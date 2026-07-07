@@ -1,0 +1,25 @@
+[package]
+name = "mingyuan-desktop"
+version = "0.1.0"
+description = "Mingyuan AI Desktop Client"
+authors = ["mingyuan"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "mingyuan_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+# 默认即 prod 壳模式；dev 通过 cfg!(debug_assertions) 自动判定
+default = []

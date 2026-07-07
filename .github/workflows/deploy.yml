@@ -1,0 +1,123 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  ACR_PUBLIC: clip-registry.cn-hangzhou.cr.aliyuncs.com
+  ACR_VPC: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com
+  ACR_NAMESPACE: mingyuan
+
+jobs:
+  quality:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --dir apps/web exec prisma generate
+      - name: Typecheck
+        run: pnpm --dir apps/web exec tsc --noEmit
+      - name: Lint
+        run: pnpm --dir apps/web exec eslint --quiet .
+
+  build-and-push:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to ACR (public endpoint)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_PUBLIC }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: web-runner
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:latest
+            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          target: worker-runner
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:latest
+            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
+
+  migrate:
+    name: Prisma Migrate Deploy
+    needs: quality
+    runs-on: ubuntu-latest
+    # 首次上线前必须人工 bootstrap:在生产 DB 执行
+    #   prisma migrate resolve --applied 20260323122000_remove_credits_columns ... (对齐已有迁移)
+    # 否则 _prisma_migrations 表为空,本 job 会尝试重放所有迁移而失败。
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --dir apps/web exec prisma generate
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: apps/web
+        run: pnpm exec prisma migrate deploy
+
+  deploy:
+    needs: [build-and-push, migrate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy to K8s
+        run: |
+          kubectl set image deployment/mingyuan-web web=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
+          kubectl set image deployment/mingyuan-worker worker=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
+          kubectl rollout status deployment/mingyuan-web --timeout=180s
+          kubectl rollout status deployment/mingyuan-worker --timeout=180s
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Rollout failed, rolling back..."
+          kubectl rollout undo deployment/mingyuan-web
+          kubectl rollout undo deployment/mingyuan-worker
+          exit 1

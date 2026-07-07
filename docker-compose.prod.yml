@@ -1,0 +1,71 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: web-runner
+    container_name: mingyuan-web
+    restart: unless-stopped
+    env_file:
+      - ${MINGYUAN_WEB_ENV_FILE:-./apps/web/.env.production}
+    environment:
+      DATABASE_URL: mysql://mingyuan:${MYSQL_PASSWORD}@mysql:3306/mingyuan
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - mingyuan-prod
+
+  mysql:
+    image: mysql:8.0
+    container_name: mingyuan-prod-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: mingyuan
+      MYSQL_USER: mingyuan
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mingyuan-prod
+
+  redis:
+    image: redis:7-alpine
+    container_name: mingyuan-prod-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mingyuan-prod
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  mingyuan-prod:
+    driver: bridge

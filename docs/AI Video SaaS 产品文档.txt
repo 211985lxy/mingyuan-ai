@@ -1,0 +1,769 @@
+AI Video SaaS 产品文档
+
+版本：v1.0
+
+一、产品概述
+
+产品名称：
+
+AI 视频生成平台
+
+产品定位：
+
+输入文案
+自动生成短视频
+
+系统自动完成：
+
+语音生成
+数字人口播
+字幕生成
+视频包装
+
+最终输出：
+
+可发布短视频
+二、目标用户
+
+主要用户：
+
+中小企业主
+电商卖家
+房产中介
+教育机构
+自媒体
+
+核心需求：
+
+持续生成营销视频
+
+而不是：
+
+学习剪辑软件
+三、核心功能模块
+
+系统分为五个核心模块：
+
+用户系统
+资产系统
+脚本系统
+视频生成系统
+发布系统
+四、用户系统
+
+功能：
+
+用户注册
+用户登录
+账号管理
+套餐管理
+额度管理
+
+数据字段：
+
+user_id
+email
+plan
+credits
+created_at
+五、资产系统
+
+资产系统管理视频生产素材。
+
+资产包括：
+
+数字人（含绑定声音）
+素材
+数字人资产
+
+用户可以创建数字人。
+
+创建方式：
+
+上传自拍视频
+
+系统生成：
+
+avatar_profile
+
+数据结构：
+
+avatar_id
+user_id
+avatar_type
+created_at
+声音资产
+
+声音来源：
+
+声音克隆
+
+字段：
+
+voice_id
+user_id
+voice_type
+created_at
+素材资产
+
+用户可以上传：
+
+图片
+视频
+音乐
+
+字段：
+
+asset_id
+asset_type
+url
+created_at
+六、脚本系统
+
+脚本系统负责生成视频文案。
+
+用户输入：
+
+行业
+卖点
+城市
+
+AI生成：
+
+3条口播脚本
+
+用户可以：
+
+选择
+编辑
+保存
+
+字段：
+
+script_id
+content
+created_at
+七、视频生成系统
+
+视频生成是核心模块。
+
+输入：
+
+script
+avatar（内含绑定声音）
+素材
+
+输出：
+
+video
+
+生成流程：
+
+script
+↓
+TTS生成语音
+↓
+数字人口播
+↓
+视频包装
+↓
+生成视频
+
+任务字段：
+
+task_id
+user_id
+status
+video_url
+created_at
+
+任务状态：
+
+pending
+processing
+completed
+failed
+八、发布系统
+
+发布系统提供：
+
+视频下载
+发布文案生成
+话题推荐
+外部账号绑定
+半自动发布（Chrome 插件辅助）
+
+支持平台：
+
+视频号
+小红书
+
+发布流程：
+
+1. 用户在账户设置中绑定视频号 / 小红书账号（OAuth 授权）
+2. 视频生成完成后，页面出现 [ 发布 ] 按钮
+3. 点击发布 → 选择目标账号 → 跳转至对应平台创作者后台
+4. 安装了 Chrome 插件的用户：
+   插件自动从服务端拉取视频标题、文案、话题
+   → 自动填入创作者后台表单
+   → 用户手动将视频拖入上传框
+   → 插件自动点击发布按钮
+
+注：平台未开放发布 API，Chrome 插件为半自动方案，文件上传必须用户手动操作（浏览器安全限制）。
+九、UI信息架构
+
+系统页面结构：
+
+Home
+Create Video
+My Videos
+Assets
+Account
+十、首页
+
+页面功能：
+
+创建视频
+查看最近视频
+查看额度
+
+页面结构：
+
+--------------------------------
+Logo
+
+[ 创建视频 ]
+
+最近生成的视频
+
+视频1
+视频2
+视频3
+
+--------------------------------
+十一、视频生成页面
+
+生成流程：
+
+Step1 输入文案
+Step2 选择数字人
+Step3 生成视频
+Step1 输入文案
+
+页面：
+
+--------------------------------
+输入文案
+
+[ AI生成脚本 ]
+
+脚本1
+脚本2
+脚本3
+--------------------------------
+Step2 选择数字人
+
+页面：
+
+--------------------------------
+我的数字人
+
+[ 创建数字人 ]
+--------------------------------
+Step3 生成视频
+
+页面：
+
+--------------------------------
+生成视频
+
+预计耗时：
+30秒 - 2分钟
+
+[ 生成 ]
+--------------------------------
+十二、视频生成完成
+
+页面：
+
+--------------------------------
+视频预览
+
+▶ 播放
+
+[ 下载视频 ]
+
+[ 复制发布文案 ]
+
+[ 发布 ]
+  → 弹出选择账号：
+     视频号  @xxx
+     小红书  @xxx
+  → 选择后跳转至对应创作者后台
+     （Chrome 插件自动填写表单）
+
+--------------------------------
+十三、我的视频
+
+页面：
+
+--------------------------------
+视频列表
+
+视频1
+视频2
+视频3
+
+状态：
+完成
+生成中
+失败
+--------------------------------
+十四、资产管理
+
+资产页面：
+
+--------------------------------
+数字人
+声音
+素材
+--------------------------------
+十五、账户设置
+
+页面：
+
+--------------------------------
+当前套餐
+
+剩余额度
+
+升级套餐
+
+已绑定账号：
+
+视频号  @xxx  [ 解绑 ]
+小红书  @xxx  [ 解绑 ]
+
+[ 绑定视频号 ]
+[ 绑定小红书 ]
+--------------------------------
+十六、MVP范围
+
+MVP需要实现：
+
+用户系统
+视频生成
+视频列表
+资产管理
+
+MVP暂不实现：
+
+自动发布
+复杂模板
+数据分析
+十七、核心体验
+
+用户操作：
+
+输入文案
+选择数字人
+点击生成
+
+系统自动生成视频。
+
+目标体验：
+
+3分钟出片
+十八、产品总结
+
+产品本质：
+
+AI视频生产平台
+
+而不是：
+
+数字人平台
+
+十九、技术方案
+
+一、技术栈
+
+后端：      Node.js + Express（或 Python + FastAPI）
+数据库：    PostgreSQL
+缓存/队列： Redis
+前端：      React + Next.js
+文件存储：  阿里云 OSS（用户上传视频/素材）
+第三方 API：闪剪 OpenAPI（数字人克隆 + 视频生成）
+
+二、系统架构
+
+┌─────────────────────────────────────────┐
+│                前端 (Next.js)            │
+│   轮询 /api/tasks/:id 查询任务状态       │
+└──────────────┬──────────────────────────┘
+               │ HTTP
+┌──────────────▼──────────────────────────┐
+│              后端 API (Express)          │
+│  路由 / 业务逻辑 / 状态管理              │
+└──────┬───────────────────┬──────────────┘
+       │                   │
+┌──────▼──────┐    ┌───────▼──────────────┐
+│ PostgreSQL  │    │  闪剪 OpenAPI         │
+│ 持久化状态  │    │  数字人克隆 + 视频生成 │
+└─────────────┘    └───────┬──────────────┘
+                           │ Webhook 回调
+               ┌───────────▼──────────────┐
+               │  POST /webhook/shanjian   │
+               │  接收闪剪异步结果         │
+               └──────────────────────────┘
+
+三、数据库设计
+
+-- 用户表
+users (
+  id          UUID PRIMARY KEY,
+  email       VARCHAR UNIQUE,
+  plan        VARCHAR,          -- free / pro / enterprise
+  credits     INT DEFAULT 0,
+  created_at  TIMESTAMP
+)
+
+-- 数字人表（声音绑定在数字人上）
+avatars (
+  id              UUID PRIMARY KEY,
+  user_id         UUID REFERENCES users,
+  name            VARCHAR,
+  status          VARCHAR,       -- uploading / cloning / ready / failed
+  shanjian_task_id VARCHAR,      -- 闪剪克隆任务 ID
+  avatar_id       VARCHAR,       -- 闪剪返回的 avatar_id
+  speaker_id      VARCHAR,       -- 闪剪返回的 speaker_id（声音，与数字人绑定）
+  cover_url       VARCHAR,       -- 数字人封面图
+  created_at      TIMESTAMP
+)
+
+-- 脚本表
+scripts (
+  id          UUID PRIMARY KEY,
+  user_id     UUID REFERENCES users,
+  content     TEXT,
+  created_at  TIMESTAMP
+)
+
+-- 视频任务表（核心状态表）
+video_tasks (
+  id                UUID PRIMARY KEY,
+  user_id           UUID REFERENCES users,
+  avatar_id         UUID REFERENCES avatars,
+  script_id         UUID REFERENCES scripts,
+  status            VARCHAR,      -- pending / processing / completed / failed
+  shanjian_task_id  VARCHAR,      -- 闪剪视频生成任务 ID
+  video_url         VARCHAR,      -- 成功后存储视频地址
+  error_message     VARCHAR,      -- 失败原因
+  credits_cost      INT,          -- 本次消耗额度
+  created_at        TIMESTAMP,
+  completed_at      TIMESTAMP
+)
+
+四、异步流程设计
+
+4.1 数字人克隆流程
+
+用户上传视频
+↓
+后端接收 → 上传至 OSS → 获得 video_url
+↓
+调用闪剪极速克隆 API
+  POST https://openapi.shanjian.tv/v1/avatar/fast_clone
+  { videoUrl, callbackUrl: "https://yourapi.com/webhook/shanjian" }
+  → 返回 shanjian_task_id
+↓
+写入 avatars 表
+  status = "cloning"
+  shanjian_task_id = 闪剪返回的 task_id
+↓
+[等待闪剪 Webhook 回调，约 3-4 分钟]
+↓
+Webhook 到达 POST /webhook/shanjian
+  解析 status / avatar_id / speaker_id
+  更新 avatars 表：
+    status = "ready"
+    avatar_id = 闪剪 avatar_id
+    speaker_id = 闪剪 speaker_id
+↓
+前端轮询 GET /api/avatars/:id
+  返回 status = "ready" → 提示用户数字人已就绪
+
+4.2 视频生成流程
+
+用户选择数字人 + 输入/选择脚本 → 点击生成
+↓
+后端检查：
+  - avatar.status === "ready" ✓
+  - user.credits >= 所需额度 ✓
+↓
+创建 video_tasks 记录
+  status = "pending"
+↓
+调用闪剪视频生成 API
+  POST https://openapi.shanjian.tv/v1/video/avatar_broadcast
+  {
+    avatarId: avatar.avatar_id,
+    speakerId: avatar.speaker_id,
+    text: script.content,
+    callbackUrl: "https://yourapi.com/webhook/shanjian"
+  }
+  → 返回 shanjian_task_id
+↓
+更新 video_tasks：
+  status = "processing"
+  shanjian_task_id = 闪剪返回的 task_id
+↓
+[等待闪剪 Webhook 回调，约 30s - 2分钟]
+↓
+Webhook 到达 POST /webhook/shanjian
+  status = "succeed"：
+    更新 video_tasks：
+      status = "completed"
+      video_url = 闪剪返回的 video_url
+      completed_at = now()
+    扣除用户 credits
+  status = "failed"：
+    更新 video_tasks：
+      status = "failed"
+      error_message = 闪剪错误信息
+    不扣除 credits
+↓
+前端轮询 GET /api/tasks/:id
+  status = "completed" → 展示视频
+  status = "failed"    → 展示错误提示
+
+五、Webhook 处理要点
+
+// POST /webhook/shanjian
+router.post('/webhook/shanjian', async (req, res) => {
+  // 1. 立即返回 200，避免闪剪超时重试
+  res.status(200).send('ok')
+
+  const { taskId, status, videoUrl, avatarId, speakerId, errorMessage } = req.body
+
+  // 2. 幂等处理：同一 taskId 可能回调多次
+  const alreadyProcessed = await redis.get(`webhook:${taskId}`)
+  if (alreadyProcessed) return
+  await redis.set(`webhook:${taskId}`, 1, 'EX', 86400)
+
+  // 3. 区分回调类型（克隆 or 视频生成）
+  const avatar = await db.avatars.findByShanjianTaskId(taskId)
+  const task   = await db.video_tasks.findByShanjianTaskId(taskId)
+
+  if (avatar) {
+    // 数字人克隆回调
+    if (status === 'succeed') {
+      await db.avatars.update(avatar.id, { status: 'ready', avatar_id: avatarId, speaker_id: speakerId })
+    } else {
+      await db.avatars.update(avatar.id, { status: 'failed' })
+    }
+  }
+
+  if (task) {
+    // 视频生成回调
+    if (status === 'succeed') {
+      await db.video_tasks.update(task.id, { status: 'completed', video_url: videoUrl })
+      await db.users.deductCredits(task.user_id, task.credits_cost)
+    } else {
+      await db.video_tasks.update(task.id, { status: 'failed', error_message: errorMessage })
+    }
+  }
+})
+
+六、兜底轮询机制（防止 Webhook 丢失）
+
+定时任务每 5 分钟执行一次，扫描超时未完成的任务：
+
+- 克隆任务：status = "cloning" 且超过 10 分钟未更新
+- 视频任务：status = "processing" 且超过 5 分钟未更新
+
+主动调用闪剪查询接口：
+  GET https://openapi.shanjian.tv/v1/task/:taskId
+按结果补充更新状态，等同于手动触发一次 Webhook 处理逻辑。
+
+七、前端状态同步
+
+方案：简单轮询（1000 用户 / 低并发，无需 WebSocket）
+
+- 用户进入任务详情页后，每 5 秒请求一次：
+  GET /api/tasks/:id → 返回 { status, videoUrl, errorMessage }
+- status = "completed" 时停止轮询，展示视频
+- status = "failed" 时停止轮询，展示错误
+
+八、API 接口设计（自有后端）
+
+POST   /api/avatars                  上传视频，触发数字人克隆
+GET    /api/avatars                  获取用户数字人列表
+GET    /api/avatars/:id              查询单个数字人状态
+
+POST   /api/scripts/generate         AI 生成脚本（调用 LLM）
+POST   /api/scripts                  保存脚本
+
+POST   /api/tasks                    创建视频生成任务
+GET    /api/tasks                    获取视频任务列表
+GET    /api/tasks/:id                查询单个任务状态
+
+POST   /webhook/shanjian             接收闪剪异步回调（内部）
+
+九、额度设计
+
+数字人口播视频：50 算力 / 分钟（闪剪计费单位）
+
+建议套餐换算：
+  免费套餐：  100 算力（约 2 分钟视频）
+  基础套餐：  1000 算力 / 月（约 20 分钟视频）
+  专业套餐：  5000 算力 / 月（约 100 分钟视频）
+
+额度在视频生成成功后扣除（失败不扣）。
+
+十、错误处理原则
+
+- 闪剪 API 调用失败：task.status = failed，记录错误，不扣额度，前端提示重试
+- 用户额度不足：拒绝创建任务，前端引导升级套餐
+- Webhook 签名验证失败：丢弃请求，依赖兜底轮询
+- 视频 URL 过期：闪剪视频有效期需确认，必要时下载至 OSS 自行托管
+
+十一、外部账号绑定技术方案
+
+11.1 OAuth 登录流程
+
+平台          协议         获取信息
+视频号        OAuth 2.0    openid / 昵称 / 头像
+小红书        OAuth 2.0    openid / 昵称 / 头像
+
+注：两个平台 OAuth 均需申请开发者资质（审核约 1 周）。
+
+视频号 OAuth 流程：
+  用户点击「绑定视频号」
+  → 跳转 https://open.weixin.qq.com/connect/oauth2/authorize
+    ?appid=APP_ID
+    &redirect_uri=https://yourapp.com/callback/weixin
+    &response_type=code
+    &scope=snsapi_userinfo
+  → 用户授权
+  → 回调带回 code
+  → 后端用 code + AppSecret 换取 access_token
+  → 用 access_token 获取用户信息（openid / nickname / avatar）
+  → 保存至 social_accounts 表
+
+小红书 OAuth 流程与微信类似，均为标准授权码模式。
+
+11.2 数据库：外部账号表
+
+social_accounts (
+  id            UUID PRIMARY KEY,
+  user_id       UUID REFERENCES users,
+  platform      VARCHAR,      -- 'weixin_channels' / 'xiaohongshu'
+  openid        VARCHAR,      -- 平台用户唯一标识
+  nickname      VARCHAR,      -- 平台昵称
+  avatar_url    VARCHAR,      -- 平台头像
+  access_token  VARCHAR,      -- 加密存储
+  refresh_token VARCHAR,      -- 加密存储
+  token_expires_at TIMESTAMP,
+  created_at    TIMESTAMP
+)
+
+11.3 发布跳转接口
+
+用户点击「发布」并选择账号后：
+
+POST /api/publish/prepare
+{
+  task_id: "xxx",
+  platform: "weixin_channels"  // or "xiaohongshu"
+}
+
+后端生成一条 publish_session 记录：
+publish_sessions (
+  id          UUID PRIMARY KEY,       -- 作为 session_token
+  task_id     UUID,
+  platform    VARCHAR,
+  title       VARCHAR,
+  content     VARCHAR,                -- 发布文案
+  tags        VARCHAR[],              -- 话题标签
+  video_url   VARCHAR,                -- 视频下载地址
+  expires_at  TIMESTAMP,             -- 10 分钟后过期
+  used        BOOLEAN DEFAULT false
+)
+
+返回：
+{
+  session_token: "uuid",
+  redirect_url: "https://channels.weixin.qq.com/platform/post/create"
+  // 或 "https://creator.xiaohongshu.com/publish/publish"
+}
+
+前端带着 redirect_url 在新标签页打开创作者后台，Chrome 插件介入。
+
+十二、Chrome 插件技术方案
+
+12.1 插件架构
+
+manifest.json 声明：
+- content_scripts：注入视频号 / 小红书创作者后台页面
+- host_permissions：
+    "https://channels.weixin.qq.com/*"
+    "https://creator.xiaohongshu.com/*"
+    "https://yourapi.com/*"
+- background service_worker：负责与服务端通信
+
+12.2 工作流程
+
+① 插件检测到用户打开创作者后台页面
+  （URL 匹配 channels.weixin.qq.com/platform/post/create 等）
+
+② Content script 检查 URL query 或 localStorage 是否存在 session_token
+  （主站在打开新标签前写入 localStorage，或 URL 带参数传递）
+
+③ 插件向服务端拉取发布信息
+  Background script 调用：
+  GET https://yourapi.com/api/publish/session/:session_token
+  返回 { title, content, tags, video_url }
+
+④ Content script 自动填写表单
+  // 以视频号为例（实际选择器需调试）
+  document.querySelector('[placeholder="填写标题"]').value = title
+  document.querySelector('.desc-textarea').value = content
+  // 话题标签逐个点击添加
+  tags.forEach(tag => insertTag(tag))
+
+⑤ 在页面显示操作提示浮层
+  ┌──────────────────────────────┐
+  │ ✅ 标题、文案已自动填写       │
+  │                              │
+  │ 请将视频文件拖入上传框        │
+  │ 完成后点击下方按钮            │
+  │                              │
+  │     [ 点击发布 ]             │
+  └──────────────────────────────┘
+
+⑥ 用户手动将视频拖入上传框（浏览器安全限制，无法绕过）
+
+⑦ 用户点击插件浮层「点击发布」按钮
+  Content script 触发：
+  document.querySelector('.publish-btn').click()
+
+⑧ 插件检测到发布成功（页面跳转或成功提示）
+  通知服务端更新发布状态：
+  POST /api/publish/complete { session_token, status: 'published' }
+
+12.3 插件登录方案
+
+插件需要登录才能拉取 session 数据：
+
+方案：复用主站登录态
+- 主站登录后将 JWT token 写入 localStorage
+- 插件 content script 读取 localStorage 获取 token
+- 不需要插件单独登录，与主站共享认证
+
+12.4 注意事项
+
+- 创作者后台页面结构可能变更，选择器需定期维护
+- 操作间加入随机延迟（100-500ms），模拟人工操作，降低被检测风险
+- 视频号和小红书均未开放发布 API，此方案属于辅助用户操作，不违反法律
+- 不建议完全无人值守的全自动发布，保留用户手动上传文件的环节是合规边界

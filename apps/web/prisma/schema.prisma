@@ -1,0 +1,1200 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ─── MVP Core Tables ──────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String
+  name         String
+  plan         String    @default("free") // free | basic | pro
+  authVideoUrl String? // 授权视频 OSS URL，录一次可复用
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  ipProfile                      IpProfile?
+  contentGenerationRuns          ContentGenerationRun[]
+  avatars                        Avatar[]
+  assets                         Asset[]
+  scripts                        Script[]
+  videoTasks                     VideoTask[]
+  productionPlans                VideoProductionPlan[]
+  publicAvatarPreviewPreferences PublicAvatarPreviewPreference[]
+  activationCodes                ActivationCode[]
+  topicSelections                TopicSelection[]
+  competitorAnalyses             CompetitorAnalysis[]
+  watchAccounts                  WatchAccount[]
+  videoCopyExtractions           VideoCopyExtraction[]
+  knowledgeEntries               KnowledgeEntry[]
+  knowledgeEntities              KnowledgeEntity[]
+  aimGenerations                 AimGeneration[]
+  aimMemories                    AimMemory[]
+  clientProjects                 ClientProject[]
+  ipWikiPages                    IpWikiPage[]
+  benchmarkProfiles              BenchmarkProfile[]
+  inspirations                   Inspiration[]
+  agentApiKeys                   AgentApiKey[]
+  agentApiCallLogs               AgentApiCallLog[]
+  aimExecutionTraces             AimExecutionTrace[]
+}
+
+model Avatar {
+  id                   String   @id @default(cuid())
+  userId               String
+  name                 String
+  status               String   @default("uploading") // uploading | cloning | ready | failed
+  coverUrl             String?
+  sourceVideoUrl       String?
+  externalTaskId       String?  @unique
+  externalVirtualmanId String?
+  externalSpeakerId    String?
+  speakerName          String?
+  demoTaskId           String?  @unique
+  demoVideoUrl         String?
+  errorCode            String?
+  errorMessage         String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  videoTasks VideoTask[]
+
+  @@index([userId, status])
+  @@index([externalTaskId])
+}
+
+model Asset {
+  id                String   @id @default(cuid())
+  userId            String
+  sourceAvatarId    String?
+  name              String
+  assetType         String // image | video | music | voice
+  url               String
+  size              Int?
+  status            String   @default("ready") // ready | processing | failed
+  externalTaskId    String?  @unique
+  externalSpeakerId String?
+  voiceModel        String? // v1 | v2 | v3 | s1 | s3
+  demoAudioUrl      String?
+  retryCount        Int      @default(0)
+  errorCode         String?
+  errorMessage      String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, assetType])
+  @@index([externalTaskId])
+  @@index([sourceAvatarId])
+  @@index([status])
+}
+
+model Script {
+  id               String    @id @default(cuid())
+  userId           String
+  content          String    @db.Text
+  sourceTemplateId String?
+  generationRunId  String?
+  ipProfileId      String?
+  structureId      String?
+  status           String    @default("draft") // draft | candidate | selected | discarded
+  qualityScore     Float?
+  qualityMetadata  Json?
+  selectedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // ── Phase 14: Copywriting Engine ──
+  topicSelectionId  String?
+  isHotTopicVersion Boolean  @default(false)
+
+  // ── Quality Gate (PRD Module 4) ──
+  openingTypeCode String?  // 使用的开头类型代码
+  structureCode   String?  // 使用的文案结构代码
+  endingTypeCode  String?  // 使用的结尾类型代码
+  qualityReport   Json?    // 四维评分详情 { editorial, aiTaste, attraction, logic }
+  rewriteCount    Int      @default(0) // 自动重写次数
+
+  user          User                  @relation(fields: [userId], references: [id])
+  generationRun ContentGenerationRun? @relation(fields: [generationRunId], references: [id])
+  ipProfile     IpProfile?            @relation(fields: [ipProfileId], references: [id])
+  structure     VideoStructure?       @relation(fields: [structureId], references: [id])
+  videoTasks    VideoTask[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([generationRunId])
+  @@index([ipProfileId])
+  @@index([structureId])
+  @@index([topicSelectionId])
+}
+
+model VideoTask {
+  id                  String    @id @default(cuid())
+  userId              String
+  avatarId            String?
+  scriptId            String?
+  productionPlanId    String?
+  structureId         String?
+  packagingTemplateId String?
+  status              String    @default("pending") // pending | processing | completed | failed
+  deliveryStatus      String    @default("pending") // pending | durable | degraded
+  deliveryWarning     String?   @db.Text
+  deliveryExpiresAt   DateTime?
+  videoType           String    @default("virtualman_broadcast")
+  videoUrl            String?
+  coverUrl            String?
+  scriptContent       String    @db.Text
+  avatarName          String
+  duration            Int?
+  externalTaskId      String?   @unique
+  structureSnapshot   Json?
+  packagingSnapshot   Json?
+  shanjianPayload     Json?
+  errorCode           String?
+  errorMessage        String?   @db.Text
+  marketingAnalysis   Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  completedAt         DateTime?
+
+  // ── 4K Enhancement (Phase 7) ──────────────────────────
+  enhancementStatus       String? // none | pending | processing | completed | failed
+  enhancementJobId        String?   @unique
+  enhanced4kUrl           String?
+  enhanced4kCoverUrl      String?
+  enhanced4kDuration      Int?
+  enhancementErrorCode    String?
+  enhancementErrorMessage String?   @db.Text
+  enhancementStartedAt    DateTime?
+  enhancementCompletedAt  DateTime?
+
+  user              User                    @relation(fields: [userId], references: [id])
+  avatar            Avatar?                 @relation(fields: [avatarId], references: [id])
+  script            Script?                 @relation(fields: [scriptId], references: [id])
+  productionPlan    VideoProductionPlan?    @relation(fields: [productionPlanId], references: [id])
+  structure         VideoStructure?         @relation(fields: [structureId], references: [id])
+  packagingTemplate VideoPackagingTemplate? @relation(fields: [packagingTemplateId], references: [id])
+  @@index([userId, status])
+  @@index([userId, deliveryStatus])
+  @@index([externalTaskId])
+  @@index([status, updatedAt])
+  @@index([productionPlanId])
+  @@index([enhancementStatus, updatedAt])
+}
+
+model PublicAvatarPreviewCache {
+  id             String   @id @default(cuid())
+  cacheKey       String   @unique
+  virtualmanId   String
+  speakerId      String
+  text           String   @db.Text
+  textHash       String
+  status         String   @default("processing") // processing | completed | failed
+  externalTaskId String?  @unique
+  videoUrl       String?
+  coverUrl       String?
+  duration       Int?
+  errorCode      String?
+  errorMessage   String?  @db.Text
+  lastAccessedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  preferences PublicAvatarPreviewPreference[]
+
+  @@index([virtualmanId, speakerId])
+  @@index([status, updatedAt])
+  @@index([lastAccessedAt])
+}
+
+model PublicAvatarPreviewPreference {
+  id             String   @id @default(cuid())
+  userId         String
+  virtualmanId   String
+  speakerId      String
+  text           String   @db.Text
+  previewCacheId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User                      @relation(fields: [userId], references: [id])
+  previewCache PublicAvatarPreviewCache? @relation(fields: [previewCacheId], references: [id])
+
+  @@unique([userId, virtualmanId])
+  @@index([previewCacheId])
+  @@index([virtualmanId, updatedAt])
+}
+
+model IpProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  displayName    String?
+  nickname       String?
+  industry       String?
+  primaryOffer   String?  @db.Text
+  targetAudience String?  @db.Text
+  ipTraits       String?  @db.Text
+  toneOfVoice    String?
+  proofPoints    String?  @db.Text
+  callToAction   String?  @db.Text
+  promptSnapshot String?  @db.Text
+  isComplete     Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // ── v2 IP Profile (Phase 10) ──────────────────────────
+  profileVersion       Int?    @default(1)
+  surveyIndustry       String?
+  surveyTargetCustomer String? @db.Text
+  surveyMonetization   Json?
+  surveyPersonalTraits String? @db.Text
+  surveyContentGoal    String?
+  business             Json?
+  persona              Json?
+  content              Json?
+
+  user                  User                   @relation(fields: [userId], references: [id])
+  scripts               Script[]
+  contentGenerationRuns ContentGenerationRun[]
+  topicSelections      TopicSelection[]
+
+  @@index([isComplete])
+  @@index([profileVersion])
+}
+
+// ─── 企业知识库 ─────────────────────────────────────────
+
+model KnowledgeEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String?
+  category   String // boss_experience | product_usp | customer_pain | project_case | customer_qa
+  title      String
+  content    String   @db.Text
+  tags       Json     @default("[]")
+  sourceType String   @default("manual") // manual | voice_transcribe | import
+  valueGrade String?  @db.VarChar(2) // 价值分级：S(战略) | A(战术) | B(参考) | C(索引)；null 视为 B
+  sortOrder  Int      @default(0)
+  status     String   @default("active") // active | archived
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  embedding KnowledgeEmbedding?
+  relations KnowledgeRelation[]
+
+  @@index([userId, category])
+  @@index([userId, status])
+  @@index([userId, valueGrade])
+  @@index([projectId])
+}
+
+model KnowledgeEmbedding {
+  id           String   @id @default(cuid())
+  entryId      String   @unique
+  embedding    Json
+  dimensions   Int      @default(1024)
+  model        String
+  contentHash  String   @db.VarChar(64)
+  status       String   @default("pending") @db.VarChar(20) // pending | completed | failed
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entry KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([contentHash])
+}
+
+// ─── 知识实体 / 关系（轻量知识图谱） ───────────────────────
+// 借鉴 Cognee 的 cognify 管道：把知识条目增量抽取成实体-关系三元组，
+// 让「同一概念跨多条知识连通」，作为向量检索的补充召回来源。
+
+model KnowledgeEntity {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  name      String // 实体名（归一化后），如「创始人老王」「美白精华」
+  type      String   @db.VarChar(40) // person | product | brand | concept | pain | channel | audience
+  aliases   Json     @default("[]") // 别名数组，用于归并
+  status    String   @default("active") // active | archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  relationsFrom KnowledgeRelation[] @relation("RelationFrom")
+  relationsTo   KnowledgeRelation[] @relation("RelationTo")
+
+  @@unique([userId, projectId, name, type])
+  @@index([projectId, status])
+  @@index([userId, name])
+}
+
+model KnowledgeRelation {
+  id           String   @id @default(cuid())
+  fromEntityId String
+  toEntityId   String
+  entryId      String // 关系来源于哪条知识（可溯源）
+  type         String @db.VarChar(40) // sells | targets | mentions | solves | competes_with | part_of
+  weight       Float   @default(1.0)
+  evidence     String? @db.Text // 原文片段
+  createdAt    DateTime @default(now())
+
+  fromEntity KnowledgeEntity @relation("RelationFrom", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity   KnowledgeEntity @relation("RelationTo", fields: [toEntityId], references: [id], onDelete: Cascade)
+  entry      KnowledgeEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([fromEntityId, toEntityId, entryId, type])
+  @@index([fromEntityId, type])
+  @@index([entryId])
+}
+
+// ─── AIM 智能体持久化记忆 ─────────────────────────────────
+// 把对话中值得长期记住的事实/偏好/决策沉淀下来，下次同项目同 agent 召回。
+// 与 /api/aim/evolve（只产出建议不落库）互补。
+
+model AimMemory {
+  id                 String   @id @default(cuid())
+  userId             String
+  projectId          String?
+  agentId            String  @db.VarChar(40)
+  kind               String  @db.VarChar(24) // conversation_summary | preference | decision | fact
+  content            String  @db.Text // 摘要/偏好内容
+  entityIds          Json    @default("[]") // 关联到 KnowledgeEntity.id，打通知识图谱
+  sourceGenerationId String? // 溯源到 AimGeneration
+  relevance          Float   @default(1.0) // 衰减权重（暂未使用，预留）
+  status             String  @default("active") // active | archived
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, projectId, agentId])
+  @@index([userId, projectId, kind])
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+// ─── 客户项目 / 交付空间 ─────────────────────────────────
+
+model ClientProject {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  companyName    String?
+  industry       String?
+  targetCustomer String?  @db.Text
+  offer          String?  @db.Text
+  deliveryGoal   String?  @db.Text
+  status         String   @default("active") // active | paused | archived
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user             User             @relation(fields: [userId], references: [id])
+  aimGenerations   AimGeneration[]
+  knowledgeEntries KnowledgeEntry[]
+  knowledgeEntities KnowledgeEntity[]
+  aimMemories      AimMemory[]
+  ipWikiPages      IpWikiPage[]
+  benchmarkProfiles BenchmarkProfile[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+// ─── AIM 生成记录 ───────────────────────────────────────
+
+model AimGeneration {
+  id               String   @id @default(cuid())
+  userId           String
+  agentId          String?
+  projectId        String?
+  rawInput         String   @db.MediumText
+  inputSource      String   @default("text") // text | voice
+  videoScript      String?  @db.MediumText
+  wechatArticle    String?  @db.MediumText
+  momentsPost      String?  @db.MediumText
+  communityMessage String?  @db.MediumText
+  shootingBrief    String?  @db.MediumText
+  rawCopy          String?  @db.MediumText
+  formatsRequested Json     @default("[]")
+  knowledgeUsed    Json     @default("[]")
+  ipSnapshotUsed   String?  @db.MediumText
+  qualityScores    Json?
+  topicTitle       String?
+  hotTopic         String?
+  polishInstruction String? @db.MediumText
+  workflowStatus   String   @default("draft")
+  reviewNote       String?  @db.MediumText
+  publishedAt      DateTime?
+  publishPlatform  String?
+  publishUrl       String?  @db.MediumText
+  decisionSnapshot Json?
+  retroSnapshots   Json     @default("[]")
+  calibrationRules Json     @default("[]")
+  model            String?
+  totalTokens      Int?
+  status           String   @default("completed")
+  errorMessage     String?  @db.MediumText
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, projectId, createdAt(sort: Desc)])
+  @@index([userId, workflowStatus])
+}
+
+// ─── IP 定位维基（Karpathy LLM-Wiki 模式） ──────────────
+// 每个 IP 营销全案一个「活体维基」：定位策划官产出的定位方案经 LLM
+// 增量编译成结构化页（定位主张/人设/内容策略底盘/目标人群/成交路径/选题方向），
+// 下游 agent 生成时直接读「已编译」的页，而非每次 JIT 向量检索碎片。
+
+model IpWikiPage {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String
+  pageType    String // positioning | persona | content_strategy | audience | conversion_path | topic_direction | index | log
+  title       String
+  content     String   @db.Text
+  frontmatter Json     @default("{}") // 结构化字段（如内容策略底盘的话题分布/钩子/频率/时段/爆款公式）
+  sources     Json     @default("[]") // 溯源：[{ kind: "aim_generation" | "knowledge_entry", id, label }]
+  links       Json     @default("[]") // [[双向链接]] 目标 title 列表
+  sourceGenerationId String? // 编译自哪条 AimGeneration（定位方案），可溯源指针
+  version     Int      @default(1)
+  status      String   @default("active") // active | archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id])
+  project ClientProject @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, status])
+  @@index([projectId, pageType, status])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─── 外部 Agent 调用 ─────────────────────────────────────
+
+model AgentApiKey {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  keyPrefix       String
+  keyHash         String    @unique
+  status          String    @default("active") // active | disabled
+  allowedProjects Json      @default("[]")
+  allowedAgents   Json      @default("[]")
+  dailyLimit      Int       @default(50)
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  logs AgentApiCallLog[]
+
+  @@index([userId, status])
+  @@index([keyPrefix])
+}
+
+model AgentApiCallLog {
+  id             String   @id @default(cuid())
+  apiKeyId       String?
+  userId         String?
+  projectId      String?
+  agentId        String?
+  action         String
+  inputSummary   String?  @db.Text
+  outputFormats  Json     @default("[]")
+  status         String   // success | failed
+  errorMessage   String?  @db.Text
+  durationMs     Int?
+  aimGenerationId String?
+  createdAt      DateTime @default(now())
+
+  apiKey AgentApiKey? @relation(fields: [apiKeyId], references: [id])
+  user   User?        @relation(fields: [userId], references: [id])
+
+  @@index([apiKeyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AimExecutionTrace {
+  id              String    @id @default(cuid())
+  userId          String?
+  projectId       String?
+  agentId         String?
+  action          String
+  status          String    @default("running") // running | success | failed
+  durationMs      Int?
+  model           String?
+  totalTokens     Int?
+  inputSummary    String?   @db.Text
+  outputSummary   String?   @db.Text
+  errorMessage    String?   @db.Text
+  steps           Json      @default("[]")
+  aimGenerationId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model ContentGenerationRun {
+  id                String   @id @default(cuid())
+  userId            String
+  ipProfileId       String
+  templateId        String
+  structureId       String?
+  structureSnapshot Json?
+  hotTopicId        String?
+  hotTopic          String?
+  hotTopicInsight   Json?
+  hotTopicFit       Json?
+  inputsJson        Json
+  promptText        String   @db.Text
+  model             String
+  status            String    @default("succeeded") // pending | succeeded | failed | degraded
+  qualityScore      Float?
+  qualityMetadata   Json?
+  errorMessage      String?  @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // ── Phase 14: Copywriting Engine (Topic Selection context) ──
+  topicSelectionId  String?
+  openingTypeCode   String?
+  copyStructureCode String?
+  endingTypeCode    String?
+
+  user      User            @relation(fields: [userId], references: [id])
+  ipProfile IpProfile       @relation(fields: [ipProfileId], references: [id])
+  structure VideoStructure? @relation(fields: [structureId], references: [id])
+  scripts   Script[]
+
+  @@index([userId, createdAt])
+  @@index([templateId])
+  @@index([structureId])
+  @@index([hotTopicId])
+  @@index([topicSelectionId])
+}
+
+model HotTopicFitCache {
+  id          String   @id @default(cuid())
+  cacheKey    String   @unique
+  topicId     String
+  topicTitle  String
+  templateId  String
+  structureId String
+  ipProfileId String
+  fitJson     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([topicId, templateId, structureId])
+  @@index([ipProfileId, updatedAt])
+}
+
+// ─── Three-Layer Video Creation ──────────────────────────
+
+model VideoStructure {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  subtitle    String?
+  description String?  @db.Text
+  useCase     String?
+  blueprint   Json // Machine-readable: openingPattern, narrativeBeats, evidenceSlots, ctaSlot, durationRange
+  sortOrder   Int      @default(0)
+  status      String   @default("published") // draft | published | archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scripts               Script[]
+  contentGenerationRuns ContentGenerationRun[]
+  videoTasks            VideoTask[]
+  productionPlans       VideoProductionPlan[]
+
+  @@index([status, sortOrder])
+}
+
+// ─── Topic Selection Engine (Phase 13) ──────────────────
+
+model TopicElement {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  typeLabel     String
+  description   String   @db.Text
+  conflictCodes Json     @default("[]")
+  sortOrder     Int      @default(0)
+  status        String   @default("published")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model OpeningType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String   @db.Text
+  formulas    Json
+  examples    Json     @default("[]")
+  sortOrder   Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model CopyStructure {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String   @db.Text
+  beats       Json
+  caseStudy   Json     @default("[]")
+  sortOrder   Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model EndingType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String   @db.Text
+  guidance    String   @db.Text
+  patterns    Json     @default("[]")
+  sortOrder   Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model TopicSelection {
+  id                String    @id @default(cuid())
+  userId            String
+  ipProfileId       String
+  elementCodes      Json
+  candidates        Json
+  selectedIndex     Int?
+  promptText        String    @db.Text
+  sourceHighlights  Json?
+  model             String?
+  status            String    @default("pending")
+  recommendationMode String?  @db.VarChar(20) // normal | daily | weekly，用于判断"今天的每日推荐"
+  recommendedDate   String?  @db.VarChar(10) // YYYY-MM-DD，生成当天日期，便于按天查重
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  ipProfile IpProfile @relation(fields: [ipProfileId], references: [id])
+
+  @@index([userId, status])
+  @@index([ipProfileId])
+  @@index([userId, recommendationMode, recommendedDate])
+}
+
+// ─── Video Packaging ────────────────────────────────────
+
+model VideoPackagingTemplate {
+  id           String   @id @default(cuid())
+  shanjianId   String   @unique
+  name         String
+  coverUrl     String?
+  demoUrl      String?
+  scene        String // virtualman | realMan | oralMixCutting | newsMixCutting
+  capabilities Json     @default("[]") // Labels: ["subtitle","identity_card","evidence_insert","pip","keyword_highlight"]
+  description  String?  @db.Text
+  sortOrder    Int      @default(0)
+  status       String   @default("published") // published | hidden
+  lastSyncedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  videoTasks      VideoTask[]
+  productionPlans VideoProductionPlan[]
+
+  @@index([scene, status])
+  @@index([status, sortOrder])
+}
+
+model VideoProductionPlan {
+  id                    String   @id @default(cuid())
+  userId                String
+  scriptId              String
+  packagingTemplateId   String?
+  structureId           String?
+  styleId               String
+  materials             Json? // [{role, fileUrl, type}]
+  backgroundMusic       Json? // {audioUrl, volume}
+  packRules             Json?
+  processRules          Json?
+  recommendationContext Json?
+  videoType             String   @default("virtualman_broadcast")
+  status                String   @default("draft") // draft | confirmed(reserved) | used
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user              User                    @relation(fields: [userId], references: [id])
+  structure         VideoStructure?         @relation(fields: [structureId], references: [id])
+  packagingTemplate VideoPackagingTemplate? @relation(fields: [packagingTemplateId], references: [id])
+  videoTasks        VideoTask[]
+
+  @@index([userId, status])
+  @@index([scriptId])
+}
+
+// ─── Douyin Hot List ──────────────────────────────────────
+
+model DouyinHotItem {
+  id               String    @id @default(cuid())
+  sentenceId       String
+  word             String
+  hotValue         Int
+  position         Int
+  label            Int       @default(0) // 0=normal 1=new 2=hot 3=recommended
+  videoCount       Int       @default(0)
+  discussCount     Int       @default(0)
+  coverUrl         String?
+  eventTime        DateTime
+  searchSnapshot   Json?
+  insightStatus    String    @default("pending") // pending | ready | failed
+  insightJson      Json?
+  insightError     String?   @db.Text
+  insightUpdatedAt DateTime?
+  fetchedAt        DateTime  @default(now())
+  batchId          String
+
+  @@unique([sentenceId, batchId])
+  @@index([fetchedAt])
+  @@index([position])
+  @@index([sentenceId, fetchedAt])
+}
+
+model DouyinHotSnapshot {
+  id        String   @id @default(cuid())
+  batchId   String   @unique
+  fetchedAt DateTime @default(now())
+  itemCount Int
+  rawJson   Json?
+  status    String   @default("success") // success | failed | partial
+}
+
+model AiHotBriefing {
+  id          String   @id @default(cuid())
+  date        String   @unique // Beijing date, YYYY-MM-DD
+  title       String
+  generatedAt DateTime
+  windowStart DateTime
+  windowEnd   DateTime
+  markdown    String   @db.Text
+  items       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([generatedAt])
+}
+
+model MarketHotSnapshot {
+  id          String   @id @default(cuid())
+  date        String   @unique // Beijing date, YYYY-MM-DD
+  generatedAt DateTime
+  items       Json
+  warnings    Json
+  summary     String   @db.Text
+  status      String   @default("success") // success | partial | failed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([generatedAt])
+}
+
+// ─── Content Templates ────────────────────────────────────
+
+model ContentTemplate {
+  id                  String    @id @default(cuid())
+  name                String
+  displayName         String
+  description         String?   @db.Text
+  scriptTemplate      String    @db.Text
+  expressionBlueprint Json?
+  variables           Json      @default("[]")
+  hookType            String?
+  shanjianStyleId     String?
+  videoType           String    @default("virtualman_broadcast")
+  packRulesJson       Json?
+  processRulesJson    Json?
+  industry            Json      @default("[]") // JSON array of strings for MySQL
+  contentType         String // product_intro | promotion | knowledge | story | testimonial
+  tags                Json      @default("[]") // JSON array of display tags
+  hotTopicKeywords    Json      @default("[]") // JSON array for hot topic matching
+  seasonalEvents      Json      @default("[]") // JSON array of {id, startDate, endDate}
+  status              String    @default("draft") // draft | published | archived
+  sortOrder           Int       @default(0)
+  featured            Boolean   @default(false)
+  usageCount          Int       @default(0)
+  createdBy           String
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status])
+  @@index([status, sortOrder])
+  @@index([featured, status])
+}
+
+// ─── Admin Users ──────────────────────────────────────────
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("editor") // editor | admin
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activationCodes ActivationCode[]
+}
+
+// ─── Activation Codes ────────────────────────────────────
+
+model ActivationCode {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  batchId      String
+  batchNote    String?
+  durationDays Int       @default(365)
+  status       String    @default("unused") // unused | used
+  usedBy       String?
+  usedAt       DateTime?
+  createdBy    String
+  createdAt    DateTime  @default(now())
+
+  user  User?     @relation(fields: [usedBy], references: [id])
+  admin AdminUser @relation(fields: [createdBy], references: [id])
+
+  @@index([batchId])
+  @@index([status])
+  @@index([code])
+}
+
+// ─── System Settings ─────────────────────────────────────
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   @db.Text
+  type        String   @default("string") // string | number | boolean | json
+  category    String   @default("general")
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+// ─── Pexels Media Library ───────────────────────────────
+
+model PexelsMedia {
+  id                String    @id @default(cuid())
+  provider          String    @default("pexels") // pexels | pixabay
+  pexelsId          Int // external ID from provider
+  mediaType         String // photo | video
+  width             Int
+  height            Int
+  url               String // source webpage URL
+  photographer      String
+  photographerUrl   String?
+  photographerId    BigInt?
+  avgColor          String?
+  alt               String?   @db.Text
+  duration          Int? // Video duration in seconds, null for photos
+  srcJson           Json? // Photo src object (size variants)
+  videoFilesJson    Json? // Video files array
+  videoPicturesJson Json? // Video preview pictures array
+  imageUrl          String? // Video cover image URL
+  ossUrl            String? // Our durable OSS copy
+  ossStatus         String    @default("pending") // pending | transferring | ready | failed
+  ossTransferredAt  DateTime?
+  discoveryQuery    String? // First search query that found this media
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([provider, pexelsId])
+  @@index([mediaType, createdAt])
+  @@index([ossStatus])
+  @@index([discoveryQuery])
+  @@index([provider])
+}
+
+model PexelsQueryCache {
+  id            String   @id @default(cuid())
+  provider      String   @default("pexels") // pexels | pixabay
+  queryHash     String   @unique // SHA-256 of normalized query params (includes provider + schemaVersion)
+  query         String
+  mediaType     String // photo | video | all
+  orientation   String?
+  size          String?
+  color         String?
+  schemaVersion Int      @default(1) // Cache schema version; increment to invalidate pre-scoring entries
+  totalResults  Int      @default(0)
+  pexelsIds     Json // number[] ordered by relevance
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([query, mediaType])
+  @@index([provider])
+}
+
+// ─── Competitor Analysis (v5.0) ───────────────────────────
+
+model CompetitorAnalysis {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+
+  // Input
+  targetUrl         String   @db.VarChar(500)
+  platform          String   @db.VarChar(20)   // douyin | xiaohongshu | bilibili | kuaishou
+  platformUserId    String?  @db.VarChar(200)  // sec_user_id / user_id / uid
+
+  // Pipeline status
+  status            String   @default("pending") @db.VarChar(20)
+  // pending → scraping → enriching → analyzing → completed → failed
+  currentStep       String?  @db.VarChar(20)
+  errorMessage      String?  @db.Text
+
+  // Raw data (JSON)
+  rawAccountData    Json?    // Platform-returned account info
+  rawVideoData      Json?    // Video list + stats
+  rawCommentData    Json?    // Comment samples
+
+  // Collection source
+  collectionSource  String?  @db.VarChar(40) // external_api | redfox_api | local_browser | tikhub_api
+  fallbackUsed      Boolean  @default(false)
+  fallbackReason    String?  @db.Text
+
+  // Computed metrics
+  metricsData       Json?    // Quantitative metrics (engagement rate, posting frequency, etc.)
+
+  // AI analysis result
+  analysisResult    Json?    // Full report JSON (6-dimension scores + narrative)
+  overallScore      Int?     // Overall score 0-100
+
+  // Cached display data
+  accountName       String?  @db.VarChar(100)
+  accountAvatar     String?  @db.VarChar(500)
+  followerCount     Int?
+  videoCount        Int?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  completedAt       DateTime?
+
+  // Cost tracking
+  apiCostUsd        Float?   @default(0)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, platform])
+}
+
+// ─── Watch Accounts (对标账号监控看板) ──────────────────────
+
+model WatchAccount {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+
+  // Input
+  targetUrl         String    @db.VarChar(500)
+  platform          String    @default("douyin") @db.VarChar(20)
+
+  // Cached account info (from refresh)
+  platformUserId    String?   @db.VarChar(200)
+  nickname          String?   @db.VarChar(100)
+  avatar            String?   @db.VarChar(500)
+  followerCount     Int?
+
+  // Cached video data (from refresh)
+  latestVideos      Json?     // NormalizedVideo[] — newest works
+  viralVideos       Json?     // NormalizedVideo[] — viral picks by engagement
+
+  // Refresh tracking
+  refreshStatus     String    @default("idle") @db.VarChar(20)
+  // idle | refreshing | success | failed
+  refreshError      String?   @db.Text
+  lastRefreshedAt   DateTime?
+
+  // Timestamps
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([userId, targetUrl])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ─── Video Copy Extraction（视频文案提取分析） ───────────────
+
+model VideoCopyExtraction {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+
+  sourceUrl       String    @db.VarChar(800)
+  platform        String    @default("unknown") @db.VarChar(40)
+  status          String    @default("queued") @db.VarChar(20)
+  errorMessage    String?   @db.Text
+  analysisError   String?   @db.Text
+
+  providerBatchId String?   @db.VarChar(120)
+  providerTaskId  String?   @db.VarChar(120)
+
+  videoTitle      String?   @db.VarChar(500)
+  videoCover      String?   @db.VarChar(800)
+  videoDuration   String?   @db.VarChar(40)
+  transcript      String?   @db.LongText
+  analysisResult  Json?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  completedAt     DateTime?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+}
+
+// ─── Inspiration（灵感收集） ──────────────────────────────────
+
+model Inspiration {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+
+  // 灵感来源：text(手写/粘贴) | feishu_webhook | wechat
+  source         String    @default("text") @db.VarChar(40)
+  // 灵感内容
+  content        String    @db.Text
+  // AI 状态：pending | processing | completed | failed
+  aiStatus       String    @default("pending") @db.VarChar(20)
+  // AI 生成的选题 (JSON array of topic card)
+  generatedTopics Json?
+  // AI 生成的文案内容 (AimGenerateResponse)
+  generatedContent Json?
+  // 关联的 AIM 生成记录 id
+  aimGenerationId String?
+  // 错误信息
+  errorMessage   String?   @db.Text
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, aiStatus])
+  @@index([source])
+}
+
+// ─── Benchmark Profile（对标账号整体档案） ──────────────────────
+// 一个对标账号 = 一套长期参照档案：结构化头部（账号画像）+ 可挂多条自由素材。
+// 绑定到 IP 营销全案（projectId），档案素材同步落一条 KnowledgeEntry
+// （category=benchmark_reference），自动进入现有 RAG 检索被选题/AIM 复用。
+
+model BenchmarkProfile {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String
+
+  // ── 结构化头部：账号画像 ──
+  name           String                     // 账号名称
+  platform       String   @db.VarChar(20)   // douyin | xiaohongshu | bilibili | kuaishou
+  accountUrl     String?  @db.VarChar(500)  // 主页链接（稳定锚点，一键拉取匹配用）
+  platformUserId String?  @db.VarChar(200)  // sec_user_id / user_id / uid
+  followerCount  Int?
+  personaTags    Json     @default("[]")    // 人设标签数组
+  positioning    String?  @db.Text          // 内容定位
+  differentiator String?  @db.Text          // 差异化
+  takeaways      String?  @db.Text          // 借鉴要点（迁移给本 IP 时怎么用）
+
+  // ── 一键拉取来源快照（可选） ──
+  competitorAnalysisId String? @db.VarChar(40)
+
+  // ── 元数据 ──
+  status    String   @default("active") @db.VarChar(20) // active | archived
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User                 @relation(fields: [userId], references: [id])
+  project ClientProject        @relation(fields: [projectId], references: [id])
+  items   BenchmarkProfileItem[]
+
+  @@index([userId, status])
+  @@index([projectId])
+  @@index([userId, accountUrl])
+}
+
+model BenchmarkProfileItem {
+  id        String   @id @default(cuid())
+  profileId String
+  kind      String   @db.VarChar(20) // note | report | copy_extraction | video
+  title     String
+  content   String   @db.Text
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile BenchmarkProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+// ─── Agent Methodology（智能体方法论库，可在后台编辑） ──
+// 对应 mingyuan/docs/*-methodology-core.md 三份方法论。
+// 加载器优先读 DB，无则回退文件并播种。编辑后通过版本号使内存缓存失效。
+model AgentMethodology {
+  id        String   @id @default(cuid())
+  key       String   @unique // ip_copywriting | business_diagnosis | event_storytelling
+  title     String
+  content   String   @db.Text // markdown 全文
+  filePath  String?  // 对应的 md 文件相对路径，仅记录溯源
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,60 @@
+import { NextRequest, NextResponse } from "next/server"
+import { withAdminAuth } from "@/lib/admin-auth"
+import { prisma } from "@/lib/prisma"
+import crypto from "crypto"
+
+// Alphabet excluding ambiguous characters: 0, O, 1, I, L
+const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+const CODE_LENGTH = 16
+
+function generateCode(): string {
+  const bytes = crypto.randomBytes(CODE_LENGTH)
+  let code = ""
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    code += ALPHABET[bytes[i] % ALPHABET.length]
+  }
+  return code
+}
+
+export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+  const { quantity, batchNote, durationDays } = await request.json()
+
+  const qty = parseInt(quantity)
+  if (!qty || qty < 1 || qty > 500) {
+    return NextResponse.json(
+      { error: "Quantity must be between 1 and 500" },
+      { status: 400 }
+    )
+  }
+
+  const duration = parseInt(durationDays ?? "14")
+  if (!duration || duration < 1 || duration > 3650) {
+    return NextResponse.json(
+      { error: "Duration days must be between 1 and 3650" },
+      { status: 400 }
+    )
+  }
+
+  const batchId = crypto.randomUUID()
+
+  // Generate unique codes with collision retry
+  const codes = new Set<string>()
+  while (codes.size < qty) {
+    codes.add(generateCode())
+  }
+
+  const data = Array.from(codes).map((code) => ({
+    code,
+    batchId,
+    batchNote: batchNote || null,
+    durationDays: duration,
+    status: "unused",
+    createdBy: admin.id,
+  }))
+
+  await prisma.activationCode.createMany({ data })
+
+  return NextResponse.json({
+    data: { count: qty, batchId, durationDays: duration },
+  })
+}, "admin")

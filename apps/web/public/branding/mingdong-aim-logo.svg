@@ -1,0 +1,8 @@
+<svg width="400" height="450" viewBox="0 0 400 450" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="200" cy="150" r="100" fill="none" stroke="#D14A33" stroke-width="20"/>
+  <path d="M200 70 C180 90, 170 110, 180 130 C170 140, 175 155, 190 165 C195 160, 205 160, 210 165 C225 155, 230 140, 220 130 C230 110, 220 90, 200 70 L230 100 L250 80 L240 110 Z" fill="#D14A33"/>
+  <path d="M225 150 C235 160, 240 170, 235 180 L215 165 Z" fill="#D14A33"/>
+  <path d="M130 250 L200 120 L270 250 L230 250 L200 190 L170 250 Z" fill="#B88C33"/>
+  <text x="200" y="330" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="80" font-weight="bold" fill="#333333" text-anchor="middle">明远AIM</text>
+  <text x="200" y="390" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="45" fill="#333333" text-anchor="middle">企业AI增长大脑</text>
+</svg>

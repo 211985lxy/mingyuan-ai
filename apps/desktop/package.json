@@ -1,0 +1,20 @@
+{
+  "name": "@mingyuan/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "明源AIM macOS 桌面客户端（Tauri 2 壳模式，加载云端 Next.js）",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon icon-source.png -o src-tauri/icons",
+    "lint": "echo \"no lint for desktop shell\" && exit 0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-shell": "^2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

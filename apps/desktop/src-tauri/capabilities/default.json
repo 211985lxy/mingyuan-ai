@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "壳模式主窗口能力：core 默认 + 窗口拖拽/显隐 + 窗口状态插件 + shell open",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:webview:allow-create-webview",
+    "window-state:default",
+    "shell:allow-open"
+  ]
+}

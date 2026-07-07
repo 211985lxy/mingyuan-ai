@@ -1,0 +1,56 @@
+# dependencies
+node_modules
+
+# next.js
+.next/
+out/
+
+# production
+build
+dist
+
+# turbo
+.turbo
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# python
+__pycache__/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# playwright-cli artifacts
+.playwright-cli/
+
+# claude worktrees & local settings
+.claude/worktrees/
+.claude/settings.local.json
+.claude/remote-exec.json
+
+# obsidian sync
+.obsidian-sync.json
+.obsidian-sync-state.json
+
+# output artifacts
+output/
+
+# tauri / rust (desktop client)
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/gen
+apps/desktop/src-tauri/.window-state.json

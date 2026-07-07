@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="120" fill="#0F172A"/>
+  <rect x="88" y="88" width="180" height="220" rx="42" fill="#1D4ED8"/>
+  <rect x="116" y="116" width="124" height="164" rx="22" fill="#DBEAFE"/>
+  <path d="M172 164L226 198V254L172 288V164Z" fill="#1D4ED8"/>
+  <rect x="290" y="126" width="62" height="260" rx="31" fill="#38BDF8"/>
+  <rect x="376" y="126" width="62" height="200" rx="31" fill="#60A5FA"/>
+  <path d="M92 394C92 382.954 100.954 374 112 374H400C411.046 374 420 382.954 420 394C420 405.046 411.046 414 400 414H112C100.954 414 92 405.046 92 394Z" fill="#1E293B"/>
+  <text x="256" y="452" text-anchor="middle" fill="#E2E8F0" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700">明远AIM</text>
+</svg>

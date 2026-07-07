@@ -1,0 +1,33 @@
+{
+  "rules": [
+    {
+      "id": "transition-1080p-to-ia",
+      "prefix": "videos/",
+      "status": "Enabled",
+      "transitions": [
+        {
+          "days": 7,
+          "storageClass": "IA"
+        }
+      ],
+      "filter": {
+        "objectSizeGreaterThan": 1048576,
+        "objectSizeLessThan": 104857600
+      }
+    },
+    {
+      "id": "transition-4k-to-ia",
+      "prefix": "videos/",
+      "status": "Enabled",
+      "transitions": [
+        {
+          "days": 30,
+          "storageClass": "IA"
+        }
+      ],
+      "filter": {
+        "objectSizeGreaterThan": 104857600
+      }
+    }
+  ]
+}

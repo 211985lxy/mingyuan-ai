@@ -1,0 +1,24 @@
+{
+  "model_profile": "balanced",
+  "commit_docs": true,
+  "parallelization": true,
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "auto_advance": true,
+    "skip_discuss": true,
+    "_auto_chain_active": false,
+    "nyquist_validation": false,
+    "ui_phase": false,
+    "ui_safety_gate": false,
+    "node_repair": true,
+    "node_repair_budget": 3
+  },
+  "git": {
+    "branching_strategy": "none"
+  },
+  "hooks": {
+    "context_warnings": false
+  }
+}

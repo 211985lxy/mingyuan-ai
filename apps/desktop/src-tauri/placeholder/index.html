@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>明源AIM</title>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body {
+        margin: 0; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+        background: #f5f5f7; color: #1d1d1f;
+      }
+      @media (prefers-color-scheme: dark) { body { background: #15130e; color: #f5f5f7; } }
+      .box { text-align: center; padding: 2rem; max-width: 420px; }
+      .logo { width: 72px; height: 72px; margin: 0 auto 1.25rem; opacity: .85; }
+      h1 { font-size: 1.1rem; margin: 0 0 .5rem; font-weight: 600; }
+      p { font-size: .9rem; opacity: .7; margin: 0 0 1.5rem; line-height: 1.6; }
+      button {
+        appearance: none; border: 1px solid rgba(0,0,0,.15);
+        background: #007aff; color: #fff; padding: .6rem 1.4rem;
+        border-radius: 8px; font-size: .9rem; cursor: pointer;
+      }
+      button:hover { background: #006ae0; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <img class="logo" src="icons/icon.png" alt="明源AIM" />
+      <h1>正在连接明源AIM…</h1>
+      <p>若长时间无响应，请检查网络连接，然后点击下方按钮重试。</p>
+      <button onclick="location.reload()">重试</button>
+    </div>
+  </body>
+</html>

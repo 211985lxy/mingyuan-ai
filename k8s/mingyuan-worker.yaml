@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mingyuan-worker
+  labels:
+    app.kubernetes.io/name: mingyuan-worker
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mingyuan-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mingyuan-worker
+    spec:
+      imagePullSecrets:
+        - name: acr-secret
+      containers:
+        - name: worker
+          image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/worker:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: mingyuan-web-config
+            - secretRef:
+                name: mingyuan-web-secrets
+          env:
+            - name: TASK_RECOVERY_INTERVAL_MS
+              value: "60000"
+            - name: TASK_RECOVERY_STARTUP_DELAY_MS
+              value: "5000"
+            - name: aliyun_logs_workerstdout
+              value: "stdout"
+            - name: aliyun_logs_workerstdout_project
+              value: "mingyuan-logs"
+            - name: aliyun_logs_workerstdout_logstore
+              value: "app-logs"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - >
+                  test -f /tmp/mingyuan-task-recovery-heartbeat.json &&
+                  find /tmp/mingyuan-task-recovery-heartbeat.json -mmin -2 | grep -q .
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 2
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - test -f /tmp/mingyuan-task-recovery-heartbeat.json
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 24
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mingyuan-worker-pdb
+  labels:
+    app.kubernetes.io/name: mingyuan-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mingyuan-worker

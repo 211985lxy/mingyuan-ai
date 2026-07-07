@@ -1,0 +1,12 @@
+# dependencies
+node_modules
+
+# tauri / rust
+src-tauri/target
+src-tauri/gen
+
+# window-state 持久化文件
+src-tauri/.window-state.json
+
+# misc
+.DS_Store

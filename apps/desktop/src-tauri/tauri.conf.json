@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "明源AIM",
+  "version": "0.1.0",
+  "identifier": "com.mingyuan.desktop",
+  "build": {
+    "devUrl": "http://localhost:3000",
+    "frontendDist": "placeholder",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
+    "macOS": {
+      "signingIdentity": null
+    }
+  },
+  "plugins": {}
+}

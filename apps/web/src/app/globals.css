@@ -1,0 +1,440 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* 暖玉玄黄 (Warm Jade & Yellow Sand) — 土德厚重，温润典雅 */
+  --background: oklch(0.982 0.012 76.0); /* 极浅暖沙米白 */
+  --foreground: oklch(0.24 0.035 68.0); /* 玄石褐黑 */
+  --card: oklch(0.995 0.005 76.0); /* 羊脂温润白 */
+  --card-foreground: oklch(0.24 0.035 68.0);
+  --popover: oklch(0.995 0.005 76.0);
+  --popover-foreground: oklch(0.24 0.035 68.0);
+  
+  /* 火属性：朱砂红 */
+  --primary: oklch(0.575 0.205 28.0); /* 尊贵朱砂红 */
+  --primary-foreground: oklch(0.985 0.008 76.0);
+  
+  /* 土属性：玄黄/琥珀金/古铜 */
+  --secondary: oklch(0.945 0.025 76.0); /* 暖润沙黄 */
+  --secondary-foreground: oklch(0.38 0.08 68.0); /* 古铜玄黄 */
+  
+  --muted: oklch(0.955 0.015 76.0);
+  --muted-foreground: oklch(0.54 0.03 68.0);
+  --accent: oklch(0.935 0.03 76.0);
+  --accent-foreground: oklch(0.38 0.08 68.0);
+  --destructive: oklch(0.58 0.23 25.0);
+  
+  --border: oklch(0.915 0.018 76.0); /* 温润玉线 */
+  --input: oklch(0.915 0.018 76.0);
+  --ring: oklch(0.575 0.205 28.0);
+  
+  /* 图表配色，全部转为火土系 */
+  --chart-1: oklch(0.575 0.205 28.0); /* 朱砂红 */
+  --chart-2: oklch(0.68 0.16 48.0); /* 琥珀橙 */
+  --chart-3: oklch(0.78 0.17 76.0); /* 黄金土 */
+  --chart-4: oklch(0.48 0.10 60.0); /* 铜褐色 */
+  --chart-5: oklch(0.60 0.15 32.0); /* 熔岩红 */
+  
+  --radius: 0.75rem;
+  
+  --sidebar: oklch(0.975 0.015 76.0); /* 沙岩灰黄 */
+  --sidebar-foreground: oklch(0.24 0.035 68.0);
+  --sidebar-primary: oklch(0.575 0.205 28.0);
+  --sidebar-primary-foreground: oklch(0.985 0.008 76.0);
+  --sidebar-accent: oklch(0.935 0.03 76.0);
+  --sidebar-accent-foreground: oklch(0.38 0.08 68.0);
+  --sidebar-border: oklch(0.915 0.018 76.0);
+  --sidebar-ring: oklch(0.575 0.205 28.0);
+}
+
+.dark {
+  /* 玄曜赤金 (Dark Obsidian & Pure Yang Gold) — 大道无形，尊享极致 */
+  --background: oklch(0.145 0.02 65.0); /* 玄天墨曜黑，极高贵 */
+  --foreground: oklch(0.955 0.01 76.0); /* 羊脂白玉 */
+  --card: oklch(0.18 0.025 65.0); /* 玄墨古岩 */
+  --card-foreground: oklch(0.955 0.01 76.0);
+  --popover: oklch(0.18 0.025 65.0);
+  --popover-foreground: oklch(0.955 0.01 76.0);
+  
+  /* 火中提炼出的纯阳赤金 */
+  --primary: oklch(0.745 0.185 38.0); /* 尊享纯阳赤金，极致奢华 */
+  --primary-foreground: oklch(0.125 0.015 65.0);
+  
+  --secondary: oklch(0.23 0.03 65.0); /* 深玄古铜 */
+  --secondary-foreground: oklch(0.955 0.01 76.0);
+  
+  --muted: oklch(0.22 0.025 65.0);
+  --muted-foreground: oklch(0.68 0.025 76.0);
+  --accent: oklch(0.24 0.03 65.0);
+  --accent-foreground: oklch(0.955 0.01 76.0);
+  
+  --destructive: oklch(0.54 0.18 25.0);
+  
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.745 0.185 38.0);
+  
+  --sidebar: oklch(0.165 0.022 65.0);
+  --sidebar-foreground: oklch(0.955 0.01 76.0);
+  --sidebar-primary: oklch(0.745 0.185 38.0);
+  --sidebar-primary-foreground: oklch(0.125 0.015 65.0);
+  --sidebar-accent: oklch(0.22 0.03 65.0);
+  --sidebar-accent-foreground: oklch(0.955 0.01 76.0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.745 0.185 38.0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* Prevent pull-to-refresh on mobile H5 */
+    overscroll-behavior-y: contain;
+  }
+  html {
+    @apply font-sans;
+    /* Prevent pull-to-refresh on mobile H5 */
+    overscroll-behavior-y: contain;
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
+}
+
+/* Marketing page — CJK typography and CSS isolation */
+.marketing-page {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Offset anchor targets so they land below the sticky navbar */
+.marketing-page section[id] {
+  scroll-margin-top: 5rem;
+}
+
+.marketing-page [lang="zh-CN"] h1,
+.marketing-page [lang="zh-CN"] h2,
+.marketing-page [lang="zh-CN"] h3,
+.marketing-page [lang="zh-CN"] p,
+.marketing-page [lang="zh-CN"] li,
+.marketing-page[lang="zh-CN"] h1,
+.marketing-page[lang="zh-CN"] h2,
+.marketing-page[lang="zh-CN"] h3,
+.marketing-page[lang="zh-CN"] p,
+.marketing-page[lang="zh-CN"] li {
+  line-height: 1.75;
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   Marketing — Section scroll-triggered animations
+   ============================================================ */
+
+@keyframes marketing-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply scroll-driven animation to all marketing sections */
+.marketing-page section {
+  animation: marketing-fade-in-up 0.5s ease forwards;
+  animation-timeline: view();
+  animation-range: entry 0% entry 30%;
+}
+
+/* Fallback: browsers that don't support animation-timeline still see content */
+@supports not (animation-timeline: view()) {
+  .marketing-page section {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
+
+/* Respect user's motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-page section {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============================================================
+   Eastern Wisdom & Fire-Earth Theme Utilities
+   ============================================================ */
+
+/* 东方水墨宣纸流光晕染 (Ink Wash Sand Shimmer) */
+.dao-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.dao-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(251, 191, 36, 0.08) 20%,
+    rgba(239, 68, 68, 0.05) 60%,
+    transparent
+  );
+  animation: dao-shimmer-anim 3s infinite ease-in-out;
+}
+@keyframes dao-shimmer-anim {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* 乾坤太极微光旋转 (Tai Chi Rotation Light) */
+.tai-chi-rotate {
+  animation: tai-chi-spin 12s linear infinite;
+}
+@keyframes tai-chi-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 金石印章与印记效果 (Golden Seal Badge) */
+.badge-gold {
+  border: 1px solid oklch(0.745 0.185 38.0 / 30%);
+  background: linear-gradient(135deg, oklch(0.745 0.185 38.0 / 8%), oklch(0.575 0.205 28.0 / 4%));
+  color: oklch(0.745 0.185 38.0);
+  box-shadow: 0 1px 3px rgba(251, 191, 36, 0.05);
+}
+
+.dark .badge-gold {
+  border: 1px solid oklch(0.745 0.185 38.0 / 40%);
+  background: linear-gradient(135deg, oklch(0.745 0.185 38.0 / 12%), oklch(0.745 0.185 38.0 / 3%));
+  color: oklch(0.745 0.185 38.0);
+}
+
+/* 火土流光渐变 (Fire-Earth Lava Gold Gradient) */
+.bg-fire-earth-gradient {
+  background: linear-gradient(135deg, oklch(0.575 0.205 28.0), oklch(0.745 0.185 38.0));
+}
+.dark .bg-fire-earth-gradient {
+  background: linear-gradient(135deg, oklch(0.575 0.205 28.0), oklch(0.745 0.185 38.0));
+}
+
+/* 水墨晕染宣纸加载过渡 */
+.ink-wash-mask {
+  background-color: rgba(245, 245, 240, 0.85);
+  backdrop-filter: blur(8px);
+}
+.dark .ink-wash-mask {
+  background-color: rgba(20, 18, 16, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+/* 薪火跳动呼吸晕圈 (Fire Pulse Breathing Glow) */
+@keyframes fire-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px oklch(0.575 0.205 28.0 / 15%), 0 0 24px oklch(0.575 0.205 28.0 / 8%);
+  }
+  50% {
+    box-shadow: 0 0 20px oklch(0.575 0.205 28.0 / 25%), 0 0 40px oklch(0.745 0.185 38.0 / 12%);
+  }
+}
+.fire-pulse-ring {
+  animation: fire-pulse-glow 2s ease-in-out infinite;
+}
+.dark .fire-pulse-ring {
+  animation: fire-pulse-glow 2s ease-in-out infinite;
+  --_glow-a: oklch(0.745 0.185 38.0 / 20%);
+  --_glow-b: oklch(0.745 0.185 38.0 / 10%);
+}
+@keyframes fire-pulse-glow-dark {
+  0%, 100% {
+    box-shadow: 0 0 12px oklch(0.745 0.185 38.0 / 18%), 0 0 24px oklch(0.745 0.185 38.0 / 8%);
+  }
+  50% {
+    box-shadow: 0 0 20px oklch(0.745 0.185 38.0 / 30%), 0 0 40px oklch(0.575 0.205 28.0 / 15%);
+  }
+}
+.dark .fire-pulse-ring {
+  animation-name: fire-pulse-glow-dark;
+}
+
+/* 金石落印完成动画 (Seal Stamp Success) */
+@keyframes seal-stamp {
+  0% { transform: scale(1.3); opacity: 0; }
+  50% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.seal-stamp-anim {
+  animation: seal-stamp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* 赤金榜首微光闪烁 (Champion Gold Shimmer) */
+@keyframes gold-champion-shimmer {
+  0%, 100% {
+    background-position: -200% center;
+  }
+  50% {
+    background-position: 200% center;
+  }
+}
+.gold-champion-badge {
+  background: linear-gradient(
+    90deg,
+    oklch(0.745 0.185 38.0) 0%,
+    oklch(0.85 0.16 85.0) 25%,
+    oklch(0.745 0.185 38.0) 50%,
+    oklch(0.85 0.16 85.0) 75%,
+    oklch(0.745 0.185 38.0) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gold-champion-shimmer 3s ease-in-out infinite;
+}
+
+/* 玉石浮印质感 (Jade Emboss Hover) */
+.jade-emboss {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+.jade-emboss:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px oklch(0.575 0.205 28.0 / 8%), 0 1px 3px oklch(0 0 0 / 4%);
+}
+.jade-emboss:active {
+  transform: scale(0.98);
+}
+
+/* 天道拂晓/山河日出渐变 (Dawn Mountain Sunrise Gradient) */
+.bg-dawn-mountain {
+  background: linear-gradient(
+    135deg,
+    oklch(0.575 0.205 28.0) 0%,
+    oklch(0.625 0.185 38.0) 40%,
+    oklch(0.68 0.16 48.0) 70%,
+    oklch(0.72 0.14 68.0) 100%
+  );
+}
+
+/* 红莲熔岩声波渐变 (Lava Waveform Gradient) */
+.bg-lava-waveform {
+  background: linear-gradient(
+    to top,
+    oklch(0.575 0.205 28.0),
+    oklch(0.68 0.18 38.0),
+    oklch(0.745 0.185 42.0)
+  );
+}
+
+/* 竹简画面标签 (Bamboo Scroll Scene Tag) */
+.bamboo-scene-tag {
+  background-color: oklch(0.96 0.015 76.0);
+  border-left: 3px solid oklch(0.68 0.12 68.0);
+  padding: 0.25rem 0.75rem;
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+.dark .bamboo-scene-tag {
+  background-color: oklch(0.22 0.025 65.0);
+  border-left-color: oklch(0.745 0.185 38.0 / 60%);
+}
+
+/* 金泥旁白高亮 (Gold Ink Narration Highlight) */
+.gold-ink-narration {
+  color: oklch(0.48 0.10 60.0);
+  font-weight: 600;
+}
+.dark .gold-ink-narration {
+  color: oklch(0.745 0.185 38.0);
+  font-weight: 600;
+}
+
+/* 纯阳赤金流光进度条 (Pure Yang Gold Flowing Progress) */
+@keyframes gold-flow-progress {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.gold-flow-progress {
+  background: linear-gradient(
+    90deg,
+    oklch(0.745 0.185 38.0),
+    oklch(0.85 0.16 85.0),
+    oklch(0.745 0.185 38.0),
+    oklch(0.85 0.16 85.0)
+  );
+  background-size: 200% 100%;
+  animation: gold-flow-progress 2s linear infinite;
+}
+
+/* 印章篆刻小图标 (Seal Stamp Icon) */
+.seal-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+  background-color: oklch(0.575 0.205 28.0 / 12%);
+  color: oklch(0.575 0.205 28.0);
+  flex-shrink: 0;
+}
+.dark .seal-icon {
+  background-color: oklch(0.745 0.185 38.0 / 15%);
+  color: oklch(0.745 0.185 38.0);
+}

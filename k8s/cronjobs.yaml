@@ -1,0 +1,335 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-douyin-hot
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "5,35 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 60
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/douyin-hot`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 30000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-poll-tasks
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 90
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/poll-tasks`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 60000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-pexels-transfer
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "1-59/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 90
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/pexels-transfer`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 60000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-backfill-delivery
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "3-59/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/backfill-delivery`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 90000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-cleanup
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 60
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/cleanup`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 30000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-poll-enhancements
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 90
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/poll-enhancements`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 60000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi

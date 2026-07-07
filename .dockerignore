@@ -1,0 +1,43 @@
+.git
+.github
+.next
+.playwright-cli
+.planning
+.turbo
+apps/desktop
+test-results
+output
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/coverage
+*.log
+.DS_Store
+
+# 密钥与环境文件:绝不打进镜像层
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 本地数据库与临时脚本
+*.db
+apps/web/dev.db
+apps/web/scratch_db.ts
+apps/web/create-codes.ts
+
+# 工具配置(含可能的 token)
+.mcp.json
+.codex
+.claude
+
+# IDE / 历史产物
+.idea
+.vscode
+*.tsbuildinfo
+apps/web/tsconfig.tsbuildinfo
