@@ -13,3 +13,4 @@
 - Kube 配置：`KUBECONFIG=~/.kube/config-ask-aibao365`（部署机，开发机不存在）
 - 阿里云 AccessKey：profile 名为 `aliyun-aibao365`，存储在 `~/.aliyun/config.json`（部署机）
 - ECS 独立部署脚本：`mingyuan/scripts/deploy-ecs-standalone.sh`
+- 发布默认从明确 commit 部署，不从大量未提交改动里临时挑文件。临时 worktree 指定文件发布只用于用户明确要求的抢修，发布后要回收成 commit。
