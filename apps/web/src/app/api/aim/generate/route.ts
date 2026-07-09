@@ -22,6 +22,43 @@ import {
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
+import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
+
+function includesAny(text: string, words: string[]) {
+  return words.some((word) => text.includes(word))
+}
+
+function shouldBypassAuxiliaryContext(agentId: string | undefined, rawInput: string) {
+  if (agentId !== "business_diagnosis") return false
+
+  const text = extractLatestAimUserIntentText(rawInput).replace(/\s+/g, "")
+  if (!text) return false
+
+  const mentionsMeetingMaterial = includesAny(text, [
+    "会议纪要",
+    "会议记录",
+    "访谈纪要",
+    "逐字稿",
+    "录音整理",
+    "妙记",
+  ])
+  if (!mentionsMeetingMaterial) return false
+
+  return (
+    includesAny(text, [
+      "内容资产包",
+      "整理",
+      "总结",
+      "提炼",
+      "纪要",
+      "选题",
+      "采访清单",
+      "任务清单",
+      "脚本模板",
+    ]) ||
+    includesAny(text, ["会议一句话结论", "关键信息抽取表", "核心矛盾/机会"])
+  )
+}
 
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
@@ -73,7 +110,8 @@ export async function POST(request: NextRequest) {
       }),
       (task) => ({ summary: task, metadata: { runtimeTask: task } }),
     )
-    const withVideoCopyContext = shouldUseKnowledgeContextForTask(runtimeTask)
+    const bypassAuxiliaryContext = shouldBypassAuxiliaryContext(parsed.agentId, parsed.rawInput)
+    const withVideoCopyContext = shouldUseKnowledgeContextForTask(runtimeTask) && !bypassAuxiliaryContext
       ? await runAimTraceStep(
           trace,
           "video_copy_context",
@@ -90,14 +128,19 @@ export async function POST(request: NextRequest) {
         )
       : parsed.rawInput
 
-    if (!shouldUseKnowledgeContextForTask(runtimeTask)) {
+    if (!shouldUseKnowledgeContextForTask(runtimeTask) || bypassAuxiliaryContext) {
       await addAimTraceStep(trace, {
         key: "video_copy_context",
         label: "爆款拆解上下文注入",
         status: "skipped",
-        summary: "轻改任务跳过爆款拆解",
+        summary: bypassAuxiliaryContext ? "会议纪要模式跳过爆款拆解" : "轻改任务跳过爆款拆解",
       })
     }
+
+    const useMarketSignals =
+      !bypassAuxiliaryContext &&
+      parsed.useMarketViralVideos !== false &&
+      shouldUseMarketViralContextForTask(runtimeTask)
 
     const rawInput = await runAimTraceStep(
       trace,
@@ -106,7 +149,7 @@ export async function POST(request: NextRequest) {
       () => buildRawInputWithMarketViralContext(
         user.id,
         withVideoCopyContext,
-        parsed.useMarketViralVideos !== false && shouldUseMarketViralContextForTask(runtimeTask),
+        useMarketSignals,
       ),
       (value) => ({
         summary: value === withVideoCopyContext ? "未注入市场爆款" : "已注入市场爆款",
@@ -115,7 +158,7 @@ export async function POST(request: NextRequest) {
     )
 
     // ── 热榜上下文注入（RedFox 实时热榜 TOP10） ──
-    const useTrending = parsed.useMarketViralVideos !== false && shouldUseMarketViralContextForTask(runtimeTask)
+    const useTrending = useMarketSignals
     const withTrendingContext = await runAimTraceStep(
       trace,
       "trending_context",
@@ -162,57 +205,58 @@ export async function POST(request: NextRequest) {
     })
 
     // ── 后置质检（含 RedFox 违禁词检测） ──
-    // 仅对内容生产类 agent（非 persona/free_copywriter）和 write_script 任务运行
+    // ponytail: quality gate is tuned for publishable short-form scripts, not planning/diagnosis raw_copy.
+    const qualityGateFormats = new Set(["video_script", "koubo_script", "xiaohongshu_post"])
+    const firstQualityCandidate = result.results.find((item) =>
+      item.content?.trim() && qualityGateFormats.has(item.format)
+    )
     const needsQualityCheck =
       parsed.agentId !== "persona" &&
       parsed.agentId !== "free_copywriter" &&
       parsed.taskType !== "polish_copy" &&
-      parsed.taskType !== "quality_check"
+      parsed.taskType !== "quality_check" &&
+      !!firstQualityCandidate
 
-    if (needsQualityCheck && result.results.length > 0) {
+    if (needsQualityCheck && firstQualityCandidate) {
       try {
         const { runQualityCheck } = await import("@/lib/quality-gate")
-        // 取第一个有内容的结果做质检
-        const firstContent = result.results.find((r) => r.content?.trim())
-        if (firstContent) {
-          const qualityReport = await runAimTraceStep(
-            trace,
-            "quality_gate",
-            "生成后质检（含违禁词检测）",
-            () => runQualityCheck({
-              content: firstContent.content,
-              topicTitle: parsed.topicTitle,
-            }),
-            (report) => ({
-              summary: `质检得分 ${report.overall.score}/10，${report.overall.passed ? "通过" : "未通过"}`,
-              metadata: {
-                overallScore: report.overall.score,
-                passed: report.overall.passed,
-                editorialScore: report.editorial.score,
-                aiTasteScore: report.aiTaste.score,
-                attractionScore: report.attraction.score,
-                logicScore: report.logic.score,
-                hasCompliance: !!report.compliance,
-                compliancePassed: report.compliance?.passed,
-              },
-            }),
-          )
-          // 将质检报告附加到返回结果中（前端可展示）
-          return NextResponse.json({
-            ...result,
-            qualityReport: {
-              overallScore: qualityReport.overall.score,
-              passed: qualityReport.overall.passed,
-              editorial: qualityReport.editorial.score,
-              aiTaste: qualityReport.aiTaste.score,
-              attraction: qualityReport.attraction.score,
-              logic: qualityReport.logic.score,
-              compliance: qualityReport.compliance
-                ? { passed: qualityReport.compliance.passed, violations: qualityReport.compliance.violations.length }
-                : undefined,
+        const qualityReport = await runAimTraceStep(
+          trace,
+          "quality_gate",
+          "生成后质检（含违禁词检测）",
+          () => runQualityCheck({
+            content: firstQualityCandidate.content,
+            topicTitle: parsed.topicTitle,
+          }),
+          (report) => ({
+            summary: `质检得分 ${report.overall.score}/10，${report.overall.passed ? "通过" : "未通过"}`,
+            metadata: {
+              overallScore: report.overall.score,
+              passed: report.overall.passed,
+              editorialScore: report.editorial.score,
+              aiTasteScore: report.aiTaste.score,
+              attractionScore: report.attraction.score,
+              logicScore: report.logic.score,
+              hasCompliance: !!report.compliance,
+              compliancePassed: report.compliance?.passed,
             },
-          })
-        }
+          }),
+        )
+        // 将质检报告附加到返回结果中（前端可展示）
+        return NextResponse.json({
+          ...result,
+          qualityReport: {
+            overallScore: qualityReport.overall.score,
+            passed: qualityReport.overall.passed,
+            editorial: qualityReport.editorial.score,
+            aiTaste: qualityReport.aiTaste.score,
+            attraction: qualityReport.attraction.score,
+            logic: qualityReport.logic.score,
+            compliance: qualityReport.compliance
+              ? { passed: qualityReport.compliance.passed, violations: qualityReport.compliance.violations.length }
+              : undefined,
+          },
+        })
       } catch (err) {
         // 质检失败不阻断生成结果，仅记录
         console.warn("[aim/generate] Quality gate check failed:", err)
