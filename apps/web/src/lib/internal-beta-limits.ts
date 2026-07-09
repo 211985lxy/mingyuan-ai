@@ -17,13 +17,22 @@ export const INTERNAL_BETA_LIMITS = {
 
 type DailyKind = "aim_chat" | "aim_generate" | "video_copy_extraction" | "competitor_analysis" | "video_task"
 
+/**
+ * 免限制白名单：优先从环境变量读取（逗号分隔），部署后通过 .env 配置即可，无需改代码。
+ * 环境变量: UNLIMITED_BETA_EMAILS="a@b.com,c@d.com"
+ *            UNLIMITED_BETA_USER_IDS="user_id_1,user_id_2"
+ */
 const UNLIMITED_BETA_EMAILS = new Set([
   "1450069849@qq.com",
   "17737232700@qq.com",
+  "18126880027@163.com",
+  "957739245@qq.com",
+  ...(process.env.UNLIMITED_BETA_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
 ])
 
 const UNLIMITED_BETA_USER_IDS = new Set([
   "cmr97na52001zxhn4nlaxzi4v",
+  ...(process.env.UNLIMITED_BETA_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean),
 ])
 
 function todayStart() {

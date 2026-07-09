@@ -33,30 +33,36 @@ export const METHODOLOGY_META: Record<MethodologyKey, MethodologyMeta> = {
     blockTitle: "IP操盘方法论库",
     title: "IP 操盘方法论",
     fileCandidates: [
+      path.resolve(process.cwd(), "../../docs/methodologies/ip-copywriting-methodology-core.md"),
       path.resolve(process.cwd(), "../../docs/ip-copywriting-methodology-core.md"),
+      path.resolve(process.cwd(), "mingyuan/docs/methodologies/ip-copywriting-methodology-core.md"),
       path.resolve(process.cwd(), "mingyuan/docs/ip-copywriting-methodology-core.md"),
     ],
-    displayFilePath: "mingyuan/docs/ip-copywriting-methodology-core.md",
+    displayFilePath: "mingyuan/docs/methodologies/ip-copywriting-methodology-core.md",
   },
   business_diagnosis: {
     key: "business_diagnosis",
     blockTitle: "商业诊断方法论库",
     title: "商业诊断方法论",
     fileCandidates: [
+      path.resolve(process.cwd(), "../../docs/methodologies/business-diagnosis-methodology-core.md"),
       path.resolve(process.cwd(), "../../docs/business-diagnosis-methodology-core.md"),
+      path.resolve(process.cwd(), "mingyuan/docs/methodologies/business-diagnosis-methodology-core.md"),
       path.resolve(process.cwd(), "mingyuan/docs/business-diagnosis-methodology-core.md"),
     ],
-    displayFilePath: "mingyuan/docs/business-diagnosis-methodology-core.md",
+    displayFilePath: "mingyuan/docs/methodologies/business-diagnosis-methodology-core.md",
   },
   event_storytelling: {
     key: "event_storytelling",
     blockTitle: "事件内容化方法论库",
     title: "事件内容化方法论",
     fileCandidates: [
+      path.resolve(process.cwd(), "../../docs/methodologies/event-storytelling-methodology-core.md"),
       path.resolve(process.cwd(), "../../docs/event-storytelling-methodology-core.md"),
+      path.resolve(process.cwd(), "mingyuan/docs/methodologies/event-storytelling-methodology-core.md"),
       path.resolve(process.cwd(), "mingyuan/docs/event-storytelling-methodology-core.md"),
     ],
-    displayFilePath: "mingyuan/docs/event-storytelling-methodology-core.md",
+    displayFilePath: "mingyuan/docs/methodologies/event-storytelling-methodology-core.md",
   },
 }
 

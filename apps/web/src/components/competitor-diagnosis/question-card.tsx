@@ -10,6 +10,9 @@ import type { DiagnosisQuestion } from "@/lib/competitor-diagnosis/types"
  * 五层诊断主卡：核心问题 → 一句话结论 → 证据 → 反证 → 行动建议。
  */
 export function QuestionCard({ question: q }: { question: DiagnosisQuestion }) {
+  const visibleCharts = q.keyCharts.slice(0, 3)
+  const hiddenChartCount = Math.max(0, q.keyCharts.length - visibleCharts.length)
+
   return (
     <Card id={`layer-${q.questionNo}`} className="scroll-mt-20">
       <CardHeader className="pb-3">
@@ -55,18 +58,19 @@ export function QuestionCard({ question: q }: { question: DiagnosisQuestion }) {
         {q.keyCharts.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">关联图表：</span>
-            {q.keyCharts.map((c, i) => (
-              <Badge key={i} variant="secondary" className="text-[11px]">{c}</Badge>
+            <span className="text-xs text-muted-foreground">图表</span>
+            {visibleCharts.map((chart, index) => (
+              <Badge key={index} variant="secondary" className="text-[11px]">{chart}</Badge>
             ))}
+            {hiddenChartCount > 0 && (
+              <span className="text-[11px] text-muted-foreground">+{hiddenChartCount}</span>
+            )}
           </div>
         )}
 
         {/* 反证表 */}
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            这个判断可能错在哪里
-          </p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">可能误判</p>
           <FalsificationTable rows={q.falsificationTable} />
         </div>
 

@@ -160,11 +160,29 @@ describe("定位策划官 prompt 保护", () => {
     await handler.chat(buildChatParams())
 
     const systemPrompt = capturedSystemPrompt()
+    expect(systemPrompt).toContain("纯会议纪要整理路由")
+    expect(systemPrompt).toContain("只做会议纪要整理")
+    expect(systemPrompt).toContain("不用做其他动作")
+    expect(systemPrompt).toContain("只输出会议纪要整理结果")
+    expect(systemPrompt).toContain("整理完成后默认停在这里")
     expect(systemPrompt).toContain("会议纪要内容资产包路由必须高密度")
     expect(systemPrompt).toContain("关键信息抽取表")
     expect(systemPrompt).toContain("至少 12 条")
     expect(systemPrompt).toContain("会议证据")
     expect(systemPrompt).toContain("禁止结尾反问")
+  })
+
+  it("generate prompt supports pure meeting-minutes organization without action outputs", async () => {
+    const handler = getAgentHandler("business_diagnosis")
+    await handler.generate(buildGenerateContext())
+
+    const systemPrompt = capturedSystemPrompt()
+    expect(systemPrompt).toContain("C. 纯会议纪要整理路由")
+    expect(systemPrompt).toContain("只做会议纪要整理")
+    expect(systemPrompt).toContain("不要选题")
+    expect(systemPrompt).toContain("不要任务清单")
+    expect(systemPrompt).toContain("整理完成后默认停止")
+    expect(systemPrompt).toContain("不要输出选题池、优先级、执行清单、采访清单、脚本/分镜")
   })
 
   it("chat prompt includes the shared high-risk verification rule", async () => {
@@ -369,7 +387,7 @@ describe("商业诊断官 generate prompt 固定报告结构", () => {
   })
 })
 
-describe("定位策划官 天命IP资产化操盘全案路由 (E)", () => {
+describe("定位策划官 天命IP资产化操盘全案路由 (F)", () => {
   beforeEach(() => {
     completeMock.mockReset()
     completeMock.mockResolvedValue({ content: "ok", model: "test", usage: { totalTokens: 0 } })
@@ -401,14 +419,14 @@ describe("定位策划官 天命IP资产化操盘全案路由 (E)", () => {
     expect(block).toContain("待补充证据")
   })
 
-  it("chat prompt 包含 E 路由触发条件（不替换 C 完整 IP 策划路由）", async () => {
+  it("chat prompt 包含 F 路由触发条件（不替换 D 完整 IP 策划路由）", async () => {
     const handler = getAgentHandler("business_diagnosis")
     await handler.chat(buildChatParams())
 
     const systemPrompt = capturedSystemPrompt()
-    // 原 C 路由保留
+    // 原 D 路由保留
     expect(systemPrompt).toContain("完整 IP 策划路由")
-    // 新 E 路由触发词
+    // 新 F 路由触发词
     expect(systemPrompt).toContain("天命IP资产化操盘全案路由")
     expect(systemPrompt).toContain("天命IP")
     expect(systemPrompt).toContain("资产化")
@@ -427,12 +445,12 @@ describe("定位策划官 天命IP资产化操盘全案路由 (E)", () => {
     expect(systemPrompt).toContain("不编造命理")
   })
 
-  it("generate prompt 包含 E 路由固定 12 模块输出结构", async () => {
+  it("generate prompt 包含 F 路由固定 12 模块输出结构", async () => {
     const handler = getAgentHandler("business_diagnosis")
     await handler.generate(buildGenerateContext())
 
     const systemPrompt = capturedSystemPrompt()
-    expect(systemPrompt).toContain("E. 天命IP资产化操盘全案路由")
+    expect(systemPrompt).toContain("F. 天命IP资产化操盘全案路由")
     for (const moduleName of [
       "项目总判断", "天命底盘", "IP 主定位", "目标客户", "核心问题", "IP 价值",
       "产品设计", "内容系统", "流量闭环", "私域成交", "交付资产化", "行动处方",

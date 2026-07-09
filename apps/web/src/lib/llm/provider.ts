@@ -21,7 +21,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       apiKey: config.apiKey,
       baseURL: config.baseURL,
       defaultHeaders: config.defaultHeaders,
-      timeout: Number(process.env.LLM_TIMEOUT_MS || 60000),
+      timeout: config.timeoutMs ?? Number(process.env.LLM_TIMEOUT_MS || 60000),
     })
   }
 

@@ -36,6 +36,7 @@ export interface LLMProviderConfig {
   baseURL: string
   defaultModel: string
   defaultHeaders?: Record<string, string>
+  timeoutMs?: number
 }
 
 export interface LLMProvider {

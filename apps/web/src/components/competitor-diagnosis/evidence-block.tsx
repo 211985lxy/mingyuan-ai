@@ -15,21 +15,26 @@ export function EvidenceBlock({
 }) {
   if (!sources.length && !metrics?.length && !quotes?.length) return null
 
-  return (
-    <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        证据来源
-      </p>
+  const visibleSources = sources.slice(0, 4)
+  const hiddenSourceCount = Math.max(0, sources.length - visibleSources.length)
 
+  return (
+    <div className="space-y-2">
       {sources.length > 0 && (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1.5">
-          {sources.map((s, i) => (
-            <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
-              <span className="text-primary mt-0.5">•</span>
-              <span>{s}</span>
-            </li>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">证据</span>
+          {visibleSources.map((source, index) => (
+            <span
+              key={index}
+              className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] text-foreground/80"
+            >
+              {source}
+            </span>
           ))}
-        </ul>
+          {hiddenSourceCount > 0 && (
+            <span className="text-[11px] text-muted-foreground">+{hiddenSourceCount}</span>
+          )}
+        </div>
       )}
 
       {metrics && metrics.length > 0 && (
