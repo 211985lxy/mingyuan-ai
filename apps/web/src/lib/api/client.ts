@@ -1392,14 +1392,15 @@ export interface StyleProfileEvolveResult {
   reason?: string
 }
 
-/** 渐进沉淀：从当前对话提炼并更新【用户级全局】写作风格档案（不需 projectId） */
+/** 渐进沉淀：从当前对话提炼并更新写作风格档案 */
 export async function evolveStyleConversation(input: {
   messages: Array<{ role: "user" | "assistant"; content: string }>
+  projectId?: string
   signal?: AbortSignal
 }): Promise<StyleProfileEvolveResult> {
   return request<StyleProfileEvolveResult>("/api/aim/evolve-style", {
     method: "POST",
-    body: JSON.stringify({ messages: input.messages }),
+    body: JSON.stringify({ messages: input.messages, projectId: input.projectId }),
     signal: input.signal,
     timeout: 60000,
   })

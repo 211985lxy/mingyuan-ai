@@ -23,6 +23,7 @@ import {
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import {
+  retrieveAimMemory,
   retrieveLayeredAimMemory,
   formatAimMemoryBlock,
   persistMemoriesFromConversation,
@@ -207,7 +208,7 @@ export async function POST(request: NextRequest) {
           trace,
           "style_profile",
           "风格档案召回",
-          () => getStyleProfileBlock(user.id).catch(() => ""),
+          () => getStyleProfileBlock(user.id, projectId || null).catch(() => ""),
           (block) => ({ summary: block ? "已召回" : "无风格档案", metadata: { chars: block.length } }),
         )
       : ""
@@ -234,7 +235,9 @@ export async function POST(request: NextRequest) {
           trace,
           "aim_memory",
           "历史记忆召回",
-          () => retrieveLayeredAimMemory({ userId: user.id, projectId, agentId }).catch(() => []),
+          () => projectId
+            ? retrieveAimMemory({ userId: user.id, projectId, agentId }).catch(() => [])
+            : retrieveLayeredAimMemory({ userId: user.id, projectId, agentId }).catch(() => []),
           (rows) => ({ summary: `召回 ${rows.length} 条记忆`, metadata: { count: rows.length } }),
         )
       : []

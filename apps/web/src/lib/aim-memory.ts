@@ -297,22 +297,11 @@ export async function retrieveLayeredAimMemory(input: {
   agentId?: string
   topK?: number
 }): Promise<AimMemoryRow[]> {
-  const topK = input.topK ?? 6
-
-  if (!input.projectId) {
-    return retrieveAimMemory({
-      ...input,
-      projectId: null,
-      topK,
-    })
-  }
-
-  const [projectRows, globalRows] = await Promise.all([
-    retrieveAimMemory({ ...input, projectId: input.projectId, topK }),
-    retrieveAimMemory({ ...input, projectId: null, topK }),
-  ])
-
-  return mergeAimMemoryRows(projectRows, globalRows, topK)
+  return retrieveAimMemory({
+    ...input,
+    projectId: input.projectId ?? null,
+    topK: input.topK ?? 6,
+  })
 }
 
 const KIND_LABEL: Record<string, string> = {

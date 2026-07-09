@@ -98,9 +98,9 @@ export const POST = withUserAuth(async (request, { user }) => {
       return NextResponse.json({ error: "草稿内容不能为空" }, { status: 400 })
     }
 
-    // 用户级写作风格档案打底（这个 IP 真实文风）+ 可选 12 风格覆盖
+    // 用户级写作风格档案打底（项目内读项目风格）+ 可选 12 风格覆盖
     const [styleProfileBlock, knowledgeBlock] = await Promise.all([
-      getStyleProfileBlock(user.id).catch(() => ""),
+      getStyleProfileBlock(user.id, projectId ?? null).catch(() => ""),
       loadProjectKnowledge(user.id, projectId),
     ])
     const styleOverrideBlock = getStylePromptBlock(styleId)
@@ -266,9 +266,10 @@ export const POST = withUserAuth(async (request, { user }) => {
     )
   }
 
-  // 用户级全局写作风格档案（用户从未沉淀时返回空串，跳过）
-  const styleProfileBlock = await getStyleProfileBlock(user.id).catch(() => "")
-  const contextSection = [
+    // 用户级写作风格档案（项目内读项目风格，无项目读全局）
+    // projectId: projectId ?? null — 确保项目风格隔离
+    const styleProfileBlock = await getStyleProfileBlock(user.id, projectId ?? null).catch(() => "")
+    const contextSection = [
     topicTitle ? `选题方向：${topicTitle}` : null,
     persona ? `IP人设：${persona}` : null,
     styleProfileBlock ? `写作风格档案：\n${styleProfileBlock}` : null,

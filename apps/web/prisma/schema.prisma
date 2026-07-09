@@ -449,6 +449,7 @@ model AimGeneration {
   decisionSnapshot Json?
   retroSnapshots   Json     @default("[]")
   calibrationRules Json     @default("[]")
+  wechatDraft      Json?
   model            String?
   totalTokens      Int?
   status           String   @default("completed")

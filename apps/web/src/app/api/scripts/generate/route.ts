@@ -65,6 +65,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   // Phase 14: COPY-04 hot topic fusion
   const hotTopicFusionTitle = typeof body.hotTopicFusionTitle === "string" ? body.hotTopicFusionTitle : null
   const hotTopicFusionPoints = Array.isArray(body.hotTopicFusionPoints) ? body.hotTopicFusionPoints as string[] : null
+  const projectId = typeof body.projectId === "string" && body.projectId ? body.projectId : undefined
 
   console.log(`[${requestId}] Request params: templateId=${templateId}, structureId=${structureId}, hotTopicId=${hotTopicId || 'none'}, topicSelectionId=${topicSelectionId || 'none'}, inputKeys=${inputs ? Object.keys(inputs).join(',') : 'none'}`)
 
@@ -208,8 +209,8 @@ export const POST = withUserAuth(async (request, { user }) => {
   const startTime = Date.now()
 
   try {
-    // 用户级全局写作风格档案（用户从未沉淀时返回空串，跳过注入，行为不变）
-    const styleProfileBlock = await getStyleProfileBlock(user.id).catch(() => "")
+    // 用户级写作风格档案（项目内读项目风格，无项目读全局）
+    const styleProfileBlock = await getStyleProfileBlock(user.id, projectId ?? null).catch(() => "")
     const generation = await generateScriptCandidates({
       template: {
         ...template,

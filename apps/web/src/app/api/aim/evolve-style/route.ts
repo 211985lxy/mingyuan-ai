@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const user = await authenticateRequest(request)
     const body = await request.json()
     const messages = normalizeStyleMessages(body.messages)
+    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
 
     if (messages.length < 2) {
       return NextResponse.json({ delta: null, profile: null, reason: "对话太少" })
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const stamp = new Date().toISOString().slice(0, 10)
-    const result = await upsertMainStyleProfile({ userId: user.id, delta, stamp })
+    const result = await upsertMainStyleProfile({ userId: user.id, delta, stamp, projectId: projectId || null })
 
     return NextResponse.json({
       delta: { evidence: delta.evidence, confidence: delta.confidence },

@@ -36,12 +36,17 @@ function formatDate(value: Date): string {
  *
  * 返回空串表示用户尚未沉淀风格档案，调用方应跳过注入（行为与改动前一致）。
  */
-export async function getStyleProfileBlock(userId: string): Promise<string> {
+/**
+ * 读取写作风格档案文本块。
+ * 项目内优先读取项目风格档案，无项目时回退用户全局。
+ */
+export async function getStyleProfileBlock(userId: string, projectId?: string | null): Promise<string> {
+  const effectiveProjectId = projectId ?? null
   const entries = await prisma.knowledgeEntry.findMany({
     where: {
       userId,
       category: STYLE_PROFILE_CATEGORY,
-      projectId: null,
+      projectId: effectiveProjectId,
       status: "active",
     },
     orderBy: [{ updatedAt: "desc" }],

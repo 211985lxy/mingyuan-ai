@@ -329,14 +329,17 @@ export async function upsertMainStyleProfile(input: {
   delta: StyleProfileDelta
   /** 日期戳（由调用方传入，避免在库内 new Date()） */
   stamp: string
+  projectId?: string | null
 }): Promise<UpsertStyleProfileResult> {
-  const { userId, delta, stamp } = input
+  const { userId, delta, stamp, projectId } = input
+  const effectiveProjectId = projectId ?? null
 
   const existing = await prisma.knowledgeEntry.findFirst({
     where: {
       userId,
       category: STYLE_PROFILE_CATEGORY,
       title: STYLE_PROFILE_MAIN_TITLE,
+      ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
       status: "active",
     },
     select: { id: true, content: true },
@@ -356,7 +359,7 @@ export async function upsertMainStyleProfile(input: {
   const created = await prisma.knowledgeEntry.create({
     data: {
       userId,
-      projectId: null,
+      projectId: effectiveProjectId,
       category: STYLE_PROFILE_CATEGORY,
       title: STYLE_PROFILE_MAIN_TITLE,
       content: renderStyleProfileMarkdown(delta, stamp),
