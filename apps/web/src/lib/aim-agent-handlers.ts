@@ -32,7 +32,7 @@ import {
 } from "@/lib/aim-observability"
 import { buildScenarioPromptBlock, type ContentScenario } from "@/lib/content-scenario-config"
 import { buildExplicitWordCountPriorityRule } from "@/lib/aim-benchmark-length"
-import { hasExplicitDirectDraftIntent } from "@/lib/aim-current-user-input"
+import { hasExplicitDirectDraftIntent, hasWechatDraftIntent } from "@/lib/aim-current-user-input"
 import {
   buildConversationIntentBlock,
   resolveAimConversationIntentWithRules,

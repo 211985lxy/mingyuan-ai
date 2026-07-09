@@ -47,6 +47,8 @@ import {
 import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
 import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
+import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
+import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
 import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
 
 // ─── Helpers ────────────────────────────────────────────
@@ -64,11 +66,11 @@ function isSupportedUrl(url: string): boolean {
 }
 
 function proxyAvatarUrl(url: string): string {
-  return `/api/proxy-image?url=${encodeURIComponent(url)}`
+  return buildProxyImageUrl(url)
 }
 
 function proxyCoverUrl(url: string): string {
-  return `/api/proxy-image?url=${encodeURIComponent(url)}`
+  return buildProxyImageUrl(url)
 }
 
 function formatRelativeTime(iso: string | null): string {
@@ -140,7 +142,12 @@ function formatRefreshError(error: string): string {
 }
 
 function videoPageUrl(video: WatchVideo): string {
-  return video.videoUrl || `https://www.douyin.com/video/${video.videoId}`
+  return getWatchVideoPageUrl({
+    platform: video.account.platform || null,
+    videoId: video.videoId || null,
+    videoUrl: video.videoUrl || null,
+    fallbackUrl: video.account.targetUrl || null,
+  })
 }
 
 function accountPageUrl(video: WatchVideo): string {
@@ -590,9 +597,7 @@ export default function CompetitorWatchPage() {
             src={proxyCoverUrl(video.coverUrl)}
             alt={video.title || (options.viral ? "爆款作品" : "作品")}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover/video:scale-105"
-            onError={(e) => {
-              e.currentTarget.style.display = "none"
-            }}
+            onError={(e) => handleProxyImageError(e, video.coverUrl || "")}
           />
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-2">
@@ -652,9 +657,7 @@ export default function CompetitorWatchPage() {
               src={proxyCoverUrl(video.coverUrl)}
               alt={video.title}
               className="h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = "none"
-              }}
+              onError={(e) => handleProxyImageError(e, video.coverUrl || "")}
             />
             <span className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px] font-semibold text-white">
               {video.score}

@@ -57,3 +57,16 @@ export function hasExplicitDirectDraftIntent(raw: string): boolean {
   const text = normalizeForMatch(extractLatestAimUserIntentText(raw))
   return DIRECT_DRAFT_PATTERNS.some((pattern) => text.includes(pattern))
 }
+
+const WECHAT_DRAFT_PATTERNS = [
+  "推到草稿箱",
+  "推到公众号草稿箱",
+  "保存到草稿箱",
+  "发布到公众号",
+  "推到公众号",
+]
+
+export function hasWechatDraftIntent(raw: string): boolean {
+  const text = normalizeForMatch(raw)
+  return WECHAT_DRAFT_PATTERNS.some((pattern) => text.includes(pattern))
+}
