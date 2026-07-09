@@ -14,5 +14,5 @@ function durationToSeconds(value: string | null) {
 }
 
 export function shouldOpenDeepCopywriter(record: Pick<ApiVideoCopyExtraction, "videoDuration" | "transcript">) {
-  return durationToSeconds(record.videoDuration) >= 600 || (record.transcript?.length ?? 0) >= 2500
+  return durationToSeconds(record.videoDuration) >= 600 || (record.transcript?.length ?? 0) >= 1200
 }

@@ -15,12 +15,14 @@ import {
   isBenchmarkCopyTooSimilar,
 } from "@/lib/aim-agent-handlers"
 import {
+  AIM_OUTPUT_MAX_CHARS,
   BENCHMARK_RECREATION_PREFILL,
   buildBenchmarkLengthRule,
   buildBenchmarkRecreationSopBlock,
   buildExplicitWordCountPriorityRule,
   hasWordCountPreservationIntent,
 } from "@/lib/aim-benchmark-length"
+import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
 
 describe("AIM content production positioning", () => {
   it("keeps the required standalone content agents", () => {
@@ -102,10 +104,22 @@ describe("AIM content production positioning", () => {
     expect(buildBenchmarkLengthRule("")).toBeNull()
   })
 
+  it("switches long benchmark rewrites to deep copywriter earlier", () => {
+    expect(shouldOpenDeepCopywriter({
+      videoDuration: null,
+      transcript: "测".repeat(1579),
+    })).toBe(true)
+    expect(shouldOpenDeepCopywriter({
+      videoDuration: null,
+      transcript: "测".repeat(900),
+    })).toBe(false)
+  })
+
   it("lets explicit user word count override benchmark length", () => {
     const rule = buildBenchmarkLengthRule("一 二 三 四 五", "请写一篇不少于2000字的长文") || ""
 
     expect(rule).toContain("必须优先服从用户字数")
+    expect(rule).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
     expect(rule).not.toContain("控制在 5-5 字")
     expect(buildExplicitWordCountPriorityRule("请输出两千字")).toContain("必须优先服从用户字数")
   })
@@ -113,6 +127,13 @@ describe("AIM content production positioning", () => {
   it("recognizes keep-length intent even without explicit numbers", () => {
     expect(hasWordCountPreservationIntent("别越改越短，保持原稿长度")).toBe(true)
     expect(buildExplicitWordCountPriorityRule("不要压缩，按原稿体量来")).toContain("不要越改越短")
+  })
+
+  it("caps benchmark rewrite guidance at the global max length", () => {
+    const rule = buildBenchmarkLengthRule("测".repeat(6000)) || ""
+
+    expect(rule).toContain(`目标约 ${AIM_OUTPUT_MAX_CHARS} 字`)
+    expect(rule).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
   })
 
   it("requires visible rewrite for benchmark copy", () => {

@@ -11,6 +11,8 @@ export const BENCHMARK_RECREATION_PREFILL = {
   long: "请基于下面这条长对标文案和已有拆解，先按拆解好的爆款结构逻辑走，再创作一篇适合我自己的完整长篇文案。",
 }
 
+export const AIM_OUTPUT_MAX_CHARS = 5000
+
 export function buildBenchmarkRecreationSopBlock() {
   return [
     "爆款选题再创作 SOP：",
@@ -34,10 +36,10 @@ export function hasWordCountPreservationIntent(text: string | null | undefined) 
 
 export function buildExplicitWordCountPriorityRule(text: string | null | undefined) {
   if (hasExplicitWordCountRequirement(text)) {
-    return "用户输入里已有明确字数要求，必须优先服从用户字数；格式模板的默认字数范围、对标原文字数 95%-105% 和原文字数硬规则都只能作为节奏参考，不能压缩用户要求的长度。"
+    return `用户输入里已有明确字数要求，必须优先服从用户字数；格式模板的默认字数范围、对标原文字数 95%-105% 和原文字数硬规则都只能作为节奏参考，不能压缩用户要求的长度；但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
   }
   if (hasWordCountPreservationIntent(text)) {
-    return "用户输入里明确表达了保持篇幅、不要越改越短的意图；必须保留当前稿子的主体信息密度和体量，除非用户明确要求精简，否则不要主动压缩长度。"
+    return `用户输入里明确表达了保持篇幅、不要越改越短的意图；必须保留当前稿子的主体信息密度和体量，除非用户明确要求精简，否则不要主动压缩长度；但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
   }
   return null
 }
@@ -49,6 +51,7 @@ export function buildBenchmarkLengthRule(transcript: string | null | undefined, 
   const count = (transcript || "").replace(/\s+/g, "").length
   if (count === 0) return null
   const min = Math.max(1, Math.round(count * 0.95))
-  const max = Math.round(count * 1.05)
-  return `字数参考规则：如果用户没有另写明确字数要求，本次生成的对标改写正文参考对标原文体量；对标原文约 ${count} 字，目标约 ${count} 字，控制在 ${min}-${max} 字；如果用户另写了 2000 字、至少 2000 字等明确要求，必须优先服从用户字数。`
+  const max = Math.min(Math.round(count * 1.05), AIM_OUTPUT_MAX_CHARS)
+  const target = Math.min(count, AIM_OUTPUT_MAX_CHARS)
+  return `字数参考规则：如果用户没有另写明确字数要求，本次生成的对标改写正文参考对标原文体量；对标原文约 ${count} 字，目标约 ${target} 字，控制在 ${Math.min(min, AIM_OUTPUT_MAX_CHARS)}-${max} 字；如果用户另写了 2000 字、至少 2000 字等明确要求，必须优先服从用户字数，但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
 }

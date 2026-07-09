@@ -31,7 +31,7 @@ import {
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { buildScenarioPromptBlock, type ContentScenario } from "@/lib/content-scenario-config"
-import { buildExplicitWordCountPriorityRule } from "@/lib/aim-benchmark-length"
+import { AIM_OUTPUT_MAX_CHARS, buildExplicitWordCountPriorityRule } from "@/lib/aim-benchmark-length"
 import { hasExplicitDirectDraftIntent, hasWechatDraftIntent } from "@/lib/aim-current-user-input"
 import {
   buildConversationIntentBlock,
@@ -207,6 +207,7 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
 14.1 不要擅自整篇重写或切回最早素材。
 15. 如果用户要求"结合他的资料/人设/IP故事/来时路自然融入"，要把资料化进正文推进、案例、判断和身份表达里，不要单独拼一段履历总结，也不要生硬堆标签。
 16. 如果用户表达了"别越改越短""保持原稿长度/体量""不要压缩"这类意图，就默认保留当前稿子的主体信息密度和篇幅；除非用户明确要求精简，否则不要主动缩成短版。
+17. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 请直接根据上文与用户的历史对话，产出下一轮内容。`
 }
@@ -290,7 +291,7 @@ export function buildXhsVisualDirectorInstruction(): string {
 const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
   video_script: `【视频口播脚本】
 要求：
-- 200-500字，适合口播录制
+- 默认 200-500字，适合口播录制；如果当前任务明确是对标改写，且上文已经给了对标原文字数或保持体量规则，必须优先服从该规则，不要为了迁就短口播模板把正文压缩成摘要
 - 开头3秒必须使用下方「爆款开头库」中的一种公式思路，不能平铺直叙
 - 正文必须使用下方「爆款文案结构库」中的一种结构节拍
 - 结尾必须使用下方「结尾类型库」中的一种方式
@@ -365,7 +366,7 @@ const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
 
   koubo_script: `【口播文案】
 要求：
-- 200-500字纯口播文字，适合直接对着镜头念
+- 默认 200-500字纯口播文字，适合直接对着镜头念；如果当前任务明确是对标改写，且上文已经给了对标原文字数或保持体量规则，必须优先服从该规则，不要为了迁就短口播模板把正文压缩成摘要
 - 禁止分镜格式，不要写【画面】【旁白】等任何前缀或镜头标注
 - 开头3秒必须使用下方「爆款开头库」中的一种公式思路，制造停留
 - 正文必须使用下方「爆款文案结构库」中的一种结构节拍推进
@@ -1750,6 +1751,7 @@ ${lightEditOutputRule}
 - 文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。
 - 如果信息不足，基于企业知识库、用户输入和现有上下文做合理假设，并在文案里自然处理。
 - 成稿前做内部质检：是否遵守用户修改意图、是否保留原文有效表达、是否过度调用背景导致跑题、是否有明显 AI 套话；除非用户要求，不要输出质检报告。
+- 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 对标改写硬规则：
 ${BENCHMARK_REWRITE_GUARDRAIL}
