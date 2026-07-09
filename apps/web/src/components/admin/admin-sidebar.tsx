@@ -49,7 +49,7 @@ const navItems = [
 ]
 
 export function AdminSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? ""
   const router = useRouter()
   const { admin, clearSession } = useAdminStore()
   const branding = useBranding()

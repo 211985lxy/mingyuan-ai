@@ -892,7 +892,7 @@ function DeliverableBubble({
 
 export default function AimPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams() ?? new URLSearchParams()
   const agentParam = searchParams.get("agent")
   const topicTitleParam = searchParams.get("topicTitle")
   const topicRationaleParam = searchParams.get("topicRationale")

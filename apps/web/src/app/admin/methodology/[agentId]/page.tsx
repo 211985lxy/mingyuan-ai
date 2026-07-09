@@ -52,7 +52,7 @@ interface GuideDetail {
 }
 
 export default function AgentMethodologyDetailPage() {
-  const params = useParams<{ agentId: string }>()
+  const params = useParams<{ agentId: string }>() ?? { agentId: "" }
   const agentId = params.agentId as AimAgentId
   const profile = getAgentLogicProfile(agentId)
 

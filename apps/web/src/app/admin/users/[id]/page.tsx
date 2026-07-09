@@ -28,7 +28,7 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 }
 
 export default function AdminUserDetailPage() {
-  const params = useParams()
+  const params = useParams() ?? {}
   const [user, setUser] = React.useState<AdminUserDetail | null>(null)
   const [loading, setLoading] = React.useState(true)
 

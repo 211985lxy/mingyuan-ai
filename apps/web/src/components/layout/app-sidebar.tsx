@@ -161,8 +161,8 @@ function formatHistoryTitle(item: {
 export function AppSidebar() {
   const [collapsedAgents, setCollapsedAgents] = useState<Set<AimAgentId>>(new Set())
   const [showAllAgents, setShowAllAgents] = useState<Set<AimAgentId>>(new Set())
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const pathname = usePathname() ?? ""
+  const searchParams = useSearchParams() ?? new URLSearchParams()
   const branding = useBranding()
   const { setOpenMobile } = useSidebar()
 

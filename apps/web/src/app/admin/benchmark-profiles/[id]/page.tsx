@@ -133,7 +133,7 @@ function authHeaders(json = false): Record<string, string> {
 // ── 主页面 ──
 
 export default function BenchmarkProfileDetailPage() {
-  const params = useParams<{ id: string }>()
+  const params = useParams<{ id: string }>() ?? { id: "" }
   const router = useRouter()
   const id = params.id
 

@@ -198,7 +198,7 @@ const LEGACY_DRAFT_KEYS = ["mingyuan:create-draft-v5", "mingyuan:create-draft-v4
 
 export default function CreateVideoPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams() ?? new URLSearchParams();
   const [draftHydrated, setDraftHydrated] = useState(false);
 
   // Phase state

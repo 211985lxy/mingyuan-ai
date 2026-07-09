@@ -100,7 +100,7 @@ function buildPublishTags(task: ApiVideoTask): string[] {
 // ─── Main Page Component ────────────────────────────────
 
 export default function VideoDetailPage() {
-  const params = useParams()
+  const params = useParams() ?? {}
   const router = useRouter()
   const id = params.id as string
 

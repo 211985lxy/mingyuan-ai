@@ -202,7 +202,7 @@ function categorizeTopicCards(cards: ApiTopicCard[]): TopicCategoryGroup[] {
 
 export default function TopicPlanningPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams() ?? new URLSearchParams()
   const importedDraftKey = useRef("")
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState("")

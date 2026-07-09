@@ -207,7 +207,7 @@ function ReportView({ analysis }: { analysis: ApiCompetitorAnalysis }) {
 // ─── Main Page Component ─────────────────────────────────
 
 export default function CompetitorReportPage() {
-  const params = useParams<{ id: string }>()
+  const params = useParams<{ id: string }>() ?? { id: "" }
   const router = useRouter()
   const [analysis, setAnalysis] = useState<ApiCompetitorAnalysis | null>(null)
   const [loading, setLoading] = useState(true)
