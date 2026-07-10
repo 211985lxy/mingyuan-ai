@@ -17,8 +17,8 @@
 
 import { randomUUID } from "node:crypto"
 
-import type { ProviderAttempt } from "@/lib/llm/telemetry"
-import { setLlmTelemetryCallback } from "@/lib/llm/telemetry"
+import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
+import { runWithLlmTelemetry } from "@/lib/llm/telemetry"
 
 import { hashContextManifest, hashPrompt } from "./hashing"
 import { planAimRun } from "./planner"
@@ -65,6 +65,8 @@ export interface AimHarnessOutcome {
   output: unknown
   contextManifest: AimContextSource[]
   composedPrompt: string
+  promptMessages: LlmInvocation["messages"][]
+  imageHashes: LlmInvocation["imageHashes"]
   runId: string
 }
 
@@ -81,19 +83,23 @@ export async function runAimHarness(
 
   // Capture every provider attempt for this run via the LLM telemetry seam.
   const providerAttempts: ProviderAttempt[] = []
-  const dispose = setLlmTelemetryCallback((attempt) => {
-    providerAttempts.push(attempt)
-  })
-
-  let execution: RunAimExecutionResult
-  try {
-    execution = await input.execute(spec)
-  } finally {
-    dispose()
-  }
+  const invocations: LlmInvocation[] = []
+  const execution = await runWithLlmTelemetry(
+    {
+      onAttempt: (attempt) => providerAttempts.push(attempt),
+      onInvocation: (invocation) => invocations.push(invocation),
+    },
+    () => input.execute(spec),
+  )
 
   const contextManifest = execution.contextManifest ?? []
-  const composedPrompt = execution.composedPrompt ?? spec.rawInput
+  const composedPrompt = invocations.length > 0
+    ? invocations.map((invocation, index) =>
+        `=== LLM INVOCATION ${index + 1} ===\n${invocation.fullPrompt}`
+      ).join("\n\n")
+    : execution.composedPrompt ?? spec.rawInput
+  const promptMessages = invocations.map((invocation) => invocation.messages)
+  const imageHashes = invocations.flatMap((invocation) => invocation.imageHashes)
 
   // Derive metadata from the observed attempts.
   const successfulAttempt =
@@ -132,6 +138,8 @@ export async function runAimHarness(
     output: execution.output,
     contextManifest,
     composedPrompt,
+    promptMessages,
+    imageHashes,
     runId,
   }
 }

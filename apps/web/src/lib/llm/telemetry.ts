@@ -1,20 +1,7 @@
-/**
- * LLM provider-attempt telemetry.
- *
- * The existing LLMClient silently swallows per-provider failures and falls
- * back. The aim-harness-v1 needs to observe every attempt (provider/model,
- * success or failure, error kind, latency) so it can record `degraded`,
- * `fallbackIndex` and the full provider-attempt chain in the trace + snapshot.
- *
- * This module is the single, opt-in seam. LLMClient invokes the active
- * callback (if any) after each provider attempt. Nothing observes by default,
- * so production behavior is unchanged when no run is in flight.
- *
- * The harness also enforces the fallback policy here: non-retryable errors
- * (400/401/403, config errors) must fail immediately instead of silently
- * switching models. LLMClient checks `shouldRetryAfter` before continuing to
- * the next provider.
- */
+import { AsyncLocalStorage } from "node:async_hooks"
+import { createHash } from "node:crypto"
+
+import type { ChatMessage, CompletionOptions } from "./types"
 
 export type ProviderAttemptStatus = "success" | "failed"
 
@@ -22,13 +9,10 @@ export interface ProviderAttempt {
   provider: string
   model?: string
   status: ProviderAttemptStatus
-  /** human-readable error message on failure */
   error?: string
-  /** classified error kind: network | timeout | rate_limit | client | server | config | unknown */
   errorKind?: ProviderErrorKind
   durationMs?: number
   attemptIndex: number
-  /** response model as reported by the provider (may differ from requested) */
   responseModel?: string
   totalTokens?: number
 }
@@ -37,54 +21,140 @@ export type ProviderErrorKind =
   | "network"
   | "timeout"
   | "rate_limit"
-  | "client" // 400 bad request, invalid messages, unsupported model
-  | "server" // 5xx
-  | "config" // missing key / baseURL misconfiguration
-  | "auth" // 401/403
+  | "client"
+  | "server"
+  | "config"
+  | "auth"
   | "unknown"
 
-/** A callback registered for the duration of one AIM run. */
-export type LlmTelemetryCallback = (attempt: ProviderAttempt) => void
+export interface LlmInvocation {
+  messages: Array<{
+    role: ChatMessage["role"]
+    content: string | Array<{ type: "text"; text: string } | { type: "image_ref"; hash: string }>
+  }>
+  fullPrompt: string
+  imageHashes: Array<{ hash: string; type: "data_url" | "remote_url" }>
+  stream: boolean
+  temperature?: number
+  maxTokens?: number
+}
 
-let _activeCallback: LlmTelemetryCallback | null = null
+export interface LlmTelemetryRecorder {
+  onAttempt?: (attempt: ProviderAttempt) => void
+  onInvocation?: (invocation: LlmInvocation) => void
+}
 
-/** Register the run-scoped telemetry callback. Returns a disposer. */
-export function setLlmTelemetryCallback(cb: LlmTelemetryCallback | null): () => void {
-  _activeCallback = cb
-  return () => {
-    if (_activeCallback === cb) _activeCallback = null
+const telemetryStorage = new AsyncLocalStorage<LlmTelemetryRecorder>()
+
+export function runWithLlmTelemetry<T>(
+  recorder: LlmTelemetryRecorder,
+  fn: () => T,
+): T {
+  return telemetryStorage.run(recorder, fn)
+}
+
+export function wrapLlmTelemetryIterable<T>(
+  recorder: LlmTelemetryRecorder,
+  source: AsyncIterable<T>,
+): AsyncIterable<T> {
+  const iterator = source[Symbol.asyncIterator]()
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        next: () => runWithLlmTelemetry(recorder, () => iterator.next()),
+        return: iterator.return
+          ? (value?: unknown) => runWithLlmTelemetry(recorder, () => iterator.return!(value as never))
+          : undefined,
+        throw: iterator.throw
+          ? (error?: unknown) => runWithLlmTelemetry(recorder, () => iterator.throw!(error))
+          : undefined,
+      }
+    },
   }
 }
 
-/** Internal: report an attempt if a callback is active. */
 export function reportProviderAttempt(attempt: ProviderAttempt): void {
-  if (_activeCallback) {
-    try {
-      _activeCallback(attempt)
-    } catch {
-      // Telemetry must never break the generation path.
-    }
+  try {
+    telemetryStorage.getStore()?.onAttempt?.(attempt)
+  } catch {
+    // Telemetry must never break the generation path.
   }
 }
 
-/**
- * Classify a provider error and decide whether fallback is allowed.
- *
- * Per the harness policy, only transient failures may fall back:
- *   - network errors, timeouts, 429 (rate_limit), 5xx (server)  → retryable
- *   - 400 (client/invalid request), 401/403 (auth), config errors → NOT retryable
- */
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex")
+}
+
+function sanitizeMessages(messages: ChatMessage[]): {
+  messages: LlmInvocation["messages"]
+  imageHashes: LlmInvocation["imageHashes"]
+} {
+  const imageHashes: LlmInvocation["imageHashes"] = []
+  const sanitized = messages.map((message) => {
+    if (typeof message.content === "string") {
+      return { role: message.role, content: message.content }
+    }
+    return {
+      role: message.role,
+      content: message.content.map((part) => {
+        if (part.type === "text") return { type: "text" as const, text: part.text }
+        const url = part.image_url.url
+        const image = {
+          hash: sha256(url),
+          type: url.startsWith("data:") ? "data_url" as const : "remote_url" as const,
+        }
+        imageHashes.push(image)
+        return { type: "image_ref" as const, hash: image.hash }
+      }),
+    }
+  })
+  return { messages: sanitized, imageHashes }
+}
+
+function renderPrompt(messages: LlmInvocation["messages"]): string {
+  return messages.map((message) => {
+    const content = typeof message.content === "string"
+      ? message.content
+      : message.content.map((part) =>
+          part.type === "text" ? part.text : `[image sha256=${part.hash}]`
+        ).join("\n")
+    return `[${message.role}]\n${content}`
+  }).join("\n\n")
+}
+
+export function reportLlmInvocation(options: CompletionOptions, stream: boolean): void {
+  const recorder = telemetryStorage.getStore()
+  if (!recorder?.onInvocation) return
+  const sanitized = sanitizeMessages(options.messages)
+  try {
+    recorder.onInvocation({
+      messages: sanitized.messages,
+      fullPrompt: renderPrompt(sanitized.messages),
+      imageHashes: sanitized.imageHashes,
+      stream,
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+    })
+  } catch {
+    // Telemetry must never break the generation path.
+  }
+}
+
 export function classifyProviderError(error: unknown): {
   kind: ProviderErrorKind
   retryable: boolean
 } {
   const message = error instanceof Error ? error.message : String(error)
-
-  // OpenAI SDK surfaces HTTP status in error objects/messages.
-  const statusMatch = message.match(/\b(40[013]|429|5\d{2})\b/)
-  const status = statusMatch ? Number(statusMatch[1]) : NaN
+  const statusValue = typeof error === "object" && error !== null && "status" in error
+    ? Number((error as { status?: unknown }).status)
+    : NaN
+  const statusMatch = message.match(/\b(400|401|403|408|429|5\d{2})\b/)
+  const status = Number.isFinite(statusValue)
+    ? statusValue
+    : statusMatch ? Number(statusMatch[1]) : NaN
 
   if (!Number.isNaN(status)) {
+    if (status === 408) return { kind: "timeout", retryable: true }
     if (status === 429) return { kind: "rate_limit", retryable: true }
     if (status >= 500) return { kind: "server", retryable: true }
     if (status === 401 || status === 403) return { kind: "auth", retryable: false }
@@ -98,9 +168,9 @@ export function classifyProviderError(error: unknown): {
   if (/(no providers configured|missing.*key|api[_ ]?key|baseurl|config)/.test(lower)) {
     return { kind: "config", retryable: false }
   }
-  if (/(econnrefused|enotfound|epipe|fetch failed|network|socket|getaddrinfo)/.test(lower)) {
+  if (/(econnrefused|econnreset|enotfound|epipe|fetch failed|network|socket|getaddrinfo)/.test(lower)) {
     return { kind: "network", retryable: true }
   }
 
-  return { kind: "unknown", retryable: true }
+  return { kind: "unknown", retryable: false }
 }

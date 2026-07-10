@@ -30,6 +30,8 @@ import {
   type AimMemoryMessage,
 } from "@/lib/aim-memory"
 import { runAimChat, planAimChatStream } from "@/lib/aim-harness/adapters"
+import { sha256 } from "@/lib/aim-harness/hashing"
+import type { AimContextSource } from "@/lib/aim-harness/types"
 
 /** 把 chat 请求里的 messages 规范化为记忆提炼所需格式（只保留 user/assistant 的文本内容）。 */
 function normalizeMemoryMessages(messages: unknown): AimMemoryMessage[] {
@@ -252,6 +254,31 @@ export async function POST(request: NextRequest) {
       : []
     const memoryBlock = formatAimMemoryBlock(memoryRows)
     const knowledgeBlock = [memoryBlock, baseKnowledgeBlock, competitorWatchBlock, styleBlock, editorBlock].filter(Boolean).join("\n")
+    const normalizedMessages = normalizeMemoryMessages(messages)
+    const contextManifest: AimContextSource[] = [
+      {
+        kind: "request",
+        id: "raw_input",
+        charCount: query.length,
+        contentHash: sha256(query),
+      },
+      ...knowledgeContext.entries.map((entry) => ({
+        kind: "knowledge" as const,
+        id: entry.id,
+        charCount: entry.content.length,
+        contentHash: sha256(entry.content),
+      })),
+    ]
+    const contextBlocks: Array<[AimContextSource["kind"], string, string]> = [
+      ["memory", "long_term_memory", memoryBlock],
+      ["competitor_watch", "competitor_watch", competitorWatchBlock],
+      ["methodology", "style_profile", styleBlock],
+      ["history", "editor_context", editorBlock],
+      ["history", "conversation_history", JSON.stringify(normalizedMessages)],
+    ]
+    for (const [kind, id, content] of contextBlocks) {
+      if (content) contextManifest.push({ kind, id, charCount: content.length, contentHash: sha256(content) })
+    }
 
     const chatParams = {
       userId: user.id,
@@ -281,10 +308,11 @@ export async function POST(request: NextRequest) {
       const streamPlan = await planAimChatStream({
         rawInput: query,
         agentId,
-        messages: normalizeMemoryMessages(messages),
+        messages: normalizedMessages,
         trace,
         userId: user.id,
         projectId: projectId || null,
+        contextManifest,
       })
       // Fire-and-forget: 从已有对话沉淀长期记忆（不等流式输出完成）
       if (projectId && agentId) {
@@ -296,7 +324,7 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
       return streamChatContent(
-        buildAimChatResponseStream(agentId, chatParams),
+        streamPlan.capture(buildAimChatResponseStream(agentId, chatParams)),
         trace,
         { runId: streamPlan.runId, finalize: streamPlan.finalize },
       )
@@ -306,10 +334,11 @@ export async function POST(request: NextRequest) {
       execute: () => buildAimChatResponse(agentId, chatParams).then((response) => response.content),
       rawInput: query,
       agentId,
-      messages: normalizeMemoryMessages(messages),
+      messages: normalizedMessages,
       trace,
       userId: user.id,
       projectId: projectId || null,
+      contextManifest,
     })
     await finishAimTrace(trace, { outputSummary: summarizeText(chatHarness.content) })
 

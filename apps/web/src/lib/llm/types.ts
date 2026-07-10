@@ -41,6 +41,8 @@ export interface LLMProviderConfig {
 
 export interface LLMProvider {
   readonly name: string
+  /** Configured model used when CompletionOptions.model is omitted. */
+  readonly defaultModel?: string
   complete(options: CompletionOptions): Promise<CompletionResult>
   stream?(options: CompletionOptions): AsyncIterable<string>
   isAvailable(): boolean

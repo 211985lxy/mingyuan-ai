@@ -69,6 +69,7 @@ export interface EvalCaseResult {
   rubricScore: number | null
   rubricJudgeProvider: string | null
   rubricJudgeModel: string | null
+  fabricatedFact: boolean
   /** deterministic per-format validation */
   formatValidations: Array<{ format: string; passed: boolean }>
   /** error, if the executor threw */
@@ -87,7 +88,21 @@ export interface EvalRunOptions {
   sampleSize?: number
   /** logger */
   onProgress?: (done: number, total: number, fixtureId: string) => void
+  /** Required for real-model runs. Deterministic CI intentionally omits it. */
+  executor?: EvalExecutor
 }
+
+export interface EvalExecutionResult {
+  drafts: Array<{ format: string; content: string }>
+  citedKnowledgeIds?: string[]
+  warnedInsufficientInfo?: boolean
+  runId: string
+}
+
+export type EvalExecutor = (
+  fixture: EvalFixture,
+  context: EvalContext,
+) => Promise<EvalExecutionResult>
 
 export interface EvalRunReport {
   adapter: "frozen" | "db"
@@ -179,20 +194,16 @@ export async function runEvalCase(
     charCount: 0,
   }))
 
-  // Deterministic draft: in the frozen CI run we synthesize a representative
-  // draft per format (deterministic — no model). Nightly/prod runs would inject
-  // the real harness executor here; the grading path is identical. Chat cases
-  // (no expected formats) produce a single conversational draft but make no
-  // format-exact assertion (the grader only checks formats when expected > 0).
-  const draftFormats = fixture.expectations.outputFormats.length
-    ? fixture.expectations.outputFormats
-    : spec.outputFormats.length
-      ? spec.outputFormats
-      : (["raw_copy"] as const)
-  const drafts = draftFormats.map((format) => ({
-    format,
-    contentPreview: deterministicDraftFor(fixture, format, ctx),
-    content: deterministicDraftFor(fixture, format, ctx),
+  if (!options.skipRubric && !options.executor) {
+    throw new Error("real eval executor is required when rubric evaluation is enabled")
+  }
+
+  const execution = options.executor
+    ? await options.executor(fixture, ctx)
+    : deterministicEvalExecution(fixture, spec.outputFormats, ctx, runId)
+  const drafts = execution.drafts.map((draft) => ({
+    ...draft,
+    contentPreview: draft.content,
   }))
 
   const formatValidations = drafts.map((draft) => {
@@ -211,26 +222,26 @@ export async function runEvalCase(
   const graderInput: Parameters<typeof gradeFixture>[0] = {
     fixture,
     producedFormats: [...fixture.expectations.outputFormats] as NonNullable<Parameters<typeof gradeFixture>[0]["producedFormats"]>,
-    citedKnowledgeIds: ctx.knowledgeIds,
+    citedKnowledgeIds: execution.citedKnowledgeIds ?? ctx.knowledgeIds,
     draftText: drafts.map((d) => d.content).join("\n"),
   }
   // info_insufficient cases: the deterministic runner emits a guidance note
   // (no fabrication), so the warning IS present.
-  if (fixture.expectations.mustWarnInsufficientInfo) {
-    graderInput.warnedInsufficientInfo = true
-  }
+  graderInput.warnedInsufficientInfo = execution.warnedInsufficientInfo
   const grade = gradeFixture(graderInput)
 
   // Rubric judge (LLM) — optional, skipped in deterministic CI.
   let rubricScore: number | null = null
   let rubricJudgeProvider: string | null = null
   let rubricJudgeModel: string | null = null
+  let fabricatedFact = false
   if (!options.skipRubric) {
     const draftForJudge = drafts[0]?.content ?? ""
     const judged = await judgeDraft(fixture, draftForJudge)
     rubricScore = judged.score
     rubricJudgeProvider = judged.provider
     rubricJudgeModel = judged.model
+    fabricatedFact = judged.fabricated
   }
 
   void contextManifest
@@ -245,8 +256,31 @@ export async function runEvalCase(
     rubricScore,
     rubricJudgeProvider,
     rubricJudgeModel,
+    fabricatedFact,
     formatValidations,
     drafts: drafts.map((d) => ({ format: d.format, contentPreview: d.contentPreview.slice(0, 120) })),
+    runId: execution.runId,
+  }
+}
+
+function deterministicEvalExecution(
+  fixture: EvalFixture,
+  specFormats: readonly string[],
+  ctx: EvalContext,
+  runId: string,
+): EvalExecutionResult {
+  const draftFormats = fixture.expectations.outputFormats.length
+    ? fixture.expectations.outputFormats
+    : specFormats.length
+      ? specFormats
+      : (["raw_copy"] as const)
+  return {
+    drafts: draftFormats.map((format) => ({
+      format,
+      content: deterministicDraftFor(fixture, format, ctx),
+    })),
+    citedKnowledgeIds: ctx.knowledgeIds,
+    warnedInsufficientInfo: fixture.expectations.mustWarnInsufficientInfo === true,
     runId,
   }
 }
@@ -307,6 +341,7 @@ export async function runEvalSuite(
           rubricScore: null,
           rubricJudgeProvider: null,
           rubricJudgeModel: null,
+          fabricatedFact: false,
           formatValidations: [],
           drafts: [],
           runId: `eval_${fixture.id}_err`,
@@ -349,6 +384,47 @@ export async function runEvalSuite(
     results,
     generatedAt: new Date().toISOString(),
   }
+}
+
+export type EvalGateMode = "deterministic" | "daily" | "full"
+
+export function evaluateEvalGate(
+  report: EvalRunReport,
+  mode: EvalGateMode,
+): { passed: boolean; reasons: string[] } {
+  const reasons: string[] = []
+  if (report.contractPassRate < 0.999) reasons.push("contract pass rate is below 100%")
+  if (mode === "deterministic") return { passed: reasons.length === 0, reasons }
+
+  if (report.results.some((result) => result.rubricScore === null)) {
+    reasons.push("rubric judge coverage is incomplete")
+  }
+  if (report.results.some((result) => result.fabricatedFact)) {
+    reasons.push("fabricated facts detected")
+  }
+
+  const requiredOverall = mode === "daily" ? 0.8 : 0.85
+  if ((report.rubricPassRate ?? 0) < requiredOverall) {
+    reasons.push(`rubric pass rate is below ${Math.round(requiredOverall * 100)}%`)
+  }
+
+  if (mode === "daily" && report.repetitions > 1) {
+    const fixtureIds = new Set(report.results.map((result) => result.fixtureId))
+    for (const fixtureId of fixtureIds) {
+      const attempts = report.results.filter((result) => result.fixtureId === fixtureId)
+      if (attempts.length >= 2 && attempts.every((result) => (result.rubricScore ?? 0) < RUBRIC_PASS_THRESHOLD)) {
+        reasons.push(`fixture ${fixtureId} failed every repetition`)
+      }
+    }
+  }
+
+  if (mode === "full") {
+    for (const [agent, stats] of Object.entries(report.perAgent)) {
+      if ((stats.rubricPassRate ?? 0) < 0.8) reasons.push(`agent ${agent} rubric pass rate is below 80%`)
+    }
+  }
+
+  return { passed: reasons.length === 0, reasons }
 }
 
 /** Render a report to Markdown for the CI job summary / artifact. */

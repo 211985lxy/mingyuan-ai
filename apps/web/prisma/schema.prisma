@@ -601,6 +601,7 @@ model AimRunSnapshot {
   contextManifest  Json     @default("[]")  // 上下文来源清单（id/更新时间/字符数/SHA-256）
   providerAttempts Json     @default("[]")  // 每次 provider 尝试（provider/model/状态/错误/耗时）
   fullPrompt       String?  @db.MediumText  // 完整文本 prompt（管理员可见）
+  promptMessages   Json     @default("[]")  // 结构化 role/content；图片仅保存 hash
   promptHash       String?  @db.VarChar(64)
   contextHash      String?  @db.VarChar(64)
   output           String?  @db.MediumText  // 原样生成稿

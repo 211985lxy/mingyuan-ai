@@ -10,7 +10,7 @@ import type {
 export class OpenAICompatibleProvider implements LLMProvider {
   readonly name: string
   private client: OpenAI
-  private defaultModel: string
+  readonly defaultModel: string
   private apiKey: string
 
   constructor(config: LLMProviderConfig) {

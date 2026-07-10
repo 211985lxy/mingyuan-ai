@@ -1,7 +1,7 @@
 -- AIM Thin Harness v1: additive telemetry + run snapshots.
 -- 纯增量：为 AimExecutionTrace 增加 long-term 可观测字段，并新建 AimRunSnapshot。
--- 注意：AimExecutionTrace 表在生产已存在（历史 drift，无建表迁移），这里只做 ADD COLUMN，
--- 所有新列均为 nullable，保证旧行与旧代码零回归。
+-- AimExecutionTrace 由前一条 baseline migration 纳入迁移历史；已有该表的
+-- 环境须先将 baseline 标记为 applied。所有新列均为 nullable，保证旧行兼容。
 ALTER TABLE `AimExecutionTrace`
   ADD COLUMN `runId` VARCHAR(40) NULL,
   ADD COLUMN `provider` VARCHAR(64) NULL,
@@ -35,6 +35,7 @@ CREATE TABLE `AimRunSnapshot` (
     `contextManifest` JSON NOT NULL DEFAULT (JSON_ARRAY()),
     `providerAttempts` JSON NOT NULL DEFAULT (JSON_ARRAY()),
     `fullPrompt` MEDIUMTEXT NULL,
+    `promptMessages` JSON NOT NULL DEFAULT (JSON_ARRAY()),
     `promptHash` VARCHAR(64) NULL,
     `contextHash` VARCHAR(64) NULL,
     `output` MEDIUMTEXT NULL,

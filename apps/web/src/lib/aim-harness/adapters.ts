@@ -18,6 +18,9 @@ import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimGenerateResponse } from "@/lib/aim-agent-handlers"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import type { ProviderAttempt } from "@/lib/llm/telemetry"
+import type { LlmInvocation } from "@/lib/llm/telemetry"
+import { wrapLlmTelemetryIterable } from "@/lib/llm/telemetry"
+import { prisma } from "@/lib/prisma"
 import { runQualityCheck } from "@/lib/quality-gate"
 
 import {
@@ -29,6 +32,7 @@ import {
   type AimContextSource,
   type FormatValidationResult,
 } from "./index"
+import { sha256 } from "./hashing"
 import type { AimRunSpec } from "./types"
 
 /** Formats eligible for the main-draft LLM quality report (matches the route). */
@@ -57,6 +61,10 @@ export interface AimGenerateHarnessInput {
   citedKnowledgeIds?: string[]
   /** whether to run the LLM quality report on the main draft */
   runLlmQuality?: boolean
+  /** Eval-only: do not write snapshots/traces. */
+  persistSnapshot?: boolean
+  /** Frozen or pre-resolved sources used instead of querying live knowledge. */
+  contextManifest?: AimContextSource[]
 }
 
 export interface AimGenerateHarnessOutput {
@@ -73,20 +81,42 @@ export interface AimGenerateHarnessOutput {
 }
 
 /** Build a context manifest from the cited knowledge + the spec. */
-function buildManifest(
+async function buildManifest(
   spec: AimRunSpec,
-  citedKnowledgeIds: string[] | undefined
-): AimContextSource[] {
-  const sources: AimContextSource[] = []
+  citedKnowledgeIds: string[] | undefined,
+  provided: AimContextSource[] | undefined,
+): Promise<AimContextSource[]> {
+  const sources: AimContextSource[] = [...(provided ?? [])]
+  if (!sources.some((source) => source.kind === "request")) {
+    sources.push({
+      kind: "request",
+      id: "raw_input",
+      charCount: spec.rawInput.length,
+      contentHash: sha256(spec.rawInput),
+    })
+  }
   const knowledgeIds = citedKnowledgeIds?.length ? citedKnowledgeIds : []
-  for (const id of knowledgeIds) {
-    sources.push({ kind: "knowledge", id, charCount: 0 })
-  }
-  if (spec.contextPolicy.loadIpWiki) {
-    sources.push({ kind: "ip_wiki", id: spec.projectId ? `project:${spec.projectId}` : "global", charCount: 0 })
-  }
-  if (spec.contextPolicy.loadMarketViral) {
-    sources.push({ kind: "market_viral", id: "market", charCount: 0 })
+  const missingIds = knowledgeIds.filter((id) =>
+    !sources.some((source) => source.kind === "knowledge" && source.id === id)
+  )
+  if (missingIds.length > 0) {
+    try {
+      const rows = await prisma.knowledgeEntry.findMany({
+        where: { id: { in: missingIds } },
+        select: { id: true, content: true, updatedAt: true },
+      })
+      for (const row of rows) {
+        sources.push({
+          kind: "knowledge",
+          id: row.id,
+          updatedAt: row.updatedAt.toISOString(),
+          charCount: row.content.length,
+          contentHash: sha256(row.content),
+        })
+      }
+    } catch {
+      // Snapshot persistence is best-effort; the actual prompt remains captured.
+    }
   }
   return sources
 }
@@ -116,8 +146,11 @@ export async function runAimGenerate(
       const result = await input.execute()
       return {
         output: result,
-        contextManifest: buildManifest(spec, input.citedKnowledgeIds ?? result.knowledgeUsed?.map((k) => k.id)),
-        composedPrompt: `${spec.agentId} | task=${spec.runtimeTask} | strategy=${spec.knowledgeStrategy} | formats=${spec.outputFormats.join(",")}\n\n${input.rawInput}`,
+        contextManifest: await buildManifest(
+          spec,
+          input.citedKnowledgeIds ?? result.knowledgeUsed?.map((k) => k.id),
+          input.contextManifest,
+        ),
       }
     },
   })
@@ -176,18 +209,22 @@ export async function runAimGenerate(
   })
 
   // Persist snapshot (admin-only, 30-day) + stamp the trace long-term fields.
-  const snapshotId = await persistAimRunSnapshot({
-    runSpec: outcome.spec,
-    metadata: outcome.metadata,
-    contextManifest: outcome.contextManifest,
-    composedPrompt: outcome.composedPrompt,
-    output: result,
-    qualityResult: { deterministic: qualityChecks, llm: qualityReport ?? null },
-    traceId: input.trace?.id,
-    userId: input.userId,
-    projectId: input.projectId,
-  })
-  await applyRunMetadataToTrace(input.trace?.id, outcome.metadata, snapshotId, qualityStatus)
+  if (input.persistSnapshot !== false) {
+    const snapshotId = await persistAimRunSnapshot({
+      runSpec: outcome.spec,
+      metadata: outcome.metadata,
+      contextManifest: outcome.contextManifest,
+      composedPrompt: outcome.composedPrompt,
+      promptMessages: outcome.promptMessages,
+      output: result,
+      qualityResult: { deterministic: qualityChecks, llm: qualityReport ?? null },
+      imageHashes: outcome.imageHashes,
+      traceId: input.trace?.id,
+      userId: input.userId,
+      projectId: input.projectId,
+    })
+    await applyRunMetadataToTrace(input.trace?.id, outcome.metadata, outcome.spec, snapshotId, qualityStatus)
+  }
 
   return {
     result,
@@ -213,6 +250,8 @@ export interface AimChatHarnessInput {
   trace?: AimTraceRecorder
   userId?: string | null
   projectId?: string | null
+  contextManifest?: AimContextSource[]
+  persistSnapshot?: boolean
 }
 
 export interface AimChatHarnessOutput {
@@ -236,27 +275,31 @@ export async function runAimChat(input: AimChatHarnessInput): Promise<AimChatHar
       actorId: input.userId ?? undefined,
       projectId: input.projectId ?? undefined,
     },
-    execute: async (spec) => {
+    execute: async () => {
       const content = await input.execute()
       return {
         output: content,
-        composedPrompt: `${spec.agentId} | chat | task=${spec.runtimeTask} | mode=${spec.conversationMode ?? "chat"}\n\n${input.rawInput}`,
+        contextManifest: input.contextManifest,
       }
     },
   })
 
   // Chat has no multi-format output; snapshot stores the single content string.
-  await persistAimRunSnapshot({
-    runSpec: outcome.spec,
-    metadata: outcome.metadata,
-    contextManifest: outcome.contextManifest,
-    composedPrompt: outcome.composedPrompt,
-    output: outcome.output,
-    traceId: input.trace?.id,
-    userId: input.userId,
-    projectId: input.projectId,
-  })
-  await applyRunMetadataToTrace(input.trace?.id, outcome.metadata)
+  if (input.persistSnapshot !== false) {
+    const snapshotId = await persistAimRunSnapshot({
+      runSpec: outcome.spec,
+      metadata: outcome.metadata,
+      contextManifest: outcome.contextManifest,
+      composedPrompt: outcome.composedPrompt,
+      promptMessages: outcome.promptMessages,
+      output: outcome.output,
+      imageHashes: outcome.imageHashes,
+      traceId: input.trace?.id,
+      userId: input.userId,
+      projectId: input.projectId,
+    })
+    await applyRunMetadataToTrace(input.trace?.id, outcome.metadata, outcome.spec, snapshotId)
+  }
 
   return {
     content: outcome.output as string,
@@ -281,17 +324,18 @@ export async function planAimChatStream(input: {
   trace?: AimTraceRecorder
   userId?: string | null
   projectId?: string | null
+  contextManifest?: AimContextSource[]
 }): Promise<{
   spec: AimRunSpec
   runId: string
   /** call after the stream finishes (success or failure) to persist snapshot + stamp trace */
   finalize: (fullOutput: string, ok: boolean) => Promise<void>
+  capture: <T>(chunks: AsyncIterable<T>) => AsyncIterable<T>
 }> {
   // Reuse runAimHarness with a no-op executor to get a spec + telemetry
   // callback registration, but we discard its execution; the caller streams.
   // To keep telemetry scoped to this stream, we plan + register here directly.
   const { planAimRun } = await import("./planner")
-  const { setLlmTelemetryCallback } = await import("@/lib/llm/telemetry")
   const { hashPrompt, hashContextManifest } = await import("./hashing")
   const { HARNESS_VERSION } = await import("./types")
   const { randomUUID } = await import("node:crypto")
@@ -308,12 +352,25 @@ export async function planAimChatStream(input: {
   const runId = `run_${randomUUID().replace(/-/g, "").slice(0, 28)}`
 
   const attempts: ProviderAttempt[] = []
-  const dispose = setLlmTelemetryCallback((attempt) => attempts.push(attempt))
+  const invocations: LlmInvocation[] = []
+  const recorder = {
+    onAttempt: (attempt: ProviderAttempt) => attempts.push(attempt),
+    onInvocation: (invocation: LlmInvocation) => invocations.push(invocation),
+  }
+  const capture = <T,>(chunks: AsyncIterable<T>) => wrapLlmTelemetryIterable(recorder, chunks)
 
   const finalize = async (fullOutput: string, ok: boolean) => {
-    dispose()
     const successful = [...attempts].reverse().find((a) => a.status === "success") ?? attempts[attempts.length - 1]
     const failed = attempts.filter((a) => a.status === "failed")
+    const composedPrompt = invocations.length > 0
+      ? invocations.map((invocation, index) => `=== LLM INVOCATION ${index + 1} ===\n${invocation.fullPrompt}`).join("\n\n")
+      : input.rawInput
+    const contextManifest = input.contextManifest ?? [{
+      kind: "request" as const,
+      id: "raw_input",
+      charCount: input.rawInput.length,
+      contentHash: sha256(input.rawInput),
+    }]
     const metadata = {
       runId,
       harnessVersion: HARNESS_VERSION,
@@ -321,23 +378,24 @@ export async function planAimChatStream(input: {
       model: successful?.responseModel ?? successful?.model ?? "unknown",
       fallbackIndex: successful?.attemptIndex ?? 0,
       degraded: failed.length > 0 && !!successful && ok,
-      promptHash: hashPrompt(fullOutput || input.rawInput),
-      contextHash: hashContextManifest([]),
+      promptHash: hashPrompt(composedPrompt),
+      contextHash: hashContextManifest(contextManifest),
       providerAttempts: attempts,
     }
     await persistAimRunSnapshot({
       runSpec: spec,
       metadata,
-      contextManifest: [],
-      composedPrompt: fullOutput || input.rawInput,
+      contextManifest,
+      composedPrompt,
+      promptMessages: invocations.map((invocation) => invocation.messages),
       output: fullOutput,
+      imageHashes: invocations.flatMap((invocation) => invocation.imageHashes),
       traceId: input.trace?.id,
       userId: input.userId,
       projectId: input.projectId,
     })
-    await applyRunMetadataToTrace(input.trace?.id, metadata)
+    await applyRunMetadataToTrace(input.trace?.id, metadata, spec)
   }
 
-  return { spec, runId, finalize }
+  return { spec, runId, finalize, capture }
 }
-

@@ -1,9 +1,10 @@
 name: AIM Harness Eval (daily real-model)
 
 # Daily + manual: 15 deterministically-sampled cases × 2 reps, rubric ON.
-# Uses the real model routing (content_review as rubric judge). Does NOT write
-# to the customer database. Fails only on hard contract failure or fabricated
-# facts in info_insufficient cases (single case may not fail both reps).
+# Uses the production generation/chat path plus content_review as rubric judge.
+# Does NOT write to the customer database. Requires 100% contract pass, 80%
+# rubric pass, complete judge coverage, no fabricated facts, and no fixture
+# failing both repetitions.
 on:
   schedule:
     # 08:00 UTC daily

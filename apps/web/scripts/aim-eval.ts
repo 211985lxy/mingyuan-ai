@@ -24,7 +24,9 @@ import {
   createFrozenContextAdapter,
   runEvalSuite,
   renderEvalMarkdown,
+  evaluateEvalGate,
 } from "../src/lib/aim-harness/eval-runner"
+import { createRealEvalExecutor } from "../src/lib/aim-harness/eval-real-executor"
 
 interface CliOptions {
   mode: "deterministic" | "daily" | "full"
@@ -55,11 +57,13 @@ async function main() {
       : opts.mode === "daily"
         ? { sampleSize: 15, repetitions: 2, skipRubric: false }
         : { sampleSize: 50, repetitions: 3, skipRubric: false }
+  const executor = opts.mode === "deterministic" ? undefined : createRealEvalExecutor()
 
   process.stderr.write(`[aim-eval] mode=${opts.mode} adapter=${adapter.name}\n`)
 
   const report = await runEvalSuite(ALL_FIXTURES, adapter, {
     ...runOptions,
+    executor,
     onProgress: (done, total, fixtureId) => {
       process.stderr.write(`[aim-eval] ${done}/${total} ${fixtureId}\n`)
     },
@@ -73,21 +77,14 @@ async function main() {
   // Print the markdown to stdout so it can be appended to $GITHUB_STEP_SUMMARY.
   process.stdout.write(renderEvalMarkdown(report) + "\n")
 
-  // Exit non-zero if the contract gate fails (deterministic) — but for real-model
-  // runs, only fail on fabrication / hard contract failures, not low scores.
-  const contractOk = report.contractPassRate >= 0.999
-  const anyFabrication =
-    opts.mode !== "deterministic" &&
-    report.results.some(
-      (r) => r.scenario === "info_insufficient" && (r.rubricScore ?? 100) < 40
-    )
+  const gate = evaluateEvalGate(report, opts.mode)
   process.stderr.write(
     `[aim-eval] contract=${(report.contractPassRate * 100).toFixed(1)}% rubric=${
       report.rubricPassRate === null ? "n/a" : (report.rubricPassRate * 100).toFixed(1) + "%"
     }\n`
   )
-  if (!contractOk || anyFabrication) {
-    process.stderr.write(`[aim-eval] FAILED (contract=${contractOk} fabrication=${anyFabrication})\n`)
+  if (!gate.passed) {
+    process.stderr.write(`[aim-eval] FAILED: ${gate.reasons.join("; ")}\n`)
     process.exit(1)
   }
 }

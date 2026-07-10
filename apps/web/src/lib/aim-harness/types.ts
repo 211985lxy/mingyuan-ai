@@ -56,13 +56,15 @@ export interface AimModelPolicy {
 
 /** A single context source loaded for the run, for the manifest + hash. */
 export interface AimContextSource {
-  kind: "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history"
+  kind: "request" | "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history"
   /** source id (knowledge entry id, wiki page id, …) or stable label */
   id: string
   /** when the source was last updated (ISO), if known */
   updatedAt?: string
   /** character count of the block contributed */
   charCount: number
+  /** SHA-256 of the actual source content used for this run. */
+  contentHash?: string
 }
 
 /** The immutable, normalized run plan. Built once; the rest of the run reads it. */

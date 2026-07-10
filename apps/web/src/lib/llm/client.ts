@@ -3,6 +3,7 @@ import { OpenAICompatibleProvider } from "./provider"
 import type { CompletionOptions, CompletionResult, LLMProvider } from "./types"
 import {
   classifyProviderError,
+  reportLlmInvocation,
   reportProviderAttempt,
 } from "./telemetry"
 
@@ -48,6 +49,7 @@ export class LLMClient {
       )
     }
 
+    reportLlmInvocation(options, false)
     let lastError: Error | undefined
 
     for (let index = 0; index < this.providers.length; index += 1) {
@@ -57,7 +59,7 @@ export class LLMClient {
         const result = await provider.complete(options)
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model,
+          model: options.model ?? provider.defaultModel,
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
@@ -70,7 +72,7 @@ export class LLMClient {
         const classified = classifyProviderError(error)
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model,
+          model: options.model ?? provider.defaultModel,
           status: "failed",
           error: lastError.message,
           errorKind: classified.kind,
@@ -104,6 +106,7 @@ export class LLMClient {
       )
     }
 
+    reportLlmInvocation(options, true)
     let lastError: Error | undefined
 
     for (let index = 0; index < this.providers.length; index += 1) {
@@ -119,7 +122,7 @@ export class LLMClient {
         }
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model,
+          model: options.model ?? provider.defaultModel,
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
@@ -130,7 +133,7 @@ export class LLMClient {
         if (emitted) {
           reportProviderAttempt({
             provider: provider.name,
-            model: options.model,
+            model: options.model ?? provider.defaultModel,
             status: "failed",
             error: lastError.message,
             errorKind: classifyProviderError(error).kind,
@@ -142,7 +145,7 @@ export class LLMClient {
         const classified = classifyProviderError(error)
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model,
+          model: options.model ?? provider.defaultModel,
           status: "failed",
           error: lastError.message,
           errorKind: classified.kind,

@@ -10,12 +10,36 @@
 import { describe, expect, it } from "vitest"
 
 import { planAimRun } from "@/lib/aim-harness/planner"
+import { runAimHarness } from "@/lib/aim-harness/runner"
 import {
   hashPrompt,
   hashContextManifest,
 } from "@/lib/aim-harness/hashing"
 import { validateFormat, deriveQualityStatus } from "@/lib/aim-harness/validators"
-import { classifyProviderError } from "@/lib/llm/telemetry"
+import { LLMClient } from "@/lib/llm/client"
+import {
+  classifyProviderError,
+  runWithLlmTelemetry,
+  type LlmInvocation,
+  type ProviderAttempt,
+} from "@/lib/llm/telemetry"
+import type { CompletionOptions, LLMProvider } from "@/lib/llm/types"
+
+function fakeProvider(name: string, delayMs = 0): LLMProvider {
+  return {
+    name,
+    defaultModel: `${name}-default-model`,
+    isAvailable: () => true,
+    async complete(options: CompletionOptions) {
+      if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs))
+      return {
+        content: `${name}:${String(options.messages.at(-1)?.content ?? "")}`,
+        model: `${name}-model`,
+        provider: name,
+      }
+    },
+  }
+}
 
 describe("aim-harness planner", () => {
   it("resolves new_copy + deep for a write_script request", () => {
@@ -83,6 +107,86 @@ describe("aim-harness fallback policy", () => {
     expect(classifyProviderError(new Error("403 Forbidden")).retryable).toBe(false)
     expect(classifyProviderError(new Error("No providers configured, missing API_KEY")).retryable).toBe(false)
   })
+
+  it("does not silently fall back for an unclassified error", () => {
+    expect(classifyProviderError(new Error("unexpected invalid payload")).retryable).toBe(false)
+  })
+
+  it("isolates telemetry between concurrent runs", async () => {
+    const attemptsA: ProviderAttempt[] = []
+    const attemptsB: ProviderAttempt[] = []
+    const invocationsA: LlmInvocation[] = []
+    const invocationsB: LlmInvocation[] = []
+
+    await Promise.all([
+      runWithLlmTelemetry(
+        { onAttempt: (attempt) => attemptsA.push(attempt), onInvocation: (call) => invocationsA.push(call) },
+        () => new LLMClient([fakeProvider("provider-a", 20)]).complete({
+          messages: [{ role: "user", content: "request-a" }],
+        }),
+      ),
+      runWithLlmTelemetry(
+        { onAttempt: (attempt) => attemptsB.push(attempt), onInvocation: (call) => invocationsB.push(call) },
+        () => new LLMClient([fakeProvider("provider-b", 5)]).complete({
+          messages: [{ role: "user", content: "request-b" }],
+        }),
+      ),
+    ])
+
+    expect(attemptsA.map((attempt) => attempt.provider)).toEqual(["provider-a"])
+    expect(attemptsB.map((attempt) => attempt.provider)).toEqual(["provider-b"])
+    expect(invocationsA[0]?.fullPrompt).toContain("request-a")
+    expect(invocationsA[0]?.fullPrompt).not.toContain("request-b")
+    expect(invocationsB[0]?.fullPrompt).toContain("request-b")
+    expect(invocationsB[0]?.fullPrompt).not.toContain("request-a")
+  })
+
+  it("records the configured model for streaming attempts", async () => {
+    const attempts: ProviderAttempt[] = []
+    const provider: LLMProvider = {
+      name: "stream-provider",
+      defaultModel: "stream-model-v1",
+      isAvailable: () => true,
+      async complete() {
+        throw new Error("not used")
+      },
+      async *stream() {
+        yield "ok"
+      },
+    }
+
+    await runWithLlmTelemetry({ onAttempt: (attempt) => attempts.push(attempt) }, async () => {
+      for await (const chunk of new LLMClient([provider]).stream({
+        messages: [{ role: "user", content: "stream request" }],
+      })) {
+        expect(chunk).toBe("ok")
+      }
+    })
+
+    expect(attempts).toMatchObject([{ provider: "stream-provider", model: "stream-model-v1", status: "success" }])
+  })
+
+  it("stores image hashes without persisting image URLs", async () => {
+    const invocations: LlmInvocation[] = []
+    const dataUrl = "data:image/png;base64,SECRET_IMAGE_BYTES"
+
+    await runWithLlmTelemetry({ onInvocation: (call) => invocations.push(call) }, () =>
+      new LLMClient([fakeProvider("vision-provider")]).complete({
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "请分析图片" },
+            { type: "image_url", image_url: { url: dataUrl } },
+          ],
+        }],
+      }),
+    )
+
+    expect(invocations[0]?.imageHashes).toHaveLength(1)
+    expect(invocations[0]?.fullPrompt).toContain("[image sha256=")
+    expect(JSON.stringify(invocations[0])).not.toContain(dataUrl)
+    expect(JSON.stringify(invocations[0])).not.toContain("SECRET_IMAGE_BYTES")
+  })
 })
 
 describe("aim-harness hashing", () => {
@@ -107,6 +211,52 @@ describe("aim-harness hashing", () => {
     expect(hashContextManifest(sourcesChanged)).not.toBe(
       hashContextManifest([{ kind: "knowledge", id: "k1", charCount: 100, updatedAt: "2026-01-01" }])
     )
+  })
+
+  it("context manifest hash changes when source content changes at the same length", () => {
+    const original = [{
+      kind: "knowledge" as const,
+      id: "k1",
+      charCount: 4,
+      contentHash: hashPrompt("甲乙丙丁"),
+    }]
+    const changed = [{
+      kind: "knowledge" as const,
+      id: "k1",
+      charCount: 4,
+      contentHash: hashPrompt("春夏秋冬"),
+    }]
+
+    expect(hashContextManifest(original)).not.toBe(hashContextManifest(changed))
+  })
+
+  it("uses the actual LLM invocation as the prompt snapshot", async () => {
+    const client = new LLMClient([fakeProvider("provider-real")])
+    const outcome = await runAimHarness({
+      plan: {
+        entrypoint: "generate",
+        agentId: "content_producer",
+        rawInput: "原始请求",
+        targetFormats: ["video_script"],
+        taskType: "write_script",
+      },
+      execute: async () => {
+        const completion = await client.complete({
+          messages: [
+            { role: "system", content: "REAL SYSTEM PROMPT" },
+            { role: "user", content: "REAL USER PROMPT" },
+          ],
+        })
+        return {
+          output: completion.content,
+          composedPrompt: "FAKE ADAPTER PROMPT",
+        }
+      },
+    })
+
+    expect(outcome.composedPrompt).toContain("REAL SYSTEM PROMPT")
+    expect(outcome.composedPrompt).toContain("REAL USER PROMPT")
+    expect(outcome.composedPrompt).not.toContain("FAKE ADAPTER PROMPT")
   })
 })
 

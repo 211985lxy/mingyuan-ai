@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 
 import type { AimRunMetadata, AimRunSpec, AimContextSource } from "./types"
+import type { LlmInvocation } from "@/lib/llm/telemetry"
 
 const SNAPSHOT_TTL_DAYS = 30
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -25,6 +26,7 @@ interface SnapshotInput {
   metadata: AimRunMetadata
   contextManifest: AimContextSource[]
   composedPrompt: string
+  promptMessages?: LlmInvocation["messages"][]
   /** raw generated output (string or the domain response object) */
   output: unknown
   qualityResult?: unknown
@@ -66,6 +68,7 @@ export async function persistAimRunSnapshot(
         contextManifest: input.contextManifest,
         providerAttempts: input.metadata.providerAttempts,
         fullPrompt: input.composedPrompt,
+        promptMessages: input.promptMessages ?? [],
         promptHash: input.metadata.promptHash,
         contextHash: input.metadata.contextHash,
         output:
@@ -103,6 +106,7 @@ function getTraceDelegate(): TraceDelegate | undefined {
 export async function applyRunMetadataToTrace(
   traceId: string | undefined,
   metadata: AimRunMetadata,
+  spec: AimRunSpec,
   snapshotId?: string,
   qualityStatus?: string
 ): Promise<void> {
@@ -118,6 +122,9 @@ export async function applyRunMetadataToTrace(
         fallbackIndex: metadata.fallbackIndex,
         degraded: metadata.degraded,
         harnessVersion: metadata.harnessVersion,
+        runtimeTask: spec.runtimeTask,
+        conversationMode: spec.conversationMode ?? null,
+        knowledgeStrategy: spec.knowledgeStrategy,
         promptHash: metadata.promptHash,
         contextHash: metadata.contextHash,
         qualityStatus: qualityStatus ?? null,

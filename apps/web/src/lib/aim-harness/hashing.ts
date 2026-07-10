@@ -5,7 +5,7 @@
  *   version of what was sent to the model — we never rely on hand-maintained
  *   version numbers.
  * - contextHash: SHA-256 of the context manifest (source ids + updatedAt +
- *   charCount). Two runs that load the same sources in the same state produce
+ *   charCount + actual content hashes). Two runs that load the same sources in the same state produce
  *   the same hash, enabling deterministic replay.
  *
  * The hash is computed over a canonical, stable string form so it is identical
@@ -30,12 +30,6 @@ export function hashImageBytes(bytes: Buffer | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex")
 }
 
-/** Hash a URL by its content (fetched bytes) — used when we can fetch the image. */
-export function hashImageUrlContentSync(): string {
-  // Placeholder: image hashing at rest is by content hash captured upstream.
-  return ""
-}
-
 /**
  * Hash the context manifest. Stable ordering: sources are sorted by
  * (kind, id) before hashing so order-independent loads match.
@@ -45,7 +39,7 @@ export function hashContextManifest(sources: readonly AimContextSource[]): strin
     .sort((a, b) =>
       a.kind === b.kind ? a.id.localeCompare(b.id) : a.kind.localeCompare(b.kind)
     )
-    .map((source) => `${source.kind}|${source.id}|${source.updatedAt ?? ""}|${source.charCount}`)
+    .map((source) => `${source.kind}|${source.id}|${source.updatedAt ?? ""}|${source.charCount}|${source.contentHash ?? ""}`)
     .join("\n")
   return sha256(canonical)
 }

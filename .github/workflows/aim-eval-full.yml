@@ -1,8 +1,8 @@
 name: AIM Harness Eval (pre-release full)
 
 # Manual only: all 50 cases × 3 reps, rubric ON. Run before release to verify
-# the full pass-rate gate (≥85% overall, ≥80% per agent, ≤5pt regression vs
-# baseline, no critical fabrication). Does NOT write to the customer database.
+# the full pass-rate gate (≥85% overall, ≥80% per agent, complete judge
+# coverage, no critical fabrication). Does NOT write to the customer database.
 on:
   workflow_dispatch:
 

@@ -53,4 +53,19 @@ describe("Prisma migrations", () => {
 
     expect(migrationSql).toContain("CREATE TABLE `AimRunSnapshot`")
   })
+
+  it("creates the AimExecutionTrace table for a clean database", () => {
+    const appRoot = path.resolve(__dirname, "../..")
+    const schema = readFileSync(path.join(appRoot, "prisma/schema.prisma"), "utf8")
+
+    expect(schema).toContain("model AimExecutionTrace")
+
+    const migrationsRoot = path.join(appRoot, "prisma/migrations")
+    const migrationSql = readdirSync(migrationsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => readFileSync(path.join(migrationsRoot, entry.name, "migration.sql"), "utf8"))
+      .join("\n")
+
+    expect(migrationSql).toContain("CREATE TABLE `AimExecutionTrace`")
+  })
 })

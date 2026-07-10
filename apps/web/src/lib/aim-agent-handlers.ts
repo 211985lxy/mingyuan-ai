@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+
 import { prisma } from "@/lib/prisma"
 import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { ChatMessage } from "@/lib/llm/types"
@@ -101,6 +103,29 @@ export interface AimGenerateContext {
   /** 内容场景模式（由前端或路由层传入，驱动提示块和知识策略差异化） */
   contentScenario?: ContentScenario
   trace?: AimTraceRecorder
+  /** Eval-only: use frozen context instead of live DB loaders. */
+  contextOverride?: AimGenerationContextOverride
+  /** Eval-only: execute the production prompt/model path without writing history. */
+  skipPersistence?: boolean
+}
+
+export interface AimGenerationContextOverride {
+  knowledgeBlock: string
+  entries: Array<{
+    id: string
+    title: string
+    content: string
+    category: string
+    tags: unknown
+    valueGrade: string | null
+    score: number
+  }>
+  source: "embedding" | "raw"
+  viralStructureBlock?: string
+  methodologyBlock?: string
+  businessDiagnosisBlock?: string
+  ipWikiBlock?: string
+  eventStorytellingBlock?: string
 }
 
 export interface AimGenerateResponse {
@@ -1471,7 +1496,20 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     params.trace,
     "load_generation_context",
     "知识/结构/方法论读取",
-    () => Promise.all([
+    () => params.contextOverride
+      ? Promise.resolve([
+          {
+            knowledgeBlock: params.contextOverride.knowledgeBlock,
+            entries: params.contextOverride.entries,
+            source: params.contextOverride.source,
+          },
+          params.contextOverride.viralStructureBlock ?? "",
+          params.contextOverride.methodologyBlock ?? "",
+          params.contextOverride.businessDiagnosisBlock ?? "",
+          params.contextOverride.ipWikiBlock ?? "",
+          params.contextOverride.eventStorytellingBlock ?? "",
+        ] as const)
+      : Promise.all([
       params.projectId && shouldUseKnowledgeContextForTask(runtimeTask)
         && generationIntent.useKnowledge
         ? buildAimKnowledgeContext({
@@ -1498,7 +1536,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
       generationIntent.useMethodology && (agentId === "content_producer" || agentId === "deep_copywriter") && useEventStorytelling
         ? buildEventStorytellingMethodologyBlock()
         : Promise.resolve(""),
-    ]),
+        ]),
     ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory]) => ({
       summary: `命中 ${knowledge.entries.length} 条知识`,
       metadata: {
@@ -1551,19 +1589,23 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
   }))
 
   // 5. 后续处理 (Fire-and-forget 向量写入)
-  await addAimTraceStep(params.trace, {
-    key: "fire_knowledge_embedding",
-    label: "知识向量补写",
-    status: "success",
-    summary: "已触发后台补写",
-    metadata: { entries: knowledgeCtx.entries.length },
-  })
-  fireKnowledgeEmbedding(knowledgeCtx.entries, knowledgeCtx.source)
+  if (!params.skipPersistence) {
+    await addAimTraceStep(params.trace, {
+      key: "fire_knowledge_embedding",
+      label: "知识向量补写",
+      status: "success",
+      summary: "已触发后台补写",
+      metadata: { entries: knowledgeCtx.entries.length },
+    })
+    fireKnowledgeEmbedding(knowledgeCtx.entries, knowledgeCtx.source)
+  }
 
-  const saved = await prisma.aimGeneration.findUnique({
-    where: { id: response.id },
-    select: { model: true, totalTokens: true },
-  }).catch(() => null)
+  const saved = params.skipPersistence
+    ? null
+    : await prisma.aimGeneration.findUnique({
+        where: { id: response.id },
+        select: { model: true, totalTokens: true },
+      }).catch(() => null)
   await finishAimTrace(params.trace, {
     aimGenerationId: response.id,
     model: saved?.model || null,
@@ -1829,6 +1871,13 @@ async function saveAimGenerationRecord(
     title: entry.title,
     category: entry.category,
   }))
+
+  if (context.skipPersistence) {
+    return {
+      id: `eval_${randomUUID().replace(/-/g, "").slice(0, 24)}`,
+      knowledgeUsed,
+    }
+  }
 
   const data = {
     userId: context.userId,
