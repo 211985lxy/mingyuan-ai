@@ -253,7 +253,9 @@ export async function POST(request: NextRequest) {
         )
       : []
     const memoryBlock = formatAimMemoryBlock(memoryRows)
-    const knowledgeBlock = [memoryBlock, baseKnowledgeBlock, competitorWatchBlock, styleBlock, editorBlock].filter(Boolean).join("\n")
+    // Current editor selection and explicit memory are highest-signal when the
+    // downstream runtime budget truncates this combined context block.
+    const knowledgeBlock = [editorBlock, memoryBlock, baseKnowledgeBlock, styleBlock, competitorWatchBlock].filter(Boolean).join("\n")
     const normalizedMessages = normalizeMemoryMessages(messages)
     const contextManifest: AimContextSource[] = [
       {
@@ -286,6 +288,7 @@ export async function POST(request: NextRequest) {
       messages,
       knowledgeBlock,
       conversationIntent,
+      runtimeTask,
       trace,
     }
     await addAimTraceStep(trace, {

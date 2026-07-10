@@ -68,4 +68,33 @@ describe("Prisma migrations", () => {
 
     expect(migrationSql).toContain("CREATE TABLE `AimExecutionTrace`")
   })
+
+  it("creates the AgentMethodology table and preserves production text widths", () => {
+    const appRoot = path.resolve(__dirname, "../..")
+    const schema = readFileSync(path.join(appRoot, "prisma/schema.prisma"), "utf8")
+    const migrationsRoot = path.join(appRoot, "prisma/migrations")
+    const migrationSql = readdirSync(migrationsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => readFileSync(path.join(migrationsRoot, entry.name, "migration.sql"), "utf8"))
+      .join("\n")
+
+    expect(schema).toContain("model AgentMethodology")
+    expect(schema).toMatch(/topicTitle\s+String\?\s+@db\.Text/)
+    expect(schema).toMatch(/hotTopic\s+String\?\s+@db\.Text/)
+    expect(migrationSql).toContain("CREATE TABLE `AgentMethodology`")
+  })
+
+  it("creates the AimRunEvent table for user adoption signals", () => {
+    const appRoot = path.resolve(__dirname, "../..")
+    const schema = readFileSync(path.join(appRoot, "prisma/schema.prisma"), "utf8")
+    const migrationsRoot = path.join(appRoot, "prisma/migrations")
+    const migrationSql = readdirSync(migrationsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => readFileSync(path.join(migrationsRoot, entry.name, "migration.sql"), "utf8"))
+      .join("\n")
+
+    expect(schema).toContain("model AimRunEvent")
+    expect(migrationSql).toContain("CREATE TABLE `AimRunEvent`")
+    expect(migrationSql).toContain("FOREIGN KEY (`userId`) REFERENCES `User`(`id`)")
+  })
 })

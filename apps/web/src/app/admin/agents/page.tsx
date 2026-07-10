@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Bot,
   CheckCircle2,
+  Clipboard,
   Clock3,
   Gauge,
   Layers3,
@@ -67,6 +68,9 @@ interface TraceStats {
   success24h: number
   successRate24h: number
   averageDurationMs24h: number
+  copied24h: number
+  revised24h: number
+  accepted24h: number
 }
 
 const workflow = [
@@ -145,6 +149,9 @@ export default function AdminAgentsPage() {
         <MetricCard icon={Gauge} label="平均耗时" value={`${Math.round((stats?.averageDurationMs24h ?? 0) / 1000)}s`} />
         <MetricCard icon={AlertTriangle} label="失败数" value={String(stats?.failed24h ?? 0)} />
         <MetricCard icon={Clock3} label="今日请求" value={String(stats?.total24h ?? 0)} />
+        <MetricCard icon={Clipboard} label="复制次数" value={String(stats?.copied24h ?? 0)} />
+        <MetricCard icon={Sparkles} label="采纳次数" value={String(stats?.accepted24h ?? 0)} />
+        <MetricCard icon={Layers3} label="追改次数" value={String(stats?.revised24h ?? 0)} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">

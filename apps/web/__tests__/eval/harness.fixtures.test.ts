@@ -2,7 +2,7 @@
  * Deterministic harness fixture test (no model, no DB).
  *
  * This is the `test:x harness` gate that runs on every PR. It asserts:
- *   - the suite has exactly 50 fixtures with the required agent/scenario spread
+ *   - the suite has exactly 66 fixtures with all seven agents represented
  *   - every fixture's declared routing/knowledge/format contract matches the
  *     real production planner (resolveAimRuntimeTask / resolveKnowledgeStrategy)
  *   - ids are unique and versioned
@@ -22,18 +22,18 @@ import {
 import { gradeFixture, GRADABLE_FORMATS } from "@/lib/aim-harness/eval/graders"
 
 describe("aim harness fixture registry", () => {
-  it("has exactly 50 fixtures", () => {
-    expect(ALL_FIXTURES).toHaveLength(50)
+  it("has exactly 66 fixtures", () => {
+    expect(ALL_FIXTURES).toHaveLength(66)
   })
 
-  it("covers all three full-eval agents with the required counts", () => {
+  it("covers all seven agents with the required counts", () => {
     const byAgent = ALL_FIXTURES.reduce<Record<string, number>>((acc, fixture) => {
       acc[fixture.agent] = (acc[fixture.agent] ?? 0) + 1
       return acc
     }, {})
-    expect(byAgent.content_producer).toBe(EXPECTED_AGENT_COUNTS.content_producer)
-    expect(byAgent.deep_copywriter).toBe(EXPECTED_AGENT_COUNTS.deep_copywriter)
-    expect(byAgent.business_diagnosis).toBe(EXPECTED_AGENT_COUNTS.business_diagnosis)
+    for (const [agent, count] of Object.entries(EXPECTED_AGENT_COUNTS)) {
+      expect(byAgent[agent], agent).toBe(count)
+    }
   })
 
   it("covers all six scenarios", () => {
@@ -62,7 +62,7 @@ describe("aim harness fixture registry", () => {
   })
 })
 
-describe("aim harness deterministic grading (planner contract, 50 cases)", () => {
+describe("aim harness deterministic grading (planner contract, 66 cases)", () => {
   // One it() per fixture so a failure pinpoints the exact case.
   for (const fixture of ALL_FIXTURES) {
     it(`${fixture.id}: routing/format/context contract`, () => {

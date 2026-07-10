@@ -4,7 +4,7 @@
  * Modes:
  *   --deterministic   frozen adapter, skip rubric (the PR gate; no model)
  *   --daily           frozen adapter, 15 cases × 2 reps, rubric ON (needs model keys)
- *   --full            frozen adapter, 50 cases × 3 reps, rubric ON (pre-release)
+ *   --full            all fixtures × 3 reps, rubric ON (pre-release)
  *
  * The runner never writes to the customer database. Reports are written to
  * --out (default ./aim-eval-report) as report.json + report.md for the CI
@@ -56,7 +56,7 @@ async function main() {
       ? { skipRubric: true }
       : opts.mode === "daily"
         ? { sampleSize: 15, repetitions: 2, skipRubric: false }
-        : { sampleSize: 50, repetitions: 3, skipRubric: false }
+        : { sampleSize: ALL_FIXTURES.length, repetitions: 3, skipRubric: false }
   const executor = opts.mode === "deterministic" ? undefined : createRealEvalExecutor()
 
   process.stderr.write(`[aim-eval] mode=${opts.mode} adapter=${adapter.name}\n`)

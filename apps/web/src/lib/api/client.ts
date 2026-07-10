@@ -1378,6 +1378,17 @@ export async function generateAimContent(data: AimGenerateRequest, signal?: Abor
   })
 }
 
+export async function recordAimRunEvent(
+  runId: string,
+  event: "copied" | "revised" | "accepted",
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  await request(`/api/aim/runs/${encodeURIComponent(runId)}/events`, {
+    method: "POST",
+    body: JSON.stringify({ event, metadata }),
+  })
+}
+
 export interface AimEvolutionSuggestion {
   category: "user_insight"
   title: string

@@ -1,7 +1,7 @@
 name: AIM Harness Eval (deterministic)
 
 # Runs on every PR (and push to main): the deterministic harness gate.
-# No model calls, no customer DB writes. Asserts the 50 eval fixtures pass the
+# No model calls, no customer DB writes. Asserts all eval fixtures pass the
 # routing/format/context contract grader at 100%.
 on:
   pull_request:
@@ -39,7 +39,7 @@ jobs:
         run: pnpm --dir apps/web exec eslint --quiet src/lib/aim-harness src/lib/llm/client.ts src/lib/llm/telemetry.ts "__tests__/eval/**"
 
       # Deterministic harness tests (planner / fallback policy / hashing /
-      # validators / 50 fixture contracts / eval runner).
+      # validators / fixture contracts / eval runner).
       - name: test:harness
         run: pnpm --dir apps/web run test:harness
 

@@ -108,6 +108,7 @@ const runRealChat: RealCaseRunner = async (fixture, context) => {
       messages,
       knowledgeBlock: context.knowledgeBlock,
       conversationIntent,
+      runtimeTask: fixture.expectations.runtimeTask,
     }).then((response) => response.content),
     rawInput,
     agentId: fixture.agent,

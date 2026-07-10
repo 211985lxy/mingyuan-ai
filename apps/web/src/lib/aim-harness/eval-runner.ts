@@ -1,7 +1,7 @@
 /**
  * AIM Thin Harness v1 — eval runner.
  *
- * Runs the 50 versioned fixtures through the harness. Two context adapters:
+ * Runs the versioned fixtures through the harness. Two context adapters:
  *   - frozen (CI):  supplies the fixture's seedContext deterministically
  *   - db (prod/nightly): loads the same context shape from the database
  *
@@ -84,7 +84,7 @@ export interface EvalRunOptions {
   repetitions?: number
   /** skip the LLM rubric judge (deterministic CI runs set this) */
   skipRubric?: boolean
-  /** seed for case sampling (daily = 15, full = 50) */
+  /** deterministic case sample size */
   sampleSize?: number
   /** logger */
   onProgress?: (done: number, total: number, fixtureId: string) => void

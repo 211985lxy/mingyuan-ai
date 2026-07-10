@@ -18,6 +18,7 @@ import {
   type AimRuntimeTask,
 } from "@/lib/aim-knowledge-strategy"
 import { compressAimMessages } from "@/lib/aim-context-compressor"
+import { applyAimContextBudget } from "@/lib/aim-context-budget"
 import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 import {
   ContentFormat,
@@ -64,6 +65,7 @@ export interface AimChatParams {
   /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
   ipWikiBlock: string
   conversationIntent?: AimConversationIntent
+  runtimeTask?: AimRuntimeTask
   trace?: AimTraceRecorder
 }
 
@@ -1371,16 +1373,32 @@ async function buildAimChatRuntime(
       },
     }),
   )
+  const budgeted = applyAimContextBudget({
+    conversationBlock,
+    knowledgeBlock: enrichedKnowledgeBlock,
+    methodologyBlock,
+    businessDiagnosisBlock,
+    viralStructureBlock: "",
+    eventStorytellingBlock: "",
+    ipWikiBlock,
+  }, params.runtimeTask ?? "rewrite_copy")
+  await addAimTraceStep(params.trace, {
+    key: "context_budget",
+    label: "上下文预算",
+    status: "success",
+    summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
+    metadata: budgeted.stats,
+  })
 
   return {
     handler: getAgentHandler(agentId),
     params: {
       ...params,
-      conversationBlock,
-      knowledgeBlock: enrichedKnowledgeBlock,
-      methodologyBlock,
-      businessDiagnosisBlock,
-      ipWikiBlock,
+      conversationBlock: budgeted.blocks.conversationBlock,
+      knowledgeBlock: budgeted.blocks.knowledgeBlock,
+      methodologyBlock: budgeted.blocks.methodologyBlock,
+      businessDiagnosisBlock: budgeted.blocks.businessDiagnosisBlock,
+      ipWikiBlock: budgeted.blocks.ipWikiBlock,
     },
   }
 }
@@ -1568,17 +1586,33 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
   const knowledgeWithContext = compressed.didCompress
     ? `【对话摘要】\n${compressed.summary}\n\n${knowledgeCtx.knowledgeBlock}`
     : knowledgeCtx.knowledgeBlock
-
-  const response = await runAimTraceStep(params.trace, "agent_generate", "智能体生成并保存", () => handler.generate({
-    ...params,
-    agentId,
-    runtimeTask,
+  const budgeted = applyAimContextBudget({
+    conversationBlock: "",
     knowledgeBlock: knowledgeWithContext,
     methodologyBlock,
     businessDiagnosisBlock,
     viralStructureBlock,
     eventStorytellingBlock,
     ipWikiBlock,
+  }, runtimeTask)
+  await addAimTraceStep(params.trace, {
+    key: "context_budget",
+    label: "上下文预算",
+    status: "success",
+    summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
+    metadata: budgeted.stats,
+  })
+
+  const response = await runAimTraceStep(params.trace, "agent_generate", "智能体生成并保存", () => handler.generate({
+    ...params,
+    agentId,
+    runtimeTask,
+    knowledgeBlock: budgeted.blocks.knowledgeBlock,
+    methodologyBlock: budgeted.blocks.methodologyBlock,
+    businessDiagnosisBlock: budgeted.blocks.businessDiagnosisBlock,
+    viralStructureBlock: budgeted.blocks.viralStructureBlock,
+    eventStorytellingBlock: budgeted.blocks.eventStorytellingBlock,
+    ipWikiBlock: budgeted.blocks.ipWikiBlock,
     retrievedEntries: knowledgeCtx.entries,
     retrievedSource: knowledgeCtx.source,
     knowledgeStrategy,

@@ -1,6 +1,6 @@
 name: AIM Harness Eval (pre-release full)
 
-# Manual only: all 50 cases × 3 reps, rubric ON. Run before release to verify
+# Manual only: all fixtures × 3 reps, rubric ON. Run before release to verify
 # the full pass-rate gate (≥85% overall, ≥80% per agent, complete judge
 # coverage, no critical fabrication). Does NOT write to the customer database.
 on:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   full-eval:
-    name: Full eval (50 cases × 3)
+    name: Full eval (all cases × 3)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

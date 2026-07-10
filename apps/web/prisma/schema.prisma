@@ -45,6 +45,7 @@ model User {
   agentApiCallLogs               AgentApiCallLog[]
   aimExecutionTraces             AimExecutionTrace[]
   aimRunSnapshots                AimRunSnapshot[]
+  aimRunEvents                   AimRunEvent[]
 }
 
 model Avatar {
@@ -439,8 +440,8 @@ model AimGeneration {
   knowledgeUsed    Json     @default("[]")
   ipSnapshotUsed   String?  @db.MediumText
   qualityScores    Json?
-  topicTitle       String?
-  hotTopic         String?
+  topicTitle       String?  @db.Text
+  hotTopic         String?  @db.Text
   polishInstruction String? @db.MediumText
   workflowStatus   String   @default("draft")
   reviewNote       String?  @db.MediumText
@@ -623,6 +624,21 @@ model AimRunSnapshot {
   @@index([userId, createdAt(sort: Desc)])
   @@index([agentId, createdAt(sort: Desc)])
   @@index([traceId])
+}
+
+model AimRunEvent {
+  id        String   @id @default(cuid())
+  runId     String   @db.VarChar(40)
+  userId    String
+  event     String   @db.VarChar(24) // copied | revised | accepted
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([runId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([event, createdAt(sort: Desc)])
 }
 
 model ContentGenerationRun {

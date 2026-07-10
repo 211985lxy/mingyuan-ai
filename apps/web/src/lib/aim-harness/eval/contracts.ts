@@ -118,8 +118,8 @@ export interface EvalExpectations {
 export interface EvalFixture {
   id: string
   version: number
-  /** which of the first three full-eval agents this case belongs to */
-  agent: "content_producer" | "deep_copywriter" | "business_diagnosis"
+  /** AIM agent exercised by this case. */
+  agent: AimAgentId
   scenario: EvalScenario
   entrypoint: AimEntrypoint
   /** the raw request body, shaped exactly like parseGenerateBody input */

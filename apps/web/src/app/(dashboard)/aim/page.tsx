@@ -49,6 +49,7 @@ import {
   evolveStyleConversation,
   ApiError,
   listClientProjects,
+  recordAimRunEvent,
   updateAimWorkflowStatus,
   type AimCalibrationRule,
   type AimDecisionSnapshot,
@@ -119,6 +120,16 @@ const FORMAT_LABELS: Record<ContentFormat, string> = {
 const SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-muted/45 px-2 text-xs text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
 const ACTIVE_SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-primary/10 px-2 text-xs text-primary shadow-none hover:bg-primary/15"
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
+const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
+
+function reportAimRunEvent(
+  runId: string | null | undefined,
+  event: "copied" | "revised" | "accepted",
+  metadata?: Record<string, unknown>,
+) {
+  if (!runId) return
+  void recordAimRunEvent(runId, event, metadata).catch(() => undefined)
+}
 
 const WORKFLOW_STATUS_OPTIONS = [
   { value: "draft", label: "草稿" },
@@ -652,6 +663,7 @@ const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) 
 /** 交付物气泡：在对话中渲染 generateAimContent 的多格式结果 */
 function DeliverableBubble({
   deliverables,
+  runId,
   agentId,
   nextActions,
   onRepurpose,
@@ -666,6 +678,7 @@ function DeliverableBubble({
   onOpenRetro,
 }: {
   deliverables: AimGenerateResponse
+  runId?: string | null
   agentId: AimAgentId
   nextActions?: AimNextAction[]
   onRepurpose: (format: ContentFormat) => void
@@ -693,6 +706,7 @@ function DeliverableBubble({
       setCopiedFormat(format)
       setTimeout(() => setCopiedFormat(null), 600)
     }
+    reportAimRunEvent(runId, "copied", format ? { format } : undefined)
     toast.success("已复制")
   }
 
@@ -1774,6 +1788,8 @@ export default function AimPage() {
     if (!text && images.length === 0) return
     const workbenchCommand = detectAimWorkbenchCommand(text)
     if (workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
+    const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId
+    reportAimRunEvent(revisedRun, "revised", { channel: "chat" })
     const controller = new AbortController()
     requestAbortRef.current = controller
     const userMsg: ChatMessage = { id: nextId(), role: "user", content: text || "请分析这张图片。", images }
@@ -2177,13 +2193,17 @@ export default function AimPage() {
 
   const handleMarkStatus = useCallback(
     (msgId: string) => async (status: string) => {
-      const base = messages.find((m) => m.id === msgId)?.deliverables
+      const message = messages.find((m) => m.id === msgId)
+      const base = message?.deliverables
       if (!base?.id || base.id.startsWith("polish-")) {
         toast.error("只有已保存的内容才能推进状态")
         return
       }
       try {
         await updateAimWorkflowStatus(base.id, { workflowStatus: status })
+        if (ACCEPTED_WORKFLOW_STATUSES.has(status)) {
+          reportAimRunEvent(message?.runId, "accepted", { workflowStatus: status })
+        }
         refreshHistory({ force: true, agentId: selectedAgentId })
         toast.success(`已标记为：${workflowStatusLabel(status)}`)
       } catch (error) {
@@ -2252,6 +2272,8 @@ export default function AimPage() {
           publishPlatform: publishForm.publishPlatform.trim() || "抖音",
           publishUrl: publishForm.publishUrl.trim(),
         })
+        const publishedMessage = messages.find((message) => message.deliverables?.id === recordDialog.generationId)
+        reportAimRunEvent(publishedMessage?.runId, "accepted", { workflowStatus: "published" })
         toast.success("已登记发布")
       } else {
         if (!retroForm.summary.trim()) {
@@ -2280,7 +2302,7 @@ export default function AimPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
-  }, [decisionForm, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
+  }, [decisionForm, messages, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
 
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
@@ -2489,6 +2511,7 @@ export default function AimPage() {
                       <div className="w-full mt-2">
                         <DeliverableBubble
                           deliverables={m.deliverables}
+                          runId={m.runId}
                           agentId={isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId}
                           nextActions={getAimAgentGuide(isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId).nextActions}
                           onRepurpose={handleRepurpose(m.id)}

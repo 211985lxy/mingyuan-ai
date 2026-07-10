@@ -13,6 +13,14 @@ function getTraceDelegate() {
   }).aimExecutionTrace
 }
 
+function getRunEventDelegate() {
+  return (prisma as typeof prisma & {
+    aimRunEvent?: {
+      groupBy(args: unknown): Promise<Array<{ event: string; _count: { _all: number } }>>
+    }
+  }).aimRunEvent
+}
+
 export const GET = withAdminAuth(async (request: NextRequest) => {
   const delegate = getTraceDelegate()
   if (!delegate) {
@@ -22,8 +30,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
   const url = new URL(request.url)
   const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 30)))
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const eventDelegate = getRunEventDelegate()
 
-  const [traces, total24h, failed24h, success24h, avg, byAgent] = await Promise.all([
+  const [traces, total24h, failed24h, success24h, avg, byAgent, byEvent] = await Promise.all([
     delegate.findMany({
       orderBy: { createdAt: "desc" },
       take: limit,
@@ -57,7 +66,16 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
       where: { createdAt: { gte: oneDayAgo } },
       _count: { _all: true },
     }),
+    eventDelegate
+      ? eventDelegate.groupBy({
+          by: ["event"],
+          where: { createdAt: { gte: oneDayAgo } },
+          _count: { _all: true },
+        })
+      : Promise.resolve([]),
   ])
+
+  const eventCounts = Object.fromEntries(byEvent.map((row) => [row.event, row._count._all]))
 
   return NextResponse.json({
     data: {
@@ -68,6 +86,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
         success24h,
         successRate24h: total24h > 0 ? Math.round((success24h / total24h) * 1000) / 10 : 0,
         averageDurationMs24h: Math.round(avg._avg?.durationMs || 0),
+        copied24h: eventCounts.copied ?? 0,
+        revised24h: eventCounts.revised ?? 0,
+        accepted24h: eventCounts.accepted ?? 0,
         byAgent,
       },
     },
