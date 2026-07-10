@@ -44,6 +44,7 @@ model User {
   agentApiKeys                   AgentApiKey[]
   agentApiCallLogs               AgentApiCallLog[]
   aimExecutionTraces             AimExecutionTrace[]
+  aimRunSnapshots                AimRunSnapshot[]
 }
 
 model Avatar {
@@ -558,12 +559,69 @@ model AimExecutionTrace {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // ── aim-harness-v1 长期可观测字段（不随快照过期，长期保留） ──
+  runId             String?  @db.VarChar(40) // 对外执行编号，= AimRunSnapshot.runId
+  provider          String?  @db.VarChar(64) // 实际命中的 provider（与 model 分别记录）
+  fallbackIndex     Int?     // 命中第几个 provider（0=首选）
+  degraded          Boolean? // fallback 后继续交付则 true
+  harnessVersion    String?  @db.VarChar(40) // "aim-harness-v1"
+  runtimeTask       String?  @db.VarChar(32)
+  conversationMode  String?  @db.VarChar(32)
+  knowledgeStrategy String?  @db.VarChar(32)
+  promptHash        String?  @db.VarChar(64) // 最终组合 prompt 的 SHA-256
+  contextHash       String?  @db.VarChar(64) // 上下文清单的 SHA-256
+  qualityStatus     String?  @db.VarChar(24) // 主稿质量结果：pass | warn | fail | skipped
+  snapshotId        String?  @db.VarChar(40) // 关联完整快照（可能已过期删除）
+
   user User? @relation(fields: [userId], references: [id])
 
   @@index([createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@index([agentId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
+  @@index([runId])
+  @@index([promptHash])
+  @@index([qualityStatus])
+}
+
+// AIM Thin Harness v1 完整运行快照：保存 runSpec、上下文清单、provider 尝试、
+// 完整文本 prompt、输出、质量结果、哈希与 expiresAt。仅管理员可见，30 天由
+// cron/cleanup 删除；关联的 trace 元数据（provider/model/哈希/指标）长期保留。
+// 图片只保存哈希和类型，不保存 base64 或临时签名地址。
+model AimRunSnapshot {
+  id              String   @id @default(cuid())
+  runId           String   @unique @db.VarChar(40) // 对外稳定执行编号（= trace.runId）
+  traceId         String?  @db.VarChar(40)         // 关联 AimExecutionTrace.id
+  userId          String?
+  projectId       String?
+  agentId         String?
+  action          String?  @db.VarChar(32)         // chat | generate | agent_api | inspiration | tool_action
+
+  runSpec          Json     @default("{}")  // AimRunSpec 快照
+  contextManifest  Json     @default("[]")  // 上下文来源清单（id/更新时间/字符数/SHA-256）
+  providerAttempts Json     @default("[]")  // 每次 provider 尝试（provider/model/状态/错误/耗时）
+  fullPrompt       String?  @db.MediumText  // 完整文本 prompt（管理员可见）
+  promptHash       String?  @db.VarChar(64)
+  contextHash      String?  @db.VarChar(64)
+  output           String?  @db.MediumText  // 原样生成稿
+  outputFormats    Json     @default("[]")  // ContentFormat[]
+  qualityResult    Json?                   // 主稿 LLM 评分 + 全部格式确定性检查
+  imageHashes      Json     @default("[]")  // [{hash, type}]，不存 base64/签名地址
+
+  provider      String?  @db.VarChar(64)
+  model         String?  @db.VarChar(64)
+  fallbackIndex Int?
+  degraded      Boolean?
+
+  expiresAt DateTime // 30 天后由 cron/cleanup 删除
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([expiresAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([traceId])
 }
 
 model ContentGenerationRun {
