@@ -1,16 +1,26 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getCompetitorPlatformGate } from '@/lib/competitor-analysis/platform-scope'
 
 describe('getCompetitorPlatformGate', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('allows Douyin in the local-browser MVP', () => {
     expect(getCompetitorPlatformGate('douyin')).toEqual({ supported: true })
   })
 
-  it('keeps Xiaohongshu closed in the first release', () => {
+  it('allows Xiaohongshu by default', () => {
+    expect(getCompetitorPlatformGate('xiaohongshu')).toEqual({ supported: true })
+  })
+
+  it('can close Xiaohongshu through the platform allowlist', () => {
+    vi.stubEnv('COMPETITOR_ENABLED_PLATFORMS', 'douyin')
+
     expect(getCompetitorPlatformGate('xiaohongshu')).toEqual({
       supported: false,
       code: 'PLATFORM_NOT_OPEN',
-      message: '第一版对标账号分析暂时只支持抖音主页链接',
+      message: '当前版本暂不支持小红书对标账号分析',
     })
   })
 })

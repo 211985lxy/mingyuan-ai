@@ -117,8 +117,8 @@ export function buildTopicSources(input: {
     ...(input.projectSource ? [input.projectSource] : []),
     ...input.benchmarkSources,
     ...input.videoCopySources,
-    ...input.hotTopicSources,
     ...selectedBenchmarkKnowledge,
     ...supplementalKnowledge,
+    ...input.hotTopicSources,
   ]
 }

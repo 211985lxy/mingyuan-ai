@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { buildTopicSources } from "@/lib/topic-source-builders"
 
 describe("buildTopicSources", () => {
-  it("keeps benchmark and hot signals ahead of knowledge when enriched sources exist", () => {
+  it("keeps customer knowledge ahead of supplemental hot signals", () => {
     const sources = buildTopicSources({
       projectSource: { category: "client_project", title: "项目基准线", content: "项目内容" },
       benchmarkSources: [{ category: "benchmark_reference", title: "对标账号", content: "对标内容" }],
@@ -19,11 +19,11 @@ describe("buildTopicSources", () => {
       "项目基准线",
       "对标账号",
       "拆解文案",
-      "热点",
       "知识库1",
       "知识库2",
       "知识库3",
       "知识库4",
+      "热点",
     ])
   })
 

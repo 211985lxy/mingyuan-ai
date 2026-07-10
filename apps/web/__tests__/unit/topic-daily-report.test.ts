@@ -43,26 +43,27 @@ describe("buildTopicDailyReport", () => {
     const report = buildTopicDailyReport(cards, [item(1)], "daily")
 
     expect(report.leadCard?.title).toBe("AI工具先看流程")
-    expect(report.editorJudgment).toContain("AI工具先看流程")
-    expect(report.decision.action).toContain("流程")
+    expect(report.conclusion).toContain("AI工具先看流程")
+    expect(report.execution.action).toContain("流程")
   })
 
-  it("assigns AIHOT items into S/A/B/C pipeline", () => {
+  it("uses AI HOT as capped fallback evidence when no source snapshot exists", () => {
     const report = buildTopicDailyReport(
       cards,
       Array.from({ length: 8 }, (_, index) => item(index + 1)),
       "daily",
     )
 
-    expect(report.signals.map((signal) => signal.rank)).toEqual(["S", "A", "A", "A", "B", "B", "B", "C"])
-    expect(report.evidence[0].source).toContain("辅助热点")
+    expect(report.hasSourceSnapshot).toBe(false)
+    expect(report.evidenceGroups).toHaveLength(1)
+    expect(report.evidenceGroups[0].key).toBe("hot")
+    expect(report.evidenceGroups[0].items).toHaveLength(4)
   })
 
   it("builds a report without AIHOT items", () => {
     const report = buildTopicDailyReport(cards, [], "daily")
 
-    expect(report.signals).toHaveLength(1)
-    expect(report.signals[0].title).toBe("AI工具先看流程")
+    expect(report.evidenceGroups).toHaveLength(0)
     expect(report.workshop[0].hook).toBe("可做但不是今天主推。")
   })
 
@@ -82,10 +83,10 @@ describe("buildTopicDailyReport", () => {
       },
     ])
 
-    expect(report.signals[0].title).toBe("对标拆解视频")
-    expect(report.signals[0].source).toBe("对标")
-    expect(report.evidence[0].source).toBe("对标视频/拆解文案")
-    expect(report.evidence[0].summary).toContain("反差开头")
+    expect(report.hasSourceSnapshot).toBe(true)
+    expect(report.evidenceGroups[0].key).toBe("benchmark")
+    expect(report.evidenceGroups[0].items[0].title).toBe("对标拆解视频")
+    expect(report.evidenceGroups[0].items[0].content).toContain("反差开头")
   })
 
   it("explains lead decision with score breakdown when available", () => {
@@ -103,8 +104,8 @@ describe("buildTopicDailyReport", () => {
       },
     ], [], "daily")
 
-    expect(report.decision.why).toContain("总分 91")
-    expect(report.decision.why).toContain("强项是项目匹配")
-    expect(report.decision.why).toContain("短板是传播钩子")
+    expect(report.reason).toContain("总分 91")
+    expect(report.reason).toContain("强项是项目匹配")
+    expect(report.reason).toContain("短板是传播钩子")
   })
 })

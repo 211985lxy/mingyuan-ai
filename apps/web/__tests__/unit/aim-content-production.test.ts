@@ -163,7 +163,7 @@ describe("AIM content production positioning", () => {
     expect(PUBLISH_PACKAGE_CHAT_RULE).toContain("与对标基本一致")
     expect(PUBLISH_PACKAGE_CHAT_RULE).toContain("不要照抄")
     expect(PUBLISH_PACKAGE_CHAT_RULE).toContain("账号名称、品牌名称、IP 名或项目名相关的话题")
-    expect(PUBLISH_PACKAGE_CHAT_RULE).toContain("## 我的发布文案")
+    expect(PUBLISH_PACKAGE_CHAT_RULE).toContain("## 发布文案")
     expect(PUBLISH_PACKAGE_CHAT_RULE).toContain("## 发布话题")
   })
 
