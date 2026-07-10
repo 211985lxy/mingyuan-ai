@@ -7,7 +7,7 @@
  * deep_copywriter agentId does not trigger special-case routing in
  * resolveAimRuntimeTask, so normal keyword/taskType/format rules apply.
  */
-import type { EvalFixture } from "../contracts"
+import type { EvalFixture } from "@/lib/aim-harness/eval/contracts"
 
 export const DEEP_COPYWRITER_FIXTURES: EvalFixture[] = [
   // ───────────────────────────── new (5) ─────────────────────────────

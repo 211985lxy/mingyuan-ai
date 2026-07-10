@@ -11,7 +11,12 @@
     "worker:backfill-video-delivery": "DOTENV_CONFIG_PATH=.env NODE_OPTIONS='-r dotenv/config' tsx --tsconfig tsconfig.json src/worker/backfill-video-task-delivery.ts",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:harness": "vitest run __tests__/eval/ __tests__/unit/aim-harness-core.test.ts __tests__/unit/aim-admin-runs-route.test.ts",
+    "typecheck": "tsc --noEmit",
+    "eval:deterministic": "DATABASE_URL='mysql://eval:eval@127.0.0.1:3306/aim_eval' tsx --tsconfig tsconfig.json scripts/aim-eval.ts --deterministic",
+    "eval:daily": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --daily",
+    "eval:full": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --full"
   },
   "dependencies": {
     "@alicloud/credentials": "^2.4.4",

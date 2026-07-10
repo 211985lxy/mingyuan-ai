@@ -4,3 +4,5 @@ node_modules
 
 /src/generated/prisma
 .gstack/
+# aim-harness-v1 eval report output (CI artifacts; not version controlled)
+/aim-eval-report/

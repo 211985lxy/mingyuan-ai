@@ -7,7 +7,7 @@
  *   ─────────────────────
  *   total             : 50
  */
-import type { EvalFixture, EvalScenario } from "../contracts"
+import type { EvalFixture, EvalScenario } from "@/lib/aim-harness/eval/contracts"
 import { CONTENT_PRODUCER_FIXTURES } from "./content-producer"
 import { DEEP_COPYWRITER_FIXTURES } from "./deep-copywriter"
 import { BUSINESS_DIAGNOSIS_FIXTURES } from "./business-diagnosis"

@@ -1,0 +1,57 @@
+name: AIM Harness Eval (daily real-model)
+
+# Daily + manual: 15 deterministically-sampled cases × 2 reps, rubric ON.
+# Uses the real model routing (content_review as rubric judge). Does NOT write
+# to the customer database. Fails only on hard contract failure or fabricated
+# facts in info_insufficient cases (single case may not fail both reps).
+on:
+  schedule:
+    # 08:00 UTC daily
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-eval:
+    name: Daily eval (15 cases × 2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --dir apps/web exec prisma generate
+
+      - name: Daily eval (real model)
+        env:
+          # Real model provider keys for the rubric judge + frozen-adapter run.
+          THEROUTER_API_KEY: ${{ secrets.THEROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          JIEKOU_API_KEY: ${{ secrets.JIEKOU_API_KEY }}
+          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          LIHUO_API_KEY: ${{ secrets.LIHUO_API_KEY }}
+          DATABASE_URL: mysql://eval:eval@127.0.0.1:3306/aim_eval
+        run: |
+          pnpm --dir apps/web run eval:daily > daily-summary.md 2> eval.log
+          STATUS=$?
+          cat daily-summary.md >> "$GITHUB_STEP_SUMMARY"
+          tail -n 20 eval.log >> "$GITHUB_STEP_SUMMARY"
+          exit $STATUS
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aim-eval-daily
+          path: apps/web/aim-eval-report/

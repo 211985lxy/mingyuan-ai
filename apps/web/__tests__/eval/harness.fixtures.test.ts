@@ -19,7 +19,7 @@ import {
   EXPECTED_AGENT_COUNTS,
   EXPECTED_SCENARIO_COVERAGE,
 } from "./fixtures"
-import { gradeFixture, GRADABLE_FORMATS } from "./graders"
+import { gradeFixture, GRADABLE_FORMATS } from "@/lib/aim-harness/eval/graders"
 
 describe("aim harness fixture registry", () => {
   it("has exactly 50 fixtures", () => {

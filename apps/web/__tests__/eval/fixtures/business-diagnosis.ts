@@ -10,7 +10,7 @@
  * Coverage matrix (plan §1):
  *   new 5 | imitate 2 | partial_edit 3 | revision 2 | cite_knowledge 2 | info_insufficient 1
  */
-import type { EvalFixture } from "../contracts"
+import type { EvalFixture } from "@/lib/aim-harness/eval/contracts"
 
 export const BUSINESS_DIAGNOSIS_FIXTURES: EvalFixture[] = [
   // ───────────────────────────── new (5) ─────────────────────────────

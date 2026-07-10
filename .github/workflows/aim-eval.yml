@@ -1,0 +1,59 @@
+name: AIM Harness Eval (deterministic)
+
+# Runs on every PR (and push to main): the deterministic harness gate.
+# No model calls, no customer DB writes. Asserts the 50 eval fixtures pass the
+# routing/format/context contract grader at 100%.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  harness:
+    name: Deterministic eval (no model)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --dir apps/web exec prisma generate
+
+      - name: Typecheck
+        run: pnpm --dir apps/web exec tsc --noEmit
+
+      - name: Lint (AIM harness + eval)
+        run: pnpm --dir apps/web exec eslint --quiet src/lib/aim-harness src/lib/llm/client.ts src/lib/llm/telemetry.ts "__tests__/eval/**"
+
+      # Deterministic harness tests (planner / fallback policy / hashing /
+      # validators / 50 fixture contracts / eval runner).
+      - name: test:harness
+        run: pnpm --dir apps/web run test:harness
+
+      # Deterministic eval report (frozen adapter, no model). Writes report
+      # artifacts and appends the summary to the job.
+      - name: eval:deterministic
+        run: |
+          pnpm --dir apps/web run eval:deterministic > determinstic-summary.md 2> eval.log
+          cat determinstic-summary.md >> "$GITHUB_STEP_SUMMARY"
+          tail -n 20 eval.log >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aim-eval-deterministic
+          path: apps/web/aim-eval-report/
