@@ -59,9 +59,16 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
 }
 
 function createPrismaClient() {
-  const url = new URL(
-    (process.env.DATABASE_URL ?? "").replace(/^mysql:\/\//, "mariadb://")
-  )
+  // `next build` 的 page-data collection 阶段会 import 本模块；构建机/CI 可能
+  // 没有 DATABASE_URL。此时用占位 URL 让模块加载成功（构建不会真正连库），
+  // 真正缺失连接串只会在运行期首次查询时报错——生产环境永远会注入
+  // DATABASE_URL（systemd EnvironmentFile）。这不是 Mock：占位串不返回任何
+  // 假数据，只是推迟到运行期失败。
+  const rawUrl = (process.env.DATABASE_URL ?? "").trim()
+  const connectionString = rawUrl
+    ? rawUrl.replace(/^mysql:\/\//, "mariadb://")
+    : "mariadb://build:build@127.0.0.1:3306/mingyuan"
+  const url = new URL(connectionString)
   const adapter = new PrismaMariaDb({
     host: url.hostname,
     port: parseInt(url.port || "3306"),
