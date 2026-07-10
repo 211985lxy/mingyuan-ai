@@ -12,19 +12,26 @@ import { prisma } from "@/lib/prisma"
  * (provider/model/hashes/metrics) remains queryable.
  */
 
-type FindUniqueDelegate = {
+type TraceDelegate = {
+  // runId is an indexed (non-unique) column on AimExecutionTrace, so use
+  // findFirst; findUnique would fail Prisma validation at runtime.
+  findFirst(args: unknown): Promise<Record<string, unknown> | null>
+}
+
+type SnapshotDelegate = {
+  // runId is @unique on AimRunSnapshot, so findUnique is valid here.
   findUnique(args: unknown): Promise<Record<string, unknown> | null>
 }
 
-function getTraceDelegate(): FindUniqueDelegate | undefined {
+function getTraceDelegate(): TraceDelegate | undefined {
   return (prisma as typeof prisma & {
-    aimExecutionTrace?: FindUniqueDelegate
+    aimExecutionTrace?: TraceDelegate
   }).aimExecutionTrace
 }
 
-function getSnapshotDelegate(): FindUniqueDelegate | undefined {
+function getSnapshotDelegate(): SnapshotDelegate | undefined {
   return (prisma as typeof prisma & {
-    aimRunSnapshot?: FindUniqueDelegate
+    aimRunSnapshot?: SnapshotDelegate
   }).aimRunSnapshot
 }
 
@@ -43,7 +50,11 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
   let snapshot: Record<string, unknown> | null = null
 
   if (traceDelegate) {
-    trace = await traceDelegate.findUnique({ where: { runId } })
+    // runId is non-unique on the trace → findFirst, ordered by most recent.
+    trace = await traceDelegate.findFirst({
+      where: { runId },
+      orderBy: { createdAt: "desc" },
+    })
   }
   if (snapshotDelegate) {
     snapshot = await snapshotDelegate.findUnique({ where: { runId } })

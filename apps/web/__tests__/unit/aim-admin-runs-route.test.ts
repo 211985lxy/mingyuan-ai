@@ -12,7 +12,8 @@ import { NextRequest } from "next/server"
 const traceStore = new Map<string, Record<string, unknown>>()
 const snapshotStore = new Map<string, Record<string, unknown>>()
 const aimExecutionTrace = {
-  findUnique: vi.fn(async ({ where }: { where: { runId?: string; id?: string } }) =>
+  // runId is non-unique on the trace → route uses findFirst
+  findFirst: vi.fn(async ({ where }: { where: { runId?: string; id?: string } }) =>
     where.runId ? traceStore.get(where.runId) ?? null : null
   ),
   findMany: vi.fn(async () => Array.from(traceStore.values())),
