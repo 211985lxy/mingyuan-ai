@@ -208,6 +208,10 @@ interface ChatMessage {
   deliverables?: AimGenerateResponse | null
   qualityReport?: QualityCheckReport | null
   editorApply?: { range: TextSelectionRange } | null
+  // aim-harness-v1: 执行诊断，仅在结果详情/低分/降级时向用户展示执行编号
+  runId?: string | null
+  degraded?: boolean | null
+  qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
 }
 
 interface AimImageAttachment {
@@ -2065,6 +2069,10 @@ export default function AimPage() {
           content: `${agent.title} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`,
           agentId: agent.id,
           deliverables: correctedResponse,
+          // aim-harness-v1: 捕获执行诊断，仅在低分/降级时向用户展示执行编号
+          runId: response.runId ?? null,
+          degraded: response.degraded ?? null,
+          qualityStatus: response.qualityStatus ?? null,
           }
           : message
       ))
@@ -2511,6 +2519,19 @@ export default function AimPage() {
                               : undefined
                           }
                         />
+                      </div>
+                    )}
+
+                    {/* aim-harness-v1 执行诊断：仅在降级或质量异常时展示执行编号，不常驻 */}
+                    {m.deliverables && (m.degraded || (m.qualityStatus && m.qualityStatus !== "pass")) && m.runId && (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${m.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>
+                          {m.degraded ? "降级交付" : "质量提示"}
+                        </span>
+                        <span>执行编号 {m.runId}</span>
+                        {m.qualityStatus && m.qualityStatus !== "pass" && (
+                          <span>· 质量 {m.qualityStatus === "warn" ? "待优化" : m.qualityStatus === "fail" ? "未通过" : m.qualityStatus}</span>
+                        )}
                       </div>
                     )}
 

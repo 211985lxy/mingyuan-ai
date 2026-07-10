@@ -1300,6 +1300,23 @@ export interface AimGenerateResponse {
   conversationMode?: string
   /** 本次实际生效的知识调用策略（由服务端解析，供 UI 反馈） */
   knowledgeStrategy?: string
+  // ── aim-harness-v1 additive diagnostics (optional; always present from the
+  // generate/inspiration entrypoints). Existing consumers ignore these. ──
+  /** 对外执行编号（仅在结果详情/低分/降级时向用户展示） */
+  runId?: string
+  /** 是否发生了 provider fallback 后继续交付 */
+  degraded?: boolean
+  /** 实际命中的 provider / 模型（降级或排查时展示） */
+  provider?: string
+  model?: string
+  /** 主稿确定性+LLM 质量结果：pass | warn | fail | skipped */
+  qualityStatus?: "pass" | "warn" | "fail" | "skipped"
+  /** 每种格式的确定性检查（空内容/长度/禁词/AI 味） */
+  qualityChecks?: Array<{
+    format: ContentFormat
+    passed: boolean
+    checks: Array<{ name: string; passed: boolean; detail?: string }>
+  }>
 }
 
 export interface AimDecisionSnapshot {
