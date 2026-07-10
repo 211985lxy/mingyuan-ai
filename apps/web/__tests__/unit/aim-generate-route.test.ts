@@ -62,6 +62,47 @@ vi.mock("@/lib/aim-generate-context", () => ({
   buildRawInputWithCommentInsightContext,
 }))
 
+// aim-harness-v1: keep the route's real behavior (calls generateAimContent +
+// runQualityCheck, returns runId/degraded/qualityReport) but avoid hitting the
+// DB for snapshot/trace persistence in this unit test. The adapter still runs
+// the real deterministic validators + the (mocked) main-draft LLM report.
+vi.mock("@/lib/aim-harness/adapters", () => ({
+  runAimGenerate: vi.fn(async (input: {
+    execute: () => Promise<{ id: string; results: Array<{ format: string; content: string; wordCount: number }>; knowledgeUsed: unknown[] }>
+    runLlmQuality?: boolean
+  }) => {
+    const result = await input.execute()
+    let qualityReport: Record<string, unknown> | undefined
+    if (input.runLlmQuality !== false) {
+      const { runQualityCheck } = await import("@/lib/quality-gate")
+      const main = result.results.find((item) =>
+        ["video_script", "koubo_script", "xiaohongshu_post"].includes(item.format) && item.content?.trim()
+      )
+      if (main) {
+        const report = await runQualityCheck({ content: main.content, topicTitle: undefined })
+        qualityReport = {
+          overallScore: report.overall.score,
+          passed: report.overall.passed,
+          editorial: report.editorial.score,
+          aiTaste: report.aiTaste.score,
+          attraction: report.attraction.score,
+          logic: report.logic.score,
+        }
+      }
+    }
+    return {
+      result,
+      runId: "run_test",
+      degraded: false,
+      provider: "test-provider",
+      model: "test-model",
+      qualityChecks: [],
+      qualityStatus: "pass",
+      qualityReport,
+    }
+  }),
+}))
+
 import { POST } from "@/app/api/aim/generate/route"
 
 function makeRequest(body: Record<string, unknown>) {

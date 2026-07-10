@@ -29,6 +29,7 @@ import {
   persistMemoriesFromConversation,
   type AimMemoryMessage,
 } from "@/lib/aim-memory"
+import { runAimChat, planAimChatStream } from "@/lib/aim-harness/adapters"
 
 /** 把 chat 请求里的 messages 规范化为记忆提炼所需格式（只保留 user/assistant 的文本内容）。 */
 function normalizeMemoryMessages(messages: unknown): AimMemoryMessage[] {
@@ -58,7 +59,11 @@ function extractTextContent(content: unknown): string {
     .join("\n")
 }
 
-function streamChatContent(chunks: AsyncIterable<string>, trace?: AimTraceRecorder) {
+function streamChatContent(
+  chunks: AsyncIterable<string>,
+  trace?: AimTraceRecorder,
+  options?: { runId?: string; finalize?: (output: string, ok: boolean) => Promise<void> }
+) {
   const encoder = new TextEncoder()
   return new Response(
     new ReadableStream({
@@ -78,6 +83,7 @@ function streamChatContent(chunks: AsyncIterable<string>, trace?: AimTraceRecord
             outputSummary: summarizeText(output),
           })
           await finishAimTrace(trace, { outputSummary: summarizeText(output) })
+          await options?.finalize?.(output, true)
           controller.close()
         } catch (error) {
           await addAimTraceStep(trace, {
@@ -88,6 +94,7 @@ function streamChatContent(chunks: AsyncIterable<string>, trace?: AimTraceRecord
             error: error instanceof Error ? error.message : String(error),
           })
           await failAimTrace(trace, error)
+          await options?.finalize?.(output, false)
           controller.error(error)
         }
       },
@@ -99,6 +106,8 @@ function streamChatContent(chunks: AsyncIterable<string>, trace?: AimTraceRecord
         // 关闭 nginx 代理缓冲，确保流式 token 即时下发到客户端，
         // 否则 nginx 会攒齐整个响应，长耗时时易触发 504。
         "X-Accel-Buffering": "no",
+        // aim-harness-v1: expose the execution number on the stream response.
+        ...(options?.runId ? { "X-AIM-Run-Id": options.runId } : {}),
       },
     },
   )
@@ -267,6 +276,16 @@ export async function POST(request: NextRequest) {
     })
 
     if (shouldStream) {
+      // aim-harness-v1: plan the stream run, capture telemetry, set X-AIM-Run-Id
+      // and backfill the snapshot/trace once the stream completes.
+      const streamPlan = await planAimChatStream({
+        rawInput: query,
+        agentId,
+        messages: normalizeMemoryMessages(messages),
+        trace,
+        userId: user.id,
+        projectId: projectId || null,
+      })
       // Fire-and-forget: 从已有对话沉淀长期记忆（不等流式输出完成）
       if (projectId && agentId) {
         const memoryMessages = normalizeMemoryMessages(messages)
@@ -276,11 +295,23 @@ export async function POST(request: NextRequest) {
           agentId,
         }).catch(() => {})
       }
-      return streamChatContent(buildAimChatResponseStream(agentId, chatParams), trace)
+      return streamChatContent(
+        buildAimChatResponseStream(agentId, chatParams),
+        trace,
+        { runId: streamPlan.runId, finalize: streamPlan.finalize },
+      )
     }
 
-    const chatResponse = await buildAimChatResponse(agentId, chatParams)
-    await finishAimTrace(trace, { outputSummary: summarizeText(chatResponse.content) })
+    const chatHarness = await runAimChat({
+      execute: () => buildAimChatResponse(agentId, chatParams).then((response) => response.content),
+      rawInput: query,
+      agentId,
+      messages: normalizeMemoryMessages(messages),
+      trace,
+      userId: user.id,
+      projectId: projectId || null,
+    })
+    await finishAimTrace(trace, { outputSummary: summarizeText(chatHarness.content) })
 
     // Fire-and-forget: 从本次对话沉淀长期记忆（决策/偏好/事实）
     if (projectId && agentId) {
@@ -293,7 +324,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      content: chatResponse.content,
+      content: chatHarness.content,
+      runId: chatHarness.runId,
+      degraded: chatHarness.degraded,
+      provider: chatHarness.provider,
+      model: chatHarness.model,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)

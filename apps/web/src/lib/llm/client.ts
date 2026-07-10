@@ -1,6 +1,10 @@
 import { getProviderConfigs } from "./config"
 import { OpenAICompatibleProvider } from "./provider"
 import type { CompletionOptions, CompletionResult, LLMProvider } from "./types"
+import {
+  classifyProviderError,
+  reportProviderAttempt,
+} from "./telemetry"
 
 let _instance: LLMClient | null = null
 
@@ -32,6 +36,10 @@ export class LLMClient {
   /**
    * Run a chat completion through the provider chain.
    * Tries each provider in order; falls back on failure.
+   *
+   * aim-harness-v1: reports each provider attempt via telemetry and honors the
+   * fallback policy — non-retryable errors (400/401/403/config) fail immediately
+   * instead of silently switching to the next provider.
    */
   async complete(options: CompletionOptions): Promise<CompletionResult> {
     if (this.providers.length === 0) {
@@ -42,15 +50,39 @@ export class LLMClient {
 
     let lastError: Error | undefined
 
-    for (const provider of this.providers) {
+    for (let index = 0; index < this.providers.length; index += 1) {
+      const provider = this.providers[index]
+      const startedAt = Date.now()
       try {
-        return await provider.complete(options)
+        const result = await provider.complete(options)
+        reportProviderAttempt({
+          provider: provider.name,
+          model: options.model,
+          status: "success",
+          durationMs: Date.now() - startedAt,
+          attemptIndex: index,
+          responseModel: result.model,
+          totalTokens: result.usage?.totalTokens,
+        })
+        return result
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
+        const classified = classifyProviderError(error)
+        reportProviderAttempt({
+          provider: provider.name,
+          model: options.model,
+          status: "failed",
+          error: lastError.message,
+          errorKind: classified.kind,
+          durationMs: Date.now() - startedAt,
+          attemptIndex: index,
+        })
         console.warn(
-          `[llm] Provider "${provider.name}" failed, trying next:`,
+          `[llm] Provider "${provider.name}" failed (${classified.kind}), trying next:`,
           lastError.message
         )
+        // Non-retryable errors must not silently switch models.
+        if (!classified.retryable) break
       }
     }
 
@@ -60,6 +92,10 @@ export class LLMClient {
   /**
    * Stream a chat completion through the provider chain.
    * Falls back only if a provider fails before emitting chunks.
+   *
+   * aim-harness-v1: reports attempts + honors fallback policy (non-retryable
+   * errors fail immediately). Telemetry reports the successful provider once the
+   * stream completes; failures-before-emit are classified like complete().
    */
   async *stream(options: CompletionOptions): AsyncIterable<string> {
     if (this.providers.length === 0) {
@@ -70,23 +106,54 @@ export class LLMClient {
 
     let lastError: Error | undefined
 
-    for (const provider of this.providers) {
+    for (let index = 0; index < this.providers.length; index += 1) {
+      const provider = this.providers[index]
       if (!provider.stream) continue
 
+      const startedAt = Date.now()
       let emitted = false
       try {
         for await (const chunk of provider.stream(options)) {
           emitted = true
           yield chunk
         }
+        reportProviderAttempt({
+          provider: provider.name,
+          model: options.model,
+          status: "success",
+          durationMs: Date.now() - startedAt,
+          attemptIndex: index,
+        })
         return
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        if (emitted) throw lastError
+        if (emitted) {
+          reportProviderAttempt({
+            provider: provider.name,
+            model: options.model,
+            status: "failed",
+            error: lastError.message,
+            errorKind: classifyProviderError(error).kind,
+            durationMs: Date.now() - startedAt,
+            attemptIndex: index,
+          })
+          throw lastError
+        }
+        const classified = classifyProviderError(error)
+        reportProviderAttempt({
+          provider: provider.name,
+          model: options.model,
+          status: "failed",
+          error: lastError.message,
+          errorKind: classified.kind,
+          durationMs: Date.now() - startedAt,
+          attemptIndex: index,
+        })
         console.warn(
-          `[llm] Provider "${provider.name}" stream failed, trying next:`,
+          `[llm] Provider "${provider.name}" stream failed (${classified.kind}), trying next:`,
           lastError.message
         )
+        if (!classified.retryable) break
       }
     }
 

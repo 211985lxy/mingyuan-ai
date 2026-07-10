@@ -4,6 +4,8 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { generateAimContent } from "@/lib/aim-generator"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { Prisma } from "@/generated/prisma/client"
+import { runAimGenerate } from "@/lib/aim-harness/adapters"
+import { createAimTrace } from "@/lib/aim-observability"
 
 export async function POST(
   request: NextRequest,
@@ -28,15 +30,38 @@ export async function POST(
       return NextResponse.json({ error: "请选择 IP 营销全案" }, { status: 400 })
     }
 
-    // 调用 AIM 生成文案
-    const result = await generateAimContent({
+    // aim-harness-v1: route through the thin harness for runId/provider/model/
+    // degraded + snapshot + trace. Inspiration is a content draft path.
+    const trace = await createAimTrace({
       userId: user.id,
       projectId,
+      agentId: "content_producer",
+      action: "generate",
+      inputSummary: inspiration.content,
+    })
+    const harness = await runAimGenerate({
+      execute: () =>
+        generateAimContent({
+          userId: user.id,
+          projectId,
+          rawInput: inspiration.content,
+          targetFormats: ["video_script", "shooting_brief", "moments_post"] as ContentFormat[],
+          taskType: "write_script",
+          topicTitle,
+          trace,
+        }),
       rawInput: inspiration.content,
+      agentId: "content_producer",
       targetFormats: ["video_script", "shooting_brief", "moments_post"] as ContentFormat[],
       taskType: "write_script",
-      topicTitle,
+      entrypoint: "inspiration",
+      trace,
+      userId: user.id,
+      projectId,
+      runLlmQuality: false,
     })
+
+    const result = harness.result
 
     // 更新灵感记录，关联生成结果
     await prisma.inspiration.update({
@@ -47,7 +72,13 @@ export async function POST(
       },
     })
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      ...result,
+      runId: harness.runId,
+      degraded: harness.degraded,
+      provider: harness.provider,
+      model: harness.model,
+    })
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse

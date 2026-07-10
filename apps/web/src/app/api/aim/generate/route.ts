@@ -23,6 +23,7 @@ import {
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
+import { runAimGenerate } from "@/lib/aim-harness/adapters"
 
 function includesAny(text: string, words: string[]) {
   return words.some((word) => text.includes(word))
@@ -186,90 +187,79 @@ export async function POST(request: NextRequest) {
       }),
     )
 
-    const result = await generateAimContent({
-      userId: user.id,
-      projectId: parsed.projectId,
+    // ── aim-harness-v1: generate through the thin harness ──
+    // The harness wraps generateAimContent unchanged, capturing runId / real
+    // provider+model / fallbackIndex / degraded / promptHash / contextHash,
+    // persisting an AimRunSnapshot and stamping the trace. It also runs the
+    // deterministic validators on every format + the main-draft LLM report
+    // (read-only; auto-rewrite stays off the main path).
+    const harness = await runAimGenerate({
+      execute: () =>
+        generateAimContent({
+          userId: user.id,
+          projectId: parsed.projectId,
+          rawInput: withCommentContext,
+          agentId: parsed.agentId,
+          targetFormats: parsed.targetFormats,
+          taskType: parsed.taskType,
+          topicTitle: parsed.topicTitle,
+          topicRationale: parsed.topicRationale,
+          topicType: parsed.topicType,
+          hotTopic: parsed.hotTopic,
+          polishInstruction: parsed.polishInstruction,
+          videoCopyExtractionId: parsed.videoCopyExtractionId,
+          existingGenerationId: parsed.existingGenerationId,
+          runtimeTask,
+          trace,
+        }),
       rawInput: withCommentContext,
-      agentId: parsed.agentId,
+      agentId: parsed.agentId || "content_producer",
       targetFormats: parsed.targetFormats,
       taskType: parsed.taskType,
-      topicTitle: parsed.topicTitle,
-      topicRationale: parsed.topicRationale,
+      polishInstruction: parsed.polishInstruction,
       topicType: parsed.topicType,
       hotTopic: parsed.hotTopic,
-      polishInstruction: parsed.polishInstruction,
-      videoCopyExtractionId: parsed.videoCopyExtractionId,
-      existingGenerationId: parsed.existingGenerationId,
-      runtimeTask,
+      entrypoint: "generate",
       trace,
+      userId: user.id,
+      projectId: parsed.projectId || null,
     })
 
-    // ── 后置质检（含 RedFox 违禁词检测） ──
-    // ponytail: quality gate is tuned for publishable short-form scripts, not planning/diagnosis raw_copy.
-    const qualityGateFormats = new Set(["video_script", "koubo_script", "xiaohongshu_post"])
-    const firstQualityCandidate = result.results.find((item) =>
-      item.content?.trim() && qualityGateFormats.has(item.format)
-    )
-    const needsQualityCheck =
-      parsed.agentId !== "persona" &&
-      parsed.agentId !== "free_copywriter" &&
-      parsed.taskType !== "polish_copy" &&
-      parsed.taskType !== "quality_check" &&
-      !!firstQualityCandidate
+    const result = harness.result
 
-    if (needsQualityCheck && firstQualityCandidate) {
-      try {
-        const { runQualityCheck } = await import("@/lib/quality-gate")
-        const qualityReport = await runAimTraceStep(
-          trace,
-          "quality_gate",
-          "生成后质检（含违禁词检测）",
-          () => runQualityCheck({
-            content: firstQualityCandidate.content,
-            topicTitle: parsed.topicTitle,
-          }),
-          (report) => ({
-            summary: `质检得分 ${report.overall.score}/10，${report.overall.passed ? "通过" : "未通过"}`,
-            metadata: {
-              overallScore: report.overall.score,
-              passed: report.overall.passed,
-              editorialScore: report.editorial.score,
-              aiTasteScore: report.aiTaste.score,
-              attractionScore: report.attraction.score,
-              logicScore: report.logic.score,
-              hasCompliance: !!report.compliance,
-              compliancePassed: report.compliance?.passed,
-            },
-          }),
-        )
-        // 将质检报告附加到返回结果中（前端可展示）
-        return NextResponse.json({
-          ...result,
-          qualityReport: {
-            overallScore: qualityReport.overall.score,
-            passed: qualityReport.overall.passed,
-            editorial: qualityReport.editorial.score,
-            aiTaste: qualityReport.aiTaste.score,
-            attraction: qualityReport.attraction.score,
-            logic: qualityReport.logic.score,
-            compliance: qualityReport.compliance
-              ? { passed: qualityReport.compliance.passed, violations: qualityReport.compliance.violations.length }
-              : undefined,
+    if (harness.qualityReport) {
+      await runAimTraceStep(
+        trace,
+        "quality_gate",
+        "生成后质检（含违禁词检测）",
+        async () => harness.qualityReport as Record<string, unknown>,
+        (report) => ({
+          summary: `质检得分 ${(report as { overallScore?: number }).overallScore ?? "-"}/10，${(report as { passed?: boolean }).passed ? "通过" : "未通过"}`,
+          metadata: {
+            ...report,
+            runId: harness.runId,
+            degraded: harness.degraded,
+            provider: harness.provider,
+            model: harness.model,
+            qualityStatus: harness.qualityStatus,
           },
-        })
-      } catch (err) {
-        // 质检失败不阻断生成结果，仅记录
-        console.warn("[aim/generate] Quality gate check failed:", err)
-        await addAimTraceStep(trace, {
-          key: "quality_gate",
-          label: "生成后质检（含违禁词检测）",
-          status: "skipped",
-          summary: "质检执行异常，已跳过",
-        })
-      }
+        }),
+      )
     }
 
-    return NextResponse.json(result)
+    return NextResponse.json({
+      ...result,
+      // Additive optional fields (Phase 4): runId, degraded, provider, model,
+      // qualityStatus and deterministic per-format qualityChecks. Existing
+      // qualityReport keeps its meaning (main-draft LLM score).
+      runId: harness.runId,
+      degraded: harness.degraded,
+      provider: harness.provider,
+      model: harness.model,
+      qualityStatus: harness.qualityStatus,
+      qualityChecks: harness.qualityChecks,
+      qualityReport: harness.qualityReport,
+    })
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
