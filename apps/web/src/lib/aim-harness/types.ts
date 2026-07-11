@@ -76,6 +76,17 @@ export interface AimRunSpec {
   /** stable label identifying the actor (user id / api key id) */
   actorId?: string
   projectId?: string
+  /**
+   * draft-only: do NOT persist a generation record (agent_api 外部交付约定)。
+   * 升级阶段 1.2：此前散落在 adapter 入参里，现在并入冻结的 spec，使"是否落库"
+   * 与其它决策一样由 planner 一次确定、下游不再二次判断。
+   */
+  draftOnly?: boolean
+  /**
+   * 是否对主稿跑 LLM 质检（只读、不回写）。agent_api / inspiration 入口显式关闭。
+   * 升级阶段 1.2：并入冻结 spec，统一质检开关的事实源。
+   */
+  runLlmQuality?: boolean
 }
 
 /** Per-run metadata captured during execution (the acceptance-criteria payload). */

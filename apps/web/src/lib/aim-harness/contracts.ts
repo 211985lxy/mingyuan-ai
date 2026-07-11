@@ -68,3 +68,162 @@ export function isValidAimAgent(id: string | null | undefined): id is AimAgentId
   if (!id) return false
   return (AIM_AGENT_IDS as Set<string>).has(id) || id in LEGACY_AGENT_ID_ALIASES
 }
+
+// ─── v2 运行时契约（升级阶段 1.2 引入，阶段 1.3 起 executeAimRun/streamAimRun 消费）
+// ────────────────────────────────────────────────────────────────────────────
+//
+// 下面四个类型是"Harness 作为唯一执行内核"的对外契约形状。它们复用已有的
+// AimRunSpec / AimRunMetadata（types.ts）和 eval 侧的 FrozenContext /
+// EvalExecutionResult，确保生产运行时与确定性评测共享同一套结构，可逐字对拍。
+//
+// 阶段 1.2 仅声明类型与 re-export，不新增任何执行逻辑（行为零变化）。阶段 2
+// 的 prepareAimContext / executeAimRun / streamAimRun 才真正产出这些值。
+
+import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
+import type {
+  AimRuntimeTask,
+  ResolvedKnowledgeStrategy,
+} from "@/lib/aim-knowledge-strategy"
+import type { AimConversationMode } from "@/lib/aim-conversation-intent"
+import type { TaskSpec } from "@/lib/task-spec"
+import type {
+  AimRunSpec,
+  AimRunMetadata,
+  AimContextSource,
+} from "./types"
+
+/**
+ * 单条对话消息（chat / revision 场景）。与 EvalInput.messages 同构。
+ * 单独定义以避免 v2 契约反向依赖 eval 模块。
+ */
+export interface AimChatTurn {
+  role: "user" | "assistant"
+  content: string
+}
+
+/**
+ * 唯一运行请求 —— 所有 AIM 入口（generate / chat / agent_api / inspiration）
+ * 在阶段 2 迁移后都必须构造它并交给 executeAimRun / streamAimRun。
+ *
+ * 字段是对四入口现有入参的并集；可选字段仅在对应入口有意义。agentId 为 string
+ * （可能含旧别名），归一化在 executeAimRun 内部完成（阶段 2）。
+ */
+export interface AimRunRequest {
+  /** 服务端入口 */
+  entrypoint: AimEntrypoint
+  /** 智能体 id（string，接受旧别名，内部归一化） */
+  agentId: string
+  /** 用户原始输入（已含被注入的爆款/热榜/评论等来源文本，阶段 2 由 prepareAimContext 产出） */
+  rawInput: string
+  /** 期望输出格式 */
+  targetFormats?: ContentFormat[]
+  /** 任务类型（驱动 runtimeTask 解析） */
+  taskType?: AimTaskType
+  /** 执行者稳定标识（userId / api key id），用于隔离与诊断 */
+  actorId?: string
+  projectId?: string
+  /** 选题流转标识（落 AimGeneration.topicSelectionId） */
+  topicSelectionId?: string
+  selectedTopicIndex?: number
+  /** 已授权重建的工作流 TaskSpec（route 层 buildWorkflowBrief 产出） */
+  taskSpec?: TaskSpec
+  /** 运行时任务覆盖（route 已解析时透传，避免 planner 二次解析） */
+  runtimeTask?: AimRuntimeTask
+  /** 知识策略覆盖（已解析时透传） */
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
+  conversationMode?: AimConversationMode
+  /** chat / revision 场景的对话历史 */
+  messages?: AimChatTurn[]
+  /** 输出格式相关元数据 */
+  topicTitle?: string
+  topicRationale?: string
+  topicType?: string
+  hotTopic?: string
+  polishInstruction?: string
+  videoCopyExtractionId?: string
+  /** 复用既有生成记录（追改场景） */
+  existingGenerationId?: string
+  /** 关联 trace（route 层已创建） */
+  trace?: { id: string }
+  /** draft-only：不落生成记录（agent_api 外部交付） */
+  draftOnly?: boolean
+  /** 是否跑 LLM 质检（默认 true；agent_api / inspiration 关闭） */
+  runLlmQuality?: boolean
+  /** 流式输出 */
+  stream?: boolean
+}
+
+/**
+ * 统一上下文装配阶段的产物。prepareAimContext(spec) 一次产出 prompt 所需的全部
+ * block + 声明式来源清单，handler 只读它、不再自行查知识/建 TaskSpec。
+ *
+ * 与 eval 侧 FrozenContext 同构（blocks 字段一一对应），保证生产与评测可对拍。
+ */
+export interface PreparedAimContext {
+  /** 冻结的运行计划（planner 产出，不可变） */
+  spec: AimRunSpec
+  /** 进 prompt 的最终用户输入文本（逐字，含注入来源） */
+  rawInput: string
+  /** 各类上下文 block；空 block 为 ""，便于直接拼接 */
+  blocks: {
+    knowledge: string
+    methodology: string
+    businessDiagnosis: string
+    viralStructure: string
+    eventStorytelling: string
+    ipWiki: string
+    /** 对话记忆（generate 路径此前未接入，阶段 2 接入） */
+    memory?: string
+    /** chat 场景的对话上下文块 */
+    conversation?: string
+    /** 竞品监控（chat 专有） */
+    competitorWatch?: string
+  }
+  /** 已解析/重建的 TaskSpec（落 AimGeneration.taskSpec） */
+  taskSpec?: TaskSpec
+  /** RAG 命中的知识条目（含 id，用于引用校验与 manifest） */
+  retrievedEntries?: Array<{ id: string; title: string; category?: string }>
+  retrievedSource?: string
+  /** 声明式来源清单（每个被装配件同步 push 一条），用于 contextHash + 快照 */
+  contextManifest: AimContextSource[]
+  /** 是否已应用上下文预算裁剪 */
+  budgetApplied: boolean
+}
+
+/**
+ * 智能体产出。handler(prepared) 返回它；与 EvalExecutionResult（drafts /
+ * citedKnowledgeIds / warnedInsufficientInfo）同构，便于评测 graders 复用。
+ */
+export interface AimAgentOutput {
+  /** 每种格式的草稿 */
+  drafts: Array<{ format: ContentFormat; content: string; wordCount?: number }>
+  /** 实际引用的知识条目 id（用于引用校验） */
+  citedKnowledgeIds?: string[]
+  /** 信息不足时是否给出明确提示（而非编造） */
+  warnedInsufficientInfo?: boolean
+  /** 质检报告（content_review 等场景产出） */
+  reviewReport?: string
+}
+
+/**
+ * 唯一执行内核的返回值。executeAimRun 返回它；入口据此序列化 HTTP 响应。
+ * metadata.runId 是对外执行编号（兼容现有 runId 诊断字段）。
+ */
+export interface AimRunResult {
+  /** 运行元数据（runId / provider / model / fallbackIndex / degraded / hashes） */
+  metadata: AimRunMetadata
+  /** 智能体产出 */
+  output: AimAgentOutput
+  /** 落库的生成记录 id（draftOnly 时为 undefined） */
+  generationId?: string
+  /** 快照 id（admin 可查） */
+  snapshotId?: string
+  /** 关联 trace id */
+  traceId?: string
+  /** 主稿 LLM 质检报告（runLlmQuality 关闭时为 undefined） */
+  qualityReport?: Record<string, unknown>
+  /** 冻结的运行计划（回传给入口做响应序列化） */
+  spec: AimRunSpec
+}
+
+export type { AimRunSpec, AimRunMetadata, AimContextSource }

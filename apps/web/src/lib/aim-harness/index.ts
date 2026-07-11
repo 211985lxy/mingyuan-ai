@@ -23,6 +23,23 @@ export type {
   AimRunSpec,
 } from "./types"
 
+// v2 运行时契约（升级阶段 1.2）：身份契约 + 请求/上下文/产出/结果类型。
+// AimAgentId / AimEntrypoint 仍从 ./types re-export（上方），保持既有导入路径稳定。
+export {
+  AIM_AGENT_IDS,
+  DEFAULT_AIM_AGENT,
+  LEGACY_AGENT_ID_ALIASES,
+  normalizeAimAgentId,
+  isValidAimAgent,
+} from "./contracts"
+export type {
+  AimRunRequest,
+  PreparedAimContext,
+  AimAgentOutput,
+  AimRunResult,
+  AimChatTurn,
+} from "./contracts"
+
 export { planAimRun } from "./planner"
 export type { PlanRunInput } from "./planner"
 
