@@ -2,8 +2,7 @@
  * AIM Harness v2 — 唯一执行入口（阶段 1.3 引入骨架，阶段 2.4 真正接管非流式）。
  *
  * executeAimRun / streamAimRun 是"Harness 作为 AIM 唯一执行内核"的对外入口。
- * 四个服务端入口（generate / chat / agent_api / inspiration）在阶段 2 将逐个
- * 从旧 adapter（runAimGenerate / runAimChat / planAimChatStream）切换到这里。
+ * 四个服务端入口（generate / chat / agent_api / inspiration）均通过本模块执行。
  *
  * ── 阶段 2.4（本提交）：executeAimRun 内化非流式编排 ──
  * 入口形态确立后，executeAimRun 现在承担：
@@ -233,7 +232,7 @@ export async function executeAimRun<TOutput = unknown>(
  * 流式唯一入口（阶段 2.5 真内核）。
  *
  * 与 executeAimRun 共享 plan / runId / telemetry / snapshot lifecycle，吃掉此前
- * planAimChatStream 内部三处散落：
+ * 流式路径同样统一以下生命周期：
  *   - runId 统一走 runner.makeRunId（此前 adapters.ts 独立 randomUUID）
  *   - telemetry 用 wrapLlmTelemetryIterable 包裹流（流式专用；与 runWithLlmTelemetry
  *     共享 ProviderAttempt/LlmInvocation 结构）

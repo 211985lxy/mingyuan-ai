@@ -1,7 +1,7 @@
 import { buildAimChatResponse, buildAimGeneration } from "@/lib/aim-agent-handlers"
 import { resolveAimConversationIntentWithRules } from "@/lib/aim-conversation-intent"
 
-import { runAimChat, runAimGenerate } from "./adapters"
+import { executeAimRun } from "./runtime"
 import type { EvalContext, EvalExecutionResult, EvalExecutor } from "./eval-runner"
 import type { EvalFixture } from "./eval/contracts"
 import { sha256 } from "./hashing"
@@ -48,8 +48,23 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
   const rawInput = composeRawInput(fixture, context)
   const targetFormats = fixture.input.targetFormats ?? fixture.expectations.outputFormats
   const contextManifest = buildContextManifest(fixture, context)
-  const harness = await runAimGenerate({
-    execute: () => buildAimGeneration(fixture.agent, {
+  const run = await executeAimRun({
+    entrypoint: fixture.entrypoint === "agent_api" ? "agent_api" : fixture.entrypoint === "inspiration" ? "inspiration" : "generate",
+    rawInput,
+    agentId: fixture.agent,
+    targetFormats,
+    taskType: fixture.input.taskType,
+    polishInstruction: fixture.input.polishInstruction,
+    topicTitle: fixture.input.topicTitle,
+    topicRationale: fixture.input.topicRationale,
+    topicType: fixture.input.topicType,
+    hotTopic: fixture.input.hotTopic,
+    actorId: "aim-eval",
+    contextManifest,
+    runLlmQuality: false,
+    persistSnapshot: false,
+  }, async (spec) => {
+    const output = await buildAimGeneration(spec.agentId, {
       userId: "aim-eval",
       rawInput,
       targetFormats,
@@ -59,6 +74,7 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
       topicType: fixture.input.topicType,
       hotTopic: fixture.input.hotTopic,
       polishInstruction: fixture.input.polishInstruction,
+      runtimeTask: spec.runtimeTask,
       skipPersistence: true,
       contextOverride: {
         knowledgeBlock: context.knowledgeBlock,
@@ -72,25 +88,15 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
         viralStructureBlock: context.videoCopyBlock,
         ipWikiBlock: context.ipWikiBlock,
       },
-    }),
-    rawInput,
-    agentId: fixture.agent,
-    targetFormats,
-    taskType: fixture.input.taskType,
-    polishInstruction: fixture.input.polishInstruction,
-    topicType: fixture.input.topicType,
-    hotTopic: fixture.input.hotTopic,
-    entrypoint: fixture.entrypoint === "agent_api" ? "agent_api" : fixture.entrypoint === "inspiration" ? "inspiration" : "generate",
-    contextManifest,
-    runLlmQuality: false,
-    persistSnapshot: false,
+    })
+    return { output, contextManifest }
   })
-  const drafts = harness.result.results.map((item) => ({ format: item.format, content: item.content }))
+  const drafts = run.output.results.map((item) => ({ format: item.format, content: item.content }))
   return {
     drafts,
-    citedKnowledgeIds: harness.result.knowledgeUsed.map((entry) => entry.id),
+    citedKnowledgeIds: run.output.knowledgeUsed.map((entry) => entry.id),
     warnedInsufficientInfo: warnedInsufficientInfo(drafts),
-    runId: harness.runId,
+    runId: run.metadata.runId,
   }
 }
 
@@ -102,26 +108,33 @@ const runRealChat: RealCaseRunner = async (fixture, context) => {
     messages,
   }).intent
   const contextManifest = buildContextManifest(fixture, context)
-  const harness = await runAimChat({
-    execute: () => buildAimChatResponse(fixture.agent, {
+  const run = await executeAimRun({
+    entrypoint: "chat",
+    rawInput,
+    agentId: fixture.agent,
+    targetFormats: [],
+    messages,
+    actorId: "aim-eval",
+    runtimeTask: fixture.expectations.runtimeTask,
+    conversationMode: conversationIntent.mode,
+    contextManifest,
+    persistSnapshot: false,
+  }, async (spec) => {
+    const response = await buildAimChatResponse(spec.agentId, {
       userId: "aim-eval",
       messages,
       knowledgeBlock: context.knowledgeBlock,
       conversationIntent,
-      runtimeTask: fixture.expectations.runtimeTask,
-    }).then((response) => response.content),
-    rawInput,
-    agentId: fixture.agent,
-    messages,
-    contextManifest,
-    persistSnapshot: false,
+      runtimeTask: spec.runtimeTask,
+    })
+    return { output: response.content, contextManifest }
   })
-  const drafts = [{ format: "raw_copy", content: harness.content }]
+  const drafts = [{ format: "raw_copy", content: run.output }]
   return {
     drafts,
     citedKnowledgeIds: context.knowledgeIds,
     warnedInsufficientInfo: warnedInsufficientInfo(drafts),
-    runId: harness.runId,
+    runId: run.metadata.runId,
   }
 }
 

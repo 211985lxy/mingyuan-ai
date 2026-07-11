@@ -16,9 +16,7 @@
  *       handler 改为只接收 PreparedAimContext 后消除），暂列入白名单 + TODO。
  *   R3  AimAgentId 的 `export type` 定义全仓只允许出现在 contracts.ts（唯一源）。
  *       立即硬失败。
- *   R4  废弃 adapter（runAimGenerate / runAimChat / planAimChatStream）不得有
- *       新增调用者。现有调用者（四入口 + eval-real-executor）为基线白名单，
- *       迁移完成后逐个从白名单移除；任何白名单外的新引用硬失败。
+ *   R4  旧 adapter 文件和符号已删除，任何回流都硬失败。
  *
  * 退出码：0 通过；1 有硬失败；2 仅有待收紧项（阶段过渡期视为通过，但打印提醒）。
  *
@@ -89,6 +87,7 @@ const EXEC_ENTRYPOINTS = [
 // 阶段 1 基线：这些入口当前确实直接 import 了底层模块（迁移完成后应全部清零）。
 // 列为 todo，迁移完成后把 forbidden 改为硬失败。
 const R1_FORBIDDEN = [
+  /from\s+["']@\/lib\/aim-harness\/adapters["']/,
   /from\s+["']@\/lib\/aim-agent-handlers["']/,
   /from\s+["']@\/lib\/aim-generator["']/,
   /from\s+["']@\/lib\/prisma["']/,
@@ -105,6 +104,14 @@ function checkR1() {
     } catch {
       findings.push({ rule: "R1", severity: "error", file: ep, detail: "执行入口文件缺失" })
       continue
+    }
+    if (!/\b(executeAimRun|streamAimRun)\b/.test(text)) {
+      findings.push({
+        rule: "R1",
+        severity: "error",
+        file: ep,
+        detail: "正式 AIM 入口必须调用 executeAimRun 或 streamAimRun",
+      })
     }
     for (const re of R1_FORBIDDEN) {
       const m = text.match(re)
@@ -151,22 +158,13 @@ function checkR2() {
 }
 
 // ── R4：废弃 adapter 不得有新增调用者 ───────────────────────────────────────
-// 阶段 2.6–2.10 入口迁移完成后，四入口与 eval-real-executor 已全部改用
-// executeAimRun/streamAimRun，旧 adapter（runAimGenerate/runAimChat/planAimChatStream）
-// 成为死代码。白名单收紧为只剩"定义自身 + runtime 注释引用"；任何其它文件引用
-// （含四入口）即硬失败，防止回退。
-const R4_BASELINE_CALLERS = new Set<string>([
-  "src/lib/aim-harness/adapters.ts", // 自身定义（死代码，阶段 3 删除）
-  "src/lib/aim-harness/runtime.ts", // 注释引用（非真实调用）
-])
 const R4_DEPRECATED = /\b(runAimGenerate|runAimChat|planAimChatStream)\b/
 
 function checkR4(files: string[]) {
   for (const file of files) {
     const rp = rel(file)
     const text = read(file)
-    // 命中废弃符号且不在基线白名单 → 视为新增调用者，硬失败。
-    if (R4_DEPRECATED.test(text) && !R4_BASELINE_CALLERS.has(rp)) {
+    if (R4_DEPRECATED.test(text)) {
       findings.push({
         rule: "R4",
         severity: "error",
