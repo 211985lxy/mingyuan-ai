@@ -21,7 +21,7 @@ export type AimTaskType =
   | "quality_check"
   | "repurpose"
 
-interface AimInput {
+export interface AimInput {
   userId: string
   agentId?: string
   projectId?: string

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { generateAimContent } from "@/lib/aim-generator"
-import type { ContentFormat } from "@/lib/aim-generator"
 import type { Prisma } from "@/generated/prisma/client"
 import { executeAimRun } from "@/lib/aim-harness/runtime"
+import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
 
 export async function POST(
@@ -37,7 +36,11 @@ export async function POST(
       action: "generate",
       inputSummary: inspiration.content,
     })
-    const targetFormats = ["video_script", "shooting_brief", "moments_post"] as ContentFormat[]
+    const targetFormats: Array<"video_script" | "shooting_brief" | "moments_post"> = [
+      "video_script",
+      "shooting_brief",
+      "moments_post",
+    ]
     const run = await executeAimRun({
       entrypoint: "inspiration",
       rawInput: inspiration.content,
@@ -49,21 +52,15 @@ export async function POST(
       projectId,
       trace,
       runLlmQuality: false,
-    }, async (spec) => {
-      const output = await generateAimContent({
+    }, (spec) => executeAimGenerationDomain(spec, {
           userId: user.id,
           projectId,
-          agentId: spec.agentId,
           rawInput: inspiration.content,
           targetFormats,
           taskType: "write_script",
           topicTitle,
           trace,
-          runtimeTask: spec.runtimeTask,
-          runSpec: spec,
-        })
-      return { output, generationId: output.id }
-    })
+        }))
 
     const result = run.output
 

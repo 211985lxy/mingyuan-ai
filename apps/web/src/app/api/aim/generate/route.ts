@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { generateAimContent } from "@/lib/aim-generator"
 import { parseGenerateBody, validateGenerateInput } from "@/lib/aim-generate-validate"
-import {
-  resolveAimRuntimeTask,
-  shouldUseKnowledgeContextForTask,
-  shouldUseMarketViralContextForTask,
-} from "@/lib/aim-knowledge-strategy"
-import {
-  buildRawInputWithMarketViralContext,
-  buildRawInputWithVideoCopyContext,
-  buildRawInputWithTrendingContext,
-  buildRawInputWithCommentInsightContext,
-} from "@/lib/aim-generate-context"
 import {
   addAimTraceStep,
   createAimTrace,
@@ -22,45 +10,10 @@ import {
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
-import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
 import { executeAimRun } from "@/lib/aim-harness/runtime"
+import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
+import { prepareAimGenerateInput } from "@/lib/aim-harness/request-context"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
-
-function includesAny(text: string, words: string[]) {
-  return words.some((word) => text.includes(word))
-}
-
-function shouldBypassAuxiliaryContext(agentId: string | undefined, rawInput: string) {
-  if (agentId !== "business_diagnosis") return false
-
-  const text = extractLatestAimUserIntentText(rawInput).replace(/\s+/g, "")
-  if (!text) return false
-
-  const mentionsMeetingMaterial = includesAny(text, [
-    "会议纪要",
-    "会议记录",
-    "访谈纪要",
-    "逐字稿",
-    "录音整理",
-    "妙记",
-  ])
-  if (!mentionsMeetingMaterial) return false
-
-  return (
-    includesAny(text, [
-      "内容资产包",
-      "整理",
-      "总结",
-      "提炼",
-      "纪要",
-      "选题",
-      "采访清单",
-      "任务清单",
-      "脚本模板",
-    ]) ||
-    includesAny(text, ["会议一句话结论", "关键信息抽取表", "核心矛盾/机会"])
-  )
-}
 
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
@@ -110,94 +63,17 @@ export async function POST(request: NextRequest) {
         })
       : undefined
 
-    const runtimeTask = await runAimTraceStep(
+    const { rawInput: withCommentContext, runtimeTask } = await prepareAimGenerateInput({
+      userId: user.id,
+      agentId: parsed.agentId,
+      rawInput: parsed.rawInput,
+      targetFormats: parsed.targetFormats,
+      taskType: parsed.taskType,
+      polishInstruction: parsed.polishInstruction,
+      videoCopyExtractionId: parsed.videoCopyExtractionId,
+      useMarketViralVideos: parsed.useMarketViralVideos,
       trace,
-      "resolve_runtime_task",
-      "任务类型识别",
-      () => resolveAimRuntimeTask({
-        agentId: parsed.agentId,
-        input: parsed.rawInput,
-        taskType: parsed.taskType,
-        polishInstruction: parsed.polishInstruction,
-        targetFormats: parsed.targetFormats,
-      }),
-      (task) => ({ summary: task, metadata: { runtimeTask: task } }),
-    )
-    const bypassAuxiliaryContext = shouldBypassAuxiliaryContext(parsed.agentId, parsed.rawInput)
-    const withVideoCopyContext = shouldUseKnowledgeContextForTask(runtimeTask) && !bypassAuxiliaryContext
-      ? await runAimTraceStep(
-          trace,
-          "video_copy_context",
-          "爆款拆解上下文注入",
-          () => buildRawInputWithVideoCopyContext(
-            user.id,
-            parsed.rawInput,
-            parsed.videoCopyExtractionId,
-          ),
-          (value) => ({
-            summary: value === parsed.rawInput ? "未注入爆款拆解" : "已注入爆款拆解",
-            metadata: { chars: value.length },
-          }),
-        )
-      : parsed.rawInput
-
-    if (!shouldUseKnowledgeContextForTask(runtimeTask) || bypassAuxiliaryContext) {
-      await addAimTraceStep(trace, {
-        key: "video_copy_context",
-        label: "爆款拆解上下文注入",
-        status: "skipped",
-        summary: bypassAuxiliaryContext ? "会议纪要模式跳过爆款拆解" : "轻改任务跳过爆款拆解",
-      })
-    }
-
-    const useMarketSignals =
-      !bypassAuxiliaryContext &&
-      parsed.useMarketViralVideos !== false &&
-      shouldUseMarketViralContextForTask(runtimeTask)
-
-    const rawInput = await runAimTraceStep(
-      trace,
-      "market_viral_context",
-      "市场爆款上下文注入",
-      () => buildRawInputWithMarketViralContext(
-        user.id,
-        withVideoCopyContext,
-        useMarketSignals,
-      ),
-      (value) => ({
-        summary: value === withVideoCopyContext ? "未注入市场爆款" : "已注入市场爆款",
-        metadata: { chars: value.length },
-      }),
-    )
-
-    // ── 热榜上下文注入（RedFox 实时热榜 TOP10） ──
-    const useTrending = useMarketSignals
-    const withTrendingContext = await runAimTraceStep(
-      trace,
-      "trending_context",
-      "全网热榜上下文注入",
-      () => buildRawInputWithTrendingContext(rawInput, useTrending),
-      (value) => ({
-        summary: value === rawInput ? "未注入热榜" : "已注入全网热榜",
-        metadata: { chars: value.length },
-      }),
-    )
-
-    // ── 对标账号热评洞察注入（RedFox 评论 API） ──
-    const withCommentContext = await runAimTraceStep(
-      trace,
-      "comment_insight_context",
-      "对标账号热评洞察注入",
-      () => buildRawInputWithCommentInsightContext(
-        user.id,
-        withTrendingContext,
-        useTrending,
-      ),
-      (value) => ({
-        summary: value === withTrendingContext ? "未注入热评洞察" : "已注入对标账号热评洞察",
-        metadata: { chars: value.length },
-      }),
-    )
+    })
 
     const effectiveProjectId = workflowBrief?.projectId || parsed.projectId
     const run = await executeAimRun({
@@ -220,12 +96,10 @@ export async function POST(request: NextRequest) {
       actorId: user.id,
       projectId: effectiveProjectId,
       trace,
-    }, async (spec) => {
-      const output = await generateAimContent({
+    }, (spec) => executeAimGenerationDomain(spec, {
           userId: user.id,
           projectId: effectiveProjectId,
           rawInput: withCommentContext,
-          agentId: spec.agentId,
           targetFormats: parsed.targetFormats,
           taskType: parsed.taskType,
           topicTitle: parsed.topicTitle,
@@ -237,13 +111,9 @@ export async function POST(request: NextRequest) {
           existingGenerationId: parsed.existingGenerationId,
           topicSelectionId: parsed.topicSelectionId,
           selectedTopicIndex: parsed.selectedTopicIndex,
-          runtimeTask: spec.runtimeTask,
           trace,
           taskSpec: workflowBrief?.taskSpec,
-          runSpec: spec,
-        })
-      return { output, generationId: output.id }
-    })
+        }))
 
     const result = run.output
 

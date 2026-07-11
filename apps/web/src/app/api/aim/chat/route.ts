@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { buildAimChatResponse, buildAimChatResponseStream } from "@/lib/aim-agent-handlers"
 import { handleLarkToolAction } from "@/lib/aim-tool-actions"
 import { buildAimKnowledgeContext } from "@/lib/aim-knowledge-context"
 import { buildAimCompetitorWatchContext } from "@/lib/aim-competitor-watch-context"
@@ -30,6 +29,7 @@ import {
   type AimMemoryMessage,
 } from "@/lib/aim-memory"
 import { executeAimRun, streamAimRun } from "@/lib/aim-harness/runtime"
+import { executeAimChatDomain, streamAimChatDomain } from "@/lib/aim-harness/domain-executor"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import type { AimContextSource } from "@/lib/aim-harness/types"
 
@@ -329,10 +329,7 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
       return streamChatContent(
-        streamRun.stream(buildAimChatResponseStream(agentId, {
-          ...chatParams,
-          modelPolicy: streamRun.spec.modelPolicy,
-        })),
+        streamRun.stream(streamAimChatDomain(streamRun.spec, chatParams)),
         trace,
         { runId: streamRun.runId, finalize: streamRun.finalize },
       )
@@ -348,13 +345,7 @@ export async function POST(request: NextRequest) {
       projectId: projectId || undefined,
       runtimeTask,
       conversationMode: conversationIntent.mode,
-    }, async (spec) => {
-      const response = await buildAimChatResponse(agentId, {
-        ...chatParams,
-        modelPolicy: spec.modelPolicy,
-      })
-      return { output: response.content, contextManifest }
-    })
+    }, (spec) => executeAimChatDomain(spec, chatParams, contextManifest))
     await finishAimTrace(trace, { outputSummary: summarizeText(chatRun.output) })
 
     // Fire-and-forget: 从本次对话沉淀长期记忆（决策/偏好/事实）

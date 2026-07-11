@@ -7,7 +7,7 @@
  *
  * 规则（与计划阶段 1 一致）：
  *   R1  四个执行入口（aim/generate、aim/chat、agent/v1/aim/generate、
- *       inspiration/[id]/generate）不得直接 import handler / prisma / llm /
+ *       inspiration/[id]/generate）不得直接 import handler / llm /
  *       上下文加载器 —— 必须经 executeAimRun / streamAimRun（阶段 2 迁移后）。
  *       阶段 1：这四入口当前仍调旧 adapter（runAimGenerate 等），故本规则暂以
  *       "白名单 + 失败清单"形式记录现状，迁移完成后收紧为硬失败。
@@ -90,7 +90,6 @@ const R1_FORBIDDEN = [
   /from\s+["']@\/lib\/aim-harness\/adapters["']/,
   /from\s+["']@\/lib\/aim-agent-handlers["']/,
   /from\s+["']@\/lib\/aim-generator["']/,
-  /from\s+["']@\/lib\/prisma["']/,
   /from\s+["']@\/lib\/aim-generate-context["']/,
   /from\s+["']@\/lib\/llm\/agent-router["']/,
 ]

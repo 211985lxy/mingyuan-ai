@@ -13,9 +13,9 @@ import {
   authenticateAgentRequest,
   type AgentApiContext,
 } from "@/lib/agent-api-auth"
-import { generateAimContent } from "@/lib/aim-generator"
 import { prisma } from "@/lib/prisma"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
+import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
 
 async function writeAgentLog(params: {
@@ -106,22 +106,16 @@ export async function POST(request: NextRequest) {
       projectId,
       trace,
       runLlmQuality: false,
-    }, async (spec) => {
-      const output = await generateAimContent({
+    }, (spec) => executeAimGenerationDomain(spec, {
           userId,
           projectId,
-          agentId: spec.agentId,
           rawInput,
           targetFormats,
           topicTitle: typeof body.topicTitle === "string" ? body.topicTitle : undefined,
           topicRationale: typeof body.topicRationale === "string" ? body.topicRationale : undefined,
           polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
           trace,
-          runtimeTask: spec.runtimeTask,
-          runSpec: spec,
-        })
-      return { output, generationId: output.id }
-    })
+        }))
 
     const result = run.output
 
