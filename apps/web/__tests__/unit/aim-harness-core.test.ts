@@ -91,6 +91,69 @@ describe("aim-harness planner", () => {
     })
     expect(spec.knowledgeStrategy).toBe("hot_topic")
   })
+
+  // ── 阶段 2.1：modelPolicy 冻结（与 handler 执行函数逐字一致）──────────────
+  it("freezes modelPolicy for generate entrypoints (temp 0.8, maxTokens 4000)", () => {
+    const spec = planAimRun({
+      entrypoint: "generate",
+      agentId: "content_producer",
+      rawInput: "写脚本",
+      targetFormats: ["video_script"],
+      taskType: "write_script",
+    })
+    // 必须与 executeGenerateLLM 的 temperature:0.8 / maxTokens:4000 一致
+    expect(spec.modelPolicy.temperature).toBe(0.8)
+    expect(spec.modelPolicy.maxTokens).toBe(4000)
+    expect(spec.modelPolicy.stream).toBe(false)
+  })
+
+  it("freezes modelPolicy for chat entrypoints (temp 0.7, no maxTokens)", () => {
+    const spec = planAimRun({
+      entrypoint: "chat",
+      agentId: "business_diagnosis",
+      rawInput: "你好",
+      targetFormats: [],
+      messages: [{ role: "user", content: "你好" }],
+    })
+    // 必须与 executeChatLLM/Stream 的 temperature:0.7 一致；chat 不设 maxTokens
+    expect(spec.modelPolicy.temperature).toBe(0.7)
+    expect(spec.modelPolicy.maxTokens).toBeUndefined()
+  })
+
+  it("agent_api / inspiration 冻结为生成入口参数（与 generate 同）", () => {
+    for (const entrypoint of ["agent_api", "inspiration"] as const) {
+      const spec = planAimRun({
+        entrypoint,
+        agentId: "content_producer",
+        rawInput: "x",
+        targetFormats: ["video_script"],
+      })
+      expect(spec.modelPolicy.temperature).toBe(0.8)
+      expect(spec.modelPolicy.maxTokens).toBe(4000)
+    }
+  })
+
+  // ── 阶段 2.1：contextPolicy 真正用上 agentId / hotTopic ──────────────────
+  it("business_diagnosis 强制加载 IP Wiki（定位底盘）", () => {
+    const spec = planAimRun({
+      entrypoint: "generate",
+      agentId: "business_diagnosis",
+      rawInput: "优化定位",
+      targetFormats: ["raw_copy"],
+    })
+    expect(spec.contextPolicy.loadIpWiki).toBe(true)
+  })
+
+  it("显式 hotTopic 触发 market viral 加载", () => {
+    const spec = planAimRun({
+      entrypoint: "generate",
+      agentId: "deep_copywriter",
+      rawInput: "结合热点",
+      targetFormats: ["wechat_article"],
+      hotTopic: "搭子文化",
+    })
+    expect(spec.contextPolicy.loadMarketViral).toBe(true)
+  })
 })
 
 describe("aim-harness fallback policy", () => {

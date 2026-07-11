@@ -40,7 +40,16 @@ export interface PlanRunInput {
   stream?: boolean
 }
 
-/** Build the context policy from the resolved task (mirrors the handler gates). */
+/**
+ * Build the context policy from the resolved task + agent + entrypoint.
+ *
+ * 阶段 2.1：此前 agentId / hotTopic 被 void 掉（policy 只按 runtimeTask 派生），
+ * 现在真正用上，使 policy 与 handler 实际加载行为对齐（阶段 2.2 prepareAimContext
+ * 接管装配后，本 policy 成为加载决策的唯一依据）。
+ *
+ * 当前 policy 仍未被生产装配消费（handlers 自行加载），故本变更对运行时无影响；
+ * modelPolicy 的填充才是阶段 2.1 真正影响模型行为的部分。
+ */
 function buildContextPolicy(
   agentId: AimAgentId,
   entrypoint: AimEntrypoint,
@@ -48,18 +57,51 @@ function buildContextPolicy(
   hotTopic?: string
 ): AimContextPolicy {
   const loadKnowledge = runtimeTask !== "light_edit"
-  const loadMarketViral = runtimeTask === "new_copy" || runtimeTask === "positioning_topic"
-  // business_diagnosis lives on compiled IP Wiki; others load it opportunistically.
+
+  // market viral：新稿/定位策划类任务加载；有显式热榜（hotTopic）时也加载。
+  const loadMarketViral =
+    runtimeTask === "new_copy" || runtimeTask === "positioning_topic" || Boolean(hotTopic)
+
+  // IP Wiki：定位策划官（business_diagnosis）依赖已编译定位底盘，必载；
+  // 其它任务在定位/新稿/仿写场景机会性加载（与 handler 行为一致）。
   const loadIpWiki =
-    runtimeTask === "positioning_topic" || runtimeTask === "new_copy" || runtimeTask === "rewrite_copy"
+    agentId === "business_diagnosis" ||
+    runtimeTask === "positioning_topic" ||
+    runtimeTask === "new_copy" ||
+    runtimeTask === "rewrite_copy"
+
+  // 竞品监控仅 chat 入口加载。
   const loadCompetitorWatch = entrypoint === "chat"
-  void agentId
-  void hotTopic
+
   return {
     loadKnowledge,
     loadIpWiki,
     loadMarketViral,
     loadCompetitorWatch,
+  }
+}
+
+/**
+ * 冻结模型参数。阶段 2.1：把此前由 handler 执行函数硬编码的 temperature/maxTokens
+ * 上移到 planner，使 modelPolicy 成为模型参数唯一事实源。
+ *
+ * 必须与 handler 现有执行函数逐字一致（否则改变模型行为）：
+ *   - chat 入口（executeChatLLM/Stream）：temperature 0.7，无 maxTokens
+ *   - 生成入口（executeGenerateLLM）：temperature 0.8，maxTokens 4000
+ * agent 维度目前无差异（所有 agent 共享上述按入口的默认值）；后续若按 agent
+ * 差异化，从这里改即可，handler 执行函数改为读 spec.modelPolicy。
+ */
+function buildModelPolicy(
+  agentId: AimAgentId,
+  entrypoint: AimEntrypoint,
+  stream: boolean
+): AimModelPolicy {
+  const isChat = entrypoint === "chat"
+  return {
+    agentId,
+    stream,
+    temperature: isChat ? 0.7 : 0.8,
+    ...(isChat ? {} : { maxTokens: 4000 }),
   }
 }
 
@@ -88,10 +130,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
 
   const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
 
-  const modelPolicy: AimModelPolicy = {
-    agentId: input.agentId,
-    stream: input.stream ?? false,
-  }
+  const modelPolicy = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false)
 
   return {
     entrypoint: input.entrypoint,
