@@ -585,10 +585,16 @@ describe("Topic Generation Prompts", () => {
     })
 
     expect(normalized).toHaveLength(4)
-    expect(normalized[0].score).toBeGreaterThanOrEqual(0)
-    expect(normalized[0].score).toBeLessThanOrEqual(100)
+    expect(normalized[0].score).toBeUndefined()
+    expect(normalized[0].scoreBreakdown).toEqual({
+      projectFit: null,
+      contentValue: null,
+      viralHook: null,
+      conversionFit: null,
+      feasibility: null,
+    })
     expect(normalized[0].topicType).toBe("转化型")
     expect(normalized[0].sourceType).toBe("客户资料")
-    expect(normalized[0].scoreReason).toContain("综合评分")
+    expect(normalized[0].scoreReason).toContain("证据不足")
   })
 })
