@@ -161,6 +161,7 @@ function formatHistoryTitle(item: {
 export function AppSidebar() {
   const [collapsedAgents, setCollapsedAgents] = useState<Set<AimAgentId>>(new Set())
   const [showAllAgents, setShowAllAgents] = useState<Set<AimAgentId>>(new Set())
+  const [advancedModeOpen, setAdvancedModeOpen] = useState(false)
   const pathname = usePathname() ?? ""
   const searchParams = useSearchParams() ?? new URLSearchParams()
   const branding = useBranding()
@@ -248,14 +249,34 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
 
-        {/* AIM 智能体入口常驻；/aim 下按 Codex 侧边栏样式展示历史 */}
+        {/* 默认引导用户推进工作流；专家入口仅在主动展开后显示。 */}
         <SidebarGroup>
           <SidebarGroupLabel className="px-3 text-sm font-semibold tracking-wide text-foreground/80">
-            AIM 智能体
+            AIM 工作流
           </SidebarGroupLabel>
             <SidebarGroupContent className="mt-1">
               <div className="space-y-3 px-1.5">
-                {historyGroups.map(({ agent, items }) => {
+                <Link
+                  href="/aim"
+                  onClick={closeMobile}
+                  className={cn(
+                    "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-semibold transition-colors",
+                    isAim && !agentParam ? "bg-primary/10 text-primary" : "bg-muted/60 text-foreground hover:bg-muted",
+                  )}
+                >
+                  <Target className="h-4 w-4" />
+                  推进内容工作流
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setAdvancedModeOpen((open) => !open)}
+                  className="flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  aria-expanded={advancedModeOpen}
+                >
+                  高级模式
+                  <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", advancedModeOpen && "rotate-90")} />
+                </button>
+                {advancedModeOpen && historyGroups.map(({ agent, items }) => {
                   const Icon = agent.icon
                   const active = isAim && agent.id === activeAgent
                   const collapsed = collapsedAgents.has(agent.id)

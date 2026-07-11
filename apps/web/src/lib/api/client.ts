@@ -1372,6 +1372,7 @@ export interface AimGeneration {
   formatsRequested: string[]
   knowledgeUsed: { id: string; title: string; category: string }[]
   createdAt: string
+  updatedAt?: string
   hotTopic?: string | null
   polishInstruction?: string | null
   qualityScores?: unknown

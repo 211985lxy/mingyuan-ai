@@ -35,6 +35,7 @@ import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { Textarea } from "@/components/ui/textarea"
 import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
+import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
 import { ActionStrip } from "@/components/workbench/action-strip"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -53,6 +54,7 @@ import {
   evolveStyleConversation,
   ApiError,
   listClientProjects,
+  listAimHistory,
   recordAimRunEvent,
   updateAimWorkflowStatus,
   upsertContentOutcome,
@@ -1034,6 +1036,8 @@ export default function AimPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isQualityChecking, setIsQualityChecking] = useState(false)
   const [projects, setProjects] = useState<ClientProject[]>([])
+  const [projectWorkflowRecords, setProjectWorkflowRecords] = useState<AimGeneration[]>([])
+  const [isLoadingProjectWorkflow, setIsLoadingProjectWorkflow] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState(() => initialDraft?.selectedProjectId || "")
   const [wikiDialog, setWikiDialog] = useState<{ open: boolean; context: IpWikiDialogContext | null }>({
     open: false,
@@ -1082,6 +1086,7 @@ export default function AimPage() {
   const loadTargetId = useAimWorkspaceStore((s) => s.loadTargetId)
   const refreshHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const clearLoadTarget = useAimWorkspaceStore((s) => s.clearLoadTarget)
+  const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const requestAbortRef = useRef<AbortController | null>(null)
@@ -1183,6 +1188,20 @@ export default function AimPage() {
       })
       .catch(() => setProjectEnabled(false))
   }, [])
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setProjectWorkflowRecords([])
+      return
+    }
+    let active = true
+    setIsLoadingProjectWorkflow(true)
+    listAimHistory(1, 50, selectedProjectId)
+      .then((items) => { if (active) setProjectWorkflowRecords(items) })
+      .catch(() => { if (active) setProjectWorkflowRecords([]) })
+      .finally(() => { if (active) setIsLoadingProjectWorkflow(false) })
+    return () => { active = false }
+  }, [selectedProjectId])
 
   const lastAgentParamRef = useRef(agentParam)
 
@@ -2078,6 +2097,12 @@ export default function AimPage() {
     if (selectedAgentId !== "content_producer") beginWorkflowStage("content")
   }
 
+  async function openProjectWorkflowTask(id: string) {
+    if (!selectedProjectId) return
+    await refreshHistory({ force: true, projectId: selectedProjectId })
+    requestLoad(id)
+  }
+
   async function handleAimNextAction(action: AimNextAction, content: string, generationId: string) {
       const cleanContent = content.trim()
       if (!cleanContent) return
@@ -2286,6 +2311,7 @@ export default function AimPage() {
         )
       }
       refreshHistory({ force: true, agentId: selectedAgentId })
+      if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
       setWorkflowBrief(null)
       setContentAction(null)
       toast.success(`${agent.primaryActionLabel}完毕`)
@@ -2403,6 +2429,7 @@ export default function AimPage() {
           reportAimRunEvent(message?.runId, "accepted", { workflowStatus: status })
         }
         refreshHistory({ force: true, agentId: selectedAgentId })
+        if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
         toast.success(`已标记为：${workflowStatusLabel(status)}`)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "状态更新失败")
@@ -2525,6 +2552,7 @@ export default function AimPage() {
 
       setRecordDialog(null)
       refreshHistory({ force: true, agentId: selectedAgentId })
+      if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
@@ -2540,17 +2568,17 @@ export default function AimPage() {
         {/* 头部：AIM 业务工作台 */}
         <header className="flex flex-wrap items-center justify-between gap-3 border-b p-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-            {/* 小屏智能体切换 */}
+            {/* 小屏只切换工作流阶段；专家能力在侧边栏高级模式内。 */}
             <div className="md:hidden">
               <select
-                value={selectedAgentId}
+                value={currentWorkflowStage}
                 onChange={(event) => {
-                  if (event.target.value !== selectedAgentId) router.push(`/aim?agent=${event.target.value}`)
+                  if (isAimWorkflowStage(event.target.value)) beginWorkflowStage(event.target.value)
                 }}
                 className="h-9 w-[130px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {AGENT_OPTIONS.map((a) => (
-                  <option key={a.id} value={a.id}>{a.title}</option>
+                {AIM_WORKFLOW_STAGES.map((stage) => (
+                  <option key={stage.id} value={stage.id}>{stage.title}</option>
                 ))}
               </select>
             </div>
@@ -2634,6 +2662,15 @@ export default function AimPage() {
             <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">专家能力仍可从侧边栏进入</span>
           </div>
         </nav>
+
+        {selectedProjectId && (
+          <AimProjectTaskPanel
+            records={projectWorkflowRecords}
+            loading={isLoadingProjectWorkflow}
+            onOpenTask={(id) => void openProjectWorkflowTask(id)}
+            onStartStage={beginWorkflowStage}
+          />
+        )}
 
         {personaProgress != null && (
           <div className="border-b bg-primary/5 px-3 py-2">
