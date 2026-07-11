@@ -209,6 +209,8 @@ export async function POST(request: NextRequest) {
           polishInstruction: parsed.polishInstruction,
           videoCopyExtractionId: parsed.videoCopyExtractionId,
           existingGenerationId: parsed.existingGenerationId,
+          topicSelectionId: parsed.topicSelectionId,
+          selectedTopicIndex: parsed.selectedTopicIndex,
           runtimeTask,
           trace,
         }),

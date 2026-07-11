@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 
 import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@/generated/prisma/client"
 import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { ChatMessage } from "@/lib/llm/types"
 import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
@@ -42,6 +43,8 @@ import {
   type AimConversationMode,
   type AimConversationIntent,
 } from "@/lib/aim-conversation-intent"
+import { buildTaskSpecSkeleton } from "@/lib/task-spec"
+import { refineTaskSpec } from "@/lib/task-spec-llm"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -87,6 +90,9 @@ export interface AimGenerateContext {
   polishInstruction?: string
   videoCopyExtractionId?: string
   existingGenerationId?: string
+  topicSelectionId?: string
+  selectedTopicIndex?: number
+  taskSpec?: import("@/lib/task-spec").TaskSpec
   runtimeTask?: AimRuntimeTask
 
   // 共享数据上下文
@@ -1570,6 +1576,40 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     }),
   )
 
+  // ── 协作认知层：构建 TaskSpec（事实仅来自真实上下文，零 Mock）──
+  const projectRow = params.projectId
+    ? await prisma.clientProject.findFirst({
+        where: { id: params.projectId, userId: params.userId },
+        select: { name: true, targetCustomer: true, industry: true, offer: true, deliveryGoal: true },
+      }).catch(() => null)
+    : null
+  const topicSelectionRow = params.topicSelectionId
+    ? await prisma.topicSelection.findFirst({
+        where: { id: params.topicSelectionId, userId: params.userId },
+        select: { sourceHighlights: true, candidates: true },
+      }).catch(() => null)
+    : null
+  const knowledgeTitles = (knowledgeCtx.entries ?? []).map((e: { title?: string }) => e.title).filter(Boolean) as string[]
+  const taskSpecSkeleton = buildTaskSpecSkeleton({
+    agentId,
+    taskType: params.taskType,
+    rawInput: params.rawInput,
+    project: projectRow ? {
+      name: projectRow.name,
+      targetCustomer: projectRow.targetCustomer,
+      industry: projectRow.industry,
+      offer: projectRow.offer,
+      deliveryGoal: projectRow.deliveryGoal,
+    } : null,
+    topicSelection: topicSelectionRow ? {
+      title: params.topicTitle,
+      rationale: params.topicRationale,
+      sourceHighlights: Array.isArray(topicSelectionRow.sourceHighlights) ? topicSelectionRow.sourceHighlights as any : [],
+    } : null,
+    knowledgeTitles,
+  })
+  const taskSpec = await refineTaskSpec(taskSpecSkeleton, { enabled: false })
+
   // 4. 调用具体的智能体 Handler
   //    加入压缩摘要（如有必要，将用户原始输入视为消息列表）
   const generateMessages = [{ role: "user" as const, content: params.rawInput }]
@@ -1616,6 +1656,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     retrievedEntries: knowledgeCtx.entries,
     retrievedSource: knowledgeCtx.source,
     knowledgeStrategy,
+    taskSpec,
   }), (result) => ({
     summary: `生成 ${result.results.length} 个交付物`,
     outputSummary: summarizeText(result.results.map((item) => `${item.format}: ${item.content}`).join("\n")),
@@ -1928,6 +1969,9 @@ async function saveAimGenerationRecord(
     formatsRequested: context.targetFormats,
     knowledgeUsed,
     topicTitle: clampVarchar(context.topicTitle),
+    topicSelectionId: context.topicSelectionId,
+    selectedTopicIndex: context.selectedTopicIndex,
+    taskSpec: context.taskSpec ? (context.taskSpec as unknown as Prisma.InputJsonValue) : undefined,
     hotTopic: clampVarchar(context.hotTopic),
     polishInstruction: sanitizeDbText(context.polishInstruction),
     model: completion.model,

@@ -37,6 +37,9 @@ interface AimInput {
   contentScenario?: ContentScenario
   existingGenerationId?: string
   trace?: AimTraceRecorder
+  topicSelectionId?: string
+  selectedTopicIndex?: number
+  taskSpec?: import("@/lib/task-spec").TaskSpec
 }
 
 function asStringArray(value: unknown): string[] {
@@ -175,5 +178,8 @@ export async function generateAimContent(input: AimInput) {
     runtimeTask: input.runtimeTask,
     contentScenario: input.contentScenario,
     trace: input.trace,
+    topicSelectionId: input.topicSelectionId,
+    selectedTopicIndex: input.selectedTopicIndex,
+    taskSpec: input.taskSpec,
   })
 }
