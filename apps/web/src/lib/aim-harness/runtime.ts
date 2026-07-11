@@ -1,18 +1,23 @@
 /**
- * AIM Harness v2 — 唯一执行入口（阶段 1.3 引入骨架，阶段 2 真正接管）。
+ * AIM Harness v2 — 唯一执行入口（阶段 1.3 引入骨架，阶段 2.4 真正接管非流式）。
  *
  * executeAimRun / streamAimRun 是"Harness 作为 AIM 唯一执行内核"的对外入口。
  * 四个服务端入口（generate / chat / agent_api / inspiration）在阶段 2 将逐个
  * 从旧 adapter（runAimGenerate / runAimChat / planAimChatStream）切换到这里。
  *
- * ── 阶段 1.3（本提交）：骨架委托，行为零变化 ──
- * 入口仍需调用方注入 execute 闭包（上下文装配在阶段 2.2 才下沉到
- * prepareAimContext）。这里只做：把 AimRunRequest 规整为 planner 入参 → 复用
- * runAimHarness → 把 outcome 包装成 AimRunResult。目的是先确立"唯一入口"形态，
- * 让阶段 2 的入口迁移有明确目标，且阶段 1 全程不改变任何运行时行为。
+ * ── 阶段 2.4（本提交）：executeAimRun 内化非流式编排 ──
+ * 入口形态确立后，executeAimRun 现在承担：
+ *   - 规整 AimRunRequest（agentId 归一化 + 质检/落库开关透传到 spec）
+ *   - runAimHarness 驱动执行（spec 冻结 + telemetry + runId 统一生成）
+ *   - 质检结果回填（execute 闭包产出 qualityReport）
+ *   - **修复 degraded 语义裂缝**：provider fallback 降级时，回标 AimGeneration.status
+ *     对齐 snapshot/trace 的 degraded 语义（此前 AimGeneration 永远 completed）
  *
- * ── 阶段 2.4/2.5（后续提交）──
- * executeAimRun 内化 plan → prepareAimContext → handler → 质检 → 持久化收口；
+ * execute 闭包仍由调用方注入（驱动现有 handler），但 2.4 起闭包需回传 generationId /
+ * qualityReport，供内核组装 AimRunResult + 降级回标。阶段 3 handler 拆分后，
+ * 内核直接调 prepareAimContext + handler.generate，闭包移除。
+ *
+ * ── 阶段 2.5（后续提交）──
  * streamAimRun 吃掉 runId / telemetry / 快照三处散落，与 executeAimRun 共享 lifecycle。
  */
 
@@ -26,6 +31,7 @@ import { runAimHarness } from "./runner"
 import type { RunAimExecutionResult } from "./runner"
 import type { PlanRunInput } from "./planner"
 import type { AimRunSpec } from "./types"
+import { flagAimGenerationDegraded } from "./persistence"
 
 /**
  * 规整 AimRunRequest → planner 入参。
@@ -68,37 +74,83 @@ function withSpecOverrides(spec: AimRunSpec, request: AimRunRequest): AimRunSpec
 }
 
 /**
- * 非流式唯一入口（阶段 1.3 骨架）。
+ * 非流式唯一入口（阶段 2.4 真内核）。
  *
  * @param request 唯一运行请求
- * @param execute 过渡期的执行闭包：接收冻结 spec，驱动现有 handler 并返回其原始产出
- *                + contextManifest（阶段 2.2 prepareAimContext 接管后此参数移除）
+ * @param execute 过渡期执行适配器：接收冻结 spec，驱动现有 handler/adapter，回传
+ *                { output, contextManifest, generationId?, qualityReport?, qualityStatus? }
+ *                （阶段 3 handler 拆分后，内核直接调 prepareAimContext + handler，此参数移除）
  *
- * 阶段 1 行为等价于现有 adapter：plan → runAimHarness(execute) → 包装 AimRunResult。
+ * 流程：plan（spec 冻结）→ runAimHarness(execute)（telemetry + runId 统一生成）
+ *       → 组装 AimRunResult → 若 metadata.degraded 且落了 AimGeneration，回标 status。
+ *
+ * degraded 语义裂缝修复：此前 AimGeneration.status 永远 "completed"，与 snapshot/trace
+ * 的 degraded:true 不一致；现在 provider fallback 降级时，回标 AimGeneration.status
+ * 为 "degraded"，使三处（generation / snapshot / trace）语义对齐。
  */
+export interface ExecuteAimRunAdapter {
+  (spec: AimRunSpec): Promise<RunAimExecutionResult & {
+    /** 落库的生成记录 id（draftOnly / skipPersistence 时为 undefined） */
+    generationId?: string
+    /** 主稿 LLM 质检报告（runLlmQuality 关闭时为 undefined） */
+    qualityReport?: Record<string, unknown>
+    /** 质检状态（pass/warn/fail/skipped） */
+    qualityStatus?: "pass" | "warn" | "fail" | "skipped"
+  }>
+}
+
 export async function executeAimRun(
   request: AimRunRequest,
-  execute: (spec: AimRunSpec) => Promise<RunAimExecutionResult>,
+  execute: ExecuteAimRunAdapter,
 ): Promise<AimRunResult> {
   // 规整 + 归一化（agentId 非法时 getAgentHandler 下游兜底，这里不强抛）。
   const plan = toPlanInput(request)
 
-  const outcome = await runAimHarness({
+  // 适配器扩展结果（generationId / qualityReport / qualityStatus）通过闭包变量回传。
+  let partial: RunAimExecutionResult & {
+    generationId?: string
+    qualityReport?: Record<string, unknown>
+    qualityStatus?: "pass" | "warn" | "fail" | "skipped"
+  } | undefined
+
+  const execResult = await runAimHarness({
     traceId: request.trace?.id,
     plan,
-    execute,
+    execute: async (spec) => {
+      const adapted = await execute(spec)
+      // runAimHarness 只消费 output + contextManifest；其余字段通过闭包变量回传。
+      partial = adapted
+      return {
+        output: adapted.output,
+        contextManifest: adapted.contextManifest,
+        composedPrompt: adapted.composedPrompt,
+      }
+    },
   })
 
-  const spec = withSpecOverrides(outcome.spec, request)
+  const spec = withSpecOverrides(execResult.spec, request)
 
-  // 阶段 1：output 形状仍是各 handler 的原始返回（generate 为 AimGenerateResponse，
-  // chat 为 string）。阶段 2.3 handler 改返回 AimAgentOutput 后，这里直接用。
-  const output = outcome.output as unknown as AimAgentOutput
+  // output 形状仍是各 handler 的原始返回（generate 为 AimGenerateResponse，chat 为 string）。
+  // 阶段 3 handler 改返回 AimAgentOutput 后这里直接用；当前以 unknown 透传 + 按需断言。
+  const output = execResult.output as unknown as AimAgentOutput
+
+  const generationId = partial?.generationId
+  const qualityReport = partial?.qualityReport
+
+  // ── degraded 语义裂缝修复：provider fallback 降级时回标 AimGeneration.status ──
+  // 仅在确实落了生成记录（非 draftOnly / 非 skipPersistence）且运行降级时回标。
+  if (execResult.metadata.degraded && generationId && request.actorId) {
+    await flagAimGenerationDegraded(generationId, request.actorId).catch(() => {
+      // 回标是 best-effort：失败不阻断已完成的生成（snapshot/trace 已记录 degraded）。
+    })
+  }
 
   return {
-    metadata: outcome.metadata,
+    metadata: execResult.metadata,
     output,
+    generationId,
     traceId: request.trace?.id,
+    qualityReport,
     spec,
   }
 }

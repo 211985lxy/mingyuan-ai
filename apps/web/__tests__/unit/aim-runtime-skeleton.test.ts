@@ -10,7 +10,14 @@
  *
  * 不触达真实模型 / 数据库：execute 闭包用 LLMClient + fake provider。
  */
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
+
+// mock 持久化层：executeAimRun 在 degraded 时调 flagAimGenerationDegraded。
+// 顶层声明（hoisted），对整个文件生效；用 spy 断言调用，不触达真实 DB。
+const flagDegraded = vi.fn(async () => undefined)
+vi.mock("@/lib/aim-harness/persistence", () => ({
+  flagAimGenerationDegraded: (...args: unknown[]) => flagDegraded(...args),
+}))
 
 import { executeAimRun, streamAimRun } from "@/lib/aim-harness/runtime"
 import type { AimRunRequest, AimRunResult } from "@/lib/aim-harness/contracts"
@@ -43,7 +50,7 @@ function baseRequest(overrides: Partial<AimRunRequest> = {}): AimRunRequest {
   }
 }
 
-describe("executeAimRun 骨架（阶段 1.3）", () => {
+describe("executeAimRun 骨架（阶段 2.4 真内核）", () => {
   it("返回符合 AimRunResult 的结构，且 runId 由内核统一生成", async () => {
     const client = new LLMClient([fakeProvider("provider-real")])
     const result = await executeAimRun(baseRequest(), async () => {
@@ -107,6 +114,58 @@ describe("executeAimRun 骨架（阶段 1.3）", () => {
     )
     expect(result.spec.entrypoint).toBe("chat")
     expect(result.metadata.runId).toMatch(/^run_/)
+  })
+
+  // ── 阶段 2.4：适配器扩展结果回传 + degraded 语义裂缝修复 ──────────────────
+  it("回传 generationId / qualityReport 到 AimRunResult", async () => {
+    const client = new LLMClient([fakeProvider("p")])
+    const result = await executeAimRun(baseRequest(), async () => {
+      const c = await client.complete({ messages: [{ role: "user", content: "x" }] })
+      return {
+        output: c.content,
+        generationId: "gen_123",
+        qualityReport: { overallScore: 8, passed: true },
+        qualityStatus: "pass" as const,
+      }
+    })
+    expect(result.generationId).toBe("gen_123")
+    expect(result.qualityReport).toEqual({ overallScore: 8, passed: true })
+  })
+
+  it("provider fallback 降级时回标 AimGeneration.status=degraded", async () => {
+    flagDegraded.mockClear()
+    // 两个 provider：第一个失败（触发 fallback），第二个成功 → degraded=true
+    const failing: LLMProvider = {
+      name: "p-fail",
+      isAvailable: () => true,
+      async complete() {
+        throw new Error("Request failed with status 503")
+      },
+    } as unknown as LLMProvider
+    const client = new LLMClient([failing, fakeProvider("p-ok")])
+
+    const result = await executeAimRun(
+      baseRequest({ actorId: "user_degraded" }),
+      async () => {
+        const c = await client.complete({ messages: [{ role: "user", content: "x" }] })
+        return { output: c.content, generationId: "gen_degraded" }
+      },
+    )
+
+    // 降级发生 → 回标被调用，且按 (id, userId) 隔离
+    expect(result.metadata.degraded).toBe(true)
+    expect(flagDegraded).toHaveBeenCalledWith("gen_degraded", "user_degraded")
+  })
+
+  it("非降级运行不回标 AimGeneration", async () => {
+    flagDegraded.mockClear()
+    const client = new LLMClient([fakeProvider("p-ok")])
+    await executeAimRun(baseRequest(), async () => {
+      const c = await client.complete({ messages: [{ role: "user", content: "x" }] })
+      return { output: c.content, generationId: "gen_ok" }
+    })
+    // 无 fallback → degraded=false → 不回标
+    expect(flagDegraded).not.toHaveBeenCalled()
   })
 })
 
