@@ -60,6 +60,8 @@ function generateRequest(overrides: Partial<AimRunRequest> = {}): AimRunRequest 
     taskType: "write_script",
     actorId: "user_contract",
     projectId: "proj_1",
+    persistSnapshot: false,
+    runLlmQuality: false,
     ...overrides,
   }
 }
