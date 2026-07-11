@@ -240,6 +240,7 @@ export async function POST(request: NextRequest) {
           runtimeTask: spec.runtimeTask,
           trace,
           taskSpec: workflowBrief?.taskSpec,
+          runSpec: spec,
         })
       return { output, generationId: output.id }
     })

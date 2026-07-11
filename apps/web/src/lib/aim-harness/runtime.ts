@@ -61,6 +61,8 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     polishInstruction: request.polishInstruction,
     topicType: request.topicType,
     hotTopic: request.hotTopic,
+    videoCopyExtractionId: request.videoCopyExtractionId,
+    contentScenario: request.contentScenario,
     messages: request.messages,
     actorId: request.actorId,
     projectId: request.projectId,

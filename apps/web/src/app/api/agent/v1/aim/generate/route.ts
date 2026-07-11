@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
           polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
           trace,
           runtimeTask: spec.runtimeTask,
+          runSpec: spec,
         })
       return { output, generationId: output.id }
     })

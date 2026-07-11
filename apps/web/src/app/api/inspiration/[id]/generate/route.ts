@@ -60,6 +60,7 @@ export async function POST(
           topicTitle,
           trace,
           runtimeTask: spec.runtimeTask,
+          runSpec: spec,
         })
       return { output, generationId: output.id }
     })

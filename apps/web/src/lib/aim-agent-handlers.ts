@@ -1,14 +1,10 @@
-import { randomUUID } from "node:crypto"
-
-import { prisma } from "@/lib/prisma"
-import type { Prisma } from "@/generated/prisma/client"
-import { getAgentLLM } from "@/lib/llm/agent-router"
-import type { ChatMessage } from "@/lib/llm/types"
+import type { AimModelPolicy } from "@/lib/aim-harness/types"
+import { executeChatLLM, executeChatLLMStream, executeGenerateLLM } from "@/lib/aim-agent-model"
+import { getAimGenerationUsage, saveAimGenerationRecord } from "@/lib/aim-harness/persistence"
 import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
 import { buildBusinessDiagnosisMethodologyBlock } from "@/lib/business-diagnosis-methodology"
 import { fireKnowledgeEmbedding } from "@/lib/aim-knowledge-context"
 import {
-  resolveKnowledgeStrategy,
   type ResolvedKnowledgeStrategy,
   type AimRuntimeTask,
 } from "@/lib/aim-knowledge-strategy"
@@ -67,6 +63,7 @@ export interface AimChatParams {
   ipWikiBlock: string
   conversationIntent?: AimConversationIntent
   runtimeTask?: AimRuntimeTask
+  modelPolicy?: AimModelPolicy
   trace?: AimTraceRecorder
 }
 
@@ -92,6 +89,8 @@ export interface AimGenerateContext {
   selectedTopicIndex?: number
   taskSpec?: import("@/lib/task-spec").TaskSpec
   runtimeTask?: AimRuntimeTask
+  modelPolicy?: AimModelPolicy
+  runSpec?: import("@/lib/aim-harness/types").AimRunSpec
 
   // 共享数据上下文
   knowledgeBlock: string
@@ -423,11 +422,11 @@ class ContentProducerHandler implements AimAgentHandler {
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -485,11 +484,11 @@ ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildPrompt(params), params.messages)
+    return executeChatLLM(this.agentId, this.buildPrompt(params), params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -497,7 +496,7 @@ ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
     const systemPrompt = this.buildPrompt(context)
     const userPrompt = `请直接按用户要求写一版文案：
 "${context.rawInput}"`
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt)
+    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
     const content = completion.content.trim()
     const record = await saveAimGenerationRecord(context, completion, { [format]: content } as Record<ContentFormat, string | undefined>)
 
@@ -556,11 +555,11 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -694,11 +693,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -763,7 +762,7 @@ ${workflowContext}
 
 请生成这份详细的"生意系统体检报告"。`
 
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt)
+    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
     const rawText = completion.content.trim()
 
     const parsed: Record<ContentFormat, string | undefined> = {
@@ -872,11 +871,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -1013,7 +1012,7 @@ ${workflowContext}
 
 请生成这份详细的"IP营销策划定位方案"。`
 
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt)
+    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
     const rawText = completion.content.trim()
 
     const parsed: Record<ContentFormat, string | undefined> = {
@@ -1094,11 +1093,11 @@ class ContentReviewHandler implements AimAgentHandler {
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -1121,7 +1120,7 @@ ${workflowContext}
 
 请生成这份"发布前质检报告"。`
 
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt)
+    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
     const rawText = completion.content.trim()
 
     const parsed: Record<ContentFormat, string | undefined> = {
@@ -1224,11 +1223,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
     } else {
       prompt = this.buildChatPrompt(params)
     }
-    return executeChatLLM(this.agentId, prompt, params.messages)
+    return executeChatLLM(this.agentId, prompt, params.messages, params.modelPolicy)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages, params.modelPolicy)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -1253,7 +1252,7 @@ ${AIM_HIGH_RISK_LOOP_RULE}`
 
 ${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}请直接输出「来时路总结 + 置顶视频脚本」，不要包含任何解释性文字。`
 
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt)
+    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
     const rawText = completion.content.trim()
 
     const parsed: Record<ContentFormat, string | undefined> = {
@@ -1426,7 +1425,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
   // 此前的 step1-4（项目校验 / runtimeTask·生成意图·知识策略解析 / Promise.all
   // 背景 block 加载 / TaskSpec 构建 / 压缩 / 上下文预算）已集中到 prepareAimContext，
   // 与原实现逐字等价。buildAimGeneration 现在只做：装配 → handler.generate → 收尾。
-  const spec = planAimRun({
+  const plannedSpec = planAimRun({
     entrypoint: "generate",
     agentId: agentId as AimAgentId,
     rawInput: params.rawInput,
@@ -1440,12 +1439,12 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
   })
   // route 可能已解析 runtimeTask（与 planner 同源函数，结果应一致）；若有差异，
   // 采用 route 值以保持向后兼容（原 buildAimGeneration 行为：params.runtimeTask 优先）。
-  const specWithRuntimeTask = params.runtimeTask
-    ? { ...spec, runtimeTask: params.runtimeTask }
-    : spec
+  const spec = params.runSpec ?? (params.runtimeTask
+    ? { ...plannedSpec, runtimeTask: params.runtimeTask }
+    : plannedSpec)
 
   const prepared = await prepareAimContext({
-    spec: specWithRuntimeTask,
+    spec,
     userId: params.userId,
     trace: params.trace,
     taskType: params.taskType,
@@ -1462,15 +1461,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
   })
 
   const runtimeTask = prepared.spec.runtimeTask
-  const knowledgeStrategy = resolveKnowledgeStrategy({
-    runtimeTask,
-    topicType: params.topicType,
-    hotTopic: params.hotTopic,
-    videoCopyExtractionId: params.videoCopyExtractionId,
-    taskType: params.taskType,
-    polishInstruction: params.polishInstruction,
-    contentScenario: params.contentScenario,
-  })
+  const knowledgeStrategy = prepared.spec.knowledgeStrategy
   // 生成意图 mode（供响应回传；与原 buildAimGeneration 末尾的 conversationMode 一致）
   const generationMode = resolveAimConversationIntentWithRules({
     agentId,
@@ -1482,6 +1473,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     ...params,
     agentId,
     runtimeTask,
+    modelPolicy: prepared.spec.modelPolicy,
     knowledgeBlock: prepared.blocks.knowledge,
     methodologyBlock: prepared.blocks.methodology,
     businessDiagnosisBlock: prepared.blocks.businessDiagnosis,
@@ -1512,10 +1504,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
 
   const saved = params.skipPersistence
     ? null
-    : await prisma.aimGeneration.findUnique({
-        where: { id: response.id },
-        select: { model: true, totalTokens: true },
-      }).catch(() => null)
+    : await getAimGenerationUsage(response.id)
   await finishAimTrace(params.trace, {
     aimGenerationId: response.id,
     model: saved?.model || null,
@@ -1527,78 +1516,6 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
 }
 
 // ─── 共享辅助函数 ───────────────────────────────────────────
-
-async function executeChatLLM(agentId: string, systemPrompt: string, messages: any[]): Promise<AimChatResponse> {
-  const formattedMessages: ChatMessage[] = [
-    { role: "system", content: systemPrompt },
-    ...messages.map((m) => ({
-      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-      content: normalizeChatContentForLLM(m.content),
-    })),
-  ]
-
-  const llm = getAgentLLM(hasImageContent(formattedMessages) ? "vision_analysis" : agentId)
-  const completion = await llm.complete({
-    messages: formattedMessages,
-    temperature: 0.7,
-  })
-
-  return {
-    content: completion.content,
-  }
-}
-
-async function* executeChatLLMStream(agentId: string, systemPrompt: string, messages: any[]): AsyncIterable<string> {
-  const formattedMessages: ChatMessage[] = [
-    { role: "system", content: systemPrompt },
-    ...messages.map((m) => ({
-      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
-      content: normalizeChatContentForLLM(m.content),
-    })),
-  ]
-
-  const llm = getAgentLLM(hasImageContent(formattedMessages) ? "vision_analysis" : agentId)
-  yield* llm.stream({
-    messages: formattedMessages,
-    temperature: 0.7,
-  })
-}
-
-function hasImageContent(messages: ChatMessage[]): boolean {
-  return messages.some((message) =>
-    Array.isArray(message.content) && message.content.some((part) => part.type === "image_url")
-  )
-}
-
-function normalizeChatContentForLLM(content: unknown): ChatMessage["content"] {
-  if (!Array.isArray(content)) return String(content || "").trim()
-  return content
-    .map((part) => {
-      if (!part || typeof part !== "object") return null
-      const item = part as { type?: unknown; text?: unknown; image_url?: { url?: unknown } }
-      if (item.type === "text" && typeof item.text === "string") {
-        const text = item.text.trim()
-        return text ? { type: "text" as const, text } : null
-      }
-      if (item.type === "image_url" && typeof item.image_url?.url === "string") {
-        return { type: "image_url" as const, image_url: { url: item.image_url.url } }
-      }
-      return null
-    })
-    .filter((part): part is Exclude<ChatMessage["content"], string>[number] => part !== null)
-}
-
-async function executeGenerateLLM(agentId: string, systemPrompt: string, userPrompt: string) {
-  const llm = getAgentLLM(agentId)
-  return llm.complete({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.8,
-    maxTokens: 4000,
-  })
-}
 
 function buildWorkflowContext(context: AimGenerateContext): string {
   return [
@@ -1663,7 +1580,7 @@ async function executeGenerateLLMWithBenchmarkRetry(
   context: AimGenerateContext,
   targetFormats: ContentFormat[],
 ) {
-  const completion = await executeGenerateLLM(agentId, systemPrompt, userPrompt)
+  const completion = await executeGenerateLLM(agentId, systemPrompt, userPrompt, context.modelPolicy)
   const parsed = parseMultiFormatResponse(completion.content, targetFormats)
   const copiedFormats = targetFormats.filter((format) => isBenchmarkCopyTooSimilar(context.rawInput, parsed[format] || ""))
 
@@ -1682,7 +1599,7 @@ async function executeGenerateLLMWithBenchmarkRetry(
 上一版输出：
 ${previousOutput}`
 
-  const retryCompletion = await executeGenerateLLM(agentId, systemPrompt, retryPrompt)
+  const retryCompletion = await executeGenerateLLM(agentId, systemPrompt, retryPrompt, context.modelPolicy)
   return {
     completion: retryCompletion,
     parsed: parseMultiFormatResponse(retryCompletion.content, targetFormats),
@@ -1763,93 +1680,4 @@ ${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n` : ""
 
 输出格式要求：
 ${context.targetFormats.map((format) => `===FORMAT:${format}===\n（在这里输出${format}的内容）`).join("\n\n")}`
-}
-
-async function saveAimGenerationRecord(
-  context: AimGenerateContext,
-  completion: any,
-  parsed: Record<ContentFormat, string | undefined>
-) {
-  const clampVarchar = (value: string | null | undefined, max = 191) =>
-    value ? value.slice(0, max) : null
-
-  const sanitizeDbText = (value: string | null | undefined) =>
-    value ? value.replace(/\u0000/g, "").replace(/[\u{10000}-\u{10FFFF}]/gu, "") : null
-
-  const knowledgeUsed = context.retrievedEntries.map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    category: entry.category,
-  }))
-
-  if (context.skipPersistence) {
-    return {
-      id: `eval_${randomUUID().replace(/-/g, "").slice(0, 24)}`,
-      knowledgeUsed,
-    }
-  }
-
-  const data = {
-    userId: context.userId,
-    agentId: context.agentId,
-    projectId: context.projectId || null,
-    rawInput: sanitizeDbText(context.rawInput) ?? "",
-    inputSource: "text",
-    videoScript: sanitizeDbText(parsed.video_script),
-    wechatArticle: sanitizeDbText(parsed.wechat_article),
-    momentsPost: sanitizeDbText(parsed.moments_post),
-    communityMessage: sanitizeDbText(parsed.community_message),
-    shootingBrief: sanitizeDbText(parsed.shooting_brief),
-    rawCopy: sanitizeDbText(parsed.raw_copy),
-    formatsRequested: context.targetFormats,
-    knowledgeUsed,
-    topicTitle: clampVarchar(context.topicTitle),
-    topicSelectionId: context.topicSelectionId,
-    selectedTopicIndex: context.selectedTopicIndex,
-    taskSpec: context.taskSpec ? (context.taskSpec as unknown as Prisma.InputJsonValue) : undefined,
-    hotTopic: clampVarchar(context.hotTopic),
-    polishInstruction: sanitizeDbText(context.polishInstruction),
-    model: completion.model,
-    totalTokens: completion.usage?.totalTokens || null,
-    status: "completed",
-  }
-
-  const degradedData = {
-    ...data,
-    rawInput: "[omitted: original input could not be persisted safely]",
-    videoScript: null,
-    wechatArticle: null,
-    momentsPost: null,
-    communityMessage: null,
-    shootingBrief: null,
-    rawCopy: null,
-    polishInstruction: null,
-  }
-
-  const persist = (payload: typeof data) => {
-    if (context.existingGenerationId) {
-      return prisma.aimGeneration.findFirst({
-        where: { id: context.existingGenerationId, userId: context.userId },
-        select: { id: true },
-      }).then((existing) => {
-        if (existing) {
-          return prisma.aimGeneration.update({
-            where: { id: existing.id },
-            data: payload,
-          })
-        }
-        return prisma.aimGeneration.create({ data: payload })
-      })
-    }
-
-    return prisma.aimGeneration.create({ data: payload })
-  }
-
-  try {
-    return await persist(data)
-  } catch (error) {
-    console.error("[aim/generate] history persist failed, retrying with degraded payload", error)
-  }
-
-  return persist(degradedData)
 }

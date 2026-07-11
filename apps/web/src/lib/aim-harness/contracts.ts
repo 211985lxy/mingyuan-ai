@@ -86,6 +86,7 @@ import type {
 } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { TaskSpec } from "@/lib/task-spec"
+import type { ContentScenario } from "@/lib/content-scenario-config"
 import type {
   AimRunSpec,
   AimRunMetadata,
@@ -141,6 +142,7 @@ export interface AimRunRequest {
   hotTopic?: string
   polishInstruction?: string
   videoCopyExtractionId?: string
+  contentScenario?: ContentScenario
   /** 复用既有生成记录（追改场景） */
   existingGenerationId?: string
   /** 关联 trace（route 层已创建） */

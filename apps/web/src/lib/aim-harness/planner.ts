@@ -17,6 +17,7 @@ import { resolveAimConversationIntentWithRules } from "@/lib/aim-conversation-in
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
+import type { ContentScenario } from "@/lib/content-scenario-config"
 
 import type {
   AimAgentId,
@@ -35,6 +36,8 @@ export interface PlanRunInput {
   polishInstruction?: string
   topicType?: string
   hotTopic?: string
+  videoCopyExtractionId?: string
+  contentScenario?: ContentScenario
   /** chat/revision cases carry message history */
   messages?: Array<{ role: "user" | "assistant"; content: string }>
   actorId?: string
@@ -129,8 +132,10 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     runtimeTask,
     topicType: input.topicType,
     hotTopic: input.hotTopic,
+    videoCopyExtractionId: input.videoCopyExtractionId,
     taskType: input.taskType,
     polishInstruction: input.polishInstruction,
+    contentScenario: input.contentScenario,
   })
 
   const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)

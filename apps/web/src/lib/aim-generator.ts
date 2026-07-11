@@ -3,6 +3,7 @@ import { buildAimGeneration } from "./aim-agent-handlers"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import type { ContentScenario } from "@/lib/content-scenario-config"
+import type { AimRunSpec } from "@/lib/aim-harness/types"
 
 export type ContentFormat =
   | "video_script"
@@ -40,6 +41,7 @@ interface AimInput {
   topicSelectionId?: string
   selectedTopicIndex?: number
   taskSpec?: import("@/lib/task-spec").TaskSpec
+  runSpec?: AimRunSpec
 }
 
 function asStringArray(value: unknown): string[] {
@@ -181,5 +183,6 @@ export async function generateAimContent(input: AimInput) {
     topicSelectionId: input.topicSelectionId,
     selectedTopicIndex: input.selectedTopicIndex,
     taskSpec: input.taskSpec,
+    runSpec: input.runSpec,
   })
 }

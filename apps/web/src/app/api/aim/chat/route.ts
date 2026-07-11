@@ -329,7 +329,10 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
       return streamChatContent(
-        streamRun.stream(buildAimChatResponseStream(agentId, chatParams)),
+        streamRun.stream(buildAimChatResponseStream(agentId, {
+          ...chatParams,
+          modelPolicy: streamRun.spec.modelPolicy,
+        })),
         trace,
         { runId: streamRun.runId, finalize: streamRun.finalize },
       )
@@ -345,8 +348,11 @@ export async function POST(request: NextRequest) {
       projectId: projectId || undefined,
       runtimeTask,
       conversationMode: conversationIntent.mode,
-    }, async () => {
-      const response = await buildAimChatResponse(agentId, chatParams)
+    }, async (spec) => {
+      const response = await buildAimChatResponse(agentId, {
+        ...chatParams,
+        modelPolicy: spec.modelPolicy,
+      })
       return { output: response.content, contextManifest }
     })
     await finishAimTrace(trace, { outputSummary: summarizeText(chatRun.output) })

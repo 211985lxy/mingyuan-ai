@@ -17,7 +17,6 @@
 import { prisma } from "@/lib/prisma"
 import {
   resolveAimRuntimeTask,
-  resolveKnowledgeStrategy,
   shouldUseKnowledgeContextForTask,
   type AimRuntimeTask,
   type ResolvedKnowledgeStrategy,
@@ -126,21 +125,8 @@ export async function prepareAimContext(
     }),
   )
 
-  // 2. 知识调用策略（与 buildAimGeneration:1484 一致）。
-  // 注意：planner 冻结 spec.knowledgeStrategy 时未传入 contentScenario /
-  // videoCopyExtractionId（route 当前不透传这两者给 harness plan），而 handler
-  // 原实现会带入它们解析。为保持逐字等价，这里按完整参数重新解析——这与
-  // buildAimGeneration 原行为一致。阶段 2 收尾时把 contentScenario/videoCopyExtractionId
-  // 补进 PlanRunInput，让 planner 成为唯一源后，此处改回采用 spec.knowledgeStrategy。
-  const knowledgeStrategy = resolveKnowledgeStrategy({
-    runtimeTask,
-    topicType: params.topicType,
-    hotTopic: params.hotTopic,
-    videoCopyExtractionId: params.videoCopyExtractionId,
-    taskType: params.taskType as string | undefined,
-    polishInstruction: params.polishInstruction,
-    contentScenario: params.contentScenario,
-  })
+  // 2. 知识调用策略只读 planner 冻结结果，不再二次解析。
+  const knowledgeStrategy = spec.knowledgeStrategy
 
   // 3. 并行读取通用背景资产（与 buildAimGeneration:1508 一致，gating 逐字保留）
   const useEventStorytelling = shouldUseEventStorytelling({

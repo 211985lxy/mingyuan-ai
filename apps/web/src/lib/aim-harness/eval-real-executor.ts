@@ -75,6 +75,7 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
       hotTopic: fixture.input.hotTopic,
       polishInstruction: fixture.input.polishInstruction,
       runtimeTask: spec.runtimeTask,
+      runSpec: spec,
       skipPersistence: true,
       contextOverride: {
         knowledgeBlock: context.knowledgeBlock,
@@ -126,6 +127,7 @@ const runRealChat: RealCaseRunner = async (fixture, context) => {
       knowledgeBlock: context.knowledgeBlock,
       conversationIntent,
       runtimeTask: spec.runtimeTask,
+      modelPolicy: spec.modelPolicy,
     })
     return { output: response.content, contextManifest }
   })
