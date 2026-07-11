@@ -151,14 +151,13 @@ function checkR2() {
 }
 
 // ── R4：废弃 adapter 不得有新增调用者 ───────────────────────────────────────
+// 阶段 2.6–2.10 入口迁移完成后，四入口与 eval-real-executor 已全部改用
+// executeAimRun/streamAimRun，旧 adapter（runAimGenerate/runAimChat/planAimChatStream）
+// 成为死代码。白名单收紧为只剩"定义自身 + runtime 注释引用"；任何其它文件引用
+// （含四入口）即硬失败，防止回退。
 const R4_BASELINE_CALLERS = new Set<string>([
-  "src/lib/aim-harness/adapters.ts", // 自身定义
-  "src/lib/aim-harness/runtime.ts", // 阶段 1.3 骨架注释引用（非真实调用）
-  "src/lib/aim-harness/eval-real-executor.ts", // eval 路径
-  "src/app/api/aim/generate/route.ts",
-  "src/app/api/aim/chat/route.ts",
-  "src/app/api/agent/v1/aim/generate/route.ts",
-  "src/app/api/inspiration/[id]/generate/route.ts",
+  "src/lib/aim-harness/adapters.ts", // 自身定义（死代码，阶段 3 删除）
+  "src/lib/aim-harness/runtime.ts", // 注释引用（非真实调用）
 ])
 const R4_DEPRECATED = /\b(runAimGenerate|runAimChat|planAimChatStream)\b/
 
