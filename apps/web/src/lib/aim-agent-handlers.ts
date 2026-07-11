@@ -25,6 +25,11 @@ import {
 } from "@/lib/aim-observability"
 import { buildScenarioPromptBlock, type ContentScenario } from "@/lib/content-scenario-config"
 import { AIM_OUTPUT_MAX_CHARS, buildExplicitWordCountPriorityRule } from "@/lib/aim-benchmark-length"
+import {
+  benchmarkCopyReuseRatio,
+  extractBenchmarkOriginalCopy,
+  isBenchmarkCopyTooSimilar,
+} from "@/lib/aim-benchmark-quality"
 import { hasExplicitDirectDraftIntent, hasWechatDraftIntent } from "@/lib/aim-current-user-input"
 import {
   buildConversationIntentBlock,
@@ -50,6 +55,7 @@ import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 // AimAgentId 的唯一事实源在 @/lib/aim-harness/contracts，这里 re-export 以
 // 保持现有从 aim-agent-handlers 引入该类型的调用方兼容。
 export type { AimAgentId }
+export { benchmarkCopyReuseRatio, extractBenchmarkOriginalCopy, isBenchmarkCopyTooSimilar }
 
 export interface AimChatParams {
   userId: string
@@ -1531,46 +1537,6 @@ function buildWorkflowContext(context: AimGenerateContext): string {
   ]
     .filter(Boolean)
     .join("\n\n")
-}
-
-export function extractBenchmarkOriginalCopy(rawInput: string) {
-  const marker = rawInput.match(/对标原文[：:]\s*/)
-  if (marker?.index == null) return ""
-  const rest = rawInput.slice(marker.index + marker[0].length).trim()
-  const nextSection = rest.search(/\n(?:已有拆解|结构化拆解|改写原则|创作原则|来源链接|字数硬规则|硬规则|===)[：:：]?/)
-  return (nextSection >= 0 ? rest.slice(0, nextSection) : rest).trim()
-}
-
-function normalizeCopyForCompare(text: string) {
-  return text.replace(/\s+/g, "").replace(/[，。！？、；：,.!?;:"“”‘’'（）()《》【】\[\]{}]/g, "")
-}
-
-export function benchmarkCopyReuseRatio(benchmark: string, output: string, size = 12) {
-  const source = normalizeCopyForCompare(benchmark)
-  const target = normalizeCopyForCompare(output)
-  if (source.length < size || target.length < size) return source && target && source.includes(target) ? 1 : 0
-
-  const sourceChunks = new Set<string>()
-  for (let index = 0; index <= source.length - size; index += 1) {
-    sourceChunks.add(source.slice(index, index + size))
-  }
-
-  let reused = 0
-  const total = target.length - size + 1
-  for (let index = 0; index <= target.length - size; index += 1) {
-    if (sourceChunks.has(target.slice(index, index + size))) reused += 1
-  }
-
-  return total > 0 ? reused / total : 0
-}
-
-export function isBenchmarkCopyTooSimilar(rawInput: string, output: string) {
-  const benchmark = extractBenchmarkOriginalCopy(rawInput)
-  const source = normalizeCopyForCompare(benchmark)
-  const target = normalizeCopyForCompare(output)
-  if (source.length < 30 || target.length < 30) return false
-  if (source === target || source.includes(target) || target.includes(source)) return true
-  return benchmarkCopyReuseRatio(benchmark, output) >= 0.35
 }
 
 async function executeGenerateLLMWithBenchmarkRetry(

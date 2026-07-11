@@ -117,7 +117,7 @@ function checkR1() {
       if (m) {
         findings.push({
           rule: "R1",
-          severity: "todo",
+          severity: "error",
           file: ep,
           detail: `直接 import 底层模块（${m[0]}）；阶段 2 入口迁移到 executeAimRun 后应移除`,
         })
@@ -148,7 +148,7 @@ function checkR2() {
     if (re.test(text)) {
       findings.push({
         rule: "R2",
-        severity: "todo",
+        severity: "error",
         file: "src/lib/aim-agent-handlers.ts",
         detail: todo,
       })
@@ -174,6 +174,30 @@ function checkR4(files: string[]) {
   }
 }
 
+// ── R5：历史大文件只能缩小，不得继续堆 Agent ──────────────
+function checkR5() {
+  const rp = "src/lib/aim-agent-handlers.ts"
+  const text = read(join(WEB_ROOT, rp))
+  const lines = text.split(/\r?\n/).length
+  if (lines > 1700) {
+    findings.push({
+      rule: "R5",
+      severity: "error",
+      file: rp,
+      detail: `历史 Handler 超过 1700 行预算（当前 ${lines}）；新能力必须拆到独立模块`,
+    })
+  }
+  const handlerClasses = text.match(/class\s+\w+Handler\s+implements/g)?.length ?? 0
+  if (handlerClasses > 7) {
+    findings.push({
+      rule: "R5",
+      severity: "error",
+      file: rp,
+      detail: `历史 Handler 内不得新增 Agent class（当前 ${handlerClasses}）`,
+    })
+  }
+}
+
 // ── 主流程 ──────────────────────────────────────────────────────────────────
 function main() {
   const files = listTsFiles(SRC_ROOT)
@@ -181,6 +205,7 @@ function main() {
   checkR1()
   checkR2()
   checkR4(files)
+  checkR5()
 
   const errors = findings.filter((f) => f.severity === "error")
   const todos = findings.filter((f) => f.severity === "todo")
