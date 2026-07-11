@@ -6,15 +6,9 @@ import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { ChatMessage } from "@/lib/llm/types"
 import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
 import { buildBusinessDiagnosisMethodologyBlock } from "@/lib/business-diagnosis-methodology"
+import { fireKnowledgeEmbedding } from "@/lib/aim-knowledge-context"
 import {
-  buildEventStorytellingMethodologyBlock,
-  shouldUseEventStorytelling,
-} from "@/lib/event-storytelling-methodology"
-import { buildAimKnowledgeContext, fireKnowledgeEmbedding } from "@/lib/aim-knowledge-context"
-import {
-  resolveAimRuntimeTask,
   resolveKnowledgeStrategy,
-  shouldUseKnowledgeContextForTask,
   type ResolvedKnowledgeStrategy,
   type AimRuntimeTask,
 } from "@/lib/aim-knowledge-strategy"
@@ -24,7 +18,6 @@ import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 import {
   ContentFormat,
   AimTaskType,
-  buildViralStructureBlock,
   parseMultiFormatResponse,
 } from "./aim-generator"
 import {
@@ -43,8 +36,6 @@ import {
   type AimConversationMode,
   type AimConversationIntent,
 } from "@/lib/aim-conversation-intent"
-import { buildTaskSpecSkeleton } from "@/lib/task-spec"
-import { refineTaskSpec } from "@/lib/task-spec-llm"
 // 身份契约唯一源：AimAgentId / 运行时校验 / 别名归一化统一来自这里。
 import type { AimAgentId } from "@/lib/aim-harness/contracts"
 import {
@@ -52,6 +43,11 @@ import {
   LEGACY_AGENT_ID_ALIASES,
   DEFAULT_AIM_AGENT,
 } from "@/lib/aim-harness/contracts"
+// 阶段 2.3：装配下沉。buildAimGeneration 改为 plan + prepareAimContext + handler.generate。
+// 注意：这是过渡态——阶段 2.4 executeAimRun 接管编排后，buildAimGeneration 将只接收
+// PreparedAimContext，不再反向依赖 harness 模块（届时移除这两行 import）。
+import { planAimRun } from "@/lib/aim-harness/planner"
+import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -1426,244 +1422,92 @@ export async function* buildAimChatResponseStream(
 export async function buildAimGeneration(agentId: string, params: Omit<AimGenerateContext, "agentId" | "knowledgeBlock" | "methodologyBlock" | "businessDiagnosisBlock" | "viralStructureBlock" | "eventStorytellingBlock" | "ipWikiBlock" | "retrievedEntries" | "retrievedSource" | "knowledgeStrategy">): Promise<AimGenerateResponse> {
   const handler = getAgentHandler(agentId)
 
-  // 1. 项目校验
-  await runAimTraceStep(params.trace, "project_check", "项目权限校验", async () => {
-    if (!params.projectId) return { checked: false }
-    const project = await prisma.clientProject.findFirst({
-      where: {
-        id: params.projectId,
-        userId: params.userId,
-        status: "active",
-      },
-      select: { id: true },
-    })
-    if (!project) throw new Error("客户项目不存在或已归档")
-    return { checked: true }
-  }, (result) => ({
-    summary: result.checked ? "项目有效" : "无项目模式",
-    metadata: result,
-  }))
-
-  const runtimeTask = await runAimTraceStep(
-    params.trace,
-    "resolve_runtime_task",
-    "任务类型识别",
-    () => params.runtimeTask ?? resolveAimRuntimeTask({
-      agentId,
-      input: params.rawInput,
-      taskType: params.taskType,
-      polishInstruction: params.polishInstruction,
-      targetFormats: params.targetFormats,
-    }),
-    (task) => ({ summary: task, metadata: { runtimeTask: task } }),
-  )
-  const generationIntent = await runAimTraceStep(
-    params.trace,
-    "resolve_generation_intent",
-    "生成模式识别",
-    async () =>
-      resolveAimConversationIntentWithRules({
-        agentId,
-        messages: [
-          {
-            role: "user",
-            content: [params.rawInput, params.polishInstruction].filter(Boolean).join("\n"),
-          },
-        ],
-      }).intent,
-    (intent) => ({
-      summary: intent.mode,
-      metadata: {
-        useKnowledge: intent.useKnowledge,
-        useMethodology: intent.useMethodology,
-      },
-    }),
-  )
-
-  // 2. 解析知识调用策略（决定本次调多少知识、侧重哪类）
-  const knowledgeStrategy = await runAimTraceStep(
-    params.trace,
-    "resolve_knowledge_strategy",
-    "知识调用策略解析",
-    () => resolveKnowledgeStrategy({
-      runtimeTask,
-      topicType: params.topicType,
-      hotTopic: params.hotTopic,
-      videoCopyExtractionId: params.videoCopyExtractionId,
-      taskType: params.taskType,
-      polishInstruction: params.polishInstruction,
-      contentScenario: params.contentScenario,
-    }),
-    (strategy) => ({ summary: strategy, metadata: { strategy } }),
-  )
-
-  // 3. 并行读取通用背景资产（统一知识上下文，按策略画像调用）
-  //    事件内容化方法论按需加载：仅当创作属于"现场/事件复盘类"时注入，避免噪声
-  const useEventStorytelling = shouldUseEventStorytelling({
+  // ── 阶段 2.3：装配下沉到 prepareAimContext（统一上下文装配阶段）──
+  // 此前的 step1-4（项目校验 / runtimeTask·生成意图·知识策略解析 / Promise.all
+  // 背景 block 加载 / TaskSpec 构建 / 压缩 / 上下文预算）已集中到 prepareAimContext，
+  // 与原实现逐字等价。buildAimGeneration 现在只做：装配 → handler.generate → 收尾。
+  const spec = planAimRun({
+    entrypoint: "generate",
+    agentId: agentId as AimAgentId,
     rawInput: params.rawInput,
-    topicTitle: params.topicTitle,
-    topicType: params.topicType,
-    topicRationale: params.topicRationale,
-  })
-  const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock] = await runAimTraceStep(
-    params.trace,
-    "load_generation_context",
-    "知识/结构/方法论读取",
-    () => params.contextOverride
-      ? Promise.resolve([
-          {
-            knowledgeBlock: params.contextOverride.knowledgeBlock,
-            entries: params.contextOverride.entries,
-            source: params.contextOverride.source,
-          },
-          params.contextOverride.viralStructureBlock ?? "",
-          params.contextOverride.methodologyBlock ?? "",
-          params.contextOverride.businessDiagnosisBlock ?? "",
-          params.contextOverride.ipWikiBlock ?? "",
-          params.contextOverride.eventStorytellingBlock ?? "",
-        ] as const)
-      : Promise.all([
-      params.projectId && shouldUseKnowledgeContextForTask(runtimeTask)
-        && generationIntent.useKnowledge
-        ? buildAimKnowledgeContext({
-            userId: params.userId,
-            projectId: params.projectId,
-            agentId,
-            query: params.rawInput,
-            topicTitle: params.topicTitle,
-            topicRationale: params.topicRationale,
-            strategy: knowledgeStrategy,
-          })
-        : Promise.resolve({
-            knowledgeBlock: "",
-            entries: [],
-            source: "raw" as const,
-          }),
-      buildViralStructureBlock(),
-      generationIntent.useMethodology ? buildIpCopywritingMethodologyBlock() : Promise.resolve(""),
-      generationIntent.useMethodology && agentId === "business_system_diagnosis"
-        ? buildBusinessDiagnosisMethodologyBlock()
-        : Promise.resolve(""),
-      generationIntent.useMethodology && params.projectId ? buildIpWikiBlock({ projectId: params.projectId }) : Promise.resolve(""),
-      // 仅创作类智能体（内容生产官/深度文案官）+ 命中现场/事件复盘类时加载
-      generationIntent.useMethodology && (agentId === "content_producer" || agentId === "deep_copywriter") && useEventStorytelling
-        ? buildEventStorytellingMethodologyBlock()
-        : Promise.resolve(""),
-        ]),
-    ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory]) => ({
-      summary: `命中 ${knowledge.entries.length} 条知识`,
-      metadata: {
-        knowledgeEntries: knowledge.entries.length,
-        knowledgeSource: knowledge.source,
-        viralStructureChars: viralStructure.length,
-        methodologyChars: methodology.length,
-        businessDiagnosisChars: businessDiagnosis.length,
-        ipWikiChars: ipWiki.length,
-        eventStorytellingChars: eventStory.length,
-        eventStorytellingActive: useEventStorytelling,
-      },
-    }),
-  )
-
-  // ── 协作认知层：构建 TaskSpec（事实仅来自真实上下文，零 Mock）──
-  const projectRow = params.projectId
-    ? await prisma.clientProject.findFirst({
-        where: { id: params.projectId, userId: params.userId },
-        select: { name: true, targetCustomer: true, industry: true, offer: true, deliveryGoal: true },
-      }).catch(() => null)
-    : null
-  const topicSelectionRow = params.topicSelectionId
-    ? await prisma.topicSelection.findFirst({
-        where: { id: params.topicSelectionId, userId: params.userId },
-        select: { sourceHighlights: true, candidates: true },
-      }).catch(() => null)
-    : null
-  const knowledgeTitles = (knowledgeCtx.entries ?? []).map((e: { title?: string }) => e.title).filter(Boolean) as string[]
-  const taskSpecSkeleton = buildTaskSpecSkeleton({
-    agentId,
+    targetFormats: params.targetFormats,
     taskType: params.taskType,
-    rawInput: params.rawInput,
-    project: projectRow ? {
-      name: projectRow.name,
-      targetCustomer: projectRow.targetCustomer,
-      industry: projectRow.industry,
-      offer: projectRow.offer,
-      deliveryGoal: projectRow.deliveryGoal,
-    } : null,
-    topicSelection: topicSelectionRow ? {
-      title: params.topicTitle,
-      rationale: params.topicRationale,
-      sourceHighlights: Array.isArray(topicSelectionRow.sourceHighlights) ? topicSelectionRow.sourceHighlights as any : [],
-    } : null,
-    knowledgeTitles,
+    polishInstruction: params.polishInstruction,
+    topicType: params.topicType,
+    hotTopic: params.hotTopic,
+    actorId: params.userId,
+    projectId: params.projectId,
   })
-  // A confirmed workflow brief was rebuilt and authorized by the route. Keep
-  // it intact; otherwise preserve the established automatic task-spec path.
-  const taskSpec = params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
+  // route 可能已解析 runtimeTask（与 planner 同源函数，结果应一致）；若有差异，
+  // 采用 route 值以保持向后兼容（原 buildAimGeneration 行为：params.runtimeTask 优先）。
+  const specWithRuntimeTask = params.runtimeTask
+    ? { ...spec, runtimeTask: params.runtimeTask }
+    : spec
 
-  // 4. 调用具体的智能体 Handler
-  //    加入压缩摘要（如有必要，将用户原始输入视为消息列表）
-  const generateMessages = [{ role: "user" as const, content: params.rawInput }]
-  const compressed = await runAimTraceStep(
-    params.trace,
-    "compress_generation_input",
-    "生成输入压缩",
-    () => compressAimMessages(agentId, generateMessages),
-    (result) => ({
-      summary: result.didCompress ? "已压缩输入" : "无需压缩",
-      metadata: { didCompress: result.didCompress },
-    }),
-  )
-  const knowledgeWithContext = compressed.didCompress
-    ? `【对话摘要】\n${compressed.summary}\n\n${knowledgeCtx.knowledgeBlock}`
-    : knowledgeCtx.knowledgeBlock
-  const budgeted = applyAimContextBudget({
-    conversationBlock: "",
-    knowledgeBlock: knowledgeWithContext,
-    methodologyBlock,
-    businessDiagnosisBlock,
-    viralStructureBlock,
-    eventStorytellingBlock,
-    ipWikiBlock,
-  }, runtimeTask)
-  await addAimTraceStep(params.trace, {
-    key: "context_budget",
-    label: "上下文预算",
-    status: "success",
-    summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
-    metadata: budgeted.stats,
+  const prepared = await prepareAimContext({
+    spec: specWithRuntimeTask,
+    userId: params.userId,
+    trace: params.trace,
+    taskType: params.taskType,
+    polishInstruction: params.polishInstruction,
+    taskSpec: params.taskSpec,
+    topicSelectionId: params.topicSelectionId,
+    topicTitle: params.topicTitle,
+    topicRationale: params.topicRationale,
+    topicType: params.topicType,
+    hotTopic: params.hotTopic,
+    videoCopyExtractionId: params.videoCopyExtractionId,
+    contentScenario: params.contentScenario,
+    contextOverride: params.contextOverride,
   })
 
+  const runtimeTask = prepared.spec.runtimeTask
+  const knowledgeStrategy = resolveKnowledgeStrategy({
+    runtimeTask,
+    topicType: params.topicType,
+    hotTopic: params.hotTopic,
+    videoCopyExtractionId: params.videoCopyExtractionId,
+    taskType: params.taskType,
+    polishInstruction: params.polishInstruction,
+    contentScenario: params.contentScenario,
+  })
+  // 生成意图 mode（供响应回传；与原 buildAimGeneration 末尾的 conversationMode 一致）
+  const generationMode = resolveAimConversationIntentWithRules({
+    agentId,
+    messages: [{ role: "user", content: [params.rawInput, params.polishInstruction].filter(Boolean).join("\n") }],
+  }).intent.mode
+
+  // 5. 调用具体的智能体 Handler（接收已装配的 prepared blocks）
   const response = await runAimTraceStep(params.trace, "agent_generate", "智能体生成并保存", () => handler.generate({
     ...params,
     agentId,
     runtimeTask,
-    knowledgeBlock: budgeted.blocks.knowledgeBlock,
-    methodologyBlock: budgeted.blocks.methodologyBlock,
-    businessDiagnosisBlock: budgeted.blocks.businessDiagnosisBlock,
-    viralStructureBlock: budgeted.blocks.viralStructureBlock,
-    eventStorytellingBlock: budgeted.blocks.eventStorytellingBlock,
-    ipWikiBlock: budgeted.blocks.ipWikiBlock,
-    retrievedEntries: knowledgeCtx.entries,
-    retrievedSource: knowledgeCtx.source,
+    knowledgeBlock: prepared.blocks.knowledge,
+    methodologyBlock: prepared.blocks.methodology,
+    businessDiagnosisBlock: prepared.blocks.businessDiagnosis,
+    viralStructureBlock: prepared.blocks.viralStructure,
+    eventStorytellingBlock: prepared.blocks.eventStorytelling,
+    ipWikiBlock: prepared.blocks.ipWiki,
+    retrievedEntries: (prepared.retrievedEntries ?? []) as any[],
+    retrievedSource: prepared.retrievedSource ?? "raw",
     knowledgeStrategy,
-    taskSpec,
+    taskSpec: prepared.taskSpec,
   }), (result) => ({
     summary: `生成 ${result.results.length} 个交付物`,
     outputSummary: summarizeText(result.results.map((item) => `${item.format}: ${item.content}`).join("\n")),
     metadata: { resultId: result.id, formats: result.results.map((item) => item.format) },
   }))
 
-  // 5. 后续处理 (Fire-and-forget 向量写入)
+  // 6. 后续处理 (Fire-and-forget 向量写入)
   if (!params.skipPersistence) {
     await addAimTraceStep(params.trace, {
       key: "fire_knowledge_embedding",
       label: "知识向量补写",
       status: "success",
       summary: "已触发后台补写",
-      metadata: { entries: knowledgeCtx.entries.length },
+      metadata: { entries: (prepared.retrievedEntries ?? []).length },
     })
-    fireKnowledgeEmbedding(knowledgeCtx.entries, knowledgeCtx.source)
+    fireKnowledgeEmbedding((prepared.retrievedEntries ?? []) as any[], prepared.retrievedSource ?? "raw")
   }
 
   const saved = params.skipPersistence
@@ -1679,7 +1523,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     outputSummary: summarizeText(response.results.map((item) => item.content).join("\n\n")),
   })
 
-  return { ...response, conversationMode: generationIntent.mode, knowledgeStrategy, taskSpec }
+  return { ...response, conversationMode: generationMode, knowledgeStrategy, taskSpec: prepared.taskSpec }
 }
 
 // ─── 共享辅助函数 ───────────────────────────────────────────
