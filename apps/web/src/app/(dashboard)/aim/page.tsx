@@ -6,10 +6,12 @@ import { useSearchParams, useRouter } from "next/navigation"
 import {
   Check,
   Clipboard,
+  Database,
   FileText,
   Loader2,
   Sparkles,
   ShieldCheck,
+  Target,
   Plus,
   ArrowRight,
 } from "lucide-react"
@@ -17,6 +19,7 @@ import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { KNOWLEDGE_STRATEGY_PROFILES } from "@/lib/aim-knowledge-strategy"
+import { buildAimDeliveryContract } from "@/lib/aim-delivery-contract"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import {
@@ -223,6 +226,7 @@ interface ChatMessage {
   runId?: string | null
   degraded?: boolean | null
   qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
+  failure?: { kind: "chat" | "generate"; retryText: string } | null
 }
 
 interface AimImageAttachment {
@@ -664,6 +668,7 @@ const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) 
 function DeliverableBubble({
   deliverables,
   runId,
+  isCurrentVersion,
   agentId,
   nextActions,
   onRepurpose,
@@ -679,6 +684,7 @@ function DeliverableBubble({
 }: {
   deliverables: AimGenerateResponse
   runId?: string | null
+  isCurrentVersion: boolean
   agentId: AimAgentId
   nextActions?: AimNextAction[]
   onRepurpose: (format: ContentFormat) => void
@@ -731,6 +737,20 @@ function DeliverableBubble({
     || onCompileToWiki
     || secondaryNextActions.length > 0,
   )
+  const knowledgeStrategyLabel = deliverables.knowledgeStrategy
+    ? KNOWLEDGE_STRATEGY_PROFILES[deliverables.knowledgeStrategy as keyof typeof KNOWLEDGE_STRATEGY_PROFILES]?.label
+      ?? deliverables.knowledgeStrategy
+    : undefined
+  const deliveryContract = buildAimDeliveryContract({
+    conversationMode: deliverables.conversationMode,
+    knowledgeCount: deliverables.knowledgeUsed?.length ?? 0,
+    knowledgeTitles: deliverables.knowledgeUsed?.map((item) => item.title),
+    knowledgeStrategyLabel,
+    degraded: deliverables.degraded,
+    qualityStatus: deliverables.qualityStatus,
+    isCurrentVersion,
+    primaryNextActionLabel: primaryNextActions[0]?.label,
+  })
 
   function runMoreAction(value: string | null) {
     if (!value) return
@@ -752,32 +772,13 @@ function DeliverableBubble({
         title="AI 交付物"
         icon={<Sparkles className="h-4 w-4 text-primary animate-pulse" />}
         meta={
-          <div className="flex items-center gap-1.5">
-            {deliverables.knowledgeStrategy && (
-              <Badge variant="outline" className="text-[10px]">
-                {KNOWLEDGE_STRATEGY_PROFILES[deliverables.knowledgeStrategy as keyof typeof KNOWLEDGE_STRATEGY_PROFILES]?.label ?? deliverables.knowledgeStrategy}
-              </Badge>
-            )}
-            {deliverables.conversationMode && (
-              <Badge variant="outline" className="text-[10px]">
-                {deliverables.conversationMode === "formal_delivery"
-                  ? "正式交付"
-                  : deliverables.conversationMode === "local_edit"
-                    ? "局部修改"
-                    : deliverables.conversationMode === "follow_up_edit"
-                      ? "追改纠偏"
-                      : deliverables.conversationMode === "select_version"
-                        ? "版本延续"
-                        : "自然对话"}
-              </Badge>
-            )}
-            {deliverables.knowledgeUsed?.length > 0 && (
-              <Badge variant="secondary" className="text-[10px]">已用知识库 {deliverables.knowledgeUsed.length} 条</Badge>
-            )}
-          </div>
+          <Badge variant={isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">
+            {isCurrentVersion ? "当前版本" : "历史版本"}
+          </Badge>
         }
         flat
       >
+        <DeliveryContractStrip contract={deliveryContract} />
         <Tabs value={activeFormat} onValueChange={(v) => setActiveTab(v as ContentFormat)} className="w-full">
           <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
             {deliverables.results.map((item) => (
@@ -904,6 +905,40 @@ function DeliverableBubble({
           </Select>
         </ActionStrip>
       </AiResultPanel>
+    </div>
+  )
+}
+
+function DeliveryContractStrip({ contract }: { contract: ReturnType<typeof buildAimDeliveryContract> }) {
+  const toneClass = {
+    success: "text-emerald-700 dark:text-emerald-400",
+    warning: "text-amber-700 dark:text-amber-400",
+    danger: "text-red-700 dark:text-red-400",
+    neutral: "text-foreground",
+  }[contract.status.tone]
+  const items = [
+    { label: "任务", value: contract.task.label, detail: contract.task.detail, icon: Target, className: "text-foreground" },
+    { label: "依据", value: contract.evidence.label, detail: contract.evidence.detail, icon: Database, className: "text-foreground" },
+    { label: "状态", value: contract.status.label, detail: contract.status.detail, icon: ShieldCheck, className: toneClass },
+    { label: "下一步", value: contract.next.label, detail: contract.next.detail, icon: ArrowRight, className: "text-foreground" },
+  ]
+
+  return (
+    <div className="mb-4 grid grid-cols-2 border-y border-border/70 bg-muted/20 lg:grid-cols-4">
+      {items.map(({ label, value, detail, icon: Icon, className }, index) => (
+        <div
+          key={label}
+          className={`min-w-0 px-3 py-2.5 ${index % 2 === 1 ? "border-l border-border/60" : ""} ${index > 1 ? "border-t border-border/60 lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`}
+          title={detail}
+        >
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <Icon className="h-3 w-3 shrink-0" />
+            <span>{label}</span>
+          </div>
+          <p className={`mt-1 truncate text-xs font-medium ${className}`}>{value}</p>
+          <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{detail}</p>
+        </div>
+      ))}
     </div>
   )
 }
@@ -1782,18 +1817,24 @@ export default function AimPage() {
       editorContext?: AimEditorContext
       editorApplyRange?: TextSelectionRange
       images?: AimImageAttachment[]
+      retryMessageId?: string
     }
   ) {
     const images = options?.images ?? []
     if (!text && images.length === 0) return
     const workbenchCommand = detectAimWorkbenchCommand(text)
     if (workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
-    const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId
-    reportAimRunEvent(revisedRun, "revised", { channel: "chat" })
+    if (!options?.retryMessageId) {
+      const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId
+      reportAimRunEvent(revisedRun, "revised", { channel: "chat" })
+    }
     const controller = new AbortController()
     requestAbortRef.current = controller
+    const baseMessages = options?.retryMessageId
+      ? messages.filter((message) => message.id !== options.retryMessageId)
+      : messages
     const userMsg: ChatMessage = { id: nextId(), role: "user", content: text || "请分析这张图片。", images }
-    const thread = [...messages, userMsg]
+    const thread = options?.retryMessageId ? baseMessages : [...baseMessages, userMsg]
     const assistantId = nextId()
     setMessages([
       ...thread,
@@ -1858,14 +1899,18 @@ export default function AimPage() {
       })
       if (!hasContent) {
         setMessages((prev) => prev.map((message) =>
-          message.id === assistantId ? { ...message, content: "没有收到模型回复，请重试。" } : message
+          message.id === assistantId
+            ? { ...message, content: "没有收到模型回复。", failure: { kind: "chat", retryText: text } }
+            : message
         ))
       }
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
       const message = stopped ? "已停止本次回复。" : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`
       setMessages((prev) => prev.map((item) =>
-        item.id === assistantId ? { ...item, content: message } : item
+        item.id === assistantId
+          ? { ...item, content: message, failure: stopped ? null : { kind: "chat", retryText: text } }
+          : item
       ))
     } finally {
       if (requestAbortRef.current === controller) requestAbortRef.current = null
@@ -2014,7 +2059,7 @@ export default function AimPage() {
     } : { images: imageAttachments })
   }
 
-  async function generateWithInput(currentInput: string) {
+  async function generateWithInput(currentInput: string, options?: { retryMessageId?: string }) {
     const rawInput = buildRawInputForGenerate(currentInput || undefined)
     if (!rawInput) {
       toast.error("请先在对话框里说点素材或需求")
@@ -2028,9 +2073,14 @@ export default function AimPage() {
     requestAbortRef.current = controller
     const assistantMessageId = nextId()
     pendingScrollMessageIdRef.current = assistantMessageId
+    const baseMessages = options?.retryMessageId
+      ? messages.filter((message) => message.id !== options.retryMessageId)
+      : messages
     setMessages((prev) => [
-      ...prev,
-      ...(currentInput ? [{ id: nextId(), role: "user" as const, content: currentInput }] : []),
+      ...(options?.retryMessageId
+        ? prev.filter((message) => message.id !== options.retryMessageId)
+        : prev),
+      ...(currentInput && !options?.retryMessageId ? [{ id: nextId(), role: "user" as const, content: currentInput }] : []),
       {
         id: assistantMessageId,
         role: "assistant" as const,
@@ -2043,7 +2093,7 @@ export default function AimPage() {
     try {
       const response = await generateAimContent({
         agentId: selectedAgentId,
-        rawInput: buildHistoryRawInput(rawInput, currentInput, messages),
+        rawInput: buildHistoryRawInput(rawInput, options?.retryMessageId ? "" : currentInput, baseMessages),
         targetFormats: agent.defaultFormats,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
         videoCopyExtractionId: sourceVideoCopyExtractionId,
@@ -2106,7 +2156,9 @@ export default function AimPage() {
       const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
       const message = stopped ? "已停止本次生成。" : `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`
       setMessages((prev) => prev.map((item) =>
-        item.id === assistantMessageId ? { ...item, content: message } : item
+        item.id === assistantMessageId
+          ? { ...item, content: message, failure: stopped ? null : { kind: "generate", retryText: currentInput } }
+          : item
       ))
     } finally {
       if (requestAbortRef.current === controller) requestAbortRef.current = null
@@ -2123,6 +2175,15 @@ export default function AimPage() {
     const workbenchCommand = detectAimWorkbenchCommand(currentInput)
     if (workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
     await generateWithInput(currentInput)
+  }
+
+  function retryFailedMessage(message: ChatMessage) {
+    if (!message.failure || busy) return
+    if (message.failure.kind === "generate") {
+      void generateWithInput(message.failure.retryText, { retryMessageId: message.id })
+      return
+    }
+    void sendText(message.failure.retryText, { retryMessageId: message.id })
   }
 
   function handleStop() {
@@ -2495,6 +2556,19 @@ export default function AimPage() {
                       />
                     )}
 
+                    {m.role === "assistant" && m.failure && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 h-7 px-2 text-xs"
+                        onClick={() => retryFailedMessage(m)}
+                        disabled={busy}
+                      >
+                        <ArrowRight className="mr-1 h-3.5 w-3.5" />
+                        重试本次请求
+                      </Button>
+                    )}
+
                     {m.role === "assistant" && m.editorApply?.range && extractReplacementDraft(m.content) && (
                       <Button
                         size="sm"
@@ -2512,6 +2586,7 @@ export default function AimPage() {
                         <DeliverableBubble
                           deliverables={m.deliverables}
                           runId={m.runId}
+                          isCurrentVersion={m.id === latestDeliverableMessageId()}
                           agentId={isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId}
                           nextActions={getAimAgentGuide(isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId).nextActions}
                           onRepurpose={handleRepurpose(m.id)}
