@@ -46,6 +46,7 @@ function baseRequest(overrides: Partial<AimRunRequest> = {}): AimRunRequest {
     taskType: "write_script",
     actorId: "user_1",
     projectId: "proj_1",
+    persistSnapshot: false,
     ...overrides,
   }
 }

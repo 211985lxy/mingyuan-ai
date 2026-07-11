@@ -38,6 +38,8 @@ import { persistAimRunSnapshot, applyRunMetadataToTrace } from "./snapshot"
 import { wrapLlmTelemetryIterable } from "@/lib/llm/telemetry"
 import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
 import { flagAimGenerationDegraded } from "./persistence"
+import { buildAimContextManifest } from "./manifest"
+import { assessAimGeneration, isAimGenerationLike } from "./quality"
 
 /**
  * 规整 AimRunRequest → planner 入参。
@@ -94,8 +96,9 @@ function withSpecOverrides(spec: AimRunSpec, request: AimRunRequest): AimRunSpec
  * 的 degraded:true 不一致；现在 provider fallback 降级时，回标 AimGeneration.status
  * 为 "degraded"，使三处（generation / snapshot / trace）语义对齐。
  */
-export interface ExecuteAimRunAdapter {
-  (spec: AimRunSpec): Promise<RunAimExecutionResult & {
+export interface ExecuteAimRunAdapter<TOutput = unknown> {
+  (spec: AimRunSpec): Promise<Omit<RunAimExecutionResult, "output"> & {
+    output: TOutput
     /** 落库的生成记录 id（draftOnly / skipPersistence 时为 undefined） */
     generationId?: string
     /** 主稿 LLM 质检报告（runLlmQuality 关闭时为 undefined） */
@@ -105,19 +108,20 @@ export interface ExecuteAimRunAdapter {
   }>
 }
 
-export async function executeAimRun(
+export async function executeAimRun<TOutput = unknown>(
   request: AimRunRequest,
-  execute: ExecuteAimRunAdapter,
-): Promise<AimRunResult> {
+  execute: ExecuteAimRunAdapter<TOutput>,
+): Promise<AimRunResult<TOutput>> {
   // 规整 + 归一化（agentId 非法时 getAgentHandler 下游兜底，这里不强抛）。
   const plan = toPlanInput(request)
 
   // 适配器扩展结果（generationId / qualityReport / qualityStatus）通过闭包变量回传。
-  let partial: RunAimExecutionResult & {
+  let partial: (Omit<RunAimExecutionResult, "output"> & {
+    output: TOutput
     generationId?: string
     qualityReport?: Record<string, unknown>
     qualityStatus?: "pass" | "warn" | "fail" | "skipped"
-  } | undefined
+  }) | undefined
 
   const execResult = await runAimHarness({
     traceId: request.trace?.id,
@@ -138,10 +142,67 @@ export async function executeAimRun(
 
   // output 形状仍是各 handler 的原始返回（generate 为 AimGenerateResponse，chat 为 string）。
   // 阶段 3 handler 改返回 AimAgentOutput 后这里直接用；当前以 unknown 透传 + 按需断言。
-  const output = execResult.output as unknown as AimAgentOutput
+  const output = execResult.output as TOutput
 
-  const generationId = partial?.generationId
-  const qualityReport = partial?.qualityReport
+  const legacyGenerationId =
+    output && typeof output === "object" && "id" in output
+      ? String((output as { id: unknown }).id)
+      : undefined
+  const generationId = partial?.generationId ?? legacyGenerationId
+
+  let qualityReport = partial?.qualityReport
+  let qualityStatus = partial?.qualityStatus
+  let qualityChecks: import("./validators").FormatValidationResult[] | undefined
+
+  if (isAimGenerationLike(output)) {
+    const quality = await assessAimGeneration({
+      output,
+      agentId: spec.agentId,
+      taskType: request.taskType,
+      runLlmQuality: request.runLlmQuality,
+    })
+    qualityReport = qualityReport ?? quality.qualityReport
+    qualityStatus = qualityStatus ?? quality.qualityStatus
+    qualityChecks = quality.qualityChecks
+  }
+
+  const citedKnowledgeIds =
+    output && typeof output === "object" && "knowledgeUsed" in output
+      ? ((output as { knowledgeUsed?: Array<{ id?: unknown }> }).knowledgeUsed ?? [])
+          .map((item) => typeof item.id === "string" ? item.id : "")
+          .filter(Boolean)
+      : undefined
+  const contextManifest = await buildAimContextManifest({
+    spec,
+    citedKnowledgeIds,
+    provided: partial?.contextManifest,
+  })
+
+  let snapshotId: string | undefined
+  if (request.persistSnapshot !== false) {
+    snapshotId = await persistAimRunSnapshot({
+      runSpec: spec,
+      metadata: execResult.metadata,
+      contextManifest,
+      composedPrompt: execResult.composedPrompt,
+      promptMessages: execResult.promptMessages,
+      output,
+      qualityResult: isAimGenerationLike(output)
+        ? { deterministic: qualityChecks ?? [], llm: qualityReport ?? null }
+        : undefined,
+      imageHashes: execResult.imageHashes,
+      traceId: request.trace?.id,
+      userId: request.actorId,
+      projectId: request.projectId,
+    })
+    await applyRunMetadataToTrace(
+      request.trace?.id,
+      execResult.metadata,
+      spec,
+      snapshotId,
+      qualityStatus,
+    )
+  }
 
   // ── degraded 语义裂缝修复：provider fallback 降级时回标 AimGeneration.status ──
   // 仅在确实落了生成记录（非 draftOnly / 非 skipPersistence）且运行降级时回标。
@@ -155,8 +216,11 @@ export async function executeAimRun(
     metadata: execResult.metadata,
     output,
     generationId,
+    snapshotId,
     traceId: request.trace?.id,
     qualityReport,
+    qualityChecks,
+    qualityStatus,
     spec,
   }
 }

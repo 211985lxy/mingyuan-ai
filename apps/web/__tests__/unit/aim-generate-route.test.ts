@@ -62,18 +62,14 @@ vi.mock("@/lib/aim-generate-context", () => ({
   buildRawInputWithCommentInsightContext,
 }))
 
-// aim-harness-v1: keep the route's real behavior (calls generateAimContent +
-// runQualityCheck, returns runId/degraded/qualityReport) but avoid hitting the
-// DB for snapshot/trace persistence in this unit test. The adapter still runs
-// the real deterministic validators + the (mocked) main-draft LLM report.
-vi.mock("@/lib/aim-harness/adapters", () => ({
-  runAimGenerate: vi.fn(async (input: {
-    execute: () => Promise<{ id: string; results: Array<{ format: string; content: string; wordCount: number }>; knowledgeUsed: unknown[] }>
-    runLlmQuality?: boolean
-  }) => {
-    const result = await input.execute()
+// Route 契约测试只验证入口对接与响应序列化；运行时内核、
+// 快照和边界由独立单测覆盖，这里不连真实 DB。
+vi.mock("@/lib/aim-harness/runtime", () => ({
+  executeAimRun: vi.fn(async (request: { runLlmQuality?: boolean }, execute: (spec: { agentId: string; runtimeTask: string }) => Promise<{ output: { id: string; results: Array<{ format: string; content: string; wordCount: number }>; knowledgeUsed: unknown[] } }>) => {
+    const adapted = await execute({ agentId: "content_producer", runtimeTask: "new_copy" })
+    const result = adapted.output
     let qualityReport: Record<string, unknown> | undefined
-    if (input.runLlmQuality !== false) {
+    if (request.runLlmQuality !== false) {
       const { runQualityCheck } = await import("@/lib/quality-gate")
       const main = result.results.find((item) =>
         ["video_script", "koubo_script", "xiaohongshu_post"].includes(item.format) && item.content?.trim()
@@ -91,11 +87,13 @@ vi.mock("@/lib/aim-harness/adapters", () => ({
       }
     }
     return {
-      result,
-      runId: "run_test",
-      degraded: false,
-      provider: "test-provider",
-      model: "test-model",
+      output: result,
+      metadata: {
+        runId: "run_test",
+        degraded: false,
+        provider: "test-provider",
+        model: "test-model",
+      },
       qualityChecks: [],
       qualityStatus: "pass",
       qualityReport,

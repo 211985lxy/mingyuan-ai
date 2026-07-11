@@ -149,6 +149,8 @@ export interface AimRunRequest {
   draftOnly?: boolean
   /** 是否跑 LLM 质检（默认 true；agent_api / inspiration 关闭） */
   runLlmQuality?: boolean
+  /** Eval/测试可关闭快照与 trace 回标；生产默认开启 */
+  persistSnapshot?: boolean
   /** 流式输出 */
   stream?: boolean
 }
@@ -209,11 +211,11 @@ export interface AimAgentOutput {
  * 唯一执行内核的返回值。executeAimRun 返回它；入口据此序列化 HTTP 响应。
  * metadata.runId 是对外执行编号（兼容现有 runId 诊断字段）。
  */
-export interface AimRunResult {
+export interface AimRunResult<TOutput = AimAgentOutput> {
   /** 运行元数据（runId / provider / model / fallbackIndex / degraded / hashes） */
   metadata: AimRunMetadata
   /** 智能体产出 */
-  output: AimAgentOutput
+  output: TOutput
   /** 落库的生成记录 id（draftOnly 时为 undefined） */
   generationId?: string
   /** 快照 id（admin 可查） */
@@ -222,6 +224,10 @@ export interface AimRunResult {
   traceId?: string
   /** 主稿 LLM 质检报告（runLlmQuality 关闭时为 undefined） */
   qualityReport?: Record<string, unknown>
+  /** 每个输出格式的确定性校验 */
+  qualityChecks?: import("./validators").FormatValidationResult[]
+  /** 本次运行的综合质量状态 */
+  qualityStatus?: "pass" | "warn" | "fail" | "skipped"
   /** 冻结的运行计划（回传给入口做响应序列化） */
   spec: AimRunSpec
 }

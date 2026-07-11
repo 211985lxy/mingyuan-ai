@@ -23,7 +23,7 @@ import {
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
-import { runAimGenerate } from "@/lib/aim-harness/adapters"
+import { executeAimRun } from "@/lib/aim-harness/runtime"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 
 function includesAny(text: string, words: string[]) {
@@ -199,19 +199,33 @@ export async function POST(request: NextRequest) {
       }),
     )
 
-    // ── aim-harness-v1: generate through the thin harness ──
-    // The harness wraps generateAimContent unchanged, capturing runId / real
-    // provider+model / fallbackIndex / degraded / promptHash / contextHash,
-    // persisting an AimRunSnapshot and stamping the trace. It also runs the
-    // deterministic validators on every format + the main-draft LLM report
-    // (read-only; auto-rewrite stays off the main path).
-    const harness = await runAimGenerate({
-      execute: () =>
-        generateAimContent({
+    const effectiveProjectId = workflowBrief?.projectId || parsed.projectId
+    const run = await executeAimRun({
+      entrypoint: "generate",
+      rawInput: withCommentContext,
+      agentId: parsed.agentId || "content_producer",
+      targetFormats: parsed.targetFormats,
+      taskType: parsed.taskType,
+      polishInstruction: parsed.polishInstruction,
+      topicTitle: parsed.topicTitle,
+      topicRationale: parsed.topicRationale,
+      topicType: parsed.topicType,
+      hotTopic: parsed.hotTopic,
+      videoCopyExtractionId: parsed.videoCopyExtractionId,
+      existingGenerationId: parsed.existingGenerationId,
+      topicSelectionId: parsed.topicSelectionId,
+      selectedTopicIndex: parsed.selectedTopicIndex,
+      runtimeTask,
+      taskSpec: workflowBrief?.taskSpec,
+      actorId: user.id,
+      projectId: effectiveProjectId,
+      trace,
+    }, async (spec) => {
+      const output = await generateAimContent({
           userId: user.id,
-          projectId: workflowBrief?.projectId || parsed.projectId,
+          projectId: effectiveProjectId,
           rawInput: withCommentContext,
-          agentId: parsed.agentId,
+          agentId: spec.agentId,
           targetFormats: parsed.targetFormats,
           taskType: parsed.taskType,
           topicTitle: parsed.topicTitle,
@@ -223,40 +237,30 @@ export async function POST(request: NextRequest) {
           existingGenerationId: parsed.existingGenerationId,
           topicSelectionId: parsed.topicSelectionId,
           selectedTopicIndex: parsed.selectedTopicIndex,
-          runtimeTask,
+          runtimeTask: spec.runtimeTask,
           trace,
           taskSpec: workflowBrief?.taskSpec,
-        }),
-      rawInput: withCommentContext,
-      agentId: parsed.agentId || "content_producer",
-      targetFormats: parsed.targetFormats,
-      taskType: parsed.taskType,
-      polishInstruction: parsed.polishInstruction,
-      topicType: parsed.topicType,
-      hotTopic: parsed.hotTopic,
-      entrypoint: "generate",
-      trace,
-      userId: user.id,
-      projectId: parsed.projectId || null,
+        })
+      return { output, generationId: output.id }
     })
 
-    const result = harness.result
+    const result = run.output
 
-    if (harness.qualityReport) {
+    if (run.qualityReport) {
       await runAimTraceStep(
         trace,
         "quality_gate",
         "生成后质检（含违禁词检测）",
-        async () => harness.qualityReport as Record<string, unknown>,
+        async () => run.qualityReport as Record<string, unknown>,
         (report) => ({
           summary: `质检得分 ${(report as { overallScore?: number }).overallScore ?? "-"}/10，${(report as { passed?: boolean }).passed ? "通过" : "未通过"}`,
           metadata: {
             ...report,
-            runId: harness.runId,
-            degraded: harness.degraded,
-            provider: harness.provider,
-            model: harness.model,
-            qualityStatus: harness.qualityStatus,
+            runId: run.metadata.runId,
+            degraded: run.metadata.degraded,
+            provider: run.metadata.provider,
+            model: run.metadata.model,
+            qualityStatus: run.qualityStatus,
           },
         }),
       )
@@ -267,13 +271,13 @@ export async function POST(request: NextRequest) {
       // Additive optional fields (Phase 4): runId, degraded, provider, model,
       // qualityStatus and deterministic per-format qualityChecks. Existing
       // qualityReport keeps its meaning (main-draft LLM score).
-      runId: harness.runId,
-      degraded: harness.degraded,
-      provider: harness.provider,
-      model: harness.model,
-      qualityStatus: harness.qualityStatus,
-      qualityChecks: harness.qualityChecks,
-      qualityReport: harness.qualityReport,
+      runId: run.metadata.runId,
+      degraded: run.metadata.degraded,
+      provider: run.metadata.provider,
+      model: run.metadata.model,
+      qualityStatus: run.qualityStatus,
+      qualityChecks: run.qualityChecks,
+      qualityReport: run.qualityReport,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)
