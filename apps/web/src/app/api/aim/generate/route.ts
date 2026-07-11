@@ -24,6 +24,7 @@ import {
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
 import { runAimGenerate } from "@/lib/aim-harness/adapters"
+import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 
 function includesAny(text: string, words: string[]) {
   return words.some((word) => text.includes(word))
@@ -97,6 +98,17 @@ export async function POST(request: NextRequest) {
       await failAimTrace(trace, validationError)
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
+
+    // Workflow context is deliberately rebuilt here. The browser may suggest a
+    // goal and constraints, but project facts and source records are always
+    // re-authorized for the current user before they reach the model.
+    const workflowBrief = parsed.workflow
+      ? await buildWorkflowBrief({
+          userId: user.id,
+          ...parsed.workflow,
+          projectId: parsed.workflow.projectId || parsed.projectId || undefined,
+        })
+      : undefined
 
     const runtimeTask = await runAimTraceStep(
       trace,
@@ -197,7 +209,7 @@ export async function POST(request: NextRequest) {
       execute: () =>
         generateAimContent({
           userId: user.id,
-          projectId: parsed.projectId,
+          projectId: workflowBrief?.projectId || parsed.projectId,
           rawInput: withCommentContext,
           agentId: parsed.agentId,
           targetFormats: parsed.targetFormats,
@@ -213,6 +225,7 @@ export async function POST(request: NextRequest) {
           selectedTopicIndex: parsed.selectedTopicIndex,
           runtimeTask,
           trace,
+          taskSpec: workflowBrief?.taskSpec,
         }),
       rawInput: withCommentContext,
       agentId: parsed.agentId || "content_producer",

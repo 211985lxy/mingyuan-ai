@@ -1,5 +1,6 @@
 import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
 import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
+import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
 
 const VALID_FORMATS = new Set([
   "video_script",
@@ -40,6 +41,7 @@ export interface ParseGenerateBodyResult {
   existingGenerationId: string | undefined
   topicSelectionId: string | undefined
   selectedTopicIndex: number | undefined
+  workflow: ReturnType<typeof parseWorkflowBriefRequest> | undefined
 }
 
 export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateBodyResult {
@@ -92,6 +94,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
       typeof body.selectedTopicIndex === "number" && Number.isInteger(body.selectedTopicIndex) && body.selectedTopicIndex >= 0
         ? body.selectedTopicIndex
         : undefined,
+    workflow: parseWorkflowBriefRequest(body.workflow) || undefined,
   }
 }
 

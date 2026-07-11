@@ -1610,7 +1610,9 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     } : null,
     knowledgeTitles,
   })
-  const taskSpec = await refineTaskSpec(taskSpecSkeleton, { enabled: false })
+  // A confirmed workflow brief was rebuilt and authorized by the route. Keep
+  // it intact; otherwise preserve the established automatic task-spec path.
+  const taskSpec = params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
 
   // 4. 调用具体的智能体 Handler
   //    加入压缩摘要（如有必要，将用户原始输入视为消息列表）

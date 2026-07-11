@@ -48,6 +48,7 @@ import {
   chatAim,
   chatAimStream,
   createKnowledge,
+  createAimWorkflowBrief,
   evolveAimConversation,
   evolveStyleConversation,
   ApiError,
@@ -67,6 +68,15 @@ import {
   type ContentFormat,
   type QualityCheckReport,
 } from "@/lib/api/client"
+import {
+  AIM_CONTENT_ACTIONS,
+  AIM_WORKFLOW_STAGES,
+  getWorkflowStageForAgent,
+  isAimWorkflowStage,
+  type AimContentAction,
+  type AimWorkflowStage,
+  type ConfirmedWorkflowBrief,
+} from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { transcribeAudio } from "@/lib/api/client"
 import { STYLE_GUIDE_LABELS, type StyleGuideId } from "@/lib/style-guide-config"
@@ -227,6 +237,8 @@ interface ChatMessage {
   runId?: string | null
   degraded?: boolean | null
   qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
+  workflowStage?: AimWorkflowStage
+  contentAction?: AimContentAction | null
   failure?: { kind: "chat" | "generate"; retryText: string } | null
 }
 
@@ -671,6 +683,8 @@ function DeliverableBubble({
   runId,
   isCurrentVersion,
   agentId,
+  workflowStage,
+  contentAction,
   nextActions,
   onRepurpose,
   onQuality,
@@ -687,11 +701,13 @@ function DeliverableBubble({
   runId?: string | null
   isCurrentVersion: boolean
   agentId: AimAgentId
+  workflowStage?: AimWorkflowStage
+  contentAction?: AimContentAction | null
   nextActions?: AimNextAction[]
   onRepurpose: (format: ContentFormat) => void
   onQuality: () => void
   onMarkStatus: (status: string) => void
-  onNextAction?: (action: AimNextAction, content: string) => void
+  onNextAction?: (action: AimNextAction, content: string, generationId: string) => void
   isBusy: boolean
   onEditResult?: (format: ContentFormat, content: string) => void
   onCompileToWiki?: () => void
@@ -713,7 +729,11 @@ function DeliverableBubble({
       setCopiedFormat(format)
       setTimeout(() => setCopiedFormat(null), 600)
     }
-    reportAimRunEvent(runId, "copied", format ? { format } : undefined)
+    reportAimRunEvent(runId, "copied", {
+      ...(format ? { format } : {}),
+      ...(workflowStage ? { workflowStage } : {}),
+      ...(contentAction ? { contentAction } : {}),
+    })
     toast.success("已复制")
   }
 
@@ -765,7 +785,7 @@ function DeliverableBubble({
       return
     }
     const action = secondaryNextActions.find((item) => `action:${item.id}` === value)
-    if (action && activeResult) onNextAction?.(action, activeResult.content)
+    if (action && activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
   }
 
   return (
@@ -854,7 +874,7 @@ function DeliverableBubble({
                   onQuality()
                   return
                 }
-                if (activeResult) onNextAction?.(action, activeResult.content)
+                if (activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
               }}
               disabled={isBusy || !activeResult?.content.trim() || (action.id === "publish_check" && !hasPublishScript)}
             >
@@ -978,6 +998,7 @@ export default function AimPage() {
   const router = useRouter()
   const searchParams = useSearchParams() ?? new URLSearchParams()
   const agentParam = searchParams.get("agent")
+  const workflowStageParam = searchParams.get("stage")
   const topicTitleParam = searchParams.get("topicTitle")
   const topicRationaleParam = searchParams.get("topicRationale")
   const topicSelectionIdParam = searchParams.get("topicSelectionId")
@@ -1041,6 +1062,15 @@ export default function AimPage() {
     rule: "",
     source: "内容复盘",
   })
+  const [workflowBrief, setWorkflowBrief] = useState<{
+    sourceGenerationId?: string
+    nextInput: string
+    confirmed: ConfirmedWorkflowBrief
+  } | null>(null)
+  const [workflowBriefForm, setWorkflowBriefForm] = useState<ConfirmedWorkflowBrief>({})
+  const [workflowBriefDialogOpen, setWorkflowBriefDialogOpen] = useState(false)
+  const [isBuildingWorkflowBrief, setIsBuildingWorkflowBrief] = useState(false)
+  const [contentAction, setContentAction] = useState<AimContentAction | null>(null)
   const [projectEnabled, setProjectEnabled] = useState(false)
   const [isEvolving, setIsEvolving] = useState(false)
   const [evolutionSuggestions, setEvolutionSuggestions] = useState<AimEvolutionSuggestion[]>([])
@@ -1109,6 +1139,10 @@ export default function AimPage() {
           : selectedAgentId === "deep_copywriter"
             ? "深度长文创作"
             : "内容文案创作"
+  const currentWorkflowStage = isAimWorkflowStage(workflowStageParam)
+    ? workflowStageParam
+    : getWorkflowStageForAgent(selectedAgentId)
+  const showWorkflowLanding = !agentParam && !workflowStageParam && messages.length === 0 && !input.trim() && !ideaParam
 
   const hasEditorSelection = Boolean(referenceSelection.text.trim() || draftSelection.text.trim())
 
@@ -2023,8 +2057,28 @@ export default function AimPage() {
     }
   }
 
-  const handleAimNextAction = useCallback(
-    async (action: AimNextAction, content: string) => {
+  function beginWorkflowStage(stage: AimWorkflowStage) {
+    const config = AIM_WORKFLOW_STAGES.find((item) => item.id === stage)!
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.set("stage", stage)
+    nextParams.set("agent", config.defaultAgentId)
+    lastAgentParamRef.current = config.defaultAgentId
+    setSelectedAgentId(config.defaultAgentId)
+    if (stage !== "content") setContentAction(null)
+    if (stage === "results") {
+      setInput("请基于已发布内容填写复盘：结果、判断和下一轮可复用规则。")
+    }
+    router.replace(`/aim?${nextParams.toString()}`)
+  }
+
+  function beginContentAction(action: AimContentAction) {
+    const config = AIM_CONTENT_ACTIONS.find((item) => item.id === action)!
+    setContentAction(action)
+    setInput((current) => current.trim() ? `${config.prompt}\n\n${current}` : config.prompt)
+    if (selectedAgentId !== "content_producer") beginWorkflowStage("content")
+  }
+
+  async function handleAimNextAction(action: AimNextAction, content: string, generationId: string) {
       const cleanContent = content.trim()
       if (!cleanContent) return
 
@@ -2050,8 +2104,39 @@ export default function AimPage() {
       }
 
       if (action.targetAgentId && action.targetAgentId !== selectedAgentId) {
+        if (action.targetAgentId === "content_producer" && getWorkflowStageForAgent(selectedAgentId) === "direction") {
+          setIsBuildingWorkflowBrief(true)
+          try {
+            const brief = await createAimWorkflowBrief({
+              stage: "content",
+              projectId: selectedProjectId || undefined,
+              sourceGenerationId: generationId,
+              goal: action.label,
+            })
+            setWorkflowBriefForm({
+              goal: brief.taskSpec.goal,
+              targetCustomer: brief.taskSpec.targetCustomer,
+              realProblem: brief.taskSpec.realProblem,
+              contentTask: brief.taskSpec.contentTask,
+              mustKeep: brief.taskSpec.exclusiveEvidence,
+              desiredAction: brief.taskSpec.desiredAction,
+            })
+            setWorkflowBrief({
+              sourceGenerationId: brief.sourceGenerationId,
+              nextInput: buildAimNextActionPrompt(action, cleanContent),
+              confirmed: {},
+            })
+            setWorkflowBriefDialogOpen(true)
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "任务单创建失败")
+          } finally {
+            setIsBuildingWorkflowBrief(false)
+          }
+          return
+        }
         const nextParams = new URLSearchParams(searchParams.toString())
         nextParams.set("agent", action.targetAgentId)
+        nextParams.set("stage", getWorkflowStageForAgent(action.targetAgentId))
         lastAgentParamRef.current = action.targetAgentId
         setSelectedAgentId(action.targetAgentId)
         setMessages([])
@@ -2067,9 +2152,7 @@ export default function AimPage() {
       }
       setInput(buildAimNextActionPrompt(action, cleanContent))
       toast.success("已带入聊天框")
-    },
-    [agent.title, router, searchParams, selectedAgentId, selectedProjectId],
-  )
+  }
 
   const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
     const hasCurrentContext = Boolean(
@@ -2140,8 +2223,17 @@ export default function AimPage() {
         topicRationale: sourceTopicRationale.trim() || undefined,
         topicSelectionId: topicSelectionIdParam || undefined,
         selectedTopicIndex: Number.isFinite(selectedTopicIndexParam) ? selectedTopicIndexParam : undefined,
-        taskType: "write_script",
+        taskType: contentAction
+          ? AIM_CONTENT_ACTIONS.find((item) => item.id === contentAction)?.taskType || "write_script"
+          : "write_script",
         useMarketViralVideos: selectedAgentId === "business_diagnosis",
+        workflow: workflowBrief
+          ? {
+              stage: "content",
+              sourceGenerationId: workflowBrief.sourceGenerationId,
+              confirmed: workflowBrief.confirmed,
+            }
+          : undefined,
       }, controller.signal)
       const proofreadFormats = new Set<ContentFormat>(["raw_copy", "video_script", "koubo_script"])
       const proofreadResults = await Promise.all(
@@ -2180,6 +2272,8 @@ export default function AimPage() {
           runId: response.runId ?? null,
           degraded: response.degraded ?? null,
           qualityStatus: response.qualityStatus ?? null,
+          workflowStage: currentWorkflowStage,
+          contentAction,
           }
           : message
       ))
@@ -2192,6 +2286,8 @@ export default function AimPage() {
         )
       }
       refreshHistory({ force: true, agentId: selectedAgentId })
+      setWorkflowBrief(null)
+      setContentAction(null)
       toast.success(`${agent.primaryActionLabel}完毕`)
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
@@ -2519,6 +2615,26 @@ export default function AimPage() {
           </div>
         )}
 
+        <nav className="border-b px-3 py-2" aria-label="AIM 工作流">
+          <div className="mx-auto flex max-w-3xl items-center gap-1 overflow-x-auto">
+            {AIM_WORKFLOW_STAGES.map((stage, index) => (
+              <div key={stage.id} className="flex shrink-0 items-center gap-1">
+                {index > 0 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={currentWorkflowStage === stage.id ? "secondary" : "ghost"}
+                  className="h-7 rounded-md px-2 text-xs"
+                  onClick={() => beginWorkflowStage(stage.id)}
+                >
+                  {stage.title}
+                </Button>
+              </div>
+            ))}
+            <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">专家能力仍可从侧边栏进入</span>
+          </div>
+        </nav>
+
         {personaProgress != null && (
           <div className="border-b bg-primary/5 px-3 py-2">
             <div className="mx-auto flex max-w-2xl items-center gap-2">
@@ -2564,10 +2680,37 @@ export default function AimPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
           {messages.length === 0 ? (
             <div className="mx-auto flex w-full max-w-3xl flex-col py-6">
-              <div className="max-w-2xl text-left">
-                <p className="text-sm font-semibold text-foreground">{agent.title}</p>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{agent.intro}</p>
-              </div>
+              {showWorkflowLanding ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {AIM_WORKFLOW_STAGES.map((stage) => (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      className="border p-4 text-left transition-colors hover:bg-muted/50"
+                      onClick={() => beginWorkflowStage(stage.id)}
+                    >
+                      <p className="text-sm font-semibold text-foreground">
+                        {stage.id === "direction" ? "我还没想清楚方向" : stage.id === "content" ? "我有方向，要做内容" : stage.id === "publish" ? "我有稿，准备发布" : "我想复盘和沉淀"}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{stage.description}</p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="max-w-2xl text-left">
+                  <p className="text-sm font-semibold text-foreground">{agent.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{agent.intro}</p>
+                  {currentWorkflowStage === "content" && selectedAgentId === "content_producer" && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {AIM_CONTENT_ACTIONS.map((action) => (
+                        <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => beginContentAction(action.id)}>
+                          {action.title}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="mx-auto flex w-full max-w-none flex-col gap-4">
@@ -2657,6 +2800,8 @@ export default function AimPage() {
                           runId={m.runId}
                           isCurrentVersion={m.id === latestDeliverableMessageId()}
                           agentId={isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId}
+                          workflowStage={m.workflowStage}
+                          contentAction={m.contentAction}
                           nextActions={getAimAgentGuide(isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId).nextActions}
                           onRepurpose={handleRepurpose(m.id)}
                           onQuality={handleQuality(m.id)}
@@ -2856,6 +3001,72 @@ export default function AimPage() {
           onClose={() => setWikiDialog((prev) => ({ ...prev, open: false }))}
         />
       )}
+
+      <Dialog open={workflowBriefDialogOpen && !!workflowBrief} onOpenChange={(open) => {
+        setWorkflowBriefDialogOpen(open)
+        if (!open) setWorkflowBrief(null)
+      }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>确认内容任务单</DialogTitle>
+            <DialogDescription>项目事实和上游结果已带入。这里可以改目标和约束，确认后再交给内容生产官。</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">内容目标</p>
+              <Input value={workflowBriefForm.goal || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, goal: event.target.value }))} />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium">目标客户</p>
+                <Input value={workflowBriefForm.targetCustomer || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, targetCustomer: event.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium">承接动作</p>
+                <Input value={workflowBriefForm.desiredAction || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, desiredAction: event.target.value as ConfirmedWorkflowBrief["desiredAction"] }))} placeholder="如：私信、预约诊断" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">核心问题</p>
+              <Textarea value={workflowBriefForm.realProblem || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, realProblem: event.target.value }))} />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">必须保留项</p>
+              <Textarea value={workflowBriefForm.mustKeep || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, mustKeep: event.target.value }))} placeholder="案例、原话、关键结论等" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">禁区</p>
+              <Textarea value={workflowBriefForm.avoid || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, avoid: event.target.value }))} placeholder="不能说的承诺、敏感词或表达" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium">用户补充</p>
+              <Textarea value={workflowBriefForm.userSupplement || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, userSupplement: event.target.value }))} placeholder="会标记为用户补充，不会伪装成项目事实" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setWorkflowBriefDialogOpen(false); setWorkflowBrief(null) }}>取消</Button>
+            <Button
+              disabled={isBuildingWorkflowBrief}
+              onClick={() => {
+                const next = workflowBrief
+                if (!next) return
+                const params = new URLSearchParams(searchParams.toString())
+                params.set("agent", "content_producer")
+                params.set("stage", "content")
+                lastAgentParamRef.current = "content_producer"
+                setSelectedAgentId("content_producer")
+                setWorkflowBrief({ ...next, confirmed: workflowBriefForm })
+                setWorkflowBriefDialogOpen(false)
+                setInput(next.nextInput)
+                router.replace(`/aim?${params.toString()}`)
+                toast.success("任务单已确认，开始内容创作")
+              }}
+            >
+              进入内容创作
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!recordDialog} onOpenChange={(open) => { if (!open) setRecordDialog(null) }}>
         <DialogContent className="max-w-xl">

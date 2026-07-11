@@ -1287,6 +1287,19 @@ export interface AimGenerateRequest {
   existingGenerationId?: string
   topicSelectionId?: string
   selectedTopicIndex?: number
+  workflow?: {
+    stage: import("@/lib/aim-workflow").AimWorkflowStage
+    sourceGenerationId?: string
+    goal?: string
+    confirmed?: import("@/lib/aim-workflow").ConfirmedWorkflowBrief
+  }
+}
+
+export interface AimWorkflowBriefResponse {
+  stage: import("@/lib/aim-workflow").AimWorkflowStage
+  projectId?: string
+  sourceGenerationId?: string
+  taskSpec: import("@/lib/task-spec").TaskSpec
 }
 
 export interface AimGenerateResult {
@@ -1382,6 +1395,19 @@ export async function generateAimContent(data: AimGenerateRequest, signal?: Abor
     body: JSON.stringify(data),
     timeout: 180000,
     signal,
+  })
+}
+
+export async function createAimWorkflowBrief(data: {
+  stage: import("@/lib/aim-workflow").AimWorkflowStage
+  projectId?: string
+  sourceGenerationId?: string
+  goal?: string
+  confirmed?: import("@/lib/aim-workflow").ConfirmedWorkflowBrief
+}): Promise<AimWorkflowBriefResponse> {
+  return request<AimWorkflowBriefResponse>("/api/aim/workflow/brief", {
+    method: "POST",
+    body: JSON.stringify(data),
   })
 }
 
