@@ -124,6 +124,11 @@ async function buildManifest(
 /**
  * Drive a generation through the harness. The executor is unchanged; this adds
  * planning, run metadata, snapshot, trace stamping and deterministic+LLM quality.
+ *
+ * @deprecated 升级阶段 1.3：新入口统一为 executeAimRun（aim-harness/runtime.ts）。
+ * 阶段 2.6–2.8 四个生成类入口（普通生成 / 外部 Agent API / 灵感生成）切换到
+ * executeAimRun 后，本函数不再有正式调用者。阶段 3 删除。禁止新增调用者
+ * （由 CI 架构护栏 check-aim-architecture 强制）。
  */
 export async function runAimGenerate(
   input: AimGenerateHarnessInput
@@ -265,7 +270,12 @@ export interface AimChatHarnessOutput {
   model: string
 }
 
-/** Drive a non-stream chat through the harness. */
+/**
+ * Drive a non-stream chat through the harness.
+ *
+ * @deprecated 升级阶段 1.3：新入口统一为 executeAimRun（entrypoint=chat）。
+ * 阶段 2.9 非流式 chat 切换后本函数无正式调用者，阶段 3 删除。禁止新增调用者。
+ */
 export async function runAimChat(input: AimChatHarnessInput): Promise<AimChatHarnessOutput> {
   const outcome = await runAimHarness({
     traceId: input.trace?.id,
@@ -320,6 +330,10 @@ export async function runAimChat(input: AimChatHarnessInput): Promise<AimChatHar
  * (chunks must be emitted as they arrive), so we register telemetry here and
  * finalize metadata after the stream completes — matching the plan's
  * "streaming calls backfill trace via telemetry callback on completion".
+ *
+ * @deprecated 升级阶段 1.3：新入口统一为 streamAimRun（aim-harness/runtime.ts）。
+ * 阶段 2.5/2.10 流式 chat 切换后，本函数及其内部散落的 runId / telemetry / 快照
+ * 三处独立实现一并删除（由 streamAimRun 统一 lifecycle 接管）。禁止新增调用者。
  */
 export async function planAimChatStream(input: {
   rawInput: string

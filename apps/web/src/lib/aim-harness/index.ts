@@ -58,3 +58,11 @@ export type {
 } from "./validators"
 
 export { hashPrompt, hashContextManifest, hashImageBytes } from "./hashing"
+
+// v2 唯一执行入口（阶段 1.3 骨架，阶段 2 接管）。入口迁移后四入口都从这里进。
+export {
+  executeAimRun,
+  streamAimRun,
+  prepareAimContext,
+} from "./runtime"
+export type { AimStreamHandle } from "./runtime"
