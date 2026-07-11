@@ -53,7 +53,7 @@ export interface RunAimExecutionResult {
 }
 
 /** Build a stable runId (the external execution number). */
-function makeRunId(): string {
+export function makeRunId(): string {
   // Prefix + uuid; kept under the VarChar(40) column.
   const uuid = randomUUID().replace(/-/g, "").slice(0, 28)
   return `run_${uuid}`

@@ -27,10 +27,16 @@ import type {
   AimAgentOutput,
 } from "./contracts"
 import { normalizeAimAgentId, isValidAimAgent } from "./contracts"
-import { runAimHarness } from "./runner"
+import { runAimHarness, makeRunId } from "./runner"
 import type { RunAimExecutionResult } from "./runner"
+import { planAimRun } from "./planner"
 import type { PlanRunInput } from "./planner"
-import type { AimRunSpec } from "./types"
+import type { AimRunSpec, AimContextSource, AimRunMetadata } from "./types"
+import { HARNESS_VERSION } from "./types"
+import { hashPrompt, hashContextManifest, sha256 } from "./hashing"
+import { persistAimRunSnapshot, applyRunMetadataToTrace } from "./snapshot"
+import { wrapLlmTelemetryIterable } from "@/lib/llm/telemetry"
+import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
 import { flagAimGenerationDegraded } from "./persistence"
 
 /**
@@ -156,31 +162,84 @@ export async function executeAimRun(
 }
 
 /**
- * 流式唯一入口（阶段 1.3 骨架）。
+ * 流式唯一入口（阶段 2.5 真内核）。
  *
- * 阶段 1 仅声明形态：返回一个 stream handle（spec + runId + 产出 async iterable
- * 的工厂）。真正的 lifecycle 合并（统一 runId / telemetry / 快照，删除
- * planAimChatStream 三处散落）在阶段 2.5 完成。本骨架当前不被入口调用，供阶段 2
- * 迁移流式 chat 时替换 planAimChatStream。
+ * 与 executeAimRun 共享 plan / runId / telemetry / snapshot lifecycle，吃掉此前
+ * planAimChatStream 内部三处散落：
+ *   - runId 统一走 runner.makeRunId（此前 adapters.ts 独立 randomUUID）
+ *   - telemetry 用 wrapLlmTelemetryIterable 包裹流（流式专用；与 runWithLlmTelemetry
+ *     共享 ProviderAttempt/LlmInvocation 结构）
+ *   - 快照统一走 persistAimRunSnapshot + applyRunMetadataToTrace（此前 finalize 手写 metadata）
+ *
+ * 返回 AimStreamHandle：调用方把 handler 的 async iterable 注入 stream()，流结束后
+ * 调 finalize()（成功或失败）持久化快照 + 盖 trace。流式无法像非流式那样在 runAimHarness
+ * 内 await 整条流，故 plan + telemetry 注册在此完成，metadata 在 finalize 组装。
  */
 export interface AimStreamHandle {
   spec: AimRunSpec
   runId: string
-  /** 由调用方把 handler 的 async iterable 注入，内部捕获 telemetry 并在流结束后 finalize */
+  /** 把 handler 的 async iterable 注入，内部捕获 telemetry 后原样产出（逐字不变） */
   stream: (chunks: AsyncIterable<string>) => AsyncIterable<string>
   /** 流结束后调用（成功或失败），持久化快照 + 盖 trace */
   finalize: (fullOutput: string, ok: boolean) => Promise<void>
 }
 
-export async function streamAimRun(_request: AimRunRequest): Promise<AimStreamHandle> {
-  // 阶段 1.3 骨架：形态占位。阶段 2.5 实现：
-  //   - runId 统一走 runner 的 makeRunId（删除 adapters.ts:357 独立 randomUUID）
-  //   - telemetry 统一走 runWithLlmTelemetry（删除 wrapLlmTelemetryIterable 独立收集）
-  //   - 快照统一一处 persistAimRunSnapshot（删除 finalize 手写 metadata）
-  //   - 与 executeAimRun 共享 plan / telemetry / snapshot lifecycle
-  throw new Error(
-    "streamAimRun: 阶段 1.3 仅声明形态，阶段 2.5 才实现。当前流式入口仍走 planAimChatStream。",
-  )
+export async function streamAimRun(request: AimRunRequest): Promise<AimStreamHandle> {
+  const plan = toPlanInput(request)
+  const spec = planAimRun(plan)
+  // runId 统一走 runner.makeRunId（与 executeAimRun / runAimHarness 同源）
+  const runId = makeRunId()
+
+  const attempts: ProviderAttempt[] = []
+  const invocations: LlmInvocation[] = []
+  const recorder = {
+    onAttempt: (attempt: ProviderAttempt) => attempts.push(attempt),
+    onInvocation: (invocation: LlmInvocation) => invocations.push(invocation),
+  }
+  // 流式 telemetry：包裹 async iterable，捕获 provider attempt / invocation
+  const stream = (chunks: AsyncIterable<string>) => wrapLlmTelemetryIterable(recorder, chunks)
+
+  const finalize = async (fullOutput: string, ok: boolean) => {
+    const successful =
+      [...attempts].reverse().find((a) => a.status === "success") ?? attempts[attempts.length - 1]
+    const failed = attempts.filter((a) => a.status === "failed")
+    const composedPrompt = invocations.length > 0
+      ? invocations.map((invocation, index) => `=== LLM INVOCATION ${index + 1} ===\n${invocation.fullPrompt}`).join("\n\n")
+      : request.rawInput
+    // 来源清单：调用方若提供（request 侧）则用，否则回退到 rawInput 单条
+    const contextManifest: AimContextSource[] = [{
+      kind: "request",
+      id: "raw_input",
+      charCount: request.rawInput.length,
+      contentHash: sha256(request.rawInput),
+    }]
+    const metadata: AimRunMetadata = {
+      runId,
+      harnessVersion: HARNESS_VERSION,
+      provider: successful?.provider ?? "unknown",
+      model: successful?.responseModel ?? successful?.model ?? "unknown",
+      fallbackIndex: successful?.attemptIndex ?? 0,
+      degraded: failed.length > 0 && !!successful && ok,
+      promptHash: hashPrompt(composedPrompt),
+      contextHash: hashContextManifest(contextManifest),
+      providerAttempts: attempts,
+    }
+    await persistAimRunSnapshot({
+      runSpec: spec,
+      metadata,
+      contextManifest,
+      composedPrompt,
+      promptMessages: invocations.map((invocation) => invocation.messages),
+      output: fullOutput,
+      imageHashes: invocations.flatMap((invocation) => invocation.imageHashes),
+      traceId: request.trace?.id,
+      userId: request.actorId,
+      projectId: request.projectId,
+    })
+    await applyRunMetadataToTrace(request.trace?.id, metadata, spec)
+  }
+
+  return { spec, runId, stream, finalize }
 }
 
 /**

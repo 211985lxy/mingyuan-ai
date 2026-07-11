@@ -169,10 +169,37 @@ describe("executeAimRun 骨架（阶段 2.4 真内核）", () => {
   })
 })
 
-describe("streamAimRun 骨架（阶段 1.3 占位）", () => {
-  it("阶段 1.3 显式抛错，阶段 2.5 才实现", async () => {
-    await expect(streamAimRun(baseRequest({ entrypoint: "chat" }))).rejects.toThrow(
-      /阶段 2\.5/,
+describe("streamAimRun（阶段 2.5 统一流式 lifecycle）", () => {
+  it("返回 AimStreamHandle：runId 走统一 makeRunId，与 executeAimRun 同源前缀", async () => {
+    const handle = await streamAimRun(
+      baseRequest({
+        entrypoint: "chat",
+        agentId: "business_diagnosis",
+        messages: [{ role: "user", content: "你好" }],
+        targetFormats: [],
+      }),
     )
+    expect(handle.spec.entrypoint).toBe("chat")
+    // runId 由 runner.makeRunId 生成（与 executeAimRun / runAimHarness 同源），统一前缀
+    expect(handle.runId).toMatch(/^run_/)
+    expect(handle.runId.length).toBeLessThanOrEqual(40)
+    expect(typeof handle.stream).toBe("function")
+    expect(typeof handle.finalize).toBe("function")
+  })
+
+  it("stream() 逐字透传 handler 的 chunks（telemetry 包裹不改内容）", async () => {
+    const handle = await streamAimRun(
+      baseRequest({ entrypoint: "chat", agentId: "business_diagnosis", targetFormats: [] }),
+    )
+    const chunks = (async function* () {
+      yield "你好"
+      yield "，"
+      yield "世界"
+    })()
+    const collected: string[] = []
+    for await (const c of handle.stream(chunks)) {
+      collected.push(c)
+    }
+    expect(collected.join("")).toBe("你好，世界")
   })
 })
