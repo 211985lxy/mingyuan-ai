@@ -1,0 +1,44 @@
+name: AIM Architecture Guard
+
+# 升级阶段 1.4：把"Harness 作为 AIM 唯一执行内核"的层依赖边界固化为 CI 门禁。
+# 纯静态源码扫描，不跑模型、不连数据库、不生成 Prisma client。
+#
+# - R3 AimAgentId 唯一源、R4 废弃 adapter 无新增调用者 → 硬失败（阻断 PR）
+# - R1 入口绕过、R2 Agent 反向依赖 → 阶段过渡期记 todo（exit 2，不阻断），
+#   阶段 2 迁移完成后收紧为硬失败
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  architecture:
+    name: Layer dependency guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: AIM architecture guard
+        run: |
+          set +e
+          pnpm --dir apps/web exec tsx scripts/check-aim-architecture.ts > guard-output.md 2>&1
+          code=$?
+          cat guard-output.md
+          cat guard-output.md >> "$GITHUB_STEP_SUMMARY"
+          # exit 0/2 通过（2 = 仅待收紧项）；exit 1 = 硬失败
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          exit 0

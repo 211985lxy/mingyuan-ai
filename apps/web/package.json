@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit",
     "eval:deterministic": "DATABASE_URL='mysql://eval:eval@127.0.0.1:3306/aim_eval' tsx --tsconfig tsconfig.json scripts/aim-eval.ts --deterministic",
     "eval:daily": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --daily",
-    "eval:full": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --full"
+    "eval:full": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --full",
+    "arch:check": "tsx --tsconfig tsconfig.json scripts/check-aim-architecture.ts"
   },
   "dependencies": {
     "@alicloud/credentials": "^2.4.4",
