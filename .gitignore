@@ -25,6 +25,9 @@ yarn-debug.log*
 .env.local
 .env.*.local
 
+# local credentials
+docs/accounts.local.md
+
 # python
 __pycache__/
 

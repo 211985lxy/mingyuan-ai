@@ -1,13 +1,9 @@
-1.微信开放平台：370927539@qq.com 
-                                
-2.阿里云 :nick7028736541
+# 外部账号与凭据管理
 
-3.抖音开放平台： 19327605349
+本仓库不保存邮箱、手机号、用户名、密码、Access Key、Token、镜像仓库密码或登录命令中的明文凭据。
 
-4.Apify:370927539@qq.com 
+账号标识与密码应存入团队密码管理器；运行时密钥应通过服务器环境文件或部署平台 Secret 注入。需要本地记录时，只能使用被 Git 忽略的 `docs/accounts.local.md`，并避免复制到日志、Issue、聊天记录或提交信息中。
 
-密码均为 hjx112300
+## 安全处置
 
-sudo docker login --username=nick7028736541 clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com
-ACR user: nick7028736541
-ACR passwd: 23hGWuEujkod
+此文件曾包含明文凭据。相关平台的密码和镜像仓库凭据必须轮换；仅删除当前文件内容不能清除 Git 历史和既有克隆中的泄漏。
