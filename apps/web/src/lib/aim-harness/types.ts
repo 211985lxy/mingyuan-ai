@@ -17,19 +17,13 @@ import type {
   ResolvedKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
+import type { AimAgentId, AimEntrypoint } from "./contracts"
 
 export const HARNESS_VERSION = "aim-harness-v1" as const
 
-export type AimEntrypoint = "chat" | "generate" | "agent_api" | "inspiration"
-
-export type AimAgentId =
-  | "content_producer"
-  | "free_copywriter"
-  | "deep_copywriter"
-  | "business_system_diagnosis"
-  | "business_diagnosis"
-  | "content_review"
-  | "persona"
+// AimAgentId / AimEntrypoint 的唯一事实源在 ./contracts.ts，这里仅 re-export
+// 以保持现有 import 路径（@/lib/aim-harness/types）向后兼容。
+export type { AimAgentId, AimEntrypoint }
 
 /** Context policy: how aggressively to load external context for this run. */
 export interface AimContextPolicy {

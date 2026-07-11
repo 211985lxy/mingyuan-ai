@@ -132,6 +132,9 @@ export async function runAimGenerate(
     traceId: input.trace?.id,
     plan: {
       entrypoint: input.entrypoint ?? "generate",
+      // 阶段1：AimAgentId 类型已唯一化，但 input.agentId 仍是 string（route 接收的
+      // 原始请求值，可能含未归一化别名）。强转暂保留，阶段2 入口迁到 executeAimRun
+      // 时会在传入前归一化，届时移除此强转。
       agentId: input.agentId as AimRunSpec["agentId"],
       rawInput: input.rawInput,
       targetFormats: input.targetFormats,
@@ -268,6 +271,7 @@ export async function runAimChat(input: AimChatHarnessInput): Promise<AimChatHar
     traceId: input.trace?.id,
     plan: {
       entrypoint: "chat",
+      // 阶段1：AimAgentId 已唯一化；input.agentId 仍为 string，强转暂保留（见上文说明）。
       agentId: input.agentId as AimRunSpec["agentId"],
       rawInput: input.rawInput,
       targetFormats: [],
@@ -342,6 +346,7 @@ export async function planAimChatStream(input: {
 
   const spec = planAimRun({
     entrypoint: "chat",
+    // 阶段1：AimAgentId 已唯一化；input.agentId 仍为 string，强转暂保留（见上文说明）。
     agentId: input.agentId as AimRunSpec["agentId"],
     rawInput: input.rawInput,
     targetFormats: [],

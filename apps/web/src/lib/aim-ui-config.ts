@@ -1,16 +1,18 @@
 import type { ComponentType } from "react"
 import { Activity, Compass, PenLine, ShieldCheck, Video } from "lucide-react"
 import type { ContentFormat } from "@/lib/api/client"
-
-/** 内容智能体 id */
-export type AimAgentId =
-  | "content_producer"
-  | "free_copywriter"
-  | "business_diagnosis"
-  | "business_system_diagnosis"
-  | "deep_copywriter"
-  | "content_review"
-  | "persona"
+// 身份契约唯一源：aim-harness/contracts.ts。
+// AimAgentId 类型 + 运行时校验/归一化逻辑（DEFAULT_AIM_AGENT /
+// LEGACY_AGENT_ID_ALIASES / normalizeAimAgentId / isValidAimAgent）已迁出本文件，
+// 这里 re-export 以兼容现有从 aim-ui-config 引入这些符号的调用方。
+export type { AimAgentId } from "@/lib/aim-harness/contracts"
+export {
+  DEFAULT_AIM_AGENT,
+  normalizeAimAgentId,
+  isValidAimAgent,
+} from "@/lib/aim-harness/contracts"
+import type { AimAgentId } from "@/lib/aim-harness/contracts"
+import { DEFAULT_AIM_AGENT, normalizeAimAgentId } from "@/lib/aim-harness/contracts"
 
 /** 智能体的共享元信息（侧边栏与工作台页面的单一事实源） */
 export interface AimAgentMeta {
@@ -20,8 +22,6 @@ export interface AimAgentMeta {
   icon: ComponentType<{ className?: string }>
   defaultFormats: ContentFormat[]
 }
-
-export const DEFAULT_AIM_AGENT: AimAgentId = "content_producer"
 
 export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   {
@@ -75,34 +75,14 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   },
 ]
 
-const AIM_AGENT_IDS = new Set<AimAgentId>(AIM_AGENT_OPTIONS.map((a) => a.id))
-
-/**
- * 旧 id 归一化映射。内容生产官曾用 "ip_video" 作为公开 id（URL、外部 API、
- * 旧 AimGeneration 记录），现已统一为 "content_producer"。这里保留旧 id 的
- * 归一化，使旧书签链接、旧外部调用、旧数据库行都能正确路由，不报 404。
- */
-const LEGACY_AGENT_ID_ALIASES: Record<string, AimAgentId> = {
-  ip_video: "content_producer",
-}
-
-/** 把旧别名归一化为当前规范 id；非别名原样返回 */
-export function normalizeAimAgentId(id: string | null | undefined): string {
-  if (!id) return DEFAULT_AIM_AGENT
-  return LEGACY_AGENT_ID_ALIASES[id] ?? id
-}
+// AIM_AGENT_IDS / LEGACY_AGENT_ID_ALIASES / normalizeAimAgentId / isValidAimAgent
+// 已迁入 @/lib/aim-harness/contracts（顶部 import 并 re-export）。
+// 下面保留 getAimAgent：它是 UI 元数据（AIM_AGENT_OPTIONS）专有逻辑，留在 UI 层。
 
 /** 按 id 取智能体元信息；非法 id 回退到默认智能体 */
 export function getAimAgent(id: string | null | undefined): AimAgentMeta {
-  const normalized = normalizeAimAgentId(id) as AimAgentId
-  if (AIM_AGENT_IDS.has(normalized)) {
-    return AIM_AGENT_OPTIONS.find((a) => a.id === normalized)!
-  }
+  const normalized = normalizeAimAgentId(id)
+  const matched = AIM_AGENT_OPTIONS.find((a) => a.id === (normalized as AimAgentId))
+  if (matched) return matched
   return AIM_AGENT_OPTIONS.find((a) => a.id === DEFAULT_AIM_AGENT)!
-}
-
-/** 判断某个 id 是否是合法的智能体 id（接受旧别名） */
-export function isValidAimAgent(id: string | null | undefined): id is AimAgentId {
-  if (!id) return false
-  return AIM_AGENT_IDS.has(id as AimAgentId) || id in LEGACY_AGENT_ID_ALIASES
 }

@@ -18,25 +18,13 @@
 import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
+// AimAgentId / AimEntrypoint 的唯一事实源在 aim-harness/contracts.ts。
+// eval 契约与生产 harness 必须共享同一身份定义，避免 fixture 与生产路由对
+// "合法 agent id" 出现两套判定。
+import type { AimAgentId, AimEntrypoint } from "../contracts"
 
-/**
- * The seven AIM agents that the harness routes to. Kept in sync with
- * VALID_AGENT_IDS in aim-agent-handlers.ts.
- */
-export type AimAgentId =
-  | "content_producer"
-  | "free_copywriter"
-  | "deep_copywriter"
-  | "business_system_diagnosis"
-  | "business_diagnosis"
-  | "content_review"
-  | "persona"
-
-/**
- * The four entrypoints that the thin harness adapts. Mirrors the plan's
- * AimRunSpec.entrypoint.
- */
-export type AimEntrypoint = "chat" | "generate" | "agent_api" | "inspiration"
+// 类型仅为在 eval 契约中显式标注；唯一源在 ../contracts.ts。
+export type { AimAgentId, AimEntrypoint }
 
 /**
  * Scenarios the fixture suite must cover (plan §1):

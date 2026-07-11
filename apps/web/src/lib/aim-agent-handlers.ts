@@ -45,17 +45,19 @@ import {
 } from "@/lib/aim-conversation-intent"
 import { buildTaskSpecSkeleton } from "@/lib/task-spec"
 import { refineTaskSpec } from "@/lib/task-spec-llm"
+// 身份契约唯一源：AimAgentId / 运行时校验 / 别名归一化统一来自这里。
+import type { AimAgentId } from "@/lib/aim-harness/contracts"
+import {
+  AIM_AGENT_IDS,
+  LEGACY_AGENT_ID_ALIASES,
+  DEFAULT_AIM_AGENT,
+} from "@/lib/aim-harness/contracts"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
-export type AimAgentId =
-  | "content_producer"
-  | "free_copywriter"
-  | "deep_copywriter"
-  | "business_system_diagnosis"
-  | "business_diagnosis"
-  | "content_review"
-  | "persona"
+// AimAgentId 的唯一事实源在 @/lib/aim-harness/contracts，这里 re-export 以
+// 保持现有从 aim-agent-handlers 引入该类型的调用方兼容。
+export type { AimAgentId }
 
 export interface AimChatParams {
   userId: string
@@ -1301,25 +1303,10 @@ const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
   persona: new PersonaHandler(),
 }
 
-const VALID_AGENT_IDS = new Set<string>([
-  "content_producer",
-  "free_copywriter",
-  "deep_copywriter",
-  "business_system_diagnosis",
-  "business_diagnosis",
-  "content_review",
-  "persona",
-])
-
-/**
- * 向后兼容别名 → 内部 handler ID 映射。
- * 内容生产官的公开 id 已从 "ip_video" 统一为 "content_producer"，但旧书签链接、
- * 旧外部 API 调用、旧 AimGeneration 数据库行仍可能携带 "ip_video"，这里兜底归一化，
- * 确保历史数据和历史调用方不因重命名而失效。
- */
-const AGENT_ID_ALIASES: Record<string, AimAgentId> = {
-  ip_video: "content_producer",
-}
+// VALID_AGENT_IDS / 别名映射统一引用 @/lib/aim-harness/contracts，避免与
+// AimAgentId 字面量出现第三份事实源。
+const VALID_AGENT_IDS = AIM_AGENT_IDS as ReadonlySet<string>
+const AGENT_ID_ALIASES = LEGACY_AGENT_ID_ALIASES
 
 export function getAgentHandler(agentId: string): AimAgentHandler {
   // 1. 直接命中
@@ -1332,7 +1319,7 @@ export function getAgentHandler(agentId: string): AimAgentHandler {
     return HANDLERS[aliased]
   }
   // 3. 回退到默认 handler
-  return HANDLERS.content_producer
+  return HANDLERS[DEFAULT_AIM_AGENT]
 }
 
 /**
