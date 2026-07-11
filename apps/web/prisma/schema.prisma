@@ -46,6 +46,7 @@ model User {
   aimExecutionTraces             AimExecutionTrace[]
   aimRunSnapshots                AimRunSnapshot[]
   aimRunEvents                   AimRunEvent[]
+  contentOutcomes                ContentOutcome[]
 }
 
 model Avatar {
@@ -441,6 +442,8 @@ model AimGeneration {
   ipSnapshotUsed   String?  @db.MediumText
   qualityScores    Json?
   topicTitle       String?  @db.Text
+  topicSelectionId String?  @db.VarChar(30) // 来源选题批次 TopicSelection.id
+  selectedTopicIndex Int?   // 采用的第几号候选 (0-3)
   hotTopic         String?  @db.Text
   polishInstruction String? @db.MediumText
   workflowStatus   String   @default("draft")
@@ -451,6 +454,7 @@ model AimGeneration {
   decisionSnapshot Json?
   retroSnapshots   Json     @default("[]")
   calibrationRules Json     @default("[]")
+  taskSpec         Json?    // 协作认知 + 业务判断统一结构（见 lib/task-spec.ts）
   wechatDraft      Json?
   model            String?
   totalTokens      Int?
@@ -461,6 +465,7 @@ model AimGeneration {
 
   user    User           @relation(fields: [userId], references: [id])
   project ClientProject? @relation(fields: [projectId], references: [id])
+  contentOutcomes ContentOutcome[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, projectId, createdAt(sort: Desc)])
@@ -1273,4 +1278,47 @@ model AgentMethodology {
   updatedBy String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── 内容发布结果（结构化，Sprint 2） ───────────────────
+// 同一 AimGeneration 可按采集窗口(7/14/30天)记录多条；所有指标 nullable，未填写不得为 0。
+model ContentOutcome {
+  id                  String   @id @default(cuid())
+  userId              String
+  generationId        String
+  topicSelectionId    String?  @db.VarChar(30)
+  projectId           String?
+  platform            String?  @db.VarChar(40)
+  publishedAt         DateTime?
+  collectedAt         DateTime @default(now())
+  collectWindowDay    Int      // 7 | 14 | 30
+
+  // 第一组：商业结果（nullable）
+  qualifiedCommentCount Int?
+  dmCount               Int?
+  qualifiedLeadCount    Int?
+  appointmentCount      Int?
+  dealCount             Int?
+  revenue               Decimal? @db.Decimal(14, 2)
+
+  // 第二组：内容信号（nullable）
+  views       Int?
+  likes       Int?
+  comments    Int?
+  saves       Int?
+  shares      Int?
+
+  // 第三组：用户反馈（自由文本）
+  audienceFeedback String? @db.Text
+  userVerdict      String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id])
+  generation AimGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, generationId, collectWindowDay])
+  @@index([userId, collectedAt])
+  @@index([generationId])
 }
