@@ -981,7 +981,11 @@ export default function AimPage() {
   const topicTitleParam = searchParams.get("topicTitle")
   const topicRationaleParam = searchParams.get("topicRationale")
   const topicSelectionIdParam = searchParams.get("topicSelectionId")
-  const selectedTopicIndexParam = Number(searchParams.get("selectedTopicIndex"))
+  // 注意：searchParams.get 缺省返回 null，Number(null)===0 会误把「未选选题」记成第 0 号。
+  // 仅当参数确实存在且为非负整数时才解析，否则 NaN（下游 Number.isFinite 会丢弃）。
+  const selectedTopicIndexRaw = searchParams.get("selectedTopicIndex")
+  const selectedTopicIndexParam =
+    selectedTopicIndexRaw !== null && /^\d+$/.test(selectedTopicIndexRaw) ? Number(selectedTopicIndexRaw) : NaN
   const projectIdParam = searchParams.get("projectId")
   const videoCopyExtractionIdParam = searchParams.get("videoCopyExtractionId")
   const modeParam = searchParams.get("mode")
