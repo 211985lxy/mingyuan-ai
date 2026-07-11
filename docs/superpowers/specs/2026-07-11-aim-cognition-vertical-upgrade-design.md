@@ -326,4 +326,4 @@ model ContentOutcome {
 9. 反馈事件枚举扩展。
 10. 全量 typecheck + test + build + 迁移验证 → 提交。
 
-每步独立可提交、可验证，符合 Agents.md「小改完即验证后 commit」。
+每步独立可提交、可验证，符合 AGENTS.md「小改完即验证后 commit」。
