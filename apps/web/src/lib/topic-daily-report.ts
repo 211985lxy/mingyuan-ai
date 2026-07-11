@@ -34,12 +34,19 @@ export interface TopicDailyReport {
   copyText: string
 }
 
-function scoreOf(card: ApiTopicCard) {
-  return typeof card.score === "number" ? card.score : 0
+function scoreOf(card: ApiTopicCard): number | null {
+  return typeof card.score === "number" ? card.score : null
 }
 
 function getLeadCard(cards: ApiTopicCard[]) {
-  return [...cards].sort((a, b) => scoreOf(b) - scoreOf(a))[0] ?? null
+  return [...cards].sort((a, b) => {
+    const sa = scoreOf(a)
+    const sb = scoreOf(b)
+    if (sa === null && sb === null) return 0
+    if (sa === null) return 1
+    if (sb === null) return -1
+    return sb - sa
+  })[0] ?? null
 }
 
 function fallbackHook(card: ApiTopicCard) {
@@ -69,7 +76,7 @@ function scoreDecisionReason(card: ApiTopicCard | null) {
     .sort((a, b) => b.value - a.value)
   const strongest = entries[0]
   const weakest = entries[entries.length - 1]
-  return `总分 ${card.score ?? 0}，强项是${SCORE_LABELS[strongest.key]}，短板是${SCORE_LABELS[weakest.key]}。${card.scoreReason || card.rationale || ""}`
+  return `${card.score ? `总分 ${card.score}` : "证据不足，未给评分"}，强项是${SCORE_LABELS[strongest.key]}，短板是${SCORE_LABELS[weakest.key]}。${card.scoreReason || card.rationale || ""}`
 }
 
 function groupKeyForSource(source: TopicDailyReportSource): TopicEvidenceGroupKey {

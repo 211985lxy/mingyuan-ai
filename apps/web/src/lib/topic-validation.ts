@@ -34,6 +34,9 @@ export const VALID_TOPIC_SOURCE_TYPES = [
 
 export const REVIEW_VERDICTS = ["strong", "usable", "observe", "revise"] as const
 
+export const BUSINESS_VERDICTS = ["值得主推", "补证据再发", "暂不建议"] as const
+export type BusinessVerdict = (typeof BUSINESS_VERDICTS)[number]
+
 // ─── 陌生化（Defamiliarization）代码集 ──────────────────────
 // 6 类稀缺 + 赋比兴三法，详见 lib/topic-defamiliarization.ts
 import { VALID_SCARCITY_CODES, VALID_RHETORIC_CODES } from "@/lib/topic-defamiliarization"
@@ -42,11 +45,11 @@ export { VALID_SCARCITY_CODES, VALID_RHETORIC_CODES }
 // ─── Zod schemas ────────────────────────────────────────
 
 export const TopicScoreBreakdownSchema = z.object({
-  projectFit: z.number().min(0).max(100),
-  contentValue: z.number().min(0).max(100),
-  viralHook: z.number().min(0).max(100),
-  conversionFit: z.number().min(0).max(100),
-  feasibility: z.number().min(0).max(100),
+  projectFit: z.number().min(0).max(100).nullable().optional(),
+  contentValue: z.number().min(0).max(100).nullable().optional(),
+  viralHook: z.number().min(0).max(100).nullable().optional(),
+  conversionFit: z.number().min(0).max(100).nullable().optional(),
+  feasibility: z.number().min(0).max(100).nullable().optional(),
 })
 
 export const TopicCardSchema = z.object({

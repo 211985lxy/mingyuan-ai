@@ -28,21 +28,23 @@ describe("topic scoring", () => {
     expect(result.success).toBe(true)
   })
 
-  it("normalizes legacy cards with default score breakdown", () => {
+  it("does not fabricate a score breakdown when evidence is missing", () => {
     const [card] = normalizeTopicCards([baseCard], {
       topicSources: [{ category: "client_project", title: "客户资料", content: "客户要降低获客成本" }],
       recommendationMode: "normal",
     })
 
     expect(card.scoreBreakdown).toEqual({
-      projectFit: 80,
-      contentValue: 80,
-      viralHook: 70,
-      conversionFit: 75,
-      feasibility: 80,
+      projectFit: null,
+      contentValue: null,
+      viralHook: null,
+      conversionFit: null,
+      feasibility: null,
     })
-    expect(card.reviewVerdict).toBe("usable")
-    expect(card.revisionAdvice).toBe("补充更具体的客户场景或案例证据。")
+    expect(card.score).toBeUndefined()
+    expect(card.reviewVerdict).toBeUndefined()
+    expect(card.scoreReason).toContain("证据不足")
+    expect(card.revisionAdvice).toContain("补充客户原话")
   })
 
   it("calculates and clamps total score from breakdown", () => {
