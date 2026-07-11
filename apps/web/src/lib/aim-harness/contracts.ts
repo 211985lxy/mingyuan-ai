@@ -145,6 +145,8 @@ export interface AimRunRequest {
   existingGenerationId?: string
   /** 关联 trace（route 层已创建） */
   trace?: { id: string }
+  /** 入口已装配的声明式上下文（过渡期；最终由 prepareAimContext 统一产出） */
+  contextManifest?: AimContextSource[]
   /** draft-only：不落生成记录（agent_api 外部交付） */
   draftOnly?: boolean
   /** 是否跑 LLM 质检（默认 true；agent_api / inspiration 关闭） */

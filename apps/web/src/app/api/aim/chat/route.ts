@@ -29,7 +29,7 @@ import {
   persistMemoriesFromConversation,
   type AimMemoryMessage,
 } from "@/lib/aim-memory"
-import { runAimChat, planAimChatStream } from "@/lib/aim-harness/adapters"
+import { executeAimRun, streamAimRun } from "@/lib/aim-harness/runtime"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import type { AimContextSource } from "@/lib/aim-harness/types"
 
@@ -306,16 +306,18 @@ export async function POST(request: NextRequest) {
     })
 
     if (shouldStream) {
-      // aim-harness-v1: plan the stream run, capture telemetry, set X-AIM-Run-Id
-      // and backfill the snapshot/trace once the stream completes.
-      const streamPlan = await planAimChatStream({
+      const streamRun = await streamAimRun({
+        entrypoint: "chat",
         rawInput: query,
         agentId,
         messages: normalizedMessages,
         trace,
-        userId: user.id,
-        projectId: projectId || null,
+        actorId: user.id,
+        projectId: projectId || undefined,
+        runtimeTask,
+        conversationMode: conversationIntent.mode,
         contextManifest,
+        stream: true,
       })
       // Fire-and-forget: 从已有对话沉淀长期记忆（不等流式输出完成）
       if (projectId && agentId) {
@@ -327,23 +329,27 @@ export async function POST(request: NextRequest) {
         }).catch(() => {})
       }
       return streamChatContent(
-        streamPlan.capture(buildAimChatResponseStream(agentId, chatParams)),
+        streamRun.stream(buildAimChatResponseStream(agentId, chatParams)),
         trace,
-        { runId: streamPlan.runId, finalize: streamPlan.finalize },
+        { runId: streamRun.runId, finalize: streamRun.finalize },
       )
     }
 
-    const chatHarness = await runAimChat({
-      execute: () => buildAimChatResponse(agentId, chatParams).then((response) => response.content),
+    const chatRun = await executeAimRun({
+      entrypoint: "chat",
       rawInput: query,
       agentId,
       messages: normalizedMessages,
       trace,
-      userId: user.id,
-      projectId: projectId || null,
-      contextManifest,
+      actorId: user.id,
+      projectId: projectId || undefined,
+      runtimeTask,
+      conversationMode: conversationIntent.mode,
+    }, async () => {
+      const response = await buildAimChatResponse(agentId, chatParams)
+      return { output: response.content, contextManifest }
     })
-    await finishAimTrace(trace, { outputSummary: summarizeText(chatHarness.content) })
+    await finishAimTrace(trace, { outputSummary: summarizeText(chatRun.output) })
 
     // Fire-and-forget: 从本次对话沉淀长期记忆（决策/偏好/事实）
     if (projectId && agentId) {
@@ -356,11 +362,11 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      content: chatHarness.content,
-      runId: chatHarness.runId,
-      degraded: chatHarness.degraded,
-      provider: chatHarness.provider,
-      model: chatHarness.model,
+      content: chatRun.output,
+      runId: chatRun.metadata.runId,
+      degraded: chatRun.metadata.degraded,
+      provider: chatRun.metadata.provider,
+      model: chatRun.metadata.model,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)

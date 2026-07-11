@@ -65,6 +65,10 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     messages: request.messages,
     actorId: request.actorId,
     projectId: request.projectId,
+    stream: request.stream,
+    runtimeTask: request.runtimeTask,
+    knowledgeStrategy: request.knowledgeStrategy,
+    conversationMode: request.conversationMode,
   }
 }
 
@@ -271,12 +275,12 @@ export async function streamAimRun(request: AimRunRequest): Promise<AimStreamHan
       ? invocations.map((invocation, index) => `=== LLM INVOCATION ${index + 1} ===\n${invocation.fullPrompt}`).join("\n\n")
       : request.rawInput
     // 来源清单：调用方若提供（request 侧）则用，否则回退到 rawInput 单条
-    const contextManifest: AimContextSource[] = [{
-      kind: "request",
-      id: "raw_input",
-      charCount: request.rawInput.length,
-      contentHash: sha256(request.rawInput),
-    }]
+    const contextManifest: AimContextSource[] = request.contextManifest ?? [{
+        kind: "request",
+        id: "raw_input",
+        charCount: request.rawInput.length,
+        contentHash: sha256(request.rawInput),
+      }]
     const metadata: AimRunMetadata = {
       runId,
       harnessVersion: HARNESS_VERSION,
@@ -288,19 +292,21 @@ export async function streamAimRun(request: AimRunRequest): Promise<AimStreamHan
       contextHash: hashContextManifest(contextManifest),
       providerAttempts: attempts,
     }
-    await persistAimRunSnapshot({
-      runSpec: spec,
-      metadata,
-      contextManifest,
-      composedPrompt,
-      promptMessages: invocations.map((invocation) => invocation.messages),
-      output: fullOutput,
-      imageHashes: invocations.flatMap((invocation) => invocation.imageHashes),
-      traceId: request.trace?.id,
-      userId: request.actorId,
-      projectId: request.projectId,
-    })
-    await applyRunMetadataToTrace(request.trace?.id, metadata, spec)
+    if (request.persistSnapshot !== false) {
+      await persistAimRunSnapshot({
+        runSpec: spec,
+        metadata,
+        contextManifest,
+        composedPrompt,
+        promptMessages: invocations.map((invocation) => invocation.messages),
+        output: fullOutput,
+        imageHashes: invocations.flatMap((invocation) => invocation.imageHashes),
+        traceId: request.trace?.id,
+        userId: request.actorId,
+        projectId: request.projectId,
+      })
+      await applyRunMetadataToTrace(request.trace?.id, metadata, spec)
+    }
   }
 
   return { spec, runId, stream, finalize }

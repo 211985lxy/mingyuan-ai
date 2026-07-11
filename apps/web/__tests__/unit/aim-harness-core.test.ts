@@ -92,6 +92,22 @@ describe("aim-harness planner", () => {
     expect(spec.knowledgeStrategy).toBe("hot_topic")
   })
 
+  it("honors authorized route overrides instead of resolving a second time", () => {
+    const spec = planAimRun({
+      entrypoint: "chat",
+      agentId: "content_producer",
+      rawInput: "这段文字本身会被判定为新稿",
+      targetFormats: [],
+      runtimeTask: "light_edit",
+      knowledgeStrategy: "light_edit",
+      conversationMode: "direct_delivery",
+    })
+    expect(spec.runtimeTask).toBe("light_edit")
+    expect(spec.knowledgeStrategy).toBe("light_edit")
+    expect(spec.conversationMode).toBe("direct_delivery")
+    expect(spec.contextPolicy.loadKnowledge).toBe(false)
+  })
+
   // ── 阶段 2.1：modelPolicy 冻结（与 handler 执行函数逐字一致）──────────────
   it("freezes modelPolicy for generate entrypoints (temp 0.8, maxTokens 4000)", () => {
     const spec = planAimRun({

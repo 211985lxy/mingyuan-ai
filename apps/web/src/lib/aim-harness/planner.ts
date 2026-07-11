@@ -15,6 +15,8 @@
 import { resolveAimRuntimeTask, resolveKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import { resolveAimConversationIntentWithRules } from "@/lib/aim-conversation-intent"
 import type { ContentFormat } from "@/lib/aim-generator"
+import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
+import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 
 import type {
   AimAgentId,
@@ -38,6 +40,9 @@ export interface PlanRunInput {
   actorId?: string
   projectId?: string
   stream?: boolean
+  runtimeTask?: AimRuntimeTask
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
+  conversationMode?: AimConversationMode
 }
 
 /**
@@ -107,7 +112,7 @@ function buildModelPolicy(
 
 /** Plan a run into an immutable AimRunSpec. Single source of truth for the run. */
 export function planAimRun(input: PlanRunInput): AimRunSpec {
-  const runtimeTask = resolveAimRuntimeTask({
+  const runtimeTask = input.runtimeTask ?? resolveAimRuntimeTask({
     agentId: input.agentId,
     input: input.rawInput,
     taskType: input.taskType,
@@ -115,12 +120,12 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     targetFormats: input.targetFormats,
   })
 
-  const conversationIntent = resolveAimConversationIntentWithRules({
-    agentId: input.agentId,
-    messages: input.messages ?? [{ role: "user", content: input.rawInput }],
-  })
+  const conversationMode = input.conversationMode ?? resolveAimConversationIntentWithRules({
+      agentId: input.agentId,
+      messages: input.messages ?? [{ role: "user", content: input.rawInput }],
+    }).intent.mode
 
-  const knowledgeStrategy = resolveKnowledgeStrategy({
+  const knowledgeStrategy = input.knowledgeStrategy ?? resolveKnowledgeStrategy({
     runtimeTask,
     topicType: input.topicType,
     hotTopic: input.hotTopic,
@@ -136,7 +141,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     entrypoint: input.entrypoint,
     agentId: input.agentId,
     runtimeTask,
-    conversationMode: conversationIntent.intent.mode,
+    conversationMode,
     knowledgeStrategy,
     outputFormats: input.targetFormats,
     contextPolicy,
