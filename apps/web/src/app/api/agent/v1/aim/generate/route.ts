@@ -14,9 +14,8 @@ import {
   type AgentApiContext,
 } from "@/lib/agent-api-auth"
 import { generateAimContent } from "@/lib/aim-generator"
-import { normalizeAimAgentId } from "@/lib/aim-ui-config"
 import { prisma } from "@/lib/prisma"
-import { runAimGenerate } from "@/lib/aim-harness/adapters"
+import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { createAimTrace } from "@/lib/aim-observability"
 
 async function writeAgentLog(params: {
@@ -86,11 +85,6 @@ export async function POST(request: NextRequest) {
     // 归一化旧别名（ip_video → content_producer），保证写入 DB / 日志 / 响应的 id 一致
     agentId = normalizeAimAgentId(agentId)
 
-    // aim-harness-v1: create an execution trace for the external API too (it
-    // previously produced none), then route through the thin harness to capture
-    // runId / provider / model / degraded / qualityStatus. Additive only: the
-    // existing fields and draft_only convention are untouched. The Agent API
-    // stays draft-only — no LLM quality rewrite here.
     const userId = context.userId
     const trace = await createAimTrace({
       userId,
@@ -100,32 +94,35 @@ export async function POST(request: NextRequest) {
       inputSummary,
     })
 
-    const harness = await runAimGenerate({
-      execute: () =>
-        generateAimContent({
+    const run = await executeAimRun({
+      entrypoint: "agent_api",
+      rawInput,
+      agentId,
+      targetFormats,
+      polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
+      topicTitle: typeof body.topicTitle === "string" ? body.topicTitle : undefined,
+      topicRationale: typeof body.topicRationale === "string" ? body.topicRationale : undefined,
+      actorId: userId,
+      projectId,
+      trace,
+      runLlmQuality: false,
+    }, async (spec) => {
+      const output = await generateAimContent({
           userId,
           projectId,
-          agentId,
+          agentId: spec.agentId,
           rawInput,
           targetFormats,
           topicTitle: typeof body.topicTitle === "string" ? body.topicTitle : undefined,
           topicRationale: typeof body.topicRationale === "string" ? body.topicRationale : undefined,
           polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
           trace,
-        }),
-      rawInput,
-      agentId,
-      targetFormats,
-      polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
-      entrypoint: "agent_api",
-      trace,
-      userId,
-      projectId,
-      // External draft API: keep draft-only behavior (no LLM quality rewrite).
-      runLlmQuality: false,
+          runtimeTask: spec.runtimeTask,
+        })
+      return { output, generationId: output.id }
     })
 
-    const result = harness.result
+    const result = run.output
 
     const created = await prisma.aimGeneration.findUnique({
       where: { id: result.id },
@@ -157,11 +154,11 @@ export async function POST(request: NextRequest) {
       warnings: ["draft_only"],
       deniedActions: AGENT_DENIED_ACTIONS,
       // Additive harness diagnostics (Phase 4): do not alter existing fields.
-      runId: harness.runId,
-      degraded: harness.degraded,
-      provider: harness.provider,
-      model: harness.model,
-      qualityStatus: harness.qualityStatus,
+      runId: run.metadata.runId,
+      degraded: run.metadata.degraded,
+      provider: run.metadata.provider,
+      model: run.metadata.model,
+      qualityStatus: run.qualityStatus,
     })
   } catch (error) {
     if (context) {

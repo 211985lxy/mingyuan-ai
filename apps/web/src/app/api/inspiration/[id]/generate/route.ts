@@ -4,7 +4,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { generateAimContent } from "@/lib/aim-generator"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { Prisma } from "@/generated/prisma/client"
-import { runAimGenerate } from "@/lib/aim-harness/adapters"
+import { executeAimRun } from "@/lib/aim-harness/runtime"
 import { createAimTrace } from "@/lib/aim-observability"
 
 export async function POST(
@@ -30,8 +30,6 @@ export async function POST(
       return NextResponse.json({ error: "请选择 IP 营销全案" }, { status: 400 })
     }
 
-    // aim-harness-v1: route through the thin harness for runId/provider/model/
-    // degraded + snapshot + trace. Inspiration is a content draft path.
     const trace = await createAimTrace({
       userId: user.id,
       projectId,
@@ -39,29 +37,34 @@ export async function POST(
       action: "generate",
       inputSummary: inspiration.content,
     })
-    const harness = await runAimGenerate({
-      execute: () =>
-        generateAimContent({
+    const targetFormats = ["video_script", "shooting_brief", "moments_post"] as ContentFormat[]
+    const run = await executeAimRun({
+      entrypoint: "inspiration",
+      rawInput: inspiration.content,
+      agentId: "content_producer",
+      targetFormats,
+      taskType: "write_script",
+      topicTitle,
+      actorId: user.id,
+      projectId,
+      trace,
+      runLlmQuality: false,
+    }, async (spec) => {
+      const output = await generateAimContent({
           userId: user.id,
           projectId,
+          agentId: spec.agentId,
           rawInput: inspiration.content,
-          targetFormats: ["video_script", "shooting_brief", "moments_post"] as ContentFormat[],
+          targetFormats,
           taskType: "write_script",
           topicTitle,
           trace,
-        }),
-      rawInput: inspiration.content,
-      agentId: "content_producer",
-      targetFormats: ["video_script", "shooting_brief", "moments_post"] as ContentFormat[],
-      taskType: "write_script",
-      entrypoint: "inspiration",
-      trace,
-      userId: user.id,
-      projectId,
-      runLlmQuality: false,
+          runtimeTask: spec.runtimeTask,
+        })
+      return { output, generationId: output.id }
     })
 
-    const result = harness.result
+    const result = run.output
 
     // 更新灵感记录，关联生成结果
     await prisma.inspiration.update({
@@ -74,10 +77,10 @@ export async function POST(
 
     return NextResponse.json({
       ...result,
-      runId: harness.runId,
-      degraded: harness.degraded,
-      provider: harness.provider,
-      model: harness.model,
+      runId: run.metadata.runId,
+      degraded: run.metadata.degraded,
+      provider: run.metadata.provider,
+      model: run.metadata.model,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)
