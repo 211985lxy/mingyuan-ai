@@ -151,6 +151,8 @@ export interface AimGenerateResponse {
   conversationMode?: AimConversationMode
   /** 本次实际生效的知识调用策略（由 buildAimGeneration 解析后注入，供 UI 反馈） */
   knowledgeStrategy?: ResolvedKnowledgeStrategy
+  /** 协作认知层产物：风险/模式/事实/缺口/假设（由 buildAimGeneration 注入） */
+  taskSpec?: import("@/lib/task-spec").TaskSpec
 }
 
 export interface AimAgentHandler {
@@ -1688,7 +1690,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     outputSummary: summarizeText(response.results.map((item) => item.content).join("\n\n")),
   })
 
-  return { ...response, conversationMode: generationIntent.mode, knowledgeStrategy }
+  return { ...response, conversationMode: generationIntent.mode, knowledgeStrategy, taskSpec }
 }
 
 // ─── 共享辅助函数 ───────────────────────────────────────────

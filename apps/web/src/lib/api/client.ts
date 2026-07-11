@@ -1285,6 +1285,8 @@ export interface AimGenerateRequest {
   polishInstruction?: string
   useMarketViralVideos?: boolean
   existingGenerationId?: string
+  topicSelectionId?: string
+  selectedTopicIndex?: number
 }
 
 export interface AimGenerateResult {
@@ -1317,6 +1319,8 @@ export interface AimGenerateResponse {
     passed: boolean
     checks: Array<{ name: string; passed: boolean; detail?: string }>
   }>
+  /** 协作认知层产物：风险/模式/事实/缺口/假设 */
+  taskSpec?: import("@/lib/task-spec").TaskSpec
 }
 
 export interface AimDecisionSnapshot {
@@ -1359,6 +1363,8 @@ export interface AimGeneration {
   polishInstruction?: string | null
   qualityScores?: unknown
   topicTitle?: string | null
+  topicSelectionId?: string | null
+  selectedTopicIndex?: number | null
   workflowStatus?: string
   reviewNote?: string | null
   publishedAt?: string | null
@@ -1367,6 +1373,7 @@ export interface AimGeneration {
   decisionSnapshot?: AimDecisionSnapshot | null
   retroSnapshots?: AimRetroSnapshot[]
   calibrationRules?: AimCalibrationRule[]
+  taskSpec?: import("@/lib/task-spec").TaskSpec | null
 }
 
 export async function generateAimContent(data: AimGenerateRequest, signal?: AbortSignal): Promise<AimGenerateResponse> {
@@ -1574,6 +1581,63 @@ export async function updateAimWorkflowStatus(id: string, data: {
 
 export async function deleteAimHistory(id: string): Promise<void> {
   await request(`/api/aim/history/${encodeURIComponent(id)}`, { method: "DELETE" })
+}
+
+// ─── ContentOutcome：结构化发布结果（Sprint 2） ───────────
+export interface ContentOutcome {
+  id: string
+  collectWindowDay: number
+  platform?: string | null
+  publishedAt?: string | null
+  collectedAt: string
+  qualifiedCommentCount?: number | null
+  dmCount?: number | null
+  qualifiedLeadCount?: number | null
+  appointmentCount?: number | null
+  dealCount?: number | null
+  revenue?: number | null
+  views?: number | null
+  likes?: number | null
+  comments?: number | null
+  saves?: number | null
+  shares?: number | null
+  audienceFeedback?: string | null
+  userVerdict?: string | null
+}
+
+export interface ContentOutcomeInput {
+  collectWindowDay: 7 | 14 | 30
+  platform?: string
+  publishedAt?: string
+  qualifiedCommentCount?: number | null
+  dmCount?: number | null
+  qualifiedLeadCount?: number | null
+  appointmentCount?: number | null
+  dealCount?: number | null
+  revenue?: number | null
+  views?: number | null
+  likes?: number | null
+  comments?: number | null
+  saves?: number | null
+  shares?: number | null
+  audienceFeedback?: string
+  userVerdict?: string
+}
+
+export async function upsertContentOutcome(
+  generationId: string,
+  body: ContentOutcomeInput,
+): Promise<{ outcome: ContentOutcome }> {
+  return request(`/api/aim/history/${encodeURIComponent(generationId)}/outcome`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  })
+}
+
+export async function getContentOutcome(
+  generationId: string,
+): Promise<{ outcomes: ContentOutcome[]; topicSelectionId?: string | null; projectId?: string | null }> {
+  return request(`/api/aim/history/${encodeURIComponent(generationId)}/outcome`, { method: "GET" })
 }
 
 export async function transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {

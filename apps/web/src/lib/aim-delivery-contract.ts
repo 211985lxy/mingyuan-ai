@@ -9,6 +9,7 @@ export interface AimDeliveryContractInput {
   qualityStatus?: AimDeliveryQualityStatus
   isCurrentVersion: boolean
   primaryNextActionLabel?: string
+  taskSpec?: import("@/lib/task-spec").TaskSpec | null
 }
 
 export interface AimDeliveryContract {
@@ -16,6 +17,11 @@ export interface AimDeliveryContract {
   evidence: { label: string; detail: string }
   status: { label: string; detail: string; tone: "success" | "warning" | "danger" | "neutral" }
   next: { label: string; detail: string }
+  assumptions?: { statement: string; impact: "low" | "medium" | "high" }[]
+  unknowns?: string[]
+  knownFacts?: { statement: string; source: string }[]
+  taskSpec?: import("@/lib/task-spec").TaskSpec | null
+  expanded: boolean // 是否需要展开详情（低风险 false，其余 true）
 }
 
 const TASK_LABELS: Record<string, string> = {
@@ -58,6 +64,17 @@ export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDe
       ? "确认修改或继续追改"
       : "复制、编辑或推进发布")
 
+  // ── 协作认知层（TaskSpec）：按模式折叠/展开假设与缺口 ──
+  const spec = input.taskSpec
+  const expanded = !!(spec && spec.mode !== "direct_delivery")
+  const assumptions = spec?.assumptions?.slice(0, 2)
+  const unknowns = spec?.unknowns
+  const knownFacts = spec?.knownFacts
+  // 低风险直接交付：状态补充「已按现有资料直接完成」（不追问）
+  if (spec?.mode === "direct_delivery" && !input.degraded && input.qualityStatus !== "fail") {
+    status = { ...status, detail: "已按现有资料直接完成。" }
+  }
+
   return {
     task: { label: taskLabel, detail: taskDetail },
     evidence: { label: evidenceLabel, detail: evidenceDetail },
@@ -66,5 +83,10 @@ export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDe
       label: nextLabel,
       detail: input.isCurrentVersion ? "操作当前版本" : "建议返回当前版本",
     },
+    assumptions,
+    unknowns,
+    knownFacts,
+    taskSpec: spec ?? null,
+    expanded,
   }
 }
