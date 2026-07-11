@@ -24,3 +24,13 @@
 不要长期把大量无关改动堆在 `main` 脏工作区里。小改动改完验证后及时 commit；未完成实验放单独分支或 worktree；紧急修复用独立 hotfix commit。
 
 当用户要求部署、上线、同步服务器时，先检查是否有明确 release commit。若工作区很脏，先提醒本次发布可能混入无关改动，并建议先 commit 或改走临时指定文件发布。只有用户明确要求临时抢修时，才允许用临时 worktree 挑指定文件发布；发布后提醒尽快回收成 commit。
+
+## 视频生成边界
+
+视频生成仍按三层边界工作，不能混层：
+
+- 导演层：`VideoStructure`
+- 编剧层：`Script` / `ContentTemplate`
+- 包装层：`VideoPackagingTemplate` / `VideoProductionPlan`
+
+闪剪包装模板属于包装层，不能回流成内容结构或文案模板。详细规则见 `docs/architecture/direction-a-architecture.md`。
