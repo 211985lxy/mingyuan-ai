@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { sanitizeOutcomeBody } from "@/app/api/aim/history/[id]/outcome/route"
+import { sanitizeOutcomeBody } from "@/lib/content-outcome"
 
 describe("sanitizeOutcomeBody", () => {
   it("未填写字段为 null，不转为 0", () => {
