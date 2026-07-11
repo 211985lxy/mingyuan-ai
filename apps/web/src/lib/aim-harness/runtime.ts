@@ -19,7 +19,6 @@
 import type {
   AimRunRequest,
   AimRunResult,
-  PreparedAimContext,
   AimAgentOutput,
 } from "./contracts"
 import { normalizeAimAgentId, isValidAimAgent } from "./contracts"
@@ -133,12 +132,9 @@ export async function streamAimRun(_request: AimRunRequest): Promise<AimStreamHa
 }
 
 /**
- *（阶段 2 内部用）统一上下文装配入口占位。阶段 2.2 实现 prepareAimContext。
+ *（阶段 2 内部用）统一上下文装配入口。阶段 2.2 已实现，见 context-assembly.ts。
+ * runtime 保留 re-export，使入口可统一从 aim-harness/runtime 或 aim-harness/index 取用。
  */
-export async function prepareAimContext(_spec: AimRunSpec): Promise<PreparedAimContext> {
-  throw new Error(
-    "prepareAimContext: 阶段 2.2 实现。阶段 1 上下文装配仍分散在 route + handler。",
-  )
-}
+export { prepareAimContext, type PrepareAimContextInput } from "./context-assembly"
 
 export { normalizeAimAgentId, isValidAimAgent }
