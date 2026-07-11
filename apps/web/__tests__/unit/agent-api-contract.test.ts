@@ -58,4 +58,18 @@ describe("Agent API contract", () => {
     expect(skill).toContain("修改 IP 营销全案")
     expect(skill).toContain("Authorization: Bearer maim_xxx")
   })
+
+  it("publishes a dedicated wechat chat import skill document", () => {
+    const skill = readFileSync(join(process.cwd(), "public/skill-wechat-chat.md"), "utf8")
+    const capabilities = buildAgentCapabilities()
+
+    expect(skill).toContain("name: mingdong-wechat-chat-skill")
+    expect(skill).toContain("微信聊天导入 Skill")
+    expect(skill).toContain("/api/agent/v1/knowledge/wechat-chat/import")
+    expect(skill).toContain("/api/agent/v1/knowledge/wechat-chat/confirm")
+    expect(capabilities.extraSkills?.[0]?.id).toBe("wechat_chat_import")
+    expect(capabilities.boundaries.allowed).toContain("create_confirmed_wechat_chat_knowledge")
+    expect(capabilities.boundaries.denied).toContain("unreviewed_knowledge_mutation")
+    expect(capabilities.boundaries.denied).toContain("knowledge_update_or_delete")
+  })
 })

@@ -31,6 +31,10 @@ export const AGENT_DENIED_ACTIONS = [
   "shell_or_webhook_execution",
 ]
 
+const AGENT_KNOWLEDGE_IMPORT_DENIED_ACTIONS = AGENT_DENIED_ACTIONS
+  .filter((action) => action !== "knowledge_mutation")
+  .concat("unreviewed_knowledge_mutation", "knowledge_update_or_delete")
+
 const TARGET_FORMAT_SET = new Set<string>(AGENT_TARGET_FORMATS)
 const AGENT_AIM_AGENT_ID_SET = new Set<string>(AGENT_AIM_AGENT_IDS)
 
@@ -69,9 +73,18 @@ export function buildAgentCapabilities() {
       })
     ),
     targetFormats: AGENT_TARGET_FORMATS,
+    extraSkills: [
+      {
+        id: "wechat_chat_import",
+        name: "微信聊天导入",
+        description: "把微信/企微聊天导出文本整理成可确认入库的知识条目",
+        previewEndpoint: "/api/agent/v1/knowledge/wechat-chat/import",
+        confirmEndpoint: "/api/agent/v1/knowledge/wechat-chat/confirm",
+      },
+    ],
     boundaries: {
-      allowed: ["generate_content_drafts"],
-      denied: AGENT_DENIED_ACTIONS,
+      allowed: ["generate_content_drafts", "create_confirmed_wechat_chat_knowledge"],
+      denied: AGENT_KNOWLEDGE_IMPORT_DENIED_ACTIONS,
     },
   }
 }
