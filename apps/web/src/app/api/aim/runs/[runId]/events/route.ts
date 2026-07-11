@@ -2,7 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 
-const EVENTS = new Set(["copied", "revised", "accepted"])
+// 事件类型：既有 copied/revised/accepted + 协作认知层反馈事件（补充指令 §五）
+// 全部 ≤ 24 字符，适配 AimRunEvent.event @db.VarChar(24)
+const EVENTS = new Set([
+  "copied", "revised", "accepted",
+  "edited", "published", "retrospected",
+  "partially_satisfied", "rewrite_requested", "rejected",
+])
+
+// 反馈原因（可选；非法值忽略，不报错）
+const VALID_REASONS = new Set([
+  "fact_inaccurate", "tone_mismatch", "structure_mismatch", "too_generic",
+  "conversion_weak", "missing_evidence", "other",
+])
 
 type RouteContext = { params: Promise<{ runId: string }> }
 
@@ -13,6 +25,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const body = await request.json().catch(() => ({})) as {
       event?: unknown
       metadata?: unknown
+      reason?: unknown
     }
 
     if (!runId.startsWith("run_") || runId.length > 40) {
@@ -33,12 +46,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const metadata = body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
       ? body.metadata
       : undefined
+    // 可选 reason：仅当属于合法集合时才写入 metadata，避免污染
+    const reason = typeof body.reason === "string" && VALID_REASONS.has(body.reason) ? body.reason : undefined
     await prisma.aimRunEvent.create({
       data: {
         runId,
         userId: user.id,
         event: body.event,
-        metadata,
+        metadata: metadata ?? (reason ? { reason } : undefined),
       },
     })
 

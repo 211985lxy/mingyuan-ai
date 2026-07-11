@@ -979,6 +979,8 @@ export default function AimPage() {
   const agentParam = searchParams.get("agent")
   const topicTitleParam = searchParams.get("topicTitle")
   const topicRationaleParam = searchParams.get("topicRationale")
+  const topicSelectionIdParam = searchParams.get("topicSelectionId")
+  const selectedTopicIndexParam = Number(searchParams.get("selectedTopicIndex"))
   const projectIdParam = searchParams.get("projectId")
   const videoCopyExtractionIdParam = searchParams.get("videoCopyExtractionId")
   const modeParam = searchParams.get("mode")
@@ -2129,6 +2131,8 @@ export default function AimPage() {
         videoCopyExtractionId: sourceVideoCopyExtractionId,
         topicTitle: sourceTopicTitle.trim() || undefined,
         topicRationale: sourceTopicRationale.trim() || undefined,
+        topicSelectionId: topicSelectionIdParam || undefined,
+        selectedTopicIndex: Number.isFinite(selectedTopicIndexParam) ? selectedTopicIndexParam : undefined,
         taskType: "write_script",
         useMarketViralVideos: selectedAgentId === "business_diagnosis",
       }, controller.signal)

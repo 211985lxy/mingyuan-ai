@@ -584,13 +584,15 @@ export default function TopicPlanningPage() {
     }
   }
 
-  function jumpToAim(card: ApiTopicCard) {
+  function jumpToAim(card: ApiTopicCard, index: number) {
     const params = new URLSearchParams()
     params.set("agent", "content_producer")
     params.set("mode", "asset_pack")
     params.set("topicTitle", card.title)
     if (card.rationale) params.set("topicRationale", card.rationale)
     if (selectedProjectId) params.set("projectId", selectedProjectId)
+    if (topicSelectionId) params.set("topicSelectionId", topicSelectionId)
+    if (Number.isInteger(index)) params.set("selectedTopicIndex", String(index))
     router.push(`/aim?${params.toString()}`)
   }
 
@@ -789,7 +791,7 @@ export default function TopicPlanningPage() {
                                       </div>
                                       <div className="flex flex-col gap-2 lg:w-40">
                                         {isSelected ? (
-                                          <Button className="w-full" onClick={() => jumpToAim(card)}>
+                                          <Button className="w-full" onClick={() => jumpToAim(card, index)}>
                                             <Send className="mr-1 h-4 w-4" />
                                             去 AIM 写文案
                                           </Button>
