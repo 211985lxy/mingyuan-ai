@@ -54,6 +54,7 @@ import {
   listClientProjects,
   recordAimRunEvent,
   updateAimWorkflowStatus,
+  upsertContentOutcome,
   type AimCalibrationRule,
   type AimDecisionSnapshot,
   type AimEvolutionSuggestion,
@@ -1030,6 +1031,8 @@ export default function AimPage() {
     verdict: "",
     nextRule: "",
   })
+  const [outcomeForm, setOutcomeForm] = useState<Record<string, string>>({})
+  const [outcomeWindow, setOutcomeWindow] = useState<"7" | "14" | "30">("7")
   const [retroRuleForm, setRetroRuleForm] = useState<AimCalibrationRule>({
     rule: "",
     source: "内容复盘",
@@ -2316,11 +2319,12 @@ export default function AimPage() {
     }
 
     if (mode === "decision") {
+      const spec = base.taskSpec
       setDecisionForm({
-        summary: "",
-        targetUser: "",
-        expectedSignal: "",
-        confidence: "",
+        summary: spec?.realProblem || spec?.goal || "",
+        targetUser: spec?.targetCustomer || "",
+        expectedSignal: spec?.desiredAction || "",
+        confidence: spec?.riskLevel === "high" ? "低" : spec?.riskLevel === "medium" ? "中" : "高",
       })
     } else if (mode === "publish") {
       setPublishForm({
@@ -2338,6 +2342,8 @@ export default function AimPage() {
         rule: "",
         source: "内容复盘",
       })
+      setOutcomeForm({})
+      setOutcomeWindow("7")
     }
 
     setRecordDialog({ mode, generationId: base.id })
@@ -2389,6 +2395,31 @@ export default function AimPage() {
               }
             : undefined,
         })
+        const hasOutcome = Object.values(outcomeForm).some((v) => v && v.trim())
+        if (hasOutcome) {
+          const num = (key: string) => {
+            const raw = outcomeForm[key]
+            if (!raw || !raw.trim()) return null
+            const n = Number(raw)
+            return Number.isFinite(n) ? n : null
+          }
+          await upsertContentOutcome(recordDialog.generationId, {
+            collectWindowDay: Number(outcomeWindow) as 7 | 14 | 30,
+            platform: publishForm.publishPlatform.trim() || undefined,
+            dmCount: num("dmCount"),
+            qualifiedLeadCount: num("qualifiedLeadCount"),
+            appointmentCount: num("appointmentCount"),
+            dealCount: num("dealCount"),
+            revenue: num("revenue"),
+            views: num("views"),
+            saves: num("saves"),
+            comments: num("comments"),
+            shares: num("shares"),
+            audienceFeedback: outcomeForm.audienceFeedback?.trim() || undefined,
+          }).catch((e) => {
+            console.error("[retro] outcome save failed (non-blocking)", e)
+          })
+        }
         toast.success("已保存复盘")
       }
 
@@ -2397,7 +2428,7 @@ export default function AimPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
-  }, [decisionForm, messages, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
+  }, [decisionForm, messages, outcomeForm, outcomeWindow, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
 
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
@@ -2932,6 +2963,53 @@ export default function AimPage() {
                   onChange={(event) => setRetroRuleForm((prev) => ({ ...prev, rule: event.target.value }))}
                   placeholder="比如：工具类长教程先看能不能压成一个明确场景，否则不做大而全。"
                 />
+              </div>
+              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">结构化结果（选填，未填不计为 0）</p>
+                  <select
+                    value={outcomeWindow}
+                    onChange={(e) => setOutcomeWindow(e.target.value as "7" | "14" | "30")}
+                    className="h-7 rounded border border-border/60 bg-background px-2 text-xs"
+                  >
+                    <option value="7">7 天</option>
+                    <option value="14">14 天</option>
+                    <option value="30">30 天</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {([
+                    ["dmCount", "有效私信"],
+                    ["qualifiedLeadCount", "合格线索"],
+                    ["appointmentCount", "预约咨询"],
+                    ["dealCount", "成交"],
+                    ["revenue", "营收(元)"],
+                    ["views", "播放"],
+                    ["saves", "收藏"],
+                    ["comments", "评论"],
+                    ["shares", "转发"],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} className="flex flex-col gap-0.5">
+                      <span className="text-[11px] text-muted-foreground">{label}</span>
+                      <input
+                        inputMode="numeric"
+                        value={outcomeForm[key] ?? ""}
+                        onChange={(e) => setOutcomeForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                        placeholder="—"
+                        className="h-8 rounded border border-border/60 bg-background px-2 text-sm"
+                      />
+                    </label>
+                  ))}
+                </div>
+                <label className="flex flex-col gap-0.5">
+                  <span className="text-[11px] text-muted-foreground">用户反馈（哪类人在问 / 是否目标客户原话 / 是否带来错误人群）</span>
+                  <Textarea
+                    value={outcomeForm.audienceFeedback ?? ""}
+                    onChange={(e) => setOutcomeForm((prev) => ({ ...prev, audienceFeedback: e.target.value }))}
+                    placeholder="把评论区/私信里真实出现的话记下来。"
+                    className="min-h-[60px]"
+                  />
+                </label>
               </div>
             </div>
           )}
