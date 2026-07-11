@@ -58,3 +58,34 @@ export function sanitizeOutcomeBody(body: Record<string, unknown>): SanitizedOut
     userVerdict: typeof body.userVerdict === "string" ? body.userVerdict.slice(0, 1000) : null,
   }
 }
+
+/**
+ * 允许被 PATCH（部分更新）的字段名。collectWindowDay 是主键的一部分，不在其中。
+ * 思路：update 时只覆盖「请求体里明确出现过」的字段，避免重复提交部分数据时
+ * 把之前已填的字段误清成 null。这与「未填写≠0」并不冲突——后者指单次请求内
+ * 显式传空串/null 要存 null；此处针对的是多次保存之间的合并语义。
+ */
+const PATCHABLE_FIELDS = [
+  "platform", "publishedAt",
+  "qualifiedCommentCount", "dmCount", "qualifiedLeadCount", "appointmentCount",
+  "dealCount", "revenue", "views", "likes", "comments", "saves", "shares",
+  "audienceFeedback", "userVerdict",
+] as const
+
+/**
+ * 构造 upsert 的 update 片段：只包含请求体里明确出现过的字段。
+ * - collectWindowDay 永远用 sanitized 值（它决定 upsert 定位哪一行）。
+ * - 其余字段：请求体里有该 key 才写入（哪怕是 null）；没有则不触碰，保留旧值。
+ */
+export function buildOutcomeUpdate(
+  sanitized: SanitizedOutcome,
+  presentKeys: Set<string>,
+): Partial<SanitizedOutcome> {
+  const update: Record<string, unknown> = { collectWindowDay: sanitized.collectWindowDay }
+  for (const field of PATCHABLE_FIELDS) {
+    if (presentKeys.has(field)) {
+      update[field] = sanitized[field]
+    }
+  }
+  return update as Partial<SanitizedOutcome>
+}

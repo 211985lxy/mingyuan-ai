@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { sanitizeOutcomeBody, type SanitizedOutcome } from "@/lib/content-outcome"
+import { sanitizeOutcomeBody, buildOutcomeUpdate, type SanitizedOutcome } from "@/lib/content-outcome"
 
 export const dynamic = "force-dynamic"
 
@@ -63,6 +63,9 @@ export async function PUT(
       return NextResponse.json({ error: (e as Error).message }, { status: 400 })
     }
 
+    // 请求体里明确出现过的可更新字段：update 时只覆盖这些，保留旧值不被误清。
+    const presentKeys = new Set(Object.keys(body))
+
     // upsert 靠 unique([userId, generationId, collectWindowDay]) 去重
     const outcome = await prisma.contentOutcome.upsert({
       where: {
@@ -79,7 +82,8 @@ export async function PUT(
         projectId: owned.projectId,
         ...sanitized,
       },
-      update: { ...sanitized },
+      // PATCH 语义：只更新请求体里出现过的字段，避免重复部分提交时清掉已填数据
+      update: buildOutcomeUpdate(sanitized, presentKeys),
     })
     return NextResponse.json({ outcome })
   } catch (error) {
