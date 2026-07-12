@@ -12,7 +12,10 @@
  * Requirements: RSCO-01, RSCO-02, RSCO-03, FBACK-01, FBACK-02
  */
 
-import { LLMClient } from "@/lib/llm/client";
+import { LLM_PASS_SCORE } from "@/lib/material-relevance/scoring-constants";
+import { scoreLLMBatch } from "@/lib/material-relevance/llm-score";
+
+export { LLM_PASS_SCORE } from "@/lib/material-relevance/scoring-constants";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,7 +50,7 @@ export interface ScoredMediaRow {
 
 type SafeRole = "product_detail" | "store_environment" | "process";
 
-interface BusinessContext {
+export interface BusinessContext {
   industry: string | null;
   primaryOffer: string | null;
   targetAudience: string | null;
@@ -55,7 +58,7 @@ interface BusinessContext {
   archetype: string;
 }
 
-interface ScoringEntry {
+export interface ScoringEntry {
   role: SafeRole;
   query: string;
 }
@@ -64,9 +67,6 @@ interface ScoringEntry {
 
 /** If deterministic acceptance rate < this threshold, trigger LLM batch scoring. */
 export const DETERMINISTIC_YIELD_THRESHOLD = 0.5;
-
-/** LLM score (0-10) at or below this is rejected. */
-export const LLM_PASS_SCORE = 5;
 
 /** Nature/landscape terms that signal irrelevance for businesses with specific visual vocabulary. */
 const OFF_DOMAIN_TERMS = [
@@ -90,10 +90,6 @@ const OFF_DOMAIN_TERMS = [
 
 /** The "generic" archetype — skip off-domain blocklist for this one since any image could be relevant. */
 const GENERIC_ARCHETYPE = "professional service business";
-
-/** LLM model for scoring (lower temperature than generation for consistency). */
-const SCORING_MODEL =
-  process.env.PACKAGING_MATERIAL_PLAN_MODEL || "openai/gpt-5-mini";
 
 // ─── INDUSTRY_ABSTRACT_QUERY_MAP ──────────────────────────────────────────────
 
@@ -327,134 +323,6 @@ function scoreDeterministic(
     score: Math.round(overlapRatio * 100),
     rejected: false,
   };
-}
-
-// ─── Tier 2: LLM batch scoring ────────────────────────────────────────────────
-
-interface LLMScoreItem {
-  id: string;
-  score: number;
-  reject: boolean;
-}
-
-/**
- * LLM batch relevance scorer (Tier 2).
- *
- * RSCO-02: Sends exactly ONE LLM call per invocation (not per-item).
- * RSCO-03: Results with LLM score <= LLM_PASS_SCORE are marked rejected.
- */
-async function scoreLLMBatch(
-  rows: ScorableMediaRow[],
-  context: BusinessContext,
-  entry: ScoringEntry,
-): Promise<ScoredMediaRow[]> {
-  const llm = LLMClient.shared();
-
-  // If no LLM available, return all rows as un-scored (neutral pass)
-  if (!llm.available) {
-    return rows.map((row) => ({
-      row,
-      score: 50,
-      rejected: false,
-      tier: "llm" as const,
-      rejectionReason: "LLM unavailable — passed through unscored",
-    }));
-  }
-
-  // Cap at 20 candidates per call
-  const candidates = rows.slice(0, 20);
-  const candidatePayload = candidates.map((row) => ({
-    id: `${row.provider}:${row.pexelsId}`,
-    alt: row.alt ?? "",
-  }));
-
-  const contextSummary = [
-    context.industry ? `行业: ${context.industry}` : null,
-    context.primaryOffer ? `主营: ${context.primaryOffer}` : null,
-    context.targetAudience ? `目标: ${context.targetAudience}` : null,
-  ]
-    .filter(Boolean)
-    .join(", ")
-    .substring(0, 300);
-
-  const systemPrompt = `你是一名图库素材相关性评估专家。
-给定用户的业务背景和一批图库素材的描述，为每条素材评分（0-10），判断是否与用户的具体行业相关。
-
-评分标准：
-- 9-10：高度相关，直接展示用户行业的典型场景
-- 6-8：相关，展示的内容符合用户业务方向
-- 3-5：边缘相关，通用商业场景，非行业特定
-- 0-2：不相关，展示了与用户行业无关的场景（如自然风景、其他行业）
-
-输出 JSON：{"scores":[{"id":"pexels:123","score":7,"reject":false}]}
-reject=true 当 score <= ${LLM_PASS_SCORE}。`;
-
-  const userMessage = `业务背景：${contextSummary}
-搜索角色：${entry.role}，搜索词：${entry.query}
-
-待评估素材：
-${JSON.stringify(candidatePayload)}`;
-
-  try {
-    const result = await llm.complete({
-      model: SCORING_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.2,
-      maxTokens: 800,
-      responseFormat: { type: "json_object" },
-    });
-
-    // Defensive JSON parse: accept bare array, parsed.scores, or parsed.results
-    let scoreItems: LLMScoreItem[] = [];
-    try {
-      const parsed = JSON.parse(result.content);
-      if (Array.isArray(parsed)) {
-        scoreItems = parsed;
-      } else if (Array.isArray(parsed?.scores)) {
-        scoreItems = parsed.scores;
-      } else if (Array.isArray(parsed?.results)) {
-        scoreItems = parsed.results;
-      }
-    } catch {
-      // Parse failure — fall through to neutral pass
-    }
-
-    // Build a score lookup map
-    const scoreMap = new Map<string, LLMScoreItem>();
-    for (const item of scoreItems) {
-      scoreMap.set(item.id, item);
-    }
-
-    return candidates.map((row) => {
-      const itemId = `${row.provider}:${row.pexelsId}`;
-      const scoreItem = scoreMap.get(itemId);
-      if (!scoreItem) {
-        // Row not in LLM output — neutral pass
-        return { row, score: 50, rejected: false, tier: "llm" as const };
-      }
-      const llmScore = scoreItem.score ?? 5;
-      const rejected = llmScore <= LLM_PASS_SCORE;
-      return {
-        row,
-        score: Math.round((llmScore / 10) * 100),
-        rejected: rejected || scoreItem.reject,
-        tier: "llm" as const,
-        ...(rejected ? { rejectionReason: `LLM score ${llmScore} <= ${LLM_PASS_SCORE}` } : {}),
-      };
-    });
-  } catch {
-    // LLM error — return all candidates as un-scored (neutral pass)
-    return candidates.map((row) => ({
-      row,
-      score: 50,
-      rejected: false,
-      tier: "llm" as const,
-      rejectionReason: "LLM error — passed through unscored",
-    }));
-  }
 }
 
 // ─── Main scoring function ────────────────────────────────────────────────────
