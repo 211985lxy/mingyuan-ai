@@ -21,7 +21,8 @@
     "arch:size": "node scripts/check-source-file-size.mjs",
     "arch:size:report": "node scripts/check-source-file-size.mjs --report",
     "schema:verify": "node scripts/verify-production-schema.mjs",
-    "schema:migration-status": "prisma migrate status"
+    "schema:migration-status": "prisma migrate status",
+    "env:check": "node scripts/check-env-contract.mjs"
   },
   "dependencies": {
     "@alicloud/credentials": "^2.4.4",

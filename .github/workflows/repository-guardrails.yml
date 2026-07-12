@@ -28,6 +28,8 @@ jobs:
         run: pnpm --dir apps/web exec eslint --quiet .
       - name: Typecheck
         run: pnpm --dir apps/web run typecheck
+      - name: Environment contract
+        run: pnpm --dir apps/web run env:check
       - name: Architecture size guard
         run: pnpm --dir apps/web run arch:size
       - name: Deterministic harness
