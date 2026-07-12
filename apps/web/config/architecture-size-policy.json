@@ -1,7 +1,7 @@
 {
   "fileLineLimit": 500,
   "targetModuleLineRange": [100, 300],
-  "functionLineLimit": 100,
+  "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",
   "legacyFiles": [
     { "path": "src/app/(dashboard)/create/page.tsx", "maxLines": 3532, "target": "features/create" },
@@ -12,13 +12,10 @@
     { "path": "src/lib/aim-agent-handlers.ts", "maxLines": 1649, "target": "lib/aim-agents" },
     { "path": "src/app/api/packaging-material-suggestions/route.ts", "maxLines": 1298, "target": "features/packaging" },
     { "path": "src/lib/script-generator.ts", "maxLines": 1290, "target": "features/content-generation" },
-    { "path": "src/lib/hot-topic-intelligence.ts", "maxLines": 1250, "target": "features/topics" },
     { "path": "src/app/(dashboard)/topic-planning/page.tsx", "maxLines": 1248, "target": "features/topics" },
     { "path": "src/app/(dashboard)/competitor/page.tsx", "maxLines": 1105, "target": "features/competitor" },
     { "path": "src/app/(dashboard)/videos/[id]/page.tsx", "maxLines": 936, "target": "features/videos" },
-    { "path": "src/lib/task-recovery.ts", "maxLines": 895, "target": "lib/task-recovery" },
     { "path": "src/app/admin/benchmark-profiles/page.tsx", "maxLines": 835, "target": "features/benchmark-profiles" },
-    { "path": "src/app/admin/benchmark-profiles/[id]/page.tsx", "maxLines": 805, "target": "features/benchmark-profiles" },
-    { "path": "src/app/api/tasks/route.ts", "maxLines": 789, "target": "features/tasks" }
+    { "path": "src/app/admin/benchmark-profiles/[id]/page.tsx", "maxLines": 805, "target": "features/benchmark-profiles" }
   ]
 }
