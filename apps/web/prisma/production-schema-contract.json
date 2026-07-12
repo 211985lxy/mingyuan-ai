@@ -1,0 +1,56 @@
+{
+  "tables": [
+    {
+      "name": "AimGeneration",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "workflowStatus",
+        "topicSelectionId",
+        "selectedTopicIndex",
+        "taskSpec",
+        "decisionSnapshot",
+        "retroSnapshots",
+        "calibrationRules"
+      ]
+    },
+    {
+      "name": "ContentOutcome",
+      "columns": [
+        "id",
+        "userId",
+        "generationId",
+        "collectWindowDay",
+        "collectedAt",
+        "qualifiedLeadCount",
+        "views",
+        "userVerdict"
+      ]
+    },
+    {
+      "name": "AimRunSnapshot",
+      "columns": [
+        "id",
+        "runId",
+        "userId",
+        "runSpec",
+        "contextManifest",
+        "providerAttempts",
+        "qualityResult",
+        "expiresAt"
+      ]
+    },
+    {
+      "name": "AimRunEvent",
+      "columns": [
+        "id",
+        "runId",
+        "userId",
+        "event",
+        "metadata",
+        "createdAt"
+      ]
+    }
+  ]
+}

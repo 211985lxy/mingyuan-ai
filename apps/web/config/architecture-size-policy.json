@@ -1,0 +1,31 @@
+{
+  "fileLineLimit": 500,
+  "targetModuleLineRange": [100, 300],
+  "functionLineLimit": 100,
+  "legacyDeadline": "2026-07-26",
+  "legacyFiles": [
+    { "path": "src/app/(dashboard)/create/page.tsx", "maxLines": 3532, "target": "features/create" },
+    { "path": "src/app/(dashboard)/aim/page.tsx", "maxLines": 3237, "target": "features/aim" },
+    { "path": "src/lib/api/client.ts", "maxLines": 1897, "target": "lib/api" },
+    { "path": "src/app/(dashboard)/assets/page.tsx", "maxLines": 1824, "target": "features/assets" },
+    { "path": "src/app/admin/knowledge/page.tsx", "maxLines": 1816, "target": "features/knowledge" },
+    { "path": "src/lib/aim-agent-handlers.ts", "maxLines": 1649, "target": "lib/aim-agents" },
+    { "path": "src/app/api/packaging-material-suggestions/route.ts", "maxLines": 1298, "target": "features/packaging" },
+    { "path": "src/lib/script-generator.ts", "maxLines": 1290, "target": "features/content-generation" },
+    { "path": "src/lib/hot-topic-intelligence.ts", "maxLines": 1250, "target": "features/topics" },
+    { "path": "src/app/(dashboard)/topic-planning/page.tsx", "maxLines": 1248, "target": "features/topics" },
+    { "path": "src/app/(dashboard)/competitor/page.tsx", "maxLines": 1105, "target": "features/competitor" },
+    { "path": "src/app/(dashboard)/videos/[id]/page.tsx", "maxLines": 936, "target": "features/videos" },
+    { "path": "src/lib/task-recovery.ts", "maxLines": 895, "target": "lib/task-recovery" },
+    { "path": "src/app/admin/benchmark-profiles/page.tsx", "maxLines": 835, "target": "features/benchmark-profiles" },
+    { "path": "src/types/api.ts", "maxLines": 813, "target": "types/api" },
+    { "path": "src/app/admin/benchmark-profiles/[id]/page.tsx", "maxLines": 805, "target": "features/benchmark-profiles" },
+    { "path": "src/app/api/tasks/route.ts", "maxLines": 789, "target": "features/tasks" },
+    { "path": "src/components/ui/sidebar.tsx", "maxLines": 723, "target": "components/ui/sidebar" },
+    { "path": "src/app/api/pexels/search/route.ts", "maxLines": 712, "target": "features/media-search" },
+    { "path": "src/components/public-avatar-preview-dialog.tsx", "maxLines": 643, "target": "features/public-avatar-preview" },
+    { "path": "src/lib/topic-generation.ts", "maxLines": 587, "target": "features/topics" },
+    { "path": "src/lib/mock/services.ts", "maxLines": 564, "target": "lib/mock" },
+    { "path": "src/lib/material-relevance.ts", "maxLines": 559, "target": "features/packaging" }
+  ]
+}

@@ -43,6 +43,7 @@ import {
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags } from "@/lib/knowledge-tags"
 import { buildTopicDailyReport, type TopicDailyReport, type TopicDailyReportSource } from "@/lib/topic-daily-report"
 import { buildTopicPoolDraftFromSearchParams } from "@/lib/topic-pool-draft"
+import { categorizeTopicCards, getTopicDisplayLabel, scoreEntries, strongestAndWeakest } from "@/features/topics/topic-presentation"
 import type { ApiAiHotBriefingItem, ApiTopicCard, ApiTopicRecommendationMode } from "@/types/api"
 
 type TopicCategory = "daily_inspiration" | "meeting_minutes" | "benchmark_reference" | "user_insight"
@@ -111,14 +112,6 @@ function formatDate(value: string) {
   })
 }
 
-const SCORE_DIMENSIONS = [
-  ["projectFit", "项目匹配"],
-  ["contentValue", "内容价值"],
-  ["viralHook", "传播钩子"],
-  ["conversionFit", "成交关联"],
-  ["feasibility", "可执行"],
-] as const
-
 const SCARCITY_BADGE: Record<string, string> = {
   scenery: "稀缺·景观",
   emotion: "稀缺·情感",
@@ -143,61 +136,6 @@ const VERDICT_META: Record<NonNullable<ApiTopicCard["reviewVerdict"]>, { label: 
   usable: { label: "可用", className: "border-sky-200 bg-sky-50 text-sky-700" },
   observe: { label: "观察", className: "border-amber-200 bg-amber-50 text-amber-700" },
   revise: { label: "需优化", className: "border-rose-200 bg-rose-50 text-rose-700" },
-}
-
-function scoreEntries(card: ApiTopicCard) {
-  const breakdown = card.scoreBreakdown
-  if (!breakdown) return []
-  return SCORE_DIMENSIONS.map(([key, label]) => ({ key, label, value: breakdown[key] }))
-}
-
-function strongestAndWeakest(card: ApiTopicCard) {
-  const entries = scoreEntries(card)
-  if (entries.length === 0) return null
-  const sorted = [...entries].sort((a, b) => b.value - a.value)
-  return { strongest: sorted[0], weakest: sorted[sorted.length - 1] }
-}
-
-// ─── 前台四分类分区 ────────────────────────────────────────
-
-interface TopicCategoryGroup {
-  key: string
-  label: string
-  cards: ApiTopicCard[]
-}
-
-const TOPIC_DISPLAY_GROUPS: TopicCategoryGroup[] = [
-  { key: "hot_topic", label: "热点类", cards: [] },
-  { key: "persona", label: "人设类", cards: [] },
-  { key: "question_answer", label: "问题解答类", cards: [] },
-  { key: "point_of_view", label: "观点类", cards: [] },
-]
-
-function getTopicDisplayGroupKey(card: ApiTopicCard) {
-  const text = [
-    card.title,
-    card.rationale,
-    card.contentLine,
-    card.scoreReason,
-  ].filter(Boolean).join(" ")
-
-  if (/人设|身份|老板|经历|故事|信任|认识/.test(text) || card.topicType === "人设型") return "persona"
-  if (/热点/.test(text) || card.sourceType === "行业热点") return "hot_topic"
-  if (/观点|判断|认知|趋势|误区|反常识|立场/.test(text) || card.topicType === "流量型") return "point_of_view"
-  return "question_answer"
-}
-
-function getTopicDisplayLabel(card: ApiTopicCard) {
-  return TOPIC_DISPLAY_GROUPS.find((group) => group.key === getTopicDisplayGroupKey(card))?.label ?? "问题解答类"
-}
-
-function categorizeTopicCards(cards: ApiTopicCard[]): TopicCategoryGroup[] {
-  const groups: TopicCategoryGroup[] = TOPIC_DISPLAY_GROUPS.map((group) => ({ ...group, cards: [] }))
-  for (const card of cards) {
-    groups.find((group) => group.key === getTopicDisplayGroupKey(card))?.cards.push(card)
-  }
-
-  return groups.filter((g) => g.cards.length > 0)
 }
 
 export default function TopicPlanningPage() {

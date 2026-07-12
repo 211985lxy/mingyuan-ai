@@ -44,23 +44,28 @@ import {
 } from "@/lib/api/client"
 import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
-import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
 import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
+import {
+  accountPageUrl,
+  compactAccountUrl,
+  extractionStatusText,
+  formatAccountName,
+  formatCount,
+  formatDate,
+  formatRefreshError,
+  formatRelativeTime,
+  isSupportedCompetitorUrl,
+  refreshStatusText,
+  reportStatusLabel,
+  reportTitle,
+  videoPageUrl,
+  type WatchVideo,
+} from "@/features/competitor/presentation"
 import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
 
 // ─── Helpers ────────────────────────────────────────────
 
-const SUPPORTED_DOMAINS = ["douyin.com", "iesdouyin.com", "v.douyin.com"]
 const ACTIVE_EXTRACTION_STATUSES = new Set(["queued", "extracting", "analyzing"])
-
-type WatchVideo = NonNullable<WatchAccount["latestVideos"]>[number] & {
-  account: WatchAccount
-  engagementScore?: number
-}
-
-function isSupportedUrl(url: string): boolean {
-  return SUPPORTED_DOMAINS.some((domain) => url.includes(domain))
-}
 
 function proxyAvatarUrl(url: string): string {
   return buildProxyImageUrl(url)
@@ -70,95 +75,6 @@ function proxyCoverUrl(url: string): string {
   return buildProxyImageUrl(url)
 }
 
-function formatRelativeTime(iso: string | null): string {
-  if (!iso) return "尚未刷新"
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return "刚刚"
-  if (m < 60) return `${m}分钟前`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}小时前`
-  const d = Math.floor(h / 24)
-  if (d < 7) return `${d}天前`
-  return new Date(iso).toLocaleDateString("zh-CN")
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "未完成"
-  return new Date(iso).toLocaleDateString("zh-CN")
-}
-
-function formatCount(n: number): string {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}w`
-  return n.toLocaleString("zh-CN")
-}
-
-function reportTitle(report: ApiCompetitorReport): string {
-  return `${report.accountName || "优质账号"} · 分析报告`
-}
-
-function reportStatusLabel(status: ApiCompetitorReport["status"]): string {
-  if (status === "completed") return "已完成"
-  if (status === "failed") return "失败"
-  return "分析中"
-}
-
-function formatAccountName(account: WatchAccount): string {
-  if (account.nickname) return account.nickname
-
-  try {
-    const url = new URL(account.targetUrl)
-    const pathParts = url.pathname.split("/").filter(Boolean)
-    const tail = pathParts[pathParts.length - 1]
-    if (tail) return `抖音账号 · ${tail.slice(0, 12)}`
-  } catch {
-    // Keep the fallback readable even when a pasted URL is not normalized.
-  }
-
-  return "抖音账号（待刷新）"
-}
-
-function compactAccountUrl(url: string): string {
-  try {
-    const parsed = new URL(url)
-    const text = `${parsed.hostname}${parsed.pathname}`.replace(/\/$/, "")
-    return text.length > 46 ? `${text.slice(0, 43)}...` : text
-  } catch {
-    return url.length > 46 ? `${url.slice(0, 43)}...` : url
-  }
-}
-
-function formatRefreshError(error: string): string {
-  if (error.includes("Timeout") || error.includes("超时")) {
-    return "本地浏览器访问抖音超时，账号链接已保存，可以稍后再刷新。"
-  }
-  if (error.includes("BrowserType.launch") || error.includes("browser")) {
-    return "本地浏览器启动失败，账号链接已保存，可以稍后再试。"
-  }
-  return error.split("\n")[0] || "刷新失败，账号链接已保存。"
-}
-
-function videoPageUrl(video: WatchVideo): string {
-  return getWatchVideoPageUrl({
-    platform: video.account.platform || null,
-    videoId: video.videoId || null,
-    videoUrl: video.videoUrl || null,
-    fallbackUrl: video.account.targetUrl || null,
-  })
-}
-
-function accountPageUrl(video: WatchVideo): string {
-  return video.account.targetUrl || videoPageUrl(video)
-}
-
-function extractionStatusText(record: ApiVideoCopyExtraction | undefined): string {
-  if (!record) return "爆款文案拆解"
-  if (record.status === "completed" && record.analysisResult) return "查看拆解"
-  if (record.status === "completed") return "文案已提取"
-  if (record.status === "failed") return "提取失败"
-  if (record.status === "analyzing") return "分析中"
-  return "提取中"
-}
 
 function refreshStatusBadge(account: WatchAccount) {
   if (account.refreshStatus === "refreshing")
@@ -168,13 +84,6 @@ function refreshStatusBadge(account: WatchAccount) {
   if (account.refreshStatus === "success")
     return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">已刷新</Badge>
   return <Badge variant="outline">待刷新</Badge>
-}
-
-function refreshStatusText(account: WatchAccount) {
-  if (account.refreshStatus === "refreshing") return "刷新中"
-  if (account.refreshStatus === "failed") return "刷新失败"
-  if (account.refreshStatus === "success") return "已刷新"
-  return "待刷新"
 }
 
 // ─── Main Page ─────────────────────────────────────────
@@ -271,7 +180,7 @@ export default function CompetitorWatchPage() {
     const trimmed = addUrl.trim()
     if (!trimmed) return
 
-    if (!isSupportedUrl(trimmed)) {
+    if (!isSupportedCompetitorUrl(trimmed)) {
       toast.error("第一版暂时只支持抖音主页链接")
       return
     }
@@ -312,7 +221,7 @@ export default function CompetitorWatchPage() {
       return
     }
 
-    if (!isSupportedUrl(trimmed)) {
+    if (!isSupportedCompetitorUrl(trimmed)) {
       toast.error("第一版暂时只支持抖音主页链接")
       return
     }
