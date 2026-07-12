@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { textToSpeech } from "@/lib/shanjian"
@@ -16,7 +17,7 @@ export const POST = withUserAuth(async (request) => {
     )
   }
 
-  if (process.env.VOLC_SPEECH_API_KEY) {
+  if (env.VOLC_SPEECH_API_KEY) {
     const audio = await synthesizeVolcengineSpeech({
       text,
       speaker: speakerId,

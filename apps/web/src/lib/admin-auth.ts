@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { NextRequest, NextResponse } from "next/server"
@@ -6,7 +7,7 @@ import type { AdminRole } from "@/types/content-template"
 
 // 删除硬编码 fallback。允许回退到 JWT_SECRET(安全等价,只要 JWT_SECRET 强即可),
 // 但两者都缺失时必须 fail-fast,而不是用公开字符串验签。
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
+const ADMIN_JWT_SECRET = env.ADMIN_JWT_SECRET || env.JWT_SECRET
 
 function requireAdminJwtSecret(): string {
   if (!ADMIN_JWT_SECRET || ADMIN_JWT_SECRET.length < 32) {
@@ -101,7 +102,7 @@ export function withAdminAuth(
  */
 export function validateCronSecret(request: NextRequest): boolean {
   const auth = request.headers.get("authorization")
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = env.CRON_SECRET
   if (!cronSecret) return false
   return auth === `Bearer ${cronSecret}`
 }

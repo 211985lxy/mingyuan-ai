@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
@@ -27,12 +28,12 @@ const UNLIMITED_BETA_EMAILS = new Set([
   "17737232700@qq.com",
   "18126880027@163.com",
   "957739245@qq.com",
-  ...(process.env.UNLIMITED_BETA_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
+  ...(env.UNLIMITED_BETA_EMAILS || "").split(",").map(e => e.trim().toLowerCase()).filter(Boolean),
 ])
 
 const UNLIMITED_BETA_USER_IDS = new Set([
   "cmr97na52001zxhn4nlaxzi4v",
-  ...(process.env.UNLIMITED_BETA_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean),
+  ...(env.UNLIMITED_BETA_USER_IDS || "").split(",").map(id => id.trim()).filter(Boolean),
 ])
 
 function todayStart() {

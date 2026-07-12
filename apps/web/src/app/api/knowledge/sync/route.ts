@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
@@ -11,7 +12,7 @@ interface ObsidianSyncEntry {
 }
 
 export async function POST(request: NextRequest) {
-  const syncToken = process.env.OBSIDIAN_SYNC_TOKEN
+  const syncToken = env.OBSIDIAN_SYNC_TOKEN
   if (!syncToken) {
     console.error("[knowledge/sync] OBSIDIAN_SYNC_TOKEN 未配置,拒绝请求")
     return NextResponse.json(

@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { withCache } from "./cache"
 import { logger } from "./logger"
 import { externalApiRequestsTotal, externalApiDuration } from "./metrics"
@@ -31,9 +32,9 @@ import type {
 
 // ─── Config ─────────────────────────────────────────────
 
-const BASE_URL = process.env.SHANJIAN_BASE_URL || "https://openapi.shanjian.tv"
-const APP_KEY = process.env.SHANJIAN_APP_KEY || ""
-const WEBHOOK_URL = process.env.SHANJIAN_WEBHOOK_URL || ""
+const BASE_URL = env.SHANJIAN_BASE_URL || "https://openapi.shanjian.tv"
+const APP_KEY = env.SHANJIAN_APP_KEY || ""
+const WEBHOOK_URL = env.SHANJIAN_WEBHOOK_URL || ""
 
 // ─── Error Mapping (spec 3.7) ───────────────────────────
 

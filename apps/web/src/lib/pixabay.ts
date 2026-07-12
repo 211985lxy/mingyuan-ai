@@ -1,3 +1,4 @@
+import { env, getIndexedEnvironmentValue } from "@/env"
 import { createHash } from "crypto";
 import type {
   PixabayApiKey,
@@ -28,9 +29,9 @@ function loadKeys(): void {
   if (keyPool.length > 0) return;
 
   let i = 1;
-  while (process.env[`PIXABAY_API_KEY_${i}`]) {
+  while (getIndexedEnvironmentValue("PIXABAY_API_KEY", i)) {
     keyPool.push({
-      key: process.env[`PIXABAY_API_KEY_${i}`]!,
+      key: getIndexedEnvironmentValue("PIXABAY_API_KEY", i)!,
       index: i,
       remainingRequests: 100, // Pixabay: 100 req/min
       lastUsedAt: 0,
@@ -77,8 +78,8 @@ export function getKeyPoolStatus() {
 
 // ─── Base Request with Retry ───────────────────────────
 
-const PIXABAY_IMAGE_BASE_URL = process.env.PIXABAY_API || "https://pixabay.com/api/";
-const PIXABAY_VIDEO_BASE_URL = (process.env.PIXABAY_API || "https://pixabay.com/api/").replace(/\/?$/, "videos/");
+const PIXABAY_IMAGE_BASE_URL = env.PIXABAY_API || "https://pixabay.com/api/";
+const PIXABAY_VIDEO_BASE_URL = (env.PIXABAY_API || "https://pixabay.com/api/").replace(/\/?$/, "videos/");
 
 async function pixabayRequest<T>(
   baseUrl: string,

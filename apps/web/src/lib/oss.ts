@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
@@ -45,10 +46,10 @@ function assertPublicSourceUrl(sourceUrl: string): void {
   }
 }
 
-const OSS_REGION = process.env.OSS_REGION;
-const OSS_ACCESS_KEY_ID = process.env.OSS_ACCESS_KEY_ID;
-const OSS_ACCESS_KEY_SECRET = process.env.OSS_ACCESS_KEY_SECRET;
-const OSS_BUCKET = process.env.OSS_BUCKET;
+const OSS_REGION = env.OSS_REGION;
+const OSS_ACCESS_KEY_ID = env.OSS_ACCESS_KEY_ID;
+const OSS_ACCESS_KEY_SECRET = env.OSS_ACCESS_KEY_SECRET;
+const OSS_BUCKET = env.OSS_BUCKET;
 
 // Legacy bucket for URL migration (杭州 → 上海)
 const OSS_LEGACY_HOSTNAMES = [

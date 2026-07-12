@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { createHash } from "crypto"
 import OpenAI from "openai"
 import { prisma } from "@/lib/prisma"
@@ -13,13 +14,13 @@ export interface EmbeddingConfig {
 }
 
 function readConfig(): EmbeddingConfig {
-  const enabled = process.env.EMBEDDING_ENABLED === "true"
+  const enabled = env.EMBEDDING_ENABLED === "true"
   const baseURL =
-    process.env.EMBEDDING_BASE_URL || "https://api.siliconflow.cn/v1"
+    env.EMBEDDING_BASE_URL || "https://api.siliconflow.cn/v1"
   const apiKey =
-    process.env.EMBEDDING_API_KEY || process.env.SILICONFLOW_API_KEY || ""
-  const model = process.env.EMBEDDING_MODEL || "BAAI/bge-large-zh-v1.5"
-  const dimensions = parseInt(process.env.EMBEDDING_DIMENSIONS || "1024", 10)
+    env.EMBEDDING_API_KEY || env.SILICONFLOW_API_KEY || ""
+  const model = env.EMBEDDING_MODEL || "BAAI/bge-large-zh-v1.5"
+  const dimensions = parseInt(env.EMBEDDING_DIMENSIONS || "1024", 10)
 
   return { enabled, baseURL, apiKey, model, dimensions }
 }

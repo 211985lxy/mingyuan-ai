@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { runTaskRecoveryPass } from "@/lib/task-recovery";
@@ -5,7 +6,7 @@ import { runTaskRecoveryPass } from "@/lib/task-recovery";
 const DEFAULT_INTERVAL_MS = 60 * 1000;
 const DEFAULT_STARTUP_DELAY_MS = 5 * 1000;
 const HEARTBEAT_FILE =
-  process.env.TASK_RECOVERY_HEARTBEAT_FILE ??
+  env.TASK_RECOVERY_HEARTBEAT_FILE ??
   "/tmp/mingyuan-task-recovery-heartbeat.json";
 
 function readIntervalMs(envValue: string | undefined, fallback: number): number {
@@ -39,11 +40,11 @@ async function writeHeartbeat(state: "starting" | "ok" | "error", meta?: object)
 
 async function main() {
   const intervalMs = readIntervalMs(
-    process.env.TASK_RECOVERY_INTERVAL_MS,
+    env.TASK_RECOVERY_INTERVAL_MS,
     DEFAULT_INTERVAL_MS,
   );
   const startupDelayMs = readIntervalMs(
-    process.env.TASK_RECOVERY_STARTUP_DELAY_MS,
+    env.TASK_RECOVERY_STARTUP_DELAY_MS,
     DEFAULT_STARTUP_DELAY_MS,
   );
   let stopping = false;

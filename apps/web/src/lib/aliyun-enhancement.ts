@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import Videoenhan, {
   EnhanceVideoQualityRequest,
   GetAsyncJobResultRequest,
@@ -10,9 +11,9 @@ let _client: Videoenhan | null = null;
 export function createViapiClient(): Videoenhan {
   if (_client) return _client;
 
-  const accessKeyId = process.env.ALIYUN_VIAPI_ACCESS_KEY_ID || process.env.OSS_ACCESS_KEY_ID;
-  const accessKeySecret = process.env.ALIYUN_VIAPI_ACCESS_KEY_SECRET || process.env.OSS_ACCESS_KEY_SECRET;
-  const endpoint = process.env.ALIYUN_VIAPI_ENDPOINT || "videoenhan.cn-shanghai.aliyuncs.com";
+  const accessKeyId = env.ALIYUN_VIAPI_ACCESS_KEY_ID || env.OSS_ACCESS_KEY_ID;
+  const accessKeySecret = env.ALIYUN_VIAPI_ACCESS_KEY_SECRET || env.OSS_ACCESS_KEY_SECRET;
+  const endpoint = env.ALIYUN_VIAPI_ENDPOINT || "videoenhan.cn-shanghai.aliyuncs.com";
 
   if (!accessKeyId || !accessKeySecret) {
     throw new Error(

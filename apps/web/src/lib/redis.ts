@@ -1,9 +1,10 @@
+import { env } from "@/env"
 import Redis from "ioredis"
 
 const globalForRedis = globalThis as unknown as { redis: Redis }
 
 function createRedisClient(): Redis {
-  const client = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+  const client = new Redis(env.REDIS_URL ?? "redis://localhost:6379", {
     maxRetriesPerRequest: 5,
     lazyConnect: true,
     connectTimeout: 5000,
@@ -26,4 +27,4 @@ function createRedisClient(): Redis {
 
 export const redis = globalForRedis.redis ?? createRedisClient()
 
-if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis
+if (env.NODE_ENV !== "production") globalForRedis.redis = redis

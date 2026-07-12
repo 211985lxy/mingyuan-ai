@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -26,7 +27,7 @@ type WebhookPayload = {
  * 值等于 ALIYUN_ENHANCEMENT_WEBHOOK_SECRET。未配置时返回 503(fail-closed)。
  */
 function authorizeAliyunWebhook(request: NextRequest): boolean {
-  const secret = process.env.ALIYUN_ENHANCEMENT_WEBHOOK_SECRET;
+  const secret = env.ALIYUN_ENHANCEMENT_WEBHOOK_SECRET;
   if (!secret) return false;
   const provided = request.headers.get("x-webhook-secret");
   if (!provided) return false;
@@ -38,7 +39,7 @@ function authorizeAliyunWebhook(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   if (!authorizeAliyunWebhook(request)) {
-    if (!process.env.ALIYUN_ENHANCEMENT_WEBHOOK_SECRET) {
+    if (!env.ALIYUN_ENHANCEMENT_WEBHOOK_SECRET) {
       console.error("[webhook:aliyun-enhancement] ALIYUN_ENHANCEMENT_WEBHOOK_SECRET 未配置,拒绝回调");
       return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 });
     }

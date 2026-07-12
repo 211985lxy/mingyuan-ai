@@ -1,10 +1,11 @@
+import { env } from "@/env"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "./prisma"
 import { getSubscriptionStatus } from "@/lib/subscription"
 
-const JWT_SECRET = process.env.JWT_SECRET
+const JWT_SECRET = env.JWT_SECRET
 
 /**
  * 强制要求 JWT_SECRET 已配置且足够强。

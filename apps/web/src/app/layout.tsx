@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import type { Metadata, Viewport } from "next"
 import { NextIntlClientProvider } from "next-intl"
 import { getMessages } from "next-intl/server"
@@ -16,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const branding = await getBrandingConfig()
 
   return {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+    metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
     title: `${branding.name} - AI内容总监`,
     description: `${branding.name}，帮企业把业务资料、老板经验、项目案例变成可持续生产的内容资产`,
     icons: {

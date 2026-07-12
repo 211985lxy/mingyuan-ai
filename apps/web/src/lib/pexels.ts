@@ -1,3 +1,4 @@
+import { env, getIndexedEnvironmentValue } from "@/env"
 import { createHash } from "crypto";
 import type {
   PexelsApiKey,
@@ -29,9 +30,9 @@ function loadKeys(): void {
   if (keyPool.length > 0) return;
 
   let i = 1;
-  while (process.env[`PEXELS_API_KEY_${i}`]) {
+  while (getIndexedEnvironmentValue("PEXELS_API_KEY", i)) {
     keyPool.push({
-      key: process.env[`PEXELS_API_KEY_${i}`]!,
+      key: getIndexedEnvironmentValue("PEXELS_API_KEY", i)!,
       index: i,
       remainingRequests: 200,
       lastUsedAt: 0,
@@ -78,7 +79,7 @@ export function getKeyPoolStatus() {
 
 // ─── Base Request with Retry ───────────────────────────
 
-const PEXELS_BASE_URL = process.env.PEXELS_API_ENDPOINT || "https://api.pexels.com";
+const PEXELS_BASE_URL = env.PEXELS_API_ENDPOINT || "https://api.pexels.com";
 
 async function pexelsRequest<T>(
   path: string,

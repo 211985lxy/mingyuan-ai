@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
@@ -18,7 +19,7 @@ export const runtime = "nodejs"
 export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
-  const webhookToken = process.env.INSPIRATION_WEBHOOK_TOKEN
+  const webhookToken = env.INSPIRATION_WEBHOOK_TOKEN
   if (!webhookToken) {
     // 未配置时拒绝服务并明确报错,而不是用公开默认值放行
     console.error("[webhook/inspiration] INSPIRATION_WEBHOOK_TOKEN 未配置,拒绝请求")
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     })
 
     // 异步触发 AI 分析(带超时,防止 hang 住 fetch 连接)
-    fetch(`${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/inspiration/${inspiration.id}/process`, {
+    fetch(`${env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/inspiration/${inspiration.id}/process`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextResponse } from "next/server"
 import { buildImageGeneratePrompt, normalizeImageGenerateKind } from "@/lib/image-generate-prompt"
 
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 })
   }
 
-  if (!process.env.ARK_API_KEY) {
+  if (!env.ARK_API_KEY) {
     return NextResponse.json({ error: "ARK_API_KEY is required" }, { status: 500 })
   }
 
@@ -21,10 +22,10 @@ export async function POST(request: Request) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.ARK_API_KEY}`,
+      Authorization: `Bearer ${env.ARK_API_KEY}`,
     },
     body: JSON.stringify({
-      model: process.env.ARK_IMAGE_MODEL || "doubao-seedream-5-0-260128",
+      model: env.ARK_IMAGE_MODEL || "doubao-seedream-5-0-260128",
       prompt: buildImageGeneratePrompt({ prompt, kind, style: body?.style, layout: body?.layout }),
       sequential_image_generation: "disabled",
       response_format: "url",

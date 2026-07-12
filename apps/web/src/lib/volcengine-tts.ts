@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { randomUUID } from "crypto"
 
 const VOLC_TTS_URL = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
@@ -10,7 +11,7 @@ export async function synthesizeVolcengineSpeech(input: {
   speedRatio?: number
   volume?: number
 }) {
-  const apiKey = process.env.VOLC_SPEECH_API_KEY
+  const apiKey = env.VOLC_SPEECH_API_KEY
   if (!apiKey) throw new Error("未配置 VOLC_SPEECH_API_KEY")
 
   const response = await fetch(VOLC_TTS_URL, {
@@ -18,14 +19,14 @@ export async function synthesizeVolcengineSpeech(input: {
     headers: {
       "Content-Type": "application/json",
       "X-Api-Key": apiKey,
-      "X-Api-Resource-Id": process.env.VOLC_TTS_RESOURCE_ID || DEFAULT_RESOURCE_ID,
+      "X-Api-Resource-Id": env.VOLC_TTS_RESOURCE_ID || DEFAULT_RESOURCE_ID,
       "X-Api-Request-Id": randomUUID(),
     },
     body: JSON.stringify({
       user: { uid: "aim-web" },
       req_params: {
         text: input.text,
-        speaker: input.speaker || process.env.VOLC_SPEECH_VOICE || DEFAULT_VOICE,
+        speaker: input.speaker || env.VOLC_SPEECH_VOICE || DEFAULT_VOICE,
         audio_params: {
           format: "mp3",
           speed: input.speedRatio ?? 1,

@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextResponse } from "next/server"
 
 import {
@@ -13,7 +14,7 @@ export const maxDuration = 60
 
 export async function POST(request: Request) {
   const payload = await request.json()
-  const verificationToken = process.env.FEISHU_VERIFICATION_TOKEN || ""
+  const verificationToken = env.FEISHU_VERIFICATION_TOKEN || ""
 
   if (!verifyFeishuEventToken(payload, verificationToken)) {
     return NextResponse.json({ error: "invalid feishu token" }, { status: 401 })
@@ -30,10 +31,10 @@ export async function POST(request: Request) {
   const event = parseFeishuMessageEvent(payload)
   if (!event) return NextResponse.json({ ok: true, ignored: true })
 
-  const userId = process.env.FEISHU_TOPIC_CHAT_USER_ID || ""
-  const projectId = process.env.FEISHU_TOPIC_CHAT_PROJECT_ID || ""
-  const appId = process.env.FEISHU_APP_ID || ""
-  const appSecret = process.env.FEISHU_APP_SECRET || ""
+  const userId = env.FEISHU_TOPIC_CHAT_USER_ID || ""
+  const projectId = env.FEISHU_TOPIC_CHAT_PROJECT_ID || ""
+  const appId = env.FEISHU_APP_ID || ""
+  const appSecret = env.FEISHU_APP_SECRET || ""
   if (!userId || !projectId || !appId || !appSecret) {
     return NextResponse.json({ error: "feishu topic chat env is not configured" }, { status: 503 })
   }

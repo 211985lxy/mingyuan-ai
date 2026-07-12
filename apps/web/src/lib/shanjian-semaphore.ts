@@ -1,8 +1,9 @@
+import { env } from "@/env"
 import { redis } from "./redis"
 import { prisma } from "./prisma"
 
 const SEMAPHORE_KEY = "shanjian:inflight"
-const MAX_CONCURRENT = parseInt(process.env.SHANJIAN_MAX_CONCURRENT ?? "8", 10)
+const MAX_CONCURRENT = parseInt(env.SHANJIAN_MAX_CONCURRENT ?? "8", 10)
 
 // Lua script: atomic acquire
 // Returns 1 if acquired, 0 if at capacity

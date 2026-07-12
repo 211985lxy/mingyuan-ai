@@ -1,10 +1,11 @@
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { transcribeAudioWav } from "@/lib/aliyun-asr"
 import { LLMClient } from "@/lib/llm"
 import { INTERNAL_BETA_LIMITS } from "@/lib/internal-beta-limits"
 
-const ASR_PROOFREAD_MODEL = process.env.SCRIPT_GENERATION_MODEL || "openai/gpt-5.4"
+const ASR_PROOFREAD_MODEL = env.SCRIPT_GENERATION_MODEL || "openai/gpt-5.4"
 
 async function correctAsrText(text: string): Promise<string> {
   const source = text.trim()
@@ -71,9 +72,9 @@ export async function POST(request: NextRequest) {
 
     // 3. 转写
     const hasAliyun =
-      (process.env.ALIYUN_VIAPI_ACCESS_KEY_ID || process.env.OSS_ACCESS_KEY_ID) &&
-      (process.env.ALIYUN_VIAPI_ACCESS_KEY_SECRET || process.env.OSS_ACCESS_KEY_SECRET) &&
-      process.env.ALIYUN_NLS_APP_KEY
+      (env.ALIYUN_VIAPI_ACCESS_KEY_ID || env.OSS_ACCESS_KEY_ID) &&
+      (env.ALIYUN_VIAPI_ACCESS_KEY_SECRET || env.OSS_ACCESS_KEY_SECRET) &&
+      env.ALIYUN_NLS_APP_KEY
 
     if (!hasAliyun) {
       console.warn("[aim/transcribe] 阿里云语音交互配置缺失，请检查环境变量 ALIYUN_NLS_APP_KEY 等。")

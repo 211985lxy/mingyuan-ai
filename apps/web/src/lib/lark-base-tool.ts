@@ -1,3 +1,4 @@
+import { env as appEnv } from "@/env"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 
@@ -55,7 +56,7 @@ const ALLOWED_COMMANDS = new Set<LarkCommand>([
 ])
 
 // 不再硬编码开发者本机绝对路径(生产会 ENOENT)。LARK_CLI_PATH 必须由环境变量提供。
-function requireLarkCliPath(env: EnvLike = process.env): string {
+function requireLarkCliPath(env: EnvLike = appEnv): string {
   const p = env.LARK_CLI_PATH?.trim()
   if (!p) {
     throw new Error("缺少 LARK_CLI_PATH:请在环境变量中配置 lark-cli 可执行文件的绝对路径")
@@ -217,8 +218,8 @@ export async function importLarkBaseKnowledge(input: {
   db: DbLike
   runCommand?: RunCommand
 }) {
-  const env = input.env || process.env
-  const config = readLarkBaseConfig(env, input.tableType)
+  const runtimeEnv = input.env || appEnv
+  const config = readLarkBaseConfig(runtimeEnv, input.tableType)
   const runCommand = input.runCommand || ((command, args) => runLarkBaseCommand(command, args, { cliPath: config.cliPath }))
 
   await ensureProject(input.db, input.userId, input.projectId)
@@ -297,8 +298,8 @@ export async function exportLarkBaseResult(input: {
   db: DbLike
   runCommand?: RunCommand
 }) {
-  const env = input.env || process.env
-  const config = readResultTableConfig(env, input.resultType)
+  const runtimeEnv = input.env || appEnv
+  const config = readResultTableConfig(runtimeEnv, input.resultType)
   const runCommand = input.runCommand || ((command, args) => runLarkBaseCommand(command, args, { cliPath: config.cliPath }))
   const project = await ensureProject(input.db, input.userId, input.projectId)
 

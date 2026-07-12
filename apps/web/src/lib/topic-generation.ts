@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { getAgentLLM } from "@/lib/llm/agent-router"
 import {
   TopicCardsSchema,
@@ -16,7 +17,7 @@ import type { RecommendationMode, TopicGenerationInput, TopicGenerationResult } 
 export type { RecommendationMode, TopicGenerationInput, TopicGenerationResult } from "@/lib/topic-generation/contracts"
 export { buildTopicSystemPrompt, buildTopicUserPrompt } from "@/lib/topic-generation/prompts"
 
-const TOPIC_MODEL = process.env.TOPIC_GENERATION_MODEL
+const TOPIC_MODEL = env.TOPIC_GENERATION_MODEL
 
 function inferTopicType(card: TopicCard, index: number): TopicCard["topicType"] {
   if (card.topicType && (VALID_TOPIC_TYPES as readonly string[]).includes(card.topicType)) return card.topicType

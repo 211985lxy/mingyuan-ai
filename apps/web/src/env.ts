@@ -51,6 +51,12 @@ export const env = createEnv({
     LAST30DAYS_CN_ENABLED: z.string().optional(),
     LAST30DAYS_CN_SKILL_DIR: z.string().optional(),
     LAST30DAYS_CN_TIMEOUT_MS: z.string().optional(),
+    LARK_BASE_TOKEN: z.string().optional(),
+    LARK_CLI_PATH: z.string().optional(),
+    LARK_DATA_TABLE_ID: z.string().optional(),
+    LARK_PROJECT_TABLE_ID: z.string().optional(),
+    LARK_RESULT_TABLE_ID: z.string().optional(),
+    LARK_TOPIC_TABLE_ID: z.string().optional(),
     LIHUO_API_KEY: z.string().optional(),
     LIHUO_BASE_URL: z.string().optional(),
     LIHUO_MODEL: z.string().optional(),
@@ -171,6 +177,12 @@ export const env = createEnv({
     LAST30DAYS_CN_ENABLED: process.env.LAST30DAYS_CN_ENABLED,
     LAST30DAYS_CN_SKILL_DIR: process.env.LAST30DAYS_CN_SKILL_DIR,
     LAST30DAYS_CN_TIMEOUT_MS: process.env.LAST30DAYS_CN_TIMEOUT_MS,
+    LARK_BASE_TOKEN: process.env.LARK_BASE_TOKEN,
+    LARK_CLI_PATH: process.env.LARK_CLI_PATH,
+    LARK_DATA_TABLE_ID: process.env.LARK_DATA_TABLE_ID,
+    LARK_PROJECT_TABLE_ID: process.env.LARK_PROJECT_TABLE_ID,
+    LARK_RESULT_TABLE_ID: process.env.LARK_RESULT_TABLE_ID,
+    LARK_TOPIC_TABLE_ID: process.env.LARK_TOPIC_TABLE_ID,
     LIHUO_API_KEY: process.env.LIHUO_API_KEY,
     LIHUO_BASE_URL: process.env.LIHUO_BASE_URL,
     LIHUO_MODEL: process.env.LIHUO_MODEL,
@@ -244,3 +256,13 @@ export const env = createEnv({
   },
   emptyStringAsUndefined: true,
 })
+
+// Provider key pools and child-process inheritance need dynamic names or the
+// complete process map. Keep those two escape hatches centralized here.
+export function getIndexedEnvironmentValue(prefix: string, index: number): string | undefined {
+  return process.env[`${prefix}_${index}`]?.trim() || undefined
+}
+
+export function getProcessEnvironment(): NodeJS.ProcessEnv {
+  return process.env
+}

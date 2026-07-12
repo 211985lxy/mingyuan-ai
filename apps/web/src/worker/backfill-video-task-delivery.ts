@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { prisma } from "@/lib/prisma";
 import {
   isManagedOssUrl,
@@ -12,7 +13,7 @@ import {
 const DEFAULT_BATCH_SIZE = 50;
 
 function readBatchSize(): number {
-  const parsed = Number(process.env.VIDEO_TASK_DELIVERY_BACKFILL_LIMIT);
+  const parsed = Number(env.VIDEO_TASK_DELIVERY_BACKFILL_LIMIT);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return DEFAULT_BATCH_SIZE;
   }

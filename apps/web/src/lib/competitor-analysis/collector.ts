@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { DouyinAdapter, XiaohongshuAdapter } from '@/lib/tikhub/adapters'
 import {
   fetchFromExternalDouyinApi,
@@ -58,8 +59,8 @@ export async function collectDouyinCompetitorData(
   const localCrawler = deps.fetchFromLocalCrawler ?? fetchFromLocalCrawler
   // 放开 adapter 兜底：TikHub 失败时允许降级（sec_user_id 走 HTTP+正则，博主/视频走本地爬虫）
   const apiAdapter = deps.apiAdapter ?? new DouyinAdapter()
-  const hasTikHubApiKey = deps.hasTikHubApiKey ?? (() => Boolean(process.env.TIKHUB_API_KEY))
-  const hasLocalCrawler = deps.hasLocalCrawler ?? (() => process.env.LOCAL_CRAWLER_ENABLED === 'true')
+  const hasTikHubApiKey = deps.hasTikHubApiKey ?? (() => Boolean(env.TIKHUB_API_KEY))
+  const hasLocalCrawler = deps.hasLocalCrawler ?? (() => env.LOCAL_CRAWLER_ENABLED === 'true')
 
   if (canUseExternalApi()) {
     const external = await externalApi({
@@ -272,8 +273,8 @@ async function collectXiaohongshuCompetitorData(
   deps: CollectDouyinDeps = {},
 ): Promise<CompetitorCollectionResult> {
   const count = input.count ?? 50
-  const hasTikHubApiKey = deps.hasTikHubApiKey ?? (() => Boolean(process.env.TIKHUB_API_KEY))
-  const hasLocalCrawler = deps.hasLocalCrawler ?? (() => process.env.LOCAL_CRAWLER_ENABLED === 'true')
+  const hasTikHubApiKey = deps.hasTikHubApiKey ?? (() => Boolean(env.TIKHUB_API_KEY))
+  const hasLocalCrawler = deps.hasLocalCrawler ?? (() => env.LOCAL_CRAWLER_ENABLED === 'true')
   const localCrawler = deps.fetchFromLocalCrawler ?? fetchFromLocalCrawler
   const apiAdapter = deps.apiAdapter ?? new XiaohongshuAdapter()
 

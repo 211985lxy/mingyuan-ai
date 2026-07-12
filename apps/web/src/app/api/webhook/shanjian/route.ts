@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
@@ -28,7 +29,7 @@ const log = logger.child({ component: "webhook-shanjian" });
  * 使用 timingSafeEqual 防时序攻击。
  */
 function authorizeShanjianWebhook(request: NextRequest): boolean {
-  const secret = process.env.SHANJIAN_WEBHOOK_SECRET;
+  const secret = env.SHANJIAN_WEBHOOK_SECRET;
   if (!secret) return false;
   const provided = request.headers.get("x-webhook-secret");
   if (!provided) return false;
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
 
   if (!authorizeShanjianWebhook(request)) {
-    if (!process.env.SHANJIAN_WEBHOOK_SECRET) {
+    if (!env.SHANJIAN_WEBHOOK_SECRET) {
       log.error({ requestId }, "SHANJIAN_WEBHOOK_SECRET 未配置,拒绝回调。上线前必须在山见回调配置加上 X-Webhook-Secret 头并配置本环境变量。");
       return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 });
     }

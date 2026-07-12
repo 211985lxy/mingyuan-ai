@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import type { Platform } from './types'
 
 export interface CompetitorPlatformGate {
@@ -12,7 +13,7 @@ export interface CompetitorPlatformGate {
  * 默认放开抖音和小红书。
  */
 export function getCompetitorPlatformGate(platform: Platform): CompetitorPlatformGate {
-  const enabledPlatforms = (process.env.COMPETITOR_ENABLED_PLATFORMS || 'douyin,xiaohongshu')
+  const enabledPlatforms = (env.COMPETITOR_ENABLED_PLATFORMS || 'douyin,xiaohongshu')
     .split(',')
     .map((p) => p.trim().toLowerCase())
 

@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { prisma } from "@/lib/prisma";
 import {
   acquireSlot,
@@ -31,7 +32,7 @@ export async function consumeQueuedTasks(logPrefix: string): Promise<number> {
 }
 
 function getAvailableSlots(usage: number): number {
-  const max = Number.parseInt(process.env.SHANJIAN_MAX_CONCURRENT ?? "8", 10);
+  const max = Number.parseInt(env.SHANJIAN_MAX_CONCURRENT ?? "8", 10);
   return max - usage;
 }
 
