@@ -2,8 +2,8 @@
 
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   Eye,
@@ -12,24 +12,17 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  listTemplates,
   generateScripts as apiGenerateScripts,
   updateScript,
-  listPackagingTemplates,
-  syncPackagingTemplates,
   createProductionPlan,
   createVideoTask,
   getVideoTask,
-  listAssets,
   uploadFileToStorage,
   registerAsset,
   generatePackagingMaterialSuggestions,
   getPexelsMedia,
   generateTopics,
   selectTopic,
-  listOpeningTypes,
-  listCopyStructures,
-  listEndingTypes,
 } from "@/lib/api/client";
 import { buildPackagingRecommendationContext } from "@/lib/video-template-config";
 import { mapCopyToVideoStructure } from "@/lib/copy-structure-mapping";
@@ -55,6 +48,10 @@ import { PhaseTopic } from "@/features/create/components/topic-phase";
 import { PhaseCopywriting } from "@/features/create/components/copywriting-phase";
 import { PhasePackaging } from "@/features/create/components/packaging-phase";
 import { isAiMaterial } from "@/features/create/components/packaging-material-preview";
+import { useCreateWorkbenchDraft } from "@/features/create/hooks/use-create-workbench-draft";
+import { useCreateWorkbenchResources } from "@/features/create/hooks/use-create-workbench-resources";
+import { useAiMaterialSync } from "@/features/create/hooks/use-ai-material-sync";
+import { useVideoTaskPolling } from "@/features/create/hooks/use-video-task-polling";
 
 // ─── Phase Definitions ──────────────────────────────────
 
@@ -92,49 +89,12 @@ function buildManualMaterialFromAsset(input: {
   };
 }
 
-const WORKBENCH_SUPPORTED_VIDEO_TYPES = [
-  "broadcast_mixcut",
-  "custom_broadcast_mixcut",
-] as const;
-
-function resolveWorkbenchTemplateVideoType(videoType: string | null | undefined) {
-  const normalized = videoType?.trim();
-  return normalized || "broadcast_mixcut";
-}
-
-function isWorkbenchSupportedVideoType(videoType: string | null | undefined) {
-  return WORKBENCH_SUPPORTED_VIDEO_TYPES.includes(
-    resolveWorkbenchTemplateVideoType(videoType) as (typeof WORKBENCH_SUPPORTED_VIDEO_TYPES)[number],
-  );
-}
-
 // ─── Types ──────────────────────────────────────────────
-
-interface WorkbenchDraft {
-  currentPhase: number;
-  topicSelectionId: string | null;
-  selectedTopicIndex: number | null;
-  openingTypeCode: string | null;
-  copyStructureCode: string | null;
-  endingTypeCode: string | null;
-  selectedScriptId: string | null;
-  editedScript: string;
-  packagingTemplateId: string | null;
-  materials: MaterialAssignment[];
-  backgroundMusic: BackgroundMusicSelection | null;
-  savedAt: number;
-}
-
-const DRAFT_KEY = "mingyuan:create-draft-v6";
-const LEGACY_DRAFT_KEYS = ["mingyuan:create-draft-v5", "mingyuan:create-draft-v4"];
 
 // ─── Main Page Component ────────────────────────────────
 
 export default function CreateVideoPage() {
-  const router = useRouter();
   const searchParams = useSearchParams() ?? new URLSearchParams();
-  const [draftHydrated, setDraftHydrated] = useState(false);
-
   // Phase state
   const [currentPhase, setCurrentPhase] = useState(0);
 
@@ -184,10 +144,38 @@ export default function CreateVideoPage() {
   const [taskStatus, setTaskStatus] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Dependency invalidation tracking
   const [staleWarning, setStaleWarning] = useState<string | null>(null);
+
+  const { saveDraft, clearDraft } = useCreateWorkbenchDraft(
+    {
+      currentPhase,
+      topicSelectionId,
+      selectedTopicIndex,
+      openingTypeCode: selectedOpeningCode,
+      copyStructureCode: selectedCopyStructureCode,
+      endingTypeCode: selectedEndingCode,
+      selectedScriptId,
+      editedScript,
+      packagingTemplateId: selectedPackagingTemplateId,
+      materials,
+      backgroundMusic,
+    },
+    {
+      setCurrentPhase,
+      setTopicSelectionId,
+      setSelectedTopicIndex,
+      setSelectedOpeningCode,
+      setSelectedCopyStructureCode,
+      setSelectedEndingCode,
+      setSelectedScriptId,
+      setEditedScript,
+      setSelectedPackagingTemplateId,
+      setMaterials,
+      setBackgroundMusic,
+    },
+  );
 
   // ─── Derived values ────────────────────────────────────
 
@@ -214,94 +202,6 @@ export default function CreateVideoPage() {
     && resolvedPackagingRecommendation?.tier !== "blocked";
   const phase3Ready = phase2Ready && !!editedScript.trim();
 
-  // ─── Draft save/restore ────────────────────────────────
-
-  const saveDraft = useCallback((overrides: Partial<WorkbenchDraft> = {}) => {
-    const draft: WorkbenchDraft = {
-      currentPhase,
-      topicSelectionId,
-      selectedTopicIndex,
-      openingTypeCode: selectedOpeningCode,
-      copyStructureCode: selectedCopyStructureCode,
-      endingTypeCode: selectedEndingCode,
-      selectedScriptId,
-      editedScript,
-      packagingTemplateId: selectedPackagingTemplateId,
-      materials,
-      backgroundMusic,
-      ...overrides,
-      savedAt: Date.now(),
-    };
-
-    const hasMeaningfulState =
-      draft.currentPhase > 0
-      || !!draft.topicSelectionId
-      || !!draft.selectedScriptId
-      || draft.editedScript.trim().length > 0
-      || !!draft.packagingTemplateId
-      || draft.materials.length > 0
-      || !!draft.backgroundMusic;
-
-    if (!hasMeaningfulState) {
-      localStorage.removeItem(DRAFT_KEY);
-      return;
-    }
-
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  }, [
-    currentPhase,
-    topicSelectionId,
-    selectedTopicIndex,
-    selectedOpeningCode,
-    selectedCopyStructureCode,
-    selectedEndingCode,
-    selectedScriptId,
-    editedScript,
-    selectedPackagingTemplateId,
-    materials,
-    backgroundMusic,
-  ]);
-
-  // Restore draft on mount
-  useEffect(() => {
-    try {
-      for (const key of LEGACY_DRAFT_KEYS) {
-        localStorage.removeItem(key);
-      }
-
-      const raw = localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const draft: WorkbenchDraft = JSON.parse(raw);
-        if (Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
-          localStorage.removeItem(DRAFT_KEY);
-        } else {
-          if (draft.topicSelectionId) setTopicSelectionId(draft.topicSelectionId);
-          if (draft.selectedTopicIndex != null) setSelectedTopicIndex(draft.selectedTopicIndex);
-          if (draft.openingTypeCode) setSelectedOpeningCode(draft.openingTypeCode);
-          if (draft.copyStructureCode) setSelectedCopyStructureCode(draft.copyStructureCode);
-          if (draft.endingTypeCode) setSelectedEndingCode(draft.endingTypeCode);
-          if (draft.selectedScriptId) setSelectedScriptId(draft.selectedScriptId);
-          if (draft.editedScript) setEditedScript(draft.editedScript);
-          if (draft.packagingTemplateId) setSelectedPackagingTemplateId(draft.packagingTemplateId);
-          if (Array.isArray(draft.materials)) setMaterials(draft.materials);
-          if (draft.backgroundMusic) setBackgroundMusic(draft.backgroundMusic);
-          if (typeof draft.currentPhase === "number") {
-            setCurrentPhase(Math.max(0, Math.min(draft.currentPhase, 3)));
-          }
-        }
-      }
-    } catch { /* ignore */ }
-    setDraftHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!draftHydrated) {
-      return;
-    }
-
-    saveDraft();
-  }, [draftHydrated, saveDraft]);
-
   // Read hot topic from URL params (from home page "追热点")
   useEffect(() => {
     const urlHotTopicId = searchParams.get("hotTopicId");
@@ -310,251 +210,36 @@ export default function CreateVideoPage() {
     if (urlHotTopic) setHotTopicTitle(decodeURIComponent(urlHotTopic));
   }, [searchParams]);
 
-  // ─── Data Loading Effects ──────────────────────────────
-
-  const loadPackagingTemplates = useCallback(async (options?: { forceSync?: boolean }) => {
-    setPackagingLoading(true);
-    setPackagingError(null);
-
-    try {
-      const mappedStructureId = selectedCopyStructureCode
-        ? mapCopyToVideoStructure(selectedCopyStructureCode)
-        : null;
-
-      let nextTemplates = options?.forceSync
-        ? []
-        : await listPackagingTemplates({
-            structureId: mappedStructureId,
-            scriptId: selectedScriptId,
-          });
-
-      if (nextTemplates.length === 0) {
-        setPackagingSyncing(true);
-        try {
-          await syncPackagingTemplates();
-          nextTemplates = await listPackagingTemplates({
-            structureId: mappedStructureId,
-            scriptId: selectedScriptId,
-          });
-        } finally {
-          setPackagingSyncing(false);
-        }
-      }
-
-      setPackagingTemplates(nextTemplates);
-
-      if (nextTemplates.length === 0) {
-        setPackagingError("已尝试自动同步包装模板，但当前仍没有可用模板，请检查闪剪模板权限或联系管理员。");
-      }
-
-      if (
-        selectedPackagingTemplateId
-        && !nextTemplates.some((template) => template.id === selectedPackagingTemplateId)
-      ) {
-        setSelectedPackagingTemplateId(null);
-      }
-    } catch (error) {
-      setPackagingTemplates([]);
-      setPackagingError(
-        error instanceof Error
-          ? error.message
-          : "包装模板加载失败，请稍后重试"
-      );
-    } finally {
-      setPackagingLoading(false);
-      setPackagingSyncing(false);
-    }
-  }, [selectedPackagingTemplateId, selectedScriptId, selectedCopyStructureCode]);
-
-  const loadAssets = useCallback(async () => {
-    setAssetsLoading(true);
-    setAssetLibraryError(null);
-    try {
-      const [imageAssets, videoAssets, musicAssets] = await Promise.all([
-        listAssets("image"),
-        listAssets("video"),
-        listAssets("music"),
-      ]);
-      setAssets(mergeAssets([imageAssets, videoAssets, musicAssets]));
-    } catch (error) {
-      setAssetLibraryError(
-        error instanceof Error ? error.message : "素材库加载失败，请稍后重试",
-      );
-    } finally {
-      assetsLoadedRef.current = true;
-      setAssetsLoading(false);
-    }
-  }, []);
-
-  // Load fallback template ID on mount (first published template)
-  useEffect(() => {
-    listTemplates()
-      .then((data) => {
-        const first = data.results.find((t) =>
-          isWorkbenchSupportedVideoType(resolveWorkbenchTemplateVideoType(t.videoType)),
-        );
-        if (first) setFallbackTemplateId(first.id);
-      })
-      .catch(() => {});
-  }, []);
-
-  // Load opening types, copy structures, ending types when entering phase 1
-  useEffect(() => {
-    if (currentPhase >= 1 && openingTypes.length === 0) {
-      listOpeningTypes().then(setOpeningTypes).catch(() => {});
-    }
-    if (currentPhase >= 1 && copyStructures.length === 0) {
-      listCopyStructures().then(setCopyStructures).catch(() => {});
-    }
-    if (currentPhase >= 1 && endingTypes.length === 0) {
-      listEndingTypes().then(setEndingTypes).catch(() => {});
-    }
-  }, [currentPhase, openingTypes.length, copyStructures.length, endingTypes.length]);
-
-  useEffect(() => {
-    if (currentPhase >= 1 && !selectedEndingCode && endingTypes.length > 0) {
-      setSelectedEndingCode(endingTypes[0].code);
-    }
-  }, [currentPhase, endingTypes, selectedEndingCode]);
-
-  // Load packaging templates when entering phase 2
-  useEffect(() => {
-    if (currentPhase >= 2 && selectedScriptId) {
-      void loadPackagingTemplates();
-    }
-  }, [currentPhase, loadPackagingTemplates, selectedScriptId]);
-
-  useEffect(() => {
-    if (currentPhase >= 2 && !assetsLoadedRef.current && !assetsLoading) {
-      void loadAssets();
-    }
-  }, [assetsLoading, currentPhase, loadAssets]);
-
-  useEffect(() => {
-    if (currentPhase < 2) {
-      return;
-    }
-
-    if (selectedPackagingTemplateId) {
-      return;
-    }
-
-    const recommendedTemplate =
-      packagingTemplates.find((template) => template.recommendation?.tier === "recommended")
-      ?? packagingTemplates.find((template) => template.recommendation?.tier !== "blocked")
-      ?? null;
-
-    if (recommendedTemplate) {
-      setSelectedPackagingTemplateId(recommendedTemplate.id);
-    }
-  }, [
+  const { loadAssets, loadPackagingTemplates } = useCreateWorkbenchResources({
     currentPhase,
-    packagingTemplates,
+    selectedScriptId,
+    selectedCopyStructureCode,
     selectedPackagingTemplateId,
-  ]);
+    packagingTemplates,
+    assetsLoading,
+    openingTypes,
+    copyStructures,
+    endingTypes,
+    selectedEndingCode,
+    assetsLoadedRef,
+    setFallbackTemplateId,
+    setPackagingTemplates,
+    setPackagingLoading,
+    setPackagingSyncing,
+    setPackagingError,
+    setSelectedPackagingTemplateId,
+    setAssets,
+    setAssetsLoading,
+    setAssetLibraryError,
+    setOpeningTypes,
+    setCopyStructures,
+    setEndingTypes,
+    setSelectedEndingCode,
+  });
 
-  useEffect(() => {
-    const pendingAi = materials.filter(
-      (material) =>
-        isAiMaterial(material)
-        && typeof material.pexelsId === "number"
-        && material.ossStatus !== "ready"
-        && material.ossStatus !== "failed",
-    );
+  useAiMaterialSync(materials, setMaterials);
 
-    if (pendingAi.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const syncAiMaterials = async () => {
-      const updates = await Promise.all(
-        pendingAi.map(async (material) => {
-          try {
-            const provider = material.source === "ai_pixabay" ? "pixabay" as const : "pexels" as const;
-            const latest = await getPexelsMedia(material.pexelsId!, provider);
-            return {
-              pexelsId: material.pexelsId!,
-              ossStatus: latest.ossStatus as MaterialAssignment["ossStatus"],
-              fileUrl: latest.ossStatus === "ready"
-                ? latest.ossUrl ?? material.fileUrl
-                : material.fileUrl,
-              previewUrl: latest.ossUrl ?? latest.imageUrl ?? material.previewUrl ?? material.fileUrl,
-            };
-          } catch {
-            return null;
-          }
-        }),
-      );
-
-      if (cancelled) {
-        return;
-      }
-
-      const updateMap = new Map(
-        updates
-          .filter(Boolean)
-          .map((item) => [item!.pexelsId, item!]),
-      );
-
-      if (updateMap.size === 0) {
-        return;
-      }
-
-      setMaterials((current) =>
-        current.map((material) => {
-          if ((material.source !== "ai_pexels" && material.source !== "ai_pixabay") || !material.pexelsId) {
-            return material;
-          }
-
-          const latest = updateMap.get(material.pexelsId);
-          if (!latest) {
-            return material;
-          }
-
-          return {
-            ...material,
-            fileUrl: latest.fileUrl,
-            previewUrl: latest.previewUrl,
-            thumbnailUrl: material.thumbnailUrl ?? latest.previewUrl,
-            ossStatus: latest.ossStatus,
-          };
-        }),
-      );
-    };
-
-    void syncAiMaterials();
-    const timer = window.setInterval(() => {
-      void syncAiMaterials();
-    }, 5000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [materials]);
-
-  // Poll for task status (queued at 10s, active at 3s)
-  useEffect(() => {
-    if (!taskId || taskStatus === "completed" || taskStatus === "failed") return;
-    const interval = taskStatus === "queued" ? 10000 : 3000;
-    pollRef.current = setInterval(async () => {
-      try {
-        const task = await getVideoTask(taskId);
-        setTaskStatus(task.status);
-        if (task.status === "completed") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          router.push(`/videos/${task.id}`);
-        }
-        if (task.status === "failed") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setTaskError(task.errorMessage ?? "生成失败，请重试");
-        }
-      } catch { /* continue polling */ }
-    }, interval);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [taskId, taskStatus, router]);
+  useVideoTaskPolling(taskId, taskStatus, setTaskStatus, setTaskError);
 
   // ─── Dependency Invalidation ──────────────────────────
 
@@ -878,7 +563,7 @@ export default function CreateVideoPage() {
       const task = await createVideoTask(taskParams);
       setTaskId(task.id);
       setTaskStatus(task.status);
-      localStorage.removeItem(DRAFT_KEY);
+      clearDraft();
       if (task.status === "queued") {
         toast.info("当前使用人数较多，您的视频已排队，将自动开始生成");
       } else {
