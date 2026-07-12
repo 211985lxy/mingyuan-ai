@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronDown, Loader2, Mic, Plus, Search, Send, Square, X } from "lucide-react"
+import { ChevronDown, ImagePlus, Loader2, Mic, Search, Send, Square, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -185,12 +185,13 @@ export function AimPromptComposer({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               title="添加图片"
             >
-              <Plus className="h-4 w-4" />
+              <ImagePlus className="h-4 w-4" />
+              上传图片
             </Button>
             <Button
               type="button"

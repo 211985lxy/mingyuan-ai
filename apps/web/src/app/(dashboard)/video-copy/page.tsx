@@ -31,7 +31,6 @@ import {
   listVideoCopyExtractions,
   syncVideoCopyExtraction,
 } from "@/lib/api/client"
-import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import type { ApiVideoCopyExtraction } from "@/types/api"
 
@@ -71,11 +70,9 @@ export default function VideoCopyPage() {
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [coverFailed, setCoverFailed] = useState(false)
-  const rewriteHref = record && shouldOpenDeepCopywriter(record)
-    ? `/aim?agent=deep_copywriter&videoCopyExtractionId=${record.id}`
-    : record
-      ? `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
-      : "/aim"
+  const rewriteHref = record
+    ? `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
+    : "/aim"
   const [history, setHistory] = useState<ApiVideoCopyExtraction[]>([])
 
   const isActive = record ? ACTIVE_STATUSES.has(record.status) : false
@@ -365,14 +362,12 @@ const topComments = analysis?.topComments ?? []
               className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               <Wand2 className="h-4 w-4" />
-              {shouldOpenDeepCopywriter(record) ? "进入深度再创作" : "再创作内容资产包"}
+              再创作内容资产包
             </Link>
           }
         >
           <p className="text-sm leading-6 text-muted-foreground">
-            {shouldOpenDeepCopywriter(record)
-              ? "长文案会进入深度文案官，先锁定爆款选题逻辑，再用你的立场、人设和业务场景重构成深度母稿。"
-              : "再创作会在内容生产官里进行，基于本参考文案、拆解结果和爆款选题再创作原则，生成全套内容资产包。"}
+            再创作会在内容文案创作里进行，基于本参考文案、拆解结果和爆款选题再创作原则，生成全套内容资产包。
           </p>
         </AiResultPanel>
       ) : null}

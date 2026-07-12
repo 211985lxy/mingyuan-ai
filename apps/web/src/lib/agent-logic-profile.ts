@@ -80,8 +80,8 @@ const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
 const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
   content_producer: ["deepseek", "openrouter", "jiekou", "glm"],
   free_copywriter: ["deepseek", "openrouter", "jiekou", "glm"],
-  deep_copywriter: ["lihuo", "openrouter", "openrouter", "deepseek", "jiekou", "therouter", "glm"],
-  business_diagnosis: ["lihuo", "openrouter", "openrouter", "deepseek", "jiekou", "therouter", "glm"],
+  deep_copywriter: ["lihuo", "deepseek", "openrouter", "openrouter", "jiekou", "therouter", "glm"],
+  business_diagnosis: ["lihuo", "deepseek", "openrouter", "openrouter", "jiekou", "therouter", "glm"],
   business_system_diagnosis: ["deepseek", "openrouter", "openrouter", "jiekou", "glm"],
   content_review: ["deepseek", "openrouter", "openrouter", "jiekou", "glm"],
   persona: ["deepseek", "openrouter", "openrouter", "jiekou", "glm"],

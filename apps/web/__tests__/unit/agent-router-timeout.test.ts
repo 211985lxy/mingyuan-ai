@@ -46,4 +46,21 @@ describe("agent router timeout overrides", () => {
     expect(ctorArgs.length).toBeGreaterThan(0)
     expect(ctorArgs.every((config) => config.timeout === 60000)).toBe(true)
   })
+
+  it("keeps DeepSeek in every text agent route", async () => {
+    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+    const textAgents = [
+      "content_producer",
+      "free_copywriter",
+      "deep_copywriter",
+      "business_diagnosis",
+      "business_system_diagnosis",
+      "content_review",
+      "persona",
+    ]
+
+    for (const agentId of textAgents) {
+      expect(getAgentLLM(agentId).providerNames, agentId).toContain("deepseek")
+    }
+  })
 })

@@ -187,6 +187,26 @@ describe("aim-harness fallback policy", () => {
     expect(classifyProviderError(new Error("No providers configured, missing API_KEY")).retryable).toBe(false)
   })
 
+  it("falls back when a provider returns a balance or quota 403", async () => {
+    const balanceError = new Error("403 预扣费额度失败，用户剩余额度：$0.086392，需要预扣费额度：$0.203380")
+    expect(classifyProviderError(balanceError)).toEqual({ kind: "rate_limit", retryable: true })
+    expect(classifyProviderError(new Error("403 insufficient balance"))).toEqual({ kind: "rate_limit", retryable: true })
+
+    const exhaustedProvider: LLMProvider = {
+      name: "exhausted-provider",
+      defaultModel: "expensive-model",
+      isAvailable: () => true,
+      async complete() {
+        throw balanceError
+      },
+    }
+    const result = await new LLMClient([exhaustedProvider, fakeProvider("deepseek")]).complete({
+      messages: [{ role: "user", content: "写一条内容" }],
+    })
+
+    expect(result.provider).toBe("deepseek")
+  })
+
   it("does not silently fall back for an unclassified error", () => {
     expect(classifyProviderError(new Error("unexpected invalid payload")).retryable).toBe(false)
   })

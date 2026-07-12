@@ -145,6 +145,7 @@ export function classifyProviderError(error: unknown): {
   retryable: boolean
 } {
   const message = error instanceof Error ? error.message : String(error)
+  const lower = message.toLowerCase()
   const statusValue = typeof error === "object" && error !== null && "status" in error
     ? Number((error as { status?: unknown }).status)
     : NaN
@@ -157,11 +158,13 @@ export function classifyProviderError(error: unknown): {
     if (status === 408) return { kind: "timeout", retryable: true }
     if (status === 429) return { kind: "rate_limit", retryable: true }
     if (status >= 500) return { kind: "server", retryable: true }
+    if (status === 403 && /(预扣费|剩余额度|额度不足|余额不足|insufficient (balance|credit|quota)|quota exceeded|credit balance|billing)/.test(lower)) {
+      return { kind: "rate_limit", retryable: true }
+    }
     if (status === 401 || status === 403) return { kind: "auth", retryable: false }
     if (status === 400) return { kind: "client", retryable: false }
   }
 
-  const lower = message.toLowerCase()
   if (/(timeout|timed out|deadline|aborted)/.test(lower)) {
     return { kind: "timeout", retryable: true }
   }

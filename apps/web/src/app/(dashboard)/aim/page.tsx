@@ -99,7 +99,6 @@ import {
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
-import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { detectAimWorkbenchCommand, type AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 import { buildOpeningRecommendationPrompt } from "@/lib/aim-opening-recommendation"
@@ -1123,27 +1122,11 @@ export default function AimPage() {
     return baseAgent
   }, [modeParam, selectedAgentId, sourceTopicTitle, sourceVideoCopyExtractionId])
 
-  const selectedProject = useMemo(
-    () => projects.find((p) => p.id === selectedProjectId),
-    [projects, selectedProjectId],
-  )
-
   const editorPanelLabels = useMemo(
     () => getAimEditorPanelLabels(selectedAgentId, editorFormat),
     [editorFormat, selectedAgentId],
   )
 
-  const workStage = selectedAgentId === "business_diagnosis"
-    ? "灵感选题策划"
-    : selectedAgentId === "persona"
-      ? "人设故事梳理"
-      : selectedAgentId === "content_review"
-        ? "发布前质检"
-        : selectedAgentId === "business_system_diagnosis"
-          ? "商业模式诊断"
-          : selectedAgentId === "deep_copywriter"
-            ? "深度长文创作"
-            : "内容文案创作"
   const currentWorkflowStage = isAimWorkflowStage(workflowStageParam)
     ? workflowStageParam
     : getWorkflowStageForAgent(selectedAgentId)
@@ -1309,23 +1292,16 @@ export default function AimPage() {
 
     getVideoCopyExtraction(videoCopyExtractionIdParam)
       .then((record) => {
-        const isDeepCopy = shouldOpenDeepCopywriter(record)
         const lengthRule = buildBenchmarkLengthRule(record.transcript)
         const recreationSop = buildBenchmarkRecreationSopBlock()
         const prefill = [
-          isDeepCopy ? BENCHMARK_RECREATION_PREFILL.long : BENCHMARK_RECREATION_PREFILL.short,
+          BENCHMARK_RECREATION_PREFILL.short,
           "",
           "创作原则：",
           recreationSop,
-          isDeepCopy
-            ? "1. 先参考拆解里的开头类型和情绪入口，重新设计适合我的长文开头。"
-            : "1. 开头机制可以借，但第一句话必须重写成我的身份和业务场景里的话。",
-          isDeepCopy
-            ? "2. 参考拆解里的正文结构、转折节奏和心理推进，但表达至少 30% 可感知重写。"
-            : "2. 结构节奏可以保留，但表达至少 30% 可感知重写：案例、转折、句式和行动引导不能贴原文。",
-          isDeepCopy
-            ? "3. 用我的产品、案例、用户痛点和人设表达重新完成创作，除专有名词外不要连续沿用原文 12 个字以上。"
-            : "3. 除专有名词外，不要连续沿用原文 12 个字以上，最终稿要像我的内容，不像原文换皮。",
+          "1. 开头机制可以借，但第一句话必须重写成我的身份和业务场景里的话。",
+          "2. 结构节奏可以保留，但表达至少 30% 可感知重写：案例、转折、句式和行动引导不能贴原文。",
+          "3. 除专有名词外，不要连续沿用原文 12 个字以上，最终稿要像我的内容，不像原文换皮。",
           lengthRule ? `4. ${lengthRule}` : null,
           "",
           record.videoTitle ? `对标标题：${record.videoTitle}` : null,
@@ -1336,7 +1312,7 @@ export default function AimPage() {
         ].filter(Boolean).join("\n")
 
         startTransition(() => {
-          if (isDeepCopy) setSelectedAgentId("deep_copywriter")
+          setSelectedAgentId("content_producer")
           setMessages([])
           setInput(prefill)
           setSourceVideoCopyExtractionId(record.id)
@@ -2566,7 +2542,7 @@ export default function AimPage() {
       {/* 对话区（智能体列表与最近内容已移至全局侧边栏） */}
       <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-card px-4 md:px-6">
         {/* 头部：AIM 业务工作台 */}
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b p-3">
+        <header className="flex items-center justify-between gap-3 border-b px-3 py-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
             {/* 小屏只切换工作流阶段；专家能力在侧边栏高级模式内。 */}
             <div className="md:hidden">
@@ -2582,23 +2558,24 @@ export default function AimPage() {
                 ))}
               </select>
             </div>
-            <span className="hidden h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary md:flex">
+            <span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary md:flex">
               <agent.icon className="h-4 w-4" />
             </span>
-            <div className="min-w-0 flex-1 mr-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="text-[11px] font-medium text-muted-foreground">AIM 工作台</span>
-                <span className="text-xs text-muted-foreground">/</span>
-                <p className="truncate text-sm font-semibold text-foreground">{agent.title}</p>
-                <Badge variant="secondary" className="hidden h-5 rounded-md px-1.5 text-[10px] font-medium sm:inline-flex">
-                  {workStage}
-                </Badge>
-              </div>
-              <p className="mt-0.5 hidden truncate text-xs text-muted-foreground lg:block">
-                {selectedProject?.name || (projectEnabled ? "未选择 IP 全案" : "未绑定项目")} · {agent.description}
-              </p>
-            </div>
-
+            <p className="hidden shrink-0 truncate text-sm font-semibold text-foreground md:block">{agent.title}</p>
+            <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex" aria-label="AIM 工作流">
+              {AIM_WORKFLOW_STAGES.map((stage) => (
+                <Button
+                  key={stage.id}
+                  type="button"
+                  size="sm"
+                  variant={currentWorkflowStage === stage.id ? "secondary" : "ghost"}
+                  className="h-7 shrink-0 rounded-md px-2 text-xs"
+                  onClick={() => beginWorkflowStage(stage.id)}
+                >
+                  {stage.title}
+                </Button>
+              ))}
+            </nav>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -2642,26 +2619,6 @@ export default function AimPage() {
             正在加载你的 IP 营销全案，请稍后再生成内容。
           </div>
         )}
-
-        <nav className="border-b px-3 py-2" aria-label="AIM 工作流">
-          <div className="mx-auto flex max-w-3xl items-center gap-1 overflow-x-auto">
-            {AIM_WORKFLOW_STAGES.map((stage, index) => (
-              <div key={stage.id} className="flex shrink-0 items-center gap-1">
-                {index > 0 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={currentWorkflowStage === stage.id ? "secondary" : "ghost"}
-                  className="h-7 rounded-md px-2 text-xs"
-                  onClick={() => beginWorkflowStage(stage.id)}
-                >
-                  {stage.title}
-                </Button>
-              </div>
-            ))}
-            <span className="ml-auto hidden text-[11px] text-muted-foreground lg:inline">专家能力仍可从侧边栏进入</span>
-          </div>
-        </nav>
 
         {selectedProjectId && (
           <AimProjectTaskPanel
@@ -2716,27 +2673,26 @@ export default function AimPage() {
         {/* 消息流 */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
           {messages.length === 0 ? (
-            <div className="mx-auto flex w-full max-w-3xl flex-col py-6">
+            <div className="mx-auto flex w-full max-w-3xl flex-col py-5">
               {showWorkflowLanding ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {AIM_WORKFLOW_STAGES.map((stage) => (
-                    <button
-                      key={stage.id}
-                      type="button"
-                      className="border p-4 text-left transition-colors hover:bg-muted/50"
-                      onClick={() => beginWorkflowStage(stage.id)}
-                    >
-                      <p className="text-sm font-semibold text-foreground">
-                        {stage.id === "direction" ? "我还没想清楚方向" : stage.id === "content" ? "我有方向，要做内容" : stage.id === "publish" ? "我有稿，准备发布" : "我想复盘和沉淀"}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{stage.description}</p>
-                    </button>
-                  ))}
+                <div>
+                  <p className="mb-3 text-sm font-semibold text-foreground">你今天要推进哪一步？</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {AIM_WORKFLOW_STAGES.map((stage) => (
+                      <button
+                        key={stage.id}
+                        type="button"
+                        className="h-10 rounded-lg border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                        onClick={() => beginWorkflowStage(stage.id)}
+                      >
+                        {stage.id === "direction" ? "想清楚方向" : stage.id === "content" ? "开始做内容" : stage.id === "publish" ? "准备发布" : "复盘沉淀"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="max-w-2xl text-left">
-                  <p className="text-sm font-semibold text-foreground">{agent.title}</p>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{agent.intro}</p>
+                  <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agent.intro}</p>
                   {currentWorkflowStage === "content" && selectedAgentId === "content_producer" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {AIM_CONTENT_ACTIONS.map((action) => (

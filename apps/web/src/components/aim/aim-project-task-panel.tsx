@@ -1,16 +1,11 @@
 "use client"
 
-import { ArrowRight, CheckCircle2 } from "lucide-react"
+import { useState } from "react"
+import { ArrowRight, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { type AimWorkflowStage, AIM_WORKFLOW_STAGES } from "@/lib/aim-workflow"
 import { groupAimWorkflowTasks } from "@/lib/aim-workflow-tasks"
 import type { AimGeneration } from "@/lib/api/client"
-
-function formatUpdatedAt(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ""
-  return date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })
-}
 
 export function AimProjectTaskPanel({
   records,
@@ -23,28 +18,29 @@ export function AimProjectTaskPanel({
   onOpenTask: (id: string) => void
   onStartStage: (stage: AimWorkflowStage) => void
 }) {
+  const [expanded, setExpanded] = useState(false)
   const grouped = groupAimWorkflowTasks(records)
   const total = Object.values(grouped).reduce((count, tasks) => count + tasks.length, 0)
 
+  if (!loading && total === 0) return null
+
   return (
-    <section className="border-b px-3 py-3" aria-label="项目任务">
-      <div className="mx-auto max-w-3xl">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">项目待推进</p>
-            <p className="text-xs text-muted-foreground">每条内容只显示一个当前动作</p>
-          </div>
-          <span className="text-xs text-muted-foreground">{loading ? "加载中" : `${total} 项待推进`}</span>
-        </div>
-        {total === 0 && !loading ? (
-          <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
-            当前项目没有待推进内容，可以从任一阶段开始。
-          </div>
-        ) : (
-          <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+    <section className="border-b px-3 py-1.5" aria-label="项目任务">
+      <div className="w-full">
+        <button
+          type="button"
+          className="flex h-7 w-full items-center gap-2 text-left"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <span className="text-xs font-medium text-foreground">项目待推进</span>
+          <span className="text-[11px] text-muted-foreground">{loading ? "加载中" : `${total} 项`}</span>
+          <ChevronDown className={`ml-auto h-3.5 w-3.5 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </button>
+        {expanded ? (
+          <div className="grid gap-x-4 gap-y-1 pb-1 pt-2 sm:grid-cols-2">
             {AIM_WORKFLOW_STAGES.map((stage) => {
-              const tasks = grouped[stage.id].slice(0, 2)
+              const tasks = grouped[stage.id].slice(0, 1)
               return (
                 <div key={stage.id} className="min-w-0 border-l-2 border-muted pl-2">
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -66,7 +62,7 @@ export function AimProjectTaskPanel({
               )
             })}
           </div>
-        )}
+        ) : null}
       </div>
     </section>
   )

@@ -20,9 +20,9 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
   deep_copywriter: [
     { name: "lihuo", model: "gpt-5.5" },
+    { name: "deepseek" },
     { name: "openrouter", model: "qwen/qwen3.7-plus" },
     { name: "openrouter", model: "moonshotai/kimi-k2.6" },
-    { name: "deepseek" },
     { name: "jiekou" },
     { name: "therouter" },
     { name: "glm" },
@@ -30,9 +30,9 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   business_diagnosis: [
     // ponytail: planning/diagnosis routes are non-streaming; keep each fallback short so the chain cannot eat the whole 180s client budget.
     { name: "lihuo", model: "gpt-5.5", timeoutMs: 20000 },
+    { name: "deepseek", timeoutMs: 20000 },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000 },
     { name: "openrouter", model: "z-ai/glm-5.2", timeoutMs: 20000 },
-    { name: "deepseek", timeoutMs: 20000 },
     { name: "jiekou", timeoutMs: 20000 },
     { name: "therouter", timeoutMs: 20000 },
     { name: "glm", timeoutMs: 20000 },

@@ -16,7 +16,6 @@ import {
   type WatchVideoRecommendation,
 } from "@/lib/api/client"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
-import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
 import type { ApiVideoCopyExtraction } from "@/types/api"
 
 const ACTIVE_EXTRACTION_STATUSES = new Set(["queued", "extracting", "analyzing"])
@@ -107,9 +106,7 @@ export function WatchRecommendationsPanel({ projectId }: { projectId?: string })
 
   function renderExtractionResult(record: ApiVideoCopyExtraction) {
     const analysis = record.analysisResult as { markdown: string } | null
-    const rewriteHref = shouldOpenDeepCopywriter(record)
-      ? `/aim?agent=deep_copywriter&videoCopyExtractionId=${record.id}`
-      : `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
+    const rewriteHref = `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
     if (record.status === "failed") {
       return <p className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-600">{record.errorMessage || "文案提取失败"}</p>
     }
@@ -137,7 +134,7 @@ export function WatchRecommendationsPanel({ projectId }: { projectId?: string })
             className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Sparkles className="h-3 w-3" />
-            {shouldOpenDeepCopywriter(record) ? "深度改写" : "生成内容资产包"}
+            生成内容资产包
           </Link>
         </div>
       </AiResultPanel>
