@@ -1,0 +1,34 @@
+name: Repository Guardrails
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Lint, types, architecture, and harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --dir apps/web exec prisma generate
+      - name: Lint
+        run: pnpm --dir apps/web exec eslint --quiet .
+      - name: Typecheck
+        run: pnpm --dir apps/web run typecheck
+      - name: Architecture size guard
+        run: pnpm --dir apps/web run arch:size
+      - name: Deterministic harness
+        run: pnpm --dir apps/web run test:harness

@@ -30,6 +30,10 @@ jobs:
         run: pnpm --dir apps/web exec tsc --noEmit
       - name: Lint
         run: pnpm --dir apps/web exec eslint --quiet .
+      - name: Architecture size guard
+        run: pnpm --dir apps/web run arch:size
+      - name: Deterministic harness
+        run: pnpm --dir apps/web run test:harness
 
   build-and-push:
     needs: quality
@@ -92,6 +96,16 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         working-directory: apps/web
         run: pnpm exec prisma migrate deploy
+      - name: Verify schema is up to date
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          output="$(pnpm exec prisma migrate status 2>&1)"
+          printf '%s\n' "$output"
+          printf '%s\n' "$output" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$output" | grep -F "Database schema is up to date"
 
   deploy:
     needs: [build-and-push, migrate]
@@ -113,6 +127,23 @@ jobs:
           kubectl set image deployment/mingyuan-worker worker=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
           kubectl rollout status deployment/mingyuan-web --timeout=180s
           kubectl rollout status deployment/mingyuan-worker --timeout=180s
+
+      - name: Verify live health dependencies
+        run: |
+          set -euo pipefail
+          kubectl port-forward service/mingyuan-web 18080:80 >/tmp/mingyuan-port-forward.log 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 20); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/api/healthz > health.json; then
+              grep -q '"ok":true' health.json
+              cat health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/mingyuan-port-forward.log
+          exit 1
 
       - name: Rollback on failure
         if: failure()
