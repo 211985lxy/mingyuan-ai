@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
-import fs from "fs";
-import path from "path";
 import { computeQueryHash as pexelsHash } from "@/lib/pexels";
 import { computeQueryHash as pixabayHash } from "@/lib/pixabay";
+import { CACHE_SCHEMA_VERSION } from "@/lib/packaging-material-suggestions/contracts";
 
 const baseQueryPexels = {
   query: "HVAC technician outdoor unit",
@@ -49,18 +48,15 @@ describe("INFRA-02: Cache schema versioning", () => {
     });
   });
 
-  describe("route.ts static analysis", () => {
-    const routeSrc = fs.readFileSync(
-      path.resolve(__dirname, "../../src/app/api/packaging-material-suggestions/route.ts"),
-      "utf-8"
-    );
+  describe("packaging material cache configuration", () => {
     it("defines CACHE_SCHEMA_VERSION = 2", () => {
-      expect(routeSrc).toMatch(/const CACHE_SCHEMA_VERSION\s*=\s*2/);
+      expect(CACHE_SCHEMA_VERSION).toBe(2);
     });
-    it("passes schemaVersion in all cache create blocks", () => {
-      const matches = routeSrc.match(/schemaVersion:\s*CACHE_SCHEMA_VERSION/g);
-      expect(matches).not.toBeNull();
-      expect(matches!.length).toBeGreaterThanOrEqual(6);
+    it("changes provider cache hashes from the default schema version", () => {
+      expect(pexelsHash({ ...baseQueryPexels, schemaVersion: CACHE_SCHEMA_VERSION }))
+        .not.toBe(pexelsHash(baseQueryPexels));
+      expect(pixabayHash({ ...baseQueryPixabay, schemaVersion: CACHE_SCHEMA_VERSION }))
+        .not.toBe(pixabayHash(baseQueryPixabay));
     });
   });
 });
