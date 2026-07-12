@@ -18,7 +18,6 @@
     { "path": "src/app/(dashboard)/videos/[id]/page.tsx", "maxLines": 936, "target": "features/videos" },
     { "path": "src/lib/task-recovery.ts", "maxLines": 895, "target": "lib/task-recovery" },
     { "path": "src/app/admin/benchmark-profiles/page.tsx", "maxLines": 835, "target": "features/benchmark-profiles" },
-    { "path": "src/types/api.ts", "maxLines": 813, "target": "types/api" },
     { "path": "src/app/admin/benchmark-profiles/[id]/page.tsx", "maxLines": 805, "target": "features/benchmark-profiles" },
     { "path": "src/app/api/tasks/route.ts", "maxLines": 789, "target": "features/tasks" },
     { "path": "src/components/ui/sidebar.tsx", "maxLines": 723, "target": "components/ui/sidebar" }
