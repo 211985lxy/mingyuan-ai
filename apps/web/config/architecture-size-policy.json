@@ -22,7 +22,6 @@
     { "path": "src/app/admin/benchmark-profiles/[id]/page.tsx", "maxLines": 805, "target": "features/benchmark-profiles" },
     { "path": "src/app/api/tasks/route.ts", "maxLines": 789, "target": "features/tasks" },
     { "path": "src/components/ui/sidebar.tsx", "maxLines": 723, "target": "components/ui/sidebar" },
-    { "path": "src/app/api/pexels/search/route.ts", "maxLines": 712, "target": "features/media-search" },
-    { "path": "src/components/public-avatar-preview-dialog.tsx", "maxLines": 643, "target": "features/public-avatar-preview" }
+    { "path": "src/app/api/pexels/search/route.ts", "maxLines": 712, "target": "features/media-search" }
   ]
 }

@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Pause, Play, Sparkles, Volume2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,51 +9,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   createPublicAvatarPreview,
   getPublicAvatarPreview,
   getPublicAvatarPreviewDefaults,
 } from "@/lib/api/client";
 import type { ApiPublicAvatarPreview } from "@/types/api";
+import { PreviewActions } from "@/features/public-avatar-preview/components/preview-actions";
+import { PreviewConfiguration } from "@/features/public-avatar-preview/components/preview-configuration";
+import { PreviewStatus } from "@/features/public-avatar-preview/components/preview-status";
+import type { PreviewablePublicAvatar, PreviewablePublicVoice } from "@/features/public-avatar-preview/contracts";
+
+export type { PreviewablePublicAvatar, PreviewablePublicVoice } from "@/features/public-avatar-preview/contracts";
 
 const MIN_PREVIEW_TEXT_LENGTH = 6;
 const MAX_PREVIEW_TEXT_LENGTH = 80;
 const SLOW_PREVIEW_HINT_DELAY = 20000;
-const PRESET_TEXTS = [
-  "你好，我来用一句话告诉你，这个方案为什么更适合你。",
-  "今天用 10 秒讲清楚，我们这项服务到底能帮你解决什么问题。",
-  "如果你也在做个人 IP，这条建议能帮你少走很多弯路。",
-];
-
-export interface PreviewablePublicAvatar {
-  id: string;
-  name: string;
-  coverUrl: string;
-  gender?: string;
-  previewVirtualmanId?: string;
-  source?: "public" | "mine";
-}
-
-export interface PreviewablePublicVoice {
-  id: string;
-  name: string;
-  gender?: string;
-  coverUrl?: string;
-  demoUrl?: string;
-  langs?: string[];
-}
-
 interface PublicAvatarPreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -421,219 +392,43 @@ export function PublicAvatarPreviewDialog({
             </div>
 
             <div className="space-y-5">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="public-avatar-preview-text">试看文案</Label>
-                  <span className="text-xs text-muted-foreground">
-                    {draftText.trim().length}/{MAX_PREVIEW_TEXT_LENGTH}
-                  </span>
-                </div>
-                <Textarea
-                  id="public-avatar-preview-text"
-                  value={draftText}
-                  onChange={(event) => setDraftText(event.target.value)}
-                  rows={5}
-                  placeholder={
-                    avatarSource === "mine"
-                      ? "输入一句你想让这个数字人说的话"
-                      : "输入一句你想让这个公共数字人说的话"
-                  }
-                />
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_TEXTS.map((text) => (
-                    <Button
-                      key={text}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="cursor-pointer"
-                      onClick={() => setDraftText(text)}
-                    >
-                      {text.length > 18 ? `${text.slice(0, 18)}...` : text}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <PreviewConfiguration
+                avatarSource={avatarSource}
+                draftText={draftText}
+                maxTextLength={MAX_PREVIEW_TEXT_LENGTH}
+                voices={voices}
+                resolvedVoiceId={resolvedVoiceId}
+                currentVoice={currentVoice}
+                playingVoiceId={playingVoiceId}
+                onDraftTextChange={setDraftText}
+                onVoiceChange={onSelectedVoiceChange}
+                onVoicePreview={handleVoicePreview}
+              />
 
-              <div className="space-y-2">
-                <Label>声音</Label>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Select
-                    value={resolvedVoiceId ?? undefined}
-                    onValueChange={(value) => {
-                      if (value) onSelectedVoiceChange(value);
-                    }}
-                  >
-                    <SelectTrigger className="cursor-pointer sm:flex-1">
-                      <SelectValue placeholder="选择一个声音">
-                        {currentVoice
-                          ? `${currentVoice.name}${currentVoice.gender ? ` · ${currentVoice.gender}` : ""}`
-                          : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {voices.map((voice) => (
-                        <SelectItem key={voice.id} value={voice.id}>
-                          {voice.name}
-                          {voice.gender ? ` · ${voice.gender}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      currentVoice && handleVoicePreview(currentVoice)
-                    }
-                    disabled={
-                      !currentVoice?.demoUrl || currentVoice.demoUrl === "#"
-                    }
-                    className="cursor-pointer gap-2"
-                  >
-                    {playingVoiceId === currentVoice?.id ? (
-                      <Pause className="h-4 w-4" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                    试听声音
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  先听声线，再生成口播试看。最终正式视频将沿用你当前选中的声音。
-                </p>
-              </div>
+              <PreviewStatus
+                preview={preview}
+                previewError={previewError}
+                isHydratingDefaults={isHydratingDefaults}
+                defaultsLoadError={defaultsLoadError}
+                hasLoadedCachedPreview={hasLoadedCachedPreview}
+                hasPreviewConfigChanged={hasPreviewConfigChanged}
+                showBackgroundHint={showBackgroundHint}
+                videoRef={videoRef}
+                onReloadDefaults={() => setDefaultsLoadVersion((value) => value + 1)}
+              />
 
-              {previewError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {previewError}
-                </div>
-              )}
-
-              {isHydratingDefaults && !preview && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                  正在读取你上次生成过的试看配置...
-                </div>
-              )}
-
-              {defaultsLoadError && !preview && (
-                <div className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-                  <span>{defaultsLoadError}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDefaultsLoadVersion((value) => value + 1)}
-                    className="cursor-pointer text-amber-900 hover:text-amber-900"
-                  >
-                    重新加载上次试看
-                  </Button>
-                </div>
-              )}
-
-              {preview?.status === "failed" &&
-                preview.errorMessage &&
-                !previewError && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {preview.errorMessage}
-                  </div>
-                )}
-
-              {hasLoadedCachedPreview && !hasPreviewConfigChanged && (
-                <div className="flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between">
-                  <span>
-                    已直接载入你上次生成过的试看，点左侧播放即可查看。
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      videoRef.current?.play().catch(() => {});
-                    }}
-                    className="cursor-pointer text-emerald-900 hover:text-emerald-900"
-                  >
-                    播放上次试看
-                  </Button>
-                </div>
-              )}
-
-              {preview?.status === "processing" && showBackgroundHint && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  后台会继续生成，关闭弹窗不会中断处理。你稍后再回来时，如果结果已经完成，会自动直接显示。
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center">
-                <Button
-                  type="button"
-                  onClick={handleGeneratePreview}
-                  disabled={
-                    !resolvedVoiceId ||
-                    isSubmitting ||
-                    (hasLoadedCachedPreview && !hasPreviewConfigChanged)
-                  }
-                  className="cursor-pointer gap-2"
-                  variant={
-                    hasLoadedCachedPreview && !hasPreviewConfigChanged
-                      ? "outline"
-                      : undefined
-                  }
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {showBackgroundHint ? "后台处理中，可先离开" : "处理中"}
-                    </>
-                  ) : hasLoadedCachedPreview && !hasPreviewConfigChanged ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      已加载上次试看
-                    </>
-                  ) : hasLoadedCachedPreview ? (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      生成新的试看
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      生成口播试看
-                    </>
-                  )}
-                </Button>
-                {onApply && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onApply}
-                    className="cursor-pointer gap-2"
-                  >
-                    <Check className="h-4 w-4" />
-                    {applyLabel ?? "选用这个数字人"}
-                  </Button>
-                )}
-                {preview?.status === "processing" && showBackgroundHint && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onOpenChange(false)}
-                    className="cursor-pointer"
-                  >
-                    先去选别的数字人
-                  </Button>
-                )}
-              </div>
-
-              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Volume2 className="h-3.5 w-3.5" />
-                  <span>
-                    这不是正式出片，只是帮你确认“这张脸 + 这条声线 +
-                    这句文案”是否匹配。
-                  </span>
-                </div>
-              </div>
+              <PreviewActions
+                preview={preview}
+                isSubmitting={isSubmitting}
+                hasLoadedCachedPreview={hasLoadedCachedPreview}
+                hasPreviewConfigChanged={hasPreviewConfigChanged}
+                resolvedVoiceId={resolvedVoiceId}
+                showBackgroundHint={showBackgroundHint}
+                applyLabel={applyLabel}
+                onGenerate={handleGeneratePreview}
+                onApply={onApply}
+                onClose={() => onOpenChange(false)}
+              />
             </div>
           </div>
         )}
