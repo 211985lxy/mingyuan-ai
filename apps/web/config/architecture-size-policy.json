@@ -9,7 +9,6 @@
     { "path": "src/app/(dashboard)/assets/page.tsx", "maxLines": 1824, "target": "features/assets" },
     { "path": "src/app/admin/knowledge/page.tsx", "maxLines": 1816, "target": "features/knowledge" },
     { "path": "src/lib/aim-agent-handlers.ts", "maxLines": 1649, "target": "lib/aim-agents" },
-    { "path": "src/app/api/packaging-material-suggestions/route.ts", "maxLines": 1298, "target": "features/packaging" },
     { "path": "src/app/(dashboard)/topic-planning/page.tsx", "maxLines": 1248, "target": "features/topics" },
     { "path": "src/app/(dashboard)/competitor/page.tsx", "maxLines": 1105, "target": "features/competitor" },
     { "path": "src/app/(dashboard)/videos/[id]/page.tsx", "maxLines": 936, "target": "features/videos" },
