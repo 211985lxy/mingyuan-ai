@@ -204,6 +204,7 @@ export default function TopicPlanningPage() {
   const router = useRouter()
   const searchParams = useSearchParams() ?? new URLSearchParams()
   const importedDraftKey = useRef("")
+  const topicGenerationInFlightRef = useRef(false)
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState("")
   const [knowledgeEntries, setKnowledgeEntries] = useState<KnowledgeEntry[]>([])
@@ -350,8 +351,10 @@ export default function TopicPlanningPage() {
   useEffect(() => {
     if (!selectedProjectId || knowledgeLoadedProjectId !== selectedProjectId || loadingKnowledge) return
     if (topicCards.length > 0) return // 已有卡片不重复触发
+    if (topicGenerationInFlightRef.current) return
 
     let cancelled = false
+    topicGenerationInFlightRef.current = true
     startTransition(() => setAutoGenerating(true))
 
     getTodayTopics("daily")
@@ -396,6 +399,7 @@ export default function TopicPlanningPage() {
         setAutoGenerateError(err instanceof Error ? err.message : "每日选题日报自动生成失败")
       })
       .finally(() => {
+        topicGenerationInFlightRef.current = false
         if (!cancelled) setAutoGenerating(false)
       })
 
@@ -498,6 +502,11 @@ export default function TopicPlanningPage() {
       toast.error("先选择一个 IP 营销全案")
       return
     }
+    if (topicGenerationInFlightRef.current) {
+      toast.info("今日选题正在生成，请等待当前结果")
+      return
+    }
+    topicGenerationInFlightRef.current = true
     setIsGenerating(true)
     try {
       const result = await generateTopics({
@@ -523,6 +532,7 @@ export default function TopicPlanningPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "选题生成失败")
     } finally {
+      topicGenerationInFlightRef.current = false
       setIsGenerating(false)
     }
   }
@@ -675,10 +685,10 @@ export default function TopicPlanningPage() {
                   <Button
                     variant="outline"
                     onClick={handleGenerateTopics}
-                    disabled={!selectedProjectId || isGenerating}
+                    disabled={!selectedProjectId || isGenerating || autoGenerating}
                   >
                     <Sparkles className="mr-1 h-4 w-4" />
-                    {isGenerating ? "生成中..." : topicCards.length > 0 ? "重新生成" : `生成${MODE_META[recommendationMode].label}`}
+                    {isGenerating || autoGenerating ? "生成中..." : topicCards.length > 0 ? "重新生成" : `生成${MODE_META[recommendationMode].label}`}
                   </Button>
                 </div>
               </AiResultPanel>

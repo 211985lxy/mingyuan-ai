@@ -729,6 +729,10 @@ export async function getPexelsMedia(pexelsId: number, provider: "pexels" | "pix
 
 // ─── Topic Engine (v5.0) ─────────────────────────────────
 
+// Topic generation may wait for a primary provider timeout before the fallback
+// finishes. Keep the browser request alive long enough to receive that result.
+export const TOPIC_GENERATE_TIMEOUT_MS = 180000
+
 export async function generateTopics(
   input?: {
     projectId?: string
@@ -749,7 +753,7 @@ export async function generateTopics(
     {
       method: "POST",
       body: JSON.stringify(body),
-      timeout: 60000,
+      timeout: TOPIC_GENERATE_TIMEOUT_MS,
     }
   )
   return payload.data
