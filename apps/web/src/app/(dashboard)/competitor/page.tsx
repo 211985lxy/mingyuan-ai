@@ -173,6 +173,13 @@ function refreshStatusBadge(account: WatchAccount) {
   return <Badge variant="outline">待刷新</Badge>
 }
 
+function refreshStatusText(account: WatchAccount) {
+  if (account.refreshStatus === "refreshing") return "刷新中"
+  if (account.refreshStatus === "failed") return "刷新失败"
+  if (account.refreshStatus === "success") return "已刷新"
+  return "待刷新"
+}
+
 // ─── Main Page ─────────────────────────────────────────
 
 export default function CompetitorWatchPage() {
@@ -193,7 +200,6 @@ export default function CompetitorWatchPage() {
   const [reportsLoading, setReportsLoading] = useState(true)
   const [recommendations, setRecommendations] = useState<WatchVideoRecommendation[]>([])
   const [recommendationsLoading, setRecommendationsLoading] = useState(false)
-  const [discoverUrl, setDiscoverUrl] = useState("")
   const [discovering, setDiscovering] = useState(false)
   const [discoveryAttempted, setDiscoveryAttempted] = useState(false)
   const [peerAccounts, setPeerAccounts] = useState<SimilarAccount[]>([])
@@ -323,9 +329,12 @@ export default function CompetitorWatchPage() {
     }
   }
 
-  async function handleDiscoverSimilar() {
-    const trimmed = discoverUrl.trim()
-    if (!trimmed) return
+  async function handleDiscoverSimilar(targetUrl: string) {
+    const trimmed = targetUrl.trim()
+    if (!trimmed) {
+      toast.error("先选择一个已监控账号")
+      return
+    }
 
     if (!isSupportedUrl(trimmed)) {
       toast.error("第一版暂时只支持抖音主页链接")
@@ -356,9 +365,9 @@ export default function CompetitorWatchPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         const msg = err.details ? String((err.details as Record<string, unknown>).error || "") : ""
-        toast.error(msg || err.message)
+        toast.error(msg || "当前账号暂时无法自动扩展同赛道，监控和作品池不受影响")
       } else {
-        toast.error(err instanceof Error ? err.message : "发现对标账号失败")
+        toast.error("当前账号暂时无法自动扩展同赛道，监控和作品池不受影响")
       }
     } finally {
       setDiscovering(false)
@@ -901,43 +910,64 @@ export default function CompetitorWatchPage() {
       </div>
 
           <AiResultPanel
-            title="发现对标账号"
+            title="监控对标"
             icon={<Search className="h-4 w-4 text-primary" />}
-            meta={<span>粘贴一个抖音账号主页，找同赛道可参考账号</span>}
+            meta={<span>先监控账号并刷新作品池；自动扩展同赛道是可选增强</span>}
             flat
           >
-            <div className="flex gap-3">
-              <Input
-                placeholder="https://www.douyin.com/user/..."
-                value={discoverUrl}
-                onChange={(e) => setDiscoverUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleDiscoverSimilar()}
-                disabled={discovering}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleDiscoverSimilar}
-                disabled={discovering || !discoverUrl.trim()}
-              >
-                {discovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {discovering ? "发现中..." : "发现对标"}
-              </Button>
-            </div>
-            {discovering ? (
-              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-36 rounded-lg" />
-                ))}
-              </div>
-            ) : discoveryAttempted && peerAccounts.length + leaderAccounts.length === 0 ? (
-              <p className="mt-3 rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-                暂未找到可用对标账号，可以换一个更明确的赛道账号
-              </p>
+            {activeAccount ? (
+              <>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select
+                    value={activeAccount.id}
+                    onChange={(event) => setActiveAccountId(event.target.value)}
+                    disabled={discovering}
+                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>{formatAccountName(account)}</option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleRefreshOne(activeAccount.id)}
+                    disabled={Boolean(refreshingId) || activeAccount.refreshStatus === "refreshing"}
+                  >
+                    {refreshingId === activeAccount.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    刷新作品池
+                  </Button>
+                  <Button
+                    onClick={() => void handleDiscoverSimilar(activeAccount.targetUrl)}
+                    disabled={discovering || activeAccount.refreshStatus === "refreshing"}
+                  >
+                    {discovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    {discovering ? "扩展中..." : "扩展同赛道"}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  当前监控：{formatAccountName(activeAccount)} · {refreshStatusText(activeAccount)} · 最近刷新 {formatRelativeTime(activeAccount.lastRefreshedAt)}
+                </p>
+                {discovering ? (
+                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-36 rounded-lg" />
+                    ))}
+                  </div>
+                ) : discoveryAttempted && peerAccounts.length + leaderAccounts.length === 0 ? (
+                  <p className="mt-3 rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+                    当前账号没有可用的自动扩展结果。监控作品池仍可正常刷新；需要加入新账号时，请在下方粘贴抖音主页链接。
+                  </p>
+                ) : (
+                  <div className="mt-4 space-y-5">
+                    {renderDiscoveredGroup("近身对标账号", "适合直接学习选题、钩子、表达方式", peerAccounts)}
+                    {renderDiscoveredGroup("头部标杆账号", "适合观察赛道天花板和成熟账号结构", leaderAccounts)}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="mt-4 space-y-5">
-                {renderDiscoveredGroup("近身对标账号", "适合直接学习选题、钩子、表达方式", peerAccounts)}
-                {renderDiscoveredGroup("头部标杆账号", "适合观察赛道天花板和成熟账号结构", leaderAccounts)}
-              </div>
+              <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+                先在下方添加一个抖音主页链接，再刷新作品池。这里不支持直接输入账号名称。
+              </p>
             )}
           </AiResultPanel>
 
