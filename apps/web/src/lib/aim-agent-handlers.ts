@@ -57,113 +57,27 @@ import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 export type { AimAgentId }
 export { benchmarkCopyReuseRatio, extractBenchmarkOriginalCopy, isBenchmarkCopyTooSimilar }
 
-export interface AimChatParams {
-  userId: string
-  projectId?: string
-  messages: any[]
-  knowledgeBlock: string
-  conversationBlock: string
-  methodologyBlock: string
-  businessDiagnosisBlock: string
-  /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
-  ipWikiBlock: string
-  conversationIntent?: AimConversationIntent
-  runtimeTask?: AimRuntimeTask
-  modelPolicy?: AimModelPolicy
-  trace?: AimTraceRecorder
-}
-
-export interface AimChatResponse {
-  content: string
-}
-
-export interface AimGenerateContext {
-  userId: string
-  agentId: string
-  projectId?: string
-  rawInput: string
-  targetFormats: ContentFormat[]
-  taskType?: AimTaskType
-  topicTitle?: string
-  topicRationale?: string
-  topicType?: string
-  hotTopic?: string
-  polishInstruction?: string
-  videoCopyExtractionId?: string
-  existingGenerationId?: string
-  topicSelectionId?: string
-  selectedTopicIndex?: number
-  taskSpec?: import("@/lib/task-spec").TaskSpec
-  runtimeTask?: AimRuntimeTask
-  modelPolicy?: AimModelPolicy
-  runSpec?: import("@/lib/aim-harness/types").AimRunSpec
-
-  // 共享数据上下文
-  knowledgeBlock: string
-  methodologyBlock: string
-  businessDiagnosisBlock: string
-  viralStructureBlock: string
-  /** 事件内容化方法论（现场/事件复盘类专用，非该类内容时为空串） */
-  eventStorytellingBlock: string
-  /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
-  ipWikiBlock: string
-  retrievedEntries: any[]
-  retrievedSource: string
-  /** 本次实际生效的知识调用策略（解析后回传，供 UI 反馈） */
-  knowledgeStrategy: ResolvedKnowledgeStrategy
-  /** 内容场景模式（由前端或路由层传入，驱动提示块和知识策略差异化） */
-  contentScenario?: ContentScenario
-  trace?: AimTraceRecorder
-  /** Eval-only: use frozen context instead of live DB loaders. */
-  contextOverride?: AimGenerationContextOverride
-  /** Eval-only: execute the production prompt/model path without writing history. */
-  skipPersistence?: boolean
-}
-
-export interface AimGenerationContextOverride {
-  knowledgeBlock: string
-  entries: Array<{
-    id: string
-    title: string
-    content: string
-    category: string
-    tags: unknown
-    valueGrade: string | null
-    score: number
-  }>
-  source: "embedding" | "raw"
-  viralStructureBlock?: string
-  methodologyBlock?: string
-  businessDiagnosisBlock?: string
-  ipWikiBlock?: string
-  eventStorytellingBlock?: string
-}
-
-export interface AimGenerateResponse {
-  id: string
-  results: Array<{
-    format: ContentFormat
-    content: string
-    wordCount: number
-  }>
-  knowledgeUsed: Array<{
-    id: string
-    title: string
-    category: string
-  }>
-  conversationMode?: AimConversationMode
-  /** 本次实际生效的知识调用策略（由 buildAimGeneration 解析后注入，供 UI 反馈） */
-  knowledgeStrategy?: ResolvedKnowledgeStrategy
-  /** 协作认知层产物：风险/模式/事实/缺口/假设（由 buildAimGeneration 注入） */
-  taskSpec?: import("@/lib/task-spec").TaskSpec
-}
-
-export interface AimAgentHandler {
-  agentId: AimAgentId
-  chat(params: AimChatParams): Promise<AimChatResponse>
-  streamChat(params: AimChatParams): AsyncIterable<string>
-  generate(context: AimGenerateContext): Promise<AimGenerateResponse>
-}
+// ── 阶段 3.1：Agent 类型契约抽出到 ./aim/agent-types ──────────────────────────
+// 此前内联在本文件的 AimChatParams / AimChatResponse / AimGenerateContext /
+// AimGenerationContextOverride / AimGenerateResponse / AimAgentHandler，已迁出，
+// 供 agents/ 各模块与编排层共享。这里 import 供本文件内部使用，并 re-export 两个
+// 外部调用方依赖的类型（AimGenerateContext / AimGenerationContextOverride）保持路径不变。
+import type {
+  AimChatParams,
+  AimChatResponse,
+  AimGenerateContext,
+  AimGenerationContextOverride,
+  AimGenerateResponse,
+  AimAgentHandler,
+} from "./aim/agent-types"
+export type {
+  AimChatParams,
+  AimChatResponse,
+  AimGenerateContext,
+  AimGenerationContextOverride,
+  AimGenerateResponse,
+  AimAgentHandler,
+} from "./aim/agent-types"
 
 function buildChatContextBlock(params: {
   knowledgeBlock: string

@@ -1,0 +1,133 @@
+/**
+ * AIM Agent 类型契约（阶段 3.1 从 aim-agent-handlers.ts 抽出）。
+ *
+ * 集中定义智能体接口与上下文/响应类型，作为 agents/ 各模块与编排层的共享类型源。
+ * 此前这些类型内联在 1649 行的 aim-agent-handlers.ts 中；抽出后各 agent 模块可直接
+ * import，不必反向依赖编排层。
+ *
+ * 纯类型，无运行时逻辑。
+ */
+
+import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
+import type {
+  AimConversationIntent,
+  AimConversationMode,
+} from "@/lib/aim-conversation-intent"
+import type {
+  AimRuntimeTask,
+  ResolvedKnowledgeStrategy,
+} from "@/lib/aim-knowledge-strategy"
+import type { AimModelPolicy } from "@/lib/aim-harness/types"
+import type { AimTraceRecorder } from "@/lib/aim-observability"
+import type { ContentScenario } from "@/lib/content-scenario-config"
+import type { TaskSpec } from "@/lib/task-spec"
+import type { AimRunSpec } from "@/lib/aim-harness/types"
+import type { AimAgentId } from "@/lib/aim-harness/contracts"
+
+export interface AimChatParams {
+  userId: string
+  projectId?: string
+  messages: any[]
+  knowledgeBlock: string
+  conversationBlock: string
+  methodologyBlock: string
+  businessDiagnosisBlock: string
+  /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
+  ipWikiBlock: string
+  conversationIntent?: AimConversationIntent
+  runtimeTask?: AimRuntimeTask
+  modelPolicy?: AimModelPolicy
+  trace?: AimTraceRecorder
+}
+
+export interface AimChatResponse {
+  content: string
+}
+
+export interface AimGenerateContext {
+  userId: string
+  agentId: string
+  projectId?: string
+  rawInput: string
+  targetFormats: ContentFormat[]
+  taskType?: AimTaskType
+  topicTitle?: string
+  topicRationale?: string
+  topicType?: string
+  hotTopic?: string
+  polishInstruction?: string
+  videoCopyExtractionId?: string
+  existingGenerationId?: string
+  topicSelectionId?: string
+  selectedTopicIndex?: number
+  taskSpec?: TaskSpec
+  runtimeTask?: AimRuntimeTask
+  modelPolicy?: AimModelPolicy
+  runSpec?: AimRunSpec
+
+  // 共享数据上下文
+  knowledgeBlock: string
+  methodologyBlock: string
+  businessDiagnosisBlock: string
+  viralStructureBlock: string
+  /** 事件内容化方法论（现场/事件复盘类专用，非该类内容时为空串） */
+  eventStorytellingBlock: string
+  /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
+  ipWikiBlock: string
+  retrievedEntries: any[]
+  retrievedSource: string
+  /** 本次实际生效的知识调用策略（解析后回传，供 UI 反馈） */
+  knowledgeStrategy: ResolvedKnowledgeStrategy
+  /** 内容场景模式（由前端或路由层传入，驱动提示块和知识策略差异化） */
+  contentScenario?: ContentScenario
+  trace?: AimTraceRecorder
+  /** Eval-only: use frozen context instead of live DB loaders. */
+  contextOverride?: AimGenerationContextOverride
+  /** Eval-only: execute the production prompt/model path without writing history. */
+  skipPersistence?: boolean
+}
+
+export interface AimGenerationContextOverride {
+  knowledgeBlock: string
+  entries: Array<{
+    id: string
+    title: string
+    content: string
+    category: string
+    tags: unknown
+    valueGrade: string | null
+    score: number
+  }>
+  source: "embedding" | "raw"
+  viralStructureBlock?: string
+  methodologyBlock?: string
+  businessDiagnosisBlock?: string
+  ipWikiBlock?: string
+  eventStorytellingBlock?: string
+}
+
+export interface AimGenerateResponse {
+  id: string
+  results: Array<{
+    format: ContentFormat
+    content: string
+    wordCount: number
+  }>
+  knowledgeUsed: Array<{
+    id: string
+    title: string
+    category: string
+  }>
+  conversationMode?: AimConversationMode
+  /** 本次实际生效的知识调用策略（由 buildAimGeneration 解析后注入，供 UI 反馈） */
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
+  /** 协作认知层产物：风险/模式/事实/缺口/假设（由 buildAimGeneration 注入） */
+  taskSpec?: TaskSpec
+}
+
+export interface AimAgentHandler {
+  agentId: AimAgentId
+  chat(params: AimChatParams): Promise<AimChatResponse>
+  streamChat(params: AimChatParams): AsyncIterable<string>
+  generate(context: AimGenerateContext): Promise<AimGenerateResponse>
+}
