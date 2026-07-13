@@ -1,39 +1,56 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import {
+  AIM_CHAT_PENDING_TEXT,
+  AIM_CHAT_STOPPED_TEXT,
+  buildAimChatFailureText,
+  buildAimGenerationPendingText,
+  canStartAimGeneration,
+} from "@/features/aim/aim-request-state"
 
-const source = readFileSync(join(process.cwd(), "src/app/(dashboard)/aim/page.tsx"), "utf8")
-const apiClientSource = readFileSync(join(process.cwd(), "src/lib/api/client.ts"), "utf8")
+const request = vi.hoisted(() => vi.fn())
+
+vi.mock("@/lib/api/core", () => ({
+  ApiError: class ApiError extends Error {},
+  getApiErrorMessage: vi.fn(),
+  request,
+}))
 
 describe("AIM composer generate button", () => {
-  it("requires current input instead of enabling from old messages", () => {
-    const canGenerateBlock = source.match(/canGenerate=\{\s*([\s\S]*?)\s*\}\s*primaryActionLabel=/)?.[1] ?? ""
+  beforeEach(() => request.mockReset())
 
-    expect(canGenerateBlock).toContain("input.trim().length > 0")
-    expect(canGenerateBlock).not.toContain("messages.some")
+  it("requires current input or an image instead of old messages", () => {
+    const base = {
+      imageCount: 0,
+      projectEnabled: false,
+      projectId: "",
+      uploadingImage: false,
+    }
+
+    expect(canStartAimGeneration({ ...base, text: "" })).toBe(false)
+    expect(canStartAimGeneration({ ...base, text: "写一版" })).toBe(true)
+    expect(canStartAimGeneration({ ...base, text: "", imageCount: 1 })).toBe(true)
   })
 
-  it("shows the user input and generation status before the generation request finishes", () => {
-    const generateBlock = source.match(/async function generateWithInput[\s\S]*?async function handleGenerate/)?.[0] ?? ""
-
-    expect(generateBlock).toContain("setMessages((prev) => [")
-    expect(generateBlock).toContain("正在${agent.primaryActionLabel}")
-    expect(generateBlock.indexOf("setMessages((prev) => [")).toBeLessThan(generateBlock.indexOf("await generateAimContent"))
+  it("builds a visible generation status before the result replaces it", () => {
+    expect(buildAimGenerationPendingText("生成内容")).toBe(
+      "正在生成内容，会先读取项目资料、匹配知识库，再生成交付物…",
+    )
   })
 
-  it("keeps chat request status inside the assistant message", () => {
-    const sendBlock = source.match(/async function sendText[\s\S]*?async function handleEvolveConversation/)?.[0] ?? ""
-
-    expect(sendBlock).toContain("正在思考，会先读取上下文和资料，再给出回复")
-    expect(sendBlock).toContain("已停止本次回复")
-    expect(sendBlock).toContain("对话失败：")
-    expect(source).not.toContain("思考中占位")
-    expect(source).not.toContain("LOADING_MESSAGES")
+  it("keeps chat request status and failure messages in one contract", () => {
+    expect(AIM_CHAT_PENDING_TEXT).toContain("正在思考")
+    expect(AIM_CHAT_STOPPED_TEXT).toBe("已停止本次回复。")
+    expect(buildAimChatFailureText("网络错误")).toBe("对话失败：网络错误")
   })
 
-  it("allows long-running generation requests", () => {
-    const generateClientBlock = apiClientSource.match(/export async function generateAimContent[\s\S]*?\n}/)?.[0] ?? ""
+  it("allows long-running generation requests", async () => {
+    request.mockResolvedValue({ id: "generation-1", results: [], knowledgeUsed: [] })
+    const { generateAimContent } = await import("@/lib/api/aim")
 
-    expect(generateClientBlock).toContain("timeout: 180000")
+    await generateAimContent({ rawInput: "写一版" })
+
+    expect(request).toHaveBeenCalledWith("/api/aim/generate", expect.objectContaining({
+      timeout: 180000,
+    }))
   })
 })

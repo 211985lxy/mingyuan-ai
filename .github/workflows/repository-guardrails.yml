@@ -9,8 +9,33 @@ on:
 
 jobs:
   quality:
-    name: Lint, types, architecture, and harness
+    name: Lint, types, tests, architecture, and harness
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: mingyuan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      TEST_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/mingyuan_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,10 +49,18 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         run: pnpm --dir apps/web exec prisma generate
+      - name: Validate Prisma schema
+        run: pnpm --dir apps/web exec prisma validate
       - name: Lint
         run: pnpm --dir apps/web exec eslint --quiet .
       - name: Typecheck
         run: pnpm --dir apps/web run typecheck
+      - name: Typecheck tests
+        run: pnpm --dir apps/web run typecheck:tests
+      - name: Unit and evaluation tests
+        run: pnpm --dir apps/web test
+      - name: Database E2E tests
+        run: pnpm --dir apps/web run test:e2e
       - name: Environment contract
         run: pnpm --dir apps/web run env:check
       - name: Architecture size guard

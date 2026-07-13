@@ -28,7 +28,7 @@ describe("activation code generation", () => {
   it("defaults beta activation codes to 14 days", async () => {
     createMany.mockResolvedValue({ count: 1 })
 
-    const res = await POST(req({ quantity: 1 }))
+    const res = await POST(req({ quantity: 1 }), { params: Promise.resolve({}) })
     const body = await res.json()
 
     expect(res.status).toBe(200)

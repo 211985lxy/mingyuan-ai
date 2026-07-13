@@ -5,11 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["__tests__/unit/**/*.test.ts", "__tests__/eval/**/*.test.ts"],
-    exclude: ["__tests__/e2e/**"],
-    testTimeout: 10000,
-    hookTimeout: 10000,
-    setupFiles: ["./__tests__/unit/setup-env.ts"],
+    include: ["__tests__/e2e/**/*.test.ts"],
+    testTimeout: 30000,
+    hookTimeout: 30000,
+    globalSetup: ["./__tests__/e2e/global-lifecycle.ts"],
+    setupFiles: ["./__tests__/e2e/global-setup.ts"],
     sequence: { concurrent: false },
     fileParallelism: false,
   },
@@ -17,7 +17,7 @@ export default defineConfig({
     alias: {
       "@/generated/prisma/client": path.resolve(
         __dirname,
-        "src/generated/prisma/client.ts"
+        "src/generated/prisma/client.ts",
       ),
       "@": path.resolve(__dirname, "src"),
     },

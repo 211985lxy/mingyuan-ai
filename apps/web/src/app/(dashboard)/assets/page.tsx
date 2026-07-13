@@ -32,8 +32,8 @@ export default function AssetsPage() {
   }, []);
 
   useEffect(() => {
-    fetchAssets();
-    fetchPublicVoices().then(setPublicVoices);
+    void Promise.resolve().then(fetchAssets);
+    void fetchPublicVoices().then(setPublicVoices);
   }, [fetchAssets]);
 
   return (

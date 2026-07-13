@@ -16,6 +16,11 @@ import {
 } from "@/features/aim/aim-command-utils"
 import type { AimEditorContext, TextSelectionRange } from "@/lib/aim-editor"
 import type { AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
+import {
+  AIM_CHAT_PENDING_TEXT,
+  AIM_CHAT_STOPPED_TEXT,
+  buildAimChatFailureText,
+} from "@/features/aim/aim-request-state"
 
 interface SendTextOptions {
   editorContext?: AimEditorContext
@@ -82,7 +87,7 @@ export function useAimChatActions({
       {
         id: assistantId,
         role: "assistant",
-        content: "正在思考，会先读取上下文和资料，再给出回复…",
+        content: AIM_CHAT_PENDING_TEXT,
         editorApply: options?.editorApplyRange ? { range: options.editorApplyRange } : null,
       },
     ])
@@ -149,7 +154,9 @@ export function useAimChatActions({
       }
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-      const message = stopped ? "已停止本次回复。" : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`
+      const message = stopped
+        ? AIM_CHAT_STOPPED_TEXT
+        : buildAimChatFailureText(error instanceof Error ? error.message : "请稍后重试")
       setMessages((prev) => prev.map((item) =>
         item.id === assistantId
           ? { ...item, content: message, failure: stopped ? null : { kind: "chat", retryText: text } }

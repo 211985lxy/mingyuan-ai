@@ -7,6 +7,7 @@ import { generateAimContent, polishScript, ApiError, type ContentFormat } from "
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { ChatMessage } from "@/features/aim/aim-workbench-types"
+import { buildAimGenerationPendingText } from "@/features/aim/aim-request-state"
 import { nextAimMessageId } from "@/features/aim/aim-id"
 import { buildRawInputFromMessages } from "@/features/aim/aim-command-utils"
 import {
@@ -113,7 +114,7 @@ export function useAimGenerateActions({
       {
         id: assistantMessageId,
         role: "assistant" as const,
-        content: `正在${agent.primaryActionLabel}，会先读取项目资料、匹配知识库，再生成交付物…`,
+        content: buildAimGenerationPendingText(agent.primaryActionLabel),
         agentId: agent.id,
       },
     ])

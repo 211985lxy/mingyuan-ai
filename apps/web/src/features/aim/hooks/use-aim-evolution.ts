@@ -36,7 +36,10 @@ export function useAimEvolution({
     }
 
     setIsEvolving(true)
-    void evolveStyleConversation({ messages: contextMessages })
+    void evolveStyleConversation({
+      messages: contextMessages,
+      projectId: projectEnabled ? selectedProjectId || undefined : undefined,
+    })
       .then((result) => {
         if (result.profile) {
           toast.success(result.created ? "已建立全局写作风格档案" : "全局写作风格档案已更新")
@@ -66,7 +69,10 @@ export function useAimEvolution({
     setIsEvolving(true)
     try {
       const results = await Promise.allSettled([
-        evolveStyleConversation({ messages: sourceMessages }),
+        evolveStyleConversation({
+          messages: sourceMessages,
+          projectId: canEvolveProject ? selectedProjectId : undefined,
+        }),
         canEvolveProject
           ? evolveAimConversation({ projectId: selectedProjectId, messages: sourceMessages })
           : Promise.resolve<AimEvolutionSuggestion[]>([]),

@@ -38,7 +38,15 @@ export function useAimProjectWorkflow(initialProjectId: string) {
   }, [])
 
   useEffect(() => {
-    return refreshProjectWorkflow()
+    let cancelled = false
+    let cleanup: (() => void) | undefined
+    void Promise.resolve().then(() => {
+      if (!cancelled) cleanup = refreshProjectWorkflow()
+    })
+    return () => {
+      cancelled = true
+      cleanup?.()
+    }
   }, [refreshProjectWorkflow])
 
   return {

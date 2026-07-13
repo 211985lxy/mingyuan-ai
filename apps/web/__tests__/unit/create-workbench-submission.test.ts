@@ -19,7 +19,19 @@ function submissionInput() {
     selectedPackagingTemplateId: "packaging_1",
     selectedCopyStructureCode: null,
     fallbackTemplateId: "template_1",
-    packagingTemplates: [{ id: "packaging_1", shanjianId: "style_1", recommendation: null }],
+    packagingTemplates: [{
+      id: "packaging_1",
+      shanjianId: "style_1",
+      name: "测试包装",
+      coverUrl: null,
+      demoUrl: null,
+      scene: "口播",
+      capabilities: [],
+      description: null,
+      sortOrder: 0,
+      status: "published",
+      recommendation: null,
+    }],
     materials: [{ role: "product_detail", type: "image", source: "manual_library", assetId: "asset_1", fileUrl: "https://example.com/a.jpg" }],
     backgroundMusic: null,
     saveScript: vi.fn(async () => {}),
@@ -57,7 +69,7 @@ describe("submitCreateWorkbench", () => {
 
   it("blocks submission when the packaging template has no style id", async () => {
     const input = submissionInput();
-    input.packagingTemplates[0].shanjianId = null;
+    input.packagingTemplates[0].shanjianId = null as unknown as string;
 
     await expect(submitCreateWorkbench(input)).rejects.toThrow("当前视频没有可用的包装 styleId");
     expect(input.saveScript).not.toHaveBeenCalled();

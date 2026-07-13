@@ -3,6 +3,7 @@
 import type { Dispatch, SetStateAction } from "react"
 
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
+import { canStartAimGeneration } from "@/features/aim/aim-request-state"
 import { IpWikiDialog, type IpWikiDialogContext } from "@/app/(dashboard)/aim/ip-wiki-dialog"
 import { BenchmarkEditorPanel, type EditorSelection } from "@/features/aim/components/benchmark-editor-panel"
 import { AimRecordDialog } from "@/features/aim/components/record-dialog"
@@ -260,11 +261,13 @@ export function AimWorkbenchLayout({
             isRecording={isRecording}
             isTranscribing={isTranscribing}
             isGenerating={isGenerating || isUploadingImage}
-            canGenerate={
-              (input.trim().length > 0 || imageAttachments.length > 0) &&
-              (!projectState.projectEnabled || Boolean(selectedProjectId)) &&
-              !isUploadingImage
-            }
+            canGenerate={canStartAimGeneration({
+              text: input,
+              imageCount: imageAttachments.length,
+              projectEnabled: projectState.projectEnabled,
+              projectId: selectedProjectId,
+              uploadingImage: isUploadingImage,
+            })}
             primaryActionLabel={hasEditorSelection ? editorPanelLabels.selectActionLabel : agent.primaryActionLabel}
             onChange={setInput}
             onGenerate={onGenerate}

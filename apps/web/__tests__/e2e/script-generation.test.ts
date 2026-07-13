@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 import jwt from "jsonwebtoken"
 import { PATCH as PATCH_SCRIPT } from "@/app/api/scripts/[id]/route"
 import { POST as GENERATE_SCRIPTS } from "@/app/api/scripts/generate/route"
-import { buildIpProfilePromptSnapshot } from "@/lib/ip-profile"
+import { buildIpProfilePromptSnapshot } from "./ip-profile-fixtures"
 import {
   cleanDatabase,
   cleanRedis,

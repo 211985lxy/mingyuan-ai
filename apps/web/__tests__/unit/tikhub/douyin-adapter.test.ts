@@ -1,14 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DouyinAdapter } from '@/lib/tikhub/adapters/douyin'
 
+const mockEnv = vi.hoisted<Record<string, string | undefined>>(() => ({}))
+
+vi.mock('@/env', () => ({ env: mockEnv }))
+
 describe('DouyinAdapter', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
-    vi.unstubAllEnvs()
+    mockEnv.TIKHUB_API_KEY = undefined
   })
 
   it('resolves sec_user_id when TikHub returns the id as a string', async () => {
-    vi.stubEnv('TIKHUB_API_KEY', 'test-key')
+    mockEnv.TIKHUB_API_KEY = 'test-key'
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       code: 200,
       message: 'ok',

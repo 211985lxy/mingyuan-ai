@@ -12,7 +12,7 @@ import {
 import { POST as REGISTER } from "@/app/api/auth/register/route"
 import { POST as ACTIVATE } from "@/app/api/auth/activate/route"
 import { GET as ME } from "@/app/api/auth/me/route"
-import { GET as IP_PROFILE } from "@/app/api/ip-profile/route"
+import { GET as PROJECTS } from "@/app/api/projects/route"
 import { POST as GENERATE_CODES } from "@/app/api/admin/activation-codes/generate/route"
 
 let admin: { id: string; email: string; role: string }
@@ -54,11 +54,10 @@ describe("Activation Flow E2E", () => {
     expect(registerBody.user.subscriptionStatus).toBe("inactive")
     expect(registerBody.user.expiresAt).toBeNull()
 
-    const protectedRes = await IP_PROFILE(
-      req("/api/ip-profile", {
+    const protectedRes = await PROJECTS(
+      req("/api/projects", {
         headers: { Authorization: `Bearer ${token}` },
-      }),
-      undefined as never
+      })
     )
     expect(protectedRes.status).toBe(403)
 
@@ -133,11 +132,10 @@ describe("Activation Flow E2E", () => {
     expect(diffDays).toBeGreaterThan(29)
     expect(diffDays).toBeLessThan(31)
 
-    const protectedRes = await IP_PROFILE(
-      req("/api/ip-profile", {
+    const protectedRes = await PROJECTS(
+      req("/api/projects", {
         headers: { Authorization: `Bearer ${token}` },
-      }),
-      undefined as never
+      })
     )
     expect(protectedRes.status).toBe(200)
 

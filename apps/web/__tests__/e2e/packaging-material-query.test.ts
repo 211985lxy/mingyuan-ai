@@ -355,7 +355,7 @@ describe("QGEN-01/02/03: LLM query generation quality", { timeout: 120_000 }, ()
       },
     );
 
-    const response = await POST(request);
+    const response = await POST(request, { params: Promise.resolve({}) });
     const body = await response.json();
     return body;
   }

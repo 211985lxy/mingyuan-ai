@@ -108,7 +108,7 @@ describe("lintIpWikiPages", () => {
   it("flags stale aim_generation sources when id not in known set", () => {
     const pages = healthyPages().map((p) =>
       p.id === "p-pos"
-        ? { ...p, sources: [{ kind: "aim_generation", id: "gen-old", label: "定位方案" }] }
+        ? makeRow({ ...p, sources: [{ kind: "aim_generation", id: "gen-old", label: "定位方案" }] })
         : p
     )
     const report = lintIpWikiPages(pages, { existingGenerationIds: new Set(["gen-other"]) })
@@ -120,7 +120,7 @@ describe("lintIpWikiPages", () => {
   it("skips stale_source check when existingGenerationIds is not provided", () => {
     const pages = healthyPages().map((p) =>
       p.id === "p-pos"
-        ? { ...p, sources: [{ kind: "aim_generation", id: "gen-old", label: "定位方案" }] }
+        ? makeRow({ ...p, sources: [{ kind: "aim_generation", id: "gen-old", label: "定位方案" }] })
         : p
     )
     const report = lintIpWikiPages(pages)

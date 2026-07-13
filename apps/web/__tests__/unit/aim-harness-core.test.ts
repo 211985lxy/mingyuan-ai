@@ -100,11 +100,11 @@ describe("aim-harness planner", () => {
       targetFormats: [],
       runtimeTask: "light_edit",
       knowledgeStrategy: "light_edit",
-      conversationMode: "direct_delivery",
+      conversationMode: "local_edit",
     })
     expect(spec.runtimeTask).toBe("light_edit")
     expect(spec.knowledgeStrategy).toBe("light_edit")
-    expect(spec.conversationMode).toBe("direct_delivery")
+    expect(spec.conversationMode).toBe("local_edit")
     expect(spec.contextPolicy.loadKnowledge).toBe(false)
   })
 
