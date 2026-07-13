@@ -4,11 +4,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ASSET_FLOW_CARDS } from "@/features/assets/asset-page-shared";
 
 export function AssetFlowOverview({
-  avatarCount,
   assetCount,
   voiceCount,
 }: {
-  avatarCount: number;
   assetCount: number;
   voiceCount: number;
 }) {
@@ -30,33 +28,10 @@ export function AssetFlowOverview({
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <Badge variant="secondary">已沉淀素材 {assetCount}</Badge>
-          <Badge variant="secondary">数字人 {avatarCount}</Badge>
           <Badge variant="secondary">可用声音 {voiceCount}</Badge>
         </div>
       </CardContent>
     </Card>
-  );
-}
-
-export function AvatarsSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
-        <Skeleton className="h-9 w-28" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="overflow-hidden">
-            <Skeleton className="aspect-square w-full" />
-            <CardContent className="pt-3 space-y-2">
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-1/2" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
   );
 }
 
