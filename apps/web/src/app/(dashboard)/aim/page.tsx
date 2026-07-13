@@ -27,7 +27,6 @@ import type {
   AimImageAttachment,
   ChatMessage,
   RecordDialogMode,
-  RecordDialogState,
 } from "@/features/aim/aim-workbench-types"
 import {
   generateAimContent,
@@ -44,14 +43,10 @@ import {
   ApiError,
   recordAimRunEvent,
   updateAimWorkflowStatus,
-  upsertContentOutcome,
-  type AimCalibrationRule,
-  type AimDecisionSnapshot,
   type AimEvolutionSuggestion,
   type AimGenerateResponse,
   type AimGeneration,
   type AimChatContent,
-  type AimRetroSnapshot,
   type ContentFormat,
 } from "@/lib/api/client"
 import {
@@ -105,6 +100,7 @@ import {
   getHistoryContents,
 } from "@/features/aim/aim-text-utils"
 import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-workflow"
+import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -185,29 +181,6 @@ export default function AimPage() {
     open: false,
     context: null,
   })
-  const [recordDialog, setRecordDialog] = useState<RecordDialogState | null>(null)
-  const [decisionForm, setDecisionForm] = useState<AimDecisionSnapshot>({
-    summary: "",
-    targetUser: "",
-    expectedSignal: "",
-    confidence: "",
-  })
-  const [publishForm, setPublishForm] = useState({
-    publishPlatform: "抖音",
-    publishUrl: "",
-  })
-  const [retroForm, setRetroForm] = useState<AimRetroSnapshot>({
-    summary: "",
-    actualData: "",
-    verdict: "",
-    nextRule: "",
-  })
-  const [outcomeForm, setOutcomeForm] = useState<Record<string, string>>({})
-  const [outcomeWindow, setOutcomeWindow] = useState<"7" | "14" | "30">("7")
-  const [retroRuleForm, setRetroRuleForm] = useState<AimCalibrationRule>({
-    rule: "",
-    source: "内容复盘",
-  })
   const [workflowBrief, setWorkflowBrief] = useState<{
     sourceGenerationId?: string
     nextInput: string
@@ -228,6 +201,31 @@ export default function AimPage() {
   const refreshHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const clearLoadTarget = useAimWorkspaceStore((s) => s.clearLoadTarget)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
+
+  const {
+    recordDialog,
+    setRecordDialog,
+    decisionForm,
+    setDecisionForm,
+    publishForm,
+    setPublishForm,
+    retroForm,
+    setRetroForm,
+    outcomeForm,
+    setOutcomeForm,
+    outcomeWindow,
+    setOutcomeWindow,
+    retroRuleForm,
+    setRetroRuleForm,
+    openRecordDialog,
+    handleSubmitRecordDialog,
+  } = useAimRecordDialog({
+    messages,
+    selectedAgentId,
+    selectedProjectId,
+    refreshHistory,
+    refreshProjectWorkflow,
+  })
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const requestAbortRef = useRef<AbortController | null>(null)
@@ -1526,126 +1524,6 @@ export default function AimPage() {
     },
     [messages, refreshHistory, selectedAgentId],
   )
-
-  const openRecordDialog = useCallback((msgId: string, mode: RecordDialogMode) => {
-    const base = messages.find((m) => m.id === msgId)?.deliverables
-    if (!base?.id || base.id.startsWith("polish-")) {
-      toast.error("只有已保存的内容才能记录")
-      return
-    }
-
-    if (mode === "decision") {
-      const spec = base.taskSpec
-      setDecisionForm({
-        summary: spec?.realProblem || spec?.goal || "",
-        targetUser: spec?.targetCustomer || "",
-        expectedSignal: spec?.desiredAction || "",
-        confidence: spec?.riskLevel === "high" ? "低" : spec?.riskLevel === "medium" ? "中" : "高",
-      })
-    } else if (mode === "publish") {
-      setPublishForm({
-        publishPlatform: "抖音",
-        publishUrl: "",
-      })
-    } else {
-      setRetroForm({
-        summary: "",
-        actualData: "",
-        verdict: "",
-        nextRule: "",
-      })
-      setRetroRuleForm({
-        rule: "",
-        source: "内容复盘",
-      })
-      setOutcomeForm({})
-      setOutcomeWindow("7")
-    }
-
-    setRecordDialog({ mode, generationId: base.id })
-  }, [messages])
-
-  const handleSubmitRecordDialog = useCallback(async () => {
-    if (!recordDialog) return
-
-    try {
-      if (recordDialog.mode === "decision") {
-        if (!decisionForm.summary.trim()) {
-          toast.error("先写清楚为什么值得发")
-          return
-        }
-        await updateAimWorkflowStatus(recordDialog.generationId, {
-          decisionSnapshot: {
-            summary: decisionForm.summary.trim(),
-            targetUser: decisionForm.targetUser?.trim(),
-            expectedSignal: decisionForm.expectedSignal?.trim(),
-            confidence: decisionForm.confidence?.trim(),
-          },
-        })
-        toast.success("已记下发布前判断")
-      } else if (recordDialog.mode === "publish") {
-        await updateAimWorkflowStatus(recordDialog.generationId, {
-          workflowStatus: "published",
-          publishPlatform: publishForm.publishPlatform.trim() || "抖音",
-          publishUrl: publishForm.publishUrl.trim(),
-        })
-        const publishedMessage = messages.find((message) => message.deliverables?.id === recordDialog.generationId)
-        reportAimRunEvent(publishedMessage?.runId, "accepted", { workflowStatus: "published" })
-        toast.success("已登记发布")
-      } else {
-        if (!retroForm.summary.trim()) {
-          toast.error("先写清楚这次结果怎么判断")
-          return
-        }
-        await updateAimWorkflowStatus(recordDialog.generationId, {
-          retroSnapshot: {
-            summary: retroForm.summary.trim(),
-            actualData: retroForm.actualData?.trim(),
-            verdict: retroForm.verdict?.trim(),
-            nextRule: retroForm.nextRule?.trim(),
-          },
-          calibrationRule: retroRuleForm.rule.trim()
-            ? {
-                rule: retroRuleForm.rule.trim(),
-                source: retroRuleForm.source?.trim() || "内容复盘",
-              }
-            : undefined,
-        })
-        const hasOutcome = Object.values(outcomeForm).some((v) => v && v.trim())
-        if (hasOutcome) {
-          const num = (key: string) => {
-            const raw = outcomeForm[key]
-            if (!raw || !raw.trim()) return null
-            const n = Number(raw)
-            return Number.isFinite(n) ? n : null
-          }
-          await upsertContentOutcome(recordDialog.generationId, {
-            collectWindowDay: Number(outcomeWindow) as 7 | 14 | 30,
-            platform: publishForm.publishPlatform.trim() || undefined,
-            dmCount: num("dmCount"),
-            qualifiedLeadCount: num("qualifiedLeadCount"),
-            appointmentCount: num("appointmentCount"),
-            dealCount: num("dealCount"),
-            revenue: num("revenue"),
-            views: num("views"),
-            saves: num("saves"),
-            comments: num("comments"),
-            shares: num("shares"),
-            audienceFeedback: outcomeForm.audienceFeedback?.trim() || undefined,
-          }).catch((e) => {
-            console.error("[retro] outcome save failed (non-blocking)", e)
-          })
-        }
-        toast.success("已保存复盘")
-      }
-
-      setRecordDialog(null)
-      refreshHistory({ force: true, agentId: selectedAgentId })
-      refreshProjectWorkflow()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "保存失败")
-    }
-  }, [decisionForm, messages, outcomeForm, outcomeWindow, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
 
   function confirmWorkflowBrief() {
     const next = workflowBrief
