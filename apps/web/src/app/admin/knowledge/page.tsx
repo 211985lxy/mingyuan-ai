@@ -43,13 +43,16 @@ import {
   knowledgeCleanupLabel,
   parseKnowledgeTags,
 } from "@/lib/knowledge-tags"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { KnowledgeMap } from "@/components/admin/knowledge-map"
 import {
   KnowledgeBrowser,
   type KnowledgeEntry as BrowserKnowledgeEntry,
   type AdminProject as BrowserAdminProject,
 } from "@/components/admin/knowledge-browser"
+import {
+  KnowledgeDetailDialog,
+  KnowledgeDistillDialog,
+} from "@/features/knowledge/components/knowledge-review-dialogs"
 import {
   CATEGORY_LABELS,
   JIEKOU_PROVIDER_MODELS,
@@ -1144,115 +1147,13 @@ export default function AdminKnowledgePage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!detailEntry} onOpenChange={(open) => !open && setDetailEntry(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{detailEntry?.title ?? "知识详情"}</DialogTitle>
-            <DialogDescription>
-              {detailEntry?.project?.name ?? "全局/未绑定"} · {detailEntry?.user?.email ?? "未知用户"}
-            </DialogDescription>
-          </DialogHeader>
-          {detailEntry && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{CATEGORY_LABELS[detailEntry.category] || detailEntry.category}</Badge>
-                <Badge variant="outline">{SOURCE_TYPE_LABELS[detailEntry.sourceType] || detailEntry.sourceType}</Badge>
-                <Badge variant={detailEntry.status === "active" ? "default" : "secondary"}>
-                  {detailEntry.status === "active" ? "生效" : "已归档"}
-                </Badge>
-                {detailEntry.valueGrade ? <Badge variant="outline">{detailEntry.valueGrade}</Badge> : null}
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <MarkdownRenderer content={detailEntry.content} />
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 知识蒸馏结果弹窗 */}
-      <Dialog open={distillDialogOpen} onOpenChange={setDistillDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              知识蒸馏分析
-            </DialogTitle>
-            <DialogDescription>
-              基于 DeepSeek 对选中知识的优化建议
-            </DialogDescription>
-          </DialogHeader>
-
-          {distilling ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">正在分析知识条目...</p>
-            </div>
-          ) : distillResult ? (
-            <div className="space-y-6">
-              {/* 精炼建议 */}
-              <div>
-                <h3 className="font-semibold mb-3">精炼建议</h3>
-                <div className="space-y-3">
-                  {distillResult.distilled.map((item, i) => (
-                    <Card key={i}>
-                      <CardContent className="p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Badge
-                            variant={
-                              item.action === "keep"
-                                ? "default"
-                                : item.action === "merge"
-                                ? "secondary"
-                                : "outline"
-                            }
-                          >
-                            {item.action === "keep" ? "保留" : item.action === "merge" ? "合并" : "归档"}
-                          </Badge>
-                          <Badge variant="outline">{item.suggestedCategory}</Badge>
-                        </div>
-                        <p className="font-medium">{item.suggestedTitle}</p>
-                        <p className="text-sm text-muted-foreground">{item.suggestedContent}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {item.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px]">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* 重复检测 */}
-              {distillResult.duplicates.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">可能的重复条目</h3>
-                  <div className="space-y-1">
-                    {distillResult.duplicates.map((pair, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">
-                        条目 #{pair[0]} 和 #{pair[1]} 可能重复
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 总体建议 */}
-              <div>
-                <h3 className="font-semibold mb-2">优化建议</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {distillResult.suggestions}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-destructive">分析失败，请重试</p>
-          )}
-        </DialogContent>
-      </Dialog>
+      <KnowledgeDetailDialog entry={detailEntry} onClose={() => setDetailEntry(null)} />
+      <KnowledgeDistillDialog
+        open={distillDialogOpen}
+        loading={distilling}
+        result={distillResult}
+        onOpenChange={setDistillDialogOpen}
+      />
 
       {/* 手动录入弹窗 */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
