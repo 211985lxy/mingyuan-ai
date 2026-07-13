@@ -17,17 +17,13 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/features/aim/components/project-task-panel"
 import { BenchmarkEditorPanel, type EditorSelection } from "@/features/aim/components/benchmark-editor-panel"
-import { DeliverableBubble } from "@/features/aim/components/deliverable-bubble"
-import { ChoiceStepper } from "@/features/aim/components/choice-stepper"
-import { QualityReportCard } from "@/features/aim/components/quality-report-card"
 import { AimRecordDialog } from "@/features/aim/components/record-dialog"
 import { WorkflowBriefDialog } from "@/features/aim/components/workflow-brief-dialog"
-import { extractChoiceGroups } from "@/features/aim/aim-choice-groups"
+import { AimMessageList } from "@/features/aim/components/message-list"
 import { aimDraftStorageKey, loadAimDraft, saveAimDraft } from "@/features/aim/aim-draft-storage"
 import type {
   AimChatToolAction,
@@ -114,7 +110,6 @@ import {
   extractProgress,
   formatAnalysisResultForPrompt,
   getHistoryContents,
-  splitMethodNote,
 } from "@/features/aim/aim-text-utils"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
@@ -1835,181 +1830,37 @@ export default function AimPage() {
 
         {/* 消息流 */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
-          {messages.length === 0 ? (
-            <div className="mx-auto flex w-full max-w-3xl flex-col py-5">
-              {showWorkflowLanding ? (
-                <div>
-                  <p className="mb-3 text-sm font-semibold text-foreground">你今天要推进哪一步？</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {AIM_WORKFLOW_STAGES.map((stage) => (
-                      <button
-                        key={stage.id}
-                        type="button"
-                        className="h-10 rounded-lg border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                        onClick={() => beginWorkflowStage(stage.id)}
-                      >
-                        {stage.id === "direction" ? "想清楚方向" : stage.id === "content" ? "开始做内容" : stage.id === "publish" ? "准备发布" : "复盘沉淀"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="max-w-2xl text-left">
-                  <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agent.intro}</p>
-                  {currentWorkflowStage === "content" && selectedAgentId === "content_producer" && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {AIM_CONTENT_ACTIONS.map((action) => (
-                        <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => beginContentAction(action.id)}>
-                          {action.title}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="mx-auto flex w-full max-w-none flex-col gap-4">
-              {messages.map((m) => (
-                <div key={m.id} data-message-id={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`${m.deliverables ? "w-full max-w-full" : "max-w-[96%]"} ${m.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
-                    <div
-                      className={`leading-relaxed ${
-                        m.role === "user"
-                          ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground"
-                          : "bg-transparent p-0 text-sm sm:text-base text-foreground/90 font-medium"
-                      }`}
-                    >
-                      {m.role === "assistant" ? (
-                        (() => {
-                          const display = splitMethodNote(m.content)
-                          return (
-                            <>
-                              {display.methodNote && (
-                                <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-                                  <summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary>
-                                  <div className="mt-2 border-t border-border/60 pt-2">
-                                    <MarkdownRenderer content={display.methodNote} />
-                                  </div>
-                                </details>
-                              )}
-                              <MarkdownRenderer content={display.result} />
-                            </>
-                          )
-                        })()
-                      ) : (
-                        <>
-                          {m.images?.length ? (
-                            <div className="mb-2 flex max-w-64 flex-wrap gap-2">
-                              {m.images.map((image) => (
-                                <img
-                                  key={image.id}
-                                  src={image.previewUrl}
-                                  alt={image.name}
-                                  className="h-20 w-20 rounded-md border object-cover"
-                                />
-                              ))}
-                            </div>
-                          ) : null}
-                          <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                        </>
-                      )}
-                    </div>
-
-                    {m.role === "assistant" && extractChoiceGroups(m.content).length > 0 && (
-                      <ChoiceStepper
-                        groups={extractChoiceGroups(m.content)}
-                        busy={busy}
-                        onSubmit={(text) => void sendText(text)}
-                      />
-                    )}
-
-                    {m.role === "assistant" && m.failure && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 h-7 px-2 text-xs"
-                        onClick={() => retryFailedMessage(m)}
-                        disabled={busy}
-                      >
-                        <ArrowRight className="mr-1 h-3.5 w-3.5" />
-                        重试本次请求
-                      </Button>
-                    )}
-
-                    {m.role === "assistant" && m.editorApply?.range && extractReplacementDraft(m.content) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 h-7 px-2 text-xs"
-                        onClick={() => applyEditorReplacement(m)}
-                      >
-                        应用到右侧选区
-                      </Button>
-                    )}
-
-                    {/* 交付物气泡 */}
-                    {m.deliverables && (
-                      <div className="w-full mt-2">
-                        <DeliverableBubble
-                          deliverables={m.deliverables}
-                          runId={m.runId}
-                          isCurrentVersion={m.id === latestDeliverableMessageId()}
-                          agentId={isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId}
-                          workflowStage={m.workflowStage}
-                          contentAction={m.contentAction}
-                          nextActions={getAimAgentGuide(isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId).nextActions}
-                          onRepurpose={handleRepurpose(m.id)}
-                          onQuality={handleQuality(m.id)}
-                          onMarkStatus={handleMarkStatus(m.id)}
-                          onNextAction={handleAimNextAction}
-                          isBusy={busy}
-                          onEditResult={(format, content) => openEditorFromResult(m.id, format, content)}
-                          onOpenDecision={() => openRecordDialog(m.id, "decision")}
-                          onOpenPublish={() => openRecordDialog(m.id, "publish")}
-                          onOpenRetro={() => openRecordDialog(m.id, "retro")}
-                          onCompileToWiki={
-                            m.agentId === "business_diagnosis" &&
-                            !!selectedProjectId &&
-                            !!m.deliverables.results.some((r) => r.format === "raw_copy")
-                              ? () => {
-                                  const text =
-                                    m.deliverables!.results.find((r) => r.format === "raw_copy")?.content ?? ""
-                                  setWikiDialog({
-                                    open: true,
-                                    context: {
-                                      projectId: selectedProjectId,
-                                      sourceGenerationId: m.deliverables!.id,
-                                      positioningText: text,
-                                    },
-                                  })
-                                }
-                              : undefined
-                          }
-                        />
-                      </div>
-                    )}
-
-                    {/* aim-harness-v1 执行诊断：仅在降级或质量异常时展示执行编号，不常驻 */}
-                    {m.deliverables && (m.degraded || (m.qualityStatus && m.qualityStatus !== "pass")) && m.runId && (
-                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${m.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>
-                          {m.degraded ? "降级交付" : "质量提示"}
-                        </span>
-                        <span>执行编号 {m.runId}</span>
-                        {m.qualityStatus && m.qualityStatus !== "pass" && (
-                          <span>· 质量 {m.qualityStatus === "warn" ? "待优化" : m.qualityStatus === "fail" ? "未通过" : m.qualityStatus}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {m.qualityReport && <QualityReportCard report={m.qualityReport} />}
-                  </div>
-                </div>
-              ))}
-
-            </div>
-          )}
+          <AimMessageList
+            messages={messages}
+            showWorkflowLanding={showWorkflowLanding}
+            agentIntro={agent.intro}
+            currentWorkflowStage={currentWorkflowStage}
+            selectedAgentId={selectedAgentId}
+            selectedProjectId={selectedProjectId}
+            busy={busy}
+            latestDeliverableMessageId={latestDeliverableMessageId()}
+            onStartStage={beginWorkflowStage}
+            onBeginContentAction={beginContentAction}
+            onSendText={(text) => void sendText(text)}
+            onRetryFailedMessage={retryFailedMessage}
+            onApplyEditorReplacement={applyEditorReplacement}
+            onRepurpose={handleRepurpose}
+            onQuality={handleQuality}
+            onMarkStatus={handleMarkStatus}
+            onNextAction={handleAimNextAction}
+            onEditResult={openEditorFromResult}
+            onOpenRecordDialog={openRecordDialog}
+            onCompileToWiki={(sourceGenerationId, positioningText) => {
+              setWikiDialog({
+                open: true,
+                context: {
+                  projectId: selectedProjectId,
+                  sourceGenerationId,
+                  positioningText,
+                },
+              })
+            }}
+          />
         </div>
 
         {/* 输入区 */}
