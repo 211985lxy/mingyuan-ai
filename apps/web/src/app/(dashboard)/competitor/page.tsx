@@ -3,30 +3,13 @@
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  RefreshCw,
-  Trash2,
-  Plus,
-  Clock,
-  Video,
-  Flame,
-  User,
-  ExternalLink,
-  Target,
-  Loader2,
-  FileText,
-  Bell,
-  Search,
-} from "lucide-react"
+import { Bell, ExternalLink, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
-import { CompetitorVideoCard } from "@/features/competitor/components/competitor-video-card"
-import { DiscoveredAccountGroup } from "@/features/competitor/components/discovered-accounts"
+import { CompetitorAccountWorkspace } from "@/features/competitor/components/competitor-account-workspace"
+import { AddCompetitorPanel, CompetitorMonitorPanel, CompetitorResearchPanel } from "@/features/competitor/components/competitor-input-panels"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api/client"
 import {
@@ -44,44 +27,15 @@ import {
   type SimilarAccount,
 } from "@/lib/api/client"
 import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
-import { buildProxyImageUrl } from "@/lib/proxy-image-client"
 import {
-  accountPageUrl,
-  compactAccountUrl,
-  extractionStatusText,
-  formatAccountName,
-  formatCount,
-  formatDate,
   formatRefreshError,
-  formatRelativeTime,
   isSupportedCompetitorUrl,
-  refreshStatusText,
-  reportStatusLabel,
-  reportTitle,
   videoPageUrl,
   type WatchVideo,
 } from "@/features/competitor/presentation"
 import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
 
-// ─── Helpers ────────────────────────────────────────────
-
 const ACTIVE_EXTRACTION_STATUSES = new Set(["queued", "extracting", "analyzing"])
-
-function proxyAvatarUrl(url: string): string {
-  return buildProxyImageUrl(url)
-}
-
-function refreshStatusBadge(account: WatchAccount) {
-  if (account.refreshStatus === "refreshing")
-    return <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 animate-pulse">刷新中</Badge>
-  if (account.refreshStatus === "failed")
-    return <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">失败</Badge>
-  if (account.refreshStatus === "success")
-    return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">已刷新</Badge>
-  return <Badge variant="outline">待刷新</Badge>
-}
-
-// ─── Main Page ─────────────────────────────────────────
 
 export default function CompetitorWatchPage() {
   const router = useRouter()
@@ -485,440 +439,59 @@ export default function CompetitorWatchPage() {
         </Link>
       </div>
 
-          <AiResultPanel
-            title="监控对标"
-            icon={<Search className="h-4 w-4 text-primary" />}
-            meta={<span>先监控账号并刷新作品池；自动扩展同赛道是可选增强</span>}
-            flat
-          >
-            {activeAccount ? (
-              <>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <select
-                    value={activeAccount.id}
-                    onChange={(event) => setActiveAccountId(event.target.value)}
-                    disabled={discovering}
-                    className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    {accounts.map((account) => (
-                      <option key={account.id} value={account.id}>{formatAccountName(account)}</option>
-                    ))}
-                  </select>
-                  <Button
-                    variant="outline"
-                    onClick={() => void handleRefreshOne(activeAccount.id)}
-                    disabled={Boolean(refreshingId) || activeAccount.refreshStatus === "refreshing"}
-                  >
-                    {refreshingId === activeAccount.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    刷新作品池
-                  </Button>
-                  <Button
-                    onClick={() => void handleDiscoverSimilar(activeAccount.targetUrl)}
-                    disabled={discovering || activeAccount.refreshStatus === "refreshing"}
-                  >
-                    {discovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    {discovering ? "扩展中..." : "扩展同赛道"}
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  当前监控：{formatAccountName(activeAccount)} · {refreshStatusText(activeAccount)} · 最近刷新 {formatRelativeTime(activeAccount.lastRefreshedAt)}
-                </p>
-                {discovering ? (
-                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="h-36 rounded-lg" />
-                    ))}
-                  </div>
-                ) : discoveryAttempted && peerAccounts.length + leaderAccounts.length === 0 ? (
-                  <p className="mt-3 rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-                    当前账号没有可用的自动扩展结果。监控作品池仍可正常刷新；需要加入新账号时，请在下方粘贴抖音主页链接。
-                  </p>
-                ) : (
-                  <div className="mt-4 space-y-5">
-                    <DiscoveredAccountGroup
-                      title="近身对标账号"
-                      description="适合直接学习选题、钩子、表达方式"
-                      items={peerAccounts}
-                      accounts={accounts}
-                      ignoredUrls={ignoredDiscoveryUrls}
-                      adding={adding}
-                      onAdd={handleAddDiscoveredAccount}
-                      onIgnore={(key) => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
-                    />
-                    <DiscoveredAccountGroup
-                      title="头部标杆账号"
-                      description="适合观察赛道天花板和成熟账号结构"
-                      items={leaderAccounts}
-                      accounts={accounts}
-                      ignoredUrls={ignoredDiscoveryUrls}
-                      adding={adding}
-                      onAdd={handleAddDiscoveredAccount}
-                      onIgnore={(key) => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-                先在下方添加一个抖音主页链接，再刷新作品池。这里不支持直接输入账号名称。
-              </p>
-            )}
-          </AiResultPanel>
+          <CompetitorMonitorPanel
+            accounts={accounts}
+            activeAccount={activeAccount}
+            refreshingId={refreshingId}
+            discovering={discovering}
+            discoveryAttempted={discoveryAttempted}
+            peerAccounts={peerAccounts}
+            leaderAccounts={leaderAccounts}
+            ignoredUrls={ignoredDiscoveryUrls}
+            adding={adding}
+            onSelectAccount={setActiveAccountId}
+            onRefresh={handleRefreshOne}
+            onDiscover={handleDiscoverSimilar}
+            onAddDiscovered={handleAddDiscoveredAccount}
+            onIgnore={(key) => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
+          />
 
-          {/* Add Account Card */}
-          <AiResultPanel
-            title="添加监控账号"
-            icon={<Plus className="h-4 w-4 text-primary" />}
-            meta={<span>粘贴优质账号主页链接，添加后可刷新作品池</span>}
-            flat
-          >
-            <div className="flex gap-3">
-              <Input
-                placeholder="https://www.douyin.com/user/..."
-                value={addUrl}
-                onChange={(e) => setAddUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                disabled={adding || accounts.length >= 10}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleAdd}
-                disabled={adding || !addUrl.trim() || accounts.length >= 10}
-              >
-                {adding ? "添加中..." : `添加 (${accounts.length}/10)`}
-              </Button>
-            </div>
-            {accounts.length >= 10 && (
-              <p className="text-xs text-amber-600 mt-2">已达到 10 个账号上限</p>
-            )}
-          </AiResultPanel>
+          <AddCompetitorPanel
+            value={addUrl}
+            adding={adding}
+            accountCount={accounts.length}
+            onChange={setAddUrl}
+            onAdd={handleAdd}
+          />
 
-          <AiResultPanel
-            title="全网补证"
-            icon={<Search className="h-4 w-4 text-primary" />}
-            meta={<span>使用 agent-reach 的公开 web / RSS 路径，先补真实外部线索</span>}
-            flat
-          >
-            <div className="flex flex-col gap-3 lg:flex-row">
-              <Input
-                placeholder={activeAccount ? `例如：${formatAccountName(activeAccount)}` : "例如：供暖行业 老板IP / 某个账号名 / 某个细分主题"}
-                value={researchQuery}
-                onChange={(e) => setResearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void handleWebResearch()}
-                disabled={researchLoading}
-                className="flex-1"
-              />
-              <div className="flex gap-2">
-                {activeAccount ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => setResearchQuery(formatAccountName(activeAccount))}
-                    disabled={researchLoading}
-                  >
-                    带入当前账号
-                  </Button>
-                ) : null}
-                <Button
-                  onClick={() => void handleWebResearch()}
-                  disabled={researchLoading || !researchQuery.trim()}
-                >
-                  {researchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  {researchLoading ? "补证中..." : "开始补证"}
-                </Button>
-              </div>
-            </div>
+          <CompetitorResearchPanel
+            activeAccount={activeAccount}
+            query={researchQuery}
+            loading={researchLoading}
+            result={researchResult}
+            onQueryChange={setResearchQuery}
+            onResearch={handleWebResearch}
+          />
 
-            {researchResult ? (
-              <div className="mt-4 space-y-3">
-                <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                  检索词：{researchResult.query} · 通道：{researchResult.availability.summary}
-                </div>
-                {researchResult.warnings.length > 0 ? (
-                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                    {researchResult.warnings.join("；")}
-                  </p>
-                ) : null}
-                <div className="space-y-2">
-                  {researchResult.items.map((item) => (
-                    <a
-                      key={item.url}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block rounded-lg border p-3 transition-colors hover:bg-muted/30"
-                    >
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">{item.source}</Badge>
-                        {item.publishedAt ? <span>{item.publishedAt}</span> : null}
-                      </div>
-                      <p className="mt-2 text-sm font-semibold text-foreground">{item.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.snippet || "该结果未返回摘要，可直接打开原文查看。"}</p>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-                这里不替你直接下结论，只补公开网页线索。搜到的结果适合反喂给 AI 深度调查和后续选题判断。
-              </p>
-            )}
-          </AiResultPanel>
-
-          {/* Account Cards */}
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="flex-1">
-                        <Skeleton className="h-4 w-28" />
-                        <Skeleton className="h-3 w-20 mt-1" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : sortedAccounts.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-16 text-center">
-                <User className="h-12 w-12 text-muted-foreground mb-4" />
-                <h2 className="text-lg font-semibold">还没有监控账号</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  在上方输入抖音优质账号主页链接开始监控
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Account Pool Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sortedAccounts.map((account) => (
-                  <Card
-                    key={account.id}
-                    className={`group relative overflow-hidden cursor-pointer transition-all border shadow-sm ${
-                      (activeAccountId || (accounts[0] && accounts[0].id)) === account.id
-                        ? "ring-2 ring-primary/60 border-primary bg-primary/[0.01] shadow-xs"
-                        : "hover:border-primary/50 hover:shadow-md"
-                    }`}
-                    onClick={() => setActiveAccountId(account.id)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {account.avatar ? (
-                            <img
-                              src={proxyAvatarUrl(account.avatar)}
-                              alt=""
-                              className="h-10 w-10 rounded-full object-cover shrink-0"
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                              <User className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate">
-                              {formatAccountName(account)}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-xs text-muted-foreground">
-                                {account.followerCount != null
-                                  ? `${formatCount(account.followerCount)} 粉丝`
-                                  : "抖音"}
-                              </span>
-                              {refreshStatusBadge(account)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <a
-                        href={account.targetUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                        title={account.targetUrl}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{compactAccountUrl(account.targetUrl)}</span>
-                      </a>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-2.5 text-xs font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all flex items-center justify-center gap-1.5"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleAnalyze(account.targetUrl)
-                        }}
-                        disabled={analyzingUrl === account.targetUrl}
-                      >
-                        {analyzingUrl === account.targetUrl ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Target className="h-3.5 w-3.5 text-primary" />
-                        )}
-                        {analyzingUrl === account.targetUrl ? "启动分析中..." : "AI 深度调查"}
-                      </Button>
-
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatRelativeTime(account.lastRefreshedAt)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRefreshOne(account.id)
-                            }}
-                            disabled={refreshingId === account.id || account.refreshStatus === "refreshing"}
-                            title="刷新该账号"
-                          >
-                            <RefreshCw className={`h-3.5 w-3.5 ${refreshingId === account.id ? "animate-spin" : ""}`} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            disabled={deletingId === account.id}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDelete(account.id)
-                            }}
-                            title="移除监控"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {account.refreshStatus === "failed" && account.refreshError && (
-                        <p className="mt-2 rounded-md bg-red-50 px-2.5 py-2 text-xs leading-5 text-red-600">
-                          {formatRefreshError(account.refreshError)}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <FileText className="h-4 w-4" />
-                    最近分析报告
-                    <Badge variant="secondary" className="text-xs ml-1">{reports.length}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {reportsLoading ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-14 rounded-lg" />
-                      ))}
-                    </div>
-                  ) : reports.length === 0 ? (
-                    <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-                      当前账号还没有分析报告。点击该账号的 AI 深度调查后会出现在这里。
-                    </p>
-                  ) : (
-                    <div className="divide-y rounded-lg border">
-                      {reports.map((report) => (
-                        <Link
-                          key={report.id}
-                          href={`/competitor/${report.id}`}
-                          className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/50"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{reportTitle(report)}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              分析于 {formatDate(report.completedAt ?? report.createdAt)}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {report.overallScore != null ? (
-                              <span className="text-sm font-semibold">{Math.round(report.overallScore)}分</span>
-                            ) : null}
-                            <Badge variant={report.status === "failed" ? "destructive" : "secondary"}>
-                              {reportStatusLabel(report.status)}
-                            </Badge>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Latest Videos Section */}
-              {activeLatestVideos.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Video className="h-4 w-4" />
-                      最新作品
-                      <Badge variant="secondary" className="text-xs ml-1">{activeLatestVideos.length}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {activeLatestVideos.map((video) => {
-                        const key = `${video.account.id}-${video.videoId}`
-                        return (
-                          <CompetitorVideoCard
-                            key={key}
-                            video={video}
-                            extraction={videoExtractions[key]}
-                            extractingVideoId={extractingVideoId}
-                            onExtract={handleExtractVideo}
-                          />
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Viral Videos Section */}
-              {activeViralVideos.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Flame className="h-4 w-4 text-orange-500" />
-                      爆款作品
-                      <Badge variant="secondary" className="text-xs ml-1">{activeViralVideos.length}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {activeViralVideos.map((video, index) => {
-                        const key = `${video.account.id}-${video.videoId}`
-                        return (
-                          <CompetitorVideoCard
-                            key={`viral-${key}`}
-                            video={video}
-                            extraction={videoExtractions[key]}
-                            extractingVideoId={extractingVideoId}
-                            viral
-                            rank={index + 1}
-                            onExtract={handleExtractVideo}
-                          />
-                        )
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
+          <CompetitorAccountWorkspace
+            loading={loading}
+            accounts={sortedAccounts}
+            activeAccountId={activeAccountId || accounts[0]?.id || null}
+            analyzingUrl={analyzingUrl}
+            refreshingId={refreshingId}
+            deletingId={deletingId}
+            reports={reports}
+            reportsLoading={reportsLoading}
+            latestVideos={activeLatestVideos}
+            viralVideos={activeViralVideos}
+            videoExtractions={videoExtractions}
+            extractingVideoId={extractingVideoId}
+            onSelectAccount={setActiveAccountId}
+            onAnalyze={handleAnalyze}
+            onRefresh={handleRefreshOne}
+            onDelete={handleDelete}
+            onExtract={handleExtractVideo}
+          />
     </div>
   )
 }
