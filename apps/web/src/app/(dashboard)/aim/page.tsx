@@ -36,6 +36,15 @@ import { BenchmarkEditorPanel, type EditorSelection } from "@/features/aim/compo
 import { DeliverableBubble } from "@/features/aim/components/deliverable-bubble"
 import { ChoiceStepper } from "@/features/aim/components/choice-stepper"
 import { extractChoiceGroups } from "@/features/aim/aim-choice-groups"
+import { aimDraftStorageKey, loadAimDraft, saveAimDraft } from "@/features/aim/aim-draft-storage"
+import type {
+  AimChatToolAction,
+  AimDraft,
+  AimImageAttachment,
+  ChatMessage,
+  RecordDialogMode,
+  RecordDialogState,
+} from "@/features/aim/aim-workbench-types"
 import {
   generateAimContent,
   getVideoCopyExtraction,
@@ -59,12 +68,10 @@ import {
   type AimEvolutionSuggestion,
   type AimGenerateResponse,
   type AimGeneration,
-  type AimChatToolAction,
   type AimChatContent,
   type AimRetroSnapshot,
   type ClientProject,
   type ContentFormat,
-  type QualityCheckReport,
 } from "@/lib/api/client"
 import {
   AIM_CONTENT_ACTIONS,
@@ -102,7 +109,6 @@ import {
   EDITOR_PANEL_DEFAULT_WIDTH,
   applyFirstMatchingStructureToReference,
   applySelectionReplacement,
-  clampEditorPanelWidth,
   extractEditorDraftFromAssistantText,
   extractReplacementDraft,
   type AimEditorContext,
@@ -177,112 +183,6 @@ let _seq = 0
 function nextId(prefix = "m") {
   _seq += 1
   return `${prefix}-${Date.now()}-${_seq}`
-}
-
-interface ChatMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  images?: AimImageAttachment[]
-  agentId?: string | null
-  deliverables?: AimGenerateResponse | null
-  qualityReport?: QualityCheckReport | null
-  editorApply?: { range: TextSelectionRange } | null
-  // aim-harness-v1: 执行诊断，仅在结果详情/低分/降级时向用户展示执行编号
-  runId?: string | null
-  degraded?: boolean | null
-  qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
-  workflowStage?: AimWorkflowStage
-  contentAction?: AimContentAction | null
-  failure?: { kind: "chat" | "generate"; retryText: string } | null
-}
-
-interface AimImageAttachment {
-  id: string
-  name: string
-  assetUrl: string
-  readUrl: string
-  previewUrl: string
-}
-
-type RecordDialogMode = "decision" | "publish" | "retro"
-
-interface RecordDialogState {
-  mode: RecordDialogMode
-  generationId: string
-}
-
-const AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v2"
-
-interface AimDraft {
-  selectedAgentId: AimAgentId
-  selectedProjectId: string
-  input: string
-  messages: ChatMessage[]
-  videoCopyExtractionId?: string
-  sourceOriginalText?: string
-  sourceAnalysisText?: string
-  sourceTopicTitle?: string
-  sourceTopicRationale?: string
-  editorText?: string
-  editorFormat?: ContentFormat
-  editorSourceMessageId?: string
-  editorPanelWidth?: number
-  editorPanelOpen?: boolean
-}
-
-function aimDraftStorageKey(agentId: AimAgentId) {
-  return `${AIM_DRAFT_STORAGE_KEY_PREFIX}:${agentId}`
-}
-
-function loadAimDraft(agentId: AimAgentId): AimDraft | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.sessionStorage.getItem(aimDraftStorageKey(agentId))
-    if (!raw) return null
-    const draft = JSON.parse(raw) as Partial<AimDraft>
-    if (!isValidAimAgent(draft.selectedAgentId) || !Array.isArray(draft.messages)) return null
-    return {
-      selectedAgentId: draft.selectedAgentId,
-      selectedProjectId: typeof draft.selectedProjectId === "string" ? draft.selectedProjectId : "",
-      input: typeof draft.input === "string" ? draft.input : "",
-      messages: draft.messages,
-      videoCopyExtractionId: typeof draft.videoCopyExtractionId === "string" ? draft.videoCopyExtractionId : undefined,
-      sourceOriginalText: typeof draft.sourceOriginalText === "string" ? draft.sourceOriginalText : undefined,
-      sourceAnalysisText: typeof draft.sourceAnalysisText === "string" ? draft.sourceAnalysisText : undefined,
-      sourceTopicTitle: typeof draft.sourceTopicTitle === "string" ? draft.sourceTopicTitle : undefined,
-      sourceTopicRationale: typeof draft.sourceTopicRationale === "string" ? draft.sourceTopicRationale : undefined,
-      editorText: typeof draft.editorText === "string" ? draft.editorText : undefined,
-      editorFormat: typeof draft.editorFormat === "string" ? draft.editorFormat as ContentFormat : undefined,
-      editorSourceMessageId: typeof draft.editorSourceMessageId === "string" ? draft.editorSourceMessageId : undefined,
-      editorPanelWidth: typeof draft.editorPanelWidth === "number" ? clampEditorPanelWidth(draft.editorPanelWidth) : undefined,
-      editorPanelOpen: typeof draft.editorPanelOpen === "boolean" ? draft.editorPanelOpen : undefined,
-    }
-  } catch {
-    return null
-  }
-}
-
-function saveAimDraft(draft: AimDraft) {
-  if (typeof window === "undefined") return
-  try {
-    const storageKey = aimDraftStorageKey(draft.selectedAgentId)
-    if (
-      !draft.input.trim()
-      && draft.messages.length === 0
-      && !draft.editorText?.trim()
-      && !draft.sourceOriginalText?.trim()
-      && !draft.sourceAnalysisText?.trim()
-      && !draft.sourceTopicTitle?.trim()
-      && !draft.sourceTopicRationale?.trim()
-    ) {
-      window.sessionStorage.removeItem(storageKey)
-      return
-    }
-    window.sessionStorage.setItem(storageKey, JSON.stringify(draft))
-  } catch {
-    // ponytail: losing a browser draft is better than breaking the editor.
-  }
 }
 
 function formatAnalysisResultForPrompt(analysisResult: unknown) {
