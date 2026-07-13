@@ -34,6 +34,8 @@ import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/features/aim/components/project-task-panel"
 import { BenchmarkEditorPanel, type EditorSelection } from "@/features/aim/components/benchmark-editor-panel"
 import { DeliverableBubble } from "@/features/aim/components/deliverable-bubble"
+import { ChoiceStepper } from "@/features/aim/components/choice-stepper"
+import { extractChoiceGroups } from "@/features/aim/aim-choice-groups"
 import {
   generateAimContent,
   getVideoCopyExtraction,
@@ -153,52 +155,12 @@ function workflowStatusLabel(status?: string | null) {
   return WORKFLOW_STATUS_OPTIONS.find((item) => item.value === status)?.label || "草稿"
 }
 
-interface ChoiceGroup {
-  question: string
-  options: Array<{ label: string; text: string }>
-}
-
-function cleanChoiceText(text: string) {
-  return text.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim()
-}
-
 /** 从人设故事梳理的回复里解析【进度 XX%】，用于顶部进度条 */
 function extractProgress(content: string): number | null {
   const m = content.match(/【进度\s*(\d+)\s*%】/)
   if (!m) return null
   const v = parseInt(m[1], 10)
   return Number.isNaN(v) ? null : Math.min(100, Math.max(0, v))
-}
-
-function extractChoiceGroups(content: string): ChoiceGroup[] {
-  const lines = content.split("\n")
-  const groups: ChoiceGroup[] = []
-  for (let i = 0; i < lines.length; i += 1) {
-    const first = lines[i].trim().match(/^([A-D])[\s.、．)]\s*(.+)$/)
-    if (!first) continue
-
-    const options = []
-    let j = i
-    while (j < lines.length) {
-      const match = lines[j].trim().match(/^([A-D])[\s.、．)]\s*(.+)$/)
-      if (!match) break
-      const text = cleanChoiceText(match[2])
-      if (text.length > 0 && text.length <= 120) options.push({ label: match[1], text })
-      j += 1
-    }
-
-    let question = "请选择一个方向"
-    for (let k = i - 1; k >= 0; k -= 1) {
-      const line = cleanChoiceText(lines[k])
-      if (line && !/^([A-D])[\s.、．)]/.test(line)) {
-        question = line
-        break
-      }
-    }
-    if (options.length > 1) groups.push({ question, options })
-    i = j
-  }
-  return groups
 }
 
 function splitMethodNote(content: string) {
@@ -248,64 +210,6 @@ type RecordDialogMode = "decision" | "publish" | "retro"
 interface RecordDialogState {
   mode: RecordDialogMode
   generationId: string
-}
-
-function ChoiceStepper({
-  groups,
-  busy,
-  onSubmit,
-}: {
-  groups: ChoiceGroup[]
-  busy: boolean
-  onSubmit: (text: string) => void
-}) {
-  const [step, setStep] = useState(0)
-  const [answers, setAnswers] = useState<Record<number, string>>({})
-  const group = groups[step]
-  if (!group) return null
-
-  const selected = answers[step]
-  const isLast = step === groups.length - 1
-
-  function next() {
-    if (!selected) return
-    if (!isLast) {
-      setStep((current) => current + 1)
-      return
-    }
-    onSubmit(groups.map((item, index) => `${index + 1}. ${item.question}\n${answers[index]}`).join("\n\n"))
-  }
-
-  return (
-    <div className="mt-3 max-w-xl rounded-xl border bg-muted/20 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted-foreground">
-          {step + 1}/{groups.length} · {group.question}
-        </p>
-        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={busy || !selected} onClick={next}>
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="grid gap-2">
-        {group.options.map((option) => {
-          const value = `${option.label}. ${option.text}`
-          return (
-            <Button
-              key={value}
-              type="button"
-              variant={selected === value ? "default" : "outline"}
-              className="h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs"
-              disabled={busy}
-              onClick={() => setAnswers((current) => ({ ...current, [step]: value }))}
-            >
-              <span className="mr-1 font-semibold">{option.label}</span>
-              {option.text}
-            </Button>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 const AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v2"
