@@ -90,7 +90,11 @@ import {
   buildBenchmarkQualityMessage,
   buildBenchmarkRewriteInput,
   buildChatContent,
+  buildRawInputFromMessages,
   detectLarkToolAction,
+  getLatestDeliverableId,
+  getLatestDeliverableMessageId,
+  getLatestDeliverableText,
   getOpeningSegment,
 } from "@/features/aim/aim-command-utils"
 
@@ -422,29 +426,6 @@ export default function AimPage() {
     if (typeof window !== "undefined") window.sessionStorage.removeItem(aimDraftStorageKey(selectedAgentId))
   }
 
-  /** 把对话里的用户输入拼成生成素材 */
-  function buildRawInputForGenerate(extra?: string) {
-    const userTexts = messages.filter((m) => m.role === "user").map((m) => m.content)
-    if (extra) userTexts.push(extra)
-    return userTexts.filter(Boolean).join("\n\n")
-  }
-
-  function latestDeliverableId() {
-    return [...messages].reverse().find((m) => m.deliverables?.id)?.deliverables?.id
-  }
-
-  function latestDeliverableMessageId() {
-    return [...messages]
-      .reverse()
-      .find((message) => message.deliverables?.results.some((result) => result.format === "video_script"))
-      ?.id
-  }
-
-  function latestDeliverableText() {
-    const latest = [...messages].reverse().find((message) => message.deliverables?.results.length)
-    return latest?.deliverables?.results[0]?.content.trim() || ""
-  }
-
   function fillReferenceTextFromConversation() {
     const source = [...messages]
       .reverse()
@@ -537,7 +518,7 @@ export default function AimPage() {
   }
 
   function handleOptimizeOpening(commandInput: string) {
-    const sourceText = editorText.trim() || latestDeliverableText()
+    const sourceText = editorText.trim() || getLatestDeliverableText(messages)
     if (!sourceText) {
       toast.error("当前没有可优化的内容，请先生成脚本或写入编辑区")
       return true
@@ -591,7 +572,7 @@ export default function AimPage() {
   }
 
   function handleReviseCurrentDraft(commandInput: string) {
-    const draft = editorText.trim() || latestDeliverableText()
+    const draft = editorText.trim() || getLatestDeliverableText(messages)
     if (!draft) {
       toast.error("当前没有可改写的稿子")
       return true
@@ -686,7 +667,7 @@ export default function AimPage() {
         sourceOriginalText,
         messages,
         sourceAnalysisText,
-        currentDraft: editorText.trim() || latestDeliverableText(),
+        currentDraft: editorText.trim() || getLatestDeliverableText(messages),
       })
       if (rewriteInput) void generateWithInput(rewriteInput)
       return true
@@ -695,9 +676,9 @@ export default function AimPage() {
       const localCheckMessage = buildBenchmarkQualityMessage({
         sourceOriginalText,
         messages,
-        draft: editorText.trim() || latestDeliverableText(),
+        draft: editorText.trim() || getLatestDeliverableText(messages),
       })
-      const messageId = latestDeliverableMessageId()
+      const messageId = getLatestDeliverableMessageId(messages)
       if (localCheckMessage) {
         setMessages((prev) => [...prev, { id: nextId(), role: "assistant", content: localCheckMessage }])
       }
@@ -785,7 +766,7 @@ export default function AimPage() {
         ))
         return
       }
-      const resultId = toolAction === "export_lark_generation" ? latestDeliverableId() : undefined
+      const resultId = toolAction === "export_lark_generation" ? getLatestDeliverableId(messages) : undefined
       if (toolAction === "export_lark_generation" && !resultId) {
         setMessages((prev) => prev.map((message) =>
           message.id === assistantId ? { ...message, content: "当前没有可同步到飞书的 AIM 生成结果。" } : message
@@ -881,7 +862,7 @@ export default function AimPage() {
   }
 
   async function generateWithInput(currentInput: string, options?: { retryMessageId?: string }) {
-    const rawInput = buildRawInputForGenerate(currentInput || undefined)
+    const rawInput = buildRawInputFromMessages(messages, currentInput || undefined)
     if (!rawInput) {
       toast.error("请先在对话框里说点素材或需求")
       return
@@ -1153,7 +1134,7 @@ export default function AimPage() {
             selectedAgentId={selectedAgentId}
             selectedProjectId={selectedProjectId}
             busy={busy}
-            latestDeliverableMessageId={latestDeliverableMessageId()}
+            latestDeliverableMessageId={getLatestDeliverableMessageId(messages)}
             onStartStage={beginWorkflowStage}
             onBeginContentAction={beginContentAction}
             onSendText={(text) => void sendText(text)}

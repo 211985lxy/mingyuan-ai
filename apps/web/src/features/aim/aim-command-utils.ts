@@ -21,6 +21,28 @@ export function buildChatContent(text: string, images: AimImageAttachment[]): Ai
   ]
 }
 
+export function buildRawInputFromMessages(messages: ChatMessage[], extra?: string) {
+  const userTexts = messages.filter((message) => message.role === "user").map((message) => message.content)
+  if (extra) userTexts.push(extra)
+  return userTexts.filter(Boolean).join("\n\n")
+}
+
+export function getLatestDeliverableId(messages: ChatMessage[]) {
+  return [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
+}
+
+export function getLatestDeliverableMessageId(messages: ChatMessage[]) {
+  return [...messages]
+    .reverse()
+    .find((message) => message.deliverables?.results.some((result) => result.format === "video_script"))
+    ?.id
+}
+
+export function getLatestDeliverableText(messages: ChatMessage[]) {
+  const latest = [...messages].reverse().find((message) => message.deliverables?.results.length)
+  return latest?.deliverables?.results[0]?.content.trim() || ""
+}
+
 export function getOpeningSegment(text: string) {
   const trimmed = text.trimStart()
   const offset = text.length - trimmed.length
