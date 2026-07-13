@@ -35,8 +35,6 @@ import {
   polishScript,
   chatAim,
   chatAimStream,
-  createKnowledge,
-  createAimWorkflowBrief,
   ApiError,
   recordAimRunEvent,
   updateAimWorkflowStatus,
@@ -46,12 +44,8 @@ import {
 } from "@/lib/api/client"
 import {
   AIM_CONTENT_ACTIONS,
-  AIM_WORKFLOW_STAGES,
   getWorkflowStageForAgent,
   isAimWorkflowStage,
-  type AimContentAction,
-  type AimWorkflowStage,
-  type ConfirmedWorkflowBrief,
 } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { transcribeAudio } from "@/lib/api/client"
@@ -64,10 +58,8 @@ import {
   type AimAgentMeta,
 } from "@/lib/aim-ui-config"
 import {
-  buildAimNextActionPrompt,
   getAimAgentGuide,
   type AimAgentGuide,
-  type AimNextAction,
   type AimWorkbenchSkill,
 } from "@/lib/aim-agent-guides"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
@@ -97,6 +89,7 @@ import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-work
 import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
 import { useAimEvolution } from "@/features/aim/hooks/use-aim-evolution"
 import { useAimImageAttachments } from "@/features/aim/hooks/use-aim-image-attachments"
+import { useAimWorkflowActions } from "@/features/aim/hooks/use-aim-workflow-actions"
 import {
   buildBenchmarkQualityMessage,
   buildBenchmarkRewriteInput,
@@ -188,15 +181,6 @@ export default function AimPage() {
     open: false,
     context: null,
   })
-  const [workflowBrief, setWorkflowBrief] = useState<{
-    sourceGenerationId?: string
-    nextInput: string
-    confirmed: ConfirmedWorkflowBrief
-  } | null>(null)
-  const [workflowBriefForm, setWorkflowBriefForm] = useState<ConfirmedWorkflowBrief>({})
-  const [workflowBriefDialogOpen, setWorkflowBriefDialogOpen] = useState(false)
-  const [isBuildingWorkflowBrief, setIsBuildingWorkflowBrief] = useState(false)
-  const [contentAction, setContentAction] = useState<AimContentAction | null>(null)
   const [isImitating, setIsImitating] = useState(false)
   const [imitateStyleId, setImitateStyleId] = useState("default")
 
@@ -280,6 +264,42 @@ export default function AimPage() {
     return baseAgent
   }, [modeParam, selectedAgentId, sourceTopicTitle, sourceVideoCopyExtractionId])
 
+  const lastAgentParamRef = useRef(agentParam)
+
+  const {
+    workflowBrief,
+    setWorkflowBrief,
+    workflowBriefForm,
+    setWorkflowBriefForm,
+    workflowBriefDialogOpen,
+    setWorkflowBriefDialogOpen,
+    isBuildingWorkflowBrief,
+    contentAction,
+    setContentAction,
+    beginWorkflowStage,
+    beginContentAction,
+    handleAimNextAction,
+    confirmWorkflowBrief,
+  } = useAimWorkflowActions({
+    searchParams,
+    selectedAgentId,
+    selectedProjectId,
+    agentTitle: agent.title,
+    lastAgentParamRef,
+    replaceAimUrl: router.replace,
+    setSelectedAgentId,
+    setInput,
+    setMessages,
+    setSourceVideoCopyExtractionId,
+    setSourceOriginalText,
+    setSourceAnalysisText,
+    setSourceTopicTitle,
+    setSourceTopicRationale,
+    setEditorText,
+    setEditorFormat,
+    setEditorSourceMessageId,
+  })
+
   const editorPanelLabels = useMemo(
     () => getAimEditorPanelLabels(selectedAgentId, editorFormat),
     [editorFormat, selectedAgentId],
@@ -314,8 +334,6 @@ export default function AimPage() {
     transcribeFn: transcribeAudio,
     onTranscribeSuccess: (text) => setInput((prev) => (prev ? `${prev}\n${text}` : text)),
   })
-
-  const lastAgentParamRef = useRef(agentParam)
 
   useEffect(() => {
     saveAimDraft({
@@ -980,107 +998,10 @@ export default function AimPage() {
     }
   }
 
-  function beginWorkflowStage(stage: AimWorkflowStage) {
-    const config = AIM_WORKFLOW_STAGES.find((item) => item.id === stage)!
-    const nextParams = new URLSearchParams(searchParams.toString())
-    nextParams.set("stage", stage)
-    nextParams.set("agent", config.defaultAgentId)
-    lastAgentParamRef.current = config.defaultAgentId
-    setSelectedAgentId(config.defaultAgentId)
-    if (stage !== "content") setContentAction(null)
-    if (stage === "results") {
-      setInput("请基于已发布内容填写复盘：结果、判断和下一轮可复用规则。")
-    }
-    router.replace(`/aim?${nextParams.toString()}`)
-  }
-
-  function beginContentAction(action: AimContentAction) {
-    const config = AIM_CONTENT_ACTIONS.find((item) => item.id === action)!
-    setContentAction(action)
-    setInput((current) => current.trim() ? `${config.prompt}\n\n${current}` : config.prompt)
-    if (selectedAgentId !== "content_producer") beginWorkflowStage("content")
-  }
-
   async function openProjectWorkflowTask(id: string) {
     if (!selectedProjectId) return
     await refreshHistory({ force: true, projectId: selectedProjectId })
     requestLoad(id)
-  }
-
-  async function handleAimNextAction(action: AimNextAction, content: string, generationId: string) {
-      const cleanContent = content.trim()
-      if (!cleanContent) return
-
-      if (action.id === "save_knowledge") {
-        if (!selectedProjectId) {
-          toast.error("请先选择 IP 营销全案")
-          return
-        }
-        try {
-          await createKnowledge({
-            projectId: selectedProjectId,
-            category: "positioning_material",
-            title: `AIM交付物 · ${agent.title}`,
-            content: cleanContent,
-            tags: ["aim_delivery", action.id],
-            sourceType: "manual",
-          })
-          toast.success("已保存为档案素材")
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : "保存失败")
-        }
-        return
-      }
-
-      if (action.targetAgentId && action.targetAgentId !== selectedAgentId) {
-        if (action.targetAgentId === "content_producer" && getWorkflowStageForAgent(selectedAgentId) === "direction") {
-          setIsBuildingWorkflowBrief(true)
-          try {
-            const brief = await createAimWorkflowBrief({
-              stage: "content",
-              projectId: selectedProjectId || undefined,
-              sourceGenerationId: generationId,
-              goal: action.label,
-            })
-            setWorkflowBriefForm({
-              goal: brief.taskSpec.goal,
-              targetCustomer: brief.taskSpec.targetCustomer,
-              realProblem: brief.taskSpec.realProblem,
-              contentTask: brief.taskSpec.contentTask,
-              mustKeep: brief.taskSpec.exclusiveEvidence,
-              desiredAction: brief.taskSpec.desiredAction,
-            })
-            setWorkflowBrief({
-              sourceGenerationId: brief.sourceGenerationId,
-              nextInput: buildAimNextActionPrompt(action, cleanContent),
-              confirmed: {},
-            })
-            setWorkflowBriefDialogOpen(true)
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "任务单创建失败")
-          } finally {
-            setIsBuildingWorkflowBrief(false)
-          }
-          return
-        }
-        const nextParams = new URLSearchParams(searchParams.toString())
-        nextParams.set("agent", action.targetAgentId)
-        nextParams.set("stage", getWorkflowStageForAgent(action.targetAgentId))
-        lastAgentParamRef.current = action.targetAgentId
-        setSelectedAgentId(action.targetAgentId)
-        setMessages([])
-        setSourceVideoCopyExtractionId(undefined)
-        setSourceOriginalText("")
-        setSourceAnalysisText("")
-        setSourceTopicTitle("")
-        setSourceTopicRationale("")
-        setEditorText("")
-        setEditorFormat(undefined)
-        setEditorSourceMessageId(undefined)
-        router.replace(`/aim?${nextParams.toString()}`)
-      }
-      setInput(buildAimNextActionPrompt(action, cleanContent))
-      toast.success("已带入聊天框")
   }
 
   const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
@@ -1341,21 +1262,6 @@ export default function AimPage() {
     },
     [messages, refreshHistory, selectedAgentId],
   )
-
-  function confirmWorkflowBrief() {
-    const next = workflowBrief
-    if (!next) return
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("agent", "content_producer")
-    params.set("stage", "content")
-    lastAgentParamRef.current = "content_producer"
-    setSelectedAgentId("content_producer")
-    setWorkflowBrief({ ...next, confirmed: workflowBriefForm })
-    setWorkflowBriefDialogOpen(false)
-    setInput(next.nextInput)
-    router.replace(`/aim?${params.toString()}`)
-    toast.success("任务单已确认，开始内容创作")
-  }
 
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
