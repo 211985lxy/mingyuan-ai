@@ -1,27 +1,10 @@
 "use client"
 
 import React from "react"
-import Link from "next/link"
-import {
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  Loader2,
-  Plus,
-  Search,
-  Target,
-  Undo2,
-  Upload,
-  X,
-  Users,
-} from "lucide-react"
+import { Plus, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
@@ -30,128 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { CreateProfileDialog } from "@/features/benchmark-profiles/components/create-profile-dialog"
+import { BenchmarkProfileList } from "@/features/benchmark-profiles/components/profile-list"
+import { PLATFORM_LABELS, type BenchmarkProfileForm, type ImportedFile, type ProfileListItem } from "@/features/benchmark-profiles/model"
 import { getStoredAdminToken } from "@/lib/admin-store"
-import { cn } from "@/lib/utils"
-
-// ── 常量 ──
-
-const PLATFORM_LABELS: Record<string, string> = {
-  douyin: "抖音",
-  xiaohongshu: "小红书",
-  bilibili: "B站",
-  kuaishou: "快手",
-}
-
-const PLATFORM_COLORS: Record<string, string> = {
-  douyin: "bg-pink-50 text-pink-700 border-pink-200",
-  xiaohongshu: "bg-red-50 text-red-700 border-red-200",
-  bilibili: "bg-blue-50 text-blue-700 border-blue-200",
-  kuaishou: "bg-orange-50 text-orange-700 border-orange-200",
-}
-
-const KIND_LABELS: Record<string, string> = {
-  note: "笔记",
-  report: "诊断报告",
-  copy_extraction: "文案提取",
-  video: "爆款样本",
-  account_pool: "账号池",
-  structure_asset: "结构资产",
-  topic_candidates: "选题池",
-}
-
-const KIND_COLORS: Record<string, string> = {
-  note: "bg-gray-100 text-gray-600",
-  report: "bg-indigo-50 text-indigo-600",
-  copy_extraction: "bg-amber-50 text-amber-600",
-  video: "bg-emerald-50 text-emerald-600",
-  account_pool: "bg-violet-50 text-violet-600",
-  structure_asset: "bg-fuchsia-50 text-fuchsia-600",
-  topic_candidates: "bg-orange-50 text-orange-600",
-}
-
-function formatFollowerCount(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return ""
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}万粉丝`
-  return `${n}粉丝`
-}
-
-// ── 类型 ──
-
-interface ProfileListItem {
-  id: string
-  name: string
-  platform: string
-  accountUrl: string | null
-  followerCount: number | null
-  positioning: string | null
-  personaTags: unknown
-  status: string
-  createdAt: string
-  updatedAt: string
-  project: { id: string; name: string; companyName: string | null; industry: string | null; status: string } | null
-  user: { id: string; name: string | null; email: string } | null
-  items: Array<{ id: string; kind: string; title: string; content: string }>
-  _count: { items: number }
-}
-
-interface ImportedFile {
-  name: string
-  text: string
-}
-
-// ── 项目选择器 ──
-
-function ProjectSelector({
-  value,
-  onChange,
-  token,
-}: {
-  value: string
-  onChange: (projectId: string) => void
-  token: string
-}) {
-  const [projects, setProjects] = React.useState<Array<{ id: string; name: string; companyName: string | null }>>([])
-  const [loading, setLoading] = React.useState(false)
-
-  React.useEffect(() => {
-    if (!token) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true)
-    fetch("/api/admin/projects?status=active&pageSize=100", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => (r.ok ? r.json() : { data: [] }))
-      .then((j) => setProjects(j.data ?? []))
-      .catch(() => setProjects([]))
-      .finally(() => setLoading(false))
-  }, [token])
-
-  return (
-    <Select value={value} onValueChange={(v) => { if (v) onChange(v) }}>
-      <SelectTrigger className="h-10">
-        <SelectValue placeholder={loading ? "加载中..." : "选择项目 *"} />
-      </SelectTrigger>
-      <SelectContent>
-        {projects.map((p) => (
-          <SelectItem key={p.id} value={p.id}>
-            {p.name}{p.companyName ? ` · ${p.companyName}` : ""}
-          </SelectItem>
-        ))}
-        {projects.length === 0 && !loading && (
-          <div className="px-2 py-3 text-sm text-muted-foreground text-center">暂无项目</div>
-        )}
-      </SelectContent>
-    </Select>
-  )
-}
 
 // ── 主页面 ──
 
@@ -170,7 +35,7 @@ export default function BenchmarkProfilesPage() {
   // 新建对话框
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createMode, setCreateMode] = React.useState<"account" | "note">("note")
-  const [form, setForm] = React.useState({
+  const [form, setForm] = React.useState<BenchmarkProfileForm>({
     content: "",
     accountName: "",
     platform: "",
@@ -429,8 +294,6 @@ export default function BenchmarkProfilesPage() {
     fileInputRef.current?.click()
   }
 
-  const supportedFileText = ".txt / .md / .pdf / .docx / .xlsx / .csv"
-
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       {/* 标题栏 */}
@@ -484,352 +347,41 @@ export default function BenchmarkProfilesPage() {
         </Tabs>
       </div>
 
-      {/* 列表 */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-xl" />
-          ))}
-        </div>
-      ) : profiles.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-3">
-            <Target className="h-10 w-10 text-muted-foreground/40" />
-            <div>
-              <p className="font-medium">
-                {statusTab === "archived" ? "没有已归档的档案" : "还没有档案"}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {statusTab === "archived"
-                  ? "归档的档案会显示在这里"
-                  : "添加一个真实账号或客户资料即可"}
-              </p>
-            </div>
-            {statusTab !== "archived" && (
-              <Button variant="outline" onClick={() => setCreateOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                添加档案
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {profiles.map((profile) => (
-              <Card key={profile.id} className="h-full transition-colors hover:border-foreground/20">
-                <CardContent className="space-y-3 p-5">
-                  {/* 名称 + 平台 */}
-                  <div className="flex items-start justify-between gap-2">
-                    <Link
-                      href={`/admin/benchmark-profiles/${profile.id}`}
-                      className="min-w-0 text-base font-semibold truncate hover:underline"
-                    >
-                      {profile.name}
-                    </Link>
-                    {profile.platform && PLATFORM_LABELS[profile.platform] && (
-                      <Badge
-                        variant="outline"
-                        className={cn("shrink-0 text-[10px]", PLATFORM_COLORS[profile.platform])}
-                      >
-                        {PLATFORM_LABELS[profile.platform]}
-                      </Badge>
-                    )}
-                  </div>
+      <BenchmarkProfileList
+        loading={loading}
+        profiles={profiles}
+        status={statusTab}
+        page={page}
+        total={total}
+        totalPages={totalPages}
+        onCreate={() => setCreateOpen(true)}
+        onRestore={handleRestore}
+        onPageChange={setPage}
+      />
 
-                  {/* 定位 */}
-                  {profile.positioning && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{profile.positioning}</p>
-                  )}
-
-                  {/* 元信息 */}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <FileText className="h-3.5 w-3.5" />
-                      {profile._count.items} 份资料
-                    </span>
-                    {profile.followerCount != null && (
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5" />
-                        {formatFollowerCount(profile.followerCount)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* 项目 */}
-                  {profile.project && (
-                    <div className="text-xs text-muted-foreground truncate">
-                      项目：{profile.project.name}
-                    </div>
-                  )}
-
-                  {profile.items.length > 0 && (
-                    <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-xs">
-                      {profile.items.map((item) => (
-                        <div key={item.id} className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className={cn("shrink-0 px-1.5 py-0 text-[10px]", KIND_COLORS[item.kind])}>
-                              {KIND_LABELS[item.kind] ?? item.kind}
-                            </Badge>
-                            <span className="truncate font-medium">{item.title}</span>
-                          </div>
-                          <p className="mt-1 line-clamp-2 text-muted-foreground">
-                            {item.content}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 操作 */}
-                  <div className="flex items-center gap-2 pt-1 border-t">
-                    <Link href={`/admin/benchmark-profiles/${profile.id}`} className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full">
-                        查看详情
-                      </Button>
-                    </Link>
-                    {statusTab === "archived" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRestore(profile.id)}
-                        className="text-emerald-600 hover:text-emerald-700"
-                      >
-                        <Undo2 className="h-3.5 w-3.5 mr-1" />
-                        恢复
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* 分页 */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {page} / {totalPages}（共 {total} 条）
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ── 新建对话框 ── */}
-      <Dialog open={createOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent
-          className={cn(
-            "max-w-md gap-5 rounded-xl bg-background p-5 transition-colors",
-            isDraggingFile && "border-primary bg-primary/5"
-          )}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <DialogHeader>
-            <DialogTitle>添加档案</DialogTitle>
-            <DialogDescription className="leading-6">
-              {createMode === "account"
-                ? "录入真实账号信息，后续可通过「一键拉取」导入账号分析。"
-                : "粘贴聊天记录、客户资料或 Markdown 文档，保存后进入该项目的 AIM 检索。"}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* 模式切换 */}
-          <Tabs value={createMode} onValueChange={(v) => setCreateMode(v as "account" | "note")}>
-            <TabsList className="w-full">
-              <TabsTrigger value="note" className="flex-1">客户资料</TabsTrigger>
-              <TabsTrigger value="account" className="flex-1">真实账号</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div className="space-y-4">
-            {/* 归属项目 */}
-            <div className="space-y-2">
-              <Label>归属项目 *</Label>
-              <ProjectSelector
-                value={form.projectId}
-                onChange={(v) => setForm((f) => ({ ...f, projectId: v }))}
-                token={getStoredAdminToken() ?? ""}
-              />
-            </div>
-
-            {/* 账号名称 */}
-            <div className="space-y-2">
-              <Label>{createMode === "account" ? "账号名称 *" : "名称 *"}</Label>
-              <Input
-                className="h-10 focus-visible:border-foreground/30 focus-visible:ring-1 focus-visible:ring-foreground/10"
-                value={form.accountName}
-                onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))}
-                placeholder={createMode === "account" ? "如：某知识付费 IP" : "如：张总 / 某客户名"}
-              />
-            </div>
-
-            {/* 真实账号专属字段 */}
-            {createMode === "account" && (
-              <>
-                <div className="space-y-2">
-                  <Label>平台 *</Label>
-                  <Select value={form.platform} onValueChange={(v) => setForm((f) => ({ ...f, platform: v ?? "" }))}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="选择平台" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PLATFORM_LABELS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>主页链接</Label>
-                  <Input
-                    className="h-10"
-                    value={form.accountUrl}
-                    onChange={(e) => setForm((f) => ({ ...f, accountUrl: e.target.value }))}
-                    placeholder="https://..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>粉丝数</Label>
-                  <Input
-                    className="h-10"
-                    type="number"
-                    value={form.followerCount}
-                    onChange={(e) => setForm((f) => ({ ...f, followerCount: e.target.value }))}
-                    placeholder="如：120000"
-                  />
-                </div>
-              </>
-            )}
-
-            {/* 客户资料模式：粘贴 + 上传 */}
-            {createMode === "note" && (
-              <>
-                <div className="space-y-2">
-                  <Label>聊天框 / 文字资料</Label>
-                  <textarea
-                    className="min-h-40 w-full resize-y rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-foreground/30 focus-visible:ring-1 focus-visible:ring-foreground/10"
-                    value={form.content}
-                    onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                    placeholder="把微信聊天记录、客户问答、Markdown 文档内容直接粘贴到这里..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>上传文字文件</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".txt,.md,.markdown,.pdf,.docx,.xlsx,.csv"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => handleFileUpload(e.target.files)}
-                  />
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors",
-                      isDraggingFile
-                        ? "border-primary bg-primary/5"
-                        : "border-muted-foreground/25 bg-muted/40 hover:border-primary/50 hover:bg-muted/60",
-                      importingFiles ? "cursor-wait opacity-70" : "cursor-pointer"
-                    )}
-                    onClick={triggerFilePicker}
-                    disabled={importingFiles}
-                  >
-                    {importingFiles ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    ) : (
-                      <Upload className="h-5 w-5 text-muted-foreground" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {importingFiles ? "正在解析文件" : "点击选择，或直接拖进这个弹窗"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{supportedFileText}</span>
-                  </button>
-                  {importedFiles.length > 0 && (
-                    <div className="space-y-2">
-                      {importedFiles.map((file, index) => (
-                        <div
-                          key={`${file.name}-${index}`}
-                          className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm"
-                        >
-                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                          <button
-                            type="button"
-                            className="rounded-sm p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            onClick={() => removeImportedFile(index)}
-                            aria-label={`移除 ${file.name}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* 备注（可选） */}
-            <div className="space-y-2">
-              <Label>备注（可选）</Label>
-              <Input
-                className="h-10"
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="内部备注..."
-              />
-            </div>
-
-            {/* 去重提示 */}
-            {duplicateNotice && (
-              <p className="text-sm text-amber-600 bg-amber-50 rounded-md px-3 py-2">{duplicateNotice}</p>
-            )}
-
-            {createError ? (
-              <p className="text-sm text-destructive">{createError}</p>
-            ) : null}
-          </div>
-
-          <DialogFooter className="-mx-5 -mb-5 rounded-b-xl bg-transparent px-5 py-4">
-            <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
-              取消
-            </Button>
-            <Button onClick={handleCreate} disabled={creating || importingFiles}>
-              {creating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  创建中
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  创建
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateProfileDialog
+        open={createOpen}
+        mode={createMode}
+        form={form}
+        creating={creating}
+        error={createError}
+        duplicateNotice={duplicateNotice}
+        importingFiles={importingFiles}
+        isDraggingFile={isDraggingFile}
+        importedFiles={importedFiles}
+        fileInputRef={fileInputRef}
+        token={getStoredAdminToken() ?? ""}
+        onOpenChange={handleDialogOpenChange}
+        onModeChange={setCreateMode}
+        setForm={setForm}
+        onCreate={handleCreate}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onFileUpload={handleFileUpload}
+        onPickFile={triggerFilePicker}
+        onRemoveFile={removeImportedFile}
+      />
     </div>
   )
 }
