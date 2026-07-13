@@ -2,8 +2,6 @@
 
 import type { Dispatch, SetStateAction } from "react";
 import {
-  createProductionPlan,
-  createVideoTask,
   generatePackagingMaterialSuggestions,
   generateScripts as apiGenerateScripts,
   registerAsset,
@@ -11,11 +9,7 @@ import {
   uploadFileToStorage,
 } from "@/lib/api/client";
 import { mapCopyToVideoStructure } from "@/lib/copy-structure-mapping";
-import {
-  getBlockingAiMaterials,
-  splitMaterialAssignments,
-} from "@/lib/packaging-materials";
-import { buildPackagingRecommendationContext } from "@/lib/video-template-config";
+import { splitMaterialAssignments } from "@/lib/packaging-materials";
 import type {
   ApiAsset,
   ApiScript,
@@ -25,6 +19,8 @@ import type {
 } from "@/types/api";
 import { isAiMaterial } from "@/features/create/components/packaging-material-preview";
 import type { CreateWorkbenchDraftState } from "@/features/create/hooks/use-create-workbench-draft";
+import { buildManualMaterialFromAsset, mergeWorkbenchAssets } from "@/features/create/services/create-workbench-assets";
+import { submitCreateWorkbench } from "@/features/create/services/create-workbench-submission";
 import { toast } from "sonner";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
@@ -75,33 +71,6 @@ interface UseCreateWorkbenchActionsParams {
   setters: CreateWorkbenchActionSetters;
   saveDraft: SaveDraft;
   clearDraft: () => void;
-}
-
-function mergeAssets(assetGroups: ApiAsset[][]): ApiAsset[] {
-  const merged = new Map<string, ApiAsset>();
-  for (const group of assetGroups) {
-    for (const asset of group) merged.set(asset.id, asset);
-  }
-  return [...merged.values()].sort((left, right) =>
-    right.createdAt.localeCompare(left.createdAt),
-  );
-}
-
-function buildManualMaterialFromAsset(input: {
-  role: string;
-  asset: ApiAsset;
-  source: "manual_library" | "manual_upload";
-  type: "image" | "video";
-}): MaterialAssignment {
-  return {
-    role: input.role,
-    type: input.type,
-    source: input.source,
-    assetId: input.asset.id,
-    fileUrl: input.asset.url,
-    previewUrl: input.asset.url,
-    thumbnailUrl: input.asset.url,
-  };
 }
 
 export function useCreateWorkbenchActions(params: UseCreateWorkbenchActionsParams) {
@@ -219,7 +188,7 @@ export function useCreateWorkbenchActions(params: UseCreateWorkbenchActionsParam
       size: file.size || null,
     });
 
-    setAssets((current) => mergeAssets([[asset], current]));
+    setAssets((current) => mergeWorkbenchAssets([[asset], current]));
     return asset;
   }
 
@@ -385,66 +354,16 @@ export function useCreateWorkbenchActions(params: UseCreateWorkbenchActionsParam
     setIsSubmitting(true);
     setTaskError(null);
     try {
-      const blockingAiMaterials = getBlockingAiMaterials(materials);
-      if (blockingAiMaterials.length > 0) {
-        throw new Error("AI 补充素材正在准备中，请稍候再提交");
-      }
-
-      await handleSaveScript();
-
-      const selectedPackaging = packagingTemplates.find((item) => item.id === selectedPackagingTemplateId) ?? null;
-      if (!selectedPackaging) {
-        throw new Error("请先选择包装模板");
-      }
-
-      const recommendation = selectedPackaging.recommendation ?? null;
-      if (recommendation?.tier === "blocked") {
-        throw new Error(
-          recommendation.blockingReasons?.[0]
-            ?? "当前包装模板与这条视频存在真实能力冲突，请改选其他模板",
-        );
-      }
-
-      const styleId = selectedPackaging.shanjianId;
-      if (!styleId) {
-        throw new Error("当前视频没有可用的包装 styleId");
-      }
-
-      const usableMaterials = materials.filter((item) => isAiMaterial(item) || !!item.assetId);
-      if (usableMaterials.length === 0) {
-        throw new Error("请先在包装阶段补充至少一个可用素材，再生成视频");
-      }
-
-      const mappedStructureId = selectedCopyStructureCode
-        ? mapCopyToVideoStructure(selectedCopyStructureCode)
-        : null;
-      const recommendationContext = buildPackagingRecommendationContext({
-        structureId: mappedStructureId,
-        scriptId: selectedScriptId,
-        packagingTemplateId: selectedPackaging.id,
-        recommendation,
-      });
-
-      const plan = await createProductionPlan({
-        scriptId: selectedScriptId,
-        contentTemplateId: fallbackTemplateId || undefined,
-        packagingTemplateId: selectedPackagingTemplateId || undefined,
-        structureId: mappedStructureId || undefined,
-        styleId,
-        materials: usableMaterials,
-        backgroundMusic: backgroundMusic ?? undefined,
-        packRules: recommendation?.presetPackRules ?? undefined,
-        processRules: recommendation?.presetProcessRules ?? undefined,
-        recommendationContext,
-        videoType: "broadcast_mixcut",
-      });
-
-      const task = await createVideoTask({
-        type: "broadcast_mixcut",
-        scriptId: selectedScriptId,
-        scriptContent: editedScript.trim(),
-        productionPlanId: plan.id,
-        styleId,
+      const task = await submitCreateWorkbench({
+        selectedScriptId,
+        editedScript,
+        selectedPackagingTemplateId,
+        selectedCopyStructureCode,
+        fallbackTemplateId,
+        packagingTemplates,
+        materials,
+        backgroundMusic,
+        saveScript: handleSaveScript,
       });
       setTaskId(task.id);
       setTaskStatus(task.status);
