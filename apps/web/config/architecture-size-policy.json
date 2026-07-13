@@ -4,7 +4,6 @@
   "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",
   "legacyFiles": [
-    { "path": "src/app/(dashboard)/create/page.tsx", "maxLines": 3532, "target": "features/create" },
     { "path": "src/app/(dashboard)/aim/page.tsx", "maxLines": 3237, "target": "features/aim" },
     { "path": "src/app/(dashboard)/assets/page.tsx", "maxLines": 1824, "target": "features/assets" },
     { "path": "src/app/admin/knowledge/page.tsx", "maxLines": 1816, "target": "features/knowledge" },
