@@ -46,7 +46,6 @@ import {
   type AimEvolutionSuggestion,
   type AimGenerateResponse,
   type AimGeneration,
-  type AimChatContent,
   type ContentFormat,
 } from "@/lib/api/client"
 import {
@@ -77,7 +76,6 @@ import {
 } from "@/lib/aim-agent-guides"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
-import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { detectAimWorkbenchCommand, type AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 import { buildOpeningRecommendationPrompt } from "@/lib/aim-opening-recommendation"
 import {
@@ -101,6 +99,13 @@ import {
 } from "@/features/aim/aim-text-utils"
 import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-workflow"
 import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
+import {
+  buildBenchmarkQualityMessage,
+  buildBenchmarkRewriteInput,
+  buildChatContent,
+  detectLarkToolAction,
+  getOpeningSegment,
+} from "@/features/aim/aim-command-utils"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -544,15 +549,6 @@ export default function AimPage() {
     return userTexts.filter(Boolean).join("\n\n")
   }
 
-  function detectLarkToolAction(text: string): AimChatToolAction | null {
-    if (!/飞书/.test(text)) return null
-    if (/同步.*选题|导入.*选题/.test(text)) return "import_lark_topics"
-    if (/热点|竞品|优质账号|参考|数据/.test(text) && /导入|同步/.test(text)) return "import_lark_archive_data"
-    if (/项目/.test(text) && /导入|同步/.test(text)) return "import_lark_project_data"
-    if (/回写|同步到飞书|同步.*脚本|同步.*内容/.test(text)) return "export_lark_generation"
-    return null
-  }
-
   function latestDeliverableId() {
     return [...messages].reverse().find((m) => m.deliverables?.id)?.deliverables?.id
   }
@@ -604,42 +600,6 @@ export default function AimPage() {
     return true
   }
 
-  function buildBenchmarkRewriteInput() {
-    const original = sourceOriginalText.trim() || [...messages]
-      .reverse()
-      .map((message) => extractBenchmarkOriginalText(message.content))
-      .find((content) => content.trim()) || ""
-
-    if (!original) {
-      toast.error("请先带入对标原文")
-      return null
-    }
-
-    const currentDraft = editorText.trim() || latestDeliverableText()
-    const lengthRule = buildBenchmarkLengthRule(original)
-
-    return [
-      "请按对标原文重新生成一版文案，直接输出最终稿。",
-      "硬性要求：",
-      buildBenchmarkRecreationSopBlock(),
-      "1. 目标字数必须和对标原文基本一致，允许 95%-105% 波动。",
-      "2. 整体至少 30% 可感知重写，不能只是替换少数字。",
-      "3. 除专有名词外，不要连续沿用原文 12 个字以上。",
-      lengthRule ? `4. ${lengthRule}` : null,
-      sourceAnalysisText.trim() ? `已有拆解：\n${sourceAnalysisText.trim()}` : null,
-      `对标原文：\n${original}`,
-      currentDraft ? `我当前不满意的稿子：\n${currentDraft}` : null,
-    ].filter(Boolean).join("\n\n")
-  }
-
-  function buildChatContent(text: string, images: AimImageAttachment[]): AimChatContent {
-    if (images.length === 0) return text
-    return [
-      { type: "text", text: text.trim() || "请分析这张图片。" },
-      ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.readUrl } })),
-    ]
-  }
-
   async function handleAddImages(files: FileList) {
     const nextImages: AimImageAttachment[] = []
     setIsUploadingImage(true)
@@ -668,37 +628,6 @@ export default function AimPage() {
       setIsUploadingImage(false)
     }
     if (nextImages.length) setImageAttachments((current) => [...current, ...nextImages].slice(-4))
-  }
-
-  function buildBenchmarkQualityMessage() {
-    const original = sourceOriginalText.trim() || [...messages]
-      .reverse()
-      .map((message) => extractBenchmarkOriginalText(message.content))
-      .find((content) => content.trim()) || ""
-    const draft = editorText.trim() || latestDeliverableText()
-
-    if (!original || !draft) return null
-
-    const report = assessBenchmarkRewrite(original, draft)
-    const lengthRatio = report.lengthRatio == null ? "无法计算" : `${Math.round(report.lengthRatio * 100)}%`
-    const lengthStatus = report.lengthPassed
-      ? "通过"
-      : report.outputChars < report.originalChars
-        ? "偏短"
-        : "偏长"
-    const copyStatus = report.tooSimilar ? "风险高，需要继续重写" : "通过"
-
-    return [
-      "## 对标自检结果",
-      `- 字数：当前 ${report.outputChars} 字 / 原文 ${report.originalChars} 字，比例 ${lengthRatio}，判定：${lengthStatus}。`,
-      `- 12字连续复用：${Math.round(report.reuseRatio * 100)}%，判定：${copyStatus}。`,
-      report.reusedSamples.length
-        ? `- 复用片段示例：${report.reusedSamples.map((sample) => `「${sample}」`).join("、")}`
-        : "- 复用片段示例：未发现明显连续复用。",
-      report.lengthPassed && !report.tooSimilar
-        ? "- 结论：这版在字数和照抄风险上基本合格，可以继续看表达质量。"
-        : "- 结论：这版还不合格，优先按原文字数重写，并替换开头、案例、过渡句或行动引导。",
-    ].join("\n\n")
   }
 
   function rememberWorkbenchPreference(input: string) {
@@ -783,16 +712,6 @@ export default function AimPage() {
     )
     toast.success("已保存到交付物")
     return true
-  }
-
-  function getOpeningSegment(text: string) {
-    const trimmed = text.trimStart()
-    const offset = text.length - trimmed.length
-    const paragraphs = trimmed.split(/\n\s*\n/)
-    const first = paragraphs[0]?.trim() || ""
-    const second = paragraphs[1]?.trim() || ""
-    const segment = first.length < 80 && second ? `${first}\n\n${second}` : first
-    return { offset, segment }
   }
 
   function handleOptimizeOpening(commandInput: string) {
@@ -941,12 +860,21 @@ export default function AimPage() {
     if (command.id === "revise_current_draft") return handleReviseCurrentDraft(command.input)
     if (command.id === "optimize_opening") return handleOptimizeOpening(command.input)
     if (command.id === "rewrite_benchmark") {
-      const rewriteInput = buildBenchmarkRewriteInput()
+      const rewriteInput = buildBenchmarkRewriteInput({
+        sourceOriginalText,
+        messages,
+        sourceAnalysisText,
+        currentDraft: editorText.trim() || latestDeliverableText(),
+      })
       if (rewriteInput) void generateWithInput(rewriteInput)
       return true
     }
     if (command.id === "run_quality_check") {
-      const localCheckMessage = buildBenchmarkQualityMessage()
+      const localCheckMessage = buildBenchmarkQualityMessage({
+        sourceOriginalText,
+        messages,
+        draft: editorText.trim() || latestDeliverableText(),
+      })
       const messageId = latestDeliverableMessageId()
       if (localCheckMessage) {
         setMessages((prev) => [...prev, { id: nextId(), role: "assistant", content: localCheckMessage }])
