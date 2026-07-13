@@ -4,7 +4,6 @@
   "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",
   "legacyFiles": [
-    { "path": "src/app/(dashboard)/topic-planning/page.tsx", "maxLines": 1248, "target": "features/topics" },
     { "path": "src/app/(dashboard)/competitor/page.tsx", "maxLines": 1105, "target": "features/competitor" },
     { "path": "src/app/(dashboard)/videos/[id]/page.tsx", "maxLines": 936, "target": "features/videos" },
     { "path": "src/app/admin/benchmark-profiles/page.tsx", "maxLines": 835, "target": "features/benchmark-profiles" },

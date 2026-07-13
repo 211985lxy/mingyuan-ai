@@ -1,135 +1,25 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, startTransition } from "react"
-import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import {
-  Check,
-  ExternalLink,
-  Loader2,
-  Plus,
-  Send,
-  Sparkles,
-  Target,
-} from "lucide-react"
+import { Target } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { AiResultPanel } from "@/components/workbench/ai-result-panel"
+import { Card, CardContent } from "@/components/ui/card"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import {
-  createKnowledge,
-  deleteKnowledge,
-  generateTopics,
-  getTodayAiHotBriefing,
-  getTodayTopics,
-  listClientProjects,
-  listKnowledge,
-  selectTopic,
-  sendTopicChatMessage,
-  updateKnowledge,
-  type ClientProject,
-  type KnowledgeEntry,
-  type TopicChatResponse,
+  createKnowledge, deleteKnowledge, generateTopics, getTodayAiHotBriefing, getTodayTopics,
+  listClientProjects, listKnowledge, selectTopic, sendTopicChatMessage, updateKnowledge,
+  type ClientProject, type KnowledgeEntry, type TopicChatResponse,
 } from "@/lib/api/client"
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags } from "@/lib/knowledge-tags"
 import { buildTopicDailyReport, type TopicDailyReportSource } from "@/lib/topic-daily-report"
 import { buildTopicPoolDraftFromSearchParams } from "@/lib/topic-pool-draft"
-import { categorizeTopicCards, getTopicDisplayLabel, scoreEntries, strongestAndWeakest } from "@/features/topics/topic-presentation"
-import { KnowledgeEntryCard } from "@/features/topics/components/knowledge-entry-card"
-import { TopicDailyReportEmptyState, TopicDailyReportPanel } from "@/features/topics/components/topic-daily-report-panel"
+import { TopicResultsPanel } from "@/features/topics/components/topic-results-panel"
+import { TopicPoolPanel, type TopicKnowledgeForms } from "@/features/topics/components/topic-pool-panel"
+import { MODE_META, type TopicCategory } from "@/features/topics/topic-planning-config"
 import type { ApiAiHotBriefingItem, ApiTopicCard, ApiTopicRecommendationMode } from "@/types/api"
-
-type TopicCategory = "daily_inspiration" | "meeting_minutes" | "benchmark_reference" | "user_insight"
-
-const CATEGORY_META: Record<
-  TopicCategory,
-  {
-    label: string
-    description: string
-    titlePlaceholder: string
-    contentPlaceholder: string
-  }
-> = {
-  daily_inspiration: {
-    label: "日常灵感",
-    description: "老板随口一句、客户现场一句话、想到的切入角度，都先收进来。",
-    titlePlaceholder: "例如：老板晨会金句",
-    contentPlaceholder: "记录原话、场景或你想到的选题切口。",
-  },
-  meeting_minutes: {
-    label: "会议纪要",
-    description: "把客户访谈、内部复盘、项目会议纪要粘贴进来，提炼真实问题和可拍选题。",
-    titlePlaceholder: "例如：7月客户复盘会",
-    contentPlaceholder: "粘贴会议纪要、访谈记录、讨论要点。保留原话、问题、分歧、案例和下一步动作。",
-  },
-  benchmark_reference: {
-    label: "参考素材",
-    description: "人工粘贴优质账号链接、爆款标题、开头方式或结构拆解。",
-    titlePlaceholder: "例如：某优质账号爆款开头",
-    contentPlaceholder: "贴链接、标题、开头文案，或你观察到的结构节奏。",
-  },
-  user_insight: {
-    label: "用户洞察",
-    description: "来自客户在选题策划和总聊天框里的真实输入，系统沉淀后再进入选题。",
-    titlePlaceholder: "",
-    contentPlaceholder: "",
-  },
-}
-
-const CATEGORY_ORDER: TopicCategory[] = [
-  "daily_inspiration",
-  "meeting_minutes",
-  "benchmark_reference",
-  "user_insight",
-]
-
-const MODE_META: Record<ApiTopicRecommendationMode, { label: string; description: string }> = {
-  normal: {
-    label: "常规选题",
-    description: "基于现有素材，给你一组能直接判断的选题。",
-  },
-  daily: {
-    label: "每日选题日报",
-    description: "先告诉你今天主推哪条，再补充原因和备选。",
-  },
-  weekly: {
-    label: "本周选题",
-    description: "把本周值得拍的方向先排出来，方便继续筛。",
-  },
-}
-
-const SCARCITY_BADGE: Record<string, string> = {
-  scenery: "稀缺·景观",
-  emotion: "稀缺·情感",
-  beauty: "稀缺·美好",
-  info: "稀缺·资讯",
-  curio: "稀缺·奇闻",
-  event: "稀缺·事件",
-}
-
-const RHETORIC_BADGE: Record<string, string> = {
-  fu: "赋",
-  bi: "比",
-  xing: "兴",
-}
-
-// 含金量阈值（软门槛：标红 + 建议，不拦截"采用"）
-const NOVELTY_HIGH = 75
-const NOVELTY_LOW = 60
-
-const VERDICT_META: Record<NonNullable<ApiTopicCard["reviewVerdict"]>, { label: string; className: string }> = {
-  strong: { label: "主推", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  usable: { label: "可用", className: "border-sky-200 bg-sky-50 text-sky-700" },
-  observe: { label: "观察", className: "border-amber-200 bg-amber-50 text-amber-700" },
-  revise: { label: "需优化", className: "border-rose-200 bg-rose-50 text-rose-700" },
-}
-
 export default function TopicPlanningPage() {
   const router = useRouter()
   const searchParams = useSearchParams() ?? new URLSearchParams()
@@ -156,7 +46,7 @@ export default function TopicPlanningPage() {
   const [topicChatInput, setTopicChatInput] = useState("")
   const [topicChatLoading, setTopicChatLoading] = useState(false)
   const [topicChatReply, setTopicChatReply] = useState<TopicChatResponse | null>(null)
-  const [forms, setForms] = useState<Record<TopicCategory, { title: string; content: string }>>({
+  const [forms, setForms] = useState<TopicKnowledgeForms>({
     daily_inspiration: { title: "", content: "" },
     meeting_minutes: { title: "", content: "" },
     benchmark_reference: { title: "", content: "" },
@@ -277,7 +167,6 @@ export default function TopicPlanningPage() {
       .finally(() => setLoadingKnowledge(false))
   }, [selectedProjectId])
 
-  // ─── 自动生成：进页/切换项目后，若今天没有 daily 缓存则自动生成 ──
   useEffect(() => {
     if (!selectedProjectId || knowledgeLoadedProjectId !== selectedProjectId || loadingKnowledge) return
     if (topicCards.length > 0) return // 已有卡片不重复触发
@@ -304,7 +193,6 @@ export default function TopicPlanningPage() {
           toast.success("已加载今日备选选题")
           return
         }
-        // missing → 自动生成
         const entryIds = knowledgeEntries.map((e) => e.id)
         return generateTopics({
           projectId: selectedProjectId,
@@ -536,21 +424,12 @@ export default function TopicPlanningPage() {
     router.push(`/aim?${params.toString()}`)
   }
 
-  const groupedEntries = CATEGORY_ORDER.map((category) => ({
-    category,
-    items: knowledgeEntries.filter((entry) => entry.category === category),
-  }))
   const dailyReport = useMemo(
     () => recommendationMode === "daily" && topicCards.length > 0
       ? buildTopicDailyReport(topicCards, dailyBriefingItems, recommendationMode, dailyReportSources)
       : null,
     [dailyBriefingItems, dailyReportSources, recommendationMode, topicCards],
   )
-  const categorizedTopicCards = useMemo(
-    () => categorizeTopicCards(topicCards),
-    [topicCards],
-  )
-
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-10">
       <WorkbenchHero
@@ -572,401 +451,47 @@ export default function TopicPlanningPage() {
       ) : (
         <>
           <div className="flex flex-col gap-6">
-            <div className="order-1 space-y-6">
-              {dailyReport ? (
-                <TopicDailyReportPanel report={dailyReport} />
-              ) : recommendationMode === "daily" ? (
-                <TopicDailyReportEmptyState
-                  error={autoGenerateError}
-                  onGenerate={handleGenerateTopics}
-                  disabled={!selectedProjectId || isGenerating || autoGenerating}
-                />
-              ) : null}
+            <TopicResultsPanel
+              dailyReport={dailyReport}
+              autoGenerateError={autoGenerateError}
+              recommendationMode={recommendationMode}
+              selectedProjectName={selectedProject ? selectedProject.name : loadingProjects ? "正在读取全案" : "全案配置中"}
+              selectedKnowledgeIds={selectedKnowledgeIds}
+              knowledgeEntries={knowledgeEntries}
+              isGenerating={isGenerating}
+              autoGenerating={autoGenerating}
+              topicCards={topicCards}
+              selectedTopicIndex={selectedTopicIndex}
+              onGenerate={handleGenerateTopics}
+              onModeChange={(mode) => {
+                setRecommendationMode(mode)
+                setTopicCards([])
+                setDailyBriefingItems([])
+                setDailyReportSources([])
+                setTopicSelectionId(null)
+                setSelectedTopicIndex(null)
+              }}
+              onSelectTopic={handleSelectTopic}
+              onWriteTopic={jumpToAim}
+            />
 
-              <AiResultPanel
-                title="选题设置"
-                icon={<Target className="h-4 w-4 text-primary" />}
-                meta={<span>{MODE_META[recommendationMode].description}</span>}
-                contentClassName="flex flex-wrap items-center justify-between gap-3 p-4"
-                flat
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  {Object.entries(MODE_META).map(([mode, meta]) => (
-                    <Button
-                      key={mode}
-                      size="sm"
-                      variant={recommendationMode === mode ? "default" : "outline"}
-                      onClick={() => {
-                        setRecommendationMode(mode as ApiTopicRecommendationMode)
-                        setTopicCards([])
-                        setDailyBriefingItems([])
-                        setDailyReportSources([])
-                        setTopicSelectionId(null)
-                        setSelectedTopicIndex(null)
-                      }}
-                    >
-                      {meta.label}
-                    </Button>
-                  ))}
-                  <Badge variant="outline">{selectedProject ? selectedProject.name : loadingProjects ? "正在读取全案" : "全案配置中"}</Badge>
-                  <Badge variant="secondary">
-                    {selectedKnowledgeIds.length > 0 ? `已选素材 ${selectedKnowledgeIds.length} 条` : `选题池 ${knowledgeEntries.length} 条`}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    onClick={handleGenerateTopics}
-                    disabled={!selectedProjectId || isGenerating || autoGenerating}
-                  >
-                    <Sparkles className="mr-1 h-4 w-4" />
-                    {isGenerating || autoGenerating ? "生成中..." : topicCards.length > 0 ? "重新生成" : `生成${MODE_META[recommendationMode].label}`}
-                  </Button>
-                </div>
-              </AiResultPanel>
-
-              <AiResultPanel
-                title="备选选题"
-                icon={<Sparkles className="h-4 w-4 text-primary" />}
-                meta={<span>今天这条不拍，再从这里换。选中后直接去 AIM 写文案。</span>}
-                flat
-              >
-                  <div className="flex flex-wrap gap-2">
-                    {selectedKnowledgeIds.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        还没手动圈素材，系统会优先参考对标账号、拆解文案和热点；知识库 {knowledgeEntries.length} 条素材只作补充。
-                      </p>
-                    ) : (
-                      selectedKnowledgeIds.map((entryId) => {
-                        const entry = knowledgeEntries.find((item) => item.id === entryId)
-                        if (!entry) return null
-                        return (
-                          <Badge key={entry.id} variant="outline">
-                            {CATEGORY_META[entry.category as TopicCategory]?.label ?? "素材"} · {entry.title}
-                          </Badge>
-                        )
-                      })
-                    )}
-                  </div>
-
-                  {autoGenerating ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      正在整理今日备选选题…
-                    </div>
-                  ) : topicCards.length === 0 ? (
-                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      暂无备选选题。
-                    </div>
-                  ) : (
-                      <div className="space-y-5">
-                        {categorizedTopicCards.map((group) => (
-                          <div key={group.key}>
-                            <div className="mb-2 flex items-center gap-2">
-                              <span className="text-sm font-medium text-foreground">{group.label}</span>
-                              <Badge variant="secondary" className="text-[11px]">{group.cards.length}</Badge>
-                            </div>
-                            <div className="grid gap-3">
-                              {group.cards.map((card) => {
-                                const index = topicCards.indexOf(card)
-                                const isSelected = selectedTopicIndex === index
-                                return (
-                                  <div
-                                    key={`${card.title}-${index}`}
-                                    className={`rounded-2xl border p-4 shadow-sm transition-colors ${
-                                      isSelected
-                                        ? "border-primary/30 bg-primary/[0.04]"
-                                        : "border-primary/10 bg-card"
-                                    }`}
-                                  >
-                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                      <div className="min-w-0 flex-1 space-y-3">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <Badge variant="secondary">#{index + 1}</Badge>
-                                          {isSelected && <Badge>已采用</Badge>}
-                                          <Badge variant="outline">{getTopicDisplayLabel(card)}</Badge>
-                                          {typeof card.score === "number" && <Badge variant="outline">{card.score}分</Badge>}
-                                          {card.reviewVerdict && (
-                                            <Badge variant="outline" className={VERDICT_META[card.reviewVerdict].className}>
-                                              {VERDICT_META[card.reviewVerdict].label}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <div className="space-y-2">
-                                          <h3 className="text-base font-semibold leading-6">{card.title}</h3>
-                                          {card.rationale ? (
-                                            <p className="text-sm leading-6 text-muted-foreground">{card.rationale}</p>
-                                          ) : null}
-                                        </div>
-                                        <div className="grid gap-3 text-sm md:grid-cols-2">
-                                          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">为什么值得拍</p>
-                                            <p className="mt-1 leading-6 text-foreground">
-                                              {card.scoreReason || card.contentLine || "先从这个方向切，判断会更稳。"}
-                                            </p>
-                                          </div>
-                                          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">适合怎么讲</p>
-                                            <p className="mt-1 leading-6 text-foreground">
-                                              {card.hook || card.angle || "先抛问题，再给判断，最后落到动作。"}
-                                            </p>
-                                          </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 text-xs">
-                                          {card.contentLine ? (
-                                            <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">
-                                              {card.contentLine}
-                                            </Badge>
-                                          ) : null}
-                                          {card.sourceType ? <Badge variant="outline">{card.sourceType}</Badge> : null}
-                                          {card.defamiliarization?.scarcityType ? (
-                                            <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">
-                                              {SCARCITY_BADGE[card.defamiliarization.scarcityType] ?? card.defamiliarization.scarcityType}
-                                            </Badge>
-                                          ) : null}
-                                          {card.defamiliarization?.rhetoric ? (
-                                            <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
-                                              {RHETORIC_BADGE[card.defamiliarization.rhetoric] ?? card.defamiliarization.rhetoric}
-                                            </Badge>
-                                          ) : null}
-                                        </div>
-                                      </div>
-                                      <div className="flex flex-col gap-2 lg:w-40">
-                                        {isSelected ? (
-                                          <Button className="w-full" onClick={() => jumpToAim(card, index)}>
-                                            <Send className="mr-1 h-4 w-4" />
-                                            去 AIM 写文案
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            className="w-full"
-                                            variant="outline"
-                                            onClick={() => handleSelectTopic(card, index)}
-                                            disabled={selectedTopicIndex !== null}
-                                          >
-                                            <Check className="mr-1 h-4 w-4" />
-                                            采用这个选题
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {card.scoreBreakdown ? (
-                                      <div className="mt-4 space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3">
-                                        <div className="grid gap-2 sm:grid-cols-5">
-                                          {scoreEntries(card).map((entry) => (
-                                            <div key={entry.key} className="space-y-1">
-                                              <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                                                <span>{entry.label}</span>
-                                                <span>{entry.value}</span>
-                                              </div>
-                                              <div className="h-1.5 rounded-full bg-muted">
-                                                <div className="h-1.5 rounded-full bg-primary" style={{ width: `${entry.value}%` }} />
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        {(() => {
-                                          const summary = strongestAndWeakest(card)
-                                          return summary ? (
-                                            <p className="text-xs text-muted-foreground">
-                                              强项是{summary.strongest.label}，短板是{summary.weakest.label}。
-                                              {card.revisionAdvice ? ` ${card.revisionAdvice}` : ""}
-                                            </p>
-                                          ) : null
-                                        })()}
-                                      </div>
-                                    ) : null}
-                                    {card.defamiliarization ? (() => {
-                                      const df = card.defamiliarization
-                                      const score = typeof df.noveltyScore === "number" ? df.noveltyScore : null
-                                      const low = score !== null && score < NOVELTY_LOW
-                                      const barColor = score === null
-                                        ? "bg-muted-foreground"
-                                        : score >= NOVELTY_HIGH
-                                          ? "bg-emerald-500"
-                                          : low
-                                            ? "bg-rose-500"
-                                            : "bg-amber-500"
-                                      const levelLabel =
-                                        score === null
-                                          ? "未评分"
-                                          : score >= NOVELTY_HIGH
-                                            ? "高含金量"
-                                            : low
-                                              ? "含金量偏低"
-                                              : "中等"
-                                      return (
-                                        <div className={`mt-2 space-y-2 rounded-xl border p-3 ${low ? "border-rose-200 bg-rose-50/40" : "border-border/70 bg-muted/10"}`}>
-                                          <div className="flex items-center justify-between gap-2">
-                                            <span className="text-[11px] font-medium text-muted-foreground">陌生化含金量 · {levelLabel}</span>
-                                            {score !== null && <span className={`text-[11px] ${low ? "text-rose-600" : "text-muted-foreground"}`}>{score}</span>}
-                                          </div>
-                                          {score !== null && (
-                                            <div className="h-1.5 rounded-full bg-muted">
-                                              <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${score}%` }} />
-                                            </div>
-                                          )}
-                                          {df.note ? (
-                                            <p className="text-xs text-muted-foreground">凭什么陌生：{df.note}</p>
-                                          ) : null}
-                                          {df.advice ? (
-                                            <p className={`text-xs ${low ? "text-rose-600" : "text-muted-foreground"}`}>{df.advice}</p>
-                                          ) : null}
-                                        </div>
-                                      )
-                                    })() : null}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-              </AiResultPanel>
-            </div>
-
-              <Card className="order-3 border-primary/20 bg-primary/[0.02]">
-              <CardHeader className="pb-3">
-                <CardTitle>临时想法</CardTitle>
-                <CardDescription>
-                  丢一句客户问题、现场灵感或对标观察，先整理出方向。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  value={topicChatInput}
-                  placeholder="比如：今天客户又问我为什么报价比别人高"
-                  className="min-h-24"
-                  onChange={(event) => setTopicChatInput(event.target.value)}
-                />
-                <div className="flex justify-end">
-                  <Button onClick={handleTopicChatSubmit} disabled={topicChatLoading || !selectedProjectId}>
-                    <Sparkles className="mr-1 h-4 w-4" />
-                    {topicChatLoading ? "整理中..." : "整理成方向"}
-                  </Button>
-                </div>
-                {topicChatReply ? (
-                  <div className="rounded-lg border bg-background p-3 text-sm leading-6">
-                    <p className="font-medium">{topicChatReply.reply.summary}</p>
-                    <p className="mt-2">
-                      <b>优先方向：</b>{topicChatReply.reply.recommendedTitle}
-                    </p>
-                    <p>
-                      <b>开头：</b>{topicChatReply.reply.opening}
-                    </p>
-                    {topicChatReply.reply.alternatives.length > 0 ? (
-                      <p>
-                        <b>备选角度：</b>{topicChatReply.reply.alternatives.join("、")}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <div className="order-4 rounded-xl border bg-muted/20 p-3 text-sm opacity-80">
-              <div className="font-medium text-muted-foreground">
-                选题池 {knowledgeEntries.length} 条
-              </div>
-              <div className="mt-4 space-y-4">
-                {groupedEntries.map(({ category, items }) => (
-                <Card key={category} className="shadow-none">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <CardTitle>{CATEGORY_META[category].label}</CardTitle>
-                        <CardDescription>{CATEGORY_META[category].description}</CardDescription>
-                      </div>
-                      <Badge variant="secondary">{items.length} 条</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {category === "user_insight" ? (
-                      <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
-                        客户在选题策划或总聊天框里提到的偏好、顾虑和真实问题，会沉淀到这里。
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        <div className="space-y-2">
-                          <Label>标题</Label>
-                          <Input
-                            value={forms[category].title}
-                            placeholder={CATEGORY_META[category].titlePlaceholder}
-                            onChange={(event) => updateForm(category, "title", event.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>内容</Label>
-                          <Textarea
-                            value={forms[category].content}
-                            placeholder={CATEGORY_META[category].contentPlaceholder}
-                            className="min-h-28"
-                            onChange={(event) => updateForm(category, "content", event.target.value)}
-                          />
-                        </div>
-                        <div className="flex justify-end">
-                          <Button
-                            onClick={() => handleCreateKnowledge(category)}
-                            disabled={savingCategory === category}
-                          >
-                            <Plus className="mr-1 h-4 w-4" />
-                            {savingCategory === category ? "保存中..." : "加入选题池"}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-3 border-t pt-4">
-                      {loadingKnowledge ? (
-                        <p className="text-sm text-muted-foreground">正在读取项目素材...</p>
-                      ) : items.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          {category === "user_insight"
-                            ? "还没有沉淀到用户洞察。客户多聊几轮后，可以从对话里提炼出来。"
-                            : "这个分类还没有素材，先录一条，后面生成选题时就能直接带进去。"}
-                        </p>
-                      ) : (
-                        items.map((entry) => (
-                          <KnowledgeEntryCard
-                            key={entry.id}
-                            entry={entry}
-                            selected={selectedKnowledgeIds.includes(entry.id)}
-                            onToggleSelected={() => toggleKnowledgeSelection(entry.id)}
-                            onSave={(data) => handleUpdateKnowledge(entry.id, data)}
-                            onArchive={() => handleArchiveKnowledge(entry.id)}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-            <div className="order-5 grid gap-3 md:grid-cols-2">
-              <Link href="/ai-hot" className="block">
-                <Card className="h-full transition-colors hover:border-primary/40 hover:bg-muted/40">
-                  <CardContent className="flex items-center justify-between gap-3 p-4">
-                    <div>
-                      <p className="font-semibold text-foreground">全网热点洞察</p>
-                      <p className="mt-1 text-sm text-muted-foreground">查看当天热点、行业信号和可用线索，再收进选题池。</p>
-                    </div>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              </Link>
-              <Link href="/competitor" className="block">
-                <Card className="h-full transition-colors hover:border-primary/40 hover:bg-muted/40">
-                  <CardContent className="flex items-center justify-between gap-3 p-4">
-                    <div>
-                      <p className="font-semibold text-foreground">竞品研究</p>
-                      <p className="mt-1 text-sm text-muted-foreground">查看对标账号、爆款作品和趋势证据。</p>
-                    </div>
-                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                  </CardContent>
-                </Card>
-              </Link>
-            </div>
+            <TopicPoolPanel
+              topicChatInput={topicChatInput}
+              topicChatLoading={topicChatLoading}
+              topicChatReply={topicChatReply}
+              knowledgeEntries={knowledgeEntries}
+              forms={forms}
+              savingCategory={savingCategory}
+              loadingKnowledge={loadingKnowledge}
+              selectedKnowledgeIds={selectedKnowledgeIds}
+              onTopicChatInputChange={setTopicChatInput}
+              onTopicChatSubmit={handleTopicChatSubmit}
+              onFormChange={updateForm}
+              onCreateKnowledge={handleCreateKnowledge}
+              onToggleKnowledge={toggleKnowledgeSelection}
+              onUpdateKnowledge={handleUpdateKnowledge}
+              onArchiveKnowledge={handleArchiveKnowledge}
+            />
           </div>
         </>
       )}
