@@ -8,7 +8,6 @@ import {
   FileText,
   Loader2,
   Sparkles,
-  ShieldCheck,
   Target,
   Plus,
   ArrowRight,
@@ -35,6 +34,7 @@ import { AimProjectTaskPanel } from "@/features/aim/components/project-task-pane
 import { BenchmarkEditorPanel, type EditorSelection } from "@/features/aim/components/benchmark-editor-panel"
 import { DeliverableBubble } from "@/features/aim/components/deliverable-bubble"
 import { ChoiceStepper } from "@/features/aim/components/choice-stepper"
+import { QualityReportCard } from "@/features/aim/components/quality-report-card"
 import { extractChoiceGroups } from "@/features/aim/aim-choice-groups"
 import { aimDraftStorageKey, loadAimDraft, saveAimDraft } from "@/features/aim/aim-draft-storage"
 import type {
@@ -1996,89 +1996,7 @@ export default function AimPage() {
                       </div>
                     )}
 
-                    {/* 质检报告 */}
-                    {m.qualityReport && (
-                      <div className="mt-2 w-full rounded-xl border border-primary/20 bg-card p-4">
-                        <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                          <ShieldCheck className="h-4 w-4 text-primary" />
-                          质检报告
-                          <Badge variant={m.qualityReport.overall.passed ? "default" : "destructive"} className="ml-auto">
-                            {m.qualityReport.overall.score}分 {m.qualityReport.overall.passed ? "通过" : "需修改"}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          {[
-                            { label: "开头吸引力", data: m.qualityReport.attraction },
-                            { label: "逻辑性", data: m.qualityReport.logic },
-                            { label: "去AI味", data: m.qualityReport.aiTaste },
-                            { label: "文笔质量", data: m.qualityReport.editorial },
-                          ].map((dim) => (
-                            <div key={dim.label} className="rounded-lg border p-2 text-center">
-                              <p className="text-[10px] text-muted-foreground">{dim.label}</p>
-                              <p className={`text-xl font-bold ${dim.data.passed ? "text-green-600" : "text-red-500"}`}>{dim.data.score}</p>
-                            </div>
-                          ))}
-                        </div>
-                        {m.qualityReport.publishCheck && (
-                          <div className="mt-4 space-y-3 border-t pt-4">
-                            <div className="flex items-center gap-2 text-sm font-semibold">
-                              抖音发布前自查
-                              <Badge
-                                variant={m.qualityReport.publishCheck.verdict === "可发" ? "default" : "destructive"}
-                                className="ml-auto"
-                              >
-                                {m.qualityReport.publishCheck.verdict}
-                              </Badge>
-                            </div>
-                            {m.qualityReport.publishCheck.violations.length > 0 ? (
-                              <div className="space-y-2">
-                                {m.qualityReport.publishCheck.violations.map((violation) => (
-                                  <div key={`${violation.text}-${violation.category}`} className="rounded-lg border p-3 text-sm">
-                                    <div className="mb-1 flex flex-wrap items-center gap-2">
-                                      <span className="font-medium">「{violation.text}」</span>
-                                      <Badge variant={violation.severity === "high" ? "destructive" : "secondary"} className="text-[10px]">
-                                        {violation.category}
-                                      </Badge>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">{violation.reason}</p>
-                                    <p className="mt-1 text-xs text-foreground">{violation.suggest}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">未发现明显发布违规风险。</p>
-                            )}
-                            <div className="rounded-lg border p-3">
-                              <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                                流量潜力评分
-                                <Badge variant={m.qualityReport.publishCheck.trafficScore.score >= 80 ? "default" : "secondary"} className="ml-auto">
-                                  {m.qualityReport.publishCheck.trafficScore.score}分 · {m.qualityReport.publishCheck.trafficScore.level}
-                                </Badge>
-                              </div>
-                              <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                                {m.qualityReport.publishCheck.trafficScore.reasons.map((item) => (
-                                  <li key={item}>{item}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            <p className="text-xs text-muted-foreground">{m.qualityReport.publishCheck.aiLabelReminder}</p>
-                            {m.qualityReport.publishCheck.trafficWeakness.length > 0 && (
-                              <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground">
-                                {m.qualityReport.publishCheck.trafficWeakness.map((item) => (
-                                  <li key={item}>{item}</li>
-                                ))}
-                              </ul>
-                            )}
-                            {m.qualityReport.publishCheck.violations.length > 0 && m.qualityReport.publishCheck.minimalRewrite !== "" && (
-                              <div className="rounded-lg bg-muted/40 p-3">
-                                <p className="mb-1 text-xs font-medium text-muted-foreground">最小改法</p>
-                                <p className="whitespace-pre-wrap text-sm leading-6">{m.qualityReport.publishCheck.minimalRewrite}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {m.qualityReport && <QualityReportCard report={m.qualityReport} />}
                   </div>
                 </div>
               ))}
