@@ -64,6 +64,56 @@ export interface BenchmarkProfileForm {
   notes: string
 }
 
+export interface ProfileItem {
+  id: string
+  kind: string
+  title: string
+  content: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProfileDetail {
+  id: string
+  name: string
+  platform: string
+  accountUrl: string | null
+  platformUserId: string | null
+  followerCount: number | null
+  personaTags: unknown
+  positioning: string | null
+  differentiator: string | null
+  takeaways: string | null
+  competitorAnalysisId: string | null
+  notes: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+  project: { id: string; name: string; companyName: string | null; industry: string | null } | null
+  user: { id: string; name: string | null; email: string } | null
+  items: ProfileItem[]
+}
+
+export interface ImportableAnalysis {
+  id: string
+  targetUrl: string | null
+  platform: string | null
+  accountName: string | null
+  overallScore: number | null
+  status: string
+  createdAt: string
+  userId: string
+  user: { email: string | null; name: string | null } | null
+}
+
+export interface EditableProfileItem {
+  id: string
+  title: string
+  content: string
+  kind: string
+}
+
 export function formatFollowerCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return ""
   if (value >= 10000) return `${(value / 10000).toFixed(1)}万粉丝`

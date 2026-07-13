@@ -3,7 +3,5 @@
   "targetModuleLineRange": [100, 300],
   "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",
-  "legacyFiles": [
-    { "path": "src/app/admin/benchmark-profiles/[id]/page.tsx", "maxLines": 805, "target": "features/benchmark-profiles" }
-  ]
+  "legacyFiles": []
 }

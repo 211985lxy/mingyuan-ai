@@ -10,7 +10,6 @@ const legacyLargeFiles = [
   "src/app/admin/knowledge/page.tsx",
   "src/lib/aim-agent-handlers.ts",
   "src/app/(dashboard)/topic-planning/page.tsx",
-  "src/app/admin/benchmark-profiles/[id]/page.tsx",
   "__tests__/e2e/three-layer-flow.test.ts",
 ];
 

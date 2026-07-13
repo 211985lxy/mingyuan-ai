@@ -5,120 +5,22 @@ import { useParams, useRouter } from "next/navigation"
 import {
   AlertCircle,
   ArrowLeft,
-  ChevronDown,
-  ChevronUp,
   Download,
   Loader2,
-  Plus,
   Save,
   Trash2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { ProfileBasicForm } from "@/features/benchmark-profiles/components/profile-basic-form"
+import { ProfileDetailDialogs } from "@/features/benchmark-profiles/components/profile-detail-dialogs"
+import { ProfileMaterials } from "@/features/benchmark-profiles/components/profile-materials"
+import { PLATFORM_COLORS, PLATFORM_LABELS, type EditableProfileItem, type ImportableAnalysis, type ProfileDetail } from "@/features/benchmark-profiles/model"
 import { getStoredAdminToken } from "@/lib/admin-store"
 import { cn } from "@/lib/utils"
-
-// ── 常量 ──
-
-const PLATFORM_LABELS: Record<string, string> = {
-  douyin: "抖音",
-  xiaohongshu: "小红书",
-  bilibili: "B站",
-  kuaishou: "快手",
-}
-
-const PLATFORM_COLORS: Record<string, string> = {
-  douyin: "bg-pink-50 text-pink-700 border-pink-200",
-  xiaohongshu: "bg-red-50 text-red-700 border-red-200",
-  bilibili: "bg-blue-50 text-blue-700 border-blue-200",
-  kuaishou: "bg-orange-50 text-orange-700 border-orange-200",
-}
-
-const KIND_LABELS: Record<string, string> = {
-  note: "笔记",
-  report: "诊断报告",
-  copy_extraction: "文案提取",
-  video: "爆款样本",
-  account_pool: "账号池",
-  structure_asset: "结构资产",
-  topic_candidates: "选题池",
-}
-
-const KIND_COLORS: Record<string, string> = {
-  note: "bg-gray-100 text-gray-600",
-  report: "bg-indigo-50 text-indigo-600",
-  copy_extraction: "bg-amber-50 text-amber-600",
-  video: "bg-emerald-50 text-emerald-600",
-  account_pool: "bg-violet-50 text-violet-600",
-  structure_asset: "bg-fuchsia-50 text-fuchsia-600",
-  topic_candidates: "bg-orange-50 text-orange-600",
-}
-
-// ── 类型 ──
-
-interface ProfileItem {
-  id: string
-  kind: string
-  title: string
-  content: string
-  sortOrder: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface ProfileDetail {
-  id: string
-  name: string
-  platform: string
-  accountUrl: string | null
-  platformUserId: string | null
-  followerCount: number | null
-  personaTags: unknown
-  positioning: string | null
-  differentiator: string | null
-  takeaways: string | null
-  competitorAnalysisId: string | null
-  notes: string | null
-  status: string
-  createdAt: string
-  updatedAt: string
-  project: { id: string; name: string; companyName: string | null; industry: string | null } | null
-  user: { id: string; name: string | null; email: string } | null
-  items: ProfileItem[]
-}
-
-interface ImportableAnalysis {
-  id: string
-  targetUrl: string | null
-  platform: string | null
-  accountName: string | null
-  overallScore: number | null
-  status: string
-  createdAt: string
-  userId: string
-  user: { email: string | null; name: string | null } | null
-}
 
 // ── 辅助 ──
 
@@ -153,7 +55,7 @@ export default function BenchmarkProfileDetailPage() {
   const [notes, setNotes] = React.useState("")
 
   // items 逐条编辑状态
-  const [editItems, setEditItems] = React.useState<Array<{ id: string; title: string; content: string; kind: string }>>([])
+  const [editItems, setEditItems] = React.useState<EditableProfileItem[]>([])
   const [expandedItems, setExpandedItems] = React.useState<Set<string>>(new Set())
   const [savingItemIds, setSavingItemIds] = React.useState<Set<string>>(new Set())
 
@@ -431,8 +333,6 @@ export default function BenchmarkProfileDetailPage() {
     )
   }
 
-  const isAccount = !!platform
-
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       {/* 顶部导航 */}
@@ -485,308 +385,51 @@ export default function BenchmarkProfileDetailPage() {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      {/* 基础信息 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>基础信息</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>账号名称 / IP 名称 *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>平台</Label>
-              <Select value={platform} onValueChange={(v) => { if (v) setPlatform(v) }}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="选择平台（可选）" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(PLATFORM_LABELS).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <ProfileBasicForm
+        name={name}
+        platform={platform}
+        accountUrl={accountUrl}
+        followerCount={followerCount}
+        positioning={positioning}
+        differentiator={differentiator}
+        takeaways={takeaways}
+        notes={notes}
+        onNameChange={setName}
+        onPlatformChange={setPlatform}
+        onAccountUrlChange={setAccountUrl}
+        onFollowerCountChange={setFollowerCount}
+        onPositioningChange={setPositioning}
+        onDifferentiatorChange={setDifferentiator}
+        onTakeawaysChange={setTakeaways}
+        onNotesChange={setNotes}
+      />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>主页链接</Label>
-              <Input value={accountUrl} onChange={(e) => setAccountUrl(e.target.value)} placeholder="https://..." />
-            </div>
-            <div className="space-y-2">
-              <Label>粉丝数</Label>
-              <Input
-                type="number"
-                value={followerCount}
-                onChange={(e) => setFollowerCount(e.target.value)}
-                placeholder="如：120000"
-              />
-            </div>
-          </div>
+      <ProfileMaterials
+        items={editItems}
+        expandedIds={expandedItems}
+        savingIds={savingItemIds}
+        onAdd={handleAddItem}
+        onToggle={(itemId) => setExpandedItems((current) => { const next = new Set(current); if (next.has(itemId)) next.delete(itemId); else next.add(itemId); return next })}
+        onUpdate={updateEditItem}
+        onSave={handleSaveItem}
+        onDelete={handleDeleteItem}
+      />
 
-          {/* 真实账号专属字段 */}
-          {isAccount && (
-            <div className="space-y-4 pt-2 border-t">
-              <div className="space-y-2">
-                <Label>内容定位</Label>
-                <Textarea
-                  rows={2}
-                  value={positioning}
-                  onChange={(e) => setPositioning(e.target.value)}
-                  placeholder="该账号的核心内容方向..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>差异化</Label>
-                <Textarea
-                  rows={2}
-                  value={differentiator}
-                  onChange={(e) => setDifferentiator(e.target.value)}
-                  placeholder="相比同类账号的独特之处..."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>借鉴要点</Label>
-                <Textarea
-                  rows={2}
-                  value={takeaways}
-                  onChange={(e) => setTakeaways(e.target.value)}
-                  placeholder="迁移给本 IP 时怎么用..."
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2 pt-2 border-t">
-            <Label>备注（可选）</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="内部备注..." />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 素材列表 */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">素材资料（{editItems.length} 条）</h2>
-          <Button variant="outline" size="sm" onClick={handleAddItem}>
-            <Plus className="h-4 w-4 mr-1" />
-            添加素材
-          </Button>
-        </div>
-
-        {editItems.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                暂无素材。可点击「添加素材」手动添加，或使用「一键拉取」导入竞品分析。
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          editItems.map((item) => {
-            const isExpanded = expandedItems.has(item.id)
-            const isSaving = savingItemIds.has(item.id)
-
-            return (
-              <Card key={item.id}>
-                <CardContent className="p-0">
-                  {/* Item header */}
-                  <button
-                    type="button"
-                    className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-                    onClick={() =>
-                      setExpandedItems((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(item.id)) next.delete(item.id)
-                        else next.add(item.id)
-                        return next
-                      })
-                    }
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <Badge
-                        variant="outline"
-                        className={cn("shrink-0 text-[10px]", KIND_COLORS[item.kind])}
-                      >
-                        {KIND_LABELS[item.kind] ?? item.kind}
-                      </Badge>
-                      <span className="truncate text-sm font-medium">{item.title}</span>
-                      {item.content && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          {item.content.length} 字
-                        </span>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* Item body (expanded) */}
-                  {isExpanded && (
-                    <div className="px-4 pb-4 space-y-3 border-t pt-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs">标题</Label>
-                        <Input
-                          className="h-9 text-sm"
-                          value={item.title}
-                          onChange={(e) => updateEditItem(item.id, "title", e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">类型</Label>
-                        <Select
-                          value={item.kind}
-                          onValueChange={(v) => { if (v) updateEditItem(item.id, "kind", v) }}
-                        >
-                          <SelectTrigger className="h-9 text-sm w-[140px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(KIND_LABELS).map(([k, v]) => (
-                              <SelectItem key={k} value={k}>{v}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">内容</Label>
-                        <Textarea
-                          className="min-h-32 text-sm"
-                          value={item.content}
-                          onChange={(e) => updateEditItem(item.id, "content", e.target.value)}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleSaveItem(item.id)}
-                          disabled={isSaving || !item.content.trim()}
-                        >
-                          {isSaving ? (
-                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-                          ) : (
-                            <Save className="h-3.5 w-3.5 mr-1" />
-                          )}
-                          保存此条
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          删除
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })
-        )}
-      </div>
-
-      {/* ── 归档确认 Dialog ── */}
-      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>确认归档</DialogTitle>
-            <DialogDescription>
-              归档后，该档案及其所有素材将从 AIM 检索中移除。你可以随时在「已归档」列表中恢复。
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiving}>
-              取消
-            </Button>
-            <Button variant="destructive" onClick={handleArchive} disabled={archiving}>
-              {archiving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  归档中
-                </>
-              ) : (
-                "确认归档"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── 一键拉取 Dialog ── */}
-      <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>一键拉取竞品分析</DialogTitle>
-            <DialogDescription>
-              选择一个已完成的竞品分析，导入账号诊断和爆款样本到当前档案。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            {importLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : importableAnalyses.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                暂无可导入的竞品分析记录
-              </p>
-            ) : (
-              <Select value={selectedAnalysisId} onValueChange={(v) => { if (v) setSelectedAnalysisId(v) }}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="选择竞品分析..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {importableAnalyses.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{a.accountName || "未知账号"}</span>
-                        {a.platform && PLATFORM_LABELS[a.platform] && (
-                          <Badge variant="outline" className="text-[10px] ml-1">
-                            {PLATFORM_LABELS[a.platform]}
-                          </Badge>
-                        )}
-                        {a.overallScore != null && (
-                          <span className="text-muted-foreground text-xs">{a.overallScore}分</span>
-                        )}
-                        {a.user && (
-                          <span className="text-muted-foreground text-xs">({a.user.email ?? a.user.name})</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {importError ? (
-              <p className="text-sm text-destructive">{importError}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importing}>
-              取消
-            </Button>
-            <Button onClick={handleImportAnalysis} disabled={importing || !selectedAnalysisId}>
-              {importing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  导入中
-                </>
-              ) : (
-                "导入"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProfileDetailDialogs
+        archiveOpen={archiveOpen}
+        archiving={archiving}
+        importOpen={importOpen}
+        importLoading={importLoading}
+        importing={importing}
+        analyses={importableAnalyses}
+        selectedAnalysisId={selectedAnalysisId}
+        importError={importError}
+        onArchiveOpenChange={setArchiveOpen}
+        onArchive={handleArchive}
+        onImportOpenChange={setImportOpen}
+        onAnalysisChange={setSelectedAnalysisId}
+        onImport={handleImportAnalysis}
+      />
     </div>
   )
 }
