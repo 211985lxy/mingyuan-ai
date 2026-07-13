@@ -16,7 +16,6 @@ import {
   Loader2,
   FileText,
   Bell,
-  Wand2,
   Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,6 +25,8 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
+import { CompetitorVideoCard } from "@/features/competitor/components/competitor-video-card"
+import { DiscoveredAccountGroup } from "@/features/competitor/components/discovered-accounts"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api/client"
 import {
@@ -43,8 +44,7 @@ import {
   type SimilarAccount,
 } from "@/lib/api/client"
 import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
-import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
-import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
+import { buildProxyImageUrl } from "@/lib/proxy-image-client"
 import {
   accountPageUrl,
   compactAccountUrl,
@@ -70,11 +70,6 @@ const ACTIVE_EXTRACTION_STATUSES = new Set(["queued", "extracting", "analyzing"]
 function proxyAvatarUrl(url: string): string {
   return buildProxyImageUrl(url)
 }
-
-function proxyCoverUrl(url: string): string {
-  return buildProxyImageUrl(url)
-}
-
 
 function refreshStatusBadge(account: WatchAccount) {
   if (account.refreshStatus === "refreshing")
@@ -408,118 +403,6 @@ export default function CompetitorWatchPage() {
 
   const hasRefreshingAccount = accounts.some((account) => account.refreshStatus === "refreshing")
 
-  function renderExtractionResult(record: ApiVideoCopyExtraction) {
-    const analysis = record.analysisResult as { markdown: string } | null
-    const rewriteHref = `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
-    if (record.status === "failed") {
-      return <p className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-600">{record.errorMessage || "文案提取失败"}</p>
-    }
-    if (!analysis) return null
-
-    return (
-      <AiResultPanel
-        title="文案拆解预览"
-        icon={<FileText className="h-3.5 w-3.5 text-primary" />}
-        meta={<span>{record.status === "completed" ? "已完成" : "处理中"}</span>}
-        contentClassName="p-2"
-        className="rounded-lg"
-        flat
-      >
-        <p className="mt-1 line-clamp-4 text-muted-foreground">{cleanVideoCopyAnalysisMarkdown(analysis.markdown).slice(0, 200)}...</p>
-        {record.transcript ? (
-          <p className="mt-2 line-clamp-2 text-muted-foreground">原文案：{record.transcript}</p>
-        ) : null}
-        <div className="mt-2 flex items-center justify-between border-t pt-2 gap-2">
-          <Link href="/video-copy" className="text-xs text-primary hover:underline">
-            查看完整记录
-          </Link>
-          <Link
-            href={rewriteHref}
-            className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Wand2 className="h-3 w-3" />
-            生成内容资产包
-          </Link>
-        </div>
-      </AiResultPanel>
-    )
-  }
-
-  function renderVideoCard(video: WatchVideo, options: { viral?: boolean; rank?: number } = {}) {
-    const key = `${video.account.id}-${video.videoId}`
-    const record = videoExtractions[key]
-    const isBusy = extractingVideoId === key || (record && ACTIVE_EXTRACTION_STATUSES.has(record.status))
-
-    return (
-      <div key={`${options.viral ? "viral-" : ""}${key}`} className="space-y-2">
-        <a
-          href={accountPageUrl(video)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`group/video relative block aspect-[9/16] rounded-lg overflow-hidden bg-muted ${options.viral ? "ring-1 ring-orange-300/50" : ""}`}
-        >
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-b from-muted/30 to-muted-foreground/10 p-4">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background/50 backdrop-blur-xs text-muted-foreground/60 shadow-xs">
-              <Video className="h-5 w-5" />
-            </span>
-          </div>
-          <img
-            src={proxyCoverUrl(video.coverUrl)}
-            alt={video.title || (options.viral ? "爆款作品" : "作品")}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover/video:scale-105"
-            onError={(e) => handleProxyImageError(e, video.coverUrl || "")}
-          />
-          <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-2">
-            <p className="text-xs text-white font-medium line-clamp-1">
-              {video.title || "无标题"}
-            </p>
-            <div className="flex items-center gap-2 text-[10px] text-white/70 mt-0.5">
-              <span>赞 {formatCount(video.likes)}</span>
-              <span>评 {formatCount(video.comments)}</span>
-              {options.viral && video.engagementScore != null ? (
-                <span className="text-orange-300">热 {formatCount(video.engagementScore)}</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between">
-            <span className="text-[10px] px-1 py-0.5 rounded bg-black/50 text-white/80 truncate max-w-20 block">
-              {video.account.nickname || ""}
-            </span>
-            {options.viral ? (
-              <span className="text-[10px] px-1 py-0.5 rounded bg-orange-500/80 text-white font-bold">
-                TOP {options.rank ?? "?"}
-              </span>
-            ) : (
-              <ExternalLink className="h-3 w-3 text-white/50 opacity-0 group-hover/video:opacity-100 transition-opacity" />
-            )}
-          </div>
-        </a>
-        <Button
-          size="sm"
-          variant={record?.status === "failed" ? "outline" : "secondary"}
-          className="h-8 w-full text-xs"
-          onClick={() => handleExtractVideo(video)}
-          disabled={Boolean(isBusy)}
-        >
-          {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-          {extractionStatusText(record)}
-        </Button>
-        {record ? renderExtractionResult(record) : null}
-      </div>
-    )
-  }
-
-  function isDiscoveredAccountMonitored(account: SimilarAccount) {
-    if (!account.targetUrl) return false
-    const pureUrl = extractPureUrl(account.targetUrl) || account.targetUrl
-    return accounts.some((a) => a.targetUrl === pureUrl || a.platformUserId === account.platformUserId)
-  }
-
-  function visibleDiscoveredAccounts(items: SimilarAccount[]) {
-    return items.filter((account) => !ignoredDiscoveryUrls.has(account.targetUrl || account.platformUserId || account.nickname))
-  }
-
   async function handleWebResearch() {
     const query = researchQuery.trim()
     if (!query) {
@@ -541,112 +424,6 @@ export default function CompetitorWatchPage() {
     } finally {
       setResearchLoading(false)
     }
-  }
-
-  function renderDiscoveredAccount(account: SimilarAccount) {
-    const key = account.targetUrl || account.platformUserId || account.nickname
-    const monitored = isDiscoveredAccountMonitored(account)
-    const canAdd = Boolean(account.targetUrl) && !monitored && accounts.length < 10
-
-    return (
-      <Card key={key} className="overflow-hidden">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            {account.avatar ? (
-              <img
-                src={proxyAvatarUrl(account.avatar)}
-                alt=""
-                className="h-10 w-10 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                <User className="h-5 w-5 text-muted-foreground" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold">{account.nickname || "未知账号"}</p>
-                {monitored ? <Badge variant="secondary">已监控</Badge> : null}
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {account.followerCount ? `${formatCount(account.followerCount)} 粉丝` : "粉丝数未提供"}
-                {account.redfoxScore != null ? ` · 红狐指数 ${account.redfoxScore}` : ""}
-              </p>
-            </div>
-          </div>
-
-          {account.reason ? (
-            <p className="mt-3 line-clamp-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-              {account.reason}
-            </p>
-          ) : null}
-
-          {account.recentVideos.length > 0 ? (
-            <div className="mt-3 space-y-1.5">
-              {account.recentVideos.map((video, index) => (
-                <a
-                  key={`${video.videoUrl}-${index}`}
-                  href={video.videoUrl || account.targetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block truncate text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {video.title} · 赞 {formatCount(video.likes)} · 评 {formatCount(video.comments)}
-                </a>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-3 flex gap-2">
-            <Button
-              size="sm"
-              className="h-8 flex-1 text-xs"
-              disabled={!canAdd || adding}
-              onClick={() => handleAddDiscoveredAccount(account)}
-            >
-              {monitored ? "已监控" : accounts.length >= 10 ? "账号池已满" : account.targetUrl ? "加入监控" : "无法加入"}
-            </Button>
-            {account.targetUrl ? (
-              <a
-                href={account.targetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-8 items-center justify-center rounded-md border px-3 text-xs font-medium transition-colors hover:bg-muted"
-              >
-                打开主页
-              </a>
-            ) : null}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs"
-              onClick={() => {
-                setIgnoredDiscoveryUrls((prev) => new Set(prev).add(key))
-              }}
-            >
-              忽略
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  function renderDiscoveredGroup(title: string, description: string, items: SimilarAccount[]) {
-    const visible = visibleDiscoveredAccounts(items)
-    if (visible.length === 0) return null
-
-    return (
-      <div className="space-y-3">
-        <div>
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {visible.map((account) => renderDiscoveredAccount(account))}
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -758,8 +535,26 @@ export default function CompetitorWatchPage() {
                   </p>
                 ) : (
                   <div className="mt-4 space-y-5">
-                    {renderDiscoveredGroup("近身对标账号", "适合直接学习选题、钩子、表达方式", peerAccounts)}
-                    {renderDiscoveredGroup("头部标杆账号", "适合观察赛道天花板和成熟账号结构", leaderAccounts)}
+                    <DiscoveredAccountGroup
+                      title="近身对标账号"
+                      description="适合直接学习选题、钩子、表达方式"
+                      items={peerAccounts}
+                      accounts={accounts}
+                      ignoredUrls={ignoredDiscoveryUrls}
+                      adding={adding}
+                      onAdd={handleAddDiscoveredAccount}
+                      onIgnore={(key) => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
+                    />
+                    <DiscoveredAccountGroup
+                      title="头部标杆账号"
+                      description="适合观察赛道天花板和成熟账号结构"
+                      items={leaderAccounts}
+                      accounts={accounts}
+                      ignoredUrls={ignoredDiscoveryUrls}
+                      adding={adding}
+                      onAdd={handleAddDiscoveredAccount}
+                      onIgnore={(key) => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
+                    />
                   </div>
                 )}
               </>
@@ -1075,7 +870,18 @@ export default function CompetitorWatchPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {activeLatestVideos.map((video) => renderVideoCard(video))}
+                      {activeLatestVideos.map((video) => {
+                        const key = `${video.account.id}-${video.videoId}`
+                        return (
+                          <CompetitorVideoCard
+                            key={key}
+                            video={video}
+                            extraction={videoExtractions[key]}
+                            extractingVideoId={extractingVideoId}
+                            onExtract={handleExtractVideo}
+                          />
+                        )
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -1093,7 +899,20 @@ export default function CompetitorWatchPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {activeViralVideos.map((video, index) => renderVideoCard(video, { viral: true, rank: index + 1 }))}
+                      {activeViralVideos.map((video, index) => {
+                        const key = `${video.account.id}-${video.videoId}`
+                        return (
+                          <CompetitorVideoCard
+                            key={`viral-${key}`}
+                            video={video}
+                            extraction={videoExtractions[key]}
+                            extractingVideoId={extractingVideoId}
+                            viral
+                            rank={index + 1}
+                            onExtract={handleExtractVideo}
+                          />
+                        )
+                      })}
                     </div>
                   </CardContent>
                 </Card>
