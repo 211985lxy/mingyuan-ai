@@ -31,13 +31,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   buildKnowledgeCleaningSuggestion,
   knowledgeCleanupLabel,
   parseKnowledgeTags,
@@ -56,10 +49,10 @@ import {
   KnowledgeEntryDialog,
   KnowledgeUploadDialog,
 } from "@/features/knowledge/components/knowledge-entry-dialogs"
+import { SmartImportDialog } from "@/features/knowledge/components/smart-import-dialog"
 import {
   CATEGORY_LABELS,
   JIEKOU_PROVIDER_MODELS,
-  KNOWLEDGE_UPLOAD_ACCEPT,
   SOURCE_TYPE_LABELS,
   batchAction,
   deleteEntries,
@@ -126,36 +119,7 @@ export default function AdminKnowledgePage() {
 
   // 智能导入
   const [smartImportOpen, setSmartImportOpen] = React.useState(false)
-  const [smartImportStep, setSmartImportStep] = React.useState<"upload" | "processing" | "preview">("upload")
-  const [smartImportFiles, setSmartImportFiles] = React.useState<File[]>([])
   const [smartImportProjectId, setSmartImportProjectId] = React.useState("none")
-  const [smartImportPreviewData, setSmartImportPreviewData] = React.useState<{
-    userId: string
-    projectId: string | null
-    processed: Array<{
-      index: number
-      originalText: string
-      detectedSource: string
-      suggestedTitle: string
-      suggestedKeyPoints: string
-      suggestedCategory: string
-      suggestedTags: string[]
-      suggestedValueGrade: string
-      duplicateOfId?: string
-      duplicateScore?: number
-      confidence: string
-    }>
-    fileNames: string[]
-  } | null>(null)
-  const [smartImportConfirming, setSmartImportConfirming] = React.useState(false)
-  const [smartImportEdits, setSmartImportEdits] = React.useState<Record<number, {
-    title?: string
-    category?: string
-    tags?: string[]
-    valueGrade?: string
-    skip?: boolean
-  }>>({})
-  const [smartImportExpanded, setSmartImportExpanded] = React.useState<Set<number>>(new Set())
 
   // 中转站测试
   const [jiekouTestOpen, setJiekouTestOpen] = React.useState(false)
@@ -432,79 +396,6 @@ export default function AdminKnowledgePage() {
       toast.error(error instanceof Error ? error.message : "上传失败，请重试")
     } finally {
       setUploading(false)
-    }
-  }
-
-  async function handleSmartImportAnalyze() {
-    if (smartImportFiles.length === 0) return
-    setSmartImportStep("processing")
-    setSmartImportEdits({})
-    setSmartImportPreviewData(null)
-    try {
-      const formData = new FormData()
-      for (const file of smartImportFiles) formData.append("files", file)
-      if (smartImportProjectId !== "none") formData.append("projectId", smartImportProjectId)
-
-      const res = await fetch("/api/admin/knowledge/smart-import", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-        body: formData,
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "分析失败" }))
-        throw new Error(err.error || "智能分析失败")
-      }
-      const data = await res.json()
-      setSmartImportPreviewData(data.data)
-      setSmartImportStep("preview")
-    } catch (error) {
-      toast.error(`智能分析失败：${error instanceof Error ? error.message : "未知错误"}`)
-      setSmartImportStep("upload")
-    }
-  }
-
-  async function handleSmartImportConfirm() {
-    if (!smartImportPreviewData) return
-    setSmartImportConfirming(true)
-    try {
-      const entries = (Array.isArray(smartImportPreviewData.processed) ? smartImportPreviewData.processed : [])
-        .filter((r) => !(smartImportEdits[r.index]?.skip))
-        .map((r) => {
-          const edit = smartImportEdits[r.index]
-          return {
-            title: edit?.title || r.suggestedTitle,
-            content: r.originalText,
-            category: edit?.category || r.suggestedCategory,
-            tags: edit?.tags || r.suggestedTags,
-            valueGrade: edit?.valueGrade || r.suggestedValueGrade,
-          }
-        })
-
-      const res = await fetch("/api/admin/knowledge/smart-import/confirm", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
-        },
-        body: JSON.stringify({
-          userId: smartImportPreviewData.userId,
-          projectId: smartImportPreviewData.projectId,
-          entries,
-        }),
-      })
-      if (!res.ok) throw new Error("确认导入失败")
-      await res.json().catch(() => null)
-      setSmartImportOpen(false)
-      setSmartImportStep("upload")
-      setSmartImportFiles([])
-      setSmartImportPreviewData(null)
-      setSmartImportEdits({})
-      toast.success(`已导入 ${entries.length} 条知识`)
-      fetchData()
-    } catch (error) {
-      toast.error(`导入失败：${error instanceof Error ? error.message : "未知错误"}`)
-    } finally {
-      setSmartImportConfirming(false)
     }
   }
 
@@ -1181,217 +1072,14 @@ export default function AdminKnowledgePage() {
         onUpload={handleUploadFile}
       />
 
-      {/* 智能导入 Dialog */}
-      <Dialog open={smartImportOpen} onOpenChange={(open) => { if (!open) { setSmartImportStep("upload"); setSmartImportFiles([]); setSmartImportPreviewData(null); setSmartImportEdits({}) } setSmartImportOpen(open) }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              智能导入
-            </DialogTitle>
-            <DialogDescription>上传文件，系统自动分类、打标签、去重</DialogDescription>
-          </DialogHeader>
-
-          {/* Step 1: Upload */}
-          {smartImportStep === "upload" && (
-            <div className="space-y-4">
-              <div>
-                <Label>归属项目</Label>
-                <Select value={smartImportProjectId} onValueChange={(v) => setSmartImportProjectId(v ?? "none")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>{projectLabel(project)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>选择文件（支持 PDF/Word/PPT/Excel/HTML/TXT/MD/CSV/JSON/XML/RTF）</Label>
-                <div className="mt-1">
-                  <Input
-                    type="file"
-                    accept={KNOWLEDGE_UPLOAD_ACCEPT}
-                    multiple
-                    onChange={(e) => setSmartImportFiles(Array.from(e.target.files ?? []))}
-                    className="cursor-pointer"
-                  />
-                </div>
-              </div>
-              {smartImportFiles.length > 0 && (
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">已选 {smartImportFiles.length} 个文件：</p>
-                  <div className="flex flex-wrap gap-2">
-                    {smartImportFiles.map((f, i) => (
-                      <Badge key={i} variant="secondary" className="text-xs">
-                        {f.name} ({(f.size / 1024).toFixed(1)}KB)
-                        <button className="ml-1 hover:text-destructive" onClick={() => setSmartImportFiles((prev) => prev.filter((_, j) => j !== i))}>×</button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setSmartImportOpen(false)} className="cursor-pointer">取消</Button>
-                <Button onClick={handleSmartImportAnalyze} disabled={smartImportFiles.length === 0} className="cursor-pointer">
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  开始智能分析
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Processing */}
-          {smartImportStep === "processing" && (
-            <div className="flex flex-col items-center justify-center py-12 gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">正在智能分析文件内容…</p>
-              <div className="text-xs text-muted-foreground space-y-1">
-                {smartImportFiles.map((f) => (
-                  <p key={f.name}>{f.name}</p>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Preview + Confirm */}
-          {smartImportStep === "preview" && smartImportPreviewData && (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                共 {(Array.isArray(smartImportPreviewData.processed) ? smartImportPreviewData.processed : []).length} 条知识待确认，可编辑标题/分类/分级，勾选跳过重复条目
-              </p>
-              <div className="space-y-3">
-                {(Array.isArray(smartImportPreviewData.processed) ? smartImportPreviewData.processed : []).map((item) => {
-                  const edit = smartImportEdits[item.index] ?? {}
-                  const isDuplicate = !!item.duplicateOfId
-                  const isExpanded = smartImportExpanded.has(item.index)
-                  return (
-                    <Card key={item.index} className={`border ${edit.skip ? "opacity-50" : isDuplicate ? "border-orange-200" : ""}`}>
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">#{item.index + 1}</span>
-                            {item.detectedSource === "wechat_chat" && (
-                              <Badge variant="outline" className="text-[10px]">微信记录</Badge>
-                            )}
-                            <Badge variant={item.confidence === "high" ? "default" : item.confidence === "medium" ? "secondary" : "outline"} className="text-[10px]">
-                              {item.confidence === "high" ? "高置信" : item.confidence === "medium" ? "中置信" : "低置信"}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {isDuplicate && (
-                              <Badge variant="outline" className="text-[10px] text-orange-600 border-orange-300">
-                                重复 {(item.duplicateScore! * 100).toFixed(0)}%
-                              </Badge>
-                            )}
-                            <label className="flex items-center gap-1 text-xs cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={!!edit.skip}
-                                onChange={(e) => setSmartImportEdits((prev) => ({ ...prev, [item.index]: { ...prev[item.index], skip: e.target.checked } }))}
-                              />
-                              跳过
-                            </label>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">标题</Label>
-                            <Input
-                              value={edit.title ?? item.suggestedTitle}
-                              onChange={(e) => setSmartImportEdits((prev) => ({ ...prev, [item.index]: { ...prev[item.index], title: e.target.value } }))}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">分类</Label>
-                            <Select
-                              value={edit.category ?? item.suggestedCategory}
-                              onValueChange={(v) => setSmartImportEdits((prev) => ({ ...prev, [item.index]: { ...prev[item.index], category: v ?? "" } }))}
-                            >
-                              <SelectTrigger className="h-8 text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground">价值分级</Label>
-                            <Select
-                              value={edit.valueGrade ?? item.suggestedValueGrade}
-                              onValueChange={(v) => setSmartImportEdits((prev) => ({ ...prev, [item.index]: { ...prev[item.index], valueGrade: v ?? "" } }))}
-                            >
-                              <SelectTrigger className="h-8 text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="S">S · 战略级</SelectItem>
-                                <SelectItem value="A">A · 战术级</SelectItem>
-                                <SelectItem value="B">B · 参考级</SelectItem>
-                                <SelectItem value="C">C · 索引级</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-1">
-                          {(edit.tags ?? item.suggestedTags ?? []).map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px]">{tag.replace("kb_scope:", "").replace("asset_role:", "").replace("usable_for:", "").replace("confidence:", "")}</Badge>
-                          ))}
-                        </div>
-
-                        <p className="text-xs text-muted-foreground line-clamp-2">{edit.skip ? "(已跳过)" : item.suggestedKeyPoints}</p>
-
-                        <button
-                          className="text-[10px] text-primary hover:underline cursor-pointer"
-                          onClick={() => setSmartImportExpanded((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(item.index)) next.delete(item.index)
-                            else next.add(item.index)
-                            return next
-                          })}
-                        >
-                          {isExpanded ? "收起原文" : "展开原文"}
-                        </button>
-                        {isExpanded && (
-                          <pre className="text-xs text-muted-foreground bg-muted/50 rounded p-2 whitespace-pre-wrap max-h-40 overflow-y-auto">{item.originalText}</pre>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-sm text-muted-foreground">
-                  将导入 {(Array.isArray(smartImportPreviewData.processed) ? smartImportPreviewData.processed : []).filter((r) => !smartImportEdits[r.index]?.skip).length} 条
-                </span>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setSmartImportStep("upload")} className="cursor-pointer">
-                    重新选择
-                  </Button>
-                  <Button
-                    onClick={handleSmartImportConfirm}
-                    disabled={smartImportConfirming || (Array.isArray(smartImportPreviewData.processed) ? smartImportPreviewData.processed : []).every((r) => smartImportEdits[r.index]?.skip)}
-                    className="cursor-pointer"
-                  >
-                    {smartImportConfirming ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                    确认导入
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <SmartImportDialog
+        open={smartImportOpen}
+        projectId={smartImportProjectId}
+        projects={projects}
+        onOpenChange={setSmartImportOpen}
+        onProjectChange={setSmartImportProjectId}
+        onImported={fetchData}
+      />
     </div>
   )
 }
