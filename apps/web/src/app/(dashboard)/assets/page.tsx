@@ -46,10 +46,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   createAvatar as apiCreateAvatar,
-  getPublicAssets,
   listAssets,
   listAvatars,
   registerAsset,
@@ -62,8 +60,8 @@ import { useBranding } from "@/components/providers/branding-provider";
 import { useAuthStore } from "@/lib/store";
 import type { ApiAsset, ApiAvatar } from "@/types/api";
 import { PublicAvatarPreviewDialog } from "@/components/public-avatar-preview-dialog";
+import { AssetFlowOverview, AssetsSkeleton, AvatarsSkeleton } from "@/features/assets/components/page-sections";
 import {
-  ASSET_FLOW_CARDS,
   assetFilters,
   assetTypeConfig,
   avatarStatusConfig,
@@ -183,41 +181,6 @@ export default function AssetsPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function AssetFlowOverview({
-  avatarCount,
-  assetCount,
-  voiceCount,
-}: {
-  avatarCount: number;
-  assetCount: number;
-  voiceCount: number;
-}) {
-  return (
-    <Card className="border-primary/15 bg-primary/[0.02]">
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-4">
-          {ASSET_FLOW_CARDS.map((item, index) => (
-            <div key={item.title} className="rounded-md border bg-background px-3 py-3">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
-                  {index + 1}
-                </span>
-                <p className="text-sm font-medium">{item.title}</p>
-              </div>
-              <p className="text-xs leading-relaxed text-muted-foreground">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant="secondary">已沉淀素材 {assetCount}</Badge>
-          <Badge variant="secondary">数字人 {avatarCount}</Badge>
-          <Badge variant="secondary">可用声音 {voiceCount}</Badge>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1526,59 +1489,6 @@ function AssetsTab({
           </div>
         )}
       </section>
-    </div>
-  );
-}
-
-// ─── Skeleton Loaders ───────────────────────────────────
-
-function AvatarsSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-end">
-        <Skeleton className="h-9 w-28" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="overflow-hidden">
-            <Skeleton className="aspect-square w-full" />
-            <CardContent className="pt-3 space-y-2">
-              <Skeleton className="h-4 w-2/3" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-1/2" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AssetsSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-8 w-14" />
-          ))}
-        </div>
-        <Skeleton className="h-9 w-28" />
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="overflow-hidden">
-            <Skeleton className="aspect-video w-full" />
-            <CardContent className="pt-3 space-y-2">
-              <Skeleton className="h-4 w-2/3" />
-              <div className="flex justify-between">
-                <Skeleton className="h-5 w-10" />
-                <Skeleton className="h-3 w-20" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }
