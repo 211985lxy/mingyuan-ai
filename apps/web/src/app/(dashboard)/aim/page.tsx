@@ -33,7 +33,6 @@ import {
   getVideoCopyExtraction,
   checkScriptQuality,
   polishScript,
-  uploadImageForAimChat,
   chatAim,
   chatAimStream,
   createKnowledge,
@@ -97,6 +96,7 @@ import {
 import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-workflow"
 import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
 import { useAimEvolution } from "@/features/aim/hooks/use-aim-evolution"
+import { useAimImageAttachments } from "@/features/aim/hooks/use-aim-image-attachments"
 import {
   buildBenchmarkQualityMessage,
   buildBenchmarkRewriteInput,
@@ -153,8 +153,12 @@ export default function AimPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
-  const [imageAttachments, setImageAttachments] = useState<AimImageAttachment[]>([])
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const {
+    imageAttachments,
+    setImageAttachments,
+    isUploadingImage,
+    handleAddImages,
+  } = useAimImageAttachments()
   const [sourceVideoCopyExtractionId, setSourceVideoCopyExtractionId] = useState<string | undefined>(() => initialDraft?.videoCopyExtractionId)
   const [sourceOriginalText, setSourceOriginalText] = useState(() => initialDraft?.sourceOriginalText || "")
   const [sourceAnalysisText, setSourceAnalysisText] = useState(() => initialDraft?.sourceAnalysisText || "")
@@ -607,36 +611,6 @@ export default function AimPage() {
     setInput("")
     toast.success(`已整合到右侧${editorPanelLabels.title}`)
     return true
-  }
-
-  async function handleAddImages(files: FileList) {
-    const nextImages: AimImageAttachment[] = []
-    setIsUploadingImage(true)
-    try {
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) {
-          toast.error(`${file.name} 不是图片文件`)
-          continue
-        }
-        if (file.size > 8 * 1024 * 1024) {
-          toast.error(`${file.name} 超过 8MB`)
-          continue
-        }
-        const uploaded = await uploadImageForAimChat(file)
-        nextImages.push({
-          id: nextId("img"),
-          name: file.name,
-          assetUrl: uploaded.assetUrl,
-          readUrl: uploaded.readUrl,
-          previewUrl: uploaded.readUrl,
-        })
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "图片上传失败")
-    } finally {
-      setIsUploadingImage(false)
-    }
-    if (nextImages.length) setImageAttachments((current) => [...current, ...nextImages].slice(-4))
   }
 
   function handleImitate() {
