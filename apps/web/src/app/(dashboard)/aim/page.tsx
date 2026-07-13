@@ -38,12 +38,9 @@ import {
   chatAimStream,
   createKnowledge,
   createAimWorkflowBrief,
-  evolveAimConversation,
-  evolveStyleConversation,
   ApiError,
   recordAimRunEvent,
   updateAimWorkflowStatus,
-  type AimEvolutionSuggestion,
   type AimGenerateResponse,
   type AimGeneration,
   type ContentFormat,
@@ -99,6 +96,7 @@ import {
 } from "@/features/aim/aim-text-utils"
 import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-workflow"
 import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
+import { useAimEvolution } from "@/features/aim/hooks/use-aim-evolution"
 import {
   buildBenchmarkQualityMessage,
   buildBenchmarkRewriteInput,
@@ -195,8 +193,6 @@ export default function AimPage() {
   const [workflowBriefDialogOpen, setWorkflowBriefDialogOpen] = useState(false)
   const [isBuildingWorkflowBrief, setIsBuildingWorkflowBrief] = useState(false)
   const [contentAction, setContentAction] = useState<AimContentAction | null>(null)
-  const [isEvolving, setIsEvolving] = useState(false)
-  const [evolutionSuggestions, setEvolutionSuggestions] = useState<AimEvolutionSuggestion[]>([])
   const [isImitating, setIsImitating] = useState(false)
   const [imitateStyleId, setImitateStyleId] = useState("default")
 
@@ -206,6 +202,19 @@ export default function AimPage() {
   const refreshHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const clearLoadTarget = useAimWorkspaceStore((s) => s.clearLoadTarget)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
+
+  const {
+    isEvolving,
+    evolutionSuggestions,
+    setEvolutionSuggestions,
+    rememberWorkbenchPreference,
+    handleEvolveConversation,
+    handleSaveEvolutionSuggestion,
+  } = useAimEvolution({
+    messages,
+    projectEnabled,
+    selectedProjectId,
+  })
 
   const {
     recordDialog,
@@ -630,34 +639,6 @@ export default function AimPage() {
     if (nextImages.length) setImageAttachments((current) => [...current, ...nextImages].slice(-4))
   }
 
-  function rememberWorkbenchPreference(input: string) {
-    const contextMessages = [
-      ...messages.map((message) => ({ role: message.role, content: message.content })),
-      { role: "user" as const, content: input },
-    ].filter((message) => message.content.trim()).slice(-8)
-
-    if (contextMessages.length === 0) {
-      toast.error("没有可沉淀的偏好内容")
-      return
-    }
-
-    setIsEvolving(true)
-    void evolveStyleConversation({ messages: contextMessages })
-      .then((result) => {
-        if (result.profile) {
-          toast.success(result.created ? "已建立全局写作风格档案" : "全局写作风格档案已更新")
-        } else if (result.reason === "no_style") {
-          toast.info("这句话还没有形成稳定偏好")
-        } else {
-          toast.info(result.reason || "这句话没有形成稳定偏好")
-        }
-      })
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "偏好沉淀失败")
-      })
-      .finally(() => setIsEvolving(false))
-  }
-
   function handleImitate() {
     const viralSourceText = sourceOriginalText.trim()
     if (viralSourceText.length < 30) {
@@ -1022,72 +1003,6 @@ export default function AimPage() {
     } finally {
       if (requestAbortRef.current === controller) requestAbortRef.current = null
       setIsThinking(false)
-    }
-  }
-
-  async function handleEvolveConversation() {
-    const sourceMessages = messages
-      .filter((message) => message.role === "user" || message.role === "assistant")
-      .map((message) => ({ role: message.role, content: message.content }))
-
-    if (sourceMessages.length < 2) {
-      toast.error("对话太少，还没有可沉淀的偏好")
-      return
-    }
-
-    // 纯文案模式（未启用 IP 全案）也能沉淀全局写作风格；选了项目则同时提炼项目偏好
-    const canEvolveProject = projectEnabled && !!selectedProjectId
-
-    setIsEvolving(true)
-    try {
-      const results = await Promise.allSettled([
-        evolveStyleConversation({ messages: sourceMessages }),
-        canEvolveProject
-          ? evolveAimConversation({ projectId: selectedProjectId, messages: sourceMessages })
-          : Promise.resolve<AimEvolutionSuggestion[]>([]),
-      ])
-
-      const [styleOutcome, projectOutcome] = results
-
-      if (styleOutcome.status === "fulfilled") {
-        const r = styleOutcome.value
-        if (r.profile) {
-          toast.success(r.created ? "已建立全局写作风格档案" : "全局写作风格档案已更新")
-        } else if (r.reason === "no_style") {
-          toast.info("这轮对话还没有明显的写作风格可沉淀")
-        }
-      } else {
-        toast.error("写作风格沉淀失败")
-      }
-
-      if (projectOutcome.status === "fulfilled") {
-        setEvolutionSuggestions(projectOutcome.value)
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "偏好提炼失败")
-    } finally {
-      setIsEvolving(false)
-    }
-  }
-
-  async function handleSaveEvolutionSuggestion(suggestion: AimEvolutionSuggestion) {
-    if (!selectedProjectId) {
-      toast.error("请先选择 IP 营销全案")
-      return
-    }
-    try {
-      await createKnowledge({
-        projectId: selectedProjectId,
-        category: suggestion.category,
-        title: suggestion.title,
-        content: suggestion.content,
-        tags: suggestion.tags,
-        sourceType: "manual",
-      })
-      setEvolutionSuggestions((prev) => prev.filter((item) => item !== suggestion))
-      toast.success("已沉淀进知识库")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "知识沉淀失败")
     }
   }
 
