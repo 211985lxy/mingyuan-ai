@@ -13,6 +13,6 @@ export default defineConfig({
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"] || "mysql://mingyuan:changethis@127.0.0.1:3306/mingyuan",
+    url: process.env["DATABASE_URL"],
   },
 });

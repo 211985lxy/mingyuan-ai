@@ -51,6 +51,24 @@
         "metadata",
         "createdAt"
       ]
+    },
+    {
+      "name": "ContentGenerationRun",
+      "columns": [
+        "id",
+        "topicSelectionId",
+        "openingTypeCode",
+        "copyStructureCode",
+        "endingTypeCode"
+      ]
+    },
+    {
+      "name": "Script",
+      "columns": [
+        "id",
+        "topicSelectionId",
+        "isHotTopicVersion"
+      ]
     }
   ]
 }

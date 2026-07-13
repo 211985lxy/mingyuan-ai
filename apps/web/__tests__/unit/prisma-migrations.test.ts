@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "fs"
+import { existsSync, readFileSync, readdirSync } from "fs"
 import path from "path"
 import { describe, expect, it } from "vitest"
 
@@ -79,5 +79,27 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model AimRunEvent")
     expect(migrationSql).toContain("CREATE TABLE `AimRunEvent`")
     expect(migrationSql).toContain("FOREIGN KEY (`userId`) REFERENCES `User`(`id`)")
+  })
+
+  it("owns phase 14 schema changes in Prisma migrations only", () => {
+    const migrationSql = readFileSync(
+      path.join(
+        appRoot,
+        "prisma/migrations/20260713113000_consolidate_phase14_schema/migration.sql",
+      ),
+      "utf8",
+    )
+
+    expect(migrationSql).toContain("information_schema.COLUMNS")
+    expect(migrationSql).toContain("ContentGenerationRun_topicSelectionId_idx")
+    expect(migrationSql).toContain("Script_topicSelectionId_idx")
+    expect(existsSync(path.join(appRoot, "src/app/api/admin/migrate/route.ts"))).toBe(false)
+  })
+
+  it("does not provide a fallback database URL", () => {
+    const prismaConfig = readFileSync(path.join(appRoot, "prisma.config.ts"), "utf8")
+
+    expect(prismaConfig).toContain('url: process.env["DATABASE_URL"]')
+    expect(prismaConfig).not.toContain("changethis")
   })
 })
