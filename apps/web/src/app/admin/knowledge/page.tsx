@@ -11,7 +11,6 @@ import {
   Trash2,
   Upload,
   Plus,
-  X,
   Eye,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -53,6 +52,10 @@ import {
   KnowledgeDetailDialog,
   KnowledgeDistillDialog,
 } from "@/features/knowledge/components/knowledge-review-dialogs"
+import {
+  KnowledgeEntryDialog,
+  KnowledgeUploadDialog,
+} from "@/features/knowledge/components/knowledge-entry-dialogs"
 import {
   CATEGORY_LABELS,
   JIEKOU_PROVIDER_MODELS,
@@ -1155,165 +1158,28 @@ export default function AdminKnowledgePage() {
         onOpenChange={setDistillDialogOpen}
       />
 
-      {/* 手动录入弹窗 */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>手动录入知识条目</DialogTitle>
-            <DialogDescription>手动添加一条知识到知识库</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>分类</Label>
-                      <Select value={editForm.category} onValueChange={(v) => setEditForm((f) => ({ ...f, category: v ?? "" }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>归属项目</Label>
-              <Select value={editForm.projectId} onValueChange={(v) => setEditForm((f) => ({ ...f, projectId: v ?? "none" }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {projectLabel(project)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>价值分级（决定检索优先级，默认 B）</Label>
-              <Select value={editForm.valueGrade || "none"} onValueChange={(v) => setEditForm((f) => ({ ...f, valueGrade: v === "none" ? "" : (v ?? "") }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">B · 参考级（默认）</SelectItem>
-                  <SelectItem value="S">S · 战略级（优先浮出）</SelectItem>
-                  <SelectItem value="A">A · 战术级</SelectItem>
-                  <SelectItem value="C">C · 索引级（靠后）</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>标题</Label>
-              <Input
-                value={editForm.title}
-                onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="知识条目标题"
-              />
-            </div>
-            <div>
-              <Label>内容</Label>
-              <Textarea
-                value={editForm.content}
-                onChange={(e) => setEditForm((f) => ({ ...f, content: e.target.value }))}
-                placeholder="知识条目内容"
-                rows={6}
-              />
-            </div>
-            <div>
-              <Label>标签（用逗号分隔）</Label>
-              <Input
-                value={editForm.tags}
-                onChange={(e) => setEditForm((f) => ({ ...f, tags: e.target.value }))}
-                placeholder="标签1, 标签2"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="cursor-pointer">
-                取消
-              </Button>
-              <Button onClick={handleAddEntry} disabled={saving || !editForm.title || !editForm.content} className="cursor-pointer">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                保存
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* 文件上传弹窗 */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>上传文件导入知识</DialogTitle>
-            <DialogDescription>支持 PDF、Word、PPT、Excel、HTML、TXT、MD、CSV、JSON、XML、RTF</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>分类</Label>
-              <Select value={uploadCategory} onValueChange={(v) => setUploadCategory(v ?? "")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>归属项目</Label>
-              <Select value={uploadProjectId} onValueChange={(v) => setUploadProjectId(v ?? "none")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {projectLabel(project)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>选择文件</Label>
-              <div className="mt-1 flex items-center gap-2">
-                <Input
-                  type="file"
-                  accept={KNOWLEDGE_UPLOAD_ACCEPT}
-                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                  className="cursor-pointer"
-                />
-                {uploadFile && (
-                  <Button variant="ghost" size="icon" onClick={() => setUploadFile(null)} className="cursor-pointer">
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {uploadFile && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  已选: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                </p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setUploadDialogOpen(false)} className="cursor-pointer">
-                取消
-              </Button>
-              <Button onClick={handleUploadFile} disabled={uploading || !uploadFile} className="cursor-pointer">
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {uploading ? "上传中..." : "上传并导入"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <KnowledgeEntryDialog
+        open={addDialogOpen}
+        form={editForm}
+        projects={projects}
+        saving={saving}
+        onOpenChange={setAddDialogOpen}
+        onFormChange={setEditForm}
+        onSave={handleAddEntry}
+      />
+      <KnowledgeUploadDialog
+        open={uploadDialogOpen}
+        file={uploadFile}
+        category={uploadCategory}
+        projectId={uploadProjectId}
+        projects={projects}
+        uploading={uploading}
+        onOpenChange={setUploadDialogOpen}
+        onFileChange={setUploadFile}
+        onCategoryChange={setUploadCategory}
+        onProjectChange={setUploadProjectId}
+        onUpload={handleUploadFile}
+      />
 
       {/* 智能导入 Dialog */}
       <Dialog open={smartImportOpen} onOpenChange={(open) => { if (!open) { setSmartImportStep("upload"); setSmartImportFiles([]); setSmartImportPreviewData(null); setSmartImportEdits({}) } setSmartImportOpen(open) }}>
