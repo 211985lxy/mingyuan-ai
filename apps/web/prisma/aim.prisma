@@ -1,0 +1,264 @@
+// Aim domain models
+
+model AimGeneration {
+  id                 String    @id @default(cuid())
+  userId             String
+  agentId            String?
+  projectId          String?
+  rawInput           String    @db.MediumText
+  inputSource        String    @default("text") // text | voice
+  videoScript        String?   @db.MediumText
+  wechatArticle      String?   @db.MediumText
+  momentsPost        String?   @db.MediumText
+  communityMessage   String?   @db.MediumText
+  shootingBrief      String?   @db.MediumText
+  rawCopy            String?   @db.MediumText
+  formatsRequested   Json      @default("[]")
+  knowledgeUsed      Json      @default("[]")
+  ipSnapshotUsed     String?   @db.MediumText
+  qualityScores      Json?
+  topicTitle         String?   @db.Text
+  topicSelectionId   String?   @db.VarChar(30) // 来源选题批次 TopicSelection.id
+  selectedTopicIndex Int? // 采用的第几号候选 (0-3)
+  hotTopic           String?   @db.Text
+  polishInstruction  String?   @db.MediumText
+  workflowStatus     String    @default("draft")
+  reviewNote         String?   @db.MediumText
+  publishedAt        DateTime?
+  publishPlatform    String?
+  publishUrl         String?   @db.MediumText
+  decisionSnapshot   Json?
+  retroSnapshots     Json      @default("[]")
+  calibrationRules   Json      @default("[]")
+  taskSpec           Json? // 协作认知 + 业务判断统一结构（见 lib/task-spec.ts）
+  wechatDraft        Json?
+  model              String?
+  totalTokens        Int?
+  status             String    @default("completed")
+  errorMessage       String?   @db.MediumText
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id])
+  project         ClientProject?   @relation(fields: [projectId], references: [id])
+  contentOutcomes ContentOutcome[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, projectId, createdAt(sort: Desc)])
+  @@index([userId, workflowStatus])
+}
+
+model IpWikiPage {
+  id                 String   @id @default(cuid())
+  userId             String
+  projectId          String
+  pageType           String // positioning | persona | content_strategy | audience | conversion_path | topic_direction | index | log
+  title              String
+  content            String   @db.Text
+  frontmatter        Json     @default("{}") // 结构化字段（如内容策略底盘的话题分布/钩子/频率/时段/爆款公式）
+  sources            Json     @default("[]") // 溯源：[{ kind: "aim_generation" | "knowledge_entry", id, label }]
+  links              Json     @default("[]") // [[双向链接]] 目标 title 列表
+  sourceGenerationId String? // 编译自哪条 AimGeneration（定位方案），可溯源指针
+  version            Int      @default(1)
+  status             String   @default("active") // active | archived
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id])
+  project ClientProject @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, status])
+  @@index([projectId, pageType, status])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model AgentApiKey {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  keyPrefix       String
+  keyHash         String    @unique
+  status          String    @default("active") // active | disabled
+  allowedProjects Json      @default("[]")
+  allowedAgents   Json      @default("[]")
+  dailyLimit      Int       @default(50)
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User              @relation(fields: [userId], references: [id])
+  logs AgentApiCallLog[]
+
+  @@index([userId, status])
+  @@index([keyPrefix])
+}
+
+model AgentApiCallLog {
+  id              String   @id @default(cuid())
+  apiKeyId        String?
+  userId          String?
+  projectId       String?
+  agentId         String?
+  action          String
+  inputSummary    String?  @db.Text
+  outputFormats   Json     @default("[]")
+  status          String // success | failed
+  errorMessage    String?  @db.Text
+  durationMs      Int?
+  aimGenerationId String?
+  createdAt       DateTime @default(now())
+
+  apiKey AgentApiKey? @relation(fields: [apiKeyId], references: [id])
+  user   User?        @relation(fields: [userId], references: [id])
+
+  @@index([apiKeyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AimExecutionTrace {
+  id              String   @id @default(cuid())
+  userId          String?
+  projectId       String?
+  agentId         String?
+  action          String
+  status          String   @default("running") // running | success | failed
+  durationMs      Int?
+  model           String?
+  totalTokens     Int?
+  inputSummary    String?  @db.Text
+  outputSummary   String?  @db.Text
+  errorMessage    String?  @db.Text
+  steps           Json     @default("[]")
+  aimGenerationId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // ── aim-harness-v1 长期可观测字段（不随快照过期，长期保留） ──
+  runId             String?  @db.VarChar(40) // 对外执行编号，= AimRunSnapshot.runId
+  provider          String?  @db.VarChar(64) // 实际命中的 provider（与 model 分别记录）
+  fallbackIndex     Int? // 命中第几个 provider（0=首选）
+  degraded          Boolean? // fallback 后继续交付则 true
+  harnessVersion    String?  @db.VarChar(40) // "aim-harness-v1"
+  runtimeTask       String?  @db.VarChar(32)
+  conversationMode  String?  @db.VarChar(32)
+  knowledgeStrategy String?  @db.VarChar(32)
+  promptHash        String?  @db.VarChar(64) // 最终组合 prompt 的 SHA-256
+  contextHash       String?  @db.VarChar(64) // 上下文清单的 SHA-256
+  qualityStatus     String?  @db.VarChar(24) // 主稿质量结果：pass | warn | fail | skipped
+  snapshotId        String?  @db.VarChar(40) // 关联完整快照（可能已过期删除）
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([runId])
+  @@index([promptHash])
+  @@index([qualityStatus])
+}
+
+model AimRunSnapshot {
+  id        String  @id @default(cuid())
+  runId     String  @unique @db.VarChar(40) // 对外稳定执行编号（= trace.runId）
+  traceId   String? @db.VarChar(40) // 关联 AimExecutionTrace.id
+  userId    String?
+  projectId String?
+  agentId   String?
+  action    String? @db.VarChar(32) // chat | generate | agent_api | inspiration | tool_action
+
+  runSpec          Json    @default("{}") // AimRunSpec 快照
+  contextManifest  Json    @default("[]") // 上下文来源清单（id/更新时间/字符数/SHA-256）
+  providerAttempts Json    @default("[]") // 每次 provider 尝试（provider/model/状态/错误/耗时）
+  fullPrompt       String? @db.MediumText // 完整文本 prompt（管理员可见）
+  promptMessages   Json    @default("[]") // 结构化 role/content；图片仅保存 hash
+  promptHash       String? @db.VarChar(64)
+  contextHash      String? @db.VarChar(64)
+  output           String? @db.MediumText // 原样生成稿
+  outputFormats    Json    @default("[]") // ContentFormat[]
+  qualityResult    Json? // 主稿 LLM 评分 + 全部格式确定性检查
+  imageHashes      Json    @default("[]") // [{hash, type}]，不存 base64/签名地址
+
+  provider      String?  @db.VarChar(64)
+  model         String?  @db.VarChar(64)
+  fallbackIndex Int?
+  degraded      Boolean?
+
+  expiresAt DateTime // 30 天后由 cron/cleanup 删除
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([expiresAt])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([agentId, createdAt(sort: Desc)])
+  @@index([traceId])
+}
+
+model AimRunEvent {
+  id        String   @id @default(cuid())
+  runId     String   @db.VarChar(40)
+  userId    String
+  event     String   @db.VarChar(24) // copied | revised | accepted
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([runId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([event, createdAt(sort: Desc)])
+}
+
+model AgentMethodology {
+  id        String   @id @default(cuid())
+  key       String   @unique // ip_copywriting | business_diagnosis | event_storytelling
+  title     String
+  content   String   @db.Text // markdown 全文
+  filePath  String? // 对应的 md 文件相对路径，仅记录溯源
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ContentOutcome {
+  id               String    @id @default(cuid())
+  userId           String
+  generationId     String
+  topicSelectionId String?   @db.VarChar(30)
+  projectId        String?
+  platform         String?   @db.VarChar(40)
+  publishedAt      DateTime?
+  collectedAt      DateTime  @default(now())
+  collectWindowDay Int // 7 | 14 | 30
+
+  // 第一组：商业结果（nullable）
+  qualifiedCommentCount Int?
+  dmCount               Int?
+  qualifiedLeadCount    Int?
+  appointmentCount      Int?
+  dealCount             Int?
+  revenue               Decimal? @db.Decimal(14, 2)
+
+  // 第二组：内容信号（nullable）
+  views    Int?
+  likes    Int?
+  comments Int?
+  saves    Int?
+  shares   Int?
+
+  // 第三组：用户反馈（自由文本）
+  audienceFeedback String? @db.Text
+  userVerdict      String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id])
+  generation AimGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, generationId, collectWindowDay])
+  @@index([userId, collectedAt])
+  @@index([generationId])
+}

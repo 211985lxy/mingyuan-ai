@@ -1,5 +1,6 @@
 {
   "fileLineLimit": 500,
+  "prismaFileLineLimit": 400,
   "targetModuleLineRange": [100, 300],
   "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",

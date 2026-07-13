@@ -1,0 +1,87 @@
+// Profiles domain models
+
+model IpProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  displayName    String?
+  nickname       String?
+  industry       String?
+  primaryOffer   String?  @db.Text
+  targetAudience String?  @db.Text
+  ipTraits       String?  @db.Text
+  toneOfVoice    String?
+  proofPoints    String?  @db.Text
+  callToAction   String?  @db.Text
+  promptSnapshot String?  @db.Text
+  isComplete     Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // ── v2 IP Profile (Phase 10) ──────────────────────────
+  profileVersion       Int?    @default(1)
+  surveyIndustry       String?
+  surveyTargetCustomer String? @db.Text
+  surveyMonetization   Json?
+  surveyPersonalTraits String? @db.Text
+  surveyContentGoal    String?
+  business             Json?
+  persona              Json?
+  content              Json?
+
+  user                  User                   @relation(fields: [userId], references: [id])
+  scripts               Script[]
+  contentGenerationRuns ContentGenerationRun[]
+  topicSelections       TopicSelection[]
+
+  @@index([isComplete])
+  @@index([profileVersion])
+}
+
+model AimMemory {
+  id                 String   @id @default(cuid())
+  userId             String
+  projectId          String?
+  agentId            String   @db.VarChar(40)
+  kind               String   @db.VarChar(24) // conversation_summary | preference | decision | fact
+  content            String   @db.Text // 摘要/偏好内容
+  entityIds          Json     @default("[]") // 关联到 KnowledgeEntity.id，打通知识图谱
+  sourceGenerationId String? // 溯源到 AimGeneration
+  relevance          Float    @default(1.0) // 衰减权重（暂未使用，预留）
+  status             String   @default("active") // active | archived
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, projectId, agentId])
+  @@index([userId, projectId, kind])
+  @@index([projectId, createdAt(sort: Desc)])
+}
+
+model ClientProject {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  companyName    String?
+  industry       String?
+  targetCustomer String?  @db.Text
+  offer          String?  @db.Text
+  deliveryGoal   String?  @db.Text
+  status         String   @default("active") // active | paused | archived
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id])
+  aimGenerations    AimGeneration[]
+  knowledgeEntries  KnowledgeEntry[]
+  knowledgeEntities KnowledgeEntity[]
+  aimMemories       AimMemory[]
+  ipWikiPages       IpWikiPage[]
+  benchmarkProfiles BenchmarkProfile[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}

@@ -1,0 +1,147 @@
+// Media domain models
+
+model Avatar {
+  id                   String   @id @default(cuid())
+  userId               String
+  name                 String
+  status               String   @default("uploading") // uploading | cloning | ready | failed
+  coverUrl             String?
+  sourceVideoUrl       String?
+  externalTaskId       String?  @unique
+  externalVirtualmanId String?
+  externalSpeakerId    String?
+  speakerName          String?
+  demoTaskId           String?  @unique
+  demoVideoUrl         String?
+  errorCode            String?
+  errorMessage         String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id])
+  videoTasks VideoTask[]
+
+  @@index([userId, status])
+  @@index([externalTaskId])
+}
+
+model Asset {
+  id                String   @id @default(cuid())
+  userId            String
+  sourceAvatarId    String?
+  name              String
+  assetType         String // image | video | music | voice
+  url               String
+  size              Int?
+  status            String   @default("ready") // ready | processing | failed
+  externalTaskId    String?  @unique
+  externalSpeakerId String?
+  voiceModel        String? // v1 | v2 | v3 | s1 | s3
+  demoAudioUrl      String?
+  retryCount        Int      @default(0)
+  errorCode         String?
+  errorMessage      String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, assetType])
+  @@index([externalTaskId])
+  @@index([sourceAvatarId])
+  @@index([status])
+}
+
+model PublicAvatarPreviewCache {
+  id             String   @id @default(cuid())
+  cacheKey       String   @unique
+  virtualmanId   String
+  speakerId      String
+  text           String   @db.Text
+  textHash       String
+  status         String   @default("processing") // processing | completed | failed
+  externalTaskId String?  @unique
+  videoUrl       String?
+  coverUrl       String?
+  duration       Int?
+  errorCode      String?
+  errorMessage   String?  @db.Text
+  lastAccessedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  preferences PublicAvatarPreviewPreference[]
+
+  @@index([virtualmanId, speakerId])
+  @@index([status, updatedAt])
+  @@index([lastAccessedAt])
+}
+
+model PublicAvatarPreviewPreference {
+  id             String   @id @default(cuid())
+  userId         String
+  virtualmanId   String
+  speakerId      String
+  text           String   @db.Text
+  previewCacheId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User                      @relation(fields: [userId], references: [id])
+  previewCache PublicAvatarPreviewCache? @relation(fields: [previewCacheId], references: [id])
+
+  @@unique([userId, virtualmanId])
+  @@index([previewCacheId])
+  @@index([virtualmanId, updatedAt])
+}
+
+model PexelsMedia {
+  id                String    @id @default(cuid())
+  provider          String    @default("pexels") // pexels | pixabay
+  pexelsId          Int // external ID from provider
+  mediaType         String // photo | video
+  width             Int
+  height            Int
+  url               String // source webpage URL
+  photographer      String
+  photographerUrl   String?
+  photographerId    BigInt?
+  avgColor          String?
+  alt               String?   @db.Text
+  duration          Int? // Video duration in seconds, null for photos
+  srcJson           Json? // Photo src object (size variants)
+  videoFilesJson    Json? // Video files array
+  videoPicturesJson Json? // Video preview pictures array
+  imageUrl          String? // Video cover image URL
+  ossUrl            String? // Our durable OSS copy
+  ossStatus         String    @default("pending") // pending | transferring | ready | failed
+  ossTransferredAt  DateTime?
+  discoveryQuery    String? // First search query that found this media
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([provider, pexelsId])
+  @@index([mediaType, createdAt])
+  @@index([ossStatus])
+  @@index([discoveryQuery])
+  @@index([provider])
+}
+
+model PexelsQueryCache {
+  id            String   @id @default(cuid())
+  provider      String   @default("pexels") // pexels | pixabay
+  queryHash     String   @unique // SHA-256 of normalized query params (includes provider + schemaVersion)
+  query         String
+  mediaType     String // photo | video | all
+  orientation   String?
+  size          String?
+  color         String?
+  schemaVersion Int      @default(1) // Cache schema version; increment to invalidate pre-scoring entries
+  totalResults  Int      @default(0)
+  pexelsIds     Json // number[] ordered by relevance
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([query, mediaType])
+  @@index([provider])
+}

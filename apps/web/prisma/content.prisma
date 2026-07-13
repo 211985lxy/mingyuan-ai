@@ -1,0 +1,262 @@
+// Content domain models
+
+model Script {
+  id               String    @id @default(cuid())
+  userId           String
+  content          String    @db.Text
+  sourceTemplateId String?
+  generationRunId  String?
+  ipProfileId      String?
+  structureId      String?
+  status           String    @default("draft") // draft | candidate | selected | discarded
+  qualityScore     Float?
+  qualityMetadata  Json?
+  selectedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // ── Phase 14: Copywriting Engine ──
+  topicSelectionId  String?
+  isHotTopicVersion Boolean @default(false)
+
+  // ── Quality Gate (PRD Module 4) ──
+  openingTypeCode String? // 使用的开头类型代码
+  structureCode   String? // 使用的文案结构代码
+  endingTypeCode  String? // 使用的结尾类型代码
+  qualityReport   Json? // 四维评分详情 { editorial, aiTaste, attraction, logic }
+  rewriteCount    Int     @default(0) // 自动重写次数
+
+  user          User                  @relation(fields: [userId], references: [id])
+  generationRun ContentGenerationRun? @relation(fields: [generationRunId], references: [id])
+  ipProfile     IpProfile?            @relation(fields: [ipProfileId], references: [id])
+  structure     VideoStructure?       @relation(fields: [structureId], references: [id])
+  videoTasks    VideoTask[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([generationRunId])
+  @@index([ipProfileId])
+  @@index([structureId])
+  @@index([topicSelectionId])
+}
+
+model ContentGenerationRun {
+  id                String   @id @default(cuid())
+  userId            String
+  ipProfileId       String
+  templateId        String
+  structureId       String?
+  structureSnapshot Json?
+  hotTopicId        String?
+  hotTopic          String?
+  hotTopicInsight   Json?
+  hotTopicFit       Json?
+  inputsJson        Json
+  promptText        String   @db.Text
+  model             String
+  status            String   @default("succeeded") // pending | succeeded | failed | degraded
+  qualityScore      Float?
+  qualityMetadata   Json?
+  errorMessage      String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // ── Phase 14: Copywriting Engine (Topic Selection context) ──
+  topicSelectionId  String?
+  openingTypeCode   String?
+  copyStructureCode String?
+  endingTypeCode    String?
+
+  user      User            @relation(fields: [userId], references: [id])
+  ipProfile IpProfile       @relation(fields: [ipProfileId], references: [id])
+  structure VideoStructure? @relation(fields: [structureId], references: [id])
+  scripts   Script[]
+
+  @@index([userId, createdAt])
+  @@index([templateId])
+  @@index([structureId])
+  @@index([hotTopicId])
+  @@index([topicSelectionId])
+}
+
+model HotTopicFitCache {
+  id          String   @id @default(cuid())
+  cacheKey    String   @unique
+  topicId     String
+  topicTitle  String
+  templateId  String
+  structureId String
+  ipProfileId String
+  fitJson     Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([topicId, templateId, structureId])
+  @@index([ipProfileId, updatedAt])
+}
+
+model VideoStructure {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  subtitle    String?
+  description String?  @db.Text
+  useCase     String?
+  blueprint   Json // Machine-readable: openingPattern, narrativeBeats, evidenceSlots, ctaSlot, durationRange
+  sortOrder   Int      @default(0)
+  status      String   @default("published") // draft | published | archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scripts               Script[]
+  contentGenerationRuns ContentGenerationRun[]
+  videoTasks            VideoTask[]
+  productionPlans       VideoProductionPlan[]
+
+  @@index([status, sortOrder])
+}
+
+model TopicElement {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  name          String
+  typeLabel     String
+  description   String   @db.Text
+  conflictCodes Json     @default("[]")
+  sortOrder     Int      @default(0)
+  status        String   @default("published")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model OpeningType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String   @db.Text
+  formulas    Json
+  examples    Json     @default("[]")
+  sortOrder   Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model CopyStructure {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String   @db.Text
+  beats       Json
+  caseStudy   Json     @default("[]")
+  sortOrder   Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model EndingType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String   @db.Text
+  guidance    String   @db.Text
+  patterns    Json     @default("[]")
+  sortOrder   Int      @default(0)
+  status      String   @default("published")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, sortOrder])
+}
+
+model TopicSelection {
+  id                 String   @id @default(cuid())
+  userId             String
+  ipProfileId        String
+  elementCodes       Json
+  candidates         Json
+  selectedIndex      Int?
+  promptText         String   @db.Text
+  sourceHighlights   Json?
+  model              String?
+  status             String   @default("pending")
+  recommendationMode String?  @db.VarChar(20) // normal | daily | weekly，用于判断"今天的每日推荐"
+  recommendedDate    String?  @db.VarChar(10) // YYYY-MM-DD，生成当天日期，便于按天查重
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  ipProfile IpProfile @relation(fields: [ipProfileId], references: [id])
+
+  @@index([userId, status])
+  @@index([ipProfileId])
+  @@index([userId, recommendationMode, recommendedDate])
+}
+
+model ContentTemplate {
+  id                  String    @id @default(cuid())
+  name                String
+  displayName         String
+  description         String?   @db.Text
+  scriptTemplate      String    @db.Text
+  expressionBlueprint Json?
+  variables           Json      @default("[]")
+  hookType            String?
+  shanjianStyleId     String?
+  videoType           String    @default("virtualman_broadcast")
+  packRulesJson       Json?
+  processRulesJson    Json?
+  industry            Json      @default("[]") // JSON array of strings for MySQL
+  contentType         String // product_intro | promotion | knowledge | story | testimonial
+  tags                Json      @default("[]") // JSON array of display tags
+  hotTopicKeywords    Json      @default("[]") // JSON array for hot topic matching
+  seasonalEvents      Json      @default("[]") // JSON array of {id, startDate, endDate}
+  status              String    @default("draft") // draft | published | archived
+  sortOrder           Int       @default(0)
+  featured            Boolean   @default(false)
+  usageCount          Int       @default(0)
+  createdBy           String
+  publishedAt         DateTime?
+  archivedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([status])
+  @@index([status, sortOrder])
+  @@index([featured, status])
+}
+
+model Inspiration {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // 灵感来源：text(手写/粘贴) | feishu_webhook | wechat
+  source           String  @default("text") @db.VarChar(40)
+  // 灵感内容
+  content          String  @db.Text
+  // AI 状态：pending | processing | completed | failed
+  aiStatus         String  @default("pending") @db.VarChar(20)
+  // AI 生成的选题 (JSON array of topic card)
+  generatedTopics  Json?
+  // AI 生成的文案内容 (AimGenerateResponse)
+  generatedContent Json?
+  // 关联的 AIM 生成记录 id
+  aimGenerationId  String?
+  // 错误信息
+  errorMessage     String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, aiStatus])
+  @@index([source])
+}

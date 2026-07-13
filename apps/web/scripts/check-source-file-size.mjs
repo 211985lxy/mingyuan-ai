@@ -6,17 +6,18 @@ import { createRequire } from "node:module"
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const CONFIG_PATH = join(WEB_ROOT, "config", "architecture-size-policy.json")
 const SOURCE_ROOT = join(WEB_ROOT, "src")
+const PRISMA_ROOT = join(WEB_ROOT, "prisma")
 const require = createRequire(import.meta.url)
 const ts = require("typescript")
 
-function listSourceFiles(dir, files = []) {
+function listSourceFiles(dir, files = [], filePattern = /\.(ts|tsx)$/) {
   for (const entry of readdirSync(dir)) {
     if (["generated", "node_modules", ".next"].includes(entry)) continue
     const path = join(dir, entry)
     const stat = statSync(path)
     if (stat.isDirectory()) {
-      listSourceFiles(path, files)
-    } else if (/\.(ts|tsx)$/.test(entry)) {
+      listSourceFiles(path, files, filePattern)
+    } else if (filePattern.test(entry)) {
       files.push(path)
     }
   }
@@ -67,6 +68,14 @@ function main() {
     }
   }
 
+  for (const path of listSourceFiles(PRISMA_ROOT, [], /\.prisma$/)) {
+    const file = relative(WEB_ROOT, path)
+    const lines = lineCount(path)
+    if (lines > policy.prismaFileLineLimit) {
+      violations.push(`${file}: ${lines} lines; Prisma domain files must stay at or below ${policy.prismaFileLineLimit} lines`)
+    }
+  }
+
   if (deadlinePassed && oversizedFunctions.length > 0) {
     violations.push(`${oversizedFunctions.length} functions exceed ${policy.functionLineLimit} lines after the legacy deadline`)
   }
@@ -85,7 +94,7 @@ function main() {
   const warning = oversizedFunctions.length > 0
     ? ` warnings=functions>${policy.functionLineLimit}:${oversizedFunctions.length} due=${policy.legacyDeadline}`
     : ""
-  console.log(`architecture-size-ok fileLimit=${policy.fileLineLimit} legacyFiles=${legacyFiles.size}${warning}`)
+  console.log(`architecture-size-ok fileLimit=${policy.fileLineLimit} prismaFileLimit=${policy.prismaFileLineLimit} legacyFiles=${legacyFiles.size}${warning}`)
 }
 
 main()
