@@ -29,13 +29,10 @@ import type {
 } from "@/features/aim/aim-workbench-types"
 import {
   generateAimContent,
-  checkScriptQuality,
   polishScript,
   chatAim,
   chatAimStream,
   ApiError,
-  recordAimRunEvent,
-  updateAimWorkflowStatus,
   type AimGeneration,
   type ContentFormat,
 } from "@/lib/api/client"
@@ -71,7 +68,6 @@ import {
   type AimEditorContext,
 } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
-import { FORMAT_LABELS, workflowStatusLabel } from "@/features/aim/aim-format-labels"
 import {
   buildHistoryRawInput,
   extractBenchmarkAnalysisText,
@@ -85,6 +81,7 @@ import { useAimImageAttachments } from "@/features/aim/hooks/use-aim-image-attac
 import { useAimWorkflowActions } from "@/features/aim/hooks/use-aim-workflow-actions"
 import { useAimRouteEffects } from "@/features/aim/hooks/use-aim-route-effects"
 import { useAimChatActions } from "@/features/aim/hooks/use-aim-chat-actions"
+import { useAimPublishActions } from "@/features/aim/hooks/use-aim-publish-actions"
 import {
   buildBenchmarkQualityMessage,
   buildBenchmarkRewriteInput,
@@ -102,16 +99,6 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
 }))
 
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
-const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
-
-function reportAimRunEvent(
-  runId: string | null | undefined,
-  event: "copied" | "revised" | "accepted",
-  metadata?: Record<string, unknown>,
-) {
-  if (!runId) return
-  void recordAimRunEvent(runId, event, metadata).catch(() => undefined)
-}
 
 /** 生成一个稳定的临时 id（组件内使用，避免 Math.random 之外的库依赖） */
 let _seq = 0
@@ -911,90 +898,22 @@ export default function AimPage() {
     requestAbortRef.current?.abort()
   }
 
-  const handleRepurpose = useCallback(
-    (msgId: string) => async (fmt: ContentFormat) => {
-        setIsGenerating(true)
-        try {
-          if (projectEnabled && !selectedProjectId) {
-          toast.error("你的 IP 营销全案还在配置中")
-          return
-        }
-        const base = messages.find((m) => m.id === msgId)?.deliverables
-        const mainContent = base?.results.find((r) => r.format === "video_script")?.content
-        if (!mainContent) return
-        const response = await generateAimContent({
-          rawInput: `基于以下脚本，派生${FORMAT_LABELS[fmt]}：\n\n${mainContent}`,
-          targetFormats: [fmt],
-          projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-          taskType: "repurpose",
-        })
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId && m.deliverables
-              ? { ...m, deliverables: { ...m.deliverables, results: [...m.deliverables.results, ...response.results] } }
-              : m,
-          ),
-        )
-        refreshHistory({ force: true, agentId: selectedAgentId })
-        toast.success(`${FORMAT_LABELS[fmt]}已生成`)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "生成失败")
-      } finally {
-        setIsGenerating(false)
-      }
-    },
-    [messages, projectEnabled, refreshHistory, selectedAgentId, selectedProjectId],
-  )
-
-  const handleQuality = useCallback(
-    (msgId: string) => async () => {
-      const base = messages.find((m) => m.id === msgId)?.deliverables
-      const mainContent =
-        base?.results.find((r) => r.format === "video_script")?.content
-        || base?.results.find((r) => r.format === "koubo_script")?.content
-      if (!mainContent) return
-      setIsQualityChecking(true)
-      try {
-        const report = await checkScriptQuality({
-          content: mainContent,
-          persona: agent.defaultInstruction,
-          publishPlatform: "douyin",
-        })
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msgId ? { ...m, qualityReport: report } : m)),
-        )
-        toast.success("发布前自查完成")
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "质检失败")
-      } finally {
-        setIsQualityChecking(false)
-      }
-    },
-    [messages, agent],
-  )
-
-  const handleMarkStatus = useCallback(
-    (msgId: string) => async (status: string) => {
-      const message = messages.find((m) => m.id === msgId)
-      const base = message?.deliverables
-      if (!base?.id || base.id.startsWith("polish-")) {
-        toast.error("只有已保存的内容才能推进状态")
-        return
-      }
-      try {
-        await updateAimWorkflowStatus(base.id, { workflowStatus: status })
-        if (ACCEPTED_WORKFLOW_STATUSES.has(status)) {
-          reportAimRunEvent(message?.runId, "accepted", { workflowStatus: status })
-        }
-        refreshHistory({ force: true, agentId: selectedAgentId })
-        refreshProjectWorkflow()
-        toast.success(`已标记为：${workflowStatusLabel(status)}`)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "状态更新失败")
-      }
-    },
-    [messages, refreshHistory, selectedAgentId],
-  )
+  const {
+    handleRepurpose,
+    handleQuality,
+    handleMarkStatus,
+  } = useAimPublishActions({
+    messages,
+    selectedAgentId,
+    selectedProjectId,
+    projectEnabled,
+    agentInstruction: agent.defaultInstruction,
+    refreshHistory,
+    refreshProjectWorkflow,
+    setMessages,
+    setIsGenerating,
+    setIsQualityChecking,
+  })
 
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
