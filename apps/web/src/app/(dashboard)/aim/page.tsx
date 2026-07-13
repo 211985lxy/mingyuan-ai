@@ -28,7 +28,6 @@ import type {
   RecordDialogMode,
 } from "@/features/aim/aim-workbench-types"
 import {
-  generateAimContent,
   polishScript,
   chatAim,
   chatAimStream,
@@ -36,11 +35,7 @@ import {
   type AimGeneration,
   type ContentFormat,
 } from "@/lib/api/client"
-import {
-  AIM_CONTENT_ACTIONS,
-  getWorkflowStageForAgent,
-  isAimWorkflowStage,
-} from "@/lib/aim-workflow"
+import { getWorkflowStageForAgent, isAimWorkflowStage } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { transcribeAudio } from "@/lib/api/client"
 import { STYLE_GUIDE_LABELS, type StyleGuideId } from "@/lib/style-guide-config"
@@ -68,12 +63,7 @@ import {
   type AimEditorContext,
 } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
-import {
-  buildHistoryRawInput,
-  extractBenchmarkAnalysisText,
-  extractBenchmarkOriginalText,
-  extractProgress,
-} from "@/features/aim/aim-text-utils"
+import { extractBenchmarkAnalysisText, extractBenchmarkOriginalText, extractProgress } from "@/features/aim/aim-text-utils"
 import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-workflow"
 import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
 import { useAimEvolution } from "@/features/aim/hooks/use-aim-evolution"
@@ -82,10 +72,10 @@ import { useAimWorkflowActions } from "@/features/aim/hooks/use-aim-workflow-act
 import { useAimRouteEffects } from "@/features/aim/hooks/use-aim-route-effects"
 import { useAimChatActions } from "@/features/aim/hooks/use-aim-chat-actions"
 import { useAimPublishActions } from "@/features/aim/hooks/use-aim-publish-actions"
+import { useAimGenerateActions } from "@/features/aim/hooks/use-aim-generate-actions"
 import {
   buildBenchmarkQualityMessage,
   buildBenchmarkRewriteInput,
-  buildRawInputFromMessages,
   getLatestDeliverableMessageId,
   getLatestDeliverableText,
   getOpeningSegment,
@@ -751,128 +741,33 @@ export default function AimPage() {
     } : { images: imageAttachments })
   }
 
-  async function generateWithInput(currentInput: string, options?: { retryMessageId?: string }) {
-    const rawInput = buildRawInputFromMessages(messages, currentInput || undefined)
-    if (!rawInput) {
-      toast.error("请先在对话框里说点素材或需求")
-      return
-    }
-    if (projectEnabled && !selectedProjectId) {
-      toast.error("你的 IP 营销全案还在配置中")
-      return
-    }
-    const controller = new AbortController()
-    requestAbortRef.current = controller
-    const assistantMessageId = nextId()
-    pendingScrollMessageIdRef.current = assistantMessageId
-    const baseMessages = options?.retryMessageId
-      ? messages.filter((message) => message.id !== options.retryMessageId)
-      : messages
-    setMessages((prev) => [
-      ...(options?.retryMessageId
-        ? prev.filter((message) => message.id !== options.retryMessageId)
-        : prev),
-      ...(currentInput && !options?.retryMessageId ? [{ id: nextId(), role: "user" as const, content: currentInput }] : []),
-      {
-        id: assistantMessageId,
-        role: "assistant" as const,
-        content: `正在${agent.primaryActionLabel}，会先读取项目资料、匹配知识库，再生成交付物…`,
-        agentId: agent.id,
-      },
-    ])
-    if (currentInput) setInput("")
-    setIsGenerating(true)
-    try {
-      const response = await generateAimContent({
-        agentId: selectedAgentId,
-        rawInput: buildHistoryRawInput(rawInput, options?.retryMessageId ? "" : currentInput, baseMessages),
-        targetFormats: agent.defaultFormats,
-        projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-        videoCopyExtractionId: sourceVideoCopyExtractionId,
-        topicTitle: sourceTopicTitle.trim() || undefined,
-        topicRationale: sourceTopicRationale.trim() || undefined,
-        topicSelectionId: topicSelectionIdParam || undefined,
-        selectedTopicIndex: Number.isFinite(selectedTopicIndexParam) ? selectedTopicIndexParam : undefined,
-        taskType: contentAction
-          ? AIM_CONTENT_ACTIONS.find((item) => item.id === contentAction)?.taskType || "write_script"
-          : "write_script",
-        useMarketViralVideos: selectedAgentId === "business_diagnosis",
-        workflow: workflowBrief
-          ? {
-              stage: "content",
-              sourceGenerationId: workflowBrief.sourceGenerationId,
-              confirmed: workflowBrief.confirmed,
-            }
-          : undefined,
-      }, controller.signal)
-      const proofreadFormats = new Set<ContentFormat>(["raw_copy", "video_script", "koubo_script"])
-      const proofreadResults = await Promise.all(
-        response.results.map(async (result) => {
-          if (!proofreadFormats.has(result.format) || result.content.trim().length < 30) return result
-          try {
-            const polished = await polishScript({
-              content: result.content,
-              persona: agent.defaultInstruction,
-              mode: "proofread",
-            })
-            return {
-              ...result,
-              content: polished.polished,
-              wordCount: polished.polished.length,
-            }
-          } catch {
-            return result
-          }
-        }),
-      )
-      const correctedResponse = { ...response, results: proofreadResults }
-      const extractedOriginalText = extractBenchmarkOriginalText(currentInput)
-      const extractedAnalysisText = extractBenchmarkAnalysisText(currentInput)
-      if (extractedOriginalText) setSourceOriginalText(extractedOriginalText)
-      if (extractedAnalysisText) setSourceAnalysisText(extractedAnalysisText)
-      const mainResult = response.results[0]
-      setMessages((prev) => prev.map((message) =>
-        message.id === assistantMessageId
-          ? {
-            ...message,
-          content: `${agent.title} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`,
-          agentId: agent.id,
-          deliverables: correctedResponse,
-          // aim-harness-v1: 捕获执行诊断，仅在低分/降级时向用户展示执行编号
-          runId: response.runId ?? null,
-          degraded: response.degraded ?? null,
-          qualityStatus: response.qualityStatus ?? null,
-          workflowStage: currentWorkflowStage,
-          contentAction,
-          }
-          : message
-      ))
-      if (mainResult) {
-        const correctedMainResult = correctedResponse.results[0] ?? mainResult
-        openEditorFromResult(
-          assistantMessageId,
-          correctedMainResult.format,
-          correctedMainResult.content,
-        )
-      }
-      refreshHistory({ force: true, agentId: selectedAgentId })
-      refreshProjectWorkflow()
-      setWorkflowBrief(null)
-      setContentAction(null)
-      toast.success(`${agent.primaryActionLabel}完毕`)
-    } catch (error) {
-      const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-      const message = stopped ? "已停止本次生成。" : `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`
-      setMessages((prev) => prev.map((item) =>
-        item.id === assistantMessageId
-          ? { ...item, content: message, failure: stopped ? null : { kind: "generate", retryText: currentInput } }
-          : item
-      ))
-    } finally {
-      if (requestAbortRef.current === controller) requestAbortRef.current = null
-      setIsGenerating(false)
-    }
-  }
+  const { generateWithInput } = useAimGenerateActions({
+    agent,
+    selectedAgentId,
+    selectedProjectId,
+    projectEnabled,
+    messages,
+    sourceVideoCopyExtractionId,
+    sourceTopicTitle,
+    sourceTopicRationale,
+    topicSelectionId: topicSelectionIdParam || undefined,
+    selectedTopicIndex: selectedTopicIndexParam,
+    contentAction,
+    workflowBrief,
+    currentWorkflowStage,
+    requestAbortRef,
+    pendingScrollMessageIdRef,
+    refreshHistory,
+    refreshProjectWorkflow,
+    openEditorFromResult,
+    setMessages,
+    setInput,
+    setIsGenerating,
+    setSourceOriginalText,
+    setSourceAnalysisText,
+    setWorkflowBrief,
+    setContentAction,
+  })
 
   async function handleGenerate() {
     if (hasEditorSelection || imageAttachments.length > 0) {
