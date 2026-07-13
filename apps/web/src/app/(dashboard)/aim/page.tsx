@@ -2,35 +2,14 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import {
-  Database,
-  FileText,
-  Loader2,
-  Target,
-  ArrowRight,
-} from "lucide-react"
 import { toast } from "sonner"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
-import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
-import { BenchmarkEditorPanel, type EditorSelection } from "@/features/aim/components/benchmark-editor-panel"
-import { AimRecordDialog } from "@/features/aim/components/record-dialog"
-import { WorkflowBriefDialog } from "@/features/aim/components/workflow-brief-dialog"
-import { AimMessageList } from "@/features/aim/components/message-list"
-import { AimWorkbenchChrome } from "@/features/aim/components/workbench-chrome"
+import type { IpWikiDialogContext } from "./ip-wiki-dialog"
+import type { EditorSelection } from "@/features/aim/components/benchmark-editor-panel"
+import { AimWorkbenchLayout } from "@/features/aim/components/workbench-layout"
 import { aimDraftStorageKey, loadAimDraft } from "@/features/aim/aim-draft-storage"
-import type {
-  AimChatToolAction,
-  AimDraft,
-  ChatMessage,
-  RecordDialogMode,
-} from "@/features/aim/aim-workbench-types"
-import {
-  type AimGeneration,
-  type ContentFormat,
-} from "@/lib/api/client"
+import type { AimDraft, ChatMessage } from "@/features/aim/aim-workbench-types"
+import type { ContentFormat } from "@/lib/api/client"
 import { getWorkflowStageForAgent, isAimWorkflowStage } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { transcribeAudio } from "@/lib/api/client"
@@ -52,7 +31,7 @@ import {
   EDITOR_PANEL_DEFAULT_WIDTH,
   applyFirstMatchingStructureToReference,
 } from "@/lib/aim-editor"
-import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
+import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
 import { extractBenchmarkAnalysisText, extractBenchmarkOriginalText, extractProgress } from "@/features/aim/aim-text-utils"
 import { useAimProjectWorkflow } from "@/features/aim/hooks/use-aim-project-workflow"
 import { useAimRecordDialog } from "@/features/aim/hooks/use-aim-record-dialog"
@@ -75,13 +54,6 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
 
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 
-/** 生成一个稳定的临时 id（组件内使用，避免 Math.random 之外的库依赖） */
-let _seq = 0
-function nextId(prefix = "m") {
-  _seq += 1
-  return `${prefix}-${Date.now()}-${_seq}`
-}
-
 export default function AimPage() {
   const router = useRouter()
   const searchParams = useSearchParams() ?? new URLSearchParams()
@@ -90,8 +62,6 @@ export default function AimPage() {
   const topicTitleParam = searchParams.get("topicTitle")
   const topicRationaleParam = searchParams.get("topicRationale")
   const topicSelectionIdParam = searchParams.get("topicSelectionId")
-  // 注意：searchParams.get 缺省返回 null，Number(null)===0 会误把「未选选题」记成第 0 号。
-  // 仅当参数确实存在且为非负整数时才解析，否则 NaN（下游 Number.isFinite 会丢弃）。
   const selectedTopicIndexRaw = searchParams.get("selectedTopicIndex")
   const selectedTopicIndexParam =
     selectedTopicIndexRaw !== null && /^\d+$/.test(selectedTopicIndexRaw) ? Number(selectedTopicIndexRaw) : NaN
@@ -104,12 +74,7 @@ export default function AimPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
-  const {
-    imageAttachments,
-    setImageAttachments,
-    isUploadingImage,
-    handleAddImages,
-  } = useAimImageAttachments()
+  const { imageAttachments, setImageAttachments, isUploadingImage, handleAddImages } = useAimImageAttachments()
   const [sourceVideoCopyExtractionId, setSourceVideoCopyExtractionId] = useState<string | undefined>(() => initialDraft?.videoCopyExtractionId)
   const [sourceOriginalText, setSourceOriginalText] = useState(() => initialDraft?.sourceOriginalText || "")
   const [sourceAnalysisText, setSourceAnalysisText] = useState(() => initialDraft?.sourceAnalysisText || "")
@@ -125,59 +90,25 @@ export default function AimPage() {
   const [isThinking, setIsThinking] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isQualityChecking, setIsQualityChecking] = useState(false)
-  const {
-    projects,
-    projectWorkflowRecords,
-    isLoadingProjectWorkflow,
-    selectedProjectId,
-    setSelectedProjectId,
-    projectEnabled,
-    setProjectEnabled,
-    refreshProjectWorkflow,
-  } = useAimProjectWorkflow(initialDraft?.selectedProjectId || "")
+  const { projects, projectWorkflowRecords, isLoadingProjectWorkflow, selectedProjectId, setSelectedProjectId, projectEnabled, setProjectEnabled, refreshProjectWorkflow } = useAimProjectWorkflow(initialDraft?.selectedProjectId || "")
   const [wikiDialog, setWikiDialog] = useState<{ open: boolean; context: IpWikiDialogContext | null }>({
     open: false,
     context: null,
   })
 
-  // 历史记录由侧边栏共享 store 管理（侧边栏渲染列表、生成成功后刷新、点击后触发加载）
   const storeHistory = useAimWorkspaceStore((s) => s.history)
   const loadTargetId = useAimWorkspaceStore((s) => s.loadTargetId)
   const refreshHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const clearLoadTarget = useAimWorkspaceStore((s) => s.clearLoadTarget)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
 
-  const {
-    isEvolving,
-    evolutionSuggestions,
-    setEvolutionSuggestions,
-    rememberWorkbenchPreference,
-    handleEvolveConversation,
-    handleSaveEvolutionSuggestion,
-  } = useAimEvolution({
+  const { isEvolving, evolutionSuggestions, setEvolutionSuggestions, rememberWorkbenchPreference, handleEvolveConversation, handleSaveEvolutionSuggestion } = useAimEvolution({
     messages,
     projectEnabled,
     selectedProjectId,
   })
 
-  const {
-    recordDialog,
-    setRecordDialog,
-    decisionForm,
-    setDecisionForm,
-    publishForm,
-    setPublishForm,
-    retroForm,
-    setRetroForm,
-    outcomeForm,
-    setOutcomeForm,
-    outcomeWindow,
-    setOutcomeWindow,
-    retroRuleForm,
-    setRetroRuleForm,
-    openRecordDialog,
-    handleSubmitRecordDialog,
-  } = useAimRecordDialog({
+  const { recordDialog, setRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm, retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow, retroRuleForm, setRetroRuleForm, openRecordDialog, handleSubmitRecordDialog } = useAimRecordDialog({
     messages,
     selectedAgentId,
     selectedProjectId,
@@ -539,164 +470,31 @@ export default function AimPage() {
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
 
+  const projectState = { projects, projectEnabled, projectWorkflowRecords, isLoadingProjectWorkflow, setProjectEnabled }
+  const recordState = { recordDialog, setRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm, retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow, retroRuleForm, setRetroRuleForm, openRecordDialog, handleSubmitRecordDialog }
+
   return (
-    <div className="-mx-4 -my-4 flex h-[calc(100dvh-3.5rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
-      {/* 对话区（智能体列表与最近内容已移至全局侧边栏） */}
-      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-card px-4 md:px-6">
-        <AimWorkbenchChrome
-          agentTitle={agent.title}
-          agentIcon={agent.icon}
-          currentWorkflowStage={currentWorkflowStage}
-          projects={projects}
-          projectEnabled={projectEnabled}
-          selectedProjectId={selectedProjectId}
-          projectWorkflowRecords={projectWorkflowRecords}
-          isLoadingProjectWorkflow={isLoadingProjectWorkflow}
-          personaProgress={personaProgress}
-          evolutionSuggestions={evolutionSuggestions}
-          isThinking={isThinking}
-          isGenerating={isGenerating}
-          isEvolving={isEvolving}
-          messagesLength={messages.length}
-          onStartStage={beginWorkflowStage}
-          onToggleProjectEnabled={() => setProjectEnabled((value) => !value)}
-          onEvolveConversation={() => void handleEvolveConversation()}
-          onResetConversation={resetConversation}
-          onOpenProjectTask={(id) => void openProjectWorkflowTask(id)}
-          onDismissEvolutionSuggestion={(suggestion) => setEvolutionSuggestions((prev) => prev.filter((item) => item !== suggestion))}
-          onSaveEvolutionSuggestion={(suggestion) => void handleSaveEvolutionSuggestion(suggestion)}
-        />
-
-        {/* 消息流 */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
-          <AimMessageList
-            messages={messages}
-            showWorkflowLanding={showWorkflowLanding}
-            agentIntro={agent.intro}
-            currentWorkflowStage={currentWorkflowStage}
-            selectedAgentId={selectedAgentId}
-            selectedProjectId={selectedProjectId}
-            busy={busy}
-            latestDeliverableMessageId={getLatestDeliverableMessageId(messages)}
-            onStartStage={beginWorkflowStage}
-            onBeginContentAction={beginContentAction}
-            onSendText={(text) => void sendText(text)}
-            onRetryFailedMessage={retryFailedMessage}
-            onApplyEditorReplacement={applyEditorReplacement}
-            onRepurpose={handleRepurpose}
-            onQuality={handleQuality}
-            onMarkStatus={handleMarkStatus}
-            onNextAction={handleAimNextAction}
-            onEditResult={openEditorFromResult}
-            onOpenRecordDialog={openRecordDialog}
-            onCompileToWiki={(sourceGenerationId, positioningText) => {
-              setWikiDialog({
-                open: true,
-                context: {
-                  projectId: selectedProjectId,
-                  sourceGenerationId,
-                  positioningText,
-                },
-              })
-            }}
-          />
-        </div>
-
-        {/* 输入区 */}
-        <footer className="border-t px-3 py-2 sm:px-5">
-          {RESEARCH_HINT_AGENT_IDS.has(selectedAgentId) && (
-            <p className="mx-auto mb-2 hidden max-w-2xl text-xs text-muted-foreground lg:block">
-              可以直接把官网链接、竞品资料、客户资料或 Research Agent 资料包粘贴到聊天框里，系统会作为诊断上下文使用。
-            </p>
-          )}
-          <AimPromptComposer
-            value={input}
-            placeholder={agent.placeholder}
-            busy={busy}
-            isRecording={isRecording}
-            isTranscribing={isTranscribing}
-            isGenerating={isGenerating || isUploadingImage}
-            canGenerate={
-              (input.trim().length > 0 || imageAttachments.length > 0) &&
-              (!projectEnabled || Boolean(selectedProjectId)) &&
-              !isUploadingImage
-            }
-            primaryActionLabel={hasEditorSelection ? editorPanelLabels.selectActionLabel : agent.primaryActionLabel}
-            onChange={setInput}
-            onGenerate={handleGenerate}
-            onStop={handleStop}
-            onStartRecording={startRecording}
-            onStopRecording={stopRecording}
-            skills={agent.skills}
-            onUseSkill={handleUseSkill}
-            imageAttachments={imageAttachments}
-            onAddImages={(files) => void handleAddImages(files)}
-            onRemoveImage={(id) => setImageAttachments((current) => current.filter((image) => image.id !== id))}
-          />
-        </footer>
-      </section>
-
-      {hasEditor && (
-        <BenchmarkEditorPanel
-          open={editorPanelOpen}
-          width={editorPanelWidth}
-          labels={editorPanelLabels}
-          referenceText={annotatedReferenceText}
-          editorText={editorText}
-          editorFormat={editorFormat}
-          onOpen={() => setEditorPanelOpen(true)}
-          onClose={() => setEditorPanelOpen(false)}
-          onWidthChange={setEditorPanelWidth}
-          onEditorTextChange={setEditorText}
-          onReferenceSelection={setReferenceSelection}
-          onDraftSelection={setDraftSelection}
-          onSave={saveEditorToDeliverable}
-          onImitate={handleImitate}
-          imitating={isImitating}
-          imitateStyleId={imitateStyleId}
-          onImitateStyleChange={setImitateStyleId}
-        />
-      )}
-
-      {wikiDialog.open && wikiDialog.context && (
-        <IpWikiDialog
-          key={wikiDialog.context.sourceGenerationId ?? "ip-wiki"}
-          context={wikiDialog.context}
-          onClose={() => setWikiDialog((prev) => ({ ...prev, open: false }))}
-        />
-      )}
-
-      <WorkflowBriefDialog
-        open={workflowBriefDialogOpen && !!workflowBrief}
-        busy={isBuildingWorkflowBrief}
-        form={workflowBriefForm}
-        setForm={setWorkflowBriefForm}
-        onOpenChange={(open) => {
-          setWorkflowBriefDialogOpen(open)
-          if (!open) setWorkflowBrief(null)
-        }}
-        onCancel={() => { setWorkflowBriefDialogOpen(false); setWorkflowBrief(null) }}
-        onConfirm={confirmWorkflowBrief}
-      />
-
-      <AimRecordDialog
-        recordDialog={recordDialog}
-        decisionForm={decisionForm}
-        publishForm={publishForm}
-        retroForm={retroForm}
-        retroRuleForm={retroRuleForm}
-        outcomeForm={outcomeForm}
-        outcomeWindow={outcomeWindow}
-        busy={busy}
-        setRecordDialog={setRecordDialog}
-        setDecisionForm={setDecisionForm}
-        setPublishForm={setPublishForm}
-        setRetroForm={setRetroForm}
-        setRetroRuleForm={setRetroRuleForm}
-        setOutcomeForm={setOutcomeForm}
-        setOutcomeWindow={setOutcomeWindow}
-        onSubmit={() => void handleSubmitRecordDialog()}
-      />
-    </div>
+    <AimWorkbenchLayout
+      {...{ agent, currentWorkflowStage, showWorkflowLanding, selectedAgentId, selectedProjectId, projectState, messages, busy, isThinking, isGenerating, isEvolving, isUploadingImage, isRecording, isTranscribing, personaProgress, evolutionSuggestions, input, imageAttachments, hasEditorSelection, hasEditor, editorPanelLabels, editorPanelOpen, editorPanelWidth, annotatedReferenceText, editorText, editorFormat, isImitating, imitateStyleId, wikiDialog, workflowBrief, workflowBriefForm, workflowBriefDialogOpen, isBuildingWorkflowBrief, recordState }}
+      latestDeliverableMessageId={getLatestDeliverableMessageId(messages)}
+      researchHintAgentIds={RESEARCH_HINT_AGENT_IDS}
+      scrollRef={scrollRef}
+      {...{ setInput, setImageAttachments, setEditorPanelOpen, setEditorPanelWidth, setEditorText, setReferenceSelection, setDraftSelection, setImitateStyleId, setWikiDialog, setWorkflowBrief, setWorkflowBriefForm, setWorkflowBriefDialogOpen, setEvolutionSuggestions }}
+      {...{ onStartStage: beginWorkflowStage, onBeginContentAction: beginContentAction }}
+      onEvolveConversation={() => void handleEvolveConversation()}
+      {...{ onResetConversation: resetConversation }}
+      onOpenProjectTask={(id) => void openProjectWorkflowTask(id)}
+      onSaveEvolutionSuggestion={(suggestion) => void handleSaveEvolutionSuggestion(suggestion)}
+      onSendText={(text) => void sendText(text)}
+      {...{ onRetryFailedMessage: retryFailedMessage, onApplyEditorReplacement: applyEditorReplacement }}
+      {...{ onRepurpose: handleRepurpose, onQuality: handleQuality, onMarkStatus: handleMarkStatus }}
+      onNextAction={(action, content, generationId) => void handleAimNextAction(action, content, generationId)}
+      {...{ onEditResult: openEditorFromResult, onOpenRecordDialog: openRecordDialog }}
+      onGenerate={() => void handleGenerate()}
+      {...{ onStop: handleStop, onStartRecording: startRecording }}
+      {...{ onUseSkill: handleUseSkill, onStopRecording: () => void stopRecording(), onAddImages: (files: FileList) => void handleAddImages(files) }}
+      {...{ onSaveEditor: saveEditorToDeliverable, onImitate: handleImitate, onConfirmWorkflowBrief: confirmWorkflowBrief }}
+      onSubmitRecordDialog={() => void handleSubmitRecordDialog()}
+    />
   )
 }
