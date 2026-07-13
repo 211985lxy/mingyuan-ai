@@ -17,17 +17,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { Textarea } from "@/components/ui/textarea"
 import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/features/aim/components/project-task-panel"
@@ -36,6 +26,7 @@ import { DeliverableBubble } from "@/features/aim/components/deliverable-bubble"
 import { ChoiceStepper } from "@/features/aim/components/choice-stepper"
 import { QualityReportCard } from "@/features/aim/components/quality-report-card"
 import { AimRecordDialog } from "@/features/aim/components/record-dialog"
+import { WorkflowBriefDialog } from "@/features/aim/components/workflow-brief-dialog"
 import { extractChoiceGroups } from "@/features/aim/aim-choice-groups"
 import { aimDraftStorageKey, loadAimDraft, saveAimDraft } from "@/features/aim/aim-draft-storage"
 import type {
@@ -1691,6 +1682,21 @@ export default function AimPage() {
     }
   }, [decisionForm, messages, outcomeForm, outcomeWindow, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
 
+  function confirmWorkflowBrief() {
+    const next = workflowBrief
+    if (!next) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("agent", "content_producer")
+    params.set("stage", "content")
+    lastAgentParamRef.current = "content_producer"
+    setSelectedAgentId("content_producer")
+    setWorkflowBrief({ ...next, confirmed: workflowBriefForm })
+    setWorkflowBriefDialogOpen(false)
+    setInput(next.nextInput)
+    router.replace(`/aim?${params.toString()}`)
+    toast.success("任务单已确认，开始内容创作")
+  }
+
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
 
@@ -2070,71 +2076,18 @@ export default function AimPage() {
         />
       )}
 
-      <Dialog open={workflowBriefDialogOpen && !!workflowBrief} onOpenChange={(open) => {
-        setWorkflowBriefDialogOpen(open)
-        if (!open) setWorkflowBrief(null)
-      }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>确认内容任务单</DialogTitle>
-            <DialogDescription>项目事实和上游结果已带入。这里可以改目标和约束，确认后再交给内容生产官。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">内容目标</p>
-              <Input value={workflowBriefForm.goal || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, goal: event.target.value }))} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">目标客户</p>
-                <Input value={workflowBriefForm.targetCustomer || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, targetCustomer: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">承接动作</p>
-                <Input value={workflowBriefForm.desiredAction || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, desiredAction: event.target.value as ConfirmedWorkflowBrief["desiredAction"] }))} placeholder="如：私信、预约诊断" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">核心问题</p>
-              <Textarea value={workflowBriefForm.realProblem || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, realProblem: event.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">必须保留项</p>
-              <Textarea value={workflowBriefForm.mustKeep || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, mustKeep: event.target.value }))} placeholder="案例、原话、关键结论等" />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">禁区</p>
-              <Textarea value={workflowBriefForm.avoid || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, avoid: event.target.value }))} placeholder="不能说的承诺、敏感词或表达" />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">用户补充</p>
-              <Textarea value={workflowBriefForm.userSupplement || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, userSupplement: event.target.value }))} placeholder="会标记为用户补充，不会伪装成项目事实" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setWorkflowBriefDialogOpen(false); setWorkflowBrief(null) }}>取消</Button>
-            <Button
-              disabled={isBuildingWorkflowBrief}
-              onClick={() => {
-                const next = workflowBrief
-                if (!next) return
-                const params = new URLSearchParams(searchParams.toString())
-                params.set("agent", "content_producer")
-                params.set("stage", "content")
-                lastAgentParamRef.current = "content_producer"
-                setSelectedAgentId("content_producer")
-                setWorkflowBrief({ ...next, confirmed: workflowBriefForm })
-                setWorkflowBriefDialogOpen(false)
-                setInput(next.nextInput)
-                router.replace(`/aim?${params.toString()}`)
-                toast.success("任务单已确认，开始内容创作")
-              }}
-            >
-              进入内容创作
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkflowBriefDialog
+        open={workflowBriefDialogOpen && !!workflowBrief}
+        busy={isBuildingWorkflowBrief}
+        form={workflowBriefForm}
+        setForm={setWorkflowBriefForm}
+        onOpenChange={(open) => {
+          setWorkflowBriefDialogOpen(open)
+          if (!open) setWorkflowBrief(null)
+        }}
+        onCancel={() => { setWorkflowBriefDialogOpen(false); setWorkflowBrief(null) }}
+        onConfirm={confirmWorkflowBrief}
+      />
 
       <AimRecordDialog
         recordDialog={recordDialog}
