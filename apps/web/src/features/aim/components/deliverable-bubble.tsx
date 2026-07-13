@@ -17,30 +17,9 @@ import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
 import type { AimNextAction } from "@/lib/aim-agent-guides"
 import { DeliveryContractStrip } from "@/features/aim/components/delivery-contract-strip"
-
-const FORMAT_LABELS: Record<ContentFormat, string> = {
-  video_script: "口播文案",
-  wechat_article: "公众号文章",
-  moments_post: "朋友圈文案",
-  community_message: "社群运营文案",
-  shooting_brief: "拍摄交接单",
-  raw_copy: "诊断报告",
-  koubo_script: "口播文案",
-  xiaohongshu_post: "小红书图文",
-}
+import { FORMAT_LABELS, WORKFLOW_STATUS_OPTIONS } from "@/features/aim/aim-format-labels"
 
 const SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-muted/45 px-2 text-xs text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
-
-const WORKFLOW_STATUS_OPTIONS = [
-  { value: "draft", label: "草稿" },
-  { value: "pending_review", label: "待审核" },
-  { value: "ready_to_shoot", label: "待拍摄" },
-  { value: "shooting", label: "拍摄中" },
-  { value: "editing", label: "剪辑中" },
-  { value: "ready_to_publish", label: "待发布" },
-  { value: "published", label: "已发布" },
-  { value: "archived", label: "已归档" },
-]
 
 function splitMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)

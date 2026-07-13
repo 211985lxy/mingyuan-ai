@@ -102,7 +102,6 @@ import {
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
-import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { detectAimWorkbenchCommand, type AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 import { buildOpeningRecommendationPrompt } from "@/lib/aim-opening-recommendation"
 import {
@@ -115,6 +114,16 @@ import {
   type TextSelectionRange,
 } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
+import { FORMAT_LABELS, workflowStatusLabel } from "@/features/aim/aim-format-labels"
+import {
+  buildHistoryRawInput,
+  extractBenchmarkAnalysisText,
+  extractBenchmarkOriginalText,
+  extractProgress,
+  formatAnalysisResultForPrompt,
+  getHistoryContents,
+  splitMethodNote,
+} from "@/features/aim/aim-text-utils"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -122,17 +131,6 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
   ...meta,
   ...getAimAgentGuide(meta.id),
 }))
-
-const FORMAT_LABELS: Record<ContentFormat, string> = {
-  video_script: "口播文案",
-  wechat_article: "公众号文章",
-  moments_post: "朋友圈文案",
-  community_message: "社群运营文案",
-  shooting_brief: "拍摄交接单",
-  raw_copy: "诊断报告",
-  koubo_script: "口播文案",
-  xiaohongshu_post: "小红书图文",
-}
 
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
@@ -146,98 +144,11 @@ function reportAimRunEvent(
   void recordAimRunEvent(runId, event, metadata).catch(() => undefined)
 }
 
-const WORKFLOW_STATUS_OPTIONS = [
-  { value: "draft", label: "草稿" },
-  { value: "pending_review", label: "待审核" },
-  { value: "ready_to_shoot", label: "待拍摄" },
-  { value: "shooting", label: "拍摄中" },
-  { value: "editing", label: "剪辑中" },
-  { value: "ready_to_publish", label: "待发布" },
-  { value: "published", label: "已发布" },
-  { value: "archived", label: "已归档" },
-]
-
-function workflowStatusLabel(status?: string | null) {
-  return WORKFLOW_STATUS_OPTIONS.find((item) => item.value === status)?.label || "草稿"
-}
-
-/** 从人设故事梳理的回复里解析【进度 XX%】，用于顶部进度条 */
-function extractProgress(content: string): number | null {
-  const m = content.match(/【进度\s*(\d+)\s*%】/)
-  if (!m) return null
-  const v = parseInt(m[1], 10)
-  return Number.isNaN(v) ? null : Math.min(100, Math.max(0, v))
-}
-
-function splitMethodNote(content: string) {
-  const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
-  if (!match) return { methodNote: "", result: content }
-  return {
-    methodNote: match[1].trim(),
-    result: content.replace(match[0], "").trim(),
-  }
-}
-
 /** 生成一个稳定的临时 id（组件内使用，避免 Math.random 之外的库依赖） */
 let _seq = 0
 function nextId(prefix = "m") {
   _seq += 1
   return `${prefix}-${Date.now()}-${_seq}`
-}
-
-function formatAnalysisResultForPrompt(analysisResult: unknown) {
-  if (!analysisResult) return null
-  if (typeof analysisResult === "object" && "markdown" in analysisResult) {
-    const markdown = (analysisResult as { markdown?: unknown }).markdown
-    if (typeof markdown === "string" && markdown.trim()) return cleanVideoCopyAnalysisMarkdown(markdown)
-  }
-  return JSON.stringify(analysisResult, null, 2)
-}
-
-function extractBenchmarkOriginalText(text: string) {
-  const marker = text.match(/对标原文[：:]/)
-  if (marker?.index == null) return ""
-  const start = marker.index + marker[0].length
-  const rest = text.slice(start).trim()
-  const nextSection = rest.search(/\n(?:已有拆解|结构化拆解|改写原则|创作原则|===|来源链接|硬规则)[：:：]?/)
-  return (nextSection >= 0 ? rest.slice(0, nextSection) : rest).trim()
-}
-
-function extractBenchmarkAnalysisText(text: string) {
-  const marker = text.match(/(?:已有拆解|结构化拆解)[：:]/)
-  if (marker?.index != null) return text.slice(marker.index + marker[0].length).trim()
-  const numberedStructure = text.match(/(?:^|\n)\d+[.、]\s*.+\n内容[：:]/)
-  return numberedStructure?.index == null ? "" : text.slice(numberedStructure.index).trim()
-}
-
-function getHistoryContents(item: AimGeneration) {
-  return [
-    item.videoScript ? { format: "video_script" as const, content: item.videoScript } : null,
-    item.wechatArticle ? { format: "wechat_article" as const, content: item.wechatArticle } : null,
-    item.momentsPost ? { format: "moments_post" as const, content: item.momentsPost } : null,
-    item.communityMessage ? { format: "community_message" as const, content: item.communityMessage } : null,
-    item.shootingBrief ? { format: "shooting_brief" as const, content: item.shootingBrief } : null,
-    item.rawCopy ? { format: "raw_copy" as const, content: item.rawCopy } : null,
-  ].filter(Boolean) as Array<{ format: ContentFormat; content: string }>
-}
-
-function buildHistoryRawInput(baseInput: string, currentInput: string, messages: ChatMessage[]) {
-  const turns = messages
-    .filter((message) => message.role === "user" || message.role === "assistant")
-    .map((message) => {
-      const text = message.content.trim()
-      const deliverableNote = message.deliverables?.results.length
-        ? `生成了：${message.deliverables.results.map((result) => FORMAT_LABELS[result.format] || result.format).join("、")}`
-        : ""
-      const content = [text, deliverableNote].filter(Boolean).join("\n")
-      if (!content) return ""
-      return `${message.role === "user" ? "用户" : "助手"}：${content}`
-    })
-    .filter(Boolean)
-
-  const current = currentInput.trim() ? [`用户：${currentInput.trim()}`] : []
-  if (turns.length === 0 && current.length === 0) return baseInput
-  return [`【本轮对话】`, ...turns, ...current, "", `【本次生成输入】`, baseInput].join("\n")
 }
 
 export default function AimPage() {
