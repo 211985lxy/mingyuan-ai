@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
+import { recordAdminAudit } from "@/lib/admin-audit"
 
 // Alphabet excluding ambiguous characters: 0, O, 1, I, L
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -54,8 +55,16 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
   }))
 
   await prisma.activationCode.createMany({ data })
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "activation_codes.generate",
+    targetType: "activation_code_batch",
+    targetId: batchId,
+    metadata: { quantity: qty, durationDays: duration },
+  })
 
   return NextResponse.json({
     data: { count: qty, batchId, durationDays: duration },
-  })
+  }, { headers: { "x-request-id": requestId } })
 }, "admin")

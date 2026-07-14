@@ -8,6 +8,7 @@ import {
   resetMethodologyToText,
   type MethodologyKey,
 } from "@/lib/agent-methodology-store"
+import { recordAdminAudit } from "@/lib/admin-audit"
 
 const VALID_KEYS = new Set<MethodologyKey>(
   Object.keys(METHODOLOGY_META) as MethodologyKey[]
@@ -28,7 +29,7 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
 })
 
 /** POST /api/admin/methodology/[key] —— 重置为文件原文（删除 DB 覆盖） */
-export const POST = withAdminAuth(async (request: NextRequest, { params }) => {
+export const POST = withAdminAuth(async (request: NextRequest, { admin, params }) => {
   const key = params?.key
   if (!key || !isValidKey(key)) {
     return NextResponse.json({ error: "key 非法" }, { status: 400 })
@@ -45,5 +46,12 @@ export const POST = withAdminAuth(async (request: NextRequest, { params }) => {
 
   await resetMethodologyToText(key)
   const item = await getMethodologyForAdmin(key)
-  return NextResponse.json({ data: item })
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "methodology.reset",
+    targetType: "methodology",
+    targetId: key,
+  })
+  return NextResponse.json({ data: item }, { headers: { "x-request-id": requestId } })
 })

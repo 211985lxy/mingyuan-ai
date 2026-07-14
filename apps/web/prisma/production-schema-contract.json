@@ -77,6 +77,19 @@
         "isActive",
         "sessionVersion"
       ]
+    },
+    {
+      "name": "AdminAuditLog",
+      "columns": [
+        "id",
+        "adminId",
+        "action",
+        "targetType",
+        "targetId",
+        "requestId",
+        "metadata",
+        "createdAt"
+      ]
     }
   ]
 }

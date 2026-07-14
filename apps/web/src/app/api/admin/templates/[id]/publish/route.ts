@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { isValidTransition, invalidateTemplateCache } from "@/lib/template-state"
+import { recordAdminAudit } from "@/lib/admin-audit"
 
-export const POST = withAdminAuth(async (_request, { params }) => {
+export const POST = withAdminAuth(async (request, { admin, params }) => {
   const template = await prisma.contentTemplate.findUnique({
     where: { id: params?.id },
   })
@@ -22,5 +23,12 @@ export const POST = withAdminAuth(async (_request, { params }) => {
     data: { status: "published", publishedAt: new Date() },
   })
   await invalidateTemplateCache()
-  return NextResponse.json({ data: updated })
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "content_template.publish",
+    targetType: "content_template",
+    targetId: updated.id,
+  })
+  return NextResponse.json({ data: updated }, { headers: { "x-request-id": requestId } })
 })

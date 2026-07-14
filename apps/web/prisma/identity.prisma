@@ -41,17 +41,35 @@ model User {
 }
 
 model AdminUser {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("editor") // editor | admin
-  isActive  Boolean  @default(true)
-  sessionVersion Int @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  name           String
+  role           String   @default("editor") // editor | admin
+  isActive       Boolean  @default(true)
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   activationCodes ActivationCode[]
+  auditLogs       AdminAuditLog[]
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String   @db.VarChar(100)
+  targetType String   @db.VarChar(80)
+  targetId   String?  @db.VarChar(191)
+  requestId  String   @db.VarChar(80)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@index([requestId])
 }
 
 model ActivationCode {

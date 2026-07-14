@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getImageCandidateUrls, isDomainAllowed } from "./proxy-image-utils"
+import { lookup } from "node:dns/promises"
+import { getImageCandidateUrls, isDomainAllowed, isPrivateIpAddress } from "./proxy-image-utils"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
+
+async function isPublicAllowedTarget(value: string): Promise<boolean> {
+  const target = new URL(value)
+  if (!["http:", "https:"].includes(target.protocol) || !isDomainAllowed(target.hostname)) return false
+  const addresses = await lookup(target.hostname, { all: true, verbatim: true })
+  return addresses.length > 0 && addresses.every(({ address }) => !isPrivateIpAddress(address))
+}
 
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url")
@@ -32,6 +40,9 @@ export async function GET(request: NextRequest) {
   try {
     let upstream: Response | null = null
     for (const targetUrl of candidateUrls) {
+      if (!await isPublicAllowedTarget(targetUrl)) {
+        return NextResponse.json({ error: "Resolved address is not allowed" }, { status: 403 })
+      }
       upstream = await fetch(targetUrl, {
         headers: {
           "User-Agent":
@@ -40,8 +51,12 @@ export async function GET(request: NextRequest) {
           "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
         },
         signal: AbortSignal.timeout(10_000),
+        redirect: "manual",
       })
 
+      if (upstream.status >= 300 && upstream.status < 400) {
+        return NextResponse.json({ error: "Upstream redirect rejected" }, { status: 502 })
+      }
       if (upstream.ok) break
     }
 

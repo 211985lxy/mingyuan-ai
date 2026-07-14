@@ -724,10 +724,28 @@ CREATE TABLE `AdminUser` (
     `name` VARCHAR(191) NOT NULL,
     `role` VARCHAR(191) NOT NULL DEFAULT 'editor',
     `isActive` BOOLEAN NOT NULL DEFAULT true,
+    `sessionVersion` INTEGER NOT NULL DEFAULT 0,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `AdminUser_email_key`(`email`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `AdminAuditLog` (
+    `id` VARCHAR(191) NOT NULL,
+    `adminId` VARCHAR(191) NOT NULL,
+    `action` VARCHAR(100) NOT NULL,
+    `targetType` VARCHAR(80) NOT NULL,
+    `targetId` VARCHAR(191) NULL,
+    `requestId` VARCHAR(80) NOT NULL,
+    `metadata` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `AdminAuditLog_adminId_createdAt_idx`(`adminId`, `createdAt`),
+    INDEX `AdminAuditLog_targetType_targetId_idx`(`targetType`, `targetId`),
+    INDEX `AdminAuditLog_requestId_idx`(`requestId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -1251,6 +1269,9 @@ ALTER TABLE `TopicSelection` ADD CONSTRAINT `TopicSelection_ipProfileId_fkey` FO
 
 -- AddForeignKey
 ALTER TABLE `Inspiration` ADD CONSTRAINT `Inspiration_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `AdminAuditLog` ADD CONSTRAINT `AdminAuditLog_adminId_fkey` FOREIGN KEY (`adminId`) REFERENCES `AdminUser`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `ActivationCode` ADD CONSTRAINT `ActivationCode_usedBy_fkey` FOREIGN KEY (`usedBy`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

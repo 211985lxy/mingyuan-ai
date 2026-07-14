@@ -5,6 +5,7 @@ import { withUserAuth } from "@/lib/user-auth"
 import { buildAuthUserPayload } from "@/lib/auth-user"
 import { getActivationStartDate } from "@/lib/subscription"
 import { activationBodySchema } from "@/features/auth/contracts"
+import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
 
 const DAILY_LIMIT = 2
 
@@ -17,6 +18,16 @@ function normalizeActivationCode(value: unknown): string {
 export const POST = withUserAuth(async (request: NextRequest, { user }) => {
   const body = await parseJsonBody(request, activationBodySchema, { maxBytes: 1024 })
   const code = normalizeActivationCode(body.code)
+
+  if (!await allowAuthAttempt("activate", request, `${user.id}:${code}`, {
+    limit: 6,
+    windowSeconds: 15 * 60,
+  })) {
+    return NextResponse.json(
+      { error: "Too many activation attempts", code: "RATE_LIMITED" },
+      { status: 429 },
+    )
+  }
 
   if (!code) {
     return NextResponse.json(
