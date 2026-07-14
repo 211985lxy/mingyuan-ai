@@ -11,13 +11,11 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 })
   }
 
-  const asset = await prisma.asset.findUnique({ where: { id } })
+  const asset = await prisma.asset.findFirst({
+    where: { id, userId: user.id, assetType: "voice" },
+  })
 
   if (!asset) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
-
-  if (asset.userId !== user.id || asset.assetType !== "voice") {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -26,7 +24,7 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
     deleteAsset(asset.externalSpeakerId).catch(() => {})
   }
 
-  await prisma.asset.delete({ where: { id } })
+  await prisma.asset.delete({ where: { id, userId: user.id, assetType: "voice" } })
 
   return NextResponse.json({ data: { deleted: true } })
 })

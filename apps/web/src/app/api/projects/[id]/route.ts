@@ -38,7 +38,7 @@ export async function PATCH(
       : undefined
 
     const project = await prisma.clientProject.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: {
         name: cleanRequiredText(body.name, 80),
         companyName: cleanText(body.companyName, 80),
@@ -77,7 +77,7 @@ export async function DELETE(
     }
 
     const project = await prisma.clientProject.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: { status: "archived" },
     })
 

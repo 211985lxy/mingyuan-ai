@@ -16,7 +16,6 @@ import {
 import { CreateProfileDialog } from "@/features/benchmark-profiles/components/create-profile-dialog"
 import { BenchmarkProfileList } from "@/features/benchmark-profiles/components/profile-list"
 import { PLATFORM_LABELS, type BenchmarkProfileForm, type ImportedFile, type ProfileListItem } from "@/features/benchmark-profiles/model"
-import { getStoredAdminToken } from "@/lib/admin-store"
 
 // ── 主页面 ──
 
@@ -57,7 +56,6 @@ export default function BenchmarkProfilesPage() {
   const fetchProfiles = React.useCallback(async (p = page) => {
     setLoading(true)
     try {
-      const token = getStoredAdminToken()
       const params = new URLSearchParams({
         status: statusTab,
         page: String(p),
@@ -66,9 +64,7 @@ export default function BenchmarkProfilesPage() {
       if (search.trim()) params.set("search", search.trim())
       if (platformFilter) params.set("platform", platformFilter)
 
-      const res = await fetch(`/api/admin/benchmark-profiles?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
+      const res = await fetch(`/api/admin/benchmark-profiles?${params.toString()}`)
       if (!res.ok) throw new Error("加载失败")
       const json = await res.json()
       setProfiles(json.data ?? [])
@@ -107,13 +103,11 @@ export default function BenchmarkProfilesPage() {
 
   // 恢复已归档档案
   async function handleRestore(id: string) {
-    const token = getStoredAdminToken()
     try {
       const res = await fetch(`/api/admin/benchmark-profiles/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ status: "active" }),
       })
@@ -149,14 +143,11 @@ export default function BenchmarkProfilesPage() {
     setCreateError(null)
     setDuplicateNotice(null)
     try {
-      const token = getStoredAdminToken()
-
       // 创建档案
       const profileRes = await fetch("/api/admin/benchmark-profiles", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           name: accountName.trim(),
@@ -186,7 +177,6 @@ export default function BenchmarkProfilesPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             title: `${accountName.trim()}的聊天/文档资料`,
@@ -221,13 +211,11 @@ export default function BenchmarkProfilesPage() {
     setImportingFiles(true)
     setCreateError(null)
     try {
-      const token = getStoredAdminToken()
       const body = new FormData()
       for (const file of files) body.append("files", file)
 
       const res = await fetch("/api/admin/benchmark-profiles/import-text", {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body,
       })
       const json = await res.json()
@@ -370,7 +358,6 @@ export default function BenchmarkProfilesPage() {
         isDraggingFile={isDraggingFile}
         importedFiles={importedFiles}
         fileInputRef={fileInputRef}
-        token={getStoredAdminToken() ?? ""}
         onOpenChange={handleDialogOpenChange}
         onModeChange={setCreateMode}
         setForm={setForm}

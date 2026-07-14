@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { JIEKOU_PROVIDER_MODELS, getAdminToken } from "@/features/knowledge/admin-knowledge-shared"
+import { JIEKOU_PROVIDER_MODELS } from "@/features/knowledge/admin-knowledge-shared"
 
 export function JiekouTestPanel() {
   const [open, setOpen] = useState(false)
@@ -35,7 +35,6 @@ export function JiekouTestPanel() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
         },
         body: JSON.stringify({
           provider,

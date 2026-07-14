@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`单次最多确认 ${MAX_ENTRIES_PER_CONFIRM} 条知识`)
     }
 
-    assertAgentProjectAccess(context, projectId)
+    await assertAgentProjectAccess(context, projectId)
 
     const toCreate = entries.filter((entry) => !entry.skip)
     if (toCreate.length === 0) {

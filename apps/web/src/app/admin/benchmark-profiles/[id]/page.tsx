@@ -19,17 +19,12 @@ import { ProfileBasicForm } from "@/features/benchmark-profiles/components/profi
 import { ProfileDetailDialogs } from "@/features/benchmark-profiles/components/profile-detail-dialogs"
 import { ProfileMaterials } from "@/features/benchmark-profiles/components/profile-materials"
 import { PLATFORM_COLORS, PLATFORM_LABELS, type EditableProfileItem, type ImportableAnalysis, type ProfileDetail } from "@/features/benchmark-profiles/model"
-import { getStoredAdminToken } from "@/lib/admin-store"
 import { cn } from "@/lib/utils"
 
 // ── 辅助 ──
 
 function authHeaders(json = false): Record<string, string> {
-  const token = getStoredAdminToken()
-  return {
-    ...(json ? { "Content-Type": "application/json" } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
+  return json ? { "Content-Type": "application/json" } : {}
 }
 
 // ── 主页面 ──

@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "./prisma"
 import { getSubscriptionStatus } from "@/lib/subscription"
+import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
 
 const JWT_SECRET = env.JWT_SECRET
 
@@ -51,22 +52,17 @@ export function verifyUserToken(token: string): UserPayload | null {
   }
 }
 
-function extractToken(request: NextRequest): string | null {
-  const auth = request.headers.get("authorization")
-  if (auth?.startsWith("Bearer ")) return auth.slice(7)
-  return null
-}
-
 export async function authenticateRequest(
   request: NextRequest,
   options: { requireActivation?: boolean } = {}
 ): Promise<UserPayload> {
-  const token = extractToken(request)
-  if (!token) {
+  const session = readSessionToken(request, "user")
+  if (!session) {
     throw new Error("UNAUTHORIZED")
   }
+  if (!isCsrfSafe(request, session.source)) throw new Error("CSRF_REJECTED")
 
-  const user = verifyUserToken(token)
+  const user = verifyUserToken(session.token)
   if (!user) {
     throw new Error("INVALID_TOKEN")
   }
@@ -116,6 +112,12 @@ export function authErrorResponse(error: unknown): NextResponse | null {
       { status: 403 }
     )
   }
+  if (error.message === "CSRF_REJECTED") {
+    return NextResponse.json(
+      { error: "Cross-site request rejected", code: "CSRF_REJECTED" },
+      { status: 403 },
+    )
+  }
 
   return null
 }
@@ -135,12 +137,18 @@ export function withUserAuth(
     request: NextRequest,
     segmentData: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
-    const token = extractToken(request)
-    if (!token) {
+    const session = readSessionToken(request, "user")
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+    if (!isCsrfSafe(request, session.source)) {
+      return NextResponse.json(
+        { error: "Cross-site request rejected", code: "CSRF_REJECTED" },
+        { status: 403 },
+      )
+    }
 
-    const user = verifyUserToken(token)
+    const user = verifyUserToken(session.token)
     if (!user) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }

@@ -111,7 +111,7 @@ export async function PATCH(
     }
 
     const record = await prisma.aimGeneration.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: {
         workflowStatus,
         reviewNote,
@@ -155,7 +155,7 @@ export async function DELETE(
       return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
     }
 
-    await prisma.aimGeneration.delete({ where: { id } })
+    await prisma.aimGeneration.delete({ where: { id, userId: user.id } })
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     return authErrorResponse(error) ?? NextResponse.json(

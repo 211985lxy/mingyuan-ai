@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { useAdminStore } from "@/lib/admin-store"
+import { adminLogout } from "@/lib/api/admin-client"
 
 const navItems = [
   { title: "仪表盘", titleEn: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -54,10 +55,14 @@ export function AdminSidebar() {
   const { admin, clearSession } = useAdminStore()
   const branding = useBranding()
 
-  function handleLogout() {
-    clearSession()
-    toast.success("已退出登录")
-    router.replace("/admin/login")
+  async function handleLogout() {
+    try {
+      await adminLogout()
+    } finally {
+      clearSession()
+      toast.success("已退出登录")
+      router.replace("/admin/login")
+    }
   }
 
   return (

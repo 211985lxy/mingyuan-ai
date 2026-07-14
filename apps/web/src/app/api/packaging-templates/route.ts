@@ -39,17 +39,14 @@ export const GET = withUserAuth(async (request, { user }) => {
         })
       : Promise.resolve(null),
     scriptId
-      ? prisma.script.findUnique({
-          where: { id: scriptId },
+      ? prisma.script.findFirst({
+          where: { id: scriptId, userId: user.id },
           select: { id: true, userId: true, content: true },
         })
       : Promise.resolve(null),
   ])
 
-  const authorizedScript =
-    script && script.userId === user.id
-      ? script
-      : null
+  const authorizedScript = script
 
   const decorated = templates.map((template) => {
     const capabilities = normalizePackagingTemplateCapabilities({

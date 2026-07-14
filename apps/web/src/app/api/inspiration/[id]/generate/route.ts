@@ -29,6 +29,14 @@ export async function POST(
       return NextResponse.json({ error: "请选择 IP 营销全案" }, { status: 400 })
     }
 
+    const project = await prisma.clientProject.findFirst({
+      where: { id: projectId, userId: user.id, status: "active" },
+      select: { id: true },
+    })
+    if (!project) {
+      return NextResponse.json({ error: "IP 营销全案不存在" }, { status: 404 })
+    }
+
     const trace = await createAimTrace({
       userId: user.id,
       projectId,
@@ -66,7 +74,7 @@ export async function POST(
 
     // 更新灵感记录，关联生成结果
     await prisma.inspiration.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: {
         generatedContent: result as unknown as Prisma.InputJsonValue,
         aimGenerationId: result.id,

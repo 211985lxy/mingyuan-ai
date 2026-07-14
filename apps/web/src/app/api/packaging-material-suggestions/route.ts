@@ -40,8 +40,8 @@ export const POST = withUserAuth(async (request, { user }) => {
   }
 
   const [script, packagingTemplate, structure] = await Promise.all([
-    prisma.script.findUnique({
-      where: { id: scriptId },
+    prisma.script.findFirst({
+      where: { id: scriptId, userId: user.id },
       select: {
         id: true,
         userId: true,
@@ -67,7 +67,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       : Promise.resolve(null),
   ]);
 
-  if (!script || script.userId !== user.id) {
+  if (!script) {
     return NextResponse.json({ error: "Script not found" }, { status: 404 });
   }
 

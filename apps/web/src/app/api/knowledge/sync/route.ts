@@ -13,8 +13,9 @@ interface ObsidianSyncEntry {
 
 export async function POST(request: NextRequest) {
   const syncToken = env.OBSIDIAN_SYNC_TOKEN
-  if (!syncToken) {
-    console.error("[knowledge/sync] OBSIDIAN_SYNC_TOKEN 未配置,拒绝请求")
+  const targetUserId = env.OBSIDIAN_SYNC_USER_ID
+  if (!syncToken || !targetUserId) {
+    console.error("[knowledge/sync] 同步令牌或绑定用户未配置,拒绝请求")
     return NextResponse.json(
       { error: "同步接口未配置鉴权令牌" },
       { status: 503 }
@@ -28,9 +29,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { entries, userId, projectId } = body as {
+    const { entries, projectId } = body as {
       entries: ObsidianSyncEntry[]
-      userId?: string
       projectId?: string
     }
 
@@ -38,25 +38,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid payload: entries must be an array" }, { status: 400 })
     }
 
-    let targetUserId = userId
-
-    // 如果未显式提供 userId，则兜底关联系统中的第一个 User
-    if (!targetUserId) {
-      const firstUser = await prisma.user.findFirst({
-        orderBy: { createdAt: "asc" },
-      })
-      if (!firstUser) {
-        return NextResponse.json({ error: "No user found in the system to bind knowledge" }, { status: 404 })
-      }
-      targetUserId = firstUser.id
-    } else {
-      // 校验该 userId 是否真实存在
-      const userExists = await prisma.user.findUnique({
-        where: { id: targetUserId },
-      })
-      if (!userExists) {
-        return NextResponse.json({ error: `User with ID ${targetUserId} does not exist` }, { status: 404 })
-      }
+    const userExists = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true },
+    })
+    if (!userExists) {
+      return NextResponse.json({ error: "同步接口绑定用户不存在" }, { status: 503 })
     }
 
     let targetProjectId: string | null = null
@@ -78,6 +65,14 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      const existingOwner = await prisma.knowledgeEntry.findUnique({
+        where: { id: entry.id },
+        select: { userId: true },
+      })
+      if (existingOwner && existingOwner.userId !== targetUserId) {
+        return NextResponse.json({ error: "知识条目标识冲突" }, { status: 409 })
+      }
+
       // 保证分类合法，不合法时默认归入 boss_experience
       const validCategories = [
         "boss_experience",
@@ -91,7 +86,7 @@ export async function POST(request: NextRequest) {
         : "boss_experience"
 
       const upserted = await prisma.knowledgeEntry.upsert({
-        where: { id: entry.id },
+        where: { id: entry.id, userId: targetUserId },
         update: {
           title: entry.title,
           content: entry.content,
@@ -130,7 +125,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Obsidian sync error:", error)
     return NextResponse.json(
-      { error: "Internal Server Error", details: (error as Error).message },
+      { error: "Internal Server Error" },
       { status: 500 }
     )
   }

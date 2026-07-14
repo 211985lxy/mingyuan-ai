@@ -17,19 +17,15 @@ export const GET = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 })
   }
 
-  const task = await prisma.videoTask.findUnique({ where: { id } })
+  const task = await prisma.videoTask.findFirst({ where: { id, userId: user.id } })
 
   if (!task) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  if (task.userId !== user.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
-
   // If completed with video but no analysis yet, trigger it (non-blocking)
   if (task.status === "completed" && task.videoUrl && !task.marketingAnalysis) {
-    triggerAnalysis(task.id, task.scriptContent).catch((err) =>
+    triggerAnalysis(task.id, task.userId, task.scriptContent).catch((err) =>
       console.error(`[tasks/${id}] Analysis failed:`, err instanceof Error ? err.message : err)
     )
   }
@@ -63,6 +59,7 @@ function parseTemplateTags(value: unknown): string[] {
 }
 
 async function enrichTaskForResponse<T extends {
+  userId: string
   scriptId: string | null
   sourceTemplateId?: string | null
 }>(task: T): Promise<T & {
@@ -80,7 +77,7 @@ async function enrichTaskForResponse<T extends {
   }
 
   const script = await prisma.script.findUnique({
-    where: { id: task.scriptId },
+    where: { id: task.scriptId, userId: task.userId },
     select: {
       sourceTemplateId: true,
       generationRun: {
@@ -112,7 +109,7 @@ async function enrichTaskForResponse<T extends {
 
 const analysisInProgress = new Set<string>()
 
-async function triggerAnalysis(taskId: string, scriptContent: string) {
+async function triggerAnalysis(taskId: string, userId: string, scriptContent: string) {
   if (!LLMClient.shared().available) return
   if (analysisInProgress.has(taskId)) return
 
@@ -120,7 +117,7 @@ async function triggerAnalysis(taskId: string, scriptContent: string) {
   try {
     const analysis = await analyzeMarketing(scriptContent)
     await prisma.videoTask.update({
-      where: { id: taskId },
+      where: { id: taskId, userId },
       data: { marketingAnalysis: JSON.parse(JSON.stringify(analysis)) },
     })
   } finally {

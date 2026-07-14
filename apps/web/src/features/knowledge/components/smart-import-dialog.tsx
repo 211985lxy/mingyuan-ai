@@ -23,7 +23,6 @@ import {
 import {
   CATEGORY_LABELS,
   KNOWLEDGE_UPLOAD_ACCEPT,
-  getAdminToken,
   projectLabel,
   type AdminProject,
 } from "@/features/knowledge/admin-knowledge-shared"
@@ -104,7 +103,6 @@ export function SmartImportDialog({
 
       const response = await fetch("/api/admin/knowledge/smart-import", {
         method: "POST",
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
         body: formData,
       })
       if (!response.ok) {
@@ -141,7 +139,6 @@ export function SmartImportDialog({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
         },
         body: JSON.stringify({
           userId: previewData.userId,

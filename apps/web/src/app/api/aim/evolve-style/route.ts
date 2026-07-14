@@ -5,6 +5,7 @@ import {
   normalizeStyleMessages,
   upsertMainStyleProfile,
 } from "@/lib/aim-style-evolution"
+import { ownsActiveProject } from "@/lib/resource-ownership"
 
 // 提取 + 合并两次 LLM 调用，给足时间
 export const maxDuration = 60
@@ -15,6 +16,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const messages = normalizeStyleMessages(body.messages)
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+
+    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
+    }
 
     if (messages.length < 2) {
       return NextResponse.json({ delta: null, profile: null, reason: "对话太少" })

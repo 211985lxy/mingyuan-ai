@@ -47,12 +47,12 @@ export const POST = withUserAuth(async (request, { user }) => {
   }
 
   // Validate the script belongs to the user
-  const script = await prisma.script.findUnique({
-    where: { id: scriptId },
+  const script = await prisma.script.findFirst({
+    where: { id: scriptId, userId: user.id },
     select: { id: true, userId: true },
   })
 
-  if (!script || script.userId !== user.id) {
+  if (!script) {
     return NextResponse.json(
       { error: "Script not found" },
       { status: 404 }

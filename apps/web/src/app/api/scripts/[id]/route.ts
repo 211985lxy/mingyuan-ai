@@ -20,8 +20,8 @@ export const PATCH = withUserAuth(async (request, { user, params }) => {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 })
   }
 
-  const script = await prisma.script.findUnique({ where: { id } })
-  if (!script || script.userId !== user.id) {
+  const script = await prisma.script.findFirst({ where: { id, userId: user.id } })
+  if (!script) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -42,7 +42,7 @@ export const PATCH = withUserAuth(async (request, { user, params }) => {
     }
 
     return tx.script.update({
-      where: { id: script.id },
+      where: { id: script.id, userId: user.id },
       data: {
         content: content ?? script.content,
         status: status ?? script.status,

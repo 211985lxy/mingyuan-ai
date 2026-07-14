@@ -21,7 +21,7 @@ export async function PUT(
     }
 
     const updated = await prisma.knowledgeEntry.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.content !== undefined ? { content: body.content } : {}),
@@ -64,7 +64,7 @@ export async function DELETE(
     }
 
     await prisma.knowledgeEntry.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: { status: "archived" },
     })
 

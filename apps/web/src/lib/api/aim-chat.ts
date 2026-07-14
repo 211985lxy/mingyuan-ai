@@ -2,7 +2,6 @@
 
 import { ApiError, getApiErrorMessage, request } from "./core"
 import { useAuthStore } from "@/lib/store"
-import { getStoredAuthToken } from "@/lib/auth-storage"
 import type { KnowledgeEntry } from "./knowledge"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
@@ -34,15 +33,13 @@ export async function uploadKnowledgeDocument(
   file: File,
   category: string
 ): Promise<{ created: number; entries: KnowledgeEntry[] }> {
-  const token = useAuthStore.getState().token || getStoredAuthToken()
-
   const formData = new FormData()
   formData.append("file", file)
   formData.append("category", category)
 
   const response = await fetch("/api/knowledge/upload", {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "same-origin",
     body: formData,
     // 不设置 Content-Type，让浏览器自动处理 multipart boundary
   })
@@ -118,15 +115,14 @@ export async function chatAimStream(
   },
 ): Promise<{ content: string }> {
   const { signal, onDelta, ...bodyOptions } = options
-  const token = useAuthStore.getState().token || getStoredAuthToken()
   let response: Response
   try {
     response = await fetch("/api/aim/chat", {
       method: "POST",
+      credentials: "same-origin",
       signal,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ messages, ...bodyOptions, stream: true }),
     })

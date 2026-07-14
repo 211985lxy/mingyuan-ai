@@ -14,6 +14,7 @@ import { executeAimRun } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { prepareAimGenerateInput } from "@/lib/aim-harness/request-context"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
+import { ownsActiveProject } from "@/lib/resource-ownership"
 
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const parsed = parseGenerateBody(body)
+    if (parsed.projectId && !(await ownsActiveProject(user.id, parsed.projectId))) {
+      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
+    }
     trace = await createAimTrace({
       userId: user.id,
       projectId: parsed.projectId || null,

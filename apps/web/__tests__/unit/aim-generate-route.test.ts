@@ -11,6 +11,7 @@ const {
   buildRawInputWithVideoCopyContext,
   buildRawInputWithTrendingContext,
   buildRawInputWithCommentInsightContext,
+  ownsActiveProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
@@ -28,6 +29,7 @@ const {
   buildRawInputWithVideoCopyContext: vi.fn(async (_userId, rawInput) => rawInput),
   buildRawInputWithTrendingContext: vi.fn(async (rawInput) => rawInput),
   buildRawInputWithCommentInsightContext: vi.fn(async (_userId, rawInput) => rawInput),
+  ownsActiveProject: vi.fn(async () => true),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -37,6 +39,10 @@ vi.mock("@/lib/user-auth", () => ({
 
 vi.mock("@/lib/internal-beta-limits", () => ({
   enforceDailyBetaLimit,
+}))
+
+vi.mock("@/lib/resource-ownership", () => ({
+  ownsActiveProject,
 }))
 
 vi.mock("@/lib/aim-generator", () => ({
@@ -117,6 +123,22 @@ describe("POST /api/aim/generate", () => {
     authenticateRequest.mockResolvedValue({ id: "user-1" })
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
+    ownsActiveProject.mockResolvedValue(true)
+  })
+
+  it("rejects a project that is not owned before generation starts", async () => {
+    ownsActiveProject.mockResolvedValueOnce(false)
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      rawInput: "写一条文案",
+      targetFormats: ["video_script"],
+      projectId: "project-from-another-user",
+    }))
+
+    expect(res.status).toBe(404)
+    expect(ownsActiveProject).toHaveBeenCalledWith("user-1", "project-from-another-user")
+    expect(generateAimContent).not.toHaveBeenCalled()
   })
 
   it("skips quality gate for business diagnosis raw_copy output", async () => {

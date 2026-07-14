@@ -32,6 +32,7 @@ import { executeAimRun, streamAimRun } from "@/lib/aim-harness/runtime"
 import { executeAimChatDomain, streamAimChatDomain } from "@/lib/aim-harness/domain-executor"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import type { AimContextSource } from "@/lib/aim-harness/types"
+import { ownsActiveProject } from "@/lib/resource-ownership"
 
 /** 把 chat 请求里的 messages 规范化为记忆提炼所需格式（只保留 user/assistant 的文本内容）。 */
 function normalizeMemoryMessages(messages: unknown): AimMemoryMessage[] {
@@ -135,6 +136,9 @@ export async function POST(request: NextRequest) {
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "请求格式不正确，缺少 messages 数组" }, { status: 400 })
+    }
+    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
     }
     trace = await createAimTrace({
       userId: user.id,

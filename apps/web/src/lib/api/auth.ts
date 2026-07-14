@@ -2,7 +2,6 @@
 
 import { ApiError, getApiErrorMessage, request } from "./core"
 import { useAuthStore } from "@/lib/store"
-import { getStoredAuthToken } from "@/lib/auth-storage"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type {
@@ -44,6 +43,10 @@ export async function getCurrentUser(): Promise<ApiUser> {
   return payload.user
 }
 
+export async function logoutUser(): Promise<void> {
+  await request<{ ok: true }>("/api/auth/logout", { method: "POST" })
+}
+
 export async function listAgentApiKeys(): Promise<ApiAgentApiKeySummary[]> {
   const payload = await request<{ items: ApiAgentApiKeySummary[] }>("/api/account/agent-keys")
   return payload.items
@@ -69,5 +72,3 @@ export async function saveAuthVideo(authVideoUrl: string): Promise<ApiUser> {
   })
   return payload.user
 }
-
-

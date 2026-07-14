@@ -168,7 +168,6 @@ export interface ApiHotTopicFit {
 }
 
 export interface AuthResponse {
-  token: string;
   user: ApiUser;
 }
 

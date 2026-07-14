@@ -2,7 +2,6 @@
 
 import { ApiError, getApiErrorMessage, request } from "./core"
 import { useAuthStore } from "@/lib/store"
-import { getStoredAuthToken } from "@/lib/auth-storage"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type {
@@ -290,4 +289,3 @@ export interface TopCommentEntry {
   likes: number
   isTop: boolean
 }
-

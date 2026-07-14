@@ -1,20 +1,19 @@
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-export function ProjectSelector({ value, onChange, token }: { value: string; onChange: (projectId: string) => void; token: string }) {
+export function ProjectSelector({ value, onChange }: { value: string; onChange: (projectId: string) => void }) {
   const [projects, setProjects] = useState<Array<{ id: string; name: string; companyName: string | null }>>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!token) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
-    fetch("/api/admin/projects?status=active&pageSize=100", { headers: { Authorization: `Bearer ${token}` } })
+    fetch("/api/admin/projects?status=active&pageSize=100")
       .then((response) => (response.ok ? response.json() : { data: [] }))
       .then((json) => setProjects(json.data ?? []))
       .catch(() => setProjects([]))
       .finally(() => setLoading(false))
-  }, [token])
+  }, [])
 
   return (
     <Select value={value} onValueChange={(projectId) => { if (projectId) onChange(projectId) }}>

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`微信聊天导出文本不能超过 ${MAX_WECHAT_CHAT_CHARS} 字`)
     }
 
-    assertAgentProjectAccess(context, projectId)
+    await assertAgentProjectAccess(context, projectId)
 
     const processed = await processChunksForSmartImport({
       // ponytail: 微信聊天 skill 先支持直接贴文本，后续真有需要再补文件上传版本。

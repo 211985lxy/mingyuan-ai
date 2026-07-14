@@ -44,7 +44,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
     if (!Array.isArray(candidates) || selectedIndex >= candidates.length) {
       // Rollback: shouldn't happen since we control generation, but guard anyway
       await prisma.topicSelection.update({
-        where: { id: topicSelectionId },
+        where: { id: topicSelectionId, userId: user.id },
         data: { selectedIndex: null, status: "pending" },
       })
       return NextResponse.json(

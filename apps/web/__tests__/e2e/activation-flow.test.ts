@@ -16,7 +16,7 @@ import { GET as PROJECTS } from "@/app/api/projects/route"
 import { POST as GENERATE_CODES } from "@/app/api/admin/activation-codes/generate/route"
 
 let admin: { id: string; email: string; role: string }
-let token: string
+let sessionCookie: string
 
 describe("Activation Flow E2E", () => {
   beforeAll(async () => {
@@ -50,13 +50,13 @@ describe("Activation Flow E2E", () => {
     expect(registerRes.status).toBe(201)
 
     const registerBody = await json(registerRes)
-    token = registerBody.token
+    sessionCookie = (registerRes.headers.get("set-cookie") ?? "").split(";", 1)[0]
     expect(registerBody.user.subscriptionStatus).toBe("inactive")
     expect(registerBody.user.expiresAt).toBeNull()
 
     const protectedRes = await PROJECTS(
       req("/api/projects", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie },
       })
     )
     expect(protectedRes.status).toBe(403)
@@ -66,7 +66,7 @@ describe("Activation Flow E2E", () => {
 
     const meRes = await ME(
       req("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie },
       }),
       undefined as never
     )
@@ -114,7 +114,7 @@ describe("Activation Flow E2E", () => {
     const activateRes = await ACTIVATE(
       req("/api/auth/activate", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie, Origin: "http://localhost:3000" },
         body: {
           code: `${firstCode!.code.slice(0, 4)}-${firstCode!.code.slice(4, 8)}-${firstCode!.code.slice(8, 12)}-${firstCode!.code.slice(12, 16)}`,
         },
@@ -134,7 +134,7 @@ describe("Activation Flow E2E", () => {
 
     const protectedRes = await PROJECTS(
       req("/api/projects", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie },
       })
     )
     expect(protectedRes.status).toBe(200)
@@ -160,7 +160,7 @@ describe("Activation Flow E2E", () => {
     const renewalRes = await ACTIVATE(
       req("/api/auth/activate", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie, Origin: "http://localhost:3000" },
         body: { code: renewalCode!.code },
       }),
       undefined as never
@@ -174,7 +174,7 @@ describe("Activation Flow E2E", () => {
 
     const meRes = await ME(
       req("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie },
       }),
       undefined as never
     )

@@ -13,6 +13,7 @@ import {
 import type { StructureBlueprint, TopicContext, HotTopicFusionContext } from "@/lib/script-generator"
 import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
+import { ownsActiveProject } from "@/lib/resource-ownership"
 
 // Allow up to 120 seconds for script generation (3-step LLM chain can take 30-60s)
 export const maxDuration = 120
@@ -75,6 +76,10 @@ export const POST = withUserAuth(async (request, { user }) => {
       { error: "templateId, structureId, and inputs are required" },
       { status: 400 }
     )
+  }
+
+  if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+    return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
   }
 
   const [template, videoStructure] = await Promise.all([

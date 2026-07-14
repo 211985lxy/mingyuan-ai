@@ -12,13 +12,9 @@ export const GET = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  const avatar = await prisma.avatar.findUnique({ where: { id } });
+  const avatar = await prisma.avatar.findFirst({ where: { id, userId: user.id } });
 
   if (!avatar) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (avatar.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -33,13 +29,9 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  const avatar = await prisma.avatar.findUnique({ where: { id } });
+  const avatar = await prisma.avatar.findFirst({ where: { id, userId: user.id } });
 
   if (!avatar) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (avatar.userId !== user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -59,7 +51,7 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
     deleteAsset(avatar.externalVirtualmanId).catch(() => {});
   }
 
-  await prisma.avatar.delete({ where: { id } });
+  await prisma.avatar.delete({ where: { id, userId: user.id } });
 
   return NextResponse.json({ data: { deleted: true } });
 });

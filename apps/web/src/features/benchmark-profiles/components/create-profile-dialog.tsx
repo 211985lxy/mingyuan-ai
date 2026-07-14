@@ -21,7 +21,6 @@ export function CreateProfileDialog({
   isDraggingFile,
   importedFiles,
   fileInputRef,
-  token,
   onOpenChange,
   onModeChange,
   setForm,
@@ -43,7 +42,6 @@ export function CreateProfileDialog({
   isDraggingFile: boolean
   importedFiles: ImportedFile[]
   fileInputRef: RefObject<HTMLInputElement | null>
-  token: string
   onOpenChange: (open: boolean) => void
   onModeChange: (mode: "account" | "note") => void
   setForm: Dispatch<SetStateAction<BenchmarkProfileForm>>
@@ -64,7 +62,7 @@ export function CreateProfileDialog({
         </DialogHeader>
         <Tabs value={mode} onValueChange={(value) => onModeChange(value as "account" | "note")}><TabsList className="w-full"><TabsTrigger value="note" className="flex-1">客户资料</TabsTrigger><TabsTrigger value="account" className="flex-1">真实账号</TabsTrigger></TabsList></Tabs>
         <div className="space-y-4">
-          <div className="space-y-2"><Label>归属项目 *</Label><ProjectSelector value={form.projectId} onChange={(projectId) => setForm((current) => ({ ...current, projectId }))} token={token} /></div>
+          <div className="space-y-2"><Label>归属项目 *</Label><ProjectSelector value={form.projectId} onChange={(projectId) => setForm((current) => ({ ...current, projectId }))} /></div>
           <div className="space-y-2"><Label>{mode === "account" ? "账号名称 *" : "名称 *"}</Label><Input className="h-10 focus-visible:border-foreground/30 focus-visible:ring-1 focus-visible:ring-foreground/10" value={form.accountName} onChange={(event) => setForm((current) => ({ ...current, accountName: event.target.value }))} placeholder={mode === "account" ? "如：某知识付费 IP" : "如：张总 / 某客户名"} /></div>
           {mode === "account" ? (
             <>

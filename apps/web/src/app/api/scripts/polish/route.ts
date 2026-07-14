@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { LLMClient } from "@/lib/llm"
 import { getStyleProfileBlock } from "@/lib/style-profile"
+import { ownsActiveProject } from "@/lib/resource-ownership"
 import { getStylePromptBlock, STYLE_GUIDE_IDS, type StyleGuideId } from "@/lib/style-guide-config"
 import { prisma } from "@/lib/prisma"
 
@@ -82,6 +83,10 @@ export const POST = withUserAuth(async (request, { user }) => {
 
   if (!content || content.length < 30) {
     return NextResponse.json({ error: "文案内容不能为空" }, { status: 400 })
+  }
+
+  if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+    return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
   }
 
   const llm = LLMClient.shared()

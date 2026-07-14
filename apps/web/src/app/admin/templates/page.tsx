@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { useAdminStore } from "@/lib/admin-store"
 
 interface Template {
   id: string
@@ -36,7 +35,6 @@ export default function AdminTemplatesPage() {
   const [statusFilter, setStatusFilter] = React.useState("")
   const [contentTypeFilter, setContentTypeFilter] = React.useState("")
   const [loading, setLoading] = React.useState(true)
-  const token = useAdminStore((s) => s.token)
   const pageSize = 20
 
   const fetchTemplates = React.useCallback(async () => {
@@ -45,9 +43,7 @@ export default function AdminTemplatesPage() {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       if (statusFilter) params.set("status", statusFilter)
       if (contentTypeFilter) params.set("contentType", contentTypeFilter)
-      const res = await fetch(`/api/admin/templates?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/admin/templates?${params}`)
       const json = await res.json()
       setTemplates(json.data?.results ?? [])
       setTotal(json.data?.total ?? 0)
@@ -59,7 +55,7 @@ export default function AdminTemplatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, contentTypeFilter, token])
+  }, [page, statusFilter, contentTypeFilter])
 
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

@@ -24,12 +24,12 @@ export async function POST(
 
     // 标记处理中，异步执行
     await prisma.inspiration.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: { aiStatus: "processing" },
     })
 
     // 异步处理，不阻塞响应
-    processInspiration(id).catch((err) => {
+    processInspiration(id, user.id).catch((err) => {
       console.error(`[inspiration/${id}] re-process failed:`, err)
     })
 
@@ -42,12 +42,12 @@ export async function POST(
   }
 }
 
-async function processInspiration(inspirationId: string) {
+async function processInspiration(inspirationId: string, userId: string) {
   const llm = LLMClient.shared()
 
   try {
     const insp = await prisma.inspiration.findUnique({
-      where: { id: inspirationId },
+      where: { id: inspirationId, userId },
     })
     if (!insp) throw new Error("灵感记录不存在")
 
@@ -92,7 +92,7 @@ async function processInspiration(inspirationId: string) {
     }
 
     await prisma.inspiration.update({
-      where: { id: inspirationId },
+      where: { id: inspirationId, userId },
       data: {
         aiStatus: "completed",
         generatedTopics: topics.length > 0 ? (topics as unknown as Prisma.InputJsonValue) : undefined,
@@ -101,7 +101,7 @@ async function processInspiration(inspirationId: string) {
     })
   } catch (error) {
     await prisma.inspiration.update({
-      where: { id: inspirationId },
+      where: { id: inspirationId, userId },
       data: {
         aiStatus: "failed",
         errorMessage: error instanceof Error ? error.message : "AI 处理失败",

@@ -17,7 +17,6 @@ import {
   distillEntries,
   fetchKnowledge,
   fetchProjects,
-  getAdminToken,
   type AdminProject,
   type DistillResult,
   type KnowledgeEntry,
@@ -129,11 +128,8 @@ export default function AdminKnowledgePage() {
 
   // 拉取浏览视图的分类计数（按当前项目）
   React.useEffect(() => {
-    const token = getAdminToken()
     const qs = browserProject ? `?projectId=${encodeURIComponent(browserProject)}` : ""
-    void fetch(`/api/admin/knowledge/stats${qs}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    void fetch(`/api/admin/knowledge/stats${qs}`)
       .then((r) => r.json())
       .then((json) => {
         const data = json.data ?? json
@@ -281,12 +277,10 @@ export default function AdminKnowledgePage() {
     if (!editForm.title || !editForm.content) return
     setSaving(true)
     try {
-      const token = getAdminToken()
       const res = await fetch("/api/admin/knowledge", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           title: editForm.title,
@@ -319,12 +313,8 @@ export default function AdminKnowledgePage() {
       formData.append("category", uploadCategory)
       if (uploadProjectId !== "none") formData.append("projectId", uploadProjectId)
 
-      const token = getAdminToken()
       const res = await fetch("/api/admin/knowledge/upload", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: formData,
       })
       if (!res.ok) throw new Error("上传失败")

@@ -42,19 +42,6 @@ import {
 const PROFILES = getAllAgentLogicProfiles()
 const FLOW_EDGES = getAgentFlowEdges()
 
-// ─── API helpers ──────────────────────────────────────────
-
-function getAdminToken(): string {
-  if (typeof window === "undefined") return ""
-  try {
-    const authStr = localStorage.getItem("mingyuan-admin-auth")
-    if (!authStr) return ""
-    return JSON.parse(authStr).state?.token || ""
-  } catch {
-    return ""
-  }
-}
-
 interface MethodologyItem {
   key: string
   title: string
@@ -77,9 +64,7 @@ export default function AdminMethodologyPage() {
   const fetchMethodologies = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/admin/methodology", {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-      })
+      const res = await fetch("/api/admin/methodology")
       const json = await res.json()
       setMethodologies(Array.isArray(json.data) ? json.data : [])
     } catch (error) {
@@ -108,7 +93,6 @@ export default function AdminMethodologyPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
         },
         body: JSON.stringify({ key: editingKey, content: editingContent }),
       })
@@ -133,7 +117,6 @@ export default function AdminMethodologyPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
         },
         body: JSON.stringify({ action: "reset" }),
       })

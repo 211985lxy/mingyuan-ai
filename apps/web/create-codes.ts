@@ -3,9 +3,9 @@ import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import crypto from 'crypto';
 
 function createPrismaClient() {
-  const url = new URL(
-    (process.env.DATABASE_URL ?? "mysql://mingyuan:changethis@127.0.0.1:3306/mingyuan").replace(/^mysql:\/\//, "mariadb://")
-  )
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) throw new Error("DATABASE_URL is required")
+  const url = new URL(databaseUrl.replace(/^mysql:\/\//, "mariadb://"))
 
   return new PrismaClient({
     adapter: new PrismaMariaDb({
@@ -22,20 +22,10 @@ const prisma = createPrismaClient();
 
 async function createActivationCodes() {
   try {
-    // 首先创建或获取一个 AdminUser 作为真正的创建者（满足外键约束）
+    // 使用现有管理员作为创建者，脚本不得创建免密码账号。
     const adminEmail = 'admin@mingyuan.ai';
-    let admin = await prisma.adminUser.findUnique({ where: { email: adminEmail } });
-    if (!admin) {
-      admin = await prisma.adminUser.create({
-        data: {
-          email: adminEmail,
-          password: 'skip-password-check',
-          name: 'System Admin',
-          role: 'admin',
-        }
-      });
-      console.log(`✓ 自动生成系统管理员: ${adminEmail}`);
-    }
+    const admin = await prisma.adminUser.findUnique({ where: { email: adminEmail } });
+    if (!admin) throw new Error(`请先创建管理员账号: ${adminEmail}`)
 
     const creatorId = admin.id;
     console.log(`📧 使用系统管理员 ${admin.email} 创建激活码`);

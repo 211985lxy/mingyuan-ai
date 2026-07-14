@@ -10,6 +10,6 @@ if (!/(^|[_-])test([_-]|$)/i.test(databaseName)) {
 
 process.env.DATABASE_URL = testDatabaseUrl
 process.env.REDIS_URL = process.env.TEST_REDIS_URL ?? "redis://localhost:6379"
-process.env.ADMIN_JWT_SECRET = "test-e2e-jwt-secret"
-process.env.JWT_SECRET = "test-e2e-jwt-secret"
-process.env.CRON_SECRET = "test-e2e-cron-secret"
+process.env.ADMIN_JWT_SECRET = "test-e2e-admin-jwt-secret-at-least-32-bytes"
+process.env.JWT_SECRET = "test-e2e-user-jwt-secret-at-least-32-bytes"
+process.env.CRON_SECRET = "test-e2e-cron-secret-at-least-32-bytes"

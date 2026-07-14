@@ -1,7 +1,6 @@
 "use client"
 
 import { useAuthStore } from "@/lib/store"
-import { getStoredAuthToken } from "@/lib/auth-storage"
 
 class ApiError extends Error {
   status: number
@@ -30,7 +29,6 @@ type RequestOptions = RequestInit & { auth?: boolean; timeout?: number }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { auth = true, headers, timeout, signal, ...init } = options
-  const token = auth ? useAuthStore.getState().token || getStoredAuthToken() : null
   const controller = new AbortController()
   let abortedBySignal = false
   const abortFromSignal = () => { abortedBySignal = true; controller.abort() }
@@ -38,13 +36,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   else if (signal) signal.addEventListener("abort", abortFromSignal, { once: true })
   const timeoutId = timeout ? setTimeout(() => controller.abort(), timeout) : null
   try {
-    const response = await fetch(path, { ...init, signal: controller.signal, headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(headers ?? {}) } })
+    const response = await fetch(path, {
+      ...init,
+      credentials: "same-origin",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...(headers ?? {}) },
+    })
     if (timeoutId) clearTimeout(timeoutId)
     if (signal) signal.removeEventListener("abort", abortFromSignal)
     const text = await response.text().catch(() => "")
     const payload = text ? (() => { try { return JSON.parse(text) as unknown } catch { return { error: text } } })() : null
     if (!response.ok) {
-      if (response.status === 401) useAuthStore.getState().clearSession()
+      if (response.status === 401 && auth) useAuthStore.getState().clearSession()
       throw new ApiError(getApiErrorMessage(payload, response.status, response.statusText), response.status, payload)
     }
     return payload as T

@@ -86,18 +86,6 @@ export const JIEKOU_PROVIDER_MODELS: Record<
   ],
 }
 
-export function getAdminToken(): string {
-  if (typeof window === "undefined") return ""
-  try {
-    const authStr = localStorage.getItem("mingyuan-admin-auth")
-    if (!authStr) return ""
-    const authObj = JSON.parse(authStr)
-    return authObj.state?.token || ""
-  } catch {
-    return ""
-  }
-}
-
 export async function fetchKnowledge(params: {
   page?: number
   pageSize?: number
@@ -118,18 +106,14 @@ export async function fetchKnowledge(params: {
   if (params.projectId) qs.set("projectId", params.projectId)
   if (params.valueGrade) qs.set("valueGrade", params.valueGrade)
 
-  const res = await fetch(`/api/admin/knowledge?${qs}`, {
-    headers: { Authorization: `Bearer ${getAdminToken()}` },
-  })
+  const res = await fetch(`/api/admin/knowledge?${qs}`)
   return res.json() as Promise<{
     data: { results: KnowledgeEntry[]; total: number; page: number; pageSize: number }
   }>
 }
 
 export async function fetchProjects() {
-  const res = await fetch("/api/admin/projects", {
-    headers: { Authorization: `Bearer ${getAdminToken()}` },
-  })
+  const res = await fetch("/api/admin/projects")
   return res.json() as Promise<{ data: AdminProject[] }>
 }
 
@@ -149,7 +133,6 @@ export async function batchAction(ids: string[], action: string, value?: string 
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getAdminToken()}`,
     },
     body: JSON.stringify({ ids, action, value }),
   })
@@ -160,7 +143,6 @@ export async function batchAction(ids: string[], action: string, value?: string 
 export async function deleteEntries(ids: string[]) {
   const res = await fetch(`/api/admin/knowledge?ids=${ids.join(",")}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${getAdminToken()}` },
   })
   if (!res.ok) throw new Error("删除失败")
   return res.json().catch(() => ({ success: true }))
@@ -171,7 +153,6 @@ export async function distillEntries(ids: string[]) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getAdminToken()}`,
     },
     body: JSON.stringify({ ids }),
   })

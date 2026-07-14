@@ -21,9 +21,9 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 })
   }
 
-  const avatar = await prisma.avatar.findUnique({ where: { id } })
+  const avatar = await prisma.avatar.findFirst({ where: { id, userId: user.id } })
 
-  if (!avatar || avatar.userId !== user.id) {
+  if (!avatar) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -94,7 +94,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
 
   // Reset avatar status to cloning
   await prisma.avatar.update({
-    where: { id: avatar.id },
+    where: { id: avatar.id, userId: user.id },
     data: {
       status: "cloning",
       errorCode: null,
@@ -125,7 +125,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
     console.log(`[${requestId}] Shanjian retry successful, taskId: ${taskId}`)
 
     const updatedAvatar = await prisma.avatar.update({
-      where: { id: avatar.id },
+      where: { id: avatar.id, userId: user.id },
       data: { externalTaskId: taskId },
     })
 
@@ -139,7 +139,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
       : "重试失败，请稍后再试"
 
     await prisma.avatar.update({
-      where: { id: avatar.id },
+      where: { id: avatar.id, userId: user.id },
       data: { status: "failed", errorCode, errorMessage },
     })
 

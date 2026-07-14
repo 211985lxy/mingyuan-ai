@@ -16,7 +16,7 @@ import { PageHeader } from "@/components/ui/page-header"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { useAuthStore } from "@/lib/store"
-import { getCurrentUser, listAgentApiKeys } from "@/lib/api/client"
+import { getCurrentUser, listAgentApiKeys, logoutUser } from "@/lib/api/client"
 import { getSubscriptionStatus } from "@/lib/subscription"
 import type { ApiAgentApiKeySummary, ApiUser } from "@/types/api"
 
@@ -43,14 +43,17 @@ export default function AccountPage() {
   const remaining = Math.max(dailyLimit - videosCreatedToday, 0)
   const remainingPercent = dailyLimit > 0 ? (remaining / dailyLimit) * 100 : 0
 
-  function handleLogout() {
-    clearSession()
-    router.push("/login")
+  async function endSession(destination: string) {
+    try {
+      await logoutUser()
+    } finally {
+      clearSession()
+      router.push(destination)
+    }
   }
 
   function handleSwitchAccount() {
-    clearSession()
-    router.push("/login?switch=1")
+    void endSession("/login?switch=1")
   }
 
   function formatDate(dateStr: string) {
@@ -265,7 +268,7 @@ export default function AccountPage() {
           </Button>
           <Button
             variant="destructive"
-            onClick={handleLogout}
+            onClick={() => void endSession("/login")}
             className="cursor-pointer"
           >
             <LogOut className="h-4 w-4 mr-2" />

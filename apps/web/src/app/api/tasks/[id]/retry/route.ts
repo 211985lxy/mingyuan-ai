@@ -12,9 +12,9 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 })
   }
 
-  const task = await prisma.videoTask.findUnique({ where: { id } })
+  const task = await prisma.videoTask.findFirst({ where: { id, userId: user.id } })
 
-  if (!task || task.userId !== user.id) {
+  if (!task) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 

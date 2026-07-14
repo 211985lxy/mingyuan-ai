@@ -478,7 +478,7 @@ export function req(
 
 export function adminToken(admin: { id: string; email: string; role: string }) {
   return jwt.sign(
-    { id: admin.id, email: admin.email, role: admin.role },
+    { id: admin.id, email: admin.email, role: admin.role, sessionVersion: 0 },
     JWT_SECRET,
     { expiresIn: "1h" }
   )
@@ -505,7 +505,7 @@ export function authReq(
 
 export function cronReq(url: string) {
   return req(url, {
-    headers: { Authorization: `Bearer test-e2e-cron-secret` },
+    headers: { Authorization: `Bearer test-e2e-cron-secret-at-least-32-bytes` },
   })
 }
 

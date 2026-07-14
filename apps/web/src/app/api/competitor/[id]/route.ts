@@ -5,11 +5,11 @@ import { withUserAuth } from '@/lib/user-auth'
 export const GET = withUserAuth(async (_request, { user, params }) => {
   const id = (params as { id: string }).id
 
-  const analysis = await prisma.competitorAnalysis.findUnique({
-    where: { id },
+  const analysis = await prisma.competitorAnalysis.findFirst({
+    where: { id, userId: user.id },
   })
 
-  if (!analysis || analysis.userId !== user.id) {
+  if (!analysis) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
   }
 
@@ -57,16 +57,16 @@ export const GET = withUserAuth(async (_request, { user, params }) => {
 export const DELETE = withUserAuth(async (_request, { user, params }) => {
   const id = (params as { id: string }).id
 
-  const analysis = await prisma.competitorAnalysis.findUnique({
-    where: { id },
-    select: { userId: true },
+  const analysis = await prisma.competitorAnalysis.findFirst({
+    where: { id, userId: user.id },
+    select: { id: true },
   })
 
-  if (!analysis || analysis.userId !== user.id) {
+  if (!analysis) {
     return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
   }
 
-  await prisma.competitorAnalysis.delete({ where: { id } })
+  await prisma.competitorAnalysis.delete({ where: { id, userId: user.id } })
 
   return new NextResponse(null, { status: 204 })
 })

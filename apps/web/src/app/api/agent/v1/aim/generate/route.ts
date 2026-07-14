@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`不支持的生成格式：${invalidFormats.join(", ")}`)
     }
 
-    assertAgentProjectAccess(context, projectId)
+    await assertAgentProjectAccess(context, projectId)
     assertAgentAccess(context, agentId)
 
     // 归一化旧别名（ip_video → content_producer），保证写入 DB / 日志 / 响应的 id 一致
