@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { getActivationAccountLabel } from "@/lib/activation-account"
 import { ApiError, activateUser, getCurrentUser, logoutUser } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/store"
 import { getSubscriptionStatus } from "@/lib/subscription"
@@ -54,6 +55,7 @@ export default function ActivatePage() {
           router.replace("/login")
           return
         }
+        setSubmitError("账号信息加载失败，请刷新重试")
       })
       .finally(() => setChecking(false))
   }, [isHydrated, router, setSession, clearSession])
@@ -122,7 +124,7 @@ export default function ActivatePage() {
                 {subscriptionStatus === "expired" ? "当前服务已过期" : "当前账号未激活"}
               </p>
               <p className="text-muted-foreground">
-                账号: {user?.email ?? "—"}
+                账号: {getActivationAccountLabel(user?.email)}
               </p>
               {subscriptionStatus === "expired" && expiryText ? (
                 <p className="text-muted-foreground">
@@ -157,7 +159,7 @@ export default function ActivatePage() {
           <Button
             type="submit"
             size="lg"
-            disabled={loading}
+            disabled={loading || !user?.email}
             className="w-full cursor-pointer"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}

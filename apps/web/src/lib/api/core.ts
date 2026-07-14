@@ -17,6 +17,9 @@ class ApiError extends Error {
 export function getApiErrorMessage(payload: unknown, status: number, statusText: string): string {
   if (typeof (payload as { error?: unknown } | null)?.error === "string") {
     const error = (payload as { error: string }).error
+    if (status === 401 && ["Invalid token", "Unauthorized", "User not found"].includes(error)) {
+      return "登录状态已失效，请重新登录"
+    }
     if (/<html[\s>]/i.test(error) || /504 Gateway Time-?out/i.test(error)) {
       return "AI 服务响应超时，请稍后重试"
     }
