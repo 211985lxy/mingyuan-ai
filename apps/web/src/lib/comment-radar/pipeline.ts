@@ -68,3 +68,29 @@ export async function syncJobForUser(uid: string, jid: string): Promise<SyncResu
   }
   return toSR(j)
 }
+
+export interface ListCommentsParams { page?: number; pageSize?: number; keyword?: string; sortBy?: 'likes' | 'createTime'; sortOrder?: 'asc' | 'desc'; sourceItemId?: string }
+export interface CommentPageResult { items: Array<{ id: string; platformCommentId: string; text: string; nickname: string | null; likes: number; createTime: string; isTop: boolean; sourceItemTitle: string }>; total: number; page: number; pageSize: number }
+
+export async function listCommentsForJob(userId: string, jobId: string, params: ListCommentsParams): Promise<CommentPageResult | null> {
+  const job = await prisma.commentInsightJob.findFirst({ where: { id: jobId, userId } })
+  if (!job) return null
+  const page = params.page ?? 1; const pageSize = Math.min(params.pageSize ?? 50, 200)
+  const where: Record<string, unknown> = { jobId }
+  if (params.sourceItemId) where.sourceItemId = params.sourceItemId
+  if (params.keyword) where.text = { contains: params.keyword }
+  const orderBy: Record<string, string> = params.sortBy === 'likes' ? { likes: params.sortOrder === 'asc' ? 'asc' : 'desc' } : { createdAt: params.sortOrder === 'asc' ? 'asc' : 'desc' }
+  const [items, total] = await Promise.all([
+    prisma.commentRecord.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize, include: { sourceItem: { select: { title: true } } } }),
+    prisma.commentRecord.count({ where }),
+  ])
+  return { items: items.map(r => ({ id: r.id, platformCommentId: r.platformCommentId, text: r.text, nickname: r.nickname, likes: r.likes, createTime: r.createTime, isTop: r.isTop, sourceItemTitle: r.sourceItem.title })), total, page, pageSize }
+}
+
+export async function exportJobCsv(userId: string, jobId: string): Promise<string | null> {
+  const job = await prisma.commentInsightJob.findFirst({ where: { id: jobId, userId } })
+  if (!job) return null
+  const records = await prisma.commentRecord.findMany({ where: { jobId }, orderBy: { createdAt: 'desc' } })
+  const { generateCsv } = await import('./csv')
+  return generateCsv(records.map(r => ({ commentId: r.platformCommentId, text: r.text, nickname: r.nickname, likes: r.likes, createTime: r.createTime, isTop: r.isTop })))
+}
