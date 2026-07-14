@@ -1,44 +1,41 @@
 # Purpose
-Define the server-owned script generation pipeline that combines IP profile context, template blueprints, and structured brief inputs into persisted candidate scripts.
+
+Define server-owned content generation that combines authorized project context, knowledge, task constraints, and user input into persisted AIM versions.
 
 ## Requirements
 
-### Requirement: Template-guided script generation
-The system SHALL generate scripts from published content templates, not from freeform mock helpers. Script generation SHALL accept a selected template, structured brief inputs, and optional hot-topic context.
+### Requirement: Server owns generation context
 
-#### Scenario: Generate scripts from a selected template
-- **WHEN** an authenticated user calls `POST /api/scripts/generate` with `{ templateId, inputs }`
-- **THEN** the system validates the published template, validates required brief fields, generates script candidates through the server-side pipeline, and returns persisted candidates
+The server SHALL validate project access and compose the final generation context. The client MUST NOT be trusted to provide authoritative project facts, knowledge records, source generation records, or final prompts.
 
-#### Scenario: Generate scripts with hot-topic context
-- **WHEN** an authenticated user calls `POST /api/scripts/generate` with `{ templateId, inputs, hotTopic }`
-- **THEN** the system incorporates the hot-topic context into the prompt composition and returns script candidates tied to the same generation run
+#### Scenario: Authorized generation
 
-#### Scenario: Missing required brief field
-- **WHEN** the request omits a template-required field declared by the template's variable schema
-- **THEN** the system returns 400 and lists the missing fields
+- **WHEN** an authenticated user requests content for an accessible project
+- **THEN** the server loads authorized context, composes the runtime task, and records the generation
 
-### Requirement: Prompt composition uses profile, template, and brief together
-The system SHALL compose LLM prompts from three required layers: the user's IP profile snapshot, the selected content template blueprint, and the current brief inputs. The backend MUST own this composition and MUST NOT trust the client to send final prompt text.
+#### Scenario: Unauthorized source reference
 
-#### Scenario: Server-side prompt assembly
-- **WHEN** a valid script generation request is received
-- **THEN** the backend loads the IP profile, loads the selected template blueprint, merges in the brief inputs, and builds the final prompt on the server before calling the LLM
+- **WHEN** the request references a project, knowledge item, or generation owned by another user
+- **THEN** the server rejects or ignores that source without exposing its content
 
-### Requirement: Generation runs and script candidates are persisted
-Each script generation request SHALL create a persistent generation run and persistent candidate scripts. Every candidate script MUST record its source template, source IP profile, and generation batch linkage.
+### Requirement: Generation context distinguishes evidence
 
-#### Scenario: Persisted generation batch
-- **WHEN** a generation request succeeds
-- **THEN** the system creates one `ContentGenerationRun` record and multiple `Script` records with `status="candidate"`, each linked to the selected template and active IP profile
+Facts from project records, knowledge, topics, and upstream generations SHALL retain source metadata. User-entered additions SHALL be marked as user input, and model inference MUST NOT be represented as verified fact.
 
-### Requirement: Candidate scripts can be edited and selected
-The system SHALL allow the user to edit a candidate script and mark a single script as the selected script for downstream video generation.
+### Requirement: Content versions are persisted and editable
 
-#### Scenario: User edits a generated script
-- **WHEN** the user updates a candidate through `PATCH /api/scripts/[id]`
-- **THEN** the system saves the edited content to that script record instead of keeping the edit only in client memory
+Each successful generation SHALL create a persistent version. A user may create a new version, edit the current version, rewrite from a reference, or split the current version for multiple platforms.
 
-#### Scenario: User selects one candidate for video generation
-- **WHEN** the user marks a script as selected
-- **THEN** the system updates that script to `status="selected"` and ensures the create flow can use that saved script for the later video task
+#### Scenario: User performs a scoped edit
+
+- **WHEN** the request identifies an edit scope
+- **THEN** the new version changes only that scope and retains the prior version in history
+
+#### Scenario: User restores history
+
+- **WHEN** the user explicitly restores a historical version
+- **THEN** it becomes the current version without deleting intervening history
+
+### Requirement: Content flows to publishing
+
+The current content version SHALL be reusable by pre-publish review, publication planning, publication records, and outcome review without starting a media-generation subsystem.

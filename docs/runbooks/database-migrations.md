@@ -16,7 +16,7 @@
 4. `prisma migrate deploy` applies production migrations under a 15-minute job timeout.
 5. `prisma migrate status` and `prisma migrate diff` must both pass before deployment begins.
 6. Kubernetes deploys the SHA-tagged images and checks `/api/healthz`.
-7. Only after health succeeds are `web:latest` and `worker:latest` advanced to that SHA.
+7. Only after health succeeds is `web:latest` advanced to that SHA.
 
 ## Destructive Changes
 

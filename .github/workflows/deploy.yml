@@ -102,16 +102,6 @@ jobs:
           platforms: linux/amd64
           tags: ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
 
-      - name: Build and push worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          target: worker-runner
-          push: true
-          platforms: linux/amd64
-          tags: ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
-
   migrate:
     name: Prisma Migrate Deploy
     needs: build-and-push
@@ -167,9 +157,7 @@ jobs:
       - name: Deploy to K8s
         run: |
           kubectl set image deployment/mingyuan-web web=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
-          kubectl set image deployment/mingyuan-worker worker=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
           kubectl rollout status deployment/mingyuan-web --timeout=180s
-          kubectl rollout status deployment/mingyuan-worker --timeout=180s
 
       - name: Verify live health dependencies
         run: |
@@ -193,7 +181,6 @@ jobs:
         run: |
           echo "Rollout failed, rolling back..."
           kubectl rollout undo deployment/mingyuan-web
-          kubectl rollout undo deployment/mingyuan-worker
           exit 1
 
   promote-stable:
@@ -212,6 +199,3 @@ jobs:
           docker buildx imagetools create \
             --tag ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:latest \
             ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
-          docker buildx imagetools create \
-            --tag ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:latest \
-            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
