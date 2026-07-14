@@ -12,6 +12,7 @@
     "commitlint": "commitlint --edit",
     "release": "release-it",
     "release:dry-run": "release-it --dry-run",
+    "release:verify": "node scripts/release-verify.mjs",
     "security:audit": "node scripts/check-dependency-audit.mjs",
     "dev": "turbo dev --filter='./apps/*'",
     "build": "turbo build",

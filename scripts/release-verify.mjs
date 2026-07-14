@@ -1,0 +1,49 @@
+import { spawnSync } from "node:child_process"
+
+const allowMissingServices = process.argv.includes("--allow-missing-services")
+const steps = [
+  ["Frozen dependency install", ["install", "--frozen-lockfile"]],
+  ["Prisma schema validation", ["--dir", "apps/web", "exec", "prisma", "validate"]],
+  ["Prisma client generation", ["--dir", "apps/web", "exec", "prisma", "generate"]],
+  ["Environment contract", ["--dir", "apps/web", "run", "env:check"]],
+  ["API contract inventory", ["--dir", "apps/web", "run", "api:contracts"]],
+  ["Dependency audit", ["security:audit"]],
+  ["Application typecheck", ["--dir", "apps/web", "run", "typecheck"]],
+  ["Test typecheck", ["--dir", "apps/web", "run", "typecheck:tests"]],
+  ["Lint", ["--dir", "apps/web", "exec", "eslint", "--quiet", "."]],
+  ["Source size guard", ["--dir", "apps/web", "run", "arch:size"]],
+  ["AIM architecture guard", ["--dir", "apps/web", "run", "arch:check"]],
+  ["Domain boundary guard", ["--dir", "apps/web", "run", "arch:domains"]],
+  ["Retired capability guard", ["--dir", "apps/web", "run", "arch:retired"]],
+  ["Bounded Prisma query guard", ["--dir", "apps/web", "run", "db:bounds"]],
+  ["Unit and evaluation tests", ["--dir", "apps/web", "test"]],
+  ["Deterministic harness", ["--dir", "apps/web", "run", "test:harness"]],
+  ["Production build", ["--dir", "apps/web", "build"]],
+]
+
+const databaseSteps = [
+  ["Database E2E", ["--dir", "apps/web", "run", "test:e2e"]],
+  ["Migration status", ["--dir", "apps/web", "run", "schema:migration-status"]],
+]
+const hasDatabaseServices = Boolean(process.env.TEST_DATABASE_URL && process.env.DATABASE_URL)
+
+if (!hasDatabaseServices && !allowMissingServices) {
+  console.error("release:verify requires both TEST_DATABASE_URL and DATABASE_URL")
+  process.exit(1)
+}
+
+for (const [name, args] of hasDatabaseServices ? [...steps, ...databaseSteps] : steps) {
+  console.log(`\n==> ${name}`)
+  const startedAt = Date.now()
+  const result = spawnSync("pnpm", args, { stdio: "inherit", env: process.env })
+  if (result.status !== 0) {
+    console.error(`release verification failed: ${name}`)
+    process.exit(result.status ?? 1)
+  }
+  console.log(`<== ${name} passed in ${Math.ceil((Date.now() - startedAt) / 1000)}s`)
+}
+
+if (!hasDatabaseServices) {
+  console.warn("SKIPPED Database E2E and migration status: isolated database services are unavailable.")
+}
+console.log("release-verification-ok")
