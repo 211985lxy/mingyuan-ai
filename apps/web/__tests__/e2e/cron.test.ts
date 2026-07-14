@@ -38,6 +38,12 @@ describe("Cron Endpoints E2E", () => {
     const now = new Date()
     const fortyDaysAgo = new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000)
     const hundredDaysAgo = new Date(now.getTime() - 100 * 24 * 60 * 60 * 1000)
+    const freshItemsBefore = await prisma.douyinHotItem.count({
+      where: { fetchedAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } },
+    })
+    const freshSnapshotsBefore = await prisma.douyinHotSnapshot.count({
+      where: { fetchedAt: { gte: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000) } },
+    })
 
     // Seed old hot items (>30 days)
     await prisma.douyinHotItem.createMany({
@@ -109,9 +115,9 @@ describe("Cron Endpoints E2E", () => {
 
     // Verify the fresh data survived
     const remainingItems = await prisma.douyinHotItem.count()
-    expect(remainingItems).toBe(1) // only fresh one
+    expect(remainingItems).toBe(freshItemsBefore + 1)
 
     const remainingSnaps = await prisma.douyinHotSnapshot.count()
-    expect(remainingSnaps).toBe(1) // only fresh one
+    expect(remainingSnaps).toBe(freshSnapshotsBefore + 1)
   })
 })

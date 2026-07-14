@@ -7,6 +7,7 @@ import { createConnection, type RowDataPacket } from "mysql2/promise"
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const BASELINE_SQL = resolve(WEB_ROOT, "prisma/baseline/current.sql")
 const BASELINE_MIGRATIONS = resolve(WEB_ROOT, "prisma/baseline/migrations.json")
+const PRODUCTION_SCHEMA_CONTRACT = resolve(WEB_ROOT, "prisma/production-schema-contract.json")
 
 export function requireTestDatabaseUrl(databaseUrl = process.env.TEST_DATABASE_URL): string {
   const value = databaseUrl?.trim()
@@ -54,6 +55,35 @@ export async function resetE2eDatabase(databaseUrl = process.env.TEST_DATABASE_U
   }
 }
 
+async function verifySchemaContract(databaseUrl: string): Promise<void> {
+  const contract = JSON.parse(readFileSync(PRODUCTION_SCHEMA_CONTRACT, "utf8")) as {
+    tables: Array<{ name: string; columns: string[] }>
+  }
+  const connection = await connect(databaseUrl)
+  try {
+    for (const table of contract.tables) {
+      const [rows] = await connection.query<RowDataPacket[]>(
+        "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+        [table.name],
+      )
+      const columns = new Set(rows.map((row) => String(row.COLUMN_NAME)))
+      if (columns.size === 0) throw new Error(`Schema contract missing table ${table.name}`)
+      for (const column of table.columns) {
+        if (!columns.has(column)) throw new Error(`Schema contract missing column ${table.name}.${column}`)
+      }
+    }
+
+    const [retiredTables] = await connection.query<RowDataPacket[]>(
+      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('VideoTask', 'VideoProductionPlan', 'VideoPackagingTemplate', 'Avatar')",
+    )
+    if (retiredTables.length > 0) {
+      throw new Error(`Retired media tables remain: ${retiredTables.map((row) => row.TABLE_NAME).join(", ")}`)
+    }
+  } finally {
+    await connection.end()
+  }
+}
+
 function runPrisma(args: string[], databaseUrl: string): void {
   execFileSync("pnpm", ["exec", "prisma", ...args], {
     cwd: WEB_ROOT,
@@ -73,14 +103,7 @@ export async function prepareE2eDatabase(databaseUrl = process.env.TEST_DATABASE
   }
 
   runPrisma(["migrate", "deploy"], safeUrl)
-  runPrisma([
-    "migrate",
-    "diff",
-    "--from-config-datasource",
-    "--to-schema",
-    "prisma",
-    "--exit-code",
-  ], safeUrl)
+  await verifySchemaContract(safeUrl)
 }
 
 async function main() {

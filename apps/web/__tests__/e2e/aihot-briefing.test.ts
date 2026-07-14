@@ -3,6 +3,10 @@ import { GET as CRON } from "@/app/api/cron/aihot-briefing/route"
 import { GET as TODAY } from "@/app/api/aihot-briefing/today/route"
 import { cronReq, disconnectAll, json, prisma, req } from "./helpers"
 
+vi.mock("@/lib/hot-source-settings", () => ({
+  loadEffectiveAccountSourceBindings: vi.fn(async () => []),
+}))
+
 const now = new Date("2099-01-01T01:00:00.000Z")
 
 function mockAiHotFetch(titleSuffix: string) {
@@ -78,7 +82,7 @@ describe("AI HOT briefing endpoints", () => {
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.data.title).toBe("每日选题雷达 · 今日 9 点")
+    expect(body.data.title).toBe("选题雷达 · 今日 9 点")
     expect(body.data.items).toHaveLength(2)
     expect(body.data.markdown).toContain("https://example.com/model-two")
   })

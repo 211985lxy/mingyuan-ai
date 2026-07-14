@@ -32,5 +32,6 @@ Temporary objectives pending business approval: RPO 24 hours, RTO 4 hours. They 
 4. Run `TEST_DATABASE_URL=... pnpm --dir apps/web backup:verify -- <backup.sql.gz>`.
 5. Run Prisma migration status, schema verification and the database E2E suite against that restored test database.
 6. Record backup timestamp, restore duration, migration version, row-count checks and operator. Never record credentials.
+7. Before the retired-media migration, set `RETIRED_MEDIA_BACKUP_REFERENCE` to that sanitized record identifier; the preflight refuses destructive rows without it.
 
 Do not restore into production as a rollback for partially applied destructive DDL without a reviewed incident plan. Production automation, encryption policy and an actual restore drill remain release prerequisites.

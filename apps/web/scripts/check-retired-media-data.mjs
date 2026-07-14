@@ -2,6 +2,7 @@ import mysql from "mysql2/promise"
 
 const confirmation = "DELETE_RETIRED_MEDIA_DATA"
 const databaseUrl = process.env.DATABASE_URL?.trim()
+const backupReference = process.env.RETIRED_MEDIA_BACKUP_REFERENCE?.trim()
 
 if (!databaseUrl) {
   console.error("DATABASE_URL is required for the retired-media preflight")
@@ -116,11 +117,20 @@ try {
   console.log("AIM ASR uses transient audio input and is not part of these retired asset records.")
 
   const destructiveRows = counts.reduce((sum, item) => sum + item.count, 0)
-  if (destructiveRows > 0 && process.env.ACK_RETIRE_MEDIA_DATA !== confirmation) {
-    console.error(
-      `Refusing destructive migration: ${destructiveRows} retired records/metadata values exist. Export or archive them, then rerun with ACK_RETIRE_MEDIA_DATA=${confirmation}.`,
-    )
-    process.exitCode = 2
+  if (destructiveRows > 0) {
+    if (process.env.ACK_RETIRE_MEDIA_DATA !== confirmation) {
+      console.error(
+        `Refusing destructive migration: ${destructiveRows} retired records/metadata values exist. Export or archive them, then rerun with ACK_RETIRE_MEDIA_DATA=${confirmation}.`,
+      )
+      process.exitCode = 2
+    } else if (!backupReference) {
+      console.error(
+        "Refusing destructive migration: RETIRED_MEDIA_BACKUP_REFERENCE must identify the verified backup and restore drill.",
+      )
+      process.exitCode = 2
+    } else {
+      console.log("Retired-media preflight passed with recorded backup evidence.")
+    }
   } else {
     console.log("Retired-media preflight passed.")
   }

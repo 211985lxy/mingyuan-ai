@@ -36,5 +36,8 @@
   "20260710120000_add_aim_harness_v1",
   "20260710210000_add_agent_methodology",
   "20260710220000_add_aim_run_events",
-  "20260711100000_add_task_spec_and_content_outcome"
+  "20260711100000_add_task_spec_and_content_outcome",
+  "20260713113000_consolidate_phase14_schema",
+  "20260713130000_add_admin_session_version",
+  "20260714100000_add_admin_audit_log"
 ]

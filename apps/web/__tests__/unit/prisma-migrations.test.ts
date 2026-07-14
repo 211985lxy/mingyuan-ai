@@ -102,4 +102,21 @@ describe("Prisma migrations", () => {
     expect(prismaConfig).toContain('url: process.env["DATABASE_URL"]')
     expect(prismaConfig).not.toContain("changethis")
   })
+
+  it("requires backup evidence before retiring production media data", () => {
+    const preflight = readFileSync(
+      path.join(appRoot, "scripts/check-retired-media-data.mjs"),
+      "utf8",
+    )
+    const deployWorkflow = readFileSync(
+      path.join(appRoot, "../../.github/workflows/deploy.yml"),
+      "utf8",
+    )
+
+    expect(preflight).toContain("RETIRED_MEDIA_BACKUP_REFERENCE")
+    expect(deployWorkflow).toContain(
+      "RETIRED_MEDIA_BACKUP_REFERENCE: ${{ secrets.RETIRED_MEDIA_BACKUP_REFERENCE }}",
+    )
+    expect(deployWorkflow).toContain("run: pnpm security:audit")
+  })
 })

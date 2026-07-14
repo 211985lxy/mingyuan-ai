@@ -7,6 +7,11 @@ import { GET as HISTORY } from "@/app/api/admin/hot-topics/history/route"
 import { GET as STATS } from "@/app/api/admin/hot-topics/stats/route"
 
 let admin: { id: string; email: string; role: string }
+let snapshotCountBefore = 0
+let success24hBefore = 0
+let failed24hBefore = 0
+let success7dBefore = 0
+let failed7dBefore = 0
 
 describe("Admin Hot Topics E2E", () => {
   beforeAll(async () => {
@@ -17,8 +22,32 @@ describe("Admin Hot Topics E2E", () => {
 
     // Seed snapshots at various times
     const now = new Date()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
     const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    ;[
+      snapshotCountBefore,
+      success24hBefore,
+      failed24hBefore,
+      success7dBefore,
+      failed7dBefore,
+    ] = await Promise.all([
+      prisma.douyinHotSnapshot.count(),
+      prisma.douyinHotSnapshot.count({
+        where: { fetchedAt: { gte: oneDayAgo }, status: "success" },
+      }),
+      prisma.douyinHotSnapshot.count({
+        where: { fetchedAt: { gte: oneDayAgo }, status: "failed" },
+      }),
+      prisma.douyinHotSnapshot.count({
+        where: { fetchedAt: { gte: sevenDaysAgo }, status: "success" },
+      }),
+      prisma.douyinHotSnapshot.count({
+        where: { fetchedAt: { gte: sevenDaysAgo }, status: "failed" },
+      }),
+    ])
 
     await prisma.douyinHotSnapshot.createMany({
       data: [
@@ -43,8 +72,8 @@ describe("Admin Hot Topics E2E", () => {
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.data.results.length).toBe(4)
-    expect(body.data.total).toBe(4)
+    expect(body.data.results.length).toBe(snapshotCountBefore + 4)
+    expect(body.data.total).toBe(snapshotCountBefore + 4)
     // First result should be the most recent
     expect(body.data.results[0].batchId).toMatch(/recent/)
   })
@@ -56,7 +85,7 @@ describe("Admin Hot Topics E2E", () => {
     )
     const body = await json(res)
     expect(body.data.results.length).toBe(2)
-    expect(body.data.total).toBe(4)
+    expect(body.data.total).toBe(snapshotCountBefore + 4)
   })
 
   it("returns accurate stats for 24h and 7d", async () => {
@@ -67,9 +96,9 @@ describe("Admin Hot Topics E2E", () => {
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.data.last24h.success).toBe(1) // recent-ok
-    expect(body.data.last24h.failed).toBe(1)  // recent-fail
-    expect(body.data.last7d.success).toBeGreaterThanOrEqual(3) // recent + 2d + 5d
-    expect(body.data.last7d.failed).toBe(1)
+    expect(body.data.last24h.success).toBe(success24hBefore + 1)
+    expect(body.data.last24h.failed).toBe(failed24hBefore + 1)
+    expect(body.data.last7d.success).toBe(success7dBefore + 3)
+    expect(body.data.last7d.failed).toBe(failed7dBefore + 1)
   })
 })

@@ -17,6 +17,11 @@ export async function cleanDatabase() {
   // 为了防止运行测试时将本地开发环境的真实用户、IP 档案和知识库误删，
   // 我们只清理以 "@test.com" 结尾的测试账户以及它们产生的数据资产！
 
+  const testAdminIds = (await prisma.adminUser.findMany({
+    where: { email: { endsWith: "@test.com" } },
+    select: { id: true },
+  })).map((admin) => admin.id)
+
   // 1. 最先清理最底层的二级子依赖（仅限测试用户的数据，防外键死锁）
   await prisma.script.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.contentGenerationRun.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
@@ -40,22 +45,15 @@ export async function cleanDatabase() {
       ]
     }
   })
+
+  if (testAdminIds.length > 0) {
+    await prisma.adminAuditLog.deleteMany({ where: { adminId: { in: testAdminIds } } })
+    await prisma.contentTemplate.deleteMany({ where: { createdBy: { in: testAdminIds } } })
+  }
   
   // 3. 最后清理一级核心用户中的测试专用账户
   await prisma.user.deleteMany({ where: { email: { endsWith: "@test.com" } } })
   await prisma.adminUser.deleteMany({ where: { email: { endsWith: "@test.com" } } })
-  
-  // 4. 精准清理测试临时模板，保留全局开发环境配置与系统资产
-  const testAdminIds = (await prisma.adminUser.findMany({
-    where: { email: { endsWith: "@test.com" } },
-    select: { id: true }
-  })).map(a => a.id)
-
-  if (testAdminIds.length > 0) {
-    await prisma.contentTemplate.deleteMany({
-      where: { createdBy: { in: testAdminIds } }
-    })
-  }
 }
 
 export async function cleanRedis() {

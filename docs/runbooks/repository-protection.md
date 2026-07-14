@@ -31,4 +31,4 @@ The real-model daily and full evaluations remain operational release evidence; t
 
 ## Release boundary
 
-The deploy workflow applies production migrations only after quality gates pass. Destructive retired-media cleanup runs its data-count preflight before `prisma migrate deploy`; a non-empty production result requires the explicit `ACK_RETIRE_MEDIA_DATA=DELETE_RETIRED_MEDIA_DATA` repository secret after backup and review.
+The deploy workflow applies production migrations only after quality gates pass. Destructive retired-media cleanup runs its data-count preflight before `prisma migrate deploy`; a non-empty production result requires both `ACK_RETIRE_MEDIA_DATA=DELETE_RETIRED_MEDIA_DATA` and a `RETIRED_MEDIA_BACKUP_REFERENCE` identifying the verified backup and restore drill.

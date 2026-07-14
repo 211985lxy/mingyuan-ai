@@ -54,6 +54,8 @@ jobs:
           cache: pnpm
       - name: Install deps
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit
+        run: pnpm security:audit
       - name: Generate Prisma client
         run: pnpm --dir apps/web exec prisma generate
       - name: Validate Prisma schema
@@ -129,6 +131,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ACK_RETIRE_MEDIA_DATA: ${{ secrets.ACK_RETIRE_MEDIA_DATA }}
+          RETIRED_MEDIA_BACKUP_REFERENCE: ${{ secrets.RETIRED_MEDIA_BACKUP_REFERENCE }}
         run: pnpm --dir apps/web run schema:retired-media-preflight
       - name: Apply pending migrations
         env:
