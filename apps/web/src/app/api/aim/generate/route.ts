@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { parseGenerateBody, validateGenerateInput } from "@/lib/aim-generate-validate"
@@ -15,6 +16,7 @@ import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { prepareAimGenerateInput } from "@/lib/aim-harness/request-context"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 import { ownsActiveProject } from "@/lib/resource-ownership"
+import { aimGenerateBodySchema } from "@/features/aim/contracts/api"
 
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_generate")
     if (quotaResponse) return quotaResponse
 
-    const body = await request.json()
+    const body = await parseJsonBody(request, aimGenerateBodySchema, { maxBytes: 256 * 1024 })
     const parsed = parseGenerateBody(body)
     if (parsed.projectId && !(await ownsActiveProject(user.id, parsed.projectId))) {
       return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })

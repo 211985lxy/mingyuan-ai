@@ -6,6 +6,10 @@ import type { KnowledgeEntry } from "./knowledge"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type {
+  AimGenerateBody,
+  AimWorkflowBriefBody,
+} from "@/features/aim/contracts/api"
+import type {
   ApiAsset, ApiAvatar, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiPublicAssetVoice, ApiPublicVirtualman,
   ApiPublicAvatarPreviewDefaults, ApiPublicAvatarPreview, ApiScript, ApiUser,
@@ -19,15 +23,7 @@ import type {
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
 
-export type ContentFormat =
-  | "video_script"
-  | "wechat_article"
-  | "moments_post"
-  | "community_message"
-  | "shooting_brief"
-  | "raw_copy"
-  | "koubo_script"
-  | "xiaohongshu_post"
+export type ContentFormat = NonNullable<AimGenerateBody["targetFormats"]>[number]
 
 export type AimTaskType =
   | "polish_copy"
@@ -35,29 +31,7 @@ export type AimTaskType =
   | "quality_check"
   | "repurpose"
 
-export interface AimGenerateRequest {
-  agentId?: string
-  rawInput: string
-  targetFormats?: ContentFormat[]
-  taskType?: AimTaskType
-  projectId?: string
-  videoCopyExtractionId?: string
-  topicTitle?: string
-  topicRationale?: string
-  topicType?: string
-  hotTopic?: string
-  polishInstruction?: string
-  useMarketViralVideos?: boolean
-  existingGenerationId?: string
-  topicSelectionId?: string
-  selectedTopicIndex?: number
-  workflow?: {
-    stage: import("@/lib/aim-workflow").AimWorkflowStage
-    sourceGenerationId?: string
-    goal?: string
-    confirmed?: import("@/lib/aim-workflow").ConfirmedWorkflowBrief
-  }
-}
+export type AimGenerateRequest = AimGenerateBody
 
 export interface AimWorkflowBriefResponse {
   stage: import("@/lib/aim-workflow").AimWorkflowStage
@@ -163,13 +137,9 @@ export async function generateAimContent(data: AimGenerateRequest, signal?: Abor
   })
 }
 
-export async function createAimWorkflowBrief(data: {
-  stage: import("@/lib/aim-workflow").AimWorkflowStage
-  projectId?: string
-  sourceGenerationId?: string
-  goal?: string
-  confirmed?: import("@/lib/aim-workflow").ConfirmedWorkflowBrief
-}): Promise<AimWorkflowBriefResponse> {
+export async function createAimWorkflowBrief(
+  data: AimWorkflowBriefBody,
+): Promise<AimWorkflowBriefResponse> {
   return request<AimWorkflowBriefResponse>("/api/aim/workflow/brief", {
     method: "POST",
     body: JSON.stringify(data),

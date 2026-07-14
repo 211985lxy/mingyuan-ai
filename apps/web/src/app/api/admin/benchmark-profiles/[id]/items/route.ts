@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -36,7 +37,7 @@ export const POST = withAdminAuth(async (request, { params }) => {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { title, content, kind, sortOrder } = body
 
   if (!title || typeof title !== "string" || !title.trim()) {

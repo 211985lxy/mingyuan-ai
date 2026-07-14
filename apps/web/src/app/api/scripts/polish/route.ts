@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
@@ -61,7 +62,7 @@ async function loadProjectKnowledge(
 }
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const content = typeof body.content === "string" ? body.content.trim() : ""
   const weakDimensions = Array.isArray(body.weakDimensions) ? body.weakDimensions as string[] : []
   const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle : null

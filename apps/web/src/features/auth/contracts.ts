@@ -10,3 +10,7 @@ export const registerBodySchema = z.object({
   password,
   name: z.string().trim().min(1, "请输入名称").max(100),
 }).strict()
+
+export const activationBodySchema = z.object({
+  code: z.string().trim().min(1, "请输入激活码").max(64),
+}).strict()

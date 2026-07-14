@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { invalidateBrandingCache, isBrandingSettingKey } from "@/lib/branding"
@@ -9,7 +10,7 @@ export const PUT = withAdminAuth(async (request: NextRequest, { admin, params })
     return NextResponse.json({ error: "Key required" }, { status: 400 })
   }
 
-  const { value } = await request.json()
+  const { value } = await parseJsonRecord(request)
   if (value === undefined) {
     return NextResponse.json({ error: "Value required" }, { status: 400 })
   }

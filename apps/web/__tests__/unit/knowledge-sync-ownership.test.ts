@@ -62,9 +62,8 @@ describe("Obsidian knowledge sync ownership", () => {
     mocks.ensureKnowledgeEmbedding.mockResolvedValue(undefined)
   })
 
-  it("binds writes to the configured user instead of a request body user id", async () => {
+  it("binds writes to the configured user", async () => {
     const response = await POST(request({
-      userId: "attacker-selected-user",
       projectId: "project-1",
       entries: [entry],
     }))
@@ -78,6 +77,16 @@ describe("Obsidian knowledge sync ownership", () => {
       where: { id: entry.id, userId: "configured-user" },
       create: expect.objectContaining({ userId: "configured-user", projectId: "project-1" }),
     }))
+  })
+
+  it("rejects attempts to select a user in the request body", async () => {
+    const response = await POST(request({
+      userId: "attacker-selected-user",
+      entries: [entry],
+    }))
+
+    expect(response.status).toBe(400)
+    expect(mocks.knowledgeUpsert).not.toHaveBeenCalled()
   })
 
   it("rejects an external id already owned by another tenant", async () => {

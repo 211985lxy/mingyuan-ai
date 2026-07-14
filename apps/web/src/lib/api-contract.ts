@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto"
-import { NextResponse, type NextRequest } from "next/server"
-import type { ZodType } from "zod"
+import { NextResponse } from "next/server"
+import { z, type ZodType } from "zod"
+
+const jsonRecordSchema = z.record(z.string(), z.unknown())
+
+// Transitional shape for routes that already perform field-by-field checks.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type JsonRecord = Record<string, any>
 
 export class ApiRequestError extends Error {
   constructor(
@@ -15,7 +21,7 @@ export class ApiRequestError extends Error {
 }
 
 export async function parseJsonBody<T>(
-  request: NextRequest,
+  request: Request,
   schema: ZodType<T>,
   options: { maxBytes?: number } = {},
 ): Promise<T> {
@@ -50,12 +56,41 @@ export async function parseJsonBody<T>(
   return result.data
 }
 
+export function parseJsonRecord(
+  request: Request,
+  options: { maxBytes?: number } = {},
+): Promise<JsonRecord> {
+  // Preserves request.json() field compatibility while adding object, size, and
+  // malformed-JSON checks. Critical routes use a domain Zod schema instead.
+  return parseJsonBody(request, jsonRecordSchema, options)
+}
+
+export function parseQuery<T>(request: Request, schema: ZodType<T>): T {
+  const params = new URL(request.url).searchParams
+  const input: Record<string, string | string[]> = {}
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key)
+    input[key] = values.length > 1 ? values : values[0]
+  }
+  const result = schema.safeParse(input)
+  if (!result.success) {
+    const issue = result.error.issues[0]
+    throw new ApiRequestError(
+      400,
+      "INVALID_QUERY",
+      issue?.message ?? "Query parameters are invalid",
+      issue?.path.join(".") || undefined,
+    )
+  }
+  return result.data
+}
+
 export function apiRequestErrorResponse(
-  request: NextRequest,
+  request: Request | undefined,
   error: unknown,
 ): NextResponse | null {
   if (!(error instanceof ApiRequestError)) return null
-  const requestId = request.headers.get("x-request-id") || randomUUID()
+  const requestId = request?.headers.get("x-request-id") || randomUUID()
   return NextResponse.json(
     {
       error: error.message,

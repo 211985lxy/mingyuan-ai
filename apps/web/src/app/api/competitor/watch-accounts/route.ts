@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -5,6 +6,7 @@ import { checkUrlType, parseUrl } from "@/lib/tikhub/url-parser"
 import { getCompetitorPlatformGate } from "@/lib/competitor-analysis/platform-scope"
 import { resolveCompetitorProfileInput } from "@/lib/competitor-analysis/profile-url"
 import { enforceCountBetaLimit } from "@/lib/internal-beta-limits"
+import { watchAccountCreateBodySchema } from "@/features/competitor/contracts/api"
 
 export const GET = withUserAuth(async (_request, { user }) => {
   const accounts = await prisma.watchAccount.findMany({
@@ -15,12 +17,7 @@ export const GET = withUserAuth(async (_request, { user }) => {
 })
 
 export const POST = withUserAuth(async (request, { user }) => {
-  let body: { url?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "请求格式不正确" }, { status: 400 })
-  }
+  const body = await parseJsonBody(request, watchAccountCreateBodySchema, { maxBytes: 4 * 1024 })
 
   const rawUrl = typeof body.url === "string" ? body.url.trim() : ""
   if (!rawUrl) {

@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { generateUploadUrl } from "@/lib/oss"
@@ -5,7 +6,7 @@ import { generateUploadUrl } from "@/lib/oss"
 // ─── POST /api/assets/upload-url ───────────────────────
 
 export const POST = withUserAuth(async (request) => {
-  const { fileName, contentType } = await request.json()
+  const { fileName, contentType } = await parseJsonRecord(request)
 
   if (!fileName || !contentType) {
     return NextResponse.json(

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "./prisma"
 import { getSubscriptionStatus } from "@/lib/subscription"
 import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
+import { apiRequestErrorResponse } from "@/lib/api-contract"
 
 const JWT_SECRET = env.JWT_SECRET
 
@@ -89,6 +90,8 @@ export async function authenticateRequest(
 }
 
 export function authErrorResponse(error: unknown): NextResponse | null {
+  const contractResponse = apiRequestErrorResponse(undefined, error)
+  if (contractResponse) return contractResponse
   if (!(error instanceof Error)) return null
 
   if (error.message === "UNAUTHORIZED") {
@@ -135,7 +138,7 @@ export function withUserAuth(
 ) {
   return async (
     request: NextRequest,
-    segmentData: { params: Promise<Record<string, string>> }
+    segmentData?: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
     const session = readSessionToken(request, "user")
     if (!session) {
@@ -182,6 +185,12 @@ export function withUserAuth(
     }
 
     const params = segmentData ? await segmentData.params : undefined
-    return handler(request, { user, params })
+    try {
+      return await handler(request, { user, params })
+    } catch (error) {
+      const contractResponse = apiRequestErrorResponse(request, error)
+      if (contractResponse) return contractResponse
+      throw error
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import {
@@ -27,7 +28,7 @@ export const GET = withUserAuth(async (request, { user }) => {
 })
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const { virtualmanId, speakerId, text } = await request.json()
+  const { virtualmanId, speakerId, text } = await parseJsonRecord(request)
 
   if (!virtualmanId || !speakerId || typeof text !== "string") {
     return NextResponse.json(

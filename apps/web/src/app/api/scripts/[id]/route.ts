@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
@@ -11,7 +12,7 @@ export const PATCH = withUserAuth(async (request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const content =
     typeof body.content === "string" ? body.content.trim() : undefined
   const status = typeof body.status === "string" ? body.status : undefined

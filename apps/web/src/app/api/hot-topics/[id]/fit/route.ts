@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -14,7 +15,7 @@ export const POST = withUserAuth(async (request, { params }) => {
     return NextResponse.json({ error: "Missing topic id" }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const templateId = typeof body.templateId === "string" ? body.templateId : ""
   const structureId = typeof body.structureId === "string" ? body.structureId : ""
   const inputs =

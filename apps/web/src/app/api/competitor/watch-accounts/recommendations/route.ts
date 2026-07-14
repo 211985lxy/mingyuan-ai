@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -6,6 +7,7 @@ import {
   recommendWatchVideos,
   type WatchVideoRecommendationCategory,
 } from "@/lib/competitor-watch-recommendations"
+import { watchRecommendationsBodySchema } from "@/features/competitor/contracts/api"
 
 export const runtime = "nodejs"
 
@@ -26,7 +28,7 @@ function compactText(value: unknown, limit = 1200): string {
 }
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json().catch(() => ({} as Record<string, unknown>))
+  const body = await parseJsonBody(request, watchRecommendationsBodySchema, { maxBytes: 8 * 1024 })
   const projectId = typeof body.projectId === "string" ? body.projectId : null
   const intent = typeof body.intent === "string" ? body.intent.trim() : ""
 

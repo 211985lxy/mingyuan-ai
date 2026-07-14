@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -52,7 +53,7 @@ export const GET = withAdminAuth(async (request) => {
 
 // POST — 管理员手动录入知识条目
 export const POST = withAdminAuth(async (request, { admin }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { category, title, content, tags, sourceType, valueGrade } = body
   const projectId = typeof body.projectId === "string" && body.projectId.trim()
     ? body.projectId.trim()
@@ -105,7 +106,7 @@ export const POST = withAdminAuth(async (request, { admin }) => {
 
 // PUT — 管理员强制批量更新（批量变更状态或分类）
 export const PUT = withAdminAuth(async (request) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { ids, action, value } = body
 
   if (!Array.isArray(ids) || ids.length === 0) {

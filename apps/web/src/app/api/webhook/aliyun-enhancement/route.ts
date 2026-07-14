@@ -1,3 +1,4 @@
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
@@ -49,10 +50,10 @@ export async function POST(request: NextRequest) {
 
   let payload: WebhookPayload;
   try {
-    payload = (await request.json()) as WebhookPayload;
-  } catch {
+    payload = (await parseJsonRecord(request)) as WebhookPayload;
+  } catch (error) {
     console.warn("[webhook:aliyun-enhancement] Payload parse failed");
-    return NextResponse.json({ ok: true });
+    return apiRequestErrorResponse(request, error)!;
   }
 
   const { jobId, status } = payload;

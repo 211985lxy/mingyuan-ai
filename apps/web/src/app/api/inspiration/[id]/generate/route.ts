@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -13,7 +14,7 @@ export async function POST(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle.trim() : undefined
 

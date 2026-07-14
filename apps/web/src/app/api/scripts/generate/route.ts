@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
@@ -48,7 +49,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const requestId = `script-gen-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   console.log(`[${requestId}] Script generation initiated by user ${user.id}`)
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const templateId = typeof body.templateId === "string" ? body.templateId : ""
   const structureId = typeof body.structureId === "string" ? body.structureId : ""
   const hotTopicId = typeof body.hotTopicId === "string" ? body.hotTopicId : null

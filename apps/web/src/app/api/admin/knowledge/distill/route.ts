@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -5,7 +6,7 @@ import { LLMClient } from "@/lib/llm/client"
 
 // 知识库蒸馏：用 DeepSeek 对指定知识条目做精炼/合并/分类建议
 export const POST = withAdminAuth(async (request) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { ids } = body as { ids?: string[] }
 
   if (!ids || ids.length === 0) {

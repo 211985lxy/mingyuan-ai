@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import {
   createVideoCopyExtraction,
@@ -23,7 +24,7 @@ export const POST = withUserAuth(async (request, { user }) => {
 
   let body: { url?: unknown }
   try {
-    body = await request.json()
+    body = await parseJsonRecord(request)
   } catch {
     return NextResponse.json({ error: "请求格式不正确" }, { status: 400 })
   }

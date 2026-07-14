@@ -1,16 +1,32 @@
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { renderTemplate, validateVariables } from "@/lib/template-engine"
 import type { TemplateVariable } from "@/types/content-template"
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return Boolean(
+    value
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.values(value).every((item) => typeof item === "string"),
+  )
+}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const { variables } = await request.json()
+  let variables: unknown
+  try {
+    const body = await parseJsonRecord(request)
+    variables = body.variables
+  } catch (error) {
+    return apiRequestErrorResponse(request, error)!
+  }
 
-  if (!variables || typeof variables !== "object") {
+  if (!isStringRecord(variables)) {
     return NextResponse.json(
       { error: "variables object is required" },
       { status: 400 }

@@ -1,15 +1,9 @@
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
-
-interface ObsidianSyncEntry {
-  id: string // 由 CLI 根据文件相对路径或者内容哈希生成的唯一 ID，如 obsidian_xxxx
-  title: string
-  content: string
-  category: "boss_experience" | "product_usp" | "customer_pain" | "project_case" | "customer_qa"
-  tags: string[]
-}
+import { obsidianSyncBodySchema } from "@/features/knowledge/contracts/api"
 
 export async function POST(request: NextRequest) {
   const syncToken = env.OBSIDIAN_SYNC_TOKEN
@@ -28,15 +22,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
-    const { entries, projectId } = body as {
-      entries: ObsidianSyncEntry[]
-      projectId?: string
-    }
-
-    if (!Array.isArray(entries)) {
-      return NextResponse.json({ error: "Invalid payload: entries must be an array" }, { status: 400 })
-    }
+    const { entries, projectId } = await parseJsonBody(
+      request,
+      obsidianSyncBodySchema,
+      { maxBytes: 5 * 1024 * 1024 },
+    )
 
     const userExists = await prisma.user.findUnique({
       where: { id: targetUserId },
@@ -123,6 +113,8 @@ export async function POST(request: NextRequest) {
       syncedEntries: results,
     })
   } catch (error) {
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
     console.error("Obsidian sync error:", error)
     return NextResponse.json(
       { error: "Internal Server Error" },

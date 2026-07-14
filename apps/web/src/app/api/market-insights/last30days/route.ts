@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { runLast30DaysResearch } from "@/lib/market-insights/last30days"
@@ -18,7 +19,7 @@ export const POST = withUserAuth(async (request) => {
   try {
     let body: { topic?: unknown; sources?: unknown }
     try {
-      body = await request.json()
+      body = await parseJsonRecord(request)
     } catch {
       return NextResponse.json({ error: "请求格式不正确" }, { status: 400 })
     }

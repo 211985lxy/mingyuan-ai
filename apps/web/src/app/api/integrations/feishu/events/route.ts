@@ -1,3 +1,4 @@
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextResponse } from "next/server"
 
@@ -13,7 +14,12 @@ import { handleTopicChatMessage } from "@/lib/topic-chat-service"
 export const maxDuration = 60
 
 export async function POST(request: Request) {
-  const payload = await request.json()
+  let payload: Record<string, unknown>
+  try {
+    payload = await parseJsonRecord(request)
+  } catch (error) {
+    return apiRequestErrorResponse(request, error)!
+  }
   const verificationToken = env.FEISHU_VERIFICATION_TOKEN || ""
 
   if (!verifyFeishuEventToken(payload, verificationToken)) {

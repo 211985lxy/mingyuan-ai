@@ -1,8 +1,10 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { buildAuthUserPayload } from "@/lib/auth-user"
 import { getActivationStartDate } from "@/lib/subscription"
+import { activationBodySchema } from "@/features/auth/contracts"
 
 const DAILY_LIMIT = 2
 
@@ -13,7 +15,7 @@ function normalizeActivationCode(value: unknown): string {
 }
 
 export const POST = withUserAuth(async (request: NextRequest, { user }) => {
-  const body = await request.json().catch(() => ({}))
+  const body = await parseJsonBody(request, activationBodySchema, { maxBytes: 1024 })
   const code = normalizeActivationCode(body.code)
 
   if (!code) {

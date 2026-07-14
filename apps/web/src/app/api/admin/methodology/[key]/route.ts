@@ -1,4 +1,6 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
 import { withAdminAuth } from "@/lib/admin-auth"
 import {
   METHODOLOGY_META,
@@ -32,7 +34,11 @@ export const POST = withAdminAuth(async (request: NextRequest, { params }) => {
     return NextResponse.json({ error: "key 非法" }, { status: 400 })
   }
 
-  const body = await request.json().catch(() => ({}))
+  const body = await parseJsonBody(
+    request,
+    z.object({ action: z.literal("reset") }).strict(),
+    { maxBytes: 1024 },
+  )
   if (body?.action !== "reset") {
     return NextResponse.json({ error: "仅支持 action=reset" }, { status: 400 })
   }

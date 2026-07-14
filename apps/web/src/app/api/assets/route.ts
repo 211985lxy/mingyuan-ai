@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withUserAuth } from "@/lib/user-auth";
@@ -9,7 +10,7 @@ const VALID_ASSET_TYPES = ["image", "video", "music"];
 // ─── POST /api/assets ──────────────────────────────────
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const { name, assetType, url, size } = await request.json();
+  const { name, assetType, url, size } = await parseJsonRecord(request);
 
   if (!name || !assetType || !url) {
     return NextResponse.json(

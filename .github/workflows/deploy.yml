@@ -64,6 +64,8 @@ jobs:
         run: pnpm --dir apps/web run typecheck:tests
       - name: Environment contract
         run: pnpm --dir apps/web run env:check
+      - name: API contract inventory
+        run: pnpm --dir apps/web run api:contracts
       - name: Lint
         run: pnpm --dir apps/web exec eslint --quiet .
       - name: Unit and evaluation tests
@@ -72,6 +74,8 @@ jobs:
         run: pnpm --dir apps/web run test:e2e
       - name: Architecture size guard
         run: pnpm --dir apps/web run arch:size
+      - name: Architecture dependency guard
+        run: pnpm --dir apps/web run arch:check
       - name: Deterministic harness
         run: pnpm --dir apps/web run test:harness
 

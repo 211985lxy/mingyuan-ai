@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -5,6 +6,7 @@ import { collectDouyinCompetitorData } from "@/lib/competitor-analysis/collector
 import { logger } from "@/lib/logger"
 import { enforceWatchRefreshBetaLimit } from "@/lib/internal-beta-limits"
 import { calculateViralVideos } from "@/lib/competitor-watch-viral"
+import { watchAccountRefreshBodySchema } from "@/features/competitor/contracts/api"
 
 type RefreshLog = Pick<typeof logger, "info" | "error">
 
@@ -33,7 +35,7 @@ async function refreshAccount(
     const viralPicks = calculateViralVideos(sortedVideos)
 
     await prisma.watchAccount.update({
-      where: { id: account.id },
+      where: { id: account.id, userId: account.userId },
       data: {
         platformUserId: collected.platformUserId,
         nickname: collected.account.nickname,
@@ -51,7 +53,7 @@ async function refreshAccount(
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     await prisma.watchAccount.update({
-      where: { id: account.id },
+      where: { id: account.id, userId: account.userId },
       data: { refreshStatus: "failed", refreshError: errorMessage },
     })
     log.error({ accountId: account.id, err }, "Account refresh failed")
@@ -69,12 +71,7 @@ async function refreshAccountsInBackground(
 }
 
 export const POST = withUserAuth(async (request, { user }) => {
-  let body: { accountId?: string }
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = await parseJsonBody(request, watchAccountRefreshBodySchema, { maxBytes: 1024 })
 
   const where = { userId: user.id }
   if (body.accountId) {
@@ -97,7 +94,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   log.info(`Starting refresh for ${accounts.length} watch accounts`)
 
   await prisma.watchAccount.updateMany({
-    where: { id: { in: accounts.map((account) => account.id) } },
+    where: { userId: user.id, id: { in: accounts.map((account) => account.id) } },
     data: { refreshStatus: "refreshing", refreshError: null },
   })
 

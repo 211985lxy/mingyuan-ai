@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
@@ -29,7 +30,7 @@ const PROVIDER_CONFIGS: Record<
 }
 
 export const POST = withAdminAuth(async (request: NextRequest) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { messages, model, temperature, max_tokens, stream } = body
   const providerName: ProviderName = body.provider === "openrouter" ? "openrouter" : "jiekou"
   const providerConfig = PROVIDER_CONFIGS[providerName]

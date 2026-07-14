@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { parseQuery } from "@/lib/api-contract"
+import { aimHistoryQuerySchema } from "@/features/aim/contracts/api"
 
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const url = new URL(request.url)
-    const page = Math.max(1, parseInt(url.searchParams.get("page") || "1", 10))
-    const pageSize = Math.min(
-      50,
-      Math.max(1, parseInt(url.searchParams.get("pageSize") || "20", 10))
+    const { page = 1, pageSize = 20, projectId, agentId } = parseQuery(
+      request,
+      aimHistoryQuerySchema,
     )
-    const projectId = url.searchParams.get("projectId")
-    const agentId = url.searchParams.get("agentId")
 
     // content_producer 查询时同时包含旧 ip_video 记录
     const resolvedAgentFilter = agentId === "content_producer"

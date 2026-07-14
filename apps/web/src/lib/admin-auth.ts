@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "./prisma"
 import type { AdminRole } from "@/types/content-template"
 import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
+import { apiRequestErrorResponse } from "@/lib/api-contract"
 
 const ADMIN_JWT_SECRET = env.ADMIN_JWT_SECRET
 
@@ -61,7 +62,7 @@ export function withAdminAuth(
 ) {
   return async (
     request: NextRequest,
-    segmentData: { params: Promise<Record<string, string>> }
+    segmentData?: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
     const session = readSessionToken(request, "admin")
     if (!session) {
@@ -97,7 +98,13 @@ export function withAdminAuth(
     }
 
     const params = segmentData ? await segmentData.params : undefined
-    return handler(request, { admin, params })
+    try {
+      return await handler(request, { admin, params })
+    } catch (error) {
+      const contractResponse = apiRequestErrorResponse(request, error)
+      if (contractResponse) return contractResponse
+      throw error
+    }
   }
 }
 

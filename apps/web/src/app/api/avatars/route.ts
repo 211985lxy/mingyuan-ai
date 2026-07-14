@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { getBrandingConfig } from "@/lib/branding"
 import { prisma } from "@/lib/prisma"
@@ -21,7 +22,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   console.log(`[${requestId}] Avatar creation initiated by user ${user.id}`)
 
   const { name, cloneType, videoUrl, imageUrl } =
-    await request.json()
+    await parseJsonRecord(request)
 
   console.log(`[${requestId}] Request params: name=${name}, cloneType=${cloneType}, videoUrl=${!!videoUrl}, imageUrl=${!!imageUrl}`)
 

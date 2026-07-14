@@ -1,3 +1,4 @@
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 
 import {
@@ -9,6 +10,7 @@ import {
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { prisma } from "@/lib/prisma"
 import { enforceKnowledgeBetaLimit } from "@/lib/internal-beta-limits"
+import { agentWechatConfirmBodySchema } from "@/features/aim/contracts/agent-api"
 
 const ALLOWED_CATEGORIES = new Set([
   "boss_experience",
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
-    const body = await request.json()
+    const body = await parseJsonBody(request, agentWechatConfirmBodySchema, { maxBytes: 3 * 1024 * 1024 })
 
     projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     entries = Array.isArray(body.entries) ? body.entries : []
@@ -176,6 +178,8 @@ export async function POST(request: NextRequest) {
     console.error("[agent/knowledge/wechat-chat/confirm] Error:", error)
     const authResponse = agentAuthErrorResponse(error)
     if (authResponse) return authResponse
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "导入确认失败" },

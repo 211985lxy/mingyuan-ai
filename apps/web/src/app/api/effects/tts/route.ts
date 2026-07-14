@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
@@ -8,7 +9,7 @@ import { synthesizeVolcengineSpeech } from "@/lib/volcengine-tts"
 
 export const POST = withUserAuth(async (request) => {
   const { text, speakerId, language, speedRatio, volume, codec } =
-    await request.json()
+    await parseJsonRecord(request)
 
   if (!text) {
     return NextResponse.json(

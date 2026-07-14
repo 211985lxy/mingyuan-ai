@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { runQualityCheck, runQualityGateWithRewrite } from "@/lib/quality-gate"
 import { withUserAuth } from "@/lib/user-auth"
@@ -9,7 +10,7 @@ import { runDouyinPublishCheck } from "@/lib/douyin-publish-check"
  */
 export const POST = withUserAuth(async (request: NextRequest) => {
   try {
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
     const {
       content,
       topicTitle,

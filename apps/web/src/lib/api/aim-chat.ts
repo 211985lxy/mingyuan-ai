@@ -5,6 +5,7 @@ import { useAuthStore } from "@/lib/store"
 import type { KnowledgeEntry } from "./knowledge"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
+import type { AimChatBody } from "@/features/aim/contracts/api"
 import type {
   ApiAsset, ApiAvatar, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiPublicAssetVoice, ApiPublicVirtualman,
@@ -59,24 +60,9 @@ export async function uploadKnowledgeDocument(
   return response.json().catch(() => ({ created: 0, entries: [] }))
 }
 
-export interface AimChatMessage {
-  role: "user" | "assistant"
-  content: AimChatContent
-}
-
-export type AimChatContent =
-  | string
-  | Array<
-      | { type: "text"; text: string }
-      | { type: "image_url"; image_url: { url: string } }
-    >
-
-export interface AimEditorContext {
-  action: string
-  referenceSelection?: string
-  draftSelection?: string
-  draftText?: string
-}
+export type AimChatMessage = AimChatBody["messages"][number]
+export type AimChatContent = AimChatMessage["content"]
+export type AimEditorContext = NonNullable<AimChatBody["editorContext"]>
 
 export type AimChatToolAction =
   | "import_lark_topics"

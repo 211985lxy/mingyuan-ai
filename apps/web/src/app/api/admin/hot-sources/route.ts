@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { BUILT_IN_ACCOUNT_SOURCE_BINDINGS } from "@/lib/account-industry-sources"
@@ -50,7 +51,7 @@ export const GET = withAdminAuth(async () => {
 }, "admin")
 
 export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
   const sourceName = typeof body.sourceName === "string" ? body.sourceName.trim() : ""
   const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : ""

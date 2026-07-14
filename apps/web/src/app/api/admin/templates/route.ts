@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -5,7 +6,7 @@ import { Prisma } from "@/generated/prisma/client"
 
 // POST — Create template
 export const POST = withAdminAuth(async (request, { admin }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const {
     name, displayName, description, scriptTemplate, variables,
     expressionBlueprint,

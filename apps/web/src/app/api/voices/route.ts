@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server";
 import { signOssUrls } from "@/lib/oss";
 import { prisma } from "@/lib/prisma";
@@ -14,7 +15,7 @@ const VALID_MODELS = ["v1", "v2", "v3", "s1", "s3"];
 // ─── POST /api/voices ──────────────────────────────────
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const { name, audioUrl, model, language } = await request.json();
+  const { name, audioUrl, model, language } = await parseJsonRecord(request);
 
   if (!name || !audioUrl || !model) {
     return NextResponse.json(

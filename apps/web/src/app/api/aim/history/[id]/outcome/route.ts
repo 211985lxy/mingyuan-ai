@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -51,7 +52,7 @@ export async function PUT(
 
     let body: Record<string, unknown>
     try {
-      body = await request.json()
+      body = await parseJsonRecord(request)
     } catch {
       return NextResponse.json({ error: "invalid json" }, { status: 400 })
     }

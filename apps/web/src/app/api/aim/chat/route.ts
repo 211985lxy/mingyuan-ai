@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { handleLarkToolAction } from "@/lib/aim-tool-actions"
@@ -33,6 +34,7 @@ import { executeAimChatDomain, streamAimChatDomain } from "@/lib/aim-harness/dom
 import { sha256 } from "@/lib/aim-harness/hashing"
 import type { AimContextSource } from "@/lib/aim-harness/types"
 import { ownsActiveProject } from "@/lib/resource-ownership"
+import { aimChatBodySchema } from "@/features/aim/contracts/api"
 
 /** 把 chat 请求里的 messages 规范化为记忆提炼所需格式（只保留 user/assistant 的文本内容）。 */
 function normalizeMemoryMessages(messages: unknown): AimMemoryMessage[] {
@@ -123,7 +125,7 @@ export async function POST(request: NextRequest) {
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_chat")
     if (quotaResponse) return quotaResponse
 
-    const body = await request.json()
+    const body = await parseJsonBody(request, aimChatBodySchema, { maxBytes: 2_500_000 })
     const messages = body.messages
     const agentId = typeof body.agentId === "string" ? body.agentId : ""
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""

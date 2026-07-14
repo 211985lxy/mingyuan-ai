@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -17,7 +18,7 @@ function generateCode(): string {
 }
 
 export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
-  const { quantity, batchNote, durationDays } = await request.json()
+  const { quantity, batchNote, durationDays } = await parseJsonRecord(request)
 
   const qty = parseInt(quantity)
   if (!qty || qty < 1 || qty > 500) {

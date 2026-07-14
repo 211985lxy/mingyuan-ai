@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -11,7 +12,7 @@ import { type SafeRole } from "@/lib/packaging-material-suggestions/contracts"
 import { collectMaterialSuggestions } from "@/lib/packaging-material-suggestions/suggestion-collector"
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json();
+  const body = await parseJsonRecord(request);
   const scriptId =
     typeof body.scriptId === "string" ? body.scriptId.trim() : "";
   const scriptContentDraft =

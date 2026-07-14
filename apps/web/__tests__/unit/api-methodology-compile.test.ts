@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { NextRequest } from "next/server"
 
 // ── Mock LLMClient ────────────────────────────────────────────────────────────
 
 const mockComplete = vi.fn()
+
+vi.mock("@/lib/user-auth", () => ({
+  withUserAuth:
+    (handler: (request: Request, context: { user: { id: string; email: string } }) => Promise<Response>) =>
+    (request: Request) => handler(request, {
+      user: { id: "user-1", email: "user@example.com" },
+    }),
+}))
 
 vi.mock("@/lib/llm/client", () => ({
   LLMClient: {
@@ -17,8 +26,8 @@ const { POST } = await import(
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function makeRequest(body: Record<string, unknown>): Request {
-  return new Request("http://localhost/api/competitor-analysis/methodology/compile", {
+function makeRequest(body: Record<string, unknown>): NextRequest {
+  return new NextRequest("http://localhost/api/competitor-analysis/methodology/compile", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

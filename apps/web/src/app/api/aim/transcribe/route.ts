@@ -51,11 +51,24 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData()
       const file = formData.get("file") as File | null
       if (file) {
+        if (file.size > INTERNAL_BETA_LIMITS.uploadBytes) {
+          return NextResponse.json(
+            { error: "音频文件过大", code: "INTERNAL_BETA_UPLOAD_TOO_LARGE" },
+            { status: 413 },
+          )
+        }
         const arrayBuffer = await file.arrayBuffer()
         audioBuffer = Buffer.from(arrayBuffer)
       }
     } else {
       // 默认按 application/octet-stream 或者是 binary 直接流处理
+      const contentLength = Number(request.headers.get("content-length") || 0)
+      if (Number.isFinite(contentLength) && contentLength > INTERNAL_BETA_LIMITS.uploadBytes) {
+        return NextResponse.json(
+          { error: "音频文件过大", code: "INTERNAL_BETA_UPLOAD_TOO_LARGE" },
+          { status: 413 },
+        )
+      }
       const arrayBuffer = await request.arrayBuffer()
       audioBuffer = Buffer.from(arrayBuffer)
     }

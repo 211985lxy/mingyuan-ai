@@ -1,3 +1,4 @@
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 
 import {
@@ -17,6 +18,7 @@ import { prisma } from "@/lib/prisma"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
+import { agentAimGenerateBodySchema } from "@/features/aim/contracts/agent-api"
 
 async function writeAgentLog(params: {
   context: AgentApiContext
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
-    const body = await request.json()
+    const body = await parseJsonBody(request, agentAimGenerateBodySchema, { maxBytes: 256 * 1024 })
 
     const rawInput = typeof body.rawInput === "string" ? body.rawInput.trim() : ""
     projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
@@ -172,6 +174,8 @@ export async function POST(request: NextRequest) {
     console.error("[agent/aim/generate] Error:", error)
     const authResponse = agentAuthErrorResponse(error)
     if (authResponse) return authResponse
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "生成失败" },

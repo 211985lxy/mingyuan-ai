@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
@@ -29,7 +30,7 @@ export async function PATCH(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
 
     const existing = await prisma.aimGeneration.findFirst({
       where: { id, userId: user.id },

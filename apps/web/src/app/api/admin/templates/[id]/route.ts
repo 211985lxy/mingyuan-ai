@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -17,7 +18,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
 
 // PUT — Edit template
 export const PUT = withAdminAuth(async (request, { params }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const template = await prisma.contentTemplate.findUnique({
     where: { id: params?.id },
   })

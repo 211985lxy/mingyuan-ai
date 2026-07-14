@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server";
 import { generateVideoThumbnailUrl, isManagedOssUrl, signOssUrls } from "@/lib/oss";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,7 @@ import { type CreateVideoTaskInput, VideoTaskRequestError } from "@/lib/video-ta
 import { withUserAuth } from "@/lib/user-auth";
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json() as CreateVideoTaskInput;
+  const body = await parseJsonRecord(request) as CreateVideoTaskInput;
   const limitResponse = await enforceDailyBetaLimit(user.id, "video_task");
   if (limitResponse) return limitResponse;
 

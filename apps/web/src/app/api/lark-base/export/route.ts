@@ -1,14 +1,15 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
-import { exportLarkBaseResult } from "@/lib/lark-base-tool"
+import { exportLarkBaseResult, type LarkResultType } from "@/lib/lark-base-tool"
 
 const RESULT_TYPES = new Set(["topic", "script", "positioning", "moments_copy"])
 
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
 
     if (typeof body.projectId !== "string" || !body.projectId.trim()) {
       return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     const result = await exportLarkBaseResult({
       userId: user.id,
       projectId: body.projectId.trim(),
-      resultType: body.resultType,
+      resultType: body.resultType as LarkResultType,
       resultId: body.resultId.trim(),
       db: prisma,
     })

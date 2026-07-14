@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
@@ -16,7 +17,7 @@ import {
 // ─── POST /api/production-plans ───────────────────────
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const {
     scriptId,
     contentTemplateId,

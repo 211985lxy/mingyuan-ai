@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
@@ -6,7 +7,7 @@ import { buildAuthUserPayload } from "@/lib/auth-user"
 const DAILY_LIMIT = 2
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const { authVideoUrl } = await request.json()
+  const { authVideoUrl } = await parseJsonRecord(request)
 
   if (!authVideoUrl || typeof authVideoUrl !== "string") {
     return NextResponse.json(
