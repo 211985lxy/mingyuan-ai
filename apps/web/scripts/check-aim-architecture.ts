@@ -8,7 +8,8 @@
  * 规则（与计划阶段 1 一致）：
  *   R1  四个执行入口（aim/generate、aim/chat、agent/v1/aim/generate、
  *       inspiration/[id]/generate）不得直接 import handler / llm /
- *       上下文加载器 —— 必须经 executeAimRun / streamAimRun（阶段 2 迁移后）。
+ *       上下文加载器 —— 必须直接或经受控领域服务调用 executeAimRun /
+ *       streamAimRun（阶段 2 迁移后）。
  *       阶段 1：这四入口当前仍调旧 adapter（runAimGenerate 等），故本规则暂以
  *       "白名单 + 失败清单"形式记录现状，迁移完成后收紧为硬失败。
  *   R2  Agent 模块（aim-agent-handlers.ts）不得 import harness-runner / prisma /
@@ -94,6 +95,26 @@ const R1_FORBIDDEN = [
   /from\s+["']@\/lib\/llm\/agent-router["']/,
 ]
 
+const R1_DELEGATES: Record<string, { symbol: string; module: string; file: string }> = {
+  "src/app/api/aim/generate/route.ts": {
+    symbol: "executePreparedAimGeneration",
+    module: "@/features/aim/services/generate-content",
+    file: "src/features/aim/services/generate-content.ts",
+  },
+}
+
+function usesHarnessRuntime(entrypoint: string, text: string): boolean {
+  if (/\b(executeAimRun|streamAimRun)\b/.test(text)) return true
+
+  const delegate = R1_DELEGATES[entrypoint]
+  if (!delegate) return false
+  const imported = text.includes(delegate.symbol) && text.includes(`from "${delegate.module}"`)
+  if (!imported) return false
+
+  const service = read(join(WEB_ROOT, delegate.file))
+  return /\b(executeAimRun|streamAimRun)\b/.test(service)
+}
+
 function checkR1() {
   for (const ep of EXEC_ENTRYPOINTS) {
     const full = join(WEB_ROOT, ep)
@@ -104,12 +125,12 @@ function checkR1() {
       findings.push({ rule: "R1", severity: "error", file: ep, detail: "执行入口文件缺失" })
       continue
     }
-    if (!/\b(executeAimRun|streamAimRun)\b/.test(text)) {
+    if (!usesHarnessRuntime(ep, text)) {
       findings.push({
         rule: "R1",
         severity: "error",
         file: ep,
-        detail: "正式 AIM 入口必须调用 executeAimRun 或 streamAimRun",
+        detail: "正式 AIM 入口必须直接或经受控领域服务调用 executeAimRun / streamAimRun",
       })
     }
     for (const re of R1_FORBIDDEN) {

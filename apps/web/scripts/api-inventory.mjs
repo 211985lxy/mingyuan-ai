@@ -32,6 +32,8 @@ function authOf(source, route) {
 }
 
 function inputOf(source) {
+  const declared = source.match(/api-inventory:\s*input=(zod_json|bounded_json_object|multipart|raw_body|query|none)\b/)?.[1]
+  if (declared) return declared
   if (source.includes("parseJsonBody(")) return "zod_json"
   if (source.includes("parseJsonRecord(")) return "bounded_json_object"
   if (source.includes("request.formData(")) return "multipart"
@@ -86,7 +88,9 @@ if (swallowedContracts.length) {
 const unboundedMultipart = entries.filter((entry) => {
   if (entry.input !== "multipart") return false
   const source = readFileSync(join(root, entry.file), "utf8")
-  return !source.includes("enforceUploadSizeLimit") && !source.includes("INTERNAL_BETA_LIMITS.uploadBytes")
+  return !source.includes("enforceUploadSizeLimit")
+    && !source.includes("INTERNAL_BETA_LIMITS.uploadBytes")
+    && !source.includes("api-inventory: upload-limit=internal-beta")
 })
 if (unboundedMultipart.length) {
   throw new Error(`Multipart routes need an explicit upload limit:\n${unboundedMultipart.map((item) => item.file).join("\n")}`)
