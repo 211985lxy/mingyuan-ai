@@ -29,6 +29,7 @@ export async function handleTopicChatMessage(input: {
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
       select: { code: true, name: true, typeLabel: true, description: true },
+      take: 200,
     }),
     prisma.ipProfile.findUnique({
       where: { userId: input.userId },

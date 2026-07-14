@@ -73,6 +73,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const accounts = await prisma.watchAccount.findMany({
     where: where as { userId: string; id?: string },
     orderBy: { createdAt: "desc" },
+    take: 50,
   })
 
   if (accounts.length === 0) {

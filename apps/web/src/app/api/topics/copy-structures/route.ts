@@ -6,6 +6,7 @@ export const GET = withUserAuth(async () => {
   const structures = await prisma.copyStructure.findMany({
     where: { status: "published" },
     orderBy: { sortOrder: "asc" },
+    take: 200,
     select: {
       id: true,
       code: true,

@@ -17,6 +17,7 @@ export const GET = withUserAuth(async () => {
       name: { in: CANONICAL_STRUCTURE_NAMES },
     },
     orderBy: { sortOrder: "asc" },
+    take: CANONICAL_STRUCTURE_NAMES.length,
   })
 
   return NextResponse.json({ data: structures })

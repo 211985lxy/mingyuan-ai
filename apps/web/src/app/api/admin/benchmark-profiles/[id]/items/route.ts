@@ -25,6 +25,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
   const items = await prisma.benchmarkProfileItem.findMany({
     where: { profileId: id },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    take: 500,
   })
 
   return NextResponse.json({ data: items })

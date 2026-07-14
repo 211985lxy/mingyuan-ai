@@ -23,6 +23,7 @@ model KnowledgeEntry {
 
   @@index([userId, category])
   @@index([userId, status])
+  @@index([userId, status, projectId, sortOrder, createdAt(sort: Desc)])
   @@index([userId, valueGrade])
   @@index([projectId])
 }

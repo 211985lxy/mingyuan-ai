@@ -35,6 +35,7 @@ export async function buildAimContextManifest(input: {
         ...(input.projectId ? { projectId: input.projectId } : {}),
       },
       select: { id: true, content: true, updatedAt: true },
+      take: 100,
     })
     for (const row of rows) {
       sources.push({

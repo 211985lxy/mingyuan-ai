@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 export const GET = withAdminAuth(async () => {
   const settings = await prisma.systemSetting.findMany({
     orderBy: [{ category: "asc" }, { key: "asc" }],
+    take: 1_000,
   })
 
   // Group by category

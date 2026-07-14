@@ -386,6 +386,7 @@ export async function retrieveEntityContext(input: {
     const entries = await prisma.knowledgeEntry.findMany({
       where: { id: { in: entryIds }, status: "active" },
       select: { id: true, title: true, content: true, category: true, tags: true, valueGrade: true },
+      take: 100,
     })
     return entries.map((e) => ({
       id: e.id,

@@ -23,6 +23,7 @@ export async function GET(
     const outcomes = await prisma.contentOutcome.findMany({
       where: { generationId: id, userId: user.id },
       orderBy: { collectWindowDay: "asc" },
+      take: 100,
     })
     return NextResponse.json({
       outcomes,

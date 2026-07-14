@@ -193,6 +193,7 @@ model TopicSelection {
   ipProfile IpProfile @relation(fields: [ipProfileId], references: [id])
 
   @@index([userId, status])
+  @@index([userId, createdAt(sort: Desc)])
   @@index([ipProfileId])
   @@index([userId, recommendationMode, recommendedDate])
 }

@@ -43,8 +43,8 @@ export const POST = withUserAuth(async (request, { user }) => {
 export const GET = withUserAuth(async (request, { user }) => {
   const { searchParams } = new URL(request.url);
   const assetType = searchParams.get("assetType");
-  const page = parseInt(searchParams.get("page") ?? "1", 10);
-  const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10);
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20));
 
   const where: { userId: string; assetType?: string } = { userId: user.id };
   if (assetType) where.assetType = assetType;

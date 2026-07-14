@@ -47,8 +47,8 @@ export const GET = withAdminAuth(async (request) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const contentType = searchParams.get("contentType")
-  const page = parseInt(searchParams.get("page") ?? "1", 10)
-  const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10)
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20))
 
   const where: Record<string, unknown> = {}
   if (status) where.status = status

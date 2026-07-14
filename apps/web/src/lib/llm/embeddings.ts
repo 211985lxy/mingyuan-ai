@@ -348,23 +348,35 @@ export async function syncProjectEmbeddings(input: {
   if (input.projectId) where.projectId = input.projectId
   if (input.entryIds) where.id = { in: input.entryIds }
 
-  const entries = await prisma.knowledgeEntry.findMany({
-    where,
-    select: { id: true },
-  })
-
+  let attempted = 0
   let succeeded = 0
   let failed = 0
+  let cursor: string | undefined
 
-  for (const entry of entries) {
-    try {
-      await ensureKnowledgeEmbedding(entry.id)
-      succeeded++
-    } catch (error) {
-      console.warn(`[embedding] sync failed for entry ${entry.id}:`, error)
-      failed++
+  while (true) {
+    const entries = await prisma.knowledgeEntry.findMany({
+      where,
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: 200,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    })
+    if (entries.length === 0) break
+
+    for (const entry of entries) {
+      attempted++
+      try {
+        await ensureKnowledgeEmbedding(entry.id)
+        succeeded++
+      } catch (error) {
+        console.warn(`[embedding] sync failed for entry ${entry.id}:`, error)
+        failed++
+      }
     }
+
+    cursor = entries.at(-1)?.id
+    if (entries.length < 200) break
   }
 
-  return { attempted: entries.length, succeeded, failed }
+  return { attempted, succeeded, failed }
 }

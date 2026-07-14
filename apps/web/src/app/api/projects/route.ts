@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         ...(status === "all" ? {} : { status }),
       },
       orderBy: { updatedAt: "desc" },
+      take: 100,
       include: {
         _count: {
           select: { aimGenerations: true },

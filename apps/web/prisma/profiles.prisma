@@ -84,4 +84,5 @@ model ClientProject {
 
   @@index([userId, status])
   @@index([userId, createdAt])
+  @@index([userId, status, updatedAt(sort: Desc)])
 }

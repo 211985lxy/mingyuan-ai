@@ -215,6 +215,7 @@ export async function getLatestHotList(): Promise<HotTopic[]> {
   const items = await prisma.douyinHotItem.findMany({
     where: { batchId: latestSnapshot.batchId },
     orderBy: { position: "asc" },
+    take: 500,
   })
 
   return items.map((item) => ({

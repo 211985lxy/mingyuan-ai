@@ -25,6 +25,7 @@
     "api:contracts": "node scripts/api-inventory.mjs --check",
     "arch:size": "node scripts/check-source-file-size.mjs",
     "arch:retired": "node scripts/check-retired-capabilities.mjs",
+    "db:bounds": "node scripts/check-prisma-query-bounds.mjs",
     "arch:size:report": "node scripts/check-source-file-size.mjs --report",
     "schema:verify": "node scripts/verify-production-schema.mjs",
     "schema:migration-status": "prisma migrate status",

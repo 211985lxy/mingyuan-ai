@@ -12,6 +12,7 @@ export const GET = withUserAuth(async (_request, { user }) => {
   const accounts = await prisma.watchAccount.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
+    take: 50,
   })
   return NextResponse.json({ items: accounts })
 })

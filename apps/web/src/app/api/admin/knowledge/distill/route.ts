@@ -9,13 +9,14 @@ export const POST = withAdminAuth(async (request) => {
   const body = await parseJsonRecord(request)
   const { ids } = body as { ids?: string[] }
 
-  if (!ids || ids.length === 0) {
-    return NextResponse.json({ error: "ids 必填" }, { status: 400 })
+  if (!ids || ids.length === 0 || ids.length > 50) {
+    return NextResponse.json({ error: "ids 必填且最多 50 条" }, { status: 400 })
   }
 
   const entries = await prisma.knowledgeEntry.findMany({
     where: { id: { in: ids }, status: "active" },
     select: { id: true, title: true, content: true, category: true, tags: true },
+    take: 50,
   })
 
   if (entries.length === 0) {

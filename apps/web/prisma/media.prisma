@@ -16,5 +16,6 @@ model Asset {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, assetType])
+  @@index([userId, createdAt(sort: Desc)])
   @@index([status])
 }

@@ -14,6 +14,7 @@ export const GET = withAdminAuth(async () => {
   const settings = await prisma.systemSetting.findMany({
     where: { category: HOT_SOURCE_CATEGORY },
     orderBy: { updatedAt: "desc" },
+    take: 500,
   })
   const rows = settings.flatMap((setting) => {
     const binding = parseAccountSourceBinding(setting.value)

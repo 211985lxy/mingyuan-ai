@@ -115,6 +115,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     prisma.topicElement.findMany({
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
+      take: 200,
     }),
     // Fetch last 5 topic generations for history-aware derivation
     prisma.topicSelection.findMany({
