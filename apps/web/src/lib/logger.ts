@@ -1,5 +1,6 @@
 import { env } from "@/env"
 import pino from "pino"
+import { createHash, randomUUID } from "node:crypto"
 
 export const logger = pino({
   level: env.LOG_LEVEL || "info",
@@ -21,15 +22,19 @@ export const logger = pino({
  */
 export function createRequestLogger(context: {
   requestId: string
-  userId?: string
+  userIdHash?: string
   path?: string
 }) {
   return logger.child(context)
+}
+
+export function hashLogIdentifier(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16)
 }
 
 /**
  * Generate a short unique request ID for log correlation.
  */
 export function generateRequestId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
+  return randomUUID()
 }

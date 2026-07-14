@@ -6,6 +6,7 @@ import { prisma } from "./prisma"
 import type { AdminRole } from "@/types/content-template"
 import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
 import { apiRequestErrorResponse } from "@/lib/api-contract"
+import { createRequestLogger, generateRequestId, hashLogIdentifier } from "@/lib/logger"
 
 const ADMIN_JWT_SECRET = env.ADMIN_JWT_SECRET
 
@@ -64,6 +65,7 @@ export function withAdminAuth(
     request: NextRequest,
     segmentData?: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
+    const requestId = request.headers.get("x-request-id") || generateRequestId()
     const session = readSessionToken(request, "admin")
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -98,11 +100,19 @@ export function withAdminAuth(
     }
 
     const params = segmentData ? await segmentData.params : undefined
+    const log = createRequestLogger({
+      requestId,
+      userIdHash: hashLogIdentifier(admin.id),
+      path: request.nextUrl.pathname,
+    })
     try {
-      return await handler(request, { admin, params })
+      const response = await handler(request, { admin, params })
+      response.headers.set("x-request-id", requestId)
+      return response
     } catch (error) {
       const contractResponse = apiRequestErrorResponse(request, error)
       if (contractResponse) return contractResponse
+      log.error({ err: error }, "admin request failed")
       throw error
     }
   }

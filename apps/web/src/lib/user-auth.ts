@@ -6,6 +6,7 @@ import { prisma } from "./prisma"
 import { getSubscriptionStatus } from "@/lib/subscription"
 import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
 import { apiRequestErrorResponse } from "@/lib/api-contract"
+import { createRequestLogger, generateRequestId, hashLogIdentifier } from "@/lib/logger"
 
 const JWT_SECRET = env.JWT_SECRET
 
@@ -140,6 +141,7 @@ export function withUserAuth(
     request: NextRequest,
     segmentData?: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
+    const requestId = request.headers.get("x-request-id") || generateRequestId()
     const session = readSessionToken(request, "user")
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -185,11 +187,19 @@ export function withUserAuth(
     }
 
     const params = segmentData ? await segmentData.params : undefined
+    const log = createRequestLogger({
+      requestId,
+      userIdHash: hashLogIdentifier(user.id),
+      path: request.nextUrl.pathname,
+    })
     try {
-      return await handler(request, { user, params })
+      const response = await handler(request, { user, params })
+      response.headers.set("x-request-id", requestId)
+      return response
     } catch (error) {
       const contractResponse = apiRequestErrorResponse(request, error)
       if (contractResponse) return contractResponse
+      log.error({ err: error }, "authenticated request failed")
       throw error
     }
   }

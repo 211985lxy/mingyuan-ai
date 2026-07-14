@@ -179,6 +179,8 @@ export async function executeAimRun<TOutput = unknown>(
       : undefined
   const contextManifest = await buildAimContextManifest({
     spec,
+    userId: request.actorId,
+    projectId: request.projectId,
     citedKnowledgeIds,
     provided: partial?.contextManifest,
   })

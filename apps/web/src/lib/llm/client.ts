@@ -6,6 +6,7 @@ import {
   reportLlmInvocation,
   reportProviderAttempt,
 } from "./telemetry"
+import { env } from "@/env"
 
 let _instance: LLMClient | null = null
 
@@ -49,17 +50,23 @@ export class LLMClient {
       )
     }
 
-    reportLlmInvocation(options, false)
+    const maxAttempts = Math.max(1, Math.min(3, Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)))
+    const maxOutputTokens = Math.max(256, Math.min(16_384, Number(env.LLM_MAX_OUTPUT_TOKENS || 8192)))
+    const boundedOptions = {
+      ...options,
+      maxTokens: Math.min(options.maxTokens ?? maxOutputTokens, maxOutputTokens),
+    }
+    reportLlmInvocation(boundedOptions, false)
     let lastError: Error | undefined
 
-    for (let index = 0; index < this.providers.length; index += 1) {
+    for (let index = 0; index < Math.min(this.providers.length, maxAttempts); index += 1) {
       const provider = this.providers[index]
       const startedAt = Date.now()
       try {
-        const result = await provider.complete(options)
+        const result = await provider.complete(boundedOptions)
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model ?? provider.defaultModel,
+          model: boundedOptions.model ?? provider.defaultModel,
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
@@ -72,7 +79,7 @@ export class LLMClient {
         const classified = classifyProviderError(error)
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model ?? provider.defaultModel,
+          model: boundedOptions.model ?? provider.defaultModel,
           status: "failed",
           error: lastError.message,
           errorKind: classified.kind,
@@ -106,23 +113,29 @@ export class LLMClient {
       )
     }
 
-    reportLlmInvocation(options, true)
+    const maxAttempts = Math.max(1, Math.min(3, Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)))
+    const maxOutputTokens = Math.max(256, Math.min(16_384, Number(env.LLM_MAX_OUTPUT_TOKENS || 8192)))
+    const boundedOptions = {
+      ...options,
+      maxTokens: Math.min(options.maxTokens ?? maxOutputTokens, maxOutputTokens),
+    }
+    reportLlmInvocation(boundedOptions, true)
     let lastError: Error | undefined
 
-    for (let index = 0; index < this.providers.length; index += 1) {
+    for (let index = 0; index < Math.min(this.providers.length, maxAttempts); index += 1) {
       const provider = this.providers[index]
       if (!provider.stream) continue
 
       const startedAt = Date.now()
       let emitted = false
       try {
-        for await (const chunk of provider.stream(options)) {
+        for await (const chunk of provider.stream(boundedOptions)) {
           emitted = true
           yield chunk
         }
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model ?? provider.defaultModel,
+          model: boundedOptions.model ?? provider.defaultModel,
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
@@ -133,7 +146,7 @@ export class LLMClient {
         if (emitted) {
           reportProviderAttempt({
             provider: provider.name,
-            model: options.model ?? provider.defaultModel,
+            model: boundedOptions.model ?? provider.defaultModel,
             status: "failed",
             error: lastError.message,
             errorKind: classifyProviderError(error).kind,
@@ -145,7 +158,7 @@ export class LLMClient {
         const classified = classifyProviderError(error)
         reportProviderAttempt({
           provider: provider.name,
-          model: options.model ?? provider.defaultModel,
+          model: boundedOptions.model ?? provider.defaultModel,
           status: "failed",
           error: lastError.message,
           errorKind: classified.kind,

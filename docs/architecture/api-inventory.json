@@ -1204,7 +1204,7 @@
       "input": "zod_json",
       "query": "none",
       "externalService": true,
-      "cost": "medium",
+      "cost": "high",
       "idempotency": false
     },
     {
@@ -1543,8 +1543,8 @@
       "auth": "user_session",
       "input": "none",
       "query": "none",
-      "externalService": true,
-      "cost": "high",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -2229,8 +2229,8 @@
       "auth": "signed_integration",
       "input": "zod_json",
       "query": "none",
-      "externalService": true,
-      "cost": "medium",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {

@@ -3,6 +3,7 @@ import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { inspirationWebhookBodySchema } from "@/features/knowledge/contracts/api"
+import { processInspiration } from "@/features/topics/services/process-inspiration"
 
 /**
  * Webhook 入口：接收来自飞书/微信等外部服务的灵感推送
@@ -12,7 +13,7 @@ import { inspirationWebhookBodySchema } from "@/features/knowledge/contracts/api
  */
 
 export const runtime = "nodejs"
-export const maxDuration = 30
+export const maxDuration = 90
 
 export async function POST(request: NextRequest) {
   const webhookToken = env.INSPIRATION_WEBHOOK_TOKEN
@@ -52,25 +53,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 异步触发 AI 分析(带超时,防止 hang 住 fetch 连接)
-    fetch(`${env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/api/inspiration/${inspiration.id}/process`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(request.headers.get("authorization")
-          ? { Authorization: request.headers.get("authorization")! }
-          : {}),
-      },
-      signal: AbortSignal.timeout(10_000),
-    }).catch(() => {
-      // 异步触发失败不影响 webhook 响应
-      console.warn(`[webhook/inspiration] Failed to trigger AI process for ${inspiration.id}`)
-    })
+    const processed = await processInspiration(inspiration.id, userId)
 
     return NextResponse.json({
       ok: true,
       id: inspiration.id,
-      message: "灵感已保存，AI 分析中",
+      status: processed.status,
+      message: "灵感已保存并完成 AI 分析",
     })
   } catch (error) {
     const contractResponse = apiRequestErrorResponse(request, error)

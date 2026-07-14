@@ -211,6 +211,26 @@ describe("aim-harness fallback policy", () => {
     expect(classifyProviderError(new Error("unexpected invalid payload")).retryable).toBe(false)
   })
 
+  it("caps the provider fallback chain", async () => {
+    const calls: string[] = []
+    const failing = (name: string): LLMProvider => ({
+      name,
+      defaultModel: `${name}-model`,
+      isAvailable: () => true,
+      async complete() {
+        calls.push(name)
+        throw new Error("status 503")
+      },
+    })
+
+    await expect(new LLMClient([
+      failing("provider-1"),
+      failing("provider-2"),
+      fakeProvider("provider-3"),
+    ]).complete({ messages: [{ role: "user", content: "test" }] })).rejects.toThrow("503")
+    expect(calls).toEqual(["provider-1", "provider-2"])
+  })
+
   it("isolates telemetry between concurrent runs", async () => {
     const attemptsA: ProviderAttempt[] = []
     const attemptsB: ProviderAttempt[] = []
