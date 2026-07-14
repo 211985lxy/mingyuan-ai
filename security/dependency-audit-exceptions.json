@@ -1,0 +1,9 @@
+{
+  "GHSA-2p57-rm9w-gvfp": {
+    "package": "ip",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-31",
+    "reason": "ali-oss 6.23.0 depends on an urllib proxy chain with no patched ip release.",
+    "controls": "Server-side external URL transfer rejects loopback, private, link-local, and carrier-grade NAT literals before OSS transfer. Recheck ali-oss and urllib upgrades before expiry."
+  }
+}

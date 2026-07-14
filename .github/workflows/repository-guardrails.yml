@@ -69,5 +69,9 @@ jobs:
         run: pnpm --dir apps/web run arch:size
       - name: Architecture dependency guard
         run: pnpm --dir apps/web run arch:check
+      - name: Retired capability guard
+        run: pnpm --dir apps/web run arch:retired
+      - name: Bounded Prisma query guard
+        run: pnpm --dir apps/web run db:bounds
       - name: Deterministic harness
         run: pnpm --dir apps/web run test:harness

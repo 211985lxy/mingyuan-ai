@@ -28,10 +28,12 @@ vi.mock("@/lib/internal-beta-limits", () => ({
 import { POST } from "@/app/api/aim/transcribe/route"
 
 function makeRequest(body: Uint8Array) {
+  const requestBody = new ArrayBuffer(body.byteLength)
+  new Uint8Array(requestBody).set(body)
   return new NextRequest("http://localhost/api/aim/transcribe", {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
-    body,
+    body: requestBody,
   })
 }
 
