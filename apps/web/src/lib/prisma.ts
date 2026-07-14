@@ -16,13 +16,8 @@ const globalForPrisma = globalThis as unknown as PrismaGlobal
 
 function hasRequiredDelegates(client: PrismaClient): boolean {
   const prismaClient = client as PrismaClient & {
-    publicAvatarPreviewCache?: { findUnique?: unknown }
-    publicAvatarPreviewPreference?: { findUnique?: unknown }
     hotTopicFitCache?: { findUnique?: unknown; upsert?: unknown }
     contentTemplate?: { fields?: { expressionBlueprint?: unknown } }
-    videoProductionPlan?: { fields?: { recommendationContext?: unknown } }
-    pexelsMedia?: { fields?: { provider?: unknown } }
-    pexelsQueryCache?: { fields?: { provider?: unknown } }
     clientProject?: { findMany?: unknown }
     aiHotBriefing?: { findUnique?: unknown; upsert?: unknown }
     watchAccount?: { findMany?: unknown; create?: unknown }
@@ -33,14 +28,9 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
   }
 
   return (
-    typeof prismaClient.publicAvatarPreviewCache?.findUnique === "function"
-    && typeof prismaClient.publicAvatarPreviewPreference?.findUnique === "function"
-    && typeof prismaClient.hotTopicFitCache?.findUnique === "function"
+    typeof prismaClient.hotTopicFitCache?.findUnique === "function"
     && typeof prismaClient.hotTopicFitCache?.upsert === "function"
     && prismaClient.contentTemplate?.fields?.expressionBlueprint !== undefined
-    && prismaClient.videoProductionPlan?.fields?.recommendationContext !== undefined
-    && prismaClient.pexelsMedia?.fields?.provider !== undefined
-    && prismaClient.pexelsQueryCache?.fields?.provider !== undefined
     && typeof prismaClient.clientProject?.findMany === "function"
     && typeof prismaClient.aiHotBriefing?.findUnique === "function"
     && typeof prismaClient.aiHotBriefing?.upsert === "function"

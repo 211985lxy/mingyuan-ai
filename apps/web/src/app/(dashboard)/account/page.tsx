@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PageHeader } from "@/components/ui/page-header"
-import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { useAuthStore } from "@/lib/store"
 import { getCurrentUser, listAgentApiKeys, logoutUser } from "@/lib/api/client"
@@ -37,11 +36,6 @@ export default function AccountPage() {
   const displayCreatedAt = user?.createdAt ?? currentUser?.createdAt
   const expiresAt = user?.expiresAt
   const subscriptionStatus = getSubscriptionStatus(expiresAt ?? null)
-  const dailyLimit = currentUser?.dailyLimit ?? user?.dailyLimit ?? 2
-  const videosCreatedToday =
-    currentUser?.videosCreatedToday ?? user?.videosCreatedToday ?? 0
-  const remaining = Math.max(dailyLimit - videosCreatedToday, 0)
-  const remainingPercent = dailyLimit > 0 ? (remaining / dailyLimit) * 100 : 0
 
   async function endSession(destination: string) {
     try {
@@ -120,29 +114,6 @@ export default function AccountPage() {
               <span className="font-medium">{formatExpiryLabel()}</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Section 2 — 使用额度 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>使用额度</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-muted-foreground">今日剩余生成次数</span>
-              <span className="font-medium">
-                {remaining} / {dailyLimit} 次
-              </span>
-            </div>
-            <Progress value={remainingPercent} />
-          </div>
-          {remaining === 0 ? (
-            <p className="text-sm text-orange-500 font-medium">今日已用完</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">每日零点自动刷新</p>
-          )}
         </CardContent>
       </Card>
 

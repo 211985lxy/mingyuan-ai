@@ -30,7 +30,6 @@ model Script {
   generationRun ContentGenerationRun? @relation(fields: [generationRunId], references: [id])
   ipProfile     IpProfile?            @relation(fields: [ipProfileId], references: [id])
   structure     VideoStructure?       @relation(fields: [structureId], references: [id])
-  videoTasks    VideoTask[]
 
   @@index([userId])
   @@index([userId, status])
@@ -110,8 +109,6 @@ model VideoStructure {
 
   scripts               Script[]
   contentGenerationRuns ContentGenerationRun[]
-  videoTasks            VideoTask[]
-  productionPlans       VideoProductionPlan[]
 
   @@index([status, sortOrder])
 }
@@ -209,10 +206,6 @@ model ContentTemplate {
   expressionBlueprint Json?
   variables           Json      @default("[]")
   hookType            String?
-  shanjianStyleId     String?
-  videoType           String    @default("virtualman_broadcast")
-  packRulesJson       Json?
-  processRulesJson    Json?
   industry            Json      @default("[]") // JSON array of strings for MySQL
   contentType         String // product_intro | promotion | knowledge | story | testimonial
   tags                Json      @default("[]") // JSON array of display tags

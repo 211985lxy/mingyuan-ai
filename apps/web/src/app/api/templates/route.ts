@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
       displayName: true,
       description: true,
       hookType: true,
-      videoType: true,
       industry: true,
       contentType: true,
       expressionBlueprint: true,

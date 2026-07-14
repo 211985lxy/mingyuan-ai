@@ -10,7 +10,7 @@ export const POST = withAdminAuth(async (request, { admin }) => {
   const {
     name, displayName, description, scriptTemplate, variables,
     expressionBlueprint,
-    hookType, shanjianStyleId, videoType, packRulesJson, processRulesJson,
+    hookType,
     industry, contentType, tags, hotTopicKeywords, seasonalEvents,
   } = body
 
@@ -30,10 +30,6 @@ export const POST = withAdminAuth(async (request, { admin }) => {
       expressionBlueprint: expressionBlueprint ?? Prisma.DbNull,
       variables: variables ?? [],
       hookType: hookType ?? null,
-      shanjianStyleId: shanjianStyleId ?? null,
-      videoType: videoType ?? "virtualman_broadcast",
-      packRulesJson: packRulesJson ?? Prisma.DbNull,
-      processRulesJson: processRulesJson ?? Prisma.DbNull,
       industry: industry ?? [],
       contentType,
       tags: tags ?? [],

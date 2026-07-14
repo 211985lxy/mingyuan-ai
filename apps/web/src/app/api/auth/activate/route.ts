@@ -7,8 +7,6 @@ import { getActivationStartDate } from "@/lib/subscription"
 import { activationBodySchema } from "@/features/auth/contracts"
 import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
 
-const DAILY_LIMIT = 2
-
 function normalizeActivationCode(value: unknown): string {
   return String(value ?? "")
     .replace(/[^a-zA-Z0-9]/g, "")
@@ -66,7 +64,6 @@ export const POST = withUserAuth(async (request: NextRequest, { user }) => {
           email: true,
           name: true,
           plan: true,
-          authVideoUrl: true,
           createdAt: true,
           expiresAt: true,
         },
@@ -88,7 +85,6 @@ export const POST = withUserAuth(async (request: NextRequest, { user }) => {
           email: true,
           name: true,
           plan: true,
-          authVideoUrl: true,
           createdAt: true,
           expiresAt: true,
         },
@@ -107,9 +103,7 @@ export const POST = withUserAuth(async (request: NextRequest, { user }) => {
     })
 
     return NextResponse.json({
-      user: buildAuthUserPayload(activatedUser, {
-        dailyLimit: DAILY_LIMIT,
-      }),
+      user: buildAuthUserPayload(activatedUser),
     })
   } catch (error) {
     if (error instanceof Error) {

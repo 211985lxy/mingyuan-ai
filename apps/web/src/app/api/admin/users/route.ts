@@ -33,8 +33,7 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
         createdAt: true,
         _count: {
           select: {
-            videoTasks: true,
-            avatars: true,
+            aimGenerations: true,
             assets: true,
           },
         },

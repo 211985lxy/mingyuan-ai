@@ -16,7 +16,6 @@ interface Template {
   description: string | null
   contentType: string
   status: string
-  videoType: string
   industry: string[]
   sortOrder: number
   createdAt: string
@@ -112,7 +111,6 @@ export default function AdminTemplatesPage() {
                 <tr className="border-b text-left text-sm text-muted-foreground">
                   <th className="p-4">名称</th>
                   <th className="p-4">类型</th>
-                  <th className="p-4">视频类型</th>
                   <th className="p-4">状态</th>
                   <th className="p-4">排序</th>
                   <th className="p-4">创建时间</th>
@@ -128,7 +126,6 @@ export default function AdminTemplatesPage() {
                     <td className="p-4">
                       <Badge variant="outline">{t.contentType}</Badge>
                     </td>
-                    <td className="p-4 text-sm text-muted-foreground">{t.videoType}</td>
                     <td className="p-4">
                       <Badge className={STATUS_COLORS[t.status] ?? "bg-gray-100 text-gray-700"}>
                         {t.status === "published" ? "已发布" : t.status === "draft" ? "草稿" : t.status}

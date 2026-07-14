@@ -7,16 +7,14 @@ export const INTERNAL_BETA_LIMITS = {
   aimGenerateDaily: 30,
   videoCopyExtractionDaily: 10,
   competitorAnalysisDaily: 3,
-  videoTaskDaily: 2,
   watchAccounts: 3,
   watchRefreshDaily: 3,
   clientProjects: 3,
   knowledgeEntriesPerProject: 100,
-  avatars: 1,
   uploadBytes: 10 * 1024 * 1024,
 }
 
-type DailyKind = "aim_chat" | "aim_generate" | "video_copy_extraction" | "competitor_analysis" | "video_task"
+type DailyKind = "aim_chat" | "aim_generate" | "video_copy_extraction" | "competitor_analysis"
 
 /**
  * 免限制白名单：优先从环境变量读取（逗号分隔），部署后通过 .env 配置即可，无需改代码。
@@ -69,7 +67,8 @@ async function dailyCount(userId: string, kind: DailyKind) {
   if (kind === "competitor_analysis") {
     return prisma.competitorAnalysis.count({ where: { userId, createdAt } })
   }
-  return prisma.videoTask.count({ where: { userId, createdAt } })
+  kind satisfies never
+  throw new Error("Unsupported daily beta limit kind")
 }
 
 async function isUnlimitedBetaUser(userId: string) {
@@ -87,14 +86,12 @@ export async function enforceDailyBetaLimit(userId: string, kind: DailyKind) {
       aim_generate: INTERNAL_BETA_LIMITS.aimGenerateDaily,
       video_copy_extraction: INTERNAL_BETA_LIMITS.videoCopyExtractionDaily,
       competitor_analysis: INTERNAL_BETA_LIMITS.competitorAnalysisDaily,
-      video_task: INTERNAL_BETA_LIMITS.videoTaskDaily,
     }
     const labels = {
       aim_chat: "AIM 聊天",
       aim_generate: "AIM 生成",
       video_copy_extraction: "爆款文案拆解",
       competitor_analysis: "对标分析",
-      video_task: "视频生成",
     }
     const used = await dailyCount(userId, kind)
     const limit = limits[kind]
@@ -107,7 +104,7 @@ export async function enforceDailyBetaLimit(userId: string, kind: DailyKind) {
 
 export async function enforceCountBetaLimit(input: {
   userId: string
-  kind: "watch_account" | "client_project" | "avatar"
+  kind: "watch_account" | "client_project"
 }) {
   const { userId, kind } = input
   try {
@@ -115,15 +112,11 @@ export async function enforceCountBetaLimit(input: {
 
     const limit = kind === "watch_account"
       ? INTERNAL_BETA_LIMITS.watchAccounts
-      : kind === "client_project"
-        ? INTERNAL_BETA_LIMITS.clientProjects
-        : INTERNAL_BETA_LIMITS.avatars
+      : INTERNAL_BETA_LIMITS.clientProjects
     const used = kind === "watch_account"
       ? await prisma.watchAccount.count({ where: { userId } })
-      : kind === "client_project"
-        ? await prisma.clientProject.count({ where: { userId, status: "active" } })
-        : await prisma.avatar.count({ where: { userId, status: { not: "failed" } } })
-    const label = kind === "watch_account" ? "对标账号" : kind === "client_project" ? "项目" : "数字人"
+      : await prisma.clientProject.count({ where: { userId, status: "active" } })
+    const label = kind === "watch_account" ? "对标账号" : "项目"
     return used >= limit ? limitResponse(`内测期最多创建 ${limit} 个${label}`, limit, used) : null
   } catch (error) {
     console.error(`[beta-limit] skip count limit for ${kind}`, error)

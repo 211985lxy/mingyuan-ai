@@ -33,12 +33,6 @@ export type HookType =
   | "reverse"
   | "emotion"
 
-export type VideoType =
-  | "virtualman_broadcast"
-  | "realman_broadcast"
-  | "broadcast_mixcut"
-  | "news_mixcut"
-
 export interface TemplateVariable {
   key: string
   label: string
@@ -91,10 +85,4 @@ export const TEMPLATE_TRANSITIONS: Record<TemplateStatus, TemplateStatus[]> = {
   draft: ["published"],
   published: ["archived"],
   archived: ["published"],
-}
-
-export const PLAN_CONCURRENCY_LIMITS: Record<string, number> = {
-  free: 1,
-  basic: 3,
-  pro: 5,
 }

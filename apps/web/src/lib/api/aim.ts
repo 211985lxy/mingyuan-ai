@@ -10,12 +10,11 @@ import type {
   AimWorkflowBriefBody,
 } from "@/features/aim/contracts/api"
 import type {
-  ApiAsset, ApiAvatar, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
-  ApiTopicRecommendationMode, ApiPublicAssetVoice, ApiPublicVirtualman,
-  ApiPublicAvatarPreviewDefaults, ApiPublicAvatarPreview, ApiScript, ApiUser,
-  ApiVideoTask, ApiVideoPackagingTemplate, ApiVideoProductionPlan, ApiVideoStructure,
-  AuthResponse, ApiPackagingRecommendationContext, BackgroundMusicSelection,
-  MaterialAssignment, HotTopicsResponse, PaginatedResponse, PackagingMaterialSuggestionsResponse,
+  ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
+  ApiTopicRecommendationMode, ApiScript, ApiUser,
+  ApiVideoStructure,
+  AuthResponse,
+  HotTopicsResponse, PaginatedResponse,
   PublicTemplateDetail, PublicTemplateListItem, ApiTopicGenerateResponse, ApiTopicSelectResponse,
   ApiOpeningType, ApiCopyStructure, ApiEndingType, ApiCompetitorAnalysis,
   CompetitorReportsResponse, ApiCompetitorWebResearch, ApiAccountHotSources,

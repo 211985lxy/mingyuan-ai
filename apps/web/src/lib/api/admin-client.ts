@@ -262,8 +262,7 @@ export interface AdminUserItem {
   plan: string
   createdAt: string
   _count: {
-    videoTasks: number
-    avatars: number
+    aimGenerations: number
     assets: number
   }
 }
@@ -280,18 +279,10 @@ export interface AdminUserDetail {
     industry: string | null
     isComplete: boolean
   } | null
-  videoTasks: {
+  aimGenerations: {
     id: string
     status: string
-    videoType: string
-    avatarName: string
-    createdAt: string
-    completedAt: string | null
-  }[]
-  avatars: {
-    id: string
-    name: string
-    status: string
+    agentId: string | null
     createdAt: string
   }[]
   assets: {
@@ -301,8 +292,7 @@ export interface AdminUserDetail {
     createdAt: string
   }[]
   _count: {
-    videoTasks: number
-    avatars: number
+    aimGenerations: number
     assets: number
     scripts: number
   }

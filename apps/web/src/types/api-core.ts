@@ -5,13 +5,10 @@ export interface ApiUser {
   email: string;
   name: string;
   plan: string;
-  authVideoUrl?: string | null;
   createdAt?: string;
   expiresAt?: string | null;
   isActivated?: boolean;
   subscriptionStatus?: "inactive" | "active" | "expired";
-  dailyLimit?: number;
-  videosCreatedToday?: number;
 }
 
 export interface ApiAgentApiKeySummary {
@@ -109,39 +106,14 @@ export interface GeneratePositioningError {
   error: string
 }
 
-export interface ApiAvatar {
-  id: string;
-  userId: string;
-  name: string;
-  status: string;
-  coverUrl: string | null;
-  sourceVideoUrl: string | null;
-  previewUrl: string | null;
-  thumbnailUrl: string | null;
-  externalTaskId: string | null;
-  externalVirtualmanId: string | null;
-  externalSpeakerId: string | null;
-  speakerName: string | null;
-  demoVideoUrl: string | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ApiAsset {
   id: string;
   userId: string;
-  sourceAvatarId: string | null;
   name: string;
   assetType: string;
   url: string;
   size: number | null;
   status: string;
-  externalTaskId: string | null;
-  externalSpeakerId: string | null;
-  voiceModel: string | null;
-  demoAudioUrl: string | null;
   errorCode: string | null;
   errorMessage: string | null;
   createdAt: string;

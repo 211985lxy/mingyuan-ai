@@ -7,8 +7,6 @@ import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
 import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { setSessionCookie } from "@/lib/auth-session"
 
-const DAILY_LIMIT = 2
-
 export async function POST(request: NextRequest) {
   let input
   try {
@@ -42,10 +40,7 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json(
     {
-      user: buildAuthUserPayload(user, {
-        dailyLimit: DAILY_LIMIT,
-        videosCreatedToday: 0,
-      }),
+      user: buildAuthUserPayload(user),
     },
     { status: 201 }
   )

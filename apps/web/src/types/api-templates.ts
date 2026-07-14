@@ -12,7 +12,6 @@ export interface PublicTemplateListItem {
   displayName: string;
   description: string | null;
   hookType: string | null;
-  videoType: string;
   industry: string[];
   contentType: ContentType;
   tags: string[];
@@ -24,10 +23,6 @@ export interface PublicTemplateListItem {
 
 export interface PublicTemplateDetail extends PublicTemplateListItem {
   scriptTemplate: string;
-  shanjianStyleId: string | null;
-  videoType: string;
-  packRulesJson: unknown;
-  processRulesJson: unknown;
 }
 
 export interface HotTopicsResponse {

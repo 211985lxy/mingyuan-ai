@@ -171,39 +171,4 @@ export interface AuthResponse {
   user: ApiUser;
 }
 
-export interface ApiPublicAvatarPreview {
-  taskId: string;
-  status: "processing" | "succeed" | "failed";
-  videoUrl: string | null;
-  coverUrl: string | null;
-  duration: number | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  speakerId: string;
-  text: string;
-  cached: boolean;
-}
-
-export interface ApiPublicAvatarPreviewDefaults {
-  text: string | null;
-  speakerId: string | null;
-  preview: ApiPublicAvatarPreview | null;
-}
-
-export interface ApiPublicVirtualman {
-  id: string;
-  name: string;
-  gender?: string;
-  coverUrl?: string;
-}
-
-export interface ApiPublicAssetVoice {
-  id: string;
-  name: string;
-  gender?: string;
-  coverUrl?: string;
-  demoUrl?: string;
-  langs?: string[];
-}
-
 // ─── Three-Layer Video Creation Types ────────────────────

@@ -1,43 +1,38 @@
 // Identity domain models
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  password     String
-  name         String
-  plan         String    @default("free") // free | basic | pro
-  authVideoUrl String? // 授权视频 OSS URL，录一次可复用
-  expiresAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  plan      String    @default("free") // free | basic | pro
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  ipProfile                      IpProfile?
-  contentGenerationRuns          ContentGenerationRun[]
-  avatars                        Avatar[]
-  assets                         Asset[]
-  scripts                        Script[]
-  videoTasks                     VideoTask[]
-  productionPlans                VideoProductionPlan[]
-  publicAvatarPreviewPreferences PublicAvatarPreviewPreference[]
-  activationCodes                ActivationCode[]
-  topicSelections                TopicSelection[]
-  competitorAnalyses             CompetitorAnalysis[]
-  watchAccounts                  WatchAccount[]
-  videoCopyExtractions           VideoCopyExtraction[]
-  knowledgeEntries               KnowledgeEntry[]
-  knowledgeEntities              KnowledgeEntity[]
-  aimGenerations                 AimGeneration[]
-  aimMemories                    AimMemory[]
-  clientProjects                 ClientProject[]
-  ipWikiPages                    IpWikiPage[]
-  benchmarkProfiles              BenchmarkProfile[]
-  inspirations                   Inspiration[]
-  agentApiKeys                   AgentApiKey[]
-  agentApiCallLogs               AgentApiCallLog[]
-  aimExecutionTraces             AimExecutionTrace[]
-  aimRunSnapshots                AimRunSnapshot[]
-  aimRunEvents                   AimRunEvent[]
-  contentOutcomes                ContentOutcome[]
+  ipProfile             IpProfile?
+  contentGenerationRuns ContentGenerationRun[]
+  assets                Asset[]
+  scripts               Script[]
+  activationCodes       ActivationCode[]
+  topicSelections       TopicSelection[]
+  competitorAnalyses    CompetitorAnalysis[]
+  watchAccounts         WatchAccount[]
+  videoCopyExtractions  VideoCopyExtraction[]
+  knowledgeEntries      KnowledgeEntry[]
+  knowledgeEntities     KnowledgeEntity[]
+  aimGenerations        AimGeneration[]
+  aimMemories           AimMemory[]
+  clientProjects        ClientProject[]
+  ipWikiPages           IpWikiPage[]
+  benchmarkProfiles     BenchmarkProfile[]
+  inspirations          Inspiration[]
+  agentApiKeys          AgentApiKey[]
+  agentApiCallLogs      AgentApiCallLog[]
+  aimExecutionTraces    AimExecutionTrace[]
+  aimRunSnapshots       AimRunSnapshot[]
+  aimRunEvents          AimRunEvent[]
+  contentOutcomes       ContentOutcome[]
 }
 
 model AdminUser {

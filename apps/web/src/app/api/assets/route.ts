@@ -2,7 +2,6 @@ import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withUserAuth } from "@/lib/user-auth";
-import { ensureUserAvatarVoiceAssets } from "@/lib/avatar-voice-assets";
 import { signOssUrls } from "@/lib/oss";
 
 const VALID_ASSET_TYPES = ["image", "video", "music"];
@@ -46,8 +45,6 @@ export const GET = withUserAuth(async (request, { user }) => {
   const assetType = searchParams.get("assetType");
   const page = parseInt(searchParams.get("page") ?? "1", 10);
   const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10);
-
-  await ensureUserAvatarVoiceAssets(user.id);
 
   const where: { userId: string; assetType?: string } = { userId: user.id };
   if (assetType) where.assetType = assetType;

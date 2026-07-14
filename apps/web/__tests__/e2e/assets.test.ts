@@ -217,43 +217,6 @@ describe("Assets E2E", () => {
     expect(body.data.pageSize).toBe(2);
   });
 
-  it("backfills avatar voice assets into the asset list", async () => {
-    await prisma.avatar.create({
-      data: {
-        userId: user.id,
-        name: "Backfill Avatar",
-        status: "ready",
-        sourceVideoUrl: "https://example.com/train.mp4",
-        externalSpeakerId: "sp-backfill-1",
-        speakerName: "Backfill Avatar的声音",
-      },
-    });
-
-    const res = await GET(
-      userReq("/api/assets?assetType=voice"),
-      undefined as never,
-    );
-    expect(res.status).toBe(200);
-
-    const body = await json(res);
-    expect(
-      body.data.results.some(
-        (asset: { assetType: string; externalSpeakerId: string }) =>
-          asset.assetType === "voice" &&
-          asset.externalSpeakerId === "sp-backfill-1",
-      ),
-    ).toBe(true);
-
-    const voiceAsset = await prisma.asset.findFirst({
-      where: {
-        userId: user.id,
-        assetType: "voice",
-        externalSpeakerId: "sp-backfill-1",
-      },
-    });
-    expect(voiceAsset).not.toBeNull();
-  });
-
   // ─── DELETE /api/assets/[id] ───────────────────────────
 
   it("deletes an asset", async () => {

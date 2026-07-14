@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import {
   Users,
-  Video,
+  Sparkles,
   KeyRound,
   FileText,
   ArrowRight,
@@ -21,7 +21,7 @@ import { getAdminUserStats, getActivationCodeStats, type UserStats, type CodeSta
 
 interface DashboardData {
   totalUsers: number
-  videosToday: number
+  generationsToday: number
   activeTemplates: number
   hotListHealth: {
     successLast24h: number
@@ -89,9 +89,9 @@ export default function AdminDashboardPage() {
           icon={<Users className="h-5 w-5 text-primary" />}
         />
         <MetricCard
-          title="今日视频"
-          state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.videosToday } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
-          icon={<Video className="h-5 w-5 text-primary" />}
+          title="今日生成"
+          state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.generationsToday } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
+          icon={<Sparkles className="h-5 w-5 text-primary" />}
         />
         <MetricCard
           title="活跃模板"

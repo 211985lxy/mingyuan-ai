@@ -5,15 +5,13 @@ import { ASSET_FLOW_CARDS } from "@/features/assets/asset-page-shared";
 
 export function AssetFlowOverview({
   assetCount,
-  voiceCount,
 }: {
   assetCount: number;
-  voiceCount: number;
 }) {
   return (
     <Card className="border-primary/15 bg-primary/[0.02]">
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-3">
           {ASSET_FLOW_CARDS.map((item, index) => (
             <div key={item.title} className="rounded-md border bg-background px-3 py-3">
               <div className="mb-2 flex items-center gap-2">
@@ -28,7 +26,6 @@ export function AssetFlowOverview({
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
           <Badge variant="secondary">已沉淀素材 {assetCount}</Badge>
-          <Badge variant="secondary">可用声音 {voiceCount}</Badge>
         </div>
       </CardContent>
     </Card>

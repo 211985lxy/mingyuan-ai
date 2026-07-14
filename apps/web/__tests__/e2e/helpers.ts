@@ -18,8 +18,6 @@ export async function cleanDatabase() {
   // 我们只清理以 "@test.com" 结尾的测试账户以及它们产生的数据资产！
 
   // 1. 最先清理最底层的二级子依赖（仅限测试用户的数据，防外键死锁）
-  await prisma.videoTask.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
-  await prisma.videoProductionPlan.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.script.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.contentGenerationRun.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.topicSelection.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
@@ -29,16 +27,8 @@ export async function cleanDatabase() {
   await prisma.knowledgeEntry.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.aimGeneration.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.clientProject.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
-  await prisma.publicAvatarPreviewPreference.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
-  
-  // 预览缓存：只清理被测试用户 preference 关联的缓存记录
-  await prisma.publicAvatarPreviewCache.deleteMany({
-    where: { preferences: { some: { user: { email: { endsWith: "@test.com" } } } } }
-  })
-  
   // 2. 清理一级依赖父表 (仅限测试用户的关联记录)
   await prisma.ipProfile.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
-  await prisma.avatar.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   await prisma.asset.deleteMany({ where: { user: { email: { endsWith: "@test.com" } } } })
   
   // 激活码：只清除测试管理员创建或被测试用户使用的激活码
@@ -126,7 +116,6 @@ export async function ensureTestUser(overrides: Record<string, unknown> = {}) {
     password: (overrides.password as string) ?? "hashed",
     name: (overrides.name as string) ?? "Test User",
     plan: (overrides.plan as string) ?? "free",
-    authVideoUrl: (overrides.authVideoUrl as string | null | undefined) ?? null,
     expiresAt:
       (overrides.expiresAt as Date | null | undefined)
       ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
@@ -143,7 +132,6 @@ export async function ensureTestUser(overrides: Record<string, unknown> = {}) {
         password: createData.password,
         name: createData.name,
         plan: createData.plan,
-        authVideoUrl: createData.authVideoUrl,
         expiresAt: createData.expiresAt,
       },
     })
@@ -371,90 +359,6 @@ export async function ensureVideoStructure(
       status: (overrides.status as string) ?? "published",
     },
   })
-}
-
-export async function createPackagingTemplate(
-  overrides: Record<string, unknown> = {}
-) {
-  return prisma.videoPackagingTemplate.create({
-    data: {
-      shanjianId: (overrides.shanjianId as string) ?? "6904552d68f703003047c54f",
-      name: (overrides.name as string) ?? "经典数字人口播",
-      coverUrl: (overrides.coverUrl as string) ?? "https://example.com/cover.jpg",
-      demoUrl: (overrides.demoUrl as string) ?? "https://example.com/demo.mp4",
-      scene: (overrides.scene as string) ?? "virtualman",
-      capabilities: (overrides.capabilities as Prisma.InputJsonValue) ?? ["subtitle", "identity_card"],
-      description: (overrides.description as string) ?? "标准数字人口播模板",
-      sortOrder: (overrides.sortOrder as number) ?? 0,
-      status: (overrides.status as string) ?? "published",
-    },
-  })
-}
-
-export async function ensurePackagingTemplate(
-  overrides: Record<string, unknown> = {}
-) {
-  const shanjianId = (overrides.shanjianId as string) ?? "6904552d68f703003047c54f"
-  return prisma.videoPackagingTemplate.upsert({
-    where: { shanjianId },
-    update: {
-      name: (overrides.name as string) ?? "经典数字人口播",
-      coverUrl: (overrides.coverUrl as string) ?? "https://example.com/cover.jpg",
-      demoUrl: (overrides.demoUrl as string) ?? "https://example.com/demo.mp4",
-      scene: (overrides.scene as string) ?? "virtualman",
-      capabilities: (overrides.capabilities as Prisma.InputJsonValue) ?? ["subtitle", "identity_card"],
-      description: (overrides.description as string) ?? "标准数字人口播模板",
-      sortOrder: (overrides.sortOrder as number) ?? 0,
-      status: (overrides.status as string) ?? "published",
-    },
-    create: {
-      shanjianId,
-      name: (overrides.name as string) ?? "经典数字人口播",
-      coverUrl: (overrides.coverUrl as string) ?? "https://example.com/cover.jpg",
-      demoUrl: (overrides.demoUrl as string) ?? "https://example.com/demo.mp4",
-      scene: (overrides.scene as string) ?? "virtualman",
-      capabilities: (overrides.capabilities as Prisma.InputJsonValue) ?? ["subtitle", "identity_card"],
-      description: (overrides.description as string) ?? "标准数字人口播模板",
-      sortOrder: (overrides.sortOrder as number) ?? 0,
-      status: (overrides.status as string) ?? "published",
-    },
-  })
-}
-
-export async function ensureAvatar(overrides: Record<string, unknown>) {
-  const userId = overrides.userId as string
-  const name = (overrides.name as string) ?? "Test Avatar"
-
-  const existing = await prisma.avatar.findFirst({
-    where: { userId, name },
-  })
-
-  const data = {
-    userId,
-    name,
-    status: (overrides.status as string) ?? "ready",
-    coverUrl: (overrides.coverUrl as string | null | undefined) ?? null,
-    sourceVideoUrl: (overrides.sourceVideoUrl as string | null | undefined) ?? null,
-    externalTaskId: (overrides.externalTaskId as string | null | undefined) ?? null,
-    externalVirtualmanId:
-      (overrides.externalVirtualmanId as string | null | undefined) ?? null,
-    externalSpeakerId:
-      (overrides.externalSpeakerId as string | null | undefined) ?? null,
-    speakerName: (overrides.speakerName as string | null | undefined) ?? null,
-    demoTaskId: (overrides.demoTaskId as string | null | undefined) ?? null,
-    demoVideoUrl: (overrides.demoVideoUrl as string | null | undefined) ?? null,
-    errorCode: (overrides.errorCode as string | null | undefined) ?? null,
-    errorMessage: (overrides.errorMessage as string | null | undefined) ?? null,
-  }
-
-  if (existing) {
-    return prisma.avatar.update({
-      where: { id: existing.id },
-      data,
-    })
-  }
-
-  return prisma.avatar.create({ data })
 }
 
 // ─── Request helpers ──────────────────────────────────────

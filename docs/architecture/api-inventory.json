@@ -984,19 +984,6 @@
       "idempotency": false
     },
     {
-      "route": "/api/auth/auth-video",
-      "file": "src/app/api/auth/auth-video/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
       "route": "/api/auth/login",
       "file": "src/app/api/auth/login/route.ts",
       "methods": [
@@ -1046,47 +1033,6 @@
       "query": "none",
       "externalService": false,
       "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/avatars/[id]/retry",
-      "file": "src/app/api/avatars/[id]/retry/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": true
-    },
-    {
-      "route": "/api/avatars/[id]",
-      "file": "src/app/api/avatars/[id]/route.ts",
-      "methods": [
-        "DELETE",
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/avatars",
-      "file": "src/app/api/avatars/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "manual",
-      "externalService": false,
-      "cost": "high",
       "idempotency": false
     },
     {
@@ -1261,19 +1207,6 @@
       "idempotency": false
     },
     {
-      "route": "/api/cron/backfill-delivery",
-      "file": "src/app/api/cron/backfill-delivery/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "cron_secret",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
       "route": "/api/cron/cleanup",
       "file": "src/app/api/cron/cleanup/route.ts",
       "methods": [
@@ -1313,45 +1246,6 @@
       "idempotency": false
     },
     {
-      "route": "/api/cron/pexels-transfer",
-      "file": "src/app/api/cron/pexels-transfer/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "cron_secret",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/cron/poll-enhancements",
-      "file": "src/app/api/cron/poll-enhancements/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "cron_secret",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/cron/poll-tasks",
-      "file": "src/app/api/cron/poll-tasks/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "cron_secret",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
       "route": "/api/douyin-hot",
       "file": "src/app/api/douyin-hot/route.ts",
       "methods": [
@@ -1362,32 +1256,6 @@
       "query": "none",
       "externalService": true,
       "cost": "medium",
-      "idempotency": false
-    },
-    {
-      "route": "/api/effects/asr",
-      "file": "src/app/api/effects/asr/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/effects/tts",
-      "file": "src/app/api/effects/tts/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
       "idempotency": false
     },
     {
@@ -1733,85 +1601,6 @@
       "idempotency": false
     },
     {
-      "route": "/api/packaging-material-suggestions",
-      "file": "src/app/api/packaging-material-suggestions/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "high",
-      "idempotency": false
-    },
-    {
-      "route": "/api/packaging-templates",
-      "file": "src/app/api/packaging-templates/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "query",
-      "query": "manual",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/packaging-templates/sync",
-      "file": "src/app/api/packaging-templates/sync/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": true
-    },
-    {
-      "route": "/api/pexels/media/[pexelsId]",
-      "file": "src/app/api/pexels/media/[pexelsId]/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "query",
-      "query": "manual",
-      "externalService": false,
-      "cost": "high",
-      "idempotency": false
-    },
-    {
-      "route": "/api/pexels/search",
-      "file": "src/app/api/pexels/search/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "query",
-      "query": "manual",
-      "externalService": false,
-      "cost": "high",
-      "idempotency": true
-    },
-    {
-      "route": "/api/production-plans",
-      "file": "src/app/api/production-plans/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "manual",
-      "externalService": false,
-      "cost": "high",
-      "idempotency": false
-    },
-    {
       "route": "/api/projects/[id]",
       "file": "src/app/api/projects/[id]/route.ts",
       "methods": [
@@ -1850,46 +1639,6 @@
       "query": "manual",
       "externalService": true,
       "cost": "medium",
-      "idempotency": false
-    },
-    {
-      "route": "/api/public-assets",
-      "file": "src/app/api/public-assets/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "public",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/public-avatar-previews/[taskId]",
-      "file": "src/app/api/public-avatar-previews/[taskId]/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/public-avatar-previews",
-      "file": "src/app/api/public-avatar-previews/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "manual",
-      "externalService": false,
-      "cost": "low",
       "idempotency": false
     },
     {
@@ -1955,46 +1704,6 @@
       "query": "none",
       "externalService": false,
       "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/tasks/[id]/retry",
-      "file": "src/app/api/tasks/[id]/retry/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": true
-    },
-    {
-      "route": "/api/tasks/[id]",
-      "file": "src/app/api/tasks/[id]/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": true,
-      "cost": "high",
-      "idempotency": false
-    },
-    {
-      "route": "/api/tasks",
-      "file": "src/app/api/tasks/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "manual",
-      "externalService": false,
-      "cost": "high",
       "idempotency": false
     },
     {
@@ -2181,46 +1890,6 @@
       "idempotency": false
     },
     {
-      "route": "/api/voices/[id]",
-      "file": "src/app/api/voices/[id]/route.ts",
-      "methods": [
-        "DELETE"
-      ],
-      "auth": "user_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/voices",
-      "file": "src/app/api/voices/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/webhook/aliyun-enhancement",
-      "file": "src/app/api/webhook/aliyun-enhancement/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "signed_integration",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": true
-    },
-    {
       "route": "/api/webhook/inspiration",
       "file": "src/app/api/webhook/inspiration/route.ts",
       "methods": [
@@ -2232,19 +1901,6 @@
       "externalService": false,
       "cost": "low",
       "idempotency": false
-    },
-    {
-      "route": "/api/webhook/shanjian",
-      "file": "src/app/api/webhook/shanjian/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "signed_integration",
-      "input": "bounded_json_object",
-      "query": "none",
-      "externalService": false,
-      "cost": "high",
-      "idempotency": true
     }
   ]
 }

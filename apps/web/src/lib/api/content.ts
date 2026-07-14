@@ -5,12 +5,11 @@ import { useAuthStore } from "@/lib/store"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type {
-  ApiAsset, ApiAvatar, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
-  ApiTopicRecommendationMode, ApiPublicAssetVoice, ApiPublicVirtualman,
-  ApiPublicAvatarPreviewDefaults, ApiPublicAvatarPreview, ApiScript, ApiUser,
-  ApiVideoTask, ApiVideoPackagingTemplate, ApiVideoProductionPlan, ApiVideoStructure,
-  AuthResponse, ApiPackagingRecommendationContext, BackgroundMusicSelection,
-  MaterialAssignment, HotTopicsResponse, PaginatedResponse, PackagingMaterialSuggestionsResponse,
+  ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
+  ApiTopicRecommendationMode, ApiScript, ApiUser,
+  ApiVideoStructure,
+  AuthResponse,
+  HotTopicsResponse, PaginatedResponse,
   PublicTemplateDetail, PublicTemplateListItem, ApiTopicGenerateResponse, ApiTopicSelectResponse,
   ApiOpeningType, ApiCopyStructure, ApiEndingType, ApiCompetitorAnalysis,
   CompetitorReportsResponse, ApiCompetitorWebResearch, ApiAccountHotSources,
@@ -30,21 +29,6 @@ export async function listStructures(): Promise<ApiVideoStructure[]> {
 
 export async function getTemplate(id: string): Promise<PublicTemplateDetail> {
   const payload = await request<{ data: PublicTemplateDetail }>(`/api/templates/${id}`)
-  return payload.data
-}
-
-export async function getPublicAssets(): Promise<{
-  voices: ApiPublicAssetVoice[]
-  virtualmen: ApiPublicVirtualman[]
-}> {
-  const payload = await request<{
-    data: {
-      voices: ApiPublicAssetVoice[]
-      virtualmen: ApiPublicVirtualman[]
-    }
-  }>("/api/public-assets", {
-    auth: false,
-  })
   return payload.data
 }
 

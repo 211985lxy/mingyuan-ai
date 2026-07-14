@@ -5,19 +5,12 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { AssetsTab } from "@/features/assets/components/assets-tab";
 import { AssetFlowOverview } from "@/features/assets/components/page-sections";
-import {
-  buildUserVoicesFromAssets,
-  fetchPublicVoices,
-  type PublicVoice,
-} from "@/features/assets/asset-page-shared";
 import { listAssets } from "@/lib/api/client";
 import type { ApiAsset } from "@/types/api";
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<ApiAsset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [publicVoices, setPublicVoices] = useState<PublicVoice[]>([]);
-  const userVoices = buildUserVoicesFromAssets(assets);
 
   const fetchAssets = useCallback(async () => {
     setLoading(true);
@@ -33,7 +26,6 @@ export default function AssetsPage() {
 
   useEffect(() => {
     void Promise.resolve().then(fetchAssets);
-    void fetchPublicVoices().then(setPublicVoices);
   }, [fetchAssets]);
 
   return (
@@ -46,20 +38,15 @@ export default function AssetsPage() {
           </Badge>
         </div>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          这里不是单纯上传文件，而是把企业资料、案例素材、客户反馈、声音资产沉淀成创作页可调用的证据库。
+          这里不是单纯上传文件，而是把企业资料、案例素材和客户反馈沉淀成创作页可调用的证据库。
         </p>
-        <AssetFlowOverview
-          assetCount={assets.length}
-          voiceCount={userVoices.length + publicVoices.length}
-        />
+        <AssetFlowOverview assetCount={assets.length} />
       </div>
 
       <AssetsTab
         assets={assets}
         loading={loading}
         onRefresh={fetchAssets}
-        publicVoices={publicVoices}
-        userVoices={userVoices}
       />
     </div>
   );

@@ -160,8 +160,7 @@ export async function generateUploadUrl(
   if (!isConfigured()) return null;
 
   const client = getClient();
-  // Use UUID for the key to avoid non-ASCII chars (e.g. Chinese filenames)
-  // that cause InvalidFile.URL errors on downstream services like Shanjian.
+  // Use UUID for the key to avoid non-ASCII characters in object keys.
   const ext = fileName.includes(".") ? "." + fileName.split(".").pop() : "";
   const key = `uploads/${Date.now()}-${randomUUID()}${ext}`;
   const url = client.signatureUrl(key, {
@@ -209,7 +208,7 @@ function extractOssKey(assetUrl: string): string {
 
 /**
  * Generate a presigned download URL for a private OSS object.
- * Used to give external services (e.g., Shanjian) temporary read access.
+ * Used to give authorized callers temporary read access.
  */
 export function generateSignedUrl(assetUrl: string, expires = 7200): string {
   if (!isConfigured() || !isManagedOssUrl(assetUrl)) return assetUrl;

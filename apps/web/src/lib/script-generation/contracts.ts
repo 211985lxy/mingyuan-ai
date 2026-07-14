@@ -22,16 +22,6 @@ export interface StructureBlueprint {
   pace?: "fast" | "medium" | "slow"
   evidenceDensity?: "low" | "medium" | "high"
   ctaStyle?: "soft" | "direct" | "hard"
-  packagingIntent?: {
-    subtitleStyle: "minimal" | "standard" | "highlight" | "chapter"
-    visualPriority: "talking_head" | "balanced" | "visual_first"
-    preferredTemplateCapabilities: string[]
-    requiredTemplateCapabilities?: string[]
-    recommendedMaterialRoles: string[]
-    bgmGuidance: string
-    defaultPackRules?: Record<string, unknown> | null
-    defaultProcessRules?: Record<string, unknown> | null
-  } | null
 }
 
 export interface ScriptDirection {

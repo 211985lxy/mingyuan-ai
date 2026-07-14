@@ -18,10 +18,6 @@ interface CanonicalContentTemplateSeed {
 
 const SHARED_FIELDS = {
   industry: [] as string[],
-  videoType: "virtualman_broadcast",
-  shanjianStyleId: null,
-  packRulesJson: Prisma.DbNull,
-  processRulesJson: Prisma.DbNull,
   seasonalEvents: [] as Array<{ id: string; startDate: string; endDate: string }>,
 } as const
 
@@ -457,10 +453,6 @@ export async function syncCanonicalContentTemplates(
       expressionBlueprint: template.expressionBlueprint as unknown as Prisma.InputJsonValue,
       variables: template.variables as unknown as Prisma.InputJsonValue,
       hookType: template.hookType,
-      shanjianStyleId: SHARED_FIELDS.shanjianStyleId,
-      videoType: SHARED_FIELDS.videoType,
-      packRulesJson: SHARED_FIELDS.packRulesJson,
-      processRulesJson: SHARED_FIELDS.processRulesJson,
       industry: SHARED_FIELDS.industry as unknown as Prisma.InputJsonValue,
       contentType: template.contentType,
       tags: template.tags as unknown as Prisma.InputJsonValue,
