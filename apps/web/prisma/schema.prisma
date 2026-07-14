@@ -47,6 +47,7 @@ model User {
   aimRunSnapshots                AimRunSnapshot[]
   aimRunEvents                   AimRunEvent[]
   contentOutcomes                ContentOutcome[]
+  commentInsightJobs             CommentInsightJob[]
 }
 
 model Avatar {
@@ -1321,4 +1322,75 @@ model ContentOutcome {
   @@unique([userId, generationId, collectWindowDay])
   @@index([userId, collectedAt])
   @@index([generationId])
+}
+
+// ─── 评论选题雷达 ──────────────────────────────────────
+
+model CommentInsightJob {
+  id                      String    @id @default(cuid())
+  userId                  String
+  sourceUrl               String    @db.Text
+  platform                String
+  sourceType              String
+  status                  String    @default("pending")
+  videoLimit              Int       @default(20)
+  totalItems              Int       @default(0)
+  processedItems          Int       @default(0)
+  failedItems             Int       @default(0)
+  reportedCommentCount    Int       @default(0)
+  collectedCommentCount   Int       @default(0)
+  analyzedSampleCount     Int       @default(0)
+  analysisResult          Json?
+  partialReason           String?   @db.Text
+  errorMessage            String?   @db.Text
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  completedAt             DateTime?
+
+  sourceItems             CommentSourceItem[]
+  commentRecords          CommentRecord[]
+  user                    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+}
+
+model CommentSourceItem {
+  id                      String    @id @default(cuid())
+  jobId                   String
+  platformItemId          String
+  sourceUrl               String    @db.Text
+  title                   String    @default("")
+  reportedCommentCount    Int       @default(0)
+  cursor                  String    @default("")
+  hasMore                 Boolean   @default(true)
+  status                  String    @default("pending")
+  errorMessage            String?   @db.Text
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  job                     CommentInsightJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  commentRecords          CommentRecord[]
+
+  @@unique([jobId, platformItemId])
+}
+
+model CommentRecord {
+  id                      String    @id @default(cuid())
+  jobId                   String
+  sourceItemId            String
+  platformCommentId      String
+  text                    String    @db.Text
+  nickname                String?   @db.VarChar(255)
+  likes                   Int       @default(0)
+  createTime              String    @default("")
+  isTop                   Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+
+  job                     CommentInsightJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceItem              CommentSourceItem @relation(fields: [sourceItemId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, platformCommentId])
+  @@index([jobId, likes(sort: Desc)])
+  @@index([sourceItemId, createdAt(sort: Desc)])
 }
