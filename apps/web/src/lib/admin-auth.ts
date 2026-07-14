@@ -63,7 +63,7 @@ export function withAdminAuth(
 ) {
   return async (
     request: NextRequest,
-    segmentData?: { params: Promise<Record<string, string>> }
+    segmentData: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
     const requestId = request.headers.get("x-request-id") || generateRequestId()
     const session = readSessionToken(request, "admin")
