@@ -1601,6 +1601,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/projects/[id]/export",
+      "file": "src/app/api/projects/[id]/export/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/projects/[id]",
       "file": "src/app/api/projects/[id]/route.ts",
       "methods": [
@@ -1609,7 +1622,7 @@
       ],
       "auth": "user_session",
       "input": "bounded_json_object",
-      "query": "none",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false

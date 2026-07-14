@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
 
     // aim-harness-v1: 删除到期 AimRunSnapshot（含完整 prompt/输出，30 天），
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
     const aimSnapshots = await (prisma as typeof prisma & {
       aimRunSnapshot?: { deleteMany(args: unknown): Promise<{ count: number }> }
     }).aimRunSnapshot?.deleteMany({
-      where: { expiresAt: { lt: thirtyDaysAgo } },
+      where: { expiresAt: { lt: now } },
     })
 
     const [hotItems, snapshots] = await Promise.all([

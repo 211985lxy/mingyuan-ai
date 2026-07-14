@@ -218,6 +218,17 @@ export function generateSignedUrl(assetUrl: string, expires = 7200): string {
   return client.signatureUrl(key, { method: "GET", expires });
 }
 
+export async function deleteManagedOssObject(assetUrl: string): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  const urlObj = new URL(assetUrl);
+  const currentHostname = `${OSS_BUCKET}.${OSS_REGION}.aliyuncs.com`;
+  if (urlObj.hostname !== currentHostname) return false;
+
+  await getClient().delete(extractOssKey(assetUrl));
+  return true;
+}
+
 /**
  * Generate a signed thumbnail URL from a private OSS video.
  * Uses Aliyun OSS video snapshot processing.
