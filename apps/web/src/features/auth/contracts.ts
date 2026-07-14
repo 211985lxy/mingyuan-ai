@@ -1,6 +1,12 @@
 import { z } from "zod"
 
-const email = z.string().trim().email("请输入有效的邮箱地址").max(254)
+const email = z
+  .string()
+  .trim()
+  .max(254)
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), {
+    message: "请输入有效的邮箱地址",
+  })
 const password = z.string().min(6, "密码至少需要 6 个字符").max(128)
 
 export const loginBodySchema = z.object({ email, password }).strict()
