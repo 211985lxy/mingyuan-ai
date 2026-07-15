@@ -83,6 +83,67 @@ export function pickStrategy(refreshCount: number): DerivationStrategy {
   return strategies[(refreshCount - 4) % strategies.length]
 }
 
+function sampleFresh(
+  allCodes: string[],
+  recentFreq: Map<string, number>,
+  isNewCombo: (codes: string[]) => boolean,
+): string[] {
+  const unused = allCodes.filter((code) => !recentFreq.has(code))
+  const pool = unused.length >= 2 ? unused : allCodes
+  const count = Math.random() < 0.5 ? 2 : 3
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const sampled = sampleElements(pool, count)
+    if (sampled.length >= 2 && isNewCombo(sampled)) return sampled
+  }
+  return sampleElements(allCodes, count)
+}
+
+function sampleAdjacent(
+  allCodes: string[],
+  recentElementSets: string[][],
+  isNewCombo: (codes: string[]) => boolean,
+): string[] {
+  const lastSet = recentElementSets[0]
+  if (!lastSet || lastSet.length === 0) return sampleElements(allCodes)
+  const anchor = lastSet[Math.floor(Math.random() * lastSet.length)]
+  const neighbors = (ADJACENCY[anchor] ?? []).filter((code) => !hasConflict(anchor, code))
+  if (neighbors.length === 0) return sampleElements(allCodes)
+
+  const freshNeighbors = neighbors.filter((code) => !lastSet.includes(code))
+  const pool = freshNeighbors.length > 0 ? freshNeighbors : neighbors
+  const shuffled = [...pool].sort(() => Math.random() - 0.5)
+  const picked = [anchor, shuffled[0]]
+  if (shuffled.length > 1 && Math.random() < 0.4) picked.push(shuffled[1])
+  return isNewCombo(picked) ? picked : sampleElements(allCodes)
+}
+
+function sampleNiche(allCodes: string[], recentElementSets: string[][]): string[] {
+  const lastSet = recentElementSets[0]
+  return lastSet && lastSet.length >= 2 ? [...lastSet] : sampleElements(allCodes)
+}
+
+function sampleRemix(
+  allCodes: string[],
+  recentElementSets: string[][],
+  isNewCombo: (codes: string[]) => boolean,
+): string[] {
+  const set1 = recentElementSets[0] ?? []
+  const set2 = recentElementSets[1] ?? []
+  if (set1.length === 0 || set2.length === 0) return sampleElements(allCodes)
+  const from1 = set1[Math.floor(Math.random() * set1.length)]
+  const candidates2 = set2.filter((code) => code !== from1 && !hasConflict(code, from1))
+  if (candidates2.length === 0) return sampleElements(allCodes)
+
+  const from2 = candidates2[Math.floor(Math.random() * candidates2.length)]
+  const combo = [from1, from2]
+  if (Math.random() < 0.3) {
+    const wild = allCodes.filter((code) =>
+      code !== from1 && code !== from2 && !hasConflict(code, from1) && !hasConflict(code, from2))
+    if (wild.length > 0) combo.push(wild[Math.floor(Math.random() * wild.length)])
+  }
+  return isNewCombo(combo) ? combo : sampleElements(allCodes)
+}
+
 /**
  * Sample elements with history awareness. Avoids repeating the exact
  * same element sets the user has already seen, and uses derivation
@@ -93,7 +154,6 @@ export function sampleWithHistory(
   recentElementSets: string[][],
   strategy: DerivationStrategy,
 ): string[] {
-  // Flatten recent sets into a frequency map
   const recentFreq = new Map<string, number>()
   for (const set of recentElementSets) {
     for (const code of set) {
@@ -101,92 +161,13 @@ export function sampleWithHistory(
     }
   }
 
-  const recentSetKeys = new Set(
-    recentElementSets.map((s) => [...s].sort().join(",")),
-  )
-
-  function isNewCombo(codes: string[]): boolean {
-    return !recentSetKeys.has([...codes].sort().join(","))
-  }
+  const recentSetKeys = new Set(recentElementSets.map((set) => [...set].sort().join(",")))
+  const isNewCombo = (codes: string[]) => !recentSetKeys.has([...codes].sort().join(","))
 
   switch (strategy) {
-    case "fresh": {
-      // Prefer elements NOT used recently. Fall back to any if all used.
-      const unused = allCodes.filter((c) => !recentFreq.has(c))
-      const pool = unused.length >= 2 ? unused : allCodes
-      const count = Math.random() < 0.5 ? 2 : 3
-
-      // Try up to 10 times to find a new combination
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const sampled = sampleElements(pool, count)
-        if (sampled.length >= 2 && isNewCombo(sampled)) return sampled
-      }
-      return sampleElements(allCodes, count)
-    }
-
-    case "adjacent": {
-      // Pick 1 element from the most recent set, then add an adjacent neighbor
-      const lastSet = recentElementSets[0]
-      if (!lastSet || lastSet.length === 0) return sampleElements(allCodes)
-
-      const anchor = lastSet[Math.floor(Math.random() * lastSet.length)]
-      const neighbors = (ADJACENCY[anchor] ?? []).filter(
-        (n) => !hasConflict(anchor, n),
-      )
-
-      if (neighbors.length === 0) return sampleElements(allCodes)
-
-      // Pick 1-2 neighbors not in the original set
-      const freshNeighbors = neighbors.filter((n) => !lastSet.includes(n))
-      const pool = freshNeighbors.length > 0 ? freshNeighbors : neighbors
-      const shuffled = [...pool].sort(() => Math.random() - 0.5)
-      const picked = [anchor, shuffled[0]]
-      if (shuffled.length > 1 && Math.random() < 0.4) picked.push(shuffled[1])
-
-      if (isNewCombo(picked)) return picked
-      // Fall back to fresh
-      return sampleElements(allCodes)
-    }
-
-    case "niche": {
-      // Reuse the most recent element set — the prompt will instruct
-      // the LLM to go deeper/narrower instead of broad
-      const lastSet = recentElementSets[0]
-      if (lastSet && lastSet.length >= 2) return [...lastSet]
-      return sampleElements(allCodes)
-    }
-
-    case "remix": {
-      // Combine 1 element from session N-1 and 1 from session N-2
-      const set1 = recentElementSets[0] ?? []
-      const set2 = recentElementSets[1] ?? []
-      if (set1.length === 0 || set2.length === 0) return sampleElements(allCodes)
-
-      const from1 = set1[Math.floor(Math.random() * set1.length)]
-      const candidates2 = set2.filter(
-        (c) => c !== from1 && !hasConflict(c, from1),
-      )
-      if (candidates2.length === 0) return sampleElements(allCodes)
-
-      const from2 = candidates2[Math.floor(Math.random() * candidates2.length)]
-      const combo = [from1, from2]
-
-      // Optionally add a third wildcard
-      if (Math.random() < 0.3) {
-        const wild = allCodes.filter(
-          (c) =>
-            c !== from1 &&
-            c !== from2 &&
-            !hasConflict(c, from1) &&
-            !hasConflict(c, from2),
-        )
-        if (wild.length > 0) {
-          combo.push(wild[Math.floor(Math.random() * wild.length)])
-        }
-      }
-
-      if (isNewCombo(combo)) return combo
-      return sampleElements(allCodes)
-    }
+    case "fresh": return sampleFresh(allCodes, recentFreq, isNewCombo)
+    case "adjacent": return sampleAdjacent(allCodes, recentElementSets, isNewCombo)
+    case "niche": return sampleNiche(allCodes, recentElementSets)
+    case "remix": return sampleRemix(allCodes, recentElementSets, isNewCombo)
   }
 }
