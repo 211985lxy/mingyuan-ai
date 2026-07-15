@@ -19,6 +19,19 @@ export interface AimWorkbenchCommand {
 
 const MAX_COMMAND_INPUT_LENGTH = 120
 
+const NEW_TASK_PATTERNS = [
+  /(?:这是|开始|切到|换成)?(?:一个)?(?:全新|新的|新)(?:文案|任务|选题|主题)/,
+  /(?:再|另|重新)(?:写|做|开)(?:一篇|一个)(?:文案|任务|选题|主题)?/,
+  /(?:换一篇|换个主题|换个选题|下一个任务)/,
+  /(?:不要|别)(?:再)?(?:接着|继续)(?:改|写)(?:上一|前一|第一)(?:篇|版|个)?/,
+]
+
+/** 明确开启另一篇内容时，旧对话和当前编辑稿都不应继续作为本轮上下文。 */
+export function hasExplicitNewTaskIntent(text: string): boolean {
+  const input = text.trim().replace(/\s+/g, "")
+  return input.length > 0 && NEW_TASK_PATTERNS.some((pattern) => pattern.test(input))
+}
+
 const COMMAND_PATTERNS: Array<{ id: AimWorkbenchCommandId; pattern: RegExp }> = [
   { id: "reset_conversation", pattern: /(清空|重置|重新开始).{0,6}(对话|聊天|当前内容)/ },
   { id: "save_editor", pattern: /(保存|同步).{0,8}(编辑稿|编辑区|我的稿子|交付物)/ },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { detectAimWorkbenchCommand } from "@/lib/aim-workbench-commands"
+import { detectAimWorkbenchCommand, hasExplicitNewTaskIntent } from "@/lib/aim-workbench-commands"
 
 describe("aim workbench commands", () => {
   it("detects editor commands", () => {
@@ -41,5 +41,13 @@ describe("aim workbench commands", () => {
 `.trim()
 
     expect(detectAimWorkbenchCommand(longMeetingNote)).toBeNull()
+  })
+
+  it("recognizes an explicit new writing task without confusing follow-up edits", () => {
+    expect(hasExplicitNewTaskIntent("新任务：给我们的老板 IP 再写一篇口播稿")).toBe(true)
+    expect(hasExplicitNewTaskIntent("换个主题，写如何判断客户需求")).toBe(true)
+    expect(hasExplicitNewTaskIntent("不要继续改上一篇，这是一个全新文案")).toBe(true)
+    expect(hasExplicitNewTaskIntent("把当前这篇改得更适合我们的表达风格")).toBe(false)
+    expect(hasExplicitNewTaskIntent("继续修改第一版，保持原稿长度")).toBe(false)
   })
 })

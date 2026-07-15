@@ -100,7 +100,11 @@ import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
-import { detectAimWorkbenchCommand, type AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
+import {
+  detectAimWorkbenchCommand,
+  hasExplicitNewTaskIntent,
+  type AimWorkbenchCommand,
+} from "@/lib/aim-workbench-commands"
 import { buildOpeningRecommendationPrompt } from "@/lib/aim-opening-recommendation"
 import {
   EDITOR_PANEL_DEFAULT_WIDTH,
@@ -1412,9 +1416,7 @@ export default function AimPage() {
     return lastAssistant ? extractProgress(lastAssistant.content) : null
   }, [messages, agent.id])
 
-  function resetConversation() {
-    setMessages([])
-    setInput("")
+  function clearCurrentTaskContext() {
     setSourceVideoCopyExtractionId(undefined)
     setSourceOriginalText("")
     setSourceAnalysisText("")
@@ -1423,6 +1425,13 @@ export default function AimPage() {
     setEditorText("")
     setEditorFormat(undefined)
     setEditorSourceMessageId(undefined)
+  }
+
+  function resetConversation() {
+    requestAbortRef.current?.abort()
+    setMessages([])
+    setInput("")
+    clearCurrentTaskContext()
     if (typeof window !== "undefined") window.sessionStorage.removeItem(aimDraftStorageKey(selectedAgentId))
   }
 
@@ -1890,17 +1899,21 @@ export default function AimPage() {
   ) {
     const images = options?.images ?? []
     if (!text && images.length === 0) return
+    const startsNewTask = !options?.retryMessageId && hasExplicitNewTaskIntent(text)
     const workbenchCommand = detectAimWorkbenchCommand(text)
-    if (workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
-    if (!options?.retryMessageId) {
+    if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
+    if (!options?.retryMessageId && !startsNewTask) {
       const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId
       reportAimRunEvent(revisedRun, "revised", { channel: "chat" })
     }
     const controller = new AbortController()
     requestAbortRef.current = controller
-    const baseMessages = options?.retryMessageId
+    const baseMessages = startsNewTask
+      ? []
+      : options?.retryMessageId
       ? messages.filter((message) => message.id !== options.retryMessageId)
       : messages
+    if (startsNewTask) clearCurrentTaskContext()
     const userMsg: ChatMessage = { id: nextId(), role: "user", content: text || "请分析这张图片。", images }
     const thread = options?.retryMessageId ? baseMessages : [...baseMessages, userMsg]
     const assistantId = nextId()
@@ -1941,7 +1954,7 @@ export default function AimPage() {
           projectId: projectEnabled ? selectedProjectId || undefined : undefined,
           toolAction,
           resultId,
-          editorContext: options?.editorContext,
+          editorContext: startsNewTask ? undefined : options?.editorContext,
           signal: controller.signal,
         })
         setMessages((prev) => prev.map((message) =>
@@ -1954,7 +1967,7 @@ export default function AimPage() {
       await chatAimStream(chatMessages, {
         agentId: selectedAgentId,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-        editorContext: options?.editorContext,
+        editorContext: startsNewTask ? undefined : options?.editorContext,
         signal: controller.signal,
         onDelta: (_delta, content) => {
           hasContent = content.length > 0
@@ -2182,8 +2195,10 @@ export default function AimPage() {
     } : { images: imageAttachments })
   }
 
-  async function generateWithInput(currentInput: string, options?: { retryMessageId?: string }) {
-    const rawInput = buildRawInputForGenerate(currentInput || undefined)
+  async function generateWithInput(currentInput: string, options?: { retryMessageId?: string; startsNewTask?: boolean }) {
+    const rawInput = options?.startsNewTask
+      ? currentInput
+      : buildRawInputForGenerate(currentInput || undefined)
     if (!rawInput) {
       toast.error("请先在对话框里说点素材或需求")
       return
@@ -2196,11 +2211,16 @@ export default function AimPage() {
     requestAbortRef.current = controller
     const assistantMessageId = nextId()
     pendingScrollMessageIdRef.current = assistantMessageId
-    const baseMessages = options?.retryMessageId
+    const baseMessages = options?.startsNewTask
+      ? []
+      : options?.retryMessageId
       ? messages.filter((message) => message.id !== options.retryMessageId)
       : messages
+    if (options?.startsNewTask) clearCurrentTaskContext()
     setMessages((prev) => [
-      ...(options?.retryMessageId
+      ...(options?.startsNewTask
+        ? []
+        : options?.retryMessageId
         ? prev.filter((message) => message.id !== options.retryMessageId)
         : prev),
       ...(currentInput && !options?.retryMessageId ? [{ id: nextId(), role: "user" as const, content: currentInput }] : []),
@@ -2219,11 +2239,11 @@ export default function AimPage() {
         rawInput: buildHistoryRawInput(rawInput, options?.retryMessageId ? "" : currentInput, baseMessages),
         targetFormats: agent.defaultFormats,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-        videoCopyExtractionId: sourceVideoCopyExtractionId,
-        topicTitle: sourceTopicTitle.trim() || undefined,
-        topicRationale: sourceTopicRationale.trim() || undefined,
-        topicSelectionId: topicSelectionIdParam || undefined,
-        selectedTopicIndex: Number.isFinite(selectedTopicIndexParam) ? selectedTopicIndexParam : undefined,
+        videoCopyExtractionId: options?.startsNewTask ? undefined : sourceVideoCopyExtractionId,
+        topicTitle: options?.startsNewTask ? undefined : sourceTopicTitle.trim() || undefined,
+        topicRationale: options?.startsNewTask ? undefined : sourceTopicRationale.trim() || undefined,
+        topicSelectionId: options?.startsNewTask ? undefined : topicSelectionIdParam || undefined,
+        selectedTopicIndex: options?.startsNewTask || !Number.isFinite(selectedTopicIndexParam) ? undefined : selectedTopicIndexParam,
         taskType: contentAction
           ? AIM_CONTENT_ACTIONS.find((item) => item.id === contentAction)?.taskType || "write_script"
           : "write_script",
@@ -2311,9 +2331,10 @@ export default function AimPage() {
       return
     }
     const currentInput = input.trim()
+    const startsNewTask = hasExplicitNewTaskIntent(currentInput)
     const workbenchCommand = detectAimWorkbenchCommand(currentInput)
-    if (workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
-    await generateWithInput(currentInput)
+    if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
+    await generateWithInput(currentInput, { startsNewTask })
   }
 
   function retryFailedMessage(message: ChatMessage) {
@@ -2601,8 +2622,9 @@ export default function AimPage() {
               <Sparkles className="h-4 w-4" />
               <span className="sr-only">{isEvolving ? "提炼中" : "沉淀偏好与风格"}</span>
             </Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => resetConversation()} title="新对话">
+            <Button size="sm" variant="ghost" className="h-8 gap-1 px-2" onClick={() => resetConversation()} title="清空旧稿并开始新任务">
               <Plus className="h-4 w-4" />
+              <span className="hidden text-xs sm:inline">新任务</span>
             </Button>
           </div>
         </header>
