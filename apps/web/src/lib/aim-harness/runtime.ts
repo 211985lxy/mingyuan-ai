@@ -23,11 +23,10 @@
 import type {
   AimRunRequest,
   AimRunResult,
-  AimAgentOutput,
 } from "./contracts"
 import { normalizeAimAgentId, isValidAimAgent } from "./contracts"
 import { runAimHarness, makeRunId } from "./runner"
-import type { RunAimExecutionResult } from "./runner"
+import type { RunAimExecutionResult, AimHarnessOutcome } from "./runner"
 import { planAimRun } from "./planner"
 import type { PlanRunInput } from "./planner"
 import type { AimRunSpec, AimContextSource, AimRunMetadata } from "./types"
@@ -155,6 +154,53 @@ export async function executeAimRun<TOutput = unknown>(
       : undefined
   const generationId = partial?.generationId ?? legacyGenerationId
 
+  const { qualityReport, qualityChecks, qualityStatus, snapshotId } = await finalizeRunResult({
+    spec,
+    output,
+    partial,
+    request,
+    execResult,
+  })
+
+  // ── degraded 语义裂缝修复：provider fallback 降级时回标 AimGeneration.status ──
+  // 仅在确实落了生成记录（非 draftOnly / 非 skipPersistence）且运行降级时回标。
+  if (execResult.metadata.degraded && generationId && request.actorId) {
+    await flagAimGenerationDegraded(generationId, request.actorId).catch(() => {
+      // 回标是 best-effort：失败不阻断已完成的生成（snapshot/trace 已记录 degraded）。
+    })
+  }
+
+  return {
+    metadata: execResult.metadata,
+    output,
+    generationId,
+    snapshotId,
+    traceId: request.trace?.id,
+    qualityReport,
+    qualityChecks,
+    qualityStatus,
+    spec,
+  }
+}
+
+/**
+ * 执行收尾：质量评估 → contextManifest 构建 → 快照持久化 + trace 回填。
+ * 从 executeAimRun 逐字迁出，顺序、门控、persistSnapshot !== false 条件一字不改。
+ */
+async function finalizeRunResult<TOutput>(input: {
+  spec: AimRunSpec
+  output: TOutput
+  partial: (Omit<RunAimExecutionResult, "output"> & {
+    output: TOutput
+    generationId?: string
+    qualityReport?: Record<string, unknown>
+    qualityStatus?: "pass" | "warn" | "fail" | "skipped"
+  }) | undefined
+  request: AimRunRequest
+  execResult: AimHarnessOutcome
+}) {
+  const { spec, output, partial, request, execResult } = input
+
   let qualityReport = partial?.qualityReport
   let qualityStatus = partial?.qualityStatus
   let qualityChecks: import("./validators").FormatValidationResult[] | undefined
@@ -209,25 +255,7 @@ export async function executeAimRun<TOutput = unknown>(
     )
   }
 
-  // ── degraded 语义裂缝修复：provider fallback 降级时回标 AimGeneration.status ──
-  // 仅在确实落了生成记录（非 draftOnly / 非 skipPersistence）且运行降级时回标。
-  if (execResult.metadata.degraded && generationId && request.actorId) {
-    await flagAimGenerationDegraded(generationId, request.actorId).catch(() => {
-      // 回标是 best-effort：失败不阻断已完成的生成（snapshot/trace 已记录 degraded）。
-    })
-  }
-
-  return {
-    metadata: execResult.metadata,
-    output,
-    generationId,
-    snapshotId,
-    traceId: request.trace?.id,
-    qualityReport,
-    qualityChecks,
-    qualityStatus,
-    spec,
-  }
+  return { qualityReport, qualityChecks, qualityStatus, snapshotId }
 }
 
 /**

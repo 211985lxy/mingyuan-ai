@@ -86,7 +86,80 @@ export async function prepareAimContext(
   const agentId = spec.agentId as AimAgentId
   const params = input // alias for readability vs the original
 
-  // 1. 项目校验（与 buildAimGeneration:1430 一致）
+  // 1. 项目校验 + 生成意图（与 buildAimGeneration:1430 / 1460 一致）
+  const generationIntent = await checkProjectAndResolveIntent({ spec, agentId, params, trace })
+
+  // runtimeTask 已由 planner 冻结在 spec；这里直接采用，不二次解析
+  // （buildAimGeneration 接受 params.runtimeTask 覆盖；v2 下 planner 是唯一源）。
+  const runtimeTask = spec.runtimeTask as AimRuntimeTask
+
+  // 2. 知识调用策略只读 planner 冻结结果，不再二次解析。
+  const knowledgeStrategy = spec.knowledgeStrategy
+
+  // 3. 并行读取通用背景资产（与 buildAimGeneration:1508 一致，gating 逐字保留）
+  const {
+    knowledgeCtx, viralStructureBlock, methodologyBlock,
+    businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock,
+  } = await loadGenerationContextBlocks({ spec, params, agentId, runtimeTask, knowledgeStrategy, generationIntent, trace })
+
+  // ── TaskSpec 构建（与 buildAimGeneration:1568 一致，含二次查 project/topicSelection）
+  const taskSpec = await buildContextTaskSpec({ spec, params, knowledgeEntries: knowledgeCtx.entries ?? [] })
+
+  // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致）
+  const budgeted = await compressAndBudgetGenerationInput({
+    agentId,
+    spec,
+    runtimeTask,
+    knowledgeBlock: knowledgeCtx.knowledgeBlock,
+    methodologyBlock,
+    businessDiagnosisBlock,
+    viralStructureBlock,
+    eventStorytellingBlock,
+    ipWikiBlock,
+    trace,
+  })
+
+  // 声明式来源清单（阶段 2.2 新增；此前 harness 事后反查，此处装配时即记录）
+  const contextManifest = buildContextManifest(spec, knowledgeCtx.entries ?? [], budgeted.stats.includedChars)
+
+  return {
+    spec,
+    rawInput: spec.rawInput,
+    blocks: {
+      knowledge: budgeted.blocks.knowledgeBlock,
+      methodology: budgeted.blocks.methodologyBlock,
+      businessDiagnosis: budgeted.blocks.businessDiagnosisBlock,
+      viralStructure: budgeted.blocks.viralStructureBlock,
+      eventStorytelling: budgeted.blocks.eventStorytellingBlock,
+      ipWiki: budgeted.blocks.ipWikiBlock,
+      // generate 路径此前不注入对话记忆；阶段 2 预留，暂为空
+      memory: "",
+    },
+    taskSpec,
+    retrievedEntries: (knowledgeCtx.entries ?? []).map((e: { id: string; title: string; category?: string }) => ({
+      id: e.id,
+      title: e.title,
+      ...(e.category ? { category: e.category } : {}),
+    })),
+    retrievedSource: knowledgeCtx.source,
+    contextManifest,
+    budgetApplied: true,
+  }
+}
+
+/**
+ * 项目权限校验 + 生成意图解析（prepareAimContext step 1，与 buildAimGeneration:1430 /
+ * 1460 逐字等价）。项目校验抛「客户项目不存在或已归档」；意图用 rawInput +
+ * polishInstruction 拼成的单条 user 消息解析。顺序、校验条件、trace 一字不改。
+ */
+async function checkProjectAndResolveIntent(input: {
+  spec: AimRunSpec
+  agentId: AimAgentId
+  params: PrepareAimContextInput
+  trace?: AimTraceRecorder
+}) {
+  const { spec, agentId, params, trace } = input
+
   await runAimTraceStep(trace, "project_check", "项目权限校验", async () => {
     if (!spec.projectId) return { checked: false }
     const project = await prisma.clientProject.findFirst({
@@ -100,12 +173,7 @@ export async function prepareAimContext(
     metadata: result,
   }))
 
-  // runtimeTask 已由 planner 冻结在 spec；这里直接采用，不二次解析
-  // （buildAimGeneration 接受 params.runtimeTask 覆盖；v2 下 planner 是唯一源）。
-  const runtimeTask = spec.runtimeTask as AimRuntimeTask
-
-  // 生成意图（与 buildAimGeneration:1460 一致；仍需解析 useKnowledge/useMethodology）
-  const generationIntent = await runAimTraceStep(
+  return runAimTraceStep(
     trace,
     "resolve_generation_intent",
     "生成模式识别",
@@ -124,11 +192,76 @@ export async function prepareAimContext(
       metadata: { useKnowledge: intent.useKnowledge, useMethodology: intent.useMethodology },
     }),
   )
+}
 
-  // 2. 知识调用策略只读 planner 冻结结果，不再二次解析。
-  const knowledgeStrategy = spec.knowledgeStrategy
+/**
+ * 压缩生成输入并应用上下文预算（prepareAimContext step 4，与 buildAimGeneration:1607
+ * 逐字等价）。压缩后把摘要拼到知识块前，再按 runtimeTask 的 budget profile 裁剪，
+ * 并记录 context_budget trace。顺序与 budget 输入字段不变。
+ */
+async function compressAndBudgetGenerationInput(input: {
+  agentId: AimAgentId
+  spec: AimRunSpec
+  runtimeTask: AimRuntimeTask
+  knowledgeBlock: string
+  methodologyBlock: string
+  businessDiagnosisBlock: string
+  viralStructureBlock: string
+  eventStorytellingBlock: string
+  ipWikiBlock: string
+  trace?: AimTraceRecorder
+}) {
+  const { agentId, spec, runtimeTask, knowledgeBlock, trace } = input
+  const generateMessages = [{ role: "user" as const, content: spec.rawInput }]
+  const compressed = await runAimTraceStep(
+    trace,
+    "compress_generation_input",
+    "生成输入压缩",
+    () => compressAimMessages(agentId, generateMessages),
+    (result) => ({
+      summary: result.didCompress ? "已压缩输入" : "无需压缩",
+      metadata: { didCompress: result.didCompress },
+    }),
+  )
+  const knowledgeWithContext = compressed.didCompress
+    ? `【对话摘要】\n${compressed.summary}\n\n${knowledgeBlock}`
+    : knowledgeBlock
+  const budgeted = applyAimContextBudget({
+    conversationBlock: "",
+    knowledgeBlock: knowledgeWithContext,
+    methodologyBlock: input.methodologyBlock,
+    businessDiagnosisBlock: input.businessDiagnosisBlock,
+    viralStructureBlock: input.viralStructureBlock,
+    eventStorytellingBlock: input.eventStorytellingBlock,
+    ipWikiBlock: input.ipWikiBlock,
+  }, runtimeTask)
+  await addAimTraceStep(trace, {
+    key: "context_budget",
+    label: "上下文预算",
+    status: "success",
+    summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
+    metadata: budgeted.stats,
+  })
+  return budgeted
+}
 
-  // 3. 并行读取通用背景资产（与 buildAimGeneration:1508 一致，gating 逐字保留）
+/**
+ * 并行读取通用背景资产（知识 / 结构 / 方法论 / 竞品诊断 / IP Wiki / 事件叙事）。
+ * 从 prepareAimContext step 3 逐字迁出：Promise.all 6 元素顺序、gating（projectId /
+ * useKnowledge / useMethodology / agentId / useEventStorytelling）、contextOverride
+ * eval 分支、trace summary/metadata 全部一字不改——这是与 buildAimGeneration 字节
+ * 等价的核心，不得调整门控或顺序。
+ */
+async function loadGenerationContextBlocks(input: {
+  spec: AimRunSpec
+  params: PrepareAimContextInput
+  agentId: AimAgentId
+  runtimeTask: AimRuntimeTask
+  knowledgeStrategy: ResolvedKnowledgeStrategy | undefined
+  generationIntent: { useKnowledge: boolean; useMethodology: boolean }
+  trace?: AimTraceRecorder
+}) {
+  const { spec, params, agentId, runtimeTask, knowledgeStrategy, generationIntent, trace } = input
   const useEventStorytelling = shouldUseEventStorytelling({
     rawInput: spec.rawInput,
     topicTitle: params.topicTitle,
@@ -191,7 +324,22 @@ export async function prepareAimContext(
     }),
   )
 
-  // ── TaskSpec 构建（与 buildAimGeneration:1568 一致，含二次查 project/topicSelection）
+  return { knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock }
+}
+
+/**
+ * TaskSpec 构建：二次查 project / topicSelection（含归属过滤）→ 组装 skeleton
+ * → refine（除非 route 已提供 params.taskSpec）。
+ * 从 prepareAimContext 逐字迁出（与 buildAimGeneration:1568 等价），查询/字段不变。
+ */
+async function buildContextTaskSpec(input: {
+  spec: AimRunSpec
+  params: PrepareAimContextInput
+  knowledgeEntries: Array<{ title?: string }>
+}) {
+  const { spec, params } = input
+  const agentId = spec.agentId as AimAgentId
+
   const projectRow = spec.projectId
     ? await prisma.clientProject.findFirst({
         where: { id: spec.projectId, userId: params.userId },
@@ -204,7 +352,7 @@ export async function prepareAimContext(
         select: { sourceHighlights: true, candidates: true },
       }).catch(() => null)
     : null
-  const knowledgeTitles = (knowledgeCtx.entries ?? []).map((e: { title?: string }) => e.title).filter(Boolean) as string[]
+  const knowledgeTitles = (input.knowledgeEntries ?? []).map((e) => e.title).filter(Boolean) as string[]
   const taskSpecSkeleton = buildTaskSpecSkeleton({
     agentId,
     taskType: params.taskType,
@@ -223,66 +371,7 @@ export async function prepareAimContext(
     } : null,
     knowledgeTitles,
   })
-  const taskSpec = params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
-
-  // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致）
-  const generateMessages = [{ role: "user" as const, content: spec.rawInput }]
-  const compressed = await runAimTraceStep(
-    trace,
-    "compress_generation_input",
-    "生成输入压缩",
-    () => compressAimMessages(agentId, generateMessages),
-    (result) => ({
-      summary: result.didCompress ? "已压缩输入" : "无需压缩",
-      metadata: { didCompress: result.didCompress },
-    }),
-  )
-  const knowledgeWithContext = compressed.didCompress
-    ? `【对话摘要】\n${compressed.summary}\n\n${knowledgeCtx.knowledgeBlock}`
-    : knowledgeCtx.knowledgeBlock
-  const budgeted = applyAimContextBudget({
-    conversationBlock: "",
-    knowledgeBlock: knowledgeWithContext,
-    methodologyBlock,
-    businessDiagnosisBlock,
-    viralStructureBlock,
-    eventStorytellingBlock,
-    ipWikiBlock,
-  }, runtimeTask)
-  await addAimTraceStep(trace, {
-    key: "context_budget",
-    label: "上下文预算",
-    status: "success",
-    summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
-    metadata: budgeted.stats,
-  })
-
-  // 声明式来源清单（阶段 2.2 新增；此前 harness 事后反查，此处装配时即记录）
-  const contextManifest = buildContextManifest(spec, knowledgeCtx.entries ?? [], budgeted.stats.includedChars)
-
-  return {
-    spec,
-    rawInput: spec.rawInput,
-    blocks: {
-      knowledge: budgeted.blocks.knowledgeBlock,
-      methodology: budgeted.blocks.methodologyBlock,
-      businessDiagnosis: budgeted.blocks.businessDiagnosisBlock,
-      viralStructure: budgeted.blocks.viralStructureBlock,
-      eventStorytelling: budgeted.blocks.eventStorytellingBlock,
-      ipWiki: budgeted.blocks.ipWikiBlock,
-      // generate 路径此前不注入对话记忆；阶段 2 预留，暂为空
-      memory: "",
-    },
-    taskSpec,
-    retrievedEntries: (knowledgeCtx.entries ?? []).map((e: { id: string; title: string; category?: string }) => ({
-      id: e.id,
-      title: e.title,
-      ...(e.category ? { category: e.category } : {}),
-    })),
-    retrievedSource: knowledgeCtx.source,
-    contextManifest,
-    budgetApplied: true,
-  }
+  return params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
 }
 
 /** 装配阶段的声明式来源清单（取代 harness 事后反查）。 */

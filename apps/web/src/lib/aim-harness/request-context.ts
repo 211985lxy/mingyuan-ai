@@ -10,6 +10,7 @@ import {
   resolveAimRuntimeTask,
   shouldUseKnowledgeContextForTask,
   shouldUseMarketViralContextForTask,
+  type AimRuntimeTask,
 } from "@/lib/aim-knowledge-strategy"
 import { addAimTraceStep, runAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
 
@@ -57,22 +58,49 @@ export async function prepareAimGenerateInput(input: {
     (task) => ({ summary: task, metadata: { runtimeTask: task } }),
   )
 
-  const bypassAuxiliaryContext = shouldBypassAuxiliaryContext(input.agentId, input.rawInput)
+  const rawInput = await applyAuxiliaryContext({
+    userId: input.userId,
+    rawInput: input.rawInput,
+    runtimeTask,
+    agentId: input.agentId,
+    videoCopyExtractionId: input.videoCopyExtractionId,
+    useMarketViralVideos: input.useMarketViralVideos,
+    trace: input.trace,
+  })
+
+  return { rawInput, runtimeTask }
+}
+
+/**
+ * 辅助上下文注入链：爆款拆解 → 市场爆款 → 全网热榜 → 对标热评。
+ * 从 prepareAimGenerateInput 逐字迁出：顺序、门控、skip trace、catch 回退一字不改。
+ */
+async function applyAuxiliaryContext(input: {
+  userId: string
+  rawInput: string
+  runtimeTask: AimRuntimeTask
+  agentId?: string
+  videoCopyExtractionId?: string
+  useMarketViralVideos?: boolean
+  trace?: AimTraceRecorder
+}): Promise<string> {
+  const { userId, rawInput, runtimeTask, agentId, videoCopyExtractionId, useMarketViralVideos, trace } = input
+  const bypassAuxiliaryContext = shouldBypassAuxiliaryContext(agentId, rawInput)
   const withVideoCopyContext = shouldUseKnowledgeContextForTask(runtimeTask) && !bypassAuxiliaryContext
     ? await runAimTraceStep(
-        input.trace,
+        trace,
         "video_copy_context",
         "爆款拆解上下文注入",
-        () => buildRawInputWithVideoCopyContext(input.userId, input.rawInput, input.videoCopyExtractionId),
+        () => buildRawInputWithVideoCopyContext(userId, rawInput, videoCopyExtractionId),
         (value) => ({
-          summary: value === input.rawInput ? "未注入爆款拆解" : "已注入爆款拆解",
+          summary: value === rawInput ? "未注入爆款拆解" : "已注入爆款拆解",
           metadata: { chars: value.length },
         }),
       )
-    : input.rawInput
+    : rawInput
 
   if (!shouldUseKnowledgeContextForTask(runtimeTask) || bypassAuxiliaryContext) {
-    await addAimTraceStep(input.trace, {
+    await addAimTraceStep(trace, {
       key: "video_copy_context",
       label: "爆款拆解上下文注入",
       status: "skipped",
@@ -82,21 +110,21 @@ export async function prepareAimGenerateInput(input: {
 
   const useMarketSignals =
     !bypassAuxiliaryContext
-    && input.useMarketViralVideos !== false
+    && useMarketViralVideos !== false
     && shouldUseMarketViralContextForTask(runtimeTask)
 
   const withMarketContext = await runAimTraceStep(
-    input.trace,
+    trace,
     "market_viral_context",
     "市场爆款上下文注入",
-    () => buildRawInputWithMarketViralContext(input.userId, withVideoCopyContext, useMarketSignals),
+    () => buildRawInputWithMarketViralContext(userId, withVideoCopyContext, useMarketSignals),
     (value) => ({
       summary: value === withVideoCopyContext ? "未注入市场爆款" : "已注入市场爆款",
       metadata: { chars: value.length },
     }),
   )
   const withTrendingContext = await runAimTraceStep(
-    input.trace,
+    trace,
     "trending_context",
     "全网热榜上下文注入",
     () => buildRawInputWithTrendingContext(withMarketContext, useMarketSignals),
@@ -105,16 +133,14 @@ export async function prepareAimGenerateInput(input: {
       metadata: { chars: value.length },
     }),
   )
-  const rawInput = await runAimTraceStep(
-    input.trace,
+  return runAimTraceStep(
+    trace,
     "comment_insight_context",
     "对标账号热评洞察注入",
-    () => buildRawInputWithCommentInsightContext(input.userId, withTrendingContext, useMarketSignals),
+    () => buildRawInputWithCommentInsightContext(userId, withTrendingContext, useMarketSignals),
     (value) => ({
       summary: value === withTrendingContext ? "未注入热评洞察" : "已注入对标账号热评洞察",
       metadata: { chars: value.length },
     }),
   )
-
-  return { rawInput, runtimeTask }
 }
