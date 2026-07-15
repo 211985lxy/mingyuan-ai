@@ -103,16 +103,18 @@ function makeRequest(body: Record<string, unknown>) {
 }
 
 describe("aim chat route project isolation (source contract)", () => {
-  const routePath = join(process.cwd(), "src/app/api/aim/chat/route.ts")
-  const source = readFileSync(routePath, "utf8")
+  // WP-12 Commit B：上下文装配已迁到 lib/aim/services/chat-context.ts，隔离契约随之
+  // 迁移到服务文件断言。变量名 user.id → userId（参数重命名），隔离语义不变。
+  const servicePath = join(process.cwd(), "src/lib/aim/services/chat-context.ts")
+  const source = readFileSync(servicePath, "utf8")
 
   it("项目对话按当前项目读取风格档案", () => {
-    expect(source).toContain("getStyleProfileBlock(user.id, projectId || null)")
+    expect(source).toContain("getStyleProfileBlock(userId, projectId || null)")
   })
 
   it("项目对话只召回项目记忆，不混入全局记忆", () => {
-    expect(source).toContain("? retrieveAimMemory({ userId: user.id, projectId, agentId }).catch(() => [])")
-    expect(source).toContain(": retrieveLayeredAimMemory({ userId: user.id, projectId, agentId }).catch(() => [])")
+    expect(source).toContain("? retrieveAimMemory({ userId, projectId, agentId }).catch(() => [])")
+    expect(source).toContain(": retrieveLayeredAimMemory({ userId, projectId, agentId }).catch(() => [])")
   })
 })
 
@@ -214,7 +216,6 @@ describe("POST /api/aim/chat", () => {
     const decoder = new TextDecoder()
     let collected = ""
     // drain the stream so finalize / memory fire
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { value, done } = await reader.read()
       if (done) break
