@@ -24,72 +24,26 @@ export async function runCompetitorAnalysisPipeline(analysisId: string): Promise
       where: { id: analysisId },
     })
 
-    // 平台门控已在 API route 层通过 getCompetitorPlatformGate 检查
-    // 这里不再重复检查，由 collectCompetitorData 按平台分发
-
-    // ── Step 1: SCRAPE ────────────────────────────────────────
     await updateStatus(analysisId, 'scraping')
     log.info('Step 1: Collecting account data')
-
     const collected = await collectCompetitorData({
       platform: analysis.platform as Platform,
       targetUrl: analysis.targetUrl,
       platformUserId: analysis.platformUserId,
       count: 50,
     })
-    const { platformUserId, account, videos, comments } = collected
+    const { account, videos, comments } = collected
+    await saveCollectedData(analysisId, collected)
 
-    await prisma.competitorAnalysis.update({
-      where: { id: analysisId },
-      data: {
-        platformUserId,
-        rawAccountData: account as never,
-        rawVideoData: videos as never,
-        accountName: account.nickname,
-        accountAvatar: account.avatar,
-        followerCount: account.followerCount,
-        videoCount: account.videoCount,
-        collectionSource: collected.collectionSource,
-        fallbackUsed: collected.fallbackUsed,
-        fallbackReason: collected.fallbackReason,
-      },
-    })
-
-    // ── Step 2: ENRICH ────────────────────────────────────────
     await updateStatus(analysisId, 'enriching')
     log.info('Step 2: Calculating metrics')
-
     const metrics = calculateMetrics(account, videos)
+    await saveMetrics(analysisId, comments, metrics)
 
-    await prisma.competitorAnalysis.update({
-      where: { id: analysisId },
-      data: {
-        rawCommentData: comments as never,
-        metricsData: metrics as never,
-      },
-    })
-
-    // ── Step 3: ANALYZE ───────────────────────────────────────
     await updateStatus(analysisId, 'analyzing')
     log.info('Step 3: AI analysis')
-
-    const result = await analyzeCompetitor(
-      account,
-      videos,
-      comments,
-      metrics,
-    )
-
-    await prisma.competitorAnalysis.update({
-      where: { id: analysisId },
-      data: {
-        status: 'completed',
-        currentStep: 'completed',
-        analysisResult: result as never,
-        overallScore: result.scores.overall,
-        completedAt: new Date(),
-      },
-    })
+    const result = await analyzeCompetitor(account, videos, comments, metrics)
+    await saveAnalysisResult(analysisId, result)
 
     log.info({ overallScore: result.scores.overall }, 'Pipeline completed')
 
@@ -110,6 +64,58 @@ export async function runCompetitorAnalysisPipeline(analysisId: string): Promise
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
+
+async function saveCollectedData(
+  analysisId: string,
+  collected: Awaited<ReturnType<typeof collectCompetitorData>>,
+): Promise<void> {
+  const { platformUserId, account, videos } = collected
+  await prisma.competitorAnalysis.update({
+    where: { id: analysisId },
+    data: {
+      platformUserId,
+      rawAccountData: account as never,
+      rawVideoData: videos as never,
+      accountName: account.nickname,
+      accountAvatar: account.avatar,
+      followerCount: account.followerCount,
+      videoCount: account.videoCount,
+      collectionSource: collected.collectionSource,
+      fallbackUsed: collected.fallbackUsed,
+      fallbackReason: collected.fallbackReason,
+    },
+  })
+}
+
+async function saveMetrics(
+  analysisId: string,
+  comments: unknown,
+  metrics: ReturnType<typeof calculateMetrics>,
+): Promise<void> {
+  await prisma.competitorAnalysis.update({
+    where: { id: analysisId },
+    data: {
+      rawCommentData: comments as never,
+      metricsData: metrics as never,
+    },
+  })
+}
+
+async function saveAnalysisResult(
+  analysisId: string,
+  result: Awaited<ReturnType<typeof analyzeCompetitor>>,
+): Promise<void> {
+  await prisma.competitorAnalysis.update({
+    where: { id: analysisId },
+    data: {
+      status: 'completed',
+      currentStep: 'completed',
+      analysisResult: result as never,
+      overallScore: result.scores.overall,
+      completedAt: new Date(),
+    },
+  })
+}
 
 async function updateStatus(id: string, status: string): Promise<void> {
   await prisma.competitorAnalysis.update({
