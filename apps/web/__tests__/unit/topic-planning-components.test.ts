@@ -2,6 +2,8 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { TopicDailyReportPanel } from "@/components/topic-planning/topic-daily-report"
+import { TopicCandidatesPanel } from "@/components/topic-planning/topic-candidates-panel"
+import { TopicChatCard } from "@/components/topic-planning/topic-chat-card"
 import { categorizeTopicCards, getTopicDisplayLabel } from "@/lib/topics/display-groups"
 import type { TopicDailyReport } from "@/lib/topic-daily-report"
 import type { ApiTopicCard } from "@/types/api"
@@ -50,5 +52,69 @@ describe("topic planning components", () => {
     expect(html).toContain("判断理由和证据")
     expect(html).toContain("今天怎么讲")
     expect(html).toContain("备选选题")
+  })
+
+  it("renders candidate scores, novelty and selected actions", () => {
+    const candidate = card("客户为什么不下单", {
+      score: 86,
+      scoreBreakdown: {
+        projectFit: 90,
+        contentValue: 80,
+        viralHook: 70,
+        conversionFit: 85,
+        feasibility: 95,
+      },
+      defamiliarization: {
+        noveltyScore: 55,
+        scarcityType: "info",
+        rhetoric: "bi",
+        note: "换一个客户视角",
+        advice: "补一条反常识判断",
+      },
+    })
+    const html = renderToStaticMarkup(createElement(TopicCandidatesPanel, {
+      cards: [candidate],
+      selectedIndex: 0,
+      selectedKnowledgeLabels: ["日常灵感 · 客户原话"],
+      knowledgeCount: 1,
+      autoGenerating: false,
+      onSelect: () => {},
+      onWrite: () => {},
+    }))
+
+    expect(html).toContain("已采用")
+    expect(html).toContain("去 AIM 写文案")
+    expect(html).toContain("强项是可执行，短板是传播钩子")
+    expect(html).toContain("含金量偏低")
+    expect(html).toContain("日常灵感 · 客户原话")
+  })
+
+  it("renders a temporary idea reply", () => {
+    const html = renderToStaticMarkup(createElement(TopicChatCard, {
+      value: "客户为什么觉得报价高",
+      loading: false,
+      disabled: false,
+      reply: {
+        reply: {
+          summary: "先解释价格背后的风险",
+          recommendedTitle: "报价高，可能是在替你挡风险",
+          opening: "便宜不一定省钱。",
+          alternatives: ["成本拆解"],
+        },
+        cards: [],
+        topicSelectionId: "selection-1",
+        knowledgeEntry: {
+          id: "knowledge-1",
+          title: "客户为什么觉得报价高",
+          category: "daily_inspiration",
+        },
+      },
+      onChange: () => {},
+      onSubmit: () => {},
+    }))
+
+    expect(html).toContain("先解释价格背后的风险")
+    expect(html).toContain("报价高，可能是在替你挡风险")
+    expect(html).toContain("成本拆解")
   })
 })
