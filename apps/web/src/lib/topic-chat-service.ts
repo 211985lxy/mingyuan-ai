@@ -6,6 +6,11 @@ import {
   buildTopicKnowledgeDraft,
   classifyTopicChatInput,
 } from "@/lib/topic-chat"
+import {
+  buildTopicProjectSource,
+  createTopicIpProfile,
+  loadTopicChatContext,
+} from "@/lib/topics/chat-context"
 
 export async function handleTopicChatMessage(input: {
   userId: string
@@ -13,34 +18,7 @@ export async function handleTopicChatMessage(input: {
   content: string
 }) {
   const content = input.content.trim()
-  const [project, elements, ipProfile] = await Promise.all([
-    prisma.clientProject.findFirst({
-      where: { id: input.projectId, userId: input.userId, status: "active" },
-      select: {
-        id: true,
-        name: true,
-        industry: true,
-        targetCustomer: true,
-        offer: true,
-        deliveryGoal: true,
-      },
-    }),
-    prisma.topicElement.findMany({
-      where: { status: "published" },
-      orderBy: { sortOrder: "asc" },
-      select: { code: true, name: true, typeLabel: true, description: true },
-    }),
-    prisma.ipProfile.findUnique({
-      where: { userId: input.userId },
-      select: {
-        id: true,
-        displayName: true,
-        industry: true,
-        primaryOffer: true,
-        targetAudience: true,
-      },
-    }).catch(() => null),
-  ])
+  const [project, elements, ipProfile] = await loadTopicChatContext(input)
 
   if (!project) throw new Error("客户项目不存在或无权访问")
 
@@ -61,31 +39,8 @@ export async function handleTopicChatMessage(input: {
     select: { id: true, category: true, title: true },
   })
 
-  const projectSource = [
-    project.industry ? `行业：${project.industry}` : null,
-    project.targetCustomer ? `目标客户：${project.targetCustomer}` : null,
-    project.offer ? `产品/服务：${project.offer}` : null,
-    project.deliveryGoal ? `交付目标：${project.deliveryGoal}` : null,
-  ].filter(Boolean).join("\n")
-
-  const topicIpProfile = ipProfile ?? await prisma.ipProfile.create({
-    data: {
-      userId: input.userId,
-      displayName: project.name,
-      industry: project.industry,
-      primaryOffer: project.offer,
-      targetAudience: project.targetCustomer,
-      isComplete: false,
-      isActive: true,
-    },
-    select: {
-      id: true,
-      displayName: true,
-      industry: true,
-      primaryOffer: true,
-      targetAudience: true,
-    },
-  })
+  const projectSource = buildTopicProjectSource(project)
+  const topicIpProfile = ipProfile ?? await createTopicIpProfile(input.userId, project)
 
   const result = await generateTopicCards({
     ipProfile: topicIpProfile,
