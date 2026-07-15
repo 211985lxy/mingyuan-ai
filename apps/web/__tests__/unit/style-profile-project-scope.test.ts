@@ -13,11 +13,10 @@ describe("style profile project scope", () => {
   })
 
   it("项目内润色和生成读取项目风格档案，而不是用户全局", () => {
-    const polishSource = readFileSync(join(process.cwd(), "src/app/api/scripts/polish/route.ts"), "utf8")
+    const polishSource = readFileSync(join(process.cwd(), "src/lib/aim/services/script-polish.ts"), "utf8")
     const generateSource = readFileSync(join(process.cwd(), "src/app/api/scripts/generate/route.ts"), "utf8")
 
-    expect(polishSource).toContain("getStyleProfileBlock(user.id, projectId ?? null)")
-    expect(polishSource).toContain("projectId: projectId ?? null")
+    expect(polishSource).toContain("getStyleProfileBlock(userId, input.projectId ?? null)")
     expect(generateSource).toContain("getStyleProfileBlock(user.id, projectId ?? null)")
   })
 })

@@ -3,7 +3,13 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 const source = readFileSync(
-  join(process.cwd(), "src/app/api/scripts/polish/route.ts"),
+  join(process.cwd(), "src/lib/aim/services/script-polish.ts"),
+  "utf8"
+) + readFileSync(
+  join(process.cwd(), "src/lib/aim/services/script-polish-context.ts"),
+  "utf8"
+) + readFileSync(
+  join(process.cwd(), "src/lib/aim/services/script-polish-prompts.ts"),
   "utf8"
 )
 
@@ -33,7 +39,7 @@ describe("polish route imitate mode", () => {
     // 用户写作风格档案打底（这个 IP 真实文风）
     expect(source).toContain("getStyleProfileBlock")
     // 12 风格可选覆盖
-    expect(source).toContain("getStylePromptBlock(styleId)")
+    expect(source).toContain("getStylePromptBlock(input.styleId)")
     // 项目知识库填充新内容
     expect(source).toContain("loadProjectKnowledge")
     expect(source).toContain("企业知识库")
