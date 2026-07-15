@@ -32,6 +32,17 @@ export function hasExplicitNewTaskIntent(text: string): boolean {
   return input.length > 0 && NEW_TASK_PATTERNS.some((pattern) => pattern.test(input))
 }
 
+const CURRENT_TASK_REFERENCE_PATTERN = /(继续|接着|基于|根据|上面|刚才|这篇|这版|当前|原稿|原文|改一下|修改|优化|润色|仿写|重写)/
+const SELF_CONTAINED_WRITING_PATTERN = /(写|生成|创作|策划|输出|做).{0,12}(文案|口播|文章|脚本|内容|选题)|(文案|口播|文章|脚本|内容|选题).{0,12}(写|生成|创作|策划|输出|做)/
+
+/** 多轮对话中，本轮已给出独立写作目标且未引用旧稿时，默认保护本轮不受旧任务污染。 */
+export function shouldIsolateWritingInstruction(text: string, hasHistory: boolean): boolean {
+  if (!hasHistory) return false
+  const input = text.trim().replace(/\s+/g, "")
+  if (!input || CURRENT_TASK_REFERENCE_PATTERN.test(input)) return false
+  return hasExplicitNewTaskIntent(input) || SELF_CONTAINED_WRITING_PATTERN.test(input)
+}
+
 const COMMAND_PATTERNS: Array<{ id: AimWorkbenchCommandId; pattern: RegExp }> = [
   { id: "reset_conversation", pattern: /(清空|重置|重新开始).{0,6}(对话|聊天|当前内容)/ },
   { id: "save_editor", pattern: /(保存|同步).{0,8}(编辑稿|编辑区|我的稿子|交付物)/ },
@@ -39,7 +50,7 @@ const COMMAND_PATTERNS: Array<{ id: AimWorkbenchCommandId; pattern: RegExp }> = 
   { id: "close_editor", pattern: /(隐藏|收起|关闭).{0,8}(编辑区|文案编辑|我的稿子)/ },
   { id: "fill_reference", pattern: /对标原文.*(右侧|文案编辑|对标文案|编辑区)|(右侧|文案编辑|对标文案|编辑区).*对标原文/ },
   { id: "integrate_editor", pattern: /(整合|合并|放|搞|弄|更新|同步).{0,8}编辑区|编辑区.{0,8}(整合|合并|更新|同步)/ },
-  { id: "revise_current_draft", pattern: /(融入|结合|带入|写进|放进).{0,10}(人设|IP|资料|故事|来时路)|(人设|IP|资料|故事|来时路).{0,10}(自然融入|融进去|写进去)|((别|不要|不能).{0,6}(越改越短|越写越短|缩水|压缩))|((保持|维持|别改短|不要缩短).{0,8}(原稿|原文|字数|长度|体量))/ },
+  { id: "revise_current_draft", pattern: /(?=.*(当前|这篇|这版|原稿|原文))((融入|结合|带入|写进|放进).{0,10}(人设|IP|资料|故事|来时路)|(人设|IP|资料|故事|来时路).{0,10}(自然融入|融进去|写进去))|((别|不要|不能).{0,6}(越改越短|越写越短|缩水|压缩))|((保持|维持|别改短|不要缩短).{0,8}(原稿|原文|字数|长度|体量))/ },
   { id: "rewrite_benchmark", pattern: /(按原文字数|对标原文|不要照抄|重新洗).{0,12}(重写|改写|再生成)/ },
   { id: "optimize_opening", pattern: /(优化|改|重写|加强|调整).{0,6}(开头|开场|起手|钩子|前3秒|前三秒|第一句话)/ },
   { id: "regenerate", pattern: /(重新生成|再生成|重来一版|换一版)/ },

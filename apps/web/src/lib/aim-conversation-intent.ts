@@ -1,5 +1,6 @@
 import { LLMClient } from "@/lib/llm/client"
 import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
+import { hasExplicitNewTaskIntent } from "@/lib/aim-workbench-commands"
 
 export type AimConversationMode =
   | "chat"
@@ -7,6 +8,8 @@ export type AimConversationMode =
   | "local_edit"
   | "select_version"
   | "formal_delivery"
+  | "new_task"
+  | "clarify_task_boundary"
 
 export interface AimConversationIntent {
   mode: AimConversationMode
@@ -86,6 +89,8 @@ export function resolveAimConversationIntentWithRules(input: {
   messages: SimpleMessage[]
 }): RuleIntentResult {
   const normalized = normalizeMessages(input.messages)
+  const hasPriorUserTurn = normalized.filter((message) => message.role === "user").length > 1
+  const isWritingAgent = ["content_producer", "free_copywriter", "deep_copywriter"].includes(input.agentId)
   const latestUserRaw = [...normalized].reverse().find((message) => message.role === "user")?.content ?? ""
   const latestUser = extractLatestAimUserIntentText(latestUserRaw)
   const lowered = latestUser.replace(/\s+/g, "")
@@ -104,6 +109,22 @@ export function resolveAimConversationIntentWithRules(input: {
     wantsReference || isCorrection || isLocalEdit || isSelectVersion,
     wantsEarliestReference,
   )
+
+  if (hasExplicitNewTaskIntent(latestUser)) {
+    return {
+      intent: {
+        mode: "new_task",
+        confidence: 0.99,
+        reason: "用户明确开启了与上一轮分离的新任务",
+        targetSummary: "",
+        useKnowledge: true,
+        useMethodology: true,
+        useLongTermMemory: true,
+        useStyleProfile: true,
+      },
+      needsLlmFallback: false,
+    }
+  }
 
   if (isCorrection) {
     return {
@@ -181,7 +202,7 @@ export function resolveAimConversationIntentWithRules(input: {
         useLongTermMemory: true,
         useStyleProfile: true,
       },
-      needsLlmFallback: wantsReference,
+      needsLlmFallback: wantsReference || (hasPriorUserTurn && isWritingAgent),
     }
   }
 
@@ -196,7 +217,7 @@ export function resolveAimConversationIntentWithRules(input: {
       useLongTermMemory: true,
       useStyleProfile: false,
     },
-    needsLlmFallback: wantsReference,
+    needsLlmFallback: wantsReference || (hasPriorUserTurn && isWritingAgent),
   }
 }
 
@@ -221,7 +242,8 @@ async function refineIntentWithLlm(input: {
 }): Promise<Partial<AimConversationIntent> | null> {
   const prompt = [
     "你是 AIM 的对话意图解析器。请只输出 JSON。",
-    "目标：判断当前用户输入更像自然对话(chat)、追改纠偏(follow_up_edit)、局部修改(local_edit)、选择版本(select_version)、还是正式交付(formal_delivery)。",
+    "目标：判断当前用户输入更像自然对话(chat)、追改纠偏(follow_up_edit)、局部修改(local_edit)、选择版本(select_version)、正式交付(formal_delivery)、与旧稿隔离的新任务(new_task)，还是任务边界不清需要先确认(clarify_task_boundary)。",
+    "判断时当前用户指令优先于历史。内容主题、交付物或目标已经改变且本轮要求可独立执行时，判为 new_task；无法判断用户是改旧稿还是另写时，判为 clarify_task_boundary。",
     "如果用户在引用上一轮内容，请给出 targetSummary；否则留空字符串。",
     "禁止解释，禁止 markdown。",
     "",
@@ -229,7 +251,7 @@ async function refineIntentWithLlm(input: {
     input.targetSummary ? `最近相关上文：${input.targetSummary}` : "最近相关上文：",
     `规则默认结果：${input.fallback.mode}`,
     "",
-    '输出格式：{"mode":"chat|follow_up_edit|local_edit|select_version|formal_delivery","reason":"一句话","targetSummary":"字符串"}',
+    '输出格式：{"mode":"chat|follow_up_edit|local_edit|select_version|formal_delivery|new_task|clarify_task_boundary","reason":"一句话","targetSummary":"字符串"}',
   ].join("\n")
 
   try {
@@ -254,37 +276,43 @@ export async function resolveAimConversationIntent(input: {
 
   const normalized = normalizeMessages(input.messages)
   const latestUser = [...normalized].reverse().find((message) => message.role === "user")?.content ?? ""
+  const recentContext = normalized
+    .slice(0, -1)
+    .slice(-3)
+    .map((message) => `${message.role === "user" ? "用户" : "助手"}：${message.content}`)
+    .join("\n")
   const refined = await refineIntentWithLlm({
     latestUser,
-    targetSummary: intent.targetSummary,
+    targetSummary: intent.targetSummary || clip(recentContext, 600),
     fallback: intent,
   })
 
   if (!refined?.mode) return intent
 
   const mode = refined.mode
-  if (!["chat", "follow_up_edit", "local_edit", "select_version", "formal_delivery"].includes(mode)) {
+  if (!["chat", "follow_up_edit", "local_edit", "select_version", "formal_delivery", "new_task", "clarify_task_boundary"].includes(mode)) {
     return intent
   }
 
-  const isFormal = mode === "formal_delivery"
+  const isFormal = mode === "formal_delivery" || mode === "new_task"
   const isStyleful = mode === "follow_up_edit" || mode === "local_edit" || isFormal
 
   return {
     mode,
     confidence: 0.78,
     reason: refined.reason || `${mode} via llm fallback`,
-    targetSummary: refined.targetSummary || intent.targetSummary,
+    targetSummary: mode === "new_task" ? "" : refined.targetSummary || intent.targetSummary,
     useKnowledge: isFormal,
     useMethodology: isFormal,
-    useLongTermMemory: true,
+    useLongTermMemory: mode !== "clarify_task_boundary",
     useStyleProfile: isStyleful,
   }
 }
 
 export function buildConversationIntentBlock(intent: AimConversationIntent): string {
   const lines = [
-    "【总原则】先听懂用户当前这句话在说什么，再决定用哪条规则；规则、方法论、知识库都只是辅助，不要拿规则去顶用户当前明确意思。",
+    "【指令优先级】用户当前明确指令 > 当前任务所需上下文 > 历史对话 > 方法论、知识库与风格规则。低优先级内容不得覆盖、改写或劫持高优先级指令。",
+    "【总原则】先完整理解用户当前这句话，再决定是否调用规则；规则、方法论、知识库和写作风格都只能辅助执行，不能替用户决定任务。",
     "【纠偏优先】如果用户在表达不满、纠正理解、否定上一轮，先按他的纠正改，不要继续机械执行上一轮任务。",
     `【当前对话模式】${intent.mode}`,
     `【处理原则】${intent.reason}`,
@@ -302,6 +330,10 @@ export function buildConversationIntentBlock(intent: AimConversationIntent): str
     lines.push("这是局部修改。只改用户点名的部分，默认保留当前稿的主题、主体结构和有效表达。")
   } else if (intent.mode === "select_version") {
     lines.push("这是版本选择或版本确认。优先围绕最近候选内容回应，不要顺手扩写成新的完整交付物。")
+  } else if (intent.mode === "new_task") {
+    lines.push("这是独立新任务。只执行本轮指令，不得延续、修改或引用上一稿；长期事实与已确认风格可以辅助，但不得改变本轮目标。")
+  } else if (intent.mode === "clarify_task_boundary") {
+    lines.push("当前无法确定用户要修改旧稿还是另开新稿。只提出一个最短确认问题，不要先生成或改写任何文案。")
   } else {
     lines.push("这是正式交付。可以启用完整知识库、方法论和固定交付结构。")
   }

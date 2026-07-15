@@ -102,7 +102,7 @@ import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import {
   detectAimWorkbenchCommand,
-  hasExplicitNewTaskIntent,
+  shouldIsolateWritingInstruction,
   type AimWorkbenchCommand,
 } from "@/lib/aim-workbench-commands"
 import { buildOpeningRecommendationPrompt } from "@/lib/aim-opening-recommendation"
@@ -1899,7 +1899,7 @@ export default function AimPage() {
   ) {
     const images = options?.images ?? []
     if (!text && images.length === 0) return
-    const startsNewTask = !options?.retryMessageId && hasExplicitNewTaskIntent(text)
+    const startsNewTask = !options?.retryMessageId && shouldIsolateWritingInstruction(text, messages.length > 0)
     const workbenchCommand = detectAimWorkbenchCommand(text)
     if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
     if (!options?.retryMessageId && !startsNewTask) {
@@ -2331,7 +2331,7 @@ export default function AimPage() {
       return
     }
     const currentInput = input.trim()
-    const startsNewTask = hasExplicitNewTaskIntent(currentInput)
+    const startsNewTask = shouldIsolateWritingInstruction(currentInput, messages.length > 0)
     const workbenchCommand = detectAimWorkbenchCommand(currentInput)
     if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
     await generateWithInput(currentInput, { startsNewTask })

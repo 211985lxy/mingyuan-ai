@@ -315,17 +315,21 @@ export async function assembleAimChatContext(input: {
     }),
   )
 
+  const isolatesCurrentTurn = conversationIntent.mode === "new_task" || conversationIntent.mode === "clarify_task_boundary"
   const blocks = await retrieveChatContextBlocks({
     userId,
     projectId,
     agentId,
     query,
-    editorContext,
+    editorContext: isolatesCurrentTurn ? undefined : editorContext,
     conversationIntent,
     runtimeTask,
     trace,
   })
-  const normalizedMessages = normalizeMemoryMessages(messages)
+  const allNormalizedMessages = normalizeMemoryMessages(messages)
+  const normalizedMessages = isolatesCurrentTurn
+    ? allNormalizedMessages.slice(-1)
+    : allNormalizedMessages
   const contextManifest = buildChatContextManifest({ query, blocks, normalizedMessages })
 
   return {

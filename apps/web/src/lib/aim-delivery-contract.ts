@@ -26,6 +26,8 @@ export interface AimDeliveryContract {
 
 const TASK_LABELS: Record<string, string> = {
   formal_delivery: "正式交付",
+  new_task: "新任务",
+  clarify_task_boundary: "确认任务",
   local_edit: "局部修改",
   follow_up_edit: "追改纠偏",
   select_version: "版本延续",

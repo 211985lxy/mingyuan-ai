@@ -80,6 +80,33 @@ describe("aim-conversation-intent", () => {
     expect(result.intent.useMethodology).toBe(true)
   })
 
+  it("明确另开一篇时，优先识别为独立新任务", () => {
+    const result = resolveAimConversationIntentWithRules({
+      agentId: "content_producer",
+      messages: [
+        { role: "assistant", content: "第一篇文案正文" },
+        { role: "user", content: "新任务：结合人设资料，另写一篇关于客户需求的口播稿。" },
+      ],
+    })
+
+    expect(result.intent.mode).toBe("new_task")
+    expect(result.intent.targetSummary).toBe("")
+    expect(result.intent.useKnowledge).toBe(true)
+  })
+
+  it("多轮写作对话里的非明确指令交给完整意图判断", () => {
+    const result = resolveAimConversationIntentWithRules({
+      agentId: "content_producer",
+      messages: [
+        { role: "user", content: "先写一篇创业口播稿" },
+        { role: "assistant", content: "第一篇文案正文" },
+        { role: "user", content: "结合我们的表达风格，写客户为什么迟迟不成交。" },
+      ],
+    })
+
+    expect(result.needsLlmFallback).toBe(true)
+  })
+
   it("生成链路带历史对话时，优先理解本次生成输入", () => {
     const result = resolveAimConversationIntentWithRules({
       agentId: "deep_copywriter",
@@ -129,7 +156,7 @@ describe("aim-conversation-intent", () => {
     expect(result.intent.targetSummary).toContain("最早的对标文案")
   })
 
-  it("全局意图块明确要求先听懂用户当前意思", () => {
+  it("全局意图块明确锁定当前指令优先级", () => {
     const block = buildConversationIntentBlock({
       mode: "follow_up_edit",
       confidence: 1,
@@ -141,8 +168,8 @@ describe("aim-conversation-intent", () => {
       useStyleProfile: true,
     })
 
-    expect(block).toContain("先听懂用户当前这句话")
-    expect(block).toContain("规则、方法论、知识库都只是辅助")
+    expect(block).toContain("用户当前明确指令 > 当前任务所需上下文 > 历史对话")
+    expect(block).toContain("只能辅助执行")
     expect(block).toContain("先按他的纠正改")
   })
 })
