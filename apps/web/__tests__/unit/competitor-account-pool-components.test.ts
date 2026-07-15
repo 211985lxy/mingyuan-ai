@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
 import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
+import { CompetitorVideoSections, type CompetitorWatchVideo } from "@/components/competitor/competitor-video-sections"
 import type { WatchAccount } from "@/lib/api/client"
 import type { ApiCompetitorReport } from "@/types/api"
 
@@ -66,5 +67,52 @@ describe("competitor account pool components", () => {
     expect(html).toContain("88分")
     expect(html).toContain("已完成")
     expect(html).toContain("/competitor/report-1")
+  })
+
+  it("renders latest videos, viral rank and completed extraction", () => {
+    const video: CompetitorWatchVideo = {
+      videoId: "video-1",
+      title: "高互动作品",
+      coverUrl: "https://example.com/cover.jpg",
+      videoUrl: "https://example.com/video/1",
+      createTime: 1,
+      views: 10000,
+      likes: 800,
+      comments: 60,
+      shares: 20,
+      collects: 30,
+      engagementScore: 910,
+      account,
+    }
+    const html = renderToStaticMarkup(createElement(CompetitorVideoSections, {
+      latestVideos: [video],
+      viralVideos: [video],
+      extractions: {
+        "account-1-video-1": {
+          id: "extraction-1",
+          sourceUrl: video.videoUrl!,
+          platform: "douyin",
+          status: "completed",
+          errorMessage: null,
+          analysisError: null,
+          videoTitle: video.title,
+          videoCover: video.coverUrl,
+          videoDuration: "30",
+          transcript: "这是原文案",
+          analysisResult: { markdown: "## 文案拆解\n核心判断" },
+          createdAt: "2026-07-15T00:00:00.000Z",
+          updatedAt: "2026-07-15T01:00:00.000Z",
+          completedAt: "2026-07-15T01:00:00.000Z",
+        },
+      },
+      extractingVideoId: null,
+      onExtract: () => {},
+    }))
+
+    expect(html).toContain("最新作品")
+    expect(html).toContain("爆款作品")
+    expect(html).toContain("TOP 1")
+    expect(html).toContain("文案拆解预览")
+    expect(html).toContain("生成内容资产包")
   })
 })

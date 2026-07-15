@@ -6,18 +6,14 @@ import { useRouter } from "next/navigation"
 import {
   RefreshCw,
   Plus,
-  Video,
-  Flame,
   ExternalLink,
   Loader2,
-  FileText,
   Bell,
-  Wand2,
   Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
@@ -25,6 +21,12 @@ import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { DiscoveredAccountCard } from "@/components/competitor/discovered-account-card"
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
 import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
+import {
+  CompetitorVideoSections,
+  getCompetitorVideoPageUrl,
+  isActiveVideoExtractionStatus,
+  type CompetitorWatchVideo,
+} from "@/components/competitor/competitor-video-sections"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api/client"
 import {
@@ -42,12 +44,8 @@ import {
   type SimilarAccount,
 } from "@/lib/api/client"
 import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
-import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
-import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
-import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
 import {
   formatCompetitorAccountName as formatAccountName,
-  formatCompetitorCount,
   formatCompetitorRefreshError as formatRefreshError,
   formatCompetitorRelativeTime as formatRelativeTime,
 } from "@/lib/competitor/display"
@@ -56,41 +54,8 @@ import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtract
 // ─── Helpers ────────────────────────────────────────────
 
 const SUPPORTED_DOMAINS = ["douyin.com", "iesdouyin.com", "v.douyin.com"]
-const ACTIVE_EXTRACTION_STATUSES = new Set(["queued", "extracting", "analyzing"])
-
-type WatchVideo = NonNullable<WatchAccount["latestVideos"]>[number] & {
-  account: WatchAccount
-  engagementScore?: number
-}
-
 function isSupportedUrl(url: string): boolean {
   return SUPPORTED_DOMAINS.some((domain) => url.includes(domain))
-}
-
-function proxyCoverUrl(url: string): string {
-  return buildProxyImageUrl(url)
-}
-
-function videoPageUrl(video: WatchVideo): string {
-  return getWatchVideoPageUrl({
-    platform: video.account.platform || null,
-    videoId: video.videoId || null,
-    videoUrl: video.videoUrl || null,
-    fallbackUrl: video.account.targetUrl || null,
-  })
-}
-
-function accountPageUrl(video: WatchVideo): string {
-  return video.account.targetUrl || videoPageUrl(video)
-}
-
-function extractionStatusText(record: ApiVideoCopyExtraction | undefined): string {
-  if (!record) return "爆款文案拆解"
-  if (record.status === "completed" && record.analysisResult) return "查看拆解"
-  if (record.status === "completed") return "文案已提取"
-  if (record.status === "failed") return "提取失败"
-  if (record.status === "analyzing") return "分析中"
-  return "提取中"
 }
 
 function refreshStatusText(account: WatchAccount) {
@@ -353,13 +318,13 @@ export default function CompetitorWatchPage() {
     }
   }
 
-  async function handleExtractVideo(video: WatchVideo) {
+  async function handleExtractVideo(video: CompetitorWatchVideo) {
     const key = `${video.account.id}-${video.videoId}`
     setExtractingVideoId(key)
     try {
       const record = await extractWatchAccountVideo({
         watchAccountId: video.account.id,
-        videoUrl: videoPageUrl(video),
+        videoUrl: getCompetitorVideoPageUrl(video),
         videoTitle: video.title,
         coverUrl: video.coverUrl,
       })
@@ -378,7 +343,7 @@ export default function CompetitorWatchPage() {
 
   useEffect(() => {
     const active = Object.entries(videoExtractions).find(([, record]) =>
-      ACTIVE_EXTRACTION_STATUSES.has(record.status),
+      isActiveVideoExtractionStatus(record.status),
     )
     if (!active) return
 
@@ -422,107 +387,6 @@ export default function CompetitorWatchPage() {
 
   const hasRefreshingAccount = accounts.some((account) => account.refreshStatus === "refreshing")
 
-  function renderExtractionResult(record: ApiVideoCopyExtraction) {
-    const analysis = record.analysisResult as { markdown: string } | null
-    const rewriteHref = `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
-    if (record.status === "failed") {
-      return <p className="rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-600">{record.errorMessage || "文案提取失败"}</p>
-    }
-    if (!analysis) return null
-
-    return (
-      <AiResultPanel
-        title="文案拆解预览"
-        icon={<FileText className="h-3.5 w-3.5 text-primary" />}
-        meta={<span>{record.status === "completed" ? "已完成" : "处理中"}</span>}
-        contentClassName="p-2"
-        className="rounded-lg"
-        flat
-      >
-        <p className="mt-1 line-clamp-4 text-muted-foreground">{cleanVideoCopyAnalysisMarkdown(analysis.markdown).slice(0, 200)}...</p>
-        {record.transcript ? (
-          <p className="mt-2 line-clamp-2 text-muted-foreground">原文案：{record.transcript}</p>
-        ) : null}
-        <div className="mt-2 flex items-center justify-between border-t pt-2 gap-2">
-          <Link href="/video-copy" className="text-xs text-primary hover:underline">
-            查看完整记录
-          </Link>
-          <Link
-            href={rewriteHref}
-            className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Wand2 className="h-3 w-3" />
-            生成内容资产包
-          </Link>
-        </div>
-      </AiResultPanel>
-    )
-  }
-
-  function renderVideoCard(video: WatchVideo, options: { viral?: boolean; rank?: number } = {}) {
-    const key = `${video.account.id}-${video.videoId}`
-    const record = videoExtractions[key]
-    const isBusy = extractingVideoId === key || (record && ACTIVE_EXTRACTION_STATUSES.has(record.status))
-
-    return (
-      <div key={`${options.viral ? "viral-" : ""}${key}`} className="space-y-2">
-        <a
-          href={accountPageUrl(video)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`group/video relative block aspect-[9/16] rounded-lg overflow-hidden bg-muted ${options.viral ? "ring-1 ring-orange-300/50" : ""}`}
-        >
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-b from-muted/30 to-muted-foreground/10 p-4">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background/50 backdrop-blur-xs text-muted-foreground/60 shadow-xs">
-              <Video className="h-5 w-5" />
-            </span>
-          </div>
-          <img
-            src={proxyCoverUrl(video.coverUrl)}
-            alt={video.title || (options.viral ? "爆款作品" : "作品")}
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover/video:scale-105"
-            onError={(e) => handleProxyImageError(e, video.coverUrl || "")}
-          />
-          <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-2">
-            <p className="text-xs text-white font-medium line-clamp-1">
-              {video.title || "无标题"}
-            </p>
-            <div className="flex items-center gap-2 text-[10px] text-white/70 mt-0.5">
-              <span>赞 {formatCompetitorCount(video.likes)}</span>
-              <span>评 {formatCompetitorCount(video.comments)}</span>
-              {options.viral && video.engagementScore != null ? (
-                <span className="text-orange-300">热 {formatCompetitorCount(video.engagementScore)}</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between">
-            <span className="text-[10px] px-1 py-0.5 rounded bg-black/50 text-white/80 truncate max-w-20 block">
-              {video.account.nickname || ""}
-            </span>
-            {options.viral ? (
-              <span className="text-[10px] px-1 py-0.5 rounded bg-orange-500/80 text-white font-bold">
-                TOP {options.rank ?? "?"}
-              </span>
-            ) : (
-              <ExternalLink className="h-3 w-3 text-white/50 opacity-0 group-hover/video:opacity-100 transition-opacity" />
-            )}
-          </div>
-        </a>
-        <Button
-          size="sm"
-          variant={record?.status === "failed" ? "outline" : "secondary"}
-          className="h-8 w-full text-xs"
-          onClick={() => handleExtractVideo(video)}
-          disabled={Boolean(isBusy)}
-        >
-          {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-          {extractionStatusText(record)}
-        </Button>
-        {record ? renderExtractionResult(record) : null}
-      </div>
-    )
-  }
 
   function isDiscoveredAccountMonitored(account: SimilarAccount) {
     if (!account.targetUrl) return false
@@ -830,41 +694,13 @@ export default function CompetitorWatchPage() {
 
               <RecentReportsCard reports={reports} loading={reportsLoading} />
 
-              {/* Latest Videos Section */}
-              {activeLatestVideos.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Video className="h-4 w-4" />
-                      最新作品
-                      <Badge variant="secondary" className="text-xs ml-1">{activeLatestVideos.length}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {activeLatestVideos.map((video) => renderVideoCard(video))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Viral Videos Section */}
-              {activeViralVideos.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Flame className="h-4 w-4 text-orange-500" />
-                      爆款作品
-                      <Badge variant="secondary" className="text-xs ml-1">{activeViralVideos.length}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                      {activeViralVideos.map((video, index) => renderVideoCard(video, { viral: true, rank: index + 1 }))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              <CompetitorVideoSections
+                latestVideos={activeLatestVideos}
+                viralVideos={activeViralVideos}
+                extractions={videoExtractions}
+                extractingVideoId={extractingVideoId}
+                onExtract={(video) => void handleExtractVideo(video)}
+              />
             </>
           ) : null}
     </div>
