@@ -29,16 +29,16 @@ function toSR(j: JR): SyncResult {
   const pi = j.sourceItems.find(si => si.status !== 'completed' && si.hasMore); const s = j.status as JobStatus
   return { jobId: j.id, status: s, totalItems: j.totalItems, processedItems: j.processedItems, failedItems: j.failedItems, reportedCommentCount: j.reportedCommentCount, collectedCommentCount: j.collectedCommentCount, currentItemTitle: pi?.title ?? null, canContinue: !isTerminalStatus(s), partialReason: j.partialReason, errorMessage: j.errorMessage }
 }
-export async function syncJobForUser(uid: string, jid: string): Promise<SyncResult | null> {
+export async function syncJobForUser(uid: string, jid: string, depth = 0): Promise<SyncResult | null> {
   const j = await lj(uid, jid); if (!j) return null; const st = j.status as JobStatus
-  if (isTerminalStatus(st)) return toSR(j)
+  if (isTerminalStatus(st) || depth > 3) return toSR(j)
   if (st === 'pending') {
     await prisma.commentInsightJob.update({ where: { id: jid }, data: { status: 'resolving' } })
     const r = resolveSource(j.sourceUrl)
     if (r?.sourceType === 'video' && r.itemId) {
       await prisma.commentSourceItem.create({ data: { jobId: jid, platformItemId: r.itemId, sourceUrl: j.sourceUrl, title: r.itemId, status: 'pending', hasMore: true, cursor: '' } })
       await prisma.commentInsightJob.update({ where: { id: jid }, data: { status: 'collecting', totalItems: 1 } })
-      return syncJobForUser(uid, jid)
+      return syncJobForUser(uid, jid, depth + 1)
     }
     await prisma.commentInsightJob.update({ where: { id: jid }, data: { status: 'partial', partialReason: r?.sourceType === 'account' ? '账号链接采集将在后续版本支持' : '短链解析将在后续版本支持' } })
     return toSR((await lj(uid, jid))!)
@@ -56,7 +56,7 @@ export async function syncJobForUser(uid: string, jid: string): Promise<SyncResu
     const cr = await collectSourceItemPages(
       { jobId: jid, sourceItemId: pi.id, platform: j.platform as CommentRadarPlatform, platformItemId: pi.platformItemId, cursor: pi.cursor, hasMore: pi.hasMore },
       { maxPages: 5, existingCommentIds: eids, persistPage: async (jId, siId, cs, nc, hm) => {
-        for (const c of cs) { try { await prisma.commentRecord.create({ data: { jobId: jId, sourceItemId: siId, platformCommentId: c.commentId || `gen_${Date.now()}_${Math.random().toString(36).slice(2)}`, text: c.text, nickname: c.nickname ?? null, likes: c.likes, createTime: c.createTime, isTop: c.isTop } }) } catch {} }
+        for (const c of cs) { try { await prisma.commentRecord.create({ data: { jobId: jId, sourceItemId: siId, platformCommentId: c.commentId || `gen_${Date.now()}_${Math.random().toString(36).slice(2)}`, text: c.text, nickname: c.nickname ?? null, likes: c.likes, createTime: c.createTime, isTop: c.isTop } }) } catch (e: unknown) { if (e && typeof e === 'object' && 'code' in e && (e as { code: string }).code !== 'P2002') throw e } }
         await prisma.commentSourceItem.update({ where: { id: siId }, data: { cursor: String(nc), hasMore: hm, status: hm ? 'collecting' : 'completed' } })
         return { cursor: String(nc), hasMore: hm }
       } },
@@ -80,7 +80,7 @@ export async function listCommentsForJob(userId: string, jobId: string, params: 
   const where: Record<string, unknown> = { jobId }
   if (params.sourceItemId) where.sourceItemId = params.sourceItemId
   if (params.keyword) where.text = { contains: params.keyword }
-  const orderBy: Record<string, string> = params.sortBy === 'likes' ? { likes: params.sortOrder === 'asc' ? 'asc' : 'desc' } : { createdAt: params.sortOrder === 'asc' ? 'asc' : 'desc' }
+  const orderBy: Record<string, string> = params.sortBy === 'likes' ? { likes: params.sortOrder === 'asc' ? 'asc' : 'desc' } : { createTime: params.sortOrder === 'asc' ? 'asc' : 'desc' }
   const [items, total] = await Promise.all([
     prisma.commentRecord.findMany({ where, orderBy, skip: (page - 1) * pageSize, take: pageSize, include: { sourceItem: { select: { title: true } } } }),
     prisma.commentRecord.count({ where }),
