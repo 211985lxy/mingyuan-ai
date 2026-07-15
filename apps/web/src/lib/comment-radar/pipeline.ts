@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@/generated/prisma/client'
 import { resolveSource } from './source-resolver'
 import { collectSourceItemPages } from './collector'
 import type { JobStatus, CommentRadarPlatform, JobProgress } from './types'
 import { createJobSchema } from './schemas'
 const TR: Partial<Record<JobStatus, Set<JobStatus>>> = {
   pending: new Set(['resolving', 'failed']), resolving: new Set(['collecting', 'failed', 'partial']),
-  collecting: new Set(['collecting', 'completed', 'partial', 'failed']), analyzing: new Set(['completed', 'failed']),
+  collecting: new Set(['collecting', 'completed', 'partial', 'analyzing', 'failed']), analyzing: new Set(['completed', 'failed']),
   partial: new Set(['collecting', 'completed', 'failed']),
 }
 export function canTransition(c: JobStatus, n: JobStatus): boolean { return TR[c]?.has(n) ?? false }
@@ -93,4 +94,25 @@ export async function exportJobCsv(userId: string, jobId: string): Promise<strin
   const records = await prisma.commentRecord.findMany({ where: { jobId }, orderBy: { createdAt: 'desc' } })
   const { generateCsv } = await import('./csv')
   return generateCsv(records.map(r => ({ commentId: r.platformCommentId, text: r.text, nickname: r.nickname, likes: r.likes, createTime: r.createTime, isTop: r.isTop })))
+}
+
+export async function analyzeJobForUser(userId: string, jobId: string): Promise<SyncResult | null> {
+  const j = await lj(userId, jobId); if (!j) return null
+  const st = j.status as JobStatus
+  if (st === 'analyzing') return toSR(j)
+  if (st !== 'completed' && st !== 'partial') return null
+  if (j.collectedCommentCount === 0) return toSR(j)
+  await prisma.commentInsightJob.update({ where: { id: jobId }, data: { status: 'analyzing' } })
+  try {
+    const { analyzeComments } = await import('./analyzer')
+    const records = await prisma.commentRecord.findMany({ where: { jobId }, orderBy: { likes: 'desc' }, take: 200 })
+    const comments: Array<{ id: string; text: string; nickname: string | null; likes: number; isTop: boolean }> = records.map(r => ({ id: r.id, text: r.text, nickname: r.nickname, likes: r.likes, isTop: r.isTop }))
+    const result = await analyzeComments(comments, j.collectedCommentCount, j.platform)
+    await prisma.commentInsightJob.update({ where: { id: jobId }, data: { status: 'completed', analysisResult: result as unknown as Prisma.InputJsonValue, analyzedSampleCount: comments.length, completedAt: new Date() } })
+    return toSR((await lj(userId, jobId))!)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '分析失败'
+    await prisma.commentInsightJob.update({ where: { id: jobId }, data: { status: 'partial', errorMessage: msg } })
+    return toSR((await lj(userId, jobId))!)
+  }
 }
