@@ -99,19 +99,12 @@ function buildVerdict(analysis: ApiCompetitorAnalysis): VerdictData {
 
 // ─── Five-Layer Diagnosis Builder ────────────────────────
 
-function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQuestion[] {
-  const r = analysis.analysisResult
-  const sections = r?.sections
-  const scores = r?.scores
-  const videoCount = analysis.videoCount
-  const hasMetrics = !!analysis.metricsData
-  const hasTopVideos = !!r?.stats?.top_videos?.length
-  const hasContentStrategy = !!(sections?.content_strategy?.topic_distribution?.length)
-
-  const baseConfidence = calcConfidence(videoCount, hasMetrics, hasContentStrategy, hasTopVideos)
-
-  return [
-    {
+function buildPositioningQuestion(
+  analysis: ApiCompetitorAnalysis,
+  confidence: ConfidenceLevel,
+): DiagnosisQuestion {
+  const sections = analysis.analysisResult?.sections
+  return {
       questionNo: 1,
       layerName: "定位心智层",
       coreQuestion: "这个账号服务谁？用户为什么记住它？",
@@ -119,7 +112,7 @@ function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQues
         ?? (sections?.account_overview?.account_type
           ? `定位为${sections.account_overview.account_type}，但差异化表达不够清晰`
           : "定位信息缺失，无法判断心智沉淀"),
-      confidence: baseConfidence,
+      confidence,
       evidenceSource: [
         "账号签名与简介",
         "话题分布占比",
@@ -149,15 +142,23 @@ function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQues
         },
       ],
       actionSuggestion: "固化一句账号定位表达，确保简介、钩子、内容主题三者一致。",
-    },
-    {
+    }
+}
+
+function buildGrowthQuestion(
+  analysis: ApiCompetitorAnalysis,
+  confidence: ConfidenceLevel,
+): DiagnosisQuestion {
+  const sections = analysis.analysisResult?.sections
+  const scores = analysis.analysisResult?.scores
+  return {
       questionNo: 2,
       layerName: "内容增长层",
       coreQuestion: "为什么能涨？增长是否可复制？",
       oneLineConclusion: scores && scores.content_power >= 60
         ? `内容力${scores.content_power >= 80 ? "强" : "中等"}，${sections?.content_strategy?.viral_formula ? `爆款公式：${sections.content_strategy.viral_formula}` : "爆款模式可识别"}`
         : "内容增长力偏弱，缺乏可复制的爆款模式",
-      confidence: baseConfidence,
+      confidence,
       evidenceSource: [
         "话题分布",
         "内容形式占比",
@@ -192,15 +193,23 @@ function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQues
         },
       ],
       actionSuggestion: "保留高价值教程/分析主线，减少随机内容，固化爆款公式。",
-    },
-    {
+    }
+}
+
+function buildTrustQuestion(
+  analysis: ApiCompetitorAnalysis,
+  confidence: ConfidenceLevel,
+): DiagnosisQuestion {
+  const sections = analysis.analysisResult?.sections
+  const scores = analysis.analysisResult?.scores
+  return {
       questionNo: 3,
       layerName: "信任需求层",
       coreQuestion: "为什么能信？用户到底想解决什么问题？",
       oneLineConclusion: scores && scores.engagement_power >= 60
         ? `互动率${scores.engagement_power >= 80 ? "高" : "中等"}，${sections?.engagement_analysis?.comment_quality ? `评论质量：${sections.engagement_analysis.comment_quality}` : "用户有主动反馈"}`
         : "互动数据偏弱，信任建立证据不足",
-      confidence: calcConfidence(videoCount, hasMetrics, hasContentStrategy, hasTopVideos),
+      confidence,
       evidenceSource: [
         "评论质量分析",
         "钩子模式",
@@ -231,15 +240,23 @@ function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQues
         },
       ],
       actionSuggestion: "增加案例、过程、结果证据类内容，引导用户表达具体需求。",
-    },
-    {
+    }
+}
+
+function buildMonetizationQuestion(
+  analysis: ApiCompetitorAnalysis,
+  confidence: ConfidenceLevel,
+): DiagnosisQuestion {
+  const sections = analysis.analysisResult?.sections
+  const scores = analysis.analysisResult?.scores
+  return {
       questionNo: 4,
       layerName: "商业转化层",
       coreQuestion: "为什么能卖？变现链路是否健康？",
       oneLineConclusion: scores && scores.monetization_power >= 60
         ? `变现力${scores.monetization_power >= 80 ? "强" : "中等"}，${sections?.monetization_analysis?.monetization_paths?.length ? `路径：${sections.monetization_analysis.monetization_paths.join("、")}` : "有变现迹象"}`
         : "变现力偏弱，商业转化链路不清晰（间接推断）",
-      confidence: calcConfidence(videoCount, hasMetrics, hasContentStrategy, hasTopVideos, true),
+      confidence,
       evidenceSource: [
         "变现路径推断",
         "产品品类推断",
@@ -270,7 +287,27 @@ function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQues
         },
       ],
       actionSuggestion: "增加低门槛转化动作（资料领取、社群、咨询入口），验证付费意愿。",
-    },
+    }
+}
+
+function buildDiagnosisQuestions(analysis: ApiCompetitorAnalysis): DiagnosisQuestion[] {
+  const result = analysis.analysisResult
+  const hasMetrics = !!analysis.metricsData
+  const hasTopVideos = !!result?.stats?.top_videos?.length
+  const hasContentStrategy = !!result?.sections?.content_strategy?.topic_distribution?.length
+  const confidence = calcConfidence(analysis.videoCount, hasMetrics, hasContentStrategy, hasTopVideos)
+  const monetizationConfidence = calcConfidence(
+    analysis.videoCount,
+    hasMetrics,
+    hasContentStrategy,
+    hasTopVideos,
+    true,
+  )
+  return [
+    buildPositioningQuestion(analysis, confidence),
+    buildGrowthQuestion(analysis, confidence),
+    buildTrustQuestion(analysis, confidence),
+    buildMonetizationQuestion(analysis, monetizationConfidence),
   ]
 }
 
