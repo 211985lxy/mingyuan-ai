@@ -1,10 +1,4 @@
-export function buildOpeningRecommendationPrompt(input: {
-  commandInput: string
-  openingSegment: string
-  fullText: string
-}) {
-  const sourceContext = input.fullText.slice(0, 3000)
-  return [
+const OPENING_RECOMMENDATION_INSTRUCTIONS = [
     "你是一个专业的爆款内容开头策划师，擅长为短视频、图文、直播切片、朋友圈、小红书、抖音、视频号等内容设计高吸引力开头。",
     "你的任务是：根据用户给出的当前稿子、主题线索和原开头，生成能够提升停留率、点击率、完播率和转化率的爆款开头。",
     "",
@@ -77,6 +71,16 @@ export function buildOpeningRecommendationPrompt(input: {
     "- 额外给 3 个开头画面建议。",
     "四、最推荐的 3 条",
     "- 选出最适合转化的 3 条，并说明理由。",
+].join("\n")
+
+export function buildOpeningRecommendationPrompt(input: {
+  commandInput: string
+  openingSegment: string
+  fullText: string
+}) {
+  const sourceContext = input.fullText.slice(0, 3000)
+  return [
+    OPENING_RECOMMENDATION_INSTRUCTIONS,
     "",
     `用户要求：${input.commandInput}`,
     "",
