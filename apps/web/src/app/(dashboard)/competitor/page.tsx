@@ -5,14 +5,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   RefreshCw,
-  Trash2,
   Plus,
-  Clock,
   Video,
   Flame,
-  User,
   ExternalLink,
-  Target,
   Loader2,
   FileText,
   Bell,
@@ -27,6 +23,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { DiscoveredAccountCard } from "@/components/competitor/discovered-account-card"
+import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
+import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api/client"
 import {
@@ -47,7 +45,12 @@ import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
 import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
-import { formatCompetitorCount } from "@/lib/competitor/display"
+import {
+  formatCompetitorAccountName as formatAccountName,
+  formatCompetitorCount,
+  formatCompetitorRefreshError as formatRefreshError,
+  formatCompetitorRelativeTime as formatRelativeTime,
+} from "@/lib/competitor/display"
 import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
 
 // ─── Helpers ────────────────────────────────────────────
@@ -64,75 +67,8 @@ function isSupportedUrl(url: string): boolean {
   return SUPPORTED_DOMAINS.some((domain) => url.includes(domain))
 }
 
-function proxyAvatarUrl(url: string): string {
-  return buildProxyImageUrl(url)
-}
-
 function proxyCoverUrl(url: string): string {
   return buildProxyImageUrl(url)
-}
-
-function formatRelativeTime(iso: string | null): string {
-  if (!iso) return "尚未刷新"
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return "刚刚"
-  if (m < 60) return `${m}分钟前`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}小时前`
-  const d = Math.floor(h / 24)
-  if (d < 7) return `${d}天前`
-  return new Date(iso).toLocaleDateString("zh-CN")
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "未完成"
-  return new Date(iso).toLocaleDateString("zh-CN")
-}
-
-function reportTitle(report: ApiCompetitorReport): string {
-  return `${report.accountName || "优质账号"} · 分析报告`
-}
-
-function reportStatusLabel(status: ApiCompetitorReport["status"]): string {
-  if (status === "completed") return "已完成"
-  if (status === "failed") return "失败"
-  return "分析中"
-}
-
-function formatAccountName(account: WatchAccount): string {
-  if (account.nickname) return account.nickname
-
-  try {
-    const url = new URL(account.targetUrl)
-    const pathParts = url.pathname.split("/").filter(Boolean)
-    const tail = pathParts[pathParts.length - 1]
-    if (tail) return `抖音账号 · ${tail.slice(0, 12)}`
-  } catch {
-    // Keep the fallback readable even when a pasted URL is not normalized.
-  }
-
-  return "抖音账号（待刷新）"
-}
-
-function compactAccountUrl(url: string): string {
-  try {
-    const parsed = new URL(url)
-    const text = `${parsed.hostname}${parsed.pathname}`.replace(/\/$/, "")
-    return text.length > 46 ? `${text.slice(0, 43)}...` : text
-  } catch {
-    return url.length > 46 ? `${url.slice(0, 43)}...` : url
-  }
-}
-
-function formatRefreshError(error: string): string {
-  if (error.includes("Timeout") || error.includes("超时")) {
-    return "本地浏览器访问抖音超时，账号链接已保存，可以稍后再刷新。"
-  }
-  if (error.includes("BrowserType.launch") || error.includes("browser")) {
-    return "本地浏览器启动失败，账号链接已保存，可以稍后再试。"
-  }
-  return error.split("\n")[0] || "刷新失败，账号链接已保存。"
 }
 
 function videoPageUrl(video: WatchVideo): string {
@@ -155,16 +91,6 @@ function extractionStatusText(record: ApiVideoCopyExtraction | undefined): strin
   if (record.status === "failed") return "提取失败"
   if (record.status === "analyzing") return "分析中"
   return "提取中"
-}
-
-function refreshStatusBadge(account: WatchAccount) {
-  if (account.refreshStatus === "refreshing")
-    return <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 animate-pulse">刷新中</Badge>
-  if (account.refreshStatus === "failed")
-    return <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">失败</Badge>
-  if (account.refreshStatus === "success")
-    return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">已刷新</Badge>
-  return <Badge variant="outline">待刷新</Badge>
 }
 
 function refreshStatusText(account: WatchAccount) {
@@ -886,199 +812,23 @@ export default function CompetitorWatchPage() {
             )}
           </AiResultPanel>
 
-          {/* Account Cards */}
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="flex-1">
-                        <Skeleton className="h-4 w-28" />
-                        <Skeleton className="h-3 w-20 mt-1" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : sortedAccounts.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center py-16 text-center">
-                <User className="h-12 w-12 text-muted-foreground mb-4" />
-                <h2 className="text-lg font-semibold">还没有监控账号</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  在上方输入抖音优质账号主页链接开始监控
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
+          <MonitoredAccountGrid
+            accounts={sortedAccounts}
+            loading={loading}
+            activeAccountId={activeAccountId}
+            analyzingUrl={analyzingUrl}
+            refreshingId={refreshingId}
+            deletingId={deletingId}
+            onActivate={setActiveAccountId}
+            onAnalyze={(url) => void handleAnalyze(url)}
+            onRefresh={(id) => void handleRefreshOne(id)}
+            onDelete={(id) => void handleDelete(id)}
+          />
+
+          {!loading && sortedAccounts.length > 0 ? (
             <>
-              {/* Account Pool Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sortedAccounts.map((account) => (
-                  <Card
-                    key={account.id}
-                    className={`group relative overflow-hidden cursor-pointer transition-all border shadow-sm ${
-                      (activeAccountId || (accounts[0] && accounts[0].id)) === account.id
-                        ? "ring-2 ring-primary/60 border-primary bg-primary/[0.01] shadow-xs"
-                        : "hover:border-primary/50 hover:shadow-md"
-                    }`}
-                    onClick={() => setActiveAccountId(account.id)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {account.avatar ? (
-                            <img
-                              src={proxyAvatarUrl(account.avatar)}
-                              alt=""
-                              className="h-10 w-10 rounded-full object-cover shrink-0"
-                            />
-                          ) : (
-                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                              <User className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate">
-                              {formatAccountName(account)}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-xs text-muted-foreground">
-                                {account.followerCount != null
-                                  ? `${formatCompetitorCount(account.followerCount)} 粉丝`
-                                  : "抖音"}
-                              </span>
-                              {refreshStatusBadge(account)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
 
-                      <a
-                        href={account.targetUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                        title={account.targetUrl}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{compactAccountUrl(account.targetUrl)}</span>
-                      </a>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-2.5 text-xs font-semibold border-primary/20 hover:bg-primary/5 hover:text-primary transition-all flex items-center justify-center gap-1.5"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleAnalyze(account.targetUrl)
-                        }}
-                        disabled={analyzingUrl === account.targetUrl}
-                      >
-                        {analyzingUrl === account.targetUrl ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Target className="h-3.5 w-3.5 text-primary" />
-                        )}
-                        {analyzingUrl === account.targetUrl ? "启动分析中..." : "AI 深度调查"}
-                      </Button>
-
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatRelativeTime(account.lastRefreshedAt)}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRefreshOne(account.id)
-                            }}
-                            disabled={refreshingId === account.id || account.refreshStatus === "refreshing"}
-                            title="刷新该账号"
-                          >
-                            <RefreshCw className={`h-3.5 w-3.5 ${refreshingId === account.id ? "animate-spin" : ""}`} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            disabled={deletingId === account.id}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDelete(account.id)
-                            }}
-                            title="移除监控"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {account.refreshStatus === "failed" && account.refreshError && (
-                        <p className="mt-2 rounded-md bg-red-50 px-2.5 py-2 text-xs leading-5 text-red-600">
-                          {formatRefreshError(account.refreshError)}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <FileText className="h-4 w-4" />
-                    最近分析报告
-                    <Badge variant="secondary" className="text-xs ml-1">{reports.length}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {reportsLoading ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-14 rounded-lg" />
-                      ))}
-                    </div>
-                  ) : reports.length === 0 ? (
-                    <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-                      当前账号还没有分析报告。点击该账号的 AI 深度调查后会出现在这里。
-                    </p>
-                  ) : (
-                    <div className="divide-y rounded-lg border">
-                      {reports.map((report) => (
-                        <Link
-                          key={report.id}
-                          href={`/competitor/${report.id}`}
-                          className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-muted/50"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{reportTitle(report)}</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              分析于 {formatDate(report.completedAt ?? report.createdAt)}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            {report.overallScore != null ? (
-                              <span className="text-sm font-semibold">{Math.round(report.overallScore)}分</span>
-                            ) : null}
-                            <Badge variant={report.status === "failed" ? "destructive" : "secondary"}>
-                              {reportStatusLabel(report.status)}
-                            </Badge>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <RecentReportsCard reports={reports} loading={reportsLoading} />
 
               {/* Latest Videos Section */}
               {activeLatestVideos.length > 0 && (
@@ -1116,7 +866,7 @@ export default function CompetitorWatchPage() {
                 </Card>
               )}
             </>
-          )}
+          ) : null}
     </div>
   )
 }
