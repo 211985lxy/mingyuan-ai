@@ -183,6 +183,25 @@ export function buildTopicSystemPrompt(
   return prompt
 }
 
+function buildTopicProfileSection(ipProfile: TopicGenerationInput["ipProfile"]): string {
+  if (ipProfile?.promptSnapshot) {
+    return `## IP 档案\n${ipProfile.promptSnapshot}`
+  }
+  if (!ipProfile) return ""
+
+  return [
+    "## IP 档案",
+    ipProfile.displayName ? `- 名称：${ipProfile.displayName}` : null,
+    ipProfile.industry ? `- 行业：${ipProfile.industry}` : null,
+    ipProfile.primaryOffer ? `- 核心产品/服务：${ipProfile.primaryOffer}` : null,
+    ipProfile.targetAudience ? `- 目标受众：${ipProfile.targetAudience}` : null,
+    ipProfile.ipTraits ? `- IP 特质：${ipProfile.ipTraits}` : null,
+    ipProfile.toneOfVoice ? `- 说话风格：${ipProfile.toneOfVoice}` : null,
+    ipProfile.proofPoints ? `- 信任背书：${ipProfile.proofPoints}` : null,
+    ipProfile.callToAction ? `- 行动号召：${ipProfile.callToAction}` : null,
+  ].filter(Boolean).join("\n")
+}
+
 export function buildTopicUserPrompt(
   input: TopicGenerationInput,
   selectedCodes: string[],
@@ -192,30 +211,7 @@ export function buildTopicUserPrompt(
     selectedCodes.includes(e.code),
   )
 
-  let profileSection = ""
-  if (ipProfile?.promptSnapshot) {
-    profileSection = `## IP 档案\n${ipProfile.promptSnapshot}`
-  } else if (ipProfile) {
-    profileSection = [
-      "## IP 档案",
-      ipProfile.displayName ? `- 名称：${ipProfile.displayName}` : null,
-      ipProfile.industry ? `- 行业：${ipProfile.industry}` : null,
-      ipProfile.primaryOffer
-        ? `- 核心产品/服务：${ipProfile.primaryOffer}`
-        : null,
-      ipProfile.targetAudience
-        ? `- 目标受众：${ipProfile.targetAudience}`
-        : null,
-      ipProfile.ipTraits ? `- IP 特质：${ipProfile.ipTraits}` : null,
-      ipProfile.toneOfVoice ? `- 说话风格：${ipProfile.toneOfVoice}` : null,
-      ipProfile.proofPoints ? `- 信任背书：${ipProfile.proofPoints}` : null,
-      ipProfile.callToAction
-        ? `- 行动号召：${ipProfile.callToAction}`
-        : null,
-    ]
-      .filter(Boolean)
-      .join("\n")
-  }
+  const profileSection = buildTopicProfileSection(ipProfile)
 
   const elementSection = [
     `## 本次使用的营销元素 (${selectedCodes.length}个)`,
@@ -461,37 +457,73 @@ function revisionAdviceFor(
   return `请先重写角度，优先补强${SCORE_LABELS[weakest]}。`
 }
 
-export async function generateTopicCards(
-  input: TopicGenerationInput,
-): Promise<TopicGenerationResult> {
-  const llm = getAgentLLM("business_diagnosis")
-  const temperatures = [0.7, 0.5, 0.3]
-  const maxAttempts = 3
-
-  const allCodes = input.elements.map((e) => e.code)
+function selectTopicElements(input: TopicGenerationInput) {
+  const allCodes = input.elements.map((element) => element.code)
   const refreshCount = input.refreshCount ?? 0
   const recentElementSets = input.recentElementSets ?? []
-  const recentTitles = input.recentTitles ?? []
-
-  // Pick derivation strategy based on refresh count
   const strategy = pickStrategy(refreshCount)
-
-  // Sample elements using history-aware derivation
   let selectedCodes: string[]
   if (input.forcedElementCodes) {
     selectedCodes = input.forcedElementCodes
   } else if (recentElementSets.length > 0) {
     selectedCodes = sampleWithHistory(allCodes, recentElementSets, strategy)
   } else {
-    const sampleCount = Math.random() < 0.5 ? 2 : 3
-    selectedCodes = sampleElements(allCodes, sampleCount)
+    selectedCodes = sampleElements(allCodes, Math.random() < 0.5 ? 2 : 3)
   }
+  return { refreshCount, selectedCodes, strategy }
+}
+
+function extractTopicCards(value: unknown): unknown[] | null {
+  if (typeof value !== "object" || value === null) return Array.isArray(value) ? value : null
+  const record = value as { topics?: unknown; cards?: unknown }
+  if (Array.isArray(record.topics)) return record.topics
+  if (Array.isArray(record.cards)) return record.cards
+  return Array.isArray(value) ? value : null
+}
+
+function validateGeneratedCards(
+  cards: unknown[],
+  selectedCodes: string[],
+  input: TopicGenerationInput,
+) {
+  const normalizedCards = normalizeTopicCards(coerceTopicCards(cards, selectedCodes), input)
+  const validated = TopicCardsSchema.safeParse(normalizedCards)
+  if (!validated.success) return validated
+
+  const data = validated.data.map((card) => ({
+    ...card,
+    elementCodes: card.elementCodes.filter((code) => selectedCodes.includes(code)),
+  }))
+  return { success: true as const, data }
+}
+
+function buildFallbackTopicResult(
+  input: TopicGenerationInput,
+  selectedCodes: string[],
+  promptText: string,
+  strategy: DerivationStrategy,
+): TopicGenerationResult {
+  return {
+    success: true,
+    cards: normalizeTopicCards(fallbackTopicCards(input, selectedCodes), input),
+    elementCodes: selectedCodes,
+    promptText,
+    model: `${TOPIC_MODEL || "business_diagnosis-route"}:fallback`,
+    strategy,
+  }
+}
+
+export async function generateTopicCards(
+  input: TopicGenerationInput,
+): Promise<TopicGenerationResult> {
+  const llm = getAgentLLM("business_diagnosis")
+  const temperatures = [0.7, 0.5, 0.3]
+  const maxAttempts = 3
+  const recentTitles = input.recentTitles ?? []
+  const { refreshCount, selectedCodes, strategy } = selectTopicElements(input)
 
   if (selectedCodes.length < 2) {
-    return {
-      success: false,
-      error: "Could not sample enough non-conflicting elements",
-    }
+    return { success: false, error: "Could not sample enough non-conflicting elements" }
   }
 
   console.log(`[topic-gen] Strategy: ${strategy}, elements: [${selectedCodes.join(",")}], refresh: ${refreshCount}`)
@@ -517,14 +549,7 @@ export async function generateTopicCards(
         responseFormat: { type: "json_object" },
       })
 
-      const parsed = JSON.parse(result.content.trim())
-      const cards = Array.isArray(parsed?.topics)
-        ? parsed.topics
-        : Array.isArray(parsed?.cards)
-          ? parsed.cards
-          : Array.isArray(parsed)
-            ? parsed
-            : null
+      const cards = extractTopicCards(JSON.parse(result.content.trim()))
 
       if (!cards) {
         console.warn(
@@ -533,20 +558,10 @@ export async function generateTopicCards(
         continue
       }
 
-      const normalizedCards = normalizeTopicCards(coerceTopicCards(cards, selectedCodes), input)
-      const validated = TopicCardsSchema.safeParse(normalizedCards)
+      const validated = validateGeneratedCards(cards, selectedCodes, input)
 
       if (validated.success) {
-        // Enforce card elementCodes ⊆ selectedCodes (LLM may hallucinate extra elements)
-        const coercedCards = validated.data.map((card) => ({
-          ...card,
-          elementCodes: card.elementCodes.filter((c) =>
-            selectedCodes.includes(c),
-          ),
-        }))
-        // Ensure at least 1 element per card after filtering
-        const allValid = coercedCards.every((c) => c.elementCodes.length >= 1)
-        if (!allValid) {
+        if (validated.data.some((card) => card.elementCodes.length === 0)) {
           console.warn(`[topic-gen] Cards have elements outside selectedCodes, coercion left empty cards`)
           continue
         }
@@ -556,7 +571,7 @@ export async function generateTopicCards(
         )
         return {
           success: true,
-          cards: coercedCards,
+          cards: validated.data,
           elementCodes: selectedCodes,
           promptText: fullPromptText,
           model: result.model,
@@ -576,12 +591,5 @@ export async function generateTopicCards(
     }
   }
 
-  return {
-    success: true,
-    cards: normalizeTopicCards(fallbackTopicCards(input, selectedCodes), input),
-    elementCodes: selectedCodes,
-    promptText: fullPromptText,
-    model: `${TOPIC_MODEL || "business_diagnosis-route"}:fallback`,
-    strategy,
-  }
+  return buildFallbackTopicResult(input, selectedCodes, fullPromptText, strategy)
 }
