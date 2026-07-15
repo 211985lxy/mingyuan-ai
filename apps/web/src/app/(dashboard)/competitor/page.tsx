@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
+import { DiscoveredAccountCard } from "@/components/competitor/discovered-account-card"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api/client"
 import {
@@ -46,6 +47,7 @@ import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
 import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
+import { formatCompetitorCount } from "@/lib/competitor/display"
 import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
 
 // ─── Helpers ────────────────────────────────────────────
@@ -86,11 +88,6 @@ function formatRelativeTime(iso: string | null): string {
 function formatDate(iso: string | null): string {
   if (!iso) return "未完成"
   return new Date(iso).toLocaleDateString("zh-CN")
-}
-
-function formatCount(n: number): string {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}w`
-  return n.toLocaleString("zh-CN")
 }
 
 function reportTitle(report: ApiCompetitorReport): string {
@@ -566,10 +563,10 @@ export default function CompetitorWatchPage() {
               {video.title || "无标题"}
             </p>
             <div className="flex items-center gap-2 text-[10px] text-white/70 mt-0.5">
-              <span>赞 {formatCount(video.likes)}</span>
-              <span>评 {formatCount(video.comments)}</span>
+              <span>赞 {formatCompetitorCount(video.likes)}</span>
+              <span>评 {formatCompetitorCount(video.comments)}</span>
               {options.viral && video.engagementScore != null ? (
-                <span className="text-orange-300">热 {formatCount(video.engagementScore)}</span>
+                <span className="text-orange-300">热 {formatCompetitorCount(video.engagementScore)}</span>
               ) : null}
             </div>
           </div>
@@ -638,88 +635,17 @@ export default function CompetitorWatchPage() {
     const key = account.targetUrl || account.platformUserId || account.nickname
     const monitored = isDiscoveredAccountMonitored(account)
     const canAdd = Boolean(account.targetUrl) && !monitored && accounts.length < 10
-
     return (
-      <Card key={key} className="overflow-hidden">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            {account.avatar ? (
-              <img
-                src={proxyAvatarUrl(account.avatar)}
-                alt=""
-                className="h-10 w-10 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                <User className="h-5 w-5 text-muted-foreground" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold">{account.nickname || "未知账号"}</p>
-                {monitored ? <Badge variant="secondary">已监控</Badge> : null}
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {account.followerCount ? `${formatCount(account.followerCount)} 粉丝` : "粉丝数未提供"}
-                {account.redfoxScore != null ? ` · 红狐指数 ${account.redfoxScore}` : ""}
-              </p>
-            </div>
-          </div>
-
-          {account.reason ? (
-            <p className="mt-3 line-clamp-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs leading-5 text-muted-foreground">
-              {account.reason}
-            </p>
-          ) : null}
-
-          {account.recentVideos.length > 0 ? (
-            <div className="mt-3 space-y-1.5">
-              {account.recentVideos.map((video, index) => (
-                <a
-                  key={`${video.videoUrl}-${index}`}
-                  href={video.videoUrl || account.targetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block truncate text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {video.title} · 赞 {formatCount(video.likes)} · 评 {formatCount(video.comments)}
-                </a>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-3 flex gap-2">
-            <Button
-              size="sm"
-              className="h-8 flex-1 text-xs"
-              disabled={!canAdd || adding}
-              onClick={() => handleAddDiscoveredAccount(account)}
-            >
-              {monitored ? "已监控" : accounts.length >= 10 ? "账号池已满" : account.targetUrl ? "加入监控" : "无法加入"}
-            </Button>
-            {account.targetUrl ? (
-              <a
-                href={account.targetUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-8 items-center justify-center rounded-md border px-3 text-xs font-medium transition-colors hover:bg-muted"
-              >
-                打开主页
-              </a>
-            ) : null}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs"
-              onClick={() => {
-                setIgnoredDiscoveryUrls((prev) => new Set(prev).add(key))
-              }}
-            >
-              忽略
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <DiscoveredAccountCard
+        key={key}
+        account={account}
+        monitored={monitored}
+        canAdd={canAdd}
+        adding={adding}
+        poolFull={accounts.length >= 10}
+        onAdd={() => handleAddDiscoveredAccount(account)}
+        onIgnore={() => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
+      />
     )
   }
 
@@ -1022,7 +948,7 @@ export default function CompetitorWatchPage() {
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-xs text-muted-foreground">
                                 {account.followerCount != null
-                                  ? `${formatCount(account.followerCount)} 粉丝`
+                                  ? `${formatCompetitorCount(account.followerCount)} 粉丝`
                                   : "抖音"}
                               </span>
                               {refreshStatusBadge(account)}
