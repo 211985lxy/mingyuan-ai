@@ -4,11 +4,8 @@ import { useEffect, useMemo, useRef, useState, startTransition } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
-  Check,
   ExternalLink,
-  Loader2,
   Plus,
-  Send,
   Sparkles,
   Target,
 } from "lucide-react"
@@ -23,6 +20,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { KnowledgeEntryCard } from "@/components/topic-planning/knowledge-entry-card"
+import { TopicCandidatesPanel } from "@/components/topic-planning/topic-candidates-panel"
+import { TopicChatCard } from "@/components/topic-planning/topic-chat-card"
 import {
   TopicDailyReportEmptyState,
   TopicDailyReportPanel,
@@ -45,7 +44,6 @@ import {
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags } from "@/lib/knowledge-tags"
 import { buildTopicDailyReport, type TopicDailyReportSource } from "@/lib/topic-daily-report"
 import { buildTopicPoolDraftFromSearchParams } from "@/lib/topic-pool-draft"
-import { categorizeTopicCards, getTopicDisplayLabel } from "@/lib/topics/display-groups"
 import type { ApiAiHotBriefingItem, ApiTopicCard, ApiTopicRecommendationMode } from "@/types/api"
 
 type TopicCategory = "daily_inspiration" | "meeting_minutes" | "benchmark_reference" | "user_insight"
@@ -105,53 +103,6 @@ const MODE_META: Record<ApiTopicRecommendationMode, { label: string; description
     label: "本周选题",
     description: "把本周值得拍的方向先排出来，方便继续筛。",
   },
-}
-
-const SCORE_DIMENSIONS = [
-  ["projectFit", "项目匹配"],
-  ["contentValue", "内容价值"],
-  ["viralHook", "传播钩子"],
-  ["conversionFit", "成交关联"],
-  ["feasibility", "可执行"],
-] as const
-
-const SCARCITY_BADGE: Record<string, string> = {
-  scenery: "稀缺·景观",
-  emotion: "稀缺·情感",
-  beauty: "稀缺·美好",
-  info: "稀缺·资讯",
-  curio: "稀缺·奇闻",
-  event: "稀缺·事件",
-}
-
-const RHETORIC_BADGE: Record<string, string> = {
-  fu: "赋",
-  bi: "比",
-  xing: "兴",
-}
-
-// 含金量阈值（软门槛：标红 + 建议，不拦截"采用"）
-const NOVELTY_HIGH = 75
-const NOVELTY_LOW = 60
-
-const VERDICT_META: Record<NonNullable<ApiTopicCard["reviewVerdict"]>, { label: string; className: string }> = {
-  strong: { label: "主推", className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
-  usable: { label: "可用", className: "border-sky-200 bg-sky-50 text-sky-700" },
-  observe: { label: "观察", className: "border-amber-200 bg-amber-50 text-amber-700" },
-  revise: { label: "需优化", className: "border-rose-200 bg-rose-50 text-rose-700" },
-}
-
-function scoreEntries(card: ApiTopicCard) {
-  const breakdown = card.scoreBreakdown
-  if (!breakdown) return []
-  return SCORE_DIMENSIONS.map(([key, label]) => ({ key, label, value: breakdown[key] }))
-}
-
-function strongestAndWeakest(card: ApiTopicCard) {
-  const entries = scoreEntries(card)
-  if (entries.length === 0) return null
-  const sorted = [...entries].sort((a, b) => b.value - a.value)
-  return { strongest: sorted[0], weakest: sorted[sorted.length - 1] }
 }
 
 export default function TopicPlanningPage() {
@@ -570,10 +521,10 @@ export default function TopicPlanningPage() {
       : null,
     [dailyBriefingItems, dailyReportSources, recommendationMode, topicCards],
   )
-  const categorizedTopicCards = useMemo(
-    () => categorizeTopicCards(topicCards),
-    [topicCards],
-  )
+  const selectedKnowledgeLabels = selectedKnowledgeIds.flatMap((entryId) => {
+    const entry = knowledgeEntries.find((item) => item.id === entryId)
+    return entry ? [`${CATEGORY_META[entry.category as TopicCategory]?.label ?? "素材"} · ${entry.title}`] : []
+  })
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-10">
@@ -647,245 +598,25 @@ export default function TopicPlanningPage() {
                 </div>
               </AiResultPanel>
 
-              <AiResultPanel
-                title="备选选题"
-                icon={<Sparkles className="h-4 w-4 text-primary" />}
-                meta={<span>今天这条不拍，再从这里换。选中后直接去 AIM 写文案。</span>}
-                flat
-              >
-                  <div className="flex flex-wrap gap-2">
-                    {selectedKnowledgeIds.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        还没手动圈素材，系统会优先参考对标账号、拆解文案和热点；知识库 {knowledgeEntries.length} 条素材只作补充。
-                      </p>
-                    ) : (
-                      selectedKnowledgeIds.map((entryId) => {
-                        const entry = knowledgeEntries.find((item) => item.id === entryId)
-                        if (!entry) return null
-                        return (
-                          <Badge key={entry.id} variant="outline">
-                            {CATEGORY_META[entry.category as TopicCategory]?.label ?? "素材"} · {entry.title}
-                          </Badge>
-                        )
-                      })
-                    )}
-                  </div>
-
-                  {autoGenerating ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      正在整理今日备选选题…
-                    </div>
-                  ) : topicCards.length === 0 ? (
-                    <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                      暂无备选选题。
-                    </div>
-                  ) : (
-                      <div className="space-y-5">
-                        {categorizedTopicCards.map((group) => (
-                          <div key={group.key}>
-                            <div className="mb-2 flex items-center gap-2">
-                              <span className="text-sm font-medium text-foreground">{group.label}</span>
-                              <Badge variant="secondary" className="text-[11px]">{group.cards.length}</Badge>
-                            </div>
-                            <div className="grid gap-3">
-                              {group.cards.map((card) => {
-                                const index = topicCards.indexOf(card)
-                                const isSelected = selectedTopicIndex === index
-                                return (
-                                  <div
-                                    key={`${card.title}-${index}`}
-                                    className={`rounded-2xl border p-4 shadow-sm transition-colors ${
-                                      isSelected
-                                        ? "border-primary/30 bg-primary/[0.04]"
-                                        : "border-primary/10 bg-card"
-                                    }`}
-                                  >
-                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                      <div className="min-w-0 flex-1 space-y-3">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <Badge variant="secondary">#{index + 1}</Badge>
-                                          {isSelected && <Badge>已采用</Badge>}
-                                          <Badge variant="outline">{getTopicDisplayLabel(card)}</Badge>
-                                          {typeof card.score === "number" && <Badge variant="outline">{card.score}分</Badge>}
-                                          {card.reviewVerdict && (
-                                            <Badge variant="outline" className={VERDICT_META[card.reviewVerdict].className}>
-                                              {VERDICT_META[card.reviewVerdict].label}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <div className="space-y-2">
-                                          <h3 className="text-base font-semibold leading-6">{card.title}</h3>
-                                          {card.rationale ? (
-                                            <p className="text-sm leading-6 text-muted-foreground">{card.rationale}</p>
-                                          ) : null}
-                                        </div>
-                                        <div className="grid gap-3 text-sm md:grid-cols-2">
-                                          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">为什么值得拍</p>
-                                            <p className="mt-1 leading-6 text-foreground">
-                                              {card.scoreReason || card.contentLine || "先从这个方向切，判断会更稳。"}
-                                            </p>
-                                          </div>
-                                          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                                            <p className="text-xs font-medium text-muted-foreground">适合怎么讲</p>
-                                            <p className="mt-1 leading-6 text-foreground">
-                                              {card.hook || card.angle || "先抛问题，再给判断，最后落到动作。"}
-                                            </p>
-                                          </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 text-xs">
-                                          {card.contentLine ? (
-                                            <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">
-                                              {card.contentLine}
-                                            </Badge>
-                                          ) : null}
-                                          {card.sourceType ? <Badge variant="outline">{card.sourceType}</Badge> : null}
-                                          {card.defamiliarization?.scarcityType ? (
-                                            <Badge variant="outline" className="border-violet-200 bg-violet-50 text-violet-700">
-                                              {SCARCITY_BADGE[card.defamiliarization.scarcityType] ?? card.defamiliarization.scarcityType}
-                                            </Badge>
-                                          ) : null}
-                                          {card.defamiliarization?.rhetoric ? (
-                                            <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-700">
-                                              {RHETORIC_BADGE[card.defamiliarization.rhetoric] ?? card.defamiliarization.rhetoric}
-                                            </Badge>
-                                          ) : null}
-                                        </div>
-                                      </div>
-                                      <div className="flex flex-col gap-2 lg:w-40">
-                                        {isSelected ? (
-                                          <Button className="w-full" onClick={() => jumpToAim(card, index)}>
-                                            <Send className="mr-1 h-4 w-4" />
-                                            去 AIM 写文案
-                                          </Button>
-                                        ) : (
-                                          <Button
-                                            className="w-full"
-                                            variant="outline"
-                                            onClick={() => handleSelectTopic(card, index)}
-                                            disabled={selectedTopicIndex !== null}
-                                          >
-                                            <Check className="mr-1 h-4 w-4" />
-                                            采用这个选题
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {card.scoreBreakdown ? (
-                                      <div className="mt-4 space-y-2 rounded-xl border border-border/70 bg-muted/20 p-3">
-                                        <div className="grid gap-2 sm:grid-cols-5">
-                                          {scoreEntries(card).map((entry) => (
-                                            <div key={entry.key} className="space-y-1">
-                                              <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-                                                <span>{entry.label}</span>
-                                                <span>{entry.value}</span>
-                                              </div>
-                                              <div className="h-1.5 rounded-full bg-muted">
-                                                <div className="h-1.5 rounded-full bg-primary" style={{ width: `${entry.value}%` }} />
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        {(() => {
-                                          const summary = strongestAndWeakest(card)
-                                          return summary ? (
-                                            <p className="text-xs text-muted-foreground">
-                                              强项是{summary.strongest.label}，短板是{summary.weakest.label}。
-                                              {card.revisionAdvice ? ` ${card.revisionAdvice}` : ""}
-                                            </p>
-                                          ) : null
-                                        })()}
-                                      </div>
-                                    ) : null}
-                                    {card.defamiliarization ? (() => {
-                                      const df = card.defamiliarization
-                                      const score = typeof df.noveltyScore === "number" ? df.noveltyScore : null
-                                      const low = score !== null && score < NOVELTY_LOW
-                                      const barColor = score === null
-                                        ? "bg-muted-foreground"
-                                        : score >= NOVELTY_HIGH
-                                          ? "bg-emerald-500"
-                                          : low
-                                            ? "bg-rose-500"
-                                            : "bg-amber-500"
-                                      const levelLabel =
-                                        score === null
-                                          ? "未评分"
-                                          : score >= NOVELTY_HIGH
-                                            ? "高含金量"
-                                            : low
-                                              ? "含金量偏低"
-                                              : "中等"
-                                      return (
-                                        <div className={`mt-2 space-y-2 rounded-xl border p-3 ${low ? "border-rose-200 bg-rose-50/40" : "border-border/70 bg-muted/10"}`}>
-                                          <div className="flex items-center justify-between gap-2">
-                                            <span className="text-[11px] font-medium text-muted-foreground">陌生化含金量 · {levelLabel}</span>
-                                            {score !== null && <span className={`text-[11px] ${low ? "text-rose-600" : "text-muted-foreground"}`}>{score}</span>}
-                                          </div>
-                                          {score !== null && (
-                                            <div className="h-1.5 rounded-full bg-muted">
-                                              <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${score}%` }} />
-                                            </div>
-                                          )}
-                                          {df.note ? (
-                                            <p className="text-xs text-muted-foreground">凭什么陌生：{df.note}</p>
-                                          ) : null}
-                                          {df.advice ? (
-                                            <p className={`text-xs ${low ? "text-rose-600" : "text-muted-foreground"}`}>{df.advice}</p>
-                                          ) : null}
-                                        </div>
-                                      )
-                                    })() : null}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-              </AiResultPanel>
+              <TopicCandidatesPanel
+                cards={topicCards}
+                selectedIndex={selectedTopicIndex}
+                selectedKnowledgeLabels={selectedKnowledgeLabels}
+                knowledgeCount={knowledgeEntries.length}
+                autoGenerating={autoGenerating}
+                onSelect={handleSelectTopic}
+                onWrite={jumpToAim}
+              />
             </div>
 
-              <Card className="order-3 border-primary/20 bg-primary/[0.02]">
-              <CardHeader className="pb-3">
-                <CardTitle>临时想法</CardTitle>
-                <CardDescription>
-                  丢一句客户问题、现场灵感或对标观察，先整理出方向。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  value={topicChatInput}
-                  placeholder="比如：今天客户又问我为什么报价比别人高"
-                  className="min-h-24"
-                  onChange={(event) => setTopicChatInput(event.target.value)}
-                />
-                <div className="flex justify-end">
-                  <Button onClick={handleTopicChatSubmit} disabled={topicChatLoading || !selectedProjectId}>
-                    <Sparkles className="mr-1 h-4 w-4" />
-                    {topicChatLoading ? "整理中..." : "整理成方向"}
-                  </Button>
-                </div>
-                {topicChatReply ? (
-                  <div className="rounded-lg border bg-background p-3 text-sm leading-6">
-                    <p className="font-medium">{topicChatReply.reply.summary}</p>
-                    <p className="mt-2">
-                      <b>优先方向：</b>{topicChatReply.reply.recommendedTitle}
-                    </p>
-                    <p>
-                      <b>开头：</b>{topicChatReply.reply.opening}
-                    </p>
-                    {topicChatReply.reply.alternatives.length > 0 ? (
-                      <p>
-                        <b>备选角度：</b>{topicChatReply.reply.alternatives.join("、")}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
+            <TopicChatCard
+              value={topicChatInput}
+              loading={topicChatLoading}
+              disabled={!selectedProjectId}
+              reply={topicChatReply}
+              onChange={setTopicChatInput}
+              onSubmit={handleTopicChatSubmit}
+            />
 
             <div className="order-4 rounded-xl border bg-muted/20 p-3 text-sm opacity-80">
               <div className="font-medium text-muted-foreground">
