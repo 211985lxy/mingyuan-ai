@@ -31,89 +31,79 @@ function groupByWeek(videos: NormalizedVideo[]): Record<string, NormalizedVideo[
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function calculateMetrics(
+function emptyMetrics(): CompetitorMetrics {
+  return {
+    engagement: {
+      avg_likes: 0,
+      avg_comments: 0,
+      avg_shares: 0,
+      avg_collects: 0,
+      avg_views: 0,
+      weighted_engagement_rate: 0,
+      like_to_comment_ratio: 0,
+    },
+    publishing: {
+      total_videos: 0,
+      avg_per_week: 0,
+      avg_per_month: 0,
+      most_active_day: 'Mon',
+      most_active_hour: 12,
+      consistency_score: 50,
+    },
+    content: {
+      avg_duration_seconds: 0,
+      duration_distribution: { '<15s': 0, '15-60s': 0, '1-3min': 0, '3-5min': 0, '>5min': 0 },
+      viral_ratio: 0,
+      top_hashtags: [],
+    },
+  }
+}
+
+function calculateEngagement(
   account: NormalizedAccount,
   videos: NormalizedVideo[],
-): CompetitorMetrics {
-  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
-
-  // Empty-videos fast path
-  if (videos.length === 0) {
-    return {
-      engagement: {
-        avg_likes: 0,
-        avg_comments: 0,
-        avg_shares: 0,
-        avg_collects: 0,
-        avg_views: 0,
-        weighted_engagement_rate: 0,
-        like_to_comment_ratio: 0,
-      },
-      publishing: {
-        total_videos: 0,
-        avg_per_week: 0,
-        avg_per_month: 0,
-        most_active_day: 'Mon',
-        most_active_hour: 12,
-        consistency_score: 50,
-      },
-      content: {
-        avg_duration_seconds: 0,
-        duration_distribution: { '<15s': 0, '15-60s': 0, '1-3min': 0, '3-5min': 0, '>5min': 0 },
-        viral_ratio: 0,
-        top_hashtags: [],
-      },
-    }
-  }
-
-  const totalVideos = videos.length
-
-  // ── Engagement averages ───────────────────────────────────────────────────
+): CompetitorMetrics['engagement'] {
   const avgLikes = Math.round(avg(videos.map(v => v.likes)))
   const avgComments = Math.round(avg(videos.map(v => v.comments)))
   const avgShares = Math.round(avg(videos.map(v => v.shares)))
   const avgCollects = Math.round(avg(videos.map(v => v.collects)))
   const avgViews = Math.round(avg(videos.map(v => v.views)))
-
-  // Engagement rate: prefer views as denominator, fall back to follower count
-  // (Douyin no longer returns play_count publicly, so views may be 0)
   const engagementDenominator = avgViews > 0 ? avgViews : (account.followerCount || 1)
   const weightedEngagementRate =
     round2((avgLikes * 0.5 + avgComments * 2 + avgShares * 4 + avgCollects * 3) / engagementDenominator * 100)
+  return {
+    avg_likes: avgLikes,
+    avg_comments: avgComments,
+    avg_shares: avgShares,
+    avg_collects: avgCollects,
+    avg_views: avgViews,
+    weighted_engagement_rate: weightedEngagementRate,
+    like_to_comment_ratio: avgComments === 0 ? 0 : round2(avgLikes / avgComments),
+  }
+}
 
-  const likeToCommentRatio =
-    avgComments === 0 ? 0 : round2(avgLikes / avgComments)
-
-  // ── Publishing frequency ──────────────────────────────────────────────────
+function calculatePublishing(videos: NormalizedVideo[]): CompetitorMetrics['publishing'] {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+  const totalVideos = videos.length
   const sorted = [...videos].sort((a, b) => a.createTime - b.createTime)
   const firstTime = sorted[0].createTime
   const lastTime = sorted[sorted.length - 1].createTime
   const daySpan = Math.max(1, (lastTime - firstTime) / 86400)
   const avgPerWeek = round2((totalVideos / daySpan) * 7)
   const avgPerMonth = round2((totalVideos / daySpan) * 30)
-
-  // ── Hour/day distribution ─────────────────────────────────────────────────
   const dayCounts: Record<string, number> = {}
   const hourCounts: Record<string, number> = {}
 
-  for (const v of videos) {
-    const d = new Date(v.createTime * 1000)
-    const dayKey = DAYS[d.getDay()]
-    const hourKey = String(d.getHours())
+  for (const video of videos) {
+    const date = new Date(video.createTime * 1000)
+    const dayKey = days[date.getDay()]
+    const hourKey = String(date.getHours())
     dayCounts[dayKey] = (dayCounts[dayKey] ?? 0) + 1
     hourCounts[hourKey] = (hourCounts[hourKey] ?? 0) + 1
   }
-
   const topDayEntry = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]
   const topHourEntry = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0]
-
-  const mostActiveDay = topDayEntry ? topDayEntry[0] : 'Mon'
-  const mostActiveHour = topHourEntry ? Number(topHourEntry[0]) : 12
-
-  // ── Consistency score ─────────────────────────────────────────────────────
-  const weekBuckets = groupByWeek(videos)
-  const weeklyPostCounts = Object.values(weekBuckets).map(v => v.length)
-
+  const weeklyPostCounts = Object.values(groupByWeek(videos)).map(bucket => bucket.length)
   let consistencyScore: number
   if (weeklyPostCounts.length <= 1) {
     consistencyScore = 50
@@ -124,10 +114,17 @@ export function calculateMetrics(
       Math.max(0, 100 - (weekStddev / Math.max(1, weekAvg)) * 100),
     )
   }
+  return {
+    total_videos: totalVideos,
+    avg_per_week: avgPerWeek,
+    avg_per_month: avgPerMonth,
+    most_active_day: topDayEntry ? topDayEntry[0] : 'Mon',
+    most_active_hour: topHourEntry ? Number(topHourEntry[0]) : 12,
+    consistency_score: consistencyScore,
+  }
+}
 
-  // ── Content metrics ───────────────────────────────────────────────────────
-  const avgDurationSeconds = Math.round(avg(videos.map(v => v.duration)))
-
+function calculateContent(videos: NormalizedVideo[]): CompetitorMetrics['content'] {
   const durationDistribution: Record<string, number> = {
     '<15s': 0,
     '15-60s': 0,
@@ -135,31 +132,25 @@ export function calculateMetrics(
     '3-5min': 0,
     '>5min': 0,
   }
-  for (const v of videos) {
-    if (v.duration < 15) {
+  for (const video of videos) {
+    if (video.duration < 15) {
       durationDistribution['<15s']++
-    } else if (v.duration < 60) {
+    } else if (video.duration < 60) {
       durationDistribution['15-60s']++
-    } else if (v.duration < 180) {
+    } else if (video.duration < 180) {
       durationDistribution['1-3min']++
-    } else if (v.duration < 300) {
+    } else if (video.duration < 300) {
       durationDistribution['3-5min']++
     } else {
       durationDistribution['>5min']++
     }
   }
-
-  // ── Viral ratio ───────────────────────────────────────────────────────────
-  const avgViewsRaw = avg(videos.map(v => v.views))
-  const viewThreshold = avgViewsRaw * 2
-  const viralCount = videos.filter(v => v.views > viewThreshold).length
-  const viralRatio = round2(viralCount / totalVideos)
-
-  // ── Top hashtags ──────────────────────────────────────────────────────────
+  const viewThreshold = avg(videos.map(video => video.views)) * 2
+  const viralCount = videos.filter(video => video.views > viewThreshold).length
   const tagCounts: Record<string, number> = {}
   const hashtagRegex = /#[\w\u4e00-\u9fff]+/g
-  for (const v of videos) {
-    const matches = v.title.match(hashtagRegex) ?? []
+  for (const video of videos) {
+    const matches = video.title.match(hashtagRegex) ?? []
     for (const tag of matches) {
       tagCounts[tag] = (tagCounts[tag] ?? 0) + 1
     }
@@ -168,30 +159,22 @@ export function calculateMetrics(
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([tag, count]) => ({ tag, count }))
-
   return {
-    engagement: {
-      avg_likes: avgLikes,
-      avg_comments: avgComments,
-      avg_shares: avgShares,
-      avg_collects: avgCollects,
-      avg_views: avgViews,
-      weighted_engagement_rate: weightedEngagementRate,
-      like_to_comment_ratio: likeToCommentRatio,
-    },
-    publishing: {
-      total_videos: totalVideos,
-      avg_per_week: avgPerWeek,
-      avg_per_month: avgPerMonth,
-      most_active_day: mostActiveDay,
-      most_active_hour: mostActiveHour,
-      consistency_score: consistencyScore,
-    },
-    content: {
-      avg_duration_seconds: avgDurationSeconds,
-      duration_distribution: durationDistribution,
-      viral_ratio: viralRatio,
-      top_hashtags: topHashtags,
-    },
+    avg_duration_seconds: Math.round(avg(videos.map(video => video.duration))),
+    duration_distribution: durationDistribution,
+    viral_ratio: round2(viralCount / videos.length),
+    top_hashtags: topHashtags,
+  }
+}
+
+export function calculateMetrics(
+  account: NormalizedAccount,
+  videos: NormalizedVideo[],
+): CompetitorMetrics {
+  if (videos.length === 0) return emptyMetrics()
+  return {
+    engagement: calculateEngagement(account, videos),
+    publishing: calculatePublishing(videos),
+    content: calculateContent(videos),
   }
 }
