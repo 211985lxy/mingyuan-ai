@@ -1,53 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import {
-  AGENT_DENIED_ACTIONS,
-  findInvalidAgentTargetFormats,
-  parseAgentTargetFormats,
-  summarizeAgentInput,
-} from "@/lib/agent-api-contract"
-import {
-  agentAuthErrorResponse,
   assertAgentAccess,
   assertAgentProjectAccess,
+  agentAuthErrorResponse,
   authenticateAgentRequest,
-  type AgentApiContext,
 } from "@/lib/agent-api-auth"
-import { prisma } from "@/lib/prisma"
+import { findInvalidAgentTargetFormats } from "@/lib/agent-api-contract"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
-
-async function writeAgentLog(params: {
-  context: AgentApiContext
-  projectId?: string
-  agentId?: string
-  inputSummary?: string
-  outputFormats?: string[]
-  status: "success" | "failed"
-  errorMessage?: string
-  durationMs?: number
-  aimGenerationId?: string
-}) {
-  await prisma.agentApiCallLog.create({
-    data: {
-      apiKeyId: params.context.apiKeyId,
-      userId: params.context.userId,
-      projectId: params.projectId || null,
-      agentId: params.agentId || null,
-      action: "aim.generate",
-      inputSummary: params.inputSummary || null,
-      outputFormats: params.outputFormats || [],
-      status: params.status,
-      errorMessage: params.errorMessage || null,
-      durationMs: params.durationMs || null,
-      aimGenerationId: params.aimGenerationId || null,
-    },
-  })
-}
+import {
+  buildAgentGenerateResponse,
+  finalizeAgentGenerateRun,
+  formatInvalidFormatsError,
+  logAgentGenerateFailure,
+  parseAgentGenerateBody,
+  prepareAgentAimGeneration,
+  validateAgentGenerateBody,
+} from "@/lib/aim/services/agent-generation"
 
 export async function POST(request: NextRequest) {
-  let context: AgentApiContext | null = null
+  let context = null as null | Awaited<ReturnType<typeof authenticateAgentRequest>>
   let projectId = ""
   let agentId = ""
   let inputSummary = ""
@@ -58,116 +32,58 @@ export async function POST(request: NextRequest) {
     context = await authenticateAgentRequest(request)
     const body = await request.json()
 
-    const rawInput = typeof body.rawInput === "string" ? body.rawInput.trim() : ""
-    projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
-    agentId = typeof body.agentId === "string" ? body.agentId.trim() : ""
+    const parsed = parseAgentGenerateBody(body)
     const invalidFormats = findInvalidAgentTargetFormats(body.targetFormats)
-    const targetFormats = parseAgentTargetFormats(body.targetFormats)
-    inputSummary = summarizeAgentInput(rawInput)
-    outputFormats = targetFormats
+    projectId = parsed.projectId
+    agentId = parsed.agentId
+    inputSummary = parsed.inputSummary
+    outputFormats = parsed.targetFormats
 
-    if (!rawInput) {
-      throw new Error("请输入内容")
-    }
-    if (!projectId) {
-      throw new Error("请选择 IP 营销全案")
-    }
-    if (targetFormats.length === 0) {
-      throw new Error("请选择至少一种生成格式")
-    }
-    if (invalidFormats.length > 0) {
-      throw new Error(`不支持的生成格式：${invalidFormats.join(", ")}`)
-    }
+    const validationError = validateAgentGenerateBody(parsed)
+    if (validationError) throw new Error(validationError)
+    if (invalidFormats.length > 0) throw new Error(formatInvalidFormatsError(invalidFormats))
 
+    // access 断言顺序不可变：project 先于 agent（assertAgentAccess 用原始 agentId）
     assertAgentProjectAccess(context, projectId)
     assertAgentAccess(context, agentId)
 
     // 归一化旧别名（ip_video → content_producer），保证写入 DB / 日志 / 响应的 id 一致
-    agentId = normalizeAimAgentId(agentId)
+    const { agentId: normalizedAgentId, runRequest, buildDomainInput } =
+      prepareAgentAimGeneration({ parsed, normalizeAgentId: normalizeAimAgentId, userId: context.userId })
+    agentId = normalizedAgentId
 
-    const userId = context.userId
     const trace = await createAimTrace({
-      userId,
+      userId: context.userId,
       projectId,
       agentId,
       action: "generate",
       inputSummary,
     })
 
-    const run = await executeAimRun({
-      entrypoint: "agent_api",
-      rawInput,
-      agentId,
-      targetFormats,
-      polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
-      topicTitle: typeof body.topicTitle === "string" ? body.topicTitle : undefined,
-      topicRationale: typeof body.topicRationale === "string" ? body.topicRationale : undefined,
-      actorId: userId,
-      projectId,
-      trace,
-      runLlmQuality: false,
-    }, (spec) => executeAimGenerationDomain(spec, {
-          userId,
-          projectId,
-          rawInput,
-          targetFormats,
-          topicTitle: typeof body.topicTitle === "string" ? body.topicTitle : undefined,
-          topicRationale: typeof body.topicRationale === "string" ? body.topicRationale : undefined,
-          polishInstruction: typeof body.instruction === "string" ? body.instruction : undefined,
-          trace,
-        }))
-
+    const run = await executeAimRun(runRequest, (spec) =>
+      executeAimGenerationDomain(spec, buildDomainInput(trace)),
+    )
     const result = run.output
 
-    const created = await prisma.aimGeneration.findUnique({
-      where: { id: result.id },
-      select: { createdAt: true },
-    })
-
-    await prisma.agentApiKey.update({
-      where: { id: context.apiKeyId },
-      data: { lastUsedAt: new Date() },
-    })
-
-    await writeAgentLog({
+    const createdAt = await finalizeAgentGenerateRun({
       context,
       projectId,
       agentId,
       inputSummary,
-      outputFormats: targetFormats,
-      status: "success",
-      durationMs: Date.now() - startedAt,
-      aimGenerationId: result.id,
+      outputFormats: parsed.targetFormats,
+      generationId: result.id,
+      startedAt,
     })
 
-    return NextResponse.json({
-      id: result.id,
+    return buildAgentGenerateResponse({
+      result,
       agentId,
       projectId,
-      results: result.results,
-      createdAt: created?.createdAt.toISOString() || new Date().toISOString(),
-      warnings: ["draft_only"],
-      deniedActions: AGENT_DENIED_ACTIONS,
-      // Additive harness diagnostics (Phase 4): do not alter existing fields.
-      runId: run.metadata.runId,
-      degraded: run.metadata.degraded,
-      provider: run.metadata.provider,
-      model: run.metadata.model,
-      qualityStatus: run.qualityStatus,
+      run,
+      createdAt,
     })
   } catch (error) {
-    if (context) {
-      await writeAgentLog({
-        context,
-        projectId,
-        agentId,
-        inputSummary,
-        outputFormats,
-        status: "failed",
-        errorMessage: error instanceof Error ? error.message : "生成失败",
-        durationMs: Date.now() - startedAt,
-      })
-    }
+    await logAgentGenerateFailure({ context, projectId, agentId, inputSummary, outputFormats, error, startedAt })
 
     console.error("[agent/aim/generate] Error:", error)
     const authResponse = agentAuthErrorResponse(error)
