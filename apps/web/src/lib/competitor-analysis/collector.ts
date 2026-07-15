@@ -46,20 +46,50 @@ interface CollectDouyinDeps {
   hasLocalCrawler?: () => boolean
 }
 
+function resolveDouyinDeps(deps: CollectDouyinDeps) {
+  return {
+    externalApi: deps.fetchFromExternalApi ?? fetchFromExternalDouyinApi,
+    redfoxApi: deps.fetchFromRedFoxApi ?? fetchFromRedFoxDouyinApi,
+    canUseExternalApi: deps.hasExternalApi ?? hasExternalDouyinApi,
+    canUseRedFoxApi: deps.hasRedFoxApi ?? hasRedFoxDouyinApi,
+    localCrawler: deps.fetchFromLocalCrawler ?? fetchFromLocalCrawler,
+    apiAdapter: deps.apiAdapter ?? new DouyinAdapter(),
+    hasTikHubApiKey: deps.hasTikHubApiKey ?? (() => Boolean(process.env.TIKHUB_API_KEY)),
+    hasLocalCrawler: deps.hasLocalCrawler ?? (() => process.env.LOCAL_CRAWLER_ENABLED === 'true'),
+  }
+}
+
+function buildCollectionResult(
+  data: Pick<CompetitorCollectionResult, 'platformUserId' | 'account' | 'videos' | 'comments'>,
+  collectionSource: CompetitorCollectionSource,
+  count: number,
+  fallbackUsed = false,
+  fallbackReason: string | null = null,
+): CompetitorCollectionResult {
+  return {
+    ...data,
+    videos: data.videos.slice(0, count),
+    collectionSource,
+    fallbackUsed,
+    fallbackReason,
+  }
+}
+
 export async function collectDouyinCompetitorData(
   input: CollectDouyinInput,
   deps: CollectDouyinDeps = {},
 ): Promise<CompetitorCollectionResult> {
   const count = input.count ?? 50
-  const externalApi = deps.fetchFromExternalApi ?? fetchFromExternalDouyinApi
-  const redfoxApi = deps.fetchFromRedFoxApi ?? fetchFromRedFoxDouyinApi
-  const canUseExternalApi = deps.hasExternalApi ?? hasExternalDouyinApi
-  const canUseRedFoxApi = deps.hasRedFoxApi ?? hasRedFoxDouyinApi
-  const localCrawler = deps.fetchFromLocalCrawler ?? fetchFromLocalCrawler
-  // 放开 adapter 兜底：TikHub 失败时允许降级（sec_user_id 走 HTTP+正则，博主/视频走本地爬虫）
-  const apiAdapter = deps.apiAdapter ?? new DouyinAdapter()
-  const hasTikHubApiKey = deps.hasTikHubApiKey ?? (() => Boolean(process.env.TIKHUB_API_KEY))
-  const hasLocalCrawler = deps.hasLocalCrawler ?? (() => process.env.LOCAL_CRAWLER_ENABLED === 'true')
+  const {
+    externalApi,
+    redfoxApi,
+    canUseExternalApi,
+    canUseRedFoxApi,
+    localCrawler,
+    apiAdapter,
+    hasTikHubApiKey,
+    hasLocalCrawler,
+  } = resolveDouyinDeps(deps)
 
   if (canUseExternalApi()) {
     const external = await externalApi({
@@ -67,15 +97,7 @@ export async function collectDouyinCompetitorData(
       platformUserId: input.platformUserId,
       count,
     })
-    return {
-      platformUserId: external.platformUserId,
-      account: external.account,
-      videos: external.videos.slice(0, count),
-      comments: external.comments,
-      collectionSource: 'external_api',
-      fallbackUsed: false,
-      fallbackReason: null,
-    }
+    return buildCollectionResult(external, 'external_api', count)
   }
 
   if (canUseRedFoxApi()) {
@@ -86,15 +108,7 @@ export async function collectDouyinCompetitorData(
         platformUserId: redfoxInput.platformUserId,
         count,
       })
-      return {
-        platformUserId: redfox.platformUserId,
-        account: redfox.account,
-        videos: redfox.videos.slice(0, count),
-        comments: redfox.comments,
-        collectionSource: 'redfox_api',
-        fallbackUsed: false,
-        fallbackReason: null,
-      }
+      return buildCollectionResult(redfox, 'redfox_api', count)
     } catch (err) {
       const fallbackReason = errorMessage(err)
       if (hasTikHubApiKey()) {
@@ -109,15 +123,10 @@ export async function collectDouyinCompetitorData(
   if (hasLocalCrawler()) {
     try {
       const local = await localCrawler('douyin', input.targetUrl, count)
-      return {
+      return buildCollectionResult({
+        ...local,
         platformUserId: local.account.platformUserId || input.platformUserId || '',
-        account: local.account,
-        videos: local.videos.slice(0, count),
-        comments: local.comments,
-        collectionSource: 'local_browser',
-        fallbackUsed: false,
-        fallbackReason: null,
-      }
+      }, 'local_browser', count)
     } catch (err) {
       const fallbackReason = errorMessage(err)
 
