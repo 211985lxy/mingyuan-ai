@@ -54,7 +54,7 @@ describe("User Auth E2E", () => {
     }))
     expect(res.status).toBe(409)
     const body = await json(res)
-    expect(body.error).toContain("already registered")
+    expect(body.error).toContain("已注册")
   })
 
   // ─── Login ────────────────────────────────────────────

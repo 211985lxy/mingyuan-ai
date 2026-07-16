@@ -71,6 +71,14 @@
       ]
     },
     {
+      "name": "User",
+      "columns": [
+        "id",
+        "email",
+        "authVideoUrl"
+      ]
+    },
+    {
       "name": "AdminUser",
       "columns": [
         "id",
