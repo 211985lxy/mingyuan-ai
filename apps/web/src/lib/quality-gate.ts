@@ -271,13 +271,87 @@ function parseCombinedEvaluation(raw: string): CombinedEvaluationResult {
   return fallbackResult
 }
 
+function formatPersona(persona: QualityCheckInput["persona"]): string {
+  return persona
+    ? `${persona.roleType || ""}，${persona.oneLiner || ""}，语气：${persona.toneOfVoice || ""}`
+    : "未指定"
+}
+
+function toQualityDimension(fields: EvaluationFields, passScore: number): QualityDimensionResult {
+  return {
+    score: fields.score,
+    passed: fields.score >= passScore,
+    feedback: fields.feedback,
+    details: fields.details,
+  }
+}
+
+async function checkPublishCompliance(input: QualityCheckInput): Promise<ComplianceResult | undefined> {
+  if (!input.publishPlatform || !input.content.trim()) return undefined
+  try {
+    return await checkRedFoxSensitiveWords({
+      content: input.content,
+      platform: input.publishPlatform,
+    })
+  } catch (error) {
+    console.warn("[quality-gate] Compliance check failed:", error)
+    return undefined
+  }
+}
+
+function buildTargetedRewritePrompt(
+  input: QualityCheckInput,
+  content: string,
+  report: QualityReport,
+): string {
+  const gaps = [
+    { dimension: "aiTaste", gap: report.aiTaste.passed ? 0 : PASS_SCORES.aiTaste - report.aiTaste.score, priority: 4 },
+    { dimension: "attraction", gap: report.attraction.passed ? 0 : PASS_SCORES.attraction - report.attraction.score, priority: 3 },
+    { dimension: "logic", gap: report.logic.passed ? 0 : PASS_SCORES.logic - report.logic.score, priority: 2 },
+    { dimension: "editorial", gap: report.editorial.passed ? 0 : PASS_SCORES.editorial - report.editorial.score, priority: 1 },
+  ]
+  gaps.sort((a, b) => b.gap !== a.gap ? b.gap - a.gap : b.priority - a.priority)
+
+  const targetFocus = gaps[0].dimension
+  const persona = formatPersona(input.persona)
+  if (targetFocus === "aiTaste") {
+    return fillTemplate(ORAL_REWRITE_PROMPT, {
+      content,
+      aiTasteHits: report.aiTaste.details || "未指定",
+      aiTasteFeedback: report.aiTaste.feedback,
+    })
+  }
+  if (targetFocus === "attraction") {
+    return fillTemplate(HOOK_REWRITE_PROMPT, {
+      content,
+      topicTitle: input.topicTitle || "未指定",
+      openingType: input.openingType || "未指定",
+      attractionFeedback: report.attraction.feedback,
+      persona,
+    })
+  }
+  if (targetFocus === "logic") {
+    return fillTemplate(LOGIC_REWRITE_PROMPT, {
+      content,
+      topicTitle: input.topicTitle || "未指定",
+      structure: input.structure || "未指定",
+      logicFeedback: report.logic.feedback,
+    })
+  }
+  if (targetFocus === "editorial") {
+    return fillTemplate(EDITORIAL_REWRITE_PROMPT, {
+      content,
+      persona,
+      editorialFeedback: report.editorial.feedback,
+    })
+  }
+  return fillTemplate(REWRITE_PROMPT, { content })
+}
+
 // ─── 核心 ────────────────────────────────────────────────
 
 export async function runQualityCheck(input: QualityCheckInput): Promise<QualityReport> {
   const llm = LLMClient.shared()
-  const personaStr = input.persona
-    ? `${input.persona.roleType || ""}，${input.persona.oneLiner || ""}，语气：${input.persona.toneOfVoice || ""}`
-    : "未指定"
 
   const vars = {
     content: input.content,
@@ -285,7 +359,7 @@ export async function runQualityCheck(input: QualityCheckInput): Promise<Quality
     openingType: input.openingType || "未指定",
     structure: input.structure || "未指定",
     endingType: input.endingType || "未指定",
-    persona: personaStr,
+    persona: formatPersona(input.persona),
   }
 
   const aiTasteResult = detectAITaste(input.content)
@@ -307,12 +381,7 @@ export async function runQualityCheck(input: QualityCheckInput): Promise<Quality
 
   const parsed = parseCombinedEvaluation(combinedRaw)
 
-  const editorial: QualityDimensionResult = {
-    score: parsed.editorial.score,
-    passed: parsed.editorial.score >= PASS_SCORES.editorial,
-    feedback: parsed.editorial.feedback,
-    details: parsed.editorial.details,
-  }
+  const editorial = toQualityDimension(parsed.editorial, PASS_SCORES.editorial)
 
   const aiTaste: QualityDimensionResult = {
     score: aiTasteResult.score,
@@ -321,36 +390,13 @@ export async function runQualityCheck(input: QualityCheckInput): Promise<Quality
     details: `禁词命中: ${aiTasteResult.forbiddenWordHits.length} 个，句式命中: ${aiTasteResult.patternHits.length} 个`,
   }
 
-  const attraction: QualityDimensionResult = {
-    score: parsed.attraction.score,
-    passed: parsed.attraction.score >= PASS_SCORES.attraction,
-    feedback: parsed.attraction.feedback,
-    details: parsed.attraction.details,
-  }
-
-  const logic: QualityDimensionResult = {
-    score: parsed.logic.score,
-    passed: parsed.logic.score >= PASS_SCORES.logic,
-    feedback: parsed.logic.feedback,
-    details: parsed.logic.details,
-  }
+  const attraction = toQualityDimension(parsed.attraction, PASS_SCORES.attraction)
+  const logic = toQualityDimension(parsed.logic, PASS_SCORES.logic)
 
   const allPassed = editorial.passed && aiTaste.passed && attraction.passed && logic.passed
   const avgScore = (editorial.score + aiTaste.score + attraction.score + logic.score) / 4
 
-  // 第5维：平台合规检测（非阻断，仅提示）
-  let compliance: ComplianceResult | undefined
-  if (input.publishPlatform && input.content.trim()) {
-    try {
-      compliance = await checkRedFoxSensitiveWords({
-        content: input.content,
-        platform: input.publishPlatform,
-      })
-    } catch (err) {
-      console.warn("[quality-gate] Compliance check failed:", err)
-      // 合规检测失败不阻断整个质检
-    }
-  }
+  const compliance = await checkPublishCompliance(input)
 
   return {
     editorial,
@@ -382,66 +428,12 @@ export async function runQualityGateWithRewrite(
     if (onRewrite) onRewrite(rewriteCount, report)
 
     const llm = LLMClient.shared()
-    const personaStr = input.persona
-      ? `${input.persona.roleType || ""}，${input.persona.oneLiner || ""}，语气：${input.persona.toneOfVoice || ""}`
-      : "未指定"
-
-    // 1. 计算未及格的差距 (Gap) 并确定靶向焦点 (Target Focus)
-    const gaps = [
-      { dimension: "aiTaste", gap: report.aiTaste.passed ? 0 : PASS_SCORES.aiTaste - report.aiTaste.score, priority: 4 },
-      { dimension: "attraction", gap: report.attraction.passed ? 0 : PASS_SCORES.attraction - report.attraction.score, priority: 3 },
-      { dimension: "logic", gap: report.logic.passed ? 0 : PASS_SCORES.logic - report.logic.score, priority: 2 },
-      { dimension: "editorial", gap: report.editorial.passed ? 0 : PASS_SCORES.editorial - report.editorial.score, priority: 1 },
-    ]
-
-    // 按照 Gap 从大到小排序，若 Gap 相同，则按优先级从高到低排序
-    gaps.sort((a, b) => {
-      if (b.gap !== a.gap) return b.gap - a.gap
-      return b.priority - a.priority
-    })
-
-    const targetFocus = gaps[0].dimension
-    let chosenPrompt = REWRITE_PROMPT // 兜底
-    let promptVars: Record<string, string> = {}
-
-    // 2. 根据靶向焦点分派子 Prompt 和填充参数
-    if (targetFocus === "aiTaste") {
-      chosenPrompt = ORAL_REWRITE_PROMPT
-      promptVars = {
-        content: currentContent,
-        aiTasteHits: report.aiTaste.details || "未指定",
-        aiTasteFeedback: report.aiTaste.feedback,
-      }
-    } else if (targetFocus === "attraction") {
-      chosenPrompt = HOOK_REWRITE_PROMPT
-      promptVars = {
-        content: currentContent,
-        topicTitle: input.topicTitle || "未指定",
-        openingType: input.openingType || "未指定",
-        attractionFeedback: report.attraction.feedback,
-        persona: personaStr,
-      }
-    } else if (targetFocus === "logic") {
-      chosenPrompt = LOGIC_REWRITE_PROMPT
-      promptVars = {
-        content: currentContent,
-        topicTitle: input.topicTitle || "未指定",
-        structure: input.structure || "未指定",
-        logicFeedback: report.logic.feedback,
-      }
-    } else if (targetFocus === "editorial") {
-      chosenPrompt = EDITORIAL_REWRITE_PROMPT
-      promptVars = {
-        content: currentContent,
-        persona: personaStr,
-        editorialFeedback: report.editorial.feedback,
-      }
-    }
+    const rewritePrompt = buildTargetedRewritePrompt(input, currentContent, report)
 
     const rewriteResult = await llm.complete({
       messages: [
         { role: "system", content: "你是一位精益求精的短视频文案靶向编辑器。直接输出改写融合后的完整文案正文，不要任何解释。" },
-        { role: "user", content: fillTemplate(chosenPrompt, promptVars) },
+        { role: "user", content: rewritePrompt },
       ],
       temperature: 0.7,
       maxTokens: 800,
