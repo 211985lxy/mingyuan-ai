@@ -6,6 +6,10 @@ import {
 import { GET } from "@/app/api/admin/dashboard/route"
 
 let admin: { id: string; email: string; role: string }
+let publishedTemplateCountBefore = 0
+let userCountBefore = 0
+let hotSuccessCountBefore = 0
+let hotFailedCountBefore = 0
 
 describe("Admin Dashboard E2E", () => {
   beforeAll(async () => {
@@ -13,6 +17,17 @@ describe("Admin Dashboard E2E", () => {
     await cleanRedis()
     const a = await createAdminUser()
     admin = { id: a.id, email: a.email, role: a.role }
+    publishedTemplateCountBefore = await prisma.contentTemplate.count({
+      where: { status: "published" },
+    })
+    userCountBefore = await prisma.user.count()
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    hotSuccessCountBefore = await prisma.douyinHotSnapshot.count({
+      where: { fetchedAt: { gte: oneDayAgo }, status: "success" },
+    })
+    hotFailedCountBefore = await prisma.douyinHotSnapshot.count({
+      where: { fetchedAt: { gte: oneDayAgo }, status: "failed" },
+    })
 
     // Seed data for dashboard metrics
     await prisma.user.create({
@@ -62,9 +77,9 @@ describe("Admin Dashboard E2E", () => {
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.data.totalUsers).toBe(2)
-    expect(body.data.activeTemplates).toBe(2) // 2 published
-    expect(body.data.hotListHealth.successLast24h).toBe(1)
-    expect(body.data.hotListHealth.failedLast24h).toBe(1)
+    expect(body.data.totalUsers).toBe(userCountBefore + 2)
+    expect(body.data.activeTemplates).toBe(publishedTemplateCountBefore + 2)
+    expect(body.data.hotListHealth.successLast24h).toBe(hotSuccessCountBefore + 1)
+    expect(body.data.hotListHealth.failedLast24h).toBe(hotFailedCountBefore + 1)
   })
 })

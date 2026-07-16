@@ -1,3 +1,4 @@
+import { env } from "@/env"
 /**
  * RedFox Hub 最小 HTTP 客户端。
  *
@@ -9,8 +10,8 @@
  * - 无 provider 抽象、无 orchestrator、无复杂回退链
  */
 
-const REDFOX_BASE = process.env.REDFOX_BASE_URL || 'https://redfox.hk'
-const TIMEOUT_MS = Number(process.env.REDFOX_TIMEOUT_MS || 60000)
+const REDFOX_BASE = env.REDFOX_BASE_URL || 'https://redfox.hk'
+const TIMEOUT_MS = Number(env.REDFOX_TIMEOUT_MS || 60000)
 
 export class RedFoxError extends Error {
   constructor(
@@ -45,7 +46,7 @@ export interface RedFoxRequestConfig {
  * 否则抛 RedFoxError。
  */
 export async function redfoxRequest<T>(config: RedFoxRequestConfig): Promise<T> {
-  const apiKey = process.env.REDFOX_API_KEY
+  const apiKey = env.REDFOX_API_KEY
   if (!apiKey) {
     throw new RedFoxError('未配置 REDFOX_API_KEY，无法调用 RedFox API')
   }
@@ -107,7 +108,7 @@ export async function redfoxRequest<T>(config: RedFoxRequestConfig): Promise<T> 
 
 /** 检查 RedFox API Key 是否已配置 */
 export function hasRedFoxApiKey(): boolean {
-  return Boolean(process.env.REDFOX_API_KEY)
+  return Boolean(env.REDFOX_API_KEY)
 }
 
 // ── 便捷方法 ──

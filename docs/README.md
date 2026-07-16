@@ -4,9 +4,8 @@
 
 ## 当前真源
 
-- `../AGENTS.md`：产品原则、开发红线与视频生成边界。
+- `../AGENTS.md`：产品原则与开发红线。
 - `../PROJECT.md`：部署、发布和运行时约束。
-- `architecture/direction-a-architecture.md`：Direction A 核心工作流与领域边界。
 - `architecture/adr-001-aim-harness-execution-kernel.md`：Harness 唯一执行内核决策。
 
 ## 运行时知识
@@ -23,8 +22,8 @@
 - `superpowers/`：特定阶段的设计与实施计划，以代码、测试和当前真源为最终依据。
 - `competitor-analysis-research.md` 与 `architecture/competitor-analysis-technical-design.md`：2026-04 的竞品调研和当时方案。
 - `architecture/topic-hot-competitor-architecture-optimization.md`：2026-07-07 的待审方案。
-- `FAST_PRODUCTION_LAUNCH.md`、`AI Video SaaS 产品文档.txt`、`our-algorithms.md`：早期产品与上线资料，仅作背景参考。
-- `结构.md`、`表达模板.md`：通用内容研究手册，不是应用架构规则。
+- `FAST_PRODUCTION_LAUNCH.md`：早期上线资料，仅作背景参考。
+- `表达模板.md`：通用内容研究手册，不是应用架构规则。
 
 ## 维护约定
 

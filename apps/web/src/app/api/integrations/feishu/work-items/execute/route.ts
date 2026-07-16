@@ -20,6 +20,7 @@
  */
 import { timingSafeEqual } from "node:crypto"
 import { NextRequest, NextResponse } from "next/server"
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import {
   createLarkWorkItemStore,
   readWorkItemStoreConfig,
@@ -99,9 +100,9 @@ export async function POST(request: NextRequest) {
 
   let body: WorkItemRequestBody
   try {
-    body = (await request.json()) as WorkItemRequestBody
-  } catch {
-    return badRequest("请求体不是合法 JSON。")
+    body = (await parseJsonRecord(request)) as WorkItemRequestBody
+  } catch (error) {
+    return apiRequestErrorResponse(request, error) ?? badRequest("请求体不是合法 JSON。")
   }
 
   const recordId = (body.recordId ?? "").trim()

@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import { NextRequest } from "next/server"
 
 // ── Mock LLMClient ────────────────────────────────────────────────────────────
 
 const mockComplete = vi.fn()
+
+vi.mock("@/lib/user-auth", () => ({
+  withUserAuth:
+    (handler: (request: Request, context: { user: { id: string; email: string } }) => Promise<Response>) =>
+    (request: Request) => handler(request, {
+      user: { id: "user-1", email: "user@example.com" },
+    }),
+}))
 
 vi.mock("@/lib/llm/client", () => ({
   LLMClient: {
@@ -17,8 +26,8 @@ const { POST } = await import(
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function makeRequest(body: Record<string, unknown>): Request {
-  return new Request("http://localhost/api/competitor-analysis/methodology/compile", {
+function makeRequest(body: Record<string, unknown>): NextRequest {
+  return new NextRequest("http://localhost/api/competitor-analysis/methodology/compile", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -58,7 +67,8 @@ describe("POST /api/competitor-analysis/methodology/compile", () => {
           "该竞品通过痛点提问开头，中段用案例推进，结尾号召关注。",
         projectName: "测试项目",
         sourceCompetitorId: "comp-123",
-      })
+      }),
+      { params: Promise.resolve({}) },
     )
 
     expect(res.status).toBe(200)
@@ -70,7 +80,8 @@ describe("POST /api/competitor-analysis/methodology/compile", () => {
 
   it("returns 400 when competitorAnalysisText is missing", async () => {
     const res = await POST(
-      makeRequest({ projectName: "测试项目" })
+      makeRequest({ projectName: "测试项目" }),
+      { params: Promise.resolve({}) },
     )
 
     expect(res.status).toBe(400)
@@ -80,7 +91,8 @@ describe("POST /api/competitor-analysis/methodology/compile", () => {
 
   it("returns 400 when competitorAnalysisText is empty string", async () => {
     const res = await POST(
-      makeRequest({ competitorAnalysisText: "   " })
+      makeRequest({ competitorAnalysisText: "   " }),
+      { params: Promise.resolve({}) },
     )
 
     expect(res.status).toBe(400)

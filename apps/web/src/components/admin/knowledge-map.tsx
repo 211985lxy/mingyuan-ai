@@ -128,13 +128,8 @@ export function KnowledgeMap({ projects, onDrillDown }: KnowledgeMapProps) {
 
   const fetchStats = useCallback(async () => {
     try {
-      const token = localStorage.getItem("mingyuan-admin-auth")
-      const authObj = token ? JSON.parse(token) : null
-      const authToken = authObj?.state?.token ?? ""
       const qs = selectedProjectId ? `?projectId=${encodeURIComponent(selectedProjectId)}` : ""
-      const res = await fetch(`/api/admin/knowledge/stats${qs}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      })
+      const res = await fetch(`/api/admin/knowledge/stats${qs}`)
       const json = await res.json()
       setStats(json.data ?? json)
     } catch (err) {

@@ -6,7 +6,7 @@ import { useAuthStore } from "@/lib/store"
 import { getSubscriptionStatus } from "@/lib/subscription"
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { token, user, isHydrated } = useAuthStore()
+  const { user, isAuthenticated, sessionChecked, isHydrated } = useAuthStore()
   const router = useRouter()
   const hasKnownActivationState =
     !!user &&
@@ -16,19 +16,19 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const subscriptionStatus =
     user?.subscriptionStatus ?? getSubscriptionStatus(user?.expiresAt ?? null)
   const needsActivation =
-    !!token && hasKnownActivationState && subscriptionStatus !== "active"
+    isAuthenticated && hasKnownActivationState && subscriptionStatus !== "active"
 
   useEffect(() => {
-    if (isHydrated && !token) {
+    if (isHydrated && sessionChecked && !isAuthenticated) {
       router.replace("/login")
     }
 
     if (isHydrated && needsActivation) {
       router.replace("/activate")
     }
-  }, [isHydrated, token, needsActivation, router])
+  }, [isHydrated, sessionChecked, isAuthenticated, needsActivation, router])
 
-  if (!isHydrated || !token || needsActivation) {
+  if (!isHydrated || !sessionChecked || !isAuthenticated || needsActivation) {
     return null
   }
 

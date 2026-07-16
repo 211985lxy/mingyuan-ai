@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -18,7 +19,7 @@ interface ConfirmedEntry {
  * 接收管理员确认的条目 → 批量写入 + 触发向量化
  */
 export const POST = withAdminAuth(async (request) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { userId, projectId, entries } = body as {
     userId: string
     projectId: string | null

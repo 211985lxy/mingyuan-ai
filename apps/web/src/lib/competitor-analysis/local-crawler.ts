@@ -1,3 +1,4 @@
+import { env, getProcessEnvironment } from "@/env"
 import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs'
@@ -82,10 +83,10 @@ export async function fetchFromLocalCrawler(
   args.push('--url', targetUrl)
   args.push('--count', String(count))
   // 本地交付版默认打开可见浏览器；如需服务器静默运行，可显式配置 LOCAL_CRAWLER_HEADLESS=true。
-  const headlessOpt = process.env.LOCAL_CRAWLER_HEADLESS === 'true' ? 'true' : 'false'
+  const headlessOpt = env.LOCAL_CRAWLER_HEADLESS === 'true' ? 'true' : 'false'
   args.push('--headless', headlessOpt)
 
-  const cdpPort = process.env.LOCAL_CRAWLER_CDP_PORT
+  const cdpPort = env.LOCAL_CRAWLER_CDP_PORT
   if (cdpPort && /^\d+$/.test(cdpPort)) {
     args.push('--cdp-port', cdpPort)
   }
@@ -98,14 +99,14 @@ export async function fetchFromLocalCrawler(
     const pyProcess = spawn(cmd, args, {
       cwd: sauDir,
       env: {
-        ...process.env,
+        ...getProcessEnvironment(),
         PYTHONIOENCODING: 'utf-8',
         // 针对 Playwright 在特定国内网络下无法下载的阿里镜像源设置
         PLAYWRIGHT_DOWNLOAD_HOST: 'https://npmmirror.com/mirrors/playwright'
       }
     })
 
-    const timeoutMs = Number(process.env.LOCAL_CRAWLER_TIMEOUT_MS || 30000)
+    const timeoutMs = Number(env.LOCAL_CRAWLER_TIMEOUT_MS || 30000)
     const timeoutTimer = setTimeout(() => {
       if (settled) return
       settled = true

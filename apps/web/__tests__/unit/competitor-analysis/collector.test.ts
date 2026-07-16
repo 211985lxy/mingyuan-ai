@@ -293,7 +293,7 @@ describe('collectDouyinCompetitorData', () => {
 describe('fetchFromRedFoxDouyinApi', () => {
   it('normalizes RedFox account and work-list data without calling TikHub', async () => {
     vi.stubEnv('REDFOX_API_KEY', 'rk_test_123')
-    const fetchMock = vi.fn(async (url: string) => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
       if (url.endsWith('/story/api/dyData/queryWorkList')) {
         return Response.json({
           code: 2000,
@@ -365,7 +365,7 @@ describe('fetchFromRedFoxDouyinApi', () => {
 
   it('sends a RedFox accountId instead of secUserId when the profile path is a Douyin account name', async () => {
     vi.stubEnv('REDFOX_API_KEY', 'rk_test_123')
-    const fetchMock = vi.fn(async (url: string) => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
       if (url.endsWith('/story/api/dyData/queryWorkList')) {
         return Response.json({
           code: 2000,

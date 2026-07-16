@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -15,6 +16,7 @@ import {
   buildTopicSources,
   buildVideoCopyExtractionSources,
 } from "@/lib/topic-source-builders"
+import { topicGenerateBodySchema } from "@/features/topics/contracts/api"
 
 export const maxDuration = 60
 
@@ -45,7 +47,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const requestId = `topic-gen-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   console.log(`[${requestId}] Topic generation initiated by user ${user.id}`)
 
-  const body = await request.json()
+  const body = await parseJsonBody(request, topicGenerateBodySchema, { maxBytes: 32 * 1024 })
   const recommendationMode = parseRecommendationMode(body.recommendationMode)
   if (!recommendationMode) {
     return NextResponse.json(
@@ -113,6 +115,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     prisma.topicElement.findMany({
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
+      take: 200,
     }),
     // Fetch last 5 topic generations for history-aware derivation
     prisma.topicSelection.findMany({

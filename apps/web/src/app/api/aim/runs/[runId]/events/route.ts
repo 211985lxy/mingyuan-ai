@@ -1,6 +1,9 @@
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { aimRunEventBodySchema } from "@/features/aim/contracts/api"
+import type { Prisma } from "@/generated/prisma/client"
 
 // 事件类型：既有 copied/revised/accepted + 协作认知层反馈事件（补充指令 §五）
 // 全部 ≤ 24 字符，适配 AimRunEvent.event @db.VarChar(24)
@@ -22,11 +25,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const user = await authenticateRequest(request)
     const { runId } = await context.params
-    const body = await request.json().catch(() => ({})) as {
-      event?: unknown
-      metadata?: unknown
-      reason?: unknown
-    }
+    const body = await parseJsonBody(request, aimRunEventBodySchema, { maxBytes: 16 * 1024 })
 
     if (!runId.startsWith("run_") || runId.length > 40) {
       return NextResponse.json({ error: "无效的执行编号" }, { status: 400 })
@@ -53,13 +52,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         runId,
         userId: user.id,
         event: body.event,
-        metadata: metadata ?? (reason ? { reason } : undefined),
+        metadata: (metadata ?? (reason ? { reason } : undefined)) as Prisma.InputJsonValue | undefined,
       },
     })
 
     return NextResponse.json({ ok: true }, { status: 201 })
   } catch (error) {
-    return authErrorResponse(error) ?? NextResponse.json(
+    return authErrorResponse(error) ?? apiRequestErrorResponse(request, error) ?? NextResponse.json(
       { error: "运行事件记录失败" },
       { status: 500 },
     )

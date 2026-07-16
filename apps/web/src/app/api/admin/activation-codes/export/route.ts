@@ -37,7 +37,12 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
       },
     },
     orderBy: { createdAt: "desc" },
+    take: 10_001,
   })
+
+  if (codes.length > 10_000) {
+    return NextResponse.json({ error: "导出结果超过 10000 条，请先按状态或批次筛选" }, { status: 413 })
+  }
 
   const header = "Code,Status,Duration Days,Batch Note,Used By,Used At,Created At"
   const rows = codes.map((c) => {

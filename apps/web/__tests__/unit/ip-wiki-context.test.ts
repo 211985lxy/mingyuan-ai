@@ -89,7 +89,7 @@ describe("formatIpWikiBlock", () => {
           pageType: "content_strategy",
           title: "底盘",
           content: "x",
-          frontmatter: { topicDistribution: "not-an-array", hooks: 123 } as unknown,
+          frontmatter: { topicDistribution: "not-an-array", hooks: 123 },
         }),
       ])
     ).not.toThrow()

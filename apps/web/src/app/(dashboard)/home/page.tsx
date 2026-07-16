@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { getContentPreview, getContentTitle } from "@/lib/home-history-summary"
 import {
   listAimHistory,
   listClientProjects,
@@ -38,10 +39,6 @@ function workflowStatusLabel(status?: string | null) {
     archived: "已归档",
   }
   return labels[status || "draft"] || "草稿"
-}
-
-function getContentTitle(item: AimGeneration) {
-  return item.topicTitle || item.rawInput.slice(0, 42) || "未命名内容"
 }
 
 export default function DashboardPage() {
@@ -220,7 +217,7 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 space-y-1">
                         <p className="line-clamp-1 text-sm font-semibold">{getContentTitle(item)}</p>
-                        <p className="line-clamp-1 text-xs text-muted-foreground">{item.rawInput}</p>
+                        <p className="line-clamp-1 text-xs text-muted-foreground">{getContentPreview(item)}</p>
                       </div>
                       <Badge variant="outline" className="shrink-0">
                         {workflowStatusLabel(item.workflowStatus)}

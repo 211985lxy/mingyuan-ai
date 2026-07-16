@@ -69,10 +69,16 @@ export async function authenticateAgentRequest(request: NextRequest): Promise<Ag
   }
 }
 
-export function assertAgentProjectAccess(context: AgentApiContext, projectId: string) {
+export async function assertAgentProjectAccess(context: AgentApiContext, projectId: string) {
   if (!context.allowedProjects.includes(projectId)) {
     throw new Error("AGENT_PROJECT_FORBIDDEN")
   }
+
+  const project = await prisma.clientProject.findFirst({
+    where: { id: projectId, userId: context.userId, status: "active" },
+    select: { id: true },
+  })
+  if (!project) throw new Error("AGENT_PROJECT_FORBIDDEN")
 }
 
 export function assertAgentAccess(context: AgentApiContext, agentId: string): asserts agentId is AimAgentId {

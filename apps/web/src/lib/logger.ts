@@ -1,7 +1,9 @@
+import { env } from "@/env"
 import pino from "pino"
+import { createHash, randomUUID } from "node:crypto"
 
 export const logger = pino({
-  level: process.env.LOG_LEVEL || "info",
+  level: env.LOG_LEVEL || "info",
   formatters: {
     level(label) {
       return { level: label }
@@ -10,7 +12,7 @@ export const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
   base: {
     service: "mingyuan-web",
-    env: process.env.NODE_ENV || "development",
+    env: env.NODE_ENV || "development",
   },
 })
 
@@ -20,15 +22,19 @@ export const logger = pino({
  */
 export function createRequestLogger(context: {
   requestId: string
-  userId?: string
+  userIdHash?: string
   path?: string
 }) {
   return logger.child(context)
+}
+
+export function hashLogIdentifier(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16)
 }
 
 /**
  * Generate a short unique request ID for log correlation.
  */
 export function generateRequestId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
+  return randomUUID()
 }

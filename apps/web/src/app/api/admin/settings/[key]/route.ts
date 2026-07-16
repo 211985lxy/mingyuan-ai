@@ -1,7 +1,9 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { invalidateBrandingCache, isBrandingSettingKey } from "@/lib/branding"
 import { prisma } from "@/lib/prisma"
+import { recordAdminAudit } from "@/lib/admin-audit"
 
 export const PUT = withAdminAuth(async (request: NextRequest, { admin, params }) => {
   const key = params?.key
@@ -9,7 +11,7 @@ export const PUT = withAdminAuth(async (request: NextRequest, { admin, params })
     return NextResponse.json({ error: "Key required" }, { status: 400 })
   }
 
-  const { value } = await request.json()
+  const { value } = await parseJsonRecord(request)
   if (value === undefined) {
     return NextResponse.json({ error: "Value required" }, { status: 400 })
   }
@@ -57,5 +59,14 @@ export const PUT = withAdminAuth(async (request: NextRequest, { admin, params })
     await invalidateBrandingCache()
   }
 
-  return NextResponse.json({ data: setting })
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "system_setting.update",
+    targetType: "system_setting",
+    targetId: setting.key,
+    metadata: { type: setting.type, category: setting.category },
+  })
+
+  return NextResponse.json({ data: setting }, { headers: { "x-request-id": requestId } })
 }, "admin")

@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -31,7 +32,7 @@ export const PATCH = withAdminAuth(async (request, { params }) => {
     return NextResponse.json({ error: "缺少 itemId" }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const data: Record<string, unknown> = {}
 
   if (typeof body.title === "string") {

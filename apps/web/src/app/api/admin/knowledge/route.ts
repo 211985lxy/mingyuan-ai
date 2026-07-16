@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -7,8 +8,8 @@ import { buildDefaultKnowledgeTags, mergeKnowledgeTags, normalizeValueGrade } fr
 // GET — 查看所有用户的知识库条目（分页+搜索+过滤）
 export const GET = withAdminAuth(async (request) => {
   const { searchParams } = new URL(request.url)
-  const page = parseInt(searchParams.get("page") ?? "1", 10)
-  const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10)
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20))
   const search = searchParams.get("search") ?? ""
   const category = searchParams.get("category") ?? ""
   const userId = searchParams.get("userId") ?? ""
@@ -52,7 +53,7 @@ export const GET = withAdminAuth(async (request) => {
 
 // POST — 管理员手动录入知识条目
 export const POST = withAdminAuth(async (request, { admin }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { category, title, content, tags, sourceType, valueGrade } = body
   const projectId = typeof body.projectId === "string" && body.projectId.trim()
     ? body.projectId.trim()
@@ -105,11 +106,11 @@ export const POST = withAdminAuth(async (request, { admin }) => {
 
 // PUT — 管理员强制批量更新（批量变更状态或分类）
 export const PUT = withAdminAuth(async (request) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { ids, action, value } = body
 
-  if (!Array.isArray(ids) || ids.length === 0) {
-    return NextResponse.json({ error: "ids 必填" }, { status: 400 })
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) {
+    return NextResponse.json({ error: "ids 必填且最多 500 条" }, { status: 400 })
   }
 
   if (action === "archive") {
@@ -145,6 +146,7 @@ export const PUT = withAdminAuth(async (request) => {
     const entries = await prisma.knowledgeEntry.findMany({
       where: { id: { in: ids } },
       select: { id: true, tags: true },
+      take: 500,
     })
     await Promise.all(entries.map((entry) =>
       prisma.knowledgeEntry.update({

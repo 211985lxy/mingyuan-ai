@@ -1,0 +1,101 @@
+// Identity domain models
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  plan      String    @default("free") // free | basic | pro
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  ipProfile             IpProfile?
+  contentGenerationRuns ContentGenerationRun[]
+  assets                Asset[]
+  scripts               Script[]
+  activationCodes       ActivationCode[]
+  topicSelections       TopicSelection[]
+  competitorAnalyses    CompetitorAnalysis[]
+  watchAccounts         WatchAccount[]
+  videoCopyExtractions  VideoCopyExtraction[]
+  knowledgeEntries      KnowledgeEntry[]
+  knowledgeEntities     KnowledgeEntity[]
+  aimGenerations        AimGeneration[]
+  aimMemories           AimMemory[]
+  clientProjects        ClientProject[]
+  ipWikiPages           IpWikiPage[]
+  benchmarkProfiles     BenchmarkProfile[]
+  inspirations          Inspiration[]
+  agentApiKeys          AgentApiKey[]
+  agentApiCallLogs      AgentApiCallLog[]
+  aimExecutionTraces    AimExecutionTrace[]
+  aimRunSnapshots       AimRunSnapshot[]
+  aimRunEvents          AimRunEvent[]
+  contentOutcomes       ContentOutcome[]
+  commentInsightJobs    CommentInsightJob[]
+}
+
+model AdminUser {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  password       String
+  name           String
+  role           String   @default("editor") // editor | admin
+  isActive       Boolean  @default(true)
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  activationCodes ActivationCode[]
+  auditLogs       AdminAuditLog[]
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String   @db.VarChar(100)
+  targetType String   @db.VarChar(80)
+  targetId   String?  @db.VarChar(191)
+  requestId  String   @db.VarChar(80)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  admin AdminUser @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, createdAt])
+  @@index([targetType, targetId])
+  @@index([requestId])
+}
+
+model ActivationCode {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  batchId      String
+  batchNote    String?
+  durationDays Int       @default(365)
+  status       String    @default("unused") // unused | used
+  usedBy       String?
+  usedAt       DateTime?
+  createdBy    String
+  createdAt    DateTime  @default(now())
+
+  user  User?     @relation(fields: [usedBy], references: [id])
+  admin AdminUser @relation(fields: [createdBy], references: [id])
+
+  @@index([batchId])
+  @@index([status])
+  @@index([code])
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   @db.Text
+  type        String   @default("string") // string | number | boolean | json
+  category    String   @default("general")
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}

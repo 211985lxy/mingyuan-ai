@@ -1,3 +1,4 @@
+import { env } from "@/env"
 // ─── 微信公众号 HTML 转换 ─────────────────────────────────
 // 主路径：调用 baoyu-markdown-to-html（bun/npx）
 // Fallback：内置最小 Markdown → 微信安全 HTML 转换器
@@ -10,7 +11,7 @@ const execFileAsync = promisify(execFile)
 
 // baoyu-markdown-to-html 脚本路径（优先检测）
 const BAOYU_SCRIPT_PATH =
-  process.env.BAOYU_MD2HTML_SCRIPT ||
+  env.BAOYU_MD2HTML_SCRIPT ||
   "/Users/xiangyu/.codex/skills/baoyu-markdown-to-html/scripts/main.ts"
 
 /** HTML 允许的白名单标签（微信图文消息支持的标签子集） */

@@ -3,6 +3,7 @@ import { authenticateRequest, authErrorResponse } from '@/lib/user-auth'
 import { adoptTopicSchema } from '@/lib/comment-radar/schemas'
 import { prisma } from '@/lib/prisma'
 import type { JobStatus } from '@/lib/comment-radar/types'
+import { apiRequestErrorResponse, parseJsonRecord } from '@/lib/api-contract'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<Record<string, string>> }) {
   let user: { id: string; email: string }
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<R
   if (st !== 'completed' && st !== 'partial') return NextResponse.json({ error: 'Job has not been analyzed yet' }, { status: 400 })
   if (!job.analysisResult) return NextResponse.json({ error: 'No analysis result' }, { status: 400 })
   let body: unknown
-  try { body = await request.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  try { body = await parseJsonRecord(request) } catch (error) { return apiRequestErrorResponse(request, error) ?? NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
   const parsed = adoptTopicSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 422 })
   const existing = (job.analysisResult as Record<string, unknown>) ?? {}

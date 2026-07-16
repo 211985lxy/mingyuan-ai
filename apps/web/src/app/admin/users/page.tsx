@@ -151,8 +151,7 @@ export default function AdminUsersPage() {
                   <th className="text-left p-3 font-medium">名称</th>
                   <th className="text-left p-3 font-medium">邮箱</th>
                   <th className="text-left p-3 font-medium">套餐</th>
-                  <th className="text-right p-3 font-medium">视频</th>
-                  <th className="text-right p-3 font-medium">数字人</th>
+                  <th className="text-right p-3 font-medium">生成稿</th>
                   <th className="text-left p-3 font-medium">注册时间</th>
                 </tr>
               </thead>
@@ -160,7 +159,7 @@ export default function AdminUsersPage() {
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-b">
-                      {Array.from({ length: 6 }).map((_, j) => (
+                      {Array.from({ length: 5 }).map((_, j) => (
                         <td key={j} className="p-3">
                           <Skeleton className="h-4 w-full" />
                         </td>
@@ -169,7 +168,7 @@ export default function AdminUsersPage() {
                   ))
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
                       未找到用户
                     </td>
                   </tr>
@@ -193,8 +192,7 @@ export default function AdminUsersPage() {
                           {user.plan}
                         </Badge>
                       </td>
-                      <td className="p-3 text-right">{user._count.videoTasks}</td>
-                      <td className="p-3 text-right">{user._count.avatars}</td>
+                      <td className="p-3 text-right">{user._count.aimGenerations}</td>
                       <td className="p-3 text-muted-foreground">
                         {new Date(user.createdAt).toLocaleDateString("zh-CN")}
                       </td>

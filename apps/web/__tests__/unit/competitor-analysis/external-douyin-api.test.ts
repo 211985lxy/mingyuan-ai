@@ -1,29 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchFromExternalDouyinApi, hasExternalDouyinApi } from '@/lib/competitor-analysis/external-douyin-api'
 
-const originalEnv = process.env
+const mockEnv = vi.hoisted<Record<string, string | undefined>>(() => ({}))
+
+vi.mock('@/env', () => ({ env: mockEnv }))
 
 describe('external douyin api', () => {
   beforeEach(() => {
-    process.env = { ...originalEnv }
+    mockEnv.COMPETITOR_DOUYIN_API_URL = undefined
+    mockEnv.COMPETITOR_DOUYIN_API_KEY = undefined
+    mockEnv.COMPETITOR_DOUYIN_API_TIMEOUT_MS = undefined
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
-    process.env = originalEnv
   })
 
   it('detects whether the external API is configured', () => {
-    delete process.env.COMPETITOR_DOUYIN_API_URL
+    mockEnv.COMPETITOR_DOUYIN_API_URL = undefined
     expect(hasExternalDouyinApi()).toBe(false)
 
-    process.env.COMPETITOR_DOUYIN_API_URL = 'https://example.com/douyin'
+    mockEnv.COMPETITOR_DOUYIN_API_URL = 'https://example.com/douyin'
     expect(hasExternalDouyinApi()).toBe(true)
   })
 
   it('normalizes a real external API response', async () => {
-    process.env.COMPETITOR_DOUYIN_API_URL = 'https://example.com/douyin'
-    process.env.COMPETITOR_DOUYIN_API_KEY = 'secret'
+    mockEnv.COMPETITOR_DOUYIN_API_URL = 'https://example.com/douyin'
+    mockEnv.COMPETITOR_DOUYIN_API_KEY = 'secret'
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       data: {
         platformUserId: 'sec_user_001',
@@ -69,7 +72,7 @@ describe('external douyin api', () => {
   })
 
   it('rejects empty video results instead of fabricating data', async () => {
-    process.env.COMPETITOR_DOUYIN_API_URL = 'https://example.com/douyin'
+    mockEnv.COMPETITOR_DOUYIN_API_URL = 'https://example.com/douyin'
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       account: { nickname: 'No Video Account' },
       platformUserId: 'sec_user_001',

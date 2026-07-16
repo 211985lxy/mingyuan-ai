@@ -213,6 +213,7 @@ export async function runIpWikiLint(input: {
     const rows = await prisma.aimGeneration.findMany({
       where: { id: { in: [...genIds] } },
       select: { id: true },
+      take: 500,
     })
     existingGenerationIds = new Set(rows.map((r) => r.id))
   }

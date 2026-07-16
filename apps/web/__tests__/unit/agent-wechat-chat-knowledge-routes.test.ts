@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 const mocks = vi.hoisted(() => ({
   authenticateAgentRequest: vi.fn(),
   assertAgentProjectAccess: vi.fn(),
-  agentAuthErrorResponse: vi.fn(() => null),
+  agentAuthErrorResponse: vi.fn<(error: unknown) => NextResponse | null>(() => null),
   processChunksForSmartImport: vi.fn(),
   enforceKnowledgeBetaLimit: vi.fn(),
   ensureKnowledgeEmbedding: vi.fn(),

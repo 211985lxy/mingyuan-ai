@@ -1,3 +1,4 @@
+import { env, getProcessEnvironment } from "@/env"
 import { spawn } from "child_process"
 import path from "path"
 import fs from "fs"
@@ -33,10 +34,10 @@ export async function runLast30DaysResearch(
   topic: string,
   requestedSources?: string[]
 ): Promise<Last30DaysResult> {
-  const enabled = process.env.LAST30DAYS_CN_ENABLED === "true"
-  const skillDir = process.env.LAST30DAYS_CN_SKILL_DIR || ""
-  const configDir = process.env.LAST30DAYS_CN_CONFIG_DIR || ""
-  const timeoutMs = parseInt(process.env.LAST30DAYS_CN_TIMEOUT_MS || "120000", 10)
+  const enabled = env.LAST30DAYS_CN_ENABLED === "true"
+  const skillDir = env.LAST30DAYS_CN_SKILL_DIR || ""
+  const configDir = env.LAST30DAYS_CN_CONFIG_DIR || ""
+  const timeoutMs = parseInt(env.LAST30DAYS_CN_TIMEOUT_MS || "120000", 10)
 
   // 1. 验证启用状态
   if (!enabled) {
@@ -85,7 +86,7 @@ export async function runLast30DaysResearch(
     // 注入 LAST30DAYS_CN_CONFIG_DIR 到子进程的环境变量中
     const pyProcess = spawn("python3", args, {
       env: {
-        ...process.env,
+        ...getProcessEnvironment(),
         LAST30DAYS_CN_CONFIG_DIR: configDir,
       }
     })

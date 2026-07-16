@@ -1,0 +1,88 @@
+// Knowledge domain models
+
+model KnowledgeEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  projectId  String?
+  category   String // boss_experience | product_usp | customer_pain | project_case | customer_qa
+  title      String
+  content    String   @db.Text
+  tags       Json     @default("[]")
+  sourceType String   @default("manual") // manual | voice_transcribe | import
+  valueGrade String?  @db.VarChar(2) // 价值分级：S(战略) | A(战术) | B(参考) | C(索引)；null 视为 B
+  sortOrder  Int      @default(0)
+  status     String   @default("active") // active | archived
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  embedding KnowledgeEmbedding?
+  relations KnowledgeRelation[]
+
+  @@index([userId, category])
+  @@index([userId, status])
+  @@index([userId, status, projectId, sortOrder, createdAt(sort: Desc)])
+  @@index([userId, valueGrade])
+  @@index([projectId])
+}
+
+model KnowledgeEmbedding {
+  id           String   @id @default(cuid())
+  entryId      String   @unique
+  embedding    Json
+  dimensions   Int      @default(1024)
+  model        String
+  contentHash  String   @db.VarChar(64)
+  status       String   @default("pending") @db.VarChar(20) // pending | completed | failed
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entry KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([contentHash])
+}
+
+model KnowledgeEntity {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  name      String // 实体名（归一化后），如「创始人老王」「美白精华」
+  type      String   @db.VarChar(40) // person | product | brand | concept | pain | channel | audience
+  aliases   Json     @default("[]") // 别名数组，用于归并
+  status    String   @default("active") // active | archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  relationsFrom KnowledgeRelation[] @relation("RelationFrom")
+  relationsTo   KnowledgeRelation[] @relation("RelationTo")
+
+  @@unique([userId, projectId, name, type])
+  @@index([projectId, status])
+  @@index([userId, name])
+}
+
+model KnowledgeRelation {
+  id           String   @id @default(cuid())
+  fromEntityId String
+  toEntityId   String
+  entryId      String // 关系来源于哪条知识（可溯源）
+  type         String   @db.VarChar(40) // sells | targets | mentions | solves | competes_with | part_of
+  weight       Float    @default(1.0)
+  evidence     String?  @db.Text // 原文片段
+  createdAt    DateTime @default(now())
+
+  fromEntity KnowledgeEntity @relation("RelationFrom", fields: [fromEntityId], references: [id], onDelete: Cascade)
+  toEntity   KnowledgeEntity @relation("RelationTo", fields: [toEntityId], references: [id], onDelete: Cascade)
+  entry      KnowledgeEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([fromEntityId, toEntityId, entryId, type])
+  @@index([fromEntityId, type])
+  @@index([entryId])
+}

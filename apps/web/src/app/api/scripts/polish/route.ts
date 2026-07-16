@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
+import { parseJsonRecord } from "@/lib/api-contract"
 import {
   parseScriptPolishBody,
   runScriptPolish,
@@ -8,7 +9,7 @@ import {
 export const maxDuration = 60
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json() as Record<string, unknown>
+  const body = await parseJsonRecord(request)
   const result = await runScriptPolish(user.id, parseScriptPolishBody(body))
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status })

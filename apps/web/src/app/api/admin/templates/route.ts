@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -5,11 +6,11 @@ import { Prisma } from "@/generated/prisma/client"
 
 // POST — Create template
 export const POST = withAdminAuth(async (request, { admin }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const {
     name, displayName, description, scriptTemplate, variables,
     expressionBlueprint,
-    hookType, shanjianStyleId, videoType, packRulesJson, processRulesJson,
+    hookType,
     industry, contentType, tags, hotTopicKeywords, seasonalEvents,
   } = body
 
@@ -29,10 +30,6 @@ export const POST = withAdminAuth(async (request, { admin }) => {
       expressionBlueprint: expressionBlueprint ?? Prisma.DbNull,
       variables: variables ?? [],
       hookType: hookType ?? null,
-      shanjianStyleId: shanjianStyleId ?? null,
-      videoType: videoType ?? "virtualman_broadcast",
-      packRulesJson: packRulesJson ?? Prisma.DbNull,
-      processRulesJson: processRulesJson ?? Prisma.DbNull,
       industry: industry ?? [],
       contentType,
       tags: tags ?? [],
@@ -50,8 +47,8 @@ export const GET = withAdminAuth(async (request) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const contentType = searchParams.get("contentType")
-  const page = parseInt(searchParams.get("page") ?? "1", 10)
-  const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10)
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20))
 
   const where: Record<string, unknown> = {}
   if (status) where.status = status

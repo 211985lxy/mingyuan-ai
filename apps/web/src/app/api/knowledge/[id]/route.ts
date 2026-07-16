@@ -1,8 +1,10 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
+import { knowledgeUpdateBodySchema } from "@/features/knowledge/contracts/api"
 
 export async function PUT(
   request: NextRequest,
@@ -11,7 +13,7 @@ export async function PUT(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const body = await request.json()
+    const body = await parseJsonBody(request, knowledgeUpdateBodySchema, { maxBytes: 64 * 1024 })
 
     const entry = await prisma.knowledgeEntry.findFirst({
       where: { id, userId: user.id },
@@ -21,7 +23,7 @@ export async function PUT(
     }
 
     const updated = await prisma.knowledgeEntry.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.content !== undefined ? { content: body.content } : {}),
@@ -64,7 +66,7 @@ export async function DELETE(
     }
 
     await prisma.knowledgeEntry.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: { status: "archived" },
     })
 

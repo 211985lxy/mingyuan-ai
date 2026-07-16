@@ -10,6 +10,7 @@ export async function matchTemplatesForHotTopic(
   const published = await prisma.contentTemplate.findMany({
     where: { status: "published" },
     select: { id: true, displayName: true, hotTopicKeywords: true },
+    take: 500,
   })
 
   return published
@@ -36,6 +37,7 @@ export async function matchSeasonalTemplates(): Promise<
   const published = await prisma.contentTemplate.findMany({
     where: { status: "published" },
     select: { id: true, displayName: true, seasonalEvents: true },
+    take: 500,
   })
 
   return published

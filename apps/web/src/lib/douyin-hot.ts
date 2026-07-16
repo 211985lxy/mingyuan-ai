@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { prisma } from "./prisma"
 import { redis } from "./redis"
 import type { HotTopic } from "@/types/content-template"
@@ -6,9 +7,9 @@ const CACHE_KEY = "douyin:hot:latest"
 const CACHE_TTL = 70 * 60 // 70 minutes
 
 const PRIMARY_URL =
-  process.env.DOUYIN_HOT_PRIMARY_URL || "https://v2.xxapi.cn/api/douyinhot"
+  env.DOUYIN_HOT_PRIMARY_URL || "https://v2.xxapi.cn/api/douyinhot"
 const FALLBACK_URL =
-  process.env.DOUYIN_HOT_FALLBACK_URL ||
+  env.DOUYIN_HOT_FALLBACK_URL ||
   "https://api.vvhan.com/api/hotlist/douyinHot"
 
 // ─── Raw API response types ──────────────────────────────
@@ -214,6 +215,7 @@ export async function getLatestHotList(): Promise<HotTopic[]> {
   const items = await prisma.douyinHotItem.findMany({
     where: { batchId: latestSnapshot.batchId },
     orderBy: { position: "asc" },
+    take: 500,
   })
 
   return items.map((item) => ({

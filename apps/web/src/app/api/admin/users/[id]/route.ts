@@ -24,26 +24,15 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
           isComplete: true,
         },
       },
-      videoTasks: {
+      aimGenerations: {
         select: {
           id: true,
           status: true,
-          videoType: true,
-          avatarName: true,
+          agentId: true,
           createdAt: true,
-          completedAt: true,
         },
         orderBy: { createdAt: "desc" },
         take: 20,
-      },
-      avatars: {
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
       },
       assets: {
         select: {
@@ -57,8 +46,7 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
       },
       _count: {
         select: {
-          videoTasks: true,
-          avatars: true,
+          aimGenerations: true,
           assets: true,
           scripts: true,
         },

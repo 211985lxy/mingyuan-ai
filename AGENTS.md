@@ -25,12 +25,11 @@
 
 当用户要求部署、上线、同步服务器时，先检查是否有明确 release commit。若工作区很脏，先提醒本次发布可能混入无关改动，并建议先 commit 或改走临时指定文件发布。只有用户明确要求临时抢修时，才允许用临时 worktree 挑指定文件发布；发布后提醒尽快回收成 commit。
 
-## 视频生成边界
+## 仓库演进规则
 
-视频生成仍按三层边界工作，不能混层：
-
-- 导演层：`VideoStructure`
-- 编剧层：`Script` / `ContentTemplate`
-- 包装层：`VideoPackagingTemplate` / `VideoProductionPlan`
-
-闪剪包装模板属于包装层，不能回流成内容结构或文案模板。详细规则见 `docs/architecture/direction-a-architecture.md`。
+- 新能力按领域放入 `apps/web/src/lib/api/{aim,topics,competitor}.ts` 或对应 feature/service；页面只负责组合状态和组件，不能继续把业务逻辑堆进 `aim/page.tsx`、`create/page.tsx`。
+- 函数和组件以 50–80 行为常态；模块以 100–300 行为常态。新增非遗留文件超过 400 行应在同一改动中拆分，超过 800 行由 ESLint 阻断。
+- 历史大文件只能缩小，不能增长；例外必须登记在 `apps/web/config/architecture-size-policy.json`，并在截止日前移除。
+- 所有浏览器 API 调用从领域模块导入；`src/lib/api/client.ts` 仅作为兼容转出入口，公共请求基础在 `src/lib/api/core.ts`。
+- 新增环境变量必须先声明到 `apps/web/src/env.ts`，再在集成边界使用；不要新建未声明的 `process.env.*` 读取。
+- 提交必须符合 Conventional Commits。发布前依次通过 lint、typecheck、架构体积、相关测试和 Prisma schema 状态校验；迁移不依赖人工记忆。

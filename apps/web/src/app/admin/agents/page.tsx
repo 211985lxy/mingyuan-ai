@@ -16,19 +16,6 @@ import {
   Sparkles,
 } from "lucide-react"
 
-// 安全读取 admin token（损坏/缺失的 localStorage 不应导致页面崩溃）。
-// 与 admin/methodology/page.tsx 的 getAdminToken 约定保持一致。
-function getAdminToken(): string {
-  if (typeof window === "undefined") return ""
-  try {
-    const authStr = localStorage.getItem("mingyuan-admin-auth")
-    if (!authStr) return ""
-    return JSON.parse(authStr).state?.token || ""
-  } catch {
-    return ""
-  }
-}
-
 type TraceStatus = "running" | "success" | "failed" | "skipped"
 
 interface TraceStep {
@@ -90,10 +77,7 @@ export default function AdminAgentsPage() {
   const selectedIdRef = React.useRef<string | null>(null)
 
   const loadDetail = React.useCallback(async (id: string) => {
-    const authToken = getAdminToken()
-    const res = await fetch(`/api/admin/agents/traces/${id}`, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    })
+    const res = await fetch(`/api/admin/agents/traces/${id}`)
     if (!res.ok) return
     const payload = await res.json()
     selectedIdRef.current = id
@@ -103,10 +87,7 @@ export default function AdminAgentsPage() {
   React.useEffect(() => {
     let cancelled = false
     async function loadList() {
-      const authToken = getAdminToken()
-      const res = await fetch("/api/admin/agents/traces?limit=30", {
-        headers: { Authorization: `Bearer ${authToken}` },
-      })
+      const res = await fetch("/api/admin/agents/traces?limit=30")
       if (!res.ok) throw new Error("加载 trace 失败")
       const payload = await res.json()
       if (cancelled) return

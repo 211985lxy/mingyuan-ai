@@ -1,3 +1,4 @@
+import { env } from "@/env"
 /**
  * TikHub smoke test — run with:
  *   DOTENV_CONFIG_PATH=.env NODE_OPTIONS='-r dotenv/config' \
@@ -15,8 +16,8 @@ interface UserBalanceResponse {
 
 async function main() {
   console.log('[tikhub-smoke-test] Testing TikHub API connectivity...')
-  console.log(`[tikhub-smoke-test] Base URL: ${process.env.TIKHUB_BASE_URL || 'https://api.tikhub.io'}`)
-  console.log(`[tikhub-smoke-test] API Key set: ${process.env.TIKHUB_API_KEY ? 'yes' : 'NO — set TIKHUB_API_KEY'}`)
+  console.log(`[tikhub-smoke-test] Base URL: ${env.TIKHUB_BASE_URL || 'https://api.tikhub.io'}`)
+  console.log(`[tikhub-smoke-test] API Key set: ${env.TIKHUB_API_KEY ? 'yes' : 'NO — set TIKHUB_API_KEY'}`)
 
   try {
     const data = await tikhubGet<UserBalanceResponse>('/api/v1/user/balance')

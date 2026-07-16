@@ -18,13 +18,13 @@
 ## 3. User Management API
 
 - [x] 3.1 Create `GET /api/admin/users` — paginated user list with search (name/email) and plan filter. Return user data with video count, avatar count, asset count aggregates.
-- [x] 3.2 Create `GET /api/admin/users/[id]` — user detail with relations: ipProfile, videoTasks (recent 20), avatars, assets, scripts count.
+- [x] 3.2 Create `GET /api/admin/users/[id]` — user detail with relations: ipProfile, assets, and scripts count.
 - [x] 3.3 Create `GET /api/admin/users/stats` — aggregate statistics: total users, count by plan, new users this week.
 
 ## 4. User Management UI
 
 - [x] 4.1 Create Users list page at `app/(admin)/users/page.tsx` — stat cards at top, data table with search bar and plan filter, pagination.
-- [x] 4.2 Create User detail page at `app/(admin)/users/[id]/page.tsx` — user info card, IP profile summary, video tasks table, avatar/asset counts.
+- [x] 4.2 Create User detail page at `app/(admin)/users/[id]/page.tsx` — user info card, IP profile summary, and asset/script counts.
 
 ## 5. Activation Code API
 

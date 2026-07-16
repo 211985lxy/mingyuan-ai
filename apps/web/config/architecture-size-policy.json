@@ -1,0 +1,34 @@
+{
+  "fileLineLimit": 500,
+  "prismaFileLineLimit": 400,
+  "targetModuleLineRange": [100, 300],
+  "functionLineLimit": 80,
+  "legacyDeadline": "2026-07-26",
+  "legacyFiles": [
+    {
+      "path": "src/app/(dashboard)/aim/page.tsx",
+      "maxLines": 758,
+      "target": "src/features/aim/components and hooks"
+    },
+    {
+      "path": "src/app/(dashboard)/competitor/page.tsx",
+      "maxLines": 517,
+      "target": "src/features/competitor/components and hooks"
+    },
+    {
+      "path": "src/app/(dashboard)/topic-planning/page.tsx",
+      "maxLines": 616,
+      "target": "src/features/topics/components and hooks"
+    },
+    {
+      "path": "src/lib/aim/services/chat-context.ts",
+      "maxLines": 512,
+      "target": "src/lib/aim/services/chat-context domain loaders"
+    },
+    {
+      "path": "src/lib/topic-generation.ts",
+      "maxLines": 595,
+      "target": "src/lib/topic-generation services"
+    }
+  ]
+}

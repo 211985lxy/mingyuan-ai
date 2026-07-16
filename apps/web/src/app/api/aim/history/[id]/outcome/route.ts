@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -22,6 +23,7 @@ export async function GET(
     const outcomes = await prisma.contentOutcome.findMany({
       where: { generationId: id, userId: user.id },
       orderBy: { collectWindowDay: "asc" },
+      take: 100,
     })
     return NextResponse.json({
       outcomes,
@@ -51,7 +53,7 @@ export async function PUT(
 
     let body: Record<string, unknown>
     try {
-      body = await request.json()
+      body = await parseJsonRecord(request)
     } catch {
       return NextResponse.json({ error: "invalid json" }, { status: 400 })
     }

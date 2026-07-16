@@ -25,17 +25,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { getAgentLogicProfile } from "@/lib/agent-logic-profile"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 
-function getAdminToken(): string {
-  if (typeof window === "undefined") return ""
-  try {
-    const authStr = localStorage.getItem("mingyuan-admin-auth")
-    if (!authStr) return ""
-    return JSON.parse(authStr).state?.token || ""
-  } catch {
-    return ""
-  }
-}
-
 interface GuideDetail {
   agentId: string
   title: string
@@ -73,9 +62,7 @@ export default function AgentMethodologyDetailPage() {
   const fetchGuide = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/admin/agents/guides", {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-      })
+      const res = await fetch("/api/admin/agents/guides")
       const json = await res.json()
       const found = (Array.isArray(json.data) ? json.data : []).find(
         (g: GuideDetail) => g.agentId === agentId
@@ -116,7 +103,6 @@ export default function AgentMethodologyDetailPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${getAdminToken()}`,
         },
         body: JSON.stringify({ agentId, field, value: payload }),
       })

@@ -108,6 +108,7 @@ export const GET = withAdminAuth(async (request) => {
     const projects = await prisma.clientProject.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, name: true, companyName: true },
+      take: 500,
     })
     for (const p of projects) projectMap.set(p.id, { name: p.name, companyName: p.companyName })
   }

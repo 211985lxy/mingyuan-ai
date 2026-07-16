@@ -17,7 +17,11 @@ describe("proofreadAimResponse", () => {
   beforeEach(() => vi.clearAllMocks())
 
   it("proofreads supported long-form results and preserves other formats", async () => {
-    vi.mocked(polishScript).mockResolvedValue({ polished: "校对后的口播文案", changes: [] })
+    vi.mocked(polishScript).mockResolvedValue({
+      original: response.results[0].content,
+      polished: "校对后的口播文案",
+      polishedDimensions: [],
+    })
     const result = await proofreadAimResponse(response, "老板口吻")
 
     expect(result.results[0]).toMatchObject({ content: "校对后的口播文案", wordCount: 8 })

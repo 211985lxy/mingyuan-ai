@@ -1,0 +1,2011 @@
+{
+  "generatedBy": "scripts/api-inventory.mjs",
+  "routes": [
+    {
+      "route": "/api/account/agent-keys",
+      "file": "src/app/api/account/agent-keys/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/account/hot-sources",
+      "file": "src/app/api/account/hot-sources/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/activation-codes/export",
+      "file": "src/app/api/admin/activation-codes/export/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/activation-codes/generate",
+      "file": "src/app/api/admin/activation-codes/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/activation-codes",
+      "file": "src/app/api/admin/activation-codes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/activation-codes/stats",
+      "file": "src/app/api/admin/activation-codes/stats/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/agents/guides",
+      "file": "src/app/api/admin/agents/guides/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/agents/traces/[id]",
+      "file": "src/app/api/admin/agents/traces/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/agents/traces",
+      "file": "src/app/api/admin/agents/traces/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/aim/runs/[runId]",
+      "file": "src/app/api/admin/aim/runs/[runId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/aim/runs",
+      "file": "src/app/api/admin/aim/runs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/auth/login",
+      "file": "src/app/api/admin/auth/login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/auth/logout",
+      "file": "src/app/api/admin/auth/logout/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/auth/me",
+      "file": "src/app/api/admin/auth/me/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles/[id]/import-analysis",
+      "file": "src/app/api/admin/benchmark-profiles/[id]/import-analysis/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles/[id]/items/[itemId]",
+      "file": "src/app/api/admin/benchmark-profiles/[id]/items/[itemId]/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles/[id]/items",
+      "file": "src/app/api/admin/benchmark-profiles/[id]/items/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles/[id]",
+      "file": "src/app/api/admin/benchmark-profiles/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles/import-text",
+      "file": "src/app/api/admin/benchmark-profiles/import-text/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles/importable-analyses",
+      "file": "src/app/api/admin/benchmark-profiles/importable-analyses/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/benchmark-profiles",
+      "file": "src/app/api/admin/benchmark-profiles/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/dashboard",
+      "file": "src/app/api/admin/dashboard/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/hot-sources",
+      "file": "src/app/api/admin/hot-sources/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
+      "route": "/api/admin/hot-topics/history",
+      "file": "src/app/api/admin/hot-topics/history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/hot-topics/stats",
+      "file": "src/app/api/admin/hot-topics/stats/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/jiekou/test",
+      "file": "src/app/api/admin/jiekou/test/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/distill",
+      "file": "src/app/api/admin/knowledge/distill/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge",
+      "file": "src/app/api/admin/knowledge/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "POST",
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/smart-import/confirm",
+      "file": "src/app/api/admin/knowledge/smart-import/confirm/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/smart-import",
+      "file": "src/app/api/admin/knowledge/smart-import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/stats",
+      "file": "src/app/api/admin/knowledge/stats/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/upload",
+      "file": "src/app/api/admin/knowledge/upload/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/methodology/[key]",
+      "file": "src/app/api/admin/methodology/[key]/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/methodology",
+      "file": "src/app/api/admin/methodology/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/projects",
+      "file": "src/app/api/admin/projects/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/seed-topic-engine",
+      "file": "src/app/api/admin/seed-topic-engine/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
+    },
+    {
+      "route": "/api/admin/settings/[key]",
+      "file": "src/app/api/admin/settings/[key]/route.ts",
+      "methods": [
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/settings",
+      "file": "src/app/api/admin/settings/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/settings/seed",
+      "file": "src/app/api/admin/settings/seed/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates/[id]/archive",
+      "file": "src/app/api/admin/templates/[id]/archive/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates/[id]/feature",
+      "file": "src/app/api/admin/templates/[id]/feature/route.ts",
+      "methods": [
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates/[id]/publish",
+      "file": "src/app/api/admin/templates/[id]/publish/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates/[id]/restore",
+      "file": "src/app/api/admin/templates/[id]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates/[id]",
+      "file": "src/app/api/admin/templates/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates/[id]/sort",
+      "file": "src/app/api/admin/templates/[id]/sort/route.ts",
+      "methods": [
+        "PUT"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/templates",
+      "file": "src/app/api/admin/templates/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/users/[id]",
+      "file": "src/app/api/admin/users/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/users",
+      "file": "src/app/api/admin/users/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/users/stats",
+      "file": "src/app/api/admin/users/stats/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/aim/generate",
+      "file": "src/app/api/agent/v1/aim/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/capabilities",
+      "file": "src/app/api/agent/v1/capabilities/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "agent_key",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/knowledge/wechat-chat/confirm",
+      "file": "src/app/api/agent/v1/knowledge/wechat-chat/confirm/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/knowledge/wechat-chat/import",
+      "file": "src/app/api/agent/v1/knowledge/wechat-chat/import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/projects",
+      "file": "src/app/api/agent/v1/projects/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "agent_key",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aihot-briefing/today/refresh",
+      "file": "src/app/api/aihot-briefing/today/refresh/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aihot-briefing/today",
+      "file": "src/app/api/aihot-briefing/today/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/chat",
+      "file": "src/app/api/aim/chat/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/evolve-style",
+      "file": "src/app/api/aim/evolve-style/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
+      "route": "/api/aim/evolve",
+      "file": "src/app/api/aim/evolve/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/generate",
+      "file": "src/app/api/aim/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/history/[id]/outcome",
+      "file": "src/app/api/aim/history/[id]/outcome/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": true
+    },
+    {
+      "route": "/api/aim/history/[id]",
+      "file": "src/app/api/aim/history/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/history",
+      "file": "src/app/api/aim/history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "zod",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/ip-wiki/compile",
+      "file": "src/app/api/aim/ip-wiki/compile/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/ip-wiki/lint",
+      "file": "src/app/api/aim/ip-wiki/lint/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/ip-wiki/pages",
+      "file": "src/app/api/aim/ip-wiki/pages/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/runs/[runId]/events",
+      "file": "src/app/api/aim/runs/[runId]/events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/scenarios",
+      "file": "src/app/api/aim/scenarios/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/transcribe",
+      "file": "src/app/api/aim/transcribe/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/workflow/brief",
+      "file": "src/app/api/aim/workflow/brief/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/assets/[id]",
+      "file": "src/app/api/assets/[id]/route.ts",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/assets",
+      "file": "src/app/api/assets/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/assets/upload-url",
+      "file": "src/app/api/assets/upload-url/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/activate",
+      "file": "src/app/api/auth/activate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/login",
+      "file": "src/app/api/auth/login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/logout",
+      "file": "src/app/api/auth/logout/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/me",
+      "file": "src/app/api/auth/me/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/register",
+      "file": "src/app/api/auth/register/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/brief/ai-fill",
+      "file": "src/app/api/brief/ai-fill/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/comment-insights/[id]/adopt-topic",
+      "file": "src/app/api/comment-insights/[id]/adopt-topic/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/comment-insights/[id]/analyze",
+      "file": "src/app/api/comment-insights/[id]/analyze/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/comment-insights/[id]/export",
+      "file": "src/app/api/comment-insights/[id]/export/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/comment-insights/[id]",
+      "file": "src/app/api/comment-insights/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/comment-insights/[id]/sync",
+      "file": "src/app/api/comment-insights/[id]/sync/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/comment-insights",
+      "file": "src/app/api/comment-insights/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor-analysis/methodology/compile",
+      "file": "src/app/api/competitor-analysis/methodology/compile/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/[id]",
+      "file": "src/app/api/competitor/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/analyze",
+      "file": "src/app/api/competitor/analyze/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/discover-similar",
+      "file": "src/app/api/competitor/discover-similar/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/reports",
+      "file": "src/app/api/competitor/reports/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "zod",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/watch-accounts/[id]",
+      "file": "src/app/api/competitor/watch-accounts/[id]/route.ts",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/watch-accounts/recommendations",
+      "file": "src/app/api/competitor/watch-accounts/recommendations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/watch-accounts/refresh",
+      "file": "src/app/api/competitor/watch-accounts/refresh/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/watch-accounts",
+      "file": "src/app/api/competitor/watch-accounts/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/watch-accounts/videos/extract",
+      "file": "src/app/api/competitor/watch-accounts/videos/extract/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/web-research",
+      "file": "src/app/api/competitor/web-research/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/aihot-briefing",
+      "file": "src/app/api/cron/aihot-briefing/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/cleanup",
+      "file": "src/app/api/cron/cleanup/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/douyin-hot",
+      "file": "src/app/api/cron/douyin-hot/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/market-hotlist",
+      "file": "src/app/api/cron/market-hotlist/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/douyin-hot",
+      "file": "src/app/api/douyin-hot/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/healthz",
+      "file": "src/app/api/healthz/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-decisions/refresh",
+      "file": "src/app/api/hot-decisions/refresh/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-decisions",
+      "file": "src/app/api/hot-decisions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-topics/[id]/fit",
+      "file": "src/app/api/hot-topics/[id]/fit/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-topics/[id]/insight",
+      "file": "src/app/api/hot-topics/[id]/insight/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-topics/ai/daily",
+      "file": "src/app/api/hot-topics/ai/daily/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-topics/ai",
+      "file": "src/app/api/hot-topics/ai/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/hot-topics",
+      "file": "src/app/api/hot-topics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/images/generate",
+      "file": "src/app/api/images/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/insights/comments",
+      "file": "src/app/api/insights/comments/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/inspiration/[id]/generate",
+      "file": "src/app/api/inspiration/[id]/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/inspiration/[id]/process",
+      "file": "src/app/api/inspiration/[id]/process/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/inspiration",
+      "file": "src/app/api/inspiration/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/integrations/feishu/events",
+      "file": "src/app/api/integrations/feishu/events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/integrations/feishu/work-items/execute",
+      "file": "src/app/api/integrations/feishu/work-items/execute/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
+      "route": "/api/knowledge/[id]",
+      "file": "src/app/api/knowledge/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "PUT"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/knowledge/export-obsidian",
+      "file": "src/app/api/knowledge/export-obsidian/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/knowledge/obsidian-status",
+      "file": "src/app/api/knowledge/obsidian-status/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/knowledge",
+      "file": "src/app/api/knowledge/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "zod",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/knowledge/sync",
+      "file": "src/app/api/knowledge/sync/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
+      "route": "/api/knowledge/upload",
+      "file": "src/app/api/knowledge/upload/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/lark-base/export",
+      "file": "src/app/api/lark-base/export/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/lark-base/import",
+      "file": "src/app/api/lark-base/import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/market-insights/last30days/hotlist/refresh",
+      "file": "src/app/api/market-insights/last30days/hotlist/refresh/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/market-insights/last30days/hotlist",
+      "file": "src/app/api/market-insights/last30days/hotlist/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/market-insights/last30days",
+      "file": "src/app/api/market-insights/last30days/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/metrics",
+      "file": "src/app/api/metrics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/projects/[id]/export",
+      "file": "src/app/api/projects/[id]/export/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/projects/[id]",
+      "file": "src/app/api/projects/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/projects",
+      "file": "src/app/api/projects/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/proxy-image",
+      "file": "src/app/api/proxy-image/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/scripts/[id]",
+      "file": "src/app/api/scripts/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/scripts/generate",
+      "file": "src/app/api/scripts/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/scripts/polish",
+      "file": "src/app/api/scripts/polish/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/scripts/quality-check",
+      "file": "src/app/api/scripts/quality-check/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/structures",
+      "file": "src/app/api/structures/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/templates/[id]/generate",
+      "file": "src/app/api/templates/[id]/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/templates/[id]",
+      "file": "src/app/api/templates/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/templates",
+      "file": "src/app/api/templates/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/[id]/select",
+      "file": "src/app/api/topics/[id]/select/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/chat",
+      "file": "src/app/api/topics/chat/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/copy-structures",
+      "file": "src/app/api/topics/copy-structures/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/ending-types",
+      "file": "src/app/api/topics/ending-types/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/generate",
+      "file": "src/app/api/topics/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/opening-types",
+      "file": "src/app/api/topics/opening-types/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/topics/today",
+      "file": "src/app/api/topics/today/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/trending/redfox",
+      "file": "src/app/api/trending/redfox/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/video-copy-extractions/[id]",
+      "file": "src/app/api/video-copy-extractions/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/video-copy-extractions/[id]/sync",
+      "file": "src/app/api/video-copy-extractions/[id]/sync/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/video-copy-extractions",
+      "file": "src/app/api/video-copy-extractions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/webhook/inspiration",
+      "file": "src/app/api/webhook/inspiration/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    }
+  ]
+}

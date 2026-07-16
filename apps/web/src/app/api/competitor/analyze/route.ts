@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withUserAuth } from '@/lib/user-auth'
@@ -6,6 +7,7 @@ import { runCompetitorAnalysisPipeline } from '@/lib/competitor-analysis/pipelin
 import { getCompetitorPlatformGate } from '@/lib/competitor-analysis/platform-scope'
 import { logger } from '@/lib/logger'
 import { enforceDailyBetaLimit } from '@/lib/internal-beta-limits'
+import { competitorAnalyzeBodySchema } from "@/features/competitor/contracts/api"
 
 // Pipeline can take up to 5 minutes (scrape + comments + AI)
 export const maxDuration = 300
@@ -14,12 +16,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const quotaResponse = await enforceDailyBetaLimit(user.id, 'competitor_analysis')
   if (quotaResponse) return quotaResponse
 
-  let body: { url?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'INVALID_URL' }, { status: 400 })
-  }
+  const body = await parseJsonBody(request, competitorAnalyzeBodySchema, { maxBytes: 4 * 1024 })
 
   const rawUrl = typeof body.url === 'string' ? body.url.trim() : ''
   if (!rawUrl) {

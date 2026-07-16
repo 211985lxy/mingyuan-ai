@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -5,7 +6,7 @@ import { LLMClient } from "@/lib/llm/client"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
 
 export const POST = withUserAuth(async (request) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const templateId = typeof body.templateId === "string" ? body.templateId : ""
   const userInput = typeof body.userInput === "string" ? body.userInput.trim() : ""
 

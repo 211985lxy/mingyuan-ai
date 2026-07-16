@@ -1,0 +1,231 @@
+// Competitor domain models
+
+model CompetitorAnalysis {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Input
+  targetUrl      String  @db.VarChar(500)
+  platform       String  @db.VarChar(20) // douyin | xiaohongshu | bilibili | kuaishou
+  platformUserId String? @db.VarChar(200) // sec_user_id / user_id / uid
+
+  // Pipeline status
+  status       String  @default("pending") @db.VarChar(20)
+  // pending → scraping → enriching → analyzing → completed → failed
+  currentStep  String? @db.VarChar(20)
+  errorMessage String? @db.Text
+
+  // Raw data (JSON)
+  rawAccountData Json? // Platform-returned account info
+  rawVideoData   Json? // Video list + stats
+  rawCommentData Json? // Comment samples
+
+  // Collection source
+  collectionSource String? @db.VarChar(40) // external_api | redfox_api | local_browser | tikhub_api
+  fallbackUsed     Boolean @default(false)
+  fallbackReason   String? @db.Text
+
+  // Computed metrics
+  metricsData Json? // Quantitative metrics (engagement rate, posting frequency, etc.)
+
+  // AI analysis result
+  analysisResult Json? // Full report JSON (6-dimension scores + narrative)
+  overallScore   Int? // Overall score 0-100
+
+  // Cached display data
+  accountName   String? @db.VarChar(100)
+  accountAvatar String? @db.VarChar(500)
+  followerCount Int?
+  videoCount    Int?
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  // Cost tracking
+  apiCostUsd Float? @default(0)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, platform])
+}
+
+model WatchAccount {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  // Input
+  targetUrl String @db.VarChar(500)
+  platform  String @default("douyin") @db.VarChar(20)
+
+  // Cached account info (from refresh)
+  platformUserId String? @db.VarChar(200)
+  nickname       String? @db.VarChar(100)
+  avatar         String? @db.VarChar(500)
+  followerCount  Int?
+
+  // Cached video data (from refresh)
+  latestVideos Json? // NormalizedVideo[] — newest works
+  viralVideos  Json? // NormalizedVideo[] — viral picks by engagement
+
+  // Refresh tracking
+  refreshStatus   String    @default("idle") @db.VarChar(20)
+  // idle | refreshing | success | failed
+  refreshError    String?   @db.Text
+  lastRefreshedAt DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, targetUrl])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model VideoCopyExtraction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  sourceUrl     String  @db.VarChar(800)
+  platform      String  @default("unknown") @db.VarChar(40)
+  status        String  @default("queued") @db.VarChar(20)
+  errorMessage  String? @db.Text
+  analysisError String? @db.Text
+
+  providerBatchId String? @db.VarChar(120)
+  providerTaskId  String? @db.VarChar(120)
+
+  videoTitle     String? @db.VarChar(500)
+  videoCover     String? @db.VarChar(800)
+  videoDuration  String? @db.VarChar(40)
+  transcript     String? @db.LongText
+  analysisResult Json?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+}
+
+model BenchmarkProfile {
+  id        String @id @default(cuid())
+  userId    String
+  projectId String
+
+  // ── 结构化头部：账号画像 ──
+  name           String // 账号名称
+  platform       String  @db.VarChar(20) // douyin | xiaohongshu | bilibili | kuaishou
+  accountUrl     String? @db.VarChar(500) // 主页链接（稳定锚点，一键拉取匹配用）
+  platformUserId String? @db.VarChar(200) // sec_user_id / user_id / uid
+  followerCount  Int?
+  personaTags    Json    @default("[]") // 人设标签数组
+  positioning    String? @db.Text // 内容定位
+  differentiator String? @db.Text // 差异化
+  takeaways      String? @db.Text // 借鉴要点（迁移给本 IP 时怎么用）
+
+  // ── 一键拉取来源快照（可选） ──
+  competitorAnalysisId String? @db.VarChar(40)
+
+  // ── 元数据 ──
+  status    String   @default("active") @db.VarChar(20) // active | archived
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User                   @relation(fields: [userId], references: [id])
+  project ClientProject          @relation(fields: [projectId], references: [id])
+  items   BenchmarkProfileItem[]
+
+  @@index([userId, status])
+  @@index([projectId])
+  @@index([userId, accountUrl])
+}
+
+model BenchmarkProfileItem {
+  id        String   @id @default(cuid())
+  profileId String
+  kind      String   @db.VarChar(20) // note | report | copy_extraction | video
+  title     String
+  content   String   @db.Text
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile BenchmarkProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+// Comment insight radar
+model CommentInsightJob {
+  id                   String    @id @default(cuid())
+  userId               String
+  sourceUrl            String    @db.Text
+  platform             String
+  sourceType           String
+  status               String    @default("pending")
+  videoLimit           Int       @default(20)
+  totalItems           Int       @default(0)
+  processedItems       Int       @default(0)
+  failedItems          Int       @default(0)
+  reportedCommentCount Int       @default(0)
+  collectedCommentCount Int      @default(0)
+  analyzedSampleCount  Int       @default(0)
+  analysisResult       Json?
+  partialReason        String?   @db.Text
+  errorMessage         String?   @db.Text
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  completedAt          DateTime?
+
+  sourceItems    CommentSourceItem[]
+  commentRecords CommentRecord[]
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+}
+
+model CommentSourceItem {
+  id                   String   @id @default(cuid())
+  jobId                String
+  platformItemId       String
+  sourceUrl            String   @db.Text
+  title                String   @default("")
+  reportedCommentCount Int      @default(0)
+  cursor               String   @default("")
+  hasMore              Boolean  @default(true)
+  status               String   @default("pending")
+  errorMessage         String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  job            CommentInsightJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  commentRecords CommentRecord[]
+
+  @@unique([jobId, platformItemId])
+}
+
+model CommentRecord {
+  id                String   @id @default(cuid())
+  jobId             String
+  sourceItemId      String
+  platformCommentId String
+  text              String   @db.Text
+  nickname          String?  @db.VarChar(255)
+  likes             Int      @default(0)
+  createTime        String   @default("")
+  isTop             Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  job        CommentInsightJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sourceItem CommentSourceItem @relation(fields: [sourceItemId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, platformCommentId])
+  @@index([jobId, likes(sort: Desc)])
+  @@index([sourceItemId, createdAt(sort: Desc)])
+}

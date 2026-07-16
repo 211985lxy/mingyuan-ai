@@ -4,7 +4,7 @@ import { POST as REGISTER } from "@/app/api/auth/register/route"
 import { POST as LOGIN } from "@/app/api/auth/login/route"
 import { GET as ME } from "@/app/api/auth/me/route"
 
-let token: string
+let sessionCookie: string
 
 describe("User Auth E2E", () => {
   beforeAll(async () => {
@@ -32,7 +32,7 @@ describe("User Auth E2E", () => {
     expect(res.status).toBe(201)
 
     const body = await json(res)
-    expect(body.token).toBeDefined()
+    expect(body.token).toBeUndefined()
     expect(body.user.email).toBe("user@e2e.com")
     expect(body.user.name).toBe("Test User")
     expect(body.user.plan).toBe("free")
@@ -40,13 +40,17 @@ describe("User Auth E2E", () => {
     expect(body.user.isActivated).toBe(false)
     expect(body.user.subscriptionStatus).toBe("inactive")
     expect(body.user.password).toBeUndefined()
-    token = body.token
+    const setCookie = res.headers.get("set-cookie") ?? ""
+    expect(setCookie).toContain("mingyuan_user_session=")
+    expect(setCookie).toContain("HttpOnly")
+    expect(setCookie).toContain("SameSite=lax")
+    sessionCookie = setCookie.split(";", 1)[0]
   })
 
   it("rejects duplicate email", async () => {
     const res = await REGISTER(req("/api/auth/register", {
       method: "POST",
-      body: { email: "user@e2e.com", password: "x", name: "Dup" },
+      body: { email: "user@e2e.com", password: "Pass123!", name: "Dup" },
     }))
     expect(res.status).toBe(409)
     const body = await json(res)
@@ -71,7 +75,7 @@ describe("User Auth E2E", () => {
   it("rejects non-existent email", async () => {
     const res = await LOGIN(req("/api/auth/login", {
       method: "POST",
-      body: { email: "nobody@e2e.com", password: "x" },
+      body: { email: "nobody@e2e.com", password: "Pass123!" },
     }))
     expect(res.status).toBe(401)
   })
@@ -84,11 +88,11 @@ describe("User Auth E2E", () => {
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.token).toBeDefined()
+    expect(body.token).toBeUndefined()
     expect(body.user.email).toBe("user@e2e.com")
     expect(body.user.isActivated).toBe(false)
     expect(body.user.subscriptionStatus).toBe("inactive")
-    token = body.token
+    sessionCookie = (res.headers.get("set-cookie") ?? "").split(";", 1)[0]
   })
 
   // ─── Me ───────────────────────────────────────────────
@@ -108,7 +112,7 @@ describe("User Auth E2E", () => {
 
   it("returns user profile with valid token", async () => {
     const res = await ME(
-      req("/api/auth/me", { headers: { Authorization: `Bearer ${token}` } }),
+      req("/api/auth/me", { headers: { Cookie: sessionCookie } }),
       undefined as never
     )
     expect(res.status).toBe(200)

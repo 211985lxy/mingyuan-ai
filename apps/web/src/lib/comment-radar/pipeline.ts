@@ -4,6 +4,8 @@ import { resolveSource } from './source-resolver'
 import { collectSourceItemPages } from './collector'
 import type { JobStatus, CommentRadarPlatform, JobProgress } from './types'
 import { createJobSchema } from './schemas'
+const MAX_COMMENTS_PER_JOB = 10_000
+const MAX_SOURCE_ITEMS_PER_JOB = 100
 const TR: Partial<Record<JobStatus, Set<JobStatus>>> = {
   pending: new Set(['resolving', 'failed']), resolving: new Set(['collecting', 'failed', 'partial']),
   collecting: new Set(['collecting', 'completed', 'partial', 'analyzing', 'failed']), analyzing: new Set(['completed', 'failed']),
@@ -51,7 +53,7 @@ export async function syncJobForUser(uid: string, jid: string, depth = 0): Promi
       await prisma.commentInsightJob.update({ where: { id: jid }, data: { status: ns, completedAt: isTerminalStatus(ns) ? new Date() : null, partialReason: ns === 'partial' ? '部分作品采集失败' : null } })
       return toSR((await lj(uid, jid))!)
     }
-    const ex = await prisma.commentRecord.findMany({ where: { jobId: jid, sourceItemId: pi.id }, select: { platformCommentId: true } })
+    const ex = await prisma.commentRecord.findMany({ where: { jobId: jid, sourceItemId: pi.id }, select: { platformCommentId: true }, take: MAX_COMMENTS_PER_JOB })
     const eids = new Set(ex.map(c => c.platformCommentId))
     const cr = await collectSourceItemPages(
       { jobId: jid, sourceItemId: pi.id, platform: j.platform as CommentRadarPlatform, platformItemId: pi.platformItemId, cursor: pi.cursor, hasMore: pi.hasMore },
@@ -63,7 +65,7 @@ export async function syncJobForUser(uid: string, jid: string, depth = 0): Promi
     )
     if (cr.rateLimited) await prisma.commentInsightJob.update({ where: { id: jid }, data: { status: 'partial', partialReason: '平台限流，暂停采集' } })
     else if (cr.error) await prisma.commentSourceItem.update({ where: { id: pi.id }, data: { status: 'failed', errorMessage: cr.error } })
-    const ai = await prisma.commentSourceItem.findMany({ where: { jobId: jid } }); const cc = await prisma.commentRecord.count({ where: { jobId: jid } })
+    const ai = await prisma.commentSourceItem.findMany({ where: { jobId: jid }, take: MAX_SOURCE_ITEMS_PER_JOB }); const cc = await prisma.commentRecord.count({ where: { jobId: jid } })
     await prisma.commentInsightJob.update({ where: { id: jid }, data: { processedItems: ai.filter(si => si.status === 'completed' || (!si.hasMore && si.status !== 'pending')).length, failedItems: ai.filter(si => si.status === 'failed').length, collectedCommentCount: cc } })
     return toSR((await lj(uid, jid))!)
   }
@@ -91,7 +93,7 @@ export async function listCommentsForJob(userId: string, jobId: string, params: 
 export async function exportJobCsv(userId: string, jobId: string): Promise<string | null> {
   const job = await prisma.commentInsightJob.findFirst({ where: { id: jobId, userId } })
   if (!job) return null
-  const records = await prisma.commentRecord.findMany({ where: { jobId }, orderBy: { createdAt: 'desc' } })
+  const records = await prisma.commentRecord.findMany({ where: { jobId }, orderBy: { createdAt: 'desc' }, take: MAX_COMMENTS_PER_JOB })
   const { generateCsv } = await import('./csv')
   return generateCsv(records.map(r => ({ commentId: r.platformCommentId, text: r.text, nickname: r.nickname, likes: r.likes, createTime: r.createTime, isTop: r.isTop })))
 }

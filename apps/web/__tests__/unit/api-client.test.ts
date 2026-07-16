@@ -19,6 +19,11 @@ describe("api client error messages", () => {
     )).toBe("AI 服务响应超时，请稍后重试")
   })
 
+  it("replaces invalid-session responses with a user-facing login message", () => {
+    expect(getApiErrorMessage({ error: "Invalid token" }, 401, "Unauthorized"))
+      .toBe("登录状态已失效，请重新登录")
+  })
+
   it("passes the agent filter when listing AIM history", async () => {
     const fetchMock = vi
       .spyOn(globalThis, "fetch")

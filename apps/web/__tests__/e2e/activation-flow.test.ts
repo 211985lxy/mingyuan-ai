@@ -12,11 +12,11 @@ import {
 import { POST as REGISTER } from "@/app/api/auth/register/route"
 import { POST as ACTIVATE } from "@/app/api/auth/activate/route"
 import { GET as ME } from "@/app/api/auth/me/route"
-import { GET as IP_PROFILE } from "@/app/api/ip-profile/route"
+import { GET as PROJECTS } from "@/app/api/projects/route"
 import { POST as GENERATE_CODES } from "@/app/api/admin/activation-codes/generate/route"
 
 let admin: { id: string; email: string; role: string }
-let token: string
+let sessionCookie: string
 
 describe("Activation Flow E2E", () => {
   beforeAll(async () => {
@@ -50,15 +50,14 @@ describe("Activation Flow E2E", () => {
     expect(registerRes.status).toBe(201)
 
     const registerBody = await json(registerRes)
-    token = registerBody.token
+    sessionCookie = (registerRes.headers.get("set-cookie") ?? "").split(";", 1)[0]
     expect(registerBody.user.subscriptionStatus).toBe("inactive")
     expect(registerBody.user.expiresAt).toBeNull()
 
-    const protectedRes = await IP_PROFILE(
-      req("/api/ip-profile", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      undefined as never
+    const protectedRes = await PROJECTS(
+      req("/api/projects", {
+        headers: { Cookie: sessionCookie },
+      })
     )
     expect(protectedRes.status).toBe(403)
 
@@ -67,7 +66,7 @@ describe("Activation Flow E2E", () => {
 
     const meRes = await ME(
       req("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie },
       }),
       undefined as never
     )
@@ -115,7 +114,7 @@ describe("Activation Flow E2E", () => {
     const activateRes = await ACTIVATE(
       req("/api/auth/activate", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie, Origin: "http://localhost:3000" },
         body: {
           code: `${firstCode!.code.slice(0, 4)}-${firstCode!.code.slice(4, 8)}-${firstCode!.code.slice(8, 12)}-${firstCode!.code.slice(12, 16)}`,
         },
@@ -133,11 +132,10 @@ describe("Activation Flow E2E", () => {
     expect(diffDays).toBeGreaterThan(29)
     expect(diffDays).toBeLessThan(31)
 
-    const protectedRes = await IP_PROFILE(
-      req("/api/ip-profile", {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      undefined as never
+    const protectedRes = await PROJECTS(
+      req("/api/projects", {
+        headers: { Cookie: sessionCookie },
+      })
     )
     expect(protectedRes.status).toBe(200)
 
@@ -162,7 +160,7 @@ describe("Activation Flow E2E", () => {
     const renewalRes = await ACTIVATE(
       req("/api/auth/activate", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie, Origin: "http://localhost:3000" },
         body: { code: renewalCode!.code },
       }),
       undefined as never
@@ -176,7 +174,7 @@ describe("Activation Flow E2E", () => {
 
     const meRes = await ME(
       req("/api/auth/me", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Cookie: sessionCookie },
       }),
       undefined as never
     )

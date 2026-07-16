@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import {
@@ -5,6 +6,8 @@ import {
   normalizeStyleMessages,
   upsertMainStyleProfile,
 } from "@/lib/aim-style-evolution"
+import { ownsActiveProject } from "@/lib/resource-ownership"
+import { aimEvolveStyleBodySchema } from "@/features/aim/contracts/api"
 
 // 提取 + 合并两次 LLM 调用，给足时间
 export const maxDuration = 60
@@ -12,9 +15,13 @@ export const maxDuration = 60
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const body = await request.json()
+    const body = await parseJsonBody(request, aimEvolveStyleBodySchema, { maxBytes: 256 * 1024 })
     const messages = normalizeStyleMessages(body.messages)
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+
+    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
+    }
 
     if (messages.length < 2) {
       return NextResponse.json({ delta: null, profile: null, reason: "对话太少" })

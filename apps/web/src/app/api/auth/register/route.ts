@@ -2,16 +2,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { hashPassword, signUserToken } from "@/lib/user-auth"
 import { buildAuthUserPayload } from "@/lib/auth-user"
-
-const DAILY_LIMIT = 2
+import { registerBodySchema } from "@/features/auth/contracts"
+import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
+import { setSessionCookie } from "@/lib/auth-session"
 
 export async function POST(request: NextRequest) {
-  const { email, password, name } = await request.json()
+  let input
+  try {
+    input = await parseJsonBody(request, registerBodySchema, { maxBytes: 4096 })
+  } catch (error) {
+    return apiRequestErrorResponse(request, error) ?? NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  }
+  const { email, password, name } = input
 
-  if (!email || !password || !name) {
+  if (!await allowAuthAttempt("user-register", request, email, { limit: 5, windowSeconds: 60 * 60 })) {
     return NextResponse.json(
-      { error: "Email, password, and name are required" },
-      { status: 400 }
+      { error: "Too many registration attempts", code: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": "3600" } },
     )
   }
 
@@ -30,14 +38,12 @@ export async function POST(request: NextRequest) {
 
   const token = signUserToken({ id: user.id, email: user.email })
 
-  return NextResponse.json(
+  const response = NextResponse.json(
     {
-      token,
-      user: buildAuthUserPayload(user, {
-        dailyLimit: DAILY_LIMIT,
-        videosCreatedToday: 0,
-      }),
+      user: buildAuthUserPayload(user),
     },
     { status: 201 }
   )
+  setSessionCookie(response, "user", token)
+  return response
 }

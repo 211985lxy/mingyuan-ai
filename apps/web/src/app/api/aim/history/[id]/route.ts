@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import {
   buildAimHistoryUpdateData,
   parseAimHistoryUpdate,
@@ -13,7 +14,7 @@ export async function PATCH(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
 
     const existing = await prisma.aimGeneration.findFirst({
       where: { id, userId: user.id },
@@ -40,7 +41,7 @@ export async function PATCH(
 
     return NextResponse.json(record)
   } catch (error) {
-    return authErrorResponse(error) ?? NextResponse.json(
+    return authErrorResponse(error) ?? apiRequestErrorResponse(request, error) ?? NextResponse.json(
       { error: "生成记录更新失败" },
       { status: 500 }
     )

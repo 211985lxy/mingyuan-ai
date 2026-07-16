@@ -1,6 +1,6 @@
 "use client"
 
-import { useAdminStore, getStoredAdminToken } from "@/lib/admin-store"
+import { useAdminStore } from "@/lib/admin-store"
 
 class AdminApiError extends Error {
   status: number
@@ -55,10 +55,6 @@ function extractErrorMessage(payload: unknown, fallback: string): string {
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { auth = true, headers, timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options
-  const token = auth
-    ? useAdminStore.getState().token || getStoredAdminToken()
-    : null
-
   const controller = timeoutMs > 0 ? new AbortController() : null
   const timer = startTimeout(controller, timeoutMs)
 
@@ -66,10 +62,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   try {
     response = await fetch(path, {
       ...init,
+      credentials: "same-origin",
       signal: controller ? controller.signal : init.signal,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(headers ?? {}),
       },
     })
@@ -108,10 +104,20 @@ export { AdminApiError }
 // ─── Auth ────────────────────────────────────────────────
 
 export async function adminLogin(email: string, password: string) {
-  return request<{ token: string; admin: { id: string; email: string; name: string; role: string } }>(
+  return request<{ admin: { id: string; email: string; name: string; role: string } }>(
     "/api/admin/auth/login",
     { auth: false, method: "POST", body: JSON.stringify({ email, password }) }
   )
+}
+
+export async function getCurrentAdmin() {
+  return request<{ admin: { id: string; email: string; name: string; role: string } }>(
+    "/api/admin/auth/me",
+  )
+}
+
+export async function adminLogout(): Promise<void> {
+  await request<{ ok: true }>("/api/admin/auth/logout", { method: "POST" })
 }
 
 // ─── Users ───────────────────────────────────────────────
@@ -171,15 +177,14 @@ export function getActivationCodesExportUrl(params: { status?: string; batchId?:
 }
 
 export async function downloadActivationCodesExport(params: { status?: string; batchId?: string }) {
-  const token = useAdminStore.getState().token || getStoredAdminToken()
   const controller = new AbortController()
   const timer = startTimeout(controller, DEFAULT_TIMEOUT_MS)
 
   let response: Response
   try {
     response = await fetch(getActivationCodesExportUrl(params), {
+      credentials: "same-origin",
       signal: controller.signal,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     })
   } catch (err) {
     stopTimeout(timer)
@@ -257,8 +262,7 @@ export interface AdminUserItem {
   plan: string
   createdAt: string
   _count: {
-    videoTasks: number
-    avatars: number
+    aimGenerations: number
     assets: number
   }
 }
@@ -275,18 +279,10 @@ export interface AdminUserDetail {
     industry: string | null
     isComplete: boolean
   } | null
-  videoTasks: {
+  aimGenerations: {
     id: string
     status: string
-    videoType: string
-    avatarName: string
-    createdAt: string
-    completedAt: string | null
-  }[]
-  avatars: {
-    id: string
-    name: string
-    status: string
+    agentId: string | null
     createdAt: string
   }[]
   assets: {
@@ -296,8 +292,7 @@ export interface AdminUserDetail {
     createdAt: string
   }[]
   _count: {
-    videoTasks: number
-    avatars: number
+    aimGenerations: number
     assets: number
     scripts: number
   }

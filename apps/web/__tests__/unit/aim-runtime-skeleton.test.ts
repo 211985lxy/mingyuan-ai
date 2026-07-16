@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest"
 
 // mock 持久化层：executeAimRun 在 degraded 时调 flagAimGenerationDegraded。
 // 顶层声明（hoisted），对整个文件生效；用 spy 断言调用，不触达真实 DB。
-const flagDegraded = vi.fn(async () => undefined)
+const flagDegraded = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock("@/lib/aim-harness/persistence", () => ({
   flagAimGenerationDegraded: (...args: unknown[]) => flagDegraded(...args),
 }))
@@ -62,7 +62,7 @@ describe("executeAimRun 骨架（阶段 2.4 真内核）", () => {
     })
 
     // 结构契约
-    const _typeCheck: AimRunResult = result
+    const _typeCheck: AimRunResult<string> = result
     void _typeCheck
     expect(result.metadata).toBeDefined()
     expect(result.output).toBeDefined()

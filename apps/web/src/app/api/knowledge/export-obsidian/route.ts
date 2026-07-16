@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import fs from "fs"
 import path from "path"
@@ -5,7 +6,7 @@ import { withUserAuth } from "@/lib/user-auth"
 
 export const POST = withUserAuth(async (request: NextRequest) => {
   try {
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
     const { title, content, format = "script" } = body as {
       title?: string
       content?: string

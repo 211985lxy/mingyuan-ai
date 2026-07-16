@@ -1,6 +1,8 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
+import { topicSelectBodySchema } from "@/features/topics/contracts/api"
 
 export const POST = withUserAuth(async (request, { user, params }) => {
   const topicSelectionId = params?.id
@@ -12,7 +14,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
     )
   }
 
-  const body = await request.json()
+  const body = await parseJsonBody(request, topicSelectBodySchema, { maxBytes: 1024 })
   const selectedIndex =
     typeof body.selectedIndex === "number" ? body.selectedIndex : null
 
@@ -44,7 +46,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
     if (!Array.isArray(candidates) || selectedIndex >= candidates.length) {
       // Rollback: shouldn't happen since we control generation, but guard anyway
       await prisma.topicSelection.update({
-        where: { id: topicSelectionId },
+        where: { id: topicSelectionId, userId: user.id },
         data: { selectedIndex: null, status: "pending" },
       })
       return NextResponse.json(

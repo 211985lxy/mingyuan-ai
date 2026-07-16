@@ -32,7 +32,7 @@ const {
   streamAimChatDomain,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  authErrorResponse: vi.fn(() => null),
+  authErrorResponse: vi.fn((): Response | null => null),
   enforceDailyBetaLimit: vi.fn(),
   handleLarkToolAction: vi.fn(),
   resolveAimConversationIntent: vi.fn(async () => ({

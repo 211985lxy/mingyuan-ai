@@ -3,6 +3,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { executeAimRun } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import {
   buildInspirationGenerateResponse,
   findOwnedInspiration,
@@ -17,7 +18,7 @@ export async function POST(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle.trim() : undefined
 
@@ -65,6 +66,8 @@ export async function POST(
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
 
     console.error("[inspiration/generate] Error:", error)
     return NextResponse.json(

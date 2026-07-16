@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { invalidateBrandingCache, isBrandingSettingKey } from "@/lib/branding"
@@ -6,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 export const GET = withAdminAuth(async () => {
   const settings = await prisma.systemSetting.findMany({
     orderBy: [{ category: "asc" }, { key: "asc" }],
+    take: 1_000,
   })
 
   // Group by category
@@ -19,7 +21,7 @@ export const GET = withAdminAuth(async () => {
 })
 
 export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
-  const { key, value, type, category, description } = await request.json()
+  const { key, value, type, category, description } = await parseJsonRecord(request)
 
   if (!key || value === undefined || !type || !category) {
     return NextResponse.json(

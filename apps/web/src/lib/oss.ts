@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
@@ -5,8 +6,7 @@ import OSS from "ali-oss";
 
 /**
  * SSRF 防护:阻止服务端去 fetch 内网/回环地址。
- * sourceUrl 在多个 webhook 回调里来自外部(山见/阿里云返回值,理论上是 CDN),
- * 但攻击者可伪造回调把这些字段改成内网元数据服务地址,必须拦截。
+ * sourceUrl 来自外部资源地址，攻击者可能将它伪造成内网元数据服务地址，必须拦截。
  * 仅做 IP 字面量与已知内网域名校验,不做 DNS 解析(留待后续加固)。
  */
 function assertPublicSourceUrl(sourceUrl: string): void {
@@ -45,10 +45,10 @@ function assertPublicSourceUrl(sourceUrl: string): void {
   }
 }
 
-const OSS_REGION = process.env.OSS_REGION;
-const OSS_ACCESS_KEY_ID = process.env.OSS_ACCESS_KEY_ID;
-const OSS_ACCESS_KEY_SECRET = process.env.OSS_ACCESS_KEY_SECRET;
-const OSS_BUCKET = process.env.OSS_BUCKET;
+const OSS_REGION = env.OSS_REGION;
+const OSS_ACCESS_KEY_ID = env.OSS_ACCESS_KEY_ID;
+const OSS_ACCESS_KEY_SECRET = env.OSS_ACCESS_KEY_SECRET;
+const OSS_BUCKET = env.OSS_BUCKET;
 
 // Legacy bucket for URL migration (杭州 → 上海)
 const OSS_LEGACY_HOSTNAMES = [
@@ -159,8 +159,7 @@ export async function generateUploadUrl(
   if (!isConfigured()) return null;
 
   const client = getClient();
-  // Use UUID for the key to avoid non-ASCII chars (e.g. Chinese filenames)
-  // that cause InvalidFile.URL errors on downstream services like Shanjian.
+  // Use UUID for the key to avoid non-ASCII characters in object keys.
   const ext = fileName.includes(".") ? "." + fileName.split(".").pop() : "";
   const key = `uploads/${Date.now()}-${randomUUID()}${ext}`;
   const url = client.signatureUrl(key, {
@@ -208,7 +207,7 @@ function extractOssKey(assetUrl: string): string {
 
 /**
  * Generate a presigned download URL for a private OSS object.
- * Used to give external services (e.g., Shanjian) temporary read access.
+ * Used to give authorized callers temporary read access.
  */
 export function generateSignedUrl(assetUrl: string, expires = 7200): string {
   if (!isConfigured() || !isManagedOssUrl(assetUrl)) return assetUrl;
@@ -216,6 +215,17 @@ export function generateSignedUrl(assetUrl: string, expires = 7200): string {
   const key = extractOssKey(assetUrl);
   const client = getClient();
   return client.signatureUrl(key, { method: "GET", expires });
+}
+
+export async function deleteManagedOssObject(assetUrl: string): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  const urlObj = new URL(assetUrl);
+  const currentHostname = `${OSS_BUCKET}.${OSS_REGION}.aliyuncs.com`;
+  if (urlObj.hostname !== currentHostname) return false;
+
+  await getClient().delete(extractOssKey(assetUrl));
+  return true;
 }
 
 /**

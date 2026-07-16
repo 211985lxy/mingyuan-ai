@@ -1,12 +1,11 @@
 FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat ffmpeg
+RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
-COPY packages/shared/package.json packages/shared/package.json
 
 RUN pnpm install --frozen-lockfile
 
@@ -43,19 +42,3 @@ USER node
 EXPOSE 3000
 
 CMD ["node", "apps/web/server.js"]
-
-FROM base AS worker-runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-COPY --from=builder --chown=node:node /app/package.json ./package.json
-COPY --from=builder --chown=node:node /app/pnpm-lock.yaml ./pnpm-lock.yaml
-COPY --from=builder --chown=node:node /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
-COPY --from=builder --chown=node:node /app/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/apps/web ./apps/web
-COPY --from=builder --chown=node:node /app/packages/shared ./packages/shared
-
-USER node
-CMD ["pnpm", "--dir", "apps/web", "worker:task-recovery"]

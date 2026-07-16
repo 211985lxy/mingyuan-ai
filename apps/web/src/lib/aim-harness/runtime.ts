@@ -225,6 +225,8 @@ async function finalizeRunResult<TOutput>(input: {
       : undefined
   const contextManifest = await buildAimContextManifest({
     spec,
+    userId: request.actorId,
+    projectId: request.projectId,
     citedKnowledgeIds,
     provided: partial?.contextManifest,
   })

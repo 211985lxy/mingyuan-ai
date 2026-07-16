@@ -1,4 +1,6 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
+import { withUserAuth } from "@/lib/user-auth"
 import { LLMClient } from "@/lib/llm/client"
 import {
   buildMethodologyCompilePrompt,
@@ -6,8 +8,8 @@ import {
   type MethodologyCompileInput,
 } from "@/lib/viral-methodology-compiler"
 
-export async function POST(request: Request) {
-  const body = await request.json()
+export const POST = withUserAuth(async (request) => {
+  const body = await parseJsonRecord(request)
   const { competitorAnalysisText, projectName, sourceCompetitorId } =
     body as MethodologyCompileInput
 
@@ -33,4 +35,4 @@ export async function POST(request: Request) {
   const proposedPages = parseMethodologyCompileResponse(completion.content)
 
   return NextResponse.json({ proposedPages })
-}
+})

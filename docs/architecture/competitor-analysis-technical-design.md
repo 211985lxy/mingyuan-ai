@@ -81,7 +81,6 @@
 
 ClipFlow 当前没有独立 worker 进程或 BullMQ。现有异步模式是：
 - API Route 内部触发异步逻辑（非阻塞 `Promise`，不 await）
-- Webhook 回调（Shanjian/Aliyun）
 - Cron 路由定时任务
 
 **方案**：沿用现有模式 — API Route 内触发 pipeline，使用 `Promise` 非阻塞执行。pipeline 内部通过 DB 状态更新追踪进度，前端轮询。

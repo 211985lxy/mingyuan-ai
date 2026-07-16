@@ -77,6 +77,8 @@ describe('analyzer', () => {
 
     it('parses valid result', () => {
       const result = parseAnalysisResult(JSON.stringify(validResult))
+      expect(result).not.toBeNull()
+      if (!result) throw new Error('expected a valid analysis result')
       expect(result.summary).toBe('用户最关心产品价格和使用效果')
       expect(result.topics).toHaveLength(2)
       expect(result.topics[0].title).toBe('价格敏感')

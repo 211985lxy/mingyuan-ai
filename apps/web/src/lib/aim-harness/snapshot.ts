@@ -14,6 +14,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { env } from "@/env"
 
 import type { AimRunMetadata, AimRunSpec, AimContextSource } from "./types"
 import type { LlmInvocation } from "@/lib/llm/telemetry"
@@ -46,6 +47,13 @@ function getSnapshotDelegate(): SnapshotDelegate | undefined {
   }).aimRunSnapshot
 }
 
+export function redactRunSpec(runSpec: AimRunSpec): AimRunSpec {
+  return {
+    ...runSpec,
+    rawInput: `[redacted:${runSpec.rawInput.length} chars]`,
+  }
+}
+
 /** Persist the full snapshot. Returns the snapshot id, or undefined on failure. */
 export async function persistAimRunSnapshot(
   input: SnapshotInput
@@ -54,6 +62,8 @@ export async function persistAimRunSnapshot(
   if (!delegate) return undefined
 
   const expiresAt = new Date(Date.now() + SNAPSHOT_TTL_DAYS * MS_PER_DAY)
+  const storeSensitive = env.AIM_STORE_SENSITIVE_SNAPSHOTS === "true"
+  const storedRunSpec = storeSensitive ? input.runSpec : redactRunSpec(input.runSpec)
 
   try {
     const record = await delegate.create({
@@ -64,17 +74,18 @@ export async function persistAimRunSnapshot(
         projectId: input.projectId ?? null,
         agentId: input.runSpec.agentId,
         action: input.runSpec.entrypoint,
-        runSpec: input.runSpec as unknown as Record<string, unknown>,
+        runSpec: storedRunSpec as unknown as Record<string, unknown>,
         contextManifest: input.contextManifest,
         providerAttempts: input.metadata.providerAttempts,
-        fullPrompt: input.composedPrompt,
-        promptMessages: input.promptMessages ?? [],
+        fullPrompt: storeSensitive ? input.composedPrompt : null,
+        promptMessages: storeSensitive ? input.promptMessages ?? [] : [],
         promptHash: input.metadata.promptHash,
         contextHash: input.metadata.contextHash,
-        output:
-          typeof input.output === "string"
+        output: storeSensitive
+          ? typeof input.output === "string"
             ? input.output
-            : JSON.stringify(input.output ?? null),
+            : JSON.stringify(input.output ?? null)
+          : null,
         outputFormats: input.runSpec.outputFormats,
         qualityResult: input.qualityResult ?? null,
         imageHashes: input.imageHashes ?? [],

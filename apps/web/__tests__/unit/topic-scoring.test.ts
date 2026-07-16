@@ -62,7 +62,7 @@ describe("topic scoring", () => {
       },
     ], { recommendationMode: "daily" })
 
-    expect(card.scoreBreakdown.contentValue).toBe(100)
+    expect(card.scoreBreakdown?.contentValue).toBe(100)
     expect(card.score).toBe(90)
     expect(card.reviewVerdict).toBe("strong")
   })

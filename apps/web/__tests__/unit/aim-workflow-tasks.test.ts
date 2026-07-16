@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { deriveAimWorkflowTasks, groupAimWorkflowTasks } from "@/lib/aim-workflow-tasks"
+import { deriveAimWorkflowTasks, groupAimWorkflowTasks } from "@/features/aim/workflow/tasks"
 import type { AimGeneration } from "@/lib/api/client"
 
 function record(overrides: Partial<AimGeneration>): AimGeneration {

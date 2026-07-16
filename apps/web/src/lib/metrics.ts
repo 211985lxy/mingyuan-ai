@@ -30,33 +30,11 @@ export const httpRequestDuration = new Histogram({
 
 // ─── Business Metrics ───────────────────────────────────
 
-export const videoTasksTotal = new Counter({
-  name: "mingyuan_video_tasks_total",
-  help: "Total video tasks created",
-  labelNames: ["type", "status"] as const,
-  registers: [metricsRegistry],
-})
-
-export const videoTaskDuration = new Histogram({
-  name: "mingyuan_video_task_duration_seconds",
-  help: "Video task creation API duration in seconds",
-  labelNames: ["type"] as const,
-  buckets: [1, 5, 10, 30, 60, 120],
-  registers: [metricsRegistry],
-})
-
-export const activeVideoTasks = new Gauge({
-  name: "mingyuan_active_video_tasks",
-  help: "Number of video tasks currently in progress",
-  labelNames: ["status"] as const,
-  registers: [metricsRegistry],
-})
-
 // ─── External API Metrics ───────────────────────────────
 
 export const externalApiRequestsTotal = new Counter({
   name: "mingyuan_external_api_requests_total",
-  help: "Total external API requests (Shanjian, LLM, Pexels, etc)",
+  help: "Total external API requests",
   labelNames: ["service", "endpoint", "status"] as const,
   registers: [metricsRegistry],
 })
@@ -66,31 +44,6 @@ export const externalApiDuration = new Histogram({
   help: "External API request duration in seconds",
   labelNames: ["service", "endpoint"] as const,
   buckets: [0.5, 1, 2, 5, 10, 30, 60],
-  registers: [metricsRegistry],
-})
-
-// ─── Task Recovery Metrics ──────────────────────────────
-
-export const taskRecoveryTotal = new Counter({
-  name: "mingyuan_task_recovery_total",
-  help: "Total task recovery passes",
-  labelNames: ["trigger", "type"] as const,
-  registers: [metricsRegistry],
-})
-
-export const taskRecoveryErrors = new Counter({
-  name: "mingyuan_task_recovery_errors_total",
-  help: "Total task recovery errors",
-  labelNames: ["trigger", "type"] as const,
-  registers: [metricsRegistry],
-})
-
-// ─── Webhook Metrics ────────────────────────────────────
-
-export const webhookTotal = new Counter({
-  name: "mingyuan_webhook_total",
-  help: "Total webhook callbacks received",
-  labelNames: ["type", "status"] as const,
   registers: [metricsRegistry],
 })
 

@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { isValidAimAgent } from "@/lib/aim-ui-config"
@@ -20,7 +21,7 @@ export const GET = withAdminAuth(async () => {
 
 /** PUT /api/admin/agents/guides —— 更新单个字段覆盖 */
 export const PUT = withAdminAuth(async (request: NextRequest, { admin }) => {
-  const body = await request.json().catch(() => null)
+  const body = await parseJsonRecord(request)
   const { agentId, field, value } = body ?? {}
 
   if (!agentId || !isValidAimAgent(agentId)) {

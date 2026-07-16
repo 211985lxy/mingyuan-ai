@@ -26,17 +26,14 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { token, user, updateUser, clearSession, isHydrated } = useAuthStore()
+  const { user, setSession, clearSession, isHydrated, sessionChecked } = useAuthStore()
 
   useEffect(() => {
-    if (!isHydrated) return
-    if (!token) {
-      return
-    }
+    if (!isHydrated || sessionChecked) return
 
     getCurrentUser()
       .then((liveUser) => {
-        updateUser(liveUser)
+        setSession(liveUser)
 
         if (liveUser.subscriptionStatus !== "active") {
           router.replace("/activate")
@@ -49,7 +46,7 @@ export default function DashboardLayout({
           return
         }
       })
-  }, [token, isHydrated, updateUser, clearSession, router])
+  }, [isHydrated, sessionChecked, setSession, clearSession, router])
 
   return (
     <AuthGuard>

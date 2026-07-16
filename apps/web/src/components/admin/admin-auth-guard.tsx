@@ -4,20 +4,25 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAdminStore } from "@/lib/admin-store"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getCurrentAdmin } from "@/lib/api/admin-client"
 
 export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
-  const { token, isHydrated } = useAdminStore()
+  const { isAuthenticated, sessionChecked, isHydrated, setSession, clearSession } = useAdminStore()
   const router = useRouter()
 
   useEffect(() => {
-    if (isHydrated && !token) {
-      router.replace("/admin/login")
-    }
-  }, [isHydrated, token, router])
+    if (!isHydrated || sessionChecked) return
+    getCurrentAdmin()
+      .then(({ admin }) => setSession(admin))
+      .catch(() => {
+        clearSession()
+        router.replace("/admin/login")
+      })
+  }, [isHydrated, sessionChecked, setSession, clearSession, router])
 
   // 未 hydrate 完成时，显示与后台布局一致的骨架屏，避免整页白屏闪烁。
   // （localStorage persist 通常很快，但慢存储/低端机上会有可见的空白闪现。）
-  if (!isHydrated) {
+  if (!isHydrated || !sessionChecked) {
     return (
       <div className="flex min-h-screen">
         <div className="hidden w-60 shrink-0 border-r p-4 md:block">
@@ -40,8 +45,7 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!token) {
-    // 已 hydrate 但无 token，useEffect 会跳转到登录页；这里短暂返回 null 避免闪烁子内容
+  if (!isAuthenticated) {
     return null
   }
 

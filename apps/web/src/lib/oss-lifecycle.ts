@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import OSS from "ali-oss";
 
 /**
@@ -65,10 +66,10 @@ const LIFECYCLE_RULES: LifecycleRule[] = [
 ];
 
 function createOssClient(): OSS {
-  const region = process.env.OSS_REGION;
-  const bucket = process.env.OSS_BUCKET;
-  const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
-  const accessKeySecret = process.env.OSS_ACCESS_KEY_SECRET;
+  const region = env.OSS_REGION;
+  const bucket = env.OSS_BUCKET;
+  const accessKeyId = env.OSS_ACCESS_KEY_ID;
+  const accessKeySecret = env.OSS_ACCESS_KEY_SECRET;
 
   if (!region || !bucket || !accessKeyId || !accessKeySecret) {
     throw new Error(
@@ -82,7 +83,7 @@ function createOssClient(): OSS {
 export async function applyLifecyclePolicy(): Promise<void> {
   const client = createOssClient();
   const lifecycleClient = client as unknown as OssLifecycleClient;
-  const bucket = process.env.OSS_BUCKET!;
+  const bucket = env.OSS_BUCKET!;
 
   console.log(`[oss-lifecycle] Applying lifecycle rules to bucket: ${bucket}`);
   console.log(
@@ -108,7 +109,7 @@ export async function applyLifecyclePolicy(): Promise<void> {
 export async function getLifecyclePolicy(): Promise<LifecycleRule[]> {
   const client = createOssClient();
   const lifecycleClient = client as unknown as OssLifecycleClient;
-  const bucket = process.env.OSS_BUCKET!;
+  const bucket = env.OSS_BUCKET!;
   const result = await lifecycleClient.getBucketLifecycle(bucket);
   return result.rules || [];
 }

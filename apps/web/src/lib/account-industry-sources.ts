@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import fs from "node:fs/promises"
 import path from "node:path"
 
@@ -66,7 +67,7 @@ const DEFAULT_SOURCE_FILES = [
 
 export async function loadAccountSourceBindings(): Promise<AccountSourceBinding[]> {
   const candidates = [
-    process.env.ACCOUNT_SOURCES_FILE,
+    env.ACCOUNT_SOURCES_FILE,
     ...DEFAULT_SOURCE_FILES,
   ].filter((value): value is string => Boolean(value))
 

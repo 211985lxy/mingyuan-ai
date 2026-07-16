@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import OpenAI from "openai"
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
 import type {
@@ -21,7 +22,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       apiKey: config.apiKey,
       baseURL: config.baseURL,
       defaultHeaders: config.defaultHeaders,
-      timeout: config.timeoutMs ?? Number(process.env.LLM_TIMEOUT_MS || 60000),
+      timeout: config.timeoutMs ?? Number(env.LLM_TIMEOUT_MS || 60000),
     })
   }
 
