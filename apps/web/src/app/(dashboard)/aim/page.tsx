@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef, useCallback, startTransition } from "react"
+import { useState, useMemo, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -16,7 +16,6 @@ import {
 } from "@/components/aim/workflow-record-dialog"
 import {
   generateAimContent,
-  getVideoCopyExtraction,
   checkScriptQuality,
   uploadImageForAimChat,
   chatAimStream,
@@ -43,6 +42,7 @@ import { useAimProjectWorkspace } from "@/hooks/use-aim-project-workspace"
 import { useAimWorkflowRecords } from "@/hooks/use-aim-workflow-records"
 import { useAimEditorActions } from "@/hooks/use-aim-editor-actions"
 import { useAimDraftAutosave, useAimMessageAutoScroll, useAimSourceHydration } from "@/hooks/use-aim-workbench-effects"
+import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVideoCopyPrefill } from "@/hooks/use-aim-route-sync"
 import { transcribeAudio } from "@/lib/api/client"
 import {
   AIM_AGENT_OPTIONS,
@@ -59,7 +59,6 @@ import {
   type AimWorkbenchSkill,
 } from "@/lib/aim-agent-guides"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
-import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import {
   detectAimWorkbenchCommand,
   shouldIsolateWritingInstruction,
@@ -90,10 +89,8 @@ import {
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
   extractPersonaProgress as extractProgress,
-  formatAnalysisResultForPrompt,
   findLatestAimDeliverableId,
   findLatestAimVideoDeliverableMessageId,
-  getAimHistoryContents as getHistoryContents,
   nextAimWorkbenchId as nextId,
   prepareAimChatTurn as prepareChatTurn,
   reportAimChatRevision as reportChatRevision,
@@ -323,6 +320,22 @@ export default function AimPage() {
   })
 
   const lastAgentParamRef = useRef(agentParam)
+  const routeSetters = useMemo(() => ({
+    setSelectedAgentId,
+    setSelectedProjectId,
+    setMessages,
+    setInput,
+    setSourceVideoCopyExtractionId,
+    setSourceOriginalText,
+    setSourceAnalysisText,
+    setSourceTopicTitle,
+    setSourceTopicRationale,
+    setEditorText,
+    setEditorFormat,
+    setEditorSourceMessageId,
+    setEditorPanelWidth,
+    setEditorPanelOpen,
+  }), [setSelectedProjectId])
 
   useAimDraftAutosave({
     selectedAgentId,
@@ -348,107 +361,17 @@ export default function AimPage() {
     setSourceAnalysisText,
   })
 
-  // 切换智能体（由全局侧边栏的 ?agent= 驱动）：同步选中态并重置当前对话
-  useEffect(() => {
-    if (lastAgentParamRef.current === agentParam) return
-    lastAgentParamRef.current = agentParam
-    const nextDraft = loadAimDraft(activeAgentId)
-    startTransition(() => {
-      setSelectedAgentId(activeAgentId)
-      setSelectedProjectId(nextDraft?.selectedProjectId || selectedProjectId)
-      setMessages(nextDraft?.messages || [])
-      setInput(nextDraft?.input || "")
-      setSourceVideoCopyExtractionId(nextDraft?.videoCopyExtractionId)
-      setSourceOriginalText(nextDraft?.sourceOriginalText || "")
-      setSourceAnalysisText(nextDraft?.sourceAnalysisText || "")
-      setSourceTopicTitle(nextDraft?.sourceTopicTitle || "")
-      setSourceTopicRationale(nextDraft?.sourceTopicRationale || "")
-      setEditorText(nextDraft?.editorText || "")
-      setEditorFormat(nextDraft?.editorFormat)
-      setEditorSourceMessageId(nextDraft?.editorSourceMessageId)
-      setEditorPanelWidth(nextDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
-      setEditorPanelOpen(nextDraft?.editorPanelOpen ?? true)
-    })
-  }, [activeAgentId, agentParam, selectedProjectId])
-
-  useEffect(() => {
-    if (!topicTitleParam && !topicRationaleParam && !projectIdParam && !ideaParam) return
-
-    const prefillLines = [
-      topicTitleParam ? `选题：${topicTitleParam}` : null,
-      topicRationaleParam ? `选题依据：${topicRationaleParam}` : null,
-      ideaParam ? `创作灵感：${ideaParam}` : null,
-    ].filter(Boolean)
-
-    startTransition(() => {
-      if (projectIdParam) setSelectedProjectId(projectIdParam)
-      setMessages([])
-      setInput(prefillLines.join("\n"))
-      setSourceTopicTitle(topicTitleParam || ideaParam || "")
-      setSourceTopicRationale(topicRationaleParam || "")
-      setSourceVideoCopyExtractionId(undefined)
-      setSourceOriginalText("")
-      setSourceAnalysisText("")
-      setEditorText("")
-      setEditorFormat(undefined)
-      setEditorSourceMessageId(undefined)
-    })
-
-    const nextParams = new URLSearchParams(searchParams.toString())
-    nextParams.delete("topicTitle")
-    nextParams.delete("topicRationale")
-    nextParams.delete("projectId")
-    nextParams.delete("idea")
-    router.replace(nextParams.toString() ? `/aim?${nextParams.toString()}` : "/aim")
-  }, [projectIdParam, router, searchParams, topicRationaleParam, topicTitleParam, ideaParam])
-
-  useEffect(() => {
-    if (!videoCopyExtractionIdParam) return
-
-    getVideoCopyExtraction(videoCopyExtractionIdParam)
-      .then((record) => {
-        const lengthRule = buildBenchmarkLengthRule(record.transcript)
-        const recreationSop = buildBenchmarkRecreationSopBlock()
-        const prefill = [
-          BENCHMARK_RECREATION_PREFILL.short,
-          "",
-          "创作原则：",
-          recreationSop,
-          "1. 开头机制可以借，但第一句话必须重写成我的身份和业务场景里的话。",
-          "2. 结构节奏可以保留，但表达至少 30% 可感知重写：案例、转折、句式和行动引导不能贴原文。",
-          "3. 除专有名词外，不要连续沿用原文 12 个字以上，最终稿要像我的内容，不像原文换皮。",
-          lengthRule ? `4. ${lengthRule}` : null,
-          "",
-          record.videoTitle ? `对标标题：${record.videoTitle}` : null,
-          "对标原文：",
-          record.transcript || "",
-          record.analysisResult ? "\n已有拆解：" : null,
-          formatAnalysisResultForPrompt(record.analysisResult),
-        ].filter(Boolean).join("\n")
-
-        startTransition(() => {
-          setSelectedAgentId("content_producer")
-          setMessages([])
-          setInput(prefill)
-          setSourceVideoCopyExtractionId(record.id)
-          setSourceTopicTitle(record.videoTitle || "")
-          setSourceTopicRationale("")
-          setSourceOriginalText(record.transcript || "")
-          setSourceAnalysisText(formatAnalysisResultForPrompt(record.analysisResult) || "")
-          setEditorText("")
-          setEditorFormat(undefined)
-          setEditorSourceMessageId(undefined)
-          setEditorPanelOpen(true)
-        })
-        toast.success("已带入对标文案")
-      })
-      .catch(() => toast.error("对标文案加载失败"))
-      .finally(() => {
-        const nextParams = new URLSearchParams(searchParams.toString())
-        nextParams.delete("videoCopyExtractionId")
-        router.replace(nextParams.toString() ? `/aim?${nextParams.toString()}` : "/aim")
-      })
-  }, [router, searchParams, videoCopyExtractionIdParam])
+  useAimAgentDraftSwitch({ agentParam, activeAgentId, selectedProjectId, lastAgentParamRef, setters: routeSetters })
+  useAimTopicPrefill({
+    topicTitle: topicTitleParam,
+    topicRationale: topicRationaleParam,
+    projectId: projectIdParam,
+    idea: ideaParam,
+    router,
+    searchParams,
+    setters: routeSetters,
+  })
+  useAimVideoCopyPrefill({ extractionId: videoCopyExtractionIdParam, router, searchParams, setters: routeSetters })
 
   const openEditorFromResult = useCallback((messageId: string, format: ContentFormat, content: string) => {
     setEditorText(content)
@@ -458,50 +381,17 @@ export default function AimPage() {
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
   }, [])
 
-  // 侧边栏点击「最近内容」：把记录加载为一次对话（数据来自共享 store，无需额外请求）
-  useEffect(() => {
-    if (!loadTargetId) return
-    const item = storeHistory.find((h) => h.id === loadTargetId)
-    if (!item) return // 列表尚未拉取到，等 storeHistory 更新后由本 effect 重试
-    const contents = getHistoryContents(item)
-    const assistantId = nextId()
-    const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
-    const historyOriginalText = extractBenchmarkOriginalText(item.rawInput)
-    const historyAnalysisText = extractBenchmarkAnalysisText(item.rawInput)
-    startTransition(() => {
-      setSelectedAgentId(itemAgentId)
-      setSelectedProjectId(item.projectId || "")
-      setSourceTopicTitle(item.topicTitle || "")
-      setSourceTopicRationale("")
-      setSourceOriginalText(historyOriginalText)
-      setSourceAnalysisText(historyAnalysisText)
-      setMessages([
-        { id: nextId(), role: "user", content: item.rawInput || "（历史素材）" },
-        ...(contents.length
-          ? [{
-              id: assistantId,
-              role: "assistant" as const,
-              content: `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
-              agentId: item.agentId ?? undefined,
-              deliverables: {
-                id: item.id,
-                results: contents.map((c) => ({ format: c.format, content: c.content, wordCount: c.content.length })),
-                knowledgeUsed: [],
-              } as AimGenerateResponse,
-            }]
-          : [{ id: nextId(), role: "assistant" as const, content: "已加载历史素材，可直接让我改写。" }]),
-      ])
-      if (contents[0]) openEditorFromResult(assistantId, contents[0].format, contents[0].content)
-    })
-    if (itemAgentId !== selectedAgentId) {
-      const nextParams = new URLSearchParams(searchParams.toString())
-      nextParams.set("agent", itemAgentId)
-      lastAgentParamRef.current = itemAgentId
-      router.replace(`/aim?${nextParams.toString()}`)
-    }
-    toast.success("已加载历史记录")
-    clearLoadTarget()
-  }, [clearLoadTarget, loadTargetId, openEditorFromResult, router, searchParams, selectedAgentId, storeHistory])
+  useAimHistoryLoad({
+    loadTargetId,
+    history: storeHistory,
+    selectedAgentId,
+    router,
+    searchParams,
+    lastAgentParamRef,
+    clearLoadTarget,
+    openEditorFromResult,
+    setters: routeSetters,
+  })
 
   useAimMessageAutoScroll({ scrollRef, pendingMessageIdRef: pendingScrollMessageIdRef, messages, isThinking, isGenerating })
 
