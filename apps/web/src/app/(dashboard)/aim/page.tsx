@@ -1,24 +1,18 @@
 "use client"
 
-import { useEffect, useState, memo, useMemo, useRef, useCallback, startTransition } from "react"
+import { useEffect, useState, useMemo, useRef, useCallback, startTransition } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  Check,
-  Clipboard,
-  Database,
   Loader2,
   Sparkles,
   ShieldCheck,
-  Target,
   Plus,
   ArrowRight,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
-import { KNOWLEDGE_STRATEGY_PROFILES } from "@/lib/aim-knowledge-strategy"
-import { buildAimDeliveryContract } from "@/lib/aim-delivery-contract"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,10 +30,7 @@ import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
 import { BenchmarkEditorPanel, type AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
-import { ActionStrip } from "@/components/workbench/action-strip"
-import { AiResultPanel } from "@/components/workbench/ai-result-panel"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
 import {
   generateAimContent,
   getVideoCopyExtraction,
@@ -55,7 +46,6 @@ import {
   ApiError,
   listClientProjects,
   listAimHistory,
-  recordAimRunEvent,
   updateAimWorkflowStatus,
   upsertContentOutcome,
   type AimCalibrationRule,
@@ -120,11 +110,10 @@ import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
 import {
   AIM_ACTIVE_SOFT_ACTION_CLASS as ACTIVE_SOFT_ACTION_CLASS,
   AIM_FORMAT_LABELS as FORMAT_LABELS,
-  AIM_SOFT_ACTION_CLASS as SOFT_ACTION_CLASS,
-  AIM_WORKFLOW_STATUS_OPTIONS as WORKFLOW_STATUS_OPTIONS,
   getAimWorkflowStatusLabel as workflowStatusLabel,
   splitAimMethodNote as splitMethodNote,
 } from "@/lib/aim/workbench-display"
+import { reportAimRunEvent } from "@/lib/aim/run-events"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -135,15 +124,6 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
 
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
-
-function reportAimRunEvent(
-  runId: string | null | undefined,
-  event: "copied" | "revised" | "accepted",
-  metadata?: Record<string, unknown>,
-) {
-  if (!runId) return
-  void recordAimRunEvent(runId, event, metadata).catch(() => undefined)
-}
 
 interface ChoiceGroup {
   question: string
@@ -420,370 +400,6 @@ function buildHistoryRawInput(baseInput: string, currentInput: string, messages:
 }
 
 
-const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
-  const lines = useMemo(() => (text ? text.split("\n") : []), [text])
-  return (
-    <div className="space-y-3 select-text font-serif leading-loose tracking-wider text-foreground/95 antialiased">
-      {lines.map((line, index) => {
-        const displayLine = line.replace(/\*\*/g, "")
-        const regex = /(【[^】]+】)/g
-        const parts = displayLine.split(regex)
-        if (parts.length > 1) {
-          return (
-            <p key={index} className="text-sm sm:text-base leading-loose my-2 text-[#2c2b2a] dark:text-[#f3ede2]">
-              {parts.map((part, pIdx) => {
-                if (part.startsWith("【") && part.endsWith("】")) {
-                  if (part === "【画面】") {
-                    return (
-                      <span key={pIdx} className="inline-block mx-1 px-2 py-0.5 rounded-xs text-xs font-serif font-bold bamboo-scene-tag">
-                        {part}
-                      </span>
-                    )
-                  }
-                  if (part === "【旁白】") {
-                    return (
-                      <span key={pIdx} className="inline-block mx-1 px-2 py-0.5 rounded-xs text-xs font-serif font-bold gold-ink-narration border border-amber-700/20 dark:border-amber-500/20">
-                        {part}
-                      </span>
-                    )
-                  }
-                  return (
-                    <span key={pIdx} className="inline-block mx-1 px-2 py-0.5 rounded-xs text-xs font-serif font-bold badge-gold border border-primary/30">
-                      {part}
-                    </span>
-                  )
-                }
-                return <span key={pIdx}>{part}</span>
-              })}
-            </p>
-          )
-        }
-        return (
-          <p key={index} className="text-sm sm:text-base leading-loose my-2 text-[#2c2b2a] dark:text-[#f3ede2] min-h-6">
-            {displayLine}
-          </p>
-        )
-      })}
-    </div>
-  )
-})
-
-/** 交付物气泡：在对话中渲染 generateAimContent 的多格式结果 */
-function DeliverableBubble({
-  deliverables,
-  runId,
-  isCurrentVersion,
-  agentId,
-  workflowStage,
-  contentAction,
-  nextActions,
-  onRepurpose,
-  onQuality,
-  onMarkStatus,
-  onNextAction,
-  isBusy,
-  onEditResult,
-  onCompileToWiki,
-  onOpenDecision,
-  onOpenPublish,
-  onOpenRetro,
-}: {
-  deliverables: AimGenerateResponse
-  runId?: string | null
-  isCurrentVersion: boolean
-  agentId: AimAgentId
-  workflowStage?: AimWorkflowStage
-  contentAction?: AimContentAction | null
-  nextActions?: AimNextAction[]
-  onRepurpose: (format: ContentFormat) => void
-  onQuality: () => void
-  onMarkStatus: (status: string) => void
-  onNextAction?: (action: AimNextAction, content: string, generationId: string) => void
-  isBusy: boolean
-  onEditResult?: (format: ContentFormat, content: string) => void
-  onCompileToWiki?: () => void
-  onOpenDecision?: () => void
-  onOpenPublish?: () => void
-  onOpenRetro?: () => void
-}) {
-  const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
-  const [copiedFormat, setCopiedFormat] = useState<string | null>(null)
-
-  const activeFormat = deliverables.results.some((r) => r.format === activeTab)
-    ? activeTab
-    : deliverables.results[0]?.format || "raw_copy"
-  const activeResult = deliverables.results.find((r) => r.format === activeFormat) || deliverables.results[0]
-
-  async function copyText(content: string, format?: string) {
-    await navigator.clipboard.writeText(content)
-    if (format) {
-      setCopiedFormat(format)
-      setTimeout(() => setCopiedFormat(null), 600)
-    }
-    reportAimRunEvent(runId, "copied", {
-      ...(format ? { format } : {}),
-      ...(workflowStage ? { workflowStage } : {}),
-      ...(contentAction ? { contentAction } : {}),
-    })
-    toast.success("已复制")
-  }
-
-  const hasMoments = deliverables.results.some((r) => r.format === "moments_post")
-  const hasWechat = deliverables.results.some((r) => r.format === "wechat_article")
-  const hasVideo = deliverables.results.some((r) => r.format === "video_script")
-  const hasKoubo = deliverables.results.some((r) => r.format === "koubo_script")
-  const hasPublishScript = hasVideo || hasKoubo
-  const hasXiaohongshu = deliverables.results.some((r) => r.format === "xiaohongshu_post")
-  const hasCommunity = deliverables.results.some((r) => r.format === "community_message")
-  const hasShooting = deliverables.results.some((r) => r.format === "shooting_brief")
-  const canRunPublishCheck = agentId === "content_producer" || agentId === "free_copywriter" || agentId === "deep_copywriter" || agentId === "content_review"
-  const primaryNextActions = nextActions?.filter((action) => action.id === "publish_package" || action.id === "publish_check") ?? []
-  const secondaryNextActions = nextActions?.filter((action) => action.id !== "publish_package" && action.id !== "publish_check") ?? []
-  const hasMoreActions = Boolean(
-    (!hasKoubo && hasVideo)
-    || (!hasXiaohongshu && hasVideo)
-    || (!hasShooting && hasVideo)
-    || (!hasMoments && hasVideo)
-    || (!hasCommunity && hasVideo)
-    || (!hasWechat && hasVideo)
-    || onCompileToWiki
-    || secondaryNextActions.length > 0,
-  )
-  const knowledgeStrategyLabel = deliverables.knowledgeStrategy
-    ? KNOWLEDGE_STRATEGY_PROFILES[deliverables.knowledgeStrategy as keyof typeof KNOWLEDGE_STRATEGY_PROFILES]?.label
-      ?? deliverables.knowledgeStrategy
-    : undefined
-  const deliveryContract = buildAimDeliveryContract({
-    conversationMode: deliverables.conversationMode,
-    knowledgeCount: deliverables.knowledgeUsed?.length ?? 0,
-    knowledgeTitles: deliverables.knowledgeUsed?.map((item) => item.title),
-    knowledgeStrategyLabel,
-    degraded: deliverables.degraded,
-    qualityStatus: deliverables.qualityStatus,
-    isCurrentVersion,
-    primaryNextActionLabel: primaryNextActions[0]?.label,
-    taskSpec: deliverables.taskSpec ?? null,
-  })
-
-  function runMoreAction(value: string | null) {
-    if (!value) return
-    if (value.startsWith("format:")) {
-      onRepurpose(value.replace("format:", "") as ContentFormat)
-      return
-    }
-    if (value === "compile_wiki") {
-      onCompileToWiki?.()
-      return
-    }
-    const action = secondaryNextActions.find((item) => `action:${item.id}` === value)
-    if (action && activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
-  }
-
-  return (
-    <div className="mt-2 w-full">
-      <AiResultPanel
-        title="AI 交付物"
-        icon={<Sparkles className="h-4 w-4 text-primary animate-pulse" />}
-        meta={
-          <Badge variant={isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">
-            {isCurrentVersion ? "当前版本" : "历史版本"}
-          </Badge>
-        }
-        flat
-      >
-        <DeliveryContractStrip contract={deliveryContract} />
-        <Tabs value={activeFormat} onValueChange={(v) => setActiveTab(v as ContentFormat)} className="w-full">
-          <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-            {deliverables.results.map((item) => (
-              <TabsTrigger
-                key={item.format}
-                value={item.format}
-                className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none"
-              >
-                {FORMAT_LABELS[item.format]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {deliverables.results.map((item) => (
-            <TabsContent key={item.format} value={item.format} className="space-y-3">
-              {(() => {
-                const display = splitMethodNote(item.content)
-                return (
-                  <>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{FORMAT_LABELS[item.format]} · {item.wordCount} 字</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {onEditResult && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className={SOFT_ACTION_CLASS}
-                      onClick={() => onEditResult(item.format, item.content)}
-                    >
-                      编辑
-                    </Button>
-                  )}
-                  <Button size="sm" variant="ghost" className={SOFT_ACTION_CLASS} onClick={() => copyText(item.content, item.format)}>
-                    {copiedFormat === item.format ? <Check className="h-3.5 w-3.5 mr-1" /> : <Clipboard className="h-3.5 w-3.5 mr-1" />}
-                    复制
-                  </Button>
-                </div>
-              </div>
-              {display.methodNote && (
-                <details className="rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary>
-                  <div className="mt-2 border-t border-border/60 pt-2">
-                    <MarkdownRenderer content={display.methodNote} />
-                  </div>
-                </details>
-              )}
-              <div className="py-1">
-                {item.format === "video_script" ? (
-                  <ZhuJianContent text={display.result} />
-                ) : (
-                  <MarkdownRenderer content={display.result} />
-                )}
-              </div>
-                  </>
-                )
-              })()}
-            </TabsContent>
-          ))}
-        </Tabs>
-
-        <ActionStrip>
-          {primaryNextActions.map((action) => (
-            <Button
-              key={action.id}
-              size="sm"
-              variant={action.id === "publish_package" ? "default" : "ghost"}
-              className={action.id === "publish_package" ? "h-7 rounded-md px-2 text-xs" : SOFT_ACTION_CLASS}
-              onClick={() => {
-                if (action.id === "publish_check") {
-                  onQuality()
-                  return
-                }
-                if (activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
-              }}
-              disabled={isBusy || !activeResult?.content.trim() || (action.id === "publish_check" && !hasPublishScript)}
-            >
-              {action.id === "publish_check" && <ShieldCheck className="h-3.5 w-3.5 mr-1" />}
-              {action.label}
-            </Button>
-          ))}
-          {canRunPublishCheck && !nextActions?.some((action) => action.id === "publish_check") && (
-            <Button size="sm" variant="ghost" className={SOFT_ACTION_CLASS} onClick={onQuality} disabled={isBusy || !hasPublishScript}>
-              <ShieldCheck className="h-3.5 w-3.5 mr-1" /> 发布前自查
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" className={SOFT_ACTION_CLASS} onClick={onOpenDecision} disabled={isBusy}>
-            发布前判断
-          </Button>
-          <Button size="sm" variant="ghost" className={SOFT_ACTION_CLASS} onClick={onOpenPublish} disabled={isBusy}>
-            登记发布
-          </Button>
-          <Button size="sm" variant="ghost" className={SOFT_ACTION_CLASS} onClick={onOpenRetro} disabled={isBusy}>
-            填写复盘
-          </Button>
-          <Select onValueChange={runMoreAction} disabled={isBusy || !hasMoreActions}>
-            <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted">
-              <SelectValue placeholder="更多" />
-            </SelectTrigger>
-            <SelectContent>
-              {!hasKoubo && hasVideo && <SelectItem value="format:koubo_script">口播文案</SelectItem>}
-              {!hasXiaohongshu && hasVideo && <SelectItem value="format:xiaohongshu_post">小红书图文</SelectItem>}
-              {!hasShooting && hasVideo && <SelectItem value="format:shooting_brief">拍摄交接单</SelectItem>}
-              {!hasMoments && hasVideo && <SelectItem value="format:moments_post">朋友圈文案</SelectItem>}
-              {!hasCommunity && hasVideo && <SelectItem value="format:community_message">社群运营</SelectItem>}
-              {!hasWechat && hasVideo && <SelectItem value="format:wechat_article">公众号文章</SelectItem>}
-              {onCompileToWiki && <SelectItem value="compile_wiki">编译进 IP 维基</SelectItem>}
-              {secondaryNextActions.map((action) => (
-                <SelectItem key={action.id} value={`action:${action.id}`} disabled={!activeResult?.content.trim()}>
-                  {action.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select onValueChange={(value) => { if (typeof value === "string") onMarkStatus(value) }}>
-            <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted">
-              <SelectValue placeholder="状态" />
-            </SelectTrigger>
-            <SelectContent>
-              {WORKFLOW_STATUS_OPTIONS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </ActionStrip>
-      </AiResultPanel>
-    </div>
-  )
-}
-
-function DeliveryContractStrip({ contract }: { contract: ReturnType<typeof buildAimDeliveryContract> }) {
-  const toneClass = {
-    success: "text-emerald-700 dark:text-emerald-400",
-    warning: "text-amber-700 dark:text-amber-400",
-    danger: "text-red-700 dark:text-red-400",
-    neutral: "text-foreground",
-  }[contract.status.tone]
-  const items = [
-    { label: "任务", value: contract.task.label, detail: contract.task.detail, icon: Target, className: "text-foreground" },
-    { label: "依据", value: contract.evidence.label, detail: contract.evidence.detail, icon: Database, className: "text-foreground" },
-    { label: "状态", value: contract.status.label, detail: contract.status.detail, icon: ShieldCheck, className: toneClass },
-    { label: "下一步", value: contract.next.label, detail: contract.next.detail, icon: ArrowRight, className: "text-foreground" },
-  ]
-
-  return (
-    <div className="mb-4 border-y border-border/70 bg-muted/20">
-      <div className="grid grid-cols-2 lg:grid-cols-4">
-        {items.map(({ label, value, detail, icon: Icon, className }, index) => (
-          <div
-            key={label}
-            className={`min-w-0 px-3 py-2.5 ${index % 2 === 1 ? "border-l border-border/60" : ""} ${index > 1 ? "border-t border-border/60 lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`}
-            title={detail}
-          >
-            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-              <Icon className="h-3 w-3 shrink-0" />
-              <span>{label}</span>
-            </div>
-            <p className={`mt-1 truncate text-xs font-medium ${className}`}>{value}</p>
-            <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{detail}</p>
-          </div>
-        ))}
-      </div>
-      {contract.expanded && (
-        <div className="border-t border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-          {contract.taskSpec?.mode === "discovery_exploration" && (
-            <p className="text-amber-600 dark:text-amber-400">
-              当前信息不足，无法给出确定方案；请先补充关键资料，再生成正式方案。
-            </p>
-          )}
-          {contract.assumptions && contract.assumptions.length > 0 && (
-            <p className="mt-1">
-              <span className="font-medium text-foreground">本次假设：</span>
-              {contract.assumptions.map((a) => `${a.statement}（影响${a.impact}）`).join("；")}
-            </p>
-          )}
-          {contract.unknowns && contract.unknowns.length > 0 && (
-            <p className="mt-1">
-              <span className="font-medium text-foreground">待确认：</span>
-              {contract.unknowns.join("；")}
-            </p>
-          )}
-          {contract.knownFacts && contract.knownFacts.length > 0 && (
-            <p className="mt-1">
-              <span className="font-medium text-foreground">已知事实：</span>
-              {contract.knownFacts.map((f) => f.statement).join("；")}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function AimPage() {
   const router = useRouter()
@@ -2596,7 +2212,7 @@ export default function AimPage() {
                     {/* 交付物气泡 */}
                     {m.deliverables && (
                       <div className="w-full mt-2">
-                        <DeliverableBubble
+                        <AimDeliverableBubble
                           deliverables={m.deliverables}
                           runId={m.runId}
                           isCurrentVersion={m.id === latestDeliverableMessageId()}
