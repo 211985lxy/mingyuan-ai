@@ -317,3 +317,37 @@ Z-Code 完成后只报告：
 1. 核对 AIM 运行身份的读写权限。
 2. 将真实 Base 与表 ID 接入经营事项执行入口。
 3. 用一条测试记录完成端到端联调。
+
+## 14. 当前交给 Z-Code 的工作包：WP-4
+
+### 目标
+
+建立一个受保护的单记录状态执行入口，把 WP-3 执行服务绑定到现有飞书单记录读写能力；本包只负责状态控制，不调用 AIM Harness 生成内容。
+
+### 实现范围
+
+- 新增 `POST /api/integrations/feishu/work-items/execute`。
+- 请求体支持 `recordId` 与 `action`：`start`、`submit_review`、`complete`、`fail`。
+- `submit_review`、`complete`、`fail` 分别校验所需结果或错误字段。
+- 使用 `Authorization: Bearer <AIM_WORK_ITEM_API_SECRET>` 保护入口，密钥缺失时 fail closed。
+- 通过 `LARK_BASE_TOKEN`、`LARK_WORK_ITEM_TABLE_ID`、`LARK_CLI_PATH` 绑定真实记录读写。
+- 复用 `getLarkBaseRecord`、`updateLarkBaseRecord` 和 WP-3 服务，不重复实现状态机。
+- 对未授权、坏 JSON、非法 action、缺字段、状态冲突和外部错误保留清晰响应。
+- 在 `.env.example` 增加上述经营事项配置，不写入真实密钥。
+
+### 不做
+
+- 不调用 AIM Harness 或生成模型。
+- 不扫描整张表，不做定时任务。
+- 不修改 AIM 页面。
+- 不新增数据库表。
+- 不创建第二套飞书客户端。
+- 不提交 Git。
+
+### 验收
+
+- 未授权请求返回 401；服务密钥未配置返回 503。
+- 输入不合法返回 400。
+- 四种 action 分发到正确的 WP-3 服务。
+- 相同请求保持幂等，业务冲突不被吞掉。
+- 定向测试、类型检查、架构护栏和目标 ESLint 通过。
