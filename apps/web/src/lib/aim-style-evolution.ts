@@ -26,6 +26,9 @@ export interface StyleProfileDelta {
   structuralDna: { hook?: string; twist?: string; ending?: string }
   microLinguistics: { sentence?: string; catchphrase?: string; metaphor?: string }
   coreValues: { beliefs?: string; supports?: string; opposes?: string }
+  decisionHeuristics: { priorities?: string; tradeoffs?: string }
+  antiPatterns: { avoids?: string; forbiddenTone?: string }
+  honestLimits: { uncertainty?: string; requiresEvidence?: string }
   evidence: string
   confidence: "confirmed" | "user_claim" | "pending_verify"
 }
@@ -44,9 +47,9 @@ export const STYLE_PROFILE_DEFAULT_TAGS = [
   "confidence:user_claim",
 ]
 
-const EXTRACTION_MAX_TOKENS = 1400
-const MERGE_MAX_TOKENS = 1600
-const MERGE_MAX_CHARS = 1200
+const EXTRACTION_MAX_TOKENS = 1800
+const MERGE_MAX_TOKENS = 2200
+const MERGE_MAX_CHARS = 1800
 
 // ─── 提取 prompt ──────────────────────────────────────────
 
@@ -64,7 +67,7 @@ export function buildStyleExtractionPrompt(messages: StyleProfileMessage[]): str
 - 助手自己的建议或示例
 - 没有用户证据的猜测
 
-按 5 个维度提炼，每个字段只填有用户证据的，没有证据就留空字符串：
+按 8 个维度提炼，每个字段只填有用户证据的，没有证据就留空字符串：
 
 {
   "cognitivePattern": {
@@ -91,6 +94,18 @@ export function buildStyleExtractionPrompt(messages: StyleProfileMessage[]): str
     "supports": "明确支持什么",
     "opposes": "明确反对什么"
   },
+  "decisionHeuristics": {
+    "priorities": "做判断时优先看什么、先后顺序是什么",
+    "tradeoffs": "面对取舍时通常如何判断"
+  },
+  "antiPatterns": {
+    "avoids": "明确不会采用的方法、套路或行为",
+    "forbiddenTone": "明确不要的表达腔调、词汇或句式"
+  },
+  "honestLimits": {
+    "uncertainty": "哪些问题会承认不知道、不确定或暂不判断",
+    "requiresEvidence": "哪些结论必须有案例、数据或亲历证据才会说"
+  },
   "evidence": "支撑以上判断的用户原话或近似原话（必填；若没有任何可沉淀的长期风格，整个对象返回 {}）",
   "confidence": "confirmed | user_claim | pending_verify"
 }
@@ -109,7 +124,16 @@ function asString(value: unknown): string {
 }
 
 function hasAnyDimFilled(d: Partial<StyleProfileDelta>): boolean {
-  const dims = [d.cognitivePattern, d.emotionalTexture, d.structuralDna, d.microLinguistics, d.coreValues]
+  const dims = [
+    d.cognitivePattern,
+    d.emotionalTexture,
+    d.structuralDna,
+    d.microLinguistics,
+    d.coreValues,
+    d.decisionHeuristics,
+    d.antiPatterns,
+    d.honestLimits,
+  ]
   return dims.some((dim) => dim && Object.values(dim).some((v) => asString(v).length > 0))
 }
 
@@ -158,6 +182,18 @@ export function parseStyleProfileJson(raw: string): StyleProfileDelta | null {
       beliefs: asString((obj.coreValues as Record<string, unknown>)?.beliefs),
       supports: asString((obj.coreValues as Record<string, unknown>)?.supports),
       opposes: asString((obj.coreValues as Record<string, unknown>)?.opposes),
+    },
+    decisionHeuristics: {
+      priorities: asString((obj.decisionHeuristics as Record<string, unknown>)?.priorities),
+      tradeoffs: asString((obj.decisionHeuristics as Record<string, unknown>)?.tradeoffs),
+    },
+    antiPatterns: {
+      avoids: asString((obj.antiPatterns as Record<string, unknown>)?.avoids),
+      forbiddenTone: asString((obj.antiPatterns as Record<string, unknown>)?.forbiddenTone),
+    },
+    honestLimits: {
+      uncertainty: asString((obj.honestLimits as Record<string, unknown>)?.uncertainty),
+      requiresEvidence: asString((obj.honestLimits as Record<string, unknown>)?.requiresEvidence),
     },
     evidence: asString(obj.evidence),
     confidence: "user_claim",
@@ -228,6 +264,30 @@ function renderStyleProfileMarkdown(delta: StyleProfileDelta, stamp: string): st
   lines.push(cv.length ? cv.join("\n") : "- （待沉淀）")
   lines.push("")
 
+  lines.push("## 6. 判断启发式（Decision Heuristics）")
+  const dh = [
+    dimLine("优先级", delta.decisionHeuristics.priorities),
+    dimLine("取舍方式", delta.decisionHeuristics.tradeoffs),
+  ].filter(Boolean)
+  lines.push(dh.length ? dh.join("\n") : "- （待沉淀）")
+  lines.push("")
+
+  lines.push("## 7. 明确禁区（Anti-patterns）")
+  const ap = [
+    dimLine("不采用", delta.antiPatterns.avoids),
+    dimLine("不要的腔调", delta.antiPatterns.forbiddenTone),
+  ].filter(Boolean)
+  lines.push(ap.length ? ap.join("\n") : "- （待沉淀）")
+  lines.push("")
+
+  lines.push("## 8. 诚实边界（Honest Limits）")
+  const hl = [
+    dimLine("承认不确定", delta.honestLimits.uncertainty),
+    dimLine("证据要求", delta.honestLimits.requiresEvidence),
+  ].filter(Boolean)
+  lines.push(hl.length ? hl.join("\n") : "- （待沉淀）")
+  lines.push("")
+
   lines.push("---")
   lines.push(`证据：${delta.evidence}`)
   lines.push(`置信度：${delta.confidence}`)
@@ -252,7 +312,7 @@ function buildMergePrompt(existing: string, delta: StyleProfileDelta): string {
 - 保留现有档案里仍然成立的维度和证据，不要丢失已有沉淀。
 - 新增量里的非空字段用于「强化 / 修正 / 补充」现有档案：方向一致就合并证据，方向冲突就以最新增量为准并替换。
 - 每个维度只保留最凝练的描述，不要堆砌重复信息。
-- 输出必须是 Markdown，严格沿用现有档案的 5 节结构（思维的底层代码 / 情绪的颗粒度 / 结构的第一性 / 语言的微观特征 / 核心价值观），末尾保留「证据 / 置信度 / 版本来源」三行。
+- 输出必须是 Markdown，严格沿用现有档案的 8 节结构（思维的底层代码 / 情绪的颗粒度 / 结构的第一性 / 语言的微观特征 / 核心价值观 / 判断启发式 / 明确禁区 / 诚实边界），末尾保留「证据 / 置信度 / 版本来源」三行。
 - 总长度控制在 ${MERGE_MAX_CHARS} 字以内。没有内容的维度写「- （待沉淀）」。
 - 不要输出任何解释，只输出更新后的 Markdown 档案本身。
 

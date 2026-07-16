@@ -9,8 +9,8 @@ export const STYLE_PROFILE_CATEGORY = "writing_style_profile"
 /** 主档案的固定 title，作为 upsert / 合并的 anchor */
 export const STYLE_PROFILE_MAIN_TITLE = "IP 写作风格主档案"
 
-const MAX_ENTRY_CHARS = 1200
-const MAX_BLOCK_CHARS = 1500
+const MAX_ENTRY_CHARS = 1800
+const MAX_BLOCK_CHARS = 2200
 const MAX_ENTRIES = 3
 
 function truncate(text: string, max: number): string {
