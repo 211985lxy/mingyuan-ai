@@ -14,36 +14,24 @@ import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import {
   WorkflowRecordDialog,
 } from "@/components/aim/workflow-record-dialog"
+import { transcribeAudio, type ContentFormat } from "@/lib/api/client"
 import {
-  generateAimContent,
-  checkScriptQuality,
-  uploadImageForAimChat,
-  chatAimStream,
-  createKnowledge,
-  createAimWorkflowBrief,
-  evolveAimConversation,
-  evolveStyleConversation,
-  ApiError,
-  type AimEvolutionSuggestion,
-  type AimGenerateResponse,
-  type ContentFormat,
-} from "@/lib/api/client"
-import {
-  AIM_CONTENT_ACTIONS,
-  AIM_WORKFLOW_STAGES,
   getWorkflowStageForAgent,
   isAimWorkflowStage,
   type AimContentAction,
-  type AimWorkflowStage,
   type ConfirmedWorkflowBrief,
 } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
+import { useAimChatActions } from "@/hooks/use-aim-chat-actions"
 import { useAimProjectWorkspace } from "@/hooks/use-aim-project-workspace"
 import { useAimWorkflowRecords } from "@/hooks/use-aim-workflow-records"
 import { useAimEditorActions } from "@/hooks/use-aim-editor-actions"
+import { useAimEvolutionActions } from "@/hooks/use-aim-evolution-actions"
+import { useAimGenerationActions, type AimWorkflowBriefState } from "@/hooks/use-aim-generation-actions"
+import { useAimImageAttachments } from "@/hooks/use-aim-image-attachments"
+import { useAimWorkflowActions } from "@/hooks/use-aim-workflow-actions"
 import { useAimDraftAutosave, useAimMessageAutoScroll, useAimSourceHydration } from "@/hooks/use-aim-workbench-effects"
 import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVideoCopyPrefill } from "@/hooks/use-aim-route-sync"
-import { transcribeAudio } from "@/lib/api/client"
 import {
   AIM_AGENT_OPTIONS,
   DEFAULT_AIM_AGENT,
@@ -52,10 +40,8 @@ import {
   type AimAgentMeta,
 } from "@/lib/aim-ui-config"
 import {
-  buildAimNextActionPrompt,
   getAimAgentGuide,
   type AimAgentGuide,
-  type AimNextAction,
   type AimWorkbenchSkill,
 } from "@/lib/aim-agent-guides"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
@@ -67,36 +53,19 @@ import {
 import {
   EDITOR_PANEL_DEFAULT_WIDTH,
   applyFirstMatchingStructureToReference,
-  type AimEditorContext,
-  type TextSelectionRange,
 } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
-import {
-  AIM_ACTIVE_SOFT_ACTION_CLASS as ACTIVE_SOFT_ACTION_CLASS,
-  AIM_FORMAT_LABELS as FORMAT_LABELS,
-} from "@/lib/aim/workbench-display"
-import { reportAimRunEvent } from "@/lib/aim/run-events"
-import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
-import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
 import { clearAimDraft, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
-  buildAimHistoryRawInput as buildHistoryRawInput,
   buildAimEditorContext,
   buildAimBenchmarkQualityMessage,
   buildAimBenchmarkRewriteInput,
-  buildAimRawInput,
-  detectAimLarkToolAction,
   extractBenchmarkAnalysisText,
-  extractBenchmarkOriginalText,
   extractPersonaProgress as extractProgress,
-  findLatestAimDeliverableId,
   findLatestAimVideoDeliverableMessageId,
   nextAimWorkbenchId as nextId,
-  prepareAimChatTurn as prepareChatTurn,
-  reportAimChatRevision as reportChatRevision,
 } from "@/lib/aim/workbench-helpers"
 import {
-  type AimImageAttachment,
   type IpWikiDialogContext,
   type AimWorkbenchMessage as ChatMessage,
 } from "@/lib/aim/workbench-types"
@@ -110,11 +79,21 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
 
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 
-interface SendTextOptions {
-  editorContext?: AimEditorContext
-  editorApplyRange?: TextSelectionRange
-  images?: AimImageAttachment[]
-  retryMessageId?: string
+function buildSkillPrompt(skill: AimWorkbenchSkill, context: {
+  editorText: string
+  sourceOriginalText: string
+  sourceAnalysisText: string
+  sourceTopicTitle: string
+  messages: ChatMessage[]
+}) {
+  const hasCurrentContext = Boolean(
+    context.editorText.trim() || context.sourceOriginalText.trim() || context.sourceAnalysisText.trim()
+    || context.sourceTopicTitle.trim()
+    || context.messages.some((message) => message.role === "assistant" && (message.content.trim() || message.deliverables)),
+  )
+  return hasCurrentContext && !skill.prompt.includes("当前")
+    ? `请基于当前内容，${skill.prompt.replace(/^请/, "")}`
+    : skill.prompt
 }
 
 export default function AimPage() {
@@ -139,8 +118,7 @@ export default function AimPage() {
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
-  const [imageAttachments, setImageAttachments] = useState<AimImageAttachment[]>([])
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
   const [sourceVideoCopyExtractionId, setSourceVideoCopyExtractionId] = useState<string | undefined>(() => initialDraft?.videoCopyExtractionId)
   const [sourceOriginalText, setSourceOriginalText] = useState(() => initialDraft?.sourceOriginalText || "")
   const [sourceAnalysisText, setSourceAnalysisText] = useState(() => initialDraft?.sourceAnalysisText || "")
@@ -170,17 +148,11 @@ export default function AimPage() {
     open: false,
     context: null,
   })
-  const [workflowBrief, setWorkflowBrief] = useState<{
-    sourceGenerationId?: string
-    nextInput: string
-    confirmed: ConfirmedWorkflowBrief
-  } | null>(null)
+  const [workflowBrief, setWorkflowBrief] = useState<AimWorkflowBriefState | null>(null)
   const [workflowBriefForm, setWorkflowBriefForm] = useState<ConfirmedWorkflowBrief>({})
   const [workflowBriefDialogOpen, setWorkflowBriefDialogOpen] = useState(false)
   const [isBuildingWorkflowBrief, setIsBuildingWorkflowBrief] = useState(false)
   const [contentAction, setContentAction] = useState<AimContentAction | null>(null)
-  const [isEvolving, setIsEvolving] = useState(false)
-  const [evolutionSuggestions, setEvolutionSuggestions] = useState<AimEvolutionSuggestion[]>([])
 
   // 历史记录由侧边栏共享 store 管理（侧边栏渲染列表、生成成功后刷新、点击后触发加载）
   const storeHistory = useAimWorkspaceStore((s) => s.history)
@@ -335,7 +307,22 @@ export default function AimPage() {
     setEditorSourceMessageId,
     setEditorPanelWidth,
     setEditorPanelOpen,
-  }), [setSelectedProjectId])
+  }), [
+    setEditorFormat,
+    setEditorPanelOpen,
+    setEditorPanelWidth,
+    setEditorSourceMessageId,
+    setEditorText,
+    setInput,
+    setMessages,
+    setSelectedAgentId,
+    setSelectedProjectId,
+    setSourceAnalysisText,
+    setSourceOriginalText,
+    setSourceTopicRationale,
+    setSourceTopicTitle,
+    setSourceVideoCopyExtractionId,
+  ])
 
   useAimDraftAutosave({
     selectedAgentId,
@@ -379,7 +366,7 @@ export default function AimPage() {
     setEditorSourceMessageId(messageId)
     setEditorPanelOpen(true)
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
-  }, [])
+  }, [setDraftSelection, setEditorFormat, setEditorPanelOpen, setEditorSourceMessageId, setEditorText])
 
   useAimHistoryLoad({
     loadTargetId,
@@ -413,70 +400,82 @@ export default function AimPage() {
     setEditorSourceMessageId(undefined)
   }
 
+  const {
+    generateWithInput,
+    stopGeneration: handleStop,
+    repurposeDeliverable: handleRepurpose,
+    checkDeliverableQuality: handleQuality,
+  } = useAimGenerationActions({
+    messages,
+    setMessages,
+    setInput,
+    setSourceOriginalText,
+    setSourceAnalysisText,
+    setWorkflowBrief,
+    setContentAction,
+    setIsGenerating,
+    setIsQualityChecking,
+    agent,
+    selectedAgentId,
+    selectedProjectId,
+    projectEnabled,
+    currentWorkflowStage,
+    contentAction,
+    workflowBrief,
+    sourceVideoCopyExtractionId,
+    sourceTopicTitle,
+    sourceTopicRationale,
+    topicSelectionId: topicSelectionIdParam,
+    selectedTopicIndex: selectedTopicIndexParam,
+    requestAbortRef,
+    pendingScrollMessageIdRef,
+    clearCurrentTaskContext,
+    openEditorFromResult,
+    refreshHistory,
+    refreshProjectWorkflow,
+  })
+
+  const {
+    beginWorkflowStage,
+    beginContentAction,
+    handleAimNextAction,
+    closeWorkflowBriefDialog,
+    confirmWorkflowBrief,
+  } = useAimWorkflowActions({
+    searchParams,
+    router,
+    lastAgentParamRef,
+    selectedAgentId,
+    selectedProjectId,
+    agentTitle: agent.title,
+    workflowBrief,
+    workflowBriefForm,
+    setSelectedAgentId,
+    setMessages,
+    setInput,
+    setContentAction,
+    setWorkflowBrief,
+    setWorkflowBriefForm,
+    setWorkflowBriefDialogOpen,
+    setIsBuildingWorkflowBrief,
+    clearCurrentTaskContext,
+  })
+
+  const {
+    isEvolving,
+    evolutionSuggestions,
+    dismissEvolutionSuggestion,
+    rememberWorkbenchPreference,
+    handleEvolveConversation,
+    handleSaveEvolutionSuggestion,
+  } = useAimEvolutionActions({ messages, selectedProjectId, projectEnabled })
+
   function resetConversation() {
     requestAbortRef.current?.abort()
     setMessages([])
     setInput("")
     clearCurrentTaskContext()
     clearAimDraft(selectedAgentId)
-  }
-
-  async function handleAddImages(files: FileList) {
-    const nextImages: AimImageAttachment[] = []
-    setIsUploadingImage(true)
-    try {
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) {
-          toast.error(`${file.name} 不是图片文件`)
-          continue
-        }
-        if (file.size > 8 * 1024 * 1024) {
-          toast.error(`${file.name} 超过 8MB`)
-          continue
-        }
-        const uploaded = await uploadImageForAimChat(file)
-        nextImages.push({
-          id: nextId("img"),
-          name: file.name,
-          assetUrl: uploaded.assetUrl,
-          readUrl: uploaded.readUrl,
-          previewUrl: uploaded.readUrl,
-        })
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "图片上传失败")
-    } finally {
-      setIsUploadingImage(false)
-    }
-    if (nextImages.length) setImageAttachments((current) => [...current, ...nextImages].slice(-4))
-  }
-
-  function rememberWorkbenchPreference(input: string) {
-    const contextMessages = [
-      ...messages.map((message) => ({ role: message.role, content: message.content })),
-      { role: "user" as const, content: input },
-    ].filter((message) => message.content.trim()).slice(-8)
-
-    if (contextMessages.length === 0) {
-      toast.error("没有可沉淀的偏好内容")
-      return
-    }
-
-    setIsEvolving(true)
-    void evolveStyleConversation({ messages: contextMessages })
-      .then((result) => {
-        if (result.profile) {
-          toast.success(result.created ? "已建立全局写作风格档案" : "全局写作风格档案已更新")
-        } else if (result.reason === "no_style") {
-          toast.info("这句话还没有形成稳定偏好")
-        } else {
-          toast.info(result.reason || "这句话没有形成稳定偏好")
-        }
-      })
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "偏好沉淀失败")
-      })
-      .finally(() => setIsEvolving(false))
   }
 
   function runWorkbenchCommand(command: AimWorkbenchCommand) {
@@ -537,166 +536,19 @@ export default function AimPage() {
     return false
   }
 
-  async function sendText(text: string, options?: SendTextOptions) {
-    const images = options?.images ?? []
-    if (!text && images.length === 0) return
-    const startsNewTask = !options?.retryMessageId && shouldIsolateWritingInstruction(text, messages.length > 0)
-    const workbenchCommand = detectAimWorkbenchCommand(text)
-    if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
-    reportChatRevision(messages, options?.retryMessageId, startsNewTask)
-    const controller = new AbortController()
-    requestAbortRef.current = controller
-    const { assistantId, thread, pendingMessages } = prepareChatTurn({
-      messages,
-      text,
-      images,
-      retryMessageId: options?.retryMessageId,
-      startsNewTask,
-      editorApplyRange: options?.editorApplyRange,
-    })
-    if (startsNewTask) clearCurrentTaskContext()
-    setMessages(pendingMessages)
-    setInput("")
-    if (images.length) setImageAttachments([])
-    setIsThinking(true)
-    try {
-      const toolAction = detectAimLarkToolAction(text)
-      if (toolAction && projectEnabled && !selectedProjectId) {
-        setMessages((prev) => prev.map((message) =>
-          message.id === assistantId ? { ...message, content: "需要先选择 IP 营销全案，才能执行这个飞书同步动作。" } : message
-        ))
-        return
-      }
-      const resultId = toolAction === "export_lark_generation" ? findLatestAimDeliverableId(messages) : undefined
-      if (toolAction === "export_lark_generation" && !resultId) {
-        setMessages((prev) => prev.map((message) =>
-          message.id === assistantId ? { ...message, content: "当前没有可同步到飞书的 AIM 生成结果。" } : message
-        ))
-        return
-      }
-      const { hasContent } = await runAimChatRequest({
-        messages: buildAimChatMessages(thread),
-        agentId: selectedAgentId,
-        projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-        toolAction,
-        resultId,
-        editorContext: startsNewTask ? undefined : options?.editorContext,
-        signal: controller.signal,
-        onContent: (content) => {
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantId ? { ...message, content } : message
-            )
-          )
-        },
-      })
-      if (!hasContent) {
-        setMessages((prev) => prev.map((message) =>
-          message.id === assistantId
-            ? { ...message, content: "没有收到模型回复。", failure: { kind: "chat", retryText: text } }
-            : message
-        ))
-      }
-    } catch (error) {
-      const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-      const message = stopped ? "已停止本次回复。" : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`
-      setMessages((prev) => prev.map((item) =>
-        item.id === assistantId
-          ? { ...item, content: message, failure: stopped ? null : { kind: "chat", retryText: text } }
-          : item
-      ))
-    } finally {
-      if (requestAbortRef.current === controller) requestAbortRef.current = null
-      setIsThinking(false)
-    }
-  }
-
-  async function handleEvolveConversation() {
-    const sourceMessages = messages
-      .filter((message) => message.role === "user" || message.role === "assistant")
-      .map((message) => ({ role: message.role, content: message.content }))
-
-    if (sourceMessages.length < 2) {
-      toast.error("对话太少，还没有可沉淀的偏好")
-      return
-    }
-
-    // 纯文案模式（未启用 IP 全案）也能沉淀全局写作风格；选了项目则同时提炼项目偏好
-    const canEvolveProject = projectEnabled && !!selectedProjectId
-
-    setIsEvolving(true)
-    try {
-      const results = await Promise.allSettled([
-        evolveStyleConversation({ messages: sourceMessages }),
-        canEvolveProject
-          ? evolveAimConversation({ projectId: selectedProjectId, messages: sourceMessages })
-          : Promise.resolve<AimEvolutionSuggestion[]>([]),
-      ])
-
-      const [styleOutcome, projectOutcome] = results
-
-      if (styleOutcome.status === "fulfilled") {
-        const r = styleOutcome.value
-        if (r.profile) {
-          toast.success(r.created ? "已建立全局写作风格档案" : "全局写作风格档案已更新")
-        } else if (r.reason === "no_style") {
-          toast.info("这轮对话还没有明显的写作风格可沉淀")
-        }
-      } else {
-        toast.error("写作风格沉淀失败")
-      }
-
-      if (projectOutcome.status === "fulfilled") {
-        setEvolutionSuggestions(projectOutcome.value)
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "偏好提炼失败")
-    } finally {
-      setIsEvolving(false)
-    }
-  }
-
-  async function handleSaveEvolutionSuggestion(suggestion: AimEvolutionSuggestion) {
-    if (!selectedProjectId) {
-      toast.error("请先选择 IP 营销全案")
-      return
-    }
-    try {
-      await createKnowledge({
-        projectId: selectedProjectId,
-        category: suggestion.category,
-        title: suggestion.title,
-        content: suggestion.content,
-        tags: suggestion.tags,
-        sourceType: "manual",
-      })
-      setEvolutionSuggestions((prev) => prev.filter((item) => item !== suggestion))
-      toast.success("已沉淀进知识库")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "知识沉淀失败")
-    }
-  }
-
-  function beginWorkflowStage(stage: AimWorkflowStage) {
-    const config = AIM_WORKFLOW_STAGES.find((item) => item.id === stage)!
-    const nextParams = new URLSearchParams(searchParams.toString())
-    nextParams.set("stage", stage)
-    nextParams.set("agent", config.defaultAgentId)
-    lastAgentParamRef.current = config.defaultAgentId
-    setSelectedAgentId(config.defaultAgentId)
-    if (stage !== "content") setContentAction(null)
-    if (stage === "results") {
-      setInput("请基于已发布内容填写复盘：结果、判断和下一轮可复用规则。")
-    }
-    router.replace(`/aim?${nextParams.toString()}`)
-  }
-
-  function beginContentAction(action: AimContentAction) {
-    const config = AIM_CONTENT_ACTIONS.find((item) => item.id === action)!
-    setContentAction(action)
-    setInput((current) => current.trim() ? `${config.prompt}\n\n${current}` : config.prompt)
-    if (selectedAgentId !== "content_producer") beginWorkflowStage("content")
-  }
+  const { sendText } = useAimChatActions({
+    messages,
+    setMessages,
+    setInput,
+    setIsThinking,
+    selectedAgentId,
+    selectedProjectId,
+    projectEnabled,
+    requestAbortRef,
+    clearCurrentTaskContext,
+    clearImages,
+    runWorkbenchCommand,
+  })
 
   async function openProjectWorkflowTask(id: string) {
     if (!selectedProjectId) return
@@ -704,100 +556,14 @@ export default function AimPage() {
     requestLoad(id)
   }
 
-  async function handleAimNextAction(action: AimNextAction, content: string, generationId: string) {
-      const cleanContent = content.trim()
-      if (!cleanContent) return
-
-      if (action.id === "save_knowledge") {
-        if (!selectedProjectId) {
-          toast.error("请先选择 IP 营销全案")
-          return
-        }
-        try {
-          await createKnowledge({
-            projectId: selectedProjectId,
-            category: "positioning_material",
-            title: `AIM交付物 · ${agent.title}`,
-            content: cleanContent,
-            tags: ["aim_delivery", action.id],
-            sourceType: "manual",
-          })
-          toast.success("已保存为档案素材")
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : "保存失败")
-        }
-        return
-      }
-
-      if (action.targetAgentId && action.targetAgentId !== selectedAgentId) {
-        if (action.targetAgentId === "content_producer" && getWorkflowStageForAgent(selectedAgentId) === "direction") {
-          setIsBuildingWorkflowBrief(true)
-          try {
-            const brief = await createAimWorkflowBrief({
-              stage: "content",
-              projectId: selectedProjectId || undefined,
-              sourceGenerationId: generationId,
-              goal: action.label,
-            })
-            setWorkflowBriefForm({
-              goal: brief.taskSpec.goal,
-              targetCustomer: brief.taskSpec.targetCustomer,
-              realProblem: brief.taskSpec.realProblem,
-              contentTask: brief.taskSpec.contentTask,
-              mustKeep: brief.taskSpec.exclusiveEvidence,
-              desiredAction: brief.taskSpec.desiredAction,
-            })
-            setWorkflowBrief({
-              sourceGenerationId: brief.sourceGenerationId,
-              nextInput: buildAimNextActionPrompt(action, cleanContent),
-              confirmed: {},
-            })
-            setWorkflowBriefDialogOpen(true)
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : "任务单创建失败")
-          } finally {
-            setIsBuildingWorkflowBrief(false)
-          }
-          return
-        }
-        const nextParams = new URLSearchParams(searchParams.toString())
-        nextParams.set("agent", action.targetAgentId)
-        nextParams.set("stage", getWorkflowStageForAgent(action.targetAgentId))
-        lastAgentParamRef.current = action.targetAgentId
-        setSelectedAgentId(action.targetAgentId)
-        setMessages([])
-        setSourceVideoCopyExtractionId(undefined)
-        setSourceOriginalText("")
-        setSourceAnalysisText("")
-        setSourceTopicTitle("")
-        setSourceTopicRationale("")
-        setEditorText("")
-        setEditorFormat(undefined)
-        setEditorSourceMessageId(undefined)
-        router.replace(`/aim?${nextParams.toString()}`)
-      }
-      setInput(buildAimNextActionPrompt(action, cleanContent))
-      toast.success("已带入聊天框")
-  }
-
   const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
-    const hasCurrentContext = Boolean(
-      editorText.trim() ||
-      sourceOriginalText.trim() ||
-      sourceAnalysisText.trim() ||
-      sourceTopicTitle.trim() ||
-      messages.some((message) => message.role === "assistant" && (message.content.trim() || message.deliverables)),
-    )
-    const prompt = hasCurrentContext && !skill.prompt.includes("当前")
-      ? `请基于当前内容，${skill.prompt.replace(/^请/, "")}`
-      : skill.prompt
-
+    const prompt = buildSkillPrompt(skill, { editorText, sourceOriginalText, sourceAnalysisText, sourceTopicTitle, messages })
     setInput((current) => {
       const text = current.trim()
       return text ? `${prompt}\n\n---\n${text}\n---` : prompt
     })
     toast.success("技能指令已填入")
-  }, [editorText, messages, sourceAnalysisText, sourceOriginalText, sourceTopicTitle])
+  }, [editorText, messages, setInput, sourceAnalysisText, sourceOriginalText, sourceTopicTitle])
 
   async function handleSend() {
     await sendText(input.trim(), hasEditorSelection ? {
@@ -805,113 +571,6 @@ export default function AimPage() {
       editorApplyRange: draftSelection.text.trim() ? draftSelection.range : undefined,
       images: imageAttachments,
     } : { images: imageAttachments })
-  }
-
-  function applyGenerationResponse(
-    assistantMessageId: string,
-    currentInput: string,
-    response: AimGenerateResponse,
-    correctedResponse: AimGenerateResponse,
-  ) {
-    const extractedOriginalText = extractBenchmarkOriginalText(currentInput)
-    const extractedAnalysisText = extractBenchmarkAnalysisText(currentInput)
-    if (extractedOriginalText) setSourceOriginalText(extractedOriginalText)
-    if (extractedAnalysisText) setSourceAnalysisText(extractedAnalysisText)
-    setMessages((prev) => prev.map((message) => message.id === assistantMessageId ? {
-      ...message,
-      content: `${agent.title} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`,
-      agentId: agent.id,
-      deliverables: correctedResponse,
-      runId: response.runId ?? null,
-      degraded: response.degraded ?? null,
-      qualityStatus: response.qualityStatus ?? null,
-      workflowStage: currentWorkflowStage,
-      contentAction,
-    } : message))
-    const mainResult = correctedResponse.results[0] ?? response.results[0]
-    if (mainResult) openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
-    refreshHistory({ force: true, agentId: selectedAgentId })
-    if (selectedProjectId) void refreshProjectWorkflow()
-    setWorkflowBrief(null)
-    setContentAction(null)
-    toast.success(`${agent.primaryActionLabel}完毕`)
-  }
-
-  async function generateWithInput(currentInput: string, options?: { retryMessageId?: string; startsNewTask?: boolean }) {
-    const rawInput = options?.startsNewTask
-      ? currentInput
-      : buildAimRawInput(messages, currentInput || undefined)
-    if (!rawInput) {
-      toast.error("请先在对话框里说点素材或需求")
-      return
-    }
-    if (projectEnabled && !selectedProjectId) {
-      toast.error("你的 IP 营销全案还在配置中")
-      return
-    }
-    const controller = new AbortController()
-    requestAbortRef.current = controller
-    const assistantMessageId = nextId()
-    pendingScrollMessageIdRef.current = assistantMessageId
-    const baseMessages = options?.startsNewTask
-      ? []
-      : options?.retryMessageId
-      ? messages.filter((message) => message.id !== options.retryMessageId)
-      : messages
-    if (options?.startsNewTask) clearCurrentTaskContext()
-    setMessages((prev) => [
-      ...(options?.startsNewTask
-        ? []
-        : options?.retryMessageId
-        ? prev.filter((message) => message.id !== options.retryMessageId)
-        : prev),
-      ...(currentInput && !options?.retryMessageId ? [{ id: nextId(), role: "user" as const, content: currentInput }] : []),
-      {
-        id: assistantMessageId,
-        role: "assistant" as const,
-        content: `正在${agent.primaryActionLabel}，会先读取项目资料、匹配知识库，再生成交付物…`,
-        agentId: agent.id,
-      },
-    ])
-    if (currentInput) setInput("")
-    setIsGenerating(true)
-    try {
-      const response = await generateAimContent({
-        agentId: selectedAgentId,
-        rawInput: buildHistoryRawInput(rawInput, options?.retryMessageId ? "" : currentInput, baseMessages),
-        targetFormats: agent.defaultFormats,
-        projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-        videoCopyExtractionId: options?.startsNewTask ? undefined : sourceVideoCopyExtractionId,
-        topicTitle: options?.startsNewTask ? undefined : sourceTopicTitle.trim() || undefined,
-        topicRationale: options?.startsNewTask ? undefined : sourceTopicRationale.trim() || undefined,
-        topicSelectionId: options?.startsNewTask ? undefined : topicSelectionIdParam || undefined,
-        selectedTopicIndex: options?.startsNewTask || !Number.isFinite(selectedTopicIndexParam) ? undefined : selectedTopicIndexParam,
-        taskType: contentAction
-          ? AIM_CONTENT_ACTIONS.find((item) => item.id === contentAction)?.taskType || "write_script"
-          : "write_script",
-        useMarketViralVideos: selectedAgentId === "business_diagnosis",
-        workflow: workflowBrief
-          ? {
-              stage: "content",
-              sourceGenerationId: workflowBrief.sourceGenerationId,
-              confirmed: workflowBrief.confirmed,
-            }
-          : undefined,
-      }, controller.signal)
-      const correctedResponse = await proofreadAimResponse(response, agent.defaultInstruction)
-      applyGenerationResponse(assistantMessageId, currentInput, response, correctedResponse)
-    } catch (error) {
-      const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-      const message = stopped ? "已停止本次生成。" : `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`
-      setMessages((prev) => prev.map((item) =>
-        item.id === assistantMessageId
-          ? { ...item, content: message, failure: stopped ? null : { kind: "generate", retryText: currentInput } }
-          : item
-      ))
-    } finally {
-      if (requestAbortRef.current === controller) requestAbortRef.current = null
-      setIsGenerating(false)
-    }
   }
 
   async function handleGenerate() {
@@ -933,91 +592,6 @@ export default function AimPage() {
       return
     }
     void sendText(message.failure.retryText, { retryMessageId: message.id })
-  }
-
-  function handleStop() {
-    requestAbortRef.current?.abort()
-  }
-
-  const handleRepurpose = useCallback(
-    (msgId: string) => async (fmt: ContentFormat) => {
-        setIsGenerating(true)
-        try {
-          if (projectEnabled && !selectedProjectId) {
-          toast.error("你的 IP 营销全案还在配置中")
-          return
-        }
-        const base = messages.find((m) => m.id === msgId)?.deliverables
-        const mainContent = base?.results.find((r) => r.format === "video_script")?.content
-        if (!mainContent) return
-        const response = await generateAimContent({
-          rawInput: `基于以下脚本，派生${FORMAT_LABELS[fmt]}：\n\n${mainContent}`,
-          targetFormats: [fmt],
-          projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-          taskType: "repurpose",
-        })
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId && m.deliverables
-              ? { ...m, deliverables: { ...m.deliverables, results: [...m.deliverables.results, ...response.results] } }
-              : m,
-          ),
-        )
-        refreshHistory({ force: true, agentId: selectedAgentId })
-        toast.success(`${FORMAT_LABELS[fmt]}已生成`)
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "生成失败")
-      } finally {
-        setIsGenerating(false)
-      }
-    },
-    [messages, projectEnabled, refreshHistory, selectedAgentId, selectedProjectId],
-  )
-
-  const handleQuality = useCallback(
-    (msgId: string) => async () => {
-      const base = messages.find((m) => m.id === msgId)?.deliverables
-      const mainContent =
-        base?.results.find((r) => r.format === "video_script")?.content
-        || base?.results.find((r) => r.format === "koubo_script")?.content
-      if (!mainContent) return
-      setIsQualityChecking(true)
-      try {
-        const report = await checkScriptQuality({
-          content: mainContent,
-          persona: agent.defaultInstruction,
-          publishPlatform: "douyin",
-        })
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msgId ? { ...m, qualityReport: report } : m)),
-        )
-        toast.success("发布前自查完成")
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "质检失败")
-      } finally {
-        setIsQualityChecking(false)
-      }
-    },
-    [messages, agent],
-  )
-
-  function closeWorkflowBriefDialog() {
-    setWorkflowBriefDialogOpen(false)
-    setWorkflowBrief(null)
-  }
-
-  function confirmWorkflowBrief() {
-    if (!workflowBrief) return
-    const params = new URLSearchParams(searchParams.toString())
-    params.set("agent", "content_producer")
-    params.set("stage", "content")
-    lastAgentParamRef.current = "content_producer"
-    setSelectedAgentId("content_producer")
-    setWorkflowBrief({ ...workflowBrief, confirmed: workflowBriefForm })
-    setWorkflowBriefDialogOpen(false)
-    setInput(workflowBrief.nextInput)
-    router.replace(`/aim?${params.toString()}`)
-    toast.success("任务单已确认，开始内容创作")
   }
 
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
@@ -1058,7 +632,7 @@ export default function AimPage() {
 
         <AimEvolutionSuggestions
           suggestions={evolutionSuggestions}
-          onDismiss={(suggestion) => setEvolutionSuggestions((current) => current.filter((item) => item !== suggestion))}
+          onDismiss={dismissEvolutionSuggestion}
           onSave={(suggestion) => void handleSaveEvolutionSuggestion(suggestion)}
         />
 
@@ -1116,8 +690,8 @@ export default function AimPage() {
             skills={agent.skills}
             onUseSkill={handleUseSkill}
             imageAttachments={imageAttachments}
-            onAddImages={(files) => void handleAddImages(files)}
-            onRemoveImage={(id) => setImageAttachments((current) => current.filter((image) => image.id !== id))}
+            onAddImages={(files) => void addImages(files)}
+            onRemoveImage={removeImage}
           />
         </footer>
       </section>
