@@ -84,141 +84,154 @@ function buildTargetSummary(
   return target ? clip(target.content) : ""
 }
 
-export function resolveAimConversationIntentWithRules(input: {
+function createRuleIntentResult(input: {
+  mode: AimConversationMode
+  confidence: number
+  reason: string
+  targetSummary: string
+  useKnowledge: boolean
+  useMethodology?: boolean
+  useStyleProfile: boolean
+  needsLlmFallback: boolean
+}): RuleIntentResult {
+  return {
+    intent: {
+      mode: input.mode,
+      confidence: input.confidence,
+      reason: input.reason,
+      targetSummary: input.targetSummary,
+      useKnowledge: input.useKnowledge,
+      useMethodology: input.useMethodology ?? false,
+      useLongTermMemory: true,
+      useStyleProfile: input.useStyleProfile,
+    },
+    needsLlmFallback: input.needsLlmFallback,
+  }
+}
+
+interface ConversationRuleSignals {
+  latestUser: string
+  hasPriorUserTurn: boolean
+  isWritingAgent: boolean
+  wantsEarliestReference: boolean
+  wantsReference: boolean
+  isCorrection: boolean
+  isLocalEdit: boolean
+  isSelectVersion: boolean
+  isFormalDelivery: boolean
+  wantsKnowledgeSupport: boolean
+  targetSummary: string
+  lowered: string
+}
+
+function collectConversationRuleSignals(input: {
   agentId: string
   messages: SimpleMessage[]
-}): RuleIntentResult {
+}): ConversationRuleSignals {
   const normalized = normalizeMessages(input.messages)
-  const hasPriorUserTurn = normalized.filter((message) => message.role === "user").length > 1
-  const isWritingAgent = ["content_producer", "free_copywriter", "deep_copywriter"].includes(input.agentId)
   const latestUserRaw = [...normalized].reverse().find((message) => message.role === "user")?.content ?? ""
   const latestUser = extractLatestAimUserIntentText(latestUserRaw)
   const lowered = latestUser.replace(/\s+/g, "")
-
   const wantsEarliestReference = includesAny(lowered, EARLIEST_REFERENCE_WORDS)
   const wantsReference = wantsEarliestReference || includesAny(lowered, REFERENCE_WORDS)
   const isCorrection = includesAny(lowered, CORRECTION_WORDS)
   const isLocalEdit = includesAny(lowered, EDIT_WORDS) && includesAny(lowered, LOCAL_EDIT_PARTS)
   const isSelectVersion = includesAny(lowered, SELECT_VERSION_WORDS) || (/第[一二三123]/.test(lowered) && lowered.includes("条"))
-  const isFormalDelivery = includesAny(lowered, FORMAL_DELIVERY_WORDS)
   const wantsKnowledgeSupport =
     (includesAny(lowered, KNOWLEDGE_ACTION_WORDS) && includesAny(lowered, KNOWLEDGE_TARGET_WORDS))
     || includesAny(lowered, ["调取知识库", "调用知识库", "知识库资料", "人设资料", "产品卖点", "老板卖点"])
-  const targetSummary = buildTargetSummary(
-    normalized,
-    wantsReference || isCorrection || isLocalEdit || isSelectVersion,
-    wantsEarliestReference,
-  )
-
-  if (hasExplicitNewTaskIntent(latestUser)) {
-    return {
-      intent: {
-        mode: "new_task",
-        confidence: 0.99,
-        reason: "用户明确开启了与上一轮分离的新任务",
-        targetSummary: "",
-        useKnowledge: true,
-        useMethodology: true,
-        useLongTermMemory: true,
-        useStyleProfile: true,
-      },
-      needsLlmFallback: false,
-    }
-  }
-
-  if (isCorrection) {
-    return {
-      intent: {
-        mode: "follow_up_edit",
-        confidence: 0.98,
-        reason: "用户在纠偏上一轮理解或结果",
-        targetSummary,
-        useKnowledge: wantsKnowledgeSupport,
-        useMethodology: false,
-        useLongTermMemory: true,
-        useStyleProfile: true,
-      },
-      needsLlmFallback: false,
-    }
-  }
-
-  if (isLocalEdit) {
-    return {
-      intent: {
-        mode: "local_edit",
-        confidence: 0.96,
-        reason: "用户只要求局部修改当前稿件",
-        targetSummary,
-        useKnowledge: wantsKnowledgeSupport,
-        useMethodology: false,
-        useLongTermMemory: true,
-        useStyleProfile: true,
-      },
-      needsLlmFallback: false,
-    }
-  }
-
-  if (isSelectVersion) {
-    return {
-      intent: {
-        mode: "select_version",
-        confidence: 0.92,
-        reason: "用户在选择上一轮候选版本或编号结果",
-        targetSummary,
-        useKnowledge: wantsKnowledgeSupport,
-        useMethodology: false,
-        useLongTermMemory: true,
-        useStyleProfile: false,
-      },
-      needsLlmFallback: false,
-    }
-  }
-
-  if (wantsReference && includesAny(lowered, EDIT_WORDS)) {
-    return {
-      intent: {
-        mode: "follow_up_edit",
-        confidence: 0.88,
-        reason: "用户基于上一轮内容继续追改",
-        targetSummary,
-        useKnowledge: wantsKnowledgeSupport,
-        useMethodology: false,
-        useLongTermMemory: true,
-        useStyleProfile: true,
-      },
-      needsLlmFallback: false,
-    }
-  }
-
-  if (isFormalDelivery) {
-    return {
-      intent: {
-        mode: "formal_delivery",
-        confidence: 0.84,
-        reason: "用户明确要求生成正式交付物",
-        targetSummary,
-        useKnowledge: true,
-        useMethodology: true,
-        useLongTermMemory: true,
-        useStyleProfile: true,
-      },
-      needsLlmFallback: wantsReference || (hasPriorUserTurn && isWritingAgent),
-    }
-  }
 
   return {
-    intent: {
-      mode: "chat",
-      confidence: wantsReference ? 0.55 : 0.72,
-      reason: "默认按自然对话处理当前轮输入",
-      targetSummary,
-      useKnowledge: wantsKnowledgeSupport,
-      useMethodology: false,
-      useLongTermMemory: true,
-      useStyleProfile: false,
-    },
-    needsLlmFallback: wantsReference || (hasPriorUserTurn && isWritingAgent),
+    latestUser,
+    hasPriorUserTurn: normalized.filter((message) => message.role === "user").length > 1,
+    isWritingAgent: ["content_producer", "free_copywriter", "deep_copywriter"].includes(input.agentId),
+    wantsEarliestReference,
+    wantsReference,
+    isCorrection,
+    isLocalEdit,
+    isSelectVersion,
+    isFormalDelivery: includesAny(lowered, FORMAL_DELIVERY_WORDS),
+    wantsKnowledgeSupport,
+    targetSummary: buildTargetSummary(
+      normalized,
+      wantsReference || isCorrection || isLocalEdit || isSelectVersion,
+      wantsEarliestReference,
+    ),
+    lowered,
   }
+}
+
+function resolveExplicitEditIntent(signals: ConversationRuleSignals): RuleIntentResult | null {
+  const { latestUser, lowered, targetSummary, wantsKnowledgeSupport } = signals
+  if (hasExplicitNewTaskIntent(latestUser)) {
+    return createRuleIntentResult({
+      mode: "new_task", confidence: 0.99, reason: "用户明确开启了与上一轮分离的新任务",
+      targetSummary: "", useKnowledge: true, useMethodology: true,
+      useStyleProfile: true, needsLlmFallback: false,
+    })
+  }
+  if (signals.isCorrection) {
+    return createRuleIntentResult({
+      mode: "follow_up_edit", confidence: 0.98, reason: "用户在纠偏上一轮理解或结果",
+      targetSummary, useKnowledge: wantsKnowledgeSupport,
+      useStyleProfile: true, needsLlmFallback: false,
+    })
+  }
+  if (signals.isLocalEdit) {
+    return createRuleIntentResult({
+      mode: "local_edit", confidence: 0.96, reason: "用户只要求局部修改当前稿件",
+      targetSummary, useKnowledge: wantsKnowledgeSupport,
+      useStyleProfile: true, needsLlmFallback: false,
+    })
+  }
+  if (signals.isSelectVersion) {
+    return createRuleIntentResult({
+      mode: "select_version", confidence: 0.92, reason: "用户在选择上一轮候选版本或编号结果",
+      targetSummary, useKnowledge: wantsKnowledgeSupport,
+      useStyleProfile: false, needsLlmFallback: false,
+    })
+  }
+  if (signals.wantsReference && includesAny(lowered, EDIT_WORDS)) {
+    return createRuleIntentResult({
+      mode: "follow_up_edit", confidence: 0.88, reason: "用户基于上一轮内容继续追改",
+      targetSummary, useKnowledge: wantsKnowledgeSupport,
+      useStyleProfile: true, needsLlmFallback: false,
+    })
+  }
+  return null
+}
+
+export function resolveAimConversationIntentWithRules(input: {
+  agentId: string
+  messages: SimpleMessage[]
+}): RuleIntentResult {
+  const signals = collectConversationRuleSignals(input)
+  const explicitIntent = resolveExplicitEditIntent(signals)
+  if (explicitIntent) return explicitIntent
+  const fallbackNeeded = signals.wantsReference || (signals.hasPriorUserTurn && signals.isWritingAgent)
+
+  if (signals.isFormalDelivery) {
+    return createRuleIntentResult({
+      mode: "formal_delivery",
+      confidence: 0.84,
+      reason: "用户明确要求生成正式交付物",
+      targetSummary: signals.targetSummary,
+      useKnowledge: true,
+      useMethodology: true,
+      useStyleProfile: true,
+      needsLlmFallback: fallbackNeeded,
+    })
+  }
+
+  return createRuleIntentResult({
+    mode: "chat",
+    confidence: signals.wantsReference ? 0.55 : 0.72,
+    reason: "默认按自然对话处理当前轮输入",
+    targetSummary: signals.targetSummary,
+    useKnowledge: signals.wantsKnowledgeSupport,
+    useStyleProfile: false,
+    needsLlmFallback: fallbackNeeded,
+  })
 }
 
 function parseIntentJson(raw: string): Partial<AimConversationIntent> | null {
