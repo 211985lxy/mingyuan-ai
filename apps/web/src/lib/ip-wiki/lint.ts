@@ -90,6 +90,64 @@ function checkPercentSum(
   }
 }
 
+function lintIpWikiPage(
+  page: IpWikiPageRow,
+  activeTitles: Set<string>,
+  options: IpWikiLintOptions,
+  findings: IpWikiLintFinding[],
+): void {
+  if (page.pageType === "content_strategy") {
+    const fm = asFrontmatter(page.frontmatter)
+    const missing = CONTENT_STRATEGY_REQUIRED_FIELDS.filter((field) => !hasStrategyField(fm[field.key]))
+    for (const field of missing) {
+      findings.push({
+        severity: "error",
+        rule: "missing_chassis_field",
+        pageType: page.pageType,
+        pageId: page.id,
+        message: `内容策略底盘缺失必填字段「${field.label}」(${field.key})，下游注入会缺关键策略`,
+      })
+    }
+    checkPercentSum(fm.topicDistribution, "话题分布", page, findings)
+    checkPercentSum(fm.contentFormats, "内容形式", page, findings)
+  }
+
+  if (Array.isArray(page.links)) {
+    for (const link of page.links) {
+      const target = typeof link === "string" ? link.trim() : ""
+      if (target && !activeTitles.has(target)) {
+        findings.push({
+          severity: "warning",
+          rule: "dead_link",
+          pageType: page.pageType,
+          pageId: page.id,
+          message: `双向链接「${target}」找不到对应维基页（死链）`,
+        })
+      }
+    }
+  }
+
+  if (options.existingGenerationIds && Array.isArray(page.sources)) {
+    for (const source of page.sources) {
+      const normalized = asFrontmatter(source)
+      if (
+        normalized.kind === "aim_generation" &&
+        typeof normalized.id === "string" &&
+        normalized.id &&
+        !options.existingGenerationIds.has(normalized.id)
+      ) {
+        findings.push({
+          severity: "warning",
+          rule: "stale_source",
+          pageType: page.pageType,
+          pageId: page.id,
+          message: `来源定位方案 ${normalized.id} 已不存在，该页可能过时`,
+        })
+      }
+    }
+  }
+}
+
 /**
  * 纯函数体检：不依赖 Prisma，导出以便单测。
  * 入参为某 IP 全案的全部 active 维基页。
@@ -117,57 +175,7 @@ export function lintIpWikiPages(pages: IpWikiPageRow[], options: IpWikiLintOptio
   }
 
   for (const page of pages) {
-    // 2. 底盘字段缺失（仅 content_strategy，因下游注入依赖这六个字段）
-    if (page.pageType === "content_strategy") {
-      const fm = asFrontmatter(page.frontmatter)
-      const missing = CONTENT_STRATEGY_REQUIRED_FIELDS.filter((f) => !hasStrategyField(fm[f.key]))
-      for (const f of missing) {
-        findings.push({
-          severity: "error",
-          rule: "missing_chassis_field",
-          pageType: page.pageType,
-          pageId: page.id,
-          message: `内容策略底盘缺失必填字段「${f.label}」(${f.key})，下游注入会缺关键策略`,
-        })
-      }
-      // 3. 策略比例失衡（话题分布 / 内容形式）
-      checkPercentSum(fm.topicDistribution, "话题分布", page, findings)
-      checkPercentSum(fm.contentFormats, "内容形式", page, findings)
-    }
-
-    // 4. 死链：links 指向的 title 在当前 active 页中不存在
-    if (Array.isArray(page.links)) {
-      for (const link of page.links) {
-        const target = typeof link === "string" ? link.trim() : ""
-        if (target && !activeTitles.has(target)) {
-          findings.push({
-            severity: "warning",
-            rule: "dead_link",
-            pageType: page.pageType,
-            pageId: page.id,
-            message: `双向链接「${target}」找不到对应维基页（死链）`,
-          })
-        }
-      }
-    }
-
-    // 5. 过时来源：sources 里的 aim_generation id 已不在库
-    if (options.existingGenerationIds && Array.isArray(page.sources)) {
-      for (const src of page.sources) {
-        const s = asFrontmatter(src)
-        if (s.kind === "aim_generation" && typeof s.id === "string" && s.id) {
-          if (!options.existingGenerationIds.has(s.id)) {
-            findings.push({
-              severity: "warning",
-              rule: "stale_source",
-              pageType: page.pageType,
-              pageId: page.id,
-              message: `来源定位方案 ${s.id} 已不存在，该页可能过时`,
-            })
-          }
-        }
-      }
-    }
+    lintIpWikiPage(page, activeTitles, options, findings)
   }
 
   const errorCount = findings.filter((f) => f.severity === "error").length
