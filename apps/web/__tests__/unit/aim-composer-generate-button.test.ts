@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 
 const source = readFileSync(join(process.cwd(), "src/app/(dashboard)/aim/page.tsx"), "utf8")
 const apiClientSource = readFileSync(join(process.cwd(), "src/lib/api/client.ts"), "utf8")
+const helperSource = readFileSync(join(process.cwd(), "src/lib/aim/workbench-helpers.ts"), "utf8")
 
 describe("AIM composer generate button", () => {
   it("requires current input instead of enabling from old messages", () => {
@@ -23,7 +24,7 @@ describe("AIM composer generate button", () => {
 
   it("keeps chat request status inside the assistant message", () => {
     const sendBlock = source.match(/async function sendText[\s\S]*?async function handleEvolveConversation/)?.[0] ?? ""
-    const prepareBlock = source.match(/function prepareChatTurn[\s\S]*?function reportChatRevision/)?.[0] ?? ""
+    const prepareBlock = helperSource.match(/function prepareAimChatTurn[\s\S]*?function reportAimChatRevision/)?.[0] ?? ""
 
     expect(sendBlock).toContain("prepareChatTurn")
     expect(prepareBlock).toContain("正在思考，会先读取上下文和资料，再给出回复")
