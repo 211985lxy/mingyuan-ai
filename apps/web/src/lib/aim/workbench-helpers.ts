@@ -1,15 +1,75 @@
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
-import type { TextSelectionRange } from "@/lib/aim-editor"
+import type { AimEditorContext, TextSelectionRange } from "@/lib/aim-editor"
+import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import type { AimImageAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
-import type { AimGeneration, ContentFormat } from "@/lib/api/client"
+import type { AimChatToolAction, AimGeneration, ContentFormat } from "@/lib/api/client"
 
 let sequence = 0
 
 export function nextAimWorkbenchId(prefix = "m") {
   sequence += 1
   return `${prefix}-${Date.now()}-${sequence}`
+}
+
+export function buildAimRawInput(messages: AimWorkbenchMessage[], extra?: string) {
+  const userTexts = messages.filter((message) => message.role === "user").map((message) => message.content)
+  if (extra) userTexts.push(extra)
+  return userTexts.filter(Boolean).join("\n\n")
+}
+
+export function detectAimLarkToolAction(text: string): AimChatToolAction | null {
+  if (!/飞书/.test(text)) return null
+  if (/同步.*选题|导入.*选题/.test(text)) return "import_lark_topics"
+  if (/热点|竞品|优质账号|参考|数据/.test(text) && /导入|同步/.test(text)) return "import_lark_archive_data"
+  if (/项目/.test(text) && /导入|同步/.test(text)) return "import_lark_project_data"
+  if (/回写|同步到飞书|同步.*脚本|同步.*内容/.test(text)) return "export_lark_generation"
+  return null
+}
+
+export function findLatestAimDeliverableId(messages: AimWorkbenchMessage[]) {
+  return [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
+}
+
+export function findLatestAimVideoDeliverableMessageId(messages: AimWorkbenchMessage[]) {
+  return [...messages]
+    .reverse()
+    .find((message) => message.deliverables?.results.some((result) => result.format === "video_script"))
+    ?.id
+}
+
+export function findLatestAimDeliverableText(messages: AimWorkbenchMessage[]) {
+  const latest = [...messages].reverse().find((message) => message.deliverables?.results.length)
+  return latest?.deliverables?.results[0]?.content.trim() || ""
+}
+
+export function getAimOpeningSegment(text: string) {
+  const trimmed = text.trimStart()
+  const offset = text.length - trimmed.length
+  const paragraphs = trimmed.split(/\n\s*\n/)
+  const first = paragraphs[0]?.trim() || ""
+  const second = paragraphs[1]?.trim() || ""
+  const segment = first.length < 80 && second ? `${first}\n\n${second}` : first
+  return { offset, segment }
+}
+
+export function buildAimEditorContext(input: {
+  action: string
+  referenceSelection: string
+  draftSelection: string
+  editorText: string
+  labels: Pick<EditorPanelLabels, "documentType" | "referenceTitle" | "draftTitle">
+}): AimEditorContext {
+  return {
+    action: input.action,
+    referenceSelection: input.referenceSelection.trim() || undefined,
+    draftSelection: input.draftSelection.trim() || undefined,
+    draftText: input.editorText.trim() || undefined,
+    documentType: input.labels.documentType,
+    referenceLabel: input.labels.referenceTitle,
+    draftLabel: input.labels.draftTitle,
+  }
 }
 
 export function extractPersonaProgress(content: string): number | null {

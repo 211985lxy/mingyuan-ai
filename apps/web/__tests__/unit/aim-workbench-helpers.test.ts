@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  buildAimEditorContext,
+  buildAimRawInput,
+  detectAimLarkToolAction,
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
   extractPersonaProgress,
+  findLatestAimDeliverableText,
+  findLatestAimVideoDeliverableMessageId,
+  getAimOpeningSegment,
   prepareAimChatTurn,
 } from "@/lib/aim/workbench-helpers"
 
@@ -39,5 +45,40 @@ describe("AIM workbench helpers", () => {
 
     expect(turn.thread).toEqual([messages[0]])
     expect(turn.pendingMessages.at(-1)?.content).toContain("正在思考")
+  })
+
+  it("builds generation input from user turns only", () => {
+    const messages = [
+      { id: "1", role: "user" as const, content: "第一条素材" },
+      { id: "2", role: "assistant" as const, content: "回复" },
+      { id: "3", role: "user" as const, content: "第二条素材" },
+    ]
+    expect(buildAimRawInput(messages, "本次要求")).toBe("第一条素材\n\n第二条素材\n\n本次要求")
+  })
+
+  it("routes explicit Lark actions without treating generic mentions as tools", () => {
+    expect(detectAimLarkToolAction("同步今天的选题到飞书")).toBe("import_lark_topics")
+    expect(detectAimLarkToolAction("把这篇脚本同步到飞书")).toBe("export_lark_generation")
+    expect(detectAimLarkToolAction("我今天用了飞书")).toBeNull()
+  })
+
+  it("selects the latest video deliverable and its primary text", () => {
+    const messages = [
+      { id: "old", role: "assistant" as const, content: "", deliverables: { id: "g1", results: [{ format: "raw_copy" as const, content: "旧稿", wordCount: 2 }], knowledgeUsed: [] } },
+      { id: "new", role: "assistant" as const, content: "", deliverables: { id: "g2", results: [{ format: "video_script" as const, content: "新稿", wordCount: 2 }], knowledgeUsed: [] } },
+    ]
+    expect(findLatestAimVideoDeliverableMessageId(messages)).toBe("new")
+    expect(findLatestAimDeliverableText(messages)).toBe("新稿")
+  })
+
+  it("builds opening and editor selection context", () => {
+    expect(getAimOpeningSegment("短标题\n\n第二段\n\n第三段").segment).toBe("短标题\n\n第二段")
+    expect(buildAimEditorContext({
+      action: "局部改写",
+      referenceSelection: " 参考段 ",
+      draftSelection: "",
+      editorText: " 当前稿 ",
+      labels: { documentType: "copy", referenceTitle: "对标", draftTitle: "稿件" },
+    })).toMatchObject({ action: "局部改写", referenceSelection: "参考段", draftSelection: undefined, draftText: "当前稿" })
   })
 })
