@@ -29,8 +29,6 @@ import {
   evolveAimConversation,
   evolveStyleConversation,
   ApiError,
-  listClientProjects,
-  listAimHistory,
   updateAimWorkflowStatus,
   upsertContentOutcome,
   type AimCalibrationRule,
@@ -40,7 +38,6 @@ import {
   type AimGeneration,
   type AimChatToolAction,
   type AimRetroSnapshot,
-  type ClientProject,
   type ContentFormat,
 } from "@/lib/api/client"
 import {
@@ -53,6 +50,7 @@ import {
   type ConfirmedWorkflowBrief,
 } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
+import { useAimProjectWorkspace } from "@/hooks/use-aim-project-workspace"
 import { transcribeAudio } from "@/lib/api/client"
 import { type StyleGuideId } from "@/lib/style-guide-config"
 import {
@@ -344,10 +342,16 @@ export default function AimPage() {
   const [isThinking, setIsThinking] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isQualityChecking, setIsQualityChecking] = useState(false)
-  const [projects, setProjects] = useState<ClientProject[]>([])
-  const [projectWorkflowRecords, setProjectWorkflowRecords] = useState<AimGeneration[]>([])
-  const [isLoadingProjectWorkflow, setIsLoadingProjectWorkflow] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState(() => initialDraft?.selectedProjectId || "")
+  const {
+    projects,
+    selectedProjectId,
+    setSelectedProjectId,
+    projectEnabled,
+    setProjectEnabled,
+    projectWorkflowRecords,
+    isLoadingProjectWorkflow,
+    refreshProjectWorkflow,
+  } = useAimProjectWorkspace(initialDraft?.selectedProjectId || "")
   const [wikiDialog, setWikiDialog] = useState<{ open: boolean; context: IpWikiDialogContext | null }>({
     open: false,
     context: null,
@@ -384,7 +388,6 @@ export default function AimPage() {
   const [workflowBriefDialogOpen, setWorkflowBriefDialogOpen] = useState(false)
   const [isBuildingWorkflowBrief, setIsBuildingWorkflowBrief] = useState(false)
   const [contentAction, setContentAction] = useState<AimContentAction | null>(null)
-  const [projectEnabled, setProjectEnabled] = useState(false)
   const [isEvolving, setIsEvolving] = useState(false)
   const [evolutionSuggestions, setEvolutionSuggestions] = useState<AimEvolutionSuggestion[]>([])
   const [isImitating, setIsImitating] = useState(false)
@@ -466,35 +469,6 @@ export default function AimPage() {
     transcribeFn: transcribeAudio,
     onTranscribeSuccess: (text) => setInput((prev) => (prev ? `${prev}\n${text}` : text)),
   })
-
-  useEffect(() => {
-    listClientProjects()
-      .then((items) => {
-        setProjects(items)
-        setProjectEnabled(items.length > 0)
-        // Validate that the current selectedProjectId belongs to this user's projects.
-        // It may be stale from sessionStorage (e.g. different user, or project deleted).
-        setSelectedProjectId((current) => {
-          if (current && items.some((p) => p.id === current)) return current
-          return items[0]?.id || ""
-        })
-      })
-      .catch(() => setProjectEnabled(false))
-  }, [])
-
-  useEffect(() => {
-    if (!selectedProjectId) {
-      setProjectWorkflowRecords([])
-      return
-    }
-    let active = true
-    setIsLoadingProjectWorkflow(true)
-    listAimHistory(1, 50, selectedProjectId)
-      .then((items) => { if (active) setProjectWorkflowRecords(items) })
-      .catch(() => { if (active) setProjectWorkflowRecords([]) })
-      .finally(() => { if (active) setIsLoadingProjectWorkflow(false) })
-    return () => { active = false }
-  }, [selectedProjectId])
 
   const lastAgentParamRef = useRef(agentParam)
 
@@ -1480,7 +1454,7 @@ export default function AimPage() {
     const mainResult = correctedResponse.results[0] ?? response.results[0]
     if (mainResult) openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
     refreshHistory({ force: true, agentId: selectedAgentId })
-    if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
+    if (selectedProjectId) void refreshProjectWorkflow()
     setWorkflowBrief(null)
     setContentAction(null)
     toast.success(`${agent.primaryActionLabel}完毕`)
@@ -1664,13 +1638,13 @@ export default function AimPage() {
           reportAimRunEvent(message?.runId, "accepted", { workflowStatus: status })
         }
         refreshHistory({ force: true, agentId: selectedAgentId })
-        if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
+        if (selectedProjectId) void refreshProjectWorkflow()
         toast.success(`已标记为：${workflowStatusLabel(status)}`)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "状态更新失败")
       }
     },
-    [messages, refreshHistory, selectedAgentId],
+    [messages, refreshHistory, refreshProjectWorkflow, selectedAgentId, selectedProjectId],
   )
 
   const openRecordDialog = useCallback((msgId: string, mode: WorkflowRecordMode) => {
@@ -1787,11 +1761,11 @@ export default function AimPage() {
 
       setRecordDialog(null)
       refreshHistory({ force: true, agentId: selectedAgentId })
-      if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
+      if (selectedProjectId) void refreshProjectWorkflow()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
-  }, [decisionForm, messages, outcomeForm, outcomeWindow, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
+  }, [decisionForm, messages, outcomeForm, outcomeWindow, publishForm, recordDialog, refreshHistory, refreshProjectWorkflow, retroForm, retroRuleForm, selectedAgentId, selectedProjectId])
 
   function closeWorkflowBriefDialog() {
     setWorkflowBriefDialogOpen(false)
