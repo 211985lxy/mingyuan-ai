@@ -170,6 +170,52 @@ function computeTextOverlap(a: string, b: string): number {
   return union === 0 ? 0 : intersection / union
 }
 
+async function buildProcessedBatch(input: {
+  items: Array<Record<string, unknown>>
+  chunks: string[]
+  batch: string[]
+  fileName: string
+  userId: string
+  projectId?: string
+  isWeChat: boolean
+  currentResultCount: number
+}): Promise<ProcessedChunk[]> {
+  const processed: ProcessedChunk[] = []
+  for (const item of input.items) {
+    const chunkIndex = (item.index as number) ?? input.currentResultCount + processed.length
+    const chunk = input.chunks[chunkIndex] || input.batch[0]
+    const duplicates = await findPotentialDuplicates(chunk, input.userId, input.projectId)
+    processed.push({
+      index: chunkIndex,
+      originalText: chunk,
+      detectedSource: input.isWeChat ? "wechat_chat" : "general",
+      suggestedTitle: (item.suggestedTitle as string) || input.fileName,
+      suggestedKeyPoints: (item.suggestedKeyPoints as string) || chunk.slice(0, 200),
+      suggestedCategory: isKnowledgeCategory(item.suggestedCategory) ? item.suggestedCategory : "daily_inspiration",
+      suggestedTags: Array.isArray(item.suggestedTags) ? item.suggestedTags as string[] : ["confidence:user_claim"],
+      suggestedValueGrade: ["S", "A", "B", "C"].includes(item.suggestedValueGrade as string) ? item.suggestedValueGrade as string : "B",
+      duplicateOfId: duplicates[0]?.entryId,
+      duplicateScore: duplicates[0]?.score,
+      confidence: ["high", "medium", "low"].includes(item.confidence as string) ? item.confidence as ProcessedChunk["confidence"] : "medium",
+    })
+  }
+  return processed
+}
+
+function buildFallbackBatch(batch: string[], startIndex: number, fileName: string, isWeChat: boolean): ProcessedChunk[] {
+  return batch.map((chunk, index) => ({
+    index: startIndex + index,
+    originalText: chunk,
+    detectedSource: isWeChat ? "wechat_chat" : "general",
+    suggestedTitle: fileName,
+    suggestedKeyPoints: chunk.slice(0, 200),
+    suggestedCategory: "daily_inspiration",
+    suggestedTags: ["confidence:pending_verify"],
+    suggestedValueGrade: "B",
+    confidence: "low",
+  }))
+}
+
 // ─── 1d. 主处理函数 ──────────────────────────────────────
 
 export async function processChunksForSmartImport(input: {
@@ -209,52 +255,15 @@ export async function processChunksForSmartImport(input: {
         responseFormat: { type: "json_object" },
       })
 
-      const parsed = JSON.parse(result.content.trim())
+      const parsed = JSON.parse(result.content.trim()) as Record<string, unknown> | Array<Record<string, unknown>>
       const items = Array.isArray(parsed) ? parsed : parsed.items || parsed.results || []
-
-      for (const item of items) {
-        const chunkIndex = (item.index as number) ?? results.length
-        const chunk = chunks[chunkIndex] || batch[0]
-        const duplicates = await findPotentialDuplicates(chunk, userId, projectId)
-
-        results.push({
-          index: chunkIndex,
-          originalText: chunk,
-          detectedSource: isWeChat ? "wechat_chat" : "general",
-          suggestedTitle: (item.suggestedTitle as string) || fileName,
-          suggestedKeyPoints: (item.suggestedKeyPoints as string) || chunk.slice(0, 200),
-          suggestedCategory: isKnowledgeCategory(item.suggestedCategory)
-            ? item.suggestedCategory
-            : "daily_inspiration",
-          suggestedTags: Array.isArray(item.suggestedTags)
-            ? (item.suggestedTags as string[])
-            : ["confidence:user_claim"],
-          suggestedValueGrade: ["S", "A", "B", "C"].includes(item.suggestedValueGrade as string)
-            ? (item.suggestedValueGrade as string)
-            : "B",
-          duplicateOfId: duplicates[0]?.entryId,
-          duplicateScore: duplicates[0]?.score,
-          confidence: ["high", "medium", "low"].includes(item.confidence as string)
-            ? (item.confidence as "high" | "medium" | "low")
-            : "medium",
-        })
-      }
+      results.push(...await buildProcessedBatch({
+        items: items as Array<Record<string, unknown>>, chunks, batch, fileName, userId,
+        projectId, isWeChat, currentResultCount: results.length,
+      }))
     } catch (error) {
       console.error(`[smart-import] LLM batch ${i / BATCH_SIZE + 1} failed:`, error)
-      // Fallback: create unclassified entries for this batch
-      for (const chunk of batch) {
-        results.push({
-          index: i + batch.indexOf(chunk),
-          originalText: chunk,
-          detectedSource: isWeChat ? "wechat_chat" : "general",
-          suggestedTitle: fileName,
-          suggestedKeyPoints: chunk.slice(0, 200),
-          suggestedCategory: "daily_inspiration",
-          suggestedTags: ["confidence:pending_verify"],
-          suggestedValueGrade: "B",
-          confidence: "low",
-        })
-      }
+      results.push(...buildFallbackBatch(batch, i, fileName, isWeChat))
     }
   }
 
