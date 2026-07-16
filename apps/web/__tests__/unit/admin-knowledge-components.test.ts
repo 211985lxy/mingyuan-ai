@@ -54,4 +54,5 @@ describe("admin knowledge components", () => {
     const payload = JSON.parse(fetchMock.mock.calls[0][1].body)
     expect(payload.entries).toEqual([expect.objectContaining({ title: "edited A", content: "A" })])
   })
+
 })

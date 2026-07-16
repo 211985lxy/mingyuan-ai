@@ -6,12 +6,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Loader2,
   Archive,
   Trash2,
   Upload,
   Plus,
-  X,
   Eye,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -19,8 +17,6 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import {
   Select,
@@ -32,18 +28,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   buildKnowledgeCleaningSuggestion,
   knowledgeCleanupLabel,
   parseKnowledgeTags,
 } from "@/lib/knowledge-tags"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { KnowledgeMap } from "@/components/admin/knowledge-map"
 import {
   KnowledgeBrowser,
@@ -52,8 +40,12 @@ import {
 } from "@/components/admin/knowledge-browser"
 import { InternalModelTestPanel } from "@/components/admin/internal-model-test-panel"
 import { SmartImportDialog } from "@/components/admin/knowledge/smart-import-dialog"
-
-const KNOWLEDGE_UPLOAD_ACCEPT = ".pdf,.txt,.md,.csv,.docx,.xls,.xlsx,.pptx,.html,.htm,.json,.xml,.rtf"
+import {
+  KnowledgeAddDialog,
+  KnowledgeDetailDialog,
+  KnowledgeDistillDialog,
+  KnowledgeUploadDialog,
+} from "@/components/admin/knowledge/knowledge-dialogs"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -984,275 +976,19 @@ export default function AdminKnowledgePage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!detailEntry} onOpenChange={(open) => !open && setDetailEntry(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{detailEntry?.title ?? "知识详情"}</DialogTitle>
-            <DialogDescription>
-              {detailEntry?.project?.name ?? "全局/未绑定"} · {detailEntry?.user?.email ?? "未知用户"}
-            </DialogDescription>
-          </DialogHeader>
-          {detailEntry && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{CATEGORY_LABELS[detailEntry.category] || detailEntry.category}</Badge>
-                <Badge variant="outline">{SOURCE_TYPE_LABELS[detailEntry.sourceType] || detailEntry.sourceType}</Badge>
-                <Badge variant={detailEntry.status === "active" ? "default" : "secondary"}>
-                  {detailEntry.status === "active" ? "生效" : "已归档"}
-                </Badge>
-                {detailEntry.valueGrade ? <Badge variant="outline">{detailEntry.valueGrade}</Badge> : null}
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <MarkdownRenderer content={detailEntry.content} />
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 知识蒸馏结果弹窗 */}
-      <Dialog open={distillDialogOpen} onOpenChange={setDistillDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              知识蒸馏分析
-            </DialogTitle>
-            <DialogDescription>
-              基于 DeepSeek 对选中知识的优化建议
-            </DialogDescription>
-          </DialogHeader>
-
-          {distilling ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">正在分析知识条目...</p>
-            </div>
-          ) : distillResult ? (
-            <div className="space-y-6">
-              {/* 精炼建议 */}
-              <div>
-                <h3 className="font-semibold mb-3">精炼建议</h3>
-                <div className="space-y-3">
-                  {distillResult.distilled.map((item, i) => (
-                    <Card key={i}>
-                      <CardContent className="p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Badge
-                            variant={
-                              item.action === "keep"
-                                ? "default"
-                                : item.action === "merge"
-                                ? "secondary"
-                                : "outline"
-                            }
-                          >
-                            {item.action === "keep" ? "保留" : item.action === "merge" ? "合并" : "归档"}
-                          </Badge>
-                          <Badge variant="outline">{item.suggestedCategory}</Badge>
-                        </div>
-                        <p className="font-medium">{item.suggestedTitle}</p>
-                        <p className="text-sm text-muted-foreground">{item.suggestedContent}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {item.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px]">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* 重复检测 */}
-              {distillResult.duplicates.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-2">可能的重复条目</h3>
-                  <div className="space-y-1">
-                    {distillResult.duplicates.map((pair, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">
-                        条目 #{pair[0]} 和 #{pair[1]} 可能重复
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 总体建议 */}
-              <div>
-                <h3 className="font-semibold mb-2">优化建议</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {distillResult.suggestions}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-destructive">分析失败，请重试</p>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* 手动录入弹窗 */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>手动录入知识条目</DialogTitle>
-            <DialogDescription>手动添加一条知识到知识库</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>分类</Label>
-                      <Select value={editForm.category} onValueChange={(v) => setEditForm((f) => ({ ...f, category: v ?? "" }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>归属项目</Label>
-              <Select value={editForm.projectId} onValueChange={(v) => setEditForm((f) => ({ ...f, projectId: v ?? "none" }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {projectLabel(project)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>价值分级（决定检索优先级，默认 B）</Label>
-              <Select value={editForm.valueGrade || "none"} onValueChange={(v) => setEditForm((f) => ({ ...f, valueGrade: v === "none" ? "" : (v ?? "") }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">B · 参考级（默认）</SelectItem>
-                  <SelectItem value="S">S · 战略级（优先浮出）</SelectItem>
-                  <SelectItem value="A">A · 战术级</SelectItem>
-                  <SelectItem value="C">C · 索引级（靠后）</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>标题</Label>
-              <Input
-                value={editForm.title}
-                onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="知识条目标题"
-              />
-            </div>
-            <div>
-              <Label>内容</Label>
-              <Textarea
-                value={editForm.content}
-                onChange={(e) => setEditForm((f) => ({ ...f, content: e.target.value }))}
-                placeholder="知识条目内容"
-                rows={6}
-              />
-            </div>
-            <div>
-              <Label>标签（用逗号分隔）</Label>
-              <Input
-                value={editForm.tags}
-                onChange={(e) => setEditForm((f) => ({ ...f, tags: e.target.value }))}
-                placeholder="标签1, 标签2"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setAddDialogOpen(false)} className="cursor-pointer">
-                取消
-              </Button>
-              <Button onClick={handleAddEntry} disabled={saving || !editForm.title || !editForm.content} className="cursor-pointer">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                保存
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* 文件上传弹窗 */}
-      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>上传文件导入知识</DialogTitle>
-            <DialogDescription>支持 PDF、Word、PPT、Excel、HTML、TXT、MD、CSV、JSON、XML、RTF</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>分类</Label>
-              <Select value={uploadCategory} onValueChange={(v) => setUploadCategory(v ?? "")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>归属项目</Label>
-              <Select value={uploadProjectId} onValueChange={(v) => setUploadProjectId(v ?? "none")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {projectLabel(project)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>选择文件</Label>
-              <div className="mt-1 flex items-center gap-2">
-                <Input
-                  type="file"
-                  accept={KNOWLEDGE_UPLOAD_ACCEPT}
-                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                  className="cursor-pointer"
-                />
-                {uploadFile && (
-                  <Button variant="ghost" size="icon" onClick={() => setUploadFile(null)} className="cursor-pointer">
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              {uploadFile && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  已选: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                </p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setUploadDialogOpen(false)} className="cursor-pointer">
-                取消
-              </Button>
-              <Button onClick={handleUploadFile} disabled={uploading || !uploadFile} className="cursor-pointer">
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {uploading ? "上传中..." : "上传并导入"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <KnowledgeDetailDialog entry={detailEntry} categories={CATEGORY_LABELS} sources={SOURCE_TYPE_LABELS} onClose={() => setDetailEntry(null)} />
+      <KnowledgeDistillDialog open={distillDialogOpen} loading={distilling} result={distillResult} onOpenChange={setDistillDialogOpen} />
+      <KnowledgeAddDialog
+        open={addDialogOpen} form={editForm} saving={saving} categories={CATEGORY_LABELS}
+        projects={projects.map((project) => ({ id: project.id, label: projectLabel(project) }))}
+        onOpenChange={setAddDialogOpen} onChange={(patch) => setEditForm((form) => ({ ...form, ...patch }))} onSave={handleAddEntry}
+      />
+      <KnowledgeUploadDialog
+        open={uploadDialogOpen} file={uploadFile} category={uploadCategory} projectId={uploadProjectId} uploading={uploading}
+        categories={CATEGORY_LABELS} projects={projects.map((project) => ({ id: project.id, label: projectLabel(project) }))}
+        onOpenChange={setUploadDialogOpen} onFileChange={setUploadFile} onCategoryChange={setUploadCategory}
+        onProjectChange={setUploadProjectId} onUpload={handleUploadFile}
+      />
 
       {/* 智能导入 Dialog */}
       <SmartImportDialog
