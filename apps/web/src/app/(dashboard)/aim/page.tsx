@@ -114,6 +114,7 @@ import {
 } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
+import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -1598,6 +1599,36 @@ export default function AimPage() {
     } : { images: imageAttachments })
   }
 
+  function applyGenerationResponse(
+    assistantMessageId: string,
+    currentInput: string,
+    response: AimGenerateResponse,
+    correctedResponse: AimGenerateResponse,
+  ) {
+    const extractedOriginalText = extractBenchmarkOriginalText(currentInput)
+    const extractedAnalysisText = extractBenchmarkAnalysisText(currentInput)
+    if (extractedOriginalText) setSourceOriginalText(extractedOriginalText)
+    if (extractedAnalysisText) setSourceAnalysisText(extractedAnalysisText)
+    setMessages((prev) => prev.map((message) => message.id === assistantMessageId ? {
+      ...message,
+      content: `${agent.title} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`,
+      agentId: agent.id,
+      deliverables: correctedResponse,
+      runId: response.runId ?? null,
+      degraded: response.degraded ?? null,
+      qualityStatus: response.qualityStatus ?? null,
+      workflowStage: currentWorkflowStage,
+      contentAction,
+    } : message))
+    const mainResult = correctedResponse.results[0] ?? response.results[0]
+    if (mainResult) openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
+    refreshHistory({ force: true, agentId: selectedAgentId })
+    if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
+    setWorkflowBrief(null)
+    setContentAction(null)
+    toast.success(`${agent.primaryActionLabel}完毕`)
+  }
+
   async function generateWithInput(currentInput: string, options?: { retryMessageId?: string; startsNewTask?: boolean }) {
     const rawInput = options?.startsNewTask
       ? currentInput
@@ -1659,61 +1690,8 @@ export default function AimPage() {
             }
           : undefined,
       }, controller.signal)
-      const proofreadFormats = new Set<ContentFormat>(["raw_copy", "video_script", "koubo_script"])
-      const proofreadResults = await Promise.all(
-        response.results.map(async (result) => {
-          if (!proofreadFormats.has(result.format) || result.content.trim().length < 30) return result
-          try {
-            const polished = await polishScript({
-              content: result.content,
-              persona: agent.defaultInstruction,
-              mode: "proofread",
-            })
-            return {
-              ...result,
-              content: polished.polished,
-              wordCount: polished.polished.length,
-            }
-          } catch {
-            return result
-          }
-        }),
-      )
-      const correctedResponse = { ...response, results: proofreadResults }
-      const extractedOriginalText = extractBenchmarkOriginalText(currentInput)
-      const extractedAnalysisText = extractBenchmarkAnalysisText(currentInput)
-      if (extractedOriginalText) setSourceOriginalText(extractedOriginalText)
-      if (extractedAnalysisText) setSourceAnalysisText(extractedAnalysisText)
-      const mainResult = response.results[0]
-      setMessages((prev) => prev.map((message) =>
-        message.id === assistantMessageId
-          ? {
-            ...message,
-          content: `${agent.title} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`,
-          agentId: agent.id,
-          deliverables: correctedResponse,
-          // aim-harness-v1: 捕获执行诊断，仅在低分/降级时向用户展示执行编号
-          runId: response.runId ?? null,
-          degraded: response.degraded ?? null,
-          qualityStatus: response.qualityStatus ?? null,
-          workflowStage: currentWorkflowStage,
-          contentAction,
-          }
-          : message
-      ))
-      if (mainResult) {
-        const correctedMainResult = correctedResponse.results[0] ?? mainResult
-        openEditorFromResult(
-          assistantMessageId,
-          correctedMainResult.format,
-          correctedMainResult.content,
-        )
-      }
-      refreshHistory({ force: true, agentId: selectedAgentId })
-      if (selectedProjectId) void listAimHistory(1, 50, selectedProjectId).then(setProjectWorkflowRecords).catch(() => {})
-      setWorkflowBrief(null)
-      setContentAction(null)
-      toast.success(`${agent.primaryActionLabel}完毕`)
+      const correctedResponse = await proofreadAimResponse(response, agent.defaultInstruction)
+      applyGenerationResponse(assistantMessageId, currentInput, response, correctedResponse)
     } catch (error) {
       const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
       const message = stopped ? "已停止本次生成。" : `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`
