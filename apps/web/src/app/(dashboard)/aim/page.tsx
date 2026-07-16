@@ -29,7 +29,6 @@ import {
   ApiError,
   type AimEvolutionSuggestion,
   type AimGenerateResponse,
-  type AimChatToolAction,
   type ContentFormat,
 } from "@/lib/api/client"
 import {
@@ -89,10 +88,17 @@ import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
 import { clearAimDraft, loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
   buildAimHistoryRawInput as buildHistoryRawInput,
+  buildAimEditorContext,
+  buildAimRawInput,
+  detectAimLarkToolAction,
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
   extractPersonaProgress as extractProgress,
   formatAnalysisResultForPrompt,
+  findLatestAimDeliverableId,
+  findLatestAimDeliverableText,
+  findLatestAimVideoDeliverableMessageId,
+  getAimOpeningSegment,
   getAimHistoryContents as getHistoryContents,
   nextAimWorkbenchId as nextId,
   prepareAimChatTurn as prepareChatTurn,
@@ -534,38 +540,6 @@ export default function AimPage() {
     clearAimDraft(selectedAgentId)
   }
 
-  /** 把对话里的用户输入拼成生成素材 */
-  function buildRawInputForGenerate(extra?: string) {
-    const userTexts = messages.filter((m) => m.role === "user").map((m) => m.content)
-    if (extra) userTexts.push(extra)
-    return userTexts.filter(Boolean).join("\n\n")
-  }
-
-  function detectLarkToolAction(text: string): AimChatToolAction | null {
-    if (!/飞书/.test(text)) return null
-    if (/同步.*选题|导入.*选题/.test(text)) return "import_lark_topics"
-    if (/热点|竞品|优质账号|参考|数据/.test(text) && /导入|同步/.test(text)) return "import_lark_archive_data"
-    if (/项目/.test(text) && /导入|同步/.test(text)) return "import_lark_project_data"
-    if (/回写|同步到飞书|同步.*脚本|同步.*内容/.test(text)) return "export_lark_generation"
-    return null
-  }
-
-  function latestDeliverableId() {
-    return [...messages].reverse().find((m) => m.deliverables?.id)?.deliverables?.id
-  }
-
-  function latestDeliverableMessageId() {
-    return [...messages]
-      .reverse()
-      .find((message) => message.deliverables?.results.some((result) => result.format === "video_script"))
-      ?.id
-  }
-
-  function latestDeliverableText() {
-    const latest = [...messages].reverse().find((message) => message.deliverables?.results.length)
-    return latest?.deliverables?.results[0]?.content.trim() || ""
-  }
-
   function fillReferenceTextFromConversation() {
     const source = [...messages]
       .reverse()
@@ -612,7 +586,7 @@ export default function AimPage() {
       return null
     }
 
-    const currentDraft = editorText.trim() || latestDeliverableText()
+    const currentDraft = editorText.trim() || findLatestAimDeliverableText(messages)
     const lengthRule = buildBenchmarkLengthRule(original)
 
     return [
@@ -664,7 +638,7 @@ export default function AimPage() {
       .reverse()
       .map((message) => extractBenchmarkOriginalText(message.content))
       .find((content) => content.trim()) || ""
-    const draft = editorText.trim() || latestDeliverableText()
+    const draft = editorText.trim() || findLatestAimDeliverableText(messages)
 
     if (!original || !draft) return null
 
@@ -774,23 +748,13 @@ export default function AimPage() {
     return true
   }
 
-  function getOpeningSegment(text: string) {
-    const trimmed = text.trimStart()
-    const offset = text.length - trimmed.length
-    const paragraphs = trimmed.split(/\n\s*\n/)
-    const first = paragraphs[0]?.trim() || ""
-    const second = paragraphs[1]?.trim() || ""
-    const segment = first.length < 80 && second ? `${first}\n\n${second}` : first
-    return { offset, segment }
-  }
-
   function handleOptimizeOpening(commandInput: string) {
-    const sourceText = editorText.trim() || latestDeliverableText()
+    const sourceText = editorText.trim() || findLatestAimDeliverableText(messages)
     if (!sourceText) {
       toast.error("当前没有可优化的内容，请先生成脚本或写入编辑区")
       return true
     }
-    const { segment } = getOpeningSegment(sourceText)
+    const { segment } = getAimOpeningSegment(sourceText)
     if (segment.length < 20) {
       toast.error("当前稿子太短，找不到可优化的开头")
       return true
@@ -839,7 +803,7 @@ export default function AimPage() {
   }
 
   function handleReviseCurrentDraft(commandInput: string) {
-    const draft = editorText.trim() || latestDeliverableText()
+    const draft = editorText.trim() || findLatestAimDeliverableText(messages)
     if (!draft) {
       toast.error("当前没有可改写的稿子")
       return true
@@ -875,7 +839,7 @@ export default function AimPage() {
     ], {
       agentId: selectedAgentId,
       projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-      editorContext: buildEditorContext("口令定向改稿"),
+      editorContext: buildAimEditorContext({ action: "口令定向改稿", referenceSelection: referenceSelection.text, draftSelection: draftSelection.text, editorText, labels: editorPanelLabels }),
       signal: controller.signal,
       onDelta: (_delta, content) => {
         setMessages((prev) =>
@@ -936,7 +900,7 @@ export default function AimPage() {
     }
     if (command.id === "run_quality_check") {
       const localCheckMessage = buildBenchmarkQualityMessage()
-      const messageId = latestDeliverableMessageId()
+      const messageId = findLatestAimVideoDeliverableMessageId(messages)
       if (localCheckMessage) {
         setMessages((prev) => [...prev, { id: nextId(), role: "assistant", content: localCheckMessage }])
       }
@@ -957,18 +921,6 @@ export default function AimPage() {
       return true
     }
     return false
-  }
-
-  function buildEditorContext(action: string): AimEditorContext {
-    return {
-      action,
-      referenceSelection: referenceSelection.text.trim() || undefined,
-      draftSelection: draftSelection.text.trim() || undefined,
-      draftText: editorText.trim() || undefined,
-      documentType: editorPanelLabels.documentType,
-      referenceLabel: editorPanelLabels.referenceTitle,
-      draftLabel: editorPanelLabels.draftTitle,
-    }
   }
 
   function applyEditorReplacement(message: ChatMessage) {
@@ -1002,14 +954,14 @@ export default function AimPage() {
     if (images.length) setImageAttachments([])
     setIsThinking(true)
     try {
-      const toolAction = detectLarkToolAction(text)
+      const toolAction = detectAimLarkToolAction(text)
       if (toolAction && projectEnabled && !selectedProjectId) {
         setMessages((prev) => prev.map((message) =>
           message.id === assistantId ? { ...message, content: "需要先选择 IP 营销全案，才能执行这个飞书同步动作。" } : message
         ))
         return
       }
-      const resultId = toolAction === "export_lark_generation" ? latestDeliverableId() : undefined
+      const resultId = toolAction === "export_lark_generation" ? findLatestAimDeliverableId(messages) : undefined
       if (toolAction === "export_lark_generation" && !resultId) {
         setMessages((prev) => prev.map((message) =>
           message.id === assistantId ? { ...message, content: "当前没有可同步到飞书的 AIM 生成结果。" } : message
@@ -1243,7 +1195,7 @@ export default function AimPage() {
 
   async function handleSend() {
     await sendText(input.trim(), hasEditorSelection ? {
-      editorContext: buildEditorContext("用户追问"),
+      editorContext: buildAimEditorContext({ action: "用户追问", referenceSelection: referenceSelection.text, draftSelection: draftSelection.text, editorText, labels: editorPanelLabels }),
       editorApplyRange: draftSelection.text.trim() ? draftSelection.range : undefined,
       images: imageAttachments,
     } : { images: imageAttachments })
@@ -1282,7 +1234,7 @@ export default function AimPage() {
   async function generateWithInput(currentInput: string, options?: { retryMessageId?: string; startsNewTask?: boolean }) {
     const rawInput = options?.startsNewTask
       ? currentInput
-      : buildRawInputForGenerate(currentInput || undefined)
+      : buildAimRawInput(messages, currentInput || undefined)
     if (!rawInput) {
       toast.error("请先在对话框里说点素材或需求")
       return
@@ -1513,7 +1465,7 @@ export default function AimPage() {
           workflowStage={currentWorkflowStage}
           selectedAgentId={selectedAgentId}
           selectedProjectId={selectedProjectId}
-          latestDeliverableMessageId={latestDeliverableMessageId()}
+          latestDeliverableMessageId={findLatestAimVideoDeliverableMessageId(messages)}
           onBeginStage={beginWorkflowStage}
           onBeginContentAction={beginContentAction}
           actions={{
