@@ -115,6 +115,9 @@ export const env = createEnv({
     ZAI_API_KEY: z.string().optional(),
     ZAI_BASE_URL: z.string().optional(),
     ZAI_MODEL: z.string().optional(),
+    ZENMUX_API_KEY: z.string().optional(),
+    ZENMUX_BASE_URL: z.string().optional(),
+    ZENMUX_MODEL: z.string().optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().optional(),
@@ -233,6 +236,9 @@ export const env = createEnv({
     ZAI_API_KEY: process.env.ZAI_API_KEY,
     ZAI_BASE_URL: process.env.ZAI_BASE_URL,
     ZAI_MODEL: process.env.ZAI_MODEL,
+    ZENMUX_API_KEY: process.env.ZENMUX_API_KEY,
+    ZENMUX_BASE_URL: process.env.ZENMUX_BASE_URL,
+    ZENMUX_MODEL: process.env.ZENMUX_MODEL,
   },
   emptyStringAsUndefined: true,
 })
