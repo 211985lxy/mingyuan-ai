@@ -15,22 +15,18 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { Textarea } from "@/components/ui/textarea"
 import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
 import { BenchmarkEditorPanel, type AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
+import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
+import {
+  WorkflowRecordDialog,
+  type WorkflowRecordDialogState,
+  type WorkflowRecordMode,
+} from "@/components/aim/workflow-record-dialog"
 import {
   generateAimContent,
   getVideoCopyExtraction,
@@ -212,13 +208,6 @@ interface SendTextOptions {
   editorApplyRange?: TextSelectionRange
   images?: AimImageAttachment[]
   retryMessageId?: string
-}
-
-type RecordDialogMode = "decision" | "publish" | "retro"
-
-interface RecordDialogState {
-  mode: RecordDialogMode
-  generationId: string
 }
 
 function ChoiceStepper({
@@ -495,7 +484,7 @@ export default function AimPage() {
     open: false,
     context: null,
   })
-  const [recordDialog, setRecordDialog] = useState<RecordDialogState | null>(null)
+  const [recordDialog, setRecordDialog] = useState<WorkflowRecordDialogState | null>(null)
   const [decisionForm, setDecisionForm] = useState<AimDecisionSnapshot>({
     summary: "",
     targetUser: "",
@@ -1816,7 +1805,7 @@ export default function AimPage() {
     [messages, refreshHistory, selectedAgentId],
   )
 
-  const openRecordDialog = useCallback((msgId: string, mode: RecordDialogMode) => {
+  const openRecordDialog = useCallback((msgId: string, mode: WorkflowRecordMode) => {
     const base = messages.find((m) => m.id === msgId)?.deliverables
     if (!base?.id || base.id.startsWith("polish-")) {
       toast.error("只有已保存的内容才能记录")
@@ -1935,6 +1924,25 @@ export default function AimPage() {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
   }, [decisionForm, messages, outcomeForm, outcomeWindow, publishForm, recordDialog, refreshHistory, retroForm, retroRuleForm, selectedAgentId])
+
+  function closeWorkflowBriefDialog() {
+    setWorkflowBriefDialogOpen(false)
+    setWorkflowBrief(null)
+  }
+
+  function confirmWorkflowBrief() {
+    if (!workflowBrief) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("agent", "content_producer")
+    params.set("stage", "content")
+    lastAgentParamRef.current = "content_producer"
+    setSelectedAgentId("content_producer")
+    setWorkflowBrief({ ...workflowBrief, confirmed: workflowBriefForm })
+    setWorkflowBriefDialogOpen(false)
+    setInput(workflowBrief.nextInput)
+    router.replace(`/aim?${params.toString()}`)
+    toast.success("任务单已确认，开始内容创作")
+  }
 
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
@@ -2398,243 +2406,33 @@ export default function AimPage() {
         />
       )}
 
-      <Dialog open={workflowBriefDialogOpen && !!workflowBrief} onOpenChange={(open) => {
-        setWorkflowBriefDialogOpen(open)
-        if (!open) setWorkflowBrief(null)
-      }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>确认内容任务单</DialogTitle>
-            <DialogDescription>项目事实和上游结果已带入。这里可以改目标和约束，确认后再交给内容生产官。</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">内容目标</p>
-              <Input value={workflowBriefForm.goal || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, goal: event.target.value }))} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">目标客户</p>
-                <Input value={workflowBriefForm.targetCustomer || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, targetCustomer: event.target.value }))} />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">承接动作</p>
-                <Input value={workflowBriefForm.desiredAction || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, desiredAction: event.target.value as ConfirmedWorkflowBrief["desiredAction"] }))} placeholder="如：私信、预约诊断" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">核心问题</p>
-              <Textarea value={workflowBriefForm.realProblem || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, realProblem: event.target.value }))} />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">必须保留项</p>
-              <Textarea value={workflowBriefForm.mustKeep || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, mustKeep: event.target.value }))} placeholder="案例、原话、关键结论等" />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">禁区</p>
-              <Textarea value={workflowBriefForm.avoid || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, avoid: event.target.value }))} placeholder="不能说的承诺、敏感词或表达" />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">用户补充</p>
-              <Textarea value={workflowBriefForm.userSupplement || ""} onChange={(event) => setWorkflowBriefForm((prev) => ({ ...prev, userSupplement: event.target.value }))} placeholder="会标记为用户补充，不会伪装成项目事实" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setWorkflowBriefDialogOpen(false); setWorkflowBrief(null) }}>取消</Button>
-            <Button
-              disabled={isBuildingWorkflowBrief}
-              onClick={() => {
-                const next = workflowBrief
-                if (!next) return
-                const params = new URLSearchParams(searchParams.toString())
-                params.set("agent", "content_producer")
-                params.set("stage", "content")
-                lastAgentParamRef.current = "content_producer"
-                setSelectedAgentId("content_producer")
-                setWorkflowBrief({ ...next, confirmed: workflowBriefForm })
-                setWorkflowBriefDialogOpen(false)
-                setInput(next.nextInput)
-                router.replace(`/aim?${params.toString()}`)
-                toast.success("任务单已确认，开始内容创作")
-              }}
-            >
-              进入内容创作
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkflowBriefDialog
+        open={workflowBriefDialogOpen && !!workflowBrief}
+        form={workflowBriefForm}
+        busy={isBuildingWorkflowBrief}
+        onChange={setWorkflowBriefForm}
+        onCancel={closeWorkflowBriefDialog}
+        onConfirm={confirmWorkflowBrief}
+      />
 
-      <Dialog open={!!recordDialog} onOpenChange={(open) => { if (!open) setRecordDialog(null) }}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
-              {recordDialog?.mode === "decision"
-                ? "发布前判断"
-                : recordDialog?.mode === "publish"
-                  ? "登记发布"
-                  : "填写复盘"}
-            </DialogTitle>
-            <DialogDescription>
-              {recordDialog?.mode === "decision"
-                ? "把这条为什么发、准备打到谁、想验证什么先记下来。"
-                : recordDialog?.mode === "publish"
-                  ? "记录发到哪个平台，顺手把状态推进到已发布。"
-                  : "只写结果判断和下次同类内容的判断规则。"}
-            </DialogDescription>
-          </DialogHeader>
-
-          {recordDialog?.mode === "decision" && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">这条为什么值得发</p>
-                <Textarea
-                  value={decisionForm.summary}
-                  onChange={(event) => setDecisionForm((prev) => ({ ...prev, summary: event.target.value }))}
-                  placeholder="比如：这条不是讲工具，而是帮新手解决不知道从哪开始的问题。"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">最可能打中的人</p>
-                <Input
-                  value={decisionForm.targetUser ?? ""}
-                  onChange={(event) => setDecisionForm((prev) => ({ ...prev, targetUser: event.target.value }))}
-                  placeholder="比如：刚开始做 AI 内容、但没有判断标准的人。"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">发完最想验证什么</p>
-                <Textarea
-                  value={decisionForm.expectedSignal ?? ""}
-                  onChange={(event) => setDecisionForm((prev) => ({ ...prev, expectedSignal: event.target.value }))}
-                  placeholder="比如：收藏率、评论里有没有人追问工具链、是否能带出下一条选题。"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">当前把握</p>
-                <Input
-                  value={decisionForm.confidence ?? ""}
-                  onChange={(event) => setDecisionForm((prev) => ({ ...prev, confidence: event.target.value }))}
-                  placeholder="比如：7/10，题对了，但开头还不够硬。"
-                />
-              </div>
-            </div>
-          )}
-
-          {recordDialog?.mode === "publish" && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">发布平台</p>
-                <Input
-                  value={publishForm.publishPlatform}
-                  onChange={(event) => setPublishForm((prev) => ({ ...prev, publishPlatform: event.target.value }))}
-                  placeholder="抖音 / 小红书 / 视频号"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">内容链接</p>
-                <Input
-                  value={publishForm.publishUrl}
-                  onChange={(event) => setPublishForm((prev) => ({ ...prev, publishUrl: event.target.value }))}
-                  placeholder="粘贴发布后的链接，没有可先留空。"
-                />
-              </div>
-            </div>
-          )}
-
-          {recordDialog?.mode === "retro" && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">这次结果怎么判断</p>
-                <Textarea
-                  value={retroForm.summary}
-                  onChange={(event) => setRetroForm((prev) => ({ ...prev, summary: event.target.value }))}
-                  placeholder="比如：播放一般，但收藏和私信明显高，说明题不破圈，但很能打中目标人。"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">实际数据或反馈</p>
-                <Textarea
-                  value={retroForm.actualData ?? ""}
-                  onChange={(event) => setRetroForm((prev) => ({ ...prev, actualData: event.target.value }))}
-                  placeholder="写播放、点赞、收藏、评论、私信，或者用户原话。"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">这次判断哪里对，哪里错</p>
-                <Textarea
-                  value={retroForm.verdict ?? ""}
-                  onChange={(event) => setRetroForm((prev) => ({ ...prev, verdict: event.target.value }))}
-                  placeholder="比如：判断对在痛点，判断错在标题太像教程合集。"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-sm font-medium">下次同类内容怎么判断</p>
-                <Textarea
-                  value={retroRuleForm.rule}
-                  onChange={(event) => setRetroRuleForm((prev) => ({ ...prev, rule: event.target.value }))}
-                  placeholder="比如：工具类长教程先看能不能压成一个明确场景，否则不做大而全。"
-                />
-              </div>
-              <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">结构化结果（选填，未填不计为 0）</p>
-                  <select
-                    value={outcomeWindow}
-                    onChange={(e) => setOutcomeWindow(e.target.value as "7" | "14" | "30")}
-                    className="h-7 rounded border border-border/60 bg-background px-2 text-xs"
-                  >
-                    <option value="7">7 天</option>
-                    <option value="14">14 天</option>
-                    <option value="30">30 天</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {([
-                    ["dmCount", "有效私信"],
-                    ["qualifiedLeadCount", "合格线索"],
-                    ["appointmentCount", "预约咨询"],
-                    ["dealCount", "成交"],
-                    ["revenue", "营收(元)"],
-                    ["views", "播放"],
-                    ["saves", "收藏"],
-                    ["comments", "评论"],
-                    ["shares", "转发"],
-                  ] as const).map(([key, label]) => (
-                    <label key={key} className="flex flex-col gap-0.5">
-                      <span className="text-[11px] text-muted-foreground">{label}</span>
-                      <input
-                        inputMode="numeric"
-                        value={outcomeForm[key] ?? ""}
-                        onChange={(e) => setOutcomeForm((prev) => ({ ...prev, [key]: e.target.value }))}
-                        placeholder="—"
-                        className="h-8 rounded border border-border/60 bg-background px-2 text-sm"
-                      />
-                    </label>
-                  ))}
-                </div>
-                <label className="flex flex-col gap-0.5">
-                  <span className="text-[11px] text-muted-foreground">用户反馈（哪类人在问 / 是否目标客户原话 / 是否带来错误人群）</span>
-                  <Textarea
-                    value={outcomeForm.audienceFeedback ?? ""}
-                    onChange={(e) => setOutcomeForm((prev) => ({ ...prev, audienceFeedback: e.target.value }))}
-                    placeholder="把评论区/私信里真实出现的话记下来。"
-                    className="min-h-[60px]"
-                  />
-                </label>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRecordDialog(null)}>
-              取消
-            </Button>
-            <Button onClick={() => void handleSubmitRecordDialog()} disabled={busy}>
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <WorkflowRecordDialog
+        dialog={recordDialog}
+        busy={busy}
+        decisionForm={decisionForm}
+        publishForm={publishForm}
+        retroForm={retroForm}
+        ruleForm={retroRuleForm}
+        outcomeForm={outcomeForm}
+        outcomeWindow={outcomeWindow}
+        onDecisionChange={setDecisionForm}
+        onPublishChange={setPublishForm}
+        onRetroChange={setRetroForm}
+        onRuleChange={setRetroRuleForm}
+        onOutcomeChange={setOutcomeForm}
+        onOutcomeWindowChange={setOutcomeWindow}
+        onClose={() => setRecordDialog(null)}
+        onSubmit={() => void handleSubmitRecordDialog()}
+      />
     </div>
   )
 }
