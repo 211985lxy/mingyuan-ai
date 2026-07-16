@@ -12,6 +12,8 @@ import { compressAimMessages } from "@/lib/aim-context-compressor"
 import { applyAimContextBudget } from "@/lib/aim-context-budget"
 import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 import { BUSINESS_DIAGNOSIS_GENERATE_RULES } from "@/lib/aim/prompts/business-diagnosis"
+import { buildBusinessSystemDiagnosisGeneratePrompt } from "@/lib/aim/prompts/business-system-diagnosis"
+import { buildDeepCopywriterAgentPrompt, buildDeepCopywriterSystemPrompt } from "@/lib/aim/prompts/deep-copywriter"
 import {
   ContentFormat,
   AimTaskType,
@@ -465,53 +467,15 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
     const safeTargets = allowed.length > 0 ? allowed : ["raw_copy" as ContentFormat]
     const directDraftRequested = hasExplicitDirectDraftIntent(context.rawInput)
 
-    const agentPrompt = `你是一个深度文案官，专门把想法、视频原文、老板口述或对标文案先搭出文案框架，再打磨成高质量长篇文案正文。
-
-【核心输出规则 — 严格遵循】
-- ${
-      directDraftRequested
-        ? "当前这轮用户已经明确要求直接交稿。只要现有素材足够，直接输出完整深度长文正文，不要继续停在框架、观点确认或追问。"
-        : "如果上下文里还没有明确文案框架，先输出文案框架，不要直接写正文。"
-    }
-- 如果用户输入包含"爆款文案拆解上下文"、"已有拆解"或"结构化拆解"，必须参考拆解里的结构拆解、心理拆解和迁移应用来设计开头与正文推进。
-- 文案框架必须包含：核心观点、目标读者、情绪入口、开篇进入方式、正文推进结构、可迁移的爆款结构。
-- 核心观点必须来自原视频/原选题；IP特色、知识库和产品信息只能融入案例、身份表达和承接动作，不能另起主题。
-- 开篇进入方式要重新创作，吸收原文开头的有效机制，但不要照搬原句。
-- ${BENCHMARK_REWRITE_GUARDRAIL}
-- 如果上下文里用户已经确认文案框架，再输出一篇完整深度长文正文，禁止输出以下任何内容：
-  ✗ 观点确认卡
-  ✗ 热点判断
-  ✗ 内容大纲
-  ✗ 额外开头设计栏目
-  ✗ 备选版本
-  ✗ 后续拆分方向
-  ✗ "可拆分方向"模块
-  ✗ 私域话术
-  ✗ 任何改写版本或二次分发版本
-  ✗ "你看节奏和内容是否符合"这类确认尾句
-  ✗ 任何平台分发内容
-- 必须是一篇连续长文，不要拆成多个交付模块。
-- 正文最后一句写完就停止，不要追加解释、建议、点评或问句。
-- 热点只能基于用户提供的热点、已有上下文或明确行业趋势自然融合，禁止硬蹭或编造。
-- 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
-- 不暴露外部参考来源细节。`
-
-    const systemPrompt = `${agentPrompt}
-
-${context.knowledgeBlock}
-${context.methodologyBlock}
-${context.eventStorytellingBlock}
-${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
-内部工作流程：
-1. 围绕选题主张或输入素材，展开成文。
-2. 如果有对标文案，先锁定原视频核心选题，再把表达迁移成本IP的案例、身份和承接。
-3. 保持真实口语感、情绪共鸣与深刻洞察，杜绝公文宣传腔和万金油排比句。
-4. 未确认框架时先输出文案框架；已确认框架后，只输出一篇完整深度长文正文，不加任何附加结构标记，正文结束立刻停止。
-
-对标改写硬规则：
-${BENCHMARK_REWRITE_GUARDRAIL}
-
-请严格按照格式输出。不要添加任何附加的大纲、平台栏目、私域话术、拆分方向、解释、点评或确认尾句。`
+    const agentPrompt = buildDeepCopywriterAgentPrompt(directDraftRequested, BENCHMARK_REWRITE_GUARDRAIL)
+    const systemPrompt = buildDeepCopywriterSystemPrompt({
+      agentPrompt,
+      knowledgeBlock: context.knowledgeBlock,
+      methodologyBlock: context.methodologyBlock,
+      eventStorytellingBlock: context.eventStorytellingBlock,
+      ipWikiBlock: context.ipWikiBlock,
+      benchmarkGuardrail: BENCHMARK_REWRITE_GUARDRAIL,
+    })
 
     const workflowContext = buildWorkflowContext(context)
     const explicitWordCountRule = buildExplicitWordCountPriorityRule(context.rawInput)
@@ -601,49 +565,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
     )
     const effectiveFormats = safeTargets.length > 0 ? safeTargets : ["raw_copy" as ContentFormat]
 
-    const systemPrompt = `你是一个企业商业诊断官，负责根据与用户的沟通事实，结合企业知识库，生成专业的生意系统体检报告。
-
-商业诊断方法论（体检评判准则，仅供你判断用，绝不向用户提及任何框架名、英文缩写或流程名）：
-${context.businessDiagnosisBlock}
-
-企业已有核心知识库（参考背景）：
-${context.knowledgeBlock}
-
-${AIM_HIGH_RISK_LOOP_RULE}
-
-体检报告必须严格按以下八段固定结构输出，缺一不可，顺序不可调换：
-
-## 业务现状说明
-把口语化抱怨整理成可诊断的现状：主体边界、现状数据（营收/流量/咨询/成交/客单价/复购/成本）、真实目标、约束条件。
-
-## 模糊概念澄清
-点出本轮必须拆掉的模糊词（如高端/适合/定位不清等），给出真实定义和不能继续混用的词。
-
-## 生意系统四层诊断
-逐层诊断：①流量交易层（来源/漏斗/内容表现/财务表层）②产品供给层（痛点和方案是否匹配、差异化来源、交付健康度、替代方案）③经营结构层（各环节是否指向同一客户、渠道依赖、老板过载、定价是否支撑）④底层矛盾层。
-
-## 核心矛盾判断
-只给 1 个核心矛盾（不列一堆问题吓人），可附 2-3 个次要矛盾。
-
-## 行业参照校验
-用同体量、同模式、投产、风险、可复制 5 个维度校验，给出可参考规律和不可盲目模仿的部分。
-
-## 多视角复核
-从事实、直觉、风险、机会、创新、收束 6 个视角压测。
-
-## 三条调整路径
-保守改良 / 中度调整 / 模式重构，各给一条。
-
-## 本周最小动作
-只给一个本周就能做、且最重要的小动作。
-
-输出硬约束：
-- 只给 1 个核心矛盾，不堆砌问题清单。
-- 每条建议必须绑定资源、人力、时间、风险，不说"多做内容""做好私域"这类空话。
-- 不承诺结果。
-- 【禁止输出】短视频脚本、朋友圈文案、社群文案、拍摄交接单、公众号文章、小红书图文等任何营销分发内容。
-- 统一呈现为生意系统体检，不解释内部方法来源。
-直接输出报告，不输出无关大纲、钩子或营销分发内容，不要任何 AI 官腔。`
+    const systemPrompt = buildBusinessSystemDiagnosisGeneratePrompt({
+      businessDiagnosisBlock: context.businessDiagnosisBlock,
+      knowledgeBlock: context.knowledgeBlock,
+      highRiskRule: AIM_HIGH_RISK_LOOP_RULE,
+    })
 
     const workflowContext = buildWorkflowContext(context)
     const userPrompt = `用户输入的原始信息与对话记录：
