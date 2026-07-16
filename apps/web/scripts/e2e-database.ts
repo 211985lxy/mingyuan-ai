@@ -9,7 +9,7 @@ const BASELINE_SQL = resolve(WEB_ROOT, "prisma/baseline/current.sql")
 const BASELINE_MIGRATIONS = resolve(WEB_ROOT, "prisma/baseline/migrations.json")
 const PRODUCTION_SCHEMA_CONTRACT = resolve(WEB_ROOT, "prisma/production-schema-contract.json")
 
-export function requireTestDatabaseUrl(databaseUrl = process.env.TEST_DATABASE_URL): string {
+export function requireTestDatabaseUrl(databaseUrl?: string): string {
   const value = databaseUrl?.trim()
   if (!value) throw new Error("TEST_DATABASE_URL is required")
 
