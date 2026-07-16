@@ -1131,16 +1131,13 @@ export async function* buildAimChatResponseStream(
   yield* runtime.handler.streamChat(runtime.params)
 }
 
-/**
- * 统一 generate 处理入口
- */
-export async function buildAimGeneration(agentId: string, params: Omit<AimGenerateContext, "agentId" | "knowledgeBlock" | "methodologyBlock" | "businessDiagnosisBlock" | "viralStructureBlock" | "eventStorytellingBlock" | "ipWikiBlock" | "retrievedEntries" | "retrievedSource" | "knowledgeStrategy">): Promise<AimGenerateResponse> {
-  const handler = getAgentHandler(agentId)
+type AimGenerationInput = Omit<AimGenerateContext,
+  "agentId" | "knowledgeBlock" | "methodologyBlock" | "businessDiagnosisBlock" |
+  "viralStructureBlock" | "eventStorytellingBlock" | "ipWikiBlock" |
+  "retrievedEntries" | "retrievedSource" | "knowledgeStrategy"
+>
 
-  // ── 阶段 2.3：装配下沉到 prepareAimContext（统一上下文装配阶段）──
-  // 此前的 step1-4（项目校验 / runtimeTask·生成意图·知识策略解析 / Promise.all
-  // 背景 block 加载 / TaskSpec 构建 / 压缩 / 上下文预算）已集中到 prepareAimContext，
-  // 与原实现逐字等价。buildAimGeneration 现在只做：装配 → handler.generate → 收尾。
+function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
   const plannedSpec = planAimRun({
     entrypoint: "generate",
     agentId: agentId as AimAgentId,
@@ -1153,11 +1150,56 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     actorId: params.userId,
     projectId: params.projectId,
   })
-  // route 可能已解析 runtimeTask（与 planner 同源函数，结果应一致）；若有差异，
-  // 采用 route 值以保持向后兼容（原 buildAimGeneration 行为：params.runtimeTask 优先）。
-  const spec = params.runSpec ?? (params.runtimeTask
+
+  return params.runSpec ?? (params.runtimeTask
     ? { ...plannedSpec, runtimeTask: params.runtimeTask }
     : plannedSpec)
+}
+
+function resolveGenerationConversationMode(agentId: string, params: AimGenerationInput) {
+  return resolveAimConversationIntentWithRules({
+    agentId,
+    messages: [{
+      role: "user",
+      content: [params.rawInput, params.polishInstruction].filter(Boolean).join("\n"),
+    }],
+  }).intent.mode
+}
+
+async function finishGenerationRun(
+  params: AimGenerationInput,
+  response: AimGenerateResponse,
+  retrievedEntries: any[],
+  retrievedSource: string,
+) {
+  if (!params.skipPersistence) {
+    await addAimTraceStep(params.trace, {
+      key: "fire_knowledge_embedding",
+      label: "知识向量补写",
+      status: "success",
+      summary: "已触发后台补写",
+      metadata: { entries: retrievedEntries.length },
+    })
+    fireKnowledgeEmbedding(retrievedEntries, retrievedSource)
+  }
+
+  const saved = params.skipPersistence
+    ? null
+    : await getAimGenerationUsage(response.id)
+  await finishAimTrace(params.trace, {
+    aimGenerationId: response.id,
+    model: saved?.model || null,
+    totalTokens: saved?.totalTokens || null,
+    outputSummary: summarizeText(response.results.map((item) => item.content).join("\n\n")),
+  })
+}
+
+/**
+ * 统一 generate 处理入口
+ */
+export async function buildAimGeneration(agentId: string, params: AimGenerationInput): Promise<AimGenerateResponse> {
+  const handler = getAgentHandler(agentId)
+  const spec = buildGenerationRunSpec(agentId, params)
 
   const prepared = await prepareAimContext({
     spec,
@@ -1178,13 +1220,8 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
 
   const runtimeTask = prepared.spec.runtimeTask
   const knowledgeStrategy = prepared.spec.knowledgeStrategy
-  // 生成意图 mode（供响应回传；与原 buildAimGeneration 末尾的 conversationMode 一致）
-  const generationMode = resolveAimConversationIntentWithRules({
-    agentId,
-    messages: [{ role: "user", content: [params.rawInput, params.polishInstruction].filter(Boolean).join("\n") }],
-  }).intent.mode
+  const generationMode = resolveGenerationConversationMode(agentId, params)
 
-  // 5. 调用具体的智能体 Handler（接收已装配的 prepared blocks）
   const response = await runAimTraceStep(params.trace, "agent_generate", "智能体生成并保存", () => handler.generate({
     ...params,
     agentId,
@@ -1206,27 +1243,12 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     metadata: { resultId: result.id, formats: result.results.map((item) => item.format) },
   }))
 
-  // 6. 后续处理 (Fire-and-forget 向量写入)
-  if (!params.skipPersistence) {
-    await addAimTraceStep(params.trace, {
-      key: "fire_knowledge_embedding",
-      label: "知识向量补写",
-      status: "success",
-      summary: "已触发后台补写",
-      metadata: { entries: (prepared.retrievedEntries ?? []).length },
-    })
-    fireKnowledgeEmbedding((prepared.retrievedEntries ?? []) as any[], prepared.retrievedSource ?? "raw")
-  }
-
-  const saved = params.skipPersistence
-    ? null
-    : await getAimGenerationUsage(response.id)
-  await finishAimTrace(params.trace, {
-    aimGenerationId: response.id,
-    model: saved?.model || null,
-    totalTokens: saved?.totalTokens || null,
-    outputSummary: summarizeText(response.results.map((item) => item.content).join("\n\n")),
-  })
+  await finishGenerationRun(
+    params,
+    response,
+    (prepared.retrievedEntries ?? []) as any[],
+    prepared.retrievedSource ?? "raw",
+  )
 
   return { ...response, conversationMode: generationMode, knowledgeStrategy, taskSpec: prepared.taskSpec }
 }
