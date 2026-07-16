@@ -1,7 +1,9 @@
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
+import { buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
+import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
-import type { AimEditorContext, TextSelectionRange } from "@/lib/aim-editor"
+import { extractEditorDraftFromAssistantText, type AimEditorContext, type TextSelectionRange } from "@/lib/aim-editor"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import type { AimImageAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { AimChatToolAction, AimGeneration, ContentFormat } from "@/lib/api/client"
@@ -101,6 +103,70 @@ export function extractBenchmarkAnalysisText(text: string) {
   if (marker?.index != null) return text.slice(marker.index + marker[0].length).trim()
   const numberedStructure = text.match(/(?:^|\n)\d+[.、]\s*.+\n内容[：:]/)
   return numberedStructure?.index == null ? "" : text.slice(numberedStructure.index).trim()
+}
+
+export function findAimBenchmarkOriginal(messages: AimWorkbenchMessage[], sourceOriginalText = "") {
+  return sourceOriginalText.trim() || [...messages]
+    .reverse()
+    .map((message) => extractBenchmarkOriginalText(message.content))
+    .find((content) => content.trim()) || ""
+}
+
+export function findLatestAimAssistantDraft(messages: AimWorkbenchMessage[]) {
+  return [...messages]
+    .reverse()
+    .filter((message) => message.role === "assistant")
+    .map((message) => extractEditorDraftFromAssistantText(message.content))
+    .find((content) => content.trim()) || ""
+}
+
+export function buildAimBenchmarkRewriteInput(input: {
+  messages: AimWorkbenchMessage[]
+  sourceOriginalText: string
+  sourceAnalysisText: string
+  editorText: string
+}) {
+  const original = findAimBenchmarkOriginal(input.messages, input.sourceOriginalText)
+  if (!original) return null
+  const currentDraft = input.editorText.trim() || findLatestAimDeliverableText(input.messages)
+  const lengthRule = buildBenchmarkLengthRule(original)
+  return [
+    "请按对标原文重新生成一版文案，直接输出最终稿。",
+    "硬性要求：",
+    buildBenchmarkRecreationSopBlock(),
+    "1. 目标字数必须和对标原文基本一致，允许 95%-105% 波动。",
+    "2. 整体至少 30% 可感知重写，不能只是替换少数字。",
+    "3. 除专有名词外，不要连续沿用原文 12 个字以上。",
+    lengthRule ? `4. ${lengthRule}` : null,
+    input.sourceAnalysisText.trim() ? `已有拆解：\n${input.sourceAnalysisText.trim()}` : null,
+    `对标原文：\n${original}`,
+    currentDraft ? `我当前不满意的稿子：\n${currentDraft}` : null,
+  ].filter(Boolean).join("\n\n")
+}
+
+export function buildAimBenchmarkQualityMessage(input: {
+  messages: AimWorkbenchMessage[]
+  sourceOriginalText: string
+  editorText: string
+}) {
+  const original = findAimBenchmarkOriginal(input.messages, input.sourceOriginalText)
+  const draft = input.editorText.trim() || findLatestAimDeliverableText(input.messages)
+  if (!original || !draft) return null
+  const report = assessBenchmarkRewrite(original, draft)
+  const lengthRatio = report.lengthRatio == null ? "无法计算" : `${Math.round(report.lengthRatio * 100)}%`
+  const lengthStatus = report.lengthPassed ? "通过" : report.outputChars < report.originalChars ? "偏短" : "偏长"
+  const copyStatus = report.tooSimilar ? "风险高，需要继续重写" : "通过"
+  return [
+    "## 对标自检结果",
+    `- 字数：当前 ${report.outputChars} 字 / 原文 ${report.originalChars} 字，比例 ${lengthRatio}，判定：${lengthStatus}。`,
+    `- 12字连续复用：${Math.round(report.reuseRatio * 100)}%，判定：${copyStatus}。`,
+    report.reusedSamples.length
+      ? `- 复用片段示例：${report.reusedSamples.map((sample) => `「${sample}」`).join("、")}`
+      : "- 复用片段示例：未发现明显连续复用。",
+    report.lengthPassed && !report.tooSimilar
+      ? "- 结论：这版在字数和照抄风险上基本合格，可以继续看表达质量。"
+      : "- 结论：这版还不合格，优先按原文字数重写，并替换开头、案例、过渡句或行动引导。",
+  ].join("\n\n")
 }
 
 export function getAimHistoryContents(item: AimGeneration) {
