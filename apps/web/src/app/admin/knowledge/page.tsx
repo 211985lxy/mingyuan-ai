@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -50,6 +50,7 @@ import {
   type KnowledgeEntry as BrowserKnowledgeEntry,
   type AdminProject as BrowserAdminProject,
 } from "@/components/admin/knowledge-browser"
+import { InternalModelTestPanel } from "@/components/admin/internal-model-test-panel"
 
 const KNOWLEDGE_UPLOAD_ACCEPT = ".pdf,.txt,.md,.csv,.docx,.xls,.xlsx,.pptx,.html,.htm,.json,.xml,.rtf"
 
@@ -120,28 +121,6 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   import: "文件导入",
   obsidian: "Obsidian 同步",
   smart_import: "智能导入",
-}
-
-// 中转站测试：通道与可选模型（OpenRouter 免费模型标注 free）
-const JIEKOU_PROVIDER_MODELS: Record<
-  string,
-  Array<{ value: string; label: string; free?: boolean }>
-> = {
-  jiekou: [
-    { value: "gpt-4o", label: "gpt-4o" },
-    { value: "gpt-4o-mini", label: "gpt-4o-mini" },
-    { value: "deepseek-chat", label: "deepseek-chat" },
-    { value: "deepseek-reasoner", label: "deepseek-reasoner" },
-    { value: "claude-sonnet-4-5", label: "claude-sonnet-4-5" },
-  ],
-  openrouter: [
-    { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6（付费）" },
-    { value: "qwen/qwen3-next-80b-a3b-instruct:free", label: "Qwen3 Next 80B（免费·中文强）", free: true },
-    { value: "google/gemma-4-31b-it:free", label: "Gemma 4 31B（免费·质量最高）", free: true },
-    { value: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B（免费）", free: true },
-    { value: "nousresearch/hermes-3-llama-3.1-405b:free", label: "Hermes 3 405B（免费·超大）", free: true },
-    { value: "openrouter/free", label: "自动路由（免费·随机选）", free: true },
-  ],
 }
 
 // ─── API 调用 ──────────────────────────────────────────────
@@ -336,19 +315,6 @@ export default function AdminKnowledgePage() {
     skip?: boolean
   }>>({})
   const [smartImportExpanded, setSmartImportExpanded] = React.useState<Set<number>>(new Set())
-
-  // 中转站测试
-  const [jiekouTestOpen, setJiekouTestOpen] = React.useState(false)
-  const [jiekouProvider, setJiekouProvider] = React.useState<"jiekou" | "openrouter">("jiekou")
-  const [jiekouPrompt, setJiekouPrompt] = React.useState("")
-  const [jiekouModel, setJiekouModel] = React.useState("gpt-4o")
-  const [jiekouTemperature, setJiekouTemperature] = React.useState(0.7)
-  const [jiekouMaxTokens, setJiekouMaxTokens] = React.useState(4000)
-  const [jiekouResult, setJiekouResult] = React.useState("")
-  const [jiekouLoading, setJiekouLoading] = React.useState(false)
-  const [jiekouStreamEnabled, setJiekouStreamEnabled] = React.useState(true)
-
-  const jiekouModelOptions = JIEKOU_PROVIDER_MODELS[jiekouProvider] || []
 
   // 知识浏览 Tab（默认）：独立的列表状态，与「条目列表」Tab 解耦，但共享 projectFilter/categoryFilter
   // 这样「知识地图」的下钻（设置 categoryFilter）也能联动浏览视图
@@ -688,77 +654,6 @@ export default function AdminKnowledgePage() {
     }
   }
 
-  async function handleJiekouTest() {
-    if (!jiekouPrompt.trim()) return
-    setJiekouLoading(true)
-    setJiekouResult("")
-
-    try {
-      const token = getAdminToken()
-      const response = await fetch("/api/admin/jiekou/test", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          provider: jiekouProvider,
-          messages: [{ role: "user", content: jiekouPrompt }],
-          model: jiekouModel,
-          temperature: jiekouTemperature,
-          max_tokens: jiekouMaxTokens,
-          stream: jiekouStreamEnabled,
-        }),
-      })
-
-      if (!response.ok) {
-        // 上游可能返回非 JSON（如 502 HTML 网关页），解析失败时回退到通用提示
-        const error = await response.json().catch(() => ({} as { error?: string }))
-        throw new Error(error.error || "测试失败")
-      }
-
-      if (jiekouStreamEnabled) {
-        // 流式输出
-        const reader = response.body?.getReader()
-        const decoder = new TextDecoder()
-
-        if (!reader) throw new Error("无法读取响应流")
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = decoder.decode(value)
-          const lines = chunk.split("\n")
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6)
-              if (data === "[DONE]") continue
-
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed.content) {
-                  setJiekouResult((prev) => prev + parsed.content)
-                }
-              } catch {
-                // 忽略解析错误
-              }
-            }
-          }
-        }
-      } else {
-        // 常规输出
-        const data = await response.json()
-        setJiekouResult(data.content || "")
-      }
-    } catch (error) {
-      setJiekouResult(`错误: ${error instanceof Error ? error.message : "未知错误"}`)
-    } finally {
-      setJiekouLoading(false)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">知识库管理</h1>
@@ -829,147 +724,7 @@ export default function AdminKnowledgePage() {
 
       {/* 条目列表 Tab */}
         <TabsContent value="list">
-      {/* 中转站测试面板（内部使用，客户不可见） */}
-      <Card>
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setJiekouTestOpen((v) => !v)}
-        >
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" />
-              中转站测试（内部）
-            </CardTitle>
-            <span className="text-xs text-muted-foreground">
-              {jiekouTestOpen ? "收起 ▲" : "展开 ▼"}
-            </span>
-          </div>
-        </CardHeader>
-        {jiekouTestOpen && (
-          <CardContent className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              切换通道测试不同模型：JieKou（接口AI）或 OpenRouter（含免费模型，每天 200 次）。默认 gpt-4o，支持流式输出。
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">通道</Label>
-                <Select
-                  value={jiekouProvider}
-                  onValueChange={(v) => {
-                    const p = (v === "openrouter" ? "openrouter" : "jiekou") as "jiekou" | "openrouter"
-                    setJiekouProvider(p)
-                    // 切换通道时重置为该通道第一个模型
-                    const first = JIEKOU_PROVIDER_MODELS[p]?.[0]
-                    if (first) setJiekouModel(first.value)
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="jiekou">JieKou（接口AI · gpt/deepseek）</SelectItem>
-                    <SelectItem value="openrouter">OpenRouter（含免费模型）</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">模型</Label>
-                <Select value={jiekouModel} onValueChange={(v) => setJiekouModel(v ?? jiekouModel)}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jiekouModelOptions.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Temperature（{jiekouTemperature}）</Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={jiekouTemperature}
-                  onChange={(e) => setJiekouTemperature(Number(e.target.value))}
-                  className="w-full h-9"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Max Tokens</Label>
-                <Input
-                  type="number"
-                  value={jiekouMaxTokens}
-                  onChange={(e) => setJiekouMaxTokens(Number(e.target.value))}
-                  className="h-9"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs">测试提示词</Label>
-              <Textarea
-                value={jiekouPrompt}
-                onChange={(e) => setJiekouPrompt(e.target.value)}
-                placeholder="输入测试内容，例如：你好，请用一句话介绍你自己。"
-                rows={3}
-              />
-            </div>
-
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={jiekouStreamEnabled}
-                  onChange={(e) => setJiekouStreamEnabled(e.target.checked)}
-                  className="cursor-pointer"
-                />
-                流式输出
-              </label>
-              <div className="flex-1" />
-              <Button
-                onClick={handleJiekouTest}
-                disabled={jiekouLoading || !jiekouPrompt.trim()}
-                className="cursor-pointer"
-              >
-                {jiekouLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    调用中...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-1" />
-                    测试调用
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {(jiekouResult || jiekouLoading) && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">返回结果</Label>
-                <div className="min-h-20 rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
-                  {jiekouResult || (
-                    <span className="text-muted-foreground">等待返回...</span>
-                  )}
-                  {jiekouLoading && jiekouResult && (
-                    <span className="inline-block w-2 h-4 ml-0.5 bg-primary animate-pulse" />
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
+      <InternalModelTestPanel getToken={getAdminToken} />
 
       {/* 操作栏 */}
       <div className="flex flex-col gap-3">
