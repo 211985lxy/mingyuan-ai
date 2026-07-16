@@ -37,6 +37,19 @@ describe("lark-base-tool", () => {
     ).rejects.toThrow("不允许")
   })
 
+  it("passes an explicit bot identity to lark-cli", async () => {
+    const runner = vi.fn(async () => ({ stdout: "{\"ok\":true}", stderr: "" }))
+
+    await runLarkBaseCommand("+record-get", ["--record-id", "rec_1"], {
+      identity: "bot",
+      runner,
+    })
+
+    expect(runner).toHaveBeenCalledWith("/mock/lark-cli", [
+      "base", "+record-get", "--record-id", "rec_1", "--as", "bot", "--format", "json",
+    ])
+  })
+
   it("reads a single Feishu record from wrapped and direct responses", async () => {
     const wrappedCommand = vi.fn(async () => ({
       record: {
@@ -73,6 +86,32 @@ describe("lark-base-tool", () => {
       "--table-id", "tbl_work",
       "--record-id", "rec_wrapped",
     ])
+  })
+
+  it("reads the matrix response returned by lark-cli bot identity", async () => {
+    const runCommand = vi.fn(async () => ({
+      ok: true,
+      identity: "bot",
+      data: {
+        data: [["WP-5 联调", ["待处理"], ["咨询交付"]]],
+        fields: ["事项名称", "状态", "工作流"],
+        record_id_list: ["rec_bot"],
+      },
+    }))
+
+    await expect(getLarkBaseRecord({
+      baseToken: "base_x",
+      tableId: "tbl_work",
+      recordId: "rec_bot",
+      runCommand,
+    })).resolves.toEqual({
+      recordId: "rec_bot",
+      fields: {
+        事项名称: "WP-5 联调",
+        状态: ["待处理"],
+        工作流: ["咨询交付"],
+      },
+    })
   })
 
   it("rejects a missing record and updates an existing row by record id", async () => {

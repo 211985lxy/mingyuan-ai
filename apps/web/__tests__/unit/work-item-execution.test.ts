@@ -97,10 +97,7 @@ describe("submitWorkItemForReview", () => {
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.status).toBe("待人工审核")
     expect(store.updates[0].fields["AIM结果ID"]).toBe("gen_001")
-    expect(store.updates[0].fields["结果链接"]).toEqual({
-      link: "https://aim.example.com/run/1",
-      text: "查看 AIM 结果",
-    })
+    expect(store.updates[0].fields["结果链接"]).toBe("https://aim.example.com/run/1")
   })
 
   it("缺少结果ID时拒绝提交（禁止伪造审核态）", async () => {

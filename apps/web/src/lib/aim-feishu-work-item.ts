@@ -201,9 +201,7 @@ export function buildReviewPatch(input: ReviewPatchInput): WorkItemPatch {
     状态: "待人工审核" as WorkItemStatus,
     AIM结果ID: input.aimResultId.trim(),
     结果摘要: input.resultSummary.trim(),
-    结果链接: input.resultLink.trim()
-      ? { link: input.resultLink.trim(), text: "查看 AIM 结果" }
-      : "",
+    结果链接: input.resultLink.trim(),
     最后处理时间: nowTimestamp(),
   }
 }

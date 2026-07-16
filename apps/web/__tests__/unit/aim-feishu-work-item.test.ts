@@ -208,10 +208,7 @@ describe("buildReviewPatch", () => {
     expect(patch["状态"]).toBe("待人工审核")
     expect(patch["AIM结果ID"]).toBe("gen_999")
     expect(patch["结果摘要"]).toBe("已完成客户诊断，预算与阶段已澄清。")
-    expect(patch["结果链接"]).toEqual({
-      link: "https://aim.example.com/run/999",
-      text: "查看 AIM 结果",
-    })
+    expect(patch["结果链接"]).toBe("https://aim.example.com/run/999")
     expect(typeof patch["最后处理时间"]).toBe("number")
   })
 

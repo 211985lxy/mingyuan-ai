@@ -117,6 +117,7 @@ export async function runLarkBaseCommand(
   args: string[],
   options: {
     cliPath?: string
+    identity?: "user" | "bot"
     runner?: (file: string, args: string[]) => Promise<{ stdout: string; stderr: string }>
   } = {},
 ): Promise<unknown> {
@@ -133,7 +134,10 @@ export async function runLarkBaseCommand(
         timeout: 15_000,
         maxBuffer: 10 * 1024 * 1024,
       }))
-  const { stdout } = await runner(cliPath, ["base", command, ...args, "--format", "json"])
+  const identityArgs = options.identity ? ["--as", options.identity] : []
+  const { stdout } = await runner(cliPath, [
+    "base", command, ...args, ...identityArgs, "--format", "json",
+  ])
   const text = stdout.trim()
   return text ? JSON.parse(text) : {}
 }
@@ -198,6 +202,22 @@ function narrowRecordResponse(
 ): { recordId: string; fields: Record<string, unknown> } | null {
   const root = asObjectRecord(payload)
   if (!root) return null
+
+  const matrix = asObjectRecord(root.data)
+  const rows = matrix?.data
+  const fieldNames = matrix?.fields
+  const recordIds = matrix?.record_id_list
+  if (
+    Array.isArray(rows) && Array.isArray(rows[0]) &&
+    Array.isArray(fieldNames) && Array.isArray(recordIds) &&
+    typeof recordIds[0] === "string"
+  ) {
+    const fields = Object.fromEntries(
+      fieldNames.map((name, index) => [String(name), rows[0][index]]),
+    )
+    return { recordId: recordIds[0], fields }
+  }
+
   const record = asObjectRecord(root.record) || root
   const fields = asObjectRecord(record.fields)
   if (typeof record.record_id !== "string" || !fields) return null
@@ -209,10 +229,14 @@ export async function getLarkBaseRecord(input: {
   tableId: string
   recordId: string
   cliPath?: string
+  identity?: "user" | "bot"
   runCommand?: RunCommand
 }): Promise<{ recordId: string; fields: Record<string, unknown> }> {
   const runCommand = input.runCommand ||
-    ((command, args) => runLarkBaseCommand(command, args, { cliPath: input.cliPath }))
+    ((command, args) => runLarkBaseCommand(command, args, {
+      cliPath: input.cliPath,
+      identity: input.identity,
+    }))
 
   const payload = await runCommand("+record-get", [
     "--base-token", input.baseToken,
@@ -233,10 +257,14 @@ export async function updateLarkBaseRecord(input: {
   recordId: string
   fields: Record<string, unknown>
   cliPath?: string
+  identity?: "user" | "bot"
   runCommand?: RunCommand
 }): Promise<{ ok: true; result: unknown }> {
   const runCommand = input.runCommand ||
-    ((command, args) => runLarkBaseCommand(command, args, { cliPath: input.cliPath }))
+    ((command, args) => runLarkBaseCommand(command, args, {
+      cliPath: input.cliPath,
+      identity: input.identity,
+    }))
 
   const payload = await runCommand("+record-upsert", [
     "--base-token", input.baseToken,
