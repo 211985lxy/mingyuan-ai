@@ -16,7 +16,7 @@ function fireEmbedding(entryId: string): void {
 
 type LarkTableType = "topic_review" | "project_management" | "data_archive"
 type LarkResultType = "topic" | "script" | "positioning" | "moments_copy"
-type LarkCommand = "+table-get" | "+field-list" | "+record-list" | "+record-upsert"
+type LarkCommand = "+table-get" | "+field-list" | "+record-list" | "+record-get" | "+record-upsert"
 
 type RunCommand = (command: LarkCommand, args: string[]) => Promise<unknown>
 
@@ -51,6 +51,7 @@ const ALLOWED_COMMANDS = new Set<LarkCommand>([
   "+table-get",
   "+field-list",
   "+record-list",
+  "+record-get",
   "+record-upsert",
 ])
 
@@ -185,6 +186,66 @@ function entryFromRecord(item: { record_id?: string; fields?: Record<string, unk
     tags,
     category: mapLarkKnowledgeCategory(type),
   }
+}
+
+function asObjectRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function narrowRecordResponse(
+  payload: unknown,
+): { recordId: string; fields: Record<string, unknown> } | null {
+  const root = asObjectRecord(payload)
+  if (!root) return null
+  const record = asObjectRecord(root.record) || root
+  const fields = asObjectRecord(record.fields)
+  if (typeof record.record_id !== "string" || !fields) return null
+  return { recordId: record.record_id, fields }
+}
+
+export async function getLarkBaseRecord(input: {
+  baseToken: string
+  tableId: string
+  recordId: string
+  cliPath?: string
+  runCommand?: RunCommand
+}): Promise<{ recordId: string; fields: Record<string, unknown> }> {
+  const runCommand = input.runCommand ||
+    ((command, args) => runLarkBaseCommand(command, args, { cliPath: input.cliPath }))
+
+  const payload = await runCommand("+record-get", [
+    "--base-token", input.baseToken,
+    "--table-id", input.tableId,
+    "--record-id", input.recordId,
+  ])
+
+  const narrowed = narrowRecordResponse(payload)
+  if (!narrowed) {
+    throw new Error(`飞书记录 ${input.recordId} 不存在`)
+  }
+  return narrowed
+}
+
+export async function updateLarkBaseRecord(input: {
+  baseToken: string
+  tableId: string
+  recordId: string
+  fields: Record<string, unknown>
+  cliPath?: string
+  runCommand?: RunCommand
+}): Promise<{ ok: true; result: unknown }> {
+  const runCommand = input.runCommand ||
+    ((command, args) => runLarkBaseCommand(command, args, { cliPath: input.cliPath }))
+
+  const payload = await runCommand("+record-upsert", [
+    "--base-token", input.baseToken,
+    "--table-id", input.tableId,
+    "--record-id", input.recordId,
+    "--json", JSON.stringify(input.fields),
+  ])
+
+  return { ok: true as const, result: payload }
 }
 
 async function ensureProject(db: DbLike, userId: string, projectId: string) {

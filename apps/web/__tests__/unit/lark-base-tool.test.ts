@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest"
 import {
+  getLarkBaseRecord,
   importLarkBaseKnowledge,
   mapLarkKnowledgeCategory,
   readLarkBaseConfig,
   runLarkBaseCommand,
+  updateLarkBaseRecord,
 } from "@/lib/lark-base-tool"
 
 describe("lark-base-tool", () => {
@@ -33,6 +35,68 @@ describe("lark-base-tool", () => {
     await expect(
       runLarkBaseCommand("+table-delete", ["--base-token", "base_x"], { runner }),
     ).rejects.toThrow("不允许")
+  })
+
+  it("reads a single Feishu record from wrapped and direct responses", async () => {
+    const wrappedCommand = vi.fn(async () => ({
+      record: {
+        record_id: "rec_wrapped",
+        fields: { 标题: "会后复盘" },
+      },
+      raw: {},
+    }))
+    const directCommand = vi.fn(async () => ({
+      record_id: "rec_direct",
+      fields: { 标题: "客户诊断" },
+    }))
+
+    await expect(getLarkBaseRecord({
+      baseToken: "base_x",
+      tableId: "tbl_work",
+      recordId: "rec_wrapped",
+      runCommand: wrappedCommand,
+    })).resolves.toEqual({
+      recordId: "rec_wrapped",
+      fields: { 标题: "会后复盘" },
+    })
+    await expect(getLarkBaseRecord({
+      baseToken: "base_x",
+      tableId: "tbl_work",
+      recordId: "rec_direct",
+      runCommand: directCommand,
+    })).resolves.toEqual({
+      recordId: "rec_direct",
+      fields: { 标题: "客户诊断" },
+    })
+    expect(wrappedCommand).toHaveBeenCalledWith("+record-get", [
+      "--base-token", "base_x",
+      "--table-id", "tbl_work",
+      "--record-id", "rec_wrapped",
+    ])
+  })
+
+  it("rejects a missing record and updates an existing row by record id", async () => {
+    await expect(getLarkBaseRecord({
+      baseToken: "base_x",
+      tableId: "tbl_work",
+      recordId: "rec_missing",
+      runCommand: vi.fn(async () => ({})),
+    })).rejects.toThrow("不存在")
+
+    const updateCommand = vi.fn(async () => ({ updated: true }))
+    await expect(updateLarkBaseRecord({
+      baseToken: "base_x",
+      tableId: "tbl_work",
+      recordId: "rec_update",
+      fields: { 状态: "待人工审核", AIM结果ID: "gen_1" },
+      runCommand: updateCommand,
+    })).resolves.toEqual({ ok: true, result: { updated: true } })
+    expect(updateCommand).toHaveBeenCalledWith("+record-upsert", [
+      "--base-token", "base_x",
+      "--table-id", "tbl_work",
+      "--record-id", "rec_update",
+      "--json", JSON.stringify({ 状态: "待人工审核", AIM结果ID: "gen_1" }),
+    ])
   })
 
   it("imports records into project knowledge and updates duplicate imported titles", async () => {
