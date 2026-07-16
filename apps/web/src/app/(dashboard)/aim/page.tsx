@@ -81,7 +81,6 @@ import {
   EDITOR_PANEL_DEFAULT_WIDTH,
   applyFirstMatchingStructureToReference,
   applySelectionReplacement,
-  clampEditorPanelWidth,
   extractEditorDraftFromAssistantText,
   extractReplacementDraft,
   type AimEditorContext,
@@ -96,6 +95,7 @@ import {
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
 import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
+import { clearAimDraft, loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
   type AimImageAttachment,
   type IpWikiDialogContext,
@@ -132,79 +132,6 @@ interface SendTextOptions {
   editorApplyRange?: TextSelectionRange
   images?: AimImageAttachment[]
   retryMessageId?: string
-}
-
-const AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v2"
-
-interface AimDraft {
-  selectedAgentId: AimAgentId
-  selectedProjectId: string
-  input: string
-  messages: ChatMessage[]
-  videoCopyExtractionId?: string
-  sourceOriginalText?: string
-  sourceAnalysisText?: string
-  sourceTopicTitle?: string
-  sourceTopicRationale?: string
-  editorText?: string
-  editorFormat?: ContentFormat
-  editorSourceMessageId?: string
-  editorPanelWidth?: number
-  editorPanelOpen?: boolean
-}
-
-function aimDraftStorageKey(agentId: AimAgentId) {
-  return `${AIM_DRAFT_STORAGE_KEY_PREFIX}:${agentId}`
-}
-
-function loadAimDraft(agentId: AimAgentId): AimDraft | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.sessionStorage.getItem(aimDraftStorageKey(agentId))
-    if (!raw) return null
-    const draft = JSON.parse(raw) as Partial<AimDraft>
-    if (!isValidAimAgent(draft.selectedAgentId) || !Array.isArray(draft.messages)) return null
-    return {
-      selectedAgentId: draft.selectedAgentId,
-      selectedProjectId: typeof draft.selectedProjectId === "string" ? draft.selectedProjectId : "",
-      input: typeof draft.input === "string" ? draft.input : "",
-      messages: draft.messages,
-      videoCopyExtractionId: typeof draft.videoCopyExtractionId === "string" ? draft.videoCopyExtractionId : undefined,
-      sourceOriginalText: typeof draft.sourceOriginalText === "string" ? draft.sourceOriginalText : undefined,
-      sourceAnalysisText: typeof draft.sourceAnalysisText === "string" ? draft.sourceAnalysisText : undefined,
-      sourceTopicTitle: typeof draft.sourceTopicTitle === "string" ? draft.sourceTopicTitle : undefined,
-      sourceTopicRationale: typeof draft.sourceTopicRationale === "string" ? draft.sourceTopicRationale : undefined,
-      editorText: typeof draft.editorText === "string" ? draft.editorText : undefined,
-      editorFormat: typeof draft.editorFormat === "string" ? draft.editorFormat as ContentFormat : undefined,
-      editorSourceMessageId: typeof draft.editorSourceMessageId === "string" ? draft.editorSourceMessageId : undefined,
-      editorPanelWidth: typeof draft.editorPanelWidth === "number" ? clampEditorPanelWidth(draft.editorPanelWidth) : undefined,
-      editorPanelOpen: typeof draft.editorPanelOpen === "boolean" ? draft.editorPanelOpen : undefined,
-    }
-  } catch {
-    return null
-  }
-}
-
-function saveAimDraft(draft: AimDraft) {
-  if (typeof window === "undefined") return
-  try {
-    const storageKey = aimDraftStorageKey(draft.selectedAgentId)
-    if (
-      !draft.input.trim()
-      && draft.messages.length === 0
-      && !draft.editorText?.trim()
-      && !draft.sourceOriginalText?.trim()
-      && !draft.sourceAnalysisText?.trim()
-      && !draft.sourceTopicTitle?.trim()
-      && !draft.sourceTopicRationale?.trim()
-    ) {
-      window.sessionStorage.removeItem(storageKey)
-      return
-    }
-    window.sessionStorage.setItem(storageKey, JSON.stringify(draft))
-  } catch {
-    // ponytail: losing a browser draft is better than breaking the editor.
-  }
 }
 
 function formatAnalysisResultForPrompt(analysisResult: unknown) {
@@ -712,7 +639,7 @@ export default function AimPage() {
     setMessages([])
     setInput("")
     clearCurrentTaskContext()
-    if (typeof window !== "undefined") window.sessionStorage.removeItem(aimDraftStorageKey(selectedAgentId))
+    clearAimDraft(selectedAgentId)
   }
 
   /** 把对话里的用户输入拼成生成素材 */
