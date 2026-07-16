@@ -1,31 +1,21 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
 const ALLOWED_PLATFORMS = new Set(["douyin", "xiaohongshu", "bilibili", "kuaishou"])
 
-// 通过 benchmark_profile:<profileId> 标签批量定位关联 KnowledgeEntry
-async function findLinkedKnowledgeEntries(profileId: string) {
-  return prisma.knowledgeEntry.findMany({
+// 批量更新关联 KnowledgeEntry 状态
+async function syncKnowledgeEntryStatus(profileId: string, status: "active" | "archived") {
+  await prisma.knowledgeEntry.updateMany({
     where: {
       category: "benchmark_reference",
       tags: { string_contains: `benchmark_profile:${profileId}` },
     },
-    select: { id: true },
+    data: { status },
+  }).catch((err) => {
+    console.error(`[benchmark-profile] syncKnowledgeEntryStatus(${profileId}, ${status}) failed:`, err)
   })
-}
-
-// 批量更新关联 KnowledgeEntry 状态
-async function syncKnowledgeEntryStatus(profileId: string, status: "active" | "archived") {
-  const entries = await findLinkedKnowledgeEntries(profileId)
-  if (entries.length > 0) {
-    await prisma.knowledgeEntry.updateMany({
-      where: { id: { in: entries.map((e) => e.id) } },
-      data: { status },
-    }).catch((err) => {
-      console.error(`[benchmark-profile] syncKnowledgeEntryStatus(${profileId}, ${status}) failed:`, err)
-    })
-  }
 }
 
 // GET — 档案详情（含所有素材条目）
@@ -42,7 +32,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
         select: { id: true, name: true, companyName: true, industry: true, status: true },
       },
       user: { select: { id: true, name: true, email: true } },
-      items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] },
+      items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }], take: 500 },
     },
   })
 
@@ -60,7 +50,7 @@ export const PATCH = withAdminAuth(async (request, { params }) => {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const data: Record<string, unknown> = {}
 
   if (typeof body.name === "string") {
@@ -98,7 +88,7 @@ export const PATCH = withAdminAuth(async (request, { params }) => {
     data,
     include: {
       project: { select: { id: true, name: true } },
-      items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] },
+      items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }], take: 500 },
     },
   })
 

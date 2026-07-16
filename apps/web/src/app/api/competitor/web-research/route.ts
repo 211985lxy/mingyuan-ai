@@ -1,19 +1,16 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 
 import { runAgentReachCompetitorResearch } from "@/lib/competitor-research/agent-reach"
 import { logger } from "@/lib/logger"
 import { withUserAuth } from "@/lib/user-auth"
+import { competitorResearchBodySchema } from "@/features/competitor/contracts/api"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
 
 export const POST = withUserAuth(async (request) => {
-  let body: { query?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "INVALID_QUERY" }, { status: 400 })
-  }
+  const body = await parseJsonBody(request, competitorResearchBodySchema, { maxBytes: 4 * 1024 })
 
   const query = typeof body.query === "string" ? body.query.trim() : ""
   if (!query) {

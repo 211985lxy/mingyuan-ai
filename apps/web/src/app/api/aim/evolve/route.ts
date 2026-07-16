@@ -1,5 +1,7 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { aimEvolveBodySchema } from "@/features/aim/contracts/api"
 import { prisma } from "@/lib/prisma"
 import {
   extractAimEvolutionSuggestions,
@@ -10,7 +12,7 @@ import { persistAimMemories } from "@/lib/aim-memory"
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const body = await request.json()
+    const body = await parseJsonBody(request, aimEvolveBodySchema, { maxBytes: 256 * 1024 })
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const agentId = typeof body.agentId === "string" ? body.agentId : ""
     const shouldPersist = body.persist === true

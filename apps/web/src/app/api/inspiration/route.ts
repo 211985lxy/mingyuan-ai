@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
     const content = typeof body.content === "string" ? body.content.trim() : ""
     const source = typeof body.source === "string" ? body.source.trim() : "text"
     const autoProcess = body.autoProcess !== false // default: auto-process

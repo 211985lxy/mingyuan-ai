@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import type { TikHubResponse } from './types'
 
 // ─── Error ──────────────────────────────────────────────
@@ -15,7 +16,7 @@ export class TikHubError extends Error {
 
 // ─── Config ─────────────────────────────────────────────
 
-const TIKHUB_BASE = process.env.TIKHUB_BASE_URL || 'https://api.tikhub.io'
+const TIKHUB_BASE = env.TIKHUB_BASE_URL || 'https://api.tikhub.io'
 const TIMEOUT_MS = 30_000
 
 // ─── Core Request Function ───────────────────────────────
@@ -39,7 +40,7 @@ export async function tikhubGet<T>(
     }
   }
 
-  const apiKey = process.env.TIKHUB_API_KEY
+  const apiKey = env.TIKHUB_API_KEY
   if (!apiKey) {
     throw new TikHubError(endpoint, null, 'TIKHUB_API_KEY environment variable is not set')
   }

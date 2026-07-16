@@ -1,3 +1,4 @@
+import { parseJsonBody, parseQuery } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -5,14 +6,18 @@ import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags, normalizeValueGrade } from "@/lib/knowledge-tags"
 import { enforceKnowledgeBetaLimit } from "@/lib/internal-beta-limits"
+import {
+  knowledgeCreateBodySchema,
+  knowledgeListQuerySchema,
+} from "@/features/knowledge/contracts/api"
 
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const url = new URL(request.url)
-    const category = url.searchParams.get("category")
-    const status = url.searchParams.get("status") || "active"
-    const projectId = url.searchParams.get("projectId")
+    const { category, status, projectId, page = 1, pageSize = 50 } = parseQuery(
+      request,
+      knowledgeListQuerySchema,
+    )
 
     const entries = await prisma.knowledgeEntry.findMany({
       where: {
@@ -22,6 +27,8 @@ export async function GET(request: NextRequest) {
         ...(projectId ? { projectId } : {}),
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     })
 
     return NextResponse.json(entries)
@@ -36,7 +43,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const body = await request.json()
+    const body = await parseJsonBody(request, knowledgeCreateBodySchema, { maxBytes: 64 * 1024 })
     const { category, title, content, tags, sourceType, projectId, valueGrade } = body
     const requiresProject = new Set([
       "daily_inspiration",

@@ -1,17 +1,14 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import {
   createWatchVideoExtraction,
   serializeWatchVideoExtraction,
 } from "@/lib/competitor-watch-video-extractions"
 import { withUserAuth } from "@/lib/user-auth"
+import { watchVideoExtractBodySchema } from "@/features/competitor/contracts/api"
 
 export const POST = withUserAuth(async (request, { user }) => {
-  let body: { watchAccountId?: unknown; videoUrl?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "请求格式不正确" }, { status: 400 })
-  }
+  const body = await parseJsonBody(request, watchVideoExtractBodySchema, { maxBytes: 8 * 1024 })
 
   const watchAccountId = typeof body.watchAccountId === "string" ? body.watchAccountId : ""
   const videoUrl = typeof body.videoUrl === "string" ? body.videoUrl : ""

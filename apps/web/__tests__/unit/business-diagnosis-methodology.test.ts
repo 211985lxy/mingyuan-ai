@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
+import type { AimChatParams, AimGenerateContext } from "@/lib/aim-agent-handlers"
 
 // 拦截 LLM 调用与数据库写入，避免真实外部依赖。
 // business_diagnosis 的 chat 走 executeChatLLM，generate 走 executeGenerateLLM + saveAimGenerationRecord。
@@ -30,8 +31,6 @@ const { buildBusinessDiagnosisMethodologyBlock } = await import("@/lib/business-
 const { buildIpCopywritingMethodologyBlock } = await import("@/lib/ip-copywriting-methodology")
 const { getAgentHandler } = await import("@/lib/aim-agent-handlers")
 const { AIM_AGENT_GUIDES } = await import("@/lib/aim-agent-guides")
-type AimChatParams = Awaited<typeof import("@/lib/aim-agent-handlers")>["AimChatParams"]
-type AimGenerateContext = Awaited<typeof import("@/lib/aim-agent-handlers")>["AimGenerateContext"]
 
 describe("business-diagnosis-methodology", () => {
   it("loads the project business diagnosis methodology without external framework traces", async () => {
@@ -56,6 +55,7 @@ describe("business-diagnosis-methodology", () => {
 function buildChatParams(overrides: Partial<AimChatParams> = {}): AimChatParams {
   return {
     userId: "test-user",
+    conversationBlock: "",
     messages: [{ role: "user", content: "帮我做 IP 定位" }],
     knowledgeBlock: "【知识库】示例知识",
     methodologyBlock: "【IP操盘方法论】IP账号定位与内容策略策划阶段",
@@ -68,15 +68,18 @@ function buildChatParams(overrides: Partial<AimChatParams> = {}): AimChatParams 
 function buildGenerateContext(overrides: Partial<AimGenerateContext> = {}): AimGenerateContext {
   return {
     userId: "test-user",
+    agentId: "business_diagnosis",
     rawInput: "AI 工具账号定位",
     targetFormats: ["raw_copy"],
     knowledgeBlock: "【知识库】示例知识",
     methodologyBlock: "【IP操盘方法论】IP账号定位与内容策略策划阶段",
     businessDiagnosisBlock: "",
     viralStructureBlock: "",
+    eventStorytellingBlock: "",
     ipWikiBlock: "",
     retrievedEntries: [],
     retrievedSource: "raw",
+    knowledgeStrategy: "deep",
     ...overrides,
   }
 }

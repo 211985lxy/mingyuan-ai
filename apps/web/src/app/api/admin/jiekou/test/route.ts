@@ -1,3 +1,5 @@
+import { parseJsonRecord } from "@/lib/api-contract"
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import OpenAI from "openai"
@@ -16,19 +18,19 @@ const PROVIDER_CONFIGS: Record<
   { apiKey?: string; baseURL: string; defaultModel: string }
 > = {
   jiekou: {
-    apiKey: process.env.JIEKOU_API_KEY,
-    baseURL: process.env.JIEKOU_BASE_URL || "https://api.highwayapi.ai/openai",
-    defaultModel: process.env.JIEKOU_MODEL || "gpt-4o",
+    apiKey: env.JIEKOU_API_KEY,
+    baseURL: env.JIEKOU_BASE_URL || "https://api.highwayapi.ai/openai",
+    defaultModel: env.JIEKOU_MODEL || "gpt-4o",
   },
   openrouter: {
-    apiKey: process.env.OPENROUTER_API_KEY,
-    baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-    defaultModel: process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.6",
+    apiKey: env.OPENROUTER_API_KEY,
+    baseURL: env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+    defaultModel: env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.6",
   },
 }
 
 export const POST = withAdminAuth(async (request: NextRequest) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { messages, model, temperature, max_tokens, stream } = body
   const providerName: ProviderName = body.provider === "openrouter" ? "openrouter" : "jiekou"
   const providerConfig = PROVIDER_CONFIGS[providerName]
@@ -53,7 +55,7 @@ export const POST = withAdminAuth(async (request: NextRequest) => {
     defaultHeaders:
       providerName === "openrouter"
         ? {
-            "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://aimingdong.com",
+            "HTTP-Referer": env.NEXT_PUBLIC_APP_URL || "https://aimingdong.com",
             "X-Title": "Mingyuan AIM Admin",
           }
         : undefined,

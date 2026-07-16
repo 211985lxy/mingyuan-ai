@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
@@ -11,7 +12,7 @@ export const PATCH = withUserAuth(async (request, { user, params }) => {
     return NextResponse.json({ error: "Missing id" }, { status: 400 })
   }
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const content =
     typeof body.content === "string" ? body.content.trim() : undefined
   const status = typeof body.status === "string" ? body.status : undefined
@@ -20,8 +21,8 @@ export const PATCH = withUserAuth(async (request, { user, params }) => {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 })
   }
 
-  const script = await prisma.script.findUnique({ where: { id } })
-  if (!script || script.userId !== user.id) {
+  const script = await prisma.script.findFirst({ where: { id, userId: user.id } })
+  if (!script) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
@@ -42,7 +43,7 @@ export const PATCH = withUserAuth(async (request, { user, params }) => {
     }
 
     return tx.script.update({
-      where: { id: script.id },
+      where: { id: script.id, userId: user.id },
       data: {
         content: content ?? script.content,
         status: status ?? script.status,

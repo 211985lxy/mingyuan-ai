@@ -152,7 +152,7 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
       fixtureId,
       version: 1,
       agent,
-      scenario: "new_copy" as const,
+      scenario: "new" as const,
       contractPassed: true,
       contractAssertions: [],
       rubricScore: score,

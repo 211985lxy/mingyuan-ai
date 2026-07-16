@@ -1,10 +1,11 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { buildAuthUserPayload } from "@/lib/auth-user"
 import { getActivationStartDate } from "@/lib/subscription"
-
-const DAILY_LIMIT = 2
+import { activationBodySchema } from "@/features/auth/contracts"
+import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
 
 function normalizeActivationCode(value: unknown): string {
   return String(value ?? "")
@@ -13,8 +14,18 @@ function normalizeActivationCode(value: unknown): string {
 }
 
 export const POST = withUserAuth(async (request: NextRequest, { user }) => {
-  const body = await request.json().catch(() => ({}))
+  const body = await parseJsonBody(request, activationBodySchema, { maxBytes: 1024 })
   const code = normalizeActivationCode(body.code)
+
+  if (!await allowAuthAttempt("activate", request, `${user.id}:${code}`, {
+    limit: 6,
+    windowSeconds: 15 * 60,
+  })) {
+    return NextResponse.json(
+      { error: "Too many activation attempts", code: "RATE_LIMITED" },
+      { status: 429 },
+    )
+  }
 
   if (!code) {
     return NextResponse.json(
@@ -53,7 +64,6 @@ export const POST = withUserAuth(async (request: NextRequest, { user }) => {
           email: true,
           name: true,
           plan: true,
-          authVideoUrl: true,
           createdAt: true,
           expiresAt: true,
         },
@@ -75,7 +85,6 @@ export const POST = withUserAuth(async (request: NextRequest, { user }) => {
           email: true,
           name: true,
           plan: true,
-          authVideoUrl: true,
           createdAt: true,
           expiresAt: true,
         },
@@ -94,9 +103,7 @@ export const POST = withUserAuth(async (request: NextRequest, { user }) => {
     })
 
     return NextResponse.json({
-      user: buildAuthUserPayload(activatedUser, {
-        dailyLimit: DAILY_LIMIT,
-      }),
+      user: buildAuthUserPayload(activatedUser),
     })
   } catch (error) {
     if (error instanceof Error) {

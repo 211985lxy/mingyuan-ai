@@ -5,8 +5,7 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft,
-  Video,
-  User,
+  Sparkles,
   ImageIcon,
   FileText,
   CheckCircle,
@@ -91,8 +90,7 @@ export default function AdminUserDetailPage() {
 
         {/* Stats */}
         <div className="space-y-4">
-          <StatMini icon={<Video className="h-4 w-4" />} label="视频" value={user._count.videoTasks} />
-          <StatMini icon={<User className="h-4 w-4" />} label="数字人" value={user._count.avatars} />
+          <StatMini icon={<Sparkles className="h-4 w-4" />} label="生成稿" value={user._count.aimGenerations} />
           <StatMini icon={<ImageIcon className="h-4 w-4" />} label="素材" value={user._count.assets} />
           <StatMini icon={<FileText className="h-4 w-4" />} label="脚本" value={user._count.scripts} />
         </div>
@@ -119,46 +117,38 @@ export default function AdminUserDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Video Tasks */}
+      {/* Recent generations */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            最近视频任务（共 {user._count.videoTasks} 个）
+            最近生成记录（共 {user._count.aimGenerations} 个）
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {user.videoTasks.length === 0 ? (
-            <p className="p-4 text-muted-foreground">暂无视频任务</p>
+          {user.aimGenerations.length === 0 ? (
+            <p className="p-4 text-muted-foreground">暂无生成记录</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium">状态</th>
-                    <th className="text-left p-3 font-medium">类型</th>
-                    <th className="text-left p-3 font-medium">数字人</th>
+                    <th className="text-left p-3 font-medium">智能体</th>
                     <th className="text-left p-3 font-medium">创建时间</th>
-                    <th className="text-left p-3 font-medium">完成时间</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {user.videoTasks.map((task) => (
-                    <tr key={task.id} className="border-b">
+                  {user.aimGenerations.map((generation) => (
+                    <tr key={generation.id} className="border-b">
                       <td className="p-3">
                         <span className="flex items-center gap-1.5">
-                          {STATUS_ICONS[task.status] || null}
-                          {task.status}
+                          {STATUS_ICONS[generation.status] || null}
+                          {generation.status}
                         </span>
                       </td>
-                      <td className="p-3 text-muted-foreground">{task.videoType}</td>
-                      <td className="p-3">{task.avatarName}</td>
+                      <td className="p-3 text-muted-foreground">{generation.agentId || "-"}</td>
                       <td className="p-3 text-muted-foreground">
-                        {new Date(task.createdAt).toLocaleDateString("zh-CN")}
-                      </td>
-                      <td className="p-3 text-muted-foreground">
-                        {task.completedAt
-                          ? new Date(task.completedAt).toLocaleDateString("zh-CN")
-                          : "-"}
+                        {new Date(generation.createdAt).toLocaleDateString("zh-CN")}
                       </td>
                     </tr>
                   ))}
@@ -169,38 +159,6 @@ export default function AdminUserDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Avatars */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">数字人 ({user._count.avatars})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {user.avatars.length === 0 ? (
-            <p className="text-muted-foreground">暂无数字人</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {user.avatars.map((avatar) => (
-                <div
-                  key={avatar.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{avatar.name}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
-                        {avatar.status}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(avatar.createdAt).toLocaleDateString("zh-CN")}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { env } from "@/env"
 // ─── 微信公众号后端服务 ─────────────────────────────────
 // 封装微信公众号服务端 API：access_token、素材上传、草稿箱新增
 // 环境变量：WECHAT_APP_ID, WECHAT_APP_SECRET, WECHAT_DEFAULT_AUTHOR
@@ -37,8 +38,8 @@ export class WechatOfficialAccount {
   private readonly appSecret: string
 
   constructor() {
-    const appId = process.env.WECHAT_APP_ID
-    const appSecret = process.env.WECHAT_APP_SECRET
+    const appId = env.WECHAT_APP_ID
+    const appSecret = env.WECHAT_APP_SECRET
     if (!appId || !appSecret) {
       throw new WechatOfficialAccountError(
         "WECHAT_APP_ID 和 WECHAT_APP_SECRET 必须配置",
@@ -177,5 +178,5 @@ export class WechatOfficialAccount {
 
 /** 获取默认作者名 */
 export function getWechatDefaultAuthor(fallback: string = "明远"): string {
-  return process.env.WECHAT_DEFAULT_AUTHOR || fallback
+  return env.WECHAT_DEFAULT_AUTHOR || fallback
 }

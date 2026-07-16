@@ -8,14 +8,10 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "参数错误" }, { status: 400 })
   }
 
-  const account = await prisma.watchAccount.findUnique({ where: { id } })
+  const account = await prisma.watchAccount.findFirst({ where: { id, userId: user.id } })
   if (!account) {
     return NextResponse.json({ error: "账号不存在" }, { status: 404 })
   }
-  if (account.userId !== user.id) {
-    return NextResponse.json({ error: "无权限" }, { status: 403 })
-  }
-
-  await prisma.watchAccount.delete({ where: { id } })
+  await prisma.watchAccount.delete({ where: { id, userId: user.id } })
   return NextResponse.json({ success: true })
 })

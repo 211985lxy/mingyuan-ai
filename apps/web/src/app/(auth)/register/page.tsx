@@ -84,7 +84,7 @@ export default function RegisterPage() {
         email,
         password,
       })
-      setSession(session.token, session.user)
+      setSession(session.user)
       router.push(
         getSubscriptionStatus(session.user.expiresAt ?? null) === "active"
           ? "/"

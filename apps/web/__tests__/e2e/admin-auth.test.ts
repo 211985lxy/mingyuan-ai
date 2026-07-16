@@ -31,7 +31,7 @@ describe("Admin Auth E2E", () => {
     const res = await POST(
       req("/api/admin/auth/login", {
         method: "POST",
-        body: { email: "nobody@e2e.com", password: "x" },
+        body: { email: "nobody@e2e.com", password: "Pass123!" },
       })
     )
     expect(res.status).toBe(401)
@@ -57,7 +57,7 @@ describe("Admin Auth E2E", () => {
     expect(res.status).toBe(401)
   })
 
-  it("returns JWT token on correct credentials", async () => {
+  it("sets an HttpOnly session cookie on correct credentials", async () => {
     const res = await POST(
       req("/api/admin/auth/login", {
         method: "POST",
@@ -67,11 +67,14 @@ describe("Admin Auth E2E", () => {
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.token).toBeDefined()
-    expect(typeof body.token).toBe("string")
+    expect(body.token).toBeUndefined()
     expect(body.admin.email).toBe("admin@e2e.com")
     expect(body.admin.role).toBe("admin")
     expect(body.admin.id).toBeDefined()
+    const setCookie = res.headers.get("set-cookie") ?? ""
+    expect(setCookie).toContain("mingyuan_admin_session=")
+    expect(setCookie).toContain("HttpOnly")
+    expect(setCookie).toContain("SameSite=lax")
     // password should NOT be in the response
     expect(body.admin.password).toBeUndefined()
   })

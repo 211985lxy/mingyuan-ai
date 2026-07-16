@@ -3,14 +3,16 @@ import { GET as CRON } from "@/app/api/cron/aihot-briefing/route"
 import { GET as TODAY } from "@/app/api/aihot-briefing/today/route"
 import { cronReq, disconnectAll, json, prisma, req } from "./helpers"
 
+vi.mock("@/lib/hot-source-settings", () => ({
+  loadEffectiveAccountSourceBindings: vi.fn(async () => []),
+}))
+
 const now = new Date("2099-01-01T01:00:00.000Z")
 
 function mockAiHotFetch(titleSuffix: string) {
   vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
     const userAgent = (init?.headers as Record<string, string>)?.["User-Agent"] ?? ""
-    return {
-      ok: true,
-      json: async () => ({
+    return Response.json({
         count: 2,
         hasNext: false,
         nextCursor: null,
@@ -34,11 +36,8 @@ function mockAiHotFetch(titleSuffix: string) {
             category: "paper",
           },
         ],
-      }),
-      headers: new Headers(),
-      status: 200,
-      userAgent,
-    } as Response
+        userAgent,
+    })
   }))
 }
 
@@ -79,11 +78,11 @@ describe("AI HOT briefing endpoints", () => {
   })
 
   it("returns an existing briefing from today endpoint", async () => {
-    const res = await TODAY()
+    const res = await TODAY(req("/api/aihot-briefing/today"))
     expect(res.status).toBe(200)
 
     const body = await json(res)
-    expect(body.data.title).toBe("每日选题雷达 · 今日 9 点")
+    expect(body.data.title).toBe("选题雷达 · 今日 9 点")
     expect(body.data.items).toHaveLength(2)
     expect(body.data.markdown).toContain("https://example.com/model-two")
   })

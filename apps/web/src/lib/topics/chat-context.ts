@@ -25,6 +25,7 @@ export async function loadTopicChatContext(input: { userId: string; projectId: s
     prisma.topicElement.findMany({
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
+      take: 200,
       select: { code: true, name: true, typeLabel: true, description: true },
     }),
     prisma.ipProfile.findUnique({

@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import type { NormalizedAccount, NormalizedComment, NormalizedVideo } from '@/lib/tikhub/types'
 
 export interface ExternalDouyinApiResult {
@@ -16,7 +17,7 @@ interface ExternalDouyinApiEnvelope {
 }
 
 export function hasExternalDouyinApi(): boolean {
-  return Boolean(process.env.COMPETITOR_DOUYIN_API_URL)
+  return Boolean(env.COMPETITOR_DOUYIN_API_URL)
 }
 
 export async function fetchFromExternalDouyinApi(input: {
@@ -24,7 +25,7 @@ export async function fetchFromExternalDouyinApi(input: {
   platformUserId: string | null
   count: number
 }): Promise<ExternalDouyinApiResult> {
-  const endpoint = process.env.COMPETITOR_DOUYIN_API_URL
+  const endpoint = env.COMPETITOR_DOUYIN_API_URL
   if (!endpoint) {
     throw new Error('未配置 COMPETITOR_DOUYIN_API_URL，无法使用云端对标账号抓取')
   }
@@ -33,11 +34,11 @@ export async function fetchFromExternalDouyinApi(input: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   }
-  if (process.env.COMPETITOR_DOUYIN_API_KEY) {
-    headers.Authorization = `Bearer ${process.env.COMPETITOR_DOUYIN_API_KEY}`
+  if (env.COMPETITOR_DOUYIN_API_KEY) {
+    headers.Authorization = `Bearer ${env.COMPETITOR_DOUYIN_API_KEY}`
   }
 
-  const timeoutMs = Number(process.env.COMPETITOR_DOUYIN_API_TIMEOUT_MS || 60000)
+  const timeoutMs = Number(env.COMPETITOR_DOUYIN_API_TIMEOUT_MS || 60000)
   const response = await fetch(endpoint, {
     method: 'POST',
     headers,

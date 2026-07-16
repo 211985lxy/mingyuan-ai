@@ -4,7 +4,7 @@ import React from "react"
 import Link from "next/link"
 import {
   Users,
-  Video,
+  Sparkles,
   KeyRound,
   FileText,
   ArrowRight,
@@ -17,12 +17,11 @@ import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getStoredAdminToken } from "@/lib/admin-store"
 import { getAdminUserStats, getActivationCodeStats, type UserStats, type CodeStats } from "@/lib/api/admin-client"
 
 interface DashboardData {
   totalUsers: number
-  videosToday: number
+  generationsToday: number
   activeTemplates: number
   hotListHealth: {
     successLast24h: number
@@ -38,17 +37,11 @@ export default function AdminDashboardPage() {
   const [codeStats, setCodeStats] = React.useState<LoadState<CodeStats>>({ status: "loading", data: null })
 
   const loadAll = React.useCallback(() => {
-    const token = getStoredAdminToken()
-
     setDashboard({ status: "loading", data: null })
     setCodeStats({ status: "loading", data: null })
     setUserStats({ status: "loading", data: null })
 
-    fetch("/api/admin/dashboard", {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    })
+    fetch("/api/admin/dashboard")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`仪表盘数据加载失败 (${r.status})`))))
       .then((r) => setDashboard({ status: "ok", data: r?.data ?? null }))
       .catch((err) => {
@@ -96,9 +89,9 @@ export default function AdminDashboardPage() {
           icon={<Users className="h-5 w-5 text-primary" />}
         />
         <MetricCard
-          title="今日视频"
-          state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.videosToday } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
-          icon={<Video className="h-5 w-5 text-primary" />}
+          title="今日生成"
+          state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.generationsToday } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
+          icon={<Sparkles className="h-5 w-5 text-primary" />}
         />
         <MetricCard
           title="活跃模板"

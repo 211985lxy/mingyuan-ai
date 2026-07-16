@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const keys = await prisma.agentApiKey.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
+      take: 100,
       select: {
         id: true,
         name: true,

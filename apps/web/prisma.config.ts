@@ -7,12 +7,12 @@ import { defineConfig } from "prisma/config";
 config({ path: ".env.local" });
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema: "prisma/",
   migrations: {
     path: "prisma/migrations",
     seed: "npx tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env["DATABASE_URL"] || "mysql://mingyuan:changethis@127.0.0.1:3306/mingyuan",
+    url: process.env["DATABASE_URL"],
   },
 });

@@ -96,11 +96,13 @@ describe("topic planning components", () => {
       loading: false,
       disabled: false,
       reply: {
+        classification: { category: "user_insight", reason: "客户问题或成交顾虑" },
         reply: {
           summary: "先解释价格背后的风险",
           recommendedTitle: "报价高，可能是在替你挡风险",
           opening: "便宜不一定省钱。",
           alternatives: ["成本拆解"],
+          nextActionLabel: "继续写成口播稿",
         },
         cards: [],
         topicSelectionId: "selection-1",

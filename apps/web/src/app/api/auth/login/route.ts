@@ -2,16 +2,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyPassword, signUserToken } from "@/lib/user-auth"
 import { buildAuthUserPayload } from "@/lib/auth-user"
-
-const DAILY_LIMIT = 2
+import { loginBodySchema } from "@/features/auth/contracts"
+import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
+import { setSessionCookie } from "@/lib/auth-session"
 
 export async function POST(request: NextRequest) {
-  const { email, password } = await request.json()
+  let credentials
+  try {
+    credentials = await parseJsonBody(request, loginBodySchema, { maxBytes: 4096 })
+  } catch (error) {
+    return apiRequestErrorResponse(request, error) ?? NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  }
+  const { email, password } = credentials
 
-  if (!email || !password) {
+  if (!await allowAuthAttempt("user-login", request, email, { limit: 8, windowSeconds: 15 * 60 })) {
     return NextResponse.json(
-      { error: "Email and password are required" },
-      { status: 400 }
+      { error: "Too many login attempts", code: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": "900" } },
     )
   }
 
@@ -23,7 +31,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const valid = user.password === "skip-password-check" || await verifyPassword(password, user.password)
+  const valid = await verifyPassword(password, user.password)
   if (!valid) {
     return NextResponse.json(
       { error: "Invalid credentials" },
@@ -33,11 +41,9 @@ export async function POST(request: NextRequest) {
 
   const token = signUserToken({ id: user.id, email: user.email })
 
-  return NextResponse.json({
-    token,
-    user: buildAuthUserPayload(user, {
-      dailyLimit: DAILY_LIMIT,
-      videosCreatedToday: 0,
-    }),
+  const response = NextResponse.json({
+    user: buildAuthUserPayload(user),
   })
+  setSessionCookie(response, "user", token)
+  return response
 }

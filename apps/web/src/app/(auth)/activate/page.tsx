@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ApiError, activateUser, getCurrentUser } from "@/lib/api/client"
+import { getActivationAccountLabel } from "@/lib/activation-account"
+import { ApiError, activateUser, getCurrentUser, logoutUser } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/store"
 import { getSubscriptionStatus } from "@/lib/subscription"
 
@@ -30,7 +31,7 @@ function formatDate(dateStr?: string | null) {
 
 export default function ActivatePage() {
   const router = useRouter()
-  const { token, user, updateUser, clearSession, isHydrated } = useAuthStore()
+  const { user, setSession, updateUser, clearSession, isHydrated } = useAuthStore()
 
   const [code, setCode] = React.useState("")
   const [loading, setLoading] = React.useState(false)
@@ -40,14 +41,9 @@ export default function ActivatePage() {
   React.useEffect(() => {
     if (!isHydrated) return
 
-    if (!token) {
-      router.replace("/login")
-      return
-    }
-
     getCurrentUser()
       .then((liveUser) => {
-        updateUser(liveUser)
+        setSession(liveUser)
 
         if (liveUser.subscriptionStatus === "active") {
           router.replace("/home")
@@ -59,9 +55,10 @@ export default function ActivatePage() {
           router.replace("/login")
           return
         }
+        setSubmitError("账号信息加载失败，请刷新重试")
       })
       .finally(() => setChecking(false))
-  }, [token, isHydrated, router, updateUser, clearSession])
+  }, [isHydrated, router, setSession, clearSession])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -86,9 +83,13 @@ export default function ActivatePage() {
     }
   }
 
-  function handleLogout() {
-    clearSession()
-    router.replace("/login")
+  async function handleLogout() {
+    try {
+      await logoutUser()
+    } finally {
+      clearSession()
+      router.replace("/login")
+    }
   }
 
   if (!isHydrated || checking) {
@@ -123,7 +124,7 @@ export default function ActivatePage() {
                 {subscriptionStatus === "expired" ? "当前服务已过期" : "当前账号未激活"}
               </p>
               <p className="text-muted-foreground">
-                账号: {user?.email ?? "—"}
+                账号: {getActivationAccountLabel(user?.email)}
               </p>
               {subscriptionStatus === "expired" && expiryText ? (
                 <p className="text-muted-foreground">
@@ -158,7 +159,7 @@ export default function ActivatePage() {
           <Button
             type="submit"
             size="lg"
-            disabled={loading}
+            disabled={loading || !user?.email}
             className="w-full cursor-pointer"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}

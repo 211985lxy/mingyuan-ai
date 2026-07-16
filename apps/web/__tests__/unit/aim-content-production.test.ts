@@ -176,6 +176,7 @@ describe("AIM content production positioning", () => {
 
   it("keeps follow-up edits anchored to the latest relevant draft", () => {
     const prompt = buildContentProducerChatPrompt({
+      conversationBlock: "最近成稿",
       knowledgeBlock: "企业知识",
       methodologyBlock: "方法论",
       ipWikiBlock: "",

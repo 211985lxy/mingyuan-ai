@@ -58,7 +58,7 @@ describe("admin api client", () => {
     const { useAdminStore } = await import("@/lib/admin-store")
     const { getAdminUserStats } = await import("@/lib/api/admin-client")
 
-    useAdminStore.getState().setSession("expired-token", {
+    useAdminStore.getState().setSession({
       id: "admin-1",
       email: "admin@example.com",
       name: "Admin",
@@ -70,14 +70,13 @@ describe("admin api client", () => {
       message: "Invalid token",
     })
 
-    expect(useAdminStore.getState().token).toBeNull()
+    expect(useAdminStore.getState().isAuthenticated).toBe(false)
+    expect(useAdminStore.getState().admin).toBeNull()
     expect(replace).toHaveBeenCalledWith("/admin/login")
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/admin/users/stats",
       expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer expired-token",
-        }),
+        credentials: "same-origin",
       })
     )
   })

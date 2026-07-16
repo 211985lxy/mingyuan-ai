@@ -1,10 +1,12 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { collectDouyinCompetitorData } from "@/lib/competitor-analysis/collector"
-import { logger } from "@/lib/logger"
+import { generateRequestId, hashLogIdentifier, logger } from "@/lib/logger"
 import { enforceWatchRefreshBetaLimit } from "@/lib/internal-beta-limits"
 import { calculateViralVideos } from "@/lib/competitor-watch-viral"
+import { watchAccountRefreshBodySchema } from "@/features/competitor/contracts/api"
 
 type RefreshLog = Pick<typeof logger, "info" | "error">
 
@@ -18,7 +20,7 @@ export const runtime = "nodejs"
 async function refreshAccount(
   account: Awaited<ReturnType<typeof prisma.watchAccount.findMany>>[number],
   log: RefreshLog,
-) {
+): Promise<{ id: string; targetUrl: string; status: "success" | "failed"; error?: string }> {
   const start = Date.now()
   try {
     const collected = await collectDouyinCompetitorData({
@@ -33,7 +35,7 @@ async function refreshAccount(
     const viralPicks = calculateViralVideos(sortedVideos)
 
     await prisma.watchAccount.update({
-      where: { id: account.id },
+      where: { id: account.id, userId: account.userId },
       data: {
         platformUserId: collected.platformUserId,
         nickname: collected.account.nickname,
@@ -48,33 +50,20 @@ async function refreshAccount(
     })
 
     log.info({ accountId: account.id, elapsed: Date.now() - start }, "Account refreshed")
+    return { id: account.id, targetUrl: account.targetUrl, status: "success" }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     await prisma.watchAccount.update({
-      where: { id: account.id },
+      where: { id: account.id, userId: account.userId },
       data: { refreshStatus: "failed", refreshError: errorMessage },
     })
     log.error({ accountId: account.id, err }, "Account refresh failed")
+    return { id: account.id, targetUrl: account.targetUrl, status: "failed", error: errorMessage }
   }
-}
-
-async function refreshAccountsInBackground(
-  accounts: Awaited<ReturnType<typeof prisma.watchAccount.findMany>>,
-  log: RefreshLog,
-) {
-  for (const account of accounts) {
-    await refreshAccount(account, log)
-  }
-  log.info(`Background refresh complete for ${accounts.length} watch accounts`)
 }
 
 export const POST = withUserAuth(async (request, { user }) => {
-  let body: { accountId?: string }
-  try {
-    body = await request.json()
-  } catch {
-    body = {}
-  }
+  const body = await parseJsonBody(request, watchAccountRefreshBodySchema, { maxBytes: 1024 })
 
   const where = { userId: user.id }
   if (body.accountId) {
@@ -84,6 +73,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const accounts = await prisma.watchAccount.findMany({
     where: where as { userId: string; id?: string },
     orderBy: { createdAt: "desc" },
+    take: 50,
   })
 
   if (accounts.length === 0) {
@@ -93,28 +83,26 @@ export const POST = withUserAuth(async (request, { user }) => {
   const quotaResponse = await enforceWatchRefreshBetaLimit(user.id, accounts.length)
   if (quotaResponse) return quotaResponse
 
-  const log = logger.child({ userId: user.id, accountIds: accounts.map((a) => a.id) })
+  const requestId = request.headers.get("x-request-id") || generateRequestId()
+  const log = logger.child({ requestId, userIdHash: hashLogIdentifier(user.id), accountIds: accounts.map((a) => a.id) })
   log.info(`Starting refresh for ${accounts.length} watch accounts`)
 
   await prisma.watchAccount.updateMany({
-    where: { id: { in: accounts.map((account) => account.id) } },
+    where: { userId: user.id, id: { in: accounts.map((account) => account.id) } },
     data: { refreshStatus: "refreshing", refreshError: null },
   })
 
-  void refreshAccountsInBackground(accounts, log).catch((err) => {
-    log.error({ err }, "Background refresh crashed")
-  })
+  const results = []
+  for (const account of accounts) results.push(await refreshAccount(account, log))
+  const success = results.filter((result) => result.status === "success").length
+  const failed = results.length - success
 
   return NextResponse.json({
-    results: accounts.map((account) => ({
-      id: account.id,
-      targetUrl: account.targetUrl,
-      status: "refreshing",
-    })),
+    results,
     summary: {
-      total: accounts.length,
-      success: 0,
-      failed: 0,
+      total: results.length,
+      success,
+      failed,
     },
-  })
+  }, { status: success > 0 ? 200 : 502, headers: { "x-request-id": requestId } })
 })

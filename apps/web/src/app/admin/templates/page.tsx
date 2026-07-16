@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { useAdminStore } from "@/lib/admin-store"
 
 interface Template {
   id: string
@@ -17,7 +16,6 @@ interface Template {
   description: string | null
   contentType: string
   status: string
-  videoType: string
   industry: string[]
   sortOrder: number
   createdAt: string
@@ -36,7 +34,6 @@ export default function AdminTemplatesPage() {
   const [statusFilter, setStatusFilter] = React.useState("")
   const [contentTypeFilter, setContentTypeFilter] = React.useState("")
   const [loading, setLoading] = React.useState(true)
-  const token = useAdminStore((s) => s.token)
   const pageSize = 20
 
   const fetchTemplates = React.useCallback(async () => {
@@ -45,9 +42,7 @@ export default function AdminTemplatesPage() {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       if (statusFilter) params.set("status", statusFilter)
       if (contentTypeFilter) params.set("contentType", contentTypeFilter)
-      const res = await fetch(`/api/admin/templates?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetch(`/api/admin/templates?${params}`)
       const json = await res.json()
       setTemplates(json.data?.results ?? [])
       setTotal(json.data?.total ?? 0)
@@ -59,7 +54,7 @@ export default function AdminTemplatesPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, contentTypeFilter, token])
+  }, [page, statusFilter, contentTypeFilter])
 
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -116,7 +111,6 @@ export default function AdminTemplatesPage() {
                 <tr className="border-b text-left text-sm text-muted-foreground">
                   <th className="p-4">名称</th>
                   <th className="p-4">类型</th>
-                  <th className="p-4">视频类型</th>
                   <th className="p-4">状态</th>
                   <th className="p-4">排序</th>
                   <th className="p-4">创建时间</th>
@@ -132,7 +126,6 @@ export default function AdminTemplatesPage() {
                     <td className="p-4">
                       <Badge variant="outline">{t.contentType}</Badge>
                     </td>
-                    <td className="p-4 text-sm text-muted-foreground">{t.videoType}</td>
                     <td className="p-4">
                       <Badge className={STATUS_COLORS[t.status] ?? "bg-gray-100 text-gray-700"}>
                         {t.status === "published" ? "已发布" : t.status === "draft" ? "草稿" : t.status}

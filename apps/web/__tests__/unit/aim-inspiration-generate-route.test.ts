@@ -13,7 +13,7 @@ const {
   inspirationUpdate,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  authErrorResponse: vi.fn(() => null),
+  authErrorResponse: vi.fn((): Response | null => null),
   executeAimRun: vi.fn(),
   inspirationFindFirst: vi.fn(),
   inspirationUpdate: vi.fn(async () => ({})),

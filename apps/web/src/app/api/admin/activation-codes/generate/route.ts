@@ -1,7 +1,9 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
+import { recordAdminAudit } from "@/lib/admin-audit"
 
 // Alphabet excluding ambiguous characters: 0, O, 1, I, L
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -17,7 +19,7 @@ function generateCode(): string {
 }
 
 export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
-  const { quantity, batchNote, durationDays } = await request.json()
+  const { quantity, batchNote, durationDays } = await parseJsonRecord(request)
 
   const qty = parseInt(quantity)
   if (!qty || qty < 1 || qty > 500) {
@@ -53,8 +55,16 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
   }))
 
   await prisma.activationCode.createMany({ data })
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "activation_codes.generate",
+    targetType: "activation_code_batch",
+    targetId: batchId,
+    metadata: { quantity: qty, durationDays: duration },
+  })
 
   return NextResponse.json({
     data: { count: qty, batchId, durationDays: duration },
-  })
+  }, { headers: { "x-request-id": requestId } })
 }, "admin")

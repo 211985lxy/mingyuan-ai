@@ -67,16 +67,19 @@ export async function buildViralStructureBlock(): Promise<string> {
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
       select: { name: true, description: true, formulas: true },
+      take: 200,
     }),
     prisma.copyStructure.findMany({
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
       select: { name: true, description: true, beats: true },
+      take: 200,
     }),
     prisma.endingType.findMany({
       where: { status: "published" },
       orderBy: { sortOrder: "asc" },
       select: { name: true, guidance: true, patterns: true },
+      take: 200,
     }),
   ])
 

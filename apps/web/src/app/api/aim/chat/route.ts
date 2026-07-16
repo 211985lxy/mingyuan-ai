@@ -9,6 +9,7 @@ import {
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { executeAimRun, streamAimRun } from "@/lib/aim-harness/runtime"
 import { executeAimChatDomain } from "@/lib/aim-harness/domain-executor"
 import {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     if (quotaResponse) return quotaResponse
 
     const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext } =
-      parseAimChatBody(await request.json())
+      parseAimChatBody(await parseJsonRecord(request))
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "请求格式不正确，缺少 messages 数组" }, { status: 400 })
@@ -90,6 +91,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
 
     console.error("[aim/chat] Error:", error)
     await failAimTrace(trace, error)

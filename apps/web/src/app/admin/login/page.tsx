@@ -37,7 +37,7 @@ export default function AdminLoginPage() {
     setError(null)
     try {
       const res = await adminLogin(email, password)
-      setSession(res.token, res.admin)
+      setSession(res.admin)
       router.push("/admin")
     } catch (err) {
       setError(

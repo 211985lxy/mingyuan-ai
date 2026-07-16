@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { NextRequest } from "next/server"
 
 const mocks = vi.hoisted(() => ({
   parseDocument: vi.fn(),
@@ -17,10 +18,10 @@ async function postFiles(files: File[]) {
   for (const file of files) formData.append("files", file)
 
   const { POST } = await import("@/app/api/admin/benchmark-profiles/import-text/route")
-  return POST(new Request("http://localhost/api/admin/benchmark-profiles/import-text", {
+  return POST(new NextRequest("http://localhost/api/admin/benchmark-profiles/import-text", {
     method: "POST",
     body: formData,
-  }))
+  }), { params: Promise.resolve({}) })
 }
 
 describe("benchmark profile text import", () => {

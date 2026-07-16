@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import crypto from "crypto"
 
 // 全局缓存 Token 避免每次请求都重新生成
@@ -22,12 +23,12 @@ export async function getAliyunNlsToken(): Promise<string> {
   }
 
   const accessKeyId =
-    process.env.ALIYUN_VIAPI_ACCESS_KEY_ID ||
-    process.env.OSS_ACCESS_KEY_ID ||
+    env.ALIYUN_VIAPI_ACCESS_KEY_ID ||
+    env.OSS_ACCESS_KEY_ID ||
     ""
   const accessKeySecret =
-    process.env.ALIYUN_VIAPI_ACCESS_KEY_SECRET ||
-    process.env.OSS_ACCESS_KEY_SECRET ||
+    env.ALIYUN_VIAPI_ACCESS_KEY_SECRET ||
+    env.OSS_ACCESS_KEY_SECRET ||
     ""
 
   if (!accessKeyId || !accessKeySecret) {
@@ -92,7 +93,7 @@ export async function getAliyunNlsToken(): Promise<string> {
  * 限制：音频时长不超过 60 秒，建议采样率为 16000Hz 单声道 16bit WAV 格式
  */
 export async function transcribeAudioWav(audioBuffer: Buffer): Promise<string> {
-  const appKey = process.env.ALIYUN_NLS_APP_KEY || ""
+  const appKey = env.ALIYUN_NLS_APP_KEY || ""
   if (!appKey) {
     throw new Error("未配置阿里云智能语音交互 AppKey (ALIYUN_NLS_APP_KEY)")
   }

@@ -1,0 +1,95 @@
+{
+  "tables": [
+    {
+      "name": "AimGeneration",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "workflowStatus",
+        "topicSelectionId",
+        "selectedTopicIndex",
+        "taskSpec",
+        "decisionSnapshot",
+        "retroSnapshots",
+        "calibrationRules"
+      ]
+    },
+    {
+      "name": "ContentOutcome",
+      "columns": [
+        "id",
+        "userId",
+        "generationId",
+        "collectWindowDay",
+        "collectedAt",
+        "qualifiedLeadCount",
+        "views",
+        "userVerdict"
+      ]
+    },
+    {
+      "name": "AimRunSnapshot",
+      "columns": [
+        "id",
+        "runId",
+        "userId",
+        "runSpec",
+        "contextManifest",
+        "providerAttempts",
+        "qualityResult",
+        "expiresAt"
+      ]
+    },
+    {
+      "name": "AimRunEvent",
+      "columns": [
+        "id",
+        "runId",
+        "userId",
+        "event",
+        "metadata",
+        "createdAt"
+      ]
+    },
+    {
+      "name": "ContentGenerationRun",
+      "columns": [
+        "id",
+        "topicSelectionId",
+        "openingTypeCode",
+        "copyStructureCode",
+        "endingTypeCode"
+      ]
+    },
+    {
+      "name": "Script",
+      "columns": [
+        "id",
+        "topicSelectionId",
+        "isHotTopicVersion"
+      ]
+    },
+    {
+      "name": "AdminUser",
+      "columns": [
+        "id",
+        "isActive",
+        "sessionVersion"
+      ]
+    },
+    {
+      "name": "AdminAuditLog",
+      "columns": [
+        "id",
+        "adminId",
+        "action",
+        "targetType",
+        "targetId",
+        "requestId",
+        "metadata",
+        "createdAt"
+      ]
+    }
+  ]
+}

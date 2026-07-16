@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withUserAuth } from '@/lib/user-auth'
+import { parseQuery } from "@/lib/api-contract"
+import { competitorReportsQuerySchema } from "@/features/competitor/contracts/api"
 
 export const GET = withUserAuth(async (request, { user }) => {
-  const { searchParams } = new URL(request.url)
-  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
-  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') ?? '10', 10)))
-  const targetUrl = searchParams.get('targetUrl')?.trim()
+  const { page = 1, limit = 10, targetUrl } = parseQuery(request, competitorReportsQuerySchema)
   const skip = (page - 1) * limit
   const where = {
     userId: user.id,

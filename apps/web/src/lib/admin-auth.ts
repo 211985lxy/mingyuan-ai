@@ -1,17 +1,19 @@
+import { env } from "@/env"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "./prisma"
 import type { AdminRole } from "@/types/content-template"
+import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
+import { apiRequestErrorResponse } from "@/lib/api-contract"
+import { createRequestLogger, generateRequestId, hashLogIdentifier } from "@/lib/logger"
 
-// 删除硬编码 fallback。允许回退到 JWT_SECRET(安全等价,只要 JWT_SECRET 强即可),
-// 但两者都缺失时必须 fail-fast,而不是用公开字符串验签。
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
+const ADMIN_JWT_SECRET = env.ADMIN_JWT_SECRET
 
 function requireAdminJwtSecret(): string {
   if (!ADMIN_JWT_SECRET || ADMIN_JWT_SECRET.length < 32) {
     throw new Error(
-      "ADMIN_JWT_SECRET(或回退的 JWT_SECRET)未配置或长度不足(需 ≥32 字符)。请在环境变量中配置。"
+      "ADMIN_JWT_SECRET 未配置或长度不足(需 ≥32 字符)。请在环境变量中配置。"
     )
   }
   return ADMIN_JWT_SECRET
@@ -21,6 +23,7 @@ interface AdminPayload {
   id: string
   email: string
   role: AdminRole
+  sessionVersion: number
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -35,7 +38,7 @@ export async function verifyPassword(
 }
 
 export function signAdminToken(payload: AdminPayload): string {
-  return jwt.sign(payload, requireAdminJwtSecret(), { expiresIn: "24h" })
+  return jwt.sign(payload, requireAdminJwtSecret(), { expiresIn: "8h" })
 }
 
 export function verifyAdminToken(token: string): AdminPayload | null {
@@ -45,12 +48,6 @@ export function verifyAdminToken(token: string): AdminPayload | null {
   } catch {
     return null
   }
-}
-
-function extractToken(request: NextRequest): string | null {
-  const auth = request.headers.get("authorization")
-  if (auth?.startsWith("Bearer ")) return auth.slice(7)
-  return null
 }
 
 /**
@@ -68,12 +65,19 @@ export function withAdminAuth(
     request: NextRequest,
     segmentData: { params: Promise<Record<string, string>> }
   ): Promise<NextResponse> => {
-    const token = extractToken(request)
-    if (!token) {
+    const requestId = request.headers.get("x-request-id") || generateRequestId()
+    const session = readSessionToken(request, "admin")
+    if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+    if (!isCsrfSafe(request, session.source)) {
+      return NextResponse.json(
+        { error: "Cross-site request rejected", code: "CSRF_REJECTED" },
+        { status: 403 },
+      )
+    }
 
-    const admin = verifyAdminToken(token)
+    const admin = verifyAdminToken(session.token)
     if (!admin) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
@@ -82,7 +86,11 @@ export function withAdminAuth(
     const dbAdmin = await prisma.adminUser.findUnique({
       where: { id: admin.id },
     })
-    if (!dbAdmin || !dbAdmin.isActive) {
+    if (
+      !dbAdmin ||
+      !dbAdmin.isActive ||
+      dbAdmin.sessionVersion !== admin.sessionVersion
+    ) {
       return NextResponse.json({ error: "Account disabled" }, { status: 403 })
     }
 
@@ -92,7 +100,21 @@ export function withAdminAuth(
     }
 
     const params = segmentData ? await segmentData.params : undefined
-    return handler(request, { admin, params })
+    const log = createRequestLogger({
+      requestId,
+      userIdHash: hashLogIdentifier(admin.id),
+      path: request.nextUrl.pathname,
+    })
+    try {
+      const response = await handler(request, { admin, params })
+      response.headers.set("x-request-id", requestId)
+      return response
+    } catch (error) {
+      const contractResponse = apiRequestErrorResponse(request, error)
+      if (contractResponse) return contractResponse
+      log.error({ err: error }, "admin request failed")
+      throw error
+    }
   }
 }
 
@@ -101,7 +123,7 @@ export function withAdminAuth(
  */
 export function validateCronSecret(request: NextRequest): boolean {
   const auth = request.headers.get("authorization")
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = env.CRON_SECRET
   if (!cronSecret) return false
   return auth === `Bearer ${cronSecret}`
 }

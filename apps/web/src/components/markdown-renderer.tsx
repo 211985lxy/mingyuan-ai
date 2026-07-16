@@ -7,6 +7,17 @@ interface MarkdownRendererProps {
   className?: string
 }
 
+export function safeMarkdownHref(value: string): string | null {
+  const href = value.trim()
+  if (href.startsWith("/") || href.startsWith("#")) return href
+  try {
+    const parsed = new URL(href)
+    return ["http:", "https:", "mailto:"].includes(parsed.protocol) ? href : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Lightweight Markdown renderer — no external dependencies.
  * Supports the patterns that AI analysis output typically uses:
@@ -78,7 +89,16 @@ function renderInline(text: string): React.ReactNode {
 
     if (boldMatch) candidates.push({ index: boldMatch.index!, length: boldMatch[0].length, render: <strong key={key++}>{renderInline(boldMatch[1])}</strong> })
     if (codeMatch) candidates.push({ index: codeMatch.index!, length: codeMatch[0].length, render: <code key={key++} className="rounded bg-muted px-1 py-0.5 text-xs font-mono">{codeMatch[1]}</code> })
-    if (linkMatch) candidates.push({ index: linkMatch.index!, length: linkMatch[0].length, render: <a key={key++} href={linkMatch[2]} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2 hover:text-primary/80">{linkMatch[1]}</a> })
+    if (linkMatch) {
+      const href = safeMarkdownHref(linkMatch[2])
+      candidates.push({
+        index: linkMatch.index!,
+        length: linkMatch[0].length,
+        render: href
+          ? <a key={key++} href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2 hover:text-primary/80">{linkMatch[1]}</a>
+          : <span key={key++}>{linkMatch[1]}</span>,
+      })
+    }
     if (italicMatch) candidates.push({ index: italicMatch.index!, length: italicMatch[0].length, render: <em key={key++}>{italicMatch[1]}</em> })
 
     if (candidates.length === 0) {

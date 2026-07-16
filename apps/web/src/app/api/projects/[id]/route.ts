@@ -1,6 +1,8 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { permanentlyDeleteOwnedProject } from "@/features/projects/services/project-lifecycle"
 
 function cleanText(value: unknown, maxLength = 500) {
   if (typeof value !== "string") return undefined
@@ -23,7 +25,7 @@ export async function PATCH(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
 
     const existing = await prisma.clientProject.findFirst({
       where: { id, userId: user.id },
@@ -38,7 +40,7 @@ export async function PATCH(
       : undefined
 
     const project = await prisma.clientProject.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: {
         name: cleanRequiredText(body.name, 80),
         companyName: cleanText(body.companyName, 80),
@@ -70,14 +72,23 @@ export async function DELETE(
 
     const existing = await prisma.clientProject.findFirst({
       where: { id, userId: user.id },
-      select: { id: true },
+      select: { id: true, name: true },
     })
     if (!existing) {
       return NextResponse.json({ error: "客户项目不存在" }, { status: 404 })
     }
 
+    const url = new URL(request.url)
+    if (url.searchParams.get("permanent") === "true") {
+      if (url.searchParams.get("confirm") !== existing.name) {
+        return NextResponse.json({ error: "永久删除必须使用项目名称确认" }, { status: 400 })
+      }
+      const deleted = await permanentlyDeleteOwnedProject(user.id, id)
+      return NextResponse.json({ deleted: Boolean(deleted), details: deleted })
+    }
+
     const project = await prisma.clientProject.update({
-      where: { id },
+      where: { id, userId: user.id },
       data: { status: "archived" },
     })
 

@@ -1,0 +1,64 @@
+// Hot domain models
+
+model DouyinHotItem {
+  id               String    @id @default(cuid())
+  sentenceId       String
+  word             String
+  hotValue         Int
+  position         Int
+  label            Int       @default(0) // 0=normal 1=new 2=hot 3=recommended
+  videoCount       Int       @default(0)
+  discussCount     Int       @default(0)
+  coverUrl         String?
+  eventTime        DateTime
+  searchSnapshot   Json?
+  insightStatus    String    @default("pending") // pending | ready | failed
+  insightJson      Json?
+  insightError     String?   @db.Text
+  insightUpdatedAt DateTime?
+  fetchedAt        DateTime  @default(now())
+  batchId          String
+
+  @@unique([sentenceId, batchId])
+  @@index([fetchedAt])
+  @@index([position])
+  @@index([sentenceId, fetchedAt])
+}
+
+model DouyinHotSnapshot {
+  id        String   @id @default(cuid())
+  batchId   String   @unique
+  fetchedAt DateTime @default(now())
+  itemCount Int
+  rawJson   Json?
+  status    String   @default("success") // success | failed | partial
+}
+
+model AiHotBriefing {
+  id          String   @id @default(cuid())
+  date        String   @unique // Beijing date, YYYY-MM-DD
+  title       String
+  generatedAt DateTime
+  windowStart DateTime
+  windowEnd   DateTime
+  markdown    String   @db.Text
+  items       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([generatedAt])
+}
+
+model MarketHotSnapshot {
+  id          String   @id @default(cuid())
+  date        String   @unique // Beijing date, YYYY-MM-DD
+  generatedAt DateTime
+  items       Json
+  warnings    Json
+  summary     String   @db.Text
+  status      String   @default("success") // success | partial | failed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([generatedAt])
+}

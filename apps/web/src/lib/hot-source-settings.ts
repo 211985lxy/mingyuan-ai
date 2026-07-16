@@ -45,6 +45,7 @@ export async function loadSystemAccountSourceBindings(): Promise<AccountSourceBi
   const settings = await prisma.systemSetting.findMany({
     where: { category: HOT_SOURCE_CATEGORY },
     orderBy: { updatedAt: "desc" },
+    take: 500,
   })
 
   return settings

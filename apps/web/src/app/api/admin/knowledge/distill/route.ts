@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -5,16 +6,17 @@ import { LLMClient } from "@/lib/llm/client"
 
 // 知识库蒸馏：用 DeepSeek 对指定知识条目做精炼/合并/分类建议
 export const POST = withAdminAuth(async (request) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const { ids } = body as { ids?: string[] }
 
-  if (!ids || ids.length === 0) {
-    return NextResponse.json({ error: "ids 必填" }, { status: 400 })
+  if (!ids || ids.length === 0 || ids.length > 50) {
+    return NextResponse.json({ error: "ids 必填且最多 50 条" }, { status: 400 })
   }
 
   const entries = await prisma.knowledgeEntry.findMany({
     where: { id: { in: ids }, status: "active" },
     select: { id: true, title: true, content: true, category: true, tags: true },
+    take: 50,
   })
 
   if (entries.length === 0) {

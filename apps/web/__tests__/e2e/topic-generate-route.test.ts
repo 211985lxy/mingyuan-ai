@@ -34,7 +34,7 @@ function req(body: unknown) {
 
 describe("topic generate route", () => {
   it("rejects invalid recommendationMode", async () => {
-    const res = await POST(req({ recommendationMode: "tomorrow" }))
+    const res = await POST(req({ recommendationMode: "tomorrow" }), { params: Promise.resolve({}) })
 
     expect(res.status).toBe(400)
     const body = await res.json()

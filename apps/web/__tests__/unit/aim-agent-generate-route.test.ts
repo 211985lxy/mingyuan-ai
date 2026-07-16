@@ -19,7 +19,7 @@ const {
   authenticateAgentRequest: vi.fn(),
   assertAgentAccess: vi.fn(),
   assertAgentProjectAccess: vi.fn(),
-  agentAuthErrorResponse: vi.fn(() => null),
+  agentAuthErrorResponse: vi.fn((): Response | null => null),
   executeAimRun: vi.fn(),
   executeAimGenerationDomain: vi.fn(async () => ({ output: {}, generationId: "gen-1" })),
   agentApiCallLogCreate: vi.fn(async () => ({})),

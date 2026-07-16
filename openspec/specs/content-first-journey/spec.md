@@ -1,48 +1,47 @@
 # Purpose
-Define the dashboard and `/create` flow behavior for the product's content-first journey, where profile completion and script quality precede avatar and video production.
+
+Define the default AIM journey as one continuous content workflow while preserving expert deep links.
 
 ## Requirements
 
-### Requirement: Dashboard prioritizes profile completion and content creation
-The console home page SHALL prioritize the actions that match the new product core: complete personal IP profile first, then create content, then create video.
+### Requirement: AIM exposes four user stages
 
-#### Scenario: Incomplete user sees profile-first CTA
-- **WHEN** the user opens the dashboard without a complete IP profile
-- **THEN** the primary CTA and first guidance module direct the user to complete the IP profile
+The default AIM page SHALL present `定方向`, `做内容`, `去发布`, and `看结果` as the primary workflow. Internal agents, routes, knowledge strategies, and model selection SHALL remain implementation details.
 
-#### Scenario: Complete user sees content-first CTA
-- **WHEN** the user opens the dashboard with a complete IP profile
-- **THEN** the primary CTA directs the user into the content creation workflow rather than avatar selection
+#### Scenario: User enters AIM without a deep link
 
-### Requirement: Create flow enforces content-first order
-The `/create` experience SHALL follow this sequence: select content template, fill brief and generate scripts, choose or edit one script, choose a digital human, then confirm and submit video generation. The user MUST NOT be asked to choose a digital human before a script has been selected.
+- **WHEN** an authenticated user opens `/aim`
+- **THEN** the page offers the four workflow stages and project-relevant recent work
 
-#### Scenario: Normal content-first progression
-- **WHEN** the user enters `/create` with a complete IP profile
-- **THEN** the flow starts from template selection and does not show avatar selection as the first step
+#### Scenario: Expert deep link remains compatible
 
-#### Scenario: Avatar step requires selected script
-- **WHEN** the user has not yet selected a saved script
-- **THEN** the avatar step remains unavailable and the user is kept in the script-generation portion of the flow
+- **WHEN** a user opens a supported `/aim?agent=...` deep link
+- **THEN** the requested expert capability remains available without forcing the default stage selector
 
-### Requirement: Create flow uses real templates, scripts, avatars, and tasks
-The content-first journey SHALL orchestrate the real backend entities already defined by the system: published content templates, persisted scripts, ready avatars, and video tasks.
+### Requirement: Direction hands off through an editable brief
 
-#### Scenario: User creates a video from a selected script
-- **WHEN** the user selects a saved script and a ready avatar, then submits the final step
-- **THEN** the frontend calls the real video task API and the backend creates a `VideoTask` linked to the selected `Script`
+Cross-stage handoff from `定方向` to `做内容` SHALL use a user-reviewable task brief stored with the generation context. Facts inherited from project or knowledge sources MUST be authorization-checked by the server.
 
-#### Scenario: Selected script is snapshotted into the task
-- **WHEN** the backend creates a `VideoTask` from a selected script
-- **THEN** the task stores both the `scriptId` relation and the current `scriptContent` snapshot so later edits do not rewrite historical task content
+#### Scenario: User confirms a direction brief
 
-### Requirement: Step-specific expert guidance remains part of the workflow
-The content-first journey SHALL preserve the product's “marketing expert guiding the user” experience by showing contextual guidance at each stage of onboarding and creation.
+- **WHEN** the user reviews and confirms the brief
+- **THEN** the confirmed snapshot becomes the content-generation constraint set
 
-#### Scenario: Profile page explains why the profile matters
-- **WHEN** the user is filling the IP profile
-- **THEN** the UI explains that the saved profile will shape later AI script generation
+#### Scenario: Direct writing does not require a brief
 
-#### Scenario: Template step explains why template choice matters
-- **WHEN** the user is selecting a content template
-- **THEN** the UI explains what kind of opening structure or conversion goal the template is designed to serve
+- **WHEN** the user requests low-risk direct copy or a scoped edit
+- **THEN** the user can enter `做内容` without completing a direction brief
+
+### Requirement: Content versions move into publishing and review
+
+The selected content version SHALL be the handoff object for pre-publish checks, publication recording, and outcome review.
+
+#### Scenario: Scoped edit preserves unselected content
+
+- **WHEN** the user requests a title, opening, ending, or selection-only edit
+- **THEN** content outside the selected scope remains unchanged
+
+#### Scenario: Published content enters review
+
+- **WHEN** a content version is recorded as published
+- **THEN** the user can review outcomes and persist evidence-backed preferences for the next cycle

@@ -14,7 +14,6 @@
 
 - 规则入口：`AGENTS.md`
 - 部署与运行环境：`PROJECT.md`
-- 视频生成三层边界与主架构：`docs/architecture/direction-a-architecture.md`
 - AIM 运行时内核与统一执行链：`docs/architecture/adr-001-aim-harness-execution-kernel.md`
 
 以下目录默认不作为当前规则真源，除非已被上面这些文件或代码再次确认：

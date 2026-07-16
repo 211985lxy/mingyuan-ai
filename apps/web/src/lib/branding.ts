@@ -21,6 +21,7 @@ export async function getBrandingConfig(): Promise<BrandingConfig> {
             in: Object.values(BRANDING_SETTING_KEYS),
           },
         },
+        take: Object.keys(BRANDING_SETTING_KEYS).length,
       })
 
       const values = new Map(settings.map((setting) => [setting.key, setting.value]))

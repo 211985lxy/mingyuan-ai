@@ -13,6 +13,7 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
   const projects = await prisma.clientProject.findMany({
     where: statuses.length ? { status: { in: statuses } } : {},
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    take: 500,
     select: {
       id: true,
       name: true,

@@ -37,6 +37,7 @@ export async function getAgentGuideWithOverrides(
   const rows = await prisma.systemSetting
     .findMany({
       where: { key: { startsWith: `${SETTING_PREFIX}.${agentId}.` } },
+      take: 20,
     })
     .catch(() => [])
 

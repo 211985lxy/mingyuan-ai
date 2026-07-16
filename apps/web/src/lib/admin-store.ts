@@ -13,11 +13,11 @@ interface AdminUser {
 }
 
 interface AdminAuthState {
-  token: string | null
   admin: AdminUser | null
   isAuthenticated: boolean
+  sessionChecked: boolean
   isHydrated: boolean
-  setSession: (token: string, admin: AdminUser) => void
+  setSession: (admin: AdminUser) => void
   clearSession: () => void
   setHydrated: (value: boolean) => void
 }
@@ -25,20 +25,23 @@ interface AdminAuthState {
 export const useAdminStore = create<AdminAuthState>()(
   persist(
     (set) => ({
-      token: null,
       admin: null,
       isAuthenticated: false,
+      sessionChecked: false,
       isHydrated: false,
-      setSession: (token, admin) => set({ token, admin, isAuthenticated: true }),
-      clearSession: () => set({ token: null, admin: null, isAuthenticated: false }),
+      setSession: (admin) => set({ admin, isAuthenticated: true, sessionChecked: true }),
+      clearSession: () => set({ admin: null, isAuthenticated: false, sessionChecked: true }),
       setHydrated: (value) => set({ isHydrated: value }),
     }),
     {
       name: ADMIN_STORAGE_KEY,
+      version: 2,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        token: state.token,
         admin: state.admin,
+      }),
+      migrate: (persisted) => ({
+        admin: (persisted as { admin?: AdminUser | null } | null)?.admin ?? null,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true)
@@ -46,15 +49,3 @@ export const useAdminStore = create<AdminAuthState>()(
     }
   )
 )
-
-export function getStoredAdminToken(): string | null {
-  if (typeof window === "undefined") return null
-  try {
-    const raw = window.localStorage.getItem(ADMIN_STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return parsed.state?.token ?? null
-  } catch {
-    return null
-  }
-}

@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 env:
   ACR_PUBLIC: clip-registry.cn-hangzhou.cr.aliyuncs.com
   ACR_VPC: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com
@@ -11,8 +15,34 @@ env:
 
 jobs:
   quality:
-    name: Lint & Typecheck
+    name: Quality gate
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: mingyuan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/mingyuan_test
+      TEST_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/mingyuan_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,12 +54,38 @@ jobs:
           cache: pnpm
       - name: Install deps
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit
+        run: pnpm security:audit
       - name: Generate Prisma client
         run: pnpm --dir apps/web exec prisma generate
+      - name: Validate Prisma schema
+        run: pnpm --dir apps/web exec prisma validate
       - name: Typecheck
         run: pnpm --dir apps/web exec tsc --noEmit
+      - name: Typecheck tests
+        run: pnpm --dir apps/web run typecheck:tests
+      - name: Environment contract
+        run: pnpm --dir apps/web run env:check
+      - name: API contract inventory
+        run: pnpm --dir apps/web run api:contracts
       - name: Lint
         run: pnpm --dir apps/web exec eslint --quiet .
+      - name: Unit and evaluation tests
+        run: pnpm --dir apps/web test
+      - name: Database E2E tests
+        run: pnpm --dir apps/web run test:e2e
+      - name: Architecture size guard
+        run: pnpm --dir apps/web run arch:size
+      - name: Architecture dependency guard
+        run: pnpm --dir apps/web run arch:check
+      - name: Domain boundary guard
+        run: pnpm --dir apps/web run arch:domains
+      - name: Retired capability guard
+        run: pnpm --dir apps/web run arch:retired
+      - name: Bounded Prisma query guard
+        run: pnpm --dir apps/web run db:bounds
+      - name: Deterministic harness
+        run: pnpm --dir apps/web run test:harness
 
   build-and-push:
     needs: quality
@@ -52,29 +108,13 @@ jobs:
           target: web-runner
           push: true
           platforms: linux/amd64
-          tags: |
-            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:latest
-            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
-
-      - name: Build and push worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          target: worker-runner
-          push: true
-          platforms: linux/amd64
-          tags: |
-            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:latest
-            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
+          tags: ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
 
   migrate:
     name: Prisma Migrate Deploy
-    needs: quality
+    needs: build-and-push
     runs-on: ubuntu-latest
-    # 首次上线前必须人工 bootstrap:在生产 DB 执行
-    #   prisma migrate resolve --applied 20260323122000_remove_credits_columns ... (对齐已有迁移)
-    # 否则 _prisma_migrations 表为空,本 job 会尝试重放所有迁移而失败。
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -87,14 +127,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Generate Prisma client
         run: pnpm --dir apps/web exec prisma generate
+      - name: Preflight retired-media migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ACK_RETIRE_MEDIA_DATA: ${{ secrets.ACK_RETIRE_MEDIA_DATA }}
+          RETIRED_MEDIA_BACKUP_REFERENCE: ${{ secrets.RETIRED_MEDIA_BACKUP_REFERENCE }}
+        run: pnpm --dir apps/web run schema:retired-media-preflight
       - name: Apply pending migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         working-directory: apps/web
         run: pnpm exec prisma migrate deploy
+      - name: Verify schema is up to date
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          output="$(pnpm exec prisma migrate status 2>&1)"
+          printf '%s\n' "$output"
+          printf '%s\n' "$output" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$output" | grep -F "Database schema is up to date"
+      - name: Verify production schema matches Prisma
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        working-directory: apps/web
+        run: pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
 
   deploy:
-    needs: [build-and-push, migrate]
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,14 +171,45 @@ jobs:
       - name: Deploy to K8s
         run: |
           kubectl set image deployment/mingyuan-web web=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}
-          kubectl set image deployment/mingyuan-worker worker=${{ env.ACR_VPC }}/${{ env.ACR_NAMESPACE }}/worker:${{ github.sha }}
           kubectl rollout status deployment/mingyuan-web --timeout=180s
-          kubectl rollout status deployment/mingyuan-worker --timeout=180s
+
+      - name: Verify live health dependencies
+        run: |
+          set -euo pipefail
+          kubectl port-forward service/mingyuan-web 18080:80 >/tmp/mingyuan-port-forward.log 2>&1 &
+          forward_pid=$!
+          trap 'kill "$forward_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 20); do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/api/healthz > health.json; then
+              grep -q '"ok":true' health.json
+              cat health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/mingyuan-port-forward.log
+          exit 1
 
       - name: Rollback on failure
         if: failure()
         run: |
           echo "Rollout failed, rolling back..."
           kubectl rollout undo deployment/mingyuan-web
-          kubectl rollout undo deployment/mingyuan-worker
           exit 1
+
+  promote-stable:
+    name: Promote stable image tags
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to ACR (public endpoint)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_PUBLIC }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Promote deployed SHA to latest
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:latest \
+            ${{ env.ACR_PUBLIC }}/${{ env.ACR_NAMESPACE }}/web:${{ github.sha }}

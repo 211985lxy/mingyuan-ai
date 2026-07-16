@@ -1,3 +1,4 @@
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 
 import {
@@ -8,6 +9,7 @@ import {
 } from "@/lib/agent-api-auth"
 import { processChunksForSmartImport } from "@/lib/knowledge-auto-processor"
 import { prisma } from "@/lib/prisma"
+import { agentWechatImportBodySchema } from "@/features/aim/contracts/agent-api"
 
 const MAX_WECHAT_CHAT_CHARS = 50_000
 
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
-    const body = await request.json()
+    const body = await parseJsonBody(request, agentWechatImportBodySchema, { maxBytes: 64 * 1024 })
 
     projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     rawText = typeof body.rawText === "string" ? body.rawText.trim() : ""
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`微信聊天导出文本不能超过 ${MAX_WECHAT_CHAT_CHARS} 字`)
     }
 
-    assertAgentProjectAccess(context, projectId)
+    await assertAgentProjectAccess(context, projectId)
 
     const processed = await processChunksForSmartImport({
       // ponytail: 微信聊天 skill 先支持直接贴文本，后续真有需要再补文件上传版本。
@@ -100,6 +102,8 @@ export async function POST(request: NextRequest) {
     console.error("[agent/knowledge/wechat-chat/import] Error:", error)
     const authResponse = agentAuthErrorResponse(error)
     if (authResponse) return authResponse
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "导入预览失败" },

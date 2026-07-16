@@ -51,6 +51,7 @@ export async function listIpWikiPages(options: {
   return prisma.ipWikiPage.findMany({
     where,
     orderBy: [{ pageType: "asc" }, { updatedAt: "desc" }],
+    take: 200,
   }) as unknown as Promise<IpWikiPageRow[]>
 }
 

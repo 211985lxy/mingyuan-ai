@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { tikhubGet } from '../client'
 import type {
   PlatformAdapter,
@@ -96,7 +97,7 @@ const localCrawlerCache = new Map<string, LocalCrawlerResult>()
 
 export class XiaohongshuAdapter implements PlatformAdapter {
   private isTikHubEnabled(): boolean {
-    return !!process.env.TIKHUB_API_KEY
+    return !!env.TIKHUB_API_KEY
   }
 
   /**

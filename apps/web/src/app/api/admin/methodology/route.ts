@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import {
@@ -19,7 +20,7 @@ export const GET = withAdminAuth(async () => {
 
 /** PUT /api/admin/methodology —— 更新某份方法论内容（写 DB + 失效缓存） */
 export const PUT = withAdminAuth(async (request: NextRequest, { admin }) => {
-  const body = await request.json().catch(() => null)
+  const body = await parseJsonRecord(request)
   const key = body?.key as string
   const content = body?.content as string
 

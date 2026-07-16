@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import { tikhubGet } from '../client'
 import type {
   PlatformAdapter,
@@ -109,7 +110,7 @@ export class DouyinAdapter implements PlatformAdapter {
   }
 
   private isTikHubEnabled(): boolean {
-    return !!process.env.TIKHUB_API_KEY
+    return !!env.TIKHUB_API_KEY
   }
 
   /**

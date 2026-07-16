@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 import { withAdminAuth } from "@/lib/admin-auth"
 import { parseDocument } from "@/lib/document-parser"
+import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
 
 interface ImportedTextFile {
   name: string
@@ -19,6 +20,11 @@ export const POST = withAdminAuth(async (request) => {
   if (files.length === 0) {
     return NextResponse.json({ error: "请上传至少一个文件" }, { status: 400 })
   }
+  if (files.length > 20) {
+    return NextResponse.json({ error: "单次最多上传 20 个文件" }, { status: 400 })
+  }
+  const uploadLimitResponse = enforceUploadSizeLimit(files)
+  if (uploadLimitResponse) return uploadLimitResponse
 
   const parsedFiles: ImportedTextFile[] = []
 

@@ -1,0 +1,21 @@
+// Media domain models
+
+model Asset {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  assetType    String // image | video | music
+  url          String
+  size         Int?
+  status       String   @default("ready") // ready | processing | failed
+  errorCode    String?
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, assetType])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+}

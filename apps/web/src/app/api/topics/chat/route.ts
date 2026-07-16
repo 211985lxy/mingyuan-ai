@@ -1,12 +1,14 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 
 import { handleTopicChatMessage } from "@/lib/topic-chat-service"
 import { withUserAuth } from "@/lib/user-auth"
+import { topicChatBodySchema } from "@/features/topics/contracts/api"
 
 export const maxDuration = 60
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json()
+  const body = await parseJsonBody(request, topicChatBodySchema, { maxBytes: 16 * 1024 })
   const projectId = typeof body.projectId === "string" ? body.projectId : ""
   const content = typeof body.content === "string" ? body.content.trim() : ""
 

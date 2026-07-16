@@ -1,3 +1,4 @@
+import { env } from "@/env"
 // BigInt → Number in JSON.stringify (Prisma BigInt fields)
 // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
 ;(BigInt.prototype as BigInt & { toJSON(): number }).toJSON = function () {
@@ -15,13 +16,8 @@ const globalForPrisma = globalThis as unknown as PrismaGlobal
 
 function hasRequiredDelegates(client: PrismaClient): boolean {
   const prismaClient = client as PrismaClient & {
-    publicAvatarPreviewCache?: { findUnique?: unknown }
-    publicAvatarPreviewPreference?: { findUnique?: unknown }
     hotTopicFitCache?: { findUnique?: unknown; upsert?: unknown }
     contentTemplate?: { fields?: { expressionBlueprint?: unknown } }
-    videoProductionPlan?: { fields?: { recommendationContext?: unknown } }
-    pexelsMedia?: { fields?: { provider?: unknown } }
-    pexelsQueryCache?: { fields?: { provider?: unknown } }
     clientProject?: { findMany?: unknown }
     aiHotBriefing?: { findUnique?: unknown; upsert?: unknown }
     watchAccount?: { findMany?: unknown; create?: unknown }
@@ -32,14 +28,9 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
   }
 
   return (
-    typeof prismaClient.publicAvatarPreviewCache?.findUnique === "function"
-    && typeof prismaClient.publicAvatarPreviewPreference?.findUnique === "function"
-    && typeof prismaClient.hotTopicFitCache?.findUnique === "function"
+    typeof prismaClient.hotTopicFitCache?.findUnique === "function"
     && typeof prismaClient.hotTopicFitCache?.upsert === "function"
     && prismaClient.contentTemplate?.fields?.expressionBlueprint !== undefined
-    && prismaClient.videoProductionPlan?.fields?.recommendationContext !== undefined
-    && prismaClient.pexelsMedia?.fields?.provider !== undefined
-    && prismaClient.pexelsQueryCache?.fields?.provider !== undefined
     && typeof prismaClient.clientProject?.findMany === "function"
     && typeof prismaClient.aiHotBriefing?.findUnique === "function"
     && typeof prismaClient.aiHotBriefing?.upsert === "function"
@@ -64,7 +55,7 @@ function createPrismaClient() {
   // 真正缺失连接串只会在运行期首次查询时报错——生产环境永远会注入
   // DATABASE_URL（systemd EnvironmentFile）。这不是 Mock：占位串不返回任何
   // 假数据，只是推迟到运行期失败。
-  const rawUrl = (process.env.DATABASE_URL ?? "").trim()
+  const rawUrl = (env.DATABASE_URL ?? "").trim()
   const connectionString = rawUrl
     ? rawUrl.replace(/^mysql:\/\//, "mariadb://")
     : "mariadb://build:build@127.0.0.1:3306/mingyuan"
@@ -96,4 +87,4 @@ function getPrismaClient(): PrismaClient {
 
 export const prisma = getPrismaClient()
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+if (env.NODE_ENV !== "production") globalForPrisma.prisma = prisma

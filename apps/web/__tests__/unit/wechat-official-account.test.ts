@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 
+const mockEnv = vi.hoisted<Record<string, string | undefined>>(() => ({}))
+
+vi.mock("@/env", () => ({ env: mockEnv }))
+
 // Mock redis
 vi.mock("@/lib/redis", () => ({
   redis: {
@@ -11,23 +15,22 @@ vi.mock("@/lib/redis", () => ({
 describe("wechat-official-account", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Reset env vars
-    process.env.WECHAT_APP_ID = "test-app-id"
-    process.env.WECHAT_APP_SECRET = "test-secret"
-    process.env.WECHAT_DEFAULT_AUTHOR = "测试作者"
+    mockEnv.WECHAT_APP_ID = "test-app-id"
+    mockEnv.WECHAT_APP_SECRET = "test-secret"
+    mockEnv.WECHAT_DEFAULT_AUTHOR = "测试作者"
   })
 
   describe("constructor validation", () => {
     it("throws when WECHAT_APP_ID is missing", async () => {
-      process.env.WECHAT_APP_ID = ""
-      process.env.WECHAT_APP_SECRET = "secret"
+      mockEnv.WECHAT_APP_ID = ""
+      mockEnv.WECHAT_APP_SECRET = "secret"
       const { WechatOfficialAccount } = await import("@/lib/wechat-official-account")
       expect(() => new WechatOfficialAccount()).toThrow("WECHAT_APP_ID")
     })
 
     it("throws when WECHAT_APP_SECRET is missing", async () => {
-      process.env.WECHAT_APP_ID = "id"
-      process.env.WECHAT_APP_SECRET = ""
+      mockEnv.WECHAT_APP_ID = "id"
+      mockEnv.WECHAT_APP_SECRET = ""
       const { WechatOfficialAccount } = await import("@/lib/wechat-official-account")
       expect(() => new WechatOfficialAccount()).toThrow("WECHAT_APP_SECRET")
     })
@@ -146,7 +149,7 @@ describe("wechat-official-account", () => {
     })
 
     it("returns fallback when env not set", async () => {
-      process.env.WECHAT_DEFAULT_AUTHOR = ""
+      mockEnv.WECHAT_DEFAULT_AUTHOR = ""
       const { getWechatDefaultAuthor } = await import("@/lib/wechat-official-account")
       expect(getWechatDefaultAuthor()).toBe("明远")
     })

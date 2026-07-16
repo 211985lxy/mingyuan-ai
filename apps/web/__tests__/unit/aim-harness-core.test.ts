@@ -100,11 +100,11 @@ describe("aim-harness planner", () => {
       targetFormats: [],
       runtimeTask: "light_edit",
       knowledgeStrategy: "light_edit",
-      conversationMode: "direct_delivery",
+      conversationMode: "local_edit",
     })
     expect(spec.runtimeTask).toBe("light_edit")
     expect(spec.knowledgeStrategy).toBe("light_edit")
-    expect(spec.conversationMode).toBe("direct_delivery")
+    expect(spec.conversationMode).toBe("local_edit")
     expect(spec.contextPolicy.loadKnowledge).toBe(false)
   })
 
@@ -209,6 +209,26 @@ describe("aim-harness fallback policy", () => {
 
   it("does not silently fall back for an unclassified error", () => {
     expect(classifyProviderError(new Error("unexpected invalid payload")).retryable).toBe(false)
+  })
+
+  it("caps the provider fallback chain", async () => {
+    const calls: string[] = []
+    const failing = (name: string): LLMProvider => ({
+      name,
+      defaultModel: `${name}-model`,
+      isAvailable: () => true,
+      async complete() {
+        calls.push(name)
+        throw new Error("status 503")
+      },
+    })
+
+    await expect(new LLMClient([
+      failing("provider-1"),
+      failing("provider-2"),
+      fakeProvider("provider-3"),
+    ]).complete({ messages: [{ role: "user", content: "test" }] })).rejects.toThrow("503")
+    expect(calls).toEqual(["provider-1", "provider-2"])
   })
 
   it("isolates telemetry between concurrent runs", async () => {

@@ -10,6 +10,7 @@ import { findInvalidAgentTargetFormats } from "@/lib/agent-api-contract"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import {
   buildAgentGenerateResponse,
   finalizeAgentGenerateRun,
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
-    const body = await request.json()
+    const body = await parseJsonRecord(request)
 
     const parsed = parseAgentGenerateBody(body)
     const invalidFormats = findInvalidAgentTargetFormats(body.targetFormats)
@@ -88,6 +89,8 @@ export async function POST(request: NextRequest) {
     console.error("[agent/aim/generate] Error:", error)
     const authResponse = agentAuthErrorResponse(error)
     if (authResponse) return authResponse
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
 
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "生成失败" },

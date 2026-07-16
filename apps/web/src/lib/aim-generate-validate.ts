@@ -9,6 +9,8 @@ const VALID_FORMATS = new Set([
   "community_message",
   "shooting_brief",
   "raw_copy",
+  "koubo_script",
+  "xiaohongshu_post",
 ])
 
 const VALID_TASK_TYPES = new Set<string>([

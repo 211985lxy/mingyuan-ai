@@ -1,3 +1,4 @@
+import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { checkUrlType, parseUrl } from "@/lib/tikhub/url-parser"
@@ -8,6 +9,7 @@ import {
   discoverXhsSimilarAccounts,
 } from "@/lib/competitor-analysis/redfox-similar-accounts"
 import { resolveRedFoxDouyinAccountId } from "@/lib/competitor-analysis/redfox-douyin-api"
+import { competitorDiscoverBodySchema } from "@/features/competitor/contracts/api"
 
 /**
  * POST /api/competitor/discover-similar
@@ -17,12 +19,7 @@ import { resolveRedFoxDouyinAccountId } from "@/lib/competitor-analysis/redfox-d
  * 支持抖音和小红书主页链接，返回同阶对标 + 头部标杆。
  */
 export const POST = withUserAuth(async (request) => {
-  let body: { targetUrl?: unknown }
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: "请求格式不正确" }, { status: 400 })
-  }
+  const body = await parseJsonBody(request, competitorDiscoverBodySchema, { maxBytes: 4 * 1024 })
 
   const rawUrl = typeof body.targetUrl === "string" ? body.targetUrl.trim() : ""
   if (!rawUrl) {

@@ -46,7 +46,7 @@ describe("AIM workbench chrome", () => {
 
   it("renders evolution suggestions", () => {
     const html = renderToStaticMarkup(createElement(AimEvolutionSuggestions, {
-      suggestions: [{ title: "语气偏好", content: "多用短句", category: "style" }],
+      suggestions: [{ title: "语气偏好", content: "多用短句", category: "user_insight", tags: ["asset_role:preference"] }],
       onDismiss: vi.fn(),
       onSave: vi.fn(),
     }))

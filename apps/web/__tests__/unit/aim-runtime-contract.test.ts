@@ -21,7 +21,7 @@ import { LLMClient } from "@/lib/llm/client"
 import type { LLMProvider } from "@/lib/llm/types"
 
 // mock 持久化层（degraded 回标），用 spy 断言，不触达真实 DB
-const flagDegraded = vi.fn(async () => undefined)
+const flagDegraded = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock("@/lib/aim-harness/persistence", () => ({
   flagAimGenerationDegraded: (...args: unknown[]) => flagDegraded(...args),
 }))
@@ -92,7 +92,7 @@ describe("AIM v2 运行时契约（贯穿阶段 1–2）", () => {
       expect(typeof result.metadata.degraded).toBe("boolean")
 
       // output 仍是 handler 原始形状（AimGenerateResponse：含 id/results/knowledgeUsed）
-      const _typeCheck: AimRunResult = result
+      const _typeCheck: AimRunResult<typeof result.output> = result
       void _typeCheck
       expect(result.output).toMatchObject({ id: "gen_contract", results: expect.any(Array) })
       expect(result.generationId).toBe("gen_contract")

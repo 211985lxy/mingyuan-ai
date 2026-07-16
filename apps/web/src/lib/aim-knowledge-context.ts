@@ -192,7 +192,7 @@ export async function buildAimKnowledgeContext(
  * @param maxChars 总字符上限，超出则跳过后续知识
  */
 export function buildKnowledgeBlock(
-  entries: Array<{ category: string; title: string; content: string; tags?: unknown }>
+  entries: Array<{ category: string; title: string; content: string; tags?: unknown; valueGrade?: string | null }>
 ): string {
   return buildKnowledgeBlockWithBudget(entries, Infinity)
 }

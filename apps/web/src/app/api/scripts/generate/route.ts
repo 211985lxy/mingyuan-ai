@@ -1,3 +1,4 @@
+import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
@@ -13,41 +14,17 @@ import {
 import type { StructureBlueprint, TopicContext, HotTopicFusionContext } from "@/lib/script-generator"
 import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
+import { ownsActiveProject } from "@/lib/resource-ownership"
+import { buildTopicContext } from "@/features/aim/services/script-topic-context"
 
 // Allow up to 120 seconds for script generation (3-step LLM chain can take 30-60s)
 export const maxDuration = 120
-
-// ─── Types for DB-fetched topic engine records ─────────────
-
-interface OpeningTypeRecord {
-  code: string
-  name: string
-  formulas: unknown // Json
-}
-
-interface CopyStructureRecord {
-  code: string
-  name: string
-  beats: unknown // Json
-}
-
-interface EndingTypeRecord {
-  code: string
-  name: string
-  guidance: string
-  patterns: unknown // Json
-}
-
-interface CopyBeat {
-  label: string
-  instruction: string
-}
 
 export const POST = withUserAuth(async (request, { user }) => {
   const requestId = `script-gen-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   console.log(`[${requestId}] Script generation initiated by user ${user.id}`)
 
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const templateId = typeof body.templateId === "string" ? body.templateId : ""
   const structureId = typeof body.structureId === "string" ? body.structureId : ""
   const hotTopicId = typeof body.hotTopicId === "string" ? body.hotTopicId : null
@@ -75,6 +52,10 @@ export const POST = withUserAuth(async (request, { user }) => {
       { error: "templateId, structureId, and inputs are required" },
       { status: 400 }
     )
+  }
+
+  if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+    return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
   }
 
   const [template, videoStructure] = await Promise.all([
@@ -113,6 +94,16 @@ export const POST = withUserAuth(async (request, { user }) => {
     return NextResponse.json(
       { error: "Video structure not found" },
       { status: 400 }
+    )
+  }
+
+  const ipProfile = await prisma.ipProfile.findUnique({
+    where: { userId: user.id },
+  })
+  if (!ipProfile?.isComplete || !ipProfile.isActive) {
+    return NextResponse.json(
+      { error: "IP profile is incomplete", data: { isComplete: false } },
+      { status: 412 },
     )
   }
 
@@ -227,7 +218,7 @@ export const POST = withUserAuth(async (request, { user }) => {
               fit: hotTopicFit,
             }
           : null,
-      ipProfile: null,
+      ipProfile,
       structure: {
         displayName: videoStructure.displayName,
         blueprint,
@@ -254,7 +245,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       const run = await tx.contentGenerationRun.create({
         data: {
           userId: user.id,
-          ipProfileId: "",
+          ipProfileId: ipProfile.id,
           templateId: template.id,
           structureId: videoStructure.id,
           structureSnapshot: blueprint as unknown as Prisma.InputJsonValue,
@@ -285,7 +276,7 @@ export const POST = withUserAuth(async (request, { user }) => {
               content,
               sourceTemplateId: template.id,
               generationRunId: run.id,
-              ipProfileId: "",
+              ipProfileId: ipProfile.id,
               structureId: videoStructure.id,
               status: "candidate",
               qualityScore: generation.scores[i]?.overall ?? null,
@@ -311,7 +302,7 @@ export const POST = withUserAuth(async (request, { user }) => {
                 content,
                 sourceTemplateId: template.id,
                 generationRunId: run.id,
-                ipProfileId: "",
+                ipProfileId: ipProfile.id,
                 structureId: videoStructure.id,
                 status: "candidate",
                 qualityScore: generation.hotTopicScores?.[i]?.overall ?? null,
@@ -345,81 +336,3 @@ export const POST = withUserAuth(async (request, { user }) => {
     throw error
   }
 })
-
-// ─── Phase 14: Build TopicContext from DB records ──────────
-
-async function buildTopicContext(
-  topicSelectionId: string,
-  openingTypeCode: string,
-  copyStructureCode: string,
-  endingTypeCode: string,
-  userId: string,
-): Promise<TopicContext> {
-  // Fetch all required records in parallel
-  const [topicSelection, openingType, copyStructure, endingType] = await Promise.all([
-    prisma.topicSelection.findUnique({
-      where: { id: topicSelectionId, userId },
-    }),
-    prisma.openingType.findUnique({
-      where: { code: openingTypeCode, status: "published" },
-      select: { code: true, name: true, formulas: true },
-    }) as Promise<OpeningTypeRecord | null>,
-    prisma.copyStructure.findUnique({
-      where: { code: copyStructureCode, status: "published" },
-      select: { code: true, name: true, beats: true },
-    }) as Promise<CopyStructureRecord | null>,
-    prisma.endingType.findUnique({
-      where: { code: endingTypeCode, status: "published" },
-      select: { code: true, name: true, guidance: true, patterns: true },
-    }) as Promise<EndingTypeRecord | null>,
-  ])
-
-  if (!topicSelection) {
-    throw new Error(`TopicSelection not found: ${topicSelectionId}`)
-  }
-  if (!openingType) {
-    throw new Error(`OpeningType not found: ${openingTypeCode}`)
-  }
-  if (!copyStructure) {
-    throw new Error(`CopyStructure not found: ${copyStructureCode}`)
-  }
-  if (!endingType) {
-    throw new Error(`EndingType not found: ${endingTypeCode}`)
-  }
-
-  // Extract topic title from the selected candidate
-  const candidates = topicSelection.candidates as unknown as Array<{ title?: string; elementCodes?: string[] }>
-  const selectedIndex = topicSelection.selectedIndex ?? 0
-  const selectedCard = candidates[selectedIndex] ?? candidates[0]
-  const topicTitle = selectedCard?.title ?? "未命名选题"
-  const elementTags = Array.isArray(topicSelection.elementCodes)
-    ? (topicSelection.elementCodes as string[])
-    : (selectedCard?.elementCodes ?? [])
-
-  // Parse JSON fields
-  const formulas = Array.isArray(openingType.formulas)
-    ? (openingType.formulas as string[])
-    : []
-  const beats = Array.isArray(copyStructure.beats)
-    ? (copyStructure.beats as CopyBeat[])
-    : []
-  const patterns = Array.isArray(endingType.patterns)
-    ? (endingType.patterns as string[])
-    : []
-
-  return {
-    topicSelectionId,
-    topicTitle,
-    elementTags,
-    openingTypeCode: openingType.code,
-    openingTypeName: openingType.name,
-    openingFormulas: formulas,
-    copyStructureCode: copyStructure.code,
-    copyStructureName: copyStructure.name,
-    copyStructureBeats: beats,
-    endingTypeCode: endingType.code,
-    endingTypeName: endingType.name,
-    endingGuidance: endingType.guidance,
-    endingPatterns: patterns,
-  }
-}

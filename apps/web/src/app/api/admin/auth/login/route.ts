@@ -2,14 +2,24 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifyPassword, signAdminToken } from "@/lib/admin-auth"
 import type { AdminRole } from "@/types/content-template"
+import { loginBodySchema } from "@/features/auth/contracts"
+import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
+import { setSessionCookie } from "@/lib/auth-session"
 
 export async function POST(request: NextRequest) {
-  const { email, password } = await request.json()
+  let credentials
+  try {
+    credentials = await parseJsonBody(request, loginBodySchema, { maxBytes: 4096 })
+  } catch (error) {
+    return apiRequestErrorResponse(request, error) ?? NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  }
+  const { email, password } = credentials
 
-  if (!email || !password) {
+  if (!await allowAuthAttempt("admin-login", request, email, { limit: 5, windowSeconds: 15 * 60 })) {
     return NextResponse.json(
-      { error: "Email and password required" },
-      { status: 400 }
+      { error: "Too many login attempts", code: "RATE_LIMITED" },
+      { status: 429, headers: { "Retry-After": "900" } },
     )
   }
 
@@ -21,7 +31,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const valid = admin.password === "skip-password-check" || await verifyPassword(password, admin.password)
+  const valid = await verifyPassword(password, admin.password)
   if (!valid) {
     return NextResponse.json(
       { error: "Invalid credentials" },
@@ -33,10 +43,12 @@ export async function POST(request: NextRequest) {
     id: admin.id,
     email: admin.email,
     role: admin.role as AdminRole,
+    sessionVersion: admin.sessionVersion,
   })
 
-  return NextResponse.json({
-    token,
+  const response = NextResponse.json({
     admin: { id: admin.id, email: admin.email, name: admin.name, role: admin.role },
   })
+  setSessionCookie(response, "admin", token)
+  return response
 }

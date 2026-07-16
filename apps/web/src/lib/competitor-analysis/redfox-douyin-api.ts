@@ -1,3 +1,4 @@
+import { env } from "@/env"
 import type { NormalizedAccount, NormalizedComment, NormalizedVideo } from '@/lib/tikhub/types'
 
 export interface RedFoxDouyinApiResult {
@@ -50,12 +51,12 @@ interface RedFoxWorkList {
   list?: RedFoxWork[]
 }
 
-const REDFOX_BASE = process.env.REDFOX_BASE_URL || 'https://redfox.hk'
-const TIMEOUT_MS = Number(process.env.REDFOX_TIMEOUT_MS || 60000)
+const REDFOX_BASE = env.REDFOX_BASE_URL || 'https://redfox.hk'
+const TIMEOUT_MS = Number(env.REDFOX_TIMEOUT_MS || 60000)
 const PAGE_SIZE = 20
 
 export function hasRedFoxDouyinApi(): boolean {
-  return Boolean(process.env.REDFOX_API_KEY)
+  return Boolean(env.REDFOX_API_KEY)
 }
 
 export async function fetchFromRedFoxDouyinApi(input: {
@@ -162,7 +163,7 @@ async function fetchUser(accountId: string | null): Promise<RedFoxUser | null> {
 }
 
 async function redfoxPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const apiKey = process.env.REDFOX_API_KEY
+  const apiKey = env.REDFOX_API_KEY
   if (!apiKey) throw new Error('REDFOX_API_KEY environment variable is not set')
 
   const res = await fetch(`${REDFOX_BASE}${path}`, {

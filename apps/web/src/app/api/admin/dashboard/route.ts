@@ -9,13 +9,13 @@ export const GET = withAdminAuth(async () => {
 
   const [
     totalUsers,
-    videosToday,
+    generationsToday,
     activeTemplates,
     recentFetchSuccess,
     recentFetchFailed,
   ] = await Promise.all([
     prisma.user.count(),
-    prisma.videoTask.count({ where: { createdAt: { gte: today } } }),
+    prisma.aimGeneration.count({ where: { createdAt: { gte: today } } }),
     prisma.contentTemplate.count({ where: { status: "published" } }),
     prisma.douyinHotSnapshot.count({
       where: { fetchedAt: { gte: oneDayAgo }, status: "success" },
@@ -28,7 +28,7 @@ export const GET = withAdminAuth(async () => {
   return NextResponse.json({
     data: {
       totalUsers,
-      videosToday,
+      generationsToday,
       activeTemplates,
       hotListHealth: {
         successLast24h: recentFetchSuccess,

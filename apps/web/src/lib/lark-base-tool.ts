@@ -14,8 +14,8 @@ function fireEmbedding(entryId: string): void {
   _ensureEmbedding?.(entryId).catch(() => {})
 }
 
-type LarkTableType = "topic_review" | "project_management" | "data_archive"
-type LarkResultType = "topic" | "script" | "positioning" | "moments_copy"
+export type LarkTableType = "topic_review" | "project_management" | "data_archive"
+export type LarkResultType = "topic" | "script" | "positioning" | "moments_copy"
 type LarkCommand = "+table-get" | "+field-list" | "+record-list" | "+record-get" | "+record-upsert"
 
 type RunCommand = (command: LarkCommand, args: string[]) => Promise<unknown>

@@ -1,15 +1,40 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+const request = vi.hoisted(() => vi.fn())
+
+vi.mock("@/lib/api/core", () => ({
+  ApiError: class ApiError extends Error {},
+  getApiErrorMessage: vi.fn(),
+  request,
+}))
 
 describe("style profile project scope", () => {
-  it("项目内风格沉淀会携带 projectId", () => {
-    const clientSource = readFileSync(join(process.cwd(), "src/lib/api/client.ts"), "utf8")
-    const routeSource = readFileSync(join(process.cwd(), "src/app/api/aim/evolve-style/route.ts"), "utf8")
+  beforeEach(() => request.mockReset())
 
-    expect(clientSource).toContain("projectId: input.projectId")
-    expect(routeSource).toContain("projectId: projectId || null")
+  it("项目内风格沉淀会携带 projectId", async () => {
+    request.mockResolvedValue({ delta: null, profile: null })
+    const { evolveStyleConversation } = await import("@/lib/api/aim")
+
+    await evolveStyleConversation({
+      messages: [
+        { role: "user", content: "保留我的口语" },
+        { role: "assistant", content: "已按口语处理" },
+      ],
+      projectId: "project-1",
+    })
+
+    expect(request).toHaveBeenCalledWith("/api/aim/evolve-style", expect.objectContaining({
+      body: JSON.stringify({
+        messages: [
+          { role: "user", content: "保留我的口语" },
+          { role: "assistant", content: "已按口语处理" },
+        ],
+        projectId: "project-1",
+      }),
+    }))
   })
 
   it("项目内润色和生成读取项目风格档案，而不是用户全局", () => {

@@ -30,9 +30,10 @@ export const GET = withAdminAuth(async (request) => {
   // 关联用户邮箱便于在后台辨认归属
   const userIds = [...new Set(analyses.map((a) => a.userId))]
   const users = userIds.length
-    ? await prisma.user.findMany({
+      ? await prisma.user.findMany({
         where: { id: { in: userIds } },
         select: { id: true, email: true, name: true },
+        take: 50,
       })
     : []
   const userMap = new Map(users.map((u) => [u.id, u]))

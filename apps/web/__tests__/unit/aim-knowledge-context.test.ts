@@ -185,11 +185,11 @@ describe("AIM knowledge strategy integration", () => {
 })
 
 describe("AIM knowledge value-grade weighting", () => {
-  const baseEntry = (overrides: Partial<{ id: string; valueGrade: string | null; score: number }> = {}) => ({
+  const baseEntry = (overrides: Partial<{ id: string; category: string; valueGrade: string | null; score: number }> = {}) => ({
     id: overrides.id ?? "entry",
     title: "知识条目",
     content: "内容",
-    category: "boss_experience",
+    category: overrides.category ?? "boss_experience",
     score: overrides.score ?? 0.6,
     tags: [],
     valueGrade: overrides.valueGrade ?? null,
