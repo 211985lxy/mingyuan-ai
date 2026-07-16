@@ -1,3 +1,5 @@
+import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
+
 export type WatchVideoRecommendationCategory =
   | "问题解答"
   | "人设故事"
@@ -93,9 +95,12 @@ function engagementScore(video: WatchVideoForRecommendation): number {
 }
 
 function videoUrl(account: WatchAccountForRecommendation, video: WatchVideoForRecommendation): string {
-  if (video.videoUrl) return video.videoUrl
-  if (video.videoId) return `https://www.douyin.com/video/${video.videoId}`
-  return account.targetUrl
+  return getWatchVideoPageUrl({
+    platform: account.platform,
+    videoId: video.videoId,
+    videoUrl: video.videoUrl,
+    fallbackUrl: account.targetUrl,
+  })
 }
 
 export function classifyWatchVideo(title: string): WatchVideoRecommendationCategory {

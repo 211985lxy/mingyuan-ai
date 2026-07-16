@@ -52,6 +52,25 @@ describe("competitor watch recommendations", () => {
     expect(result[0]?.videoId).toBe("v1")
   })
 
+  it("opens douyin work pages instead of media direct links", () => {
+    const result = recommendWatchVideos({
+      accounts: [
+        account({
+          latestVideos: [
+            video({
+              videoId: "7663075896126999818",
+              title: "带数据的作品",
+              videoUrl: "https://v3-search.douyinvod.com/video.mp4",
+            }),
+          ],
+        }),
+      ],
+      now: new Date("2026-07-05T00:00:00.000Z"),
+    })
+
+    expect(result[0]?.videoUrl).toBe("https://www.douyin.com/video/7663075896126999818")
+  })
+
   it("prioritizes matching high-engagement videos", () => {
     const result = recommendWatchVideos({
       accounts: [
