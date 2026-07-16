@@ -7,7 +7,6 @@ import {
   Check,
   Clipboard,
   Database,
-  FileText,
   Loader2,
   Sparkles,
   ShieldCheck,
@@ -36,6 +35,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
+import { BenchmarkEditorPanel, type AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import { ActionStrip } from "@/components/workbench/action-strip"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -81,7 +81,7 @@ import {
 } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { transcribeAudio } from "@/lib/api/client"
-import { STYLE_GUIDE_LABELS, type StyleGuideId } from "@/lib/style-guide-config"
+import { type StyleGuideId } from "@/lib/style-guide-config"
 import {
   AIM_AGENT_OPTIONS,
   DEFAULT_AIM_AGENT,
@@ -116,7 +116,15 @@ import {
   type AimEditorContext,
   type TextSelectionRange,
 } from "@/lib/aim-editor"
-import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
+import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
+import {
+  AIM_ACTIVE_SOFT_ACTION_CLASS as ACTIVE_SOFT_ACTION_CLASS,
+  AIM_FORMAT_LABELS as FORMAT_LABELS,
+  AIM_SOFT_ACTION_CLASS as SOFT_ACTION_CLASS,
+  AIM_WORKFLOW_STATUS_OPTIONS as WORKFLOW_STATUS_OPTIONS,
+  getAimWorkflowStatusLabel as workflowStatusLabel,
+  splitAimMethodNote as splitMethodNote,
+} from "@/lib/aim/workbench-display"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -125,19 +133,6 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
   ...getAimAgentGuide(meta.id),
 }))
 
-const FORMAT_LABELS: Record<ContentFormat, string> = {
-  video_script: "口播文案",
-  wechat_article: "公众号文章",
-  moments_post: "朋友圈文案",
-  community_message: "社群运营文案",
-  shooting_brief: "拍摄交接单",
-  raw_copy: "诊断报告",
-  koubo_script: "口播文案",
-  xiaohongshu_post: "小红书图文",
-}
-
-const SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-muted/45 px-2 text-xs text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
-const ACTIVE_SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-primary/10 px-2 text-xs text-primary shadow-none hover:bg-primary/15"
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
 
@@ -148,21 +143,6 @@ function reportAimRunEvent(
 ) {
   if (!runId) return
   void recordAimRunEvent(runId, event, metadata).catch(() => undefined)
-}
-
-const WORKFLOW_STATUS_OPTIONS = [
-  { value: "draft", label: "草稿" },
-  { value: "pending_review", label: "待审核" },
-  { value: "ready_to_shoot", label: "待拍摄" },
-  { value: "shooting", label: "拍摄中" },
-  { value: "editing", label: "剪辑中" },
-  { value: "ready_to_publish", label: "待发布" },
-  { value: "published", label: "已发布" },
-  { value: "archived", label: "已归档" },
-]
-
-function workflowStatusLabel(status?: string | null) {
-  return WORKFLOW_STATUS_OPTIONS.find((item) => item.value === status)?.label || "草稿"
 }
 
 interface ChoiceGroup {
@@ -211,15 +191,6 @@ function extractChoiceGroups(content: string): ChoiceGroup[] {
     i = j
   }
   return groups
-}
-
-function splitMethodNote(content: string) {
-  const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
-  if (!match) return { methodNote: "", result: content }
-  return {
-    methodNote: match[1].trim(),
-    result: content.replace(match[0], "").trim(),
-  }
 }
 
 /** 生成一个稳定的临时 id（组件内使用，避免 Math.random 之外的库依赖） */
@@ -448,191 +419,6 @@ function buildHistoryRawInput(baseInput: string, currentInput: string, messages:
   return [`【本轮对话】`, ...turns, ...current, "", `【本次生成输入】`, baseInput].join("\n")
 }
 
-interface EditorSelection {
-  text: string
-  range: TextSelectionRange
-}
-
-function readTextareaSelection(element: HTMLTextAreaElement): EditorSelection {
-  const range = { start: element.selectionStart, end: element.selectionEnd }
-  return { text: element.value.slice(range.start, range.end), range }
-}
-
-function BenchmarkEditorPanel({
-  open,
-  width,
-  labels,
-  referenceText,
-  editorText,
-  editorFormat,
-  onOpen,
-  onClose,
-  onWidthChange,
-  onEditorTextChange,
-  onReferenceSelection,
-  onDraftSelection,
-  onSave,
-  onImitate,
-  imitating,
-  imitateStyleId,
-  onImitateStyleChange,
-}: {
-  open: boolean
-  width: number
-  labels: EditorPanelLabels
-  referenceText: string
-  editorText: string
-  editorFormat?: ContentFormat
-  onOpen: () => void
-  onClose: () => void
-  onWidthChange: (width: number) => void
-  onEditorTextChange: (text: string) => void
-  onReferenceSelection: (selection: EditorSelection) => void
-  onDraftSelection: (selection: EditorSelection) => void
-  onSave: () => void
-  /** 跨行业爆款仿写：拿上面对标爆款的结构逻辑，重写下方草稿。仅当有对标原文时可用 */
-  onImitate: () => void
-  imitating: boolean
-  imitateStyleId: string
-  onImitateStyleChange: (styleId: string) => void
-}) {
-  const splitRef = useRef<HTMLDivElement>(null)
-  const [referencePercent, setReferencePercent] = useState(50)
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        className="flex w-9 shrink-0 flex-col items-center justify-center gap-2 border-l bg-background text-xs text-muted-foreground hover:bg-muted/40"
-        onClick={onOpen}
-        title={labels.collapsedTitle}
-      >
-        <FileText className="h-4 w-4" />
-        <span className="[writing-mode:vertical-rl]">{editorText.length}字</span>
-      </button>
-    )
-  }
-
-  return (
-    <aside
-      className="relative flex shrink-0 flex-col border-l bg-background"
-      style={{ width }}
-    >
-      <div
-        className="absolute left-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-primary/30"
-        onPointerDown={(event) => {
-          event.preventDefault()
-          const move = (moveEvent: PointerEvent) => {
-            onWidthChange(clampEditorPanelWidth(window.innerWidth - moveEvent.clientX))
-          }
-          const up = () => {
-            window.removeEventListener("pointermove", move)
-            window.removeEventListener("pointerup", up)
-          }
-          window.addEventListener("pointermove", move)
-          window.addEventListener("pointerup", up)
-        }}
-      />
-      <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">{labels.title}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {editorFormat ? FORMAT_LABELS[editorFormat] : labels.currentLabel} · {editorText.length} 字
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          {referenceText.length >= 30 ? (
-            <>
-              <Select value={imitateStyleId} onValueChange={(value) => onImitateStyleChange(value ?? "default")}>
-                <SelectTrigger size="sm" className="h-7 w-[104px] text-xs">
-                  <SelectValue placeholder="文风" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">默认（我的风格）</SelectItem>
-                  {Object.entries(STYLE_GUIDE_LABELS).map(([id, label]) => (
-                    <SelectItem key={id} value={id}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                variant="ghost"
-                className={ACTIVE_SOFT_ACTION_CLASS}
-                disabled={imitating || editorText.trim().length < 30}
-                onClick={onImitate}
-                title="把上面对标爆款的结构逻辑迁移到你的稿子"
-              >
-                {imitating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                仿写
-              </Button>
-            </>
-          ) : null}
-          <Button size="sm" variant="ghost" className={ACTIVE_SOFT_ACTION_CLASS} onClick={onSave}>
-            保存
-          </Button>
-          <Button size="sm" variant="ghost" className={SOFT_ACTION_CLASS} onClick={onClose}>
-            隐藏
-          </Button>
-        </div>
-      </div>
-      <div
-        ref={splitRef}
-        className="grid min-h-0 flex-1 bg-muted/15"
-        style={{ gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
-      >
-        <section className="flex min-h-0 flex-col px-4 py-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">{labels.referenceTitle}</span>
-            {referenceText ? <span className="text-[11px] text-muted-foreground">{referenceText.length} 字</span> : null}
-          </div>
-          <textarea
-            readOnly
-            className="min-h-0 flex-1 resize-none rounded-md border border-transparent bg-background/70 p-3 text-sm leading-6 outline-none focus:border-primary/25"
-            value={referenceText}
-            placeholder={labels.referencePlaceholder}
-            onSelect={(event) => onReferenceSelection(readTextareaSelection(event.currentTarget))}
-          />
-        </section>
-        <div
-          className="group flex cursor-row-resize items-center bg-transparent transition-colors hover:bg-primary/5"
-          title="拖动调整上下区域高度"
-          onPointerDown={(event) => {
-            event.preventDefault()
-            const box = splitRef.current?.getBoundingClientRect()
-            if (!box) return
-            const move = (moveEvent: PointerEvent) => {
-              const next = ((moveEvent.clientY - box.top) / box.height) * 100
-              setReferencePercent(Math.min(80, Math.max(20, next)))
-            }
-            const up = () => {
-              window.removeEventListener("pointermove", move)
-              window.removeEventListener("pointerup", up)
-            }
-            window.addEventListener("pointermove", move)
-            window.addEventListener("pointerup", up)
-          }}
-        >
-          <div className="h-px w-full bg-border/60 transition-colors group-hover:bg-primary/35" />
-        </div>
-        <section className="flex min-h-0 flex-col px-4 py-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">{labels.draftTitle}</span>
-            <span className="text-[11px] text-muted-foreground">{editorText.length} 字</span>
-          </div>
-          <textarea
-            className="min-h-0 flex-1 resize-none rounded-md border border-transparent bg-background p-3 text-sm leading-6 outline-none focus:border-primary/25"
-            value={editorText}
-            onChange={(event) => onEditorTextChange(event.target.value)}
-            onSelect={(event) => onDraftSelection(readTextareaSelection(event.currentTarget))}
-            placeholder={labels.draftPlaceholder}
-          />
-        </section>
-      </div>
-    </aside>
-  )
-}
 
 const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
   const lines = useMemo(() => (text ? text.split("\n") : []), [text])
@@ -1033,8 +819,8 @@ export default function AimPage() {
   const [editorSourceMessageId, setEditorSourceMessageId] = useState<string | undefined>(() => initialDraft?.editorSourceMessageId)
   const [editorPanelWidth, setEditorPanelWidth] = useState(() => initialDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
   const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? true)
-  const [referenceSelection, setReferenceSelection] = useState<EditorSelection>({ text: "", range: { start: 0, end: 0 } })
-  const [draftSelection, setDraftSelection] = useState<EditorSelection>({ text: "", range: { start: 0, end: 0 } })
+  const [referenceSelection, setReferenceSelection] = useState<AimEditorSelection>({ text: "", range: { start: 0, end: 0 } })
+  const [draftSelection, setDraftSelection] = useState<AimEditorSelection>({ text: "", range: { start: 0, end: 0 } })
   const [isThinking, setIsThinking] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isQualityChecking, setIsQualityChecking] = useState(false)
