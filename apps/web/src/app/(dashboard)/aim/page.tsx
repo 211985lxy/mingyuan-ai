@@ -18,9 +18,7 @@ import {
   generateAimContent,
   getVideoCopyExtraction,
   checkScriptQuality,
-  polishScript,
   uploadImageForAimChat,
-  chatAim,
   chatAimStream,
   createKnowledge,
   createAimWorkflowBrief,
@@ -43,8 +41,8 @@ import {
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { useAimProjectWorkspace } from "@/hooks/use-aim-project-workspace"
 import { useAimWorkflowRecords } from "@/hooks/use-aim-workflow-records"
+import { useAimEditorActions } from "@/hooks/use-aim-editor-actions"
 import { transcribeAudio } from "@/lib/api/client"
-import { type StyleGuideId } from "@/lib/style-guide-config"
 import {
   AIM_AGENT_OPTIONS,
   DEFAULT_AIM_AGENT,
@@ -61,19 +59,14 @@ import {
 } from "@/lib/aim-agent-guides"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
-import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import {
   detectAimWorkbenchCommand,
   shouldIsolateWritingInstruction,
   type AimWorkbenchCommand,
 } from "@/lib/aim-workbench-commands"
-import { buildOpeningRecommendationPrompt } from "@/lib/aim-opening-recommendation"
 import {
   EDITOR_PANEL_DEFAULT_WIDTH,
   applyFirstMatchingStructureToReference,
-  applySelectionReplacement,
-  extractEditorDraftFromAssistantText,
-  extractReplacementDraft,
   type AimEditorContext,
   type TextSelectionRange,
 } from "@/lib/aim-editor"
@@ -89,6 +82,8 @@ import { clearAimDraft, loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/
 import {
   buildAimHistoryRawInput as buildHistoryRawInput,
   buildAimEditorContext,
+  buildAimBenchmarkQualityMessage,
+  buildAimBenchmarkRewriteInput,
   buildAimRawInput,
   detectAimLarkToolAction,
   extractBenchmarkAnalysisText,
@@ -96,9 +91,7 @@ import {
   extractPersonaProgress as extractProgress,
   formatAnalysisResultForPrompt,
   findLatestAimDeliverableId,
-  findLatestAimDeliverableText,
   findLatestAimVideoDeliverableMessageId,
-  getAimOpeningSegment,
   getAimHistoryContents as getHistoryContents,
   nextAimWorkbenchId as nextId,
   prepareAimChatTurn as prepareChatTurn,
@@ -190,8 +183,6 @@ export default function AimPage() {
   const [contentAction, setContentAction] = useState<AimContentAction | null>(null)
   const [isEvolving, setIsEvolving] = useState(false)
   const [evolutionSuggestions, setEvolutionSuggestions] = useState<AimEvolutionSuggestion[]>([])
-  const [isImitating, setIsImitating] = useState(false)
-  const [imitateStyleId, setImitateStyleId] = useState("default")
 
   // 历史记录由侧边栏共享 store 管理（侧边栏渲染列表、生成成功后刷新、点击后触发加载）
   const storeHistory = useAimWorkspaceStore((s) => s.history)
@@ -293,6 +284,41 @@ export default function AimPage() {
   const { isRecording, isTranscribing, startRecording, stopRecording } = useAudioRecorder({
     transcribeFn: transcribeAudio,
     onTranscribeSuccess: (text) => setInput((prev) => (prev ? `${prev}\n${text}` : text)),
+  })
+
+  const {
+    isImitating,
+    imitateStyleId,
+    setImitateStyleId,
+    handleImitate,
+    fillReferenceFromConversation: fillReferenceTextFromConversation,
+    integrateAssistantDraft: integrateLatestAssistantDraftToEditor,
+    saveEditorToDeliverable,
+    optimizeOpening: handleOptimizeOpening,
+    reviseCurrentDraft: handleReviseCurrentDraft,
+    applyEditorReplacement,
+  } = useAimEditorActions({
+    messages,
+    setMessages,
+    setInput,
+    sourceOriginalText,
+    setSourceOriginalText,
+    sourceTopicTitle,
+    editorText,
+    setEditorText,
+    editorFormat,
+    editorSourceMessageId,
+    setEditorPanelOpen,
+    referenceSelection,
+    draftSelection,
+    labels: editorPanelLabels,
+    agentDefaultInstruction: agent.defaultInstruction,
+    selectedProjectId,
+    projectEnabled,
+    selectedAgentId,
+    requestAbortRef,
+    setIsGenerating,
+    setIsThinking,
   })
 
   const lastAgentParamRef = useRef(agentParam)
@@ -540,69 +566,6 @@ export default function AimPage() {
     clearAimDraft(selectedAgentId)
   }
 
-  function fillReferenceTextFromConversation() {
-    const source = [...messages]
-      .reverse()
-      .map((message) => extractBenchmarkOriginalText(message.content))
-      .find((content) => content.trim())
-    if (!source) {
-      toast.error(`当前对话里没有可识别的${editorPanelLabels.referenceTitle}`)
-      return true
-    }
-    setSourceOriginalText(source)
-    setEditorPanelOpen(true)
-    setInput("")
-    toast.success(`已填入右侧${editorPanelLabels.referenceTitle}`)
-    return true
-  }
-
-  function integrateLatestAssistantDraftToEditor() {
-    const draft = [...messages]
-      .reverse()
-      .filter((message) => message.role === "assistant")
-      .map((message) => extractEditorDraftFromAssistantText(message.content))
-      .find((content) => content.trim())
-
-    if (!draft) {
-      toast.error(`没有找到可整合的最新版${editorPanelLabels.draftTitle}`)
-      return true
-    }
-
-    setEditorText(draft)
-    setEditorPanelOpen(true)
-    setInput("")
-    toast.success(`已整合到右侧${editorPanelLabels.title}`)
-    return true
-  }
-
-  function buildBenchmarkRewriteInput() {
-    const original = sourceOriginalText.trim() || [...messages]
-      .reverse()
-      .map((message) => extractBenchmarkOriginalText(message.content))
-      .find((content) => content.trim()) || ""
-
-    if (!original) {
-      toast.error("请先带入对标原文")
-      return null
-    }
-
-    const currentDraft = editorText.trim() || findLatestAimDeliverableText(messages)
-    const lengthRule = buildBenchmarkLengthRule(original)
-
-    return [
-      "请按对标原文重新生成一版文案，直接输出最终稿。",
-      "硬性要求：",
-      buildBenchmarkRecreationSopBlock(),
-      "1. 目标字数必须和对标原文基本一致，允许 95%-105% 波动。",
-      "2. 整体至少 30% 可感知重写，不能只是替换少数字。",
-      "3. 除专有名词外，不要连续沿用原文 12 个字以上。",
-      lengthRule ? `4. ${lengthRule}` : null,
-      sourceAnalysisText.trim() ? `已有拆解：\n${sourceAnalysisText.trim()}` : null,
-      `对标原文：\n${original}`,
-      currentDraft ? `我当前不满意的稿子：\n${currentDraft}` : null,
-    ].filter(Boolean).join("\n\n")
-  }
-
   async function handleAddImages(files: FileList) {
     const nextImages: AimImageAttachment[] = []
     setIsUploadingImage(true)
@@ -633,37 +596,6 @@ export default function AimPage() {
     if (nextImages.length) setImageAttachments((current) => [...current, ...nextImages].slice(-4))
   }
 
-  function buildBenchmarkQualityMessage() {
-    const original = sourceOriginalText.trim() || [...messages]
-      .reverse()
-      .map((message) => extractBenchmarkOriginalText(message.content))
-      .find((content) => content.trim()) || ""
-    const draft = editorText.trim() || findLatestAimDeliverableText(messages)
-
-    if (!original || !draft) return null
-
-    const report = assessBenchmarkRewrite(original, draft)
-    const lengthRatio = report.lengthRatio == null ? "无法计算" : `${Math.round(report.lengthRatio * 100)}%`
-    const lengthStatus = report.lengthPassed
-      ? "通过"
-      : report.outputChars < report.originalChars
-        ? "偏短"
-        : "偏长"
-    const copyStatus = report.tooSimilar ? "风险高，需要继续重写" : "通过"
-
-    return [
-      "## 对标自检结果",
-      `- 字数：当前 ${report.outputChars} 字 / 原文 ${report.originalChars} 字，比例 ${lengthRatio}，判定：${lengthStatus}。`,
-      `- 12字连续复用：${Math.round(report.reuseRatio * 100)}%，判定：${copyStatus}。`,
-      report.reusedSamples.length
-        ? `- 复用片段示例：${report.reusedSamples.map((sample) => `「${sample}」`).join("、")}`
-        : "- 复用片段示例：未发现明显连续复用。",
-      report.lengthPassed && !report.tooSimilar
-        ? "- 结论：这版在字数和照抄风险上基本合格，可以继续看表达质量。"
-        : "- 结论：这版还不合格，优先按原文字数重写，并替换开头、案例、过渡句或行动引导。",
-    ].join("\n\n")
-  }
-
   function rememberWorkbenchPreference(input: string) {
     const contextMessages = [
       ...messages.map((message) => ({ role: message.role, content: message.content })),
@@ -690,180 +622,6 @@ export default function AimPage() {
         toast.error(error instanceof Error ? error.message : "偏好沉淀失败")
       })
       .finally(() => setIsEvolving(false))
-  }
-
-  function handleImitate() {
-    const viralSourceText = sourceOriginalText.trim()
-    if (viralSourceText.length < 30) {
-      toast.error("请先在对标面板加载一条对标爆款原文")
-      return
-    }
-    if (editorText.trim().length < 30) {
-      toast.error("草稿太短，请先写一些你行业的方向作为仿写参考")
-      return
-    }
-    setIsImitating(true)
-    void polishScript({
-      mode: "imitate",
-      content: editorText,
-      viralSourceText,
-      persona: agent.defaultInstruction,
-      projectId: selectedProjectId || undefined,
-      topicTitle: sourceTopicTitle || undefined,
-      ...(imitateStyleId !== "default" ? { styleId: imitateStyleId as StyleGuideId } : {}),
-    })
-      .then((result) => {
-        setEditorText(result.polished)
-        toast.success("已把对标爆款的结构逻辑迁移到你的稿子")
-      })
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "仿写失败，请重试")
-      })
-      .finally(() => setIsImitating(false))
-  }
-
-  function saveEditorToDeliverable() {
-    if (!editorSourceMessageId || !editorFormat) {
-      toast.error("当前编辑稿还没有关联交付物")
-      return false
-    }
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.id === editorSourceMessageId && message.deliverables
-          ? {
-              ...message,
-              deliverables: {
-                ...message.deliverables,
-                results: message.deliverables.results.map((result) =>
-                  result.format === editorFormat
-                    ? { ...result, content: editorText, wordCount: editorText.length }
-                    : result
-                ),
-              },
-            }
-          : message
-      )
-    )
-    toast.success("已保存到交付物")
-    return true
-  }
-
-  function handleOptimizeOpening(commandInput: string) {
-    const sourceText = editorText.trim() || findLatestAimDeliverableText(messages)
-    if (!sourceText) {
-      toast.error("当前没有可优化的内容，请先生成脚本或写入编辑区")
-      return true
-    }
-    const { segment } = getAimOpeningSegment(sourceText)
-    if (segment.length < 20) {
-      toast.error("当前稿子太短，找不到可优化的开头")
-      return true
-    }
-
-    setIsGenerating(true)
-    void chatAim([
-      {
-        role: "user",
-        content: buildOpeningRecommendationPrompt({
-          commandInput,
-          openingSegment: segment,
-          fullText: sourceText,
-        }),
-      },
-    ], {
-      agentId: "content_producer",
-      projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-    })
-      .then((result) => {
-        const recommendations = result.content.trim()
-        if (!recommendations) throw new Error("开头推荐结果为空")
-        setEditorPanelOpen(true)
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: nextId(),
-            role: "user",
-            content: commandInput,
-          },
-          {
-            id: nextId(),
-            role: "assistant",
-            content: recommendations,
-            agentId: "content_producer",
-          },
-        ])
-        toast.success("已生成开头推荐")
-      })
-      .catch((error) => {
-        toast.error(error instanceof Error ? error.message : "开头推荐失败")
-      })
-      .finally(() => setIsGenerating(false))
-
-    return true
-  }
-
-  function handleReviseCurrentDraft(commandInput: string) {
-    const draft = editorText.trim() || findLatestAimDeliverableText(messages)
-    if (!draft) {
-      toast.error("当前没有可改写的稿子")
-      return true
-    }
-
-    const prompt = [
-      "请基于当前编辑稿完成这次定向改写，只输出“修改思路 + 替换稿”。",
-      "硬要求：",
-      "1. 如果要结合项目资料、人设、IP故事或来时路，必须自然融入正文推进、案例、判断和身份表达里，不要单独堆履历或标签。",
-      "2. 如果用户表达了“别越改越短”“保持原稿长度/体量”“不要压缩”的意思，就默认保留当前稿子的主体信息密度和篇幅，除非用户明确要求精简。",
-      `3. 当前用户要求：${commandInput}`,
-    ].join("\n")
-
-    const controller = new AbortController()
-    requestAbortRef.current = controller
-    const assistantId = nextId()
-    setMessages((prev) => [
-      ...prev,
-      { id: nextId(), role: "user", content: commandInput },
-      {
-        id: assistantId,
-        role: "assistant",
-        content: "正在按当前稿子和项目资料定向改写…",
-        agentId: selectedAgentId,
-      },
-    ])
-    setInput("")
-    setIsThinking(true)
-
-    void chatAimStream([
-      ...messages.map((message) => ({ role: message.role, content: message.content })),
-      { role: "user", content: prompt },
-    ], {
-      agentId: selectedAgentId,
-      projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-      editorContext: buildAimEditorContext({ action: "口令定向改稿", referenceSelection: referenceSelection.text, draftSelection: draftSelection.text, editorText, labels: editorPanelLabels }),
-      signal: controller.signal,
-      onDelta: (_delta, content) => {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId ? { ...message, content, agentId: selectedAgentId } : message
-          )
-        )
-      },
-    })
-      .catch((error) => {
-        const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-        const content = stopped ? "已停止本次改写。" : `改写失败：${error instanceof Error ? error.message : "请稍后重试"}`
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.id === assistantId ? { ...message, content, agentId: selectedAgentId } : message
-          )
-        )
-      })
-      .finally(() => {
-        if (requestAbortRef.current === controller) requestAbortRef.current = null
-        setIsThinking(false)
-      })
-
-    return true
   }
 
   function runWorkbenchCommand(command: AimWorkbenchCommand) {
@@ -894,12 +652,13 @@ export default function AimPage() {
     if (command.id === "revise_current_draft") return handleReviseCurrentDraft(command.input)
     if (command.id === "optimize_opening") return handleOptimizeOpening(command.input)
     if (command.id === "rewrite_benchmark") {
-      const rewriteInput = buildBenchmarkRewriteInput()
+      const rewriteInput = buildAimBenchmarkRewriteInput({ messages, sourceOriginalText, sourceAnalysisText, editorText })
+      if (!rewriteInput) toast.error("请先带入对标原文")
       if (rewriteInput) void generateWithInput(rewriteInput)
       return true
     }
     if (command.id === "run_quality_check") {
-      const localCheckMessage = buildBenchmarkQualityMessage()
+      const localCheckMessage = buildAimBenchmarkQualityMessage({ messages, sourceOriginalText, editorText })
       const messageId = findLatestAimVideoDeliverableMessageId(messages)
       if (localCheckMessage) {
         setMessages((prev) => [...prev, { id: nextId(), role: "assistant", content: localCheckMessage }])
@@ -921,14 +680,6 @@ export default function AimPage() {
       return true
     }
     return false
-  }
-
-  function applyEditorReplacement(message: ChatMessage) {
-    const replacement = extractReplacementDraft(message.content)
-    const range = message.editorApply?.range
-    if (!replacement || !range) return
-    setEditorText((current) => applySelectionReplacement(current, range, replacement))
-    toast.success("已应用到右侧选区")
   }
 
   async function sendText(text: string, options?: SendTextOptions) {
