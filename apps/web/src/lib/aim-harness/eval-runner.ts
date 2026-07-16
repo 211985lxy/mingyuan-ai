@@ -19,7 +19,6 @@ import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { EvalFixture, FrozenContext } from "./eval/contracts"
 import { gradeFixture } from "./eval/graders"
 import { validateFormat, planAimRun } from "./index"
-import type { AimContextSource } from "./types"
 
 /** What a context adapter returns for a fixture. */
 export interface EvalContext {
@@ -163,6 +162,34 @@ async function judgeDraft(fixture: EvalFixture, draft: string): Promise<{
   }
 }
 
+async function judgeEvalCase(
+  fixture: EvalFixture,
+  draft: string,
+  skipRubric: boolean | undefined,
+): Promise<{
+  rubricScore: number | null
+  rubricJudgeProvider: string | null
+  rubricJudgeModel: string | null
+  fabricatedFact: boolean
+}> {
+  if (skipRubric) {
+    return {
+      rubricScore: null,
+      rubricJudgeProvider: null,
+      rubricJudgeModel: null,
+      fabricatedFact: false,
+    }
+  }
+
+  const judged = await judgeDraft(fixture, draft)
+  return {
+    rubricScore: judged.score,
+    rubricJudgeProvider: judged.provider,
+    rubricJudgeModel: judged.model,
+    fabricatedFact: judged.fabricated,
+  }
+}
+
 /**
  * The shared executor: plan the fixture, run the (mock/frozen) generation, then
  * validate + grade. In CI this uses a deterministic stub draft derived from the
@@ -188,11 +215,6 @@ export async function runEvalCase(
   })
 
   const ctx = await adapter.load(fixture)
-  const contextManifest: AimContextSource[] = ctx.knowledgeIds.map((id) => ({
-    kind: "knowledge",
-    id,
-    charCount: 0,
-  }))
 
   if (!options.skipRubric && !options.executor) {
     throw new Error("real eval executor is required when rubric evaluation is enabled")
@@ -230,21 +252,7 @@ export async function runEvalCase(
   graderInput.warnedInsufficientInfo = execution.warnedInsufficientInfo
   const grade = gradeFixture(graderInput)
 
-  // Rubric judge (LLM) — optional, skipped in deterministic CI.
-  let rubricScore: number | null = null
-  let rubricJudgeProvider: string | null = null
-  let rubricJudgeModel: string | null = null
-  let fabricatedFact = false
-  if (!options.skipRubric) {
-    const draftForJudge = drafts[0]?.content ?? ""
-    const judged = await judgeDraft(fixture, draftForJudge)
-    rubricScore = judged.score
-    rubricJudgeProvider = judged.provider
-    rubricJudgeModel = judged.model
-    fabricatedFact = judged.fabricated
-  }
-
-  void contextManifest
+  const rubric = await judgeEvalCase(fixture, drafts[0]?.content ?? "", options.skipRubric)
 
   return {
     fixtureId: fixture.id,
@@ -253,10 +261,10 @@ export async function runEvalCase(
     scenario: fixture.scenario,
     contractPassed: grade.passed,
     contractAssertions: grade.assertions,
-    rubricScore,
-    rubricJudgeProvider,
-    rubricJudgeModel,
-    fabricatedFact,
+    rubricScore: rubric.rubricScore,
+    rubricJudgeProvider: rubric.rubricJudgeProvider,
+    rubricJudgeModel: rubric.rubricJudgeModel,
+    fabricatedFact: rubric.fabricatedFact,
     formatValidations,
     drafts: drafts.map((d) => ({ format: d.format, contentPreview: d.contentPreview.slice(0, 120) })),
     runId: execution.runId,
