@@ -4,22 +4,18 @@ import { useEffect, useState, useMemo, useRef, useCallback, startTransition } fr
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
-  Loader2,
   Sparkles,
   Plus,
-  ArrowRight,
 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
+import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
 import { BenchmarkEditorPanel, type AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
-import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
-import { AimQualityReport } from "@/components/aim/aim-quality-report"
+import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import {
   WorkflowRecordDialog,
@@ -52,7 +48,6 @@ import {
   type AimRetroSnapshot,
   type ClientProject,
   type ContentFormat,
-  type QualityCheckReport,
 } from "@/lib/api/client"
 import {
   AIM_CONTENT_ACTIONS,
@@ -105,11 +100,15 @@ import {
   AIM_ACTIVE_SOFT_ACTION_CLASS as ACTIVE_SOFT_ACTION_CLASS,
   AIM_FORMAT_LABELS as FORMAT_LABELS,
   getAimWorkflowStatusLabel as workflowStatusLabel,
-  splitAimMethodNote as splitMethodNote,
 } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
 import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
+import {
+  type AimImageAttachment,
+  type IpWikiDialogContext,
+  type AimWorkbenchMessage as ChatMessage,
+} from "@/lib/aim/workbench-types"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -121,52 +120,12 @@ const AGENT_OPTIONS: AimAgentOption[] = AIM_AGENT_OPTIONS.map((meta) => ({
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
 
-interface ChoiceGroup {
-  question: string
-  options: Array<{ label: string; text: string }>
-}
-
-function cleanChoiceText(text: string) {
-  return text.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim()
-}
-
 /** 从人设故事梳理的回复里解析【进度 XX%】，用于顶部进度条 */
 function extractProgress(content: string): number | null {
   const m = content.match(/【进度\s*(\d+)\s*%】/)
   if (!m) return null
   const v = parseInt(m[1], 10)
   return Number.isNaN(v) ? null : Math.min(100, Math.max(0, v))
-}
-
-function extractChoiceGroups(content: string): ChoiceGroup[] {
-  const lines = content.split("\n")
-  const groups: ChoiceGroup[] = []
-  for (let i = 0; i < lines.length; i += 1) {
-    const first = lines[i].trim().match(/^([A-D])[\s.、．)]\s*(.+)$/)
-    if (!first) continue
-
-    const options = []
-    let j = i
-    while (j < lines.length) {
-      const match = lines[j].trim().match(/^([A-D])[\s.、．)]\s*(.+)$/)
-      if (!match) break
-      const text = cleanChoiceText(match[2])
-      if (text.length > 0 && text.length <= 120) options.push({ label: match[1], text })
-      j += 1
-    }
-
-    let question = "请选择一个方向"
-    for (let k = i - 1; k >= 0; k -= 1) {
-      const line = cleanChoiceText(lines[k])
-      if (line && !/^([A-D])[\s.、．)]/.test(line)) {
-        question = line
-        break
-      }
-    }
-    if (options.length > 1) groups.push({ question, options })
-    i = j
-  }
-  return groups
 }
 
 /** 生成一个稳定的临时 id（组件内使用，避免 Math.random 之外的库依赖） */
@@ -176,95 +135,11 @@ function nextId(prefix = "m") {
   return `${prefix}-${Date.now()}-${_seq}`
 }
 
-interface ChatMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  images?: AimImageAttachment[]
-  agentId?: string | null
-  deliverables?: AimGenerateResponse | null
-  qualityReport?: QualityCheckReport | null
-  editorApply?: { range: TextSelectionRange } | null
-  // aim-harness-v1: 执行诊断，仅在结果详情/低分/降级时向用户展示执行编号
-  runId?: string | null
-  degraded?: boolean | null
-  qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
-  workflowStage?: AimWorkflowStage
-  contentAction?: AimContentAction | null
-  failure?: { kind: "chat" | "generate"; retryText: string } | null
-}
-
-interface AimImageAttachment {
-  id: string
-  name: string
-  assetUrl: string
-  readUrl: string
-  previewUrl: string
-}
-
 interface SendTextOptions {
   editorContext?: AimEditorContext
   editorApplyRange?: TextSelectionRange
   images?: AimImageAttachment[]
   retryMessageId?: string
-}
-
-function ChoiceStepper({
-  groups,
-  busy,
-  onSubmit,
-}: {
-  groups: ChoiceGroup[]
-  busy: boolean
-  onSubmit: (text: string) => void
-}) {
-  const [step, setStep] = useState(0)
-  const [answers, setAnswers] = useState<Record<number, string>>({})
-  const group = groups[step]
-  if (!group) return null
-
-  const selected = answers[step]
-  const isLast = step === groups.length - 1
-
-  function next() {
-    if (!selected) return
-    if (!isLast) {
-      setStep((current) => current + 1)
-      return
-    }
-    onSubmit(groups.map((item, index) => `${index + 1}. ${item.question}\n${answers[index]}`).join("\n\n"))
-  }
-
-  return (
-    <div className="mt-3 max-w-xl rounded-xl border bg-muted/20 p-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-muted-foreground">
-          {step + 1}/{groups.length} · {group.question}
-        </p>
-        <Button size="sm" variant="ghost" className="h-7 px-2" disabled={busy || !selected} onClick={next}>
-          <ArrowRight className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="grid gap-2">
-        {group.options.map((option) => {
-          const value = `${option.label}. ${option.text}`
-          return (
-            <Button
-              key={value}
-              type="button"
-              variant={selected === value ? "default" : "outline"}
-              className="h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs"
-              disabled={busy}
-              onClick={() => setAnswers((current) => ({ ...current, [step]: value }))}
-            >
-              <span className="mr-1 font-semibold">{option.label}</span>
-              {option.text}
-            </Button>
-          )
-        })}
-      </div>
-    </div>
-  )
 }
 
 const AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v2"
@@ -2080,184 +1955,31 @@ export default function AimPage() {
           </div>
         )}
 
-        {/* 消息流 */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
-          {messages.length === 0 ? (
-            <div className="mx-auto flex w-full max-w-3xl flex-col py-5">
-              {showWorkflowLanding ? (
-                <div>
-                  <p className="mb-3 text-sm font-semibold text-foreground">你今天要推进哪一步？</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {AIM_WORKFLOW_STAGES.map((stage) => (
-                      <button
-                        key={stage.id}
-                        type="button"
-                        className="h-10 rounded-lg border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                        onClick={() => beginWorkflowStage(stage.id)}
-                      >
-                        {stage.id === "direction" ? "想清楚方向" : stage.id === "content" ? "开始做内容" : stage.id === "publish" ? "准备发布" : "复盘沉淀"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="max-w-2xl text-left">
-                  <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agent.intro}</p>
-                  {currentWorkflowStage === "content" && selectedAgentId === "content_producer" && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {AIM_CONTENT_ACTIONS.map((action) => (
-                        <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => beginContentAction(action.id)}>
-                          {action.title}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="mx-auto flex w-full max-w-none flex-col gap-4">
-              {messages.map((m) => (
-                <div key={m.id} data-message-id={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`${m.deliverables ? "w-full max-w-full" : "max-w-[96%]"} ${m.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
-                    <div
-                      className={`leading-relaxed ${
-                        m.role === "user"
-                          ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground"
-                          : "bg-transparent p-0 text-sm sm:text-base text-foreground/90 font-medium"
-                      }`}
-                    >
-                      {m.role === "assistant" ? (
-                        (() => {
-                          const display = splitMethodNote(m.content)
-                          return (
-                            <>
-                              {display.methodNote && (
-                                <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-                                  <summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary>
-                                  <div className="mt-2 border-t border-border/60 pt-2">
-                                    <MarkdownRenderer content={display.methodNote} />
-                                  </div>
-                                </details>
-                              )}
-                              <MarkdownRenderer content={display.result} />
-                            </>
-                          )
-                        })()
-                      ) : (
-                        <>
-                          {m.images?.length ? (
-                            <div className="mb-2 flex max-w-64 flex-wrap gap-2">
-                              {m.images.map((image) => (
-                                <img
-                                  key={image.id}
-                                  src={image.previewUrl}
-                                  alt={image.name}
-                                  className="h-20 w-20 rounded-md border object-cover"
-                                />
-                              ))}
-                            </div>
-                          ) : null}
-                          <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                        </>
-                      )}
-                    </div>
-
-                    {m.role === "assistant" && extractChoiceGroups(m.content).length > 0 && (
-                      <ChoiceStepper
-                        groups={extractChoiceGroups(m.content)}
-                        busy={busy}
-                        onSubmit={(text) => void sendText(text)}
-                      />
-                    )}
-
-                    {m.role === "assistant" && m.failure && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 h-7 px-2 text-xs"
-                        onClick={() => retryFailedMessage(m)}
-                        disabled={busy}
-                      >
-                        <ArrowRight className="mr-1 h-3.5 w-3.5" />
-                        重试本次请求
-                      </Button>
-                    )}
-
-                    {m.role === "assistant" && m.editorApply?.range && extractReplacementDraft(m.content) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2 h-7 px-2 text-xs"
-                        onClick={() => applyEditorReplacement(m)}
-                      >
-                        应用到右侧选区
-                      </Button>
-                    )}
-
-                    {/* 交付物气泡 */}
-                    {m.deliverables && (
-                      <div className="w-full mt-2">
-                        <AimDeliverableBubble
-                          deliverables={m.deliverables}
-                          runId={m.runId}
-                          isCurrentVersion={m.id === latestDeliverableMessageId()}
-                          agentId={isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId}
-                          workflowStage={m.workflowStage}
-                          contentAction={m.contentAction}
-                          nextActions={getAimAgentGuide(isValidAimAgent(m.agentId) ? m.agentId : selectedAgentId).nextActions}
-                          onRepurpose={handleRepurpose(m.id)}
-                          onQuality={handleQuality(m.id)}
-                          onMarkStatus={handleMarkStatus(m.id)}
-                          onNextAction={handleAimNextAction}
-                          isBusy={busy}
-                          onEditResult={(format, content) => openEditorFromResult(m.id, format, content)}
-                          onOpenDecision={() => openRecordDialog(m.id, "decision")}
-                          onOpenPublish={() => openRecordDialog(m.id, "publish")}
-                          onOpenRetro={() => openRecordDialog(m.id, "retro")}
-                          onCompileToWiki={
-                            m.agentId === "business_diagnosis" &&
-                            !!selectedProjectId &&
-                            !!m.deliverables.results.some((r) => r.format === "raw_copy")
-                              ? () => {
-                                  const text =
-                                    m.deliverables!.results.find((r) => r.format === "raw_copy")?.content ?? ""
-                                  setWikiDialog({
-                                    open: true,
-                                    context: {
-                                      projectId: selectedProjectId,
-                                      sourceGenerationId: m.deliverables!.id,
-                                      positioningText: text,
-                                    },
-                                  })
-                                }
-                              : undefined
-                          }
-                        />
-                      </div>
-                    )}
-
-                    {/* aim-harness-v1 执行诊断：仅在降级或质量异常时展示执行编号，不常驻 */}
-                    {m.deliverables && (m.degraded || (m.qualityStatus && m.qualityStatus !== "pass")) && m.runId && (
-                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${m.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>
-                          {m.degraded ? "降级交付" : "质量提示"}
-                        </span>
-                        <span>执行编号 {m.runId}</span>
-                        {m.qualityStatus && m.qualityStatus !== "pass" && (
-                          <span>· 质量 {m.qualityStatus === "warn" ? "待优化" : m.qualityStatus === "fail" ? "未通过" : m.qualityStatus}</span>
-                        )}
-                      </div>
-                    )}
-
-                    {m.qualityReport ? <AimQualityReport report={m.qualityReport} /> : null}
-                  </div>
-                </div>
-              ))}
-
-            </div>
-          )}
-        </div>
+        <AimMessageStream
+          ref={scrollRef}
+          messages={messages}
+          busy={busy}
+          workflowLanding={showWorkflowLanding}
+          agentIntro={agent.intro}
+          workflowStage={currentWorkflowStage}
+          selectedAgentId={selectedAgentId}
+          selectedProjectId={selectedProjectId}
+          latestDeliverableMessageId={latestDeliverableMessageId()}
+          onBeginStage={beginWorkflowStage}
+          onBeginContentAction={beginContentAction}
+          actions={{
+            onSubmitChoice: (text) => void sendText(text),
+            onRetry: retryFailedMessage,
+            onApplyReplacement: applyEditorReplacement,
+            onRepurpose: handleRepurpose,
+            onQuality: handleQuality,
+            onMarkStatus: handleMarkStatus,
+            onNextAction: handleAimNextAction,
+            onEditResult: (messageId, format, content) => openEditorFromResult(messageId, format, content),
+            onOpenRecord: openRecordDialog,
+            onCompileToWiki: (context) => setWikiDialog({ open: true, context }),
+          }}
+        />
 
         {/* 输入区 */}
         <footer className="border-t px-3 py-2 sm:px-5">

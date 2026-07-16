@@ -1,0 +1,140 @@
+"use client"
+
+import { forwardRef, useState } from "react"
+import { ArrowRight } from "lucide-react"
+import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
+import { AimQualityReport } from "@/components/aim/aim-quality-report"
+import { MarkdownRenderer } from "@/components/markdown-renderer"
+import { Button } from "@/components/ui/button"
+import { getAimAgentGuide, type AimNextAction } from "@/lib/aim-agent-guides"
+import { extractReplacementDraft } from "@/lib/aim-editor"
+import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
+import { AIM_CONTENT_ACTIONS, AIM_WORKFLOW_STAGES, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
+import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-groups"
+import { splitAimMethodNote } from "@/lib/aim/workbench-display"
+import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
+import type { ContentFormat } from "@/lib/api/client"
+import type { WorkflowRecordMode } from "@/components/aim/workflow-record-dialog"
+
+function ChoiceStepper({ groups, busy, onSubmit }: { groups: AimChoiceGroup[]; busy: boolean; onSubmit: (text: string) => void }) {
+  const [step, setStep] = useState(0)
+  const [answers, setAnswers] = useState<Record<number, string>>({})
+  const group = groups[step]
+  if (!group) return null
+  const selected = answers[step]
+  const next = () => {
+    if (!selected) return
+    if (step < groups.length - 1) return setStep((current) => current + 1)
+    onSubmit(groups.map((item, index) => `${index + 1}. ${item.question}\n${answers[index]}`).join("\n\n"))
+  }
+  return <div className="mt-3 max-w-xl rounded-xl border bg-muted/20 p-3">
+    <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted-foreground">{step + 1}/{groups.length} · {group.question}</p><Button size="sm" variant="ghost" className="h-7 px-2" disabled={busy || !selected} onClick={next}><ArrowRight className="h-4 w-4" /></Button></div>
+    <div className="grid gap-2">{group.options.map((option) => {
+      const value = `${option.label}. ${option.text}`
+      return <Button key={value} type="button" variant={selected === value ? "default" : "outline"} className="h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs" disabled={busy} onClick={() => setAnswers((current) => ({ ...current, [step]: value }))}><span className="mr-1 font-semibold">{option.label}</span>{option.text}</Button>
+    })}</div>
+  </div>
+}
+
+function MessageContent({ message }: { message: AimWorkbenchMessage }) {
+  if (message.role === "assistant") {
+    const display = splitAimMethodNote(message.content)
+    return <>{display.methodNote ? <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary><div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div></details> : null}<MarkdownRenderer content={display.result} /></>
+  }
+  return <>{message.images?.length ? <div className="mb-2 flex max-w-64 flex-wrap gap-2">{message.images.map((image) => <img key={image.id} src={image.previewUrl} alt={image.name} className="h-20 w-20 rounded-md border object-cover" />)}</div> : null}<p className="whitespace-pre-wrap break-words">{message.content}</p></>
+}
+
+function RunDiagnostics({ message }: { message: AimWorkbenchMessage }) {
+  if (!message.deliverables || (!message.degraded && (!message.qualityStatus || message.qualityStatus === "pass")) || !message.runId) return null
+  return <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${message.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>{message.degraded ? "降级交付" : "质量提示"}</span>
+    <span>执行编号 {message.runId}</span>
+    {message.qualityStatus && message.qualityStatus !== "pass" ? <span>· 质量 {message.qualityStatus === "warn" ? "待优化" : message.qualityStatus === "fail" ? "未通过" : message.qualityStatus}</span> : null}
+  </div>
+}
+
+interface MessageActions {
+  onSubmitChoice: (text: string) => void
+  onRetry: (message: AimWorkbenchMessage) => void
+  onApplyReplacement: (message: AimWorkbenchMessage) => void
+  onRepurpose: (messageId: string) => (format: ContentFormat) => void
+  onQuality: (messageId: string) => () => void
+  onMarkStatus: (messageId: string) => (status: string) => void
+  onNextAction: (action: AimNextAction, content: string, generationId: string) => void
+  onEditResult: (messageId: string, format: ContentFormat, content: string) => void
+  onOpenRecord: (messageId: string, mode: WorkflowRecordMode) => void
+  onCompileToWiki: (context: IpWikiDialogContext) => void
+}
+
+function MessageDeliverable({ message, selectedAgentId, selectedProjectId, latestDeliverableMessageId, busy, actions }: {
+  message: AimWorkbenchMessage
+  selectedAgentId: AimAgentId
+  selectedProjectId: string
+  latestDeliverableMessageId?: string
+  busy: boolean
+  actions: MessageActions
+}) {
+  const deliverables = message.deliverables
+  if (!deliverables) return null
+  const messageAgentId = isValidAimAgent(message.agentId) ? message.agentId : selectedAgentId
+  const rawCopy = deliverables.results.find((result) => result.format === "raw_copy")?.content
+  const wikiContext = message.agentId === "business_diagnosis" && selectedProjectId && rawCopy ? {
+    projectId: selectedProjectId,
+    sourceGenerationId: deliverables.id,
+    positioningText: rawCopy,
+  } : null
+  return <div className="mt-2 w-full"><AimDeliverableBubble deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} /></div>
+}
+
+function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, latestDeliverableMessageId, actions }: {
+  message: AimWorkbenchMessage
+  busy: boolean
+  selectedAgentId: AimAgentId
+  selectedProjectId: string
+  latestDeliverableMessageId?: string
+  actions: MessageActions
+}) {
+  const choices = message.role === "assistant" ? extractAimChoiceGroups(message.content) : []
+  return <div data-message-id={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+    <div className={`${message.deliverables ? "w-full max-w-full" : "max-w-[96%]"} ${message.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
+      <div className={`leading-relaxed ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground" : "bg-transparent p-0 text-sm font-medium text-foreground/90 sm:text-base"}`}><MessageContent message={message} /></div>
+      {choices.length ? <ChoiceStepper groups={choices} busy={busy} onSubmit={actions.onSubmitChoice} /> : null}
+      {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
+      {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onApplyReplacement(message)}>应用到右侧选区</Button> : null}
+      <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} />
+      <RunDiagnostics message={message} />
+      {message.qualityReport ? <AimQualityReport report={message.qualityReport} /> : null}
+    </div>
+  </div>
+}
+
+function EmptyMessageState({ workflowLanding, agentIntro, workflowStage, selectedAgentId, onBeginStage, onBeginContentAction }: {
+  workflowLanding: boolean
+  agentIntro: string
+  workflowStage: AimWorkflowStage
+  selectedAgentId: AimAgentId
+  onBeginStage: (stage: AimWorkflowStage) => void
+  onBeginContentAction: (action: AimContentAction) => void
+}) {
+  return <div className="mx-auto flex w-full max-w-3xl flex-col py-5">{workflowLanding ? <div><p className="mb-3 text-sm font-semibold text-foreground">你今天要推进哪一步？</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{AIM_WORKFLOW_STAGES.map((stage) => <button key={stage.id} type="button" className="h-10 rounded-lg border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary" onClick={() => onBeginStage(stage.id)}>{stage.id === "direction" ? "想清楚方向" : stage.id === "content" ? "开始做内容" : stage.id === "publish" ? "准备发布" : "复盘沉淀"}</button>)}</div></div> : <div className="max-w-2xl text-left"><p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && selectedAgentId === "content_producer" ? <div className="mt-3 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div>}</div>
+}
+
+interface AimMessageStreamProps {
+  messages: AimWorkbenchMessage[]
+  busy: boolean
+  workflowLanding: boolean
+  agentIntro: string
+  workflowStage: AimWorkflowStage
+  selectedAgentId: AimAgentId
+  selectedProjectId: string
+  latestDeliverableMessageId?: string
+  onBeginStage: (stage: AimWorkflowStage) => void
+  onBeginContentAction: (action: AimContentAction) => void
+  actions: MessageActions
+}
+
+export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps>(function AimMessageStream(props, ref) {
+  return <div ref={ref} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
+    {props.messages.length === 0 ? <EmptyMessageState workflowLanding={props.workflowLanding} agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginStage={props.onBeginStage} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-none flex-col gap-4">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
+  </div>
+})
