@@ -54,7 +54,6 @@ import {
   type AimGenerateResponse,
   type AimGeneration,
   type AimChatToolAction,
-  type AimChatContent,
   type AimRetroSnapshot,
   type ClientProject,
   type ContentFormat,
@@ -114,6 +113,7 @@ import {
   splitAimMethodNote as splitMethodNote,
 } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
+import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -204,6 +204,13 @@ interface AimImageAttachment {
   assetUrl: string
   readUrl: string
   previewUrl: string
+}
+
+interface SendTextOptions {
+  editorContext?: AimEditorContext
+  editorApplyRange?: TextSelectionRange
+  images?: AimImageAttachment[]
+  retryMessageId?: string
 }
 
 type RecordDialogMode = "decision" | "publish" | "retro"
@@ -397,6 +404,45 @@ function buildHistoryRawInput(baseInput: string, currentInput: string, messages:
   const current = currentInput.trim() ? [`用户：${currentInput.trim()}`] : []
   if (turns.length === 0 && current.length === 0) return baseInput
   return [`【本轮对话】`, ...turns, ...current, "", `【本次生成输入】`, baseInput].join("\n")
+}
+
+function prepareChatTurn(input: {
+  messages: ChatMessage[]
+  text: string
+  images: AimImageAttachment[]
+  retryMessageId?: string
+  startsNewTask: boolean
+  editorApplyRange?: TextSelectionRange
+}) {
+  const baseMessages = input.startsNewTask
+    ? []
+    : input.retryMessageId
+      ? input.messages.filter((message) => message.id !== input.retryMessageId)
+      : input.messages
+  const userMessage: ChatMessage = {
+    id: nextId(),
+    role: "user",
+    content: input.text || "请分析这张图片。",
+    images: input.images,
+  }
+  const thread = input.retryMessageId ? baseMessages : [...baseMessages, userMessage]
+  const assistantId = nextId()
+  return {
+    assistantId,
+    thread,
+    pendingMessages: [...thread, {
+      id: assistantId,
+      role: "assistant" as const,
+      content: "正在思考，会先读取上下文和资料，再给出回复…",
+      editorApply: input.editorApplyRange ? { range: input.editorApplyRange } : null,
+    }],
+  }
+}
+
+function reportChatRevision(messages: ChatMessage[], retryMessageId: string | undefined, startsNewTask: boolean) {
+  if (retryMessageId || startsNewTask) return
+  const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId
+  reportAimRunEvent(revisedRun, "revised", { channel: "chat" })
 }
 
 
@@ -932,14 +978,6 @@ export default function AimPage() {
     ].filter(Boolean).join("\n\n")
   }
 
-  function buildChatContent(text: string, images: AimImageAttachment[]): AimChatContent {
-    if (images.length === 0) return text
-    return [
-      { type: "text", text: text.trim() || "请分析这张图片。" },
-      ...images.map((image) => ({ type: "image_url" as const, image_url: { url: image.readUrl } })),
-    ]
-  }
-
   async function handleAddImages(files: FileList) {
     const nextImages: AimImageAttachment[] = []
     setIsUploadingImage(true)
@@ -1290,44 +1328,25 @@ export default function AimPage() {
     toast.success("已应用到右侧选区")
   }
 
-  async function sendText(
-    text: string,
-    options?: {
-      editorContext?: AimEditorContext
-      editorApplyRange?: TextSelectionRange
-      images?: AimImageAttachment[]
-      retryMessageId?: string
-    }
-  ) {
+  async function sendText(text: string, options?: SendTextOptions) {
     const images = options?.images ?? []
     if (!text && images.length === 0) return
     const startsNewTask = !options?.retryMessageId && shouldIsolateWritingInstruction(text, messages.length > 0)
     const workbenchCommand = detectAimWorkbenchCommand(text)
     if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
-    if (!options?.retryMessageId && !startsNewTask) {
-      const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId
-      reportAimRunEvent(revisedRun, "revised", { channel: "chat" })
-    }
+    reportChatRevision(messages, options?.retryMessageId, startsNewTask)
     const controller = new AbortController()
     requestAbortRef.current = controller
-    const baseMessages = startsNewTask
-      ? []
-      : options?.retryMessageId
-      ? messages.filter((message) => message.id !== options.retryMessageId)
-      : messages
+    const { assistantId, thread, pendingMessages } = prepareChatTurn({
+      messages,
+      text,
+      images,
+      retryMessageId: options?.retryMessageId,
+      startsNewTask,
+      editorApplyRange: options?.editorApplyRange,
+    })
     if (startsNewTask) clearCurrentTaskContext()
-    const userMsg: ChatMessage = { id: nextId(), role: "user", content: text || "请分析这张图片。", images }
-    const thread = options?.retryMessageId ? baseMessages : [...baseMessages, userMsg]
-    const assistantId = nextId()
-    setMessages([
-      ...thread,
-      {
-        id: assistantId,
-        role: "assistant",
-        content: "正在思考，会先读取上下文和资料，再给出回复…",
-        editorApply: options?.editorApplyRange ? { range: options.editorApplyRange } : null,
-      },
-    ])
+    setMessages(pendingMessages)
     setInput("")
     if (images.length) setImageAttachments([])
     setIsThinking(true)
@@ -1346,33 +1365,15 @@ export default function AimPage() {
         ))
         return
       }
-      const chatMessages = thread.map((m) => ({
-        role: m.role,
-        content: m.role === "user" && m.images?.length ? buildChatContent(m.content, m.images) : m.content,
-      }))
-      if (toolAction) {
-        const { content } = await chatAim(chatMessages, {
-          agentId: selectedAgentId,
-          projectId: projectEnabled ? selectedProjectId || undefined : undefined,
-          toolAction,
-          resultId,
-          editorContext: startsNewTask ? undefined : options?.editorContext,
-          signal: controller.signal,
-        })
-        setMessages((prev) => prev.map((message) =>
-          message.id === assistantId ? { ...message, content } : message
-        ))
-        return
-      }
-
-      let hasContent = false
-      await chatAimStream(chatMessages, {
+      const { hasContent } = await runAimChatRequest({
+        messages: buildAimChatMessages(thread),
         agentId: selectedAgentId,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
+        toolAction,
+        resultId,
         editorContext: startsNewTask ? undefined : options?.editorContext,
         signal: controller.signal,
-        onDelta: (_delta, content) => {
-          hasContent = content.length > 0
+        onContent: (content) => {
           setMessages((prev) =>
             prev.map((message) =>
               message.id === assistantId ? { ...message, content } : message
