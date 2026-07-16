@@ -20,88 +20,38 @@ interface MarkdownRendererProps {
 export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
   if (!content.trim()) return null
 
-  const lines = content.split("\n")
   const elements: React.ReactNode[] = []
   let key = 0
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    // Skip empty lines — they serve as paragraph separators via the gap on the container
+  for (const line of content.split("\n")) {
     if (!line.trim()) continue
-
-    const trimmed = line.trim()
-
-    // --- H2 (## heading)
-    if (/^## (.+)/.test(trimmed)) {
-      elements.push(
-        <h2 key={key++} className="mb-3 mt-5 text-lg sm:text-xl font-bold text-foreground first:mt-0">
-          {renderInline(trimmed.replace(/^## /, ""))}
-        </h2>
-      )
-      continue
-    }
-
-    // --- H3 (### heading)
-    if (/^### (.+)/.test(trimmed)) {
-      elements.push(
-        <h3 key={key++} className="mb-2 mt-4 text-base font-semibold text-foreground">
-          {renderInline(trimmed.replace(/^### /, ""))}
-        </h3>
-      )
-      continue
-    }
-
-    // --- Horizontal rule (--- / *** / ___)
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
-      elements.push(<hr key={key++} className="my-4 border-t border-border" />)
-      continue
-    }
-
-    // --- Unordered list item (- / * ...)
-    if (/^[-*]\s+(.+)/.test(trimmed)) {
-      elements.push(
-        <li key={key++} className="ml-4 list-disc text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">
-          {renderInline(trimmed.replace(/^[-*]\s+/, ""))}
-        </li>
-      )
-      continue
-    }
-
-    // --- Ordered list item (1. / 2. ...)
-    if (/^\d+[.)]\s+(.+)/.test(trimmed)) {
-      elements.push(
-        <li key={key++} className="ml-5 list-decimal text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">
-          {renderInline(trimmed.replace(/^\d+[.)]\s+/, ""))}
-        </li>
-      )
-      continue
-    }
-
-    // --- Blockquote (> ...)
-    if (/^>\s+(.+)/.test(trimmed)) {
-      elements.push(
-        <blockquote
-          key={key++}
-          className="border-l-4 border-primary/30 pl-3 my-2 text-sm sm:text-[15px] leading-7 text-muted-foreground italic"
-        >
-          {renderInline(trimmed.replace(/^>\s+/, ""))}
-        </blockquote>
-      )
-      continue
-    }
-
-    // --- Default: paragraph
-    elements.push(
-      <p key={key++} className="text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">
-        {renderInline(trimmed)}
-      </p>
-    )
+    elements.push(renderBlockLine(line.trim(), key++))
   }
 
   if (elements.length === 0) return null
 
   return <div className={`space-y-2 ${className}`}>{elements}</div>
+}
+
+function renderBlockLine(line: string, key: number): React.ReactNode {
+  if (/^## (.+)/.test(line)) {
+    return <h2 key={key} className="mb-3 mt-5 text-lg sm:text-xl font-bold text-foreground first:mt-0">{renderInline(line.replace(/^## /, ""))}</h2>
+  }
+  if (/^### (.+)/.test(line)) {
+    return <h3 key={key} className="mb-2 mt-4 text-base font-semibold text-foreground">{renderInline(line.replace(/^### /, ""))}</h3>
+  }
+  if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
+    return <hr key={key} className="my-4 border-t border-border" />
+  }
+  if (/^[-*]\s+(.+)/.test(line)) {
+    return <li key={key} className="ml-4 list-disc text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">{renderInline(line.replace(/^[-*]\s+/, ""))}</li>
+  }
+  if (/^\d+[.)]\s+(.+)/.test(line)) {
+    return <li key={key} className="ml-5 list-decimal text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">{renderInline(line.replace(/^\d+[.)]\s+/, ""))}</li>
+  }
+  if (/^>\s+(.+)/.test(line)) {
+    return <blockquote key={key} className="border-l-4 border-primary/30 pl-3 my-2 text-sm sm:text-[15px] leading-7 text-muted-foreground italic">{renderInline(line.replace(/^>\s+/, ""))}</blockquote>
+  }
+  return <p key={key} className="text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">{renderInline(line)}</p>
 }
 
 /**
