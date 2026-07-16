@@ -18,7 +18,8 @@ import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-w
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
 import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
 import {
-  CompetitorVideoSections,
+  CompetitorViralVideoPool,
+  CompetitorLatestVideoSection,
   getCompetitorVideoPageUrl,
   isActiveVideoExtractionStatus,
   type CompetitorWatchVideo,
@@ -365,13 +366,6 @@ export default function CompetitorWatchPage() {
         .slice(0, 30)
     : []
 
-  const activeViralVideos = activeAccount && activeAccount.viralVideos
-    ? (activeAccount.viralVideos || [])
-        .map((v) => ({ ...v, account: activeAccount }))
-        .sort((a, b) => b.engagementScore - a.engagementScore)
-        .slice(0, 20)
-    : []
-
   const hasRefreshingAccount = accounts.some((account) => account.refreshStatus === "refreshing")
 
 
@@ -457,6 +451,15 @@ export default function CompetitorWatchPage() {
         </Link>
       </div>
 
+      {!loading ? (
+        <CompetitorViralVideoPool
+          accounts={accounts}
+          extractions={videoExtractions}
+          extractingVideoId={extractingVideoId}
+          onExtract={(video) => void handleExtractVideo(video)}
+        />
+      ) : null}
+
           <CompetitorDiscoveryPanel
             activeAccount={activeAccount}
             accounts={accounts}
@@ -503,9 +506,8 @@ export default function CompetitorWatchPage() {
 
               <RecentReportsCard reports={reports} loading={reportsLoading} />
 
-              <CompetitorVideoSections
+              <CompetitorLatestVideoSection
                 latestVideos={activeLatestVideos}
-                viralVideos={activeViralVideos}
                 extractions={videoExtractions}
                 extractingVideoId={extractingVideoId}
                 onExtract={(video) => void handleExtractVideo(video)}

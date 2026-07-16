@@ -12,7 +12,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HotDecisionPanel } from "@/components/market-insights/hot-decision-panel"
-import { WatchRecommendationsPanel } from "@/components/topic-planning/watch-recommendations-panel"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import {
@@ -184,8 +183,6 @@ export default function AiHotBriefingPage() {
           <CardContent className="p-5 text-sm text-destructive">{error}</CardContent>
         </Card>
       ) : null}
-
-      <WatchRecommendationsPanel />
 
       <Tabs defaultValue="aihot" className="space-y-4">
         <TabsList className="w-full justify-start">

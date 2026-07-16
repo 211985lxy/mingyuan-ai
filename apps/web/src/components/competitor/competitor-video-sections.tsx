@@ -98,12 +98,55 @@ function VideoSection({ title, videos, viral, extractions, extractingVideoId, on
   )
 }
 
-export function CompetitorVideoSections({ latestVideos, viralVideos, extractions, extractingVideoId, onExtract }: {
+export function CompetitorLatestVideoSection({ latestVideos, extractions, extractingVideoId, onExtract }: {
   latestVideos: CompetitorWatchVideo[]
-  viralVideos: CompetitorWatchVideo[]
   extractions: Record<string, ApiVideoCopyExtraction>
   extractingVideoId: string | null
   onExtract: (video: CompetitorWatchVideo) => void
 }) {
-  return <><VideoSection title="最新作品" videos={latestVideos} extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} /><VideoSection title="爆款作品" videos={viralVideos} viral extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} /></>
+  return <VideoSection title="当前账号最新作品" videos={latestVideos} extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} />
+}
+
+export function collectAllViralVideos(accounts: WatchAccount[]): CompetitorWatchVideo[] {
+  return accounts
+    .flatMap((account) => (account.viralVideos ?? []).map((video) => ({ ...video, account })))
+    .sort((a, b) => (b.engagementScore ?? 0) - (a.engagementScore ?? 0))
+}
+
+export function CompetitorViralVideoPool({ accounts, extractions, extractingVideoId, onExtract }: {
+  accounts: WatchAccount[]
+  extractions: Record<string, ApiVideoCopyExtraction>
+  extractingVideoId: string | null
+  onExtract: (video: CompetitorWatchVideo) => void
+}) {
+  const videos = collectAllViralVideos(accounts)
+  if (videos.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Flame className="h-4 w-4 text-orange-500" />
+            全部对标账号爆款视频
+            <Badge variant="secondary" className="text-xs">0</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+            暂无爆款视频。先添加监控账号并刷新作品池，所有账号的爆款视频会统一显示在这里。
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <VideoSection
+      title="全部对标账号爆款视频"
+      videos={videos}
+      viral
+      extractions={extractions}
+      extractingVideoId={extractingVideoId}
+      onExtract={onExtract}
+    />
+  )
 }
