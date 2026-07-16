@@ -42,6 +42,7 @@ import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { useAimProjectWorkspace } from "@/hooks/use-aim-project-workspace"
 import { useAimWorkflowRecords } from "@/hooks/use-aim-workflow-records"
 import { useAimEditorActions } from "@/hooks/use-aim-editor-actions"
+import { useAimDraftAutosave, useAimMessageAutoScroll, useAimSourceHydration } from "@/hooks/use-aim-workbench-effects"
 import { transcribeAudio } from "@/lib/api/client"
 import {
   AIM_AGENT_OPTIONS,
@@ -78,7 +79,7 @@ import {
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
 import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
-import { clearAimDraft, loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { clearAimDraft, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
   buildAimHistoryRawInput as buildHistoryRawInput,
   buildAimEditorContext,
@@ -323,50 +324,29 @@ export default function AimPage() {
 
   const lastAgentParamRef = useRef(agentParam)
 
-  useEffect(() => {
-    saveAimDraft({
-      selectedAgentId,
-      selectedProjectId,
-      input,
-      messages,
-      videoCopyExtractionId: sourceVideoCopyExtractionId,
-      sourceOriginalText,
-      sourceAnalysisText,
-      sourceTopicTitle,
-      sourceTopicRationale,
-      editorText,
-      editorFormat,
-      editorSourceMessageId,
-      editorPanelWidth,
-      editorPanelOpen,
-    })
-  }, [
-    editorFormat,
-    editorPanelOpen,
-    editorPanelWidth,
-    editorSourceMessageId,
-    editorText,
-    input,
-    messages,
+  useAimDraftAutosave({
     selectedAgentId,
     selectedProjectId,
+    input,
+    messages,
+    videoCopyExtractionId: sourceVideoCopyExtractionId,
     sourceOriginalText,
     sourceAnalysisText,
     sourceTopicTitle,
     sourceTopicRationale,
-    sourceVideoCopyExtractionId,
-  ])
-
-  useEffect(() => {
-    if (!sourceVideoCopyExtractionId || (sourceOriginalText.trim() && sourceAnalysisText.trim())) return
-    getVideoCopyExtraction(sourceVideoCopyExtractionId)
-      .then((record) => {
-        const analysisText = formatAnalysisResultForPrompt(record.analysisResult) || ""
-        if (!sourceOriginalText.trim()) setSourceOriginalText(record.transcript || "")
-        if (!sourceAnalysisText.trim()) setSourceAnalysisText(analysisText)
-      })
-      .catch(() => {})
-  }, [sourceAnalysisText, sourceOriginalText, sourceVideoCopyExtractionId])
+    editorText,
+    editorFormat,
+    editorSourceMessageId,
+    editorPanelWidth,
+    editorPanelOpen,
+  })
+  useAimSourceHydration({
+    extractionId: sourceVideoCopyExtractionId,
+    sourceOriginalText,
+    sourceAnalysisText,
+    setSourceOriginalText,
+    setSourceAnalysisText,
+  })
 
   // 切换智能体（由全局侧边栏的 ?agent= 驱动）：同步选中态并重置当前对话
   useEffect(() => {
@@ -523,22 +503,7 @@ export default function AimPage() {
     clearLoadTarget()
   }, [clearLoadTarget, loadTargetId, openEditorFromResult, router, searchParams, selectedAgentId, storeHistory])
 
-  // 自动滚到底部
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const targetId = pendingScrollMessageIdRef.current
-    if (targetId) {
-      pendingScrollMessageIdRef.current = null
-      requestAnimationFrame(() => {
-        el.querySelector<HTMLElement>(`[data-message-id="${targetId}"]`)?.scrollIntoView({
-          block: "start",
-        })
-      })
-      return
-    }
-    el.scrollTop = el.scrollHeight
-  }, [messages, isThinking, isGenerating])
+  useAimMessageAutoScroll({ scrollRef, pendingMessageIdRef: pendingScrollMessageIdRef, messages, isThinking, isGenerating })
 
   /** 人设故事梳理：取最近一条助手回复的【进度 XX%】驱动顶部进度条 */
   const personaProgress = useMemo(() => {
