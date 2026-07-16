@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ExternalLink,
-  Plus,
   Sparkles,
   Target,
 } from "lucide-react"
@@ -13,13 +12,14 @@ import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
-import { KnowledgeEntryCard } from "@/components/topic-planning/knowledge-entry-card"
+import {
+  TOPIC_CATEGORY_META,
+  TopicKnowledgePool,
+  type TopicCategory,
+} from "@/components/topic-planning/topic-knowledge-pool"
 import { TopicCandidatesPanel } from "@/components/topic-planning/topic-candidates-panel"
 import { TopicChatCard } from "@/components/topic-planning/topic-chat-card"
 import {
@@ -46,50 +46,6 @@ import { buildTopicDailyReport, type TopicDailyReportSource } from "@/lib/topic-
 import { buildTopicPoolDraftFromSearchParams } from "@/lib/topic-pool-draft"
 import type { ApiAiHotBriefingItem, ApiTopicCard, ApiTopicRecommendationMode } from "@/types/api"
 
-type TopicCategory = "daily_inspiration" | "meeting_minutes" | "benchmark_reference" | "user_insight"
-
-const CATEGORY_META: Record<
-  TopicCategory,
-  {
-    label: string
-    description: string
-    titlePlaceholder: string
-    contentPlaceholder: string
-  }
-> = {
-  daily_inspiration: {
-    label: "日常灵感",
-    description: "老板随口一句、客户现场一句话、想到的切入角度，都先收进来。",
-    titlePlaceholder: "例如：老板晨会金句",
-    contentPlaceholder: "记录原话、场景或你想到的选题切口。",
-  },
-  meeting_minutes: {
-    label: "会议纪要",
-    description: "把客户访谈、内部复盘、项目会议纪要粘贴进来，提炼真实问题和可拍选题。",
-    titlePlaceholder: "例如：7月客户复盘会",
-    contentPlaceholder: "粘贴会议纪要、访谈记录、讨论要点。保留原话、问题、分歧、案例和下一步动作。",
-  },
-  benchmark_reference: {
-    label: "参考素材",
-    description: "人工粘贴优质账号链接、爆款标题、开头方式或结构拆解。",
-    titlePlaceholder: "例如：某优质账号爆款开头",
-    contentPlaceholder: "贴链接、标题、开头文案，或你观察到的结构节奏。",
-  },
-  user_insight: {
-    label: "用户洞察",
-    description: "来自客户在选题策划和总聊天框里的真实输入，系统沉淀后再进入选题。",
-    titlePlaceholder: "",
-    contentPlaceholder: "",
-  },
-}
-
-const CATEGORY_ORDER: TopicCategory[] = [
-  "daily_inspiration",
-  "meeting_minutes",
-  "benchmark_reference",
-  "user_insight",
-]
-
 const MODE_META: Record<ApiTopicRecommendationMode, { label: string; description: string }> = {
   normal: {
     label: "常规选题",
@@ -107,7 +63,8 @@ const MODE_META: Record<ApiTopicRecommendationMode, { label: string; description
 
 export default function TopicPlanningPage() {
   const router = useRouter()
-  const searchParams = useSearchParams() ?? new URLSearchParams()
+  const routeSearchParams = useSearchParams()
+  const searchParams = useMemo(() => routeSearchParams ?? new URLSearchParams(), [routeSearchParams])
   const importedDraftKey = useRef("")
   const topicGenerationInFlightRef = useRef(false)
   const [projects, setProjects] = useState<ClientProject[]>([])
@@ -511,10 +468,6 @@ export default function TopicPlanningPage() {
     router.push(`/aim?${params.toString()}`)
   }
 
-  const groupedEntries = CATEGORY_ORDER.map((category) => ({
-    category,
-    items: knowledgeEntries.filter((entry) => entry.category === category),
-  }))
   const dailyReport = useMemo(
     () => recommendationMode === "daily" && topicCards.length > 0
       ? buildTopicDailyReport(topicCards, dailyBriefingItems, recommendationMode, dailyReportSources)
@@ -523,7 +476,7 @@ export default function TopicPlanningPage() {
   )
   const selectedKnowledgeLabels = selectedKnowledgeIds.flatMap((entryId) => {
     const entry = knowledgeEntries.find((item) => item.id === entryId)
-    return entry ? [`${CATEGORY_META[entry.category as TopicCategory]?.label ?? "素材"} · ${entry.title}`] : []
+    return entry ? [`${TOPIC_CATEGORY_META[entry.category as TopicCategory]?.label ?? "素材"} · ${entry.title}`] : []
   })
 
   return (
@@ -618,85 +571,18 @@ export default function TopicPlanningPage() {
               onSubmit={handleTopicChatSubmit}
             />
 
-            <div className="order-4 rounded-xl border bg-muted/20 p-3 text-sm opacity-80">
-              <div className="font-medium text-muted-foreground">
-                选题池 {knowledgeEntries.length} 条
-              </div>
-              <div className="mt-4 space-y-4">
-                {groupedEntries.map(({ category, items }) => (
-                <Card key={category} className="shadow-none">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <CardTitle>{CATEGORY_META[category].label}</CardTitle>
-                        <CardDescription>{CATEGORY_META[category].description}</CardDescription>
-                      </div>
-                      <Badge variant="secondary">{items.length} 条</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {category === "user_insight" ? (
-                      <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
-                        客户在选题策划或总聊天框里提到的偏好、顾虑和真实问题，会沉淀到这里。
-                      </div>
-                    ) : (
-                      <div className="grid gap-3">
-                        <div className="space-y-2">
-                          <Label>标题</Label>
-                          <Input
-                            value={forms[category].title}
-                            placeholder={CATEGORY_META[category].titlePlaceholder}
-                            onChange={(event) => updateForm(category, "title", event.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>内容</Label>
-                          <Textarea
-                            value={forms[category].content}
-                            placeholder={CATEGORY_META[category].contentPlaceholder}
-                            className="min-h-28"
-                            onChange={(event) => updateForm(category, "content", event.target.value)}
-                          />
-                        </div>
-                        <div className="flex justify-end">
-                          <Button
-                            onClick={() => handleCreateKnowledge(category)}
-                            disabled={savingCategory === category}
-                          >
-                            <Plus className="mr-1 h-4 w-4" />
-                            {savingCategory === category ? "保存中..." : "加入选题池"}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-3 border-t pt-4">
-                      {loadingKnowledge ? (
-                        <p className="text-sm text-muted-foreground">正在读取项目素材...</p>
-                      ) : items.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          {category === "user_insight"
-                            ? "还没有沉淀到用户洞察。客户多聊几轮后，可以从对话里提炼出来。"
-                            : "这个分类还没有素材，先录一条，后面生成选题时就能直接带进去。"}
-                        </p>
-                      ) : (
-                        items.map((entry) => (
-                          <KnowledgeEntryCard
-                            key={entry.id}
-                            entry={entry}
-                            selected={selectedKnowledgeIds.includes(entry.id)}
-                            onToggleSelected={() => toggleKnowledgeSelection(entry.id)}
-                            onSave={(data) => handleUpdateKnowledge(entry.id, data)}
-                            onArchive={() => handleArchiveKnowledge(entry.id)}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+            <TopicKnowledgePool
+              entries={knowledgeEntries}
+              selectedIds={selectedKnowledgeIds}
+              forms={forms}
+              loading={loadingKnowledge}
+              savingCategory={savingCategory}
+              onUpdateForm={updateForm}
+              onCreate={(category) => void handleCreateKnowledge(category)}
+              onUpdate={handleUpdateKnowledge}
+              onArchive={handleArchiveKnowledge}
+              onToggle={toggleKnowledgeSelection}
+            />
 
             <div className="order-5 grid gap-3 md:grid-cols-2">
               <Link href="/ai-hot" className="block">
