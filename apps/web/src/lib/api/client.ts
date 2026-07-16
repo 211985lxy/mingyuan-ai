@@ -1758,6 +1758,44 @@ export async function chatAim(
   })
 }
 
+async function readAimChatStream(
+  response: Response,
+  onDelta: (delta: string, content: string) => void,
+): Promise<string> {
+  if (!response.body) {
+    throw new ApiError("当前浏览器不支持流式输出", 500, { code: "NO_STREAM_BODY" })
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let content = ""
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const delta = decoder.decode(value, { stream: true })
+      if (!delta) continue
+      content += delta
+      onDelta(delta, content)
+    }
+    const tail = decoder.decode()
+    if (tail) {
+      content += tail
+      onDelta(tail, content)
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError("请求已停止", 499, { code: "ABORTED", originalPath: "/api/aim/chat" })
+    }
+    throw error
+  } finally {
+    reader.releaseLock()
+  }
+
+  return content
+}
+
 export async function chatAimStream(
   messages: AimChatMessage[],
   options: {
@@ -1811,37 +1849,7 @@ export async function chatAimStream(
     )
   }
 
-  if (!response.body) {
-    throw new ApiError("当前浏览器不支持流式输出", 500, { code: "NO_STREAM_BODY" })
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let content = ""
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const delta = decoder.decode(value, { stream: true })
-      if (!delta) continue
-      content += delta
-      onDelta(delta, content)
-    }
-    const tail = decoder.decode()
-    if (tail) {
-      content += tail
-      onDelta(tail, content)
-    }
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiError("请求已停止", 499, { code: "ABORTED", originalPath: "/api/aim/chat" })
-    }
-    throw error
-  } finally {
-    reader.releaseLock()
-  }
-
+  const content = await readAimChatStream(response, onDelta)
   return { content }
 }
 
