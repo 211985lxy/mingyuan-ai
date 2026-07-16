@@ -359,15 +359,14 @@ export default function CompetitorWatchPage() {
     void loadReports(activeAccount.targetUrl)
   }, [activeAccount?.targetUrl, loadReports])
 
-  const activeLatestVideos = activeAccount && activeAccount.latestVideos
-    ? (activeAccount.latestVideos || [])
+  const activeLatestVideos = activeAccount?.latestVideos
+    ? activeAccount.latestVideos
         .map((v) => ({ ...v, account: activeAccount }))
         .sort((a, b) => b.createTime - a.createTime)
         .slice(0, 30)
     : []
 
   const hasRefreshingAccount = accounts.some((account) => account.refreshStatus === "refreshing")
-
 
   async function handleWebResearch() {
     const query = researchQuery.trim()
@@ -503,7 +502,6 @@ export default function CompetitorWatchPage() {
 
           {!loading && sortedAccounts.length > 0 ? (
             <>
-
               <RecentReportsCard reports={reports} loading={reportsLoading} />
 
               <CompetitorLatestVideoSection
