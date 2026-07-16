@@ -13,6 +13,16 @@ export function getProviderConfigs(): LLMProviderConfig[] {
     })
   }
 
+  // High-quality gateway: ZenMux — OpenAI-compatible unified model API
+  if (process.env.ZENMUX_API_KEY) {
+    configs.push({
+      name: "zenmux",
+      apiKey: process.env.ZENMUX_API_KEY,
+      baseURL: process.env.ZENMUX_BASE_URL || "https://zenmux.ai/api/v1",
+      defaultModel: process.env.ZENMUX_MODEL || "qwen/qwen3-max",
+    })
+  }
+
   // Alternative: JieKou AI — OpenAI-compatible API（接口AI中转站）
   if (process.env.JIEKOU_API_KEY) {
     configs.push({

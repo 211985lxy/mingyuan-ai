@@ -7,10 +7,10 @@ import type { LLMProvider, LLMProviderConfig } from "./types"
  * 智能体模型路由策略
  *
  * 核心思路：关键创作优先质量，日常生产优先稳定低成本
- * - 深度文案 / 商业选题 → 离火 GPT-5.5 优先，OpenRouter 国产强模型兜底
- * - 内容生产 / 质检 → DeepSeek 直连优先，OpenRouter 国产快模型兜底
+ * - 深度文案 / 商业选题 → ZenMux Claude 优先，离火 GPT-5.5 兜底
+ * - 内容生产 / 质检 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
- * provider 名与 config.ts 一致：deepseek / jiekou / openrouter / therouter / glm / lihuo / openai
+ * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / therouter / glm / lihuo / openai
  * model 为可选，覆盖 provider 的默认模型（同一 provider 下不同智能体可用不同模型）
  */
 
@@ -19,6 +19,7 @@ type AgentModelRoute = { name: string; model?: string; timeoutMs?: number }
 const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
   deep_copywriter: [
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6" },
     { name: "lihuo", model: "gpt-5.5" },
     { name: "deepseek" },
     { name: "openrouter", model: "qwen/qwen3.7-plus" },
@@ -29,6 +30,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   business_diagnosis: [
     // ponytail: planning/diagnosis routes are non-streaming; keep each fallback short so the chain cannot eat the whole 180s client budget.
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20000 },
     { name: "lihuo", model: "gpt-5.5", timeoutMs: 20000 },
     { name: "deepseek", timeoutMs: 20000 },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000 },
@@ -42,18 +44,21 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // DeepSeek 官方直连价格最低，不走中转站加价；直连不可用时才回退到中转站
   content_producer: [
     { name: "deepseek" },
+    { name: "zenmux" },
     { name: "openrouter", model: "qwen/qwen3.7-plus" },
     { name: "jiekou" },
     { name: "glm" },
   ],
   free_copywriter: [
     { name: "deepseek" },
+    { name: "zenmux" },
     { name: "openrouter", model: "qwen/qwen3.7-plus" },
     { name: "jiekou" },
     { name: "glm" },
   ],
   business_system_diagnosis: [
     { name: "deepseek" },
+    { name: "zenmux" },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro" },
     { name: "openrouter", model: "z-ai/glm-5.2" },
     { name: "jiekou" },
@@ -61,6 +66,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   content_review: [
     { name: "deepseek" },
+    { name: "zenmux" },
     { name: "openrouter", model: "deepseek/deepseek-v4-flash" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash" },
     { name: "jiekou" },
@@ -68,6 +74,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   persona: [
     { name: "deepseek" },
+    { name: "zenmux" },
     { name: "openrouter", model: "moonshotai/kimi-k2.6" },
     { name: "openrouter", model: "qwen/qwen3.7-plus" },
     { name: "jiekou" },
