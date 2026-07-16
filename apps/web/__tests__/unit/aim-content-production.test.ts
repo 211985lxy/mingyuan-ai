@@ -5,6 +5,7 @@ import { buildKnowledgeBlock } from "@/lib/aim-knowledge-context"
 import {
   AIM_HIGH_RISK_LOOP_RULE,
   BENCHMARK_REWRITE_GUARDRAIL,
+  CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
   CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE,
   PUBLISH_PACKAGE_CHAT_RULE,
   benchmarkCopyReuseRatio,
@@ -14,6 +15,7 @@ import {
   extractBenchmarkOriginalCopy,
   isBenchmarkCopyTooSimilar,
 } from "@/lib/aim-agent-handlers"
+import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
 import {
   AIM_OUTPUT_MAX_CHARS,
   BENCHMARK_RECREATION_PREFILL,
@@ -25,6 +27,48 @@ import {
 import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
 
 describe("AIM content production positioning", () => {
+  it("writes operating logic into the copy instead of exposing a strategy report", () => {
+    expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("一个目标客户")
+    expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("一个主要内容任务")
+    expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("一个可信证据")
+    expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("一个承接动作")
+    expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("不要输出运营分析")
+    expect(buildContentProducerChatPrompt({
+      conversationBlock: "",
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      ipWikiBlock: "",
+    })).toContain(CONTENT_PRODUCER_OPERATING_LOGIC_RULE)
+  })
+
+  it("passes the content operating brief into generation context", () => {
+    const context = buildWorkflowContext({
+      taskSpec: {
+        goal: "让传统企业老板理解内容获客",
+        mode: "assumption_delivery",
+        riskLevel: "medium",
+        targetCustomer: "已经有业务但不会稳定做内容的老板",
+        realProblem: "内容有播放但没有咨询",
+        contentTask: "推动咨询行动",
+        trustAssetType: "案例",
+        exclusiveEvidence: "真实客户交付过程",
+        desiredAction: "预约诊断",
+        dealPath: "内容教育 → 预约诊断",
+        knownFacts: [],
+        unknowns: [],
+        assumptions: [],
+        nextAction: "直接交付",
+        classifiedBy: "rule",
+        classifiedAt: "2026-07-16T00:00:00.000Z",
+      },
+    } as unknown as Parameters<typeof buildWorkflowContext>[0])
+
+    expect(context).toContain("目标客户：已经有业务但不会稳定做内容的老板")
+    expect(context).toContain("主要内容任务：推动咨询行动")
+    expect(context).toContain("优先信任证据：案例")
+    expect(context).toContain("期望动作：预约诊断")
+  })
+
   it("keeps the required standalone content agents", () => {
     const titles = AIM_AGENT_OPTIONS.map((agent) => agent.title)
 

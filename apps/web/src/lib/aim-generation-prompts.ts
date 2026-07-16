@@ -1,12 +1,30 @@
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import { AIM_OUTPUT_MAX_CHARS, buildExplicitWordCountPriorityRule } from "@/lib/aim-benchmark-length"
 import { isBenchmarkCopyTooSimilar } from "@/lib/aim-benchmark-quality"
-import { BENCHMARK_REWRITE_GUARDRAIL, CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE } from "@/lib/aim-agent-prompts"
+import {
+  BENCHMARK_REWRITE_GUARDRAIL,
+  CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
+  CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE,
+} from "@/lib/aim-agent-prompts"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 
 export function buildWorkflowContext(context: AimGenerateContext): string {
+  const taskSpec = context.taskSpec
   return [
+    taskSpec
+      ? [
+          "本次内容运营任务单：",
+          `- 内容目标：${taskSpec.goal}`,
+          taskSpec.targetCustomer ? `- 目标客户：${taskSpec.targetCustomer}` : null,
+          taskSpec.realProblem ? `- 真实问题：${taskSpec.realProblem}` : null,
+          taskSpec.contentTask ? `- 主要内容任务：${taskSpec.contentTask}` : null,
+          taskSpec.trustAssetType ? `- 优先信任证据：${taskSpec.trustAssetType}` : null,
+          taskSpec.exclusiveEvidence ? `- 专属证据：${taskSpec.exclusiveEvidence}` : null,
+          taskSpec.desiredAction ? `- 期望动作：${taskSpec.desiredAction}` : null,
+          taskSpec.dealPath ? `- 成交承接：${taskSpec.dealPath}` : null,
+        ].filter(Boolean).join("\n")
+      : null,
     context.topicTitle
       ? `选定爆款选题：${context.topicTitle}${context.topicRationale ? `\n选题依据：${context.topicRationale}` : ""}`
       : null,
@@ -80,6 +98,7 @@ ${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
 ${knowledgeUseRule}
 ${lightEditOutputRule}
 8. 如果上下文包含垂类行业热点，只能自然融合和业务相关的部分，禁止硬蹭热点。
+9. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}
 
 创作规则：
 - 选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者。
