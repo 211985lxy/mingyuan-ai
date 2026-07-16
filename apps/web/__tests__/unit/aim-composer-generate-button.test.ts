@@ -23,8 +23,10 @@ describe("AIM composer generate button", () => {
 
   it("keeps chat request status inside the assistant message", () => {
     const sendBlock = source.match(/async function sendText[\s\S]*?async function handleEvolveConversation/)?.[0] ?? ""
+    const prepareBlock = source.match(/function prepareChatTurn[\s\S]*?function reportChatRevision/)?.[0] ?? ""
 
-    expect(sendBlock).toContain("正在思考，会先读取上下文和资料，再给出回复")
+    expect(sendBlock).toContain("prepareChatTurn")
+    expect(prepareBlock).toContain("正在思考，会先读取上下文和资料，再给出回复")
     expect(sendBlock).toContain("已停止本次回复")
     expect(sendBlock).toContain("对话失败：")
     expect(source).not.toContain("思考中占位")
