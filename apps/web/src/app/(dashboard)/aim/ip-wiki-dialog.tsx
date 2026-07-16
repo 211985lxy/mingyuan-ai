@@ -22,6 +22,7 @@ import {
   type IpWikiPageDTO,
   type IpWikiLintReportDTO,
 } from "@/lib/api/client"
+import type { IpWikiDialogContext } from "@/lib/aim/workbench-types"
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   positioning: "定位主张",
@@ -32,14 +33,6 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
   topic_direction: "选题方向",
   index: "维基目录",
   log: "操作日志",
-}
-
-export interface IpWikiDialogContext {
-  projectId: string
-  /** 这份定位方案来自哪条 AimGeneration，用于来源溯源 */
-  sourceGenerationId?: string
-  /** 定位方案正文（来自交付气泡的 raw_copy，可能是用户编辑后的版本） */
-  positioningText?: string
 }
 
 /**
