@@ -4,7 +4,7 @@
 
 **生产发布：NO-GO。**
 
-代码候选已经收敛到唯一分支 `chore/release-convergence`，本地非数据库门禁全部通过；但生产发布仍被破坏性数据库迁移、数据库 E2E/迁移状态未验证、无远程备份三项阻断。
+代码候选已经收敛到唯一分支 `chore/release-convergence`，本地工程门禁和隔离数据库 E2E 全部通过；但生产发布仍被破坏性数据库迁移未获业务批准、生产备份/恢复未演练、目标环境迁移状态未验证、无远程备份四项阻断。
 
 ## 本次范围
 
@@ -48,8 +48,8 @@
 | 全量单测与评估测试 | 190 files / 1125 tests 通过 |
 | Deterministic Harness | 4 files / 112 tests 通过 |
 | Next.js 生产构建 | 通过；存在 1 个 NFT tracing warning，来源为 Obsidian 导出路由 |
-| 数据库 E2E | **跳过：缺少隔离 TEST_DATABASE_URL / DATABASE_URL** |
-| Migration status | **跳过：缺少目标数据库连接** |
+| 隔离数据库 migration + E2E | 通过；MySQL 8.4 / Redis 7，44 个 migration 状态对齐，3 个待执行 migration 成功应用，19 files / 170 tests 通过 |
+| 目标环境 Migration status | **未执行：缺少目标数据库连接** |
 
 ## 风险块
 
@@ -61,11 +61,11 @@
 - 责任人：业务负责人 + 数据库/部署负责人。
 - 截止：生产部署前，未完成不得放行。
 
-### High：数据库集成证据缺失
+### High：目标数据库证据缺失
 
-本地门禁未执行数据库 E2E 和 `prisma migrate status`，因此只能证明代码层与构建层完成，不能证明数据层可上线。
+隔离数据库已完成 migration 重放、schema contract 和 170 个 E2E 测试，但尚未对生产或 staging 快照执行 retired-media preflight、备份恢复和 `prisma migrate status`，不能据此推断生产数据可安全删除。
 
-- 缓解：启动隔离 MySQL/Redis，完成迁移重放、E2E、目标环境 migration status 和 schema verify。
+- 缓解：在生产脱敏快照上完成预检与恢复演练，再读取目标环境 migration status 和 schema verify。
 - 责任人：部署负责人。
 
 ### High：无远程备份
