@@ -50,6 +50,15 @@ describe("session cookie security", () => {
     expect(isCsrfSafe(request("POST", { Origin: "https://attacker.example" }), "bearer")).toBe(true)
     expect(isCsrfSafe(request("GET", { Origin: "https://attacker.example" }), "cookie")).toBe(true)
   })
+
+  it("accepts same-origin writes behind a reverse proxy", () => {
+    expect(isCsrfSafe(request("POST", {
+      Origin: "https://mingyuan-ai.cn",
+      Host: "127.0.0.1:3000",
+      "X-Forwarded-Host": "mingyuan-ai.cn",
+      "X-Forwarded-Proto": "https",
+    }), "cookie")).toBe(true)
+  })
 })
 
 describe("JSON request contracts", () => {

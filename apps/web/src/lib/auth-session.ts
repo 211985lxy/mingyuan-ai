@@ -11,6 +11,19 @@ const SESSION_CONFIG = {
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
 
+function getRequestOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim()
+  const host = forwardedHost || request.headers.get("host")?.trim()
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim()
+  const proto = forwardedProto || request.nextUrl.protocol.replace(/:$/, "")
+
+  if (host && proto) {
+    return `${proto}://${host}`
+  }
+
+  return request.nextUrl.origin
+}
+
 export function readSessionToken(
   request: NextRequest,
   kind: SessionKind,
@@ -63,7 +76,7 @@ export function isCsrfSafe(
   const origin = request.headers.get("origin")
   if (origin) {
     try {
-      return new URL(origin).origin === request.nextUrl.origin
+      return new URL(origin).origin === getRequestOrigin(request)
     } catch {
       return false
     }
