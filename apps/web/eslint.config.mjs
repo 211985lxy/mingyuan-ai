@@ -55,6 +55,43 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-require-imports": "off",
     },
   },
+  {
+    // Knowledge categories have one canonical definition. Scope the guard to
+    // the knowledge domain so unrelated category maps (for example AI HOT)
+    // remain valid.
+    files: [
+      "src/app/api/admin/knowledge/**/*.ts",
+      "src/app/api/knowledge/**/*.ts",
+      "src/components/admin/knowledge-browser.tsx",
+      "src/features/knowledge/**/*.{ts,tsx}",
+      "src/lib/agent-logic-profile.ts",
+      "src/lib/aim-knowledge-context.ts",
+      "src/lib/aim/services/script-polish-context.ts",
+      "src/lib/knowledge-auto-processor.ts",
+    ],
+    ignores: ["src/lib/knowledge-categories.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "VariableDeclarator[id.name='CATEGORY_LABELS']",
+          message: "Import CATEGORY_LABELS from lib/knowledge-categories.ts.",
+        },
+        {
+          selector: "VariableDeclarator[id.name='KNOWLEDGE_CATEGORY_LABELS']",
+          message: "Import CATEGORY_LABELS from lib/knowledge-categories.ts.",
+        },
+        {
+          selector: "VariableDeclarator[id.name='BROWSER_CATEGORY_LABELS']",
+          message: "Import CATEGORY_LABELS from lib/knowledge-categories.ts.",
+        },
+        {
+          selector: "VariableDeclarator[id.name='validCategories']",
+          message: "Use KNOWLEDGE_CATEGORIES or isKnowledgeCategory from lib/knowledge-categories.ts.",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

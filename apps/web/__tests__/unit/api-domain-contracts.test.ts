@@ -14,6 +14,7 @@ import {
   watchRecommendationsBodySchema,
 } from "@/features/competitor/contracts/api"
 import { parseGenerateBody } from "@/lib/aim-generate-validate"
+import { KNOWLEDGE_CATEGORIES } from "@/lib/knowledge-categories"
 
 describe("domain API contracts", () => {
   it("rejects unknown AIM fields and excessive chat history", () => {
@@ -48,6 +49,30 @@ describe("domain API contracts", () => {
     }).success).toBe(false)
 
     expect(obsidianSyncBodySchema.safeParse({ entries: [] }).success).toBe(false)
+  })
+
+  it("accepts every canonical knowledge category for Obsidian sync", () => {
+    for (const category of KNOWLEDGE_CATEGORIES) {
+      expect(obsidianSyncBodySchema.safeParse({
+        entries: [{
+          id: `entry-${category}`,
+          title: "知识条目",
+          content: "真实内容",
+          category,
+          tags: [],
+        }],
+      }).success).toBe(true)
+    }
+
+    expect(obsidianSyncBodySchema.safeParse({
+      entries: [{
+        id: "entry-invalid",
+        title: "知识条目",
+        content: "真实内容",
+        category: "not_a_category",
+        tags: [],
+      }],
+    }).success).toBe(false)
   })
 
   it("bounds topic sources and competitor inputs", () => {

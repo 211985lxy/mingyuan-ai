@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { KNOWLEDGE_CATEGORIES } from "@/lib/knowledge-categories"
 
 const id = z.string().trim().min(1).max(80)
 const category = z.string().trim().min(1).max(80)
@@ -25,13 +26,7 @@ export const obsidianSyncEntrySchema = z.object({
   id,
   title: z.string().trim().min(1).max(200),
   content: z.string().trim().min(1).max(50_000),
-  category: z.enum([
-    "boss_experience",
-    "product_usp",
-    "customer_pain",
-    "project_case",
-    "customer_qa",
-  ]),
+  category: z.enum(KNOWLEDGE_CATEGORIES),
   tags,
 }).strict()
 
