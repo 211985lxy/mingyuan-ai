@@ -86,7 +86,9 @@
 
 APIMart 已作为 OpenAI-compatible 备用供应商接入全部文本智能体，默认模型为官方文档明确支持的 `gpt-5`。本机国内网络直连会在 TLS 阶段被重置，因此新增可选 `APIMART_PROXY_URL`，仅作用于该 provider。经 `http://127.0.0.1:10808` 实测，AIM 成功获得 `gpt-5-2025-08-07` 响应和 token 用量；密钥仅保存在本机 `.env.local`，未进入 Git。
 
-生产部署后的出口实测显示，阿里云服务器直连 APIMart 连接超时。为避免 `business_diagnosis` 先等待 60 秒才降级，已从生产 `/etc/mingyuan/mingyuan.env` 移除 APIMart 配置并重启服务；代码能力保留，但生产暂不启用。后续只有在服务器获得可用代理或 APIMart 恢复直连后，才重新配置 `APIMART_API_KEY` 与 `APIMART_PROXY_URL`。国内客户端仍只访问明远服务端，不会直接访问模型供应商。
+生产部署后的出口实测显示，阿里云服务器直连 APIMart 超时。2026-07-18 已在生产机安装官方 Xray `v26.3.27`，使用独立海外 VLESS 节点提供只监听 `127.0.0.1:10809` 的 HTTP 代理，并配置 `APIMART_PROXY_URL=http://127.0.0.1:10809`。订阅地址、节点 UUID 和 API 密钥均只保存在服务器受限配置中，未进入 Git。
+
+代理上线后，生产真实请求返回 HTTP 200，实际模型为 `gpt-5-2025-08-07`，`finish_reason=stop`，输出长度 2、总计 83 tokens。`mingyuan-web` 已增加对 `xray.service` 的启动顺序依赖；两项服务均为 active，健康检查中的数据库和 Redis 均正常。曾尝试的 sing-box 因与该节点的 AI API TLS 链路不兼容，已停止、卸载并清除配置，避免维护两套代理。
 
 ### 已完成：固定 SHA 部署与基础冒烟
 
@@ -125,6 +127,6 @@ APIMart 已作为 OpenAI-compatible 备用供应商接入全部文本智能体�
 
 ## Stakeholder Communication
 
-当前可对团队表述为：“候选代码、真实模型质量、飞书闭环、生产数据库迁移和固定 SHA 应用部署均已完成，基础生产冒烟通过。本次发布已完成；APIMart 代码已接入但因生产服务器出口超时暂未启用，不影响现有模型链路。”
+当前可对团队表述为：“候选代码、真实模型质量、飞书闭环、生产数据库迁移和固定 SHA 应用部署均已完成，基础生产冒烟通过。APIMart 已通过生产机本地 Xray 代理启用并完成真实 GPT-5 请求验证，国内客户端仍只访问明远服务端。”
 
 任何人不得把“计划完成”“单测通过”或“Z-Code 已提交”表述为“已进入 main”“已部署”或“业务闭环完成”。
