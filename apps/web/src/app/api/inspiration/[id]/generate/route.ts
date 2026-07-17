@@ -6,8 +6,8 @@ import { createAimTrace } from "@/lib/aim-observability"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import {
   buildInspirationGenerateResponse,
-  findOwnedInspiration,
   persistInspirationGeneration,
+  prepareInspirationGenerateRequest,
   prepareInspirationGeneration,
 } from "@/lib/aim/services/inspiration-generation"
 
@@ -19,17 +19,13 @@ export async function POST(
     const user = await authenticateRequest(request)
     const { id } = await params
     const body = await parseJsonRecord(request)
-    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
-    const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle.trim() : undefined
 
-    // 灵感归属隔离：findFirst 必须按 id + userId
-    const inspiration = await findOwnedInspiration({ id, userId: user.id })
-    if (!inspiration) {
-      return NextResponse.json({ error: "灵感记录不存在" }, { status: 404 })
+    // 归属隔离 + 校验收口到 prepare（404 先于 400，顺序与原 route 一致）
+    const prepared = await prepareInspirationGenerateRequest({ id, userId: user.id, body })
+    if (!prepared.ok) {
+      return NextResponse.json({ error: prepared.error }, { status: prepared.status })
     }
-    if (!projectId) {
-      return NextResponse.json({ error: "请选择 IP 营销全案" }, { status: 400 })
-    }
+    const { inspiration, projectId, topicTitle } = prepared
 
     const trace = await createAimTrace({
       userId: user.id,

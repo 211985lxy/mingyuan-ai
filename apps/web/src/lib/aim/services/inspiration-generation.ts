@@ -33,6 +33,36 @@ export async function findOwnedInspiration(input: {
   return prisma.inspiration.findFirst({ where: { id: input.id, userId: input.userId } })
 }
 
+/** 准备 inspiration generate 请求的判别联合结果（对齐 generate 入口的 prepare 形态）。 */
+export type PreparedInspirationGenerateRequest =
+  | { ok: false; status: 404 | 400; error: string }
+  | { ok: true; inspiration: { id: string; content: string }; projectId: string; topicTitle?: string }
+
+/**
+ * 解析 body + 归属查找 + projectId 校验，返回判别联合。
+ *
+ * 校验顺序与原 route 逐字一致：先 findFirst 归属（404 灵感记录不存在），
+ * 再 projectId（400 请选择 IP 营销全案）。inspiration 入口无调用日志契约，
+ * 故失败可直接 return（路由据此分流），无需像 agent 那样 throw。
+ */
+export async function prepareInspirationGenerateRequest(input: {
+  id: string
+  userId: string
+  body: Record<string, unknown>
+}): Promise<PreparedInspirationGenerateRequest> {
+  const { id, userId, body } = input
+  const inspiration = await findOwnedInspiration({ id, userId })
+  if (!inspiration) {
+    return { ok: false, status: 404, error: "灵感记录不存在" }
+  }
+  const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+  if (!projectId) {
+    return { ok: false, status: 400, error: "请选择 IP 营销全案" }
+  }
+  const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle.trim() : undefined
+  return { ok: true, inspiration, projectId, topicTitle }
+}
+
 /**
  * 构造 inspiration generate 的 executeAimRun 请求对象（不调用 Harness —— 由 route
  * 调用以满足架构护栏 R1）。固定 entrypoint=inspiration / agentId=content_producer /
