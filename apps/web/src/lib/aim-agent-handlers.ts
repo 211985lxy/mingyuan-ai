@@ -37,6 +37,7 @@ import type {
   AimGenerateContext,
   AimGenerateResponse,
 } from "@/lib/aim/agent-types"
+import { AIM_FACT_PRIORITY_VERSION, withAimFactPriorityRule } from "@/lib/aim-context-priority"
 
 export type {
   AimAgentHandler,
@@ -111,9 +112,10 @@ async function buildAimChatRuntime(
       metadata: { messageCount: params.messages.length, didCompress: result.didCompress },
     }),
   )
-  const enrichedKnowledgeBlock = compressed.didCompress
+  const compressedKnowledgeBlock = compressed.didCompress
     ? `【对话摘要】\n${compressed.summary}\n\n${params.knowledgeBlock}`
     : params.knowledgeBlock
+  const enrichedKnowledgeBlock = withAimFactPriorityRule(compressedKnowledgeBlock)
   const conversationBlock = params.conversationIntent
     ? buildConversationIntentBlock(params.conversationIntent)
     : ""
@@ -156,7 +158,7 @@ async function buildAimChatRuntime(
     label: "上下文预算",
     status: "success",
     summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
-    metadata: budgeted.stats,
+    metadata: { ...budgeted.stats, factPriority: AIM_FACT_PRIORITY_VERSION },
   })
 
   return {

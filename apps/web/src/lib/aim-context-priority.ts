@@ -1,0 +1,37 @@
+const FACT_PRIORITY_HEADING = "【AIM事实与指令优先级】"
+
+export const AIM_FACT_PRIORITY_VERSION = "fact-priority-v1"
+
+export const AIM_FACT_PRIORITY_RULE = `${FACT_PRIORITY_HEADING}
+发生冲突时按以下规则处理，不得把多份上下文静默拼成一个新事实：
+- 指令优先级：用户本轮明确指令 > 已确认的任务单/工作流要求 > Agent 默认模板与方法论。
+- 事实优先级：用户本轮明确确认的事实与当前选中素材 > 已确认的项目/IP结构化事实与任务单 knownFacts > 用户指定的选题、原稿或拆解素材 > 项目知识库 > 长期记忆 > 外部热点、竞品和方法论 > 模型推断。
+- 同层事实冲突时优先采用来源更直接、更新时间更近且可追溯的版本；仍无法判断就明确标记“待确认”，不要自行合并。
+- 不得把推断写成已验证事实；人物身份、数字、案例、报价、时间和结果缺少依据时，写“未提供/待补充”或直接省略。`
+
+function removeExistingFactPriorityRule(contextBlock: string): string {
+  return contextBlock.replace(AIM_FACT_PRIORITY_RULE, "").trimStart()
+}
+
+export function withAimFactPriorityRule(contextBlock: string): string {
+  const content = removeExistingFactPriorityRule(contextBlock)
+  return content ? `${AIM_FACT_PRIORITY_RULE}\n\n${content}` : AIM_FACT_PRIORITY_RULE
+}
+
+export function composeAimReferenceContext(input: {
+  currentMaterial?: string
+  projectKnowledge?: string
+  memory?: string
+  style?: string
+  externalReference?: string
+}): string {
+  const content = [
+    input.currentMaterial,
+    input.projectKnowledge,
+    input.memory,
+    input.style,
+    input.externalReference,
+  ].filter(Boolean).join("\n")
+
+  return withAimFactPriorityRule(content)
+}

@@ -24,6 +24,7 @@ import {
 } from "@/lib/aim-memory"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationIntent } from "@/lib/aim-conversation-intent"
+import { composeAimReferenceContext } from "@/lib/aim-context-priority"
 
 export type RetrievedChatContextBlocks = {
   knowledgeBlock: string
@@ -116,7 +117,13 @@ export async function retrieveChatContextBlocks(input: {
     : []
   const memoryBlock = formatAimMemoryBlock(memoryRows)
 
-  const knowledgeBlock = [editorBlock, memoryBlock, knowledgeContext.knowledgeBlock, styleBlock, competitorWatchBlock].filter(Boolean).join("\n")
+  const knowledgeBlock = composeAimReferenceContext({
+    currentMaterial: editorBlock,
+    projectKnowledge: knowledgeContext.knowledgeBlock,
+    memory: memoryBlock,
+    style: styleBlock,
+    externalReference: competitorWatchBlock,
+  })
 
   return { knowledgeBlock, knowledgeContext, styleBlock, competitorWatchBlock, editorBlock, memoryBlock }
 }

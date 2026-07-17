@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest"
 
 import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 import { planAimRun } from "@/lib/aim-harness/planner"
+import { AIM_FACT_PRIORITY_RULE } from "@/lib/aim-context-priority"
 import type { PreparedAimContext } from "@/lib/aim-harness/contracts"
 
 function makeSpec(overrides: { rawInput?: string; taskType?: string } = {}) {
@@ -57,6 +58,8 @@ describe("prepareAimContext 装配（阶段 2.2）", () => {
     // 冻结 block 经预算后保留（new_copy 任务预算宽松，4k+ 字以内不截断）
     expect(prepared.blocks.viralStructure).toContain("爆款结构")
     expect(prepared.blocks.ipWiki).toContain("IP 定位")
+    expect(prepared.blocks.knowledge.startsWith(AIM_FACT_PRIORITY_RULE)).toBe(true)
+    expect(prepared.blocks.knowledge).toContain("护肤成分科普")
 
     // 知识条目透传
     expect(prepared.retrievedEntries).toHaveLength(1)

@@ -45,6 +45,7 @@ import type { AimAgentId } from "./contracts"
 import type { AimRunSpec, AimContextSource } from "./types"
 import type { PreparedAimContext } from "./contracts"
 import type { AimGenerationContextOverride } from "@/lib/aim-agent-handlers"
+import { AIM_FACT_PRIORITY_VERSION, withAimFactPriorityRule } from "@/lib/aim-context-priority"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -226,9 +227,10 @@ async function compressAndBudgetGenerationInput(input: {
   const knowledgeWithContext = compressed.didCompress
     ? `【对话摘要】\n${compressed.summary}\n\n${knowledgeBlock}`
     : knowledgeBlock
+  const prioritizedKnowledge = withAimFactPriorityRule(knowledgeWithContext)
   const budgeted = applyAimContextBudget({
     conversationBlock: "",
-    knowledgeBlock: knowledgeWithContext,
+    knowledgeBlock: prioritizedKnowledge,
     methodologyBlock: input.methodologyBlock,
     businessDiagnosisBlock: input.businessDiagnosisBlock,
     viralStructureBlock: input.viralStructureBlock,
@@ -240,7 +242,7 @@ async function compressAndBudgetGenerationInput(input: {
     label: "上下文预算",
     status: "success",
     summary: `${budgeted.stats.includedChars}/${budgeted.stats.budgetChars} 字`,
-    metadata: budgeted.stats,
+    metadata: { ...budgeted.stats, factPriority: AIM_FACT_PRIORITY_VERSION },
   })
   return budgeted
 }
