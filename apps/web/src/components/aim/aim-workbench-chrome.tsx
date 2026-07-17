@@ -43,18 +43,21 @@ export function AimWorkbenchHeader({
   return (
     <header className="flex items-center justify-between gap-3 border-b px-3 py-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div className="md:hidden">
+        <div className="flex flex-col gap-0.5 md:hidden">
           <select
             value={workflowStage}
             onChange={(event) => {
               if (isAimWorkflowStage(event.target.value)) onStageChange(event.target.value)
             }}
-            className="h-9 w-[130px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-9 w-[150px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {AIM_WORKFLOW_STAGES.map((stage) => (
               <option key={stage.id} value={stage.id}>{stage.title}</option>
             ))}
           </select>
+          {activeDescription && (
+            <p className="max-w-[150px] truncate text-[11px] text-muted-foreground">{activeDescription}</p>
+          )}
         </div>
         <span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary md:flex">
           <AgentIcon className="h-4 w-4" />
