@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import type { ComponentType } from "react"
-import { Plus, Sparkles } from "lucide-react"
+import { Check, Plus, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { cn } from "@/lib/utils"
 import type { AimEvolutionSuggestion } from "@/lib/api/client"
 import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimWorkflowStage } from "@/lib/aim-workflow"
 
@@ -36,6 +37,9 @@ export function AimWorkbenchHeader({
   onEvolve,
   onReset,
 }: AimWorkbenchHeaderProps) {
+  const currentIndex = AIM_WORKFLOW_STAGES.findIndex((stage) => stage.id === workflowStage)
+  const activeDescription = AIM_WORKFLOW_STAGES.find((stage) => stage.id === workflowStage)?.description
+
   return (
     <header className="flex items-center justify-between gap-3 border-b px-3 py-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
@@ -56,19 +60,46 @@ export function AimWorkbenchHeader({
           <AgentIcon className="h-4 w-4" />
         </span>
         <p className="hidden shrink-0 truncate text-sm font-semibold text-foreground md:block">{agentTitle}</p>
-        <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex" aria-label="AIM 工作流">
-          {AIM_WORKFLOW_STAGES.map((stage) => (
-            <Button
-              key={stage.id}
-              type="button"
-              size="sm"
-              variant={workflowStage === stage.id ? "secondary" : "ghost"}
-              className="h-7 shrink-0 rounded-md px-2 text-xs"
-              onClick={() => onStageChange(stage.id)}
-            >
-              {stage.title}
-            </Button>
-          ))}
+        <nav className="hidden min-w-0 flex-col gap-1 md:flex" aria-label="AIM 工作流">
+          <ol className="flex min-w-0 items-center gap-1 overflow-x-auto">
+            {AIM_WORKFLOW_STAGES.map((stage, index) => {
+              const isCurrent = stage.id === workflowStage
+              const isDone = index < currentIndex
+              return (
+                <li key={stage.id} className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => onStageChange(stage.id)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={cn(
+                      "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
+                      isCurrent && "bg-primary/10 text-primary",
+                      isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      !isCurrent && !isDone && "text-muted-foreground/50 hover:bg-muted/60 hover:text-muted-foreground",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
+                        isCurrent && "bg-primary text-primary-foreground",
+                        isDone && "bg-muted-foreground/20 text-muted-foreground",
+                        !isCurrent && !isDone && "border border-muted-foreground/30 text-transparent",
+                      )}
+                    >
+                      {isDone ? <Check className="h-3 w-3" /> : index + 1}
+                    </span>
+                    {stage.title}
+                  </button>
+                  {index < AIM_WORKFLOW_STAGES.length - 1 && (
+                    <span className="mx-0.5 h-px w-4 shrink-0 bg-border" aria-hidden />
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+          {activeDescription && (
+            <p className="truncate pl-6 text-[11px] text-muted-foreground">{activeDescription}</p>
+          )}
         </nav>
       </div>
       <div className="flex items-center gap-2">
