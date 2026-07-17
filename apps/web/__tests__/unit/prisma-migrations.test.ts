@@ -119,4 +119,24 @@ describe("Prisma migrations", () => {
     )
     expect(deployWorkflow).toContain("run: pnpm security:audit")
   })
+
+  it("repairs the known empty authVideoUrl production drift without breaking fresh databases", () => {
+    const preflight = readFileSync(
+      path.join(appRoot, "scripts/check-retired-media-data.mjs"),
+      "utf8",
+    )
+    const repair = readFileSync(
+      path.join(
+        appRoot,
+        "prisma/migrations/20260717160000_finish_retired_auth_video_column/migration.sql",
+      ),
+      "utf8",
+    )
+
+    expect(preflight).toContain("column:User.authVideoUrl")
+    expect(preflight).toContain("Known authVideoUrl repair drift preflight passed.")
+    expect(repair).toContain("information_schema`.`COLUMNS")
+    expect(repair).toContain("ALTER TABLE `User` DROP COLUMN `authVideoUrl`")
+    expect(repair).toContain("PREPARE drop_auth_video_column_statement")
+  })
 })

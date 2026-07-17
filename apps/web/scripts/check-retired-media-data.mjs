@@ -42,7 +42,7 @@ const retiredColumns = {
   User: ["authVideoUrl"],
 }
 
-try {
+async function runPreflight() {
   const [tableRows] = await connection.query(
     "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?",
     [database],
@@ -70,7 +70,31 @@ try {
 
   if (presentObjects.length === 0) {
     console.log("Retired-media schema is already absent; preflight passed.")
-    process.exit(0)
+    return
+  }
+
+  const repairableAuthVideoDrift =
+    presentObjects.length === 1 && presentObjects[0] === "column:User.authVideoUrl"
+  if (repairableAuthVideoDrift) {
+    const [rows] = await connection.query(
+      "SELECT COUNT(*) AS count FROM `User` WHERE `authVideoUrl` IS NOT NULL",
+    )
+    const count = Number(rows[0].count)
+    console.table([{ resource: "User(authVideoUrl repair drift)", count }])
+    if (count > 0 && process.env.ACK_RETIRE_MEDIA_DATA !== confirmation) {
+      console.error(
+        `Refusing repair migration: ${count} authVideoUrl values exist. Rerun with ACK_RETIRE_MEDIA_DATA=${confirmation} after backup verification.`,
+      )
+      process.exitCode = 2
+    } else if (count > 0 && !backupReference) {
+      console.error(
+        "Refusing repair migration: RETIRED_MEDIA_BACKUP_REFERENCE must identify the verified backup and restore drill.",
+      )
+      process.exitCode = 2
+    } else {
+      console.log("Known authVideoUrl repair drift preflight passed.")
+    }
+    return
   }
 
   if (presentObjects.length !== expectedObjects.length) {
@@ -78,7 +102,8 @@ try {
     console.error("Refusing migration because the retired-media schema is partially present.")
     console.error(`Present: ${presentObjects.join(", ")}`)
     console.error(`Missing: ${missingObjects.join(", ")}`)
-    process.exit(3)
+    process.exitCode = 3
+    return
   }
 
   const counts = []
@@ -134,6 +159,10 @@ try {
   } else {
     console.log("Retired-media preflight passed.")
   }
+}
+
+try {
+  await runPreflight()
 } finally {
   await connection.end()
 }

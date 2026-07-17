@@ -25,8 +25,6 @@ const child = spawn(process.env.MYSQLDUMP_BIN || "mysqldump", [
   "--triggers",
   "--events",
   "--no-tablespaces",
-  "--skip-masking-policies",
-  "--skip-add-drop-masking-policy",
   "--default-character-set=utf8mb4",
   `--host=${url.hostname}`,
   `--port=${url.port || "3306"}`,
