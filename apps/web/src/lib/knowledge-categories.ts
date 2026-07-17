@@ -63,12 +63,12 @@ export const PROJECT_REQUIRED_CATEGORIES: ReadonlySet<string> = new Set([
   "private_domain_material",
 ])
 
-export function isKnowledgeCategory(value: string): value is KnowledgeCategory {
-  return (KNOWLEDGE_CATEGORIES as readonly string[]).includes(value)
+export function isKnowledgeCategory(value: unknown): value is KnowledgeCategory {
+  return typeof value === "string" && (KNOWLEDGE_CATEGORIES as readonly string[]).includes(value)
 }
 
-export function isKnowledgeSourceType(value: string): value is KnowledgeSourceType {
-  return (SOURCE_TYPES as readonly string[]).includes(value)
+export function isKnowledgeSourceType(value: unknown): value is KnowledgeSourceType {
+  return typeof value === "string" && (SOURCE_TYPES as readonly string[]).includes(value)
 }
 
 /**

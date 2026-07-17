@@ -56,16 +56,19 @@ describe("smart-import confirm route", () => {
   })
 
   it("queues embedding and entity extraction for every created entry", async () => {
-    const response = await POST(request({
-      userId: "user-1",
-      projectId: "project-1",
-      entries: [{
-        title: "客户问题",
-        content: "客户真实问题",
-        category: "customer_pain",
-        tags: ["客户原话"],
-      }],
-    }))
+    const response = await POST(
+      request({
+        userId: "user-1",
+        projectId: "project-1",
+        entries: [{
+          title: "客户问题",
+          content: "客户真实问题",
+          category: "customer_pain",
+          tags: ["客户原话"],
+        }],
+      }),
+      { params: Promise.resolve({}) },
+    )
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ data: { created: 1 } })

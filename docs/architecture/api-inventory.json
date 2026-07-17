@@ -411,7 +411,7 @@
       "input": "query",
       "query": "manual",
       "externalService": false,
-      "cost": "medium",
+      "cost": "low",
       "idempotency": false
     },
     {

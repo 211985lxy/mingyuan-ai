@@ -14,7 +14,11 @@ import {
   watchRecommendationsBodySchema,
 } from "@/features/competitor/contracts/api"
 import { parseGenerateBody } from "@/lib/aim-generate-validate"
-import { KNOWLEDGE_CATEGORIES } from "@/lib/knowledge-categories"
+import {
+  isKnowledgeCategory,
+  isKnowledgeSourceType,
+  KNOWLEDGE_CATEGORIES,
+} from "@/lib/knowledge-categories"
 
 describe("domain API contracts", () => {
   it("rejects unknown AIM fields and excessive chat history", () => {
@@ -73,6 +77,12 @@ describe("domain API contracts", () => {
         tags: [],
       }],
     }).success).toBe(false)
+  })
+
+  it("rejects non-string values in canonical knowledge type guards", () => {
+    expect(isKnowledgeCategory(undefined)).toBe(false)
+    expect(isKnowledgeCategory({ category: "customer_pain" })).toBe(false)
+    expect(isKnowledgeSourceType(null)).toBe(false)
   })
 
   it("bounds topic sources and competitor inputs", () => {
