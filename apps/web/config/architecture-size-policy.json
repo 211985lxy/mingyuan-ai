@@ -7,7 +7,7 @@
   "legacyFiles": [
     {
       "path": "src/app/(dashboard)/aim/page.tsx",
-      "maxLines": 758,
+      "maxLines": 180,
       "target": "src/features/aim/components and hooks"
     },
     {
