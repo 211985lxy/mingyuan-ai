@@ -21,7 +21,11 @@ import {
   evaluateEvalGate,
   type EvalRunReport,
 } from "@/lib/aim-harness/eval-runner"
-import { createRealEvalExecutor } from "@/lib/aim-harness/eval-real-executor"
+import { buildRubricPrompt } from "@/lib/aim-harness/eval-rubric"
+import {
+  createRealEvalExecutor,
+  warnedInsufficientInfo,
+} from "@/lib/aim-harness/eval-real-executor"
 
 describe("aim-harness eval runner (frozen, deterministic)", () => {
   it("samples deterministically", () => {
@@ -116,6 +120,31 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     ).rejects.toThrow("real eval executor")
   })
 
+  it("treats a safe clarification as correct when required source material is missing", () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cr_insufficient_04")!
+    const prompt = buildRubricPrompt(fixture, "未提供成交数据，请先补充后再生成结论。")
+
+    expect(prompt).toContain("应视为正确完成任务")
+    expect(prompt).toContain("信息不足时必须明确提示缺口")
+    expect(prompt).toContain("不得因其不是可发布成稿而判低分")
+  })
+
+  it("recognizes natural Chinese descriptions of missing source material", () => {
+    expect(warnedInsufficientInfo([
+      { content: "核心依据完全缺失，当前内容并非完整可发布文案。" },
+    ])).toBe(true)
+  })
+
+  it("shows the judge the frozen context used by the real executor", () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_imitate_xhs_09")!
+    const prompt = buildRubricPrompt(fixture, "用数字、痛点和悬念写出的小红书笔记。")
+
+    expect(prompt).toContain("爆款标题套路：数字+痛点+悬念")
+    expect(prompt).toContain("常识性创意表达不属于编造")
+    expect(prompt).toContain("我有个学员/客户/朋友")
+    expect(prompt).toContain("未提供/待补充")
+  })
+
   it("dispatches real eval cases to the production generation/chat runners", async () => {
     const calls: string[] = []
     const executor = createRealEvalExecutor({
@@ -158,6 +187,7 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
       rubricScore: score,
       rubricJudgeProvider: score === null ? null : "judge",
       rubricJudgeModel: score === null ? null : "judge-model",
+      rubricJudgeReason: score === null ? null : "judge reason",
       fabricatedFact,
       formatValidations: [],
       drafts: [],

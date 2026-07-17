@@ -32,16 +32,20 @@ describe("domain API contracts", () => {
     }).success).toBe(false)
   })
 
-  it("keeps every content format exposed by the AIM client", () => {
+  it("normalizes the legacy spoken-script format to the canonical format", () => {
     const body = {
       rawInput: "把这版拆成口播和小红书",
       targetFormats: ["koubo_script", "xiaohongshu_post"],
     }
     expect(aimGenerateBodySchema.safeParse(body).success).toBe(true)
     expect(parseGenerateBody(body).targetFormats).toEqual([
-      "koubo_script",
+      "video_script",
       "xiaohongshu_post",
     ])
+    expect(parseGenerateBody({
+      rawInput: "写口播",
+      targetFormats: ["video_script", "koubo_script"],
+    }).targetFormats).toEqual(["video_script"])
   })
 
   it("bounds knowledge content, tags, and import batches", () => {

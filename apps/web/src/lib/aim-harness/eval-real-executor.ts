@@ -40,8 +40,8 @@ function buildContextManifest(fixture: EvalFixture, context: EvalContext): AimCo
   return sources
 }
 
-function warnedInsufficientInfo(drafts: Array<{ content: string }>): boolean {
-  return drafts.some((draft) => /信息不足|未提供|待补充|缺少/.test(draft.content))
+export function warnedInsufficientInfo(drafts: Array<{ content: string }>): boolean {
+  return drafts.some((draft) => /信息不足|未提供|尚未提供|没有提供|待补充|缺少|缺失|不完整|并非完整/.test(draft.content))
 }
 
 const runRealGeneration: RealCaseRunner = async (fixture, context) => {

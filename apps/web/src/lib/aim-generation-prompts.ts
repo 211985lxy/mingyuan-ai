@@ -9,6 +9,24 @@ import {
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 
+const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)/
+
+export function findUnsupportedFirstPersonClaimFormats(
+  context: AimGenerateContext,
+  parsed: Partial<Record<ContentFormat, string>>,
+  targetFormats: ContentFormat[],
+): ContentFormat[] {
+  const evidence = [
+    context.rawInput,
+    context.knowledgeBlock,
+    context.ipWikiBlock,
+    context.eventStorytellingBlock,
+  ].filter(Boolean).join("\n")
+  if (FIRST_PERSON_EVIDENCE_PATTERN.test(evidence)) return []
+
+  return targetFormats.filter((format) => FIRST_PERSON_EVIDENCE_PATTERN.test(parsed[format] || ""))
+}
+
 export function buildWorkflowContext(context: AimGenerateContext): string {
   const taskSpec = context.taskSpec
   return [
@@ -46,30 +64,49 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   context: AimGenerateContext,
   targetFormats: ContentFormat[],
 ) {
-  const completion = await executeGenerateLLM(agentId, systemPrompt, userPrompt, context.modelPolicy)
-  const parsed = parseMultiFormatResponse(completion.content, targetFormats)
-  const copiedFormats = targetFormats.filter((format) => isBenchmarkCopyTooSimilar(context.rawInput, parsed[format] || ""))
+  let activePrompt = userPrompt
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
+    const parsed = parseMultiFormatResponse(completion.content, targetFormats)
+    const copiedFormats = targetFormats.filter((format) =>
+      isBenchmarkCopyTooSimilar(context.rawInput, parsed[format] || "")
+    )
+    const unsupportedClaimFormats = findUnsupportedFirstPersonClaimFormats(
+      context,
+      parsed,
+      targetFormats,
+    )
 
-  if (copiedFormats.length === 0) return { completion, parsed }
+    if (copiedFormats.length === 0 && unsupportedClaimFormats.length === 0) {
+      return { completion, parsed }
+    }
+    if (attempt === 2) {
+      throw new Error("生成结果连续出现无依据的案例或过度近似原文，已停止交付")
+    }
 
-  const previousOutput = targetFormats
-    .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
-    .join("\n\n")
-  const retryPrompt = `${userPrompt}
+    const previousOutput = targetFormats
+      .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
+      .join("\n\n")
+    const retryReasons = [
+      copiedFormats.length
+        ? `上一版 ${copiedFormats.join("、")} 与对标原文过于相似，判定为“几乎没改”。`
+        : "",
+      unsupportedClaimFormats.length
+        ? `上一版 ${unsupportedClaimFormats.join("、")} 出现了上下文无依据的“我的学员/客户/朋友/亲历”，判定为事实风险。`
+        : "",
+    ].filter(Boolean).join("\n")
+    activePrompt = `${userPrompt}
 
 【自动质检结果】
-上一版 ${copiedFormats.join("、")} 与对标原文过于相似，判定为"几乎没改"。
-请重写全部请求格式：保留原选题、结构节奏和目标字数，但必须换成当前 IP 的开头、案例、过渡句、句式和行动引导。
+${retryReasons}
+请重写全部请求格式：保留原选题、结构节奏和目标字数；禁止声称“真事”、“我们公司的人”或“我观察/带过很多人”。无依据的人物案例改为普遍现象、可验证方法或明确写出“假设”的举例。
 除专有名词和固定产品名外，不要连续沿用原文 12 个字以上；不要只替换少量词。
 
 上一版输出：
 ${previousOutput}`
-
-  const retryCompletion = await executeGenerateLLM(agentId, systemPrompt, retryPrompt, context.modelPolicy)
-  return {
-    completion: retryCompletion,
-    parsed: parseMultiFormatResponse(retryCompletion.content, targetFormats),
   }
+
+  throw new Error("生成后质检未完成")
 }
 
 export function buildProducerSystemPrompt(agentPrompt: string, context: AimGenerateContext): string {
@@ -112,6 +149,7 @@ ${lightEditOutputRule}
 - 保留必要的口语、停顿、重复和语气词；不要为了显得高级主动加金句、宏大比喻或整齐三段式。
 - 文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。
 - 如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。
+- 没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。
 - 成稿前做内部质检：是否遵守用户修改意图、是否保留原文有效表达、是否过度调用背景导致跑题、是否有明显 AI 套话；除非用户要求，不要输出质检报告。
 - 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 

@@ -13,6 +13,8 @@ describe("AIM context fact priority", () => {
     expect(AIM_FACT_PRIORITY_RULE).toContain("长期记忆")
     expect(AIM_FACT_PRIORITY_RULE).toContain("外部热点、竞品和方法论")
     expect(AIM_FACT_PRIORITY_RULE).toContain("不得把推断写成已验证事实")
+    expect(AIM_FACT_PRIORITY_RULE).toContain("我有个学员/客户/朋友")
+    expect(AIM_FACT_PRIORITY_RULE).toContain("没有用户或知识库依据时禁止补编")
   })
 
   it("keeps current material and project knowledge ahead of memory and external references", () => {

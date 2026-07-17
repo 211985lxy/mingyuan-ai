@@ -25,6 +25,7 @@ import {
   hasWordCountPreservationIntent,
 } from "@/lib/aim-benchmark-length"
 import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
+import { FORMAT_INSTRUCTIONS } from "@/lib/aim-agent-prompts"
 
 describe("AIM content production positioning", () => {
   it("writes operating logic into the copy instead of exposing a strategy report", () => {
@@ -39,6 +40,37 @@ describe("AIM content production positioning", () => {
       methodologyBlock: "",
       ipWikiBlock: "",
     })).toContain(CONTENT_PRODUCER_OPERATING_LOGIC_RULE)
+  })
+
+  it("asks only targeted questions when key copywriting information is missing", () => {
+    const prompt = buildContentProducerChatPrompt({
+      conversationBlock: "",
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      ipWikiBlock: "",
+    })
+
+    expect(prompt).toContain("主动追问 1-3 个最核心的问题")
+    expect(prompt).toContain("给出示例或选项来降低回答门槛")
+    expect(prompt).toContain("标注待用户确认的假设项")
+    expect(prompt).toContain("禁止输出\"您好，请问有什么可以帮您？\"")
+    expect(prompt).toContain("可追溯的真实经历")
+    expect(prompt).toContain("绝不虚构个人经历")
+    expect(prompt).not.toContain("不在内容生产官里追问")
+  })
+
+  it("keeps one canonical spoken-script instruction without a default word range", () => {
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("不设默认字数区间")
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("根据内容完整性决定篇幅")
+    expect(FORMAT_INSTRUCTIONS.video_script).not.toContain("200-500")
+    expect(FORMAT_INSTRUCTIONS.koubo_script).toBe(FORMAT_INSTRUCTIONS.video_script)
+  })
+
+  it("learns shared style from five to ten samples without stitching or copying them", () => {
+    expect(BENCHMARK_REWRITE_GUARDRAIL).toContain("一次提供 5-10 篇样本文案")
+    expect(BENCHMARK_REWRITE_GUARDRAIL).toContain("视为同一个风格样本集")
+    expect(BENCHMARK_REWRITE_GUARDRAIL).toContain("不要逐篇摘要、拼接段落或平均混合原句")
+    expect(BENCHMARK_REWRITE_GUARDRAIL).toContain("只交付复刻风格后的全新成稿")
   })
 
   it("passes the content operating brief into generation context", () => {

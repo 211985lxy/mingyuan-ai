@@ -27,6 +27,10 @@ const TASK_DEFAULT_FORMATS: Record<string, ContentFormat[]> = {
   repurpose: ["moments_post", "wechat_article"],
 }
 
+function normalizeContentFormat(format: unknown): unknown {
+  return format === "koubo_script" ? "video_script" : format
+}
+
 export interface ParseGenerateBodyResult {
   agentId: string | undefined
   rawInput: string
@@ -58,9 +62,11 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
 
   // 解析 targetFormats：优先用显式传入的，否则根据 taskType 推断
   let targetFormats = Array.isArray(body.targetFormats)
-    ? body.targetFormats.filter((format: unknown): format is ContentFormat =>
-        typeof format === "string" && VALID_FORMATS.has(format)
-      )
+    ? Array.from(new Set(body.targetFormats
+        .map(normalizeContentFormat)
+        .filter((format: unknown): format is ContentFormat =>
+          typeof format === "string" && VALID_FORMATS.has(format)
+        )))
     : []
 
   if (targetFormats.length === 0 && taskType) {
