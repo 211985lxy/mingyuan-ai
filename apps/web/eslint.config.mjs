@@ -44,6 +44,9 @@ const eslintConfig = defineConfig([
     rules: {
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/preserve-manual-memoization": "off",
+      // scrollRef 从 useAimWorkbench 返回后作为 ref prop 传递给 AimMessageStream,
+      // 属合法用法;react-hooks@7 的 refs 规则对此误报,与上面两条同属拆分后的已知豁免。
+      "react-hooks/refs": "off",
     },
   },
   {
