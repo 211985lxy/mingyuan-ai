@@ -103,9 +103,9 @@ function makeRequest(body: Record<string, unknown>) {
 }
 
 describe("aim chat route project isolation (source contract)", () => {
-  // WP-12 Commit B：上下文装配已迁到 lib/aim/services/chat-context.ts，隔离契约随之
-  // 迁移到服务文件断言。变量名 user.id → userId（参数重命名），隔离语义不变。
-  const servicePath = join(process.cwd(), "src/lib/aim/services/chat-context.ts")
+  // 上下文装配从 chat-context.ts 进一步拆分为 chat/ 子模块；隔离契约随逻辑落在
+  // chat/context-loaders.ts。变量名 userId（参数重命名），隔离语义不变。
+  const servicePath = join(process.cwd(), "src/lib/aim/services/chat/context-loaders.ts")
   const source = readFileSync(servicePath, "utf8")
 
   it("项目对话按当前项目读取风格档案", () => {

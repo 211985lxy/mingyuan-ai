@@ -49,7 +49,7 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       return text ? `${prompt}\n\n---\n${text}\n---` : prompt
     })
     toast.success("技能指令已填入")
-  }, [options.editorText, options.messages, options.setInput, options.sourceAnalysisText, options.sourceOriginalText, options.sourceTopicTitle])
+  }, [options])
 
   async function handleSend() {
     await options.sendText(options.input.trim(), options.hasEditorSelection ? {
