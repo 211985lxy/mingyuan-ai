@@ -35,6 +35,7 @@ import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { Textarea } from "@/components/ui/textarea"
 import { IpWikiDialog, type IpWikiDialogContext } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
+import { ThinkingProcessPanel } from "@/components/aim/thinking-process-panel"
 import { ActionStrip } from "@/components/workbench/action-strip"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -227,6 +228,9 @@ interface ChatMessage {
   degraded?: boolean | null
   qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
   failure?: { kind: "chat" | "generate"; retryText: string } | null
+  // 思考过程可视化：关联的 trace ID 和类型
+  traceId?: string | null
+  traceType?: "chat" | "generate" | null
 }
 
 interface AimImageAttachment {
@@ -1868,7 +1872,7 @@ export default function AimPage() {
         content: m.role === "user" && m.images?.length ? buildChatContent(m.content, m.images) : m.content,
       }))
       if (toolAction) {
-        const { content } = await chatAim(chatMessages, {
+        const { content, traceId: chatTraceId } = await chatAim(chatMessages, {
           agentId: selectedAgentId,
           projectId: projectEnabled ? selectedProjectId || undefined : undefined,
           toolAction,
@@ -1877,13 +1881,13 @@ export default function AimPage() {
           signal: controller.signal,
         })
         setMessages((prev) => prev.map((message) =>
-          message.id === assistantId ? { ...message, content } : message
+          message.id === assistantId ? { ...message, content, traceId: chatTraceId, traceType: "chat" as const } : message
         ))
         return
       }
 
       let hasContent = false
-      await chatAimStream(chatMessages, {
+      const streamResult = await chatAimStream(chatMessages, {
         agentId: selectedAgentId,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
         editorContext: options?.editorContext,
@@ -1896,7 +1900,25 @@ export default function AimPage() {
             )
           )
         },
+        onTraceId: (tid) => {
+          // 尽早将 traceId 写入助手消息，让 ThinkingProcessPanel 在流式过程中就能显示
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === assistantId ? { ...message, traceId: tid, traceType: "chat" as const } : message
+            )
+          )
+        },
       })
+      // 兜底：如果 onTraceId 未触发但 streamResult 返回了 traceId
+      if (streamResult.traceId) {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === assistantId && !message.traceId
+              ? { ...message, traceId: streamResult.traceId, traceType: "chat" as const }
+              : message
+          )
+        )
+      }
       if (!hasContent) {
         setMessages((prev) => prev.map((message) =>
           message.id === assistantId
@@ -2139,6 +2161,9 @@ export default function AimPage() {
           runId: response.runId ?? null,
           degraded: response.degraded ?? null,
           qualityStatus: response.qualityStatus ?? null,
+          // 思考过程可视化
+          traceId: response.traceId ?? null,
+          traceType: "generate" as const,
           }
           : message
       ))
@@ -2517,6 +2542,15 @@ export default function AimPage() {
                           const display = splitMethodNote(m.content)
                           return (
                             <>
+                              {/* 思考过程可视化面板 */}
+                              {m.traceId && m.traceType && (
+                                <div className="mb-2">
+                                  <ThinkingProcessPanel
+                                    traceId={m.traceId}
+                                    type={m.traceType}
+                                  />
+                                </div>
+                              )}
                               {display.methodNote && (
                                 <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
                                   <summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary>

@@ -110,6 +110,8 @@ function streamChatContent(
         "X-Accel-Buffering": "no",
         // aim-harness-v1: expose the execution number on the stream response.
         ...(options?.runId ? { "X-AIM-Run-Id": options.runId } : {}),
+        // trace-id: 前端 ThinkingProcessPanel 用于 SSE 订阅
+        ...(trace?.id ? { "X-AIM-Trace-Id": trace.id } : {}),
       },
     },
   )
@@ -361,6 +363,7 @@ export async function POST(request: NextRequest) {
       degraded: chatHarness.degraded,
       provider: chatHarness.provider,
       model: chatHarness.model,
+      traceId: trace?.id ?? null,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)

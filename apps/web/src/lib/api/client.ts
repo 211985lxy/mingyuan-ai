@@ -1318,6 +1318,8 @@ export interface AimGenerateResponse {
     passed: boolean
     checks: Array<{ name: string; passed: boolean; detail?: string }>
   }>
+  /** 思考过程追踪 ID（供 ThinkingProcessPanel SSE 订阅） */
+  traceId?: string | null
 }
 
 export interface AimDecisionSnapshot {
@@ -1654,9 +1656,9 @@ export async function chatAim(
     editorContext?: AimEditorContext
     signal?: AbortSignal
   },
-): Promise<{ content: string; toolResult?: unknown }> {
+): Promise<{ content: string; toolResult?: unknown; traceId?: string | null }> {
   const { signal, ...bodyOptions } = options ?? {}
-  return request<{ content: string; toolResult?: unknown }>("/api/aim/chat", {
+  return request<{ content: string; toolResult?: unknown; traceId?: string | null }>("/api/aim/chat", {
     method: "POST",
     body: JSON.stringify({ messages, ...bodyOptions }),
     timeout: 30000,
@@ -1672,9 +1674,11 @@ export async function chatAimStream(
     editorContext?: AimEditorContext
     signal?: AbortSignal
     onDelta: (delta: string, content: string) => void
+    /** 当 traceId 从响应头解析到后立即回调，可在流式读取开始前拿到 */
+    onTraceId?: (traceId: string) => void
   },
-): Promise<{ content: string }> {
-  const { signal, onDelta, ...bodyOptions } = options
+): Promise<{ content: string; traceId?: string | null }> {
+  const { signal, onDelta, onTraceId, ...bodyOptions } = options
   const token = useAuthStore.getState().token || getStoredAuthToken()
   let response: Response
   try {
@@ -1717,6 +1721,10 @@ export async function chatAimStream(
     )
   }
 
+  // 从响应头提取 traceId，供 ThinkingProcessPanel 使用
+  const traceId = response.headers.get("x-aim-trace-id")
+  if (traceId) onTraceId?.(traceId)
+
   if (!response.body) {
     throw new ApiError("当前浏览器不支持流式输出", 500, { code: "NO_STREAM_BODY" })
   }
@@ -1748,7 +1756,7 @@ export async function chatAimStream(
     reader.releaseLock()
   }
 
-  return { content }
+  return { content, traceId }
 }
 
 // ─── Inspiration（灵感收集） ─────────────────────────────

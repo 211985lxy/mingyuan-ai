@@ -1,5 +1,16 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { redis } from "@/lib/redis"
+
+/** SSE 推送 Redis channel 前缀 */
+const TRACE_CHANNEL_PREFIX = "aim:trace:"
+
+/** 通过 Redis Pub/Sub 发布 trace step，供 SSE 端点推送到前端。fire-and-forget。 */
+function publishTraceEvent(traceId: string, event: { type: string; step?: AimTraceStep; status?: string }) {
+  redis.publish(`${TRACE_CHANNEL_PREFIX}${traceId}`, JSON.stringify(event)).catch(() => {
+    // Redis Pub/Sub is best-effort; missing events only degrade the UI timeline.
+  })
+}
 
 export type AimTraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -85,6 +96,8 @@ async function appendStep(trace: AimTraceRecorder | undefined, step: AimTraceSte
   const steps = await readSteps(trace.id)
   steps.push(step)
   await safeUpdateTrace(trace.id, { steps })
+  // 推送步骤到前端 SSE
+  publishTraceEvent(trace.id, { type: "step", step })
 }
 
 export async function createAimTrace(input: CreateAimTraceInput): Promise<AimTraceRecorder | undefined> {
@@ -163,6 +176,7 @@ export async function finishAimTrace(trace: AimTraceRecorder | undefined, update
     status: update.status || "success",
     durationMs: Date.now() - trace.startedAt,
   })
+  publishTraceEvent(trace.id, { type: "done", status: "success" })
 }
 
 export async function failAimTrace(trace: AimTraceRecorder | undefined, error: unknown) {
@@ -173,4 +187,5 @@ export async function failAimTrace(trace: AimTraceRecorder | undefined, error: u
     durationMs: Date.now() - trace.startedAt,
     errorMessage: summarizeText(message),
   })
+  publishTraceEvent(trace.id, { type: "done", status: "failed" })
 }

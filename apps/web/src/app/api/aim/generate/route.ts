@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
       qualityStatus: harness.qualityStatus,
       qualityChecks: harness.qualityChecks,
       qualityReport: harness.qualityReport,
+      traceId: trace?.id ?? null,
     })
   } catch (error) {
     const authResponse = authErrorResponse(error)
