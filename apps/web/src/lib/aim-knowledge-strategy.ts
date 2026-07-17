@@ -17,6 +17,7 @@ import { type ContentScenario, getScenarioConfig } from "@/lib/content-scenario-
  */
 export type ResolvedKnowledgeStrategy =
   | "light_edit" // 轻改润色：少调/几乎不调知识
+  | "rewrite" // 对标改写：中量，需要知识库做案例/身份替换
   | "hot_topic" // 热点创作：少调，突出热点 + 对标
   | "persona" // 人设型：偏中量，突出老板经验/定位素材
   | "conversion" // 转化型：偏大量，突出产品卖点/痛点/问答
@@ -58,6 +59,14 @@ export const KNOWLEDGE_STRATEGY_PROFILES: Record<ResolvedKnowledgeStrategy, Know
     categoryBoost: {},
     label: "轻改润色",
     description: "仅微改文案，知识库只兜底几句话",
+  },
+  rewrite: {
+    topK: 6,
+    maxBlockChars: 3500,
+    maxEntryChars: 800,
+    categoryBoost: { boss_experience: 1.2, positioning_material: 1.2, project_case: 1.15 },
+    label: "对标改写",
+    description: "对标改写需要中量知识库支撑案例/身份替换",
   },
   hot_topic: {
     topK: 5,
@@ -156,20 +165,24 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
   const asksForLocalCopyPart =
     includesAny(text, ["优化", "改", "润色", "换个说法", "调整"]) &&
     includesAny(text, ["开头", "前3秒", "前三秒", "第一句话", "钩子", "起手", "开场", "标题", "结尾", "收尾"])
+  // "优化这篇文案" 等不含局部词的优化意图也视为轻改
+  const asksForGenericPolish =
+    includesAny(text, ["优化", "润色", "顺一下", "自然点", "口语化"])
 
   if (
     !asksForExternalContext &&
     (
       asksForLocalCopyPart ||
+      asksForGenericPolish ||
       input.taskType === "polish_copy" ||
       Boolean(input.polishInstruction?.trim()) ||
-      includesAny(text, ["润色", "顺一下", "自然点", "口语化", "换个说法", "改得", "改成", "这里改", "这句话"])
+      includesAny(text, ["换个说法", "改得", "改成", "这里改", "这句话"])
     )
   ) {
     return "light_edit"
   }
 
-  if (includesAny(text, ["重写", "改写", "优化", "重新写", "大改"])) {
+  if (includesAny(text, ["重写", "改写", "重新写", "大改"])) {
     return "rewrite_copy"
   }
 
@@ -207,8 +220,13 @@ export function resolveKnowledgeStrategy(
   const { runtimeTask, topicType, contentScenario, hotTopic, videoCopyExtractionId, taskType, polishInstruction } = input
 
   // 1. 轻改润色：用户只想改一段，没必要拉知识库
-  if (runtimeTask === "light_edit" || runtimeTask === "rewrite_copy" || polishInstruction?.trim() || taskType === "polish_copy") {
+  if (runtimeTask === "light_edit" || polishInstruction?.trim() || taskType === "polish_copy") {
     return "light_edit"
+  }
+
+  // 1.5 对标改写：需要中量知识库做案例/身份替换
+  if (runtimeTask === "rewrite_copy") {
+    return "rewrite"
   }
 
   // 2. 内容场景：场景模式优先级仅次于 light_edit
