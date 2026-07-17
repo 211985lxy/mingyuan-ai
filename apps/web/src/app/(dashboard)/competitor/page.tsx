@@ -40,18 +40,18 @@ import {
   type WatchAccount,
   type SimilarAccount,
 } from "@/lib/api/client"
-import { extractPureUrl, checkUrlType } from "@/lib/tikhub/url-parser"
+import {
+  validateCompetitorUrl,
+  sortAccountsByRefreshStatus,
+} from "@/features/competitor/competitor-url-utils"
+import {
+  resolveActiveAccount,
+  resolveActiveLatestVideos,
+} from "@/features/competitor/viral-video-pool"
 import {
   formatCompetitorRefreshError as formatRefreshError,
 } from "@/lib/competitor/display"
 import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
-
-// ─── Helpers ────────────────────────────────────────────
-
-const SUPPORTED_DOMAINS = ["douyin.com", "iesdouyin.com", "v.douyin.com"]
-function isSupportedUrl(url: string): boolean {
-  return SUPPORTED_DOMAINS.some((domain) => url.includes(domain))
-}
 
 // ─── Main Page ─────────────────────────────────────────
 
@@ -144,28 +144,17 @@ export default function CompetitorWatchPage() {
   }, [accounts, loadAccounts])
 
   async function handleAdd() {
-    const trimmed = addUrl.trim()
-    if (!trimmed) return
+    if (!addUrl.trim()) return
 
-    if (!isSupportedUrl(trimmed)) {
-      toast.error("第一版暂时只支持抖音主页链接")
-      return
-    }
-    const typeError = checkUrlType(trimmed)
-    if (typeError) {
-      toast.error(typeError)
-      return
-    }
-
-    const pureUrl = extractPureUrl(trimmed)
-    if (!pureUrl) {
-      toast.error("链接格式不正确")
+    const validated = validateCompetitorUrl(addUrl)
+    if (!validated.ok) {
+      toast.error(validated.error)
       return
     }
 
     setAdding(true)
     try {
-      await addWatchAccount(pureUrl)
+      await addWatchAccount(validated.url)
       toast.success("已添加监控账号")
       setAddUrl("")
       await loadAccounts()
@@ -182,32 +171,21 @@ export default function CompetitorWatchPage() {
   }
 
   async function handleDiscoverSimilar(targetUrl: string) {
-    const trimmed = targetUrl.trim()
-    if (!trimmed) {
+    if (!targetUrl.trim()) {
       toast.error("先选择一个已监控账号")
       return
     }
 
-    if (!isSupportedUrl(trimmed)) {
-      toast.error("第一版暂时只支持抖音主页链接")
-      return
-    }
-    const typeError = checkUrlType(trimmed)
-    if (typeError) {
-      toast.error(typeError)
-      return
-    }
-
-    const pureUrl = extractPureUrl(trimmed)
-    if (!pureUrl) {
-      toast.error("链接格式不正确")
+    const validated = validateCompetitorUrl(targetUrl)
+    if (!validated.ok) {
+      toast.error(validated.error)
       return
     }
 
     setDiscovering(true)
     setDiscoveryAttempted(true)
     try {
-      const result = await discoverSimilarAccounts(pureUrl)
+      const result = await discoverSimilarAccounts(validated.url)
       setPeerAccounts(result.peerAccounts)
       setLeaderAccounts(result.leaderAccounts)
       setIgnoredDiscoveryUrls(new Set())
@@ -347,24 +325,16 @@ export default function CompetitorWatchPage() {
     return () => window.clearTimeout(timer)
   }, [videoExtractions])
 
-  const sortedAccounts = [...accounts].sort((a, b) => {
-    const order: Record<string, number> = { refreshing: 0, idle: 1, failed: 2, success: 3 }
-    return (order[a.refreshStatus] ?? 9) - (order[b.refreshStatus] ?? 9)
-  })
+  const sortedAccounts = sortAccountsByRefreshStatus(accounts)
 
-  const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0]
+  const activeAccount = resolveActiveAccount(accounts, activeAccountId)
 
   useEffect(() => {
     if (!activeAccount?.targetUrl) return
     void loadReports(activeAccount.targetUrl)
   }, [activeAccount?.targetUrl, loadReports])
 
-  const activeLatestVideos = activeAccount?.latestVideos
-    ? activeAccount.latestVideos
-        .map((v) => ({ ...v, account: activeAccount }))
-        .sort((a, b) => b.createTime - a.createTime)
-        .slice(0, 30)
-    : []
+  const activeLatestVideos = resolveActiveLatestVideos(activeAccount)
 
   const hasRefreshingAccount = accounts.some((account) => account.refreshStatus === "refreshing")
 

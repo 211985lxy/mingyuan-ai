@@ -12,7 +12,7 @@
     },
     {
       "path": "src/app/(dashboard)/competitor/page.tsx",
-      "maxLines": 517,
+      "maxLines": 490,
       "target": "src/features/competitor/components and hooks"
     },
     {
