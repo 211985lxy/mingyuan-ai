@@ -11,13 +11,44 @@
  * 用法：cd apps/web && npx tsx scripts/knowledge-health-check.ts
  */
 
-import { PrismaClient } from "@prisma/client"
-import { KNOWLEDGE_CATEGORIES } from "@/lib/knowledge-categories"
-import * as fs from "fs"
-import * as path from "path"
+import { PrismaClient } from "../src/generated/prisma/client"
+import { PrismaMariaDb } from "@prisma/adapter-mariadb"
+import * as fs from "node:fs"
+import * as path from "node:path"
 
-const prisma = new PrismaClient()
-const VALID_CATEGORIES = new Set(KNOWLEDGE_CATEGORIES)
+const KNOWLEDGE_CATEGORIES = [
+  "boss_experience",
+  "product_usp",
+  "customer_pain",
+  "project_case",
+  "customer_qa",
+  "daily_inspiration",
+  "benchmark_reference",
+  "user_insight",
+  "hot_topic",
+  "positioning_material",
+  "private_domain_material",
+  "writing_style_profile",
+] as const
+
+const VALID_CATEGORIES: Set<string> = new Set(KNOWLEDGE_CATEGORIES)
+
+function createPrismaClient() {
+  const url = new URL(
+    (process.env.DATABASE_URL ?? "").replace(/^mysql:\/\//, "mariadb://")
+  )
+  return new PrismaClient({
+    adapter: new PrismaMariaDb({
+      host: url.hostname,
+      port: parseInt(url.port || "3306", 10),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      database: url.pathname.slice(1),
+    }),
+  })
+}
+
+const prisma = createPrismaClient()
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
 const ONE_HUNDRED_EIGHTY_DAYS_MS = 180 * ONE_DAY_MS
@@ -49,10 +80,10 @@ async function main() {
 
   // 2. KnowledgeEntry 无 KnowledgeRelation（实体抽取缺失）
   const entriesWithRelations = await prisma.knowledgeRelation.findMany({
-    select: { knowledgeEntryId: true },
-    distinct: ["knowledgeEntryId"],
+    select: { entryId: true },
+    distinct: ["entryId"],
   })
-  const entryIdsWithRelations = new Set(entriesWithRelations.map((r) => r.knowledgeEntryId))
+  const entryIdsWithRelations = new Set(entriesWithRelations.map((r) => r.entryId))
 
   const activeEntriesWithoutRelations = await prisma.knowledgeEntry.findMany({
     where: {
@@ -76,10 +107,10 @@ async function main() {
 
   // 3. 孤儿 KnowledgeEntity（无 KnowledgeRelation）
   const entitiesWithRelations = await prisma.knowledgeRelation.findMany({
-    select: { knowledgeEntityId: true },
-    distinct: ["knowledgeEntityId"],
+    select: { fromEntityId: true },
+    distinct: ["fromEntityId"],
   })
-  const entityIdsWithRelations = new Set(entitiesWithRelations.map((r) => r.knowledgeEntityId))
+  const entityIdsWithRelations = new Set(entitiesWithRelations.map((r) => r.fromEntityId))
 
   const orphanEntities = await prisma.knowledgeEntity.findMany({
     where: { id: { notIn: Array.from(entityIdsWithRelations) } },

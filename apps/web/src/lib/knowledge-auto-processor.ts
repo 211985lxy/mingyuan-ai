@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { LLMClient } from "@/lib/llm/client"
-import { KNOWLEDGE_CATEGORIES } from "@/lib/knowledge-categories"
-import type { KnowledgeCategory } from "@/lib/knowledge-categories"
+import { KNOWLEDGE_CATEGORIES, isKnowledgeCategory } from "@/lib/knowledge-categories"
 
 // ─── 类型 ──────────────────────────────────────────────────
 

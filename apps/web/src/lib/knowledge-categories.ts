@@ -21,7 +21,7 @@ export const KNOWLEDGE_CATEGORIES = [
 
 export type KnowledgeCategory = (typeof KNOWLEDGE_CATEGORIES)[number]
 
-export const CATEGORY_LABELS: Record<KnowledgeCategory, string> = {
+export const CATEGORY_LABELS: Record<string, string> = {
   boss_experience: "老板经验",
   product_usp: "产品卖点",
   customer_pain: "客户痛点",
@@ -46,7 +46,7 @@ export const SOURCE_TYPES = [
 
 export type KnowledgeSourceType = (typeof SOURCE_TYPES)[number]
 
-export const SOURCE_TYPE_LABELS: Record<KnowledgeSourceType, string> = {
+export const SOURCE_TYPE_LABELS: Record<string, string> = {
   manual: "手动录入",
   voice_transcribe: "语音转写",
   import: "文件导入",
