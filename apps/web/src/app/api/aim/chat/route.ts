@@ -29,12 +29,12 @@ export async function POST(request: NextRequest) {
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_chat")
     if (quotaResponse) return quotaResponse
 
-    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext } =
-      parseAimChatBody(await parseJsonRecord(request))
-
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: "请求格式不正确，缺少 messages 数组" }, { status: 400 })
+    const parsed = parseAimChatBody(await parseJsonRecord(request))
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
+    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext } = parsed
+
     trace = await createAimTrace({
       userId: user.id,
       projectId: projectId || null,

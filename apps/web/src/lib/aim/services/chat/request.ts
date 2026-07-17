@@ -46,11 +46,28 @@ export type AimChatRequestBody = {
   editorContext?: AimEditorContext
 }
 
-/** Validate and coerce the raw body into strongly-typed fields. */
-export function parseAimChatBody(body: unknown): AimChatRequestBody {
+/** Result of parsing the chat body: either a validated request or an error response. */
+export type ParsedAimChatBody =
+  | { ok: false; status: 400; validationError: string }
+  | ({ ok: true } & AimChatRequestBody)
+
+/**
+ * Validate and coerce the raw body into strongly-typed fields.
+ *
+ * Returns a discriminated union so the route can branch on `ok`, mirroring the
+ * prepare→execute→serialize shape used by the generate entrypoint. The messages
+ * validation (previously inline in the route) lives here so the route no longer
+ * decides request validity — message text and status code are unchanged.
+ */
+export function parseAimChatBody(body: unknown): ParsedAimChatBody {
   const record = (body ?? {}) as Record<string, unknown>
+  const messages = record.messages as unknown[]
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return { ok: false, status: 400, validationError: "请求格式不正确，缺少 messages 数组" }
+  }
   return {
-    messages: record.messages as unknown[],
+    ok: true,
+    messages,
     agentId: typeof record.agentId === "string" ? record.agentId : "",
     projectId: typeof record.projectId === "string" ? (record.projectId as string).trim() : "",
     toolAction: typeof record.toolAction === "string" ? record.toolAction : "",
