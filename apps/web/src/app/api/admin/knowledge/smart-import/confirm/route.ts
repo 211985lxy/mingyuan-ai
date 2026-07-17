@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
+import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
 import { enforceKnowledgeBetaLimit } from "@/lib/internal-beta-limits"
 
 interface ConfirmedEntry {
@@ -60,9 +61,13 @@ export const POST = withAdminAuth(async (request) => {
     ),
   )
 
-  // Fire-and-forget 向量化
+  // Fire-and-forget 向量化 + 实体抽取
   for (const entry of created) {
     ensureKnowledgeEmbedding(entry.id).catch(() => {})
+    extractAndPersistForEntry(entry.id, entry.content, {
+      userId: entry.userId,
+      projectId: entry.projectId || null,
+    }).catch(() => {})
   }
 
   return NextResponse.json({
