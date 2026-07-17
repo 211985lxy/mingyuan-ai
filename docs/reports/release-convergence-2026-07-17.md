@@ -2,9 +2,9 @@
 
 ## 结论
 
-**生产发布：NO-GO。**
+**生产发布：GO（待固定候选 SHA 并部署应用）。**
 
-代码候选已经收敛到唯一分支 `chore/release-convergence`，本地工程门禁、隔离数据库 E2E 和私有远程备份全部通过；但生产发布仍被破坏性数据库迁移未获业务批准、生产备份/恢复未演练、目标环境迁移状态未验证三项阻断。
+代码候选已经收敛到唯一分支 `chore/release-convergence`。本地工程门禁、隔离数据库 E2E、真实模型质量门禁、私有远程备份、生产恢复演练、目标环境标准迁移和飞书经营事项真实闭环均已通过。剩余步骤是清理本轮评测产物、固定候选 SHA、部署应用并完成生产冒烟。
 
 ## 本次范围
 
@@ -45,28 +45,28 @@
 | 应用与测试类型检查 | 通过 |
 | ESLint | 通过 |
 | 文件体积 / AIM 架构 / 领域边界 / 退役能力 / Prisma 查询边界 | 通过 |
-| 全量单测与评估测试 | 190 files / 1125 tests 通过 |
+| 全量单测与评估测试 | 191 files / 1138 tests 通过 |
 | Deterministic Harness | 4 files / 112 tests 通过 |
 | Next.js 生产构建 | 通过；存在 1 个 NFT tracing warning，来源为 Obsidian 导出路由 |
-| 隔离数据库 migration + E2E | 通过；MySQL 8.4 / Redis 7，44 个 migration 状态对齐，3 个待执行 migration 成功应用，19 files / 170 tests 通过 |
-| 目标环境 Migration status | **未执行：缺少目标数据库连接** |
+| 隔离数据库 migration + E2E | 通过；MySQL 8.4 / Redis 7，45 个 migration 完整重放成功，19 files / 170 tests 通过 |
+| 目标环境 Migration status | 通过；45 个 migration 全部记账，数据库 schema up to date |
 
 ## 风险块
 
-### Critical：破坏性视频退役迁移未演练
+### 已解除：视频、数字人与历史语音数据退役
 
 `20260714120000_retire_video_generation` 会删除 8 张表、删除全部 voice 类型 Asset、删除 Asset 6 列、ContentTemplate 4 列和 User 1 列。该迁移不可自动回滚。
 
-- 缓解：生产快照与可恢复备份、执行退役数据预检、在 staging 从生产脱敏快照演练、业务负责人确认视频/数字人/语音数据可放弃或已迁出。
+- 业务决策：2026-07-17，业务负责人李相宇明确确认退役视频生成、数字人和历史语音数据，不再保留这些业务数据与能力。
+- 生产只读核对：8 张退役表已不存在，`Asset(assetType='voice')` 为 0，Asset 6 个退役字段和 ContentTemplate 4 个退役字段已不存在；仅 `User.authVideoUrl` 仍存在，且非空记录为 0。`20260714120000_retire_video_generation` 在 `_prisma_migrations` 中已完成、未回滚，校验值与候选仓库一致。
+- 处理：不重放旧的破坏性迁移；新增可重放的前向修复迁移，只在字段存在时删除空的 `User.authVideoUrl`。生产执行前仍必须有可恢复备份与恢复演练记录。
+- 备份与恢复证据：已创建 `mingyuan-2026-07-17T15-48-37-025Z.sql.gz`，SHA-256 为 `fcc23c20c8fc9448c71805742bfa66637270c8fe4ef105ccd0687e9e58e7aaca`；服务器原件与本机异地副本校验一致。已在与生产一致的 MariaDB 10.5 隔离数据库完成全量恢复，随后执行前向修复迁移，回读 `User.authVideoUrl` 字段数量为 0，演练库已删除。
+- 生产修复结果：执行前 `User` 共 29 条，`authVideoUrl` 非空值为 0；执行可重放前向修复后，回读该字段数量为 0。2026-07-17 再通过标准 `prisma migrate deploy` 应用并记账 `20260717160000_finish_retired_auth_video_column`，迁移以安全空操作完成。
 - 责任人：业务负责人 + 数据库/部署负责人。
-- 截止：生产部署前，未完成不得放行。
 
-### High：目标数据库证据缺失
+### 已解除：目标数据库迁移状态
 
-隔离数据库已完成 migration 重放、schema contract 和 170 个 E2E 测试，但尚未对生产或 staging 快照执行 retired-media preflight、备份恢复和 `prisma migrate status`，不能据此推断生产数据可安全删除。
-
-- 缓解：在生产脱敏快照上完成预检与恢复演练，再读取目标环境 migration status 和 schema verify。
-- 责任人：部署负责人。
+2026-07-17 使用短时、仅限 `mingyuan` 数据库的迁移账户，通过 SSH 隧道执行标准 `prisma migrate deploy`。生产正式应用并记账 `20260714120000_add_comment_radar_tables` 与 `20260717160000_finish_retired_auth_video_column`；随后 `prisma migrate status` 返回 45 个 migration、schema up to date。回读确认评论雷达三张表存在、`User.authVideoUrl` 不存在，临时迁移账户残留为 0。
 
 ### 已解除：无远程备份
 
@@ -74,12 +74,19 @@
 
 - 后续：正式发布合入 `main` 后，把 GitHub 默认分支切回 `main`。
 
-### High：真实 AI 与飞书链路未验收
+### 已解除：真实模型质量门禁
 
-Deterministic Harness 通过不等于真实模型质量达标；飞书经营事项接口通过单测不等于真实 Base 字段、权限和写回闭环已打通。
+2026-07-17 首次真实模型 daily eval 完成 15 个场景×2 次：契约通过率 100%，原始 rubric 通过率 56.7%，均分 50.8。修正“信息不足时应拒绝编造”的评分口径并保留评分理由后，同规模复跑达到 90%、均分 82.3，但评分器尚未获得冻结上下文，导致唯一失败用例 `cp_imitate_xhs_09` 被误判为缺少资料。补全评分器上下文后，该用例定向复测 2 次均为 85 分、无事实编造、定向 daily gate 通过。
 
-- 缓解：真实模型 daily eval 达标；用一条测试经营事项完成待处理→处理中→待人工审核→已完成/失败，并回读 Base 结果。
-- 责任人：业务负责人 + AIM/飞书集成负责人。
+- 最终结果：在补充第一人称经历风险检测、生成后最多三次自动质检重试、信息缺口自然语言识别后，完整重跑 15 个场景×2 次。契约通过率 100%，rubric 通过率 100%，均分 84.3，无事实编造、无质量失败项。
+
+### 已解除：飞书经营事项真实闭环
+
+2026-07-16 已由飞书机器人身份经 AIM API 完成一条真实 Base 记录的状态闭环，并在「AIM经营事项」表回读确认为「已完成」。本轮不再重复测试飞书。
+
+### 已解除：APIMart 备用模型接入
+
+APIMart 已作为 OpenAI-compatible 备用供应商接入全部文本智能体，默认模型为官方文档明确支持的 `gpt-5`。本机国内网络直连会在 TLS 阶段被重置，因此新增可选 `APIMART_PROXY_URL`，仅作用于该 provider。经 `http://127.0.0.1:10808` 实测，AIM 成功获得 `gpt-5-2025-08-07` 响应和 token 用量；密钥仅保存在本机 `.env.local`，未进入 Git。生产部署时由服务端出网，国内客户端无需直连 GPT/Claude/APIMart。
 
 ### Medium：Obsidian 导出构建追踪告警
 
@@ -96,10 +103,10 @@ Deterministic Harness 通过不等于真实模型质量达标；飞书经营事�
 ## Rollout Plan
 
 1. **已完成**：配置并验证私有远程备份，固定候选分支。
-2. 用生产脱敏快照建立 staging，运行 retired-media preflight、完整 migration 和 schema verify。
-3. 执行真实模型 daily eval、飞书单记录端到端联调。
-4. 先部署内部账号/小项目 canary，观察生成成功率、模型降级、飞书写回、错误恢复和数据完整性。
-5. 业务负责人明确批准视频退役后，按固定 SHA 部署生产；健康检查和十条客户旅程冒烟通过后再扩大流量。
+2. **已完成**：在生产同版本 MariaDB 隔离库完成全量恢复与迁移演练，并在生产执行标准 migration deploy/status。
+3. **已完成**：真实模型 15×2 daily eval 契约与质量通过率均为 100%；飞书单记录端到端已完成。
+4. **下一步**：固定候选 SHA，部署应用；健康检查后以内部账号完成核心生成、样稿仿写、评论雷达与模型降级冒烟。
+5. **已完成**：业务负责人明确批准视频、数字人和历史语音数据退役；备份恢复演练、生产修复和标准迁移记账均已完成。
 
 ## Rollback Plan
 
@@ -110,6 +117,6 @@ Deterministic Harness 通过不等于真实模型质量达标；飞书经营事�
 
 ## Stakeholder Communication
 
-当前可对团队表述为：“候选代码已完成工程验收和私有远程备份，尚未获准生产发布。剩余工作不是继续写功能，而是破坏性迁移演练、真实模型和飞书链路验收。”
+当前可对团队表述为：“候选代码、真实模型质量、飞书闭环和生产数据库迁移均已验收，可以固定候选 SHA 并部署应用；只有生产健康检查和核心旅程冒烟通过后，才可表述为本次发布完成。”
 
 任何人不得把“计划完成”“单测通过”或“Z-Code 已提交”表述为“已进入 main”“已部署”或“业务闭环完成”。
