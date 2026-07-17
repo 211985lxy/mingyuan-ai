@@ -1,253 +1,131 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
-import {
-  ArrowRight,
-  BookOpen,
-  BriefcaseBusiness,
-  CheckCircle2,
-  FilePenLine,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react"
+import { ArrowRight, BookOpen, BriefcaseBusiness, CheckCircle2, FilePenLine, FolderPlus, RefreshCw, Zap } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { toast } from "sonner"
 import { getContentPreview, getContentTitle } from "@/lib/home-history-summary"
-import {
-  listAimHistory,
-  listClientProjects,
-  listKnowledge,
-  type AimGeneration,
-  type ClientProject,
-  type KnowledgeEntry,
-} from "@/lib/api/client"
+import { AIM_WORKFLOW_STAGES, type AimWorkflowStage } from "@/lib/aim-workflow"
+import { deriveAimWorkflowTasks } from "@/features/aim/workflow/tasks"
+import { useAimHomeSummary } from "@/features/aim/hooks/use-aim-home-summary"
+import type { AimGeneration } from "@/lib/api/client"
 
-function workflowStatusLabel(status?: string | null) {
-  const labels: Record<string, string> = {
-    draft: "草稿",
-    pending_review: "待审核",
-    ready_to_shoot: "待拍摄",
-    shooting: "拍摄中",
-    editing: "剪辑中",
-    ready_to_publish: "待发布",
-    published: "已发布",
-    archived: "已归档",
-  }
-  return labels[status || "draft"] || "草稿"
+function taskHref(item: AimGeneration) {
+  const stage = deriveAimWorkflowTasks([item])[0]?.stage || "content"
+  const params = new URLSearchParams({ generationId: item.id, stage })
+  if (item.projectId) params.set("projectId", item.projectId)
+  else params.set("mode", "quick")
+  return `/aim?${params.toString()}`
+}
+
+function stageHref(stage: AimWorkflowStage) {
+  return `/aim?mode=quick&stage=${stage}`
+}
+
+function DataError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <button type="button" onClick={onRetry} className="mt-2 inline-flex items-center gap-1 text-xs text-destructive hover:underline">
+      <RefreshCw className="h-3 w-3" />
+      {message}，重试
+    </button>
+  )
 }
 
 export default function DashboardPage() {
-  const [projects, setProjects] = useState<ClientProject[]>([])
-  const [history, setHistory] = useState<AimGeneration[]>([])
-  const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [projectData, historyData, knowledgeData] = await Promise.all([
-          listClientProjects("all"),
-          listAimHistory(1, 6),
-          listKnowledge(),
-        ])
-        setProjects(projectData)
-        setHistory(historyData)
-        setKnowledge(knowledgeData)
-      } catch (error) {
-        // 任一请求失败时降级为空数据并提示，避免页面停留在无反馈的空白态
-        toast.error(error instanceof Error ? error.message : "数据加载失败，请刷新重试")
-        setProjects([])
-        setHistory([])
-        setKnowledge([])
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
-
-  const activeProjects = useMemo(
-    () => projects.filter((project) => project.status === "active"),
-    [projects]
-  )
-
-  const pendingItems = useMemo(
-    () => history.filter((item) => item.workflowStatus !== "published" && item.workflowStatus !== "archived"),
-    [history]
-  )
-
-  if (loading) return <DashboardSkeleton />
+  const summary = useAimHomeSummary()
+  const activeProjects = summary.projects.data.filter((project) => project.status === "active")
+  const continueItem = summary.pending.data.items[0]
 
   return (
-    <div className="space-y-6 pb-10">
-      <section className="space-y-3">
+    <div className="space-y-7 pb-10">
+      <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">工作总览</h1>
-          <Badge className="badge-gold border-none px-2 py-0.5 rounded-sm text-xs">内容生产版</Badge>
+          <h1 className="text-2xl font-bold">今天要推进什么？</h1>
+          <Badge variant="secondary">AIM 内容工作流</Badge>
         </div>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          管理全案、沉淀素材、生成内容，并跟进每一条内容的生产进度。
-        </p>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">可以先快速出一稿，也可以进入客户全案持续沉淀定位、内容和结果。</p>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-primary/20 bg-primary/[0.02]">
-          <CardContent className="flex items-center justify-between p-5">
+      {continueItem ? (
+        <section className="flex flex-col gap-4 border-y bg-muted/25 px-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-primary">继续上次任务</p>
+            <p className="mt-1 truncate text-base font-semibold">{getContentTitle(continueItem)}</p>
+            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">{getContentPreview(continueItem)}</p>
+          </div>
+          <Button nativeButton={false} render={<Link href={taskHref(continueItem)} />} className="shrink-0">
+            继续推进 <ArrowRight className="h-4 w-4" />
+          </Button>
+        </section>
+      ) : null}
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card className="border-primary/35">
+          <CardContent className="flex h-full flex-col justify-between gap-5 p-5">
             <div>
-              <p className="text-xs text-muted-foreground">进行中全案</p>
-              <p className="mt-2 text-3xl font-bold">{activeProjects.length}</p>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary"><Zap className="h-4 w-4" /></span>
+              <h2 className="mt-3 text-lg font-semibold">快速出一稿</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">不建全案，直接粘贴想法、口述或现有文案，先拿到一版能继续修改的内容。</p>
             </div>
-            <BriefcaseBusiness className="h-8 w-8 text-primary" />
+            <Button nativeButton={false} render={<Link href="/aim?mode=quick&stage=content" />}>
+              开始快速出稿 <ArrowRight className="h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="flex items-center justify-between p-5">
+          <CardContent className="flex h-full flex-col justify-between gap-5 p-5">
             <div>
-              <p className="text-xs text-muted-foreground">待推进内容</p>
-              <p className="mt-2 text-3xl font-bold">{pendingItems.length}</p>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-muted text-foreground"><FolderPlus className="h-4 w-4" /></span>
+              <h2 className="mt-3 text-lg font-semibold">建立客户全案</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">适合长期运营，把客户资料、选题、内容、发布和复盘放在同一个项目里。</p>
             </div>
-            <CheckCircle2 className="h-8 w-8 text-primary" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between p-5">
-            <div>
-              <p className="text-xs text-muted-foreground">知识库条目</p>
-              <p className="mt-2 text-3xl font-bold">{knowledge.length}</p>
-            </div>
-            <BookOpen className="h-8 w-8 text-primary" />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.05] to-amber-500/[0.02]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BriefcaseBusiness className="h-4 w-4 text-primary" />
-              商业诊断官
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              先判断生意卡点：商业模式、流量转化、交付结构和核心矛盾。
-            </p>
-            <Button className="w-full" nativeButton={false} render={<Link href="/aim?agent=business_system_diagnosis" />}>
-              去做诊断
-              <ArrowRight className="h-4 w-4" />
+            <Button variant="outline" nativeButton={false} render={<Link href="/projects?intent=create" />}>
+              建立客户全案 <ArrowRight className="h-4 w-4" />
             </Button>
           </CardContent>
         </Card>
+      </section>
 
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.05] to-amber-500/[0.02]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4 text-primary" />
-              定位策划官
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              明确 IP 怎么表达、吸引谁、建立什么信任，以及如何承接成交。
-            </p>
-            <Button className="w-full" nativeButton={false} render={<Link href="/aim?agent=business_diagnosis" />}>
-              去做定位
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
+      <section>
+        <h2 className="text-sm font-semibold">按工作流开始</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {AIM_WORKFLOW_STAGES.map((stage, index) => (
+            <Link key={stage.id} href={stageHref(stage.id)} className="group border-l-2 border-border px-3 py-2 transition-colors hover:border-primary hover:bg-muted/30">
+              <p className="text-xs text-muted-foreground">{index + 1}</p>
+              <p className="mt-1 text-sm font-semibold group-hover:text-primary">{stage.title}</p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{stage.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
 
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.05] to-amber-500/[0.02]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FilePenLine className="h-4 w-4 text-primary" />
-              内容生产官
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              统一处理选题、脚本、朋友圈、长文和发布前质检。
-            </p>
-            <Button className="w-full" nativeButton={false} render={<Link href="/aim?agent=content_producer" />}>
-              去生产内容
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
+      <section className="grid gap-3 md:grid-cols-3">
+        <Card><CardContent className="flex items-start justify-between p-4"><div><p className="text-xs text-muted-foreground">进行中全案</p>{summary.projects.loading ? <Skeleton className="mt-2 h-8 w-10" /> : <p className="mt-2 text-2xl font-bold">{activeProjects.length}</p>}{summary.projects.error ? <DataError message={summary.projects.error} onRetry={() => void summary.loadProjects()} /> : null}</div><BriefcaseBusiness className="h-5 w-5 text-primary" /></CardContent></Card>
+        <Card><CardContent className="flex items-start justify-between p-4"><div><p className="text-xs text-muted-foreground">待推进内容</p>{summary.pending.loading ? <Skeleton className="mt-2 h-8 w-10" /> : <p className="mt-2 text-2xl font-bold">{summary.pending.data.total}</p>}{summary.pending.error ? <DataError message={summary.pending.error} onRetry={() => void summary.loadPending()} /> : null}</div><CheckCircle2 className="h-5 w-5 text-primary" /></CardContent></Card>
+        <Card><CardContent className="flex items-start justify-between p-4"><div><p className="text-xs text-muted-foreground">知识库条目</p>{summary.knowledge.loading ? <Skeleton className="mt-2 h-8 w-10" /> : <p className="mt-2 text-2xl font-bold">{summary.knowledge.data}</p>}{summary.knowledge.error ? <DataError message={summary.knowledge.error} onRetry={() => void summary.loadKnowledge()} /> : null}</div><BookOpen className="h-5 w-5 text-primary" /></CardContent></Card>
+      </section>
 
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/[0.05] to-amber-500/[0.02]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              发布质检官
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              发布前检查成稿质量、平台风险和最小修改建议。
-            </p>
-            <Button className="w-full" nativeButton={false} render={<Link href="/aim?agent=content_review" />}>
-              去做质检
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <Card>
-          <CardHeader className="border-b pb-3">
-            <CardTitle className="text-base">最近待推进内容</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {pendingItems.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 p-10 text-center text-muted-foreground">
-                <CheckCircle2 className="h-8 w-8 opacity-40" />
-                <p className="text-sm">暂无待推进内容</p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {pendingItems.slice(0, 6).map((item) => (
-                  <Link key={item.id} href="/aim" className="block p-4 transition-colors hover:bg-muted/30">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 space-y-1">
-                        <p className="line-clamp-1 text-sm font-semibold">{getContentTitle(item)}</p>
-                        <p className="line-clamp-1 text-xs text-muted-foreground">{getContentPreview(item)}</p>
-                      </div>
-                      <Badge variant="outline" className="shrink-0">
-                        {workflowStatusLabel(item.workflowStatus)}
-                      </Badge>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-      </div>
-    </div>
-  )
-}
-
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-96" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-      </div>
-      <Skeleton className="h-64" />
+      <section>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold">最近待推进内容</h2>
+          {summary.pending.data.total > 6 ? <Link href="/aim" className="text-xs text-primary hover:underline">查看全部</Link> : null}
+        </div>
+        <div className="mt-3 divide-y border-y">
+          {summary.pending.loading ? <div className="space-y-3 py-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> : null}
+          {!summary.pending.loading && !summary.pending.error && summary.pending.data.items.length === 0 ? (
+            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><FilePenLine className="h-4 w-4" />还没有待推进内容，可以先快速出一稿。</div>
+          ) : null}
+          {summary.pending.data.items.map((item) => (
+            <Link key={item.id} href={taskHref(item)} className="flex items-center justify-between gap-4 py-3 transition-colors hover:bg-muted/25">
+              <div className="min-w-0"><p className="truncate text-sm font-medium">{getContentTitle(item)}</p><p className="mt-1 truncate text-xs text-muted-foreground">{getContentPreview(item)}</p></div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }

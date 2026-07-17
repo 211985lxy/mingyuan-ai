@@ -35,6 +35,7 @@ describe("derived AIM workflow tasks", () => {
       "publish:publish",
       "results:results",
     ])
+    expect(tasks.find((task) => task.id === "results")?.nextAction).toContain("发布后第 7 天复盘")
   })
 
   it("does not surface archived or already-reviewed content", () => {

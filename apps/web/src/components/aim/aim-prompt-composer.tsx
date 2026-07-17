@@ -21,6 +21,7 @@ interface AimPromptComposerProps {
   onStop?: () => void
   onStartRecording: () => void
   onStopRecording: () => void
+  showSkills?: boolean
   skills?: AimWorkbenchSkill[]
   onUseSkill?: (skill: AimWorkbenchSkill) => void
   imageAttachments?: Array<{ id: string; name: string; previewUrl: string }>
@@ -42,6 +43,7 @@ export function AimPromptComposer({
   onStop,
   onStartRecording,
   onStopRecording,
+  showSkills = false,
   skills = [],
   onUseSkill,
   imageAttachments = [],
@@ -118,7 +120,7 @@ export function AimPromptComposer({
             ))}
           </div>
         )}
-        {skillsOpen && (
+        {showSkills && skillsOpen && (
           <div className="absolute bottom-12 left-3 z-20 w-[min(420px,calc(100vw-2rem))] rounded-xl border bg-popover p-2 text-popover-foreground shadow-lg">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -151,11 +153,6 @@ export function AimPromptComposer({
               {skills.length > 0 && filteredSkills.length === 0 && (
                 <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">没有找到匹配技能</p>
               )}
-            </div>
-            <div className="mt-1 border-t pt-1">
-              <button type="button" className="w-full rounded-md px-2.5 py-1.5 text-left text-xs text-muted-foreground" disabled>
-                导入技能（暂未开放）
-              </button>
             </div>
           </div>
         )}
@@ -193,7 +190,7 @@ export function AimPromptComposer({
               <ImagePlus className="h-4 w-4" />
               上传图片
             </Button>
-            <Button
+            {showSkills ? <Button
               type="button"
               size="sm"
               variant="ghost"
@@ -203,7 +200,7 @@ export function AimPromptComposer({
             >
               技能
               <ChevronDown className="h-3.5 w-3.5" />
-            </Button>
+            </Button> : null}
             <Button
               type="button"
               size="sm"

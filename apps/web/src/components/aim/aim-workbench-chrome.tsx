@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import type { AimEvolutionSuggestion } from "@/lib/api/client"
+import type { ClientProject } from "@/lib/api/client"
 import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimWorkflowStage } from "@/lib/aim-workflow"
 
 interface AimWorkbenchHeaderProps {
@@ -15,11 +16,12 @@ interface AimWorkbenchHeaderProps {
   agentTitle: string
   AgentIcon: ComponentType<{ className?: string }>
   projectEnabled: boolean
-  projectName?: string
+  projects: ClientProject[]
+  selectedProjectId: string
   canEvolve: boolean
   isEvolving: boolean
   onStageChange: (stage: AimWorkflowStage) => void
-  onToggleProject: () => void
+  onProjectScopeChange: (scope: string) => void
   onEvolve: () => void
   onReset: () => void
 }
@@ -29,11 +31,12 @@ export function AimWorkbenchHeader({
   agentTitle,
   AgentIcon,
   projectEnabled,
-  projectName,
+  projects,
+  selectedProjectId,
   canEvolve,
   isEvolving,
   onStageChange,
-  onToggleProject,
+  onProjectScopeChange,
   onEvolve,
   onReset,
 }: AimWorkbenchHeaderProps) {
@@ -106,16 +109,16 @@ export function AimWorkbenchHeader({
         </nav>
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={projectEnabled ? "secondary" : "outline"}
-          className="hidden h-8 max-w-[220px] gap-1.5 truncate sm:inline-flex"
-          onClick={onToggleProject}
-          title={projectEnabled ? "已启用 IP 全案上下文，点击切到纯文案模式" : "纯文案模式，点击启用 IP 全案上下文"}
+        <select
+          value={projectEnabled ? selectedProjectId : "quick"}
+          onChange={(event) => onProjectScopeChange(event.target.value)}
+          className="h-8 w-[108px] max-w-[220px] rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto"
+          title="选择客户全案或快速出稿模式"
         >
-          {projectEnabled ? (projectName ?? "IP 全案") : "纯文案模式"}
-        </Button>
+          {projectEnabled && !selectedProjectId ? <option value="" disabled>项目不可用</option> : null}
+          <option value="quick">快速出稿</option>
+          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+        </select>
         <Button
           type="button"
           size="sm"
@@ -137,19 +140,29 @@ export function AimWorkbenchHeader({
   )
 }
 
-export function AimProjectNotices({ projectsCount, selectedProjectId, personaProgress }: {
+export function AimProjectNotices({ projectsCount, selectedProjectId, projectEnabled, projectAccessError, personaProgress }: {
   projectsCount: number
   selectedProjectId: string
+  projectEnabled: boolean
+  projectAccessError?: string | null
   personaProgress: number | null
 }) {
   return (
     <>
-      {projectsCount === 0 ? (
+      {!projectEnabled ? (
+        <div className="border-b bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
+          快速出稿不会读取客户全案资料，生成后可手动保存到全案。
+        </div>
+      ) : projectsCount === 0 ? (
         <div className="border-b bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
           还没有 IP 营销全案，<Link href="/projects" className="text-primary underline-offset-2 hover:underline">先创建一个</Link>，生成内容可自动归属。
         </div>
       ) : null}
-      {projectsCount > 0 && !selectedProjectId ? (
+      {projectAccessError ? (
+        <div className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
+          {projectAccessError}
+        </div>
+      ) : projectEnabled && projectsCount > 0 && !selectedProjectId ? (
         <div className="border-b bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
           正在加载你的 IP 营销全案，请稍后再生成内容。
         </div>

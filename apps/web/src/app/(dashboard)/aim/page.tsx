@@ -8,6 +8,7 @@ import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
+import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 
@@ -25,11 +26,12 @@ export default function AimPage() {
           agentTitle={w.agent.title}
           AgentIcon={w.agent.icon}
           projectEnabled={w.projectEnabled}
-          projectName={w.projects.find((p) => p.id === w.selectedProjectId)?.name}
+          projects={w.projects}
+          selectedProjectId={w.selectedProjectId}
           canEvolve={!w.isThinking && !w.isGenerating && !w.isEvolving && w.messages.length >= 2}
           isEvolving={w.isEvolving}
           onStageChange={w.beginWorkflowStage}
-          onToggleProject={() => w.setProjectEnabled((v) => !v)}
+          onProjectScopeChange={w.changeProjectScope}
           onEvolve={() => void w.handleEvolveConversation()}
           onReset={w.resetConversation}
         />
@@ -37,6 +39,8 @@ export default function AimPage() {
         <AimProjectNotices
           projectsCount={w.projects.length}
           selectedProjectId={w.selectedProjectId}
+          projectEnabled={w.projectEnabled}
+          projectAccessError={w.projectAccessError}
           personaProgress={w.personaProgress}
         />
 
@@ -78,6 +82,7 @@ export default function AimPage() {
             onEditResult: w.openEditorFromResult,
             onOpenRecord: w.openRecordDialog,
             onCompileToWiki: (ctx) => w.setWikiDialog({ open: true, context: ctx }),
+            onAttachProject: w.projectEnabled ? undefined : w.projectAttach.openDialog,
           }}
         />
 
@@ -106,6 +111,7 @@ export default function AimPage() {
             onStop={w.handleStop}
             onStartRecording={w.startRecording}
             onStopRecording={w.stopRecording}
+            showSkills={Boolean(w.params.agentParam)}
             skills={w.agent.skills}
             onUseSkill={w.handleUseSkill}
             imageAttachments={w.imageAttachments}
@@ -171,6 +177,20 @@ export default function AimPage() {
         onOutcomeWindowChange={w.setOutcomeWindow}
         onClose={w.closeRecordDialog}
         onSubmit={() => void w.submitRecordDialog()}
+      />
+
+      <AimProjectAttachDialog
+        open={w.projectAttach.open}
+        projects={w.projects}
+        mode={w.projectAttach.mode}
+        projectId={w.projectAttach.projectId}
+        projectName={w.projectAttach.projectName}
+        busy={w.projectAttach.busy}
+        onModeChange={w.projectAttach.setMode}
+        onProjectIdChange={w.projectAttach.setProjectId}
+        onProjectNameChange={w.projectAttach.setProjectName}
+        onClose={w.projectAttach.closeDialog}
+        onSubmit={() => void w.projectAttach.submit()}
       />
     </div>
   )

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowRight, BriefcaseBusiness, Loader2, Plus } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ import {
 
 export default function ProjectsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -38,6 +39,11 @@ export default function ProjectsPage() {
       .catch(() => toast.error("IP营销全案读取失败，请重新登录后再试"))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (searchParams?.get("intent") !== "create") return
+    document.getElementById("project-name")?.focus()
+  }, [searchParams])
 
   async function handleCreateProject() {
     const name = form.name.trim()
@@ -69,6 +75,7 @@ export default function ProjectsPage() {
         deliveryGoal: "",
       })
       toast.success(`已创建全案「${project.name}」`)
+      router.push(`/aim?projectId=${encodeURIComponent(project.id)}&stage=direction`)
     } catch {
       toast.error("IP营销全案创建失败，请检查必填信息或重新登录")
     } finally {
@@ -233,7 +240,7 @@ export default function ProjectsPage() {
                       </div>
                       <Button
                         variant="outline"
-                        onClick={() => router.push("/aim")}
+                        onClick={() => router.push(`/aim?projectId=${encodeURIComponent(project.id)}&stage=direction`)}
                       >
                         进入AI内容总监
                         <ArrowRight className="size-4" />

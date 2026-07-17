@@ -48,7 +48,7 @@ export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDe
 
   let status: AimDeliveryContract["status"]
   if (input.degraded) {
-    status = { label: "降级交付", detail: "建议复核后使用", tone: "warning" }
+    status = { label: "备用模型已完成", detail: "请复核关键事实后使用", tone: "warning" }
   } else if (input.qualityStatus === "fail") {
     status = { label: "未通过", detail: "需要继续修改", tone: "danger" }
   } else if (input.qualityStatus === "warn") {
@@ -61,7 +61,7 @@ export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDe
 
   const needsReview = input.degraded || input.qualityStatus === "fail" || input.qualityStatus === "warn"
   const nextLabel = needsReview
-    ? "先检查再使用"
+    ? input.qualityStatus === "fail" ? "优化后再用" : "先检查再使用"
     : input.primaryNextActionLabel || (taskLabel === "局部修改" || taskLabel === "追改纠偏"
       ? "确认修改或继续追改"
       : "复制、编辑或推进发布")

@@ -24,7 +24,7 @@ import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVi
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { EDITOR_PANEL_DEFAULT_WIDTH } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
-import { clearAimDraft, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { aimDraftProjectScope, clearAimDraft, loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
   extractPersonaProgress as extractProgress,
   findLatestAimVideoDeliverableMessageId,
@@ -32,10 +32,11 @@ import {
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { IpWikiDialogContext, AimWorkbenchMessage as ChatMessage } from "@/lib/aim/workbench-types"
-import { parseAimSearchParams, type AimSearchParams } from "@/features/aim/aim-search-params"
+import { parseAimSearchParams } from "@/features/aim/aim-search-params"
 import { useAimAgentConfig, useRouteSetters } from "@/features/aim/aim-agent-derivation"
 import { useAimPageCommands } from "@/features/aim/hooks/use-aim-page-commands"
 import { useAimSendActions } from "@/features/aim/hooks/use-aim-send-actions"
+import { useAimProjectAttach } from "@/hooks/use-aim-project-attach"
 import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/features/aim/aim-reference-annotation"
 
 /**
@@ -46,14 +47,17 @@ import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/fe
  */
 export function useAimWorkbench() {
   const router = useRouter()
-  const searchParams = useSearchParams() ?? new URLSearchParams()
+  const routeSearchParams = useSearchParams()
+  const searchParams = useMemo(() => routeSearchParams ?? new URLSearchParams(), [routeSearchParams])
   const params = parseAimSearchParams(searchParams)
   const { agentParam, activeAgentId, modeParam, topicTitleParam, topicRationaleParam,
     topicSelectionIdParam, selectedTopicIndexParam, projectIdParam, videoCopyExtractionIdParam,
-    ideaParam, workflowStageParam } = params
+    ideaParam, workflowStageParam, generationIdParam } = params
 
   // ---- Draft-based initialization ----
-  const [initialDraft] = useState<AimDraft | null>(() => loadAimDraft(activeAgentId))
+  const explicitInitialScope = modeParam === "quick" ? "quick" : projectIdParam || undefined
+  const [initialDraft] = useState<AimDraft | null>(() => loadAimDraft(activeAgentId, explicitInitialScope))
+  const initialQuickMode = modeParam === "quick" || (!projectIdParam && initialDraft?.selectedProjectId === "")
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
@@ -75,11 +79,21 @@ export function useAimWorkbench() {
   const [isQualityChecking, setIsQualityChecking] = useState(false)
 
   // ---- Project workspace ----
+  const handlePublished = useCallback((publishedGenerationId: string) => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.set("stage", "results")
+    nextParams.set("generationId", publishedGenerationId)
+    router.replace(`/aim?${nextParams.toString()}`)
+  }, [router, searchParams])
+
   const {
     projects, selectedProjectId, setSelectedProjectId,
-    projectEnabled, setProjectEnabled,
-    projectWorkflowRecords, isLoadingProjectWorkflow, refreshProjectWorkflow,
-  } = useAimProjectWorkspace(initialDraft?.selectedProjectId || "")
+    projectEnabled, setProjectEnabled, projectAccessError,
+    projectWorkflowRecords, isLoadingProjectWorkflow, refreshProjectWorkflow, refreshProjects,
+  } = useAimProjectWorkspace({
+    initialProjectId: projectIdParam || initialDraft?.selectedProjectId || "",
+    quickMode: initialQuickMode,
+  })
 
   // ---- Dialog / workflow state ----
   const [wikiDialog, setWikiDialog] = useState<{ open: boolean; context: IpWikiDialogContext | null }>({ open: false, context: null })
@@ -105,7 +119,14 @@ export function useAimWorkbench() {
     outcomeWindow, setOutcomeWindow,
     retroRuleForm, setRetroRuleForm,
     handleMarkStatus, openRecordDialog, submitRecordDialog,
-  } = useAimWorkflowRecords({ messages, selectedAgentId, selectedProjectId, refreshHistory, refreshProjectWorkflow })
+  } = useAimWorkflowRecords({
+    messages,
+    selectedAgentId,
+    selectedProjectId,
+    refreshHistory,
+    refreshProjectWorkflow,
+    onPublished: handlePublished,
+  })
 
   // ---- Refs ----
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -152,11 +173,12 @@ export function useAimWorkbench() {
   // ---- Route setters + route sync ----
   const lastAgentParamRef = useRef(agentParam)
   const routeSetters = useRouteSetters({
-    setSelectedAgentId, setSelectedProjectId, setMessages, setInput,
+    setSelectedAgentId, setSelectedProjectId, setProjectEnabled, setMessages, setInput,
     setSourceVideoCopyExtractionId, setSourceOriginalText, setSourceAnalysisText,
     setSourceTopicTitle, setSourceTopicRationale, setEditorText, setEditorFormat,
     setEditorSourceMessageId, setEditorPanelWidth, setEditorPanelOpen,
   })
+  const currentProjectScope = aimDraftProjectScope(projectEnabled, selectedProjectId)
 
   // ---- Effects ----
   useAimDraftAutosave({
@@ -164,13 +186,13 @@ export function useAimWorkbench() {
     videoCopyExtractionId: sourceVideoCopyExtractionId,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
     editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
-  })
+  }, projectEnabled)
   useAimSourceHydration({
     extractionId: sourceVideoCopyExtractionId, sourceOriginalText, sourceAnalysisText,
     setSourceOriginalText, setSourceAnalysisText,
   })
 
-  useAimAgentDraftSwitch({ agentParam, activeAgentId, selectedProjectId, lastAgentParamRef, setters: routeSetters })
+  useAimAgentDraftSwitch({ agentParam, activeAgentId, selectedProjectId, projectScope: currentProjectScope, lastAgentParamRef, setters: routeSetters })
   useAimTopicPrefill({ topicTitle: topicTitleParam, topicRationale: topicRationaleParam, projectId: projectIdParam, idea: ideaParam, router, searchParams, setters: routeSetters })
   useAimVideoCopyPrefill({ extractionId: videoCopyExtractionIdParam, router, searchParams, setters: routeSetters })
 
@@ -183,7 +205,7 @@ export function useAimWorkbench() {
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
   }, [setDraftSelection, setEditorFormat, setEditorPanelOpen, setEditorSourceMessageId, setEditorText])
 
-  useAimHistoryLoad({ loadTargetId, history: storeHistory, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters: routeSetters })
+  useAimHistoryLoad({ loadTargetId, generationIdParam, history: storeHistory, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters: routeSetters })
   useAimMessageAutoScroll({ scrollRef, pendingMessageIdRef: pendingScrollMessageIdRef, messages, isThinking, isGenerating })
 
   // ---- Persona progress ----
@@ -235,7 +257,59 @@ export function useAimWorkbench() {
     setMessages([])
     setInput("")
     clearCurrentTaskContext()
-    clearAimDraft(selectedAgentId)
+    clearAimDraft(selectedAgentId, currentProjectScope)
+  }
+
+  function changeProjectScope(scope: string) {
+    if (busy || scope === currentProjectScope) return
+    saveAimDraft({
+      selectedAgentId,
+      selectedProjectId,
+      input,
+      messages,
+      videoCopyExtractionId: sourceVideoCopyExtractionId,
+      sourceOriginalText,
+      sourceAnalysisText,
+      sourceTopicTitle,
+      sourceTopicRationale,
+      editorText,
+      editorFormat,
+      editorSourceMessageId,
+      editorPanelWidth,
+      editorPanelOpen,
+    }, currentProjectScope)
+    const nextProjectId = scope === "quick" ? "" : scope
+    const nextDraft = loadAimDraft(selectedAgentId, scope)
+    setProjectEnabled(scope !== "quick")
+    setSelectedProjectId(nextProjectId)
+    setMessages(nextDraft?.messages || [])
+    setInput(nextDraft?.input || "")
+    setSourceVideoCopyExtractionId(nextDraft?.videoCopyExtractionId)
+    setSourceOriginalText(nextDraft?.sourceOriginalText || "")
+    setSourceAnalysisText(nextDraft?.sourceAnalysisText || "")
+    setSourceTopicTitle(nextDraft?.sourceTopicTitle || "")
+    setSourceTopicRationale(nextDraft?.sourceTopicRationale || "")
+    setEditorText(nextDraft?.editorText || "")
+    setEditorFormat(nextDraft?.editorFormat)
+    setEditorSourceMessageId(nextDraft?.editorSourceMessageId)
+    setEditorPanelWidth(nextDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
+    setEditorPanelOpen(nextDraft?.editorPanelOpen ?? true)
+    setReferenceSelection({ text: "", range: { start: 0, end: 0 } })
+    setDraftSelection({ text: "", range: { start: 0, end: 0 } })
+    setWorkflowBrief(null)
+    setContentAction(null)
+    clearImages()
+
+    const nextParams = new URLSearchParams(searchParams.toString())
+    nextParams.delete("generationId")
+    if (scope === "quick") {
+      nextParams.set("mode", "quick")
+      nextParams.delete("projectId")
+    } else {
+      if (nextParams.get("mode") === "quick") nextParams.delete("mode")
+      nextParams.set("projectId", scope)
+    }
+    router.replace(`/aim?${nextParams.toString()}`)
   }
 
   // ---- Page commands ----
@@ -263,7 +337,7 @@ export function useAimWorkbench() {
   }
 
   // ---- Send actions ----
-  const { handleUseSkill, handleSend, handleGenerate, retryFailedMessage } = useAimSendActions({
+  const { handleUseSkill, handleGenerate, retryFailedMessage } = useAimSendActions({
     messages, input, hasEditorSelection, referenceSelection, draftSelection,
     editorText, sourceOriginalText, sourceAnalysisText, sourceTopicTitle,
     editorPanelLabels, imageAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
@@ -273,6 +347,21 @@ export function useAimWorkbench() {
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
+
+  const projectAttach = useAimProjectAttach({
+    projects,
+    refreshProjects,
+    onAttached: (projectId, generationId) => {
+      setProjectEnabled(true)
+      setSelectedProjectId(projectId)
+      const nextParams = new URLSearchParams(searchParams.toString())
+      nextParams.delete("mode")
+      nextParams.set("projectId", projectId)
+      nextParams.set("generationId", generationId)
+      router.replace(`/aim?${nextParams.toString()}`)
+      void refreshHistory({ force: true, projectId })
+    },
+  })
 
   return {
     params,
@@ -286,7 +375,7 @@ export function useAimWorkbench() {
     agent,
     currentWorkflowStage, showWorkflowLanding,
     workflowBrief, workflowBriefForm, workflowBriefDialogOpen, isBuildingWorkflowBrief, contentAction,
-    projects, selectedProjectId, projectEnabled, projectWorkflowRecords, isLoadingProjectWorkflow,
+    projects, selectedProjectId, projectEnabled, projectAccessError, projectWorkflowRecords, isLoadingProjectWorkflow,
     personaProgress,
     isEvolving, evolutionSuggestions,
     recordDialog, closeRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm,
@@ -297,7 +386,9 @@ export function useAimWorkbench() {
     scrollRef,
     startRecording, stopRecording,
     setEditorPanelOpen, setEditorPanelWidth, setEditorText, setReferenceSelection, setDraftSelection,
-    setInput, setProjectEnabled, setWikiDialog, setWorkflowBriefForm,
+    setInput, setWikiDialog, setWorkflowBriefForm,
+    changeProjectScope,
+    projectAttach,
     resetConversation, retryFailed, handleGenerate, handleStop, handleRepurpose, handleQuality,
     sendText, handleUseSkill, openEditorFromResult, openProjectWorkflowTask,
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,

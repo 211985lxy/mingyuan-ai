@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, useMemo, useState } from "react"
-import { ArrowRight, Check, Clipboard, Database, ShieldCheck, Sparkles, Target } from "lucide-react"
+import { ArrowRight, Check, Clipboard, Database, FolderPlus, ShieldCheck, Sparkles, Target } from "lucide-react"
 import { toast } from "sonner"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { ActionStrip } from "@/components/workbench/action-strip"
@@ -42,6 +42,7 @@ export interface AimDeliverableBubbleProps {
   onOpenDecision?: () => void
   onOpenPublish?: () => void
   onOpenRetro?: () => void
+  onAttachProject?: (generationId: string) => void
 }
 
 const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
@@ -134,7 +135,7 @@ function DeliverableTabs({ results, activeFormat, copiedFormat, onTabChange, onC
   </Tabs>
 }
 
-interface DeliverableActionsProps extends Pick<AimDeliverableBubbleProps, "deliverables" | "agentId" | "nextActions" | "onRepurpose" | "onQuality" | "onMarkStatus" | "onNextAction" | "onCompileToWiki" | "onOpenDecision" | "onOpenPublish" | "onOpenRetro" | "isBusy"> {
+interface DeliverableActionsProps extends Pick<AimDeliverableBubbleProps, "deliverables" | "agentId" | "nextActions" | "onRepurpose" | "onQuality" | "onMarkStatus" | "onNextAction" | "onCompileToWiki" | "onOpenDecision" | "onOpenPublish" | "onOpenRetro" | "onAttachProject" | "isBusy"> {
   activeResult?: AimGenerateResult
 }
 
@@ -196,10 +197,13 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const primaryActions = nextActions.filter((action) => action.id === "publish_package" || action.id === "publish_check")
   const secondaryActions = nextActions.filter((action) => action.id !== "publish_package" && action.id !== "publish_check")
   return <ActionStrip>
-    <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />
-    {canRunPublishCheck && !nextActions.some((action) => action.id === "publish_check") ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onQuality} disabled={isBusy || !hasPublishScript}><ShieldCheck className="mr-1 h-3.5 w-3.5" />发布前自查</Button> : null}
+    {props.onAttachProject ? <Button size="sm" className="h-7 rounded-md px-2 text-xs" onClick={() => props.onAttachProject?.(deliverables.id)} disabled={isBusy}><FolderPlus className="mr-1 h-3.5 w-3.5" />保存到客户全案</Button> : null}
+    {deliverables.qualityStatus === "fail" ? <Button size="sm" className="h-7 rounded-md px-2 text-xs" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <>
+      <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />
+      {canRunPublishCheck && !nextActions.some((action) => action.id === "publish_check") ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onQuality} disabled={isBusy || !hasPublishScript}><ShieldCheck className="mr-1 h-3.5 w-3.5" />发布前自查</Button> : null}
+    </>}
     <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenDecision} disabled={isBusy}>发布前判断</Button>
-    <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenPublish} disabled={isBusy}>登记发布</Button>
+    <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenPublish} disabled={isBusy || deliverables.qualityStatus === "fail"}>登记发布</Button>
     <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenRetro} disabled={isBusy}>填写复盘</Button>
     <MoreActions formats={formats} secondaryActions={secondaryActions} activeResult={activeResult} deliverables={deliverables} isBusy={isBusy} onRepurpose={props.onRepurpose} onNextAction={props.onNextAction} onCompileToWiki={props.onCompileToWiki} />
     <Select onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}>

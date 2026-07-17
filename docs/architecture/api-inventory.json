@@ -816,14 +816,15 @@
       "file": "src/app/api/aim/history/[id]/route.ts",
       "methods": [
         "DELETE",
+        "GET",
         "PATCH"
       ],
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
       "externalService": false,
-      "cost": "low",
-      "idempotency": false
+      "cost": "medium",
+      "idempotency": true
     },
     {
       "route": "/api/aim/history",

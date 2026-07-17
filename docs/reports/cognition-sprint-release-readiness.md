@@ -50,7 +50,7 @@
 
 - **7 个 Prisma migration**：task_spec/content_outcome、phase14 schema 合并、admin_session_version、admin_audit_log、comment_radar 表、**retire_video_generation（删表/删列）**、query_bound_indexes。
   - 其中 `retire_video_generation` 是**破坏性 schema 变更（不可逆）**，精确影响：
-    - `DROP TABLE` 8 张：`VideoTask`、`VideoProductionPlan`、`VideoPackagingTemplate`、`PublicAvatarPreviewPreference`、`PublicAvatarPreviewCache`、`Avatar`、`PexelsQueryCache`、`PexelsMedia`
+    - `DROP TABLE` 8 张：退役的视频任务、包装、数字人预览和外部素材缓存表（精确清单以 migration SQL 为准）
     - `DELETE FROM Asset WHERE assetType='voice'`（删除全部语音资产数据）
     - `Asset` 表砍 6 列（sourceAvatarId / externalTaskId / externalSpeakerId / voiceModel / demoAudioUrl / retryCount）
     - `ContentTemplate` 砍 4 列（shanjianStyleId / videoType / packRulesJson / processRulesJson）

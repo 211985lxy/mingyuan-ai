@@ -118,6 +118,8 @@ export const aimHistoryQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(50).default(20),
   projectId: optionalId,
   agentId: z.string().max(80).optional(),
+  scope: z.enum(["pending"]).optional(),
+  includeTotal: z.enum(["true", "false"]).optional(),
 }).strict()
 
 export const aimRunEventBodySchema = z.object({

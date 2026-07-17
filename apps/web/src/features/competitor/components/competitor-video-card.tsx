@@ -92,7 +92,7 @@ function ExtractionResult({ record }: { record: ApiVideoCopyExtraction }) {
       {record.transcript ? <p className="mt-2 line-clamp-2 text-muted-foreground">原文案：{record.transcript}</p> : null}
       <div className="mt-2 flex items-center justify-between border-t pt-2 gap-2">
         <Link href="/video-copy" className="text-xs text-primary hover:underline">查看完整记录</Link>
-        <Link href={`/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`} className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90">
+        <Link href={`/aim?agent=content_producer&mode=quick&videoCopyExtractionId=${record.id}`} className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90">
           <Wand2 className="h-3 w-3" />生成内容资产包
         </Link>
       </div>

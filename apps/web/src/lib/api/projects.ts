@@ -28,6 +28,20 @@ export async function listAimHistory(page = 1, pageSize = 20, projectId?: string
   return request<AimGeneration[]>(`/api/aim/history?${params.toString()}`)
 }
 
+export async function getAimHistory(id: string): Promise<AimGeneration> {
+  return request<AimGeneration>(`/api/aim/history/${encodeURIComponent(id)}`)
+}
+
+export async function listPendingAimHistory(pageSize = 6): Promise<{ items: AimGeneration[]; total: number }> {
+  const params = new URLSearchParams({
+    page: "1",
+    pageSize: String(pageSize),
+    scope: "pending",
+    includeTotal: "true",
+  })
+  return request<{ items: AimGeneration[]; total: number }>(`/api/aim/history?${params.toString()}`)
+}
+
 export interface ClientProject {
   id: string
   name: string
@@ -85,6 +99,8 @@ export async function updateAimWorkflowStatus(id: string, data: {
   decisionSnapshot?: AimDecisionSnapshot
   retroSnapshot?: AimRetroSnapshot
   calibrationRule?: AimCalibrationRule
+  projectId?: string
+  retroOutcome?: ContentOutcomeInput
 }): Promise<AimGeneration> {
   return request<AimGeneration>(`/api/aim/history/${encodeURIComponent(id)}`, {
     method: "PATCH",

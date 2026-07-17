@@ -12,6 +12,7 @@ type Setter<T> = Dispatch<SetStateAction<T>>
 export type AimRouteSetters = {
   setSelectedAgentId: Setter<AimAgentId>
   setSelectedProjectId: Setter<string>
+  setProjectEnabled: Setter<boolean>
   setMessages: Setter<ChatMessage[]>
   setInput: Setter<string>
   setSourceVideoCopyExtractionId: Setter<string | undefined>
@@ -28,10 +29,27 @@ export type AimRouteSetters = {
 
 /** Build stable route setters object for route-sync hooks. */
 export function useRouteSetters(setters: AimRouteSetters): AimRouteSetters {
-  return useMemo(() => setters, [
+  return useMemo(() => ({
+    setSelectedAgentId: setters.setSelectedAgentId,
+    setSelectedProjectId: setters.setSelectedProjectId,
+    setProjectEnabled: setters.setProjectEnabled,
+    setMessages: setters.setMessages,
+    setInput: setters.setInput,
+    setSourceVideoCopyExtractionId: setters.setSourceVideoCopyExtractionId,
+    setSourceOriginalText: setters.setSourceOriginalText,
+    setSourceAnalysisText: setters.setSourceAnalysisText,
+    setSourceTopicTitle: setters.setSourceTopicTitle,
+    setSourceTopicRationale: setters.setSourceTopicRationale,
+    setEditorText: setters.setEditorText,
+    setEditorFormat: setters.setEditorFormat,
+    setEditorSourceMessageId: setters.setEditorSourceMessageId,
+    setEditorPanelWidth: setters.setEditorPanelWidth,
+    setEditorPanelOpen: setters.setEditorPanelOpen,
+  }), [
     setters.setEditorFormat, setters.setEditorPanelOpen, setters.setEditorPanelWidth,
     setters.setEditorSourceMessageId, setters.setEditorText, setters.setInput,
     setters.setMessages, setters.setSelectedAgentId, setters.setSelectedProjectId,
+    setters.setProjectEnabled,
     setters.setSourceAnalysisText, setters.setSourceOriginalText,
     setters.setSourceTopicRationale, setters.setSourceTopicTitle,
     setters.setSourceVideoCopyExtractionId,
@@ -53,7 +71,9 @@ export function useAimAgentConfig(input: {
 
   return useMemo(() => {
     const baseAgent = AGENT_OPTIONS.find((a) => a.id === selectedAgentId)!
-    if (selectedAgentId === "content_producer" && modeParam === "asset_pack") {
+    const isAssetPack = modeParam === "asset_pack"
+      || (modeParam === "quick" && Boolean(sourceTopicTitle.trim() || sourceVideoCopyExtractionId))
+    if (selectedAgentId === "content_producer" && isAssetPack) {
       const isHotTopicAsset = sourceTopicTitle.trim().length > 0 && !sourceVideoCopyExtractionId
       return {
         ...baseAgent,

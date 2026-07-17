@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findMany, authenticateRequest, authErrorResponse } = vi.hoisted(() => ({
+const { findMany, count, authenticateRequest, authErrorResponse } = vi.hoisted(() => ({
   findMany: vi.fn(),
+  count: vi.fn(),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
 }))
@@ -11,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     aimGeneration: {
       findMany,
+      count,
     },
   },
 }))
@@ -50,5 +52,24 @@ describe("aim history route", () => {
         rawInput: "旧记录",
       }),
     ])
+  })
+
+  it("returns a real pending total without changing the legacy response by default", async () => {
+    findMany.mockResolvedValueOnce([{ id: "gen-2", agentId: "content_producer" }])
+    count.mockResolvedValueOnce(12)
+
+    const res = await GET(new NextRequest("http://localhost:3000/api/aim/history?scope=pending&includeTotal=true&pageSize=6"))
+    const body = await res.json()
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: [
+          { workflowStatus: { notIn: ["published", "archived"] } },
+          { workflowStatus: "published", retroSnapshots: { equals: [] } },
+        ],
+      }),
+      take: 6,
+    }))
+    expect(body).toEqual({ items: [expect.objectContaining({ id: "gen-2" })], total: 12 })
   })
 })

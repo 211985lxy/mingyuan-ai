@@ -47,8 +47,8 @@ describe("buildAimDeliveryContract", () => {
     })
 
     expect(contract.status).toEqual({
-      label: "降级交付",
-      detail: "建议复核后使用",
+      label: "备用模型已完成",
+      detail: "请复核关键事实后使用",
       tone: "warning",
     })
     expect(contract.next).toEqual({ label: "先检查再使用", detail: "建议返回当前版本" })

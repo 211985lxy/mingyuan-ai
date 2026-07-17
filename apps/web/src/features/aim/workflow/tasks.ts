@@ -22,6 +22,12 @@ function hasRetro(item: AimGeneration) {
   return Array.isArray(item.retroSnapshots) && item.retroSnapshots.length > 0
 }
 
+function retroDueLabel(item: AimGeneration) {
+  const publishedAt = item.publishedAt || item.updatedAt || item.createdAt
+  const dueAt = new Date(new Date(publishedAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+  return `发布后第 7 天复盘（${dueAt.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}）`
+}
+
 /**
  * A task is a derived view of an existing generation, not a second source of
  * truth. This keeps project progress visible without a new table or migration.
@@ -32,7 +38,7 @@ export function deriveAimWorkflowTasks(records: AimGeneration[]): AimWorkflowTas
     .flatMap((item): AimWorkflowTask[] => {
       if (item.workflowStatus === "published") {
         if (hasRetro(item)) return []
-        return [{ id: item.id, stage: "results", title: titleFor(item), nextAction: "填写发布结果和下一轮规则", updatedAt: item.updatedAt || item.publishedAt || item.createdAt, generation: item }]
+        return [{ id: item.id, stage: "results", title: titleFor(item), nextAction: retroDueLabel(item), updatedAt: item.updatedAt || item.publishedAt || item.createdAt, generation: item }]
       }
 
       if (PUBLISH_STATUSES.has(item.workflowStatus || "")) {

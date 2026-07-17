@@ -12,6 +12,7 @@ export interface AimSearchParams {
   videoCopyExtractionIdParam: string | null
   modeParam: string | null
   ideaParam: string | null
+  generationIdParam: string | null
   activeAgentId: AimAgentId
 }
 
@@ -40,6 +41,10 @@ export function parseAimSearchParams(searchParams: URLSearchParams): AimSearchPa
   const videoCopyExtractionIdParam = searchParams.get("videoCopyExtractionId")
   const modeParam = searchParams.get("mode")
   const ideaParam = searchParams.get("idea")
+  const generationIdRaw = searchParams.get("generationId")
+  const generationIdParam = generationIdRaw && /^[A-Za-z0-9_-]{1,64}$/.test(generationIdRaw)
+    ? generationIdRaw
+    : null
 
   const activeAgentId: AimAgentId = isValidAimAgent(agentParam) ? agentParam : DEFAULT_AIM_AGENT
 
@@ -54,6 +59,7 @@ export function parseAimSearchParams(searchParams: URLSearchParams): AimSearchPa
     videoCopyExtractionIdParam,
     modeParam,
     ideaParam,
+    generationIdParam,
     activeAgentId,
   }
 }

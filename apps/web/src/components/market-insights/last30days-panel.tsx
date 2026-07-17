@@ -288,7 +288,7 @@ function MarketHotCard({ item }: { item: ApiMarketHotItem }) {
             {item.engagement?.num_comments != null ? <span>评 {formatCount(item.engagement.num_comments)}</span> : null}
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" nativeButton={false} render={<Link href={`/aim?agent=content_producer&mode=asset_pack&idea=${encodeURIComponent(item.title)}`} />}>
+            <Button size="sm" nativeButton={false} render={<Link href={`/aim?agent=content_producer&mode=quick&idea=${encodeURIComponent(item.title)}`} />}>
               <Wand2 className="h-3 w-3" />
               创作
             </Button>

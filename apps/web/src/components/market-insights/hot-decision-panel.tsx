@@ -158,7 +158,7 @@ export function HotDecisionPanel({ source }: { source: ApiHotDecisionSource }) {
 function HotDecisionCard({ item }: { item: ApiHotDecisionItem }) {
   const aimParams = new URLSearchParams({
     agent: "content_producer",
-    mode: "asset_pack",
+    mode: "quick",
     topicTitle: item.title,
     topicRationale: [
       item.summary,
@@ -205,7 +205,7 @@ function HotDecisionCard({ item }: { item: ApiHotDecisionItem }) {
               <Sparkles className="h-3.5 w-3.5" />
               AIM 创作
             </Button>
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/aim?agent=deep_copywriter&idea=${encodeURIComponent(item.title)}`} />}>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/aim?mode=quick&agent=deep_copywriter&idea=${encodeURIComponent(item.title)}`} />}>
               <Wand2 className="h-3.5 w-3.5" />
               深度文案
             </Button>

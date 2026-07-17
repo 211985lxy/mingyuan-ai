@@ -19,7 +19,7 @@ describe("AIM draft storage", () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it("loads a valid draft and clamps its editor width", () => {
-    values.set(aimDraftStorageKey("content_producer"), JSON.stringify({
+    values.set(aimDraftStorageKey("content_producer", "project-1"), JSON.stringify({
       selectedAgentId: "content_producer",
       selectedProjectId: "project-1",
       input: "继续修改",
@@ -27,23 +27,32 @@ describe("AIM draft storage", () => {
       editorPanelWidth: 9999,
     }))
 
-    const draft = loadAimDraft("content_producer")
+    const draft = loadAimDraft("content_producer", "project-1")
     expect(draft?.input).toBe("继续修改")
     expect(draft?.editorPanelWidth).toBeLessThan(9999)
   })
 
   it("ignores corrupt or invalid drafts", () => {
-    values.set(aimDraftStorageKey("content_producer"), "{")
-    expect(loadAimDraft("content_producer")).toBeNull()
-    values.set(aimDraftStorageKey("content_producer"), JSON.stringify({ selectedAgentId: "unknown", messages: [] }))
-    expect(loadAimDraft("content_producer")).toBeNull()
+    values.set(aimDraftStorageKey("content_producer", "quick"), "{")
+    expect(loadAimDraft("content_producer", "quick")).toBeNull()
+    values.set(aimDraftStorageKey("content_producer", "quick"), JSON.stringify({ selectedAgentId: "unknown", messages: [] }))
+    expect(loadAimDraft("content_producer", "quick")).toBeNull()
   })
 
   it("removes empty and explicitly cleared drafts", () => {
-    saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "", input: "", messages: [] })
-    expect(values.has(aimDraftStorageKey("content_producer"))).toBe(false)
-    values.set(aimDraftStorageKey("content_producer"), "saved")
-    clearAimDraft("content_producer")
-    expect(values.has(aimDraftStorageKey("content_producer"))).toBe(false)
+    saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "", input: "", messages: [] }, "quick")
+    expect(values.has(aimDraftStorageKey("content_producer", "quick"))).toBe(false)
+    values.set(aimDraftStorageKey("content_producer", "project-1"), "saved")
+    clearAimDraft("content_producer", "project-1")
+    expect(values.has(aimDraftStorageKey("content_producer", "project-1"))).toBe(false)
+  })
+
+  it("isolates drafts by project scope", () => {
+    saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "project-1", input: "项目一", messages: [] }, "project-1")
+    saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "project-2", input: "项目二", messages: [] }, "project-2")
+
+    expect(loadAimDraft("content_producer", "project-1")?.input).toBe("项目一")
+    expect(loadAimDraft("content_producer", "project-2")?.input).toBe("项目二")
+    expect(loadAimDraft("content_producer", "quick")).toBeNull()
   })
 })

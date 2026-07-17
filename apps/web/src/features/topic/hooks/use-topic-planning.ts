@@ -289,7 +289,7 @@ export function useTopicPlanning() {
 
   function jumpToAim(card: ApiTopicCard, index: number) {
     const params = new URLSearchParams()
-    params.set("agent", "content_producer"); params.set("mode", "asset_pack")
+    params.set("agent", "content_producer"); params.set("mode", selectedProjectId ? "asset_pack" : "quick")
     params.set("topicTitle", card.title)
     if (card.rationale) params.set("topicRationale", card.rationale)
     if (selectedProjectId) params.set("projectId", selectedProjectId)

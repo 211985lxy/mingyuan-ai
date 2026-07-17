@@ -71,8 +71,8 @@ export default function VideoCopyPage() {
   const [error, setError] = useState<string | null>(null)
   const [coverFailed, setCoverFailed] = useState(false)
   const rewriteHref = record
-    ? `/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`
-    : "/aim"
+    ? `/aim?agent=content_producer&mode=quick&videoCopyExtractionId=${record.id}`
+    : "/aim?mode=quick&stage=content"
   const [history, setHistory] = useState<ApiVideoCopyExtraction[]>([])
 
   const isActive = record ? ACTIVE_STATUSES.has(record.status) : false
