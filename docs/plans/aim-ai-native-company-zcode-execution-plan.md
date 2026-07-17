@@ -251,7 +251,7 @@ Z-Code 完成后只报告：
 | WP-3 经营事项执行服务 | 已完成 | `work-item-execution.ts`，读记录→解析→转换→幂等回写 | 17 项单测、类型与架构检查通过 |
 | WP-4 单条执行 API | 已完成 | `POST /api/integrations/feishu/work-items/execute`，服务密钥鉴权、env 绑定 store、分发 WP-3 服务 | 16 项单测、类型/架构/ESLint 通过 |
 | WP-5 真实 Base 联调 | 已完成 | 机器人身份通过 WP-4 API 回写 `AIM经营事项` | 真实记录跑通待处理 → 处理中 → 待人工审核 → 已完成，幂等与终态拒绝通过 |
-| WP-6 客户会后工作流 | 待执行 | 洞察、跟进、选题、交付任务 | 真实会议样本验收 |
+| WP-6 客户会后工作流 | 域层完成（待 LLM 层） | `meeting-insight.ts`，九类产出规整+校验+接 submit_review | 13 项单测（中汝达/袁总真实样本）、类型/架构/ESLint 通过 |
 | WP-7 资产沉淀 | 待执行 | 客户、案例、方法论、评估样本 | 可追溯且不混项目 |
 | WP-8 无人值守 | 待执行 | 定时触发、恢复、提醒、人工接管 | 失败可恢复 |
 
@@ -354,3 +354,29 @@ Z-Code 完成后只报告：
 - 四种 action 分发到正确的 WP-3 服务。
 - 相同请求保持幂等，业务冲突不被吞掉。
 - 定向测试、类型检查、架构护栏和目标 ESLint 通过。
+
+## 15. WP-6 客户会后工作流
+
+### 15.1 已完成：会议洞察抽取器（纯域层）
+
+> 真实样本已由业务方提供（Obsidian 笔记库）：中汝达数字供暖（葛老板）融资/落地咨询纪要、领袖中国（袁总）AI 智能体定制合作纪要。Z-Code 据此 TDD 实现了 WP-6 的**纯域层骨架**。
+
+- 新建 `apps/web/src/lib/aim/meeting-insight.ts` + 单测 `__tests__/unit/meeting-insight.test.ts`（13 项，以两份真实纪要为验收样本）。
+- 输入 `MeetingInsightInput`（九类产物的半结构化原始字段）→ `extractMeetingInsight()` → `MeetingInsight`（去空白/去重/截断/枚举收敛/预算解析/合法性校验）。
+- 九类产出对齐 §9 阶段 B：痛点 / 目标 / 预算 / 决策阶段 / 异议 / 跟进 / 诊断问题清单 / 选题 / 交付任务。
+- `buildWorkItemReviewFields()` 把洞察接到 WP-3 `submit_review` 的飞书回写（闭环 WP-3/WP-4）。
+- 不伪造：未知决策阶段保留 raw + unresolved；无金额预算不造数；既无目标也无交付任务判为非有效会议。
+- 验收：13 项单测 + typecheck + arch:check + ESLint 全绿；longfn 87 ≤ 112。
+- 边界：不接 LLM / 飞书 / 数据库 / UI；不提交 Git。
+
+### 15.2 WP-6 仍待 Codex 裁定（上层未决项）
+
+纯域层只固化“抽取出来的东西长什么样”。从会议文本到 `MeetingInsightInput` 的**自由文本抽取属 LLM 层**，需 Codex 定义：
+
+1. **抽取入口**：用现有 AIM Harness（`executeAimRun`）+ 新 prompt，还是复用 `business-diagnosis.ts`/`topic-generation.ts`？是否新增 Agent 边界。
+2. **与经营事项状态机的关系**：客户会后产物是否作为一条 `工作流=销售诊断` 的经营事项，经 WP-3/WP-4 走 `待处理→处理中→待人工审核`？
+3. **审批边界**：§9「人工审批后才允许进入正式客户沟通」——走经营事项 `待人工审核` 还是另设审批字段？
+4. **产物正本归属**：九类产出落到飞书记录回写 vs AIM 结果对象 vs ClientProject（遵循 §4 正本边界）。
+5. **真实验收**：§9「10 次真实会议至少 8 次无需人工整理」的样本扩充与判定口径。
+
+
