@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "converging",
+  "candidateBranch": "chore/release-convergence",
+  "targetBranch": "main",
+  "integrationBase": {
+    "branch": "feat/aim-dual-mode-ux",
+    "commit": "52f9c7968261de3ca0872fdfdb22dec891207f47"
+  },
+  "policy": {
+    "sourceBranchesAreReadOnlyInputs": true,
+    "candidateRequiresReleaseVerification": true,
+    "productionRequiresExplicitCommit": true
+  }
+}

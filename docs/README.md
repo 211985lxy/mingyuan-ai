@@ -12,6 +12,7 @@
 
 - `methodologies/`：智能体实际调用的方法论资产；修改前应核对代码引用。
 - `guides/`：模型、内容模板与 E2E 测试指南；属于操作参考，不覆盖根规则。
+- `runbooks/branch-release-governance.md`：唯一候选分支、收敛决策和回滚规则。
 - `guides/copywriting-polish-and-quality-single-entry.md`：文案润色与质检的活路径说明。
 - `design-system/`：现有品牌与界面设计资料。
 - `guides/accounts.md`：凭据保存禁令与安全处置说明，不存放真实账号密码。
