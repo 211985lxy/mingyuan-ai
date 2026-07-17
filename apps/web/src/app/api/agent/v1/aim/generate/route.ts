@@ -6,7 +6,6 @@ import {
   agentAuthErrorResponse,
   authenticateAgentRequest,
 } from "@/lib/agent-api-auth"
-import { findInvalidAgentTargetFormats } from "@/lib/agent-api-contract"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
@@ -14,11 +13,9 @@ import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import {
   buildAgentGenerateResponse,
   finalizeAgentGenerateRun,
-  formatInvalidFormatsError,
   logAgentGenerateFailure,
-  parseAgentGenerateBody,
   prepareAgentAimGeneration,
-  validateAgentGenerateBody,
+  prepareAgentGenerateBody,
 } from "@/lib/aim/services/agent-generation"
 
 export async function POST(request: NextRequest) {
@@ -33,16 +30,12 @@ export async function POST(request: NextRequest) {
     context = await authenticateAgentRequest(request)
     const body = await parseJsonRecord(request)
 
-    const parsed = parseAgentGenerateBody(body)
-    const invalidFormats = findInvalidAgentTargetFormats(body.targetFormats)
-    projectId = parsed.projectId
-    agentId = parsed.agentId
-    inputSummary = parsed.inputSummary
-    outputFormats = parsed.targetFormats
-
-    const validationError = validateAgentGenerateBody(parsed)
-    if (validationError) throw new Error(validationError)
-    if (invalidFormats.length > 0) throw new Error(formatInvalidFormatsError(invalidFormats))
+    const prepared = prepareAgentGenerateBody(body)
+    if (!prepared.ok) throw new Error(prepared.validationError)
+    projectId = prepared.projectId
+    agentId = prepared.agentId
+    inputSummary = prepared.inputSummary
+    outputFormats = prepared.targetFormats
 
     // access 断言顺序不可变：project 先于 agent（assertAgentAccess 用原始 agentId）
     assertAgentProjectAccess(context, projectId)
@@ -50,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // 归一化旧别名（ip_video → content_producer），保证写入 DB / 日志 / 响应的 id 一致
     const { agentId: normalizedAgentId, runRequest, buildDomainInput } =
-      prepareAgentAimGeneration({ parsed, normalizeAgentId: normalizeAimAgentId, userId: context.userId })
+      prepareAgentAimGeneration({ parsed: prepared, normalizeAgentId: normalizeAimAgentId, userId: context.userId })
     agentId = normalizedAgentId
 
     const trace = await createAimTrace({
@@ -71,7 +64,7 @@ export async function POST(request: NextRequest) {
       projectId,
       agentId,
       inputSummary,
-      outputFormats: parsed.targetFormats,
+      outputFormats: prepared.targetFormats,
       generationId: result.id,
       startedAt,
     })

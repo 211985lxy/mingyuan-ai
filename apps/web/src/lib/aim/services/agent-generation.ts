@@ -16,6 +16,7 @@
 import { NextResponse } from "next/server"
 import {
   AGENT_DENIED_ACTIONS,
+  findInvalidAgentTargetFormats,
   parseAgentTargetFormats,
   summarizeAgentInput,
 } from "@/lib/agent-api-contract"
@@ -89,6 +90,29 @@ export function validateAgentGenerateBody(parsed: ParsedAgentGenerateBody): stri
   if (!parsed.projectId) return "请选择 IP 营销全案"
   if (parsed.targetFormats.length === 0) return "请选择至少一种生成格式"
   return null
+}
+
+/**
+ * 合并 parse + validate + invalidFormats 为单个 prepare（对齐 generate 入口的形态）。
+ *
+ * 返回判别联合：校验通过返回解析字段；失败返回首个错误文案。注意：调用方拿到
+ * `{ok:false}` 后**仍需 throw**（不能提前 return）——agent 的失败日志是审计契约，
+ * 必须经 catch → logAgentGenerateFailure 落一条 status:"failed" 记录。校验顺序、
+ * 文案与原 route 逐字一致。
+ */
+export type PreparedAgentGenerateBody =
+  | { ok: false; validationError: string }
+  | { ok: true } & ParsedAgentGenerateBody
+
+export function prepareAgentGenerateBody(body: unknown): PreparedAgentGenerateBody {
+  const parsed = parseAgentGenerateBody(body)
+  const validationError = validateAgentGenerateBody(parsed)
+  if (validationError) return { ok: false, validationError }
+  const invalidFormats = findInvalidAgentTargetFormats((body as { targetFormats?: unknown })?.targetFormats)
+  if (invalidFormats.length > 0) {
+    return { ok: false, validationError: formatInvalidFormatsError(invalidFormats) }
+  }
+  return { ok: true, ...parsed }
 }
 
 /**
