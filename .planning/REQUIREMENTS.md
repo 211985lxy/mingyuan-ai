@@ -8,7 +8,7 @@
 Requirements for 同行对标分析. Continues from v4.0 Phase 12 completion.
 
 **Technical design:** `docs/competitor-analysis-technical-design.md`
-**Research:** `docs/competitor-analysis-research.md`
+**Research:** `docs/reports/competitor-analysis-research.md`
 
 ### Data Acquisition (DATA-)
 

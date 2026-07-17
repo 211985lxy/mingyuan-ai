@@ -12,18 +12,18 @@
 
 - `methodologies/`：智能体实际调用的方法论资产；修改前应核对代码引用。
 - `guides/`：模型、内容模板与 E2E 测试指南；属于操作参考，不覆盖根规则。
-- `copywriting-polish-and-quality-single-entry.md`：文案润色与质检的活路径说明。
+- `guides/copywriting-polish-and-quality-single-entry.md`：文案润色与质检的活路径说明。
 - `design-system/`：现有品牌与界面设计资料。
-- `accounts.md`：凭据保存禁令与安全处置说明，不存放真实账号密码。
+- `guides/accounts.md`：凭据保存禁令与安全处置说明，不存放真实账号密码。
 
 ## 方案与历史材料
 
 - `plans/`、`reports/`：计划、审计和阶段性记录，默认不代表已经实现。
 - `superpowers/`：特定阶段的设计与实施计划，以代码、测试和当前真源为最终依据。
-- `competitor-analysis-research.md` 与 `architecture/competitor-analysis-technical-design.md`：2026-04 的竞品调研和当时方案。
+- `reports/competitor-analysis-research.md` 与 `architecture/competitor-analysis-technical-design.md`：2026-04 的竞品调研和当时方案。
 - `architecture/topic-hot-competitor-architecture-optimization.md`：2026-07-07 的待审方案。
-- `FAST_PRODUCTION_LAUNCH.md`：早期上线资料，仅作背景参考。
-- `表达模板.md`：通用内容研究手册，不是应用架构规则。
+- `runbooks/FAST_PRODUCTION_LAUNCH.md`：早期上线资料，仅作背景参考。
+- `guides/表达模板.md`：通用内容研究手册，不是应用架构规则。
 
 ## 维护约定
 
