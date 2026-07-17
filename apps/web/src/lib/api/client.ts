@@ -1112,6 +1112,7 @@ export interface KnowledgeEntry {
   tags: string[]
   sourceType: string
   sortOrder: number
+  valueGrade?: string | null
   status: string
   createdAt: string
   updatedAt: string

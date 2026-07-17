@@ -56,24 +56,7 @@ const KNOWLEDGE_UPLOAD_ACCEPT = ".pdf,.txt,.md,.csv,.docx,.xls,.xlsx,.pptx,.html
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
-interface KnowledgeEntry {
-  id: string
-  userId: string
-  projectId?: string | null
-  category: string
-  title: string
-  content: string
-  tags: string[]
-  sourceType: string
-  valueGrade?: string | null
-  status: string
-  sortOrder: number
-  createdAt: string
-  updatedAt: string
-  user?: { id: string; name: string; email: string }
-  project?: { id: string; name: string; companyName: string | null; industry: string | null; status: string } | null
-  embedding?: { status: string; updatedAt: string; errorMessage: string | null } | null
-}
+type KnowledgeEntry = BrowserKnowledgeEntry
 
 interface AdminProject {
   id: string

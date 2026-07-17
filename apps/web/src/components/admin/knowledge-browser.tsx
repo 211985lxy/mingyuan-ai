@@ -25,23 +25,11 @@ import {
   parseKnowledgeTags,
 } from "@/lib/knowledge-tags"
 import { CATEGORY_LABELS as BROWSER_CATEGORY_LABELS, SOURCE_TYPE_LABELS } from "@/lib/knowledge-categories"
+import type { KnowledgeEntry as ApiKnowledgeEntry } from "@/lib/api/client"
 
-// ─── 类型定义（与 knowledge/page.tsx 保持一致） ────────────
+// ─── 类型定义（扩展客户端 API 类型，加入关联字段） ────────────
 
-export interface KnowledgeEntry {
-  id: string
-  userId: string
-  projectId?: string | null
-  category: string
-  title: string
-  content: string
-  tags: string[]
-  sourceType: string
-  valueGrade?: string | null
-  status: string
-  sortOrder: number
-  createdAt: string
-  updatedAt: string
+export interface KnowledgeEntry extends ApiKnowledgeEntry {
   user?: { id: string; name: string; email: string }
   project?: {
     id: string
