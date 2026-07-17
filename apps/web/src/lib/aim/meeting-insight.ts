@@ -205,7 +205,10 @@ export function extractMeetingInsight(input: MeetingInsightInput): MeetingInsigh
 
 /**
  * 把会议洞察组装成经营事项 `submit_review` 的可回写字段（对接 WP-3/WP-4）。
- * 结果摘要受 2000 字上限保护；结果链接以超链接形态写入。
+ * 结果摘要受 2000 字上限保护。
+ *
+ * 字段契约（WP-5 真实联调）：飞书「结果链接」是 **URL 文本字段**，
+ * 必须写字符串，不能写 `{ link, text }` 对象（写对象会被飞书拒绝或失真）。
  */
 export function buildWorkItemReviewFields(
   insight: MeetingInsight,
@@ -214,8 +217,6 @@ export function buildWorkItemReviewFields(
   return {
     AIM结果ID: meta.aimResultId.trim(),
     结果摘要: buildSummary(insight),
-    结果链接: meta.resultLink.trim()
-      ? { link: meta.resultLink.trim(), text: "查看 AIM 结果" }
-      : "",
+    结果链接: meta.resultLink.trim(),
   }
 }

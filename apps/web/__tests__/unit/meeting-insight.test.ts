@@ -231,7 +231,9 @@ describe("buildWorkItemReviewFields — 接经营事项 submit_review", () => {
       resultLink: "https://aim.example.com/insight/001",
     })
     expect(fields["AIM结果ID"]).toBe("insight_zhongruda_001")
-    expect(fields["结果链接"]).toEqual({ link: "https://aim.example.com/insight/001", text: "查看 AIM 结果" })
+    // WP-5 字段契约：「结果链接」是 URL 文本字段，必须写字符串，不能写对象。
+    expect(fields["结果链接"]).toBe("https://aim.example.com/insight/001")
+    expect(typeof fields["结果链接"]).toBe("string")
     // 摘要必须含客户与关键产出计数，便于团队在飞书直接判断。
     expect(fields["结果摘要"]).toMatch(/中汝达|葛老板/)
     expect(typeof fields["结果摘要"]).toBe("string")
