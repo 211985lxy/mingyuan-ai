@@ -38,6 +38,7 @@ export interface LLMProviderConfig {
   baseURL: string
   defaultModel: string
   defaultHeaders?: Record<string, string>
+  proxyURL?: string
   timeoutMs?: number
   capability?: ModelCapability
 }

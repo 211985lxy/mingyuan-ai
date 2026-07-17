@@ -44,6 +44,17 @@ export function getProviderConfigs(): LLMProviderConfig[] {
     })
   }
 
+  // Backup: APIMart — OpenAI-compatible relay, used after primary gateways.
+  if (env.APIMART_API_KEY) {
+    configs.push({
+      name: "apimart",
+      apiKey: env.APIMART_API_KEY,
+      baseURL: env.APIMART_BASE_URL || "https://api.apimart.ai/v1",
+      defaultModel: env.APIMART_MODEL || "gpt-5",
+      proxyURL: env.APIMART_PROXY_URL,
+    })
+  }
+
   // Fallback: TheRouter — unified LLM gateway
   if (env.THEROUTER_API_KEY) {
     configs.push({

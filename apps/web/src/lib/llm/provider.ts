@@ -1,6 +1,7 @@
 import { env } from "@/env"
-import OpenAI from "openai"
+import OpenAI, { type ClientOptions } from "openai"
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions"
+import { ProxyAgent } from "undici"
 import type {
   CompletionOptions,
   CompletionResult,
@@ -20,10 +21,14 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.capability = config.capability
     this.apiKey = config.apiKey
     this.defaultModel = config.defaultModel
+    const fetchOptions = config.proxyURL
+      ? ({ dispatcher: new ProxyAgent(config.proxyURL) } as ClientOptions["fetchOptions"])
+      : undefined
     this.client = new OpenAI({
       apiKey: config.apiKey,
       baseURL: config.baseURL,
       defaultHeaders: config.defaultHeaders,
+      fetchOptions,
       timeout: config.timeoutMs ?? Number(env.LLM_TIMEOUT_MS || 60000),
     })
   }

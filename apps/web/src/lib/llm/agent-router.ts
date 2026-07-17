@@ -10,7 +10,7 @@ import type { LLMProvider, LLMProviderConfig, ModelCapability } from "./types"
  * - 深度文案 / 商业选题 → ZenMux Claude 优先，离火 GPT-5.5 兜底
  * - 内容生产 / 质检 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
- * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / therouter / glm / lihuo / openai
+ * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / openai
  * model 为可选，覆盖 provider 的默认模型（同一 provider 下不同智能体可用不同模型）
  */
 
@@ -36,6 +36,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
   deep_copywriter: [
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", capability: "advanced" },
+    { name: "apimart", capability: "advanced" },
     { name: "lihuo", model: "gpt-5.5", capability: "advanced" },
     { name: "deepseek", capability: "standard" },
     { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
@@ -45,12 +46,13 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "glm", capability: "standard" },
   ],
   business_diagnosis: [
-    // ponytail: planning/diagnosis routes are non-streaming; keep each fallback short so the chain cannot eat the whole 180s client budget.
+    // APIMart is the verified healthy advanced route; long diagnosis needs more than the generic 20s fallback budget.
+    { name: "apimart", timeoutMs: 60000, capability: "advanced" },
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "lihuo", model: "gpt-5.5", timeoutMs: 20000, capability: "advanced" },
-    { name: "deepseek", timeoutMs: 20000, capability: "standard" },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000, capability: "advanced" },
     { name: "openrouter", model: "z-ai/glm-5.2", timeoutMs: 20000, capability: "advanced" },
+    { name: "lihuo", model: "gpt-5.5", timeoutMs: 20000, capability: "advanced" },
+    { name: "deepseek", timeoutMs: 20000, capability: "standard" },
     { name: "jiekou", timeoutMs: 20000, capability: "basic" },
     { name: "therouter", timeoutMs: 20000, capability: "standard" },
     { name: "glm", timeoutMs: 20000, capability: "standard" },
@@ -60,6 +62,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // DeepSeek 官方直连价格最低，不走中转站加价；直连不可用时才回退到中转站
   content_producer: [
     { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
     { name: "jiekou", capability: "basic" },
@@ -67,6 +70,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   free_copywriter: [
     { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
     { name: "jiekou", capability: "basic" },
@@ -74,6 +78,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   business_system_diagnosis: [
     { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", capability: "advanced" },
     { name: "openrouter", model: "z-ai/glm-5.2", capability: "advanced" },
@@ -82,6 +87,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   content_review: [
     { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
@@ -90,6 +96,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
   persona: [
     { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "moonshotai/kimi-k2.6", capability: "standard" },
     { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },

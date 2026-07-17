@@ -20,6 +20,8 @@ describe("agent router timeout overrides", () => {
   beforeEach(() => {
     ctorArgs.length = 0
     process.env.LIHUO_API_KEY = "test-lihuo"
+    process.env.APIMART_API_KEY = "test-apimart"
+    process.env.APIMART_PROXY_URL = "http://127.0.0.1:10808"
     process.env.OPENROUTER_API_KEY = "test-openrouter"
     process.env.DEEPSEEK_API_KEY = "test-deepseek"
     process.env.JIEKOU_API_KEY = "test-jiekou"
@@ -29,13 +31,22 @@ describe("agent router timeout overrides", () => {
     vi.resetModules()
   })
 
-  it("caps business_diagnosis providers below the global timeout", async () => {
+  it("gives APIMart enough time for long diagnosis and caps later fallbacks", async () => {
     const { getAgentLLM } = await import("@/lib/llm/agent-router")
 
     getAgentLLM("business_diagnosis")
 
-    expect(ctorArgs.length).toBeGreaterThan(0)
-    expect(ctorArgs.every((config) => config.timeout === 20000)).toBe(true)
+    const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
+    const laterFallbacks = ctorArgs.filter((config) => config.baseURL !== "https://api.apimart.ai/v1")
+    expect(apimart?.timeout).toBe(60000)
+    expect(laterFallbacks.length).toBeGreaterThan(0)
+    expect(laterFallbacks.every((config) => config.timeout === 20000)).toBe(true)
+  })
+
+  it("uses the verified APIMart route first for business diagnosis", async () => {
+    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+
+    expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
   })
 
   it("keeps other agents on the default provider timeout", async () => {
@@ -62,6 +73,32 @@ describe("agent router timeout overrides", () => {
     for (const agentId of textAgents) {
       expect(getAgentLLM(agentId).providerNames, agentId).toContain("deepseek")
     }
+  })
+
+  it("keeps APIMart as a fallback in every text agent route", async () => {
+    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+    const textAgents = [
+      "content_producer",
+      "free_copywriter",
+      "deep_copywriter",
+      "business_diagnosis",
+      "business_system_diagnosis",
+      "content_review",
+      "persona",
+    ]
+
+    for (const agentId of textAgents) {
+      expect(getAgentLLM(agentId).providerNames, agentId).toContain("apimart")
+    }
+  })
+
+  it("passes the APIMart proxy to the OpenAI-compatible client", async () => {
+    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+
+    getAgentLLM("content_producer")
+
+    const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
+    expect(apimart?.fetchOptions).toMatchObject({ dispatcher: expect.any(Object) })
   })
 
   it("filters routes below the policy minimum capability", async () => {
