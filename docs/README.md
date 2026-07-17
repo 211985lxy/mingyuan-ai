@@ -20,6 +20,7 @@
 ## 方案与历史材料
 
 - `plans/`、`reports/`：计划、审计和阶段性记录，默认不代表已经实现。
+- `reports/release-convergence-2026-07-17.md`：当前候选分支的门禁证据、发布阻断项和放行路径。
 - `superpowers/`：特定阶段的设计与实施计划，以代码、测试和当前真源为最终依据。
 - `reports/competitor-analysis-research.md` 与 `architecture/competitor-analysis-technical-design.md`：2026-04 的竞品调研和当时方案。
 - `architecture/topic-hot-competitor-architecture-optimization.md`：2026-07-07 的待审方案。
