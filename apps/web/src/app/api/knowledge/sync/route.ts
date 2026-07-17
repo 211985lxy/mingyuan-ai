@@ -70,6 +70,13 @@ export async function POST(request: NextRequest) {
         "customer_pain",
         "project_case",
         "customer_qa",
+        "daily_inspiration",
+        "benchmark_reference",
+        "user_insight",
+        "hot_topic",
+        "positioning_material",
+        "private_domain_material",
+        "writing_style_profile",
       ]
       const finalCategory = validCategories.includes(entry.category)
         ? entry.category
