@@ -70,9 +70,7 @@
 
 ### 已解除：无远程备份
 
-已创建私有正本仓库 `https://github.com/211985lxy/mingyuan-ai.git`，绑定为 `origin`，并推送 `chore/release-convergence` 与 `main`。远程回读确认候选 SHA 一致，默认分支为 `chore/release-convergence`。
-
-- 后续：正式发布合入 `main` 后，把 GitHub 默认分支切回 `main`。
+已创建私有正本仓库 `https://github.com/211985lxy/mingyuan-ai.git`，绑定为 `origin`，并推送 `chore/release-convergence` 与 `main`。发布后通过严格快进把候选历史推进到 `main`，远程回读确认两条分支指向同一发布线，GitHub 默认分支已恢复为 `main`。
 
 ### 已解除：真实模型质量门禁
 
