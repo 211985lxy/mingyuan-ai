@@ -14,22 +14,7 @@ import type { AimAgentId } from "@/lib/aim-ui-config"
 import { AIM_AGENT_OPTIONS } from "@/lib/aim-ui-config"
 import { AIM_AGENT_GUIDES, type AimAgentGuide } from "@/lib/aim-agent-guides"
 import type { MethodologyKey } from "@/lib/agent-methodology-store"
-
-/** 知识分类中文名（与知识库保持一致，供档案页展示） */
-export const KNOWLEDGE_CATEGORY_LABELS: Record<string, string> = {
-  boss_experience: "老板经验",
-  product_usp: "产品卖点",
-  customer_pain: "客户痛点",
-  project_case: "项目案例",
-  customer_qa: "客户问答",
-  daily_inspiration: "日常灵感",
-  benchmark_reference: "竞品/对标参考",
-  user_insight: "用户洞察",
-  hot_topic: "热点素材",
-  positioning_material: "定位素材",
-  private_domain_material: "私域素材",
-  writing_style_profile: "写作风格档案",
-}
+import { CATEGORY_LABELS as KNOWLEDGE_CATEGORY_LABELS } from "@/lib/knowledge-categories"
 
 /** 模型/通道中文名（镜像 llm/config.ts 的 provider 名） */
 export const PROVIDER_LABELS: Record<string, string> = {

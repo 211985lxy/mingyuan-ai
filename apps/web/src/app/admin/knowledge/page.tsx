@@ -50,6 +50,7 @@ import {
   type KnowledgeEntry as BrowserKnowledgeEntry,
   type AdminProject as BrowserAdminProject,
 } from "@/components/admin/knowledge-browser"
+import { CATEGORY_LABELS, SOURCE_TYPE_LABELS } from "@/lib/knowledge-categories"
 
 const KNOWLEDGE_UPLOAD_ACCEPT = ".pdf,.txt,.md,.csv,.docx,.xls,.xlsx,.pptx,.html,.htm,.json,.xml,.rtf"
 
@@ -98,29 +99,6 @@ interface DistillResult {
 }
 
 // ─── 常量 ──────────────────────────────────────────────────
-
-const CATEGORY_LABELS: Record<string, string> = {
-  boss_experience: "老板经验",
-  product_usp: "产品卖点",
-  customer_pain: "客户痛点",
-  project_case: "项目案例",
-  customer_qa: "客户问答",
-  daily_inspiration: "日常灵感",
-  benchmark_reference: "竞品/对标参考",
-  user_insight: "用户洞察",
-  hot_topic: "热点素材",
-  positioning_material: "定位素材",
-  private_domain_material: "私域素材",
-  writing_style_profile: "写作风格档案",
-}
-
-const SOURCE_TYPE_LABELS: Record<string, string> = {
-  manual: "手动录入",
-  voice_transcribe: "语音转写",
-  import: "文件导入",
-  obsidian: "Obsidian 同步",
-  smart_import: "智能导入",
-}
 
 // 中转站测试：通道与可选模型（OpenRouter 免费模型标注 free）
 const JIEKOU_PROVIDER_MODELS: Record<

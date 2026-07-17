@@ -4,6 +4,7 @@ import { LLMClient } from "@/lib/llm"
 import { getStyleProfileBlock } from "@/lib/style-profile"
 import { getStylePromptBlock, STYLE_GUIDE_IDS, type StyleGuideId } from "@/lib/style-guide-config"
 import { prisma } from "@/lib/prisma"
+import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
 
 export const maxDuration = 60
 
@@ -32,14 +33,6 @@ async function loadProjectKnowledge(
   })
 
   if (entries.length === 0) return ""
-
-  const CATEGORY_LABELS: Record<string, string> = {
-    boss_experience: "老板经验",
-    product_usp: "产品卖点",
-    customer_pain: "客户痛点",
-    project_case: "项目案例",
-    customer_qa: "客户问答",
-  }
 
   const grouped = new Map<string, typeof entries>()
   for (const entry of entries) {
