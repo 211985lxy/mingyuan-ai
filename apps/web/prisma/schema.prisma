@@ -281,7 +281,7 @@ model KnowledgeEntry {
   id         String   @id @default(cuid())
   userId     String
   projectId  String?
-  category   String // boss_experience | product_usp | customer_pain | project_case | customer_qa
+  category   String // 12 种知识分类（boss_experience / product_usp / ... / writing_style_profile）
   title      String
   content    String   @db.Text
   tags       Json     @default("[]")
@@ -302,6 +302,7 @@ model KnowledgeEntry {
   @@index([userId, status])
   @@index([userId, valueGrade])
   @@index([projectId])
+  @@index([userId, status, projectId, category, valueGrade, updatedAt(sort: Desc)])
 }
 
 model KnowledgeEmbedding {
