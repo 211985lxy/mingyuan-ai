@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it } from "vitest"
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
 import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
-import { CompetitorVideoSections, type CompetitorWatchVideo } from "@/components/competitor/competitor-video-sections"
+import {
+  CompetitorLatestVideoSection,
+  CompetitorViralVideoPool,
+  type CompetitorWatchVideo,
+} from "@/components/competitor/competitor-video-sections"
 import { CompetitorAddAccountPanel } from "@/components/competitor/competitor-add-account-panel"
 import { CompetitorDiscoveryPanel } from "@/components/competitor/competitor-discovery-panel"
 import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-web-research-panel"
@@ -87,9 +91,8 @@ describe("competitor account pool components", () => {
       engagementScore: 910,
       account,
     }
-    const html = renderToStaticMarkup(createElement(CompetitorVideoSections, {
+    const latestHtml = renderToStaticMarkup(createElement(CompetitorLatestVideoSection, {
       latestVideos: [video],
-      viralVideos: [video],
       extractions: {
         "account-1-video-1": {
           id: "extraction-1",
@@ -111,9 +114,16 @@ describe("competitor account pool components", () => {
       extractingVideoId: null,
       onExtract: () => {},
     }))
+    const viralHtml = renderToStaticMarkup(createElement(CompetitorViralVideoPool, {
+      accounts: [{ ...account, viralVideos: [{ ...video, engagementScore: video.engagementScore ?? 0 }] }],
+      extractions: {},
+      extractingVideoId: null,
+      onExtract: () => {},
+    }))
+    const html = `${latestHtml}${viralHtml}`
 
     expect(html).toContain("最新作品")
-    expect(html).toContain("爆款作品")
+    expect(html).toContain("全部对标账号爆款视频")
     expect(html).toContain("TOP 1")
     expect(html).toContain("文案拆解预览")
     expect(html).toContain("生成内容资产包")
