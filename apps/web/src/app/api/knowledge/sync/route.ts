@@ -6,7 +6,7 @@ interface ObsidianSyncEntry {
   id: string // 由 CLI 根据文件相对路径或者内容哈希生成的唯一 ID，如 obsidian_xxxx
   title: string
   content: string
-  category: "boss_experience" | "product_usp" | "customer_pain" | "project_case" | "customer_qa"
+  category: "boss_experience" | "product_usp" | "customer_pain" | "project_case" | "customer_qa" | "daily_inspiration" | "benchmark_reference" | "user_insight" | "hot_topic" | "positioning_material" | "private_domain_material" | "writing_style_profile"
   tags: string[]
 }
 
@@ -84,6 +84,13 @@ export async function POST(request: NextRequest) {
         "customer_pain",
         "project_case",
         "customer_qa",
+        "daily_inspiration",
+        "benchmark_reference",
+        "user_insight",
+        "hot_topic",
+        "positioning_material",
+        "private_domain_material",
+        "writing_style_profile",
       ]
       const finalCategory = validCategories.includes(entry.category)
         ? entry.category
