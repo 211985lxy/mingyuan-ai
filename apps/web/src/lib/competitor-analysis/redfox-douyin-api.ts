@@ -56,7 +56,7 @@ const TIMEOUT_MS = Number(env.REDFOX_TIMEOUT_MS || 60000)
 const PAGE_SIZE = 20
 
 export function hasRedFoxDouyinApi(): boolean {
-  return Boolean(env.REDFOX_API_KEY)
+  return Boolean(process.env.REDFOX_API_KEY?.trim())
 }
 
 export async function fetchFromRedFoxDouyinApi(input: {
@@ -163,7 +163,7 @@ async function fetchUser(accountId: string | null): Promise<RedFoxUser | null> {
 }
 
 async function redfoxPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const apiKey = env.REDFOX_API_KEY
+  const apiKey = process.env.REDFOX_API_KEY?.trim()
   if (!apiKey) throw new Error('REDFOX_API_KEY environment variable is not set')
 
   const res = await fetch(`${REDFOX_BASE}${path}`, {

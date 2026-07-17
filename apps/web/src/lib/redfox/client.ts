@@ -46,7 +46,7 @@ export interface RedFoxRequestConfig {
  * 否则抛 RedFoxError。
  */
 export async function redfoxRequest<T>(config: RedFoxRequestConfig): Promise<T> {
-  const apiKey = env.REDFOX_API_KEY
+  const apiKey = process.env.REDFOX_API_KEY?.trim()
   if (!apiKey) {
     throw new RedFoxError('未配置 REDFOX_API_KEY，无法调用 RedFox API')
   }
@@ -108,7 +108,7 @@ export async function redfoxRequest<T>(config: RedFoxRequestConfig): Promise<T> 
 
 /** 检查 RedFox API Key 是否已配置 */
 export function hasRedFoxApiKey(): boolean {
-  return Boolean(env.REDFOX_API_KEY)
+  return Boolean(process.env.REDFOX_API_KEY?.trim())
 }
 
 // ── 便捷方法 ──
