@@ -121,6 +121,9 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.temperature).toBe(0.8)
     expect(spec.modelPolicy.maxTokens).toBe(4000)
     expect(spec.modelPolicy.stream).toBe(false)
+    expect(spec.modelPolicy.targetCapability).toBe("standard")
+    expect(spec.modelPolicy.minimumCapability).toBe("basic")
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
   })
 
   it("freezes modelPolicy for chat entrypoints (temp 0.7, no maxTokens)", () => {
@@ -134,6 +137,9 @@ describe("aim-harness planner", () => {
     // 必须与 executeChatLLM/Stream 的 temperature:0.7 一致；chat 不设 maxTokens
     expect(spec.modelPolicy.temperature).toBe(0.7)
     expect(spec.modelPolicy.maxTokens).toBeUndefined()
+    expect(spec.modelPolicy.targetCapability).toBe("advanced")
+    expect(spec.modelPolicy.minimumCapability).toBe("standard")
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
   })
 
   it("agent_api / inspiration 冻结为生成入口参数（与 generate 同）", () => {

@@ -30,6 +30,8 @@ export interface CompletionResult {
   }
 }
 
+export type ModelCapability = "basic" | "standard" | "advanced"
+
 export interface LLMProviderConfig {
   name: string
   apiKey: string
@@ -37,12 +39,15 @@ export interface LLMProviderConfig {
   defaultModel: string
   defaultHeaders?: Record<string, string>
   timeoutMs?: number
+  capability?: ModelCapability
 }
 
 export interface LLMProvider {
   readonly name: string
   /** Configured model used when CompletionOptions.model is omitted. */
   readonly defaultModel?: string
+  /** Operational capability tier used by AIM routing and telemetry. */
+  readonly capability?: ModelCapability
   complete(options: CompletionOptions): Promise<CompletionResult>
   stream?(options: CompletionOptions): AsyncIterable<string>
   isAvailable(): boolean

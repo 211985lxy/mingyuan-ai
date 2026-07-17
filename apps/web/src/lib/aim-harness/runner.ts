@@ -122,6 +122,7 @@ export async function runAimHarness(
     providerAttempts: providerAttempts.map((attempt) => ({
       provider: attempt.provider,
       model: attempt.model,
+      capability: attempt.capability,
       status: attempt.status,
       error: attempt.error,
       errorKind: attempt.errorKind,

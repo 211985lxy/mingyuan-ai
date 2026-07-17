@@ -63,4 +63,16 @@ describe("agent router timeout overrides", () => {
       expect(getAgentLLM(agentId).providerNames, agentId).toContain("deepseek")
     }
   })
+
+  it("filters routes below the policy minimum capability", async () => {
+    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+
+    const llm = getAgentLLM("deep_copywriter", {
+      minimumCapability: "standard",
+      maxProviderAttempts: 3,
+    })
+
+    expect(llm.providerNames).toContain("deepseek")
+    expect(llm.providerNames).not.toContain("jiekou")
+  })
 })

@@ -105,11 +105,21 @@ function buildModelPolicy(
   stream: boolean
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
+  const needsAdvancedReasoning =
+    agentId === "deep_copywriter" || agentId === "business_diagnosis"
+  const requiresStandardFloor =
+    needsAdvancedReasoning ||
+    agentId === "business_system_diagnosis" ||
+    agentId === "persona"
+
   return {
     agentId,
     stream,
     temperature: isChat ? 0.7 : 0.8,
     ...(isChat ? {} : { maxTokens: 4000 }),
+    targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
+    minimumCapability: requiresStandardFloor ? "standard" : "basic",
+    maxProviderAttempts: stream ? 2 : 3,
   }
 }
 

@@ -1,13 +1,14 @@
 import { AsyncLocalStorage } from "node:async_hooks"
 import { createHash } from "node:crypto"
 
-import type { ChatMessage, CompletionOptions } from "./types"
+import type { ChatMessage, CompletionOptions, ModelCapability } from "./types"
 
 export type ProviderAttemptStatus = "success" | "failed"
 
 export interface ProviderAttempt {
   provider: string
   model?: string
+  capability?: ModelCapability
   status: ProviderAttemptStatus
   error?: string
   errorKind?: ProviderErrorKind
@@ -25,6 +26,7 @@ export type ProviderErrorKind =
   | "server"
   | "config"
   | "auth"
+  | "model_unavailable"
   | "unknown"
 
 export interface LlmInvocation {
@@ -149,12 +151,19 @@ export function classifyProviderError(error: unknown): {
   const statusValue = typeof error === "object" && error !== null && "status" in error
     ? Number((error as { status?: unknown }).status)
     : NaN
-  const statusMatch = message.match(/\b(400|401|403|408|429|5\d{2})\b/)
+  const statusMatch = message.match(/\b(4\d{2}|5\d{2})\b/)
   const status = Number.isFinite(statusValue)
     ? statusValue
     : statusMatch ? Number(statusMatch[1]) : NaN
 
   if (!Number.isNaN(status)) {
+    const modelUnavailable =
+      /model.{0,40}(not found|unavailable|not available|unsupported|does not exist|invalid)/.test(lower) ||
+      /(unsupported|invalid).{0,20}model/.test(lower) ||
+      /not available in your region/.test(lower)
+    if (modelUnavailable && (status === 400 || status === 403 || status === 404)) {
+      return { kind: "model_unavailable", retryable: true }
+    }
     if (status === 408) return { kind: "timeout", retryable: true }
     if (status === 429) return { kind: "rate_limit", retryable: true }
     if (status >= 500) return { kind: "server", retryable: true }
@@ -162,7 +171,7 @@ export function classifyProviderError(error: unknown): {
       return { kind: "rate_limit", retryable: true }
     }
     if (status === 401 || status === 403) return { kind: "auth", retryable: false }
-    if (status === 400) return { kind: "client", retryable: false }
+    if (status >= 400 && status < 500) return { kind: "client", retryable: false }
   }
 
   if (/(timeout|timed out|deadline|aborted)/.test(lower)) {

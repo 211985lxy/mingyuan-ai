@@ -12,9 +12,11 @@ let _instance: LLMClient | null = null
 
 export class LLMClient {
   private providers: LLMProvider[]
+  private maxAttempts?: number
 
-  constructor(providers: LLMProvider[]) {
+  constructor(providers: LLMProvider[], options: { maxAttempts?: number } = {}) {
     this.providers = providers
+    this.maxAttempts = options.maxAttempts
   }
 
   /** Get the singleton LLMClient, configured from environment variables. */
@@ -50,7 +52,9 @@ export class LLMClient {
       )
     }
 
-    const maxAttempts = Math.max(1, Math.min(3, Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)))
+    const maxAttempts = Math.max(1, Math.min(3,
+      this.maxAttempts ?? Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)
+    ))
     const maxOutputTokens = Math.max(256, Math.min(16_384, Number(env.LLM_MAX_OUTPUT_TOKENS || 8192)))
     const boundedOptions = {
       ...options,
@@ -67,6 +71,7 @@ export class LLMClient {
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
+          capability: provider.capability,
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
@@ -80,6 +85,7 @@ export class LLMClient {
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
+          capability: provider.capability,
           status: "failed",
           error: lastError.message,
           errorKind: classified.kind,
@@ -113,7 +119,9 @@ export class LLMClient {
       )
     }
 
-    const maxAttempts = Math.max(1, Math.min(3, Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)))
+    const maxAttempts = Math.max(1, Math.min(3,
+      this.maxAttempts ?? Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)
+    ))
     const maxOutputTokens = Math.max(256, Math.min(16_384, Number(env.LLM_MAX_OUTPUT_TOKENS || 8192)))
     const boundedOptions = {
       ...options,
@@ -136,6 +144,7 @@ export class LLMClient {
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
+          capability: provider.capability,
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
@@ -147,6 +156,7 @@ export class LLMClient {
           reportProviderAttempt({
             provider: provider.name,
             model: boundedOptions.model ?? provider.defaultModel,
+            capability: provider.capability,
             status: "failed",
             error: lastError.message,
             errorKind: classifyProviderError(error).kind,
@@ -159,6 +169,7 @@ export class LLMClient {
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
+          capability: provider.capability,
           status: "failed",
           error: lastError.message,
           errorKind: classified.kind,

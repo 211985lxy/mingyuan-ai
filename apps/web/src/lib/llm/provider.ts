@@ -10,12 +10,14 @@ import type {
 
 export class OpenAICompatibleProvider implements LLMProvider {
   readonly name: string
+  readonly capability?: LLMProviderConfig["capability"]
   private client: OpenAI
   readonly defaultModel: string
   private apiKey: string
 
   constructor(config: LLMProviderConfig) {
     this.name = config.name
+    this.capability = config.capability
     this.apiKey = config.apiKey
     this.defaultModel = config.defaultModel
     this.client = new OpenAI({

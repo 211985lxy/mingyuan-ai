@@ -18,6 +18,7 @@ import type {
 } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { AimAgentId, AimEntrypoint } from "./contracts"
+import type { ModelCapability } from "@/lib/llm/types"
 
 export const HARNESS_VERSION = "aim-harness-v1" as const
 
@@ -37,6 +38,8 @@ export interface AimContextPolicy {
   loadCompetitorWatch: boolean
 }
 
+export type AimModelCapability = ModelCapability
+
 /** Model policy: routing + fallback behavior. */
 export interface AimModelPolicy {
   agentId: AimAgentId
@@ -46,6 +49,12 @@ export interface AimModelPolicy {
   temperature?: number
   /** max tokens override (optional) */
   maxTokens?: number
+  /** preferred capability for the task */
+  targetCapability: AimModelCapability
+  /** hard floor: routes below this capability must not be used silently */
+  minimumCapability: AimModelCapability
+  /** per-run provider budget; streaming uses a smaller budget */
+  maxProviderAttempts: number
 }
 
 /** A single context source loaded for the run, for the manifest + hash. */
@@ -108,6 +117,7 @@ export interface AimRunMetadata {
   providerAttempts: Array<{
     provider: string
     model?: string
+    capability?: AimModelCapability
     status: "success" | "failed"
     error?: string
     errorKind?: string
