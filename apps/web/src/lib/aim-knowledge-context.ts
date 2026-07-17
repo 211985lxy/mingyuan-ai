@@ -5,6 +5,7 @@ import {
   type ResolvedKnowledgeStrategy,
   getStrategyProfile,
 } from "@/lib/aim-knowledge-strategy"
+import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -26,22 +27,6 @@ export interface AimKnowledgeContextResult {
 }
 
 // ─── 常量 ──────────────────────────────────────────────────
-
-const CATEGORY_LABELS: Record<string, string> = {
-  boss_experience: "老板经验",
-  product_usp: "产品卖点",
-  customer_pain: "客户痛点",
-  project_case: "项目案例",
-  customer_qa: "客户问答",
-  daily_inspiration: "日常灵感",
-  meeting_minutes: "会议纪要",
-  benchmark_reference: "对标参考",
-  user_insight: "用户洞察",
-  hot_topic: "热点素材",
-  positioning_material: "定位素材",
-  private_domain_material: "私域素材",
-  writing_style_profile: "写作风格档案",
-}
 
 /**
  * 智能体分类优先级（影响排序但不过滤）

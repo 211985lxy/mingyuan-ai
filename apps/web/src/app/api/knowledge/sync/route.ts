@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { obsidianSyncBodySchema } from "@/features/knowledge/contracts/api"
+import { isKnowledgeCategory } from "@/lib/knowledge-categories"
 
 export async function POST(request: NextRequest) {
   const syncToken = env.OBSIDIAN_SYNC_TOKEN
@@ -64,21 +65,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 保证分类合法，不合法时默认归入 boss_experience
-      const validCategories = [
-        "boss_experience",
-        "product_usp",
-        "customer_pain",
-        "project_case",
-        "customer_qa",
-        "daily_inspiration",
-        "benchmark_reference",
-        "user_insight",
-        "hot_topic",
-        "positioning_material",
-        "private_domain_material",
-        "writing_style_profile",
-      ]
-      const finalCategory = validCategories.includes(entry.category)
+      const finalCategory = isKnowledgeCategory(entry.category)
         ? entry.category
         : "boss_experience"
 

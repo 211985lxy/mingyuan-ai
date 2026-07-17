@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import { LLMClient } from "@/lib/llm/client"
+import {
+  isKnowledgeCategory,
+  KNOWLEDGE_CATEGORIES,
+} from "@/lib/knowledge-categories"
 
 // ─── 类型 ──────────────────────────────────────────────────
 
@@ -24,18 +28,6 @@ interface ChatMessage {
 }
 
 // ─── 常量 ──────────────────────────────────────────────────
-
-const CATEGORY_LIST = [
-  "boss_experience", "product_usp", "customer_pain", "project_case",
-  "customer_qa", "daily_inspiration", "benchmark_reference", "user_insight",
-  "hot_topic", "positioning_material", "private_domain_material", "writing_style_profile",
-] as const
-
-type KnowledgeCategory = (typeof CATEGORY_LIST)[number]
-
-function isKnowledgeCategory(value: unknown): value is KnowledgeCategory {
-  return typeof value === "string" && (CATEGORY_LIST as readonly string[]).includes(value)
-}
 
 const BATCH_SIZE = 15
 
@@ -105,7 +97,7 @@ function buildClassificationPrompt(
 5. 价值分级 S/A/B/C
 6. 置信度 high/medium/low
 
-分类选项：${CATEGORY_LIST.join(", ")}${wechatInstruction}${projectSection}
+分类选项：${KNOWLEDGE_CATEGORIES.join(", ")}${wechatInstruction}${projectSection}
 
 输出格式（纯 JSON，不要 markdown 代码块）：
 [{"index":0,"suggestedTitle":"...","suggestedKeyPoints":"...","suggestedCategory":"product_usp","suggestedTags":["kb_scope:project","asset_role:usp","usable_for:sales","confidence:user_claim"],"suggestedValueGrade":"B","confidence":"high"}]`

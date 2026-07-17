@@ -1,12 +1,5 @@
 import { prisma } from "@/lib/prisma"
-
-const CATEGORY_LABELS: Record<string, string> = {
-  boss_experience: "老板经验",
-  product_usp: "产品卖点",
-  customer_pain: "客户痛点",
-  project_case: "项目案例",
-  customer_qa: "客户问答",
-}
+import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
 
 export async function loadProjectKnowledge(userId: string, projectId?: string): Promise<string> {
   const entries = await prisma.knowledgeEntry.findMany({
