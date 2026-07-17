@@ -247,6 +247,12 @@ export async function retrieveRelevantKnowledge(input: {
   const topK = input.topK ?? 12
   const prefilter = input.prefilter
 
+  // 环境变量控制检索最大年龄（天数），0 表示不过滤，默认 365
+  const maxAgeDays = parseInt(process.env.KNOWLEDGE_RETRIEVAL_MAX_AGE_DAYS || "365", 10)
+  const ageFilter = maxAgeDays > 0
+    ? { updatedAt: { gt: new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000) } }
+    : {}
+
   // Build the query text: combine input + topic context for richer embedding
   const queryParts = [input.query]
   if (input.topicTitle) queryParts.push(`选题：${input.topicTitle}`)
@@ -270,6 +276,7 @@ export async function retrieveRelevantKnowledge(input: {
             status: "active",
             ...(hasCategoryFilter ? { category: { in: prefilter!.categories } } : {}),
             ...(hasGradeFilter ? { valueGrade: { in: prefilter!.valueGrades } } : {}),
+            ...ageFilter,
           },
         },
         select: {
@@ -316,6 +323,7 @@ export async function retrieveRelevantKnowledge(input: {
       userId: input.userId,
       projectId: input.projectId,
       status: "active",
+      ...ageFilter,
     },
     orderBy: { sortOrder: "asc" },
     take: topK,
