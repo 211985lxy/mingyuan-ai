@@ -444,7 +444,7 @@ export async function runQualityGateWithRewrite(
         { role: "user", content: fillTemplate(chosenPrompt, promptVars) },
       ],
       temperature: 0.7,
-      maxTokens: 800,
+      maxTokens: currentContent.length >= 1000 ? 4000 : 800,
     })
 
     currentContent = rewriteResult.content.trim()
