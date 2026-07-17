@@ -49,9 +49,15 @@
 ### 🔴 高风险（必须有发布预案）
 
 - **7 个 Prisma migration**：task_spec/content_outcome、phase14 schema 合并、admin_session_version、admin_audit_log、comment_radar 表、**retire_video_generation（删表/删列）**、query_bound_indexes。
-  - 其中 `retire_video_generation` 是**破坏性 schema 变更**——若线上还在用视频生成，迁移会丢数据。**发布前必须确认线上视频功能是否还在用、是否已迁走数据。**
+  - 其中 `retire_video_generation` 是**破坏性 schema 变更（不可逆）**，精确影响：
+    - `DROP TABLE` 8 张：`VideoTask`、`VideoProductionPlan`、`VideoPackagingTemplate`、`PublicAvatarPreviewPreference`、`PublicAvatarPreviewCache`、`Avatar`、`PexelsQueryCache`、`PexelsMedia`
+    - `DELETE FROM Asset WHERE assetType='voice'`（删除全部语音资产数据）
+    - `Asset` 表砍 6 列（sourceAvatarId / externalTaskId / externalSpeakerId / voiceModel / demoAudioUrl / retryCount）
+    - `ContentTemplate` 砍 4 列（shanjianStyleId / videoType / packRulesJson / processRulesJson）
+    - `User.authVideoUrl` 列删除
+  - **若线上仍有用户在用视频生成 / 数字人 / 语音合成，跑此 migration 会永久删除其数据和功能。发布前必须由你本人确认线上是否还有这类活跃使用。**
+  - 代码层面退役**很干净**：全仓库已无 `runVideoPipeline`/`generateVideo` 等活跃引用，仅 `src/lib/oss.ts` 保留视频文件的 OSS 通用处理（MIME 类型、缩略图快照）——这是用户上传视频文件仍需的，保留正确，不属于被退役的生成子系统。
   - baseline migrations.json 是新引入的迁移基线机制，首次部署需 `prisma migrate resolve --applied` 对齐（STATE.md 有先例）。
-- **视频生成退役（-24587 行）**：若有用户依赖该功能，是产品契约破坏。需确认是否已通知用户/有无替代路径。
 
 ### 🟠 中风险（需回归验证）
 
@@ -69,8 +75,8 @@
 
 | 前提 | 验证方式 | 当前状态 |
 |---|---|---|
-| 视频生成退役不破坏线上用户 | 确认线上是否还在用 video、数据是否已迁 | ❓ 未确认 |
-| 真实模型生成质量达标 | 最近一次 `aim-eval --daily` rubric ≥80% | ❓ 需查 CI 历史 |
+| 视频生成退役不破坏线上用户 | 确认线上是否还在用 video/数字人/语音，数据是否已迁 | ❓ 需你本人确认（代码侧已查：退役干净，但 migration 破坏性且不可逆）|
+| 真实模型生成质量达标 | 最近一次 `aim-eval --daily` rubric ≥80% | ❓ 本地查不到（无 remote、gh 未登录）。需你在 GitHub Actions 的 `aim-eval-daily` workflow 历史里看 artifact |
 
 **deterministic eval 100% 契约通过 + 全量门禁绿 + 零 TODO**——代码层面是健康的。
 
