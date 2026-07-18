@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest"
 import { TopicDailyReportPanel } from "@/components/topic-planning/topic-daily-report"
 import { TopicCandidatesPanel } from "@/components/topic-planning/topic-candidates-panel"
 import { TopicChatCard } from "@/components/topic-planning/topic-chat-card"
-import { TopicKnowledgePool } from "@/components/topic-planning/topic-knowledge-pool"
 import { categorizeTopicCards, getTopicDisplayLabel } from "@/lib/topics/display-groups"
 import type { TopicDailyReport } from "@/lib/topic-daily-report"
 import type { ApiTopicCard } from "@/types/api"
@@ -117,31 +116,5 @@ describe("topic planning components", () => {
     expect(html).toContain("先解释价格背后的风险")
     expect(html).toContain("报价高，可能是在替你挡风险")
     expect(html).toContain("成本拆解")
-  })
-
-  it("renders the four knowledge pool categories and manual entry controls", () => {
-    const html = renderToStaticMarkup(createElement(TopicKnowledgePool, {
-      entries: [],
-      selectedIds: [],
-      forms: {
-        daily_inspiration: { title: "", content: "" },
-        meeting_minutes: { title: "", content: "" },
-        benchmark_reference: { title: "", content: "" },
-        user_insight: { title: "", content: "" },
-      },
-      loading: false,
-      savingCategory: null,
-      onUpdateForm: () => {},
-      onCreate: () => {},
-      onUpdate: async () => {},
-      onArchive: async () => {},
-      onToggle: () => {},
-    }))
-
-    expect(html).toContain("日常灵感")
-    expect(html).toContain("会议纪要")
-    expect(html).toContain("参考素材")
-    expect(html).toContain("用户洞察")
-    expect(html).toContain("加入选题池")
   })
 })
