@@ -77,6 +77,8 @@ export class LLMClient {
           attemptIndex: index,
           responseModel: result.model,
           totalTokens: result.usage?.totalTokens,
+          promptTokens: result.usage?.promptTokens,
+          completionTokens: result.usage?.completionTokens,
         })
         return result
       } catch (error) {
