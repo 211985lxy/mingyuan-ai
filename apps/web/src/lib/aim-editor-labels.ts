@@ -1,6 +1,5 @@
 import type { ContentFormat } from "@/lib/api/client"
 import type { AimAgentId } from "@/lib/aim-ui-config"
-import { normalizeAgentId } from "@/lib/llm/agent-router"
 
 export interface EditorPanelLabels {
   title: string
@@ -24,6 +23,14 @@ const COPY_FORMATS = new Set<ContentFormat>([
   "xiaohongshu_post",
 ])
 
+// Keep this client-facing module independent from the server-only LLM router.
+// These are the legacy agent ids that the router maps to copy_studio.* modules.
+const COPY_STUDIO_AGENT_IDS = new Set<AimAgentId>([
+  "content_producer",
+  "deep_copywriter",
+  "free_copywriter",
+])
+
 const COPY_EDITOR_LABELS: EditorPanelLabels = {
   title: "文案编辑",
   collapsedTitle: "展开文案编辑",
@@ -37,11 +44,10 @@ const COPY_EDITOR_LABELS: EditorPanelLabels = {
 }
 
 export function getAimEditorPanelLabels(agentId: AimAgentId, editorFormat?: ContentFormat): EditorPanelLabels {
-  // 归一化到 copy_studio 模块键：content_producer/free_copywriter/deep_copywriter
-  // 经别名都映射为 copy_studio.*，统一走文案编辑标签，语义与旧三 id 判断等价；
+  // content_producer/free_copywriter/deep_copywriter 都会在服务端映射为
+  // copy_studio.*，统一走文案编辑标签；
   // 文案创作官（copywriter）是三者合并的统一创作入口，同样走文案编辑标签
-  const key = normalizeAgentId(agentId)
-  if ((editorFormat && COPY_FORMATS.has(editorFormat)) || key.startsWith("copy_studio.") || agentId === "copywriter") {
+  if ((editorFormat && COPY_FORMATS.has(editorFormat)) || COPY_STUDIO_AGENT_IDS.has(agentId) || agentId === "copywriter") {
     return COPY_EDITOR_LABELS
   }
 
