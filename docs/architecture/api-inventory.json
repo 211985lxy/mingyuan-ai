@@ -1378,6 +1378,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/feishu-work-items/dispatch",
+      "file": "src/app/api/cron/feishu-work-items/dispatch/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/cron/market-hotlist",
       "file": "src/app/api/cron/market-hotlist/route.ts",
       "methods": [

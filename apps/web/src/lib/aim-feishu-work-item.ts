@@ -260,3 +260,46 @@ export function buildRetryPatch(): WorkItemPatch {
     最后处理时间: nowTimestamp(),
   }
 }
+
+/**
+ * 会议洞察工作流所需的飞书字段契约（WP-8 cron 无人值守接线用）。
+ *
+ * ⚠️ 上线前必须与飞书生产表逐字核对以下字段名：本常量集中声明、绝不散落到业务
+ * 逻辑，字段名改一处即全量生效，避免“臆造字段名”导致读不到会议数据。
+ * - 状态 / AIM项目ID / 输入内容 沿用 WP-2 既有契约。
+ * - 会议标题 / 客户名称 为会议工作流新增字段，按现有中文字段命名规范补充。
+ *   若生产表实际叫「会议主题」「客户」等，只改此处两行即可。
+ */
+export const MEETING_WORK_ITEM_FIELDS = {
+  /** 客户项目 ID（同 WP-2 契约字段）。 */
+  projectId: "AIM项目ID",
+  /** 会议原文/逐字稿：会议工作流的 transcript，粘贴于「输入内容」列。 */
+  transcript: "输入内容",
+  /** 会议标题（会议工作流新增字段，待生产表核对）。 */
+  meetingTitle: "会议标题",
+  /** 客户名称（会议工作流新增字段，待生产表核对）。 */
+  customer: "客户名称",
+} as const
+
+/** 从飞书记录字段解析会议洞察工作流输入。缺失项留空，不伪造。 */
+export interface ParsedMeetingWorkItemInput {
+  projectId: string
+  transcript: string
+  meetingTitle: string
+  customer: string
+}
+
+/**
+ * 从飞书记录字段解析会议洞察工作流所需的四类输入。
+ * 复用 WP-2 的 flattenText 收窄多行/段落数组形态；缺字段统一为空字符串。
+ */
+export function parseMeetingWorkItemInput(
+  fields: Record<string, unknown>,
+): ParsedMeetingWorkItemInput {
+  return {
+    projectId: flattenText(fields[MEETING_WORK_ITEM_FIELDS.projectId]),
+    transcript: flattenText(fields[MEETING_WORK_ITEM_FIELDS.transcript]),
+    meetingTitle: flattenText(fields[MEETING_WORK_ITEM_FIELDS.meetingTitle]),
+    customer: flattenText(fields[MEETING_WORK_ITEM_FIELDS.customer]),
+  }
+}
