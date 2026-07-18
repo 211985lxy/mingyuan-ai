@@ -6,16 +6,28 @@ import { listAimHistory, listClientProjects, type AimGeneration, type ClientProj
 
 export function selectAuthorizedProjectId(currentProjectId: string, projects: ClientProject[]) {
   if (currentProjectId && projects.some((project) => project.id === currentProjectId)) return currentProjectId
-  return projects[0]?.id || ""
+  return currentProjectId ? "" : projects[0]?.id || ""
 }
 
-export function useAimProjectWorkspace(initialProjectId: string) {
+export function useAimProjectWorkspace(input: { initialProjectId: string; quickMode: boolean }) {
+  const { initialProjectId, quickMode } = input
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId)
-  const [projectEnabled, setProjectEnabled] = useState(false)
+  const [projectEnabled, setProjectEnabled] = useState(!quickMode)
+  const [projectAccessError, setProjectAccessError] = useState<string | null>(null)
   const [projectWorkflowRecords, setProjectWorkflowRecords] = useState<AimGeneration[]>([])
   const [isLoadingProjectWorkflow, setIsLoadingProjectWorkflow] = useState(false)
   const workflowRequestRef = useRef(0)
+  const invalidProjectIdRef = useRef<string | null>(null)
+
+  const selectProjectId = useCallback<React.Dispatch<React.SetStateAction<string>>>((value) => {
+    invalidProjectIdRef.current = null
+    setProjectAccessError(null)
+    setSelectedProjectId((current) => {
+      const next = typeof value === "function" ? value(current) : value
+      return next
+    })
+  }, [])
 
   const refreshProjectWorkflow = useCallback(async () => {
     const requestId = ++workflowRequestRef.current
@@ -35,22 +47,45 @@ export function useAimProjectWorkspace(initialProjectId: string) {
     }
   }, [selectedProjectId])
 
+  const refreshProjects = useCallback(async () => {
+    const items = await listClientProjects()
+        setProjects(items)
+        if (quickMode) {
+          setProjectEnabled(false)
+          setSelectedProjectId("")
+          invalidProjectIdRef.current = null
+          setProjectAccessError(null)
+          return items
+        }
+        setProjectEnabled(true)
+        setSelectedProjectId((current) => {
+          const requested = current || invalidProjectIdRef.current || ""
+          const next = selectAuthorizedProjectId(requested, items)
+          if (requested && !next) {
+            invalidProjectIdRef.current = requested
+            setProjectAccessError("这个客户全案已失效或你无权访问，请重新选择")
+            return ""
+          }
+          invalidProjectIdRef.current = null
+          setProjectAccessError(null)
+          return next
+        })
+        return items
+  }, [quickMode])
+
   useEffect(() => {
     let active = true
-    listClientProjects()
-      .then((items) => {
-        if (!active) return
-        setProjects(items)
-        setProjectEnabled(items.length > 0)
-        setSelectedProjectId((current) => selectAuthorizedProjectId(current, items))
-      })
-      .catch(() => {
-        if (active) setProjectEnabled(false)
-      })
+    const task = Promise.resolve().then(refreshProjects)
+    void task.catch(() => {
+      if (!active) return
+      setSelectedProjectId("")
+      setProjectEnabled(!quickMode)
+      setProjectAccessError(quickMode ? null : "客户全案读取失败，请切换到快速出稿或稍后重试")
+    })
     return () => {
       active = false
     }
-  }, [])
+  }, [quickMode, refreshProjects])
 
   useEffect(() => {
     const task = Promise.resolve().then(refreshProjectWorkflow)
@@ -63,11 +98,13 @@ export function useAimProjectWorkspace(initialProjectId: string) {
   return {
     projects,
     selectedProjectId,
-    setSelectedProjectId,
+    setSelectedProjectId: selectProjectId,
     projectEnabled,
     setProjectEnabled,
+    projectAccessError,
     projectWorkflowRecords,
     isLoadingProjectWorkflow,
     refreshProjectWorkflow,
+    refreshProjects,
   }
 }

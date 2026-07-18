@@ -2,11 +2,13 @@
 
 import Link from "next/link"
 import type { ComponentType } from "react"
-import { Plus, Sparkles } from "lucide-react"
+import { Check, Plus, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { cn } from "@/lib/utils"
 import type { AimEvolutionSuggestion } from "@/lib/api/client"
+import type { ClientProject } from "@/lib/api/client"
 import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimWorkflowStage } from "@/lib/aim-workflow"
 
 interface AimWorkbenchHeaderProps {
@@ -14,11 +16,12 @@ interface AimWorkbenchHeaderProps {
   agentTitle: string
   AgentIcon: ComponentType<{ className?: string }>
   projectEnabled: boolean
-  projectName?: string
+  projects: ClientProject[]
+  selectedProjectId: string
   canEvolve: boolean
   isEvolving: boolean
   onStageChange: (stage: AimWorkflowStage) => void
-  onToggleProject: () => void
+  onProjectScopeChange: (scope: string) => void
   onEvolve: () => void
   onReset: () => void
 }
@@ -28,60 +31,94 @@ export function AimWorkbenchHeader({
   agentTitle,
   AgentIcon,
   projectEnabled,
-  projectName,
+  projects,
+  selectedProjectId,
   canEvolve,
   isEvolving,
   onStageChange,
-  onToggleProject,
+  onProjectScopeChange,
   onEvolve,
   onReset,
 }: AimWorkbenchHeaderProps) {
+  const currentIndex = AIM_WORKFLOW_STAGES.findIndex((stage) => stage.id === workflowStage)
+  const activeDescription = AIM_WORKFLOW_STAGES.find((stage) => stage.id === workflowStage)?.description
+
   return (
     <header className="flex items-center justify-between gap-3 border-b px-3 py-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div className="md:hidden">
+        <div className="flex flex-col gap-0.5 md:hidden">
           <select
             value={workflowStage}
             onChange={(event) => {
               if (isAimWorkflowStage(event.target.value)) onStageChange(event.target.value)
             }}
-            className="h-9 w-[130px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="h-9 w-[150px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {AIM_WORKFLOW_STAGES.map((stage) => (
               <option key={stage.id} value={stage.id}>{stage.title}</option>
             ))}
           </select>
+          {activeDescription && (
+            <p className="max-w-[150px] truncate text-[11px] text-muted-foreground">{activeDescription}</p>
+          )}
         </div>
         <span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary md:flex">
           <AgentIcon className="h-4 w-4" />
         </span>
         <p className="hidden shrink-0 truncate text-sm font-semibold text-foreground md:block">{agentTitle}</p>
-        <nav className="hidden min-w-0 items-center gap-1 overflow-x-auto md:flex" aria-label="AIM 工作流">
-          {AIM_WORKFLOW_STAGES.map((stage) => (
-            <Button
-              key={stage.id}
-              type="button"
-              size="sm"
-              variant={workflowStage === stage.id ? "secondary" : "ghost"}
-              className="h-7 shrink-0 rounded-md px-2 text-xs"
-              onClick={() => onStageChange(stage.id)}
-            >
-              {stage.title}
-            </Button>
-          ))}
+        <nav className="hidden min-w-0 flex-col gap-1 md:flex" aria-label="AIM 工作流">
+          <ol className="flex min-w-0 items-center gap-1 overflow-x-auto">
+            {AIM_WORKFLOW_STAGES.map((stage, index) => {
+              const isCurrent = stage.id === workflowStage
+              const isDone = index < currentIndex
+              return (
+                <li key={stage.id} className="flex shrink-0 items-center">
+                  <button
+                    type="button"
+                    onClick={() => onStageChange(stage.id)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className={cn(
+                      "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
+                      isCurrent && "bg-primary/10 text-primary",
+                      isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                      !isCurrent && !isDone && "text-muted-foreground/50 hover:bg-muted/60 hover:text-muted-foreground",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
+                        isCurrent && "bg-primary text-primary-foreground",
+                        isDone && "bg-muted-foreground/20 text-muted-foreground",
+                        !isCurrent && !isDone && "border border-muted-foreground/30 text-transparent",
+                      )}
+                    >
+                      {isDone ? <Check className="h-3 w-3" /> : index + 1}
+                    </span>
+                    {stage.title}
+                  </button>
+                  {index < AIM_WORKFLOW_STAGES.length - 1 && (
+                    <span className="mx-0.5 h-px w-4 shrink-0 bg-border" aria-hidden />
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+          {activeDescription && (
+            <p className="truncate pl-6 text-[11px] text-muted-foreground">{activeDescription}</p>
+          )}
         </nav>
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={projectEnabled ? "secondary" : "outline"}
-          className="hidden h-8 max-w-[220px] gap-1.5 truncate sm:inline-flex"
-          onClick={onToggleProject}
-          title={projectEnabled ? "已启用 IP 全案上下文，点击切到纯文案模式" : "纯文案模式，点击启用 IP 全案上下文"}
+        <select
+          value={projectEnabled ? selectedProjectId : "quick"}
+          onChange={(event) => onProjectScopeChange(event.target.value)}
+          className="h-8 w-[108px] max-w-[220px] rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto"
+          title="选择客户全案或快速出稿模式"
         >
-          {projectEnabled ? (projectName ?? "IP 全案") : "纯文案模式"}
-        </Button>
+          {projectEnabled && !selectedProjectId ? <option value="" disabled>项目不可用</option> : null}
+          <option value="quick">快速出稿</option>
+          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+        </select>
         <Button
           type="button"
           size="sm"
@@ -103,19 +140,29 @@ export function AimWorkbenchHeader({
   )
 }
 
-export function AimProjectNotices({ projectsCount, selectedProjectId, personaProgress }: {
+export function AimProjectNotices({ projectsCount, selectedProjectId, projectEnabled, projectAccessError, personaProgress }: {
   projectsCount: number
   selectedProjectId: string
+  projectEnabled: boolean
+  projectAccessError?: string | null
   personaProgress: number | null
 }) {
   return (
     <>
-      {projectsCount === 0 ? (
+      {!projectEnabled ? (
+        <div className="border-b bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
+          快速出稿不会读取客户全案资料，生成后可手动保存到全案。
+        </div>
+      ) : projectsCount === 0 ? (
         <div className="border-b bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
           还没有 IP 营销全案，<Link href="/projects" className="text-primary underline-offset-2 hover:underline">先创建一个</Link>，生成内容可自动归属。
         </div>
       ) : null}
-      {projectsCount > 0 && !selectedProjectId ? (
+      {projectAccessError ? (
+        <div className="border-b bg-destructive/10 px-3 py-1.5 text-[11px] text-destructive">
+          {projectAccessError}
+        </div>
+      ) : projectEnabled && projectsCount > 0 && !selectedProjectId ? (
         <div className="border-b bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
           正在加载你的 IP 营销全案，请稍后再生成内容。
         </div>

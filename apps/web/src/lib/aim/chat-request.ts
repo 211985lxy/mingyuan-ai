@@ -43,11 +43,15 @@ export async function runAimChatRequest(input: {
   editorContext?: AimEditorContext
   signal: AbortSignal
   onContent: (content: string) => void
+  agentModule?: "social" | "longform" | "free"
+  writerModule?: "social" | "longform" | "free"
 }): Promise<{ hasContent: boolean }> {
   const options = {
     agentId: input.agentId,
     projectId: input.projectId,
     editorContext: input.editorContext,
+    agentModule: input.agentModule,
+    writerModule: input.writerModule,
     signal: input.signal,
   }
   if (input.toolAction) {
