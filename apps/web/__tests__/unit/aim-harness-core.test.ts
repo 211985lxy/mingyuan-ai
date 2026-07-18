@@ -141,7 +141,7 @@ describe("aim-harness fallback policy", () => {
     expect(invocationsB[0]?.fullPrompt).not.toContain("request-a")
   })
 
-  it("records the configured model for streaming attempts", async () => {
+  it("records the configured model for streaming attempts and surfaces token usage", async () => {
     const attempts: ProviderAttempt[] = []
     const provider: LLMProvider = {
       name: "stream-provider",
@@ -151,19 +151,42 @@ describe("aim-harness fallback policy", () => {
         throw new Error("not used")
       },
       async *stream() {
-        yield "ok"
+        yield { delta: "ok" }
+        // terminal chunk carries usage + echoed model name, like include_usage
+        yield {
+          usage: {
+            promptTokens: 120,
+            completionTokens: 40,
+            totalTokens: 160,
+            cachedTokens: 80,
+          },
+          responseModel: "stream-model-v1",
+        }
       },
     }
 
+    const received: string[] = []
     await runWithLlmTelemetry({ onAttempt: (attempt) => attempts.push(attempt) }, async () => {
       for await (const chunk of new LLMClient([provider]).stream({
         messages: [{ role: "user", content: "stream request" }],
       })) {
-        expect(chunk).toBe("ok")
+        received.push(chunk)
       }
     })
 
-    expect(attempts).toMatchObject([{ provider: "stream-provider", model: "stream-model-v1", status: "success" }])
+    // Outward contract is preserved: LLMClient.stream still yields plain strings.
+    expect(received).toEqual(["ok"])
+    expect(attempts).toMatchObject([
+      {
+        provider: "stream-provider",
+        model: "stream-model-v1",
+        status: "success",
+        totalTokens: 160,
+        promptTokens: 120,
+        completionTokens: 40,
+        cachedTokens: 80,
+      },
+    ])
   })
 
   it("stores image hashes without persisting image URLs", async () => {

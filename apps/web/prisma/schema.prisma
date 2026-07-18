@@ -553,6 +553,10 @@ model AimExecutionTrace {
   durationMs      Int?
   model           String?
   totalTokens     Int?
+  inputTokens     Int?
+  outputTokens    Int?
+  cachedTokens    Int?
+  costCny         Decimal?  @db.Decimal(10,6)
   inputSummary    String?   @db.Text
   outputSummary   String?   @db.Text
   errorMessage    String?   @db.Text

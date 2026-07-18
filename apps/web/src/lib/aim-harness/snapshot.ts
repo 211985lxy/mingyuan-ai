@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 
 import type { AimRunMetadata, AimRunSpec, AimContextSource } from "./types"
+import { computeCostCny } from "./model-pricing"
 import type { LlmInvocation } from "@/lib/llm/telemetry"
 
 const SNAPSHOT_TTL_DAYS = 30
@@ -113,12 +114,21 @@ export async function applyRunMetadataToTrace(
   if (!traceId) return
   const delegate = getTraceDelegate()
   if (!delegate) return
+  // Derive cost from observed usage. "unknown" model means the provider never
+  // echoed a model name — skip writing model/cost to avoid polluting cost reports.
+  const hasModel = metadata.model && metadata.model !== "unknown"
+  const inputTokens = metadata.inputTokens
+  const outputTokens = metadata.outputTokens
+  const costCny = hasModel
+    ? computeCostCny(metadata.provider, metadata.model, { inputTokens, outputTokens, cachedTokens: metadata.cachedTokens })
+    : undefined
   try {
     await delegate.update({
       where: { id: traceId },
       data: {
         runId: metadata.runId,
-        provider: metadata.provider,
+        provider: metadata.provider === "unknown" ? null : metadata.provider,
+        model: hasModel ? metadata.model : null,
         fallbackIndex: metadata.fallbackIndex,
         degraded: metadata.degraded,
         harnessVersion: metadata.harnessVersion,
@@ -129,6 +139,11 @@ export async function applyRunMetadataToTrace(
         contextHash: metadata.contextHash,
         qualityStatus: qualityStatus ?? null,
         snapshotId: snapshotId ?? null,
+        totalTokens: metadata.totalTokens ?? null,
+        inputTokens: inputTokens ?? null,
+        outputTokens: outputTokens ?? null,
+        cachedTokens: metadata.cachedTokens ?? null,
+        ...(costCny !== undefined ? { costCny } : {}),
       },
     })
   } catch (error) {

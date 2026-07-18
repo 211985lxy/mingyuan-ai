@@ -19,15 +19,31 @@ export interface CompletionOptions {
   stream?: false
 }
 
+export interface CompletionUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+  /** Tokens served from prompt cache (e.g. DeepSeek/OpenAI prompt_tokens_details.cached_tokens). */
+  cachedTokens?: number
+}
+
 export interface CompletionResult {
   content: string
   model: string
   provider: string
-  usage?: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-  }
+  usage?: CompletionUsage
+}
+
+/**
+ * A single chunk emitted by a streaming provider.
+ * - `delta`: incremental text (same semantics as the old `AsyncIterable<string>`).
+ * - `usage`: present on the final chunk when `stream_options.include_usage` is set.
+ */
+export interface StreamChunk {
+  delta?: string
+  usage?: CompletionUsage
+  /** Echoed model name from the stream's final chunk, when available. */
+  responseModel?: string
 }
 
 export interface LLMProviderConfig {
@@ -44,6 +60,6 @@ export interface LLMProvider {
   /** Configured model used when CompletionOptions.model is omitted. */
   readonly defaultModel?: string
   complete(options: CompletionOptions): Promise<CompletionResult>
-  stream?(options: CompletionOptions): AsyncIterable<string>
+  stream?(options: CompletionOptions): AsyncIterable<StreamChunk>
   isAvailable(): boolean
 }

@@ -15,6 +15,9 @@ export interface ProviderAttempt {
   attemptIndex: number
   responseModel?: string
   totalTokens?: number
+  promptTokens?: number
+  completionTokens?: number
+  cachedTokens?: number
 }
 
 export type ProviderErrorKind =

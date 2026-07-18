@@ -3,9 +3,29 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import type {
   CompletionOptions,
   CompletionResult,
+  CompletionUsage,
   LLMProvider,
   LLMProviderConfig,
+  StreamChunk,
 } from "./types"
+
+/**
+ * Map OpenAI-style usage payload to our CompletionUsage, extracting the
+ * prompt-cache hit count when the provider reports it (DeepSeek / OpenAI
+ * expose it under prompt_tokens_details.cached_tokens).
+ */
+function mapUsage(raw: OpenAI.CompletionUsage | null | undefined): CompletionUsage | undefined {
+  if (!raw) return undefined
+  const cached =
+    (raw as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details
+      ?.cached_tokens
+  return {
+    promptTokens: raw.prompt_tokens,
+    completionTokens: raw.completion_tokens,
+    totalTokens: raw.total_tokens,
+    cachedTokens: typeof cached === "number" ? cached : undefined,
+  }
+}
 
 export class OpenAICompatibleProvider implements LLMProvider {
   readonly name: string
@@ -50,17 +70,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
       content: choice.message.content,
       model: response.model,
       provider: this.name,
-      usage: response.usage
-        ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
-        : undefined,
+      usage: mapUsage(response.usage),
     }
   }
 
-  async *stream(options: CompletionOptions): AsyncIterable<string> {
+  async *stream(options: CompletionOptions): AsyncIterable<StreamChunk> {
     const model = options.model || this.defaultModel
 
     const response = await this.client.chat.completions.create({
@@ -70,11 +84,25 @@ export class OpenAICompatibleProvider implements LLMProvider {
       max_tokens: options.maxTokens,
       response_format: options.responseFormat,
       stream: true,
+      // Request the usage payload on the final chunk so streaming calls can be
+      // metered for cost. Harmless for providers that ignore the option.
+      stream_options: { include_usage: true },
     })
 
     for await (const chunk of response) {
       const delta = chunk.choices[0]?.delta?.content
-      if (delta) yield delta
+      // OpenAI-compatible providers emit usage (and the echoed model name) on the
+      // terminal chunk when include_usage is set. chunk.model is populated on
+      // every chunk by some providers and only the last by others.
+      const chunkModel = chunk.model
+      const usage = mapUsage((chunk as { usage?: OpenAI.CompletionUsage }).usage)
+      if (delta || usage || chunkModel) {
+        yield {
+          ...(delta ? { delta } : {}),
+          ...(usage ? { usage } : {}),
+          ...(chunkModel ? { responseModel: chunkModel } : {}),
+        }
+      }
     }
   }
 }

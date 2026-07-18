@@ -1,11 +1,21 @@
 import { getProviderConfigs } from "./config"
 import { OpenAICompatibleProvider } from "./provider"
-import type { CompletionOptions, CompletionResult, LLMProvider } from "./types"
+import type { CompletionOptions, CompletionResult, CompletionUsage, LLMProvider } from "./types"
 import {
   classifyProviderError,
   reportLlmInvocation,
   reportProviderAttempt,
 } from "./telemetry"
+
+/** Merge a freshly observed usage into the running accumulator (later chunks win). */
+function mergeUsage(accum: CompletionUsage | undefined, next: CompletionUsage): CompletionUsage {
+  return {
+    promptTokens: next.promptTokens ?? accum?.promptTokens ?? 0,
+    completionTokens: next.completionTokens ?? accum?.completionTokens ?? 0,
+    totalTokens: next.totalTokens ?? accum?.totalTokens ?? 0,
+    cachedTokens: next.cachedTokens ?? accum?.cachedTokens,
+  }
+}
 
 let _instance: LLMClient | null = null
 
@@ -65,6 +75,9 @@ export class LLMClient {
           attemptIndex: index,
           responseModel: result.model,
           totalTokens: result.usage?.totalTokens,
+          promptTokens: result.usage?.promptTokens,
+          completionTokens: result.usage?.completionTokens,
+          cachedTokens: result.usage?.cachedTokens,
         })
         return result
       } catch (error) {
@@ -115,10 +128,17 @@ export class LLMClient {
 
       const startedAt = Date.now()
       let emitted = false
+      // Accumulate usage observed on stream chunks (usually only the final one).
+      let usage: CompletionUsage | undefined
+      let responseModel: string | undefined
       try {
         for await (const chunk of provider.stream(options)) {
-          emitted = true
-          yield chunk
+          if (chunk.delta) {
+            emitted = true
+            yield chunk.delta
+          }
+          if (chunk.usage) usage = mergeUsage(usage, chunk.usage)
+          if (chunk.responseModel) responseModel = chunk.responseModel
         }
         reportProviderAttempt({
           provider: provider.name,
@@ -126,6 +146,11 @@ export class LLMClient {
           status: "success",
           durationMs: Date.now() - startedAt,
           attemptIndex: index,
+          responseModel: responseModel ?? options.model ?? provider.defaultModel,
+          totalTokens: usage?.totalTokens,
+          promptTokens: usage?.promptTokens,
+          completionTokens: usage?.completionTokens,
+          cachedTokens: usage?.cachedTokens,
         })
         return
       } catch (error) {

@@ -23,6 +23,7 @@ export const HARNESS_VERSION = "aim-harness-v1" as const
 export type AimEntrypoint = "chat" | "generate" | "agent_api" | "inspiration"
 
 export type AimAgentId =
+  | "copywriter"
   | "content_producer"
   | "free_copywriter"
   | "deep_copywriter"
@@ -99,6 +100,12 @@ export interface AimRunMetadata {
   promptHash: string
   /** SHA-256 of the context manifest */
   contextHash: string
+  /** token usage from the successful attempt (undefined if unreported, e.g. provider omitted usage) */
+  totalTokens?: number
+  inputTokens?: number
+  outputTokens?: number
+  /** tokens served from prompt cache (DeepSeek/Kimi/GLM prompt caching) */
+  cachedTokens?: number
   /** every provider attempt observed (success + failure) */
   providerAttempts: Array<{
     provider: string
@@ -110,6 +117,9 @@ export interface AimRunMetadata {
     attemptIndex: number
     responseModel?: string
     totalTokens?: number
+    promptTokens?: number
+    completionTokens?: number
+    cachedTokens?: number
   }>
 }
 

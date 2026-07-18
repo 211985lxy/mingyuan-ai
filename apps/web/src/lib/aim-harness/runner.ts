@@ -119,6 +119,10 @@ export async function runAimHarness(
     degraded,
     promptHash: hashPrompt(composedPrompt),
     contextHash: hashContextManifest(contextManifest),
+    totalTokens: successfulAttempt?.totalTokens,
+    inputTokens: successfulAttempt?.promptTokens,
+    outputTokens: successfulAttempt?.completionTokens,
+    cachedTokens: successfulAttempt?.cachedTokens,
     providerAttempts: providerAttempts.map((attempt) => ({
       provider: attempt.provider,
       model: attempt.model,
@@ -129,6 +133,9 @@ export async function runAimHarness(
       attemptIndex: attempt.attemptIndex,
       responseModel: attempt.responseModel,
       totalTokens: attempt.totalTokens,
+      promptTokens: attempt.promptTokens,
+      completionTokens: attempt.completionTokens,
+      cachedTokens: attempt.cachedTokens,
     })),
   }
 

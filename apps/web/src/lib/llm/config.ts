@@ -54,6 +54,68 @@ export function getProviderConfigs(): LLMProviderConfig[] {
     })
   }
 
+  // Direct: 火山引擎豆包 — OpenAI-compatible API
+  if (process.env.DOUBAO_API_KEY) {
+    configs.push({
+      name: "doubao",
+      apiKey: process.env.DOUBAO_API_KEY,
+      baseURL: process.env.DOUBAO_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3",
+      defaultModel: process.env.DOUBAO_MODEL || "doubao-seed-2-1-pro-260628",
+    })
+  }
+
+  // Direct: 阿里云百炼 DashScope — OpenAI-compatible 模式
+  if (process.env.DASHSCOPE_API_KEY) {
+    configs.push({
+      name: "dashscope",
+      apiKey: process.env.DASHSCOPE_API_KEY,
+      baseURL: process.env.DASHSCOPE_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      defaultModel: process.env.DASHSCOPE_MODEL || "qwen-plus",
+    })
+  }
+
+  // Direct: MiniMax — OpenAI-compatible API
+  if (process.env.MINIMAX_API_KEY) {
+    configs.push({
+      name: "minimax",
+      apiKey: process.env.MINIMAX_API_KEY,
+      baseURL: process.env.MINIMAX_BASE_URL || "https://api.minimax.chat/v1",
+      defaultModel: process.env.MINIMAX_MODEL || "abab6.5s-chat",
+    })
+  }
+
+  // Direct: 百度千帆 — OpenAI-compatible API（/v2/chat/completions，Bearer API Key 鉴权）
+  // ERNIE 5.1：2026-07 评估报告国产第一（87.57），中文深度写作/公众号长文/润色均衡型旗舰
+  if (process.env.QIANFAN_API_KEY) {
+    configs.push({
+      name: "qianfan",
+      apiKey: process.env.QIANFAN_API_KEY,
+      baseURL: process.env.QIANFAN_BASE_URL || "https://qianfan.baidubce.com/v2",
+      defaultModel: process.env.QIANFAN_MODEL || "ernie-5.1",
+    })
+  }
+
+  // ZenMux 聚合站（OpenAI-compatible，Claude/Gemini/GPT 海外旗舰已实测可调）
+  if (process.env.ZENMUX_API_KEY) {
+    configs.push({
+      name: "zenmux",
+      apiKey: process.env.ZENMUX_API_KEY,
+      baseURL: process.env.ZENMUX_BASE_URL || "https://zenmux.ai/api/v1",
+      defaultModel: process.env.ZENMUX_MODEL || "anthropic/claude-opus-4.8",
+    })
+  }
+
+  // APIMart 聚合站（OpenAI-compatible，Claude/Gemini 备用通道；注意：需国际网络/代理才可达，
+  // 国内直连会 SSL 失败，不可达时由故障转移链自动跳过，仅作末位备用）
+  if (process.env.APIMART_API_KEY) {
+    configs.push({
+      name: "apimart",
+      apiKey: process.env.APIMART_API_KEY,
+      baseURL: process.env.APIMART_BASE_URL || "https://api.apimart.ai/v1",
+      defaultModel: process.env.APIMART_MODEL || "claude-opus-4-8",
+    })
+  }
+
   // GPT-5.x: 离火API中转站（OpenAI-compatible，GPT-5.4/5.5 等模型）
   if (process.env.LIHUO_API_KEY) {
     configs.push({
