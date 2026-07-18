@@ -1,105 +1,105 @@
+import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
+import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
-
-interface ObsidianSyncEntry {
-  id: string // 由 CLI 根据文件相对路径或者内容哈希生成的唯一 ID，如 obsidian_xxxx
-  title: string
-  content: string
-  category: "boss_experience" | "product_usp" | "customer_pain" | "project_case" | "customer_qa"
-  tags: string[]
-}
-
-const VALID_CATEGORIES = [
-  "boss_experience", "product_usp", "customer_pain", "project_case", "customer_qa",
-] as const
-
-function authorizeSync(request: NextRequest): NextResponse | null {
-  const syncToken = process.env.OBSIDIAN_SYNC_TOKEN
-  if (!syncToken) {
-    console.error("[knowledge/sync] OBSIDIAN_SYNC_TOKEN 未配置,拒绝请求")
-    return NextResponse.json({ error: "同步接口未配置鉴权令牌" }, { status: 503 })
-  }
-  if (request.headers.get("x-obsidian-token") !== syncToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-  return null
-}
-
-async function resolveSyncTarget(userId?: string, projectId?: string): Promise<
-  | { targetUserId: string; targetProjectId: string | null }
-  | { error: NextResponse }
-> {
-  let targetUserId = userId
-  if (!targetUserId) {
-    const firstUser = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } })
-    if (!firstUser) {
-      return { error: NextResponse.json({ error: "No user found in the system to bind knowledge" }, { status: 404 }) }
-    }
-    targetUserId = firstUser.id
-  } else if (!await prisma.user.findUnique({ where: { id: targetUserId } })) {
-    return { error: NextResponse.json({ error: `User with ID ${targetUserId} does not exist` }, { status: 404 }) }
-  }
-
-  if (!projectId) return { targetUserId, targetProjectId: null }
-  const project = await prisma.clientProject.findFirst({
-    where: { id: projectId, userId: targetUserId },
-    select: { id: true },
-  })
-  if (!project) {
-    return { error: NextResponse.json({ error: "Project does not exist for target user" }, { status: 404 }) }
-  }
-  return { targetUserId, targetProjectId: project.id }
-}
-
-async function syncKnowledgeEntries(
-  entries: ObsidianSyncEntry[],
-  targetUserId: string,
-  targetProjectId: string | null,
-) {
-  const results: Array<{ id: string; title: string }> = []
-  for (const entry of entries) {
-    if (!entry.id || !entry.title || !entry.content) continue
-    const category = VALID_CATEGORIES.includes(entry.category) ? entry.category : "boss_experience"
-    const upserted = await prisma.knowledgeEntry.upsert({
-      where: { id: entry.id },
-      update: {
-        title: entry.title, content: entry.content, category, tags: entry.tags,
-        sourceType: "obsidian", status: "active",
-        ...(targetProjectId ? { projectId: targetProjectId } : {}),
-        updatedAt: new Date(),
-      },
-      create: {
-        id: entry.id, userId: targetUserId, projectId: targetProjectId,
-        title: entry.title, content: entry.content, category, tags: entry.tags,
-        sourceType: "obsidian", status: "active",
-      },
-    })
-    results.push({ id: upserted.id, title: upserted.title })
-  }
-  results.forEach((result) => ensureKnowledgeEmbedding(result.id).catch(() => {}))
-  return results
-}
+import { obsidianSyncBodySchema } from "@/features/knowledge/contracts/api"
+import { isKnowledgeCategory } from "@/lib/knowledge-categories"
 
 export async function POST(request: NextRequest) {
-  const authError = authorizeSync(request)
-  if (authError) return authError
+  const syncToken = env.OBSIDIAN_SYNC_TOKEN
+  const targetUserId = env.OBSIDIAN_SYNC_USER_ID
+  if (!syncToken || !targetUserId) {
+    console.error("[knowledge/sync] 同步令牌或绑定用户未配置,拒绝请求")
+    return NextResponse.json(
+      { error: "同步接口未配置鉴权令牌" },
+      { status: 503 }
+    )
+  }
+  const authHeader = request.headers.get("x-obsidian-token")
+
+  if (!authHeader || authHeader !== syncToken) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   try {
-    const body = await request.json()
-    const { entries, userId, projectId } = body as {
-      entries: ObsidianSyncEntry[]
-      userId?: string
-      projectId?: string
+    const { entries, projectId } = await parseJsonBody(
+      request,
+      obsidianSyncBodySchema,
+      { maxBytes: 5 * 1024 * 1024 },
+    )
+
+    const userExists = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true },
+    })
+    if (!userExists) {
+      return NextResponse.json({ error: "同步接口绑定用户不存在" }, { status: 503 })
     }
 
-    if (!Array.isArray(entries)) {
-      return NextResponse.json({ error: "Invalid payload: entries must be an array" }, { status: 400 })
+    let targetProjectId: string | null = null
+    if (projectId) {
+      const project = await prisma.clientProject.findFirst({
+        where: { id: projectId, userId: targetUserId },
+        select: { id: true },
+      })
+      if (!project) {
+        return NextResponse.json({ error: "Project does not exist for target user" }, { status: 404 })
+      }
+      targetProjectId = project.id
     }
 
-    const target = await resolveSyncTarget(userId, projectId)
-    if ("error" in target) return target.error
-    const results = await syncKnowledgeEntries(entries, target.targetUserId, target.targetProjectId)
+    const results = []
+
+    for (const entry of entries) {
+      if (!entry.id || !entry.title || !entry.content) {
+        continue
+      }
+
+      const existingOwner = await prisma.knowledgeEntry.findUnique({
+        where: { id: entry.id },
+        select: { userId: true },
+      })
+      if (existingOwner && existingOwner.userId !== targetUserId) {
+        return NextResponse.json({ error: "知识条目标识冲突" }, { status: 409 })
+      }
+
+      // 保证分类合法，不合法时默认归入 boss_experience
+      const finalCategory = isKnowledgeCategory(entry.category)
+        ? entry.category
+        : "boss_experience"
+
+      const upserted = await prisma.knowledgeEntry.upsert({
+        where: { id: entry.id, userId: targetUserId },
+        update: {
+          title: entry.title,
+          content: entry.content,
+          category: finalCategory,
+          tags: entry.tags,
+          sourceType: "obsidian",
+          status: "active",
+          ...(targetProjectId ? { projectId: targetProjectId } : {}),
+          updatedAt: new Date(),
+        },
+        create: {
+          id: entry.id,
+          userId: targetUserId,
+          projectId: targetProjectId,
+          title: entry.title,
+          content: entry.content,
+          category: finalCategory,
+          tags: entry.tags,
+          sourceType: "obsidian",
+          status: "active",
+        },
+      })
+      results.push({ id: upserted.id, title: upserted.title })
+    }
+
+    // Fire-and-forget: generate embeddings for synced entries
+    for (const result of results) {
+      ensureKnowledgeEmbedding(result.id).catch(() => {})
+    }
 
     return NextResponse.json({
       success: true,
@@ -107,9 +107,11 @@ export async function POST(request: NextRequest) {
       syncedEntries: results,
     })
   } catch (error) {
+    const contractResponse = apiRequestErrorResponse(request, error)
+    if (contractResponse) return contractResponse
     console.error("Obsidian sync error:", error)
     return NextResponse.json(
-      { error: "Internal Server Error", details: (error as Error).message },
+      { error: "Internal Server Error" },
       { status: 500 }
     )
   }
