@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 const source = readFileSync(join(process.cwd(), "src/app/(dashboard)/aim/page.tsx"), "utf8")
-const aimApiSource = readFileSync(join(process.cwd(), "src/lib/api/aim.ts"), "utf8")
+const apiClientSource = readFileSync(join(process.cwd(), "src/lib/api/client.ts"), "utf8")
 const helperSource = readFileSync(join(process.cwd(), "src/lib/aim/workbench-helpers.ts"), "utf8")
 const generationSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-generation-actions.ts"), "utf8")
 const chatSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-chat-actions.ts"), "utf8")
@@ -39,7 +39,7 @@ describe("AIM composer generate button", () => {
   })
 
   it("allows long-running generation requests", () => {
-    const generateClientBlock = aimApiSource.match(/export async function generateAimContent[\s\S]*?\n}/)?.[0] ?? ""
+    const generateClientBlock = apiClientSource.match(/export async function generateAimContent[\s\S]*?\n}/)?.[0] ?? ""
 
     expect(generateClientBlock).toContain("timeout: 180000")
   })

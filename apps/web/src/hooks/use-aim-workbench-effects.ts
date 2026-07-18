@@ -3,11 +3,11 @@
 import { useEffect, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from "react"
 
 import { getVideoCopyExtraction } from "@/lib/api/client"
-import { aimDraftProjectScope, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import { formatAnalysisResultForPrompt } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
-export function useAimDraftAutosave(draft: AimDraft, projectEnabled: boolean) {
+export function useAimDraftAutosave(draft: AimDraft) {
   const {
     selectedAgentId, selectedProjectId, input, messages, videoCopyExtractionId,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
@@ -18,10 +18,10 @@ export function useAimDraftAutosave(draft: AimDraft, projectEnabled: boolean) {
       selectedAgentId, selectedProjectId, input, messages, videoCopyExtractionId,
       sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
       editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
-    }, aimDraftProjectScope(projectEnabled, selectedProjectId))
+    })
   }, [
     editorFormat, editorPanelOpen, editorPanelWidth, editorSourceMessageId, editorText,
-    input, messages, projectEnabled, selectedAgentId, selectedProjectId, sourceAnalysisText,
+    input, messages, selectedAgentId, selectedProjectId, sourceAnalysisText,
     sourceOriginalText, sourceTopicRationale, sourceTopicTitle, videoCopyExtractionId,
   ])
 }

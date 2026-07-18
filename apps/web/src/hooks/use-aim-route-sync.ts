@@ -1,9 +1,9 @@
 "use client"
 
-import { startTransition, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
+import { startTransition, useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
 import { toast } from "sonner"
 
-import { getAimHistory, getVideoCopyExtraction, type AimGenerateResponse, type AimGeneration, type ContentFormat } from "@/lib/api/client"
+import { getVideoCopyExtraction, type AimGenerateResponse, type AimGeneration, type ContentFormat } from "@/lib/api/client"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { loadAimDraft } from "@/lib/aim/draft-storage"
 import { EDITOR_PANEL_DEFAULT_WIDTH } from "@/lib/aim-editor"
@@ -24,7 +24,6 @@ type SearchParams = { toString: () => string }
 export interface AimRouteStateSetters {
   setSelectedAgentId: Setter<AimAgentId>
   setSelectedProjectId: Setter<string>
-  setProjectEnabled: Setter<boolean>
   setMessages: Setter<AimWorkbenchMessage[]>
   setInput: Setter<string>
   setSourceVideoCopyExtractionId: Setter<string | undefined>
@@ -43,15 +42,14 @@ export function useAimAgentDraftSwitch(input: {
   agentParam: string | null
   activeAgentId: AimAgentId
   selectedProjectId: string
-  projectScope: string
   lastAgentParamRef: MutableRefObject<string | null>
   setters: AimRouteStateSetters
 }) {
-  const { agentParam, activeAgentId, selectedProjectId, projectScope, lastAgentParamRef, setters } = input
+  const { agentParam, activeAgentId, selectedProjectId, lastAgentParamRef, setters } = input
   useEffect(() => {
     if (lastAgentParamRef.current === agentParam) return
     lastAgentParamRef.current = agentParam
-    const draft = loadAimDraft(activeAgentId, projectScope)
+    const draft = loadAimDraft(activeAgentId)
     startTransition(() => {
       setters.setSelectedAgentId(activeAgentId)
       setters.setSelectedProjectId(draft?.selectedProjectId || selectedProjectId)
@@ -68,7 +66,7 @@ export function useAimAgentDraftSwitch(input: {
       setters.setEditorPanelWidth(draft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
       setters.setEditorPanelOpen(draft?.editorPanelOpen ?? true)
     })
-  }, [activeAgentId, agentParam, lastAgentParamRef, projectScope, selectedProjectId, setters])
+  }, [activeAgentId, agentParam, lastAgentParamRef, selectedProjectId, setters])
 }
 
 export function useAimTopicPrefill(input: {
@@ -86,10 +84,7 @@ export function useAimTopicPrefill(input: {
     const prefill = [topicTitle ? `选题：${topicTitle}` : null, topicRationale ? `选题依据：${topicRationale}` : null, idea ? `创作灵感：${idea}` : null]
       .filter(Boolean).join("\n")
     startTransition(() => {
-      if (projectId) {
-        setters.setSelectedProjectId(projectId)
-        setters.setProjectEnabled(true)
-      }
+      if (projectId) setters.setSelectedProjectId(projectId)
       setters.setMessages([])
       setters.setInput(prefill)
       setters.setSourceTopicTitle(topicTitle || idea || "")
@@ -102,7 +97,7 @@ export function useAimTopicPrefill(input: {
       setters.setEditorSourceMessageId(undefined)
     })
     const params = new URLSearchParams(searchParams.toString())
-    for (const key of ["topicTitle", "topicRationale", "idea"]) params.delete(key)
+    for (const key of ["topicTitle", "topicRationale", "projectId", "idea"]) params.delete(key)
     router.replace(params.toString() ? `/aim?${params.toString()}` : "/aim")
   }, [idea, projectId, router, searchParams, setters, topicRationale, topicTitle])
 }
@@ -161,7 +156,6 @@ export function useAimVideoCopyPrefill(input: {
 
 export function useAimHistoryLoad(input: {
   loadTargetId: string | null
-  generationIdParam: string | null
   history: AimGeneration[]
   selectedAgentId: AimAgentId
   router: Router
@@ -171,49 +165,35 @@ export function useAimHistoryLoad(input: {
   openEditorFromResult: (messageId: string, format: ContentFormat, content: string) => void
   setters: AimRouteStateSetters
 }) {
-  const { loadTargetId, generationIdParam, history, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters } = input
-  const loadedDeepLinkRef = useRef<string | null>(null)
+  const { loadTargetId, history, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters } = input
   useEffect(() => {
-    const isDeepLink = !loadTargetId && !!generationIdParam
-    if (!loadTargetId && !generationIdParam) return
-    if (isDeepLink && loadedDeepLinkRef.current === generationIdParam) return
-    let active = true
-    const load = async () => {
-      const item = loadTargetId
-        ? history.find((record) => record.id === loadTargetId)
-        : generationIdParam ? await getAimHistory(generationIdParam) : undefined
-      if (!active || !item) return
-      const contents = getAimHistoryContents(item)
-      const assistantId = nextAimWorkbenchId()
-      const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
-      startTransition(() => {
-        setters.setSelectedAgentId(itemAgentId)
-        setters.setSelectedProjectId(item.projectId || "")
-        setters.setProjectEnabled(Boolean(item.projectId))
-        setters.setSourceTopicTitle(item.topicTitle || "")
-        setters.setSourceTopicRationale("")
-        setters.setSourceOriginalText(extractBenchmarkOriginalText(item.rawInput))
-        setters.setSourceAnalysisText(extractBenchmarkAnalysisText(item.rawInput))
-        setters.setMessages([
-          { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
-          ...(contents.length ? [{ id: assistantId, role: "assistant" as const, content: `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`, agentId: item.agentId ?? undefined, deliverables: { id: item.id, results: contents.map((content) => ({ ...content, wordCount: content.content.length })), knowledgeUsed: [], taskSpec: item.taskSpec ?? null } as AimGenerateResponse }]
-            : [{ id: nextAimWorkbenchId(), role: "assistant" as const, content: "已加载历史素材，可直接让我改写。" }]),
-        ])
-        if (contents[0]) openEditorFromResult(assistantId, contents[0].format, contents[0].content)
-      })
-      if (itemAgentId !== selectedAgentId) {
-        const params = new URLSearchParams(searchParams.toString())
-        params.set("agent", itemAgentId)
-        lastAgentParamRef.current = itemAgentId
-        router.replace(`/aim?${params.toString()}`)
-      }
-      if (isDeepLink) loadedDeepLinkRef.current = item.id
-      toast.success("已加载历史记录")
-      clearLoadTarget()
-    }
-    void load().catch((error) => {
-      if (active) toast.error(error instanceof Error ? error.message : "历史记录加载失败")
+    if (!loadTargetId) return
+    const item = history.find((record) => record.id === loadTargetId)
+    if (!item) return
+    const contents = getAimHistoryContents(item)
+    const assistantId = nextAimWorkbenchId()
+    const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
+    startTransition(() => {
+      setters.setSelectedAgentId(itemAgentId)
+      setters.setSelectedProjectId(item.projectId || "")
+      setters.setSourceTopicTitle(item.topicTitle || "")
+      setters.setSourceTopicRationale("")
+      setters.setSourceOriginalText(extractBenchmarkOriginalText(item.rawInput))
+      setters.setSourceAnalysisText(extractBenchmarkAnalysisText(item.rawInput))
+      setters.setMessages([
+        { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
+        ...(contents.length ? [{ id: assistantId, role: "assistant" as const, content: `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`, agentId: item.agentId ?? undefined, deliverables: { id: item.id, results: contents.map((content) => ({ ...content, wordCount: content.content.length })), knowledgeUsed: [] } as AimGenerateResponse }]
+          : [{ id: nextAimWorkbenchId(), role: "assistant" as const, content: "已加载历史素材，可直接让我改写。" }]),
+      ])
+      if (contents[0]) openEditorFromResult(assistantId, contents[0].format, contents[0].content)
     })
-    return () => { active = false }
-  }, [clearLoadTarget, generationIdParam, history, lastAgentParamRef, loadTargetId, openEditorFromResult, router, searchParams, selectedAgentId, setters])
+    if (itemAgentId !== selectedAgentId) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("agent", itemAgentId)
+      lastAgentParamRef.current = itemAgentId
+      router.replace(`/aim?${params.toString()}`)
+    }
+    toast.success("已加载历史记录")
+    clearLoadTarget()
+  }, [clearLoadTarget, history, lastAgentParamRef, loadTargetId, openEditorFromResult, router, searchParams, selectedAgentId, setters])
 }

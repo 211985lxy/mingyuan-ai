@@ -23,7 +23,6 @@ import {
   type IpWikiLintReportDTO,
 } from "@/lib/api/client"
 import type { IpWikiDialogContext } from "@/lib/aim/workbench-types"
-export type { IpWikiDialogContext } from "@/lib/aim/workbench-types"
 
 const PAGE_TYPE_LABELS: Record<string, string> = {
   positioning: "定位主张",

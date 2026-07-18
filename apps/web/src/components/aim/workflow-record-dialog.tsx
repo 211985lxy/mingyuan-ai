@@ -28,21 +28,11 @@ function PublishFields({ form, onChange }: { form: PublishRecordForm; onChange: 
   </div>
 }
 
-const CORE_OUTCOME_FIELDS = [
-  ["dmCount", "有效私信"], ["qualifiedLeadCount", "合格线索"], ["dealCount", "成交"], ["revenue", "营收(元)"],
+const OUTCOME_FIELDS = [
+  ["dmCount", "有效私信"], ["qualifiedLeadCount", "合格线索"], ["appointmentCount", "预约咨询"],
+  ["dealCount", "成交"], ["revenue", "营收(元)"], ["views", "播放"], ["saves", "收藏"],
+  ["comments", "评论"], ["shares", "转发"],
 ] as const
-
-const MORE_OUTCOME_FIELDS = [
-  ["appointmentCount", "预约咨询"], ["views", "播放"], ["saves", "收藏"], ["comments", "评论"], ["shares", "转发"],
-] as const
-
-function OutcomeInputs({ fields, form, onChange }: {
-  fields: ReadonlyArray<readonly [string, string]>
-  form: OutcomeForm
-  onChange: (form: OutcomeForm) => void
-}) {
-  return <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{fields.map(([key, label]) => <label key={key} className="flex flex-col gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span><input inputMode="numeric" value={form[key] ?? ""} onChange={(event) => onChange({ ...form, [key]: event.target.value })} placeholder="—" className="h-8 rounded border border-border/60 bg-background px-2 text-sm" /></label>)}</div>
-}
 
 function OutcomeFields({ form, window, onChange, onWindowChange }: {
   form: OutcomeForm
@@ -52,14 +42,8 @@ function OutcomeFields({ form, window, onChange, onWindowChange }: {
 }) {
   return <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
     <div className="flex items-center justify-between"><p className="text-sm font-medium">结构化结果（选填，未填不计为 0）</p><select value={window} onChange={(event) => onWindowChange(event.target.value as OutcomeWindow)} className="h-7 rounded border border-border/60 bg-background px-2 text-xs"><option value="7">7 天</option><option value="14">14 天</option><option value="30">30 天</option></select></div>
-    <OutcomeInputs fields={CORE_OUTCOME_FIELDS} form={form} onChange={onChange} />
-    <details className="rounded-md border border-border/50 bg-background px-3 py-2">
-      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">更多数据</summary>
-      <div className="mt-3 space-y-3">
-        <OutcomeInputs fields={MORE_OUTCOME_FIELDS} form={form} onChange={onChange} />
-        <label className="flex flex-col gap-0.5"><span className="text-[11px] text-muted-foreground">用户反馈（哪类人在问 / 是否目标客户原话 / 是否带来错误人群）</span><Textarea value={form.audienceFeedback ?? ""} onChange={(event) => onChange({ ...form, audienceFeedback: event.target.value })} placeholder="把评论区/私信里真实出现的话记下来。" className="min-h-[60px]" /></label>
-      </div>
-    </details>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{OUTCOME_FIELDS.map(([key, label]) => <label key={key} className="flex flex-col gap-0.5"><span className="text-[11px] text-muted-foreground">{label}</span><input inputMode="numeric" value={form[key] ?? ""} onChange={(event) => onChange({ ...form, [key]: event.target.value })} placeholder="—" className="h-8 rounded border border-border/60 bg-background px-2 text-sm" /></label>)}</div>
+    <label className="flex flex-col gap-0.5"><span className="text-[11px] text-muted-foreground">用户反馈（哪类人在问 / 是否目标客户原话 / 是否带来错误人群）</span><Textarea value={form.audienceFeedback ?? ""} onChange={(event) => onChange({ ...form, audienceFeedback: event.target.value })} placeholder="把评论区/私信里真实出现的话记下来。" className="min-h-[60px]" /></label>
   </div>
 }
 

@@ -13,12 +13,8 @@ describe("selectAuthorizedProjectId", () => {
     expect(selectAuthorizedProjectId("project-2", projects)).toBe("project-2")
   })
 
-  it("does not silently switch when a requested project is stale", () => {
-    expect(selectAuthorizedProjectId("deleted-project", projects)).toBe("")
+  it("falls back when a draft contains a stale project", () => {
+    expect(selectAuthorizedProjectId("deleted-project", projects)).toBe("project-1")
     expect(selectAuthorizedProjectId("deleted-project", [])).toBe("")
-  })
-
-  it("selects the first project only when no project was requested", () => {
-    expect(selectAuthorizedProjectId("", projects)).toBe("project-1")
   })
 })

@@ -12,6 +12,7 @@ import type {
 } from "@/components/aim/workflow-record-dialog"
 import {
   updateAimWorkflowStatus,
+  upsertContentOutcome,
   type AimCalibrationRule,
   type AimDecisionSnapshot,
   type AimRetroSnapshot,
@@ -59,9 +60,9 @@ async function savePublishRecord(generationId: string, form: PublishRecordForm, 
   toast.success("已登记发布")
 }
 
-function buildRetroOutcome(form: OutcomeForm, window: OutcomeWindow, platform: string) {
-  if (!Object.values(form).some((value) => value?.trim())) return undefined
-  return {
+async function saveRetroOutcome(generationId: string, form: OutcomeForm, window: OutcomeWindow, platform: string) {
+  if (!Object.values(form).some((value) => value?.trim())) return
+  await upsertContentOutcome(generationId, {
     collectWindowDay: Number(window) as 7 | 14 | 30,
     platform: platform.trim() || undefined,
     dmCount: parseAimOutcomeNumber(form, "dmCount"),
@@ -74,7 +75,7 @@ function buildRetroOutcome(form: OutcomeForm, window: OutcomeWindow, platform: s
     comments: parseAimOutcomeNumber(form, "comments"),
     shares: parseAimOutcomeNumber(form, "shares"),
     audienceFeedback: form.audienceFeedback?.trim() || undefined,
-  }
+  }).catch((error) => console.error("[retro] outcome save failed (non-blocking)", error))
 }
 
 async function saveRetroRecord(input: {
@@ -96,8 +97,8 @@ async function saveRetroRecord(input: {
     calibrationRule: input.ruleForm.rule.trim()
       ? { rule: input.ruleForm.rule.trim(), source: input.ruleForm.source?.trim() || "内容复盘" }
       : undefined,
-    retroOutcome: buildRetroOutcome(input.outcomeForm, input.outcomeWindow, input.publishForm.publishPlatform),
   })
+  await saveRetroOutcome(input.generationId, input.outcomeForm, input.outcomeWindow, input.publishForm.publishPlatform)
   toast.success("已保存复盘")
 }
 
@@ -150,7 +151,6 @@ interface UseAimWorkflowRecordsInput {
   selectedProjectId: string
   refreshHistory: (options: { force: boolean; agentId: AimAgentId }) => Promise<void>
   refreshProjectWorkflow: () => Promise<void>
-  onPublished?: (generationId: string) => void
 }
 
 export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
@@ -183,10 +183,7 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     if (!recordDialog) return
     try {
       if (recordDialog.mode === "decision") await saveDecisionRecord(recordDialog.generationId, forms.decisionForm)
-      else if (recordDialog.mode === "publish") {
-        await savePublishRecord(recordDialog.generationId, forms.publishForm, input.messages)
-        input.onPublished?.(recordDialog.generationId)
-      }
+      else if (recordDialog.mode === "publish") await savePublishRecord(recordDialog.generationId, forms.publishForm, input.messages)
       else await saveRetroRecord({
         generationId: recordDialog.generationId,
         retroForm: forms.retroForm,
@@ -200,6 +197,6 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
-  }, [forms, input, recordDialog, refreshRecords])
+  }, [forms, input.messages, recordDialog, refreshRecords])
   return { recordDialog, closeRecordDialog: () => setRecordDialog(null), ...forms, handleMarkStatus, openRecordDialog, submitRecordDialog }
 }

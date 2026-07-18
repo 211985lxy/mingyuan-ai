@@ -47,7 +47,7 @@ function MessageContent({ message }: { message: AimWorkbenchMessage }) {
 function RunDiagnostics({ message }: { message: AimWorkbenchMessage }) {
   if (!message.deliverables || (!message.degraded && (!message.qualityStatus || message.qualityStatus === "pass")) || !message.runId) return null
   return <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${message.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>{message.degraded ? "已使用备用模型完成" : "质量提示"}</span>
+    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${message.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>{message.degraded ? "降级交付" : "质量提示"}</span>
     <span>执行编号 {message.runId}</span>
     {message.qualityStatus && message.qualityStatus !== "pass" ? <span>· 质量 {message.qualityStatus === "warn" ? "待优化" : message.qualityStatus === "fail" ? "未通过" : message.qualityStatus}</span> : null}
   </div>
@@ -64,7 +64,6 @@ interface MessageActions {
   onEditResult: (messageId: string, format: ContentFormat, content: string) => void
   onOpenRecord: (messageId: string, mode: WorkflowRecordMode) => void
   onCompileToWiki: (context: IpWikiDialogContext) => void
-  onAttachProject?: (generationId: string) => void
 }
 
 function MessageDeliverable({ message, selectedAgentId, selectedProjectId, latestDeliverableMessageId, busy, actions }: {
@@ -84,7 +83,7 @@ function MessageDeliverable({ message, selectedAgentId, selectedProjectId, lates
     sourceGenerationId: deliverables.id,
     positioningText: rawCopy,
   } : null
-  return <div className="mt-2 w-full"><AimDeliverableBubble deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} /></div>
+  return <div className="mt-2 w-full"><AimDeliverableBubble deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} /></div>
 }
 
 function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, latestDeliverableMessageId, actions }: {
