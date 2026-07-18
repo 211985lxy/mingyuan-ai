@@ -75,11 +75,23 @@ export function detectVideoPlatform(url: string): string {
     if (hostname.includes("bilibili.com") || hostname.includes("b23.tv")) return "bilibili"
     if (hostname.includes("kuaishou.com")) return "kuaishou"
     if (hostname.includes("xiaohongshu.com") || hostname.includes("xhslink.com")) return "xiaohongshu"
+    if (hostname.includes("channels.weixin.qq.com") || hostname.includes("weixin110.qq.com")) return "channels"
     if (hostname.includes("youtube.com") || hostname.includes("youtu.be")) return "youtube"
     return "unknown"
   } catch {
     return "unknown"
   }
+}
+
+/** 视频号接口尚未完成真实服务商联调，默认保持关闭并明确失败。 */
+export function assertVideoTextProviderReady(platform: string): void {
+  if (platform !== "channels") return
+  const url = process.env.CHANNELS_EXTRACT_API_URL?.trim()
+  const key = process.env.CHANNELS_EXTRACT_API_KEY?.trim()
+  if (!url || !key) {
+    throw new Error("视频号文案提取服务尚未完成真实联调，请先配置服务商接口、Key 和响应契约。")
+  }
+  throw new Error("视频号 Provider 尚未启用：配置已存在，但仍需完成真实服务商联调和失败语义验收。")
 }
 
 export function assertSupportedVideoUrl(input: string): string {

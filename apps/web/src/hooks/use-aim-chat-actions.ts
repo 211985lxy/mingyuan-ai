@@ -5,6 +5,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 import { ApiError } from "@/lib/api/client"
 import type { AimEditorContext, TextSelectionRange } from "@/lib/aim-editor"
 import type { AimAgentId } from "@/lib/aim-ui-config"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand, type AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
 import {
@@ -34,6 +35,7 @@ interface AimChatActionInput {
   clearCurrentTaskContext: () => void
   clearImages: () => void
   runWorkbenchCommand: (command: AimWorkbenchCommand) => boolean | void
+  agentModule?: CopyStudioModule
 }
 
 function setAssistantMessage(input: AimChatActionInput, assistantId: string, content: string) {
@@ -65,6 +67,8 @@ async function executeChatRequest(
     toolAction,
     resultId,
     editorContext: options.editorContext,
+    agentModule: input.agentModule,
+    writerModule: input.agentModule,
     signal: controller.signal,
     onContent: (content) => setAssistantMessage(input, assistantId, content),
   })

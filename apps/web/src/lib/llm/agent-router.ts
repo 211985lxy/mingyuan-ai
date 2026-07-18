@@ -2,6 +2,7 @@ import { LLMClient } from "./client"
 import { getProviderConfigs } from "./config"
 import { OpenAICompatibleProvider } from "./provider"
 import type { LLMProvider, LLMProviderConfig, ModelCapability } from "./types"
+import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio"
 
 /**
  * 智能体模型路由策略
@@ -110,12 +111,24 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   ],
 }
 
+// 统一创作台模块复用现有生产链，避免在合并阶段改变主线的生产首选顺序。
+const COPY_STUDIO_ROUTE_ALIASES: Record<string, string> = {
+  [COPY_STUDIO_ROUTE_KEYS.social]: "content_producer",
+  [COPY_STUDIO_ROUTE_KEYS.longform]: "deep_copywriter",
+  [COPY_STUDIO_ROUTE_KEYS.free]: "free_copywriter",
+}
+
+export function resolveAgentRouteKey(agentId: string, module?: CopyStudioModule): string {
+  if (module) return COPY_STUDIO_ROUTE_KEYS[module]
+  return agentId
+}
+
 /**
  * 根据智能体 ID 获取专用的 LLM 实例
  * 按路由配置构造 provider 链，每个 provider 用指定的模型
  */
 export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMClient {
-  const routes = AGENT_ROUTES[agentId]
+  const routes = AGENT_ROUTES[COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId]
 
   if (!routes) {
     // 没有特殊配置，使用默认实例（provider 链按 config 顺序）
@@ -162,7 +175,7 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
  * 获取智能体的推荐模型名称（用于日志/可观测）
  */
 export function getAgentRecommendedModel(agentId: string): string {
-  const routes = AGENT_ROUTES[agentId]
+  const routes = AGENT_ROUTES[COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId]
   if (!routes) return "default"
 
   const allConfigs = getProviderConfigs()

@@ -84,6 +84,8 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     topicSelectionId: parsed.topicSelectionId,
     selectedTopicIndex: parsed.selectedTopicIndex,
     runtimeTask,
+    agentModule: parsed.agentModule,
+    writerModule: parsed.writerModule,
     taskSpec: workflowBrief?.taskSpec,
     actorId: userId,
     projectId,

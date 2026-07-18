@@ -29,6 +29,7 @@ import type {
   AimRunSpec,
 } from "./types"
 import { HARNESS_VERSION } from "./types"
+import { computeCostCny } from "./model-pricing"
 
 export interface RunAimHarnessInput {
   plan: PlanRunInput
@@ -109,6 +110,9 @@ export async function runAimHarness(
   const failedAttempts = providerAttempts.filter((attempt) => attempt.status === "failed")
   const fallbackIndex = successfulAttempt?.attemptIndex ?? 0
   const degraded = failedAttempts.length > 0 && successfulAttempt !== undefined
+  const inputTokens = successfulAttempt?.promptTokens
+  const outputTokens = successfulAttempt?.completionTokens
+  const cachedTokens = successfulAttempt?.cachedTokens
 
   const metadata: AimRunMetadata = {
     runId,
@@ -119,6 +123,10 @@ export async function runAimHarness(
     degraded,
     promptHash: hashPrompt(composedPrompt),
     contextHash: hashContextManifest(contextManifest),
+    inputTokens,
+    outputTokens,
+    cachedTokens,
+    costCny: computeCostCny(successfulAttempt?.provider, successfulAttempt?.responseModel ?? successfulAttempt?.model, { inputTokens, outputTokens, cachedTokens }),
     providerAttempts: providerAttempts.map((attempt) => ({
       provider: attempt.provider,
       model: attempt.model,
@@ -130,6 +138,9 @@ export async function runAimHarness(
       attemptIndex: attempt.attemptIndex,
       responseModel: attempt.responseModel,
       totalTokens: attempt.totalTokens,
+      promptTokens: attempt.promptTokens,
+      completionTokens: attempt.completionTokens,
+      cachedTokens: attempt.cachedTokens,
     })),
   }
 

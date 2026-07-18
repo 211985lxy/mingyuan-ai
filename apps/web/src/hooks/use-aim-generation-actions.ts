@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/client"
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
 import type { AimAgentId } from "@/lib/aim-ui-config"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import {
@@ -69,6 +70,7 @@ export interface AimGenerationActionInput {
   openEditorFromResult: (messageId: string, format: ContentFormat, content: string) => void
   refreshHistory: (options?: { projectId?: string; agentId?: string; force?: boolean }) => Promise<void>
   refreshProjectWorkflow: () => Promise<void>
+  agentModule?: CopyStudioModule
 }
 
 interface GenerateOptions {
@@ -104,6 +106,8 @@ function buildGenerationRequest(
   const keepContext = !options.startsNewTask
   return {
     agentId: input.selectedAgentId,
+    agentModule: input.agentModule,
+    writerModule: input.agentModule,
     rawInput: buildAimHistoryRawInput(rawInput, options.retryMessageId ? "" : currentInput, baseMessages),
     targetFormats: input.agent.defaultFormats,
     projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,

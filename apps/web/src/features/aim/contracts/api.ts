@@ -65,6 +65,8 @@ export const aimChatBodySchema = z.object({
   resultId: optionalId,
   stream: z.boolean().optional(),
   editorContext: editorContextSchema.optional(),
+  agentModule: z.enum(["social", "longform", "free"]).optional(),
+  writerModule: z.enum(["social", "longform", "free"]).optional(),
 }).strict()
 
 const contentFormatSchema = z.enum([
@@ -95,6 +97,8 @@ export const aimGenerateBodySchema = z.object({
   topicSelectionId: optionalId,
   selectedTopicIndex: z.number().int().min(0).max(20).optional(),
   workflow: aimWorkflowBriefBodySchema.optional(),
+  agentModule: z.enum(["social", "longform", "free"]).optional(),
+  writerModule: z.enum(["social", "longform", "free"]).optional(),
 }).strict()
 
 export const aimEvolveBodySchema = z.object({

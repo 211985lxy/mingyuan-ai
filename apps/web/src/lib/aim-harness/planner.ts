@@ -46,6 +46,8 @@ export interface PlanRunInput {
   runtimeTask?: AimRuntimeTask
   knowledgeStrategy?: ResolvedKnowledgeStrategy
   conversationMode?: AimConversationMode
+  agentModule?: "social" | "longform" | "free"
+  writerModule?: "social" | "longform" | "free"
 }
 
 /**
@@ -104,7 +106,9 @@ function buildContextPolicy(
 function buildModelPolicy(
   agentId: AimAgentId,
   entrypoint: AimEntrypoint,
-  stream: boolean
+  stream: boolean,
+  agentModule?: "social" | "longform" | "free",
+  writerModule?: "social" | "longform" | "free",
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
   const needsAdvancedReasoning =
@@ -116,6 +120,7 @@ function buildModelPolicy(
 
   return {
     agentId,
+    ...((agentModule ?? writerModule) ? { routeKey: `copy_studio.${agentModule ?? writerModule}` } : {}),
     stream,
     temperature: isChat ? 0.7 : 0.8,
     ...(isChat ? {} : { maxTokens: 8192 }),
@@ -152,7 +157,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
 
   const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
 
-  const modelPolicy = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false)
+  const modelPolicy = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false, input.agentModule, input.writerModule)
 
   return {
     entrypoint: input.entrypoint,

@@ -1,10 +1,12 @@
 "use client"
 
-import { useRef, useState, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { FileText, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { STYLE_GUIDE_LABELS } from "@/lib/style-guide-config"
+import { buildWechatClipboardPayload, markdownToWechatHtml, type WechatThemeId } from "@/lib/wechat-style"
+import { buildLocalChecklist } from "@/lib/xhs-review"
 import { clampEditorPanelWidth, type TextSelectionRange } from "@/lib/aim-editor"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import type { ContentFormat } from "@/lib/api/client"
@@ -37,6 +39,7 @@ interface BenchmarkEditorPanelProps {
   imitating: boolean
   imitateStyleId: string
   onImitateStyleChange: (styleId: string) => void
+  generationId?: string
 }
 
 function readSelection(element: HTMLTextAreaElement): AimEditorSelection {
@@ -73,6 +76,47 @@ function EditorHeader(props: Pick<BenchmarkEditorPanelProps, "labels" | "editorF
   )
 }
 
+type VersionSummary = { id: string; versionNo: number; source: string; createdAt: string; preview: string; content?: string }
+
+function VersionTimeline({ generationId, format, editorText, onRestore }: { generationId: string; format: ContentFormat; editorText: string; onRestore: (content: string) => void }) {
+  const [versions, setVersions] = useState<VersionSummary[]>([])
+  const [selected, setSelected] = useState<string | null>(null)
+  useEffect(() => { fetch(`/api/content-versions?generationId=${encodeURIComponent(generationId)}&format=${encodeURIComponent(format)}`).then((r) => r.ok ? r.json() : null).then(async (payload) => { const existing = payload?.data ?? []; if (existing.length === 0 && editorText.trim()) { const created = await fetch("/api/content-versions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ generationId, format, content: editorText, source: "generated" }) }).then((r) => r.ok ? r.json() : null); setVersions(created?.data ? [created.data] : []) } else setVersions(existing) }).catch(() => {}) }, [generationId, format, editorText])
+  async function restore(id: string) {
+    const response = await fetch(`/api/content-versions/${id}/restore`, { method: "POST" })
+    if (!response.ok) return
+    const payload = await response.json()
+    const content = payload?.data?.content
+    if (typeof content === "string") { onRestore(content); setVersions((items) => [...items, payload.data]) }
+  }
+  async function loadContent(id: string) {
+    const response = await fetch(`/api/content-versions?id=${encodeURIComponent(id)}`)
+    const payload = await response.json()
+    setVersions((items) => items.map((item) => item.id === id ? { ...item, content: payload?.data?.content } : item))
+  }
+  const selectedVersion = versions.find((item) => item.id === selected)
+  const diff = selectedVersion?.content ? selectedVersion.content.split("\n").map((line, index) => `${line === editorText.split("\n")[index] ? "  " : "+ "}${line}`).join("\n") : ""
+  return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4"><div className="text-xs font-medium text-muted-foreground">版本时间线</div>{versions.length === 0 ? <p className="text-xs text-muted-foreground">保存后会自动生成版本快照。</p> : <div className="space-y-2">{versions.map((version) => <div key={version.id} className="rounded-md border p-2 text-xs"><button type="button" className="w-full text-left" onClick={() => { setSelected(version.id); void loadContent(version.id) }}><div className="flex justify-between"><span>v{version.versionNo} · {version.source}</span><span>{new Date(version.createdAt).toLocaleString()}</span></div><p className="mt-1 truncate text-muted-foreground">{version.preview}</p></button><Button size="sm" variant="ghost" className="mt-1 h-7 text-xs" onClick={() => void restore(version.id)}>恢复为新版本</Button></div>)}</div>}{diff ? <pre className="whitespace-pre-wrap rounded-md bg-muted/30 p-2 text-xs leading-5">{diff}</pre> : null}</div>
+}
+
+function WechatPreview({ editorText }: { editorText: string }) {
+  const [theme, setTheme] = useState<WechatThemeId>("classic_blue")
+  async function copy() {
+    const payload = buildWechatClipboardPayload(editorText, theme)
+    await navigator.clipboard?.write([new ClipboardItem({ "text/html": new Blob([payload.html], { type: "text/html" }), "text/plain": new Blob([payload.text], { type: "text/plain" }) })]).catch(() => navigator.clipboard?.writeText(payload.text))
+  }
+  return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4"><div className="flex items-center gap-2"><Select value={theme} onValueChange={(value) => setTheme(value as WechatThemeId)}><SelectTrigger size="sm" className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="classic_blue">经典蓝</SelectItem><SelectItem value="graphite">石墨黑</SelectItem></SelectContent></Select><Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void copy()}>复制富文本</Button></div><article className="min-h-0 overflow-auto rounded-md border bg-white p-4 text-sm" dangerouslySetInnerHTML={{ __html: markdownToWechatHtml(editorText, theme) }} /></div>
+}
+
+function XhsEditor({ editorText, onEditorTextChange }: { editorText: string; onEditorTextChange: (text: string) => void }) {
+  const [title, setTitle] = useState(() => editorText.split("\n")[0]?.replace(/^#\s*/, "") ?? "")
+  const [body, setBody] = useState(() => editorText.split("\n").slice(1).join("\n"))
+  const [tags, setTags] = useState("#内容创作")
+  const checks = buildLocalChecklist(title, body)
+  function sync(nextTitle: string, nextBody: string, nextTags = tags) { onEditorTextChange([nextTitle.trim(), nextBody.trim(), nextTags.trim()].filter(Boolean).join("\n\n")) }
+  return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4"><input className="rounded-md border bg-background px-3 py-2 text-sm" value={title} placeholder="标题" onChange={(event) => { setTitle(event.target.value); sync(event.target.value, body) }} /><textarea className="min-h-40 flex-1 resize-none rounded-md border bg-background p-3 text-sm leading-6" value={body} placeholder="正文" onChange={(event) => { setBody(event.target.value); sync(title, event.target.value) }} /><input className="rounded-md border bg-background px-3 py-2 text-sm" value={tags} placeholder="标签" onChange={(event) => { setTags(event.target.value); sync(title, body, event.target.value) }} /><div className="grid grid-cols-2 gap-2 text-xs">{checks.map((check) => <div key={check.item} className="rounded border p-2">{check.item}: {check.note}</div>)}</div><div className="rounded-md bg-muted/30 p-2 text-xs text-muted-foreground">标题变体：{[title, `${title}｜我的真实经验`, `${title}：给正在做这件事的人`].filter(Boolean).join(" · ")}</div></div>
+}
+
 function EditorSection({ title, value, placeholder, readOnly, muted, hideEmptyCount, onChange, onSelection }: {
   title: string
   value: string
@@ -107,16 +151,23 @@ function EditorSplitHandle({ splitRef, onPercentChange }: { splitRef: RefObject<
 export function BenchmarkEditorPanel(props: BenchmarkEditorPanelProps) {
   const splitRef = useRef<HTMLDivElement>(null)
   const [referencePercent, setReferencePercent] = useState(50)
+  const [view, setView] = useState<"edit" | "versions" | "wechat" | "xiaohongshu">("edit")
+  async function saveWithVersion() {
+    props.onSave()
+    if (!props.generationId || !props.editorFormat || !props.editorText.trim()) return
+    await fetch("/api/content-versions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ generationId: props.generationId, format: props.editorFormat, content: props.editorText, source: "manual_edit" }) }).catch(() => {})
+  }
   if (!props.open) return <CollapsedEditor labels={props.labels} editorText={props.editorText} onOpen={props.onOpen} />
   return (
     <aside className="relative flex shrink-0 flex-col border-l bg-background" style={{ width: props.width }}>
       <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-primary/30" onPointerDown={(event) => startPanelResize(event, props.onWidthChange)} />
-      <EditorHeader {...props} />
-      <div ref={splitRef} className="grid min-h-0 flex-1 bg-muted/15" style={{ gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}>
+      <EditorHeader {...props} onSave={saveWithVersion} />
+      <div className="flex flex-wrap gap-1 border-b px-4 py-2"><Button size="sm" variant={view === "edit" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("edit")}>编辑</Button>{props.editorFormat === "wechat_article" ? <Button size="sm" variant={view === "wechat" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("wechat")}>公众号</Button> : null}{props.editorFormat === "xiaohongshu_post" ? <Button size="sm" variant={view === "xiaohongshu" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("xiaohongshu")}>小红书</Button> : null}{props.generationId ? <Button size="sm" variant={view === "versions" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("versions")}>版本</Button> : null}</div>
+      {view === "versions" && props.generationId && props.editorFormat ? <VersionTimeline generationId={props.generationId} format={props.editorFormat} editorText={props.editorText} onRestore={props.onEditorTextChange} /> : view === "wechat" ? <WechatPreview editorText={props.editorText} /> : view === "xiaohongshu" ? <XhsEditor editorText={props.editorText} onEditorTextChange={props.onEditorTextChange} /> : <div ref={splitRef} className="grid min-h-0 flex-1 bg-muted/15" style={{ gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}>
         <EditorSection title={props.labels.referenceTitle} value={props.referenceText} placeholder={props.labels.referencePlaceholder} readOnly muted hideEmptyCount onSelection={props.onReferenceSelection} />
         <EditorSplitHandle splitRef={splitRef} onPercentChange={setReferencePercent} />
         <EditorSection title={props.labels.draftTitle} value={props.editorText} placeholder={props.labels.draftPlaceholder} onChange={props.onEditorTextChange} onSelection={props.onDraftSelection} />
-      </div>
+      </div>}
     </aside>
   )
 }

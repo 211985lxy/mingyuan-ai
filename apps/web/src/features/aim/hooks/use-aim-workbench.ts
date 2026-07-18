@@ -30,6 +30,7 @@ import {
   findLatestAimVideoDeliverableMessageId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimAgentId } from "@/lib/aim-ui-config"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { IpWikiDialogContext, AimWorkbenchMessage as ChatMessage } from "@/lib/aim/workbench-types"
 import { parseAimSearchParams } from "@/features/aim/aim-search-params"
@@ -59,6 +60,7 @@ export function useAimWorkbench() {
   const [initialDraft] = useState<AimDraft | null>(() => loadAimDraft(activeAgentId, explicitInitialScope))
   const initialQuickMode = modeParam === "quick" || (!projectIdParam && initialDraft?.selectedProjectId === "")
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
+  const [agentModule, setAgentModule] = useState<CopyStudioModule | undefined>(undefined)
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
@@ -231,7 +233,7 @@ export function useAimWorkbench() {
   const { generateWithInput, stopGeneration: handleStop, repurposeDeliverable: handleRepurpose, checkDeliverableQuality: handleQuality } = useAimGenerationActions({
     messages, setMessages, setInput, setSourceOriginalText, setSourceAnalysisText,
     setWorkflowBrief, setContentAction, setIsGenerating, setIsQualityChecking,
-    agent, selectedAgentId, selectedProjectId, projectEnabled, currentWorkflowStage,
+    agent, selectedAgentId, selectedProjectId, projectEnabled, currentWorkflowStage, agentModule,
     contentAction, workflowBrief, sourceVideoCopyExtractionId,
     sourceTopicTitle, sourceTopicRationale,
     topicSelectionId: topicSelectionIdParam, selectedTopicIndex: selectedTopicIndexParam,
@@ -325,7 +327,7 @@ export function useAimWorkbench() {
   // ---- Chat actions ----
   const { sendText } = useAimChatActions({
     messages, setMessages, setInput, setIsThinking,
-    selectedAgentId, selectedProjectId, projectEnabled,
+    selectedAgentId, selectedProjectId, projectEnabled, agentModule,
     requestAbortRef, clearCurrentTaskContext, clearImages, runWorkbenchCommand,
   })
 
@@ -347,6 +349,7 @@ export function useAimWorkbench() {
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
+  const latestGenerationId = [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
 
   const projectAttach = useAimProjectAttach({
     projects,
@@ -394,5 +397,8 @@ export function useAimWorkbench() {
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),
+    latestGenerationId,
+    agentModule,
+    setAgentModule,
   }
 }

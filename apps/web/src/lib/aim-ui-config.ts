@@ -1,5 +1,5 @@
 import type { ComponentType } from "react"
-import { Activity, Compass, PenLine, ShieldCheck, Video } from "lucide-react"
+import { Activity, Compass, PenLine, ShieldCheck, Video, Edit3 } from "lucide-react"
 import type { ContentFormat } from "@/lib/api/client"
 // 身份契约唯一源：aim-harness/contracts.ts。
 // AimAgentId 类型 + 运行时校验/归一化逻辑（DEFAULT_AIM_AGENT /
@@ -18,6 +18,7 @@ import { DEFAULT_AIM_AGENT, normalizeAimAgentId } from "@/lib/aim-harness/contra
 export interface AimAgentMeta {
   id: AimAgentId
   title: string
+  displayTitle?: string
   description: string
   icon: ComponentType<{ className?: string }>
   defaultFormats: ContentFormat[]
@@ -41,22 +42,24 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   {
     id: "content_producer",
     title: "内容文案创作",
-    description: "改写、再创作、多平台内容",
+    displayTitle: "内容创作官",
+    description: "社媒速产、深度长文、自由交付",
     icon: Video,
     defaultFormats: ["video_script"],
   },
   {
     id: "free_copywriter",
     title: "交货文案创作",
-    description: "听用户要求，直接交稿",
+    description: "听用户要求，直接交稿；统一创作官内置自由模式",
     icon: PenLine,
     defaultFormats: ["raw_copy"],
   },
   {
     id: "deep_copywriter",
     title: "深度长文创作",
-    description: "公众号文章、深度长文、观点表达",
-    icon: PenLine,
+    displayTitle: "作品编辑官",
+    description: "文字二改、公众号排版、小红书图文",
+    icon: Edit3,
     defaultFormats: ["raw_copy"],
   },
   {

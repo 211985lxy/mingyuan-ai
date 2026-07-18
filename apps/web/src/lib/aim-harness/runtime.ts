@@ -69,6 +69,8 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     runtimeTask: request.runtimeTask,
     knowledgeStrategy: request.knowledgeStrategy,
     conversationMode: request.conversationMode,
+    agentModule: request.agentModule,
+    writerModule: request.writerModule,
   }
 }
 

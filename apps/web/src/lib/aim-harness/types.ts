@@ -43,6 +43,7 @@ export type AimModelCapability = ModelCapability
 /** Model policy: routing + fallback behavior. */
 export interface AimModelPolicy {
   agentId: AimAgentId
+  routeKey?: string
   /** whether streaming is requested */
   stream: boolean
   /** temperature override (optional; handlers keep their defaults otherwise) */
@@ -113,6 +114,10 @@ export interface AimRunMetadata {
   promptHash: string
   /** SHA-256 of the context manifest */
   contextHash: string
+  inputTokens?: number
+  outputTokens?: number
+  cachedTokens?: number
+  costCny?: number
   /** every provider attempt observed (success + failure) */
   providerAttempts: Array<{
     provider: string
@@ -125,6 +130,9 @@ export interface AimRunMetadata {
     attemptIndex: number
     responseModel?: string
     totalTokens?: number
+    promptTokens?: number
+    completionTokens?: number
+    cachedTokens?: number
   }>
 }
 

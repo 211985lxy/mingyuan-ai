@@ -48,6 +48,8 @@ export interface ParseGenerateBodyResult {
   topicSelectionId: string | undefined
   selectedTopicIndex: number | undefined
   workflow: ReturnType<typeof parseWorkflowBriefRequest> | undefined
+  agentModule: "social" | "longform" | "free" | undefined
+  writerModule: "social" | "longform" | "free" | undefined
 }
 
 export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateBodyResult {
@@ -81,6 +83,10 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
       : undefined
 
   const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+  const requestedModule = body.agentModule ?? body.writerModule
+  const agentModule = requestedModule === "social" || requestedModule === "longform" || requestedModule === "free"
+    ? requestedModule
+    : undefined
 
   return {
     agentId,
@@ -103,6 +109,8 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
         ? body.selectedTopicIndex
         : undefined,
     workflow: parseWorkflowBriefRequest(body.workflow) || undefined,
+    agentModule,
+    writerModule: agentModule,
   }
 }
 
@@ -110,7 +118,10 @@ export function validateGenerateInput(parsed: {
   rawInput: string
   projectId: string
   targetFormats: ContentFormat[]
+  agentId?: string
+  agentModule?: "social" | "longform" | "free"
 }): string | null {
+  if (parsed.agentModule && !["content_producer", "deep_copywriter", "free_copywriter", "ip_video"].includes(parsed.agentId || "")) return "agentModule 只能用于内容创作官"
   if (!parsed.rawInput) return "请输入内容"
   if (parsed.targetFormats.length === 0) return "请选择至少一种生成格式"
   return null

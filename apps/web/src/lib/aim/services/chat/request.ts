@@ -44,6 +44,8 @@ export type AimChatRequestBody = {
   resultId: string
   shouldStream: boolean
   editorContext?: AimEditorContext
+  agentModule?: "social" | "longform" | "free"
+  writerModule?: "social" | "longform" | "free"
 }
 
 /** Result of parsing the chat body: either a validated request or an error response. */
@@ -65,6 +67,12 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
   if (!Array.isArray(messages) || messages.length === 0) {
     return { ok: false, status: 400, validationError: "请求格式不正确，缺少 messages 数组" }
   }
+  const requestedModule = record.agentModule ?? record.writerModule
+  const hasModule = requestedModule === "social" || requestedModule === "longform" || requestedModule === "free"
+  const requestedAgent = typeof record.agentId === "string" ? record.agentId : ""
+  if (hasModule && !["content_producer", "deep_copywriter", "free_copywriter", "ip_video"].includes(requestedAgent)) {
+    return { ok: false, status: 400, validationError: "agentModule 只能用于内容创作官" }
+  }
   return {
     ok: true,
     messages,
@@ -76,5 +84,7 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     editorContext: typeof record.editorContext === "object" && record.editorContext
       ? (record.editorContext as AimEditorContext)
       : undefined,
+    agentModule: record.agentModule === "social" || record.agentModule === "longform" || record.agentModule === "free" ? record.agentModule : undefined,
+    writerModule: record.writerModule === "social" || record.writerModule === "longform" || record.writerModule === "free" ? record.writerModule : undefined,
   }
 }

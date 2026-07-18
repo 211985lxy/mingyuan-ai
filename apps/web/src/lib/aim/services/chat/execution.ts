@@ -32,6 +32,8 @@ export function prepareAimChatExecution(input: {
   agentId: string
   shouldStream: boolean
   trace?: AimTraceRecorder
+  agentModule?: "social" | "longform" | "free"
+  writerModule?: "social" | "longform" | "free"
 }) {
   const { context, userId, projectId, agentId, trace } = input
   const { query, normalizedMessages, runtimeTask, conversationIntent, knowledgeBlock } = context

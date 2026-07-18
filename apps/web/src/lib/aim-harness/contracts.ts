@@ -116,6 +116,8 @@ export interface AimRunRequest {
   agentId: string
   /** 用户原始输入（已含被注入的爆款/热榜/评论等来源文本，阶段 2 由 prepareAimContext 产出） */
   rawInput: string
+  agentModule?: "social" | "longform" | "free"
+  writerModule?: "social" | "longform" | "free"
   /** 期望输出格式 */
   targetFormats?: ContentFormat[]
   /** 任务类型（驱动 runtimeTask 解析） */
