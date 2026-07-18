@@ -4,6 +4,7 @@ import type { ContentFormat } from "@/lib/api/client"
 
 /** 内容智能体 id */
 export type AimAgentId =
+  | "copywriter"
   | "content_producer"
   | "free_copywriter"
   | "business_diagnosis"
@@ -19,9 +20,15 @@ export interface AimAgentMeta {
   description: string
   icon: ComponentType<{ className?: string }>
   defaultFormats: ContentFormat[]
+  /**
+   * 隐藏卡：不出现在智能体列表/下拉中，但 id 仍然合法。
+   * 用于统一创作官合并后保留的三张旧创作卡——旧会话、旧书签、旧外部链接
+   * 仍按原 agentId 打开原 handler，只是不再作为新入口展示。
+   */
+  hidden?: boolean
 }
 
-export const DEFAULT_AIM_AGENT: AimAgentId = "content_producer"
+export const DEFAULT_AIM_AGENT: AimAgentId = "copywriter"
 
 export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   {
@@ -39,11 +46,19 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     defaultFormats: ["raw_copy"],
   },
   {
+    id: "copywriter",
+    title: "文案创作官",
+    description: "社媒、长文、自由创作，一个入口",
+    icon: PenLine,
+    defaultFormats: ["video_script"],
+  },
+  {
     id: "content_producer",
     title: "内容文案创作",
     description: "改写、再创作、多平台内容",
     icon: Video,
     defaultFormats: ["video_script"],
+    hidden: true,
   },
   {
     id: "free_copywriter",
@@ -51,6 +66,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     description: "听用户要求，直接交稿",
     icon: PenLine,
     defaultFormats: ["raw_copy"],
+    hidden: true,
   },
   {
     id: "deep_copywriter",
@@ -58,6 +74,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     description: "公众号文章、深度长文、观点表达",
     icon: PenLine,
     defaultFormats: ["raw_copy"],
+    hidden: true,
   },
   {
     id: "content_review",
@@ -89,6 +106,8 @@ const LEGACY_AGENT_ID_ALIASES: Record<string, AimAgentId> = {
 /** 把旧别名归一化为当前规范 id；非别名原样返回 */
 export function normalizeAimAgentId(id: string | null | undefined): string {
   if (!id) return DEFAULT_AIM_AGENT
+  // copy_studio 模块键在 UI 层视为统一创作台（内容文案创作）
+  if (id.startsWith("copy_studio.")) return "content_producer"
   return LEGACY_AGENT_ID_ALIASES[id] ?? id
 }
 

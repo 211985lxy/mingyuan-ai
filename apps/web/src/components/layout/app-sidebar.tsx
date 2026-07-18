@@ -90,11 +90,21 @@ const footerItems: NavItem[] = [
 const coreAimAgentIds: AimAgentId[] = [
   "business_system_diagnosis",
   "business_diagnosis",
-  "content_producer",
-  "deep_copywriter",
+  "copywriter",
   "content_review",
   "persona",
 ]
+
+/**
+ * 旧创作卡 id（content_producer/free_copywriter/deep_copywriter/ip_video）的历史记录
+ * 在侧边栏统一归入「文案创作官」分组；点开记录时仍按记录原 agentId 走原 handler。
+ */
+const LEGACY_CREATION_AGENT_IDS = new Set<string>([
+  "content_producer",
+  "free_copywriter",
+  "deep_copywriter",
+  "ip_video",
+])
 
 const RECENT_ITEMS_PER_AGENT = 4
 
@@ -197,7 +207,9 @@ export function AppSidebar() {
       const agent = getAimAgent(agentId)
       const items = history.filter((item) => {
         const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
-        return itemAgentId === agentId
+        // 旧创作卡记录归入文案创作官分组
+        const groupAgentId = LEGACY_CREATION_AGENT_IDS.has(itemAgentId) ? "copywriter" : itemAgentId
+        return groupAgentId === agentId
       })
       return { agent, items }
     })

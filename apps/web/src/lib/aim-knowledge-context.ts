@@ -1,5 +1,6 @@
 import { retrieveRelevantKnowledge, ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import type { ScoredKnowledgeEntry } from "@/lib/llm/embeddings"
+import { normalizeAgentId } from "@/lib/llm/agent-router"
 import { parseKnowledgeTags, normalizeValueGrade } from "@/lib/knowledge-tags"
 import {
   type ResolvedKnowledgeStrategy,
@@ -36,6 +37,15 @@ export interface AimKnowledgeContextResult {
  * 保留所有类别，避免信息缺失。
  */
 const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
+  // 文案创作官沿用社媒速产的分类优先级（旧 content_producer 配置）
+  copywriter: [
+    "user_insight",
+    "product_usp",
+    "project_case",
+    "private_domain_material",
+    "hot_topic",
+    "benchmark_reference",
+  ],
   deep_copywriter: [
     "boss_experience",
     "product_usp",
@@ -192,8 +202,10 @@ export function rankKnowledgeEntriesForAgent<T extends { category: string; score
   const prioritySet = new Set(
     AGENT_PRIORITY_CATEGORIES[agentId] ?? DEFAULT_PRIORITY_CATEGORIES
   )
-  const wantsIp = agentId === "deep_copywriter" || agentId === "business_diagnosis"
-  const wantsProject = agentId === "content_producer" || agentId === "business_system_diagnosis" || agentId === "content_review"
+  // 归一化到 copy_studio 模块键再判断：旧 agentId 经别名映射到等价模块键，语义不变
+  const key = normalizeAgentId(agentId)
+  const wantsIp = key === "copy_studio.deep_article" || key === "copy_studio.outline" || key === "business_diagnosis"
+  const wantsProject = key === "copy_studio.social_post" || key === "copy_studio.video_script" || key === "business_system_diagnosis" || key === "content_review"
 
   return entries
     .map((entry) => {

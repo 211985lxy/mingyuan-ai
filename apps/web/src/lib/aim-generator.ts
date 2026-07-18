@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import { buildAimGeneration } from "./aim-agent-handlers"
+import { buildAimGeneration, type CopywriterModule } from "./aim-agent-handlers"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import type { ContentScenario } from "@/lib/content-scenario-config"
@@ -36,6 +36,8 @@ interface AimInput {
   runtimeTask?: AimRuntimeTask
   contentScenario?: ContentScenario
   existingGenerationId?: string
+  /** 文案创作官模块选择（仅 agentId="copywriter" 时生效） */
+  writerModule?: string
   trace?: AimTraceRecorder
   /** 推迟 trace done 事件到路由层发布（generate 路由会在质检步骤后统一发布） */
   deferTraceDoneEvent?: boolean
@@ -176,6 +178,7 @@ export async function generateAimContent(input: AimInput) {
     videoCopyExtractionId: input.videoCopyExtractionId,
     runtimeTask: input.runtimeTask,
     contentScenario: input.contentScenario,
+    writerModule: input.writerModule as CopywriterModule | "auto" | undefined,
     trace: input.trace,
     deferTraceDoneEvent: input.deferTraceDoneEvent,
   })

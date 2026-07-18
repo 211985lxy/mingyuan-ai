@@ -14,8 +14,12 @@ export async function GET(request: NextRequest) {
     const projectId = url.searchParams.get("projectId")
     const agentId = url.searchParams.get("agentId")
 
-    // content_producer 查询时同时包含旧 ip_video 记录
-    const resolvedAgentFilter = agentId === "content_producer"
+    // content_producer 查询时同时包含旧 ip_video 记录；
+    // copywriter（文案创作官）查询时同时包含被合并的三张旧创作卡记录，
+    // 记录本身 agentId 保持原值，点开时仍按原 agentId 走原 handler
+    const resolvedAgentFilter = agentId === "copywriter"
+      ? { agentId: { in: ["copywriter", "content_producer", "free_copywriter", "deep_copywriter", "ip_video"] as string[] } }
+      : agentId === "content_producer"
       ? { agentId: { in: ["content_producer", "ip_video"] as string[] } }
       : agentId ? { agentId } : {}
 

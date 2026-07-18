@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState, memo, useMemo, useRef, useCallback, startTransition } from "react"
+import { useEffect, useState, memo, useMemo, useRef, useCallback, startTransition, type ReactNode } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import {
   Check,
   Clipboard,
   Database,
+  Eye,
   FileText,
   Loader2,
   Sparkles,
@@ -14,6 +15,7 @@ import {
   Target,
   Plus,
   ArrowRight,
+  History,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -66,6 +68,8 @@ import {
   type ClientProject,
   type ContentFormat,
   type QualityCheckReport,
+  createContentVersion,
+  type ContentVersionSource,
 } from "@/lib/api/client"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
 import { transcribeAudio } from "@/lib/api/client"
@@ -82,6 +86,7 @@ import {
   getAimAgentGuide,
   type AimAgentGuide,
   type AimNextAction,
+  type AimStudioModule,
   type AimWorkbenchSkill,
 } from "@/lib/aim-agent-guides"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
@@ -102,6 +107,8 @@ import {
   type TextSelectionRange,
 } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
+import { VersionTimeline } from "@/components/aim/version-timeline"
+import { WechatPreview } from "@/components/aim/wechat-preview"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -462,6 +469,9 @@ function BenchmarkEditorPanel({
   imitating,
   imitateStyleId,
   onImitateStyleChange,
+  versionViewOpen,
+  onToggleVersionView,
+  versionContent,
 }: {
   open: boolean
   width: number
@@ -481,6 +491,10 @@ function BenchmarkEditorPanel({
   imitating: boolean
   imitateStyleId: string
   onImitateStyleChange: (styleId: string) => void
+  /** 版本时间线视图开关与内容（P0 版本管理） */
+  versionViewOpen: boolean
+  onToggleVersionView: () => void
+  versionContent?: ReactNode
 }) {
   const splitRef = useRef<HTMLDivElement>(null)
   const [referencePercent, setReferencePercent] = useState(50)
@@ -555,6 +569,16 @@ function BenchmarkEditorPanel({
               </Button>
             </>
           ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            className={versionViewOpen ? ACTIVE_SOFT_ACTION_CLASS : SOFT_ACTION_CLASS}
+            onClick={onToggleVersionView}
+            title="版本历史：查看/对比/恢复历史版本"
+          >
+            <History className="h-3.5 w-3.5" />
+            版本
+          </Button>
           <Button size="sm" variant="ghost" className={ACTIVE_SOFT_ACTION_CLASS} onClick={onSave}>
             保存
           </Button>
@@ -566,8 +590,12 @@ function BenchmarkEditorPanel({
       <div
         ref={splitRef}
         className="grid min-h-0 flex-1 bg-muted/15"
-        style={{ gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
+        style={versionViewOpen ? undefined : { gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
       >
+        {versionViewOpen ? (
+          <section className="flex min-h-0 flex-1 flex-col px-4 py-3">{versionContent}</section>
+        ) : (
+        <>
         <section className="flex min-h-0 flex-col px-4 py-3">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground">{labels.referenceTitle}</span>
@@ -615,6 +643,8 @@ function BenchmarkEditorPanel({
             placeholder={labels.draftPlaceholder}
           />
         </section>
+        </>
+        )}
       </div>
     </aside>
   )
@@ -960,6 +990,10 @@ export default function AimPage() {
   const activeAgentId: AimAgentId = isValidAimAgent(agentParam) ? agentParam : DEFAULT_AIM_AGENT
   const [initialDraft] = useState<AimDraft | null>(() => loadAimDraft(activeAgentId))
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
+  // 统一创作台当前选中的模块入口（copy_studio 模块键）；仅 content_producer 的 guide 提供模块按钮
+  const [activeModule, setActiveModule] = useState<AimStudioModule | null>(null)
+  // 文案创作官模块切换：auto=自动判定（默认），social=社媒速产，longform=深度长文，free=自由交付
+  const [writerModule, setWriterModule] = useState<"auto" | "social" | "longform" | "free">("auto")
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const [imageAttachments, setImageAttachments] = useState<AimImageAttachment[]>([])
@@ -974,6 +1008,10 @@ export default function AimPage() {
   const [editorSourceMessageId, setEditorSourceMessageId] = useState<string | undefined>(() => initialDraft?.editorSourceMessageId)
   const [editorPanelWidth, setEditorPanelWidth] = useState(() => initialDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
   const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? true)
+  // P0 版本管理：版本时间线视图开关 + 列表刷新信号 + 最近一次快照内容（去重/防抖用）
+  const [versionViewOpen, setVersionViewOpen] = useState(false)
+  const [versionRefreshKey, setVersionRefreshKey] = useState(0)
+  const lastVersionSnapshotRef = useRef("")
   const [referenceSelection, setReferenceSelection] = useState<EditorSelection>({ text: "", range: { start: 0, end: 0 } })
   const [draftSelection, setDraftSelection] = useState<EditorSelection>({ text: "", range: { start: 0, end: 0 } })
   const [isThinking, setIsThinking] = useState(false)
@@ -1073,7 +1111,9 @@ export default function AimPage() {
           ? "商业模式诊断"
           : selectedAgentId === "deep_copywriter"
             ? "深度长文创作"
-            : "内容文案创作"
+            : selectedAgentId === "copywriter"
+              ? "文案创作官"
+              : "内容文案创作"
 
   const hasEditorSelection = Boolean(referenceSelection.text.trim() || draftSelection.text.trim())
 
@@ -1190,6 +1230,11 @@ export default function AimPage() {
       setEditorPanelOpen(nextDraft?.editorPanelOpen ?? true)
     })
   }, [activeAgentId, agentParam, selectedProjectId])
+
+  // 切换智能体时清空已选模块（模块入口只属于统一创作台，跨智能体不保留）
+  useEffect(() => {
+    setActiveModule(null)
+  }, [selectedAgentId])
 
   useEffect(() => {
     if (!topicTitleParam && !topicRationaleParam && !projectIdParam && !ideaParam) return
@@ -1400,6 +1445,45 @@ export default function AimPage() {
     return latest?.deliverables?.results[0]?.content.trim() || ""
   }
 
+  /** 编辑器当前内容关联的生成记录 id（版本快照的归属维度） */
+  function editorGenerationId() {
+    return (
+      messages.find((message) => message.id === editorSourceMessageId)?.deliverables?.id ||
+      latestDeliverableId() ||
+      ""
+    )
+  }
+
+  // P0 版本管理：自动快照。只追加不覆盖；失败静默不打断编辑流程。
+  function snapshotEditorVersion(
+    source: ContentVersionSource,
+    content: string,
+    options?: { format?: ContentFormat; generationId?: string }
+  ) {
+    const generationId = options?.generationId || editorGenerationId()
+    if (!generationId || !content.trim()) return
+    if (content === lastVersionSnapshotRef.current) return // 内容没变不重复存版
+    lastVersionSnapshotRef.current = content
+    void createContentVersion({
+      generationId,
+      format: options?.format || editorFormat || "raw_copy",
+      content,
+      source,
+    })
+      .then(() => setVersionRefreshKey((key) => key + 1))
+      .catch(() => {})
+  }
+
+  // 手动编辑防抖快照：停留 5 秒无改动且内容非空时存一版 manual_edit
+  useEffect(() => {
+    if (!editorText.trim()) return
+    const timer = setTimeout(() => {
+      snapshotEditorVersion("manual_edit", editorText)
+    }, 5000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorText])
+
   function fillReferenceTextFromConversation() {
     const source = [...messages]
       .reverse()
@@ -1582,6 +1666,7 @@ export default function AimPage() {
     })
       .then((result) => {
         setEditorText(result.polished)
+        snapshotEditorVersion("ai_imitate", result.polished) // 版本快照：AI 仿写
         toast.success("已把对标爆款的结构逻辑迁移到你的稿子")
       })
       .catch((error) => {
@@ -1613,6 +1698,7 @@ export default function AimPage() {
       )
     )
     toast.success("已保存到交付物")
+    snapshotEditorVersion("manual_edit", editorText) // 版本快照：手动保存
     return true
   }
 
@@ -1827,7 +1913,9 @@ export default function AimPage() {
     const replacement = extractReplacementDraft(message.content)
     const range = message.editorApply?.range
     if (!replacement || !range) return
-    setEditorText((current) => applySelectionReplacement(current, range, replacement))
+    const nextText = applySelectionReplacement(editorText, range, replacement)
+    setEditorText(nextText)
+    snapshotEditorVersion("ai_polish", nextText) // 版本快照：划词 AI 润色
     toast.success("已应用到右侧选区")
   }
 
@@ -1908,8 +1996,13 @@ export default function AimPage() {
       }
 
       let hasContent = false
+      // 模块入口：仅统一创作台（content_producer）且用户已点选模块时携带模块键；
+      // 发送成功后保留 activeModule，点其他模块或切换智能体时再更换/清空
+      const agentModule = selectedAgentId === "content_producer" ? activeModule?.module : undefined
       const streamResult = await chatAimStream(chatMessages, {
         agentId: selectedAgentId,
+        agentModule,
+        writerModule: selectedAgentId === "copywriter" ? writerModule : undefined,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
         editorContext: options?.editorContext,
         signal: controller.signal,
@@ -2097,6 +2190,28 @@ export default function AimPage() {
     toast.success("技能指令已填入")
   }, [editorText, messages, sourceAnalysisText, sourceOriginalText, sourceTopicTitle])
 
+  // 模块入口：与技能一样把 prompt 填入输入框（复用“基于当前内容”前缀逻辑），
+  // 并记录本次运行的 copy_studio 模块键，发送时随 body.agentModule 上报
+  const handleUseModule = useCallback((module: AimStudioModule) => {
+    const hasCurrentContext = Boolean(
+      editorText.trim() ||
+      sourceOriginalText.trim() ||
+      sourceAnalysisText.trim() ||
+      sourceTopicTitle.trim() ||
+      messages.some((message) => message.role === "assistant" && (message.content.trim() || message.deliverables)),
+    )
+    const prompt = hasCurrentContext && !module.prompt.includes("当前")
+      ? `请基于当前内容，${module.prompt.replace(/^请/, "")}`
+      : module.prompt
+
+    setInput((current) => {
+      const text = current.trim()
+      return text ? `${prompt}\n\n---\n${text}\n---` : prompt
+    })
+    setActiveModule(module)
+    toast.success(`已进入「${module.label}」模块`)
+  }, [editorText, messages, sourceAnalysisText, sourceOriginalText, sourceTopicTitle])
+
   async function handleSend() {
     await sendText(input.trim(), hasEditorSelection ? {
       editorContext: buildEditorContext("用户追问"),
@@ -2144,6 +2259,7 @@ export default function AimPage() {
     try {
       const response = await generateAimContent({
         agentId: selectedAgentId,
+        writerModule: selectedAgentId === "copywriter" ? writerModule : undefined,
         rawInput: buildHistoryRawInput(rawInput, options?.retryMessageId ? "" : currentInput, baseMessages),
         targetFormats: agent.defaultFormats,
         projectId: projectEnabled ? selectedProjectId || undefined : undefined,
@@ -2203,6 +2319,15 @@ export default function AimPage() {
           correctedMainResult.format,
           correctedMainResult.content,
         )
+      }
+      // 版本快照：生成完成存首版 generated（按格式各存一版）
+      if (response.id) {
+        for (const result of correctedResponse.results) {
+          snapshotEditorVersion("generated", result.content, {
+            format: result.format,
+            generationId: response.id,
+          })
+        }
       }
       refreshHistory({ force: true, agentId: selectedAgentId })
       toast.success(`${agent.primaryActionLabel}完毕`)
@@ -2441,7 +2566,7 @@ export default function AimPage() {
                 }}
                 className="h-9 w-[130px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {AGENT_OPTIONS.map((a) => (
+                {AGENT_OPTIONS.filter((a) => !a.hidden).map((a) => (
                   <option key={a.id} value={a.id}>{a.title}</option>
                 ))}
               </select>
@@ -2457,6 +2582,27 @@ export default function AimPage() {
                 <Badge variant="secondary" className="hidden h-5 rounded-md px-1.5 text-[10px] font-medium sm:inline-flex">
                   {workStage}
                 </Badge>
+                {selectedAgentId === "copywriter" && (
+                  <div className="flex items-center rounded-md border border-border/60 p-0.5" title="选择创作模块，默认自动判定">
+                    {([
+                      { value: "auto", label: "自动" },
+                      { value: "social", label: "社媒速产" },
+                      { value: "longform", label: "深度长文" },
+                      { value: "free", label: "自由交付" },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setWriterModule(option.value)}
+                        className={writerModule === option.value
+                          ? "h-5 rounded px-1.5 text-[10px] font-medium bg-primary/10 text-primary"
+                          : "h-5 rounded px-1.5 text-[10px] text-muted-foreground hover:text-foreground"}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <p className="mt-0.5 hidden truncate text-xs text-muted-foreground lg:block">
                 {selectedProject?.name || (projectEnabled ? "未选择 IP 全案" : "未绑定项目")} · {agent.description}
@@ -2817,6 +2963,8 @@ export default function AimPage() {
             onStopRecording={stopRecording}
             skills={agent.skills}
             onUseSkill={handleUseSkill}
+            modules={agent.modules}
+            onUseModule={handleUseModule}
             imageAttachments={imageAttachments}
             onAddImages={(files) => void handleAddImages(files)}
             onRemoveImage={(id) => setImageAttachments((current) => current.filter((image) => image.id !== id))}
@@ -2843,6 +2991,19 @@ export default function AimPage() {
           imitating={isImitating}
           imitateStyleId={imitateStyleId}
           onImitateStyleChange={setImitateStyleId}
+          versionViewOpen={versionViewOpen}
+          onToggleVersionView={() => setVersionViewOpen((open) => !open)}
+          versionContent={
+            <VersionTimeline
+              generationId={editorGenerationId() || undefined}
+              refreshKey={versionRefreshKey}
+              onRestore={(content) => {
+                lastVersionSnapshotRef.current = content // 恢复已存为新版本，避免防抖重复存
+                setEditorText(content)
+                setVersionRefreshKey((key) => key + 1)
+              }}
+            />
+          }
         />
       )}
 

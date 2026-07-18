@@ -18,6 +18,9 @@ const VALID_TASK_TYPES = new Set<string>([
   "repurpose",
 ])
 
+/** 文案创作官可选模块（auto=自动判定） */
+const VALID_WRITER_MODULES = new Set<string>(["auto", "social", "longform", "free"])
+
 const TASK_DEFAULT_FORMATS: Record<string, ContentFormat[]> = {
   polish_copy: ["raw_copy"],
   write_script: ["video_script", "moments_post", "community_message"],
@@ -39,6 +42,8 @@ export interface ParseGenerateBodyResult {
   polishInstruction: string | undefined
   useMarketViralVideos: boolean | undefined
   existingGenerationId: string | undefined
+  /** 文案创作官模块选择（auto/social/longform/free），仅 agentId="copywriter" 时生效 */
+  writerModule: string | undefined
 }
 
 export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateBodyResult {
@@ -91,6 +96,11 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
     useMarketViralVideos:
       typeof body.useMarketViralVideos === "boolean" ? body.useMarketViralVideos : undefined,
     existingGenerationId: typeof body.existingGenerationId === "string" ? body.existingGenerationId.trim() || undefined : undefined,
+    // 文案创作官模块选择：白名单校验，非法值按未传处理（handler 自动判定）
+    writerModule:
+      typeof body.writerModule === "string" && VALID_WRITER_MODULES.has(body.writerModule)
+        ? body.writerModule
+        : undefined,
   }
 }
 

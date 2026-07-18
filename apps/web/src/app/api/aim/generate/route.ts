@@ -210,6 +210,7 @@ export async function POST(request: NextRequest) {
           polishInstruction: parsed.polishInstruction,
           videoCopyExtractionId: parsed.videoCopyExtractionId,
           existingGenerationId: parsed.existingGenerationId,
+          writerModule: parsed.writerModule,
           runtimeTask,
           trace,
           // done 事件推迟到下方 quality_gate 步骤之后由本路由统一发布，保证 SSE 事件时序

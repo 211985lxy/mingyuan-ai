@@ -283,6 +283,7 @@ function FlowDiagram({
     "business_system_diagnosis",
     "business_diagnosis",
     "persona",
+    "copywriter",
     "content_producer",
     "deep_copywriter",
     "content_review",

@@ -33,6 +33,21 @@ export interface AimCompressionProfile {
 // ─── 智能体压缩策略配置 ──────────────────────────────────
 
 const COMPRESSION_PROFILES: Record<string, AimCompressionProfile> = {
+  // 文案创作官沿用社媒速产的压缩策略（旧 content_producer 配置）
+  copywriter: {
+    recentRounds: 5,
+    focus: [
+      "用户选题和需求",
+      "平台/渠道要求",
+      "产品卖点和转化目标",
+      "脚本结构和节拍安排",
+      "CTA（行动引导）设计",
+      "已生成的最后一版内容",
+      "用户的修改反馈",
+      "人设口吻要求",
+    ],
+    maxSummaryChars: 2000,
+  },
   deep_copywriter: {
     recentRounds: 6,
     focus: [

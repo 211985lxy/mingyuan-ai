@@ -33,6 +33,7 @@ import { runAimChat, planAimChatStream } from "@/lib/aim-harness/adapters"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import type { AimContextSource } from "@/lib/aim-harness/types"
 import { isValidAimAgent, normalizeAimAgentId } from "@/lib/aim-ui-config"
+import { COPY_STUDIO_MODULES } from "@/lib/llm/agent-router"
 
 /** 把 chat 请求里的 messages 规范化为记忆提炼所需格式（只保留 user/assistant 的文本内容）。 */
 function normalizeMemoryMessages(messages: unknown): AimMemoryMessage[] {
@@ -134,6 +135,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "不支持的内容智能体" }, { status: 400 })
     }
     const agentId = normalizeAimAgentId(rawAgentId)
+    // 可选的统一创作台模块键（copy_studio.* 模块入口）：白名单校验，非法值直接 400；
+    // 合法时仅影响 LLM 路由键，知识上下文/意图/记忆/trace 仍使用规范 agentId
+    const rawAgentModule = typeof body.agentModule === "string" ? body.agentModule.trim() : ""
+    if (rawAgentModule && !(COPY_STUDIO_MODULES as readonly string[]).includes(rawAgentModule)) {
+      return NextResponse.json({ error: "不支持的内容模块" }, { status: 400 })
+    }
+    const agentModule = rawAgentModule || undefined
+    // 文案创作官模块选择（auto/social/longform/free）：白名单校验，非法值按未传处理
+    const rawWriterModule = typeof body.writerModule === "string" ? body.writerModule.trim() : ""
+    const writerModule = ["auto", "social", "longform", "free"].includes(rawWriterModule)
+      ? (rawWriterModule as "auto" | "social" | "longform" | "free")
+      : undefined
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const toolAction = typeof body.toolAction === "string" ? body.toolAction : ""
     const resultId = typeof body.resultId === "string" ? body.resultId.trim() : ""
@@ -157,7 +170,7 @@ export async function POST(request: NextRequest) {
       label: "路由请求识别",
       status: "success",
       summary: toolAction ? "工具动作" : "普通聊天",
-      metadata: { agentId, projectId: projectId || null, stream: shouldStream, messageCount: messages.length },
+      metadata: { agentId, agentModule: agentModule ?? null, writerModule: writerModule ?? null, projectId: projectId || null, stream: shouldStream, messageCount: messages.length },
     })
 
     // ── 飞书工具动作（委托给共享模块）──
@@ -294,6 +307,8 @@ export async function POST(request: NextRequest) {
     const chatParams = {
       userId: user.id,
       projectId: projectId || undefined,
+      agentModule,
+      writerModule,
       messages,
       knowledgeBlock,
       conversationIntent,

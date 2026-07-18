@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
-import { LLMClient } from "@/lib/llm"
+import { getAgentLLM } from "@/lib/llm/agent-router"
 import { getStyleProfileBlock } from "@/lib/style-profile"
 import { getStylePromptBlock, STYLE_GUIDE_IDS, type StyleGuideId } from "@/lib/style-guide-config"
 import { prisma } from "@/lib/prisma"
@@ -76,7 +76,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     return NextResponse.json({ error: "文案内容不能为空" }, { status: 400 })
   }
 
-  const llm = LLMClient.shared()
+  const llm = getAgentLLM("editor_text")
   if (!llm.available) {
     return NextResponse.json({ error: "AI 服务暂时不可用" }, { status: 503 })
   }

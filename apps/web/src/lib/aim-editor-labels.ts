@@ -1,5 +1,6 @@
 import type { ContentFormat } from "@/lib/api/client"
 import type { AimAgentId } from "@/lib/aim-ui-config"
+import { normalizeAgentId } from "@/lib/llm/agent-router"
 
 export interface EditorPanelLabels {
   title: string
@@ -36,7 +37,11 @@ const COPY_EDITOR_LABELS: EditorPanelLabels = {
 }
 
 export function getAimEditorPanelLabels(agentId: AimAgentId, editorFormat?: ContentFormat): EditorPanelLabels {
-  if ((editorFormat && COPY_FORMATS.has(editorFormat)) || agentId === "content_producer" || agentId === "free_copywriter" || agentId === "deep_copywriter") {
+  // 归一化到 copy_studio 模块键：content_producer/free_copywriter/deep_copywriter
+  // 经别名都映射为 copy_studio.*，统一走文案编辑标签，语义与旧三 id 判断等价；
+  // 文案创作官（copywriter）是三者合并的统一创作入口，同样走文案编辑标签
+  const key = normalizeAgentId(agentId)
+  if ((editorFormat && COPY_FORMATS.has(editorFormat)) || key.startsWith("copy_studio.") || agentId === "copywriter") {
     return COPY_EDITOR_LABELS
   }
 

@@ -48,6 +48,7 @@ export interface AgentLogicProfile {
  * 来源：src/lib/aim-knowledge-context.ts AGENT_PRIORITY_CATEGORIES（persona 走 DEFAULT 兜底）。
  */
 const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
+  copywriter: ["user_insight", "product_usp", "project_case", "private_domain_material", "hot_topic", "benchmark_reference"],
   content_producer: ["user_insight", "product_usp", "project_case", "private_domain_material", "hot_topic", "benchmark_reference"],
   free_copywriter: ["user_insight", "product_usp", "project_case", "benchmark_reference"],
   deep_copywriter: ["boss_experience", "product_usp", "user_insight", "benchmark_reference", "positioning_material"],
@@ -63,6 +64,8 @@ const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
  * 来源：src/lib/llm/agent-router.ts AGENT_ROUTES。
  */
 const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
+  // 文案创作官按模块路由（copywriter_social/longform/free），这里展示社媒速产链
+  copywriter: ["deepseek", "openrouter", "jiekou", "glm"],
   content_producer: ["deepseek", "openrouter", "jiekou", "glm"],
   free_copywriter: ["deepseek", "openrouter", "jiekou", "glm"],
   deep_copywriter: ["lihuo", "openrouter", "openrouter", "deepseek", "jiekou", "therouter", "glm"],
@@ -77,6 +80,10 @@ const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
  * 来源：src/lib/aim-agent-handlers.ts（IP操盘方法论 5 个智能体共用；商业诊断仅 bsd；事件方法论仅 cp/dc 特定场景）。
  */
 const AGENT_METHODOLOGIES: Record<AimAgentId, Array<{ key: MethodologyKey; label: string; note?: string }>> = {
+  copywriter: [
+    { key: "ip_copywriting", label: "IP 操盘方法论", note: "自由交付模块下不注入" },
+    { key: "event_storytelling", label: "事件内容化方法论", note: "仅现场/事件复盘类内容时按需注入" },
+  ],
   content_producer: [
     { key: "ip_copywriting", label: "IP 操盘方法论" },
     { key: "event_storytelling", label: "事件内容化方法论", note: "仅现场/事件复盘类内容时按需注入" },
@@ -97,6 +104,7 @@ const AGENT_METHODOLOGIES: Record<AimAgentId, Array<{ key: MethodologyKey; label
 
 /** 各智能体额外注入的知识源（只读说明，镜像 handlers.ts / chat route 的上下文装配） */
 const AGENT_OTHER_CONTEXT: Record<AimAgentId, string[]> = {
+  copywriter: ["爆款结构库（开头/结构/结尾，来自内容模板）", "写作风格档案", "AIM 长期记忆", "IP Wiki", "编辑器上下文"],
   content_producer: ["爆款结构库（开头/结构/结尾，来自内容模板）", "写作风格档案", "AIM 长期记忆", "IP Wiki", "编辑器上下文"],
   free_copywriter: ["写作风格档案", "AIM 长期记忆", "IP Wiki", "编辑器上下文"],
   deep_copywriter: ["爆款结构库", "写作风格档案", "AIM 长期记忆", "IP Wiki"],

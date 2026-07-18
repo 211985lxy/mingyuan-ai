@@ -5,7 +5,7 @@ import { ChevronDown, Loader2, Mic, Plus, Search, Send, Square, X } from "lucide
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import type { AimStudioModule, AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 
 interface AimPromptComposerProps {
   value: string
@@ -23,6 +23,9 @@ interface AimPromptComposerProps {
   onStopRecording: () => void
   skills?: AimWorkbenchSkill[]
   onUseSkill?: (skill: AimWorkbenchSkill) => void
+  /** 统一创作台模块入口按钮（仅当智能体 guide 提供 modules 时渲染） */
+  modules?: AimStudioModule[]
+  onUseModule?: (module: AimStudioModule) => void
   imageAttachments?: Array<{ id: string; name: string; previewUrl: string }>
   onAddImages?: (files: FileList) => void
   onRemoveImage?: (id: string) => void
@@ -44,6 +47,8 @@ export function AimPromptComposer({
   onStopRecording,
   skills = [],
   onUseSkill,
+  modules = [],
+  onUseModule,
   imageAttachments = [],
   onAddImages,
   onRemoveImage,
@@ -87,6 +92,22 @@ export function AimPromptComposer({
   return (
     <div ref={rootRef} className="mx-auto max-w-6xl w-full">
       <div className="relative overflow-visible rounded-2xl border border-primary/20 bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/20">
+        {modules.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
+            {modules.map((module) => (
+              <button
+                key={module.id}
+                type="button"
+                title={module.description}
+                disabled={busy}
+                onClick={() => onUseModule?.(module)}
+                className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-50"
+              >
+                {module.label}
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}

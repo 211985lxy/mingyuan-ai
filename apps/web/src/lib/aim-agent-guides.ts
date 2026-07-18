@@ -27,6 +27,20 @@ export interface AimWorkbenchSkill {
   agentId?: AimAgentId
 }
 
+/**
+ * 统一创作台模块入口（copy_studio 模块键）。
+ * 与 AimWorkbenchSkill 的区别：skill 只填 prompt，module 除填 prompt 外，
+ * 还会把 module 字段（copy_studio.* 模块键）随请求上报，服务端按模块键路由 LLM。
+ */
+export interface AimStudioModule {
+  id: string
+  label: string
+  description: string
+  /** copy_studio 模块键，对应 agent-router 里的 LLM 路由键 */
+  module: string
+  prompt: string
+}
+
 export interface AimAgentGuide {
   intro: string
   placeholder: string
@@ -39,6 +53,8 @@ export interface AimAgentGuide {
   nextActions: AimNextAction[]
   skills: AimWorkbenchSkill[]
   copyVariants?: AimCopyVariant[]
+  /** 统一创作台模块入口按钮（仅 content_producer 提供） */
+  modules?: AimStudioModule[]
 }
 
 export const AIM_COPY_VARIANTS: AimCopyVariant[] = [
@@ -153,6 +169,39 @@ const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
     description: "生成标题、话题和后续内容排产。",
     prompt: PUBLISH_PLAN_PROMPT,
     agentId: "content_producer",
+  },
+]
+
+// 统一创作台模块入口：点击后填入对应 prompt，并把 copy_studio 模块键随请求上报，
+// 服务端用模块键路由 LLM（长文类走深度文案链，社媒/口播走内容生产链）
+const CONTENT_PRODUCER_MODULES: AimStudioModule[] = [
+  {
+    id: "studio_long_outline",
+    label: "长文框架",
+    description: "先搭长文框架：核心观点、目标读者、开头方向和正文推进结构。",
+    module: "copy_studio.outline",
+    prompt: "请基于当前素材先搭一版长文框架，包含核心观点、目标读者、开头方向和正文推进结构。",
+  },
+  {
+    id: "studio_deep_article",
+    label: "深度长文",
+    description: "写成有框架、有观点、有真人表达的公众号文章或深度长文。",
+    module: "copy_studio.deep_article",
+    prompt: "请基于当前素材生成一篇有框架、有观点、有真人表达的公众号文章或深度长文。",
+  },
+  {
+    id: "studio_social_post",
+    label: "社媒图文",
+    description: "生成小红书/社媒图文笔记：标题、正文、封面短句和逐页图文脚本。",
+    module: "copy_studio.social_post",
+    prompt: "请基于当前素材生成一套小红书图文笔记：复用 AIM 的小红书图文视觉导演结构，输出小红书标题 5 个、封面主标题/副标题、正文、2-5 个话题标签、8 页图文结构、逐页配图脚本、发布前自检。每页只讲一个信息点，手机端一眼读懂，不要写成 PPT 课件；话题里至少包含 1 个品牌/IP/账号相关标签。",
+  },
+  {
+    id: "studio_video_script",
+    label: "口播脚本",
+    description: "生成可直接拍摄的短视频口播脚本。",
+    module: "copy_studio.video_script",
+    prompt: "请基于当前素材生成一条可直接拍摄的短视频口播脚本，不要写成品牌宣传稿或空泛鸡汤。固定输出：标题、前 3 秒钩子、口播正文、镜头表现建议、屏幕字幕重点、结尾行动引导、适合平台、建议视频时长。口播正文必须像真人说话，使用短句，开头有停留理由，中间有冲突/反差/观点，结尾有明确行动引导；平台未指定时按抖音/小红书短视频口播处理，时长默认 60 秒以内。",
   },
 ]
 
@@ -327,6 +376,30 @@ const PERSONA_SKILLS: AimWorkbenchSkill[] = [
 ]
 
 export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
+  copywriter: {
+    intro: "这里是文案创作官。社媒速产、深度长文、自由交付都在这一个入口：把选题、爆款拆解、老板口述、长文或现有稿子丢进来，我会按你的要求创作；也可以在上方切换模块（默认自动判定）。",
+    placeholder: "粘贴选题、原始想法、老板口述、现有文案或爆款拆解，我来生成可发布内容…",
+    defaultInstruction: "去 AI 味，保留真人表达的犹豫、判断和具体细节，少用套话。先判断用户要的是改写、对标再创作、追热点、热点口播、深度长文、自由交稿还是核心内容一键拆解；凡是命中热点口播 / 爆款口播 / 参考同行文案 / 拆爆款 / 仿写但不抄 / 短视频脚本，就优先按「热点口播脚本生成」路由处理，再输出适合发布的内容交付物。不是每次都重度结合知识库；只有用户明确要、当前任务确实需要，或缺少必要承接信息时，才少量带 1-2 句人设、案例、卖点或客户场景补位。",
+    quickPrompts: [
+      "改写这版现有文案，保留我的意思，但更像真人表达。",
+      "按这个爆款结构再创作一版，不照抄原句。",
+      "根据这段视频原文，先搭长文框架，再打磨成适合我表达的公众号文章。",
+      "按我的意思直接写一版文案，不要讲方法。",
+      "结合这个热点和参考口播，生成 5 条可直接拍的短视频口播脚本。",
+      "把这篇深度内容拆成公众号、短视频、小红书、朋友圈和后续 12 条选题。",
+    ],
+    primaryActionLabel: "生成内容",
+    scenarios: ["社媒速产", "深度长文", "自由交付", "多平台内容拆解"],
+    inputTemplate: BASIC_INPUT_TEMPLATE,
+    outputAssets: ["短视频口播", "小红书图文笔记", "公众号文章/深度长文", "朋友圈文案", "自由文案", "12 条发布计划"],
+    skills: [...CONTENT_PRODUCER_SKILLS, ...DEEP_COPYWRITER_SKILLS],
+    copyVariants: AIM_COPY_VARIANTS,
+    nextActions: [
+      { id: "publish_package", label: "生成发布计划", prompt: PUBLISH_PLAN_PROMPT },
+      { id: "publish_check", label: "发布前自查", prompt: "请对下面成稿做抖音发布前自查，只给风险、最小改法和复检建议。" },
+      { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
+    ],
+  },
   content_producer: {
     intro: "这里是内容文案创作。把选题、爆款拆解、老板口述、长文或现有稿子丢进来，我会改写、再创作，并拆成适合发布的多平台内容。",
     placeholder: "粘贴选题、原始想法、老板口述、现有文案或爆款拆解，我来生成可发布内容…",
@@ -345,6 +418,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     inputTemplate: BASIC_INPUT_TEMPLATE,
     outputAssets: ["短视频口播", "小红书图文笔记", "公众号文章/深度长文", "朋友圈文案", "Vlog 分镜脚本", "12 条发布计划"],
     skills: CONTENT_PRODUCER_SKILLS,
+    modules: CONTENT_PRODUCER_MODULES,
     copyVariants: AIM_COPY_VARIANTS,
     nextActions: [
       { id: "publish_package", label: "生成发布计划", prompt: PUBLISH_PLAN_PROMPT },

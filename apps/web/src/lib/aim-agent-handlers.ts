@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 
 import { prisma } from "@/lib/prisma"
-import { getAgentLLM } from "@/lib/llm/agent-router"
+import { getAgentLLM, normalizeAgentId } from "@/lib/llm/agent-router"
 import type { ChatMessage } from "@/lib/llm/types"
 import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
 import { buildBusinessDiagnosisMethodologyBlock } from "@/lib/business-diagnosis-methodology"
@@ -47,6 +47,7 @@ import { normalizeAimAgentId } from "@/lib/aim-ui-config"
 // ─── 类型定义 ──────────────────────────────────────────────
 
 export type AimAgentId =
+  | "copywriter"
   | "content_producer"
   | "free_copywriter"
   | "deep_copywriter"
@@ -55,9 +56,39 @@ export type AimAgentId =
   | "content_review"
   | "persona"
 
+/**
+ * 统一创作官「文案创作官」的内部功能模块。
+ * social=社媒速产（多平台格式），longform=深度长文，free=自由交付；
+ * UI 传 "auto" 时由 handler 按任务特征自动判定。
+ */
+export type CopywriterModule = "social" | "longform" | "free"
+
+/** 模块 → LLM 路由键（路由表单一事实源在 llm/agent-router.ts） */
+const COPYWRITER_MODULE_ROUTE_KEYS: Record<CopywriterModule, string> = {
+  social: "copywriter_social",
+  longform: "copywriter_longform",
+  free: "copywriter_free",
+}
+
+/** 解析 UI 传入的 writerModule 字段；非法值按 auto 处理 */
+function parseCopywriterModule(value: unknown): CopywriterModule | "auto" {
+  return value === "social" || value === "longform" || value === "free" ? value : "auto"
+}
+
 export interface AimChatParams {
   userId: string
   projectId?: string
+  /**
+   * 统一创作台模块键（copy_studio.*，可选）。传入后仅替换 LLM 路由键
+   * （getAgentLLM 按模块键选模型链），handler 选择与 system prompt 构建仍用原 agentId
+   */
+  agentModule?: string
+  /**
+   * 文案创作官模块选择（仅 agentId="copywriter" 时生效）：
+   * 用户显式选择 social/longform/free 时按所选模块走提示词与模型路由，
+   * "auto" 或未传时由 handler 自动判定
+   */
+  writerModule?: CopywriterModule | "auto"
   messages: any[]
   knowledgeBlock: string
   conversationBlock: string
@@ -89,6 +120,14 @@ export interface AimGenerateContext {
   videoCopyExtractionId?: string
   existingGenerationId?: string
   runtimeTask?: AimRuntimeTask
+  /** 文案创作官模块选择（仅 agentId="copywriter" 时生效），语义同 AimChatParams.writerModule */
+  writerModule?: CopywriterModule | "auto"
+  /**
+   * LLM 路由键覆盖（内部使用）：统一创作官按模块委托旧 handler 时，
+   * 用模块路由键（copywriter_*）替换 handler 默认的 agentId 路由；
+   * 不影响落库 agentId 与遥测（仍取 context.agentId）
+   */
+  llmRouteKey?: string
 
   // 共享数据上下文
   knowledgeBlock: string
@@ -429,11 +468,11 @@ class ContentProducerHandler implements AimAgentHandler {
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -448,7 +487,7 @@ class ContentProducerHandler implements AimAgentHandler {
     const userPrompt = buildUserPrompt(context, formatBlocks)
 
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
-      this.agentId,
+      context.llmRouteKey ?? this.agentId,
       systemPrompt,
       userPrompt,
       context,
@@ -491,11 +530,11 @@ ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildPrompt(params), params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, this.buildPrompt(params), params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -503,7 +542,7 @@ ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
     const systemPrompt = this.buildPrompt(context)
     const userPrompt = `请直接按用户要求写一版文案：
 "${context.rawInput}"`
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt)
+    const completion = await executeGenerateLLM(context.llmRouteKey ?? this.agentId, systemPrompt, userPrompt)
     const content = completion.content.trim()
     const record = await saveAimGenerationRecord(context, completion, { [format]: content } as Record<ContentFormat, string | undefined>)
 
@@ -562,11 +601,11 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -648,7 +687,7 @@ ${workflowContext}
 ${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n\n` : ""}请根据上下文判断：如果还没有明确文案框架，先输出文案框架；如果已经确认框架，直接输出正文。正文最后一句写完就停止，不要包含解释性文字、拆分方向、私域话术或确认尾句。`
 
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
-      this.agentId,
+      context.llmRouteKey ?? this.agentId,
       systemPrompt,
       userPrompt,
       context,
@@ -668,6 +707,70 @@ ${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n\n` : 
       })),
       knowledgeUsed: record.knowledgeUsed as any[],
     }
+  }
+}
+
+// ─── 2b. 文案创作官 (UnifiedCopywriterHandler) ─────────────────
+// Phase 3：content_producer / free_copywriter / deep_copywriter 三个创作入口
+// 合并为统一入口 "copywriter"。提示词构建完整复用三个旧 handler（组合委托，
+// 不复制提示词），仅 LLM 路由键切换为模块键 copywriter_social / copywriter_longform /
+// copywriter_free；落库与遥测仍用 context.agentId="copywriter"。
+
+class UnifiedCopywriterHandler implements AimAgentHandler {
+  agentId = "copywriter" as const
+
+  private readonly socialDelegate = new ContentProducerHandler()
+  private readonly longformDelegate = new DeepCopywriterHandler()
+  private readonly freeDelegate = new FreeCopywriterHandler()
+
+  private delegateFor(module: CopywriterModule): AimAgentHandler {
+    if (module === "longform") return this.longformDelegate
+    if (module === "free") return this.freeDelegate
+    return this.socialDelegate
+  }
+
+  /**
+   * 模块判定：用户显式选择优先；否则自动判定——
+   * 自由指令/不要方法论 → free；目标格式全是 raw_copy 且启用方法论 → longform；
+   * 其余（多平台格式/对话默认）→ social。
+   */
+  private resolveModule(
+    writerModule: CopywriterModule | "auto" | undefined,
+    signals: { useMethodology: boolean; targetFormats?: ContentFormat[] },
+  ): CopywriterModule {
+    const explicit = parseCopywriterModule(writerModule)
+    if (explicit !== "auto") return explicit
+    if (!signals.useMethodology) return "free"
+    const formats = signals.targetFormats
+    if (formats && formats.length > 0 && formats.every((f) => f === "raw_copy")) return "longform"
+    return "social"
+  }
+
+  async chat(params: AimChatParams): Promise<AimChatResponse> {
+    const module = this.resolveModule(params.writerModule, {
+      useMethodology: params.conversationIntent?.useMethodology !== false,
+    })
+    // 旧 handler 的 chat 按 params.agentModule 覆盖 LLM 路由键，这里复用该通道传模块路由键
+    return this.delegateFor(module).chat({ ...params, agentModule: COPYWRITER_MODULE_ROUTE_KEYS[module] })
+  }
+
+  streamChat(params: AimChatParams): AsyncIterable<string> {
+    const module = this.resolveModule(params.writerModule, {
+      useMethodology: params.conversationIntent?.useMethodology !== false,
+    })
+    return this.delegateFor(module).streamChat({ ...params, agentModule: COPYWRITER_MODULE_ROUTE_KEYS[module] })
+  }
+
+  async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
+    const module = this.resolveModule(context.writerModule, {
+      // 路由层在意图判定为「不要方法论」时 methodologyBlock 为空，视作自由指令
+      useMethodology: Boolean(context.methodologyBlock?.trim()),
+      targetFormats: context.targetFormats,
+    })
+    return this.delegateFor(module).generate({
+      ...context,
+      llmRouteKey: COPYWRITER_MODULE_ROUTE_KEYS[module],
+    })
   }
 }
 
@@ -709,11 +812,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -889,11 +992,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -1115,11 +1218,11 @@ class ContentReviewHandler implements AimAgentHandler {
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
-    return executeChatLLM(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -1245,11 +1348,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
     } else {
       prompt = this.buildChatPrompt(params)
     }
-    return executeChatLLM(this.agentId, prompt, params.messages)
+    return executeChatLLM(params.agentModule ?? this.agentId, prompt, params.messages)
   }
 
   streamChat(params: AimChatParams): AsyncIterable<string> {
-    return executeChatLLMStream(this.agentId, this.buildChatPrompt(params), params.messages)
+    return executeChatLLMStream(params.agentModule ?? this.agentId, this.buildChatPrompt(params), params.messages)
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
@@ -1313,6 +1416,7 @@ export function detectPersonaMode(input: string): "guided" | "intake" | "intake_
 // ─── 调度与分流器 ───────────────────────────────────────────
 
 const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
+  copywriter: new UnifiedCopywriterHandler(),
   content_producer: new ContentProducerHandler(),
   free_copywriter: new FreeCopywriterHandler(),
   deep_copywriter: new DeepCopywriterHandler(),
@@ -1516,6 +1620,9 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     topicType: params.topicType,
     topicRationale: params.topicRationale,
   })
+  // 仅创作类智能体（内容生产官/深度文案官）+ 命中现场/事件复盘类时加载
+  // 归一化到 copy_studio 模块键再判断：旧 id 经别名映射，语义与改造前等价
+  const normalizedAgentId = normalizeAgentId(agentId)
   const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock] = await runAimTraceStep(
     params.trace,
     "load_generation_context",
@@ -1556,8 +1663,8 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
         ? buildBusinessDiagnosisMethodologyBlock()
         : Promise.resolve(""),
       generationIntent.useMethodology && params.projectId ? buildIpWikiBlock({ projectId: params.projectId }) : Promise.resolve(""),
-      // 仅创作类智能体（内容生产官/深度文案官）+ 命中现场/事件复盘类时加载
-      generationIntent.useMethodology && (agentId === "content_producer" || agentId === "deep_copywriter") && useEventStorytelling
+      // 仅创作类智能体（文案创作官/社媒图文/深度长文模块，含旧 id 别名映射）+ 命中现场/事件复盘类时加载
+      generationIntent.useMethodology && (normalizedAgentId === "copywriter" || normalizedAgentId === "copy_studio.social_post" || normalizedAgentId === "copy_studio.deep_article") && useEventStorytelling
         ? buildEventStorytellingMethodologyBlock()
         : Promise.resolve(""),
         ]),
@@ -1658,6 +1765,8 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
 
 // ─── 共享辅助函数 ───────────────────────────────────────────
 
+// 第一个参数是 LLM 路由键而非严格的智能体 id：统一创作台模块入口会传入
+// copy_studio.* 模块键（见 AimChatParams.agentModule），getAgentLLM 按模块键选模型链
 async function executeChatLLM(agentId: string, systemPrompt: string, messages: any[]): Promise<AimChatResponse> {
   const formattedMessages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
