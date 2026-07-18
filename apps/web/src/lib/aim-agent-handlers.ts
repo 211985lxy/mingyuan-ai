@@ -42,6 +42,7 @@ import {
   type AimConversationMode,
   type AimConversationIntent,
 } from "@/lib/aim-conversation-intent"
+import { normalizeAimAgentId } from "@/lib/aim-ui-config"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -1321,37 +1322,14 @@ const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
   persona: new PersonaHandler(),
 }
 
-const VALID_AGENT_IDS = new Set<string>([
-  "content_producer",
-  "free_copywriter",
-  "deep_copywriter",
-  "business_system_diagnosis",
-  "business_diagnosis",
-  "content_review",
-  "persona",
-])
-
-/**
- * 向后兼容别名 → 内部 handler ID 映射。
- * 内容生产官的公开 id 已从 "ip_video" 统一为 "content_producer"，但旧书签链接、
- * 旧外部 API 调用、旧 AimGeneration 数据库行仍可能携带 "ip_video"，这里兜底归一化，
- * 确保历史数据和历史调用方不因重命名而失效。
- */
-const AGENT_ID_ALIASES: Record<string, AimAgentId> = {
-  ip_video: "content_producer",
-}
-
 export function getAgentHandler(agentId: string): AimAgentHandler {
-  // 1. 直接命中
-  if (VALID_AGENT_IDS.has(agentId)) {
-    return HANDLERS[agentId as AimAgentId]
+  // 归一化旧别名（ip_video → content_producer）。别名与合法 id 的单一事实源在
+  // aim-ui-config.ts，这里不再维护第二份映射，避免两处漂移。
+  const normalized = normalizeAimAgentId(agentId)
+  if (normalized in HANDLERS) {
+    return HANDLERS[normalized as AimAgentId]
   }
-  // 2. 尝试别名映射
-  const aliased = AGENT_ID_ALIASES[agentId]
-  if (aliased && VALID_AGENT_IDS.has(aliased)) {
-    return HANDLERS[aliased]
-  }
-  // 3. 回退到默认 handler
+  // 未知 id 回退到默认 handler（入口路由已先做合法性校验，这里只是兜底）
   return HANDLERS.content_producer
 }
 

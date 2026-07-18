@@ -197,4 +197,40 @@ describe("POST /api/aim/generate", () => {
     expect(buildRawInputWithTrendingContext).toHaveBeenCalledWith(expect.any(String), false)
     expect(buildRawInputWithCommentInsightContext).toHaveBeenCalledWith("user-1", expect.any(String), false)
   })
+
+  it("rejects invalid agentId with 400 instead of silently falling back", async () => {
+    const res = await POST(makeRequest({
+      agentId: "not_a_real_agent",
+      rawInput: "写一条短视频口播",
+      targetFormats: ["video_script"],
+      projectId: "project-1",
+      taskType: "write_script",
+    }))
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body.error).toContain("不支持的内容智能体")
+    expect(generateAimContent).not.toHaveBeenCalled()
+  })
+
+  it("normalizes legacy ip_video alias to content_producer before generation", async () => {
+    generateAimContent.mockResolvedValue({
+      id: "gen-4",
+      results: [{ format: "video_script", content: "口播脚本正文", wordCount: 6 }],
+      knowledgeUsed: [],
+    })
+
+    const res = await POST(makeRequest({
+      agentId: "ip_video",
+      rawInput: "写一条短视频口播",
+      targetFormats: ["video_script"],
+      projectId: "project-1",
+      taskType: "write_script",
+    }))
+
+    expect(res.status).toBe(200)
+    expect(generateAimContent).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: "content_producer" }),
+    )
+  })
 })

@@ -32,6 +32,7 @@ import {
 import { runAimChat, planAimChatStream } from "@/lib/aim-harness/adapters"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import type { AimContextSource } from "@/lib/aim-harness/types"
+import { isValidAimAgent, normalizeAimAgentId } from "@/lib/aim-ui-config"
 
 /** 把 chat 请求里的 messages 规范化为记忆提炼所需格式（只保留 user/assistant 的文本内容）。 */
 function normalizeMemoryMessages(messages: unknown): AimMemoryMessage[] {
@@ -126,7 +127,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const messages = body.messages
-    const agentId = typeof body.agentId === "string" ? body.agentId : ""
+    // agentId 白名单校验 + 入口归一化（旧别名 ip_video → content_producer）：
+    // 非法值直接 400，不再静默回退默认智能体；trace/记忆落库统一使用规范 id
+    const rawAgentId = typeof body.agentId === "string" ? body.agentId.trim() : ""
+    if (rawAgentId && !isValidAimAgent(rawAgentId)) {
+      return NextResponse.json({ error: "不支持的内容智能体" }, { status: 400 })
+    }
+    const agentId = normalizeAimAgentId(rawAgentId)
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const toolAction = typeof body.toolAction === "string" ? body.toolAction : ""
     const resultId = typeof body.resultId === "string" ? body.resultId.trim() : ""

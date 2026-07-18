@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
+import { normalizeAimAgentId } from "@/lib/aim-ui-config"
 
 /**
  * Admin run list — strict admin auth.
@@ -37,7 +38,8 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
   const before = url.searchParams.get("before")
 
   const where: Record<string, unknown> = {}
-  if (agentId) where.agentId = agentId
+  // 归一化旧别名，保证 ip_video 与 content_producer 筛到同一批记录
+  if (agentId) where.agentId = normalizeAimAgentId(agentId)
   if (qualityStatus) where.qualityStatus = qualityStatus
   if (degradedParam === "true") where.degraded = true
   if (before) {
