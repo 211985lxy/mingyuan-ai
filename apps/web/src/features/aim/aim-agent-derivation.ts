@@ -93,8 +93,7 @@ export function useAimAgentConfig(input: {
     if (selectedAgentId === "content_producer") {
       return {
         ...baseAgent,
-        title: baseAgent.displayTitle ?? baseAgent.title,
-        title: "内容文案创作 · 单篇创作",
+        title: `${baseAgent.displayTitle ?? baseAgent.title} · 单篇创作`,
         defaultFormats: ["video_script" as const],
         placeholder: "粘贴选题、原始想法、老板口述、现有文案或爆款拆解，我来生成可发布内容…",
         primaryActionLabel: "生成口播文案",
