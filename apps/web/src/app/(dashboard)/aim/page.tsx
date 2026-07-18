@@ -1166,6 +1166,12 @@ export default function AimPage() {
   useEffect(() => {
     if (lastAgentParamRef.current === agentParam) return
     lastAgentParamRef.current = agentParam
+    // 切换智能体时中断在途请求：旧智能体的在途生成/对话不再写入新对话，
+    // 避免结果静默丢失但 token 费用照扣；被中断方会在 finally 里自行清理状态
+    if (requestAbortRef.current) {
+      requestAbortRef.current.abort()
+      toast.info("已停止上一个智能体进行中的任务")
+    }
     const nextDraft = loadAimDraft(activeAgentId)
     startTransition(() => {
       setSelectedAgentId(activeAgentId)
@@ -1621,6 +1627,10 @@ export default function AimPage() {
   }
 
   function handleOptimizeOpening(commandInput: string) {
+    if (busy) {
+      toast.error("正在处理中，请等待完成，或先停止当前任务")
+      return true
+    }
     const sourceText = editorText.trim() || latestDeliverableText()
     if (!sourceText) {
       toast.error("当前没有可优化的内容，请先生成脚本或写入编辑区")
@@ -1675,6 +1685,10 @@ export default function AimPage() {
   }
 
   function handleReviseCurrentDraft(commandInput: string) {
+    if (busy) {
+      toast.error("正在处理中，请等待完成，或先停止当前任务")
+      return true
+    }
     const draft = editorText.trim() || latestDeliverableText()
     if (!draft) {
       toast.error("当前没有可改写的稿子")
@@ -1731,8 +1745,10 @@ export default function AimPage() {
         )
       })
       .finally(() => {
-        if (requestAbortRef.current === controller) requestAbortRef.current = null
-        setIsThinking(false)
+        if (requestAbortRef.current === controller) {
+          requestAbortRef.current = null
+          setIsThinking(false)
+        }
       })
 
     return true
@@ -1826,6 +1842,11 @@ export default function AimPage() {
   ) {
     const images = options?.images ?? []
     if (!text && images.length === 0) return
+    // 并发守卫：生成/对话/质检进行中忽略新的触发，防止双击/回车连击产生重复请求
+    if (busy) {
+      toast.error("正在处理中，请等待完成，或先停止当前任务")
+      return
+    }
     const workbenchCommand = detectAimWorkbenchCommand(text)
     if (workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
     if (!options?.retryMessageId) {
@@ -1935,8 +1956,11 @@ export default function AimPage() {
           : item
       ))
     } finally {
-      if (requestAbortRef.current === controller) requestAbortRef.current = null
-      setIsThinking(false)
+      // 只有“当前请求”能清理状态：防止先完成的请求误清后发起请求的进行标记
+      if (requestAbortRef.current === controller) {
+        requestAbortRef.current = null
+        setIsThinking(false)
+      }
     }
   }
 
@@ -2082,6 +2106,11 @@ export default function AimPage() {
   }
 
   async function generateWithInput(currentInput: string, options?: { retryMessageId?: string }) {
+    // 并发守卫：生成/对话/质检进行中忽略新的触发，防止双击/回车连击产生重复请求（双份 token 扣费）
+    if (busy) {
+      toast.error("正在处理中，请等待完成，或先停止当前任务")
+      return
+    }
     const rawInput = buildRawInputForGenerate(currentInput || undefined)
     if (!rawInput) {
       toast.error("请先在对话框里说点素材或需求")
@@ -2186,8 +2215,11 @@ export default function AimPage() {
           : item
       ))
     } finally {
-      if (requestAbortRef.current === controller) requestAbortRef.current = null
-      setIsGenerating(false)
+      // 只有“当前请求”能清理状态：防止先完成的请求误清后发起请求的进行标记
+      if (requestAbortRef.current === controller) {
+        requestAbortRef.current = null
+        setIsGenerating(false)
+      }
     }
   }
 
