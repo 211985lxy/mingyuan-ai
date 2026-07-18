@@ -66,6 +66,8 @@ model AimContentVersion {
   @@index([userId, createdAt(sort: Desc)])
   @@index([generationId, versionNo])
   @@index([conversationId, versionNo])
+  @@index([generationId, format, versionNo])
+  @@index([conversationId, format, versionNo])
   @@index([parentVersionId])
 }
 

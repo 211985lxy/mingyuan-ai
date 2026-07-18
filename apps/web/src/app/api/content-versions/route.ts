@@ -34,6 +34,7 @@ export const GET = withUserAuth(async (request, { user }) => {
   const id = search.get("id")
   const generationId = search.get("generationId")
   const conversationId = search.get("conversationId")
+  const format = search.get("format")
 
   if (id) {
     const version = await prisma.aimContentVersion.findFirst({
@@ -47,7 +48,7 @@ export const GET = withUserAuth(async (request, { user }) => {
   }
 
   const versions = await prisma.aimContentVersion.findMany({
-    where: { userId: user.id, ...(generationId ? { generationId } : { conversationId }) },
+    where: { userId: user.id, ...(generationId ? { generationId } : { conversationId }), ...(format ? { format } : {}) },
     orderBy: { versionNo: "asc" },
   })
   return NextResponse.json({ data: versions.map(summary) })
@@ -100,11 +101,11 @@ async function createNextVersion(
   const rows = input.generationId
     ? await tx.$queryRaw<Array<{ id: string; versionNo: number }>>`
         SELECT id, versionNo FROM AimContentVersion
-        WHERE userId = ${input.userId} AND generationId = ${input.generationId}
+        WHERE userId = ${input.userId} AND generationId = ${input.generationId} AND format = ${input.format}
         ORDER BY versionNo DESC LIMIT 1 FOR UPDATE`
     : await tx.$queryRaw<Array<{ id: string; versionNo: number }>>`
         SELECT id, versionNo FROM AimContentVersion
-        WHERE userId = ${input.userId} AND conversationId = ${input.conversationId}
+        WHERE userId = ${input.userId} AND conversationId = ${input.conversationId} AND format = ${input.format}
         ORDER BY versionNo DESC LIMIT 1 FOR UPDATE`
   const latest = rows[0]
   return tx.aimContentVersion.create({

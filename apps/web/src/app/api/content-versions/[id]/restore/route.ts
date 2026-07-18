@@ -14,8 +14,8 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
 
   const version = await prisma.$transaction(async (tx) => {
     const latest = target.generationId
-      ? await lockLatest(tx, user.id, target.generationId, null)
-      : await lockLatest(tx, user.id, null, target.conversationId)
+      ? await lockLatest(tx, user.id, target.generationId, null, target.format)
+      : await lockLatest(tx, user.id, null, target.conversationId, target.format)
     return tx.aimContentVersion.create({
       data: {
         userId: user.id,
@@ -37,15 +37,16 @@ async function lockLatest(
   userId: string,
   generationId: string | null,
   conversationId: string | null,
+  format: string,
 ) {
   const rows = generationId
     ? await tx.$queryRaw<Array<{ versionNo: number }>>`
         SELECT versionNo FROM AimContentVersion
-        WHERE userId = ${userId} AND generationId = ${generationId}
+        WHERE userId = ${userId} AND generationId = ${generationId} AND format = ${format}
         ORDER BY versionNo DESC LIMIT 1 FOR UPDATE`
     : await tx.$queryRaw<Array<{ versionNo: number }>>`
         SELECT versionNo FROM AimContentVersion
-        WHERE userId = ${userId} AND conversationId = ${conversationId}
+        WHERE userId = ${userId} AND conversationId = ${conversationId} AND format = ${format}
         ORDER BY versionNo DESC LIMIT 1 FOR UPDATE`
   return rows[0]
 }
