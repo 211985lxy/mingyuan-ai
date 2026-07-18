@@ -65,12 +65,16 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   targetFormats: ContentFormat[],
 ) {
   let activePrompt = userPrompt
+  const isLightEdit = context.runtimeTask === "light_edit"
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
-    const copiedFormats = targetFormats.filter((format) =>
-      isBenchmarkCopyTooSimilar(context.rawInput, parsed[format] || "")
-    )
+    // light_edit 的目的是保留原文、只做局部优化，跳过抄袭检测以避免误判
+    const copiedFormats = isLightEdit
+      ? []
+      : targetFormats.filter((format) =>
+          isBenchmarkCopyTooSimilar(context.rawInput, parsed[format] || "")
+        )
     const unsupportedClaimFormats = findUnsupportedFirstPersonClaimFormats(
       context,
       parsed,
@@ -150,7 +154,7 @@ ${lightEditOutputRule}
 - 文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。
 - 如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。
 - 没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。
-- 成稿前做内部质检：是否遵守用户修改意图、是否保留原文有效表达、是否过度调用背景导致跑题、是否有明显 AI 套话；除非用户要求，不要输出质检报告。
+- 成稿前做内部质检：是否遵守用户修改意图、是否保留原文有效表达、是否过度调用背景导致跑题、是否有明显 AI 套话；生成模式下不要输出验证结果区块或质检报告，验证结果只在聊天质检场景生效。
 - 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 对标改写硬规则：
@@ -161,10 +165,25 @@ ${BENCHMARK_REWRITE_GUARDRAIL}
 
 export function buildUserPrompt(context: AimGenerateContext, formatBlocks: string): string {
   const workflowContext = buildWorkflowContext(context)
-  const explicitWordCountRule = buildExplicitWordCountPriorityRule(context.rawInput)
-  const contextInstruction = context.runtimeTask === "light_edit"
+  const isLightEdit = context.runtimeTask === "light_edit"
+
+  // 冲突10：light_edit 不需要字数保留规则（只改局部，字数规则无意义）
+  const explicitWordCountRule = isLightEdit ? null : buildExplicitWordCountPriorityRule(context.rawInput)
+
+  // 冲突8：light_edit 覆盖格式说明，明确只输出替换稿/候选
+  // 冲突5：非 light_edit 的指令改为"选择性结合"，与 system prompt 的 SELECTIVE_KNOWLEDGE_RULE 一致
+  const contextInstruction = isLightEdit
     ? "请只根据用户原文、选区和修改要求做局部优化；替换稿只改用户点名的内容，不要顺手改未点名的开头、工具名、结尾或结构；如果用户只要求优化开头/前三秒/第一句话/钩子，只输出 3-5 个开头候选或一个开头替换稿，禁止输出整篇文案；可以给开头、结构、结尾等简短可选建议，但不要主动结合企业知识库扩写。"
-    : "请根据以上内容，结合企业知识库中的相关信息，生成以下格式的营销内容："
+    : "请根据以上内容，按上方规则选择性结合企业知识库素材，生成以下格式的营销内容："
+
+  // 冲突2：light_edit 跳过选题锁定和 GUARDRAIL（局部优化不需要对标改写硬规则）
+  const topicLockBlock = isLightEdit
+    ? ""
+    : `选题锁定要求：
+- 如果用户输入里有热点标题、对标标题、对标原文、爆款拆解或明确选题，必须先锁定其核心选题。
+- 企业知识库和IP特色只能作为案例、身份、表达口吻和承接方式融入，不允许把主题改写成知识库里另一个更熟悉的话题。
+- 成稿必须让用户一眼看出：这仍然是在讲热点/原选题，只是换成了本IP的表达和承接。
+- ${BENCHMARK_REWRITE_GUARDRAIL}`
 
   return `用户输入的原始内容：
 "${context.rawInput}"
@@ -173,11 +192,7 @@ ${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}
 
 ${contextInstruction}
 
-选题锁定要求：
-- 如果用户输入里有热点标题、对标标题、对标原文、爆款拆解或明确选题，必须先锁定其核心选题。
-- 企业知识库和IP特色只能作为案例、身份、表达口吻和承接方式融入，不允许把主题改写成知识库里另一个更熟悉的话题。
-- 成稿必须让用户一眼看出：这仍然是在讲热点/原选题，只是换成了本IP的表达和承接。
-- ${BENCHMARK_REWRITE_GUARDRAIL}
+${topicLockBlock}
 
 ${formatBlocks}
 

@@ -42,6 +42,7 @@ export const SOURCE_TYPES = [
   "import",
   "obsidian",
   "smart_import",
+  "meeting_insight",
 ] as const
 
 export type KnowledgeSourceType = (typeof SOURCE_TYPES)[number]
@@ -52,6 +53,7 @@ export const SOURCE_TYPE_LABELS: Record<string, string> = {
   import: "文件导入",
   obsidian: "Obsidian 同步",
   smart_import: "智能导入",
+  meeting_insight: "会议洞察",
 }
 
 export const PROJECT_REQUIRED_CATEGORIES: ReadonlySet<string> = new Set([

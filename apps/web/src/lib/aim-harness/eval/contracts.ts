@@ -34,6 +34,7 @@ export type { AimAgentId, AimEntrypoint }
  *   revision       — 追改纠偏 (follow-up correction / redirect)
  *   cite_knowledge — 知识引用 (must pull external knowledge into the prompt)
  *   info_insufficient — 信息不足 (should surface a warning, not fabricate)
+ *   task_semantics — 任务语义契约 (90 天计划 0.2：创建/重写/轻改边界)
  */
 export type EvalScenario =
   | "new"
@@ -42,6 +43,7 @@ export type EvalScenario =
   | "revision"
   | "cite_knowledge"
   | "info_insufficient"
+  | "task_semantics"
 
 /**
  * A single knowledge entry provided by the frozen-context adapter. This is the

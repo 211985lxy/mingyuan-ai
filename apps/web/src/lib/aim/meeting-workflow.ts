@@ -46,6 +46,8 @@ export interface InsightResultSink {
     projectId?: string
     meetingTitle: string
     customer: string
+    /** 会议原文（AimGeneration.rawInput 需要；不落盘方应忽略）。 */
+    transcript: string
   }): Promise<{ aimResultId: string; resultLink: string }>
 }
 
@@ -157,6 +159,7 @@ export async function runMeetingInsightWorkflow(
       projectId: input.projectId,
       meetingTitle: input.meetingTitle,
       customer: input.customer,
+      transcript: input.transcript,
     })
   } catch (err) {
     const message = `洞察结果落盘失败：${err instanceof Error ? err.message : String(err)}`

@@ -16,7 +16,7 @@ export function extractBenchmarkOriginalCopy(rawInput: string) {
   const marker = rawInput.match(/对标原文[：:]\s*/)
   if (marker?.index == null) return ""
   const rest = rawInput.slice(marker.index + marker[0].length).trim()
-  const nextSection = rest.search(/\n(?:已有拆解|结构化拆解|改写原则|创作原则|来源链接|字数硬规则|硬规则|===)[：:：]?/)
+  const nextSection = rest.search(/\n(?:已有拆解|结构化拆解|改写原则|创作原则|来源链接|字数硬规则|硬规则|对标标题|对标话题|对标账号|爆款拆解|===)[：:：]?/)
   return (nextSection >= 0 ? rest.slice(0, nextSection) : rest).trim()
 }
 

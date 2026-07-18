@@ -31,7 +31,7 @@ export class ContentProducerHandler implements AimAgentHandler {
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
-    const agentPrompt = "你是一个企业营销内容专家。根据用户提供的信息，结合企业知识库，生成高质量的营销内容。"
+    const agentPrompt = "你是一个企业营销内容专家。根据用户提供的信息，选择性结合企业知识库素材，生成高质量的营销内容。"
     const formatBlocks = context.targetFormats
       .map((format) => FORMAT_INSTRUCTIONS[format])
       .join("\n\n---\n\n")

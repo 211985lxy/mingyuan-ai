@@ -6,12 +6,13 @@ import { NextRequest } from "next/server"
 // 对照 docs/plans/aim-ai-native-company-zcode-execution-plan.md §14 验收。
 
 const { startWorkItem, submitWorkItemForReview, completeWorkItem, failWorkItem,
-  createLarkWorkItemStore } = vi.hoisted(() => ({
+  createLarkWorkItemStore, readWorkItemStoreConfig } = vi.hoisted(() => ({
   startWorkItem: vi.fn(),
   submitWorkItemForReview: vi.fn(),
   completeWorkItem: vi.fn(),
   failWorkItem: vi.fn(),
   createLarkWorkItemStore: vi.fn(() => ({ get: vi.fn(), update: vi.fn() })),
+  readWorkItemStoreConfig: vi.fn(() => ({ baseToken: "bse_1", tableId: "tbl_1", cliPath: "/mock/lark-cli" })),
 }))
 
 vi.mock("@/lib/aim/services/work-item-execution", () => ({
@@ -23,7 +24,7 @@ vi.mock("@/lib/aim/services/work-item-execution", () => ({
 
 vi.mock("@/lib/aim/work-item-store", () => ({
   createLarkWorkItemStore,
-  readWorkItemStoreConfig: () => ({ baseToken: "bse_1", tableId: "tbl_1", cliPath: "/mock/lark-cli" }),
+  readWorkItemStoreConfig,
 }))
 
 import { POST } from "@/app/api/integrations/feishu/work-items/execute/route"
@@ -78,6 +79,16 @@ describe("鉴权与 fail-closed", () => {
     startWorkItem.mockResolvedValueOnce({ ok: true, status: "处理中", idempotent: false, recordId: "rec_1" })
     const { status } = await call({ recordId: "rec_1", action: "start" })
     expect(status).toBe(200)
+  })
+
+  it("飞书配置缺失 → 503 fail-closed，不执行服务", async () => {
+    readWorkItemStoreConfig.mockImplementationOnce(() => {
+      throw new Error("经营事项入口缺少 LARK_BASE_TOKEN 配置。")
+    })
+    const { status, body } = await call({ recordId: "rec_1", action: "start" })
+    expect(status).toBe(503)
+    expect(String(body.error)).toContain("LARK_BASE_TOKEN")
+    expect(startWorkItem).not.toHaveBeenCalled()
   })
 })
 

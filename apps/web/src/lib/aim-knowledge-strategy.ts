@@ -17,6 +17,7 @@ import { type ContentScenario, getScenarioConfig } from "@/lib/content-scenario-
  */
 export type ResolvedKnowledgeStrategy =
   | "light_edit" // 轻改润色：少调/几乎不调知识
+  | "rewrite" // 对标改写：中量，需要知识库做案例/身份替换
   | "hot_topic" // 热点创作：少调，突出热点 + 对标
   | "persona" // 人设型：偏中量，突出老板经验/定位素材
   | "conversion" // 转化型：偏大量，突出产品卖点/痛点/问答
@@ -58,6 +59,14 @@ export const KNOWLEDGE_STRATEGY_PROFILES: Record<ResolvedKnowledgeStrategy, Know
     categoryBoost: {},
     label: "轻改润色",
     description: "仅微改文案，知识库只兜底几句话",
+  },
+  rewrite: {
+    topK: 6,
+    maxBlockChars: 3500,
+    maxEntryChars: 800,
+    categoryBoost: { boss_experience: 1.2, positioning_material: 1.2, project_case: 1.15 },
+    label: "对标改写",
+    description: "对标改写需要中量知识库支撑案例/身份替换",
   },
   hot_topic: {
     topK: 5,
@@ -156,24 +165,49 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
   const asksForLocalCopyPart =
     includesAny(text, ["优化", "改", "润色", "换个说法", "调整"]) &&
     includesAny(text, ["开头", "前3秒", "前三秒", "第一句话", "钩子", "起手", "开场", "标题", "结尾", "收尾"])
+  // "优化这篇文案" 等不含局部词的优化意图也视为轻改（需有原稿指代）
+  const asksForGenericPolish =
+    includesAny(text, ["优化", "润色", "顺一下", "自然点", "更自然", "口语化"])
+  // 整体重写动词：优先于创建动词判定（"重写一版"包含"写一版"）
+  const asksForRewrite =
+    includesAny(text, ["重写", "改写", "重新写", "大改", "重做"])
+  // 创建动词：用户要的是新稿；"写一版并优化转化"仍属新写，
+  // "优化/自然一点/口语化"不能压过创建动词单独决定任务类型
+  const asksForCreation =
+    includesAny(text, ["写一版", "写个", "生成", "起草", "创作", "出一条"])
+  // 指代已有原稿：有原稿的纯润色才是轻改；无原稿的"写得更自然"按新写处理
+  const referencesOriginalCopy =
+    includesAny(text, ["这篇", "这条", "这段", "原稿", "原文", "上述", "上面", "这一版", "稿子"])
+  // 这些说法本身隐含原稿存在
+  const impliesOriginalCopy =
+    includesAny(text, ["换个说法", "改得", "改成", "这里改", "这句话"])
 
   if (
     !asksForExternalContext &&
+    !asksForRewrite &&
+    !asksForCreation &&
     (
       asksForLocalCopyPart ||
+      impliesOriginalCopy ||
       input.taskType === "polish_copy" ||
       Boolean(input.polishInstruction?.trim()) ||
-      includesAny(text, ["润色", "顺一下", "自然点", "口语化", "换个说法", "改得", "改成", "这里改", "这句话"])
+      (asksForGenericPolish && referencesOriginalCopy)
     )
   ) {
     return "light_edit"
   }
 
-  if (includesAny(text, ["重写", "改写", "优化", "重新写", "大改"])) {
+  if (asksForRewrite) {
     return "rewrite_copy"
   }
 
-  if (input.taskType === "write_script" || (input.targetFormats?.length ?? 0) > 0 || includesAny(text, ["写一版", "写个", "生成", "起草", "创作", "出一条"])) {
+  if (
+    input.taskType === "write_script" ||
+    (input.targetFormats?.length ?? 0) > 0 ||
+    asksForCreation ||
+    // 无原稿的"写得更自然/更口语化" = 新写一版
+    (asksForGenericPolish && !referencesOriginalCopy)
+  ) {
     return "new_copy"
   }
 
@@ -207,8 +241,13 @@ export function resolveKnowledgeStrategy(
   const { runtimeTask, topicType, contentScenario, hotTopic, videoCopyExtractionId, taskType, polishInstruction } = input
 
   // 1. 轻改润色：用户只想改一段，没必要拉知识库
-  if (runtimeTask === "light_edit" || runtimeTask === "rewrite_copy" || polishInstruction?.trim() || taskType === "polish_copy") {
+  if (runtimeTask === "light_edit" || polishInstruction?.trim() || taskType === "polish_copy") {
     return "light_edit"
+  }
+
+  // 1.5 对标改写：需要中量知识库做案例/身份替换
+  if (runtimeTask === "rewrite_copy") {
+    return "rewrite"
   }
 
   // 2. 内容场景：场景模式优先级仅次于 light_edit

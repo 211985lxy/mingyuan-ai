@@ -1,5 +1,32 @@
 // Knowledge domain models
 
+// 会后资产候选（90 天计划 3.1）：会议洞察人工审核通过后生成，
+// 默认 pending 且不允许跨项目复用；人工批准后才可升级为正式知识。
+model AssetCandidate {
+  id                  String   @id @default(cuid())
+  userId              String
+  projectId           String
+  generationId        String // 来源会议洞察 AimGeneration.id（不建外键，资产可独立于生成记录存续）
+  feishuRecordId      String?  @db.VarChar(64) // 来源飞书记录
+  kind                String   @db.VarChar(40) // pain_point | customer_quote | objection | deal_trigger | follow_up_script | content_topic | case_candidate | methodology_revision
+  title               String   @db.VarChar(200)
+  content             String   @db.Text
+  evidence            String?  @db.Text // 原文证据，缺省为 null，不伪造
+  confidence          String   @default("medium") @db.VarChar(10) // high | medium | low
+  reviewStatus        String   @default("pending") @db.VarChar(20) // pending | approved | rejected
+  crossProjectAllowed Boolean  @default(false) // 跨项目复用需人工批准
+  promotedEntryId     String? // 升级后的 KnowledgeEntry.id
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id])
+  project ClientProject @relation(fields: [projectId], references: [id])
+
+  @@index([userId, reviewStatus])
+  @@index([userId, projectId, kind])
+  @@index([generationId])
+}
+
 model KnowledgeEntry {
   id         String   @id @default(cuid())
   userId     String

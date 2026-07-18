@@ -78,6 +78,7 @@ model ClientProject {
   aimGenerations    AimGeneration[]
   knowledgeEntries  KnowledgeEntry[]
   knowledgeEntities KnowledgeEntity[]
+  assetCandidates   AssetCandidate[]
   aimMemories       AimMemory[]
   ipWikiPages       IpWikiPage[]
   benchmarkProfiles BenchmarkProfile[]

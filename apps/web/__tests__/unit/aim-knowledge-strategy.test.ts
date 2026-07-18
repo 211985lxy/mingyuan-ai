@@ -109,6 +109,56 @@ describe("AIM runtime task routing", () => {
     expect(task).toBe("quality_review")
     expect(shouldUseMarketViralContextForTask(task)).toBe(false)
   })
+
+  // ─── 90 天计划 0.2 任务语义契约 ───
+
+  it("「写一版并优化转化」进入 new_copy（创建动词优先于优化词）", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "帮我写一版口播稿，并优化转化",
+    })
+
+    expect(task).toBe("new_copy")
+  })
+
+  it("「整体结构和篇幅都可以重做」进入 rewrite_copy", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "这篇稿子的整体结构和篇幅都可以重做",
+    })
+
+    expect(task).toBe("rewrite_copy")
+    expect(resolveKnowledgeStrategy({ runtimeTask: task })).toBe("rewrite")
+  })
+
+  it("「结合客户案例优化原稿」进入 rewrite_copy（非 light_edit）", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "结合客户案例优化这篇原稿",
+    })
+
+    expect(task).toBe("rewrite_copy")
+    expect(shouldUseKnowledgeContextForTask(task)).toBe(true)
+  })
+
+  it("没有原稿的「写得更自然」进入 new_copy", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "帮我把口播稿写得更自然一点",
+    })
+
+    expect(task).toBe("new_copy")
+  })
+
+  it("有原稿的纯优化仍是 light_edit（优化 + 这篇）", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "优化这篇文案，开头别动",
+    })
+
+    expect(task).toBe("light_edit")
+    expect(shouldUseKnowledgeContextForTask(task)).toBe(false)
+  })
 })
 
 // ─── resolveKnowledgeStrategy 优先级矩阵 ────────────────────────
@@ -237,7 +287,7 @@ describe("resolveKnowledgeStrategy priority chain", () => {
 
 describe("KNOWLEDGE_STRATEGY_PROFILES completeness", () => {
   const ALL_STRATEGIES: ResolvedKnowledgeStrategy[] = [
-    "light_edit", "hot_topic", "persona", "conversion", "traffic", "deep",
+    "light_edit", "rewrite", "hot_topic", "persona", "conversion", "traffic", "deep",
   ]
 
   it("has a profile for every strategy", () => {
@@ -266,6 +316,15 @@ describe("KNOWLEDGE_STRATEGY_PROFILES completeness", () => {
     const deep = KNOWLEDGE_STRATEGY_PROFILES.deep
     expect(light.topK).toBeLessThan(deep.topK)
     expect(light.maxBlockChars).toBeLessThan(deep.maxBlockChars)
+  })
+
+  it("rewrite sits between light_edit and deep（对标改写中量配额）", () => {
+    const light = KNOWLEDGE_STRATEGY_PROFILES.light_edit
+    const rewrite = KNOWLEDGE_STRATEGY_PROFILES.rewrite
+    const deep = KNOWLEDGE_STRATEGY_PROFILES.deep
+    expect(rewrite.topK).toBeGreaterThan(light.topK)
+    expect(rewrite.topK).toBeLessThan(deep.topK)
+    expect(rewrite.categoryBoost["project_case"]).toBeGreaterThan(1)
   })
 
   it("hot_topic boosts hot_topic and benchmark_reference categories", () => {

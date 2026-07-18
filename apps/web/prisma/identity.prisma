@@ -33,6 +33,7 @@ model User {
   aimRunSnapshots       AimRunSnapshot[]
   aimRunEvents          AimRunEvent[]
   contentOutcomes       ContentOutcome[]
+  assetCandidates       AssetCandidate[]
   commentInsightJobs    CommentInsightJob[]
 }
 
