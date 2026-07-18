@@ -184,9 +184,10 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
     },
     expectations: {
       // 「重写」关键词命中 → rewrite_copy（而非 write_script 的 new_copy，
-      // 因为 rewrite 检查在 new_copy 之前）。重写/改写走轻量知识策略。
+      // 因为 rewrite 检查在 new_copy 之前）。整体重写/仿写走「对标改写」
+      // 中量知识策略（rewrite 档，支撑案例/身份替换），不再是 light_edit 极低配额。
       runtimeTask: "rewrite_copy",
-      knowledgeStrategy: "light_edit",
+      knowledgeStrategy: "rewrite",
       outputFormats: ["koubo_script"],
     },
   },
@@ -227,9 +228,10 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
     },
     seedContext: { knowledge: [] },
     expectations: {
-      // “重写”关键词命中 → rewrite_copy（repurpose taskType 不单独识别）
+      // “重写”关键词命中 → rewrite_copy（repurpose taskType 不单独识别）。
+      // 改编复用属于整体重写，知识策略为 rewrite 档（中量，案例/身份替换）。
       runtimeTask: "rewrite_copy",
-      knowledgeStrategy: "light_edit",
+      knowledgeStrategy: "rewrite",
       outputFormats: ["moments_post"],
     },
   },
@@ -331,9 +333,10 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
     },
     seedContext: { knowledge: [] },
     expectations: {
-      // “重写”命中 → rewrite_copy
+      // “重写”命中 → rewrite_copy；重写段落按整体改写处理，
+      // 知识策略为 rewrite 档（中量），不再是 light_edit 极低配额。
       runtimeTask: "rewrite_copy",
-      knowledgeStrategy: "light_edit",
+      knowledgeStrategy: "rewrite",
       outputFormats: [],
     },
   },
@@ -468,6 +471,95 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
       knowledgeStrategy: "deep",
       outputFormats: [],
       mustWarnInsufficientInfo: true,
+    },
+  },
+
+  // ────────────────────── task_semantics（90 天计划 0.2 契约）──────────────────────
+  {
+    id: "cp_task_new_optimize_21",
+    version: 1,
+    agent: "content_producer",
+    scenario: "task_semantics",
+    entrypoint: "generate",
+    description: "「写一版并优化转化」：创建动词优先于优化词 → new_copy",
+    input: {
+      rawInput: "帮我写一版口播稿，并优化转化。",
+      agentId: "content_producer",
+      taskType: "write_script",
+      targetFormats: ["koubo_script"],
+    },
+    seedContext: { knowledge: [] },
+    expectations: {
+      // “写一版”是创建动词；“优化转化”不能单独决定为轻改
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: ["koubo_script"],
+    },
+  },
+  {
+    id: "cp_task_rewrite_structure_22",
+    version: 1,
+    agent: "content_producer",
+    scenario: "task_semantics",
+    entrypoint: "chat",
+    description: "「整体结构和篇幅都可以重做」→ rewrite_copy",
+    input: {
+      messages: [
+        { role: "assistant", content: "（上一稿文案略）" },
+        { role: "user", content: "这篇稿子的整体结构和篇幅都可以重做。" },
+      ],
+      rawInput: "这篇稿子的整体结构和篇幅都可以重做。",
+      agentId: "content_producer",
+    },
+    seedContext: { knowledge: [] },
+    expectations: {
+      // “重做”是整体重写动词，有原稿（“这篇稿子”）→ rewrite_copy 中量知识
+      runtimeTask: "rewrite_copy",
+      knowledgeStrategy: "rewrite",
+      outputFormats: [],
+    },
+  },
+  {
+    id: "cp_task_rewrite_case_23",
+    version: 1,
+    agent: "content_producer",
+    scenario: "task_semantics",
+    entrypoint: "chat",
+    description: "「结合客户案例优化原稿」→ rewrite_copy（外部上下文 + 原稿）",
+    input: {
+      messages: [
+        { role: "assistant", content: "（上一稿文案略）" },
+        { role: "user", content: "结合客户案例优化这篇原稿。" },
+      ],
+      rawInput: "结合客户案例优化这篇原稿。",
+      agentId: "content_producer",
+    },
+    seedContext: { knowledge: [] },
+    expectations: {
+      // 结合外部案例 + 有原稿的整体优化 → rewrite_copy，非 light_edit
+      runtimeTask: "rewrite_copy",
+      knowledgeStrategy: "rewrite",
+      outputFormats: [],
+    },
+  },
+  {
+    id: "cp_task_new_natural_24",
+    version: 1,
+    agent: "content_producer",
+    scenario: "task_semantics",
+    entrypoint: "chat",
+    description: "无原稿的「写得更自然」→ new_copy（自然/口语化不单独决定轻改）",
+    input: {
+      messages: [{ role: "user", content: "帮我把口播稿写得更自然一点。" }],
+      rawInput: "帮我把口播稿写得更自然一点。",
+      agentId: "content_producer",
+    },
+    seedContext: { knowledge: [] },
+    expectations: {
+      // 无原稿指代（无“这篇/这条/原稿”），润色词单独不成立 → 新写一版
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: [],
     },
   },
 ]

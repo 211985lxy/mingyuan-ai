@@ -166,8 +166,9 @@ export const DEEP_COPYWRITER_FIXTURES: EvalFixture[] = [
     },
     seedContext: { knowledge: [] },
     expectations: {
+      // 改编复用属于整体重写，知识策略为 rewrite 档（中量，案例/身份替换）。
       runtimeTask: "rewrite_copy",
-      knowledgeStrategy: "light_edit",
+      knowledgeStrategy: "rewrite",
       outputFormats: ["moments_post"],
     },
   },
@@ -188,8 +189,9 @@ export const DEEP_COPYWRITER_FIXTURES: EvalFixture[] = [
       videoCopyBlock: "对标原文：用场景化描写打动用户。",
     },
     expectations: {
+      // 对标重写一版走「对标改写」中量知识策略（rewrite 档）。
       runtimeTask: "rewrite_copy",
-      knowledgeStrategy: "light_edit",
+      knowledgeStrategy: "rewrite",
       outputFormats: ["raw_copy"],
     },
   },
@@ -272,8 +274,10 @@ export const DEEP_COPYWRITER_FIXTURES: EvalFixture[] = [
     },
     seedContext: { knowledge: [] },
     expectations: {
+      // “重新写一遍”命中 → rewrite_copy；重写段落按整体改写处理，
+      // 知识策略为 rewrite 档（中量），不再是 light_edit 极低配额。
       runtimeTask: "rewrite_copy",
-      knowledgeStrategy: "light_edit",
+      knowledgeStrategy: "rewrite",
       outputFormats: [],
     },
   },

@@ -1,12 +1,12 @@
 /**
- * Registry of all versioned eval fixtures (66 cases).
+ * Registry of all versioned eval fixtures (70 cases).
  *
- *   content_producer  : 20
+ *   content_producer  : 24
  *   deep_copywriter   : 15
  *   business_diagnosis: 15
  *   ─────────────────────
  *   remaining 4 agents: 16
- *   total             : 66
+ *   total             : 70
  */
 import type { EvalFixture, EvalScenario } from "@/lib/aim-harness/eval/contracts"
 import { CONTENT_PRODUCER_FIXTURES } from "./content-producer"
@@ -28,7 +28,7 @@ export const FULL_EVAL_FIXTURES: EvalFixture[] = ALL_FIXTURES
 
 /** Expected per-agent counts — asserted by the registry test. */
 export const EXPECTED_AGENT_COUNTS = {
-  content_producer: 20,
+  content_producer: 24,
   deep_copywriter: 15,
   business_diagnosis: 15,
   free_copywriter: 4,
@@ -45,4 +45,5 @@ export const EXPECTED_SCENARIO_COVERAGE: EvalScenario[] = [
   "revision",
   "cite_knowledge",
   "info_insufficient",
+  "task_semantics",
 ]
