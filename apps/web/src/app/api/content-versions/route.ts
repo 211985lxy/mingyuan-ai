@@ -66,6 +66,10 @@ export const POST = withUserAuth(async (request, { user }) => {
   if (!format) return NextResponse.json({ error: "format 不能为空" }, { status: 400 })
   if (!content.trim()) return NextResponse.json({ error: "content 不能为空" }, { status: 400 })
   if (!VALID_SOURCES.has(source)) return NextResponse.json({ error: "source 不合法" }, { status: 400 })
+  if (generationId) {
+    const ownedGeneration = await prisma.aimGeneration.findFirst({ where: { id: generationId, userId: user.id }, select: { id: true } })
+    if (!ownedGeneration) return NextResponse.json({ error: "生成记录不存在或无权访问" }, { status: 404 })
+  }
 
   let version!: AimContentVersion
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
