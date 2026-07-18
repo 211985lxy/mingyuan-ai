@@ -67,6 +67,12 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
   if (!Array.isArray(messages) || messages.length === 0) {
     return { ok: false, status: 400, validationError: "请求格式不正确，缺少 messages 数组" }
   }
+  const requestedModule = record.agentModule ?? record.writerModule
+  const hasModule = requestedModule === "social" || requestedModule === "longform" || requestedModule === "free"
+  const requestedAgent = typeof record.agentId === "string" ? record.agentId : ""
+  if (hasModule && !["content_producer", "deep_copywriter", "free_copywriter", "ip_video"].includes(requestedAgent)) {
+    return { ok: false, status: 400, validationError: "agentModule 只能用于内容创作官" }
+  }
   return {
     ok: true,
     messages,
