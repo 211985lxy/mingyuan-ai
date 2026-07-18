@@ -43,7 +43,7 @@ export class LLMClient {
    *
    * aim-harness-v1: reports each provider attempt via telemetry and honors the
    * fallback policy — non-retryable errors (400/auth/config) fail immediately.
-   * Provider balance/quota 403 errors are retryable so the route can continue.
+   * Provider balance/quota errors (402/403) are retryable so the route can continue.
    */
   async complete(options: CompletionOptions): Promise<CompletionResult> {
     if (this.providers.length === 0) {

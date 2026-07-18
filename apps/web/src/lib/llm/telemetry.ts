@@ -167,7 +167,9 @@ export function classifyProviderError(error: unknown): {
     if (status === 408) return { kind: "timeout", retryable: true }
     if (status === 429) return { kind: "rate_limit", retryable: true }
     if (status >= 500) return { kind: "server", retryable: true }
-    if (status === 403 && /(预扣费|剩余额度|额度不足|余额不足|insufficient (balance|credit|quota)|quota exceeded|credit balance|billing)/.test(lower)) {
+    // 余额/配额耗尽必须允许降级到下一个 provider：DeepSeek 用 402（Payment Required）
+    // 表达余额不足，其它中转站多用 403 + 余额文案；两者都不是请求本身有问题。
+    if (status === 402 || (status === 403 && /(预扣费|剩余额度|额度不足|余额不足|insufficient (balance|credit|quota)|quota exceeded|credit balance|billing)/.test(lower))) {
       return { kind: "rate_limit", retryable: true }
     }
     if (status === 401 || status === 403) return { kind: "auth", retryable: false }

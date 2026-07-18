@@ -42,6 +42,36 @@ describe("AIM model capability policy", () => {
     })
   })
 
+  it("treats provider balance exhaustion as retryable and falls back", async () => {
+    expect(classifyProviderError(new Error("402 Insufficient Balance"))).toEqual({
+      kind: "rate_limit",
+      retryable: true,
+    })
+    expect(classifyProviderError(new Error("403 剩余额度不足"))).toEqual({
+      kind: "rate_limit",
+      retryable: true,
+    })
+
+    const calls: string[] = []
+    const outOfBalance = (name: string): LLMProvider => ({
+      name,
+      defaultModel: `${name}-model`,
+      isAvailable: () => true,
+      async complete() {
+        calls.push(name)
+        throw new Error("402 Insufficient Balance")
+      },
+    })
+
+    const result = await new LLMClient([
+      outOfBalance("deepseek"),
+      successfulProvider("apimart"),
+    ]).complete({ messages: [{ role: "user", content: "test" }] })
+
+    expect(result.provider).toBe("apimart")
+    expect(calls).toEqual(["deepseek"])
+  })
+
   it("honors a per-run provider attempt budget", async () => {
     const calls: string[] = []
     const failing = (name: string): LLMProvider => ({
