@@ -11,9 +11,11 @@
  */
 import {
   getLarkBaseRecord,
+  listLarkBaseRecords,
   updateLarkBaseRecord,
 } from "@/lib/lark-base-tool"
 import type { WorkItemRecordStore } from "@/lib/aim/services/work-item-execution"
+import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
 
 /** 环境变量形态（process.env 的最小投影，便于注入测试）。 */
 type EnvLike = Record<string, string | undefined>
@@ -66,4 +68,26 @@ export function createLarkWorkItemStore(config: WorkItemStoreConfig): WorkItemRe
       return { ok: true }
     },
   }
+}
+
+/**
+ * 扫描「待处理」状态的经营事项记录（WP-8 无人值守调度用）。
+ * 拉取一页记录后在本地按状态机解析过滤；状态未知/损坏的记录不会混入。
+ */
+export async function listPendingWorkItemRecords(
+  config: WorkItemStoreConfig,
+  limit = 20,
+  runCommand?: (command: string, args: string[]) => Promise<unknown>,
+): Promise<Array<{ recordId: string; fields: Record<string, unknown> }>> {
+  const records = await listLarkBaseRecords({
+    baseToken: config.baseToken,
+    tableId: config.tableId,
+    limit,
+    cliPath: config.cliPath,
+    identity: "bot",
+    runCommand,
+  })
+  return records
+    .filter((record) => parseFeishuWorkItem(record.fields).status === "待处理")
+    .slice(0, limit)
 }

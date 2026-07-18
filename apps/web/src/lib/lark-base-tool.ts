@@ -276,6 +276,42 @@ export async function updateLarkBaseRecord(input: {
   return { ok: true as const, result: payload }
 }
 
+/**
+ * 列出表内记录（record 级，供 WP-8 待处理扫描等场景使用）。
+ * 返回 { recordId, fields } 形态；不做状态过滤，过滤由调用方负责。
+ */
+export async function listLarkBaseRecords(input: {
+  baseToken: string
+  tableId: string
+  limit?: number
+  offset?: number
+  cliPath?: string
+  identity?: "user" | "bot"
+  runCommand?: RunCommand
+}): Promise<Array<{ recordId: string; fields: Record<string, unknown> }>> {
+  const runCommand = input.runCommand ||
+    ((command, args) => runLarkBaseCommand(command, args, {
+      cliPath: input.cliPath,
+      identity: input.identity,
+    }))
+
+  const limit = Math.min(Math.max(input.limit ?? 100, 1), 100)
+  const offset = Math.max(input.offset ?? 0, 0)
+  const payload = await runCommand("+record-list", [
+    "--base-token", input.baseToken,
+    "--table-id", input.tableId,
+    "--offset", String(offset),
+    "--limit", String(limit),
+  ])
+
+  return asRecordList(payload)
+    .filter((item) => typeof item.record_id === "string" && item.record_id)
+    .map((item) => ({
+      recordId: item.record_id as string,
+      fields: (item.fields ?? {}) as Record<string, unknown>,
+    }))
+}
+
 async function ensureProject(db: DbLike, userId: string, projectId: string) {
   const project = await db.clientProject.findFirst({
     where: { id: projectId, userId, status: "active" },
