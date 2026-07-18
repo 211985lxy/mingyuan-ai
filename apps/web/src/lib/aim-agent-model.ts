@@ -80,6 +80,8 @@ export async function executeGenerateLLM(
       { role: "user", content: userPrompt },
     ],
     temperature: policy?.temperature ?? 0.8,
-    maxTokens: policy?.maxTokens ?? 4000,
+    // 推理模型（gpt-5 等）会先消耗 reasoning tokens 再产出正文，4000 预算在
+    // 复杂生成任务上可能只够推理、正文为空；与客户端默认上限 8192 对齐。
+    maxTokens: policy?.maxTokens ?? 8192,
   })
 }

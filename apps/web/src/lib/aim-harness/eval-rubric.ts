@@ -49,7 +49,9 @@ async function judgeDraft(fixture: EvalFixture, draft: string) {
     const result = await getAgentLLM("content_review").complete({
       messages: [{ role: "user", content: buildRubricPrompt(fixture, draft) }],
       temperature: 0,
-      maxTokens: 300,
+      // 判分 JSON 本身很短，但推理模型（gpt-5 等）会先消耗 reasoning tokens，
+      // 300 预算会在产出 JSON 前耗尽并返回空内容；留出推理余量。
+      maxTokens: 2000,
       responseFormat: { type: "json_object" },
     })
     const parsed = JSON.parse(result.content) as { score?: unknown; reasons?: unknown; fabricatedFact?: unknown }

@@ -72,6 +72,32 @@ describe("AIM model capability policy", () => {
     expect(calls).toEqual(["deepseek"])
   })
 
+  it("treats an empty provider response as retryable and falls back", async () => {
+    expect(classifyProviderError(new Error("[apimart] Empty response from model gpt-5"))).toEqual({
+      kind: "server",
+      retryable: true,
+    })
+
+    const calls: string[] = []
+    const empty = (name: string): LLMProvider => ({
+      name,
+      defaultModel: `${name}-model`,
+      isAvailable: () => true,
+      async complete() {
+        calls.push(name)
+        throw new Error(`[${name}] Empty response from model gpt-5`)
+      },
+    })
+
+    const result = await new LLMClient([
+      empty("apimart"),
+      successfulProvider("zenmux"),
+    ]).complete({ messages: [{ role: "user", content: "test" }] })
+
+    expect(result.provider).toBe("zenmux")
+    expect(calls).toEqual(["apimart"])
+  })
+
   it("honors a per-run provider attempt budget", async () => {
     const calls: string[] = []
     const failing = (name: string): LLMProvider => ({

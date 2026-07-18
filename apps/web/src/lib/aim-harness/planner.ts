@@ -95,7 +95,9 @@ function buildContextPolicy(
  *
  * 必须与 handler 现有执行函数逐字一致（否则改变模型行为）：
  *   - chat 入口（executeChatLLM/Stream）：temperature 0.7，无 maxTokens
- *   - 生成入口（executeGenerateLLM）：temperature 0.8，maxTokens 4000
+ *   - 生成入口（executeGenerateLLM）：temperature 0.8，maxTokens 8192
+ *     （推理模型如 gpt-5 会先消耗 reasoning tokens 再产出正文，4000 预算在复杂
+ *     任务上会在产出正文前耗尽并返回空内容；与客户端默认上限 8192 对齐）
  * agent 维度目前无差异（所有 agent 共享上述按入口的默认值）；后续若按 agent
  * 差异化，从这里改即可，handler 执行函数改为读 spec.modelPolicy。
  */
@@ -116,7 +118,7 @@ function buildModelPolicy(
     agentId,
     stream,
     temperature: isChat ? 0.7 : 0.8,
-    ...(isChat ? {} : { maxTokens: 4000 }),
+    ...(isChat ? {} : { maxTokens: 8192 }),
     targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
     maxProviderAttempts: stream ? 2 : 3,

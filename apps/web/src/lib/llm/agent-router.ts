@@ -35,8 +35,9 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
   deep_copywriter: [
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", capability: "advanced" },
-    { name: "apimart", capability: "advanced" },
+    // 深度长文走非流式调用，Claude/gpt-5 整篇生成常超过通用 60s 超时，放宽到 120s。
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
+    { name: "apimart", timeoutMs: 120000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.5", capability: "advanced" },
     { name: "deepseek", capability: "standard" },
     { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },

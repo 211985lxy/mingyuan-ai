@@ -179,6 +179,11 @@ export function classifyProviderError(error: unknown): {
   if (/(timeout|timed out|deadline|aborted)/.test(lower)) {
     return { kind: "timeout", retryable: true }
   }
+  // provider 返回 200 但 choices 内容为空（如推理模型在 token 预算内只产出了
+  // reasoning tokens），属于对端异常而非请求错误，必须允许降级到下一个 provider。
+  if (/(empty response|empty completion|no output|empty choice)/.test(lower)) {
+    return { kind: "server", retryable: true }
+  }
   if (/(no providers configured|missing.*key|api[_ ]?key|baseurl|config)/.test(lower)) {
     return { kind: "config", retryable: false }
   }

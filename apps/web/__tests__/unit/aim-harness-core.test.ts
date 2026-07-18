@@ -109,7 +109,7 @@ describe("aim-harness planner", () => {
   })
 
   // ── 阶段 2.1：modelPolicy 冻结（与 handler 执行函数逐字一致）──────────────
-  it("freezes modelPolicy for generate entrypoints (temp 0.8, maxTokens 4000)", () => {
+  it("freezes modelPolicy for generate entrypoints (temp 0.8, maxTokens 8192)", () => {
     const spec = planAimRun({
       entrypoint: "generate",
       agentId: "content_producer",
@@ -117,9 +117,10 @@ describe("aim-harness planner", () => {
       targetFormats: ["video_script"],
       taskType: "write_script",
     })
-    // 必须与 executeGenerateLLM 的 temperature:0.8 / maxTokens:4000 一致
+    // 必须与 executeGenerateLLM 的 temperature:0.8 / maxTokens:8192 一致
+    // （8192 为推理模型预留 reasoning tokens 余量，见 planner 注释）
     expect(spec.modelPolicy.temperature).toBe(0.8)
-    expect(spec.modelPolicy.maxTokens).toBe(4000)
+    expect(spec.modelPolicy.maxTokens).toBe(8192)
     expect(spec.modelPolicy.stream).toBe(false)
     expect(spec.modelPolicy.targetCapability).toBe("standard")
     expect(spec.modelPolicy.minimumCapability).toBe("basic")
@@ -151,7 +152,8 @@ describe("aim-harness planner", () => {
         targetFormats: ["video_script"],
       })
       expect(spec.modelPolicy.temperature).toBe(0.8)
-      expect(spec.modelPolicy.maxTokens).toBe(4000)
+      // 与 generate 入口同：非聊天入口统一 maxTokens 8192（见 planner.ts）
+      expect(spec.modelPolicy.maxTokens).toBe(8192)
     }
   })
 
