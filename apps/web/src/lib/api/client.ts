@@ -1274,6 +1274,8 @@ export type AimTaskType =
 
 export interface AimGenerateRequest {
   agentId?: string
+  /** 文案创作官模块选择（auto/social/longform/free），仅 agentId="copywriter" 时生效 */
+  writerModule?: string
   rawInput: string
   targetFormats?: ContentFormat[]
   taskType?: AimTaskType
@@ -1650,6 +1652,10 @@ export async function chatAim(
   messages: AimChatMessage[],
   options?: {
     agentId?: string
+    /** 统一创作台模块键（copy_studio.*），可选；传入后服务端按模块键路由 LLM */
+    agentModule?: string
+    /** 文案创作官模块选择（auto/social/longform/free），仅 agentId="copywriter" 时生效 */
+    writerModule?: string
     projectId?: string
     toolAction?: AimChatToolAction
     resultId?: string
@@ -1670,6 +1676,10 @@ export async function chatAimStream(
   messages: AimChatMessage[],
   options: {
     agentId?: string
+    /** 统一创作台模块键（copy_studio.*），可选；传入后服务端按模块键路由 LLM */
+    agentModule?: string
+    /** 文案创作官模块选择（auto/social/longform/free），仅 agentId="copywriter" 时生效 */
+    writerModule?: string
     projectId?: string
     editorContext?: AimEditorContext
     signal?: AbortSignal
@@ -1808,4 +1818,82 @@ export async function generateFromInspiration(
     body: JSON.stringify(data),
     timeout: 60000,
   })
+}
+
+// ─── 作品编辑环节 P0：内容版本管理 ──────────────────────────
+
+/** 版本来源：generated 原始生成 | manual_edit 手动改 | ai_polish | ai_proofread | ai_imitate */
+export type ContentVersionSource =
+  | "generated"
+  | "manual_edit"
+  | "ai_polish"
+  | "ai_proofread"
+  | "ai_imitate"
+
+export interface ContentVersionSummary {
+  id: string
+  generationId: string | null
+  conversationId: string | null
+  format: string
+  versionNo: number
+  source: ContentVersionSource
+  parentVersionId: string | null
+  createdAt: string
+  contentLength: number
+  preview: string
+}
+
+export interface ContentVersionDetail {
+  id: string
+  generationId: string | null
+  conversationId: string | null
+  format: string
+  versionNo: number
+  source: ContentVersionSource
+  parentVersionId: string | null
+  createdAt: string
+  content: string
+}
+
+export async function listContentVersions(params: {
+  generationId?: string
+  conversationId?: string
+}): Promise<ContentVersionSummary[]> {
+  const query = params.generationId
+    ? `generationId=${encodeURIComponent(params.generationId)}`
+    : `conversationId=${encodeURIComponent(params.conversationId || "")}`
+  const payload = await request<{ data: ContentVersionSummary[] }>(
+    `/api/content-versions?${query}`
+  )
+  return payload.data
+}
+
+export async function getContentVersion(id: string): Promise<ContentVersionDetail> {
+  const payload = await request<{ data: ContentVersionDetail }>(
+    `/api/content-versions?id=${encodeURIComponent(id)}`
+  )
+  return payload.data
+}
+
+export async function createContentVersion(input: {
+  generationId?: string
+  conversationId?: string
+  format: string
+  content: string
+  source: ContentVersionSource
+}): Promise<ContentVersionSummary> {
+  const payload = await request<{ data: ContentVersionSummary }>("/api/content-versions", {
+    method: "POST",
+    body: JSON.stringify(input),
+    timeout: 15000,
+  })
+  return payload.data
+}
+
+export async function restoreContentVersion(id: string): Promise<ContentVersionDetail> {
+  const payload = await request<{ data: ContentVersionDetail }>(
+    `/api/content-versions/${encodeURIComponent(id)}/restore`,
+    { method: "POST", timeout: 15000 }
+  )
+  return payload.data
 }

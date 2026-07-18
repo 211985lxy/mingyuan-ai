@@ -46,6 +46,7 @@ model User {
   aimExecutionTraces             AimExecutionTrace[]
   aimRunSnapshots                AimRunSnapshot[]
   aimRunEvents                   AimRunEvent[]
+  aimContentVersions             AimContentVersion[]
 }
 
 model Avatar {
@@ -466,6 +467,34 @@ model AimGeneration {
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, projectId, createdAt(sort: Desc)])
   @@index([userId, workflowStatus])
+}
+
+// ─── AIM 内容版本（作品编辑环节 P0：版本管理） ──────────────
+// 只追加不覆盖（immutable）；回滚 = 以旧版为父创建新版本，历史不可变。
+// generationId / conversationId 均可空：generationId 关联 AimGeneration，
+// conversationId 兜底无生成记录的手工编辑场景。
+model AimContentVersion {
+  id              String   @id @default(cuid())
+  userId          String
+  generationId    String?
+  conversationId  String?
+  format          String   @db.VarChar(40) // raw_copy | video_script | wechat_article 等
+  content         String   @db.LongText
+  versionNo       Int
+  source          String   @db.VarChar(24) // generated | manual_edit | ai_polish | ai_proofread | ai_imitate
+  parentVersionId String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  // 注意：不做 generationId+versionNo 复合唯一约束——MariaDB 唯一索引下
+  // 多个 NULL generationId 虽然允许，但 conversationId 维度的版本号同样需要
+  // 唯一性表达，两种维度混在一个约束里语义混乱，统一用普通索引 + 应用层
+  // 「取最大 versionNo + 1」保证递增。
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([generationId, versionNo])
+  @@index([conversationId, versionNo])
+  @@index([parentVersionId])
 }
 
 // ─── IP 定位维基（Karpathy LLM-Wiki 模式） ──────────────
