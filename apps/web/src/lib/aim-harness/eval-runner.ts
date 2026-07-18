@@ -15,9 +15,9 @@
  * artifact / job summary.
  */
 
+import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { EvalFixture, FrozenContext } from "./eval/contracts"
 import { gradeFixture } from "./eval/graders"
-import { judgeEvalCase } from "./eval-rubric"
 import { validateFormat, planAimRun } from "./index"
 
 /** What a context adapter returns for a fixture. */
@@ -68,7 +68,6 @@ export interface EvalCaseResult {
   rubricScore: number | null
   rubricJudgeProvider: string | null
   rubricJudgeModel: string | null
-  rubricJudgeReason: string | null
   fabricatedFact: boolean
   /** deterministic per-format validation */
   formatValidations: Array<{ format: string; passed: boolean }>
@@ -117,6 +116,79 @@ export interface EvalRunReport {
 }
 
 const RUBRIC_PASS_THRESHOLD = 70
+
+/** The content_review rubric judge prompt. Returns JSON {score, reasons}. */
+function buildRubricPrompt(fixture: EvalFixture, draft: string): string {
+  return [
+    "你是内容质检评分官（content_review rubric judge）。请按以下评分标准对生成的文案打分（0-100）。",
+    "评分维度：选题契合度、开头吸引力、逻辑连贯、去AI味（口语自然）、平台适配、可发布性。",
+    "60=及格，70=可发布，85=优秀。禁止输出新文案或整篇重写，只输出评分与理由。",
+    "",
+    `【任务场景】${fixture.scenario}`,
+    `【智能体】${fixture.agent}`,
+    `【要求】${fixture.input.rawInput}`,
+    `【目标格式】${(fixture.expectations.outputFormats ?? []).join(", ") || "对话"}`,
+    "",
+    "【生成文案】",
+    draft,
+    "",
+    '只输出 JSON：{"score": 数字, "reasons": "一句话理由", "fabricatedFact": true|false}。fabricatedFact=true 表示存在明显事实编造。',
+  ].join("\n")
+}
+
+async function judgeDraft(fixture: EvalFixture, draft: string): Promise<{
+  score: number | null
+  provider: string | null
+  model: string | null
+  fabricated: boolean
+}> {
+  if (!draft.trim()) {
+    return { score: 0, provider: null, model: null, fabricated: false }
+  }
+  try {
+    const llm = getAgentLLM("content_review")
+    const result = await llm.complete({
+      messages: [{ role: "user", content: buildRubricPrompt(fixture, draft) }],
+      temperature: 0,
+      maxTokens: 300,
+      responseFormat: { type: "json_object" },
+    })
+    const parsed = JSON.parse(result.content) as { score?: unknown; fabricatedFact?: unknown }
+    const score = typeof parsed.score === "number" ? parsed.score : null
+    const fabricated = parsed.fabricatedFact === true
+    return { score: fabricated && score !== null ? Math.min(score, 40) : score, provider: result.provider, model: result.model, fabricated }
+  } catch {
+    return { score: null, provider: null, model: null, fabricated: false }
+  }
+}
+
+async function judgeEvalCase(
+  fixture: EvalFixture,
+  draft: string,
+  skipRubric: boolean | undefined,
+): Promise<{
+  rubricScore: number | null
+  rubricJudgeProvider: string | null
+  rubricJudgeModel: string | null
+  fabricatedFact: boolean
+}> {
+  if (skipRubric) {
+    return {
+      rubricScore: null,
+      rubricJudgeProvider: null,
+      rubricJudgeModel: null,
+      fabricatedFact: false,
+    }
+  }
+
+  const judged = await judgeDraft(fixture, draft)
+  return {
+    rubricScore: judged.score,
+    rubricJudgeProvider: judged.provider,
+    rubricJudgeModel: judged.model,
+    fabricatedFact: judged.fabricated,
+  }
+}
 
 /**
  * The shared executor: plan the fixture, run the (mock/frozen) generation, then
@@ -192,7 +264,6 @@ export async function runEvalCase(
     rubricScore: rubric.rubricScore,
     rubricJudgeProvider: rubric.rubricJudgeProvider,
     rubricJudgeModel: rubric.rubricJudgeModel,
-    rubricJudgeReason: rubric.rubricJudgeReason,
     fabricatedFact: rubric.fabricatedFact,
     formatValidations,
     drafts: drafts.map((d) => ({ format: d.format, contentPreview: d.contentPreview.slice(0, 120) })),
@@ -278,7 +349,6 @@ export async function runEvalSuite(
           rubricScore: null,
           rubricJudgeProvider: null,
           rubricJudgeModel: null,
-          rubricJudgeReason: null,
           fabricatedFact: false,
           formatValidations: [],
           drafts: [],
@@ -396,18 +466,6 @@ export function renderEvalMarkdown(report: EvalRunReport): string {
         .map((a) => `${a.name}(${a.detail})`)
         .join("; ")
       lines.push(`- \`${result.fixtureId}\`: ${detail}${result.error ? ` err=${result.error}` : ""}`)
-    }
-  }
-  lines.push("", "## Quality findings", "")
-  const qualityFindings = report.results.filter((result) =>
-    result.fabricatedFact || (result.rubricScore !== null && result.rubricScore < RUBRIC_PASS_THRESHOLD)
-  )
-  if (qualityFindings.length === 0) {
-    lines.push("_(none)_")
-  } else {
-    for (const result of qualityFindings) {
-      const reason = result.rubricJudgeReason ? ` — ${result.rubricJudgeReason}` : ""
-      lines.push(`- \`${result.fixtureId}\`: score=${result.rubricScore ?? "n/a"}, fabricated=${result.fabricatedFact}${reason}`)
     }
   }
   return lines.join("\n")

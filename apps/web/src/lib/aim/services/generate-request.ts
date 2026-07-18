@@ -11,7 +11,6 @@ import {
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
-import { ownsActiveProject } from "@/lib/resource-ownership"
 
 export async function prepareAimGenerateRequest(userId: string, body: Record<string, unknown>) {
   const parsed = parseGenerateBody(body)
@@ -39,12 +38,7 @@ export async function prepareAimGenerateRequest(userId: string, body: Record<str
   )
   if (validationError) {
     await failAimTrace(trace, validationError)
-    return { ok: false as const, trace, validationError, status: 400 as const }
-  }
-  if (parsed.projectId && !await ownsActiveProject(userId, parsed.projectId)) {
-    const projectError = "项目不存在或已归档"
-    await failAimTrace(trace, projectError)
-    return { ok: false as const, trace, validationError: projectError, status: 404 as const }
+    return { ok: false as const, trace, validationError }
   }
   const workflowBrief = parsed.workflow
     ? await buildWorkflowBrief({ userId, ...parsed.workflow, projectId: parsed.workflow.projectId || parsed.projectId || undefined })
@@ -84,8 +78,6 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     topicSelectionId: parsed.topicSelectionId,
     selectedTopicIndex: parsed.selectedTopicIndex,
     runtimeTask,
-    agentModule: parsed.agentModule,
-    writerModule: parsed.writerModule,
     taskSpec: workflowBrief?.taskSpec,
     actorId: userId,
     projectId,

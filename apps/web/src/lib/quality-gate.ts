@@ -430,16 +430,13 @@ export async function runQualityGateWithRewrite(
     const llm = LLMClient.shared()
     const rewritePrompt = buildTargetedRewritePrompt(input, currentContent, report)
 
-    // 长文案（>=1000字）需要更多 token 避免截断，短文案保持 800
-    const rewriteMaxTokens = currentContent.length >= 1000 ? 4000 : 800
-
     const rewriteResult = await llm.complete({
       messages: [
         { role: "system", content: "你是一位精益求精的短视频文案靶向编辑器。直接输出改写融合后的完整文案正文，不要任何解释。" },
         { role: "user", content: rewritePrompt },
       ],
       temperature: 0.7,
-      maxTokens: rewriteMaxTokens,
+      maxTokens: 800,
     })
 
     currentContent = rewriteResult.content.trim()
