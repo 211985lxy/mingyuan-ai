@@ -1404,6 +1404,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/outcome-flywheel",
+      "file": "src/app/api/cron/outcome-flywheel/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/douyin-hot",
       "file": "src/app/api/douyin-hot/route.ts",
       "methods": [
