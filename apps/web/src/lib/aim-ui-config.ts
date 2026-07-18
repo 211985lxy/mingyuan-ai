@@ -18,6 +18,7 @@ import { DEFAULT_AIM_AGENT, normalizeAimAgentId } from "@/lib/aim-harness/contra
 export interface AimAgentMeta {
   id: AimAgentId
   title: string
+  displayTitle?: string
   description: string
   icon: ComponentType<{ className?: string }>
   defaultFormats: ContentFormat[]
@@ -40,21 +41,23 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   },
   {
     id: "content_producer",
-    title: "内容创作官",
+    title: "内容文案创作",
+    displayTitle: "内容创作官",
     description: "社媒速产、深度长文、自由交付",
     icon: Video,
     defaultFormats: ["video_script"],
   },
   {
     id: "free_copywriter",
-    title: "自由交付（兼容入口）",
-    description: "历史自由交付入口，统一创作官内置自由模式",
+    title: "交货文案创作",
+    description: "听用户要求，直接交稿；统一创作官内置自由模式",
     icon: PenLine,
     defaultFormats: ["raw_copy"],
   },
   {
     id: "deep_copywriter",
-    title: "作品编辑官",
+    title: "深度长文创作",
+    displayTitle: "作品编辑官",
     description: "文字二改、公众号排版、小红书图文",
     icon: Edit3,
     defaultFormats: ["raw_copy"],
