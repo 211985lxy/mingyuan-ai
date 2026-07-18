@@ -12,7 +12,7 @@
     "role": "historical-outer-monorepo",
     "containsCurrentIndependentHistory": false
   },
-  "candidateBranch": "chore/release-convergence",
+  "candidateBranch": "main",
   "targetBranch": "main",
   "integrationBase": {
     "branch": "feat/aim-dual-mode-ux",
