@@ -48,6 +48,27 @@ model AimGeneration {
   @@index([userId, workflowStatus])
 }
 
+// 作品编辑版本：只追加不覆盖；恢复通过创建新版本实现。
+model AimContentVersion {
+  id              String   @id @default(cuid())
+  userId          String
+  generationId    String?
+  conversationId  String?
+  format          String   @db.VarChar(40)
+  content         String   @db.LongText
+  versionNo       Int
+  source          String   @db.VarChar(24)
+  parentVersionId String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([generationId, versionNo])
+  @@index([conversationId, versionNo])
+  @@index([parentVersionId])
+}
+
 model IpWikiPage {
   id                 String   @id @default(cuid())
   userId             String
