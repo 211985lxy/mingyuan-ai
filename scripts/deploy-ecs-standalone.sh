@@ -34,6 +34,14 @@ CI=true corepack pnpm --filter @mingyuan/web exec next build --webpack
 node scripts/materialize-standalone-node-modules.mjs apps/web/.next/standalone
 node scripts/validate-standalone-artifact.mjs apps/web/.next/standalone
 
+# 写入发布事实清单：线上可通过 /api/healthz 回读 releaseSha/buildTime/version，
+# 使「线上版本 = 哪个 Git 提交」始终可验证（90 天计划 0.3）。
+RELEASE_SHA="$(git rev-parse HEAD)"
+RELEASE_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+RELEASE_VERSION="$(node -p "require('./apps/web/package.json').version")"
+node -e "require('node:fs').writeFileSync('apps/web/.next/standalone/apps/web/release-manifest.json', JSON.stringify({ releaseSha: process.argv[1], buildTime: process.argv[2], version: process.argv[3], generatedAt: new Date().toISOString() }, null, 2) + '\n')" "$RELEASE_SHA" "$RELEASE_BUILD_TIME" "$RELEASE_VERSION"
+echo "release-manifest: sha=$RELEASE_SHA buildTime=$RELEASE_BUILD_TIME version=$RELEASE_VERSION"
+
 node -e "require.resolve('./apps/web/.next/standalone/apps/web/server.js')"
 node -e "const { createRequire } = require('node:module'); const { resolve } = require('node:path'); const appDir = resolve('apps/web/.next/standalone/apps/web'); const appRequire = createRequire(resolve(appDir, 'server.js')); ['next','styled-jsx/package.json','@next/env','react','react-dom','pino'].forEach((id)=>appRequire.resolve(id)); console.log('standalone-deps-ok')"
 
@@ -62,5 +70,12 @@ if [ "$healthy" -ne 1 ]; then
   "${SSH[@]}" "set -e; systemctl stop '$SERVICE_NAME' || true; rm -rf '${REMOTE_DIR}.failed'; if [ -d '$REMOTE_DIR' ]; then mv '$REMOTE_DIR' '${REMOTE_DIR}.failed'; fi; if [ -d '$REMOTE_BACKUP_DIR' ]; then mv '$REMOTE_BACKUP_DIR' '$REMOTE_DIR'; systemctl start '$SERVICE_NAME'; fi"
   echo "Health check failed: $HEALTH_URL" >&2
   exit 1
+fi
+
+# 回读线上发布事实：releaseSha 必须等于本地 HEAD，否则视为发布事实不一致。
+LIVE_SHA="$(curl -fsS "$HEALTH_URL" | node -e "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).releaseSha??'unknown')}catch{console.log('unknown')}})")"
+echo "healthz releaseSha=$LIVE_SHA (expected $RELEASE_SHA)"
+if [ "$LIVE_SHA" != "$RELEASE_SHA" ]; then
+  echo "WARNING: live releaseSha does not match local HEAD; 线上版本与代码版本不一致，需人工确认。" >&2
 fi
 echo "deployed: $HEALTH_URL"
