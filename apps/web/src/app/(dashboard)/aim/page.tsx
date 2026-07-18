@@ -472,6 +472,9 @@ function BenchmarkEditorPanel({
   versionViewOpen,
   onToggleVersionView,
   versionContent,
+  previewViewOpen,
+  onTogglePreviewView,
+  previewContent,
 }: {
   open: boolean
   width: number
@@ -495,6 +498,10 @@ function BenchmarkEditorPanel({
   versionViewOpen: boolean
   onToggleVersionView: () => void
   versionContent?: ReactNode
+  /** 公众号实景预览视图开关与内容（P1，仅 wechat_article 格式展示入口） */
+  previewViewOpen: boolean
+  onTogglePreviewView: () => void
+  previewContent?: ReactNode
 }) {
   const splitRef = useRef<HTMLDivElement>(null)
   const [referencePercent, setReferencePercent] = useState(50)
@@ -569,6 +576,18 @@ function BenchmarkEditorPanel({
               </Button>
             </>
           ) : null}
+          {editorFormat === "wechat_article" ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className={previewViewOpen ? ACTIVE_SOFT_ACTION_CLASS : SOFT_ACTION_CLASS}
+              onClick={onTogglePreviewView}
+              title="公众号实景预览：主题样式 + 一键复制富文本"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              预览
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="ghost"
@@ -590,10 +609,12 @@ function BenchmarkEditorPanel({
       <div
         ref={splitRef}
         className="grid min-h-0 flex-1 bg-muted/15"
-        style={versionViewOpen ? undefined : { gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
+        style={versionViewOpen || previewViewOpen ? undefined : { gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
       >
         {versionViewOpen ? (
           <section className="flex min-h-0 flex-1 flex-col px-4 py-3">{versionContent}</section>
+        ) : previewViewOpen ? (
+          <section className="flex min-h-0 flex-1 flex-col px-4 py-3">{previewContent}</section>
         ) : (
         <>
         <section className="flex min-h-0 flex-col px-4 py-3">
@@ -1010,6 +1031,8 @@ export default function AimPage() {
   const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? true)
   // P0 版本管理：版本时间线视图开关 + 列表刷新信号 + 最近一次快照内容（去重/防抖用）
   const [versionViewOpen, setVersionViewOpen] = useState(false)
+  // P1 公众号实景预览视图开关（与版本视图互斥，仅 wechat_article 格式可见入口）
+  const [previewViewOpen, setPreviewViewOpen] = useState(false)
   const [versionRefreshKey, setVersionRefreshKey] = useState(0)
   const lastVersionSnapshotRef = useRef("")
   const [referenceSelection, setReferenceSelection] = useState<EditorSelection>({ text: "", range: { start: 0, end: 0 } })
@@ -2992,7 +3015,11 @@ export default function AimPage() {
           imitateStyleId={imitateStyleId}
           onImitateStyleChange={setImitateStyleId}
           versionViewOpen={versionViewOpen}
-          onToggleVersionView={() => setVersionViewOpen((open) => !open)}
+          onToggleVersionView={() => {
+            // 版本 / 预览互斥：开版本视图时关闭预览
+            setPreviewViewOpen(false)
+            setVersionViewOpen((open) => !open)
+          }}
           versionContent={
             <VersionTimeline
               generationId={editorGenerationId() || undefined}
@@ -3004,6 +3031,13 @@ export default function AimPage() {
               }}
             />
           }
+          previewViewOpen={previewViewOpen}
+          onTogglePreviewView={() => {
+            // 版本 / 预览互斥：开预览视图时关闭版本
+            setVersionViewOpen(false)
+            setPreviewViewOpen((open) => !open)
+          }}
+          previewContent={<WechatPreview content={editorText} />}
         />
       )}
 
