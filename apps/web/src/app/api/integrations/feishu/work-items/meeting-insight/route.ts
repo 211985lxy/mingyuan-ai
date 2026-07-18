@@ -6,6 +6,8 @@
  *
  * 鉴权：Authorization: Bearer <AIM_WORK_ITEM_API_SECRET>（与 execute 入口同一密钥）。
  *   密钥未配置 → 503（fail-closed）；密钥错误/缺失 → 401。
+ *   实现见 lib/aim/work-item-api-auth.ts（checkWorkItemApiSecret）。
+ *   api-inventory: auth=signed_integration
  *
  * 请求体：{ recordId, projectId, meetingTitle, customer, transcript }
  *   - recordId / projectId / transcript 必填；

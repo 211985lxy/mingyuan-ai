@@ -22,6 +22,10 @@ function methodsOf(source) {
 }
 
 function authOf(source, route) {
+  // 显式标记优先：鉴权逻辑抽到共享模块时，路由源码不再出现密钥常量，
+  // 由路由注释声明（仍需评审保证声明属实）。
+  const declared = source.match(/api-inventory:\s*auth=(signed_integration)\b/)?.[1]
+  if (declared) return declared
   if (source.includes("withAdminAuth")) return "admin_session"
   if (source.includes("authenticateAgentRequest")) return "agent_key"
   if (source.includes("withUserAuth") || source.includes("authenticateRequest")) return "user_session"

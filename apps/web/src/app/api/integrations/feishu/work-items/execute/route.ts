@@ -7,6 +7,8 @@
  *
  * 鉴权：Authorization: Bearer <AIM_WORK_ITEM_API_SECRET>，timingSafeEqual 防时序攻击。
  *       密钥未配置 → 503（fail-closed）；密钥错误/缺失 Bearer → 401。
+ *       实现见 lib/aim/work-item-api-auth.ts（checkWorkItemApiSecret）。
+ *       api-inventory: auth=signed_integration
  *
  * 请求体：{ recordId, action, aimResultId?, resultSummary?, resultLink?, errorMessage? }
  *   action ∈ start | submit_review | complete | fail

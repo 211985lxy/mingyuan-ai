@@ -90,6 +90,19 @@
         "metadata",
         "createdAt"
       ]
+    },
+    {
+      "name": "AssetCandidate",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "generationId",
+        "kind",
+        "reviewStatus",
+        "crossProjectAllowed",
+        "promotedEntryId"
+      ]
     }
   ]
 }
