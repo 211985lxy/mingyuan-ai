@@ -6,6 +6,7 @@ import {
   AIM_HIGH_RISK_LOOP_RULE,
   BENCHMARK_REWRITE_GUARDRAIL,
   CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE,
+  GENERATE_MODE_LOOP_RULE_EXEMPTION,
   PUBLISH_PACKAGE_CHAT_RULE,
   benchmarkCopyReuseRatio,
   buildContentProducerChatPrompt,
@@ -81,6 +82,8 @@ describe("AIM content production positioning", () => {
     expect(prompt).toContain("正式交付内容结尾追加一个简短“验证结果”区块")
     expect(prompt).toContain("不要整篇重写")
     expect(prompt).toContain("最小修改建议")
+    // 生成模式豁免：验证结果区块只在聊天质检场景生效，正式生成物不追加
+    expect(prompt).toContain(GENERATE_MODE_LOOP_RULE_EXEMPTION)
   })
 
   it("labels Feishu-importable content knowledge categories in prompts", () => {

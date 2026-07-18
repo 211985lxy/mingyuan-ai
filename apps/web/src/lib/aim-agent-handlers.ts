@@ -191,6 +191,15 @@ export const AIM_HIGH_RISK_LOOP_RULE = [
   "正式交付内容结尾追加一个简短“验证结果”区块，只允许包含三类信息：已确认什么、待补什么、下一步最小动作。",
 ].join("\n")
 
+/**
+ * 一键生成模式豁免：「验证结果」区块只为聊天质检场景设计。
+ * 正式生成物（固定结构报告、脚本、方案）不追加该区块，避免与各自的固定输出结构冲突；
+ * 反编造约束（缺失事实统一写「未提供/待补充」）仍然生效。
+ * 与 content_producer 生成模式「不输出验证结果区块」的既有约定保持一致。
+ */
+export const GENERATE_MODE_LOOP_RULE_EXEMPTION =
+  "生成模式说明：本次为正式交付物生成，结尾不要追加“验证结果”区块或质检报告，该区块只在聊天质检场景生效；缺失事实仍统一写“未提供/待补充”，禁止补编案例、数据、来源或用户未给出的关键背景。"
+
 export const CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE = [
   "默认不要每次都重度结合企业知识库。",
   "只有在用户明确要求、当前任务确实需要承接业务信息，或缺少必要的人设/产品/案例支撑时，才少量调用知识库素材。",
@@ -596,25 +605,35 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
 - 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
 - 不暴露外部参考来源细节。`
 
+    // light_edit 保留原文、只做局部优化，与「至少 30% 可感知重写」互斥，跳过对标改写硬规则
+    const isLightEdit = context.runtimeTask === "light_edit"
+    const benchmarkGuardrailBlock = isLightEdit
+      ? ""
+      : `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}\n\n`
+
+    // Prompt layout is ordered for prompt-cache friendliness: the stable,
+    // per-request-invariant sections (agentPrompt, methodology, workflow, hard
+    // rules, format) form a contiguous prefix, while request-specific blocks
+    // (knowledge, IP wiki) move to the tail. DeepSeek/Kimi/GLM cache by leading
+    // token prefix, so keeping the front byte-stable maximizes cache hits.
     const systemPrompt = `${agentPrompt}
 
-${context.knowledgeBlock}
 ${context.methodologyBlock}
 ${context.eventStorytellingBlock}
-${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
 内部工作流程：
 1. 围绕选题主张或输入素材，展开成文。
 2. 如果有对标文案，先锁定原视频核心选题，再把表达迁移成本IP的案例、身份和承接。
 3. 保持真实口语感、情绪共鸣与深刻洞察，杜绝公文宣传腔和万金油排比句。
 4. 未确认框架时先输出文案框架；已确认框架后，只输出一篇完整深度长文正文，不加任何附加结构标记，正文结束立刻停止。
 
-对标改写硬规则：
-${BENCHMARK_REWRITE_GUARDRAIL}
+${benchmarkGuardrailBlock}请严格按照格式输出。不要添加任何附加的大纲、平台栏目、私域话术、拆分方向、解释、点评或确认尾句。
 
-请严格按照格式输出。不要添加任何附加的大纲、平台栏目、私域话术、拆分方向、解释、点评或确认尾句。`
+${context.knowledgeBlock}
+${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}`
 
     const workflowContext = buildWorkflowContext(context)
-    const explicitWordCountRule = buildExplicitWordCountPriorityRule(context.rawInput)
+    // light_edit 不需要字数保留规则（只改局部，字数规则无意义），与 content_producer 的处理一致
+    const explicitWordCountRule = isLightEdit ? null : buildExplicitWordCountPriorityRule(context.rawInput)
     const userPrompt = `用户输入的原始内容：
 "${context.rawInput}"
 
@@ -710,6 +729,8 @@ ${context.businessDiagnosisBlock}
 ${context.knowledgeBlock}
 
 ${AIM_HIGH_RISK_LOOP_RULE}
+
+${GENERATE_MODE_LOOP_RULE_EXEMPTION}
 
 体检报告必须严格按以下八段固定结构输出，缺一不可，顺序不可调换：
 
@@ -889,6 +910,8 @@ ${context.methodologyBlock}
 
 ${AIM_HIGH_RISK_LOOP_RULE}
 
+${GENERATE_MODE_LOOP_RULE_EXEMPTION}
+
 策划方案输出结构要求：
 先判断用户输入最适合哪条交付路由，并按该路由输出，不要把四种结果混在一起：
 
@@ -1059,6 +1082,8 @@ export function buildContentReviewGeneratePrompt(knowledgeBlock: string): string
 ${knowledgeBlock}
 
 ${AIM_HIGH_RISK_LOOP_RULE}
+
+${GENERATE_MODE_LOOP_RULE_EXEMPTION}
 
 质检报告输出结构要求：
 1. 总体结论：可发 / 改完可发 / 暂不建议发，并说明一句理由。
@@ -1238,7 +1263,9 @@ ${AIM_HIGH_RISK_LOOP_RULE}
 
 ${context.knowledgeBlock}
 
-${AIM_HIGH_RISK_LOOP_RULE}`
+${AIM_HIGH_RISK_LOOP_RULE}
+
+${GENERATE_MODE_LOOP_RULE_EXEMPTION}`
 
     const workflowContext = buildWorkflowContext(context)
     const userPrompt = `用户提供的来时路素材：
@@ -1823,6 +1850,10 @@ function buildProducerSystemPrompt(agentPrompt: string, context: AimGenerateCont
   const lightEditOutputRule = context.runtimeTask === "light_edit"
     ? "\n轻改输出边界：如果用户只要求优化开头/前三秒/第一句话/钩子，输出内容只能是开头候选或开头替换稿，禁止返回整篇文案；如果要求标题只给标题，如果要求结尾只给结尾。"
     : ""
+  // light_edit 保留原文、只做局部优化，与「至少 30% 可感知重写」互斥，跳过对标改写硬规则
+  const benchmarkGuardrailBlock = context.runtimeTask === "light_edit"
+    ? ""
+    : `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}\n\n`
 
   return `${agentPrompt}
 
@@ -1858,10 +1889,7 @@ ${lightEditOutputRule}
 - 成稿前做内部质检：是否遵守用户修改意图、是否保留原文有效表达、是否过度调用背景导致跑题、是否有明显 AI 套话；生成模式下不要输出验证结果区块或质检报告，验证结果只在聊天质检场景生效。
 - 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
-对标改写硬规则：
-${BENCHMARK_REWRITE_GUARDRAIL}
-
-请严格按照下方每种格式的要求，生成对应的内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。`
+${benchmarkGuardrailBlock}请严格按照下方每种格式的要求，生成对应的内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。`
 }
 
 function buildUserPrompt(context: AimGenerateContext, formatBlocks: string): string {

@@ -28,7 +28,7 @@ vi.mock("@/lib/aim-knowledge-context", () => ({
 // 必须在 mock 之后导入
 const { buildBusinessDiagnosisMethodologyBlock } = await import("@/lib/business-diagnosis-methodology")
 const { buildIpCopywritingMethodologyBlock } = await import("@/lib/ip-copywriting-methodology")
-const { getAgentHandler } = await import("@/lib/aim-agent-handlers")
+const { getAgentHandler, GENERATE_MODE_LOOP_RULE_EXEMPTION } = await import("@/lib/aim-agent-handlers")
 const { AIM_AGENT_GUIDES } = await import("@/lib/aim-agent-guides")
 type AimChatParams = Awaited<typeof import("@/lib/aim-agent-handlers")>["AimChatParams"]
 type AimGenerateContext = Awaited<typeof import("@/lib/aim-agent-handlers")>["AimGenerateContext"]
@@ -335,6 +335,63 @@ describe("AIM high-risk loop prompt coverage", () => {
     expect(systemPrompt).toContain("体检报告必须严格按以下八段固定结构输出")
     expect(systemPrompt).toContain("业务现状说明")
     expect(systemPrompt).toContain("本周最小动作")
+    // 生成模式豁免：固定八段结构的正式报告不追加验证结果区块
+    expect(systemPrompt).toContain(GENERATE_MODE_LOOP_RULE_EXEMPTION)
+  })
+})
+
+describe("生成模式验证区块豁免与 light_edit 硬规则跳过", () => {
+  beforeEach(() => {
+    completeMock.mockReset()
+    completeMock.mockResolvedValue({ content: "ok", model: "test", usage: { totalTokens: 0 } })
+  })
+
+  it("business_diagnosis generate 追加生成模式豁免，验证结果区块只在聊天质检场景生效", async () => {
+    const handler = getAgentHandler("business_diagnosis")
+    await handler.generate(buildGenerateContext())
+
+    expect(capturedSystemPrompt()).toContain(GENERATE_MODE_LOOP_RULE_EXEMPTION)
+  })
+
+  it("persona generate 在固定两部分结构之外追加生成模式豁免", async () => {
+    const handler = getAgentHandler("persona")
+    await handler.generate(buildGenerateContext())
+
+    const systemPrompt = capturedSystemPrompt()
+    expect(systemPrompt).toContain("只输出两部分")
+    expect(systemPrompt).toContain(GENERATE_MODE_LOOP_RULE_EXEMPTION)
+  })
+
+  it("content_producer light_edit 生成不再注入对标改写硬规则（与保留原文目标互斥）", async () => {
+    const handler = getAgentHandler("content_producer")
+    await handler.generate(buildGenerateContext({ runtimeTask: "light_edit" }))
+
+    const systemPrompt = capturedSystemPrompt()
+    expect(systemPrompt).not.toContain("对标改写硬规则")
+    expect(systemPrompt).not.toContain("至少 30% 可感知重写")
+  })
+
+  it("content_producer 非 light_edit 生成仍注入对标改写硬规则", async () => {
+    const handler = getAgentHandler("content_producer")
+    await handler.generate(buildGenerateContext())
+
+    expect(capturedSystemPrompt()).toContain("对标改写硬规则")
+  })
+
+  it("deep_copywriter light_edit 生成不再注入对标改写硬规则（与保留原文目标互斥）", async () => {
+    const handler = getAgentHandler("deep_copywriter")
+    await handler.generate(buildGenerateContext({ runtimeTask: "light_edit" }))
+
+    const systemPrompt = capturedSystemPrompt()
+    expect(systemPrompt).not.toContain("对标改写硬规则")
+    expect(systemPrompt).not.toContain("至少 30% 可感知重写")
+  })
+
+  it("deep_copywriter 非 light_edit 生成仍注入对标改写硬规则", async () => {
+    const handler = getAgentHandler("deep_copywriter")
+    await handler.generate(buildGenerateContext())
+
+    expect(capturedSystemPrompt()).toContain("对标改写硬规则")
   })
 })
 
