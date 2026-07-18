@@ -42,7 +42,7 @@ import {
   type AimConversationMode,
   type AimConversationIntent,
 } from "@/lib/aim-conversation-intent"
-import { normalizeAimAgentId } from "@/lib/aim-ui-config"
+import { normalizeAimAgentId, DEFAULT_AIM_AGENT } from "@/lib/aim-ui-config"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -1433,8 +1433,9 @@ export function getAgentHandler(agentId: string): AimAgentHandler {
   if (normalized in HANDLERS) {
     return HANDLERS[normalized as AimAgentId]
   }
-  // 未知 id 回退到默认 handler（入口路由已先做合法性校验，这里只是兜底）
-  return HANDLERS.content_producer
+  // 未知 id 回退到默认 handler（入口路由已先做合法性校验，这里只是兜底）。
+  // 引用 DEFAULT_AIM_AGENT 而非硬编码，确保与 aim-ui-config 单源一致。
+  return HANDLERS[DEFAULT_AIM_AGENT]
 }
 
 /**

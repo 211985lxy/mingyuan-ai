@@ -12,6 +12,9 @@
  * Sources (2026-07):
  *  - DeepSeek 官方: V4-Pro in 3 / out 6 / cached 0.1 ; V4-Flash cheaper
  *    https://api-docs.deepseek.com/zh-cn/quick_start/pricing/
+ *  - 豆包 doubao 直连（火山引擎 2026-06/23 刊例）:
+ *    Seed-2.1-Pro in 6 / out 30 / cached 1.2 ; Turbo 减半 in 3 / out 15 / cached 0.6
+ *    https://ark.volcengine.com/region:cn-beijing/model/detail?name=doubao-seed-2-1-pro
  *  - OpenRouter 目录: per-model public pricing
  *  - 离火 lihuo GPT-5.5: 中转价未公开 → TODO 待确认，先用 OpenAI 官方价作上限估计
  */
@@ -31,6 +34,12 @@ const EXACT_PRICES: Record<string, ModelTokenPrices> = {
   "deepseek|deepseek-chat": { input: 3, output: 6, cached: 0.1 },
   "deepseek|deepseek-v4-pro": { input: 3, output: 6, cached: 0.1 },
   "deepseek|deepseek-v4-flash": { input: 1, output: 2, cached: 0.05 },
+
+  // ── 豆包 doubao 直连（火山引擎 2026-06/23 刊例）──
+  // 注意：seed-2.1-pro / turbo 是旗舰直连首选，必须精确命中，否则 substring
+  // 会回落到 Flash 价（out 4）造成约 7.5 倍低估。
+  "doubao|doubao-seed-2-1-pro-260628": { input: 6, output: 30, cached: 1.2 },
+  "doubao|doubao-seed-2-1-turbo-260628": { input: 3, output: 15, cached: 0.6 },
 
   // ── OpenRouter（公开目录价，人民币近似，含网关加价）──
   "openrouter|moonshotai/kimi-k2.6": { input: 14, output: 56 },
@@ -65,6 +74,10 @@ function resolvePrices(provider: string | undefined, model: string | undefined):
     if (lower.includes("kimi")) return EXACT_PRICES["openrouter|moonshotai/kimi-k2.6"]
     if (lower.includes("qwen")) return EXACT_PRICES["openrouter|qwen/qwen3.7-plus"]
     if (lower.includes("seed") || lower.includes("doubao")) {
+      // 区分 Pro / Turbo / Flash，避免旗舰走 Flash 价（约 7.5 倍低估）。
+      // 精确 key 已覆盖 doubao-seed-2-1-pro/turbo 直连；此处兜底其他含 seed 的模型。
+      if (lower.includes("pro")) return EXACT_PRICES["doubao|doubao-seed-2-1-pro-260628"]
+      if (lower.includes("turbo")) return EXACT_PRICES["doubao|doubao-seed-2-1-turbo-260628"]
       return EXACT_PRICES["openrouter|bytedance-seed/seed-1.6-flash"]
     }
     if (lower.includes("glm") || lower.includes("z-ai")) {

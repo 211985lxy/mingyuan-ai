@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { parseGenerateBody, validateGenerateInput } from "@/lib/aim-generate-validate"
 import { getAgentHandler } from "@/lib/aim-agent-handlers"
-import { isValidAimAgent, normalizeAimAgentId } from "@/lib/aim-ui-config"
+import { isValidAimAgent, normalizeAimAgentId, DEFAULT_AIM_AGENT } from "@/lib/aim-ui-config"
 
 describe("agentId 入口校验与归一化", () => {
   it("合法 agentId 原样通过解析与校验", () => {
@@ -52,7 +52,9 @@ describe("agentId 入口校验与归一化", () => {
   })
 
   it("getAgentHandler 对未知 id 兜底默认 handler", () => {
-    expect(getAgentHandler("garbage").agentId).toBe("content_producer")
+    // 兜底应与 DEFAULT_AIM_AGENT（当前 copywriter）单一事实源一致，
+    // 而非硬编码 content_producer，避免默认智能体切换后再次漂移。
+    expect(getAgentHandler("garbage").agentId).toBe(DEFAULT_AIM_AGENT)
   })
 
   it("normalizeAimAgentId / isValidAimAgent 单一事实源行为一致", () => {
