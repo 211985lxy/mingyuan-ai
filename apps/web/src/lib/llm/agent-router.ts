@@ -14,7 +14,7 @@ import type { LLMProvider, LLMProviderConfig } from "./types"
  * model 为可选，覆盖 provider 的默认模型（同一 provider 下不同智能体可用不同模型）
  */
 
-type AgentModelRoute = { name: string; model?: string }
+type AgentModelRoute = { name: string; model?: string; timeoutMs?: number }
 
 const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
@@ -28,13 +28,14 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "glm" },
   ],
   business_diagnosis: [
-    { name: "lihuo", model: "gpt-5.5" },
-    { name: "openrouter", model: "deepseek/deepseek-v4-pro" },
-    { name: "openrouter", model: "z-ai/glm-5.2" },
-    { name: "deepseek" },
-    { name: "jiekou" },
-    { name: "therouter" },
-    { name: "glm" },
+    // ponytail: planning/diagnosis routes are non-streaming; keep each fallback short so the chain cannot eat the whole 180s client budget.
+    { name: "lihuo", model: "gpt-5.5", timeoutMs: 20000 },
+    { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000 },
+    { name: "openrouter", model: "z-ai/glm-5.2", timeoutMs: 20000 },
+    { name: "deepseek", timeoutMs: 20000 },
+    { name: "jiekou", timeoutMs: 20000 },
+    { name: "therouter", timeoutMs: 20000 },
+    { name: "glm", timeoutMs: 20000 },
   ],
 
   // ── DeepSeek 组（日常分发，走官方直连，无中转差价）──
@@ -98,9 +99,11 @@ export function getAgentLLM(agentId: string): LLMClient {
     const config = configMap.get(route.name)
     if (!config) continue
     // 如果指定了 model，覆盖 provider 的默认模型
-    const mergedConfig: LLMProviderConfig = route.model
-      ? { ...config, defaultModel: route.model }
-      : config
+    const mergedConfig: LLMProviderConfig = {
+      ...config,
+      ...(route.model ? { defaultModel: route.model } : {}),
+      ...(route.timeoutMs ? { timeoutMs: route.timeoutMs } : {}),
+    }
     providers.push(new OpenAICompatibleProvider(mergedConfig))
   }
 

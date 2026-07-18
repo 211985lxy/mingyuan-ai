@@ -162,57 +162,58 @@ export async function POST(request: NextRequest) {
     })
 
     // ── 后置质检（含 RedFox 违禁词检测） ──
-    // 仅对内容生产类 agent（非 persona/free_copywriter）和 write_script 任务运行
+    // ponytail: quality gate is tuned for publishable short-form scripts, not planning/diagnosis raw_copy.
+    const qualityGateFormats = new Set(["video_script", "koubo_script", "xiaohongshu_post"])
+    const firstQualityCandidate = result.results.find((item) =>
+      item.content?.trim() && qualityGateFormats.has(item.format)
+    )
     const needsQualityCheck =
       parsed.agentId !== "persona" &&
       parsed.agentId !== "free_copywriter" &&
       parsed.taskType !== "polish_copy" &&
-      parsed.taskType !== "quality_check"
+      parsed.taskType !== "quality_check" &&
+      !!firstQualityCandidate
 
-    if (needsQualityCheck && result.results.length > 0) {
+    if (needsQualityCheck && firstQualityCandidate) {
       try {
         const { runQualityCheck } = await import("@/lib/quality-gate")
-        // 取第一个有内容的结果做质检
-        const firstContent = result.results.find((r) => r.content?.trim())
-        if (firstContent) {
-          const qualityReport = await runAimTraceStep(
-            trace,
-            "quality_gate",
-            "生成后质检（含违禁词检测）",
-            () => runQualityCheck({
-              content: firstContent.content,
-              topicTitle: parsed.topicTitle,
-            }),
-            (report) => ({
-              summary: `质检得分 ${report.overall.score}/10，${report.overall.passed ? "通过" : "未通过"}`,
-              metadata: {
-                overallScore: report.overall.score,
-                passed: report.overall.passed,
-                editorialScore: report.editorial.score,
-                aiTasteScore: report.aiTaste.score,
-                attractionScore: report.attraction.score,
-                logicScore: report.logic.score,
-                hasCompliance: !!report.compliance,
-                compliancePassed: report.compliance?.passed,
-              },
-            }),
-          )
-          // 将质检报告附加到返回结果中（前端可展示）
-          return NextResponse.json({
-            ...result,
-            qualityReport: {
-              overallScore: qualityReport.overall.score,
-              passed: qualityReport.overall.passed,
-              editorial: qualityReport.editorial.score,
-              aiTaste: qualityReport.aiTaste.score,
-              attraction: qualityReport.attraction.score,
-              logic: qualityReport.logic.score,
-              compliance: qualityReport.compliance
-                ? { passed: qualityReport.compliance.passed, violations: qualityReport.compliance.violations.length }
-                : undefined,
+        const qualityReport = await runAimTraceStep(
+          trace,
+          "quality_gate",
+          "生成后质检（含违禁词检测）",
+          () => runQualityCheck({
+            content: firstQualityCandidate.content,
+            topicTitle: parsed.topicTitle,
+          }),
+          (report) => ({
+            summary: `质检得分 ${report.overall.score}/10，${report.overall.passed ? "通过" : "未通过"}`,
+            metadata: {
+              overallScore: report.overall.score,
+              passed: report.overall.passed,
+              editorialScore: report.editorial.score,
+              aiTasteScore: report.aiTaste.score,
+              attractionScore: report.attraction.score,
+              logicScore: report.logic.score,
+              hasCompliance: !!report.compliance,
+              compliancePassed: report.compliance?.passed,
             },
-          })
-        }
+          }),
+        )
+        // 将质检报告附加到返回结果中（前端可展示）
+        return NextResponse.json({
+          ...result,
+          qualityReport: {
+            overallScore: qualityReport.overall.score,
+            passed: qualityReport.overall.passed,
+            editorial: qualityReport.editorial.score,
+            aiTaste: qualityReport.aiTaste.score,
+            attraction: qualityReport.attraction.score,
+            logic: qualityReport.logic.score,
+            compliance: qualityReport.compliance
+              ? { passed: qualityReport.compliance.passed, violations: qualityReport.compliance.violations.length }
+              : undefined,
+          },
+        })
       } catch (err) {
         // 质检失败不阻断生成结果，仅记录
         console.warn("[aim/generate] Quality gate check failed:", err)
