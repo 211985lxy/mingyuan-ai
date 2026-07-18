@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
   WECHAT_THEMES,
+  estimateWechatReading,
   extractWechatTitle,
   renderWechatArticleHtml,
   renderWechatHtml,
@@ -61,6 +62,8 @@ export function WechatPreview({ content, title }: WechatPreviewProps) {
   // 标题已在文章头部展示，正文第一个 # 标题行剔除，避免预览/复制重复
   const body = useMemo(() => stripFirstH1Line(content), [content])
   const bodyHtml = useMemo(() => renderWechatHtml(body, theme), [body, theme])
+  // 字数统计 + 阅读时长预估（约 400 字/分钟）
+  const reading = useMemo(() => estimateWechatReading(body), [body])
   const dateLabel = useMemo(
     () => new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" }),
     [],
@@ -137,6 +140,9 @@ export function WechatPreview({ content, title }: WechatPreviewProps) {
             复制富文本
           </Button>
         </div>
+        <p className="text-[11px] text-muted-foreground">
+          全文约 {reading.chars} 字 · 预计阅读 {reading.minutes} 分钟
+        </p>
       </div>
 
       {/* 手机尺寸实景预览（约 375px 宽，模拟公众号文章页） */}

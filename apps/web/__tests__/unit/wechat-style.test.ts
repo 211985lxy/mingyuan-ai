@@ -152,3 +152,29 @@ describe("parseWechatBlocks", () => {
     expect(blocks[2].lines).toHaveLength(2)
   })
 })
+
+describe("markdownToWechatHtml 规范入口（doocs/md 移植主题）", () => {
+  it("按主题 id 输出内联样式 HTML，未知 id 回退第一套", async () => {
+    const { markdownToWechatHtml, WECHAT_THEMES: THEMES } = await import("@/lib/wechat-style")
+    const html = markdownToWechatHtml("# 标题\n正文", "classic_blue")
+    expect(html).toContain("<h1")
+    expect(html).not.toContain("class=")
+    expect(markdownToWechatHtml("正文", "不存在的主题")).toBe(
+      markdownToWechatHtml("正文", THEMES[0].id),
+    )
+  })
+
+  it("链接渲染为强调色文本（公众号不支持外链跳转）", () => {
+    const html = renderWechatHtml("详见 [这篇文章](https://example.com)", THEME)
+    expect(html).toContain(`<span style="color:${THEME.accentColor};">这篇文章</span>`)
+    expect(html).not.toContain("https://example.com")
+  })
+
+  it("移植主题的结构装饰：default 系 h2 为色块、simple 系引用为细边框", async () => {
+    const { WECHAT_THEMES: THEMES } = await import("@/lib/wechat-style")
+    const classic = THEMES.find((t) => t.id === "classic_blue")!
+    const simple = THEMES.find((t) => t.id === "simple_green")!
+    expect(renderWechatHtml("## 二级", classic)).toContain(`background-color:${classic.accentColor}`)
+    expect(renderWechatHtml("> 引用", simple)).toContain("border-top:1px solid")
+  })
+})

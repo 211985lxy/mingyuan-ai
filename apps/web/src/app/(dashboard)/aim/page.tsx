@@ -9,6 +9,7 @@ import {
   Database,
   Eye,
   FileText,
+  LayoutGrid,
   Loader2,
   Sparkles,
   ShieldCheck,
@@ -16,6 +17,7 @@ import {
   Plus,
   ArrowRight,
   History,
+  NotebookPen,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -109,6 +111,8 @@ import {
 import { getAimEditorPanelLabels, type EditorPanelLabels } from "@/lib/aim-editor-labels"
 import { VersionTimeline } from "@/components/aim/version-timeline"
 import { WechatPreview } from "@/components/aim/wechat-preview"
+import { XhsPanel } from "@/components/aim/xhs-panel"
+import { ImageTextCanvas } from "@/components/aim/image-text-canvas"
 
 interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -475,6 +479,10 @@ function BenchmarkEditorPanel({
   previewViewOpen,
   onTogglePreviewView,
   previewContent,
+  xhsViewOpen,
+  onToggleXhsView,
+  xhsContent,
+  onOpenImageTextCanvas,
 }: {
   open: boolean
   width: number
@@ -498,10 +506,16 @@ function BenchmarkEditorPanel({
   versionViewOpen: boolean
   onToggleVersionView: () => void
   versionContent?: ReactNode
-  /** 公众号实景预览视图开关与内容（P1，仅 wechat_article 格式展示入口） */
+  /** 公众号排版视图开关与内容（P1） */
   previewViewOpen: boolean
   onTogglePreviewView: () => void
   previewContent?: ReactNode
+  /** 打开小红书图文混排画布（P2 全屏 Dialog，仅 xiaohongshu_post 格式展示入口） */
+  onOpenImageTextCanvas?: () => void
+  /** 小红书笔记编辑视图（并行任务的面板内视图接线；可选，未接入时不影响画布 Dialog） */
+  xhsViewOpen?: boolean
+  onToggleXhsView?: () => void
+  xhsContent?: ReactNode
 }) {
   const splitRef = useRef<HTMLDivElement>(null)
   const [referencePercent, setReferencePercent] = useState(50)
@@ -576,18 +590,38 @@ function BenchmarkEditorPanel({
               </Button>
             </>
           ) : null}
-          {editorFormat === "wechat_article" ? (
+          {editorFormat === "xiaohongshu_post" && onOpenImageTextCanvas ? (
             <Button
               size="sm"
               variant="ghost"
-              className={previewViewOpen ? ACTIVE_SOFT_ACTION_CLASS : SOFT_ACTION_CLASS}
-              onClick={onTogglePreviewView}
-              title="公众号实景预览：主题样式 + 一键复制富文本"
+              className={SOFT_ACTION_CLASS}
+              onClick={onOpenImageTextCanvas}
+              title="图文混排画布：逐页配图、就地改文案、一键同步回文稿"
             >
-              <Eye className="h-3.5 w-3.5" />
-              预览
+              <LayoutGrid className="h-3.5 w-3.5" />
+              图文画布
             </Button>
           ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            className={previewViewOpen ? ACTIVE_SOFT_ACTION_CLASS : SOFT_ACTION_CLASS}
+            onClick={onTogglePreviewView}
+            title="公众号排版：主题样式 + 实景预览 + 一键复制富文本"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            排版
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={xhsViewOpen ? ACTIVE_SOFT_ACTION_CLASS : SOFT_ACTION_CLASS}
+            onClick={onToggleXhsView}
+            title="小红书图文编辑：标题/正文/标签三段 + 风格检查 + 标题变体"
+          >
+            <NotebookPen className="h-3.5 w-3.5" />
+            小红书
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -609,12 +643,14 @@ function BenchmarkEditorPanel({
       <div
         ref={splitRef}
         className="grid min-h-0 flex-1 bg-muted/15"
-        style={versionViewOpen || previewViewOpen ? undefined : { gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
+        style={versionViewOpen || previewViewOpen || xhsViewOpen ? undefined : { gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}
       >
         {versionViewOpen ? (
           <section className="flex min-h-0 flex-1 flex-col px-4 py-3">{versionContent}</section>
         ) : previewViewOpen ? (
           <section className="flex min-h-0 flex-1 flex-col px-4 py-3">{previewContent}</section>
+        ) : xhsViewOpen ? (
+          <section className="flex min-h-0 flex-1 flex-col px-4 py-3">{xhsContent}</section>
         ) : (
         <>
         <section className="flex min-h-0 flex-col px-4 py-3">
@@ -1031,8 +1067,12 @@ export default function AimPage() {
   const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? true)
   // P0 版本管理：版本时间线视图开关 + 列表刷新信号 + 最近一次快照内容（去重/防抖用）
   const [versionViewOpen, setVersionViewOpen] = useState(false)
-  // P1 公众号实景预览视图开关（与版本视图互斥，仅 wechat_article 格式可见入口）
+  // P1 公众号排版视图开关（与版本/小红书视图互斥）
   const [previewViewOpen, setPreviewViewOpen] = useState(false)
+  // P2 小红书图文编辑视图开关（与版本/排版视图互斥）
+  const [xhsViewOpen, setXhsViewOpen] = useState(false)
+  // P2 图文混排画布（小红书图文，全屏 Dialog，独立于面板内的版本/排版视图）
+  const [imageTextCanvasOpen, setImageTextCanvasOpen] = useState(false)
   const [versionRefreshKey, setVersionRefreshKey] = useState(0)
   const lastVersionSnapshotRef = useRef("")
   const [referenceSelection, setReferenceSelection] = useState<EditorSelection>({ text: "", range: { start: 0, end: 0 } })
@@ -3016,8 +3056,9 @@ export default function AimPage() {
           onImitateStyleChange={setImitateStyleId}
           versionViewOpen={versionViewOpen}
           onToggleVersionView={() => {
-            // 版本 / 预览互斥：开版本视图时关闭预览
+            // 版本 / 排版 / 小红书三视图互斥
             setPreviewViewOpen(false)
+            setXhsViewOpen(false)
             setVersionViewOpen((open) => !open)
           }}
           versionContent={
@@ -3033,13 +3074,55 @@ export default function AimPage() {
           }
           previewViewOpen={previewViewOpen}
           onTogglePreviewView={() => {
-            // 版本 / 预览互斥：开预览视图时关闭版本
+            // 版本 / 排版 / 小红书三视图互斥
             setVersionViewOpen(false)
+            setXhsViewOpen(false)
             setPreviewViewOpen((open) => !open)
           }}
           previewContent={<WechatPreview content={editorText} />}
+          xhsViewOpen={xhsViewOpen}
+          onToggleXhsView={() => {
+            setVersionViewOpen(false)
+            setPreviewViewOpen(false)
+            setXhsViewOpen((open) => !open)
+          }}
+          xhsContent={
+            <XhsPanel
+              content={editorText}
+              onApply={(text, mode) => {
+                if (mode === "replace") {
+                  setEditorText(text)
+                } else if (mode === "replaceTitle") {
+                  // 替换首行（没有首行则插入到开头）
+                  const lines = editorText.split("\n")
+                  const index = lines.findIndex((line) => line.trim())
+                  if (index >= 0) lines[index] = text
+                  else lines.unshift(text)
+                  setEditorText(lines.join("\n"))
+                } else if (mode === "prepend") {
+                  setEditorText(`${text}\n${editorText}`)
+                } else {
+                  // append：追加到末尾（话题标签）
+                  setEditorText(editorText.trimEnd() ? `${editorText.trimEnd()} ${text}` : text)
+                }
+              }}
+            />
+          }
+          onOpenImageTextCanvas={() => setImageTextCanvasOpen(true)}
         />
       )}
+
+      {/* P2 图文混排画布：同步走 onEditorTextChange 通路替换 editorText，自动版本快照自然生效 */}
+      <ImageTextCanvas
+        open={imageTextCanvasOpen}
+        onOpenChange={setImageTextCanvasOpen}
+        source={editorText}
+        onSync={(text) => {
+          setEditorText(text)
+          setImageTextCanvasOpen(false)
+          toast.success("已同步回文稿")
+        }}
+      />
 
       {wikiDialog.open && wikiDialog.context && (
         <IpWikiDialog

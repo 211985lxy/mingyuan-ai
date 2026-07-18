@@ -4,10 +4,27 @@
  * 公众号后台粘贴能保留样式的关键是：全部样式内联（style 属性），
  * 不允许出现 class / 外链 CSS。因此本文件输出的 HTML 片段只使用内联样式。
  * 所有源文本先做 HTML 转义再套标签，防注入（编辑器内容直接来自用户稿件）。
+ *
+ * 主题样式移植自 doocs/md (WTFPL) —— https://github.com/doocs/md
+ * 移植其内置三套主题的结构装饰（default 经典 / grace 优雅 / simple 简洁）
+ * 与其官方配色（经典蓝 #0F4C81 / 玫瑰金 #B76E79 / 翡翠绿 #009874 / 石墨黑 #333333），
+ * 并改写为纯内联样式输出（doocs 原版为 CSS 类 + CSS 变量体系）。
  */
 
 /** 公众号后台友好的系统字体栈（苹果/安卓/PC 均能落到原生中文字体） */
 const SYSTEM_FONT_STACK = `-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Arial,sans-serif`
+
+/** 标题/引用的结构装饰风格（移植自 doocs/md 各主题的装饰语言） */
+export interface WechatThemeDecor {
+  /** h2 装饰：band=白字色块居中（doocs default）| rounded=圆角色块（grace）| blob=8px 24px 异型圆角色块（simple） */
+  h2: "band" | "rounded" | "blob"
+  /** h3 装饰：borderLeft=左边框（default/grace）| panel=左边框+浅底色面板（simple） */
+  h3: "borderLeft" | "panel"
+  /** 引用装饰：block=左边框+底色块（default/grace）| minimal=细上下边框无底色（simple） */
+  quote: "block" | "minimal"
+  /** h1 装饰：underline=居中+下边框（doocs 三主题通用）| plain=左对齐 */
+  h1: "underline" | "plain"
+}
 
 export interface WechatTheme {
   id: string
@@ -22,7 +39,7 @@ export interface WechatTheme {
   headingColor: string
   /** 正文色 */
   textColor: string
-  /** 强调色（粗体、三级标题、引用左边框） */
+  /** 强调色（粗体、三级标题、引用左边框），对应 doocs/md 的 --md-primary-color */
   accentColor: string
   /** 引用块底色 */
   quoteBackground: string
@@ -30,60 +47,70 @@ export interface WechatTheme {
   dividerColor: string
   /** 段间距 px */
   paragraphGap: number
+  /** 结构装饰 */
+  decor: WechatThemeDecor
 }
 
 export const WECHAT_THEMES: WechatTheme[] = [
   {
-    id: "business_blue",
-    label: "商务蓝",
+    // 移植 doocs/md default 主题（经典）× 官方配色「经典蓝」
+    id: "classic_blue",
+    label: "经典蓝",
     fontSize: 16,
     lineHeight: 1.75,
     fontFamily: SYSTEM_FONT_STACK,
-    headingColor: "#1f3a5f",
+    headingColor: "#1a1a1a",
     textColor: "#3f3f3f",
-    accentColor: "#2f6fdd",
-    quoteBackground: "#f2f6fc",
+    accentColor: "#0F4C81",
+    quoteBackground: "#f2f6fa",
     dividerColor: "#d6e0ee",
     paragraphGap: 16,
+    decor: { h1: "underline", h2: "band", h3: "borderLeft", quote: "block" },
   },
   {
-    id: "magazine_black",
-    label: "杂志黑",
+    // 移植 doocs/md grace 主题（优雅）× 官方配色「玫瑰金」
+    id: "grace_rosegold",
+    label: "优雅玫瑰金",
     fontSize: 16,
     lineHeight: 2,
     fontFamily: SYSTEM_FONT_STACK,
-    headingColor: "#111111",
+    headingColor: "#2b2325",
     textColor: "#3c3c3c",
-    accentColor: "#111111",
-    quoteBackground: "#f5f5f4",
-    dividerColor: "#dcdcdc",
+    accentColor: "#B76E79",
+    quoteBackground: "#faf5f6",
+    dividerColor: "#e3d4d6",
     paragraphGap: 20,
+    decor: { h1: "underline", h2: "rounded", h3: "borderLeft", quote: "block" },
   },
   {
-    id: "fresh_green",
-    label: "清新绿",
+    // 移植 doocs/md simple 主题（简洁）× 官方配色「翡翠绿」
+    id: "simple_green",
+    label: "简洁翡翠绿",
     fontSize: 15,
     lineHeight: 1.8,
     fontFamily: SYSTEM_FONT_STACK,
-    headingColor: "#1d5c3f",
+    headingColor: "#17352c",
     textColor: "#40464a",
-    accentColor: "#2e9e6b",
-    quoteBackground: "#eef7f1",
+    accentColor: "#009874",
+    quoteBackground: "#eef7f3",
     dividerColor: "#d3e8db",
     paragraphGap: 16,
+    decor: { h1: "underline", h2: "blob", h3: "panel", quote: "minimal" },
   },
   {
-    id: "warm_orange",
-    label: "暖橙",
+    // 移植 doocs/md default 主题结构 × 官方配色「石墨黑」（内敛极简）
+    id: "graphite",
+    label: "石墨黑",
     fontSize: 15,
     lineHeight: 1.75,
     fontFamily: SYSTEM_FONT_STACK,
-    headingColor: "#8a4b1f",
+    headingColor: "#111111",
     textColor: "#463f3a",
-    accentColor: "#e07b39",
-    quoteBackground: "#fdf3ea",
-    dividerColor: "#f0ddc9",
+    accentColor: "#333333",
+    quoteBackground: "#f5f5f4",
+    dividerColor: "#dcdcdc",
     paragraphGap: 16,
+    decor: { h1: "underline", h2: "band", h3: "borderLeft", quote: "block" },
   },
 ]
 
@@ -122,21 +149,28 @@ interface ParsedBlock {
 
 /**
  * 按空行/语法类型分块：连续的引用、列表、普通行各合并为一个块；
+ * 空行是硬分隔（空行分段），其前后的同类行不再合并；
  * 标题与分割线各自独立成块（导出以便单测）
  */
 export function parseWechatBlocks(source: string): ParsedBlock[] {
   const blocks: ParsedBlock[] = []
+  // 上一个有效行之后是否遇到过空行（遇到则阻断跨空行合并）
+  let separatedByBlank = false
   for (const raw of source.replace(/\r\n?/g, "\n").split("\n")) {
     const line = raw.trim()
     const kind = classifyLine(line)
-    if (kind === "blank") continue
+    if (kind === "blank") {
+      separatedByBlank = true
+      continue
+    }
     const prev = blocks[blocks.length - 1]
     const mergeable = kind === "quote" || kind === "ul" || kind === "ol" || kind === "text"
-    if (mergeable && prev && prev.kind === kind) {
+    if (!separatedByBlank && mergeable && prev && prev.kind === kind) {
       prev.lines.push(line)
     } else {
       blocks.push({ kind, lines: [line] })
     }
+    separatedByBlank = false
   }
   return blocks
 }
@@ -161,26 +195,64 @@ function lineContent(line: string, kind: LineKind): string {
   }
 }
 
-/** 行内语法：先整体转义，再把 **粗体** 换成强调样式（* 不受转义影响） */
+/** 行内语法：先整体转义，再处理 **粗体** 与 [链接](url)（* 不受转义影响） */
 function renderInlineMarkup(text: string, theme: WechatTheme): string {
-  return escapeHtml(text).replace(
-    /\*\*([^*]+)\*\*/g,
-    `<strong style="color:${theme.accentColor};font-weight:600;">$1</strong>`,
-  )
+  return escapeHtml(text)
+    .replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      // 公众号不支持外链跳转，链接渲染为强调色文本并附原始地址（纯文本，无 <a> 跳转）
+      `<span style="color:${theme.accentColor};">$1</span>`,
+    )
+    .replace(
+      /\*\*([^*]+)\*\*/g,
+      `<strong style="color:${theme.accentColor};font-weight:600;">$1</strong>`,
+    )
 }
 
 function renderBlock(block: ParsedBlock, theme: WechatTheme): string {
-  const { fontSize, lineHeight, fontFamily, headingColor, textColor, accentColor, quoteBackground, dividerColor, paragraphGap } = theme
+  const { fontSize, lineHeight, fontFamily, headingColor, textColor, accentColor, quoteBackground, dividerColor, paragraphGap, decor } = theme
   switch (block.kind) {
-    case "h1":
-      return `<h1 style="margin:${paragraphGap}px 0 ${Math.round(paragraphGap / 2)}px;font-size:${fontSize + 6}px;font-weight:700;line-height:1.4;color:${headingColor};font-family:${fontFamily};">${renderInlineMarkup(lineContent(block.lines[0], "h1"), theme)}</h1>`
-    case "h2":
-      return `<h2 style="margin:${paragraphGap}px 0 ${Math.round(paragraphGap / 2)}px;font-size:${fontSize + 3}px;font-weight:700;line-height:1.4;color:${headingColor};font-family:${fontFamily};">${renderInlineMarkup(lineContent(block.lines[0], "h2"), theme)}</h2>`
-    case "h3":
-      return `<h3 style="margin:${paragraphGap}px 0 ${Math.round(paragraphGap / 2)}px;font-size:${fontSize + 1}px;font-weight:600;line-height:1.4;color:${accentColor};font-family:${fontFamily};">${renderInlineMarkup(lineContent(block.lines[0], "h3"), theme)}</h3>`
+    case "h1": {
+      // doocs 三主题通用：居中 + 底部 2px 主色边框（display:table 让边框宽度贴合文字）
+      const base = `font-size:${fontSize + 6}px;font-weight:700;line-height:1.4;color:${headingColor};font-family:${fontFamily};`
+      const style =
+        decor.h1 === "underline"
+          ? `display:table;margin:${paragraphGap}px auto ${Math.round(paragraphGap / 2)}px;padding:0 1em 4px;border-bottom:2px solid ${accentColor};text-align:center;${base}`
+          : `margin:${paragraphGap}px 0 ${Math.round(paragraphGap / 2)}px;${base}`
+      return `<h1 style="${style}">${renderInlineMarkup(lineContent(block.lines[0], "h1"), theme)}</h1>`
+    }
+    case "h2": {
+      const base = `font-size:${fontSize + 3}px;font-weight:700;line-height:1.4;font-family:${fontFamily};`
+      let style: string
+      if (decor.h2 === "rounded") {
+        // doocs grace：圆角色块 + 白字
+        style = `display:table;margin:${paragraphGap * 2}px auto ${paragraphGap}px;padding:0.3em 1em;border-radius:8px;background-color:${accentColor};color:#ffffff;text-align:center;${base}`
+      } else if (decor.h2 === "blob") {
+        // doocs simple：8px 24px 异型圆角色块 + 白字
+        style = `display:table;margin:${paragraphGap * 2}px auto ${paragraphGap}px;padding:0.3em 1.2em;border-radius:8px 24px 8px 24px;background-color:${accentColor};color:#ffffff;text-align:center;${base}`
+      } else {
+        // doocs default：白字色块居中
+        style = `display:table;margin:${paragraphGap * 2}px auto ${paragraphGap}px;padding:0 0.4em;background-color:${accentColor};color:#ffffff;text-align:center;${base}`
+      }
+      return `<h2 style="${style}">${renderInlineMarkup(lineContent(block.lines[0], "h2"), theme)}</h2>`
+    }
+    case "h3": {
+      const content = renderInlineMarkup(lineContent(block.lines[0], "h3"), theme)
+      if (decor.h3 === "panel") {
+        // doocs simple：左边框 + 主色 8% 浅底面板
+        return `<h3 style="margin:${paragraphGap}px 0 ${Math.round(paragraphGap / 2)}px;padding:6px 12px;border-left:4px solid ${accentColor};border-radius:6px;background-color:${quoteBackground};color:${headingColor};font-size:${fontSize + 1}px;font-weight:600;line-height:1.4;font-family:${fontFamily};">${content}</h3>`
+      }
+      // doocs default/grace：左边框
+      return `<h3 style="margin:${paragraphGap}px 0 ${Math.round(paragraphGap / 2)}px;padding-left:8px;border-left:3px solid ${accentColor};color:${accentColor};font-size:${fontSize + 1}px;font-weight:600;line-height:1.4;font-family:${fontFamily};">${content}</h3>`
+    }
     case "quote": {
       const inner = block.lines.map((line) => renderInlineMarkup(lineContent(line, "quote"), theme)).join("<br/>")
-      return `<blockquote style="margin:${paragraphGap}px 0;padding:12px 16px;border-left:3px solid ${accentColor};background-color:${quoteBackground};color:${textColor};font-size:${fontSize - 1}px;line-height:${lineHeight};font-family:${fontFamily};">${inner}</blockquote>`
+      if (decor.quote === "minimal") {
+        // doocs simple：无底色，细上下边框
+        return `<blockquote style="margin:${paragraphGap}px 0;padding:12px 16px;border-top:1px solid ${dividerColor};border-bottom:1px solid ${dividerColor};color:${textColor};font-style:italic;font-size:${fontSize - 1}px;line-height:${lineHeight};font-family:${fontFamily};">${inner}</blockquote>`
+      }
+      // doocs default/grace：左边框 + 底色 + 圆角
+      return `<blockquote style="margin:${paragraphGap}px 0;padding:12px 16px;border-left:3px solid ${accentColor};border-radius:6px;background-color:${quoteBackground};color:${textColor};font-size:${fontSize - 1}px;line-height:${lineHeight};font-family:${fontFamily};">${inner}</blockquote>`
     }
     case "ul": {
       const items = block.lines
@@ -263,4 +335,25 @@ export function wechatPlainText(source: string): string {
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
+}
+
+/** 按 id 取主题（未知 id 回退到第一套） */
+export function getWechatTheme(themeId: string): WechatTheme {
+  return WECHAT_THEMES.find((theme) => theme.id === themeId) ?? WECHAT_THEMES[0]
+}
+
+/**
+ * P1 规范入口：Markdown → 公众号 HTML（纯函数，100% 内联样式，可单测）。
+ * theme 传主题 id（classic_blue / grace_rosegold / simple_green / graphite，
+ * 移植自 doocs/md 的 default / grace / simple 主题体系）。
+ */
+export function markdownToWechatHtml(md: string, theme: string): string {
+  return renderWechatHtml(md, getWechatTheme(theme))
+}
+
+/** 字数统计 + 阅读时长预估（公众号经验值：约 400 字/分钟） */
+export function estimateWechatReading(source: string): { chars: number; minutes: number } {
+  const plain = wechatPlainText(source).replace(/\s/g, "")
+  const chars = plain.length
+  return { chars, minutes: Math.max(1, Math.round(chars / 400)) }
 }

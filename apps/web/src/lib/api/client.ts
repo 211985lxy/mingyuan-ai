@@ -476,6 +476,22 @@ export async function polishScript(input: {
   return payload.data
 }
 
+/**
+ * Seedream 生图（小红书图文卡片）：prompt 走 xhs-card 组装（3:4 竖图），
+ * size 默认 2K；返回图片 URL。失败抛出 ApiError，调用方负责 toast。
+ */
+export async function generateImageCard(input: { prompt: string; size?: string }): Promise<string> {
+  const payload = await request<{ imageUrl: string | null }>("/api/images/generate", {
+    method: "POST",
+    body: JSON.stringify({ prompt: input.prompt, kind: "xhs-card", size: input.size ?? "2K" }),
+    timeout: 120000,
+  })
+  if (!payload.imageUrl) {
+    throw new ApiError("生图结果为空，请重试", 500, payload)
+  }
+  return payload.imageUrl
+}
+
 export async function listAvatars(): Promise<ApiAvatar[]> {
   const payload = await request<{ data: PaginatedResponse<ApiAvatar> }>("/api/avatars?page=1&pageSize=100")
   return payload.data.results
@@ -1895,5 +1911,59 @@ export async function restoreContentVersion(id: string): Promise<ContentVersionD
     `/api/content-versions/${encodeURIComponent(id)}/restore`,
     { method: "POST", timeout: 15000 }
   )
+  return payload.data
+}
+
+// ─── 小红书图文编辑（P2） ─────────────────────────────────
+
+export interface XhsReviewIssue {
+  /** emoji | spoken | absolute | title | structure | hook | readability | collection */
+  type: string
+  text: string
+  suggestion: string
+}
+
+/** 自检清单项：封面钩子/可读性/信息层级/风格统一/收藏价值/模板感/文字堆积/emoji/违禁词/标题 */
+export interface XhsChecklistItem {
+  item: string
+  status: "pass" | "warn" | "fail"
+  note?: string
+}
+
+export interface XhsReviewResult {
+  score: number
+  issues: XhsReviewIssue[]
+  checklist: XhsChecklistItem[]
+  emojiDensity: number
+}
+
+export interface XhsTitleVariants {
+  titles: string[]
+  hooks: string[]
+  tags: string[]
+}
+
+/** 小红书风格检查：封面钩子/可读性/层级/emoji 密度/绝对化用语 + 总分与问题清单 */
+export async function reviewXhsNote(input: {
+  content: string
+  title?: string
+}): Promise<XhsReviewResult> {
+  const payload = await request<{ data: XhsReviewResult }>("/api/scripts/xhs-review", {
+    method: "POST",
+    body: JSON.stringify({ ...input, mode: "review" }),
+    timeout: 60000,
+  })
+  return payload.data
+}
+
+/** 小红书标题/首句钩子/话题标签变体（titles 5-8 条、hooks 3-5 条） */
+export async function generateXhsTitles(input: {
+  content: string
+}): Promise<XhsTitleVariants> {
+  const payload = await request<{ data: XhsTitleVariants }>("/api/scripts/xhs-review", {
+    method: "POST",
+    body: JSON.stringify({ ...input, mode: "variants" }),
+    timeout: 60000,
+  })
   return payload.data
 }
