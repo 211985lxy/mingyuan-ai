@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "converging",
+  "status": "merged",
   "repository": {
     "canonical": "https://github.com/211985lxy/mingyuan-ai.git",
     "visibility": "private",
