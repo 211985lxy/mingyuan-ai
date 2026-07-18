@@ -48,6 +48,8 @@ export interface ParseGenerateBodyResult {
   topicSelectionId: string | undefined
   selectedTopicIndex: number | undefined
   workflow: ReturnType<typeof parseWorkflowBriefRequest> | undefined
+  agentModule: "social" | "longform" | "free" | undefined
+  writerModule: "social" | "longform" | "free" | undefined
 }
 
 export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateBodyResult {
@@ -81,6 +83,10 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
       : undefined
 
   const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+  const requestedModule = body.agentModule ?? body.writerModule
+  const agentModule = requestedModule === "social" || requestedModule === "longform" || requestedModule === "free"
+    ? requestedModule
+    : undefined
 
   return {
     agentId,
@@ -103,6 +109,8 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
         ? body.selectedTopicIndex
         : undefined,
     workflow: parseWorkflowBriefRequest(body.workflow) || undefined,
+    agentModule,
+    writerModule: agentModule,
   }
 }
 

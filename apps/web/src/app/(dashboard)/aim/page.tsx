@@ -10,6 +10,7 @@ import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
 import type { AimAgentId } from "@/lib/aim-ui-config"
+import { COPY_STUDIO_MODULES, COPY_STUDIO_MODULE_LABELS } from "@/lib/copy-studio"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 
 const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
@@ -43,6 +44,17 @@ export default function AimPage() {
           projectAccessError={w.projectAccessError}
           personaProgress={w.personaProgress}
         />
+
+        {w.selectedAgentId === "content_producer" && (
+          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">创作模式</span>
+            {COPY_STUDIO_MODULES.map((module) => (
+              <button key={module} type="button" className={`rounded-md border px-2.5 py-1 text-xs ${w.agentModule === module ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`} onClick={() => w.setAgentModule(module)}>
+                {COPY_STUDIO_MODULE_LABELS[module]}
+              </button>
+            ))}
+          </div>
+        )}
 
         {w.selectedProjectId && (
           <AimProjectTaskPanel
@@ -140,6 +152,7 @@ export default function AimPage() {
           imitating={w.isImitating}
           imitateStyleId={w.imitateStyleId}
           onImitateStyleChange={w.setImitateStyleId}
+          generationId={w.latestGenerationId}
         />
       )}
 

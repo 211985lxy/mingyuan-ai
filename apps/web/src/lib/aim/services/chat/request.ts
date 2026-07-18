@@ -44,6 +44,8 @@ export type AimChatRequestBody = {
   resultId: string
   shouldStream: boolean
   editorContext?: AimEditorContext
+  agentModule?: "social" | "longform" | "free"
+  writerModule?: "social" | "longform" | "free"
 }
 
 /** Result of parsing the chat body: either a validated request or an error response. */
@@ -76,5 +78,7 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     editorContext: typeof record.editorContext === "object" && record.editorContext
       ? (record.editorContext as AimEditorContext)
       : undefined,
+    agentModule: record.agentModule === "social" || record.agentModule === "longform" || record.agentModule === "free" ? record.agentModule : undefined,
+    writerModule: record.writerModule === "social" || record.writerModule === "longform" || record.writerModule === "free" ? record.writerModule : undefined,
   }
 }

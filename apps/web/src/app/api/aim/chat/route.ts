@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
-    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext } = parsed
+    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule } = parsed
 
     trace = await createAimTrace({
       userId: user.id,
@@ -69,6 +69,8 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       projectId,
       agentId,
+      agentModule,
+      writerModule,
       shouldStream,
       trace,
     })

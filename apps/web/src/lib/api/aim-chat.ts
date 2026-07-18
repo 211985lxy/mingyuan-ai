@@ -77,6 +77,8 @@ export async function chatAim(
     toolAction?: AimChatToolAction
     resultId?: string
     editorContext?: AimEditorContext
+    agentModule?: "social" | "longform" | "free"
+    writerModule?: "social" | "longform" | "free"
     signal?: AbortSignal
   },
 ): Promise<{ content: string; toolResult?: unknown }> {
@@ -95,6 +97,8 @@ export async function chatAimStream(
     agentId?: string
     projectId?: string
     editorContext?: AimEditorContext
+    agentModule?: "social" | "longform" | "free"
+    writerModule?: "social" | "longform" | "free"
     signal?: AbortSignal
     onDelta: (delta: string, content: string) => void
   },

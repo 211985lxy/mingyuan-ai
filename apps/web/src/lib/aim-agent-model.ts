@@ -43,7 +43,7 @@ export async function executeChatLLM(
   policy?: AimModelPolicy,
 ): Promise<{ content: string }> {
   const formattedMessages = formatMessages(systemPrompt, messages)
-  const llm = getAgentLLM(hasImageContent(formattedMessages) ? "vision_analysis" : agentId, policy)
+  const llm = getAgentLLM(hasImageContent(formattedMessages) ? "vision_analysis" : (policy?.routeKey ?? agentId), policy)
   const completion = await llm.complete({
     messages: formattedMessages,
     temperature: policy?.temperature ?? 0.7,
@@ -59,7 +59,7 @@ export async function* executeChatLLMStream(
   policy?: AimModelPolicy,
 ): AsyncIterable<string> {
   const formattedMessages = formatMessages(systemPrompt, messages)
-  const llm = getAgentLLM(hasImageContent(formattedMessages) ? "vision_analysis" : agentId, policy)
+  const llm = getAgentLLM(hasImageContent(formattedMessages) ? "vision_analysis" : (policy?.routeKey ?? agentId), policy)
   yield* llm.stream({
     messages: formattedMessages,
     temperature: policy?.temperature ?? 0.7,
@@ -73,7 +73,7 @@ export async function executeGenerateLLM(
   userPrompt: string,
   policy?: AimModelPolicy,
 ) {
-  const llm = getAgentLLM(agentId, policy)
+  const llm = getAgentLLM(policy?.routeKey ?? agentId, policy)
   return llm.complete({
     messages: [
       { role: "system", content: systemPrompt },

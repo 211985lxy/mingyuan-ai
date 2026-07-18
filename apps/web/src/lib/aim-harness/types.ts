@@ -43,6 +43,7 @@ export type AimModelCapability = ModelCapability
 /** Model policy: routing + fallback behavior. */
 export interface AimModelPolicy {
   agentId: AimAgentId
+  routeKey?: string
   /** whether streaming is requested */
   stream: boolean
   /** temperature override (optional; handlers keep their defaults otherwise) */
