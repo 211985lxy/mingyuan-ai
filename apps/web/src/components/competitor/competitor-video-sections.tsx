@@ -52,7 +52,7 @@ function ExtractionResult({ record }: { record: ApiVideoCopyExtraction }) {
       {record.transcript ? <p className="mt-2 line-clamp-2 text-muted-foreground">原文案：{record.transcript}</p> : null}
       <div className="mt-2 flex items-center justify-between border-t pt-2 gap-2">
         <Link href="/video-copy" className="text-xs text-primary hover:underline">查看完整记录</Link>
-        <Link href={`/aim?agent=content_producer&mode=asset_pack&videoCopyExtractionId=${record.id}`} className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"><Wand2 className="h-3 w-3" />生成内容资产包</Link>
+        <Link href={`/aim?agent=content_producer&mode=quick&videoCopyExtractionId=${record.id}`} className="inline-flex h-7 items-center gap-1 rounded bg-primary px-2 text-[11px] font-medium text-primary-foreground hover:bg-primary/90"><Wand2 className="h-3 w-3" />生成内容资产包</Link>
       </div>
     </AiResultPanel>
   )
@@ -98,12 +98,55 @@ function VideoSection({ title, videos, viral, extractions, extractingVideoId, on
   )
 }
 
-export function CompetitorVideoSections({ latestVideos, viralVideos, extractions, extractingVideoId, onExtract }: {
+export function CompetitorLatestVideoSection({ latestVideos, extractions, extractingVideoId, onExtract }: {
   latestVideos: CompetitorWatchVideo[]
-  viralVideos: CompetitorWatchVideo[]
   extractions: Record<string, ApiVideoCopyExtraction>
   extractingVideoId: string | null
   onExtract: (video: CompetitorWatchVideo) => void
 }) {
-  return <><VideoSection title="最新作品" videos={latestVideos} extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} /><VideoSection title="爆款作品" videos={viralVideos} viral extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} /></>
+  return <VideoSection title="当前账号最新作品" videos={latestVideos} extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} />
+}
+
+export function collectAllViralVideos(accounts: WatchAccount[]): CompetitorWatchVideo[] {
+  return accounts
+    .flatMap((account) => (account.viralVideos ?? []).map((video) => ({ ...video, account })))
+    .sort((a, b) => (b.engagementScore ?? 0) - (a.engagementScore ?? 0))
+}
+
+export function CompetitorViralVideoPool({ accounts, extractions, extractingVideoId, onExtract }: {
+  accounts: WatchAccount[]
+  extractions: Record<string, ApiVideoCopyExtraction>
+  extractingVideoId: string | null
+  onExtract: (video: CompetitorWatchVideo) => void
+}) {
+  const videos = collectAllViralVideos(accounts)
+  if (videos.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Flame className="h-4 w-4 text-orange-500" />
+            全部对标账号爆款视频
+            <Badge variant="secondary" className="text-xs">0</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+            暂无爆款视频。先添加监控账号并刷新作品池，所有账号的爆款视频会统一显示在这里。
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <VideoSection
+      title="全部对标账号爆款视频"
+      videos={videos}
+      viral
+      extractions={extractions}
+      extractingVideoId={extractingVideoId}
+      onExtract={onExtract}
+    />
+  )
 }
