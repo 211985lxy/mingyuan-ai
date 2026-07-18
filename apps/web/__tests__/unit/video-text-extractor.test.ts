@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   VIDEO_TEXT_EXTRACT_USER_AGENT,
   assertSupportedVideoUrl,
+  assertVideoTextProviderReady,
   detectVideoPlatform,
   formatVideoTextExtractionError,
   parseVideoTextSubmitResult,
@@ -18,6 +19,8 @@ describe("video text extractor", () => {
     expect(detectVideoPlatform("https://v.douyin.com/example/")).toBe("douyin")
     expect(detectVideoPlatform("https://www.bilibili.com/video/BV1234567890")).toBe("bilibili")
     expect(detectVideoPlatform("https://example.com/watch/123")).toBe("unknown")
+    expect(detectVideoPlatform("https://channels.weixin.qq.com/s/example")).toBe("channels")
+    expect(() => assertVideoTextProviderReady("channels")).toThrow(/尚未完成真实联调|Provider 尚未启用/)
   })
 
   it("extracts the first URL from pasted share text", () => {

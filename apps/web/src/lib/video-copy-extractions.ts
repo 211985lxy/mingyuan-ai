@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { analyzeVideoCopy } from "@/lib/video-copy-analysis"
 import {
   assertSupportedVideoUrl,
+  assertVideoTextProviderReady,
   detectVideoPlatform,
   fetchVideoTextExtractionResult,
   formatVideoTextExtractionError,
@@ -115,6 +116,7 @@ export async function createVideoCopyExtraction(
 ): Promise<VideoCopyExtractionRecord> {
   const sourceUrl = assertSupportedVideoUrl(inputUrl)
   const platform = detectVideoPlatform(sourceUrl)
+  assertVideoTextProviderReady(platform)
 
   const record = await prisma.videoCopyExtraction.create({
     data: {
