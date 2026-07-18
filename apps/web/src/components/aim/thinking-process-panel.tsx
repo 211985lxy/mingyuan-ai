@@ -18,6 +18,13 @@ import {
   Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getStoredAuthToken } from "@/lib/auth-storage"
+
+/**
+ * 功能开关：NEXT_PUBLIC_AIM_THINKING_PANEL=off 时整体隐藏思考过程面板（默认开启）。
+ * 作为线上异常时的一键回退手段。
+ */
+const THINKING_PANEL_ENABLED = process.env.NEXT_PUBLIC_AIM_THINKING_PANEL !== "off"
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
 
@@ -247,29 +254,21 @@ export function ThinkingProcessPanel({
   const [isFailed, setIsFailed] = useState(false)
   const [panelExpanded, setPanelExpanded] = useState(true)
   const [connected, setConnected] = useState(false)
-  const eventSourceRef = useRef<EventSource | null>(null)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 
-  // 连接 SSE
+  // 连接 SSE：用 fetch 流式读取替代 EventSource——后者不支持自定义请求头，
+  // 而 trace 端点要求 Authorization: Bearer，EventSource 直连必然 401。
   useEffect(() => {
-    if (!traceId) return
+    if (!traceId || !THINKING_PANEL_ENABLED) return
 
     let cancelled = false
-    const es = new EventSource(
-      `/api/aim/trace/${encodeURIComponent(traceId)}`,
-      { withCredentials: false },
-    )
-    eventSourceRef.current = es
+    const controller = new AbortController()
 
-    es.onopen = () => {
-      if (!cancelled) setConnected(true)
-    }
-
-    es.onmessage = (event) => {
+    const handlePayload = (json: string) => {
       if (cancelled) return
       try {
-        const data = JSON.parse(event.data as string)
+        const data = JSON.parse(json)
 
         switch (data.type) {
           case "connected":
@@ -291,19 +290,16 @@ export function ThinkingProcessPanel({
             setIsComplete(true)
             setIsFailed(data.status === "failed")
             onCompleteRef.current?.()
-            es.close()
-            eventSourceRef.current = null
+            controller.abort()
             break
           case "error":
             setIsComplete(true)
             setIsFailed(true)
-            es.close()
-            eventSourceRef.current = null
+            controller.abort()
             break
           case "timeout":
             setIsComplete(true)
-            es.close()
-            eventSourceRef.current = null
+            controller.abort()
             break
         }
       } catch {
@@ -311,18 +307,47 @@ export function ThinkingProcessPanel({
       }
     }
 
-    es.onerror = () => {
-      if (!cancelled) {
-        setIsComplete(true)
+    const connect = async () => {
+      try {
+        const token = getStoredAuthToken()
+        const res = await fetch(`/api/aim/trace/${encodeURIComponent(traceId)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          signal: controller.signal,
+        })
+        if (!res.ok || !res.body) {
+          if (!cancelled) setIsComplete(true)
+          return
+        }
+        if (!cancelled) setConnected(true)
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let pending = ""
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          pending += decoder.decode(value, { stream: true })
+          const chunks = pending.split("\n\n")
+          pending = chunks.pop() ?? ""
+          for (const chunk of chunks) {
+            const line = chunk.trim()
+            if (!line.startsWith("data:")) continue
+            handlePayload(line.slice(5).trim())
+          }
+        }
+        // 流结束但未收到 done（异常关闭），按完成处理避免一直转圈
+        if (!cancelled) setIsComplete(true)
+      } catch {
+        // 主动 abort 或网络错误都按完成处理
+        if (!cancelled) setIsComplete(true)
       }
-      es.close()
-      eventSourceRef.current = null
     }
+
+    void connect()
 
     return () => {
       cancelled = true
-      es.close()
-      eventSourceRef.current = null
+      controller.abort()
       setConnected(false)
     }
   }, [traceId])
@@ -336,6 +361,8 @@ export function ThinkingProcessPanel({
     return () => clearTimeout(timer)
   }, [isComplete, panelExpanded])
 
+  // 功能开关：off 时整体隐藏
+  if (!THINKING_PANEL_ENABLED) return null
   // 无 traceId 时不渲染
   if (!traceId) return null
   // 没有步骤且已完成且未连接时不渲染（已完成且折叠）

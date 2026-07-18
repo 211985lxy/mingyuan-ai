@@ -105,6 +105,8 @@ export interface AimGenerateContext {
   /** 内容场景模式（由前端或路由层传入，驱动提示块和知识策略差异化） */
   contentScenario?: ContentScenario
   trace?: AimTraceRecorder
+  /** 推迟 trace done 事件到路由层发布（用于路由在 generate 后追加 quality_gate 等步骤的场景） */
+  deferTraceDoneEvent?: boolean
   /** Eval-only: use frozen context instead of live DB loaders. */
   contextOverride?: AimGenerationContextOverride
   /** Eval-only: execute the production prompt/model path without writing history. */
@@ -1671,7 +1673,7 @@ export async function buildAimGeneration(agentId: string, params: Omit<AimGenera
     model: saved?.model || null,
     totalTokens: saved?.totalTokens || null,
     outputSummary: summarizeText(response.results.map((item) => item.content).join("\n\n")),
-  })
+  }, { deferDoneEvent: params.deferTraceDoneEvent })
 
   return { ...response, conversationMode: generationIntent.mode, knowledgeStrategy }
 }

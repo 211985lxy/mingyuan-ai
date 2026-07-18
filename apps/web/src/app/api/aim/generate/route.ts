@@ -17,6 +17,7 @@ import {
   addAimTraceStep,
   createAimTrace,
   failAimTrace,
+  publishAimTraceDone,
   runAimTraceStep,
   summarizeText,
   type AimTraceRecorder,
@@ -211,6 +212,8 @@ export async function POST(request: NextRequest) {
           existingGenerationId: parsed.existingGenerationId,
           runtimeTask,
           trace,
+          // done 事件推迟到下方 quality_gate 步骤之后由本路由统一发布，保证 SSE 事件时序
+          deferTraceDoneEvent: true,
         }),
       rawInput: withCommentContext,
       agentId: parsed.agentId || "content_producer",
@@ -246,6 +249,9 @@ export async function POST(request: NextRequest) {
         }),
       )
     }
+
+    // 全部步骤已追加完毕，发布推迟的 done 事件（订阅方收到 done 即关闭流）
+    publishAimTraceDone(trace, "success")
 
     return NextResponse.json({
       ...result,

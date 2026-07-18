@@ -37,6 +37,8 @@ interface AimInput {
   contentScenario?: ContentScenario
   existingGenerationId?: string
   trace?: AimTraceRecorder
+  /** 推迟 trace done 事件到路由层发布（generate 路由会在质检步骤后统一发布） */
+  deferTraceDoneEvent?: boolean
 }
 
 function asStringArray(value: unknown): string[] {
@@ -175,5 +177,6 @@ export async function generateAimContent(input: AimInput) {
     runtimeTask: input.runtimeTask,
     contentScenario: input.contentScenario,
     trace: input.trace,
+    deferTraceDoneEvent: input.deferTraceDoneEvent,
   })
 }
