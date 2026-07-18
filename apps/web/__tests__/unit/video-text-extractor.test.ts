@@ -4,6 +4,7 @@ import {
   VIDEO_TEXT_EXTRACT_USER_AGENT,
   assertSupportedVideoUrl,
   detectVideoPlatform,
+  extractPureVideoUrl,
   formatVideoTextExtractionError,
   parseVideoTextSubmitResult,
   parseVideoTextTaskResult,
@@ -18,6 +19,38 @@ describe("video text extractor", () => {
     expect(detectVideoPlatform("https://v.douyin.com/example/")).toBe("douyin")
     expect(detectVideoPlatform("https://www.bilibili.com/video/BV1234567890")).toBe("bilibili")
     expect(detectVideoPlatform("https://example.com/watch/123")).toBe("unknown")
+  })
+
+  it("detects WeChat Channels URLs as channels", () => {
+    expect(detectVideoPlatform("https://channels.weixin.qq.com/platform/post/list")).toBe("channels")
+    expect(detectVideoPlatform("https://weixin110.qq.com/abc123")).toBe("channels")
+    expect(detectVideoPlatform("https://sph.weixin.qq.com/xyz")).toBe("channels")
+    expect(detectVideoPlatform("https://weixin.qq.com/")).toBe("channels")
+  })
+
+  it("detects channels from dirty WeChat share text", () => {
+    expect(
+      detectVideoPlatform("太精彩了！点击链接观看完整视频 #视频号 https://channels.weixin.qq.com/abc 复制整段文字")
+    ).toBe("channels")
+    expect(
+      detectVideoPlatform("3.87 复制这段内容，打开微信看看吧 https://weixin110.qq.com/xyz789 。")
+    ).toBe("channels")
+  })
+
+  it("extracts pure URLs from dirty share text", () => {
+    expect(extractPureVideoUrl("看看这个 https://v.douyin.com/example/ 更多内容")).toBe(
+      "https://v.douyin.com/example/"
+    )
+    expect(extractPureVideoUrl("文案 https://weixin110.qq.com/xyz789中文尾巴")).toBe(
+      "https://weixin110.qq.com/xyz789"
+    )
+    expect(extractPureVideoUrl("没有链接的文本")).toBe("没有链接的文本")
+  })
+
+  it("assertSupportedVideoUrl accepts WeChat share text containing a channels link", () => {
+    expect(
+      assertSupportedVideoUrl("太精彩了！点击链接观看 #视频号 https://channels.weixin.qq.com/abc 复制整段文字")
+    ).toBe("https://channels.weixin.qq.com/abc")
   })
 
   it("extracts the first URL from pasted share text", () => {

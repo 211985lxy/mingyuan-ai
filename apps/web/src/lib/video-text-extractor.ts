@@ -67,9 +67,28 @@ export function parseVideoTextSubmitResult(payload: ProviderTaskResponse): { bat
   return { batchId }
 }
 
+/**
+ * 从微信/抖音等 App 的分享文案（混有中文、空格、# 口令的脏文本）中提取第一条纯 URL。
+ * 找不到 URL 时返回原输入（trim 后），便于调用方继续走 URL 校验报错。
+ */
+export function extractPureVideoUrl(input: string): string {
+  const text = input.trim()
+  if (!text) return text
+  const match = text.match(/https?:\/\/[^\s，。；；、"'<>\u4e00-\u9fa5]+/i)?.[0]
+  return match ? match.replace(/[),.。]+$/, "") : text
+}
+
 export function detectVideoPlatform(url: string): string {
   try {
-    const hostname = new URL(url).hostname.toLowerCase()
+    const pureUrl = extractPureVideoUrl(url)
+    const hostname = new URL(pureUrl).hostname.toLowerCase()
+    // 视频号（WeChat Channels）：channels.weixin.qq.com / weixin110.qq.com / weixin.qq.com 及其子域
+    if (
+      hostname === "weixin.qq.com"
+      || hostname.endsWith(".weixin.qq.com")
+      || hostname === "weixin110.qq.com"
+      || hostname.endsWith(".weixin110.qq.com")
+    ) return "channels"
     if (hostname.includes("douyin.com") || hostname.includes("iesdouyin.com")) return "douyin"
     if (hostname.includes("bilibili.com") || hostname.includes("b23.tv")) return "bilibili"
     if (hostname.includes("kuaishou.com")) return "kuaishou"
@@ -83,7 +102,7 @@ export function detectVideoPlatform(url: string): string {
 
 export function assertSupportedVideoUrl(input: string): string {
   const text = input.trim()
-  const url = text.match(/https?:\/\/[^\s，。；；、"'<>]+/i)?.[0]?.replace(/[),.。]+$/, "") ?? text
+  const url = extractPureVideoUrl(text)
   if (!url) throw new Error("请输入视频链接")
 
   let parsed: URL
@@ -117,6 +136,10 @@ export function formatVideoTextExtractionError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "")
   const lower = message.toLowerCase()
 
+  // 已经是面向用户的中文提示（如视频号服务未配置），直接透传，避免被覆盖成模糊文案
+  if (message.includes("未配置")) {
+    return message
+  }
   if (lower.includes("1004") || lower.includes("apikey") || lower.includes("api key")) {
     return "文案提取服务配置有问题，请检查服务端密钥。"
   }

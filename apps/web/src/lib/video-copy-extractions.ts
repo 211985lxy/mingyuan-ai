@@ -4,10 +4,9 @@ import { analyzeVideoCopy } from "@/lib/video-copy-analysis"
 import {
   assertSupportedVideoUrl,
   detectVideoPlatform,
-  fetchVideoTextExtractionResult,
   formatVideoTextExtractionError,
-  submitVideoTextExtractionTask,
 } from "@/lib/video-text-extractor"
+import { getVideoTextProvider } from "@/lib/video-text-providers"
 import { getAdapter } from "@/lib/tikhub/adapters/index"
 import type { Platform } from "@/lib/tikhub/types"
 import { parseUrl } from "@/lib/tikhub/url-parser"
@@ -126,7 +125,8 @@ export async function createVideoCopyExtraction(
   })
 
   try {
-    const task = await submitVideoTextExtractionTask(sourceUrl)
+    const provider = getVideoTextProvider(platform)
+    const task = await provider.submitTask(sourceUrl)
     return prisma.videoCopyExtraction.update({
       where: { id: record.id },
       data: {
@@ -178,7 +178,9 @@ export async function syncVideoCopyExtraction(
 
   if (!record.transcript) {
     try {
-      const result = await fetchVideoTextExtractionResult(record.providerBatchId)
+      // 按记录落库时的 platform 路由到对应服务商轮询，无需改 schema
+      const provider = getVideoTextProvider(record.platform)
+      const result = await provider.fetchResult(record.providerBatchId)
       if (result.status === "extracting") {
         return prisma.videoCopyExtraction.update({
           where: { id: record.id },

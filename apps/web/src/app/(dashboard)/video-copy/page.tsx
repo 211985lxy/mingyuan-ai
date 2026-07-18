@@ -43,6 +43,7 @@ function platformLabel(platform: string) {
     bilibili: "B站",
     kuaishou: "快手",
     xiaohongshu: "小红书",
+    channels: "视频号",
     youtube: "YouTube",
     unknown: "未知平台",
   }
@@ -174,14 +175,14 @@ const topComments = analysis?.topComments ?? []
       <AiResultPanel
         title="视频链接"
         icon={<Send className="h-4 w-4 text-primary" />}
-        meta={<span>支持抖音、B站或其他可识别的视频链接</span>}
+        meta={<span>支持抖音、B站、快手、小红书、视频号等视频链接</span>}
         flat
       >
         <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
           <Textarea
             value={url}
             onChange={(event) => setUrl(event.target.value)}
-            placeholder="粘贴抖音、B站或其他视频链接"
+            placeholder="粘贴抖音、B站、快手、小红书、视频号等视频链接或分享文案"
             className="min-h-24 resize-none"
           />
           <Button
@@ -193,6 +194,9 @@ const topComments = analysis?.topComments ?? []
             开始提取
           </Button>
         </div>
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          视频号：在微信中打开视频号视频 → 右上角分享 → 复制链接。直接粘贴整段分享文案即可，系统会自动提取其中的链接。
+        </p>
       </AiResultPanel>
 
       {error ? (
