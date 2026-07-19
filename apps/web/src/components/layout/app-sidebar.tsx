@@ -312,7 +312,7 @@ export function AppSidebar() {
                           className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-r-md pr-1.5"
                         >
                           <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{agent.title}</span>
+                          <span className="truncate">{agent.displayTitle ?? agent.title}</span>
                         </Link>
                       </div>
 

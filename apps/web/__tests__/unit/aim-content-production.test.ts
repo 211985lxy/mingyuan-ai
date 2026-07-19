@@ -122,6 +122,7 @@ describe("AIM content production positioning", () => {
     const deepCopywriter = AIM_AGENT_OPTIONS.find((agent) => agent.id === "deep_copywriter")
 
     expect(deepCopywriter?.title).toBe("深度长文创作")
+    expect(deepCopywriter?.displayTitle).toBe("作品编辑官")
     expect(deepCopywriter?.defaultFormats).toEqual(["raw_copy"])
   })
 
