@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
+  ApiError,
   addWatchAccount,
   deleteWatchAccount,
   listWatchAccounts,
@@ -44,7 +45,7 @@ export function useCompetitorWatchAccounts() {
     return () => window.clearInterval(timer)
   }, [accounts, loadAccounts])
 
-  async function addAccount(url = addUrl) {
+  async function addAccount(url = addUrl, successMessage = "已添加监控账号") {
     if (!url.trim()) return
     const validated = validateCompetitorUrl(url)
     if (!validated.ok) {
@@ -54,18 +55,23 @@ export function useCompetitorWatchAccounts() {
     setAdding(true)
     try {
       await addWatchAccount(validated.url)
-      toast.success("已添加监控账号")
+      toast.success(successMessage)
       setAddUrl("")
       await loadAccounts()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "添加失败")
+      if (error instanceof ApiError) {
+        const message = error.details ? String((error.details as Record<string, unknown>).error || "") : ""
+        toast.error(message || "添加失败")
+      } else {
+        toast.error("添加失败")
+      }
     } finally {
       setAdding(false)
     }
   }
 
   async function addDiscoveredAccount(account: SimilarAccount) {
-    if (account.targetUrl) await addAccount(account.targetUrl)
+    if (account.targetUrl) await addAccount(account.targetUrl, "已加入监控，刷新后可进入作品池和 AIM 选题依据")
   }
 
   async function removeAccount(id: string) {
