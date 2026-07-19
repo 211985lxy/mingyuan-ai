@@ -91,10 +91,6 @@ export async function persistAimRunSnapshot(
         imageHashes: input.imageHashes ?? [],
         provider: input.metadata.provider,
         model: input.metadata.model,
-        inputTokens: input.metadata.inputTokens ?? null,
-        outputTokens: input.metadata.outputTokens ?? null,
-        cachedTokens: input.metadata.cachedTokens ?? null,
-        costCny: input.metadata.costCny ?? null,
         fallbackIndex: input.metadata.fallbackIndex,
         degraded: input.metadata.degraded,
         expiresAt,
@@ -134,6 +130,14 @@ export async function applyRunMetadataToTrace(
       data: {
         runId: metadata.runId,
         provider: metadata.provider,
+        model: metadata.model,
+        totalTokens: metadata.inputTokens == null && metadata.outputTokens == null
+          ? null
+          : (metadata.inputTokens ?? 0) + (metadata.outputTokens ?? 0),
+        inputTokens: metadata.inputTokens ?? null,
+        outputTokens: metadata.outputTokens ?? null,
+        cachedTokens: metadata.cachedTokens ?? null,
+        costCny: metadata.costCny ?? null,
         fallbackIndex: metadata.fallbackIndex,
         degraded: metadata.degraded,
         harnessVersion: metadata.harnessVersion,
