@@ -19,10 +19,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { validateCronSecret } from "@/lib/admin-auth"
 import {
   createLarkWorkItemStore,
+  createShadowWorkItemStore,
   listPendingWorkItemRecords,
   readWorkItemStoreConfig,
 } from "@/lib/aim/work-item-store"
-import { parseMeetingWorkItemInput } from "@/lib/aim-feishu-work-item"
+import { parseFeishuWorkItem, parseMeetingWorkItemInput } from "@/lib/aim-feishu-work-item"
 import {
   createAimGenerationInsightResultSink,
 } from "@/lib/aim/meeting-insight-result-sink"
@@ -43,6 +44,9 @@ import {
   sendFeishuSupervisorNotification,
 } from "@/lib/aim/feishu-supervisor-notifier"
 import { classifyDispatchRetry } from "@/lib/aim/work-item-dispatch-retry"
+import { readLoopRuntimeConfig } from "@/lib/aim/loop-runtime-config"
+import { prisma } from "@/lib/prisma"
+import { env } from "@/env"
 
 export const runtime = "nodejs"
 /** 最坏情况：10 条 × 单次执行租约 5 分钟，留足余量。 */
@@ -76,6 +80,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  let runtimeConfig
+  try {
+    runtimeConfig = readLoopRuntimeConfig()
+  } catch {
+    return unconfigured("Business Loop 灰度配置不可用，请检查服务端配置。")
+  }
+  if (!runtimeConfig.enabled) {
+    return NextResponse.json({ ok: true, enabled: false, mode: "disabled" })
+  }
+
   let config
   try {
     config = readWorkItemStoreConfig()
@@ -83,24 +97,34 @@ export async function GET(request: NextRequest) {
     return unconfigured("飞书经营事项配置不可用，请检查服务端配置。")
   }
 
-  const ownerUserId = process.env.AIM_WORK_ITEM_OWNER_USER_ID?.trim()
+  const ownerUserId = env.AIM_WORK_ITEM_OWNER_USER_ID?.trim()
   if (!ownerUserId) {
     return unconfigured("会议洞察无人值守缺少 AIM_WORK_ITEM_OWNER_USER_ID 配置，fail-closed。")
   }
 
-  let notificationConfig
+  let notificationConfig: ReturnType<typeof readSupervisorNotificationConfig>
   try {
-    notificationConfig = readSupervisorNotificationConfig()
+    notificationConfig = runtimeConfig.shadowMode
+      ? { enabled: false }
+      : readSupervisorNotificationConfig()
   } catch {
     return unconfigured("飞书监督通知配置不可用，请检查服务端配置。")
   }
 
-  const store = createLarkWorkItemStore(config)
+  const realStore = createLarkWorkItemStore(config)
+  const store = runtimeConfig.shadowMode
+    ? createShadowWorkItemStore(realStore)
+    : realStore
   const resultSink = createAimGenerationInsightResultSink({ ownerUserId })
 
   const ports: WorkItemDispatcherPorts = {
     store,
-    listPending: (limit) => listPendingWorkItemRecords(config, limit),
+    listPending: async (limit) => {
+      const records = await listPendingWorkItemRecords(config, 100)
+      return records
+        .filter((record) => runtimeConfig.pilotProjectIds.has(parseFeishuWorkItem(record.fields).aimProjectId))
+        .slice(0, limit)
+    },
     claim: async (_recordId, context) => {
       const claimed = await claimAimTrace({
         id: context.runId,
@@ -154,6 +178,18 @@ export async function GET(request: NextRequest) {
       if (!input.projectId) {
         return { ok: false, error: "缺少 AIM项目ID，客户会议必须绑定项目", retryable: false, stopReason: "missing_input" }
       }
+      let project
+      try {
+        project = await prisma.clientProject.findUnique({
+          where: { id: input.projectId },
+          select: { userId: true },
+        })
+      } catch {
+        return { ok: false, error: "项目归属校验失败", retryable: false, stopReason: "human_required" }
+      }
+      if (!project || project.userId !== ownerUserId) {
+        return { ok: false, error: "项目不存在或不属于经营事项负责人", retryable: false, stopReason: "human_required" }
+      }
       if (!input.meetingTitle || !input.customer) {
         // fail-closed：标题/客户为会议洞察必要归属信息，缺失即阻断并回写可行动
         // 错误，交由 WP-8 重试/升级链路提示人工补齐，绝不凭空补造。
@@ -178,6 +214,8 @@ export async function GET(request: NextRequest) {
       if (result.ok) return {
         ok: true,
         verificationStatus: result.verificationStatus,
+        verificationSummary: result.verificationSummary,
+        nextAction: result.nextAction,
         resultLink: result.resultLink,
       }
       if (result.stopReason === "verification_failed") {
@@ -194,10 +232,12 @@ export async function GET(request: NextRequest) {
         stopReason: classified.stopReason,
       }
     },
-    notify: (notification) => sendFeishuSupervisorNotification({
-      config: notificationConfig,
-      notification,
-    }),
+    notify: runtimeConfig.shadowMode
+      ? async () => undefined
+      : (notification) => sendFeishuSupervisorNotification({
+          config: notificationConfig,
+          notification,
+        }),
     now: () => new Date(),
     holderId: process.env.HOSTNAME?.trim() || "cron-unattended",
   }
@@ -210,5 +250,10 @@ export async function GET(request: NextRequest) {
     // 绝不把未捕获异常暴露为 500，符合兄弟 cron 路由的 fail-closed 行为。
     return unconfigured("无人值守调度执行失败，请查看服务端日志。")
   }
-  return NextResponse.json({ ok: true, summary: publicDispatchSummary(summary) })
+  return NextResponse.json({
+    ok: true,
+    enabled: true,
+    mode: runtimeConfig.shadowMode ? "shadow" : "live",
+    summary: publicDispatchSummary(summary),
+  })
 }

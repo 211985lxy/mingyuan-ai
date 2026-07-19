@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { listPendingWorkItemRecords, readWorkItemStoreConfig } from "@/lib/aim/work-item-store"
+import {
+  createShadowWorkItemStore,
+  listPendingWorkItemRecords,
+  readWorkItemStoreConfig,
+} from "@/lib/aim/work-item-store"
 
 const VALID_ENV = {
   LARK_BASE_TOKEN: "base_1",
@@ -64,5 +68,19 @@ describe("listPendingWorkItemRecords", () => {
     })
     const limitIndex = calls[0].indexOf("--limit")
     expect(calls[0][limitIndex + 1]).toBe("100")
+  })
+})
+
+describe("createShadowWorkItemStore", () => {
+  it("读取真实记录但状态更新只保留在影子内存", async () => {
+    const realRecord = { recordId: "rec_1", fields: { 状态: "待处理", 标题: "真实任务" } }
+    const realStore = {
+      async get() { return realRecord },
+      async update() { throw new Error("影子模式不应写真实飞书") },
+    }
+    const shadow = createShadowWorkItemStore(realStore)
+    await shadow.update("rec_1", { 状态: "处理中" })
+    expect((await shadow.get("rec_1"))?.fields["状态"]).toBe("处理中")
+    expect(realRecord.fields["状态"]).toBe("待处理")
   })
 })

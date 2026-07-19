@@ -71,6 +71,32 @@ export function createLarkWorkItemStore(config: WorkItemStoreConfig): WorkItemRe
 }
 
 /**
+ * 影子运行写隔离：读取真实记录，但所有状态 patch 只落在本次进程内存。
+ * 模型、Trace 与结果存储仍可真实执行；飞书经营事项不会被推进。
+ */
+export function createShadowWorkItemStore(realStore: WorkItemRecordStore): WorkItemRecordStore {
+  const records = new Map<string, { recordId: string; fields: Record<string, unknown> }>()
+  async function load(recordId: string) {
+    const cached = records.get(recordId)
+    if (cached) return { recordId: cached.recordId, fields: { ...cached.fields } }
+    const record = await realStore.get(recordId)
+    if (!record) return null
+    const clone = { recordId: record.recordId, fields: { ...record.fields } }
+    records.set(recordId, clone)
+    return { recordId: clone.recordId, fields: { ...clone.fields } }
+  }
+  return {
+    get: load,
+    async update(recordId, fields) {
+      const current = records.get(recordId) ?? await load(recordId)
+      if (!current) throw new Error(`影子经营事项不存在：${recordId}`)
+      records.set(recordId, { recordId, fields: { ...current.fields, ...fields } })
+      return { ok: true }
+    },
+  }
+}
+
+/**
  * 扫描「待处理」状态的经营事项记录（WP-8 无人值守调度用）。
  * 拉取一页记录后在本地按状态机解析过滤；状态未知/损坏的记录不会混入。
  */

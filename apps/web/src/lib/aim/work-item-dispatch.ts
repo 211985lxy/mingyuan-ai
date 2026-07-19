@@ -22,6 +22,12 @@ export const DISPATCH_FIELDS = {
   lastRunId: "最后运行ID",
 } as const
 
+export const SUPERVISION_FIELDS = {
+  currentStep: "当前步骤",
+  verificationStatus: "验证状态",
+  verificationSummary: "验证摘要",
+} as const
+
 /** 默认租约时长：10 分钟（覆盖一次会议洞察抽取的执行窗口）。 */
 export const DEFAULT_LEASE_TTL_MS = 10 * 60_000
 /** 单次执行超时：5 分钟。 */

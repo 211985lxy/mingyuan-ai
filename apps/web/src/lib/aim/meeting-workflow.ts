@@ -100,6 +100,8 @@ export type MeetingWorkflowResult =
       aimResultId: string
       resultLink?: string
       verificationStatus?: "pass" | "needs_human"
+      verificationSummary?: string
+      nextAction?: string
       execution?: AimRunMetadata
     }
   | { ok: false; status: "失败" | "待处理" | "处理中" | "待人工审核"; error: string; recordId: string; stopReason?: "duplicate_suppressed" | "verification_failed" }
@@ -350,6 +352,8 @@ export async function runMeetingInsightWorkflow(
     aimResultId: saved.aimResultId,
     resultLink: saved.resultLink,
     verificationStatus: verification.status,
+    verificationSummary: verification.summary,
+    nextAction: verification.nextAction,
     execution: run.metadata,
   }
 }

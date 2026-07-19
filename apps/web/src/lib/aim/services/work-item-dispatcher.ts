@@ -34,9 +34,24 @@ import {
   type WorkItemRecord,
   type WorkItemRecordStore,
 } from "@/lib/aim/services/work-item-execution"
+import {
+  buildClaimSupervisionPatch,
+  buildFailureSupervisionPatch,
+  buildRetrySupervisionPatch,
+  buildReviewSupervisionPatch,
+  notifySafely,
+  releasePreExecutionClaim,
+} from "@/lib/aim/work-item-supervision"
 
 export type DispatchExecuteOutcome =
-  | { ok: true; duplicateSuppressed?: boolean; verificationStatus?: "pass" | "needs_human"; resultLink?: string }
+  | {
+      ok: true
+      duplicateSuppressed?: boolean
+      verificationStatus?: "pass" | "needs_human"
+      verificationSummary?: string
+      nextAction?: string
+      resultLink?: string
+    }
   | { ok: false; error: string; retryable: boolean; stopReason: LoopStopReason }
 
 export interface DispatchExecutionContext {
@@ -96,36 +111,6 @@ function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function releasePreExecutionClaim(
-  ports: WorkItemDispatcherPorts,
-  token: unknown,
-  recordId: string,
-  summary: WorkItemDispatchSummary,
-): Promise<boolean> {
-  try {
-    await ports.releaseClaim(token)
-    return true
-  } catch (error) {
-    summary.errors.push({ recordId, error: `释放未执行 Trace 失败：${describeError(error)}` })
-    return false
-  }
-}
-
-async function notifySafely(
-  ports: WorkItemDispatcherPorts,
-  summary: WorkItemDispatchSummary,
-  notification: SupervisorNotification,
-): Promise<void> {
-  try {
-    await ports.notify(notification)
-  } catch (error) {
-    summary.errors.push({
-      recordId: notification.recordId,
-      error: `通知负责人失败：${describeError(error)}`,
-    })
-  }
-}
-
 export function buildDispatchRunId(
   recordId: string,
   loop: BusinessLoopSpec,
@@ -168,6 +153,7 @@ async function handleFailure(
         ...buildLeaseReleasePatch(),
         [DISPATCH_FIELDS.stopReason]: stopReason,
         [DISPATCH_FIELDS.nextAction]: "等待自动重试",
+        ...buildRetrySupervisionPatch(),
       })
       summary.failed += 1
       summary.errors.push({ recordId: record.recordId, error })
@@ -196,6 +182,7 @@ async function handleFailure(
     [DISPATCH_FIELDS.needsHuman]: true,
     [DISPATCH_FIELDS.stopReason]: retryable ? "retry_exhausted" : stopReason,
     [DISPATCH_FIELDS.nextAction]: "人工接管处理",
+    ...buildFailureSupervisionPatch(stopReason, retryable),
     ...buildLeaseReleasePatch(),
   })
   summary.escalated += 1
@@ -296,7 +283,9 @@ export async function dispatchPendingWorkItems(
       // 持久化哈希链必须紧随原子 claim；即使后续飞书启动失败，人工修复后也能生成新 runId，
       // 不会永远撞上已失败的 Trace 唯一键。
       try {
-        await ports.store.update(record.recordId, { [DISPATCH_FIELDS.lastRunId]: runId })
+        await ports.store.update(record.recordId, {
+          ...buildClaimSupervisionPatch(runId, "Loop配置校验"),
+        })
       } catch (writeError) {
         const message = `持久化最后运行ID失败：${describeError(writeError)}`
         await releasePreExecutionClaim(ports, invalidClaim.token, record.recordId, summary)
@@ -348,7 +337,9 @@ export async function dispatchPendingWorkItems(
 
     // 原子 claim 成功后才允许开始处理或写入飞书租约。
     try {
-      await ports.store.update(record.recordId, { [DISPATCH_FIELDS.lastRunId]: runId })
+      await ports.store.update(record.recordId, {
+        ...buildClaimSupervisionPatch(runId, "输入与归属校验"),
+      })
     } catch (writeError) {
       const message = `持久化最后运行ID失败：${describeError(writeError)}`
       await releasePreExecutionClaim(ports, claim.token, record.recordId, summary)
@@ -413,7 +404,8 @@ export async function dispatchPendingWorkItems(
         [DISPATCH_FIELDS.nextRetryAt]: null,
         [DISPATCH_FIELDS.needsHuman]: false,
         [DISPATCH_FIELDS.stopReason]: "",
-        [DISPATCH_FIELDS.nextAction]: "等待人工审核",
+        [DISPATCH_FIELDS.nextAction]: outcome.nextAction || "等待人工审核",
+        ...buildReviewSupervisionPatch(outcome),
       })
       await notifySafely(ports, summary, {
         type: outcome.verificationStatus === "needs_human" ? "human_judgment" : "review_required",

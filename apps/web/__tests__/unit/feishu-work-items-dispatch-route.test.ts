@@ -8,6 +8,7 @@ const {
   validateCronSecret,
   runMeetingInsightWorkflow,
   createLarkWorkItemStore,
+  createShadowWorkItemStore,
   listPendingWorkItemRecords,
   readWorkItemStoreConfig,
   createAimGenerationInsightResultSink,
@@ -16,10 +17,13 @@ const {
   releaseAimTraceClaim,
   readSupervisorNotificationConfig,
   sendFeishuSupervisorNotification,
+  readLoopRuntimeConfig,
+  findProject,
 } = vi.hoisted(() => ({
   validateCronSecret: vi.fn(() => true),
   runMeetingInsightWorkflow: vi.fn(),
   createLarkWorkItemStore: vi.fn(),
+  createShadowWorkItemStore: vi.fn((store) => store),
   listPendingWorkItemRecords: vi.fn(),
   readWorkItemStoreConfig: vi.fn(() => ({ baseToken: "bse_1", tableId: "tbl_1", cliPath: "/mock/lark-cli" })),
   createAimGenerationInsightResultSink: vi.fn(() => ({ save: vi.fn() })),
@@ -34,10 +38,21 @@ const {
   releaseAimTraceClaim: vi.fn(async () => undefined),
   readSupervisorNotificationConfig: vi.fn(() => ({ enabled: false as const })),
   sendFeishuSupervisorNotification: vi.fn(async () => undefined),
+  readLoopRuntimeConfig: vi.fn(() => ({
+    enabled: true,
+    shadowMode: false,
+    pilotProjectIds: new Set(["proj_1"]),
+  })),
+  findProject: vi.fn(async () => ({ userId: "user_owner_1" })),
 }))
 
 vi.mock("@/lib/admin-auth", () => ({ validateCronSecret }))
-vi.mock("@/lib/aim/work-item-store", () => ({ createLarkWorkItemStore, listPendingWorkItemRecords, readWorkItemStoreConfig }))
+vi.mock("@/lib/aim/work-item-store", () => ({
+  createLarkWorkItemStore,
+  createShadowWorkItemStore,
+  listPendingWorkItemRecords,
+  readWorkItemStoreConfig,
+}))
 vi.mock("@/lib/aim/meeting-insight-result-sink", () => ({ createAimGenerationInsightResultSink }))
 vi.mock("@/lib/aim/meeting-workflow", () => ({ runMeetingInsightWorkflow }))
 vi.mock("@/lib/aim-observability", () => ({ claimAimTrace, failAimTrace, releaseAimTraceClaim }))
@@ -45,6 +60,13 @@ vi.mock("@/lib/aim/feishu-supervisor-notifier", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/aim/feishu-supervisor-notifier")>(),
   readSupervisorNotificationConfig,
   sendFeishuSupervisorNotification,
+}))
+vi.mock("@/lib/aim/loop-runtime-config", () => ({ readLoopRuntimeConfig }))
+vi.mock("@/lib/prisma", () => ({
+  prisma: { clientProject: { findUnique: findProject } },
+}))
+vi.mock("@/env", () => ({
+  env: new Proxy({}, { get: (_target, key) => process.env[String(key)] }),
 }))
 
 import { GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
@@ -126,6 +148,28 @@ describe("鉴权与 fail-closed", () => {
     validateCronSecret.mockReturnValueOnce(false)
     const { status } = await call("Bearer wrong")
     expect(status).toBe(401)
+  })
+
+  it("总开关关闭时安全 no-op，不读取飞书或调用模型", async () => {
+    readLoopRuntimeConfig.mockReturnValueOnce({
+      enabled: false,
+      shadowMode: true,
+      pilotProjectIds: new Set(),
+    })
+    const { status, body } = await call()
+    expect(status).toBe(200)
+    expect(body).toMatchObject({ ok: true, enabled: false, mode: "disabled" })
+    expect(readWorkItemStoreConfig).not.toHaveBeenCalled()
+    expect(runMeetingInsightWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("灰度配置无试点项目 → 503 fail-closed", async () => {
+    readLoopRuntimeConfig.mockImplementationOnce(() => {
+      throw new Error("缺少试点项目")
+    })
+    const { status, body } = await call()
+    expect(status).toBe(503)
+    expect(String(body.error)).toContain("灰度配置不可用")
   })
 
   it("负责人配置缺失 → 503 fail-closed", async () => {
@@ -236,6 +280,36 @@ describe("无人值守调度执行", () => {
     expect(status).toBe(200)
     const summary = body.summary as Record<string, unknown>
     expect(summary.scanned).toBe(0)
+    expect(runMeetingInsightWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("非试点项目被过滤，不领取 Trace 或调用模型", async () => {
+    listPendingWorkItemRecords.mockResolvedValue([pendingRecord("rec_other", { AIM项目ID: "proj_other" })])
+    const { body } = await call()
+    expect((body.summary as Record<string, unknown>).scanned).toBe(0)
+    expect(claimAimTrace).not.toHaveBeenCalled()
+    expect(runMeetingInsightWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("影子模式使用隔离 store 且不发送监督通知", async () => {
+    readLoopRuntimeConfig.mockReturnValueOnce({
+      enabled: true,
+      shadowMode: true,
+      pilotProjectIds: new Set(["proj_1"]),
+    })
+    runMeetingInsightWorkflow.mockResolvedValueOnce({
+      ok: true, status: "待人工审核", idempotent: false, recordId: "rec_1", aimResultId: "gen_shadow",
+    })
+    const { body } = await call()
+    expect(body.mode).toBe("shadow")
+    expect(createShadowWorkItemStore).toHaveBeenCalledWith(store)
+    expect(sendFeishuSupervisorNotification).not.toHaveBeenCalled()
+  })
+
+  it("项目不属于配置负责人时不消耗模型", async () => {
+    findProject.mockResolvedValueOnce({ userId: "another_owner" })
+    const { body } = await call()
+    expect((body.summary as Record<string, unknown>).escalated).toBe(1)
     expect(runMeetingInsightWorkflow).not.toHaveBeenCalled()
   })
 
