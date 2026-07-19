@@ -24,7 +24,6 @@ import {
   refreshWatchAccounts,
   discoverSimilarAccounts,
   startCompetitorAnalysis,
-  listCompetitorReports,
   type WatchAccount,
   type SimilarAccount,
 } from "@/lib/api/client"
@@ -39,10 +38,10 @@ import {
 import { CompetitorWorkbenchLinks } from "@/features/competitor/components/competitor-workbench-links"
 import { useCompetitorVideoExtractions } from "@/features/competitor/hooks/use-competitor-video-extractions"
 import { useCompetitorWebResearch } from "@/features/competitor/hooks/use-competitor-web-research"
+import { useCompetitorReports } from "@/features/competitor/hooks/use-competitor-reports"
 import {
   formatCompetitorRefreshError as formatRefreshError,
 } from "@/lib/competitor/display"
-import type { ApiCompetitorReport } from "@/types/api"
 
 // ─── Main Page ─────────────────────────────────────────
 
@@ -58,8 +57,6 @@ export default function CompetitorWatchPage() {
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null)
-  const [reports, setReports] = useState<ApiCompetitorReport[]>([])
-  const [reportsLoading, setReportsLoading] = useState(true)
   const [discovering, setDiscovering] = useState(false)
   const [discoveryAttempted, setDiscoveryAttempted] = useState(false)
   const [peerAccounts, setPeerAccounts] = useState<SimilarAccount[]>([])
@@ -73,6 +70,8 @@ export default function CompetitorWatchPage() {
     research,
     setResearchQuery,
   } = useCompetitorWebResearch()
+  const activeAccount = resolveActiveAccount(accounts, activeAccountId)
+  const { loadReports, reports, reportsLoading } = useCompetitorReports(activeAccount?.targetUrl)
 
   async function handleAnalyze(url: string) {
     setAnalyzingUrl(url)
@@ -87,18 +86,6 @@ export default function CompetitorWatchPage() {
       setAnalyzingUrl(null)
     }
   }
-
-  const loadReports = useCallback(async (targetUrl: string, showLoading = true) => {
-    if (showLoading) setReportsLoading(true)
-    try {
-      const data = await listCompetitorReports(1, 10, targetUrl)
-      setReports(data.items)
-    } catch {
-      toast.error("加载分析历史失败")
-    } finally {
-      if (showLoading) setReportsLoading(false)
-    }
-  }, [])
 
   const loadAccounts = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true)
@@ -279,13 +266,6 @@ export default function CompetitorWatchPage() {
   }
 
   const sortedAccounts = sortAccountsByRefreshStatus(accounts)
-
-  const activeAccount = resolveActiveAccount(accounts, activeAccountId)
-
-  useEffect(() => {
-    if (!activeAccount?.targetUrl) return
-    void loadReports(activeAccount.targetUrl)
-  }, [activeAccount?.targetUrl, loadReports])
 
   const activeLatestVideos = resolveActiveLatestVideos(activeAccount)
 
