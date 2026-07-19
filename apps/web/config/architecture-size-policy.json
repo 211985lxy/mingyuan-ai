@@ -11,11 +11,6 @@
       "target": "src/features/aim/components and hooks"
     },
     {
-      "path": "src/app/(dashboard)/competitor/page.tsx",
-      "maxLines": 490,
-      "target": "src/features/competitor/components and hooks"
-    },
-    {
       "path": "src/app/(dashboard)/topic-planning/page.tsx",
       "maxLines": 155,
       "target": "src/features/topic/hooks"
