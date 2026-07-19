@@ -43,6 +43,16 @@ import {
 import { BRANDING_SETTING_KEYS } from "@/lib/branding-config"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
 
+const CATEGORY_META: Record<string, { label: string; description: string; order: number }> = {
+  branding: { label: "品牌与界面", description: "系统名称、Logo 与默认品牌素材。", order: 1 },
+  features: { label: "功能开关", description: "控制用户侧可用功能。", order: 2 },
+  limits: { label: "套餐与额度", description: "管理不同套餐的使用上限。", order: 3 },
+}
+
+function getCategoryMeta(category: string) {
+  return CATEGORY_META[category] ?? { label: category, description: "自定义系统配置。", order: 99 }
+}
+
 export default function AdminSettingsPage() {
   const [grouped, setGrouped] = React.useState<Record<string, SettingItem[]>>({})
   const [loading, setLoading] = React.useState(true)
@@ -68,7 +78,7 @@ export default function AdminSettingsPage() {
     fetchSettings()
   }, [fetchSettings])
 
-  const categories = Object.keys(grouped)
+  const categories = Object.keys(grouped).sort((left, right) => getCategoryMeta(left).order - getCategoryMeta(right).order)
 
   function handleSettingUpdated(key: string, newValue: string) {
     setGrouped((prev) => {
@@ -134,8 +144,8 @@ export default function AdminSettingsPage() {
           <div className="overflow-x-auto pb-1">
           <TabsList className="w-max min-w-full">
             {categories.map((cat) => (
-              <TabsTrigger key={cat} value={cat} className="capitalize cursor-pointer">
-                {cat}
+              <TabsTrigger key={cat} value={cat} className="cursor-pointer">
+                {getCategoryMeta(cat).label}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -143,6 +153,7 @@ export default function AdminSettingsPage() {
 
           {categories.map((cat) => (
             <TabsContent key={cat} value={cat} className="space-y-3 mt-4">
+              <p className="text-sm text-muted-foreground">{getCategoryMeta(cat).description}</p>
               {grouped[cat].map((setting) => (
                 <SettingRow
                   key={setting.key}

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 
 export const GET = withAdminAuth(async () => {
   const settings = await prisma.systemSetting.findMany({
+    where: { category: { notIn: ["hot-sources", "agent_guides"] } },
     orderBy: [{ category: "asc" }, { key: "asc" }],
     take: 1_000,
   })
