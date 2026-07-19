@@ -123,6 +123,11 @@ export function createAimGenerationInsightResultSink(deps: {
           formatsRequested: ["raw_copy"],
           workflowStatus: "pending_review",
           topicTitle: input.meetingTitle || `会议洞察 · ${input.customer}`,
+          model: input.executionMetadata?.model ?? null,
+          totalTokens: input.executionMetadata?.inputTokens == null
+            && input.executionMetadata?.outputTokens == null
+            ? null
+            : (input.executionMetadata?.inputTokens ?? 0) + (input.executionMetadata?.outputTokens ?? 0),
           taskSpec: {
             kind: MEETING_INSIGHT_TASK_SPEC_KIND,
             schemaVersion: MEETING_INSIGHT_TASK_SPEC_VERSION,

@@ -83,6 +83,8 @@ describe("createAimGenerationInsightResultSink", () => {
       rawInput: "会议原文……",
       formatsRequested: ["raw_copy"],
       workflowStatus: "pending_review",
+      model: "deepseek-chat",
+      totalTokens: 200,
     })
     expect(String(data.rawCopy)).toContain("# 会议洞察")
     expect(String(data.rawCopy)).toContain("葛老板")
