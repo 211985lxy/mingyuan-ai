@@ -24,11 +24,6 @@
       "path": "src/lib/aim/services/chat-context.ts",
       "maxLines": 50,
       "target": "src/lib/aim/services/chat/* sub-modules"
-    },
-    {
-      "path": "src/lib/topic-generation.ts",
-      "maxLines": 595,
-      "target": "src/lib/topic-generation services"
     }
   ]
 }
