@@ -14,9 +14,6 @@ import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
 import {
   CompetitorViralVideoPool,
   CompetitorLatestVideoSection,
-  getCompetitorVideoPageUrl,
-  isActiveVideoExtractionStatus,
-  type CompetitorWatchVideo,
 } from "@/components/competitor/competitor-video-sections"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api/client"
@@ -25,9 +22,7 @@ import {
   addWatchAccount,
   deleteWatchAccount,
   refreshWatchAccounts,
-  extractWatchAccountVideo,
   discoverSimilarAccounts,
-  syncVideoCopyExtraction,
   startCompetitorAnalysis,
   listCompetitorReports,
   runCompetitorWebResearch,
@@ -43,10 +38,11 @@ import {
   resolveActiveLatestVideos,
 } from "@/features/competitor/viral-video-pool"
 import { CompetitorWorkbenchLinks } from "@/features/competitor/components/competitor-workbench-links"
+import { useCompetitorVideoExtractions } from "@/features/competitor/hooks/use-competitor-video-extractions"
 import {
   formatCompetitorRefreshError as formatRefreshError,
 } from "@/lib/competitor/display"
-import type { ApiCompetitorReport, ApiCompetitorWebResearch, ApiVideoCopyExtraction } from "@/types/api"
+import type { ApiCompetitorReport, ApiCompetitorWebResearch } from "@/types/api"
 
 // ─── Main Page ─────────────────────────────────────────
 
@@ -62,8 +58,6 @@ export default function CompetitorWatchPage() {
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null)
-  const [extractingVideoId, setExtractingVideoId] = useState<string | null>(null)
-  const [videoExtractions, setVideoExtractions] = useState<Record<string, ApiVideoCopyExtraction>>({})
   const [reports, setReports] = useState<ApiCompetitorReport[]>([])
   const [reportsLoading, setReportsLoading] = useState(true)
   const [discovering, setDiscovering] = useState(false)
@@ -74,6 +68,7 @@ export default function CompetitorWatchPage() {
   const [researchQuery, setResearchQuery] = useState("")
   const [researchLoading, setResearchLoading] = useState(false)
   const [researchResult, setResearchResult] = useState<ApiCompetitorWebResearch | null>(null)
+  const { extractingVideoId, videoExtractions, extractVideo } = useCompetitorVideoExtractions()
 
   async function handleAnalyze(url: string) {
     setAnalyzingUrl(url)
@@ -279,47 +274,6 @@ export default function CompetitorWatchPage() {
     }
   }
 
-  async function handleExtractVideo(video: CompetitorWatchVideo) {
-    const key = `${video.account.id}-${video.videoId}`
-    setExtractingVideoId(key)
-    try {
-      const record = await extractWatchAccountVideo({
-        watchAccountId: video.account.id,
-        videoUrl: getCompetitorVideoPageUrl(video),
-        videoTitle: video.title,
-        coverUrl: video.coverUrl,
-      })
-      setVideoExtractions((prev) => ({ ...prev, [key]: record }))
-      if (record.status === "failed") {
-        toast.error(record.errorMessage || "文案提取失败")
-      } else {
-        toast.success("已创建文案拆解任务")
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "创建文案拆解任务失败")
-    } finally {
-      setExtractingVideoId(null)
-    }
-  }
-
-  useEffect(() => {
-    const active = Object.entries(videoExtractions).find(([, record]) =>
-      isActiveVideoExtractionStatus(record.status),
-    )
-    if (!active) return
-
-    const [key, record] = active
-    const timer = window.setTimeout(() => {
-      syncVideoCopyExtraction(record.id)
-        .then((next) => {
-          setVideoExtractions((prev) => ({ ...prev, [key]: next }))
-        })
-        .catch(() => {})
-    }, 2500)
-
-    return () => window.clearTimeout(timer)
-  }, [videoExtractions])
-
   const sortedAccounts = sortAccountsByRefreshStatus(accounts)
 
   const activeAccount = resolveActiveAccount(accounts, activeAccountId)
@@ -386,7 +340,7 @@ export default function CompetitorWatchPage() {
           accounts={accounts}
           extractions={videoExtractions}
           extractingVideoId={extractingVideoId}
-          onExtract={(video) => void handleExtractVideo(video)}
+          onExtract={(video) => void extractVideo(video)}
         />
       ) : null}
 
@@ -439,7 +393,7 @@ export default function CompetitorWatchPage() {
                 latestVideos={activeLatestVideos}
                 extractions={videoExtractions}
                 extractingVideoId={extractingVideoId}
-                onExtract={(video) => void handleExtractVideo(video)}
+                onExtract={(video) => void extractVideo(video)}
               />
             </>
           ) : null}
