@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import Link from "next/link"
 import type { LucideIcon } from "lucide-react"
 import {
   AlertTriangle,
@@ -15,6 +16,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 type TraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -122,7 +124,19 @@ export default function AdminAgentsPage() {
             <p className="text-xs text-slate-400">每一步可观测 · Trace · Context · Model · Quality</p>
           </div>
         </div>
-        <p className="text-xs text-slate-500">每 2 秒自动刷新</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/admin/methodology">
+            <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-slate-200 hover:bg-white/10 hover:text-white">
+              方法论
+            </Button>
+          </Link>
+          <Link href="/admin/retrieval-test">
+            <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-slate-200 hover:bg-white/10 hover:text-white">
+              检索测试
+            </Button>
+          </Link>
+          <p className="text-xs text-slate-500">每 2 秒自动刷新</p>
+        </div>
       </div>
 
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
