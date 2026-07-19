@@ -23,4 +23,6 @@ Before production, record the commit SHA, sanitized snapshot date, migration sta
 
 Start with internal accounts and a small project set. Observe generation success, P95 latency, model fallback, empty results, retries, whole-document rewrites, publication review, and support complaints. Application rollback must preserve a schema compatible with the previous SHA.
 
+When deploying durable background tasks to Kubernetes, apply `k8s/cronjobs.yaml` with the application SHA and verify `cron-background-tasks` can authenticate, complete a single bounded task, and leave a success/failure record. Other deployment targets must provide an equivalent authenticated scheduler before enabling these task-producing endpoints.
+
 Account deletion remains intentionally unavailable until a durable cross-system deletion outbox exists. Project archive/export/permanent deletion is covered; do not claim account-erasure compliance from project lifecycle tests.

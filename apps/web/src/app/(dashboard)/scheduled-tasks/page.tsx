@@ -35,6 +35,13 @@ const TASKS = [
     desc: "清理过期热点和快照数据。",
     status: "已接入",
   },
+  {
+    name: "后台任务处理",
+    schedule: "每 5 分钟（Kubernetes）",
+    endpoint: "/api/cron/background-tasks",
+    desc: "领取并执行耐久任务，负责灵感处理和同行对标分析的恢复重试。",
+    status: "已接入",
+  },
 ]
 
 export default function ScheduledTasksPage() {

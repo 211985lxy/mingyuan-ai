@@ -6,7 +6,7 @@ import { COMPETITOR_ANALYSIS_TASK_KIND, executeCompetitorAnalysisBackgroundTask 
 import { INSPIRATION_PROCESS_TASK_KIND, executeInspirationBackgroundTask } from "@/features/topics/services/inspiration-background-task"
 
 export const runtime = "nodejs"
-export const maxDuration = 30
+export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   if (!validateCronSecret(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const tasks = await prisma.backgroundTask.findMany({
       where: { kind: { in: [COMPETITOR_ANALYSIS_TASK_KIND, INSPIRATION_PROCESS_TASK_KIND] }, status: { in: ["queued", "retry_wait"] }, availableAt: { lte: new Date() } },
       select: { id: true, kind: true },
-      take: 20,
+      take: 1,
     })
     let executed = 0
     for (const task of tasks) {
