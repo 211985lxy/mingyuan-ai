@@ -1,0 +1,10 @@
+[Unit]
+Description=Mingyuan durable background task worker
+After=network-online.target mingyuan-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mingyuan/mingyuan.env
+TimeoutStartSec=330
+ExecStart=/bin/sh -c 'exec /usr/bin/curl --fail --silent --show-error --max-time 310 -H "Authorization: Bearer ${CRON_SECRET}" http://127.0.0.1:3000/api/cron/background-tasks'

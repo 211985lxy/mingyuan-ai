@@ -9,6 +9,8 @@ REMOTE_DIR="${REMOTE_DIR:-/var/www/mingyuan/standalone-new}"
 REMOTE_INCOMING_DIR="${REMOTE_DIR}.incoming"
 REMOTE_BACKUP_DIR="${REMOTE_DIR}.previous"
 SERVICE_NAME="${SERVICE_NAME:-mingyuan-web}"
+BACKGROUND_TASK_SERVICE="${BACKGROUND_TASK_SERVICE:-mingyuan-background-tasks.service}"
+BACKGROUND_TASK_TIMER="${BACKGROUND_TASK_TIMER:-mingyuan-background-tasks.timer}"
 HEALTH_URL="${HEALTH_URL:-https://mingyuan-ai.cn/api/healthz}"
 
 SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST")
@@ -54,6 +56,8 @@ node -e "const { createRequire } = require('node:module'); const { resolve } = r
 "${RSYNC[@]}" apps/web/scripts/verify-production-schema.mjs "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
 "${RSYNC[@]}" apps/web/scripts/apply-production-schema-patches.mjs "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
 "${RSYNC[@]}" apps/web/prisma/production-schema-contract.json "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
+"${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.service "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_SERVICE"
+"${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.timer "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_TIMER"
 
 "${SSH[@]}" "cd '$REMOTE_INCOMING_DIR/apps/web' && /usr/bin/node -e \"const { createRequire } = require('node:module'); const { resolve } = require('node:path'); const appRequire = createRequire(resolve('server.js')); ['next','styled-jsx/package.json','@next/env','react','react-dom','pino'].forEach((id)=>appRequire.resolve(id)); console.log('remote-standalone-deps-ok')\""
 "${SSH[@]}" "set -a; . /etc/mingyuan/mingyuan.env; set +a; /usr/bin/node '$REMOTE_INCOMING_DIR/ops/apply-production-schema-patches.mjs'"
@@ -73,6 +77,8 @@ if [ "$healthy" -ne 1 ]; then
   echo "Health check failed: $HEALTH_URL" >&2
   exit 1
 fi
+
+"${SSH[@]}" "set -e; if grep -q '^BACKGROUND_TASKS_ENABLED=' /etc/mingyuan/mingyuan.env; then sed -i 's/^BACKGROUND_TASKS_ENABLED=.*/BACKGROUND_TASKS_ENABLED=true/' /etc/mingyuan/mingyuan.env; else printf '\nBACKGROUND_TASKS_ENABLED=true\n' >> /etc/mingyuan/mingyuan.env; fi; chmod 600 /etc/mingyuan/mingyuan.env; systemctl daemon-reload; systemctl enable --now '$BACKGROUND_TASK_TIMER'; systemctl restart '$SERVICE_NAME'; systemctl is-active '$SERVICE_NAME'; systemctl start '$BACKGROUND_TASK_SERVICE'; systemctl is-active '$BACKGROUND_TASK_TIMER'"
 
 # 回读线上发布事实：releaseSha 必须等于本地 HEAD，否则视为发布事实不一致。
 LIVE_SHA="$(curl -fsS "$HEALTH_URL" | node -e "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).releaseSha??'unknown')}catch{console.log('unknown')}})")"

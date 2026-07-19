@@ -25,4 +25,6 @@ Start with internal accounts and a small project set. Observe generation success
 
 Production defaults `BACKGROUND_TASKS_ENABLED` to `false`: task-producing endpoints fail closed until a scheduler is declared. When deploying durable background tasks to Kubernetes, apply `k8s/cronjobs.yaml` and `k8s/mingyuan-web.yaml` with the application SHA, then verify `cron-background-tasks` can authenticate, complete a single bounded task, and leave a success/failure record. Other deployment targets must provide an equivalent authenticated scheduler before setting `BACKGROUND_TASKS_ENABLED=true`.
 
+The ECS standalone release installs `mingyuan-background-tasks.timer`, which invokes the authenticated local worker every five minutes. The deploy script enables `BACKGROUND_TASKS_ENABLED=true` only after that timer is installed, restarts `mingyuan-web`, and starts one empty-queue probe. Verify both the service and timer after release with `systemctl is-active mingyuan-web mingyuan-background-tasks.timer`.
+
 Account deletion remains intentionally unavailable until a durable cross-system deletion outbox exists. Project archive/export/permanent deletion is covered; do not claim account-erasure compliance from project lifecycle tests.
