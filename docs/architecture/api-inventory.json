@@ -1243,8 +1243,8 @@
       "input": "zod_json",
       "query": "none",
       "externalService": true,
-      "cost": "high",
-      "idempotency": false
+      "cost": "low",
+      "idempotency": true
     },
     {
       "route": "/api/competitor/discover-similar",

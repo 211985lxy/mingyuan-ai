@@ -10,11 +10,8 @@ import { collectCompetitorData } from './collector'
  *
  * Flow: pending → scraping → enriching → analyzing → completed (or failed)
  *
- * This function is designed to be triggered WITHOUT await from the API route:
- *   runCompetitorAnalysisPipeline(id).catch(err => logger.error({ err }, '...'))
- *
- * All DB status transitions are atomic updates. On any error, the record is
- * marked as 'failed' with the error message stored.
+ * The durable background task executor owns retries. This function records the
+ * business failure and rethrows so the executor can schedule the next attempt.
  */
 export async function runCompetitorAnalysisPipeline(analysisId: string): Promise<void> {
   const log = logger.child({ analysisId })
@@ -60,6 +57,7 @@ export async function runCompetitorAnalysisPipeline(analysisId: string): Promise
     }).catch((dbErr: unknown) => {
       log.error({ dbErr }, 'Failed to write error status to DB')
     })
+    throw err
   }
 }
 

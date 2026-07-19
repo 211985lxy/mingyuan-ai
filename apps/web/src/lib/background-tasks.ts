@@ -30,11 +30,11 @@ export function planBackgroundTaskFailure(input: {
 
 export async function enqueueBackgroundTask(
   prisma: PrismaClient,
-  input: { kind: string; aggregateType: string; aggregateId: string; idempotencyKey: string; maxAttempts?: number },
+  input: { kind: string; aggregateType: string; aggregateId: string; idempotencyKey: string; maxAttempts?: number; availableAt?: Date },
 ) {
   return prisma.backgroundTask.upsert({
     where: { idempotencyKey: input.idempotencyKey },
-    create: { ...input, maxAttempts: input.maxAttempts ?? 3 },
+    create: { ...input, maxAttempts: input.maxAttempts ?? 3, availableAt: input.availableAt ?? new Date() },
     update: {},
   })
 }
