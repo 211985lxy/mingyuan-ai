@@ -44,12 +44,22 @@ export async function GET(request: NextRequest) {
     const evaluatorStore = createOutcomeEvaluatorStore(prisma)
     const reminderStore: OutcomeReminderStorePort = {
       aimGeneration: {
-        findMany: (args) =>
-          prisma.aimGeneration.findMany(args as Parameters<typeof prisma.aimGeneration.findMany>[0]),
+        findMany: (args) => {
+          const input = args ?? {}
+          return prisma.aimGeneration.findMany({
+            where: input.where as never,
+            take: input.take ?? 500,
+          })
+        },
       },
       contentOutcome: {
-        findMany: (args) =>
-          prisma.contentOutcome.findMany(args as Parameters<typeof prisma.contentOutcome.findMany>[0]),
+        findMany: (args) => {
+          const input = args ?? {}
+          return prisma.contentOutcome.findMany({
+            where: input.where as never,
+            take: input.take ?? 2_000,
+          })
+        },
       },
     }
 

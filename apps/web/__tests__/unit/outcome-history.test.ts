@@ -22,7 +22,7 @@ function makeRow(overrides: Partial<{
   generation: {
     id: string
     rawCopy: string | null
-    finalizedCopy: string | null
+    videoScript: string | null
     topicTitle: string | null
   } | null
 }> = {}) {

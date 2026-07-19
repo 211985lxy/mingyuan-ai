@@ -146,6 +146,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/audit-logs",
+      "file": "src/app/api/admin/audit-logs/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/auth/login",
       "file": "src/app/api/admin/auth/login/route.ts",
       "methods": [
@@ -1339,6 +1352,33 @@
       "idempotency": false
     },
     {
+      "route": "/api/content-versions/[id]/restore",
+      "file": "src/app/api/content-versions/[id]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/content-versions",
+      "file": "src/app/api/content-versions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/cron/aihot-briefing",
       "file": "src/app/api/cron/aihot-briefing/route.ts",
       "methods": [
@@ -1388,7 +1428,7 @@
       "query": "none",
       "externalService": true,
       "cost": "low",
-      "idempotency": false
+      "idempotency": true
     },
     {
       "route": "/api/cron/market-hotlist",

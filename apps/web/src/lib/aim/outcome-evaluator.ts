@@ -79,6 +79,7 @@ export interface OutcomeEvaluatorStore {
     findMany(args: {
       where: Record<string, unknown>
       select: Record<string, boolean>
+      take?: number
     }): Promise<GenerationRow[]>
   }
   knowledgeEntry: {
@@ -293,6 +294,7 @@ export async function evaluateOutcomes(input: {
   const generations = await input.store.aimGeneration.findMany({
     where: { id: { in: generationIds } },
     select: { id: true, rawCopy: true, finalizedCopy: true, topicTitle: true },
+    take: EVALUATE_BATCH_SIZE,
   })
   const genMap = new Map(generations.map((g) => [g.id, g]))
 
@@ -361,15 +363,24 @@ export function createOutcomeEvaluatorStore(prisma: PrismaClient): OutcomeEvalua
   // 工厂函数做桥接 cast，运行时 Prisma 会校验字段合法性。
   return {
     contentOutcome: {
-      findMany: (args) =>
-        prisma.contentOutcome.findMany(args as never) as Promise<OutcomeRow[]>,
+      findMany: (args) => {
+        const input = args as { where: Record<string, unknown>; orderBy?: Record<string, string>; take?: number }
+        return prisma.contentOutcome.findMany({
+          where: input.where as never,
+          orderBy: input.orderBy as never,
+          take: input.take ?? EVALUATE_BATCH_SIZE,
+        }) as Promise<OutcomeRow[]>
+      },
     },
     aimGeneration: {
-      findMany: (args) =>
-        prisma.aimGeneration.findMany({
-          where: (args as { where: Record<string, unknown> }).where as never,
+      findMany: (args) => {
+        const input = args as { where: Record<string, unknown>; take?: number }
+        return prisma.aimGeneration.findMany({
+          where: input.where as never,
           select: { id: true, rawCopy: true, videoScript: true, topicTitle: true },
-        }) as unknown as Promise<GenerationRow[]>,
+          take: input.take ?? EVALUATE_BATCH_SIZE,
+        }) as unknown as Promise<GenerationRow[]>
+      },
     },
     knowledgeEntry: {
       findFirst: (args) =>

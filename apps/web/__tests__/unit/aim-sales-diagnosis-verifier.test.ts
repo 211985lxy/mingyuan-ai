@@ -102,13 +102,13 @@ describe("verifySalesDiagnosis", () => {
     ["负责人", { deliveryTasks: [{ title: "提供数据清单", owner: "李某" }] }, { kind: "task", statement: "李某负责提供数据清单", quote: "客户目标是年底前把转化率提升到5%。" }],
     ["决策阶段", { decisionStage: "方案比较", decisionStageRaw: "方案比较" }, { kind: "goal", statement: "决策阶段是方案比较", quote: "客户目标是年底前把转化率提升到5%。" }],
     ["客户承诺", { followUps: ["客户承诺明天签约"] }, { kind: "commitment", statement: "客户承诺明天签约", quote: "客户承诺下周确认试点范围。" }],
-  ] as const)("真实但无关的 quote 不能支撑虚构的%s statement", (_label, overrides, falseEvidence) => {
+  ])("真实但无关的 quote 不能支撑虚构的%s statement", (_label, overrides, falseEvidence) => {
     const result = verifySalesDiagnosis(input({
       insight: insight({
-        ...overrides,
+        ...(overrides as Partial<MeetingInsight>),
         evidence: [
           ...(insight().evidence ?? []).filter((item) => item.kind !== falseEvidence.kind),
-          falseEvidence,
+          falseEvidence as NonNullable<MeetingInsight["evidence"]>[number],
         ],
       }),
     }))

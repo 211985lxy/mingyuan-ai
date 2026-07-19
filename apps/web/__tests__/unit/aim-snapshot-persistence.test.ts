@@ -50,7 +50,12 @@ describe("AIM snapshot telemetry persistence", () => {
     })
     await applyRunMetadataToTrace("trace_1", metadata, spec, "snapshot_1", "pass")
 
-    const snapshotData = mocks.snapshotCreate.mock.calls[0][0].data
+    const snapshotCalls = (mocks.snapshotCreate as unknown as {
+      mock: { calls: Array<[{ data: Record<string, unknown> }]> }
+    }).mock.calls
+    const snapshotCall = snapshotCalls[0]
+    expect(snapshotCall).toBeDefined()
+    const snapshotData = snapshotCall![0].data
     expect(snapshotData).not.toHaveProperty("inputTokens")
     expect(snapshotData).not.toHaveProperty("outputTokens")
     expect(snapshotData).not.toHaveProperty("cachedTokens")

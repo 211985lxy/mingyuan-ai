@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
+import { parseJsonRecord } from "@/lib/api-contract"
 import type { Prisma, AimContentVersion } from "@/generated/prisma/client"
 
 export const maxDuration = 30
@@ -50,12 +51,13 @@ export const GET = withUserAuth(async (request, { user }) => {
   const versions = await prisma.aimContentVersion.findMany({
     where: { userId: user.id, ...(generationId ? { generationId } : { conversationId }), ...(format ? { format } : {}) },
     orderBy: { versionNo: "asc" },
+    take: 200,
   })
   return NextResponse.json({ data: versions.map(summary) })
 })
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const body = await request.json()
+  const body = await parseJsonRecord(request)
   const generationId = typeof body.generationId === "string" && body.generationId ? body.generationId : null
   const conversationId = typeof body.conversationId === "string" && body.conversationId ? body.conversationId : null
   const format = typeof body.format === "string" ? body.format.trim() : ""

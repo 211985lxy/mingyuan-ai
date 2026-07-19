@@ -21,12 +21,12 @@ export type SupervisorNotificationConfig =
   | { enabled: false }
   | { enabled: true; appId: string; appSecret: string; chatId: string }
 
-type SupervisorNotificationEnvironment = Pick<NodeJS.ProcessEnv,
+type SupervisorNotificationEnvironment = Partial<Pick<NodeJS.ProcessEnv,
   | "AIM_LOOP_NOTIFICATIONS_ENABLED"
   | "AIM_SUPERVISOR_CHAT_ID"
   | "FEISHU_APP_ID"
   | "FEISHU_APP_SECRET"
->
+>>
 
 function runtimeNotificationEnvironment(): SupervisorNotificationEnvironment {
   return {

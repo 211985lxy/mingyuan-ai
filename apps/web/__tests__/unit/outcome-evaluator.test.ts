@@ -260,7 +260,7 @@ describe("evaluateOutcomes", () => {
       makeOutcomeRow({ id: "o_d", userVerdict: null, views: null, likes: null }),
     ]
     const generations = [
-      { id: "gen_1", rawCopy: "文案A", finalizedCopy: null, topicTitle: "TA" },
+      { id: "gen_1", rawCopy: "文案A", videoScript: null, topicTitle: "TA" },
     ]
     const store = makeStore(outcomes, generations)
 

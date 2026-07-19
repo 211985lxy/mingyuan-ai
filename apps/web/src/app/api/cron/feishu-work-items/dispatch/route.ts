@@ -23,11 +23,10 @@ import {
   listPendingWorkItemRecords,
   readWorkItemStoreConfig,
 } from "@/lib/aim/work-item-store"
-import { parseFeishuWorkItem, parseMeetingWorkItemInput } from "@/lib/aim-feishu-work-item"
+import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
 import {
   createAimGenerationInsightResultSink,
 } from "@/lib/aim/meeting-insight-result-sink"
-import { runMeetingInsightWorkflow } from "@/lib/aim/meeting-workflow"
 import {
   claimAimTrace,
   failAimTrace,
@@ -43,7 +42,7 @@ import {
   readSupervisorNotificationConfig,
   sendFeishuSupervisorNotification,
 } from "@/lib/aim/feishu-supervisor-notifier"
-import { classifyDispatchRetry } from "@/lib/aim/work-item-dispatch-retry"
+import { executeMeetingWorkItem } from "@/lib/aim/services/meeting-work-item-executor"
 import { readLoopRuntimeConfig } from "@/lib/aim/loop-runtime-config"
 import { prisma } from "@/lib/prisma"
 import { env } from "@/env"
@@ -144,94 +143,20 @@ export async function GET(request: NextRequest) {
     releaseClaim: async (token) => {
       if (token) await releaseAimTraceClaim(requireClaimedTrace(token))
     },
-    execute: async (recordId, context) => {
-      if (context.loop.id !== "sales-diagnosis-v1") {
-        return {
-          ok: false,
-          error: `尚未配置 ${context.loop.id} 的执行处理器。`,
-          retryable: false,
-          stopReason: "missing_input",
-        }
-      }
-      let record
-      try {
-        record = await store.get(recordId)
-      } catch (err) {
-        return {
-          ok: false,
-          error: `读取经营事项失败：${err instanceof Error ? err.message : String(err)}`,
-          retryable: false,
-          stopReason: "human_required",
-        }
-      }
-      if (!record) return {
-        ok: false,
-        error: `经营事项记录不存在：${recordId}`,
-        retryable: false,
-        stopReason: "missing_input",
-      }
-
-      const input = parseMeetingWorkItemInput(record.fields)
-      if (!input.transcript) {
-        return { ok: false, error: "会议原文（输入内容）为空，禁止凭空抽取", retryable: false, stopReason: "missing_input" }
-      }
-      if (!input.projectId) {
-        return { ok: false, error: "缺少 AIM项目ID，客户会议必须绑定项目", retryable: false, stopReason: "missing_input" }
-      }
-      let project
-      try {
-        project = await prisma.clientProject.findUnique({
-          where: { id: input.projectId },
+    execute: (recordId, context) => executeMeetingWorkItem({
+      store,
+      resultSink,
+      ownerUserId,
+      recordId,
+      context,
+      findProjectOwner: async (projectId) => {
+        const project = await prisma.clientProject.findUnique({
+          where: { id: projectId },
           select: { userId: true },
         })
-      } catch {
-        return { ok: false, error: "项目归属校验失败", retryable: false, stopReason: "human_required" }
-      }
-      if (!project || project.userId !== ownerUserId) {
-        return { ok: false, error: "项目不存在或不属于经营事项负责人", retryable: false, stopReason: "human_required" }
-      }
-      if (!input.meetingTitle || !input.customer) {
-        // fail-closed：标题/客户为会议洞察必要归属信息，缺失即阻断并回写可行动
-        // 错误，交由 WP-8 重试/升级链路提示人工补齐，绝不凭空补造。
-        return {
-          ok: false,
-          error: `会议标题/客户名称缺失（标题=${input.meetingTitle || "空"}，客户=${input.customer || "空"}），请先在飞书补齐`,
-          retryable: false,
-          stopReason: "missing_input",
-        }
-      }
-
-      const result = await runMeetingInsightWorkflow(
-        {
-          recordId,
-          ...input,
-          actorId: ownerUserId,
-          attempt: context.attempt,
-          traceId: context.runId,
-        },
-        { store, resultSink, claimedTrace: requireClaimedTrace(context.claimToken) },
-      )
-      if (result.ok) return {
-        ok: true,
-        verificationStatus: result.verificationStatus,
-        verificationSummary: result.verificationSummary,
-        nextAction: result.nextAction,
-        resultLink: result.resultLink,
-      }
-      if (result.stopReason === "verification_failed") {
-        return { ok: false, error: result.error, retryable: false, stopReason: "verification_failed" }
-      }
-      if (result.stopReason === "duplicate_suppressed") {
-        return { ok: true, duplicateSuppressed: true }
-      }
-      const classified = classifyDispatchRetry(result.error)
-      return {
-        ok: false,
-        error: result.error,
-        retryable: classified.retryable,
-        stopReason: classified.stopReason,
-      }
-    },
+        return project?.userId ?? null
+      },
+    }),
     notify: runtimeConfig.shadowMode
       ? async () => undefined
       : (notification) => sendFeishuSupervisorNotification({

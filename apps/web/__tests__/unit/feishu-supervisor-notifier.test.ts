@@ -12,7 +12,7 @@ function jsonResponse(payload: unknown, ok = true) {
 
 describe("feishu supervisor notifier", () => {
   it("默认关闭，不要求飞书凭据且不产生外部请求", async () => {
-    const config = readSupervisorNotificationConfig({} as NodeJS.ProcessEnv)
+    const config = readSupervisorNotificationConfig({})
     const fetchImpl = vi.fn()
     await sendFeishuSupervisorNotification({
       config,
@@ -33,7 +33,7 @@ describe("feishu supervisor notifier", () => {
     expect(() => readSupervisorNotificationConfig({
       AIM_LOOP_NOTIFICATIONS_ENABLED: "true",
       FEISHU_APP_ID: "app_1",
-    } as unknown as NodeJS.ProcessEnv)).toThrow("FEISHU_APP_SECRET")
+    })).toThrow("FEISHU_APP_SECRET")
   })
 
   it("复用租户令牌后向监督群发送文本消息", async () => {
