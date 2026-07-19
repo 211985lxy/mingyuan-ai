@@ -3,9 +3,9 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withUserAuth } from '@/lib/user-auth'
 import { checkUrlType, parseUrl } from '@/lib/tikhub/url-parser'
-import { runCompetitorAnalysisPipeline } from '@/lib/competitor-analysis/pipeline'
+import { enqueueBackgroundTask } from "@/lib/background-tasks"
+import { COMPETITOR_ANALYSIS_TASK_KIND } from "@/lib/competitor-analysis/background-task"
 import { getCompetitorPlatformGate } from '@/lib/competitor-analysis/platform-scope'
-import { logger } from '@/lib/logger'
 import { enforceDailyBetaLimit } from '@/lib/internal-beta-limits'
 import { competitorAnalyzeBodySchema } from "@/features/competitor/contracts/api"
 
@@ -42,20 +42,22 @@ export const POST = withUserAuth(async (request, { user }) => {
   }
 
   // Create the analysis record in pending state
-  const analysis = await prisma.competitorAnalysis.create({
-    data: {
+  const analysis = await prisma.$transaction(async (tx) => {
+    const created = await tx.competitorAnalysis.create({ data: {
       userId: user.id,
       targetUrl: parsed.pureUrl,
       platform: parsed.platform,
       platformUserId: parsed.rawUserId ?? null,
       status: 'pending',
       currentStep: 'pending',
-    },
-  })
-
-  // Trigger pipeline non-blocking (same pattern as marketing-analysis.ts)
-  runCompetitorAnalysisPipeline(analysis.id).catch((err: unknown) => {
-    logger.error({ err, analysisId: analysis.id }, 'Competitor analysis pipeline failed')
+    } })
+    await enqueueBackgroundTask(tx as never, {
+      kind: COMPETITOR_ANALYSIS_TASK_KIND,
+      aggregateType: "competitor_analysis",
+      aggregateId: created.id,
+      idempotencyKey: `competitor_analysis:${created.id}`,
+    })
+    return created
   })
 
   return NextResponse.json({
