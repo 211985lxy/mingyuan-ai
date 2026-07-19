@@ -276,6 +276,31 @@ export async function updateLarkBaseRecord(input: {
   return { ok: true as const, result: payload }
 }
 
+/** 创建一条 Base 记录。省略 record-id 时，lark-cli 的 upsert 命令即为创建。 */
+export async function createLarkBaseRecord(input: {
+  baseToken: string
+  tableId: string
+  fields: Record<string, unknown>
+  cliPath?: string
+  identity?: "user" | "bot"
+  runCommand?: RunCommand
+}): Promise<{ recordId: string; fields: Record<string, unknown> }> {
+  const runCommand = input.runCommand ||
+    ((command, args) => runLarkBaseCommand(command, args, {
+      cliPath: input.cliPath,
+      identity: input.identity,
+    }))
+
+  const payload = await runCommand("+record-upsert", [
+    "--base-token", input.baseToken,
+    "--table-id", input.tableId,
+    "--json", JSON.stringify(input.fields),
+  ])
+  const narrowed = narrowRecordResponse(payload)
+  if (!narrowed) throw new Error("飞书 Base 创建记录响应缺少 record_id 或 fields。")
+  return narrowed
+}
+
 /**
  * 列出表内记录（record 级，供 WP-8 待处理扫描等场景使用）。
  * 返回 { recordId, fields } 形态；不做状态过滤，过滤由调用方负责。

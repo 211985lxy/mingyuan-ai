@@ -10,12 +10,14 @@
  * - 只复用 lark-base-tool.ts 的 record 级函数，不重建第二套飞书客户端。
  */
 import {
+  createLarkBaseRecord,
   getLarkBaseRecord,
   listLarkBaseRecords,
   updateLarkBaseRecord,
 } from "@/lib/lark-base-tool"
 import type { WorkItemRecordStore } from "@/lib/aim/services/work-item-execution"
 import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
+import type { AfuCardWorkItemPorts } from "@/lib/aim/afu-card-bridge"
 
 /** 环境变量形态（process.env 的最小投影，便于注入测试）。 */
 type EnvLike = Record<string, string | undefined>
@@ -66,6 +68,40 @@ export function createLarkWorkItemStore(config: WorkItemStoreConfig): WorkItemRe
         identity: "bot",
       })
       return { ok: true }
+    },
+  }
+}
+
+/** 将 Afu 卡片桥接端口绑定到真实 AIM经营事项表。 */
+export function createLarkAfuCardWorkItemPorts(config: WorkItemStoreConfig): AfuCardWorkItemPorts {
+  return {
+    async list() {
+      return listLarkBaseRecords({
+        baseToken: config.baseToken,
+        tableId: config.tableId,
+        limit: 100,
+        cliPath: config.cliPath,
+        identity: "bot",
+      })
+    },
+    async create(fields) {
+      return createLarkBaseRecord({
+        baseToken: config.baseToken,
+        tableId: config.tableId,
+        fields,
+        cliPath: config.cliPath,
+        identity: "bot",
+      })
+    },
+    async update(recordId, fields) {
+      await updateLarkBaseRecord({
+        baseToken: config.baseToken,
+        tableId: config.tableId,
+        recordId,
+        fields,
+        cliPath: config.cliPath,
+        identity: "bot",
+      })
     },
   }
 }

@@ -61,6 +61,11 @@ export interface ParsedWorkItem {
   rawStatus: string
   /** 原始工作流字段（解析前）。 */
   rawWorkflow: string
+  markdownCardId: string
+  markdownCardPath: string
+  plannedStart: string
+  plannedEnd: string
+  calendarEventId: string
 }
 
 /**
@@ -124,6 +129,11 @@ export function parseFeishuWorkItem(fields: Record<string, unknown>): ParsedWork
     errorMessage: flattenText(fields["错误信息"]),
     rawStatus,
     rawWorkflow,
+    markdownCardId: flattenText(fields["Markdown卡片ID"]),
+    markdownCardPath: flattenText(fields["Markdown卡片路径"]),
+    plannedStart: flattenText(fields["计划开始"]),
+    plannedEnd: flattenText(fields["计划结束"]),
+    calendarEventId: flattenText(fields["日历事件ID"]),
   }
 }
 
