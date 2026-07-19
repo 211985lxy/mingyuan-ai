@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Check, Loader2, Pencil, RotateCcw, Save } from "lucide-react"
+import { Check, Loader2, Pencil, Plus, RotateCcw, Save } from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -69,15 +69,25 @@ export default function AdminHotSourcesPage() {
     }
   }
 
+  function startNewSource() {
+    setSelected(EMPTY_FORM)
+  }
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
         title="热点信源"
         description="按账号配置选题雷达使用的行业信源；保存后，前台会优先读取这里的内容。"
-        actions={<Button variant="outline" onClick={fetchSources} disabled={loading} className="cursor-pointer">
-          <RotateCcw className="h-4 w-4" />
-          刷新
-        </Button>}
+        actions={<>
+          <Button onClick={startNewSource} className="cursor-pointer">
+            <Plus className="mr-1.5 h-4 w-4" />
+            新建信源
+          </Button>
+          <Button variant="outline" onClick={fetchSources} disabled={loading} className="cursor-pointer">
+            <RotateCcw className="h-4 w-4" />
+            刷新
+          </Button>
+        </>}
       />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -107,6 +117,7 @@ export default function AdminHotSourcesPage() {
                     </div>
                     <p className="text-sm text-muted-foreground">{source.email}</p>
                     <p className="break-all font-mono text-xs text-muted-foreground">{source.sourceUrl}</p>
+                    <p className="text-xs text-muted-foreground">{source.isBuiltIn ? "系统内置信源" : `最近更新：${source.updatedAt ? new Date(source.updatedAt).toLocaleString("zh-CN") : "暂无记录"}`}</p>
                     {source.note && <p className="text-xs text-muted-foreground">{source.note}</p>}
                   </div>
                   <Button
