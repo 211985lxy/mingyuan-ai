@@ -55,6 +55,30 @@ describe("listPendingWorkItemRecords", () => {
     expect(records.map((r) => r.recordId)).toEqual(["rec_1", "rec_4"])
   })
 
+  it("兼容 lark-cli bot 身份返回的字段矩阵", async () => {
+    const records = await listPendingWorkItemRecords(CONFIG, 20, async () => ({
+      ok: true,
+      identity: "bot",
+      data: {
+        data: [
+          ["灰度任务", ["待处理"], "project_1"],
+          ["已启动任务", ["处理中"], "project_2"],
+        ],
+        fields: ["事项名称", "状态", "AIM项目ID"],
+        record_id_list: ["rec_shadow", "rec_running"],
+      },
+    }))
+
+    expect(records).toEqual([{
+      recordId: "rec_shadow",
+      fields: {
+        事项名称: "灰度任务",
+        状态: ["待处理"],
+        AIM项目ID: "project_1",
+      },
+    }])
+  })
+
   it("空表返回空数组，不伪造记录", async () => {
     const records = await listPendingWorkItemRecords(CONFIG, 20, runnerReturning([]))
     expect(records).toEqual([])

@@ -146,6 +146,17 @@ function asRecordList(payload: unknown): Array<{ record_id?: string; fields?: Re
   if (!payload || typeof payload !== "object") return []
   const record = payload as Record<string, unknown>
   const data = record.data && typeof record.data === "object" ? record.data as Record<string, unknown> : record
+  if (Array.isArray(data.data) && Array.isArray(data.fields) && Array.isArray(data.record_id_list)) {
+    const fieldNames = data.fields.map((field) => String(field))
+    const recordIds = data.record_id_list
+    return data.data.flatMap((row, index) => {
+      if (!Array.isArray(row) || typeof recordIds[index] !== "string") return []
+      return [{
+        record_id: recordIds[index] as string,
+        fields: Object.fromEntries(fieldNames.map((name, fieldIndex) => [name, row[fieldIndex]])),
+      }]
+    })
+  }
   const items = Array.isArray(data.items)
     ? data.items
     : Array.isArray(data.records)
