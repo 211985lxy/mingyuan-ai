@@ -1,0 +1,23 @@
+CREATE TABLE `BackgroundTask` (
+  `id` VARCHAR(191) NOT NULL,
+  `kind` VARCHAR(80) NOT NULL,
+  `aggregateType` VARCHAR(80) NOT NULL,
+  `aggregateId` VARCHAR(191) NOT NULL,
+  `idempotencyKey` VARCHAR(191) NOT NULL,
+  `status` VARCHAR(24) NOT NULL DEFAULT 'queued',
+  `attempt` INTEGER NOT NULL DEFAULT 0,
+  `maxAttempts` INTEGER NOT NULL DEFAULT 3,
+  `availableAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `leaseToken` VARCHAR(191) NULL,
+  `leaseExpiresAt` DATETIME(3) NULL,
+  `lastError` TEXT NULL,
+  `completedAt` DATETIME(3) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL,
+  UNIQUE INDEX `BackgroundTask_idempotencyKey_key`(`idempotencyKey`),
+  UNIQUE INDEX `BackgroundTask_leaseToken_key`(`leaseToken`),
+  INDEX `BackgroundTask_status_availableAt_idx`(`status`, `availableAt`),
+  INDEX `BackgroundTask_aggregateType_aggregateId_idx`(`aggregateType`, `aggregateId`),
+  INDEX `BackgroundTask_leaseExpiresAt_idx`(`leaseExpiresAt`),
+  PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
