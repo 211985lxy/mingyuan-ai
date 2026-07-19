@@ -2,12 +2,12 @@ import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { config as loadEnv } from "dotenv"
 
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const DEFAULT_CONTRACT = resolve(WEB_ROOT, "prisma", "production-schema-contract.json")
 
-loadEnv({ path: resolve(WEB_ROOT, ".env.local") })
+// 生产发布由 deploy 脚本显式加载 /etc/mingyuan/mingyuan.env。这里不依赖
+// dotenv，避免独立运行包在执行数据库校验时缺少开发依赖而中断发布。
 
 export function parseMysqlUrl(databaseUrl) {
   const url = new URL(databaseUrl)
