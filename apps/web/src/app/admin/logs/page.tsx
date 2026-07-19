@@ -2,12 +2,13 @@
 
 import React from "react"
 import { toast } from "sonner"
-import { Loader2, RotateCw } from "lucide-react"
+import { Loader2, RotateCw, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Input } from "@/components/ui/input"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
 
 interface AuditLogEntry {
@@ -23,6 +24,7 @@ interface AuditLogEntry {
 export default function AdminLogsPage() {
   const [logs, setLogs] = React.useState<AuditLogEntry[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [query, setQuery] = React.useState("")
 
   const fetchLogs = React.useCallback(async () => {
     setLoading(true)
@@ -44,6 +46,8 @@ export default function AdminLogsPage() {
     fetchLogs()
   }, [fetchLogs])
 
+  const filteredLogs = logs.filter((log) => `${log.action} ${log.targetType} ${log.targetId ?? ""}`.toLowerCase().includes(query.trim().toLowerCase()))
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -54,6 +58,11 @@ export default function AdminLogsPage() {
           刷新
         </Button>}
       />
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="搜索操作、对象类型或 ID" />
+      </div>
 
       <Card>
         <CardHeader className="pb-3">
@@ -81,14 +90,14 @@ export default function AdminLogsPage() {
                       ))}
                     </tr>
                   ))
-                ) : logs.length === 0 ? (
+                ) : filteredLogs.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-muted-foreground">
-                      暂无操作日志记录
+                      {query ? "没有匹配的操作日志" : "暂无操作日志记录"}
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => (
+                  filteredLogs.map((log) => (
                     <tr key={log.id} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="p-3">
                         <Badge variant="outline" className="font-mono text-xs">

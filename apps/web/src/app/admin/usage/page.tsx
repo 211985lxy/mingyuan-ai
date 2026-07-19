@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface UsageRecord {
   id: string
@@ -27,6 +28,7 @@ export default function AdminUsagePage() {
   const [records, setRecords] = React.useState<UsageRecord[]>([])
   const [loading, setLoading] = React.useState(true)
   const [total, setTotal] = React.useState(0)
+  const [statusFilter, setStatusFilter] = React.useState("all")
 
   const fetchRecords = React.useCallback(async () => {
     setLoading(true)
@@ -49,6 +51,8 @@ export default function AdminUsagePage() {
     fetchRecords()
   }, [fetchRecords])
 
+  const filteredRecords = statusFilter === "all" ? records : records.filter((record) => record.status === statusFilter)
+
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -59,6 +63,16 @@ export default function AdminUsagePage() {
           刷新
         </Button>}
       />
+
+      <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
+        <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">全部状态</SelectItem>
+          <SelectItem value="success">成功</SelectItem>
+          <SelectItem value="failed">失败</SelectItem>
+          <SelectItem value="running">运行中</SelectItem>
+        </SelectContent>
+      </Select>
 
       <Card>
         <CardHeader className="pb-3">
@@ -89,14 +103,14 @@ export default function AdminUsagePage() {
                       ))}
                     </tr>
                   ))
-                ) : records.length === 0 ? (
+                ) : filteredRecords.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                      暂无使用记录
+                      {statusFilter === "all" ? "暂无使用记录" : "没有匹配的使用记录"}
                     </td>
                   </tr>
                 ) : (
-                  records.map((record) => (
+                  filteredRecords.map((record) => (
                     <tr key={record.id} className="border-b hover:bg-muted/30 transition-colors">
                       <td className="p-3 font-medium">{record.agentId || "—"}</td>
                       <td className="p-3 text-muted-foreground">{record.action}</td>
