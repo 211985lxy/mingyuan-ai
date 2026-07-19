@@ -40,3 +40,17 @@ Every contract migration must state the backup point, expected lock duration, af
 ## Existing Production Bootstrap
 
 `prisma migrate resolve --applied <migration>` is permitted only once when adopting Prisma Migrate for a pre-existing database. Before resolving, compare the live database with the matching migration and current production schema contract. Record the exact resolved migration list and schema diff; never keep this as an undocumented operator step.
+
+## Reconciliation And Drift Review
+
+Run the following checks before investigating any migration discrepancy:
+
+```bash
+pnpm --dir apps/web run schema:migration-integrity
+pnpm --dir apps/web run schema:migration-status
+pnpm --dir apps/web exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
+```
+
+`schema:migration-integrity` is offline: it verifies that the immutable baseline is an ordered prefix of the committed migration history and that the production schema contract does not require known retired columns. It does not connect to a database.
+
+If `schema:migration-status` or `migrate diff` disagrees with the committed history, stop writes and record the database name, migration status output, schema diff, deployment SHA, backup reference, and operator decision. First classify the target as an isolated development database, test database, staging database, or production database. Do not use `prisma migrate resolve`, `db push`, manual DDL, or an inverse migration until the database owner and recovery boundary are recorded.

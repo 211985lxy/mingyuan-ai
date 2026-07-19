@@ -33,6 +33,7 @@
     "arch:size:report": "node scripts/check-source-file-size.mjs --report",
     "schema:verify": "node scripts/verify-production-schema.mjs",
     "schema:migration-status": "prisma migrate status",
+    "schema:migration-integrity": "node scripts/check-migration-integrity.mjs",
     "schema:retired-media-preflight": "node scripts/check-retired-media-data.mjs",
     "backup:database": "node scripts/backup-database.mjs",
     "backup:verify": "node scripts/verify-database-backup.mjs",
