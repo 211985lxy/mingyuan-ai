@@ -11,6 +11,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "test:e2e:real-llm": "vitest run --config vitest.real-llm.config.ts",
     "test:e2e:prepare": "tsx scripts/e2e-database.ts prepare",
     "test:e2e:reset": "tsx scripts/e2e-database.ts reset",
     "test:watch": "vitest",

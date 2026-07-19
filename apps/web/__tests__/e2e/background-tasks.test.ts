@@ -50,15 +50,17 @@ describe("background task database lifecycle", () => {
 
   it("requeues expired leases for recovery", async () => {
     const task = await createTask()
-    const claimed = await claimBackgroundTask(prisma, task.id, new Date("2026-07-19T00:00:00.000Z"), 1_000)
+    const claimedAt = new Date()
+    const reclaimedAt = new Date(claimedAt.getTime() + 2_000)
+    const claimed = await claimBackgroundTask(prisma, task.id, claimedAt, 1_000)
     expect(claimed).not.toBeNull()
 
-    const reclaimed = await reclaimExpiredBackgroundTaskLeases(prisma, new Date("2026-07-19T00:00:02.000Z"))
+    const reclaimed = await reclaimExpiredBackgroundTaskLeases(prisma, reclaimedAt)
     expect(reclaimed.count).toBeGreaterThanOrEqual(1)
 
     const stored = await prisma.backgroundTask.findUniqueOrThrow({ where: { id: task.id } })
     expect(stored.status).toBe(BACKGROUND_TASK_STATUS.retryWait)
     expect(stored.leaseToken).toBeNull()
-    expect(stored.availableAt).toEqual(new Date("2026-07-19T00:00:02.000Z"))
+    expect(stored.availableAt).toEqual(reclaimedAt)
   })
 })

@@ -3,12 +3,8 @@ import { buildTopicUserPrompt, generateTopicCards } from "@/lib/topic-generation
 
 const completeMock = vi.hoisted(() => vi.fn())
 
-vi.mock("@/lib/llm", () => ({
-  LLMClient: {
-    shared: () => ({
-      complete: completeMock,
-    }),
-  },
+vi.mock("@/lib/llm/agent-router", () => ({
+  getAgentLLM: () => ({ complete: completeMock }),
 }))
 
 describe("buildTopicUserPrompt", () => {

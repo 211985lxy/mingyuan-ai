@@ -13,3 +13,18 @@ process.env.REDIS_URL = process.env.TEST_REDIS_URL ?? "redis://localhost:6379"
 process.env.ADMIN_JWT_SECRET = "test-e2e-admin-jwt-secret-at-least-32-bytes"
 process.env.JWT_SECRET = "test-e2e-user-jwt-secret-at-least-32-bytes"
 process.env.CRON_SECRET = "test-e2e-cron-secret-at-least-32-bytes"
+
+for (const key of [
+  "APIMART_API_KEY",
+  "DEEPSEEK_API_KEY",
+  "GLM_API_KEY",
+  "JIEKOU_API_KEY",
+  "LIHUO_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENROUTER_API_KEY",
+  "THEROUTER_API_KEY",
+  "ZAI_API_KEY",
+  "ZENMUX_API_KEY",
+]) {
+  delete process.env[key]
+}

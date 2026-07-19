@@ -24,7 +24,7 @@ export function requireTestDatabaseUrl(databaseUrl?: string): string {
   return value
 }
 
-async function connect(databaseUrl: string) {
+async function connect(databaseUrl: string, multipleStatements = false) {
   const url = new URL(databaseUrl)
   return createConnection({
     host: url.hostname,
@@ -33,7 +33,17 @@ async function connect(databaseUrl: string) {
     password: decodeURIComponent(url.password),
     database: decodeURIComponent(url.pathname.replace(/^\//, "")),
     connectTimeout: 5000,
+    multipleStatements,
   })
+}
+
+async function applyBaseline(databaseUrl: string): Promise<void> {
+  const connection = await connect(databaseUrl, true)
+  try {
+    await connection.query(readFileSync(BASELINE_SQL, "utf8"))
+  } finally {
+    await connection.end()
+  }
 }
 
 export async function resetE2eDatabase(databaseUrl = process.env.TEST_DATABASE_URL): Promise<void> {
@@ -95,7 +105,7 @@ function runPrisma(args: string[], databaseUrl: string): void {
 export async function prepareE2eDatabase(databaseUrl = process.env.TEST_DATABASE_URL): Promise<void> {
   const safeUrl = requireTestDatabaseUrl(databaseUrl)
   await resetE2eDatabase(safeUrl)
-  runPrisma(["db", "execute", "--file", BASELINE_SQL], safeUrl)
+  await applyBaseline(safeUrl)
 
   const baselineMigrations = JSON.parse(readFileSync(BASELINE_MIGRATIONS, "utf8")) as string[]
   for (const migration of baselineMigrations) {
