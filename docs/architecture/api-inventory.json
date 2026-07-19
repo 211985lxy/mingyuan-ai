@@ -1392,6 +1392,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/background-tasks",
+      "file": "src/app/api/cron/background-tasks/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/cron/cleanup",
       "file": "src/app/api/cron/cleanup/route.ts",
       "methods": [

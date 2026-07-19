@@ -71,6 +71,29 @@ model AimContentVersion {
   @@index([parentVersionId])
 }
 
+// 通用后台任务只承载领取、租约和重试语义；业务状态仍归各领域模型所有。
+model BackgroundTask {
+  id             String   @id @default(cuid())
+  kind           String   @db.VarChar(80)
+  aggregateType  String   @db.VarChar(80)
+  aggregateId    String   @db.VarChar(191)
+  idempotencyKey String   @unique @db.VarChar(191)
+  status         String   @default("queued") @db.VarChar(24)
+  attempt        Int      @default(0)
+  maxAttempts    Int      @default(3)
+  availableAt    DateTime @default(now())
+  leaseToken     String?  @unique @db.VarChar(191)
+  leaseExpiresAt DateTime?
+  lastError      String?  @db.Text
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, availableAt])
+  @@index([aggregateType, aggregateId])
+  @@index([leaseExpiresAt])
+}
+
 model IpWikiPage {
   id                 String   @id @default(cuid())
   userId             String
