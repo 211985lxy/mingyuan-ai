@@ -4,11 +4,5 @@
   "targetModuleLineRange": [100, 300],
   "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",
-  "legacyFiles": [
-    {
-      "path": "src/app/(dashboard)/aim/page.tsx",
-      "maxLines": 180,
-      "target": "src/features/aim/components and hooks"
-    }
-  ]
+  "legacyFiles": []
 }

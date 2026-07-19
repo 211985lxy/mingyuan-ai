@@ -9,11 +9,8 @@ import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
-import type { AimAgentId } from "@/lib/aim-ui-config"
-import { COPY_STUDIO_MODULES, COPY_STUDIO_MODULE_LABELS } from "@/lib/copy-studio"
+import { AimContentModeSelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
-
-const RESEARCH_HINT_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 
 export default function AimPage() {
   const w = useAimWorkbench()
@@ -45,19 +42,7 @@ export default function AimPage() {
           personaProgress={w.personaProgress}
         />
 
-        {w.selectedAgentId === "content_producer" && (
-          <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">创作模式</span>
-            <button type="button" className={`rounded-md border px-2.5 py-1 text-xs ${w.agentModule === undefined ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`} onClick={() => w.setAgentModule(undefined)}>
-              智能选择
-            </button>
-            {COPY_STUDIO_MODULES.map((module) => (
-              <button key={module} type="button" className={`rounded-md border px-2.5 py-1 text-xs ${w.agentModule === module ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`} onClick={() => w.setAgentModule(module)}>
-                {COPY_STUDIO_MODULE_LABELS[module]}
-              </button>
-            ))}
-          </div>
-        )}
+        {w.selectedAgentId === "content_producer" && <AimContentModeSelector value={w.agentModule} onChange={w.setAgentModule} />}
 
         {w.selectedProjectId && (
           <AimProjectTaskPanel
@@ -103,11 +88,7 @@ export default function AimPage() {
 
         {/* 输入区 */}
         <footer className="border-t px-3 py-2 sm:px-5">
-          {RESEARCH_HINT_AGENT_IDS.has(w.selectedAgentId) && (
-            <p className="mx-auto mb-2 hidden max-w-2xl text-xs text-muted-foreground lg:block">
-              可以直接把官网链接、竞品资料、客户资料或 Research Agent 资料包粘贴到聊天框里，系统会作为诊断上下文使用。
-            </p>
-          )}
+          <AimResearchHint agentId={w.selectedAgentId} />
           <AimPromptComposer
             value={w.input}
             placeholder={w.agent.placeholder}
