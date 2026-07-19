@@ -40,6 +40,9 @@ describe("buildExtractionPrompt", () => {
     expect(system).toMatch(/deliveryTasks/)
     expect(system).toMatch(/evidence/)
     expect(system).toMatch(/逐字复制/)
+    expect(system).toMatch(/仅凭语境推断一律留空串/)
+    expect(system).toMatch(/不得改写、纠错、拼接或省略/)
+    expect(system).toMatch(/无法定位的证据整条删除/)
     // 必须要求纯 JSON、给出结构示例，约束模型输出。
     expect(system).toMatch(/JSON/)
     expect(user).toContain(TRANSCRIPT)
