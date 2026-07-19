@@ -60,6 +60,14 @@ describe("createAimGenerationInsightResultSink", () => {
         costCny: 0.00084,
         providerAttempts: [],
       },
+      verification: {
+        status: "pass",
+        checks: [{ id: "check-1", passed: true, critical: true, detail: "通过" }],
+        evidenceRefs: ["goal[0]"],
+        summary: "验证通过",
+        nextAction: "进入人工审核",
+      },
+      verificationPolicy: "sales-diagnosis-evidence-v1",
     })
 
     expect(saved).toEqual({
@@ -96,6 +104,11 @@ describe("createAimGenerationInsightResultSink", () => {
       outputTokens: 80,
       costCny: 0.00084,
     })
+    expect(taskSpec.verification).toMatchObject({
+      policy: "sales-diagnosis-evidence-v1",
+      status: "pass",
+      summary: "验证通过",
+    })
   })
 
   it("缺 projectId 拒绝落盘（客户会议不允许落到全局空间）", async () => {
@@ -107,6 +120,14 @@ describe("createAimGenerationInsightResultSink", () => {
         meetingTitle: INSIGHT.meetingTitle,
         customer: INSIGHT.customer,
         transcript: "会议原文",
+        verification: {
+          status: "needs_human",
+          checks: [],
+          evidenceRefs: [],
+          summary: "需人工判断",
+          nextAction: "进入人工审核",
+        },
+        verificationPolicy: "sales-diagnosis-evidence-v1",
       }),
     ).rejects.toThrow(/projectId/)
     expect(create).not.toHaveBeenCalled()

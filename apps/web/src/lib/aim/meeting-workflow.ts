@@ -26,11 +26,14 @@ import type { AimRunMetadata } from "@/lib/aim-harness"
 import { getRegisteredLoop } from "@/lib/aim/loops/registry"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import {
+  addAimTraceStep,
   claimAimTrace,
   failAimTrace,
   finishAimTrace,
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
+import type { LoopVerificationResult } from "@/lib/aim/loops/contracts"
+import { verifySalesDiagnosis } from "@/lib/aim/sales-diagnosis/verifier"
 import { logger } from "@/lib/logger"
 import {
   failWorkItem,
@@ -61,6 +64,8 @@ export interface InsightResultSink {
     /** 会议原文（AimGeneration.rawInput 需要；不落盘方应忽略）。 */
     transcript: string
     executionMetadata?: AimRunMetadata
+    verification: LoopVerificationResult
+    verificationPolicy: string
   }): Promise<{ aimResultId: string; resultLink: string }>
 }
 
@@ -77,11 +82,12 @@ export interface MeetingWorkflowPorts {
   claimTrace?: typeof claimAimTrace
   finishTrace?: typeof finishAimTrace
   failTrace?: typeof failAimTrace
+  addTraceStep?: typeof addAimTraceStep
 }
 
 export type MeetingWorkflowResult =
   | { ok: true; status: "待人工审核"; idempotent: boolean; recordId: string; aimResultId: string; execution?: AimRunMetadata }
-  | { ok: false; status: "失败" | "待处理" | "处理中" | "待人工审核"; error: string; recordId: string; stopReason?: "duplicate_suppressed" }
+  | { ok: false; status: "失败" | "待处理" | "处理中" | "待人工审核"; error: string; recordId: string; stopReason?: "duplicate_suppressed" | "verification_failed" }
 
 export function buildMeetingInsightTraceId(recordId: string): string {
   const loop = getRegisteredLoop("sales-diagnosis-v1")
@@ -193,7 +199,7 @@ export async function runMeetingInsightWorkflow(
   }
 
   const markTraceFailed = (error: unknown) => (ports.failTrace ?? failAimTrace)(trace, error)
-  const failRun = async (message: string): Promise<MeetingWorkflowResult> => {
+  const failRun = async (message: string): Promise<Extract<MeetingWorkflowResult, { ok: false }>> => {
     const failure = await failStartedWorkItem(store, input.recordId, message)
     await markTraceFailed(failure.error)
     return { ok: false, ...failure, recordId: input.recordId }
@@ -247,6 +253,31 @@ export async function runMeetingInsightWorkflow(
     return failRun(insightResult.error)
   }
 
+  const verification = verifySalesDiagnosis({
+    projectId: input.projectId,
+    customer: input.customer,
+    meetingTitle: input.meetingTitle,
+    transcript: input.transcript,
+    insight: insightResult.insight,
+  })
+  await (ports.addTraceStep ?? addAimTraceStep)(trace, {
+    key: "sales_diagnosis_verification",
+    label: "销售诊断确定性验证",
+    status: verification.status === "fail" ? "failed" : "success",
+    summary: verification.summary,
+    metadata: {
+      policy: loop.verificationPolicy,
+      status: verification.status,
+      checks: verification.checks,
+      evidenceRefs: verification.evidenceRefs,
+      nextAction: verification.nextAction,
+    },
+  })
+  if (verification.status === "fail") {
+    const failed = await failRun(`${verification.summary} ${verification.nextAction}`)
+    return { ...failed, stopReason: "verification_failed" }
+  }
+
   // 3. 落盘完整洞察（结果ID/链接由 resultSink 决定，不建表、不耦合 prisma）。
   let saved: { aimResultId: string; resultLink: string }
   try {
@@ -258,6 +289,8 @@ export async function runMeetingInsightWorkflow(
       customer: input.customer,
       transcript: input.transcript,
       executionMetadata: run.metadata,
+      verification,
+      verificationPolicy: loop.verificationPolicy,
     })
   } catch (err) {
     const message = `洞察结果落盘失败：${err instanceof Error ? err.message : String(err)}`

@@ -38,6 +38,8 @@ describe("buildExtractionPrompt", () => {
     expect(system).toMatch(/diagnosisQuestions/)
     expect(system).toMatch(/topicCandidates/)
     expect(system).toMatch(/deliveryTasks/)
+    expect(system).toMatch(/evidence/)
+    expect(system).toMatch(/逐字复制/)
     // 必须要求纯 JSON、给出结构示例，约束模型输出。
     expect(system).toMatch(/JSON/)
     expect(user).toContain(TRANSCRIPT)
@@ -56,6 +58,7 @@ describe("parseInsightJson — 严格解析与容错", () => {
       diagnosisQuestions: ["估值口径1.5亿还是3亿"],
       topicCandidates: ["智慧供暖省电30%+的故事"],
       deliveryTasks: [{ title: "制作融资PPT", owner: "葛老板" }],
+      evidence: [{ kind: "goal", statement: "今年冲3000万", quote: "今年想冲3000万" }],
     })
     const parsed = parseInsightJson(raw)
     expect(parsed.ok).toBe(true)
@@ -63,6 +66,7 @@ describe("parseInsightJson — 严格解析与容错", () => {
     expect(parsed.input.goals).toContain("今年冲3000万")
     expect(parsed.input.decisionStage).toBe("需求确认")
     expect(parsed.input.deliveryTasks).toEqual([{ title: "制作融资PPT", owner: "葛老板" }])
+    expect(parsed.input.evidence).toEqual([{ kind: "goal", statement: "今年冲3000万", quote: "今年想冲3000万" }])
   })
 
   it("剥离 markdown 代码围栏后仍能解析", () => {
@@ -120,6 +124,21 @@ describe("parseInsightJson — 严格解析与容错", () => {
       { title: "合法任务", owner: "张三" },
       { title: "另一合法任务" },
     ])
+  })
+
+  it("evidence 非法 kind、空 statement 或空 quote 被丢弃", () => {
+    const parsed = parseInsightJson(JSON.stringify({
+      goals: ["目标"],
+      evidence: [
+        { kind: "goal", statement: "目标", quote: "原文" },
+        { kind: "unknown", statement: "未知", quote: "原文" },
+        { kind: "budget", statement: "", quote: "原文" },
+        { kind: "task", statement: "任务", quote: "" },
+      ],
+    }))
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.input.evidence).toEqual([{ kind: "goal", statement: "目标", quote: "原文" }])
   })
 
   it("空字符串输入 → ok:false", () => {

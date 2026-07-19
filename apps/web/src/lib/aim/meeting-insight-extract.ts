@@ -19,6 +19,7 @@ import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { MeetingInsightInput } from "@/lib/aim/meeting-insight"
 import type { AimModelPolicy } from "@/lib/aim-harness/types"
 import { getRegisteredLoop } from "@/lib/aim/loops/registry"
+import { isMeetingEvidenceKind, type MeetingEvidence } from "@/lib/aim/sales-diagnosis/evidence"
 
 /** 模型名（可选，未配置走 provider 默认 + 降级链）。不硬编码。 */
 export const MEETING_INSIGHT_MODEL: string | undefined = env.MEETING_INSIGHT_MODEL?.trim() || undefined
@@ -59,12 +60,16 @@ const SYSTEM_PROMPT = [
   '  "followUps": ["下一步跟进建议"],',
   '  "diagnosisQuestions": ["需进一步澄清的诊断问题"],',
   '  "topicCandidates": ["可转成短视频的真实选题（基于客户原话）"],',
-  '  "deliveryTasks": [{"title": "交付任务", "owner": "负责人（未指明则省略 owner）"}]',
+  '  "deliveryTasks": [{"title": "交付任务", "owner": "负责人（未指明则省略 owner）"}],',
+  '  "evidence": [{"kind": "pain | goal | budget | objection | commitment | task", "statement": "对应判断", "quote": "从会议原文逐字复制的短句"}]',
   "}",
   "铁律：",
   "- 宁缺毋滥：原文没有的信息不要编造，对应字段留空数组或空串。",
   "- 不要补造预算金额、负责人、决策阶段或客户承诺。",
-  "- 全部字段为中文。pains/goals/objections/followUps/diagnosisQuestions/topicCandidates 为字符串数组；deliveryTasks 为对象数组。",
+  "- evidence.quote 必须逐字复制会议原文，不得改写；没有可引用原文的判断不要输出。",
+  "- 跟进建议不是客户承诺。只有客户明确表示会采取某动作时，才可输出 commitment 证据。",
+  "- commitment 的 statement 必须逐字摘自 quote 中对应的承诺内容，不得概括或改写。",
+  "- 全部字段为中文。pains/goals/objections/followUps/diagnosisQuestions/topicCandidates 为字符串数组；deliveryTasks 和 evidence 为对象数组。",
 ].join("\n")
 
 /**
@@ -105,6 +110,21 @@ function asDeliveryTasks(value: unknown): MeetingInsightInput["deliveryTasks"] {
     if (!title) continue // 没标题的任务丢弃，不伪造
     const owner = asString(obj.owner)
     out.push(owner ? { title, owner } : { title })
+  }
+  return out
+}
+
+function asEvidence(value: unknown): MeetingEvidence[] {
+  if (!Array.isArray(value)) return []
+  const out: MeetingEvidence[] = []
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue
+    const obj = item as Record<string, unknown>
+    const kind = asString(obj.kind)
+    const statement = asString(obj.statement)
+    const quote = asString(obj.quote)
+    if (!isMeetingEvidenceKind(kind) || !statement || !quote) continue
+    out.push({ kind, statement, quote })
   }
   return out
 }
@@ -158,6 +178,7 @@ export function parseInsightJson(raw: string): MeetingInsightExtractionResult {
     diagnosisQuestions: asStringArray(obj.diagnosisQuestions),
     topicCandidates: asStringArray(obj.topicCandidates),
     deliveryTasks: asDeliveryTasks(obj.deliveryTasks),
+    evidence: asEvidence(obj.evidence),
   }
   return { ok: true, input }
 }

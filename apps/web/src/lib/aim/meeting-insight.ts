@@ -14,6 +14,11 @@
  * - 与经营事项状态机解耦但可衔接：buildWorkItemReviewFields 把洞察接到 WP-3 的 submit_review 回写。
  */
 
+import {
+  isMeetingEvidenceKind,
+  type MeetingEvidence,
+} from "@/lib/aim/sales-diagnosis/evidence"
+
 /** 客户决策阶段枚举（覆盖 §9 阶段 B 的成交链路）。 */
 export const MEETING_DECISION_STAGES = [
   "初步接触",
@@ -34,7 +39,7 @@ export interface DeliveryTask {
   owner?: string
 }
 
-/** 抽取输入：九类产物的原始（未规整）形态，均可空。 */
+/** 抽取输入：九类产物的原始（未规整）形态，均可空。evidence 为兼容新增。 */
 export interface MeetingInsightInput {
   meetingTitle: string
   customer: string
@@ -48,6 +53,8 @@ export interface MeetingInsightInput {
   diagnosisQuestions: string[]
   topicCandidates: string[]
   deliveryTasks: DeliveryTask[]
+  /** v1 新增：证据数组，每项包含 kind/statement/quote。向后兼容，缺失时为空。 */
+  evidence?: MeetingEvidence[]
 }
 
 /** 规整后的结构化会议洞察。 */
@@ -72,6 +79,8 @@ export interface MeetingInsight {
   budgetFigures: number[]
   /** 是否存在可解析的预算金额。 */
   budgetSpecified: boolean
+  /** v1 新增：规整后的证据数组。向后兼容，缺失时为空。 */
+  evidence?: MeetingEvidence[]
 }
 
 export type MeetingInsightResult =
@@ -105,6 +114,26 @@ function cleanTasks(tasks: DeliveryTask[]): DeliveryTask[] {
     if (seen.has(key)) continue
     seen.add(key)
     out.push(owner ? { title, owner } : { title })
+  }
+  return out
+}
+
+/** 逐条规整 evidence：去空白、截断、校验 kind 合法性、过滤非法条目。 */
+function cleanEvidence(raw: MeetingEvidence[]): MeetingEvidence[] {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const out: MeetingEvidence[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue
+    const kind = (typeof item.kind === "string" ? item.kind.trim() : "")
+    if (!isMeetingEvidenceKind(kind)) continue
+    const statement = (typeof item.statement === "string" ? item.statement.trim() : "")
+    const quote = typeof item.quote === "string" ? item.quote.trim() : ""
+    if (!statement || !quote) continue
+    const key = `${kind}\u0000${statement}\u0000${quote}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ kind, statement, quote })
   }
   return out
 }
@@ -143,7 +172,8 @@ function buildSummary(insight: MeetingInsight): string {
     `决策阶段：${insight.decisionStage || insight.decisionStageRaw || "未明确"}`,
     `目标 ${insight.goals.length} / 痛点 ${insight.pains.length} / ` +
       `异议 ${insight.objections.length} / 跟进 ${insight.followUps.length} / ` +
-      `选题 ${insight.topicCandidates.length} / 交付 ${insight.deliveryTasks.length}`,
+      `选题 ${insight.topicCandidates.length} / 交付 ${insight.deliveryTasks.length} / ` +
+      `证据 ${insight.evidence?.length ?? 0} 条`,
   ]
   if (insight.goals.length) parts.push(`核心目标：${insight.goals.slice(0, 3).join("；")}`)
   if (insight.deliveryTasks.length) {
@@ -168,6 +198,7 @@ export function extractMeetingInsight(input: MeetingInsightInput): MeetingInsigh
   const topicCandidates = cleanStrings(input.topicCandidates ?? [])
   const budgets = cleanStrings(input.budgets ?? [])
   const deliveryTasks = cleanTasks(input.deliveryTasks ?? [])
+  const evidence = cleanEvidence(input.evidence ?? [])
 
   // 至少要有可执行落点：目标或交付任务其一，否则不是一次有产出的客户会议。
   if (goals.length === 0 && deliveryTasks.length === 0) {
@@ -199,6 +230,7 @@ export function extractMeetingInsight(input: MeetingInsightInput): MeetingInsigh
     deliveryTasks,
     budgetFigures,
     budgetSpecified: budgetFigures.length > 0,
+    evidence,
   }
   return { ok: true, insight }
 }

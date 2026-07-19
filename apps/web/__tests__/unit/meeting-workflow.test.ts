@@ -36,13 +36,18 @@ function makeStore(initialStatus: string): WorkItemRecordStore & {
 const GOOD_MODEL_JSON = JSON.stringify({
   pains: ["无技术壁垒", "缺背书"],
   goals: ["今年冲3000万", "完成种子轮融资"],
-  budgets: ["种子轮1500万"],
+  budgets: ["种子轮上限1500万"],
   decisionStage: "需求确认",
   objections: ["顾问认为现在招投融资专人太早"],
   followUps: ["先走银行贷款", "路演5轮"],
   diagnosisQuestions: ["估值口径1.5亿还是3亿"],
   topicCandidates: ["智慧供暖省电30%+的故事"],
   deliveryTasks: [{ title: "制作融资PPT", owner: "葛老板" }],
+  evidence: [
+    { kind: "goal", statement: "需求确认，今年冲3000万", quote: "目前是需求确认阶段，今年想冲3000万" },
+    { kind: "budget", statement: "种子轮1500万", quote: "种子轮上限1500万" },
+    { kind: "task", statement: "葛老板负责制作融资PPT", quote: "葛老板负责制作融资PPT" },
+  ],
 })
 
 /** 结果落盘端口替身：返回固定 aimResultId/resultLink。 */
@@ -73,6 +78,7 @@ function ports(initialStatus: string, modelContent: string): MeetingWorkflowPort
     }),
     finishTrace: vi.fn(),
     failTrace: vi.fn(),
+    addTraceStep: vi.fn(),
   } as MeetingWorkflowPorts & {
     store: ReturnType<typeof makeStore>
     resultSink: ReturnType<typeof makeResultSink>
@@ -83,7 +89,7 @@ const WORKFLOW_INPUT = {
   recordId: "rec_001",
   meetingTitle: "中汝达数字供暖 · 融资咨询",
   customer: "中汝达数字供暖（葛老板）",
-  transcript: "葛老板做数字供暖，年营收1300万想冲3000万，种子轮上限1500万，短板是无技术壁垒缺背书。",
+  transcript: "葛老板做数字供暖，目前是需求确认阶段，今年想冲3000万，种子轮上限1500万，短板是无技术壁垒缺背书。葛老板负责制作融资PPT。",
   projectId: "proj_1",
 }
 
@@ -105,9 +111,46 @@ describe("runMeetingInsightWorkflow — 成功流程", () => {
     // WP-5 契约：结果链接是字符串，不是对象。
     expect(typeof review["结果链接"]).toBe("string")
     expect(typeof review["结果摘要"]).toBe("string")
+    expect(p.addTraceStep).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        key: "sales_diagnosis_verification",
+        metadata: expect.objectContaining({ policy: "sales-diagnosis-evidence-v1" }),
+      }),
+    )
     expect((review["结果摘要"] as string).length).toBeGreaterThan(0)
     // 结果端口被调用一次（落盘完整洞察）。
     expect(p.resultSink.saved).toHaveLength(1)
+  })
+
+  it("信息不足但无编造时保存验证结果并进入人工审核", async () => {
+    const model = JSON.stringify({
+      goals: ["今年冲3000万"],
+      followUps: ["补充融资材料"],
+      evidence: [],
+    })
+    const p = ports("待处理", model)
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+
+    expect(result.ok).toBe(true)
+    expect(p.resultSink.saved).toHaveLength(1)
+    expect(p.resultSink.saved[0]).toMatchObject({ verification: { status: "needs_human" } })
+    expect(p.store.updates.map((update) => update.fields["状态"])).toEqual(["处理中", "待人工审核"])
+  })
+
+  it("关键事实无原文证据时停止、失败并且不落盘", async () => {
+    const model = JSON.stringify({
+      goals: ["今年冲3000万"],
+      budgets: ["预算5000万"],
+      followUps: ["补充融资材料"],
+      evidence: [{ kind: "budget", statement: "预算5000万", quote: "客户预算5000万" }],
+    })
+    const p = ports("待处理", model)
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+
+    expect(result).toMatchObject({ ok: false, stopReason: "verification_failed" })
+    expect(p.resultSink.saved).toHaveLength(0)
+    expect(p.store.updates.map((update) => update.fields["状态"])).toEqual(["处理中", "失败"])
   })
 
   it("调用了模型（json_object 模式）", async () => {
