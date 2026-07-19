@@ -23,6 +23,7 @@ import {
 } from "@/lib/aim/work-item-dispatch"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
+import { supervisedFailureSummary, type SupervisorNotification } from "@/lib/aim/feishu-supervisor-notifier"
 import type { LoopStopReason } from "@/lib/aim/loops/contracts"
 import type { BusinessLoopSpec } from "@/lib/aim/loops/contracts"
 import { getRegisteredLoop } from "@/lib/aim/loops/registry"
@@ -35,7 +36,7 @@ import {
 } from "@/lib/aim/services/work-item-execution"
 
 export type DispatchExecuteOutcome =
-  | { ok: true; duplicateSuppressed?: boolean }
+  | { ok: true; duplicateSuppressed?: boolean; verificationStatus?: "pass" | "needs_human"; resultLink?: string }
   | { ok: false; error: string; retryable: boolean; stopReason: LoopStopReason }
 
 export interface DispatchExecutionContext {
@@ -55,9 +56,7 @@ export interface DispatchClaimContext {
   runId: string
 }
 
-export type DispatchClaimResult =
-  | { acquired: true; token?: unknown }
-  | { acquired: false }
+export type DispatchClaimResult = { acquired: true; token?: unknown } | { acquired: false }
 
 export interface WorkItemDispatcherPorts {
   store: WorkItemRecordStore
@@ -71,8 +70,8 @@ export interface WorkItemDispatcherPorts {
   failClaim(token: unknown, error: string): Promise<void>
   /** claim 后、工作流接管前的飞书写入失败时释放唯一键，允许安全重试。 */
   releaseClaim(token: unknown): Promise<void>
-  /** 失败/超时/配置异常通知飞书负责人。 */
-  notify(message: string): Promise<void>
+  /** 仅发送监督事件；通知失败不得改变经营事项状态。 */
+  notify(notification: SupervisorNotification): Promise<void>
   now(): Date
   /** 租约持有者标识（通常为执行主机/cron 实例名）。 */
   holderId: string
@@ -112,6 +111,21 @@ async function releasePreExecutionClaim(
   }
 }
 
+async function notifySafely(
+  ports: WorkItemDispatcherPorts,
+  summary: WorkItemDispatchSummary,
+  notification: SupervisorNotification,
+): Promise<void> {
+  try {
+    await ports.notify(notification)
+  } catch (error) {
+    summary.errors.push({
+      recordId: notification.recordId,
+      error: `通知负责人失败：${describeError(error)}`,
+    })
+  }
+}
+
 export function buildDispatchRunId(
   recordId: string,
   loop: BusinessLoopSpec,
@@ -137,6 +151,8 @@ async function handleFailure(
   retryable: boolean,
   stopReason: LoopStopReason,
   maxAutoRetries: number,
+  loopId: string,
+  runId: string,
 ): Promise<void> {
   const now = ports.now()
   if (retryable) {
@@ -155,6 +171,16 @@ async function handleFailure(
       })
       summary.failed += 1
       summary.errors.push({ recordId: record.recordId, error })
+      if (stopReason === "execution_timeout") {
+        await notifySafely(ports, summary, {
+          type: "execution_timeout",
+          recordId: record.recordId,
+          loopId,
+          runId,
+          summary: supervisedFailureSummary(stopReason),
+          nextAction: "等待自动重试",
+        })
+      }
       return
     }
   }
@@ -174,16 +200,14 @@ async function handleFailure(
   })
   summary.escalated += 1
   summary.errors.push({ recordId: record.recordId, error })
-  try {
-    await ports.notify(
-      `经营事项连续失败，需人工接管：${record.recordId}\n最后错误：${error}`,
-    )
-  } catch (notifyError) {
-    summary.errors.push({
-      recordId: record.recordId,
-      error: `通知负责人失败：${describeError(notifyError)}`,
-    })
-  }
+  await notifySafely(ports, summary, {
+    type: stopReason === "execution_timeout" ? "execution_timeout" : "manual_takeover",
+    recordId: record.recordId,
+    loopId,
+    runId,
+    summary: supervisedFailureSummary(retryable ? "retry_exhausted" : stopReason),
+    nextAction: "人工接管处理",
+  })
 }
 
 /**
@@ -294,6 +318,8 @@ export async function dispatchPendingWorkItems(
         false,
         "missing_input",
         0,
+        parsed.loopId || "invalid-loop",
+        runId,
       )
       await ports.failClaim(invalidClaim.token, message)
       continue
@@ -344,7 +370,17 @@ export async function dispatchPendingWorkItems(
     } catch (writeError) {
       const message = `获取飞书执行租约失败：${describeError(writeError)}`
       await releasePreExecutionClaim(ports, claim.token, record.recordId, summary)
-      await handleFailure(ports, record, message, summary, false, "human_required", 0)
+      await handleFailure(
+        ports,
+        record,
+        message,
+        summary,
+        false,
+        "human_required",
+        0,
+        loop.id,
+        runId,
+      )
       continue
     }
 
@@ -379,6 +415,17 @@ export async function dispatchPendingWorkItems(
         [DISPATCH_FIELDS.stopReason]: "",
         [DISPATCH_FIELDS.nextAction]: "等待人工审核",
       })
+      await notifySafely(ports, summary, {
+        type: outcome.verificationStatus === "needs_human" ? "human_judgment" : "review_required",
+        recordId: record.recordId,
+        loopId: loop.id,
+        runId,
+        summary: outcome.verificationStatus === "needs_human"
+          ? "销售诊断已生成，但存在需人工判断的信息缺口。"
+          : "销售诊断已生成并通过确定性检查。",
+        nextAction: "在飞书待我审核视图中完成终审",
+        resultLink: outcome.resultLink,
+      })
       summary.succeeded += 1
       continue
     }
@@ -394,6 +441,8 @@ export async function dispatchPendingWorkItems(
       outcome.retryable,
       outcome.stopReason,
       maxAutoRetries,
+      loop.id,
+      runId,
     )
   }
 

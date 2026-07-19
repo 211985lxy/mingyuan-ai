@@ -9,6 +9,7 @@ import { DISPATCH_FIELDS, RETRY_BACKOFF_MS } from "@/lib/aim/work-item-dispatch"
 import type { WorkItemRecord } from "@/lib/aim/services/work-item-execution"
 import { retryWorkItem } from "@/lib/aim/services/work-item-execution"
 import { getRegisteredLoop } from "@/lib/aim/loops/registry"
+import type { SupervisorNotification } from "@/lib/aim/feishu-supervisor-notifier"
 
 // WP-8 无人值守执行调度（90 天计划 6.1）：
 // 扫描待处理 → 租约互斥 → 幂等执行 → 超时重试（指数退避）→ 连续失败升级人工接管并通知。
@@ -22,7 +23,7 @@ function makeRecord(recordId: string, fields: Record<string, unknown> = {}): Wor
 
 function makePorts(records: WorkItemRecord[]) {
   const updates: Array<{ recordId: string; fields: Record<string, unknown> }> = []
-  const notifications: string[] = []
+  const notifications: SupervisorNotification[] = []
   const execute = vi.fn(
     async (recordId: string, context): Promise<DispatchExecuteOutcome> => {
       void recordId
@@ -30,12 +31,12 @@ function makePorts(records: WorkItemRecord[]) {
       return { ok: true }
     },
   )
-  const claim = vi.fn(async (_recordId: string, context) => ({
-    acquired: true as const,
+  const claim = vi.fn<WorkItemDispatcherPorts["claim"]>(async (_recordId, context) => ({
+    acquired: true,
     token: { id: context.runId, startedAt: NOW.getTime() },
   }))
-  const failClaim = vi.fn(async () => undefined)
-  const releaseClaim = vi.fn(async () => undefined)
+  const failClaim = vi.fn<WorkItemDispatcherPorts["failClaim"]>(async () => undefined)
+  const releaseClaim = vi.fn<WorkItemDispatcherPorts["releaseClaim"]>(async () => undefined)
   const ports: WorkItemDispatcherPorts = {
     store: {
       async get(recordId) {
@@ -53,8 +54,8 @@ function makePorts(records: WorkItemRecord[]) {
     claim,
     failClaim,
     releaseClaim,
-    notify: async (message) => {
-      notifications.push(message)
+    notify: async (notification) => {
+      notifications.push(notification)
     },
     now: () => NOW,
     holderId: "cron-host-1",
@@ -79,7 +80,7 @@ describe("dispatchPendingWorkItems", () => {
   })
 
   it("成功路径：获取租约 → 执行 → 释放租约，幂等键为 记录ID:操作类型", async () => {
-    const { ports, updates, execute } = makePorts(records)
+    const { ports, updates, execute, notifications } = makePorts(records)
     const summary = await dispatchPendingWorkItems(ports)
     expect(summary).toMatchObject({ scanned: 1, started: 1, succeeded: 1, failed: 0 })
     expect(execute).toHaveBeenCalledWith("rec_1", expect.objectContaining({
@@ -91,6 +92,31 @@ describe("dispatchPendingWorkItems", () => {
     expect(last.fields[DISPATCH_FIELDS.leaseUntil]).toBeNull()
     expect(last.fields[DISPATCH_FIELDS.stopReason]).toBe("")
     expect(last.fields[DISPATCH_FIELDS.nextAction]).toBe("等待人工审核")
+    expect(notifications).toEqual([expect.objectContaining({ type: "review_required", recordId: "rec_1" })])
+  })
+
+  it("验证存在信息缺口时发送需人工判断通知，不把它当执行失败", async () => {
+    const { ports, execute, notifications } = makePorts(records)
+    execute.mockResolvedValueOnce({
+      ok: true,
+      verificationStatus: "needs_human",
+      resultLink: "https://example.com/result",
+    })
+    const summary = await dispatchPendingWorkItems(ports)
+    expect(summary.succeeded).toBe(1)
+    expect(summary.failed).toBe(0)
+    expect(notifications).toEqual([expect.objectContaining({
+      type: "human_judgment",
+      resultLink: "https://example.com/result",
+    })])
+  })
+
+  it("审核通知失败只记录错误，不回滚已成功的经营事项", async () => {
+    const { ports } = makePorts(records)
+    ports.notify = async () => { throw new Error("飞书消息权限不足") }
+    const summary = await dispatchPendingWorkItems(ports)
+    expect(summary.succeeded).toBe(1)
+    expect(summary.errors.some((item) => item.error.includes("通知负责人失败"))).toBe(true)
   })
 
   it("租约活跃的记录被跳过（两台进程不会同时处理）", async () => {
@@ -158,8 +184,11 @@ describe("dispatchPendingWorkItems", () => {
     expect(escalatePatch).toBeTruthy()
     expect(updates.some((u) => u.fields["状态"] === "失败")).toBe(true)
     expect(notifications).toHaveLength(1)
-    expect(notifications[0]).toContain("rec_1")
-    expect(notifications[0]).toContain("第三次还是失败")
+    expect(notifications[0]).toMatchObject({
+      recordId: "rec_1",
+      type: "execution_timeout",
+      summary: "自动重试预算已耗尽，请人工接管。",
+    })
   })
 
   it("已经由 Provider 中止的超时结果按失败处理", async () => {
@@ -277,6 +306,7 @@ describe("dispatchPendingWorkItems", () => {
     expect(firstSummary.duplicatesSuppressed + secondSummary.duplicatesSuppressed).toBe(1)
     expect(first.ports.execute).toHaveBeenCalledTimes(firstSummary.started)
     expect(second.ports.execute).toHaveBeenCalledTimes(secondSummary.started)
+    expect(first.notifications.length + second.notifications.length).toBe(1)
     expect(allUpdates.filter((fields) => fields["状态"] === "处理中")).toHaveLength(1)
     expect(sharedRecord.fields["状态"]).toBe("待人工审核")
   })

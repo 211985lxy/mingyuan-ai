@@ -38,6 +38,10 @@ import {
   type WorkItemDispatchSummary,
   type WorkItemDispatcherPorts,
 } from "@/lib/aim/services/work-item-dispatcher"
+import {
+  readSupervisorNotificationConfig,
+  sendFeishuSupervisorNotification,
+} from "@/lib/aim/feishu-supervisor-notifier"
 
 export const runtime = "nodejs"
 /** 最坏情况：10 条 × 单次执行租约 5 分钟，留足余量。 */
@@ -92,6 +96,13 @@ export async function GET(request: NextRequest) {
   const ownerUserId = process.env.AIM_WORK_ITEM_OWNER_USER_ID?.trim()
   if (!ownerUserId) {
     return unconfigured("会议洞察无人值守缺少 AIM_WORK_ITEM_OWNER_USER_ID 配置，fail-closed。")
+  }
+
+  let notificationConfig
+  try {
+    notificationConfig = readSupervisorNotificationConfig()
+  } catch {
+    return unconfigured("飞书监督通知配置不可用，请检查服务端配置。")
   }
 
   const store = createLarkWorkItemStore(config)
@@ -174,7 +185,11 @@ export async function GET(request: NextRequest) {
         },
         { store, resultSink, claimedTrace: requireClaimedTrace(context.claimToken) },
       )
-      if (result.ok) return { ok: true }
+      if (result.ok) return {
+        ok: true,
+        verificationStatus: result.verificationStatus,
+        resultLink: result.resultLink,
+      }
       if (result.stopReason === "verification_failed") {
         return { ok: false, error: result.error, retryable: false, stopReason: "verification_failed" }
       }
@@ -189,10 +204,10 @@ export async function GET(request: NextRequest) {
         stopReason: classified.stopReason,
       }
     },
-    notify: async (message) => {
-      // 负责人推送暂以服务端日志承载；接飞书消息推送时替换此端口实现。
-      console.error(`[cron/feishu-work-items/dispatch] ${message}`)
-    },
+    notify: (notification) => sendFeishuSupervisorNotification({
+      config: notificationConfig,
+      notification,
+    }),
     now: () => new Date(),
     holderId: process.env.HOSTNAME?.trim() || "cron-unattended",
   }

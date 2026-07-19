@@ -14,6 +14,8 @@ const {
   claimAimTrace,
   failAimTrace,
   releaseAimTraceClaim,
+  readSupervisorNotificationConfig,
+  sendFeishuSupervisorNotification,
 } = vi.hoisted(() => ({
   validateCronSecret: vi.fn(() => true),
   runMeetingInsightWorkflow: vi.fn(),
@@ -21,12 +23,17 @@ const {
   listPendingWorkItemRecords: vi.fn(),
   readWorkItemStoreConfig: vi.fn(() => ({ baseToken: "bse_1", tableId: "tbl_1", cliPath: "/mock/lark-cli" })),
   createAimGenerationInsightResultSink: vi.fn(() => ({ save: vi.fn() })),
-  claimAimTrace: vi.fn(async (input: { id: string }) => ({
+  claimAimTrace: vi.fn(async (input: { id: string }): Promise<
+    | { acquired: true; trace: { id: string; startedAt: number } }
+    | { acquired: false; reason: "duplicate" }
+  > => ({
     acquired: true as const,
     trace: { id: input.id, startedAt: Date.now() },
   })),
   failAimTrace: vi.fn(async () => undefined),
   releaseAimTraceClaim: vi.fn(async () => undefined),
+  readSupervisorNotificationConfig: vi.fn(() => ({ enabled: false as const })),
+  sendFeishuSupervisorNotification: vi.fn(async () => undefined),
 }))
 
 vi.mock("@/lib/admin-auth", () => ({ validateCronSecret }))
@@ -34,6 +41,11 @@ vi.mock("@/lib/aim/work-item-store", () => ({ createLarkWorkItemStore, listPendi
 vi.mock("@/lib/aim/meeting-insight-result-sink", () => ({ createAimGenerationInsightResultSink }))
 vi.mock("@/lib/aim/meeting-workflow", () => ({ runMeetingInsightWorkflow }))
 vi.mock("@/lib/aim-observability", () => ({ claimAimTrace, failAimTrace, releaseAimTraceClaim }))
+vi.mock("@/lib/aim/feishu-supervisor-notifier", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/aim/feishu-supervisor-notifier")>(),
+  readSupervisorNotificationConfig,
+  sendFeishuSupervisorNotification,
+}))
 
 import { classifyDispatchRetry, GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
 import { DISPATCH_FIELDS } from "@/lib/aim/work-item-dispatch"
@@ -131,6 +143,16 @@ describe("鉴权与 fail-closed", () => {
     expect(String(body.error)).toContain("配置不可用")
     expect(String(body.error)).not.toContain("LARK_BASE_TOKEN")
   })
+
+  it("监督通知启用但配置不完整 → 503 fail-closed", async () => {
+    readSupervisorNotificationConfig.mockImplementationOnce(() => {
+      throw new Error("缺少 AIM_SUPERVISOR_CHAT_ID")
+    })
+    const { status, body } = await call()
+    expect(status).toBe(503)
+    expect(String(body.error)).toContain("监督通知配置不可用")
+    expect(listPendingWorkItemRecords).not.toHaveBeenCalled()
+  })
 })
 
 describe("临时错误白名单", () => {
@@ -148,6 +170,7 @@ describe("无人值守调度执行", () => {
   it("待处理记录经真实 dispatcher 推进会议洞察工作流 → 成功计数 +1", async () => {
     runMeetingInsightWorkflow.mockResolvedValueOnce({
       ok: true, status: "待人工审核", idempotent: false, recordId: "rec_1", aimResultId: "gen_1",
+      verificationStatus: "needs_human", resultLink: "https://example.com/gen_1",
     })
     const { status, body } = await call()
     expect(status).toBe(200)
@@ -168,6 +191,12 @@ describe("无人值守调度执行", () => {
       }),
       expect.objectContaining({ store: expect.any(Object), resultSink: expect.any(Object) }),
     )
+    expect(sendFeishuSupervisorNotification).toHaveBeenCalledWith(expect.objectContaining({
+      notification: expect.objectContaining({
+        type: "human_judgment",
+        resultLink: "https://example.com/gen_1",
+      }),
+    }))
   })
 
   it("会议原文为空 → execute 失败，记录进入失败/重试计数", async () => {
@@ -233,6 +262,13 @@ describe("无人值守调度执行", () => {
     expect(summary.escalated).toBe(1)
     expect(serialized).not.toContain("provider-secret-token")
     expect(serialized).toContain("DISPATCH_ITEM_FAILED")
+    expect(sendFeishuSupervisorNotification).toHaveBeenCalledWith(expect.objectContaining({
+      notification: expect.objectContaining({
+        type: "manual_takeover",
+        summary: "自动执行失败，请打开经营事项或运行追踪查看详情。",
+      }),
+    }))
+    expect(JSON.stringify(sendFeishuSupervisorNotification.mock.calls)).not.toContain("should-not-leak")
     expect(store.update.mock.calls.some(([, fields]) =>
       fields[DISPATCH_FIELDS.retryCount] === 1 || fields["状态"] === "待处理",
     )).toBe(false)

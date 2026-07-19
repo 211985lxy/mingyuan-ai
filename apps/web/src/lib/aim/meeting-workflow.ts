@@ -92,7 +92,16 @@ export interface MeetingWorkflowPorts {
 }
 
 export type MeetingWorkflowResult =
-  | { ok: true; status: "待人工审核"; idempotent: boolean; recordId: string; aimResultId: string; execution?: AimRunMetadata }
+  | {
+      ok: true
+      status: "待人工审核"
+      idempotent: boolean
+      recordId: string
+      aimResultId: string
+      resultLink?: string
+      verificationStatus?: "pass" | "needs_human"
+      execution?: AimRunMetadata
+    }
   | { ok: false; status: "失败" | "待处理" | "处理中" | "待人工审核"; error: string; recordId: string; stopReason?: "duplicate_suppressed" | "verification_failed" }
 
 export function buildMeetingInsightTraceId(recordId: string, attempt = 1, inputFingerprint = ""): string {
@@ -339,6 +348,8 @@ export async function runMeetingInsightWorkflow(
     idempotent: review.idempotent,
     recordId: input.recordId,
     aimResultId: saved.aimResultId,
+    resultLink: saved.resultLink,
+    verificationStatus: verification.status,
     execution: run.metadata,
   }
 }
