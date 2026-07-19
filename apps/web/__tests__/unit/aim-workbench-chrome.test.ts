@@ -28,6 +28,7 @@ describe("AIM workbench chrome", () => {
 
     expect(html).toContain("定方向")
     expect(html).toContain("做内容")
+    expect(html).toContain("发作品")
     expect(html).toContain("测试 IP")
     expect(html).toContain("新任务")
   })
