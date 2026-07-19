@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
 import { redisConnectionStatus } from "@/lib/metrics"
+import { logger } from "@/lib/logger"
 import {
   computeFeishuWorkItemReady,
   computeProxyReady,
@@ -20,10 +21,11 @@ export async function GET() {
     await prisma.$queryRawUnsafe("SELECT 1")
     checks.database = { ok: true, latencyMs: Date.now() - dbStart }
   } catch (error) {
+    logger.warn({ error }, "[healthz] database unavailable")
     checks.database = {
       ok: false,
       latencyMs: Date.now() - dbStart,
-      error: error instanceof Error ? error.message : "unknown",
+      error: "unavailable",
     }
   }
 
@@ -34,10 +36,11 @@ export async function GET() {
     checks.redis = { ok: true, latencyMs: Date.now() - redisStart }
     redisConnectionStatus.set(1)
   } catch (error) {
+    logger.warn({ error }, "[healthz] redis unavailable")
     checks.redis = {
       ok: false,
       latencyMs: Date.now() - redisStart,
-      error: error instanceof Error ? error.message : "unknown",
+      error: "unavailable",
     }
     redisConnectionStatus.set(0)
   }
