@@ -5,6 +5,11 @@ import { parseMysqlUrl } from "./verify-production-schema.mjs"
 
 export const PRODUCTION_SCHEMA_PATCHES = [
   "ALTER TABLE `User` ADD COLUMN IF NOT EXISTS `authVideoUrl` VARCHAR(191) NULL",
+  `ALTER TABLE \`AimExecutionTrace\`
+    ADD COLUMN IF NOT EXISTS \`inputTokens\` INTEGER NULL,
+    ADD COLUMN IF NOT EXISTS \`outputTokens\` INTEGER NULL,
+    ADD COLUMN IF NOT EXISTS \`cachedTokens\` INTEGER NULL,
+    ADD COLUMN IF NOT EXISTS \`costCny\` DECIMAL(10,6) NULL`,
   `CREATE TABLE IF NOT EXISTS \`AssetCandidate\` (
     \`id\` VARCHAR(191) NOT NULL,
     \`userId\` VARCHAR(191) NOT NULL,

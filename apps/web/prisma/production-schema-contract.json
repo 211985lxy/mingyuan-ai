@@ -42,6 +42,20 @@
       ]
     },
     {
+      "name": "AimExecutionTrace",
+      "columns": [
+        "id",
+        "runId",
+        "provider",
+        "model",
+        "totalTokens",
+        "inputTokens",
+        "outputTokens",
+        "cachedTokens",
+        "costCny"
+      ]
+    },
+    {
       "name": "AimRunEvent",
       "columns": [
         "id",

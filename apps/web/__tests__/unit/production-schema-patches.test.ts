@@ -7,4 +7,15 @@ describe("production schema patches", () => {
       "ALTER TABLE `User` ADD COLUMN IF NOT EXISTS `authVideoUrl` VARCHAR(191) NULL",
     )
   })
+
+  it("repairs execution trace telemetry columns idempotently", () => {
+    const tracePatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("ALTER TABLE `AimExecutionTrace`"),
+    )
+
+    expect(tracePatch).toContain("ADD COLUMN IF NOT EXISTS `inputTokens` INTEGER NULL")
+    expect(tracePatch).toContain("ADD COLUMN IF NOT EXISTS `outputTokens` INTEGER NULL")
+    expect(tracePatch).toContain("ADD COLUMN IF NOT EXISTS `cachedTokens` INTEGER NULL")
+    expect(tracePatch).toContain("ADD COLUMN IF NOT EXISTS `costCny` DECIMAL(10,6) NULL")
+  })
 })
