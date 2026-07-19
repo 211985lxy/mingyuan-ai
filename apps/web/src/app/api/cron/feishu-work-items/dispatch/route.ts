@@ -42,6 +42,7 @@ import {
   readSupervisorNotificationConfig,
   sendFeishuSupervisorNotification,
 } from "@/lib/aim/feishu-supervisor-notifier"
+import { classifyDispatchRetry } from "@/lib/aim/work-item-dispatch-retry"
 
 export const runtime = "nodejs"
 /** 最坏情况：10 条 × 单次执行租约 5 分钟，留足余量。 */
@@ -59,17 +60,6 @@ function publicDispatchSummary(summary: WorkItemDispatchSummary) {
       code: "DISPATCH_ITEM_FAILED",
     })),
   }
-}
-
-export function classifyDispatchRetry(error: string) {
-  const lower = error.toLowerCase()
-  const status = Number(error.match(/\b(4\d{2}|5\d{2})\b/)?.[1] ?? NaN)
-  const timedOut = status === 408 || /(timeout|timed out|deadline|aborted|超时)/.test(lower)
-  const retryable = timedOut
-    || status === 429
-    || status >= 500
-    || /(econnrefused|econnreset|enotfound|epipe|fetch failed|network|socket|getaddrinfo|网络)/.test(lower)
-  return { retryable, stopReason: timedOut ? "execution_timeout" as const : "human_required" as const }
 }
 
 function requireClaimedTrace(token: unknown): AimTraceRecorder {

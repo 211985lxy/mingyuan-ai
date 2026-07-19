@@ -47,7 +47,8 @@ vi.mock("@/lib/aim/feishu-supervisor-notifier", async (importOriginal) => ({
   sendFeishuSupervisorNotification,
 }))
 
-import { classifyDispatchRetry, GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
+import { GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
+import { classifyDispatchRetry } from "@/lib/aim/work-item-dispatch-retry"
 import { DISPATCH_FIELDS } from "@/lib/aim/work-item-dispatch"
 
 const CRON_SECRET = "test-cron-secret-with-enough-length-32"
