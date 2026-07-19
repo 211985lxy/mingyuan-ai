@@ -9,6 +9,7 @@
 - 默认 E2E 已屏蔽所有模型供应商密钥；真实模型脚本质量检查独立为 `test:e2e:real-llm`，只能在获批预算的灰度阶段运行。
 - 后台任务 Cron 每次只领取一个任务，路由上限为 300 秒、租约为 6 分钟；Kubernetes 清单已声明每 5 分钟触发一次。集群侧 `kubectl` dry-run 与真实灰度仍待具备集群访问权限后完成。
 - 生产环境的 `BACKGROUND_TASKS_ENABLED` 默认关闭；只有 Kubernetes Web 清单显式启用。未配置等价调度器的部署会在入队前返回 503，避免生成永久排队任务。
+- 生产迁移账本显示早期退役修复已完成但 `User.authVideoUrl` 仍实际存在；已在备份和零非空记录取证后追加幂等修复迁移，禁止用未记账手工 DDL 处理。
 - 最新 `main` 的后续 UI 提交已消除旧 React Lint 阻断；当前集成分支的独立 Lint 已通过。
 - `prisma migrate diff` 在 MariaDB 测试库报告降序索引和外键重建差异，但 Prisma 反射与迁移记录均证明关键表存在；不得把该 SQL 当作修复迁移执行。
 
