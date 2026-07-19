@@ -37,9 +37,11 @@ export const PRODUCTION_SCHEMA_PATCHES = [
 
 function runMysql(connection, query) {
   const args = ["--protocol=TCP", "--host", connection.host, "--port", connection.port, "--user", connection.user]
-  if (connection.password) args.push(`--password=${connection.password}`)
   args.push(connection.database, "--execute", query)
-  execFileSync(process.env.MYSQL_BIN || "mysql", args, { stdio: ["ignore", "pipe", "pipe"] })
+  execFileSync(process.env.MYSQL_BIN || "mysql", args, {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, MYSQL_PWD: connection.password },
+  })
 }
 
 function main() {

@@ -29,10 +29,21 @@ function assertSchemaIdentifier(value) {
 }
 
 function runMysql(connection, query) {
+  const mysqlBin = process.env.MYSQL_BIN || "mysql"
   const args = ["--protocol=TCP", "--batch", "--skip-column-names", "--host", connection.host, "--port", connection.port, "--user", connection.user]
-  if (connection.password) args.push(`--password=${connection.password}`)
   args.push(connection.database, "--execute", query)
-  return execFileSync(process.env.MYSQL_BIN || "mysql", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+  try {
+    return execFileSync(mysqlBin, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, MYSQL_PWD: connection.password },
+    })
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      throw new Error(`MySQL client not found: set MYSQL_BIN or install mysql client (${mysqlBin})`)
+    }
+    throw error
+  }
 }
 
 export function findContractViolations(contract, tableColumns) {
