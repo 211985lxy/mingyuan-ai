@@ -1,5 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
+import { areBackgroundTasksEnabled } from "@/lib/background-task-runtime"
 import { INSPIRATION_PROCESS_TASK_KIND } from "@/features/topics/services/inspiration-background-task"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -27,6 +28,9 @@ export async function POST(request: NextRequest) {
     const autoProcess = body.autoProcess !== false
     if (!content) return NextResponse.json({ error: "灵感内容不能为空" }, { status: 400 })
     if (content.length > 10_000) return NextResponse.json({ error: "灵感内容过长，请控制在 10000 字以内" }, { status: 400 })
+    if (autoProcess && !areBackgroundTasksEnabled()) {
+      return NextResponse.json({ error: "BACKGROUND_TASKS_UNAVAILABLE" }, { status: 503 })
+    }
     const inspiration = await prisma.$transaction(async (tx) => {
       const created = await tx.inspiration.create({ data: { userId: user.id, source, content, aiStatus: autoProcess ? "pending" : "completed" } })
       if (autoProcess) await enqueueBackgroundTask(tx as never, { kind: INSPIRATION_PROCESS_TASK_KIND, aggregateType: "inspiration", aggregateId: created.id, idempotencyKey: `inspiration:${created.id}` })

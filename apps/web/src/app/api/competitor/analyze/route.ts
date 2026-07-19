@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { withUserAuth } from '@/lib/user-auth'
 import { checkUrlType, parseUrl } from '@/lib/tikhub/url-parser'
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
+import { areBackgroundTasksEnabled } from "@/lib/background-task-runtime"
 import { COMPETITOR_ANALYSIS_TASK_KIND } from "@/lib/competitor-analysis/background-task"
 import { getCompetitorPlatformGate } from '@/lib/competitor-analysis/platform-scope'
 import { enforceDailyBetaLimit } from '@/lib/internal-beta-limits'
@@ -13,6 +14,10 @@ import { competitorAnalyzeBodySchema } from "@/features/competitor/contracts/api
 export const maxDuration = 300
 
 export const POST = withUserAuth(async (request, { user }) => {
+  if (!areBackgroundTasksEnabled()) {
+    return NextResponse.json({ error: "BACKGROUND_TASKS_UNAVAILABLE" }, { status: 503 })
+  }
+
   const quotaResponse = await enforceDailyBetaLimit(user.id, 'competitor_analysis')
   if (quotaResponse) return quotaResponse
 

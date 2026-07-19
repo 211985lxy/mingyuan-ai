@@ -30,6 +30,8 @@ spec:
             - secretRef:
                 name: mingyuan-web-secrets
           env:
+            - name: BACKGROUND_TASKS_ENABLED
+              value: "true"
             - name: aliyun_logs_webstdout
               value: "stdout"
             - name: aliyun_logs_webstdout_project
