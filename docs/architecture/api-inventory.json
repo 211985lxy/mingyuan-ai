@@ -1649,9 +1649,9 @@
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
-      "externalService": true,
-      "cost": "high",
-      "idempotency": false
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
     },
     {
       "route": "/api/integrations/feishu/events",
