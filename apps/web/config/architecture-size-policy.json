@@ -19,11 +19,6 @@
       "path": "src/app/(dashboard)/topic-planning/page.tsx",
       "maxLines": 155,
       "target": "src/features/topic/hooks"
-    },
-    {
-      "path": "src/lib/aim/services/chat-context.ts",
-      "maxLines": 50,
-      "target": "src/lib/aim/services/chat/* sub-modules"
     }
   ]
 }
