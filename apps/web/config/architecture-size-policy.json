@@ -9,11 +9,6 @@
       "path": "src/app/(dashboard)/aim/page.tsx",
       "maxLines": 180,
       "target": "src/features/aim/components and hooks"
-    },
-    {
-      "path": "src/app/(dashboard)/topic-planning/page.tsx",
-      "maxLines": 155,
-      "target": "src/features/topic/hooks"
     }
   ]
 }
