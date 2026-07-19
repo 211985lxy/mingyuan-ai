@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import {
   Select,
   SelectContent,
@@ -137,9 +138,10 @@ export default function AdminActivationCodesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">激活码管理</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <AdminPageHeader
+        title="激活码"
+        description="生成、查询和导出激活码；优先关注未使用数量与即将发放的批次。"
+        actions={<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="cursor-pointer">
               <Plus className="h-4 w-4 mr-2" />
@@ -149,8 +151,8 @@ export default function AdminActivationCodesPage() {
           <DialogContent>
             <GenerateCodesForm onSuccess={handleGenerated} />
           </DialogContent>
-        </Dialog>
-      </div>
+        </Dialog>}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

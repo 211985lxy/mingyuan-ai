@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import {
   getAdminUsers,
   getAdminUserStats,
@@ -81,7 +82,10 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">用户管理</h1>
+      <AdminPageHeader
+        title="用户管理"
+        description="查看用户套餐、使用情况与注册信息，必要时进入详情处理单个用户。"
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

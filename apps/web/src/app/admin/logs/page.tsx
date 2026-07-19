@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 
 interface AuditLogEntry {
   id: string
@@ -45,18 +46,14 @@ export default function AdminLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">操作日志</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理员操作审计记录
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
+      <AdminPageHeader
+        title="操作日志"
+        description="查看管理员的关键操作记录，用于问题追溯和变更核查。"
+        actions={<Button variant="outline" size="sm" onClick={fetchLogs} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
           刷新
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <Card>
         <CardHeader className="pb-3">

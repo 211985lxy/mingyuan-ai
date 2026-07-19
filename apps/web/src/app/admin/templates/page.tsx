@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { toast } from "sonner"
 
 interface Template {
@@ -65,10 +66,11 @@ export default function AdminTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">内容模板</h1>
-        <Badge variant="secondary">{total} 个模板</Badge>
-      </div>
+      <AdminPageHeader
+        title="内容模板"
+        description="管理可复用的内容结构与提示词；先筛选，再进入对应业务场景使用。"
+        meta={<Badge variant="secondary">{total} 个模板</Badge>}
+      />
 
       <div className="flex flex-wrap gap-3">
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(!v || v === "all" ? "" : v); setPage(1) }}>

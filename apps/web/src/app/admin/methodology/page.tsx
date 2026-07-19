@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { CollapsibleContent } from "@/components/admin/collapsible-content"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import {
   getAllAgentLogicProfiles,
   getAgentFlowEdges,
@@ -135,15 +136,10 @@ export default function AdminMethodologyPage() {
 
   return (
     <div className="space-y-6">
-      {/* 标题区 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">IP 操盘方法论</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            看清每个智能体调用什么知识、应用什么方法论、走什么调用流程，并可编辑整理方法论与文案。
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <AdminPageHeader
+        title="IP 操盘方法论"
+        description="查看智能体使用的知识、方法论和调用流程，并维护可复用的方法论内容。"
+        actions={<>
           <Button variant="outline" size="sm" onClick={fetchMethodologies}>
             <RotateCw className="mr-1.5 h-4 w-4" />
             刷新
@@ -154,8 +150,8 @@ export default function AdminMethodologyPage() {
               查看真实调用追踪
             </Button>
           </Link>
-        </div>
-      </div>
+        </>}
+      />
 
       {/* 调用流程拓扑图 */}
       <Card>

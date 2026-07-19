@@ -2,7 +2,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Users,
   Sparkles,
@@ -16,7 +16,6 @@ import {
   Bot,
   CheckCircle2,
   XCircle,
-  Clock,
   ListChecks,
   Activity,
   Target,
@@ -35,6 +34,7 @@ import {
   StatusCard,
   SummarySkeleton,
 } from "@/components/admin/admin-dashboard-cards"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 
 interface DashboardData {
   totalUsers: number
@@ -55,8 +55,8 @@ type LoadState<T> = { status: "loading"; data: null } | { status: "error"; data:
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams() ?? new URLSearchParams()
   const tabParam = searchParams.get("tab")
-  const defaultTab = tabParam === "pending" ? "pending" : tabParam === "status" ? "status" : "overview"
-  const [activeTab, setActiveTab] = React.useState(defaultTab)
+  const router = useRouter()
+  const activeTab = tabParam === "pending" ? "pending" : tabParam === "status" ? "status" : "overview"
 
   const [dashboard, setDashboard] = React.useState<LoadState<DashboardData>>({ status: "loading", data: null })
   const [userStats, setUserStats] = React.useState<LoadState<UserStats>>({ status: "loading", data: null })
@@ -95,12 +95,12 @@ export default function AdminDashboardPage() {
     loadAll()
   }, [loadAll])
 
-  // Sync the tab parameter from URL on mount
-  React.useEffect(() => {
-    if (tabParam === "pending") setActiveTab("pending")
-    else if (tabParam === "status") setActiveTab("status")
-    else setActiveTab("overview")
-  }, [tabParam])
+  function handleTabChange(nextTab: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (nextTab === "overview") params.delete("tab")
+    else params.set("tab", nextTab)
+    router.replace(params.size ? `/admin?${params.toString()}` : "/admin")
+  }
 
   const anyError = dashboard.status === "error" || codeStats.status === "error" || userStats.status === "error"
   const pendingCount = (dashboard.data?.pendingKnowledgeCount ?? 0) +
@@ -110,15 +110,16 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">工作台</h1>
-        <Button variant="outline" size="sm" onClick={loadAll}>
+      <AdminPageHeader
+        title="工作台"
+        description="从待处理事项、业务概览和系统状态开始，快速进入下一步操作。"
+        actions={<Button variant="outline" size="sm" onClick={loadAll}>
           <RotateCw className="mr-1.5 h-4 w-4" />
           刷新
-        </Button>
-      </div>
+        </Button>}
+      />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview" className="cursor-pointer">
             <Activity className="h-4 w-4 mr-1" />

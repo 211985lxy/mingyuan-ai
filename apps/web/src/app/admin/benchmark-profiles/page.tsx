@@ -6,6 +6,7 @@ import { Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import {
   Select,
   SelectContent,
@@ -284,19 +285,14 @@ export default function BenchmarkProfilesPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      {/* 标题栏 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">真实档案</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            管理真实账号和客户资料，素材自动进入 AIM 检索
-          </p>
-        </div>
-        <Button className="cursor-pointer" onClick={() => setCreateOpen(true)}>
+      <AdminPageHeader
+        title="真实档案"
+        description="管理账号与客户资料；档案中的素材会进入 AIM 检索，供后续内容生成使用。"
+        actions={<Button className="cursor-pointer" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           添加档案
-        </Button>
-      </div>
+        </Button>}
+      />
 
       {/* 搜索 & 过滤 */}
       <div className="flex flex-wrap items-center gap-3">

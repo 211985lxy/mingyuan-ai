@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import {
   AdminApiError,
   getAdminHotSources,
@@ -70,18 +71,14 @@ export default function AdminHotSourcesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">热点信源</h1>
-          <p className="text-sm text-muted-foreground">
-            按账号绑定热点精选使用的行业信源。保存后，前台选题雷达会优先读取这里的配置。
-          </p>
-        </div>
-        <Button variant="outline" onClick={fetchSources} disabled={loading} className="cursor-pointer">
+      <AdminPageHeader
+        title="热点信源"
+        description="按账号配置选题雷达使用的行业信源；保存后，前台会优先读取这里的内容。"
+        actions={<Button variant="outline" onClick={fetchSources} disabled={loading} className="cursor-pointer">
           <RotateCcw className="h-4 w-4" />
           刷新
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-3">

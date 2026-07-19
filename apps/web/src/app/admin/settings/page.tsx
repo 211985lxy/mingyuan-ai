@@ -41,6 +41,7 @@ import {
   AdminApiError,
 } from "@/lib/api/admin-client"
 import { BRANDING_SETTING_KEYS } from "@/lib/branding-config"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 
 export default function AdminSettingsPage() {
   const [grouped, setGrouped] = React.useState<Record<string, SettingItem[]>>({})
@@ -96,9 +97,10 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">系统设置</h1>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <AdminPageHeader
+        title="系统设置"
+        description="按配置类别管理系统行为。日常设置在前，高级配置请确认影响范围后再修改。"
+        actions={<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button className="cursor-pointer">
               <Plus className="h-4 w-4 mr-2" />
@@ -113,8 +115,8 @@ export default function AdminSettingsPage() {
               }}
             />
           </DialogContent>
-        </Dialog>
-      </div>
+        </Dialog>}
+      />
 
       {loading ? (
         <div className="space-y-4">

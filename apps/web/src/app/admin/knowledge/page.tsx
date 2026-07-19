@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { buildKnowledgeCleaningSuggestion, parseKnowledgeTags } from "@/lib/knowledge-tags"
 import { KnowledgeMap } from "@/components/admin/knowledge-map"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { KnowledgeBrowser, type KnowledgeEntry as BrowserKnowledgeEntry, type AdminProject as BrowserAdminProject } from "@/components/admin/knowledge-browser"
 import { KnowledgeDetailDialog, KnowledgeDistillDialog } from "@/features/knowledge/components/knowledge-review-dialogs"
 import { KnowledgeEntryDialog, KnowledgeUploadDialog } from "@/features/knowledge/components/knowledge-entry-dialogs"
@@ -339,7 +340,10 @@ export default function AdminKnowledgePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">知识库管理</h1>
+      <AdminPageHeader
+        title="知识库"
+        description="按项目管理资料，优先处理待整理内容，再沉淀为可供智能体调用的核心知识。"
+      />
 
       {/* Tab 切换 */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { AdminPageHeader } from "@/components/admin/admin-page-header"
 
 interface UsageRecord {
   id: string
@@ -50,18 +51,14 @@ export default function AdminUsagePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">使用记录</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            智能体 API 调用记录和执行详情
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading}>
+      <AdminPageHeader
+        title="使用记录"
+        description="查看智能体调用、模型消耗和失败信息，定位异常请求。"
+        actions={<Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading}>
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
           刷新
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <Card>
         <CardHeader className="pb-3">
