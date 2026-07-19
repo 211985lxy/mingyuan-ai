@@ -219,6 +219,28 @@ function checkR5() {
   }
 }
 
+const R6_DEPRECATED_IMPORTS = [
+  "@/features/aim/aim-draft-storage",
+  "@/features/aim/hooks/use-aim-route-effects",
+  "@/features/aim/hooks/use-aim-publish-actions",
+]
+
+function checkR6(files: string[]) {
+  for (const file of files) {
+    const text = read(file)
+    for (const deprecatedImport of R6_DEPRECATED_IMPORTS) {
+      if (text.includes(deprecatedImport)) {
+        findings.push({
+          rule: "R6",
+          severity: "error",
+          file: rel(file),
+          detail: `引用已退役 AIM 实现（${deprecatedImport}）；请改用 lib/aim/draft-storage 或 hooks/use-aim-route-sync`,
+        })
+      }
+    }
+  }
+}
+
 // ── 主流程 ──────────────────────────────────────────────────────────────────
 function main() {
   const files = listTsFiles(SRC_ROOT)
@@ -227,6 +249,7 @@ function main() {
   checkR2()
   checkR4(files)
   checkR5()
+  checkR6(files)
 
   const errors = findings.filter((f) => f.severity === "error")
   const todos = findings.filter((f) => f.severity === "todo")

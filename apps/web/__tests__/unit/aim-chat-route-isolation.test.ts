@@ -189,6 +189,25 @@ describe("POST /api/aim/chat", () => {
     expect(persistMemoriesFromConversation).toHaveBeenCalledTimes(1)
   })
 
+  it("normalizes the legacy writer module before it reaches the harness", async () => {
+    executeAimRun.mockResolvedValue({
+      output: "模型回复正文",
+      metadata: { runId: "run_module", degraded: false, provider: "test-provider", model: "test-model" },
+    })
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      writerModule: "social",
+      messages: [{ role: "user", content: "写一段" }],
+    }))
+
+    expect(res.status).toBe(200)
+    expect(executeAimRun).toHaveBeenCalledWith(expect.objectContaining({
+      agentModule: "social",
+      writerModule: "social",
+    }), expect.any(Function))
+  })
+
   it("streaming chat returns a text/plain stream with the run id header", async () => {
     async function* chunks() {
       yield "段一"

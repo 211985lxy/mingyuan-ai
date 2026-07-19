@@ -21,7 +21,9 @@ describe("AIM composer generate button", () => {
     const executeBlock = generationSource.match(/async function executeGeneration[\s\S]*?async function generateWithInput/)?.[0] ?? ""
 
     expect(pendingBlock).toContain("setMessages((messages) => [")
-    expect(pendingBlock).toContain("正在${input.agent.primaryActionLabel}")
+    expect(pendingBlock).toContain("getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel)")
+    expect(generationSource).toContain("正在${actionLabel}，会读取当前项目资料并匹配知识库")
+    expect(generationSource).toContain("正在${actionLabel}，将根据本次输入生成交付物")
     expect(executeBlock).toContain("appendPendingGeneration")
     expect(executeBlock.indexOf("appendPendingGeneration")).toBeLessThan(executeBlock.indexOf("await generateAimContent"))
   })

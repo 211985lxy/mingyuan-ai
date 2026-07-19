@@ -24,6 +24,8 @@ import {
 import { planAimRun } from "@/lib/aim-harness/planner"
 import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 import { ContentProducerHandler } from "@/lib/aim-agent-content-producer"
+import { copyStudioModuleFromRouteKey } from "@/lib/copy-studio"
+import { withCopyStudioExecution } from "@/lib/task-spec"
 import { FreeCopywriterHandler } from "@/lib/aim-agent-free-copywriter"
 import { DeepCopywriterHandler } from "@/lib/aim-agent-deep-copywriter"
 import { BusinessSystemDiagnosisHandler } from "@/lib/aim-agent-business-system-diagnosis"
@@ -288,6 +290,10 @@ export async function buildAimGeneration(
     contextOverride: params.contextOverride,
   })
   const generationMode = resolveGenerationConversationMode(agentId, params)
+  const taskSpec = withCopyStudioExecution(
+    prepared.taskSpec,
+    copyStudioModuleFromRouteKey(prepared.spec.modelPolicy.routeKey),
+  )
   const response = await runAimTraceStep(
     params.trace,
     "agent_generate",
@@ -306,7 +312,7 @@ export async function buildAimGeneration(
       retrievedEntries: (prepared.retrievedEntries ?? []) as any[],
       retrievedSource: prepared.retrievedSource ?? "raw",
       knowledgeStrategy: prepared.spec.knowledgeStrategy,
-      taskSpec: prepared.taskSpec,
+      taskSpec,
     }),
     (result) => ({
       summary: `生成 ${result.results.length} 个交付物`,
@@ -326,6 +332,6 @@ export async function buildAimGeneration(
     ...response,
     conversationMode: generationMode,
     knowledgeStrategy: prepared.spec.knowledgeStrategy,
-    taskSpec: prepared.taskSpec,
+    taskSpec,
   }
 }

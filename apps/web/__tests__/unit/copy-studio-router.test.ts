@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { COPY_STUDIO_ROUTE_KEYS, isCopyStudioModule, resolveCopyStudioRouteKey } from "@/lib/copy-studio"
+import { COPY_STUDIO_ROUTE_KEYS, copyStudioModuleFromRouteKey, isCopyStudioModule, normalizeRequestedCopyStudioModule, normalizeWorkbenchCopyStudioModule, resolveCopyStudioRouteKey, supportsCopyStudioModule } from "@/lib/copy-studio"
 import { getAgentRecommendedModel, resolveAgentRouteKey } from "@/lib/llm/agent-router"
 
 describe("copy studio module contract", () => {
@@ -16,5 +16,18 @@ describe("copy studio module contract", () => {
     expect(resolveAgentRouteKey("deep_copywriter", "longform")).toBe(COPY_STUDIO_ROUTE_KEYS.longform)
     expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.social)).toBe(getAgentRecommendedModel("content_producer"))
     expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.longform)).toBe(getAgentRecommendedModel("deep_copywriter"))
+  })
+
+  it("scopes workbench modes to the content producer while preserving API compatibility", () => {
+    expect(normalizeWorkbenchCopyStudioModule("content_producer", "social")).toBe("social")
+    expect(normalizeWorkbenchCopyStudioModule("business_diagnosis", "social")).toBeUndefined()
+    expect(normalizeRequestedCopyStudioModule(undefined, "longform")).toBe("longform")
+    expect(supportsCopyStudioModule("deep_copywriter")).toBe(true)
+    expect(supportsCopyStudioModule("business_diagnosis")).toBe(false)
+  })
+
+  it("round-trips copy-studio route keys only", () => {
+    expect(copyStudioModuleFromRouteKey("copy_studio.free")).toBe("free")
+    expect(copyStudioModuleFromRouteKey("business_diagnosis")).toBeUndefined()
   })
 })

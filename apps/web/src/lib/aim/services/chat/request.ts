@@ -5,6 +5,7 @@
  */
 import type { AimEditorContext } from "@/lib/aim-editor"
 import type { AimMemoryMessage } from "@/lib/aim-memory"
+import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule } from "@/lib/copy-studio"
 
 /** Extract plain text from an OpenAI-compatible content field. */
 export function extractTextContent(content: unknown): string {
@@ -67,10 +68,9 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
   if (!Array.isArray(messages) || messages.length === 0) {
     return { ok: false, status: 400, validationError: "请求格式不正确，缺少 messages 数组" }
   }
-  const requestedModule = record.agentModule ?? record.writerModule
-  const hasModule = requestedModule === "social" || requestedModule === "longform" || requestedModule === "free"
+  const agentModule = normalizeRequestedCopyStudioModule(record.agentModule, record.writerModule)
   const requestedAgent = typeof record.agentId === "string" ? record.agentId : ""
-  if (hasModule && !["content_producer", "deep_copywriter", "free_copywriter", "ip_video"].includes(requestedAgent)) {
+  if (agentModule && !supportsCopyStudioModule(requestedAgent)) {
     return { ok: false, status: 400, validationError: "agentModule 只能用于内容创作官" }
   }
   return {
@@ -84,7 +84,7 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     editorContext: typeof record.editorContext === "object" && record.editorContext
       ? (record.editorContext as AimEditorContext)
       : undefined,
-    agentModule: record.agentModule === "social" || record.agentModule === "longform" || record.agentModule === "free" ? record.agentModule : undefined,
-    writerModule: record.writerModule === "social" || record.writerModule === "longform" || record.writerModule === "free" ? record.writerModule : undefined,
+    agentModule,
+    writerModule: agentModule,
   }
 }

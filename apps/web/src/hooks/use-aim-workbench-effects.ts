@@ -9,19 +9,19 @@ import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
 export function useAimDraftAutosave(draft: AimDraft, projectEnabled: boolean) {
   const {
-    selectedAgentId, selectedProjectId, input, messages, videoCopyExtractionId,
+    selectedAgentId, selectedProjectId, agentModule, input, messages, videoCopyExtractionId,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
     editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
   } = draft
   useEffect(() => {
     saveAimDraft({
-      selectedAgentId, selectedProjectId, input, messages, videoCopyExtractionId,
+      selectedAgentId, selectedProjectId, agentModule, input, messages, videoCopyExtractionId,
       sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
       editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
     }, aimDraftProjectScope(projectEnabled, selectedProjectId))
   }, [
     editorFormat, editorPanelOpen, editorPanelWidth, editorSourceMessageId, editorText,
-    input, messages, projectEnabled, selectedAgentId, selectedProjectId, sourceAnalysisText,
+    agentModule, input, messages, projectEnabled, selectedAgentId, selectedProjectId, sourceAnalysisText,
     sourceOriginalText, sourceTopicRationale, sourceTopicTitle, videoCopyExtractionId,
   ])
 }

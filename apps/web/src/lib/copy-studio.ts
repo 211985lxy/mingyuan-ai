@@ -36,6 +36,32 @@ export function isCopyStudioModule(value: unknown): value is CopyStudioModule {
   return typeof value === "string" && COPY_STUDIO_MODULES.includes(value as CopyStudioModule)
 }
 
+/** The workbench exposes copy-studio modes only from the content producer. */
+export function normalizeWorkbenchCopyStudioModule(agentId: string, value: unknown): CopyStudioModule | undefined {
+  return agentId === "content_producer" && isCopyStudioModule(value) ? value : undefined
+}
+
+export function copyStudioModuleFromRouteKey(routeKey: unknown): CopyStudioModule | undefined {
+  if (typeof routeKey !== "string" || !routeKey.startsWith("copy_studio.")) return undefined
+  return isCopyStudioModule(routeKey.slice("copy_studio.".length))
+    ? routeKey.slice("copy_studio.".length) as CopyStudioModule
+    : undefined
+}
+
+const COPY_STUDIO_COMPATIBLE_AGENT_IDS = new Set([
+  "content_producer", "deep_copywriter", "free_copywriter", "ip_video",
+])
+
+/** Normalize the additive API aliases before request validation and routing. */
+export function normalizeRequestedCopyStudioModule(agentModule: unknown, writerModule: unknown): CopyStudioModule | undefined {
+  const requested = agentModule ?? writerModule
+  return isCopyStudioModule(requested) ? requested : undefined
+}
+
+export function supportsCopyStudioModule(agentId: unknown): boolean {
+  return typeof agentId === "string" && COPY_STUDIO_COMPATIBLE_AGENT_IDS.has(agentId)
+}
+
 export function resolveCopyStudioRouteKey(value: unknown): string | null {
   return isCopyStudioModule(value) ? COPY_STUDIO_ROUTE_KEYS[value] : null
 }

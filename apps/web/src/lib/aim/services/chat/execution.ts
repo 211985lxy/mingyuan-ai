@@ -72,6 +72,8 @@ export function prepareAimChatExecution(input: {
     projectId: projectId || undefined,
     runtimeTask,
     conversationMode: conversationIntent.mode,
+    agentModule: input.agentModule,
+    writerModule: input.writerModule,
   }
 
   const streamRequest = { ...runRequest, contextManifest: context.contextManifest, stream: true }

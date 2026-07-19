@@ -24,13 +24,12 @@ import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVi
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { EDITOR_PANEL_DEFAULT_WIDTH } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
-import { aimDraftProjectScope, clearAimDraft, loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { aimDraftProjectScope, clearAimDraft, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
   extractPersonaProgress as extractProgress,
   findLatestAimVideoDeliverableMessageId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimAgentId } from "@/lib/aim-ui-config"
-import type { CopyStudioModule } from "@/lib/copy-studio"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { IpWikiDialogContext, AimWorkbenchMessage as ChatMessage } from "@/lib/aim/workbench-types"
 import { parseAimSearchParams } from "@/features/aim/aim-search-params"
@@ -39,6 +38,8 @@ import { useAimPageCommands } from "@/features/aim/hooks/use-aim-page-commands"
 import { useAimSendActions } from "@/features/aim/hooks/use-aim-send-actions"
 import { useAimProjectAttach } from "@/hooks/use-aim-project-attach"
 import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/features/aim/aim-reference-annotation"
+import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-mode"
+import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
 
 /**
  * Master hook — consolidates all AIM workbench state, refs, and hook
@@ -60,7 +61,7 @@ export function useAimWorkbench() {
   const [initialDraft] = useState<AimDraft | null>(() => loadAimDraft(activeAgentId, explicitInitialScope))
   const initialQuickMode = modeParam === "quick" || (!projectIdParam && initialDraft?.selectedProjectId === "")
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
-  const [agentModule, setAgentModule] = useState<CopyStudioModule | undefined>(undefined)
+  const { agentModule, setAgentModule } = useAimCopyStudioMode({ selectedAgentId, initialModule: initialDraft?.agentModule })
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
@@ -175,7 +176,7 @@ export function useAimWorkbench() {
   // ---- Route setters + route sync ----
   const lastAgentParamRef = useRef(agentParam)
   const routeSetters = useRouteSetters({
-    setSelectedAgentId, setSelectedProjectId, setProjectEnabled, setMessages, setInput,
+    setSelectedAgentId, setAgentModule, setSelectedProjectId, setProjectEnabled, setMessages, setInput,
     setSourceVideoCopyExtractionId, setSourceOriginalText, setSourceAnalysisText,
     setSourceTopicTitle, setSourceTopicRationale, setEditorText, setEditorFormat,
     setEditorSourceMessageId, setEditorPanelWidth, setEditorPanelOpen,
@@ -184,7 +185,7 @@ export function useAimWorkbench() {
 
   // ---- Effects ----
   useAimDraftAutosave({
-    selectedAgentId, selectedProjectId, input, messages,
+    selectedAgentId, selectedProjectId, agentModule, input, messages,
     videoCopyExtractionId: sourceVideoCopyExtractionId,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
     editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
@@ -254,6 +255,8 @@ export function useAimWorkbench() {
   const { isEvolving, evolutionSuggestions, dismissEvolutionSuggestion, rememberWorkbenchPreference, handleEvolveConversation, handleSaveEvolutionSuggestion } = useAimEvolutionActions({ messages, selectedProjectId, projectEnabled })
 
   // ---- resetConversation (shared by page commands + header) ----
+  const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
+
   function resetConversation() {
     requestAbortRef.current?.abort()
     setMessages([])
@@ -262,28 +265,8 @@ export function useAimWorkbench() {
     clearAimDraft(selectedAgentId, currentProjectScope)
   }
 
-  function changeProjectScope(scope: string) {
-    if (busy || scope === currentProjectScope) return
-    saveAimDraft({
-      selectedAgentId,
-      selectedProjectId,
-      input,
-      messages,
-      videoCopyExtractionId: sourceVideoCopyExtractionId,
-      sourceOriginalText,
-      sourceAnalysisText,
-      sourceTopicTitle,
-      sourceTopicRationale,
-      editorText,
-      editorFormat,
-      editorSourceMessageId,
-      editorPanelWidth,
-      editorPanelOpen,
-    }, currentProjectScope)
-    const nextProjectId = scope === "quick" ? "" : scope
-    const nextDraft = loadAimDraft(selectedAgentId, scope)
-    setProjectEnabled(scope !== "quick")
-    setSelectedProjectId(nextProjectId)
+  const restoreScopeDraft = useCallback((nextDraft: AimDraft | null) => {
+    setAgentModule(nextDraft?.agentModule)
     setMessages(nextDraft?.messages || [])
     setInput(nextDraft?.input || "")
     setSourceVideoCopyExtractionId(nextDraft?.videoCopyExtractionId)
@@ -296,23 +279,27 @@ export function useAimWorkbench() {
     setEditorSourceMessageId(nextDraft?.editorSourceMessageId)
     setEditorPanelWidth(nextDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
     setEditorPanelOpen(nextDraft?.editorPanelOpen ?? true)
+  }, [setAgentModule])
+
+  const afterScopeChange = useCallback(() => {
     setReferenceSelection({ text: "", range: { start: 0, end: 0 } })
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
     setWorkflowBrief(null)
     setContentAction(null)
     clearImages()
+  }, [clearImages])
 
-    const nextParams = new URLSearchParams(searchParams.toString())
-    nextParams.delete("generationId")
-    if (scope === "quick") {
-      nextParams.set("mode", "quick")
-      nextParams.delete("projectId")
-    } else {
-      if (nextParams.get("mode") === "quick") nextParams.delete("mode")
-      nextParams.set("projectId", scope)
-    }
-    router.replace(`/aim?${nextParams.toString()}`)
-  }
+  const { changeProjectScope } = useAimProjectScopeSwitch({
+    busy,
+    currentProjectScope,
+    draft: { selectedAgentId, selectedProjectId, agentModule, input, messages, videoCopyExtractionId: sourceVideoCopyExtractionId, sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale, editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen },
+    router,
+    searchParams,
+    setProjectEnabled,
+    setSelectedProjectId,
+    restoreDraft: restoreScopeDraft,
+    afterScopeChange,
+  })
 
   // ---- Page commands ----
   const { runWorkbenchCommand } = useAimPageCommands({
@@ -346,7 +333,6 @@ export function useAimWorkbench() {
   })
 
   // ---- Derived flags ----
-  const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
   const latestGenerationId = [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id

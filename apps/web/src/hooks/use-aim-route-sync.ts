@@ -6,6 +6,8 @@ import { toast } from "sonner"
 import { getAimHistory, getVideoCopyExtraction, type AimGenerateResponse, type AimGeneration, type ContentFormat } from "@/lib/api/client"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { loadAimDraft } from "@/lib/aim/draft-storage"
+import { normalizeWorkbenchCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
+import { getTaskSpecCopyStudioModule } from "@/lib/task-spec"
 import { EDITOR_PANEL_DEFAULT_WIDTH } from "@/lib/aim-editor"
 import { DEFAULT_AIM_AGENT, isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import {
@@ -21,8 +23,13 @@ type Setter<T> = Dispatch<SetStateAction<T>>
 type Router = { replace: (href: string) => void }
 type SearchParams = { toString: () => string }
 
+export function resolveAimHistoryAgentModule(agentId: AimAgentId, taskSpec: AimGeneration["taskSpec"]) {
+  return normalizeWorkbenchCopyStudioModule(agentId, getTaskSpecCopyStudioModule(taskSpec))
+}
+
 export interface AimRouteStateSetters {
   setSelectedAgentId: Setter<AimAgentId>
+  setAgentModule: (module: CopyStudioModule | undefined) => void
   setSelectedProjectId: Setter<string>
   setProjectEnabled: Setter<boolean>
   setMessages: Setter<AimWorkbenchMessage[]>
@@ -54,6 +61,7 @@ export function useAimAgentDraftSwitch(input: {
     const draft = loadAimDraft(activeAgentId, projectScope)
     startTransition(() => {
       setters.setSelectedAgentId(activeAgentId)
+      setters.setAgentModule(normalizeWorkbenchCopyStudioModule(activeAgentId, draft?.agentModule))
       setters.setSelectedProjectId(draft?.selectedProjectId || selectedProjectId)
       setters.setMessages(draft?.messages || [])
       setters.setInput(draft?.input || "")
@@ -132,6 +140,7 @@ export function useAimVideoCopyPrefill(input: {
         ].filter(Boolean).join("\n")
         startTransition(() => {
           setters.setSelectedAgentId("content_producer")
+          setters.setAgentModule(undefined)
           setters.setMessages([])
           setters.setInput(prefill)
           setters.setSourceVideoCopyExtractionId(record.id)
@@ -188,6 +197,7 @@ export function useAimHistoryLoad(input: {
       const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
       startTransition(() => {
         setters.setSelectedAgentId(itemAgentId)
+        setters.setAgentModule(resolveAimHistoryAgentModule(itemAgentId, item.taskSpec))
         setters.setSelectedProjectId(item.projectId || "")
         setters.setProjectEnabled(Boolean(item.projectId))
         setters.setSourceTopicTitle(item.topicTitle || "")

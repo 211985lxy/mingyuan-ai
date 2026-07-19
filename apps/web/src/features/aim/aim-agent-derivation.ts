@@ -4,6 +4,7 @@ import { useMemo, type Dispatch, type SetStateAction } from "react"
 import { AGENT_OPTIONS, type AimAgentOption } from "@/features/aim/aim-skill-utils"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { ContentFormat } from "@/lib/api/client"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 import type { AimWorkbenchMessage as ChatMessage } from "@/lib/aim/workbench-types"
 
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -11,6 +12,7 @@ type Setter<T> = Dispatch<SetStateAction<T>>
 /** Route setters needed by route-sync hooks. */
 export type AimRouteSetters = {
   setSelectedAgentId: Setter<AimAgentId>
+  setAgentModule: (module: CopyStudioModule | undefined) => void
   setSelectedProjectId: Setter<string>
   setProjectEnabled: Setter<boolean>
   setMessages: Setter<ChatMessage[]>
@@ -31,6 +33,7 @@ export type AimRouteSetters = {
 export function useRouteSetters(setters: AimRouteSetters): AimRouteSetters {
   return useMemo(() => ({
     setSelectedAgentId: setters.setSelectedAgentId,
+    setAgentModule: setters.setAgentModule,
     setSelectedProjectId: setters.setSelectedProjectId,
     setProjectEnabled: setters.setProjectEnabled,
     setMessages: setters.setMessages,
@@ -48,7 +51,7 @@ export function useRouteSetters(setters: AimRouteSetters): AimRouteSetters {
   }), [
     setters.setEditorFormat, setters.setEditorPanelOpen, setters.setEditorPanelWidth,
     setters.setEditorSourceMessageId, setters.setEditorText, setters.setInput,
-    setters.setMessages, setters.setSelectedAgentId, setters.setSelectedProjectId,
+    setters.setMessages, setters.setSelectedAgentId, setters.setAgentModule, setters.setSelectedProjectId,
     setters.setProjectEnabled,
     setters.setSourceAnalysisText, setters.setSourceOriginalText,
     setters.setSourceTopicRationale, setters.setSourceTopicTitle,

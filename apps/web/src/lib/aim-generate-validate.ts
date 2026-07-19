@@ -1,4 +1,5 @@
 import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
+import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule } from "@/lib/copy-studio"
 import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
 import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
 
@@ -83,10 +84,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
       : undefined
 
   const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
-  const requestedModule = body.agentModule ?? body.writerModule
-  const agentModule = requestedModule === "social" || requestedModule === "longform" || requestedModule === "free"
-    ? requestedModule
-    : undefined
+  const agentModule = normalizeRequestedCopyStudioModule(body.agentModule, body.writerModule)
 
   return {
     agentId,
@@ -121,7 +119,7 @@ export function validateGenerateInput(parsed: {
   agentId?: string
   agentModule?: "social" | "longform" | "free"
 }): string | null {
-  if (parsed.agentModule && !["content_producer", "deep_copywriter", "free_copywriter", "ip_video"].includes(parsed.agentId || "")) return "agentModule 只能用于内容创作官"
+  if (parsed.agentModule && !supportsCopyStudioModule(parsed.agentId)) return "agentModule 只能用于内容创作官"
   if (!parsed.rawInput) return "请输入内容"
   if (parsed.targetFormats.length === 0) return "请选择至少一种生成格式"
   return null

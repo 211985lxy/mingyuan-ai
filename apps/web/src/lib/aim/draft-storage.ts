@@ -2,6 +2,7 @@ import { clampEditorPanelWidth } from "@/lib/aim-editor"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { ContentFormat } from "@/lib/api/client"
+import { normalizeWorkbenchCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 
 const AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v3"
 const LEGACY_AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v2"
@@ -11,6 +12,7 @@ export type AimDraftProjectScope = string
 
 export interface AimDraft {
   selectedAgentId: AimAgentId
+  agentModule?: CopyStudioModule
   selectedProjectId: string
   input: string
   messages: AimWorkbenchMessage[]
@@ -44,6 +46,7 @@ function parseDraft(raw: string | null): AimDraft | null {
   if (!isValidAimAgent(draft.selectedAgentId) || !Array.isArray(draft.messages)) return null
   return {
     selectedAgentId: draft.selectedAgentId,
+    agentModule: normalizeWorkbenchCopyStudioModule(draft.selectedAgentId, draft.agentModule),
     selectedProjectId: typeof draft.selectedProjectId === "string" ? draft.selectedProjectId : "",
     input: typeof draft.input === "string" ? draft.input : "",
     messages: draft.messages,

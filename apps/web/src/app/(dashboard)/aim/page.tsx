@@ -48,6 +48,9 @@ export default function AimPage() {
         {w.selectedAgentId === "content_producer" && (
           <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">创作模式</span>
+            <button type="button" className={`rounded-md border px-2.5 py-1 text-xs ${w.agentModule === undefined ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`} onClick={() => w.setAgentModule(undefined)}>
+              智能选择
+            </button>
             {COPY_STUDIO_MODULES.map((module) => (
               <button key={module} type="button" className={`rounded-md border px-2.5 py-1 text-xs ${w.agentModule === module ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`} onClick={() => w.setAgentModule(module)}>
                 {COPY_STUDIO_MODULE_LABELS[module]}

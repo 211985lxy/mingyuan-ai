@@ -4,8 +4,10 @@ import {
   RISK_KEYWORDS_HIGH,
   inferRiskLevel,
   inferMode,
+  getTaskSpecCopyStudioModule,
   sanitizeLLMRefinement,
   type TaskSpecInput,
+  withCopyStudioExecution,
 } from "@/lib/task-spec"
 import { refineTaskSpec, type LLMRefineClient } from "@/lib/task-spec-llm"
 
@@ -82,6 +84,17 @@ describe("buildTaskSpecSkeleton", () => {
   })
   it("classifiedBy 标记为 rule", () => {
     expect(buildTaskSpecSkeleton(baseInput).classifiedBy).toBe("rule")
+  })
+})
+
+describe("task spec execution metadata", () => {
+  it("persists a copy-studio module without changing cognitive task fields", () => {
+    const spec = buildTaskSpecSkeleton(baseInput)
+    const withExecution = withCopyStudioExecution(spec, "social")
+    expect(withExecution?.goal).toBe(spec.goal)
+    expect(withExecution?.knownFacts).toEqual(spec.knownFacts)
+    expect(getTaskSpecCopyStudioModule(withExecution)).toBe("social")
+    expect(getTaskSpecCopyStudioModule(spec)).toBeUndefined()
   })
 })
 

@@ -1,4 +1,5 @@
 import type { AimTaskType } from "@/lib/aim-generator"
+import { isCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 
 export type CollaborationMode =
   | "direct_delivery"
@@ -58,6 +59,19 @@ export interface TaskSpec {
   nextAction: string
   classifiedBy: "rule" | "llm" | "rule_fallback"
   classifiedAt: string
+  /** 执行时实际采用的内容路由；不参与事实或业务判断。 */
+  execution?: { schemaVersion: 1; copyStudioModule?: CopyStudioModule }
+}
+
+export function withCopyStudioExecution(taskSpec: TaskSpec | undefined, copyStudioModule: CopyStudioModule | undefined): TaskSpec | undefined {
+  if (!taskSpec || !copyStudioModule) return taskSpec
+  return { ...taskSpec, execution: { ...taskSpec.execution, schemaVersion: 1, copyStudioModule } }
+}
+
+export function getTaskSpecCopyStudioModule(taskSpec: TaskSpec | null | undefined): CopyStudioModule | undefined {
+  return isCopyStudioModule(taskSpec?.execution?.copyStudioModule)
+    ? taskSpec.execution.copyStudioModule
+    : undefined
 }
 
 // 风险关键词（高）

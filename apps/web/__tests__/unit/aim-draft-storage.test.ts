@@ -48,11 +48,19 @@ describe("AIM draft storage", () => {
   })
 
   it("isolates drafts by project scope", () => {
-    saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "project-1", input: "项目一", messages: [] }, "project-1")
+    saveAimDraft({ selectedAgentId: "content_producer", agentModule: "social", selectedProjectId: "project-1", input: "项目一", messages: [] }, "project-1")
     saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "project-2", input: "项目二", messages: [] }, "project-2")
 
     expect(loadAimDraft("content_producer", "project-1")?.input).toBe("项目一")
+    expect(loadAimDraft("content_producer", "project-1")?.agentModule).toBe("social")
     expect(loadAimDraft("content_producer", "project-2")?.input).toBe("项目二")
     expect(loadAimDraft("content_producer", "quick")).toBeNull()
+  })
+
+  it("drops a stale creator mode from a non-content-agent draft", () => {
+    values.set(aimDraftStorageKey("business_diagnosis", "quick"), JSON.stringify({
+      selectedAgentId: "business_diagnosis", agentModule: "social", selectedProjectId: "", input: "诊断客户业务", messages: [],
+    }))
+    expect(loadAimDraft("business_diagnosis", "quick")?.agentModule).toBeUndefined()
   })
 })

@@ -78,6 +78,12 @@ interface GenerateOptions {
   startsNewTask?: boolean
 }
 
+export function getAimPendingGenerationMessage(projectEnabled: boolean, actionLabel: string) {
+  return projectEnabled
+    ? `正在${actionLabel}，会读取当前项目资料并匹配知识库，再生成交付物…`
+    : `正在${actionLabel}，将根据本次输入生成交付物…`
+}
+
 function appendPendingGeneration(input: AimGenerationActionInput, currentInput: string, options: GenerateOptions) {
   const assistantMessageId = nextAimWorkbenchId()
   input.pendingScrollMessageIdRef.current = assistantMessageId
@@ -90,7 +96,7 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
   input.setMessages((messages) => [
     ...(options.startsNewTask ? [] : options.retryMessageId ? messages.filter((message) => message.id !== options.retryMessageId) : messages),
     ...(currentInput && !options.retryMessageId ? [{ id: nextAimWorkbenchId(), role: "user" as const, content: currentInput }] : []),
-    { id: assistantMessageId, role: "assistant" as const, content: `正在${input.agent.primaryActionLabel}，会先读取项目资料、匹配知识库，再生成交付物…`, agentId: input.agent.id },
+    { id: assistantMessageId, role: "assistant" as const, content: getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel), agentId: input.agent.id },
   ])
   if (currentInput) input.setInput("")
   return { assistantMessageId, baseMessages }
