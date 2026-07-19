@@ -93,6 +93,12 @@ export default function AdminKnowledgePage() {
   } | null>(null)
 
   const fetchBrowserData = React.useCallback(async () => {
+    if (!browserProject) {
+      setBrowserEntries([])
+      setBrowserTotal(0)
+      setBrowserLoading(false)
+      return
+    }
     setBrowserLoading(true)
     try {
       const res = await fetchKnowledge({
@@ -101,6 +107,7 @@ export default function AdminKnowledgePage() {
         search: browserSearch,
         category: browserCategory,
         projectId: browserProject,
+        status: "active",
       })
       setBrowserEntries(Array.isArray(res.data?.results) ? res.data.results : [])
       setBrowserTotal(typeof res.data?.total === "number" ? res.data.total : 0)
@@ -337,9 +344,9 @@ export default function AdminKnowledgePage() {
       {/* Tab 切换 */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="browser">知识浏览</TabsTrigger>
-          <TabsTrigger value="map">知识地图</TabsTrigger>
-          <TabsTrigger value="list">条目列表</TabsTrigger>
+          <TabsTrigger value="browser">知识工作台</TabsTrigger>
+          <TabsTrigger value="map">高级：知识地图</TabsTrigger>
+          <TabsTrigger value="list">高级：条目管理</TabsTrigger>
         </TabsList>
 
       {/* 知识浏览 Tab（默认）：左树右文，进入即可看具体内容 */}

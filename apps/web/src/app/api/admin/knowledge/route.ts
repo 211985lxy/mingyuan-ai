@@ -16,8 +16,10 @@ export const GET = withAdminAuth(async (request) => {
   const sourceType = searchParams.get("sourceType") ?? ""
   const projectId = searchParams.get("projectId") ?? ""
   const valueGrade = normalizeValueGrade(searchParams.get("valueGrade"))
+  const status = searchParams.get("status") ?? ""
 
   const where: Record<string, unknown> = {}
+  if (status === "active" || status === "archived") where.status = status
   if (category) where.category = category
   if (userId) where.userId = userId
   if (sourceType) where.sourceType = sourceType

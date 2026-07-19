@@ -3,23 +3,21 @@
 import React, { useMemo } from "react"
 import {
   Search,
-  Plus,
   Upload,
   Sparkles,
   ChevronLeft,
   ChevronRight,
   FileText,
-  ChevronDown,
   Folder,
   Globe,
+  ArrowLeft,
+  AlertCircle,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { CollapsibleContent } from "@/components/admin/collapsible-content"
 import {
   knowledgeCleanupLabel,
   parseKnowledgeTags,
@@ -154,6 +152,7 @@ export function KnowledgeBrowser({
   onSmartImport,
 }: KnowledgeBrowserProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const [workspace, setWorkspace] = React.useState<"attention" | "core" | "library">("library")
 
   // 构建项目分组（全局/未绑定 + 各项目）。计数优先用 stats，回退到项目自身的 knowledgeCount。
   const projectGroups: NavProjectGroup[] = useMemo(() => {
@@ -196,9 +195,72 @@ export function KnowledgeBrowser({
 
   const activeProjectGroup =
     projectGroups.find((g) => g.key === selectedProject) ?? projectGroups[0]
-  const activeCategoryLabel = selectedCategory
-    ? BROWSER_CATEGORY_LABELS[selectedCategory] ?? selectedCategory
-    : null
+  const coreCategories = new Set([
+    "positioning_material",
+    "boss_experience",
+    "product_usp",
+    "private_domain_material",
+    "user_insight",
+    "customer_pain",
+    "customer_qa",
+    "project_case",
+    "writing_style_profile",
+  ])
+  const visibleEntries = entries.filter((entry) => {
+    if (workspace === "core") return coreCategories.has(entry.category)
+    if (workspace === "attention") {
+      const cleanup = parseKnowledgeTags(entry.tags)
+      return !entry.valueGrade || !cleanup.isCleaned || cleanup.confidence === "pending_verify" || entry.embedding?.status === "failed"
+    }
+    return true
+  })
+
+  if (!selectedProject) {
+    return (
+      <section className="space-y-5">
+        <div>
+          <p className="text-sm text-muted-foreground">先选择一个项目，再处理它的知识资产。</p>
+          <h2 className="mt-1 text-lg font-semibold">项目总览</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              type="button"
+              onClick={() => {
+                setWorkspace("library")
+                onSelectProject(project.id)
+              }}
+              className="rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-primary/[0.03]"
+            >
+              <div className="flex items-start gap-3">
+                <Folder className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate font-semibold">{project.name}</h3>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {project.companyName ?? project.industry ?? "未填写行业"}
+                  </p>
+                </div>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  {project.knowledgeCount ?? 0} 条
+                </span>
+              </div>
+              <p className="mt-4 text-xs text-muted-foreground">进入项目工作台 →</p>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSelectProject("unbound")}
+          className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground"
+        >
+          <Globe className="h-5 w-5" />
+          <span className="flex-1">查看未绑定项目的资料</span>
+          <span>进入 →</span>
+        </button>
+      </section>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
@@ -210,7 +272,7 @@ export function KnowledgeBrowser({
             <Folder className="h-3.5 w-3.5" />
             项目
           </div>
-          <nav className="space-y-0.5">
+            <nav className="space-y-0.5">
             {projectGroups.map((g) => {
               const active = selectedProject === g.key
               const isUnbound = g.key === "unbound"
@@ -250,10 +312,11 @@ export function KnowledgeBrowser({
             })}
           </nav>
 
-          {/* 分类分组 */}
+          {/* 分类分组：只在全部资料中展开，避免进入工作台就被 12 个分类打断。 */}
+          {workspace === "library" ? <>
           <div className="mb-1 mt-4 flex items-center gap-1.5 px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <FileText className="h-3.5 w-3.5" />
-            分类
+            分类筛选
           </div>
           <nav className="space-y-0.5">
             <button
@@ -295,6 +358,7 @@ export function KnowledgeBrowser({
               )
             })}
           </nav>
+          </> : null}
         </div>
       </aside>
 
@@ -303,31 +367,29 @@ export function KnowledgeBrowser({
         {/* 工具条 */}
         <div className="mb-4 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => onSelectProject("")}>
+              <ArrowLeft className="mr-1 h-4 w-4" />项目总览
+            </Button>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               {activeProjectGroup ? <span>{activeProjectGroup.name}</span> : null}
-              {activeCategoryLabel ? (
-                <>
-                  <ChevronDown className="h-3 w-3 -rotate-90" />
-                  <span className="text-foreground">{activeCategoryLabel}</span>
-                </>
-              ) : null}
               <span className="text-muted-foreground/60">·</span>
-              <span>共 {total} 条</span>
+              <span>{workspace === "attention" ? "待整理" : workspace === "core" ? "核心知识" : "全部资料"} · {visibleEntries.length} 条</span>
             </div>
             <div className="ml-auto flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={onManualAdd}>
-                <Plus className="mr-1 h-4 w-4" />
-                手动录入
-              </Button>
-              <Button variant="outline" size="sm" onClick={onUpload}>
-                <Upload className="mr-1 h-4 w-4" />
-                上传文件
-              </Button>
-              <Button variant="outline" size="sm" onClick={onSmartImport}>
+              <Button size="sm" onClick={onSmartImport}>
                 <Sparkles className="mr-1 h-4 w-4" />
-                智能导入
+                导入资料
               </Button>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([['attention', '待整理'], ['core', '核心知识'], ['library', '全部资料']] as const).map(([key, label]) => (
+              <Button key={key} size="sm" variant={workspace === key ? "secondary" : "ghost"} onClick={() => { setWorkspace(key); onSelectCategory(""); onPageChange(1) }}>
+                {key === "attention" ? <AlertCircle className="mr-1 h-4 w-4" /> : null}{label}
+              </Button>
+            ))}
+            <Button variant="outline" size="sm" onClick={onManualAdd}>手动录入</Button>
+            <Button variant="outline" size="sm" onClick={onUpload}><Upload className="mr-1 h-4 w-4" />普通上传</Button>
           </div>
           <form
             onSubmit={(e) => e.preventDefault()}
@@ -355,7 +417,7 @@ export function KnowledgeBrowser({
               </div>
             ))}
           </div>
-        ) : entries.length === 0 ? (
+        ) : visibleEntries.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
             <FileText className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm font-medium text-foreground">暂无知识条目</p>
@@ -367,7 +429,7 @@ export function KnowledgeBrowser({
           </div>
         ) : (
           <div className="space-y-3">
-            {entries.map((entry) => {
+            {visibleEntries.map((entry) => {
               const cleanup = parseKnowledgeTags(entry.tags)
               const selected = selectedIds.has(entry.id)
               return (
@@ -403,12 +465,9 @@ export function KnowledgeBrowser({
                     </Badge>
                   </div>
 
-                  {/* 正文：markdown 渲染 + 长文折叠 */}
-                  <div className="pl-7">
-                    <CollapsibleContent collapsedMaxHeight={336}>
-                      <MarkdownRenderer content={entry.content} />
-                    </CollapsibleContent>
-                  </div>
+                  <p className="pl-7 text-sm leading-6 text-muted-foreground">
+                    {entry.content.replace(/\s+/g, " ").slice(0, 180)}{entry.content.length > 180 ? "…" : ""}
+                  </p>
 
                   {/* meta 行 */}
                   <div className="mt-3 flex flex-wrap items-center gap-2 pl-7">
@@ -443,7 +502,7 @@ export function KnowledgeBrowser({
         )}
 
         {/* 分页 */}
-        {total > pageSize ? (
+        {total > pageSize && workspace === "library" ? (
           <div className="mt-6 flex items-center justify-center gap-4">
             <Button
               variant="outline"

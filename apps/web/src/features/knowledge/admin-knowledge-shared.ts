@@ -79,6 +79,7 @@ export async function fetchKnowledge(params: {
   sourceType?: string
   projectId?: string
   valueGrade?: string
+  status?: string
 }) {
   const qs = new URLSearchParams()
   if (params.page) qs.set("page", String(params.page))
@@ -89,6 +90,7 @@ export async function fetchKnowledge(params: {
   if (params.sourceType) qs.set("sourceType", params.sourceType)
   if (params.projectId) qs.set("projectId", params.projectId)
   if (params.valueGrade) qs.set("valueGrade", params.valueGrade)
+  if (params.status) qs.set("status", params.status)
 
   const res = await fetch(`/api/admin/knowledge?${qs}`)
   return res.json() as Promise<{

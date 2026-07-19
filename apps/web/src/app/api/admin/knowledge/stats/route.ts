@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { CATEGORY_LABELS, SOURCE_TYPE_LABELS } from "@/lib/knowledge-categories"
+import { parseKnowledgeTags } from "@/lib/knowledge-tags"
 
 const TOTAL_CATEGORIES = 12
 
@@ -25,6 +26,7 @@ export const GET = withAdminAuth(async (request) => {
     embeddingCompleted,
     embeddingFailed,
     embeddingPending,
+    attentionEntries,
   ] = await Promise.all([
     prisma.knowledgeEntry.count({ where: baseWhere }),
 
@@ -70,6 +72,11 @@ export const GET = withAdminAuth(async (request) => {
     prisma.knowledgeEmbedding.count({
       where: { status: "pending", entry: baseWhere },
     }),
+    prisma.knowledgeEntry.findMany({
+      where: baseWhere,
+      select: { projectId: true, valueGrade: true, tags: true, embedding: { select: { status: true } } },
+      take: 5000,
+    }),
   ])
 
   // --- 分类分布 ---
@@ -108,6 +115,16 @@ export const GET = withAdminAuth(async (request) => {
     projectCategoryCoverage.get(pid)!.add(g.category)
   }
 
+  const attentionByProject = new Map<string, number>()
+  for (const entry of attentionEntries) {
+    const tags = parseKnowledgeTags(entry.tags)
+    const needsAttention = !entry.valueGrade || !tags.isCleaned || tags.confidence === "pending_verify" || entry.embedding?.status === "failed"
+    if (needsAttention) {
+      const key = entry.projectId ?? "__unbound__"
+      attentionByProject.set(key, (attentionByProject.get(key) ?? 0) + 1)
+    }
+  }
+
   const projectDistribution = projectGroups
     .slice(0, 20) // 最多展示 20 个项目 + 其他
     .map((g) => ({
@@ -116,6 +133,7 @@ export const GET = withAdminAuth(async (request) => {
       companyName: projectMap.get(g.projectId ?? "")?.companyName ?? null,
       entryCount: g._count.id,
       categoryCoverage: projectCategoryCoverage.get(g.projectId ?? "__unbound__")?.size ?? 0,
+      attentionCount: attentionByProject.get(g.projectId ?? "__unbound__") ?? 0,
     }))
 
   // --- 知识来源 ---
