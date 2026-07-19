@@ -22,7 +22,6 @@ import {
   addWatchAccount,
   deleteWatchAccount,
   refreshWatchAccounts,
-  discoverSimilarAccounts,
   startCompetitorAnalysis,
   type WatchAccount,
   type SimilarAccount,
@@ -39,6 +38,7 @@ import { CompetitorWorkbenchLinks } from "@/features/competitor/components/compe
 import { useCompetitorVideoExtractions } from "@/features/competitor/hooks/use-competitor-video-extractions"
 import { useCompetitorWebResearch } from "@/features/competitor/hooks/use-competitor-web-research"
 import { useCompetitorReports } from "@/features/competitor/hooks/use-competitor-reports"
+import { useCompetitorDiscovery } from "@/features/competitor/hooks/use-competitor-discovery"
 import {
   formatCompetitorRefreshError as formatRefreshError,
 } from "@/lib/competitor/display"
@@ -57,11 +57,6 @@ export default function CompetitorWatchPage() {
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null)
-  const [discovering, setDiscovering] = useState(false)
-  const [discoveryAttempted, setDiscoveryAttempted] = useState(false)
-  const [peerAccounts, setPeerAccounts] = useState<SimilarAccount[]>([])
-  const [leaderAccounts, setLeaderAccounts] = useState<SimilarAccount[]>([])
-  const [ignoredDiscoveryUrls, setIgnoredDiscoveryUrls] = useState<Set<string>>(new Set())
   const { extractingVideoId, videoExtractions, extractVideo } = useCompetitorVideoExtractions()
   const {
     researchLoading,
@@ -72,6 +67,7 @@ export default function CompetitorWatchPage() {
   } = useCompetitorWebResearch()
   const activeAccount = resolveActiveAccount(accounts, activeAccountId)
   const { loadReports, reports, reportsLoading } = useCompetitorReports(activeAccount?.targetUrl)
+  const { discover, discovering, discoveryAttempted, ignoredDiscoveryUrls, ignore, leaderAccounts, peerAccounts } = useCompetitorDiscovery()
 
   async function handleAnalyze(url: string) {
     setAnalyzingUrl(url)
@@ -148,40 +144,6 @@ export default function CompetitorWatchPage() {
       }
     } finally {
       setAdding(false)
-    }
-  }
-
-  async function handleDiscoverSimilar(targetUrl: string) {
-    if (!targetUrl.trim()) {
-      toast.error("先选择一个已监控账号")
-      return
-    }
-
-    const validated = validateCompetitorUrl(targetUrl)
-    if (!validated.ok) {
-      toast.error(validated.error)
-      return
-    }
-
-    setDiscovering(true)
-    setDiscoveryAttempted(true)
-    try {
-      const result = await discoverSimilarAccounts(validated.url)
-      setPeerAccounts(result.peerAccounts)
-      setLeaderAccounts(result.leaderAccounts)
-      setIgnoredDiscoveryUrls(new Set())
-      if (result.peerAccounts.length + result.leaderAccounts.length === 0) {
-        toast.info("暂未找到可用对标账号，可以换一个更明确的赛道账号")
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const msg = err.details ? String((err.details as Record<string, unknown>).error || "") : ""
-        toast.error(msg || "当前账号暂时无法自动扩展同赛道，监控和作品池不受影响")
-      } else {
-        toast.error("当前账号暂时无法自动扩展同赛道，监控和作品池不受影响")
-      }
-    } finally {
-      setDiscovering(false)
     }
   }
 
@@ -317,9 +279,9 @@ export default function CompetitorWatchPage() {
             refreshingId={refreshingId}
             onActivate={setActiveAccountId}
             onRefresh={handleRefreshOne}
-            onDiscover={handleDiscoverSimilar}
+            onDiscover={discover}
             onAdd={handleAddDiscoveredAccount}
-            onIgnore={(key) => setIgnoredDiscoveryUrls((previous) => new Set(previous).add(key))}
+            onIgnore={ignore}
           />
 
           <CompetitorAddAccountPanel value={addUrl} adding={adding} accountCount={accounts.length} onChange={setAddUrl} onAdd={handleAdd} />
