@@ -57,6 +57,62 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
+  name: cron-background-tasks
+  labels:
+    app.kubernetes.io/part-of: mingyuan
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 330
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: acr-secret
+          containers:
+            - name: cron
+              image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/web:latest
+              command: ["node", "-e"]
+              args:
+                - |
+                  const http = require('http');
+                  const host = process.env.MINGYUAN_WEB_HOST || '120.26.205.132';
+                  const req = http.get(`http://${host}/api/cron/background-tasks`, {
+                    headers: { 'Authorization': 'Bearer ' + process.env.CRON_SECRET },
+                    timeout: 310000
+                  }, res => {
+                    let d = ''; res.on('data', c => d += c);
+                    res.on('end', () => { console.log('HTTP', res.statusCode, d); process.exit(res.statusCode === 200 ? 0 : 1); });
+                  });
+                  req.on('error', e => { console.error(e.message); process.exit(1); });
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: mingyuan-web-secrets
+                      key: CRON_SECRET
+                - name: MINGYUAN_WEB_HOST
+                  valueFrom:
+                    configMapKeyRef:
+                      name: mingyuan-cron-config
+                      key: WEB_HOST
+                      optional: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
   name: cron-cleanup
   labels:
     app.kubernetes.io/part-of: mingyuan

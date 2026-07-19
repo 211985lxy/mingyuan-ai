@@ -11,6 +11,7 @@ export const BACKGROUND_TASK_STATUS = {
 } as const
 
 const RETRY_BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000]
+const DEFAULT_LEASE_TTL_MS = 6 * 60_000
 
 export function planBackgroundTaskFailure(input: {
   attempt: number
@@ -56,7 +57,7 @@ export async function claimBackgroundTask(
   prisma: PrismaClient,
   taskId: string,
   now = new Date(),
-  leaseTtlMs = 5 * 60_000,
+  leaseTtlMs = DEFAULT_LEASE_TTL_MS,
 ) {
   const leaseToken = randomUUID()
   const leaseExpiresAt = new Date(now.getTime() + leaseTtlMs)
