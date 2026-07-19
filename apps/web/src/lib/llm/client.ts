@@ -10,6 +10,19 @@ import { env } from "@/env"
 
 let _instance: LLMClient | null = null
 
+function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(min, Math.min(max, Math.floor(parsed)))
+}
+
+function resolveMaxTokens(requested: number | undefined, limit: number): number {
+  if (requested === undefined) return limit
+  const parsed = Number(requested)
+  if (!Number.isFinite(parsed) || parsed <= 0) return limit
+  return Math.min(Math.floor(parsed), limit)
+}
+
 export class LLMClient {
   private providers: LLMProvider[]
   private maxAttempts?: number
@@ -52,13 +65,16 @@ export class LLMClient {
       )
     }
 
-    const maxAttempts = Math.max(1, Math.min(3,
-      this.maxAttempts ?? Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)
-    ))
-    const maxOutputTokens = Math.max(256, Math.min(16_384, Number(env.LLM_MAX_OUTPUT_TOKENS || 8192)))
+    const maxAttempts = normalizeInteger(
+      this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
+      2,
+      1,
+      3,
+    )
+    const maxOutputTokens = normalizeInteger(env.LLM_MAX_OUTPUT_TOKENS, 8192, 256, 16_384)
     const boundedOptions = {
       ...options,
-      maxTokens: Math.min(options.maxTokens ?? maxOutputTokens, maxOutputTokens),
+      maxTokens: resolveMaxTokens(options.maxTokens, maxOutputTokens),
     }
     reportLlmInvocation(boundedOptions, false)
     let lastError: Error | undefined
@@ -121,13 +137,16 @@ export class LLMClient {
       )
     }
 
-    const maxAttempts = Math.max(1, Math.min(3,
-      this.maxAttempts ?? Number(env.LLM_MAX_PROVIDER_ATTEMPTS || 2)
-    ))
-    const maxOutputTokens = Math.max(256, Math.min(16_384, Number(env.LLM_MAX_OUTPUT_TOKENS || 8192)))
+    const maxAttempts = normalizeInteger(
+      this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
+      2,
+      1,
+      3,
+    )
+    const maxOutputTokens = normalizeInteger(env.LLM_MAX_OUTPUT_TOKENS, 8192, 256, 16_384)
     const boundedOptions = {
       ...options,
-      maxTokens: Math.min(options.maxTokens ?? maxOutputTokens, maxOutputTokens),
+      maxTokens: resolveMaxTokens(options.maxTokens, maxOutputTokens),
     }
     reportLlmInvocation(boundedOptions, true)
     let lastError: Error | undefined
