@@ -1,4 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+
+vi.mock("@/lib/oss", () => ({
+  deleteManagedOssObject: vi.fn(async () => undefined),
+  generateUploadUrl: vi.fn(async () => null),
+  signOssUrls: vi.fn(<T>(assets: T) => assets),
+}));
 import {
   prisma,
   cleanDatabase,

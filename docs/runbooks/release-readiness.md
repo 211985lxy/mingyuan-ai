@@ -15,7 +15,7 @@
 | Admin run diagnostics | admin run route, admin auth, and snapshot redaction tests |
 | Project lifecycle | project route lifecycle, export, permanent-delete confirmation, and ownership tests |
 
-Run `pnpm release:verify` with isolated `TEST_DATABASE_URL` and target-environment `DATABASE_URL`. It is intentionally strict. Local review may run `node scripts/release-verify.mjs --allow-missing-services`, but the resulting skip is not release evidence.
+Run `pnpm release:verify` with isolated `TEST_DATABASE_URL` and target-environment `DATABASE_URL`. Its database E2E suite is deterministic and removes model-provider credentials before tests start. Run `pnpm --dir apps/web run test:e2e:real-llm` only in an approved, budgeted canary window; it is release evidence rather than a routine pull-request gate. Local review may run `node scripts/release-verify.mjs --allow-missing-services`, but the resulting skip is not release evidence.
 
 ## Staging and canary evidence
 

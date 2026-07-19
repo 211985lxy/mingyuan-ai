@@ -22,8 +22,9 @@ const steps = [
 ]
 
 const databaseSteps = [
-  ["Database E2E", ["--dir", "apps/web", "run", "test:e2e"]],
+  ["Prepare isolated database", ["--dir", "apps/web", "run", "test:e2e:prepare"]],
   ["Migration status", ["--dir", "apps/web", "run", "schema:migration-status"]],
+  ["Deterministic database E2E", ["--dir", "apps/web", "run", "test:e2e"]],
 ]
 const hasDatabaseServices = Boolean(process.env.TEST_DATABASE_URL && process.env.DATABASE_URL)
 
@@ -35,7 +36,10 @@ if (!hasDatabaseServices && !allowMissingServices) {
 for (const [name, args] of hasDatabaseServices ? [...steps, ...databaseSteps] : steps) {
   console.log(`\n==> ${name}`)
   const startedAt = Date.now()
-  const result = spawnSync("pnpm", args, { stdio: "inherit", env: process.env })
+  const env = name === "Production build"
+    ? { ...process.env, NODE_ENV: "production" }
+    : process.env
+  const result = spawnSync("pnpm", args, { stdio: "inherit", env })
   if (result.status !== 0) {
     console.error(`release verification failed: ${name}`)
     process.exit(result.status ?? 1)
