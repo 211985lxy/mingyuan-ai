@@ -8,7 +8,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     aimExecutionTrace: {
       async create({ data }: { data: Record<string, unknown> }) {
-        const id = `trace-${state.records.size + 1}`
+        const id = typeof data.id === "string" ? data.id : `trace-${state.records.size + 1}`
+        if (state.records.has(id)) throw Object.assign(new Error("unique"), { code: "P2002" })
         state.records.set(id, { id, steps: [], ...data })
         return { id }
       },
@@ -49,5 +50,16 @@ describe("AIM observability", () => {
     const { summarizeText } = await import("@/lib/aim-observability")
     const summary = summarizeText("a".repeat(900))
     expect(summary).toHaveLength(500)
+  })
+
+  it("以确定性 trace id 原子 claim，唯一冲突返回 duplicate", async () => {
+    const { claimAimTrace } = await import("@/lib/aim-observability")
+    const input = {
+      id: "sales_diag_stable_claim",
+      action: "generate" as const,
+      inputSummary: "rec_1",
+    }
+    await expect(claimAimTrace(input)).resolves.toMatchObject({ acquired: true })
+    await expect(claimAimTrace(input)).resolves.toEqual({ acquired: false, reason: "duplicate" })
   })
 })

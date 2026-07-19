@@ -24,6 +24,7 @@ import type {
   AimContextPolicy,
   AimEntrypoint,
   AimModelPolicy,
+  AimModelPolicyOverride,
   AimRunSpec,
 } from "./types"
 
@@ -48,6 +49,33 @@ export interface PlanRunInput {
   conversationMode?: AimConversationMode
   agentModule?: "social" | "longform" | "free"
   writerModule?: "social" | "longform" | "free"
+  modelPolicy?: AimModelPolicyOverride
+}
+
+function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
+  if (!Number.isFinite(policy.temperature) || policy.temperature < 0 || policy.temperature > 2) {
+    throw new Error("modelPolicy.temperature must be between 0 and 2")
+  }
+  if (!Number.isInteger(policy.maxTokens) || policy.maxTokens < 256 || policy.maxTokens > 16_384) {
+    throw new Error("modelPolicy.maxTokens must be an integer between 256 and 16384")
+  }
+  if (!Number.isInteger(policy.maxProviderAttempts) || policy.maxProviderAttempts < 1 || policy.maxProviderAttempts > 3) {
+    throw new Error("modelPolicy.maxProviderAttempts must be an integer between 1 and 3")
+  }
+}
+
+function applyModelPolicyOverride(
+  defaults: AimModelPolicy,
+  override?: AimModelPolicyOverride,
+): AimModelPolicy {
+  if (!override) return Object.freeze({ ...defaults })
+  validateModelPolicyOverride(override)
+  return Object.freeze({
+    ...defaults,
+    temperature: override.temperature,
+    maxTokens: override.maxTokens,
+    maxProviderAttempts: override.maxProviderAttempts,
+  })
 }
 
 /**
@@ -157,9 +185,10 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
 
   const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
 
-  const modelPolicy = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false, input.agentModule, input.writerModule)
+  const defaults = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false, input.agentModule, input.writerModule)
+  const modelPolicy = applyModelPolicyOverride(defaults, input.modelPolicy)
 
-  return {
+  return Object.freeze({
     entrypoint: input.entrypoint,
     agentId: input.agentId,
     runtimeTask,
@@ -171,5 +200,5 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     rawInput: input.rawInput,
     actorId: input.actorId,
     projectId: input.projectId,
-  }
+  })
 }

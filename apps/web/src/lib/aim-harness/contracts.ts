@@ -91,6 +91,7 @@ import type {
   AimRunSpec,
   AimRunMetadata,
   AimContextSource,
+  AimModelPolicyOverride,
 } from "./types"
 
 /**
@@ -159,6 +160,8 @@ export interface AimRunRequest {
   persistSnapshot?: boolean
   /** 流式输出 */
   stream?: boolean
+  /** 受约束的单次模型策略覆盖；由 planner 校验并冻结。 */
+  modelPolicy?: AimModelPolicyOverride
 }
 
 /**

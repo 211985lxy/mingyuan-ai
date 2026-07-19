@@ -28,6 +28,7 @@ function cloneSpec(): BusinessLoopSpec {
     steps: SALES_DIAGNOSIS_V1.steps.map((step) => ({ ...step })),
     allowedTools: [...SALES_DIAGNOSIS_V1.allowedTools],
     stopPolicy: { ...SALES_DIAGNOSIS_V1.stopPolicy },
+    modelPolicy: { ...SALES_DIAGNOSIS_V1.modelPolicy },
     supervisionPolicy: {
       ...SALES_DIAGNOSIS_V1.supervisionPolicy,
       budget: { ...SALES_DIAGNOSIS_V1.supervisionPolicy.budget },
@@ -70,6 +71,12 @@ describe("sales-diagnosis-v1 完整契约", () => {
     })
   })
 
+  it("锁定销售诊断模型限制为 0.2 / 3000 / 1", () => {
+    expect(SALES_DIAGNOSIS_V1.modelPolicy.temperature).toBe(0.2)
+    expect(SALES_DIAGNOSIS_V1.supervisionPolicy.budget.maxOutputTokens).toBe(3000)
+    expect(SALES_DIAGNOSIS_V1.supervisionPolicy.budget.maxProviderAttempts).toBe(1)
+  })
+
   it("第一步先做确定性输入检查", () => {
     expect(SALES_DIAGNOSIS_STEPS[0]).toEqual({
       id: "validate_input",
@@ -91,6 +98,7 @@ describe("sales-diagnosis-v1 完整契约", () => {
     expect(spec.steps.every(Object.isFrozen)).toBe(true)
     expect(Object.isFrozen(spec.supervisionPolicy)).toBe(true)
     expect(Object.isFrozen(spec.supervisionPolicy.budget)).toBe(true)
+    expect(Object.isFrozen(spec.modelPolicy)).toBe(true)
 
     expect(() => spec.allowedTools.push("send_customer_message")).toThrow(TypeError)
     expect(() => {
@@ -202,6 +210,14 @@ describe("完整契约校验", () => {
       const bad = cloneSpec()
       bad.supervisionPolicy.budget[field] = value
       expect(reasonOf(() => validateBusinessLoopSpec(bad)), field).toBe("invalid_budget")
+    }
+  })
+
+  it("模型温度必须是 0 到 2 的有限数", () => {
+    for (const value of [-0.1, 2.1, Number.NaN]) {
+      const bad = cloneSpec()
+      bad.modelPolicy.temperature = value
+      expect(reasonOf(() => validateBusinessLoopSpec(bad))).toBe("invalid_budget")
     }
   })
 

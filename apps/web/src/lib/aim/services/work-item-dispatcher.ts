@@ -22,6 +22,7 @@ import {
   planExecutionFailure,
 } from "@/lib/aim/work-item-dispatch"
 import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
+import type { LoopStopReason } from "@/lib/aim/loops/contracts"
 import {
   failWorkItem,
   startWorkItem,
@@ -29,7 +30,9 @@ import {
   type WorkItemRecordStore,
 } from "@/lib/aim/services/work-item-execution"
 
-export type DispatchExecuteOutcome = { ok: true } | { ok: false; error: string }
+export type DispatchExecuteOutcome =
+  | { ok: true }
+  | { ok: false; error: string; retryable?: boolean; stopReason?: LoopStopReason }
 
 export interface WorkItemDispatcherPorts {
   store: WorkItemRecordStore
@@ -87,14 +90,17 @@ async function handleFailure(
   record: WorkItemRecord,
   error: string,
   summary: WorkItemDispatchSummary,
+  retryable = true,
 ): Promise<void> {
   const now = ports.now()
-  const plan = planExecutionFailure(record.fields, now)
-  if (plan.kind === "retry") {
-    await ports.store.update(record.recordId, plan.patch)
-    summary.failed += 1
-    summary.errors.push({ recordId: record.recordId, error })
-    return
+  if (retryable) {
+    const plan = planExecutionFailure(record.fields, now)
+    if (plan.kind === "retry") {
+      await ports.store.update(record.recordId, plan.patch)
+      summary.failed += 1
+      summary.errors.push({ recordId: record.recordId, error })
+      return
+    }
   }
 
   // 升级人工接管：写失败态（可行动错误）+ 标记 + 通知负责人。
@@ -196,7 +202,7 @@ export async function dispatchPendingWorkItems(
       continue
     }
 
-    await handleFailure(ports, record, outcome.error, summary)
+    await handleFailure(ports, record, outcome.error, summary, outcome.retryable !== false)
   }
 
   return summary

@@ -48,6 +48,9 @@ const SALES_DIAGNOSIS_V1_SPEC: BusinessLoopSpec = {
     executionTimeoutMs: 300_000,
     requireHumanReview: true,
   },
+  modelPolicy: {
+    temperature: 0.2,
+  },
   supervisionPolicy: {
     defaultMode: "shadow",
     requireStartApproval: true,
@@ -71,6 +74,7 @@ function freezeBusinessLoopSpec(spec: BusinessLoopSpec): BusinessLoopSpec {
   Object.freeze(spec.steps)
   Object.freeze(spec.allowedTools)
   Object.freeze(spec.stopPolicy)
+  Object.freeze(spec.modelPolicy)
   Object.freeze(spec.supervisionPolicy.budget)
   Object.freeze(spec.supervisionPolicy)
   return Object.freeze(spec)

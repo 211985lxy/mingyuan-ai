@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { dispatchPendingWorkItems, type WorkItemDispatcherPorts } from "@/lib/aim/services/work-item-dispatcher"
+import {
+  dispatchPendingWorkItems,
+  type DispatchExecuteOutcome,
+  type WorkItemDispatcherPorts,
+} from "@/lib/aim/services/work-item-dispatcher"
 import { DISPATCH_FIELDS, RETRY_BACKOFF_MS } from "@/lib/aim/work-item-dispatch"
 import type { WorkItemRecord } from "@/lib/aim/services/work-item-execution"
 
@@ -17,7 +21,7 @@ function makePorts(records: WorkItemRecord[]) {
   const updates: Array<{ recordId: string; fields: Record<string, unknown> }> = []
   const notifications: string[] = []
   const execute = vi.fn(
-    async (_recordId: string, _key: string): Promise<{ ok: true } | { ok: false; error: string }> =>
+    async (_recordId: string, _key: string): Promise<DispatchExecuteOutcome> =>
       ({ ok: true }),
   )
   const ports: WorkItemDispatcherPorts = {
@@ -94,6 +98,23 @@ describe("dispatchPendingWorkItems", () => {
     expect(retryPatch!.fields[DISPATCH_FIELDS.nextRetryAt]).toBe(NOW.getTime() + RETRY_BACKOFF_MS[0])
     expect(retryPatch!.fields["状态"]).toBe("待处理")
     expect(retryPatch!.fields[DISPATCH_FIELDS.leaseUntil]).toBeNull()
+  })
+
+  it("不可重试失败立即人工接管，不退回待处理", async () => {
+    const { ports, updates, notifications, execute } = makePorts(records)
+    execute.mockResolvedValueOnce({
+      ok: false,
+      error: "销售诊断已消耗唯一运行次数",
+      retryable: false,
+      stopReason: "human_required",
+    })
+
+    const summary = await dispatchPendingWorkItems(ports)
+
+    expect(summary).toMatchObject({ failed: 0, escalated: 1 })
+    expect(updates.some((u) => u.fields[DISPATCH_FIELDS.retryCount] === 1)).toBe(false)
+    expect(updates.some((u) => u.fields["状态"] === "待处理")).toBe(false)
+    expect(notifications).toHaveLength(1)
   })
 
   it("重试次数达上限仍失败：进入失败态并标记需人工接管，通知负责人", async () => {

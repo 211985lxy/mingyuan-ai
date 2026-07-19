@@ -157,6 +157,67 @@ describe("aim-harness planner", () => {
     }
   })
 
+  it("校验、应用并冻结受限 modelPolicy override", () => {
+    const spec = planAimRun({
+      entrypoint: "generate",
+      agentId: "business_diagnosis",
+      rawInput: "会议诊断",
+      targetFormats: ["raw_copy"],
+      modelPolicy: { temperature: 0.2, maxTokens: 3000, maxProviderAttempts: 1 },
+    })
+    expect(spec.modelPolicy).toMatchObject({
+      temperature: 0.2,
+      maxTokens: 3000,
+      maxProviderAttempts: 1,
+      agentId: "business_diagnosis",
+      minimumCapability: "standard",
+      stream: false,
+    })
+    expect(Object.isFrozen(spec)).toBe(true)
+    expect(Object.isFrozen(spec.modelPolicy)).toBe(true)
+  })
+
+  it.each([
+    { temperature: -0.1, maxTokens: 3000, maxProviderAttempts: 1 },
+    { temperature: 0.2, maxTokens: 255, maxProviderAttempts: 1 },
+    { temperature: 0.2, maxTokens: 3000, maxProviderAttempts: 4 },
+  ])("拒绝非法 modelPolicy override: $temperature/$maxTokens/$maxProviderAttempts", (modelPolicy) => {
+    expect(() => planAimRun({
+      entrypoint: "generate",
+      agentId: "business_diagnosis",
+      rawInput: "会议诊断",
+      targetFormats: ["raw_copy"],
+      modelPolicy,
+    })).toThrow(/modelPolicy/)
+  })
+
+  it("运行时额外属性不能覆盖受保护模型策略", () => {
+    const hostile = {
+      temperature: 0.2,
+      maxTokens: 3000,
+      maxProviderAttempts: 1,
+      agentId: "content_producer",
+      stream: true,
+      minimumCapability: "basic",
+      targetCapability: "basic",
+      routeKey: "hostile.route",
+    } as unknown as Parameters<typeof planAimRun>[0]["modelPolicy"]
+    const spec = planAimRun({
+      entrypoint: "generate",
+      agentId: "business_diagnosis",
+      rawInput: "会议诊断",
+      targetFormats: ["raw_copy"],
+      modelPolicy: hostile,
+    })
+    expect(spec.modelPolicy).toMatchObject({
+      agentId: "business_diagnosis",
+      stream: false,
+      minimumCapability: "standard",
+      targetCapability: "advanced",
+    })
+    expect(spec.modelPolicy.routeKey).toBeUndefined()
+  })
+
   // ── 阶段 2.1：contextPolicy 真正用上 agentId / hotTopic ──────────────────
   it("business_diagnosis 强制加载 IP Wiki（定位底盘）", () => {
     const spec = planAimRun({
@@ -237,6 +298,30 @@ describe("aim-harness fallback policy", () => {
       fakeProvider("provider-3"),
     ]).complete({ messages: [{ role: "user", content: "test" }] })).rejects.toThrow("503")
     expect(calls).toEqual(["provider-1", "provider-2"])
+  })
+
+  it("maxProviderAttempts=1 时临时失败也不尝试第二个 provider", async () => {
+    const calls: string[] = []
+    const temporaryFailure: LLMProvider = {
+      name: "provider-1",
+      defaultModel: "model-1",
+      isAvailable: () => true,
+      async complete() {
+        calls.push("provider-1")
+        throw new Error("status 503")
+      },
+    }
+    const second = fakeProvider("provider-2")
+    const originalComplete = second.complete.bind(second)
+    second.complete = async (options) => {
+      calls.push("provider-2")
+      return originalComplete(options)
+    }
+
+    await expect(new LLMClient([temporaryFailure, second], { maxAttempts: 1 }).complete({
+      messages: [{ role: "user", content: "meeting" }],
+    })).rejects.toThrow("503")
+    expect(calls).toEqual(["provider-1"])
   })
 
   it("isolates telemetry between concurrent runs", async () => {

@@ -26,6 +26,7 @@ vi.mock("@/lib/aim/meeting-insight-result-sink", () => ({ createAimGenerationIns
 vi.mock("@/lib/aim/meeting-workflow", () => ({ runMeetingInsightWorkflow }))
 
 import { GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
+import { DISPATCH_FIELDS } from "@/lib/aim/work-item-dispatch"
 
 const CRON_SECRET = "test-cron-secret-with-enough-length-32"
 const OWNER = "user_owner_1"
@@ -111,7 +112,8 @@ describe("鉴权与 fail-closed", () => {
     })
     const { status, body } = await call()
     expect(status).toBe(503)
-    expect(String(body.error)).toContain("LARK_BASE_TOKEN")
+    expect(String(body.error)).toContain("配置不可用")
+    expect(String(body.error)).not.toContain("LARK_BASE_TOKEN")
   })
 })
 
@@ -184,6 +186,27 @@ describe("无人值守调度执行", () => {
     const { status, body } = await call()
     expect(status).toBe(503)
     expect(String(body.error)).toContain("无人值守调度执行失败")
-    expect(String(body.error)).toContain("lark-cli 调用超时")
+    expect(String(body.error)).not.toContain("lark-cli 调用超时")
+  })
+
+  it("销售诊断失败立即人工接管，公开摘要不泄露内部错误", async () => {
+    runMeetingInsightWorkflow.mockResolvedValueOnce({
+      ok: false,
+      status: "失败",
+      recordId: "rec_1",
+      error: "provider-secret-token=should-not-leak",
+    })
+
+    const { status, body } = await call()
+    const serialized = JSON.stringify(body)
+    const summary = body.summary as Record<string, unknown>
+
+    expect(status).toBe(200)
+    expect(summary.escalated).toBe(1)
+    expect(serialized).not.toContain("provider-secret-token")
+    expect(serialized).toContain("DISPATCH_ITEM_FAILED")
+    expect(store.update.mock.calls.some(([, fields]) =>
+      fields[DISPATCH_FIELDS.retryCount] === 1 || fields["状态"] === "待处理",
+    )).toBe(false)
   })
 })

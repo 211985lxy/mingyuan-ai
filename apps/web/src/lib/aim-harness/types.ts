@@ -58,6 +58,11 @@ export interface AimModelPolicy {
   maxProviderAttempts: number
 }
 
+export type AimModelPolicyOverride = Readonly<Required<Pick<
+  AimModelPolicy,
+  "temperature" | "maxTokens" | "maxProviderAttempts"
+>>>
+
 /** A single context source loaded for the run, for the manifest + hash. */
 export interface AimContextSource {
   kind: "request" | "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history"

@@ -30,6 +30,14 @@ interface CreateAimTraceInput {
   inputSummary?: string
 }
 
+export interface ClaimAimTraceInput extends CreateAimTraceInput {
+  id: string
+}
+
+export type ClaimAimTraceResult =
+  | { acquired: true; trace: AimTraceRecorder }
+  | { acquired: false; reason: "duplicate" }
+
 type TraceUpdate = {
   status?: "running" | "success" | "failed"
   durationMs?: number
@@ -107,6 +115,38 @@ export async function createAimTrace(input: CreateAimTraceInput): Promise<AimTra
   } catch (error) {
     logger.warn({ error }, "[aim-trace] create failed")
     return undefined
+  }
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002"
+}
+
+/**
+ * 以调用方提供的确定性主键原子领取一次运行。delegate 缺失或基础设施错误时抛出，
+ * 由生产工作流 fail-closed；只有数据库唯一冲突会被识别为重复执行。
+ */
+export async function claimAimTrace(input: ClaimAimTraceInput): Promise<ClaimAimTraceResult> {
+  const delegate = getTraceDelegate()
+  if (!delegate?.create) throw new Error("AimExecutionTrace delegate unavailable")
+  try {
+    await delegate.create({
+      data: {
+        id: input.id,
+        userId: input.userId || null,
+        projectId: input.projectId || null,
+        agentId: input.agentId || null,
+        action: input.action,
+        inputSummary: summarizeText(input.inputSummary),
+        status: "running",
+        steps: [],
+      },
+      select: { id: true },
+    })
+    return { acquired: true, trace: { id: input.id, startedAt: Date.now() } }
+  } catch (error) {
+    if (isUniqueConstraintError(error)) return { acquired: false, reason: "duplicate" }
+    throw error
   }
 }
 

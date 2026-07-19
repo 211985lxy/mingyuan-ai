@@ -29,6 +29,7 @@ import {
 import { runMeetingInsightWorkflow } from "@/lib/aim/meeting-workflow"
 import {
   dispatchPendingWorkItems,
+  type WorkItemDispatchSummary,
   type WorkItemDispatcherPorts,
 } from "@/lib/aim/services/work-item-dispatcher"
 
@@ -40,6 +41,16 @@ function unconfigured(error: string) {
   return NextResponse.json({ ok: false, error }, { status: 503 })
 }
 
+function publicDispatchSummary(summary: WorkItemDispatchSummary) {
+  return {
+    ...summary,
+    errors: summary.errors.map(({ recordId }) => ({
+      recordId,
+      code: "DISPATCH_ITEM_FAILED",
+    })),
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!validateCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -48,8 +59,8 @@ export async function GET(request: NextRequest) {
   let config
   try {
     config = readWorkItemStoreConfig()
-  } catch (err) {
-    return unconfigured(err instanceof Error ? err.message : "飞书经营事项配置缺失")
+  } catch {
+    return unconfigured("飞书经营事项配置不可用，请检查服务端配置。")
   }
 
   const ownerUserId = process.env.AIM_WORK_ITEM_OWNER_USER_ID?.trim()
@@ -68,16 +79,25 @@ export async function GET(request: NextRequest) {
       try {
         record = await store.get(recordId)
       } catch (err) {
-        return { ok: false, error: `读取经营事项失败：${err instanceof Error ? err.message : String(err)}` }
+        return {
+          ok: false,
+          error: `读取经营事项失败：${err instanceof Error ? err.message : String(err)}`,
+          retryable: true,
+        }
       }
-      if (!record) return { ok: false, error: `经营事项记录不存在：${recordId}` }
+      if (!record) return {
+        ok: false,
+        error: `经营事项记录不存在：${recordId}`,
+        retryable: false,
+        stopReason: "missing_input",
+      }
 
       const input = parseMeetingWorkItemInput(record.fields)
       if (!input.transcript) {
-        return { ok: false, error: "会议原文（输入内容）为空，禁止凭空抽取" }
+        return { ok: false, error: "会议原文（输入内容）为空，禁止凭空抽取", retryable: false, stopReason: "missing_input" }
       }
       if (!input.projectId) {
-        return { ok: false, error: "缺少 AIM项目ID，客户会议必须绑定项目" }
+        return { ok: false, error: "缺少 AIM项目ID，客户会议必须绑定项目", retryable: false, stopReason: "missing_input" }
       }
       if (!input.meetingTitle || !input.customer) {
         // fail-closed：标题/客户为会议洞察必要归属信息，缺失即阻断并回写可行动
@@ -85,14 +105,21 @@ export async function GET(request: NextRequest) {
         return {
           ok: false,
           error: `会议标题/客户名称缺失（标题=${input.meetingTitle || "空"}，客户=${input.customer || "空"}），请先在飞书补齐`,
+          retryable: false,
+          stopReason: "missing_input",
         }
       }
 
       const result = await runMeetingInsightWorkflow(
-        { recordId, ...input },
+        { recordId, ...input, actorId: ownerUserId },
         { store, resultSink },
       )
-      return result.ok ? { ok: true } : { ok: false, error: result.error }
+      return result.ok ? { ok: true } : {
+        ok: false,
+        error: result.error,
+        retryable: false,
+        stopReason: result.stopReason ?? "human_required",
+      }
     },
     notify: async (message) => {
       // 负责人推送暂以服务端日志承载；接飞书消息推送时替换此端口实现。
@@ -106,10 +133,10 @@ export async function GET(request: NextRequest) {
   let summary
   try {
     summary = await dispatchPendingWorkItems(ports, 10)
-  } catch (err) {
+  } catch {
     // 飞书读写 / 调度内部异常（如 listPending 抛错）必须转受控 503，
     // 绝不把未捕获异常暴露为 500，符合兄弟 cron 路由的 fail-closed 行为。
-    return unconfigured(`无人值守调度执行失败：${err instanceof Error ? err.message : String(err)}`)
+    return unconfigured("无人值守调度执行失败，请查看服务端日志。")
   }
-  return NextResponse.json({ ok: true, summary })
+  return NextResponse.json({ ok: true, summary: publicDispatchSummary(summary) })
 }

@@ -46,6 +46,20 @@ describe("createAimGenerationInsightResultSink", () => {
       meetingTitle: INSIGHT.meetingTitle,
       customer: INSIGHT.customer,
       transcript: "会议原文……",
+      executionMetadata: {
+        runId: "run_1",
+        harnessVersion: "aim-harness-v1",
+        provider: "deepseek",
+        model: "deepseek-chat",
+        fallbackIndex: 0,
+        degraded: false,
+        promptHash: "prompt_hash",
+        contextHash: "context_hash",
+        inputTokens: 120,
+        outputTokens: 80,
+        costCny: 0.00084,
+        providerAttempts: [],
+      },
     })
 
     expect(saved).toEqual({
@@ -74,6 +88,14 @@ describe("createAimGenerationInsightResultSink", () => {
       customer: INSIGHT.customer,
     })
     expect(taskSpec.insight).toEqual(INSIGHT)
+    expect(taskSpec.execution).toEqual({
+      runId: "run_1",
+      provider: "deepseek",
+      model: "deepseek-chat",
+      inputTokens: 120,
+      outputTokens: 80,
+      costCny: 0.00084,
+    })
   })
 
   it("缺 projectId 拒绝落盘（客户会议不允许落到全局空间）", async () => {

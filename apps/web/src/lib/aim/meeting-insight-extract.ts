@@ -14,9 +14,11 @@
  * 与 knowledge-entity-extractor.ts 同构：纯函数 prompt + 纯函数解析 + 可注入 complete 端口。
  */
 import { env } from "@/env"
-import { LLMClient } from "@/lib/llm"
 import type { CompletionResult } from "@/lib/llm"
+import { getAgentLLM } from "@/lib/llm/agent-router"
 import type { MeetingInsightInput } from "@/lib/aim/meeting-insight"
+import type { AimModelPolicy } from "@/lib/aim-harness/types"
+import { getRegisteredLoop } from "@/lib/aim/loops/registry"
 
 /** 模型名（可选，未配置走 provider 默认 + 降级链）。不硬编码。 */
 export const MEETING_INSIGHT_MODEL: string | undefined = env.MEETING_INSIGHT_MODEL?.trim() || undefined
@@ -170,14 +172,24 @@ export function parseInsightJson(raw: string): MeetingInsightExtractionResult {
  */
 export async function extractMeetingInsightFromTranscript(
   extraction: MeetingInsightExtractionInput,
-  ports?: { complete?: CompleteFn },
+  ports?: { modelPolicy?: AimModelPolicy; complete?: CompleteFn },
 ): Promise<MeetingInsightExtractionResult> {
   const transcript = extraction.transcript?.trim() ?? ""
   if (!transcript || transcript.length < 8) {
     return { ok: false, error: "会议原文（transcript）为空或过短，拒绝调用模型抽取。" }
   }
 
-  const complete: CompleteFn = ports?.complete ?? defaultComplete
+  const loop = getRegisteredLoop("sales-diagnosis-v1")
+  const modelPolicy = ports?.modelPolicy ?? {
+    agentId: "business_diagnosis",
+    stream: false,
+    temperature: loop.modelPolicy.temperature,
+    maxTokens: loop.supervisionPolicy.budget.maxOutputTokens,
+    targetCapability: "advanced",
+    minimumCapability: "standard",
+    maxProviderAttempts: loop.supervisionPolicy.budget.maxProviderAttempts,
+  }
+  const complete: CompleteFn = ports?.complete ?? defaultComplete(modelPolicy)
   const prompt = buildExtractionPrompt(transcript)
 
   let result: CompletionResult
@@ -188,8 +200,8 @@ export async function extractMeetingInsightFromTranscript(
         { role: "system", content: prompt.system },
         { role: "user", content: prompt.user },
       ],
-      temperature: 0.2,
-      maxTokens: 4000,
+      temperature: modelPolicy.temperature ?? 0,
+      maxTokens: modelPolicy.maxTokens ?? 256,
       responseFormat: { type: "json_object" },
     })
   } catch (err) {
@@ -210,7 +222,10 @@ export async function extractMeetingInsightFromTranscript(
   return { ok: true, input: parsed.input }
 }
 
-async function defaultComplete(options: Parameters<CompleteFn>[0]): Promise<CompletionResult> {
-  const llm = LLMClient.shared()
-  return llm.complete(options)
+function defaultComplete(modelPolicy: AimModelPolicy): CompleteFn {
+  const llm = getAgentLLM("business_diagnosis", {
+    minimumCapability: modelPolicy.minimumCapability,
+    maxProviderAttempts: modelPolicy.maxProviderAttempts,
+  })
+  return (options) => llm.complete(options)
 }

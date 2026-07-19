@@ -63,6 +63,10 @@ export interface LoopSupervisionPolicy {
   budget: LoopBudgetPolicy
 }
 
+export interface LoopModelPolicy {
+  temperature: number
+}
+
 export interface BusinessLoopSpec {
   id: BusinessLoopId
   version: number
@@ -80,6 +84,7 @@ export interface BusinessLoopSpec {
     executionTimeoutMs: number
     requireHumanReview: boolean
   }
+  modelPolicy: LoopModelPolicy
   supervisionPolicy: LoopSupervisionPolicy
 }
 
@@ -213,6 +218,15 @@ function validateSupervisionPolicy(value: unknown): void {
   validateBudget(value.budget)
 }
 
+function validateModelPolicy(value: unknown): void {
+  if (!isPlainObject(value)) {
+    throw new LoopContractError("invalid_contract", "modelPolicy 必须为对象。")
+  }
+  if (typeof value.temperature !== "number" || !Number.isFinite(value.temperature) || value.temperature < 0 || value.temperature > 2) {
+    throw new LoopContractError("invalid_budget", "modelPolicy.temperature 必须在 0 到 2 之间。")
+  }
+}
+
 function validateSteps(value: unknown, allowedTools: Set<string>): void {
   if (!Array.isArray(value) || value.length === 0) {
     throw new LoopContractError("invalid_contract", "steps 必须为非空数组。")
@@ -285,6 +299,7 @@ export function validateBusinessLoopSpec(spec: BusinessLoopSpec): void {
   if (typeof spec.stopPolicy.requireHumanReview !== "boolean") {
     throw new LoopContractError("invalid_contract", "stopPolicy.requireHumanReview 必须为布尔值。")
   }
+  validateModelPolicy(spec.modelPolicy)
   validateSupervisionPolicy(spec.supervisionPolicy)
 }
 

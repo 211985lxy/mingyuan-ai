@@ -133,6 +133,11 @@ describe("工作流执行", () => {
   it("成功 → 200，带结果ID与统一结果链接", async () => {
     runMeetingInsightWorkflow.mockResolvedValueOnce({
       ok: true, status: "待人工审核", idempotent: false, recordId: "rec_1", aimResultId: "gen_1",
+      execution: {
+        runId: "run_1", provider: "deepseek", model: "deepseek-chat",
+        inputTokens: 120, outputTokens: 80, costCny: 0.001,
+        providerAttempts: [{ provider: "private", error: "secret upstream error" }],
+      },
     })
     const { status, body } = await call()
     expect(status).toBe(200)
@@ -141,7 +146,13 @@ describe("工作流执行", () => {
       status: "待人工审核",
       aimResultId: "gen_1",
       resultLink: "/aim?generationId=gen_1&projectId=proj_1&stage=results",
+      execution: {
+        runId: "run_1", provider: "deepseek", model: "deepseek-chat",
+        inputTokens: 120, outputTokens: 80, costCny: 0.001,
+      },
     })
+    expect(JSON.stringify(body)).not.toContain("providerAttempts")
+    expect(JSON.stringify(body)).not.toContain("secret upstream error")
     expect(runMeetingInsightWorkflow).toHaveBeenCalledWith(
       {
         recordId: "rec_1",
@@ -149,6 +160,7 @@ describe("工作流执行", () => {
         customer: VALID_BODY.customer,
         transcript: VALID_BODY.transcript,
         projectId: "proj_1",
+        actorId: OWNER,
       },
       expect.objectContaining({ store: expect.any(Object), resultSink: expect.any(Object) }),
     )
@@ -163,12 +175,17 @@ describe("工作流执行", () => {
     expect(body).toMatchObject({ idempotent: true })
   })
 
-  it("工作流失败 → 409，错误原样透传", async () => {
+  it("工作流失败 → 409 安全错误，不泄露 provider/Harness 详情", async () => {
     runMeetingInsightWorkflow.mockResolvedValueOnce({
-      ok: false, status: "失败", error: "会议洞察无效：既无目标也无交付任务。", recordId: "rec_1",
+      ok: false, status: "失败", error: "provider-secret-key Harness mysql.internal:3306", recordId: "rec_1",
     })
     const { status, body } = await call()
     expect(status).toBe(409)
-    expect(String(body.error)).toContain("会议洞察无效")
+    expect(body).toMatchObject({
+      code: "MEETING_INSIGHT_EXECUTION_FAILED",
+      error: "会议洞察执行失败，请在经营事项中查看详情或联系管理员。",
+    })
+    expect(JSON.stringify(body)).not.toContain("provider-secret-key")
+    expect(JSON.stringify(body)).not.toContain("mysql.internal")
   })
 })

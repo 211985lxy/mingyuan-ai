@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { runMeetingInsightWorkflow, type MeetingWorkflowPorts } from "@/lib/aim/meeting-workflow"
 import type { WorkItemRecordStore } from "@/lib/aim/services/work-item-execution"
+import { LLMClient } from "@/lib/llm/client"
+import type { LLMProvider } from "@/lib/llm/types"
 
 // WP-6B 会议洞察工作流测试。
 // 不连真实 LLM / 飞书 / DB：三个端口全部注入（store / complete / resultSink）。
@@ -65,6 +67,12 @@ function ports(initialStatus: string, modelContent: string): MeetingWorkflowPort
     store,
     resultSink,
     complete: vi.fn().mockResolvedValue({ content: modelContent }),
+    claimTrace: vi.fn().mockResolvedValue({
+      acquired: true,
+      trace: { id: "sales_diag_test", startedAt: Date.now() },
+    }),
+    finishTrace: vi.fn(),
+    failTrace: vi.fn(),
   } as MeetingWorkflowPorts & {
     store: ReturnType<typeof makeStore>
     resultSink: ReturnType<typeof makeResultSink>
@@ -108,10 +116,65 @@ describe("runMeetingInsightWorkflow — 成功流程", () => {
     expect(p.complete).toHaveBeenCalledTimes(1)
     const opts = (p.complete as ReturnType<typeof vi.fn>).mock.calls[0][0] as { responseFormat?: { type: string } }
     expect(opts.responseFormat?.type).toBe("json_object")
+    expect(opts).toMatchObject({ temperature: 0.2, maxTokens: 3000 })
+  })
+
+  it("经 Harness 返回并保存 runId/provider/model/token/成本", async () => {
+    const p = ports("待处理", GOOD_MODEL_JSON)
+    const provider: LLMProvider = {
+      name: "deepseek",
+      defaultModel: "deepseek-chat",
+      isAvailable: () => true,
+      async complete() {
+        return {
+          content: GOOD_MODEL_JSON,
+          provider: "deepseek",
+          model: "deepseek-chat",
+          usage: { promptTokens: 120, completionTokens: 80, totalTokens: 200 },
+        }
+      },
+    }
+    p.complete = (options) => new LLMClient([provider], { maxAttempts: 1 }).complete(options)
+
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.execution).toMatchObject({
+      provider: "deepseek",
+      model: "deepseek-chat",
+      inputTokens: 120,
+      outputTokens: 80,
+    })
+    expect(result.execution?.runId).toMatch(/^run_/)
+    expect(result.execution?.costCny).toBeGreaterThan(0)
+    expect(p.resultSink.saved[0]).toMatchObject({ executionMetadata: result.execution })
   })
 })
 
 describe("runMeetingInsightWorkflow — 失败流程（处理中 → 失败，保留可行动错误）", () => {
+  it("Harness/快照收尾抛错 → 失败，模型最多一次且 sink 不保存", async () => {
+    const p = ports("待处理", GOOD_MODEL_JSON)
+    p.executeRun = vi.fn(async (_request, adapter) => {
+      await adapter({ modelPolicy: {
+        agentId: "business_diagnosis",
+        stream: false,
+        temperature: 0.2,
+        maxTokens: 3000,
+        targetCapability: "advanced",
+        minimumCapability: "standard",
+        maxProviderAttempts: 1,
+      } } as never)
+      throw new Error("快照存储不可用")
+    }) as MeetingWorkflowPorts["executeRun"]
+
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error).toContain("快照存储不可用")
+    expect(p.complete).toHaveBeenCalledTimes(1)
+    expect(p.resultSink.saved).toHaveLength(0)
+    expect(p.store.updates.map((u) => u.fields["状态"])).toEqual(["处理中", "失败"])
+  })
+
   it("模型返回坏 JSON → 进入失败，写可行动错误，不写结果字段", async () => {
     const p = ports("待处理", "这不是JSON")
     const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
@@ -128,6 +191,7 @@ describe("runMeetingInsightWorkflow — 失败流程（处理中 → 失败，�
     expect((failPatch["错误信息"] as string).length).toBeGreaterThan(0)
     // 结果未落盘。
     expect(p.resultSink.saved).toHaveLength(0)
+    expect(p.complete).toHaveBeenCalledTimes(1)
   })
 
   it("模型调用抛错 → 进入失败，错误含上游信息", async () => {
@@ -147,6 +211,30 @@ describe("runMeetingInsightWorkflow — 失败流程（处理中 → 失败，�
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toMatch(/目标|交付|有效/)
     expect(p.store.updates.map((u) => u.fields["状态"])).toEqual(["处理中", "失败"])
+    expect(p.complete).toHaveBeenCalledTimes(1)
+  })
+
+  it("落盘失败不会重新调用模型", async () => {
+    const p = ports("待处理", GOOD_MODEL_JSON)
+    p.resultSink.save = vi.fn().mockRejectedValue(new Error("数据库暂时不可用"))
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+    expect(result.ok).toBe(false)
+    expect(p.complete).toHaveBeenCalledTimes(1)
+  })
+
+  it("失败状态回写失败时不伪报已失败，并保留可行动错误", async () => {
+    const p = ports("待处理", "这不是JSON")
+    const originalUpdate = p.store.update.bind(p.store)
+    p.store.update = vi.fn(async (recordId, fields) => {
+      if (fields["状态"] === "失败") throw new Error("飞书写入不可用")
+      return originalUpdate(recordId, fields)
+    })
+
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+
+    expect(result).toMatchObject({ ok: false, status: "处理中" })
+    if (!result.ok) expect(result.error).toContain("失败状态回写失败")
+    expect(p.complete).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -175,6 +263,44 @@ describe("runMeetingInsightWorkflow — 幂等", () => {
     expect(complete).not.toHaveBeenCalled()
     expect(resultSink.saved).toHaveLength(0)
     expect(store.updates).toHaveLength(0)
+  })
+
+  it("重复 claim 立即抑制，零模型调用、零落盘", async () => {
+    const p = ports("待处理", GOOD_MODEL_JSON)
+    p.claimTrace = vi.fn().mockResolvedValue({ acquired: false, reason: "duplicate" })
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+    expect(result).toMatchObject({ ok: false, stopReason: "duplicate_suppressed" })
+    expect(p.complete).not.toHaveBeenCalled()
+    expect(p.resultSink.saved).toHaveLength(0)
+  })
+
+  it("Promise.all 并发只有一个 claim 执行模型与落盘", async () => {
+    const p = ports("待处理", GOOD_MODEL_JSON)
+    let claimed = false
+    p.claimTrace = vi.fn(async () => {
+      if (claimed) return { acquired: false as const, reason: "duplicate" as const }
+      claimed = true
+      return { acquired: true as const, trace: { id: "sales_diag_concurrent", startedAt: Date.now() } }
+    })
+
+    const results = await Promise.all([
+      runMeetingInsightWorkflow(WORKFLOW_INPUT, p),
+      runMeetingInsightWorkflow(WORKFLOW_INPUT, p),
+    ])
+    expect(results.filter((result) => result.ok)).toHaveLength(1)
+    expect(results.filter((result) => !result.ok && result.stopReason === "duplicate_suppressed")).toHaveLength(1)
+    expect(p.complete).toHaveBeenCalledTimes(1)
+    expect(p.resultSink.saved).toHaveLength(1)
+  })
+
+  it("claim delegate 不可用时 fail-closed，不调模型", async () => {
+    const p = ports("待处理", GOOD_MODEL_JSON)
+    p.claimTrace = vi.fn().mockRejectedValue(new Error("trace delegate unavailable"))
+    const result = await runMeetingInsightWorkflow(WORKFLOW_INPUT, p)
+    expect(result).toMatchObject({ ok: false, status: "失败" })
+    expect(p.complete).not.toHaveBeenCalled()
+    expect(p.resultSink.saved).toHaveLength(0)
+    expect(p.store.updates.map((u) => u.fields["状态"])).toEqual(["处理中", "失败"])
   })
 })
 

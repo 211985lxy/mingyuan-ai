@@ -71,6 +71,7 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     conversationMode: request.conversationMode,
     agentModule: request.agentModule,
     writerModule: request.writerModule,
+    modelPolicy: request.modelPolicy,
   }
 }
 

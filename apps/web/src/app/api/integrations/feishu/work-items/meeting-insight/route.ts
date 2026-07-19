@@ -35,8 +35,20 @@ import {
   createAimGenerationInsightResultSink,
 } from "@/lib/aim/meeting-insight-result-sink"
 import { prisma } from "@/lib/prisma"
+import type { AimRunMetadata } from "@/lib/aim-harness"
 
 export const dynamic = "force-dynamic"
+
+function publicExecutionSummary(execution: AimRunMetadata) {
+  return {
+    runId: execution.runId,
+    provider: execution.provider,
+    model: execution.model,
+    inputTokens: execution.inputTokens,
+    outputTokens: execution.outputTokens,
+    costCny: execution.costCny,
+  }
+}
 
 interface MeetingInsightRequestBody {
   recordId?: string
@@ -115,13 +127,23 @@ export async function POST(request: NextRequest) {
   const resultSink = createAimGenerationInsightResultSink({ ownerUserId })
 
   const result = await runMeetingInsightWorkflow(
-    { recordId, meetingTitle, customer, transcript, projectId },
+    { recordId, meetingTitle, customer, transcript, projectId, actorId: ownerUserId },
     { store, resultSink },
   )
 
   if (!result.ok) {
     return NextResponse.json(
-      { ok: false, error: result.error, status: result.status, recordId: result.recordId },
+      {
+        ok: false,
+        code: result.stopReason === "duplicate_suppressed"
+          ? "MEETING_INSIGHT_DUPLICATE_SUPPRESSED"
+          : "MEETING_INSIGHT_EXECUTION_FAILED",
+        error: result.stopReason === "duplicate_suppressed"
+          ? "该经营事项已有销售诊断运行，已抑制重复执行。"
+          : "会议洞察执行失败，请在经营事项中查看详情或联系管理员。",
+        status: result.status,
+        recordId: result.recordId,
+      },
       { status: 409 },
     )
   }
@@ -134,6 +156,7 @@ export async function POST(request: NextRequest) {
       recordId: result.recordId,
       aimResultId: result.aimResultId,
       resultLink: buildAimResultLink(result.aimResultId, projectId),
+      execution: result.execution ? publicExecutionSummary(result.execution) : undefined,
     },
     { status: 200 },
   )

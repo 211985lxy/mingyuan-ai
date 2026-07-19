@@ -130,6 +130,14 @@ export function createAimGenerationInsightResultSink(deps: {
             meetingTitle: input.meetingTitle,
             customer: input.customer,
             insight: input.insight,
+            ...(input.executionMetadata ? { execution: {
+              runId: input.executionMetadata.runId,
+              provider: input.executionMetadata.provider,
+              model: input.executionMetadata.model,
+              inputTokens: input.executionMetadata.inputTokens,
+              outputTokens: input.executionMetadata.outputTokens,
+              costCny: input.executionMetadata.costCny,
+            } } : {}),
           },
         },
       })
