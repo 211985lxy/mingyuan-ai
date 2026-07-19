@@ -88,8 +88,7 @@
       "name": "User",
       "columns": [
         "id",
-        "email",
-        "authVideoUrl"
+        "email"
       ]
     },
     {

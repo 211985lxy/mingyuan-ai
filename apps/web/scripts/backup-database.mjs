@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto"
-import { createReadStream, createWriteStream, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import { createReadStream, createWriteStream, existsSync, mkdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, resolve } from "node:path"
 import { pipeline } from "node:stream/promises"
 import { spawn } from "node:child_process"
 import { createGzip } from "node:zlib"
+import { config as loadEnv } from "dotenv"
+
+loadEnv({ path: ".env.local" })
 
 const databaseUrl = process.env.DATABASE_URL?.trim()
 if (!databaseUrl) throw new Error("DATABASE_URL is required")
@@ -17,8 +20,11 @@ const stamp = new Date().toISOString().replaceAll(/[:.]/g, "-")
 const database = url.pathname.replace(/^\//, "")
 const sqlPath = resolve(outputDirectory, `${database}-${stamp}.sql`)
 const archivePath = `${sqlPath}.gz`
+const mysqldumpBin = process.env.MYSQLDUMP_BIN
+  || ["/opt/homebrew/opt/mysql-client/bin/mysqldump", "/usr/local/opt/mysql-client/bin/mysqldump"].find(existsSync)
+  || "mysqldump"
 
-const child = spawn(process.env.MYSQLDUMP_BIN || "mysqldump", [
+const child = spawn(mysqldumpBin, [
   "--single-transaction",
   "--quick",
   "--routines",

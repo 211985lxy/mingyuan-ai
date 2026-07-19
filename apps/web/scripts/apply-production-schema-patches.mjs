@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url"
 import { parseMysqlUrl } from "./verify-production-schema.mjs"
 
 export const PRODUCTION_SCHEMA_PATCHES = [
-  "ALTER TABLE `User` ADD COLUMN IF NOT EXISTS `authVideoUrl` VARCHAR(191) NULL",
   `ALTER TABLE \`AimExecutionTrace\`
     ADD COLUMN IF NOT EXISTS \`inputTokens\` INTEGER NULL,
     ADD COLUMN IF NOT EXISTS \`outputTokens\` INTEGER NULL,

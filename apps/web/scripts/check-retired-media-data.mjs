@@ -1,4 +1,7 @@
 import mysql from "mysql2/promise"
+import { config as loadEnv } from "dotenv"
+
+loadEnv({ path: ".env.local" })
 
 const confirmation = "DELETE_RETIRED_MEDIA_DATA"
 const databaseUrl = process.env.DATABASE_URL?.trim()

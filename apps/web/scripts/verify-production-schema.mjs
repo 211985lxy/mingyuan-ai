@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { config as loadEnv } from "dotenv"
 
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const DEFAULT_CONTRACT = resolve(WEB_ROOT, "prisma", "production-schema-contract.json")
+
+loadEnv({ path: resolve(WEB_ROOT, ".env.local") })
 
 export function parseMysqlUrl(databaseUrl) {
   const url = new URL(databaseUrl)
@@ -29,7 +32,9 @@ function assertSchemaIdentifier(value) {
 }
 
 function runMysql(connection, query) {
-  const mysqlBin = process.env.MYSQL_BIN || "mysql"
+  const mysqlBin = process.env.MYSQL_BIN
+    || ["/opt/homebrew/opt/mysql-client/bin/mysql", "/usr/local/opt/mysql-client/bin/mysql"].find(existsSync)
+    || "mysql"
   const args = ["--protocol=TCP", "--batch", "--skip-column-names", "--host", connection.host, "--port", connection.port, "--user", connection.user]
   args.push(connection.database, "--execute", query)
   try {
