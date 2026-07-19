@@ -265,7 +265,7 @@ export function useAimWorkbench() {
     clearAimDraft(selectedAgentId, currentProjectScope)
   }
 
-  const restoreScopeDraft = useCallback((nextDraft: AimDraft | null) => {
+  const restoreScopeDraft = (nextDraft: AimDraft | null) => {
     setAgentModule(nextDraft?.agentModule)
     setMessages(nextDraft?.messages || [])
     setInput(nextDraft?.input || "")
@@ -279,15 +279,15 @@ export function useAimWorkbench() {
     setEditorSourceMessageId(nextDraft?.editorSourceMessageId)
     setEditorPanelWidth(nextDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
     setEditorPanelOpen(nextDraft?.editorPanelOpen ?? true)
-  }, [setAgentModule])
+  }
 
-  const afterScopeChange = useCallback(() => {
+  const afterScopeChange = () => {
     setReferenceSelection({ text: "", range: { start: 0, end: 0 } })
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
     setWorkflowBrief(null)
     setContentAction(null)
     clearImages()
-  }, [clearImages])
+  }
 
   const { changeProjectScope } = useAimProjectScopeSwitch({
     busy,

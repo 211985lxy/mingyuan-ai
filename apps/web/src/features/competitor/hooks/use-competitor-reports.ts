@@ -21,7 +21,8 @@ export function useCompetitorReports(targetUrl?: string) {
 
   useEffect(() => {
     if (!targetUrl) return
-    void loadReports(targetUrl)
+    const timer = window.setTimeout(() => void loadReports(targetUrl), 0)
+    return () => window.clearTimeout(timer)
   }, [loadReports, targetUrl])
 
   return { loadReports, reports, reportsLoading }

@@ -20,7 +20,10 @@ function useAccountList() {
     } catch { toast.error("加载监控列表失败")
     } finally { if (showLoading) setLoading(false) }
   }, [])
-  useEffect(() => { void loadAccounts() }, [loadAccounts])
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadAccounts(), 0)
+    return () => window.clearTimeout(timer)
+  }, [loadAccounts])
   useEffect(() => {
     if (!accounts.some((account) => account.refreshStatus === "refreshing")) return
     const timer = window.setInterval(() => void loadAccounts(false), 3000)

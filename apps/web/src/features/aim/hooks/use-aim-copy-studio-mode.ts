@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 
 import { normalizeWorkbenchCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 
@@ -10,10 +10,6 @@ export function useAimCopyStudioMode(input: { selectedAgentId: string; initialMo
   const [storedModule, setStoredModule] = useState<CopyStudioModule | undefined>(() =>
     normalizeWorkbenchCopyStudioModule(selectedAgentId, initialModule),
   )
-
-  useEffect(() => {
-    if (selectedAgentId !== "content_producer" && storedModule !== undefined) setStoredModule(undefined)
-  }, [selectedAgentId, storedModule])
 
   const setAgentModule = useCallback((module: CopyStudioModule | undefined) => {
     setStoredModule(normalizeWorkbenchCopyStudioModule(selectedAgentId, module))
