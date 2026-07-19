@@ -25,7 +25,6 @@ import {
   discoverSimilarAccounts,
   startCompetitorAnalysis,
   listCompetitorReports,
-  runCompetitorWebResearch,
   type WatchAccount,
   type SimilarAccount,
 } from "@/lib/api/client"
@@ -39,10 +38,11 @@ import {
 } from "@/features/competitor/viral-video-pool"
 import { CompetitorWorkbenchLinks } from "@/features/competitor/components/competitor-workbench-links"
 import { useCompetitorVideoExtractions } from "@/features/competitor/hooks/use-competitor-video-extractions"
+import { useCompetitorWebResearch } from "@/features/competitor/hooks/use-competitor-web-research"
 import {
   formatCompetitorRefreshError as formatRefreshError,
 } from "@/lib/competitor/display"
-import type { ApiCompetitorReport, ApiCompetitorWebResearch } from "@/types/api"
+import type { ApiCompetitorReport } from "@/types/api"
 
 // ─── Main Page ─────────────────────────────────────────
 
@@ -65,10 +65,14 @@ export default function CompetitorWatchPage() {
   const [peerAccounts, setPeerAccounts] = useState<SimilarAccount[]>([])
   const [leaderAccounts, setLeaderAccounts] = useState<SimilarAccount[]>([])
   const [ignoredDiscoveryUrls, setIgnoredDiscoveryUrls] = useState<Set<string>>(new Set())
-  const [researchQuery, setResearchQuery] = useState("")
-  const [researchLoading, setResearchLoading] = useState(false)
-  const [researchResult, setResearchResult] = useState<ApiCompetitorWebResearch | null>(null)
   const { extractingVideoId, videoExtractions, extractVideo } = useCompetitorVideoExtractions()
+  const {
+    researchLoading,
+    researchQuery,
+    researchResult,
+    research,
+    setResearchQuery,
+  } = useCompetitorWebResearch()
 
   async function handleAnalyze(url: string) {
     setAnalyzingUrl(url)
@@ -287,29 +291,6 @@ export default function CompetitorWatchPage() {
 
   const hasRefreshingAccount = accounts.some((account) => account.refreshStatus === "refreshing")
 
-  async function handleWebResearch() {
-    const query = researchQuery.trim()
-    if (!query) {
-      toast.error("先输入一个要补证的关键词")
-      return
-    }
-
-    setResearchLoading(true)
-    try {
-      const result = await runCompetitorWebResearch(query)
-      setResearchResult(result)
-      if (result.warnings.length > 0) {
-        toast.warning(result.warnings[0])
-      } else {
-        toast.success(`已补到 ${result.items.length} 条公开线索`)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "全网补证失败")
-    } finally {
-      setResearchLoading(false)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <WorkbenchHero
@@ -369,7 +350,7 @@ export default function CompetitorWatchPage() {
             loading={researchLoading}
             result={researchResult}
             onQueryChange={setResearchQuery}
-            onResearch={handleWebResearch}
+            onResearch={research}
           />
 
           <MonitoredAccountGrid
