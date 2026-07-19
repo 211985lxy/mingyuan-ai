@@ -28,6 +28,9 @@ describe("parseFeishuWorkItem", () => {
         工作流: "销售诊断",
         AIM项目ID: "proj_001",
         输入内容: "客户提到预算紧张，希望先看方案",
+        LoopID: "sales-diagnosis-v1",
+        Loop版本: 1,
+        最后运行ID: "loop_run_previous",
       }),
     )
 
@@ -39,6 +42,9 @@ describe("parseFeishuWorkItem", () => {
     expect(parsed.resultSummary).toBe("")
     expect(parsed.resultLink).toBe("")
     expect(parsed.errorMessage).toBe("")
+    expect(parsed.loopId).toBe("sales-diagnosis-v1")
+    expect(parsed.loopVersion).toBe(1)
+    expect(parsed.lastRunId).toBe("loop_run_previous")
   })
 
   it("把多行文本数组字段拍平为字符串（对齐 lark-base-tool 的文本字段形态）", () => {
@@ -81,6 +87,9 @@ describe("parseFeishuWorkItem", () => {
     expect(parsed.resultSummary).toBe("")
     expect(parsed.resultLink).toBe("")
     expect(parsed.errorMessage).toBe("")
+    expect(parsed.loopId).toBe("")
+    expect(parsed.loopVersion).toBeNull()
+    expect(parsed.lastRunId).toBe("")
   })
 
   it("状态字段为未知值时返回空值并暴露原始值，不伪造可执行状态", () => {

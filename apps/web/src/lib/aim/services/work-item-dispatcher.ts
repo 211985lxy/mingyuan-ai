@@ -13,42 +13,71 @@
 import {
   DISPATCH_FIELDS,
   DEFAULT_LEASE_TTL_MS,
-  EXECUTION_TIMEOUT_MS,
   buildIdempotencyKey,
   buildLeaseAcquirePatch,
   buildLeaseReleasePatch,
   isLeaseActive,
   isRetryDue,
+  parseRetryCount,
   planExecutionFailure,
 } from "@/lib/aim/work-item-dispatch"
+import { sha256 } from "@/lib/aim-harness/hashing"
 import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
 import type { LoopStopReason } from "@/lib/aim/loops/contracts"
+import type { BusinessLoopSpec } from "@/lib/aim/loops/contracts"
+import { getRegisteredLoop } from "@/lib/aim/loops/registry"
 import {
   failWorkItem,
+  retryWorkItem,
   startWorkItem,
   type WorkItemRecord,
   type WorkItemRecordStore,
 } from "@/lib/aim/services/work-item-execution"
 
 export type DispatchExecuteOutcome =
-  | { ok: true }
-  | { ok: false; error: string; retryable?: boolean; stopReason?: LoopStopReason }
+  | { ok: true; duplicateSuppressed?: boolean }
+  | { ok: false; error: string; retryable: boolean; stopReason: LoopStopReason }
+
+export interface DispatchExecutionContext {
+  loop: BusinessLoopSpec
+  idempotencyKey: string
+  attempt: number
+  runId: string
+  claimToken?: unknown
+}
+
+export interface DispatchClaimContext {
+  loopId: string
+  loopVersion: number | null
+  projectId: string
+  idempotencyKey: string
+  attempt: number
+  runId: string
+}
+
+export type DispatchClaimResult =
+  | { acquired: true; token?: unknown }
+  | { acquired: false }
 
 export interface WorkItemDispatcherPorts {
   store: WorkItemRecordStore
   /** 扫描待处理候选记录（由调用方绑定真实飞书列表能力）。 */
   listPending(limit: number): Promise<WorkItemRecord[]>
   /** 单记录的实际执行体；必须幂等（幂等键已透传）。 */
-  execute(recordId: string, idempotencyKey: string): Promise<DispatchExecuteOutcome>
+  execute(recordId: string, context: DispatchExecutionContext): Promise<DispatchExecuteOutcome>
+  /** 具有唯一约束的原子领取；必须发生在任何飞书写入之前。 */
+  claim(recordId: string, context: DispatchClaimContext): Promise<DispatchClaimResult>
+  /** claim 后、工作流接管前失败时关闭运行记录。 */
+  failClaim(token: unknown, error: string): Promise<void>
+  /** claim 后、工作流接管前的飞书写入失败时释放唯一键，允许安全重试。 */
+  releaseClaim(token: unknown): Promise<void>
   /** 失败/超时/配置异常通知飞书负责人。 */
   notify(message: string): Promise<void>
   now(): Date
   /** 租约持有者标识（通常为执行主机/cron 实例名）。 */
   holderId: string
-  /** 操作类型（幂等键组成部分），缺省为会议洞察。 */
-  action?: string
   leaseTtlMs?: number
-  executionTimeoutMs?: number
+  resolveLoop?: typeof getRegisteredLoop
 }
 
 export interface WorkItemDispatchSummary {
@@ -60,29 +89,44 @@ export interface WorkItemDispatchSummary {
   skippedLeased: number
   skippedNotDue: number
   skippedNotPending: number
+  duplicatesSuppressed: number
   errors: Array<{ recordId: string; error: string }>
 }
-
-const DEFAULT_ACTION = "meeting_insight"
 
 function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`执行超时（${ms}ms）`)), ms)
-    promise.then(
-      (value) => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      (error) => {
-        clearTimeout(timer)
-        reject(error)
-      },
-    )
-  })
+async function releasePreExecutionClaim(
+  ports: WorkItemDispatcherPorts,
+  token: unknown,
+  recordId: string,
+  summary: WorkItemDispatchSummary,
+): Promise<boolean> {
+  try {
+    await ports.releaseClaim(token)
+    return true
+  } catch (error) {
+    summary.errors.push({ recordId, error: `释放未执行 Trace 失败：${describeError(error)}` })
+    return false
+  }
+}
+
+export function buildDispatchRunId(
+  recordId: string,
+  loop: BusinessLoopSpec,
+  previousRunId: string,
+): string {
+  return `loop_run_${sha256(`${recordId}|${loop.id}|${loop.version}|${previousRunId || "root"}`).slice(0, 28)}`
+}
+
+function buildRawDispatchRunId(
+  recordId: string,
+  loopId: string,
+  loopVersion: number | null,
+  previousRunId: string,
+): string {
+  return `loop_run_${sha256(`${recordId}|${loopId || "missing"}|${loopVersion ?? "missing"}|${previousRunId || "root"}`).slice(0, 28)}`
 }
 
 async function handleFailure(
@@ -90,13 +134,25 @@ async function handleFailure(
   record: WorkItemRecord,
   error: string,
   summary: WorkItemDispatchSummary,
-  retryable = true,
+  retryable: boolean,
+  stopReason: LoopStopReason,
+  maxAutoRetries: number,
 ): Promise<void> {
   const now = ports.now()
   if (retryable) {
-    const plan = planExecutionFailure(record.fields, now)
+    const plan = planExecutionFailure(record.fields, now, maxAutoRetries)
     if (plan.kind === "retry") {
-      await ports.store.update(record.recordId, plan.patch)
+      const failed = await failWorkItem(ports.store, record.recordId, { errorMessage: error })
+      if (!failed.ok) throw new Error(failed.error)
+      const retried = await retryWorkItem(ports.store, record.recordId)
+      if (!retried.ok) throw new Error(retried.error)
+      await ports.store.update(record.recordId, {
+        [DISPATCH_FIELDS.retryCount]: plan.patch[DISPATCH_FIELDS.retryCount],
+        [DISPATCH_FIELDS.nextRetryAt]: plan.patch[DISPATCH_FIELDS.nextRetryAt],
+        ...buildLeaseReleasePatch(),
+        [DISPATCH_FIELDS.stopReason]: stopReason,
+        [DISPATCH_FIELDS.nextAction]: "等待自动重试",
+      })
       summary.failed += 1
       summary.errors.push({ recordId: record.recordId, error })
       return
@@ -104,9 +160,16 @@ async function handleFailure(
   }
 
   // 升级人工接管：写失败态（可行动错误）+ 标记 + 通知负责人。
-  await failWorkItem(ports.store, record.recordId, { errorMessage: error })
+  const failed = await failWorkItem(ports.store, record.recordId, { errorMessage: error })
+  if (!failed.ok) {
+    summary.errors.push({ recordId: record.recordId, error })
+    summary.errors.push({ recordId: record.recordId, error: `失败状态回写失败：${failed.error}` })
+    return
+  }
   await ports.store.update(record.recordId, {
     [DISPATCH_FIELDS.needsHuman]: true,
+    [DISPATCH_FIELDS.stopReason]: retryable ? "retry_exhausted" : stopReason,
+    [DISPATCH_FIELDS.nextAction]: "人工接管处理",
     ...buildLeaseReleasePatch(),
   })
   summary.escalated += 1
@@ -139,9 +202,9 @@ export async function dispatchPendingWorkItems(
     skippedLeased: 0,
     skippedNotDue: 0,
     skippedNotPending: 0,
+    duplicatesSuppressed: 0,
     errors: [],
   }
-  const action = ports.action ?? DEFAULT_ACTION
   const now = ports.now()
 
   const candidates = await ports.listPending(limit)
@@ -174,35 +237,164 @@ export async function dispatchPendingWorkItems(
       continue
     }
 
-    // 获取租约：先推进 待处理→处理中（幂等感知），再写租约字段。
+    let loop: BusinessLoopSpec
+    try {
+      loop = (ports.resolveLoop ?? getRegisteredLoop)(parsed.loopId)
+      if (parsed.loopVersion !== loop.version) {
+        throw new Error(`Loop 版本不匹配：记录=${parsed.rawLoopVersion || "空"}，注册表=${loop.version}`)
+      }
+    } catch (error) {
+      const message = `经营事项 Loop 配置无效：${describeError(error)}`
+      const runId = buildRawDispatchRunId(
+        record.recordId,
+        parsed.loopId,
+        parsed.loopVersion,
+        parsed.lastRunId,
+      )
+      let invalidClaim: DispatchClaimResult
+      try {
+        invalidClaim = await ports.claim(record.recordId, {
+          loopId: parsed.loopId,
+          loopVersion: parsed.loopVersion,
+          projectId: parsed.aimProjectId,
+          idempotencyKey: buildIdempotencyKey(record.recordId, parsed.loopId || "invalid_loop"),
+          attempt: parseRetryCount(record.fields) + 1,
+          runId,
+        })
+      } catch (claimError) {
+        summary.errors.push({ recordId: record.recordId, error: `原子领取运行失败：${describeError(claimError)}` })
+        continue
+      }
+      if (!invalidClaim.acquired) {
+        summary.duplicatesSuppressed += 1
+        continue
+      }
+      // 持久化哈希链必须紧随原子 claim；即使后续飞书启动失败，人工修复后也能生成新 runId，
+      // 不会永远撞上已失败的 Trace 唯一键。
+      try {
+        await ports.store.update(record.recordId, { [DISPATCH_FIELDS.lastRunId]: runId })
+      } catch (writeError) {
+        const message = `持久化最后运行ID失败：${describeError(writeError)}`
+        await releasePreExecutionClaim(ports, invalidClaim.token, record.recordId, summary)
+        summary.errors.push({ recordId: record.recordId, error: message })
+        continue
+      }
+      const started = await startWorkItem(ports.store, record.recordId)
+      if (!started.ok) {
+        await releasePreExecutionClaim(ports, invalidClaim.token, record.recordId, summary)
+        summary.errors.push({ recordId: record.recordId, error: started.error })
+        continue
+      }
+      summary.started += 1
+      await handleFailure(
+        ports,
+        record,
+        message,
+        summary,
+        false,
+        "missing_input",
+        0,
+      )
+      await ports.failClaim(invalidClaim.token, message)
+      continue
+    }
+
+    const runId = buildDispatchRunId(record.recordId, loop, parsed.lastRunId)
+    const claimContext: DispatchClaimContext = {
+      loopId: loop.id,
+      loopVersion: loop.version,
+      projectId: parsed.aimProjectId,
+      idempotencyKey: buildIdempotencyKey(record.recordId, loop.id),
+      attempt: parseRetryCount(record.fields) + 1,
+      runId,
+    }
+    let claim: DispatchClaimResult
+    try {
+      claim = await ports.claim(record.recordId, claimContext)
+    } catch (error) {
+      summary.errors.push({ recordId: record.recordId, error: `原子领取运行失败：${describeError(error)}` })
+      continue
+    }
+    if (!claim.acquired) {
+      summary.duplicatesSuppressed += 1
+      continue
+    }
+
+    // 原子 claim 成功后才允许开始处理或写入飞书租约。
+    try {
+      await ports.store.update(record.recordId, { [DISPATCH_FIELDS.lastRunId]: runId })
+    } catch (writeError) {
+      const message = `持久化最后运行ID失败：${describeError(writeError)}`
+      await releasePreExecutionClaim(ports, claim.token, record.recordId, summary)
+      summary.errors.push({ recordId: record.recordId, error: message })
+      continue
+    }
     const started = await startWorkItem(ports.store, record.recordId)
     if (!started.ok) {
+      await releasePreExecutionClaim(ports, claim.token, record.recordId, summary)
       summary.errors.push({ recordId: record.recordId, error: started.error })
       continue
     }
     summary.started += 1
-    await ports.store.update(
-      record.recordId,
-      buildLeaseAcquirePatch(ports.holderId, now, ports.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS),
-    )
+    try {
+      await ports.store.update(
+        record.recordId,
+        buildLeaseAcquirePatch(ports.holderId, now, ports.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS),
+      )
+    } catch (writeError) {
+      const message = `获取飞书执行租约失败：${describeError(writeError)}`
+      await releasePreExecutionClaim(ports, claim.token, record.recordId, summary)
+      await handleFailure(ports, record, message, summary, false, "human_required", 0)
+      continue
+    }
 
     let outcome: DispatchExecuteOutcome
     try {
-      outcome = await withTimeout(
-        ports.execute(record.recordId, buildIdempotencyKey(record.recordId, action)),
-        ports.executionTimeoutMs ?? EXECUTION_TIMEOUT_MS,
-      )
+      outcome = await ports.execute(record.recordId, {
+        loop,
+        idempotencyKey: claimContext.idempotencyKey,
+        attempt: claimContext.attempt,
+        runId,
+        claimToken: claim.token,
+      })
     } catch (error) {
-      outcome = { ok: false, error: describeError(error) }
+      outcome = {
+        ok: false,
+        error: describeError(error),
+        retryable: false,
+        stopReason: "human_required",
+      }
     }
 
     if (outcome.ok) {
-      await ports.store.update(record.recordId, buildLeaseReleasePatch())
+      if (outcome.duplicateSuppressed) {
+        summary.duplicatesSuppressed += 1
+        continue
+      }
+      await ports.store.update(record.recordId, {
+        ...buildLeaseReleasePatch(),
+        [DISPATCH_FIELDS.retryCount]: 0,
+        [DISPATCH_FIELDS.nextRetryAt]: null,
+        [DISPATCH_FIELDS.needsHuman]: false,
+        [DISPATCH_FIELDS.stopReason]: "",
+        [DISPATCH_FIELDS.nextAction]: "等待人工审核",
+      })
       summary.succeeded += 1
       continue
     }
 
-    await handleFailure(ports, record, outcome.error, summary, outcome.retryable !== false)
+    await ports.failClaim(claim.token, outcome.error)
+    const budget = loop.supervisionPolicy.budget
+    const maxAutoRetries = Math.min(budget.maxAutoRetries, Math.max(0, budget.maxRunsPerWorkItem - 1))
+    await handleFailure(
+      ports,
+      record,
+      outcome.error,
+      summary,
+      outcome.retryable,
+      outcome.stopReason,
+      maxAutoRetries,
+    )
   }
 
   return summary

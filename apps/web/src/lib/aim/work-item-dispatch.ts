@@ -17,6 +17,9 @@ export const DISPATCH_FIELDS = {
   retryCount: "重试次数",
   nextRetryAt: "下次重试时间",
   needsHuman: "需人工接管",
+  stopReason: "停止原因",
+  nextAction: "下一步动作",
+  lastRunId: "最后运行ID",
 } as const
 
 /** 默认租约时长：10 分钟（覆盖一次会议洞察抽取的执行窗口）。 */
@@ -91,9 +94,10 @@ export type ExecutionFailurePlan =
 export function planExecutionFailure(
   fields: Record<string, unknown>,
   now: Date,
+  maxRetries = MAX_EXECUTION_RETRIES,
 ): ExecutionFailurePlan {
   const retryCount = parseRetryCount(fields)
-  if (retryCount >= MAX_EXECUTION_RETRIES) return { kind: "escalate" }
+  if (retryCount >= maxRetries) return { kind: "escalate" }
   return {
     kind: "retry",
     patch: {

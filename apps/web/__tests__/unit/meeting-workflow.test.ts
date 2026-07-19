@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { runMeetingInsightWorkflow, type MeetingWorkflowPorts } from "@/lib/aim/meeting-workflow"
+import { buildMeetingInsightTraceId, runMeetingInsightWorkflow, type MeetingWorkflowPorts } from "@/lib/aim/meeting-workflow"
 import type { WorkItemRecordStore } from "@/lib/aim/services/work-item-execution"
 import { LLMClient } from "@/lib/llm/client"
 import type { LLMProvider } from "@/lib/llm/types"
@@ -94,6 +94,10 @@ const WORKFLOW_INPUT = {
 }
 
 beforeEach(() => vi.clearAllMocks())
+
+it("同一经营事项的不同获准重试使用不同 Trace ID", () => {
+  expect(buildMeetingInsightTraceId("rec_001", 1)).not.toBe(buildMeetingInsightTraceId("rec_001", 2))
+})
 
 describe("runMeetingInsightWorkflow — 成功流程", () => {
   it("待处理 → 处理中 → 待人工审核，最终 ok + 待人工审核状态", async () => {

@@ -28,6 +28,12 @@ import {
 } from "@/lib/aim/meeting-insight-result-sink"
 import { runMeetingInsightWorkflow } from "@/lib/aim/meeting-workflow"
 import {
+  claimAimTrace,
+  failAimTrace,
+  releaseAimTraceClaim,
+  type AimTraceRecorder,
+} from "@/lib/aim-observability"
+import {
   dispatchPendingWorkItems,
   type WorkItemDispatchSummary,
   type WorkItemDispatcherPorts,
@@ -49,6 +55,26 @@ function publicDispatchSummary(summary: WorkItemDispatchSummary) {
       code: "DISPATCH_ITEM_FAILED",
     })),
   }
+}
+
+export function classifyDispatchRetry(error: string) {
+  const lower = error.toLowerCase()
+  const status = Number(error.match(/\b(4\d{2}|5\d{2})\b/)?.[1] ?? NaN)
+  const timedOut = status === 408 || /(timeout|timed out|deadline|aborted|超时)/.test(lower)
+  const retryable = timedOut
+    || status === 429
+    || status >= 500
+    || /(econnrefused|econnreset|enotfound|epipe|fetch failed|network|socket|getaddrinfo|网络)/.test(lower)
+  return { retryable, stopReason: timedOut ? "execution_timeout" as const : "human_required" as const }
+}
+
+function requireClaimedTrace(token: unknown): AimTraceRecorder {
+  if (!token || typeof token !== "object") throw new Error("调度 claim 未返回 Trace。")
+  const trace = token as Partial<AimTraceRecorder>
+  if (typeof trace.id !== "string" || typeof trace.startedAt !== "number") {
+    throw new Error("调度 claim 返回的 Trace 无效。")
+  }
+  return trace as AimTraceRecorder
 }
 
 export async function GET(request: NextRequest) {
@@ -74,7 +100,34 @@ export async function GET(request: NextRequest) {
   const ports: WorkItemDispatcherPorts = {
     store,
     listPending: (limit) => listPendingWorkItemRecords(config, limit),
-    execute: async (recordId) => {
+    claim: async (_recordId, context) => {
+      const claimed = await claimAimTrace({
+        id: context.runId,
+        userId: ownerUserId,
+        projectId: context.projectId || undefined,
+        agentId: context.loopId === "sales-diagnosis-v1" ? "business_diagnosis" : undefined,
+        action: "generate",
+        inputSummary: `${context.loopId || "invalid-loop"}:${context.idempotencyKey}`,
+      })
+      return claimed.acquired
+        ? { acquired: true, token: claimed.trace }
+        : { acquired: false }
+    },
+    failClaim: async (token, error) => {
+      if (token) await failAimTrace(requireClaimedTrace(token), error)
+    },
+    releaseClaim: async (token) => {
+      if (token) await releaseAimTraceClaim(requireClaimedTrace(token))
+    },
+    execute: async (recordId, context) => {
+      if (context.loop.id !== "sales-diagnosis-v1") {
+        return {
+          ok: false,
+          error: `尚未配置 ${context.loop.id} 的执行处理器。`,
+          retryable: false,
+          stopReason: "missing_input",
+        }
+      }
       let record
       try {
         record = await store.get(recordId)
@@ -82,7 +135,8 @@ export async function GET(request: NextRequest) {
         return {
           ok: false,
           error: `读取经营事项失败：${err instanceof Error ? err.message : String(err)}`,
-          retryable: true,
+          retryable: false,
+          stopReason: "human_required",
         }
       }
       if (!record) return {
@@ -111,14 +165,28 @@ export async function GET(request: NextRequest) {
       }
 
       const result = await runMeetingInsightWorkflow(
-        { recordId, ...input, actorId: ownerUserId },
-        { store, resultSink },
+        {
+          recordId,
+          ...input,
+          actorId: ownerUserId,
+          attempt: context.attempt,
+          traceId: context.runId,
+        },
+        { store, resultSink, claimedTrace: requireClaimedTrace(context.claimToken) },
       )
-      return result.ok ? { ok: true } : {
+      if (result.ok) return { ok: true }
+      if (result.stopReason === "verification_failed") {
+        return { ok: false, error: result.error, retryable: false, stopReason: "verification_failed" }
+      }
+      if (result.stopReason === "duplicate_suppressed") {
+        return { ok: true, duplicateSuppressed: true }
+      }
+      const classified = classifyDispatchRetry(result.error)
+      return {
         ok: false,
         error: result.error,
-        retryable: false,
-        stopReason: result.stopReason ?? "human_required",
+        retryable: classified.retryable,
+        stopReason: classified.stopReason,
       }
     },
     notify: async (message) => {
@@ -127,7 +195,6 @@ export async function GET(request: NextRequest) {
     },
     now: () => new Date(),
     holderId: process.env.HOSTNAME?.trim() || "cron-unattended",
-    action: "meeting_insight",
   }
 
   let summary

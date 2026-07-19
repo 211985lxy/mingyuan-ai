@@ -11,6 +11,9 @@ const {
   listPendingWorkItemRecords,
   readWorkItemStoreConfig,
   createAimGenerationInsightResultSink,
+  claimAimTrace,
+  failAimTrace,
+  releaseAimTraceClaim,
 } = vi.hoisted(() => ({
   validateCronSecret: vi.fn(() => true),
   runMeetingInsightWorkflow: vi.fn(),
@@ -18,14 +21,21 @@ const {
   listPendingWorkItemRecords: vi.fn(),
   readWorkItemStoreConfig: vi.fn(() => ({ baseToken: "bse_1", tableId: "tbl_1", cliPath: "/mock/lark-cli" })),
   createAimGenerationInsightResultSink: vi.fn(() => ({ save: vi.fn() })),
+  claimAimTrace: vi.fn(async (input: { id: string }) => ({
+    acquired: true as const,
+    trace: { id: input.id, startedAt: Date.now() },
+  })),
+  failAimTrace: vi.fn(async () => undefined),
+  releaseAimTraceClaim: vi.fn(async () => undefined),
 }))
 
 vi.mock("@/lib/admin-auth", () => ({ validateCronSecret }))
 vi.mock("@/lib/aim/work-item-store", () => ({ createLarkWorkItemStore, listPendingWorkItemRecords, readWorkItemStoreConfig }))
 vi.mock("@/lib/aim/meeting-insight-result-sink", () => ({ createAimGenerationInsightResultSink }))
 vi.mock("@/lib/aim/meeting-workflow", () => ({ runMeetingInsightWorkflow }))
+vi.mock("@/lib/aim-observability", () => ({ claimAimTrace, failAimTrace, releaseAimTraceClaim }))
 
-import { GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
+import { classifyDispatchRetry, GET } from "@/app/api/cron/feishu-work-items/dispatch/route"
 import { DISPATCH_FIELDS } from "@/lib/aim/work-item-dispatch"
 
 const CRON_SECRET = "test-cron-secret-with-enough-length-32"
@@ -42,6 +52,8 @@ function pendingRecord(recordId = "rec_1", overrides: Record<string, unknown> = 
       输入内容: "葛老板做数字供暖，年营收1300万想冲3000万……",
       会议标题: "数字供暖项目启动会",
       客户名称: "葛老板",
+      LoopID: "sales-diagnosis-v1",
+      Loop版本: 1,
       ...overrides,
     },
   }
@@ -51,7 +63,11 @@ function pendingRecord(recordId = "rec_1", overrides: Record<string, unknown> = 
 function makeStore(records: Map<string, { recordId: string; fields: Record<string, unknown> }>) {
   return {
     get: vi.fn(async (id: string) => records.get(id) ?? null),
-    update: vi.fn(async () => ({ ok: true as const })),
+    update: vi.fn(async (recordId: string, fields: Record<string, unknown>) => {
+      const record = records.get(recordId)
+      if (record) record.fields = { ...record.fields, ...fields }
+      return { ok: true as const }
+    }),
   }
 }
 
@@ -117,6 +133,17 @@ describe("鉴权与 fail-closed", () => {
   })
 })
 
+describe("临时错误白名单", () => {
+  it.each(["上游 408", "请求 timeout", "上游 429", "上游 503", "ECONNRESET", "网络异常"])(
+    "%s 可重试",
+    (error) => expect(classifyDispatchRetry(error).retryable).toBe(true),
+  )
+  it.each(["上游 400", "上游 401", "上游 402 余额不足", "上游 403", "模型 404 unavailable", "配置缺失"])(
+    "%s 不可重试",
+    (error) => expect(classifyDispatchRetry(error).retryable).toBe(false),
+  )
+})
+
 describe("无人值守调度执行", () => {
   it("待处理记录经真实 dispatcher 推进会议洞察工作流 → 成功计数 +1", async () => {
     runMeetingInsightWorkflow.mockResolvedValueOnce({
@@ -137,6 +164,7 @@ describe("无人值守调度执行", () => {
         customer: "葛老板",
         transcript: "葛老板做数字供暖，年营收1300万想冲3000万……",
         projectId: "proj_1",
+        traceId: expect.stringMatching(/^loop_run_/),
       }),
       expect.objectContaining({ store: expect.any(Object), resultSink: expect.any(Object) }),
     )
@@ -208,5 +236,61 @@ describe("无人值守调度执行", () => {
     expect(store.update.mock.calls.some(([, fields]) =>
       fields[DISPATCH_FIELDS.retryCount] === 1 || fields["状态"] === "待处理",
     )).toBe(false)
+  })
+
+  it("模型 503 虽属临时错误，但当前 Loop 零自动重试预算会立即转人工", async () => {
+    runMeetingInsightWorkflow.mockResolvedValueOnce({
+      ok: false,
+      status: "失败",
+      recordId: "rec_1",
+      error: "会议洞察模型调用失败：上游 503",
+    })
+    const { body } = await call()
+    const summary = body.summary as Record<string, unknown>
+    expect(summary.failed).toBe(0)
+    expect(summary.escalated).toBe(1)
+    expect(store.update.mock.calls.some(([, fields]) =>
+      fields[DISPATCH_FIELDS.retryCount] === 1,
+    )).toBe(false)
+  })
+
+  it("确定性验证失败不可重试，立即人工接管", async () => {
+    runMeetingInsightWorkflow.mockResolvedValueOnce({
+      ok: false,
+      status: "失败",
+      recordId: "rec_1",
+      error: "高风险事实无原文证据",
+      stopReason: "verification_failed",
+    })
+    const { body } = await call()
+    const summary = body.summary as Record<string, unknown>
+    expect(summary.failed).toBe(0)
+    expect(summary.escalated).toBe(1)
+    expect(store.update.mock.calls.some(([, fields]) =>
+      fields[DISPATCH_FIELDS.stopReason] === "verification_failed"
+        && fields[DISPATCH_FIELDS.nextAction] === "人工接管处理",
+    )).toBe(true)
+  })
+
+  it("缺 LoopID 时不进入销售诊断执行器", async () => {
+    const record = pendingRecord("rec_1", { LoopID: "" })
+    store = makeStore(new Map([["rec_1", record]]))
+    createLarkWorkItemStore.mockReturnValue(store)
+    listPendingWorkItemRecords.mockResolvedValue([record])
+    const { body } = await call()
+    const summary = body.summary as Record<string, unknown>
+    expect(summary.escalated).toBe(1)
+    expect(runMeetingInsightWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("Trace 重复领取只计抑制，不重试或回写失败状态", async () => {
+    claimAimTrace.mockResolvedValueOnce({ acquired: false, reason: "duplicate" })
+    const { body } = await call()
+    const summary = body.summary as Record<string, unknown>
+    expect(summary.duplicatesSuppressed).toBe(1)
+    expect(summary.failed).toBe(0)
+    expect(summary.escalated).toBe(0)
+    expect(store.update).not.toHaveBeenCalled()
+    expect(runMeetingInsightWorkflow).not.toHaveBeenCalled()
   })
 })

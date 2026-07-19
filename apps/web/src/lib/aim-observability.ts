@@ -60,6 +60,7 @@ function getTraceDelegate() {
   return (prisma as typeof prisma & {
     aimExecutionTrace?: {
       create(args: unknown): Promise<{ id: string }>
+      deleteMany(args: unknown): Promise<{ count: number }>
       update(args: unknown): Promise<unknown>
       findUnique(args: unknown): Promise<{ steps: unknown } | null>
     }
@@ -148,6 +149,18 @@ export async function claimAimTrace(input: ClaimAimTraceInput): Promise<ClaimAim
     if (isUniqueConstraintError(error)) return { acquired: false, reason: "duplicate" }
     throw error
   }
+}
+
+/**
+ * 释放尚未进入模型工作流的原子 claim。
+ * 仅删除 running 记录；调用方必须保证该 Trace 尚未交给 executeAimRun。
+ */
+export async function releaseAimTraceClaim(trace: AimTraceRecorder | undefined): Promise<void> {
+  if (!trace) return
+  const delegate = getTraceDelegate()
+  if (!delegate?.deleteMany) throw new Error("AimExecutionTrace deleteMany unavailable")
+  const result = await delegate.deleteMany({ where: { id: trace.id, status: "running" } })
+  if (result.count !== 1) throw new Error(`Trace claim 无法安全释放：${trace.id}`)
 }
 
 export async function runAimTraceStep<T>(

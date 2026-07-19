@@ -21,6 +21,12 @@ vi.mock("@/lib/prisma", () => ({
       async findUnique({ where }: { where: { id: string } }) {
         return state.records.get(where.id) || null
       },
+      async deleteMany({ where }: { where: { id: string; status: string } }) {
+        const current = state.records.get(where.id)
+        if (!current || current.status !== where.status) return { count: 0 }
+        state.records.delete(where.id)
+        return { count: 1 }
+      },
     },
   },
 }))
@@ -61,5 +67,15 @@ describe("AIM observability", () => {
     }
     await expect(claimAimTrace(input)).resolves.toMatchObject({ acquired: true })
     await expect(claimAimTrace(input)).resolves.toEqual({ acquired: false, reason: "duplicate" })
+  })
+
+  it("模型执行前可安全释放 claim，并允许同一确定性 ID 再次领取", async () => {
+    const { claimAimTrace, releaseAimTraceClaim } = await import("@/lib/aim-observability")
+    const input = { id: "sales_diag_prestart_release", action: "generate" as const }
+    const first = await claimAimTrace(input)
+    expect(first.acquired).toBe(true)
+    if (!first.acquired) throw new Error("expected acquired claim")
+    await releaseAimTraceClaim(first.trace)
+    await expect(claimAimTrace(input)).resolves.toMatchObject({ acquired: true })
   })
 })

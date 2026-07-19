@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   completeWorkItem,
   failWorkItem,
+  retryWorkItem,
   startWorkItem,
   submitWorkItemForReview,
   type WorkItemRecord,
@@ -231,6 +232,22 @@ describe("failWorkItem", () => {
     expect(same.ok).toBe(true)
     if (same.ok) expect(same.idempotent).toBe(true)
     expect(different.ok).toBe(false)
+    expect(store.updates).toHaveLength(0)
+  })
+})
+
+describe("retryWorkItem", () => {
+  it("只允许失败 → 待处理，复用唯一状态机", async () => {
+    const store = makeStore(recordAt("失败", { 错误信息: "上游超时" }))
+    const result = await retryWorkItem(store, "rec_001")
+    expect(result.ok).toBe(true)
+    expect(store.updates[0].fields).toMatchObject({ 状态: "待处理", 错误信息: "" })
+  })
+
+  it("拒绝从处理中直接退回待处理", async () => {
+    const store = makeStore(recordAt("处理中"))
+    const result = await retryWorkItem(store, "rec_001")
+    expect(result.ok).toBe(false)
     expect(store.updates).toHaveLength(0)
   })
 })

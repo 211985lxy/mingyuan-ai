@@ -57,10 +57,14 @@ export interface ParsedWorkItem {
   resultSummary: string
   resultLink: string
   errorMessage: string
+  loopId: string
+  loopVersion: number | null
+  lastRunId: string
   /** 原始状态字段（解析前），用于在状态异常时追溯，不参与业务逻辑。 */
   rawStatus: string
   /** 原始工作流字段（解析前）。 */
   rawWorkflow: string
+  rawLoopVersion: string
 }
 
 /**
@@ -105,6 +109,9 @@ function flattenLink(value: unknown): string {
 export function parseFeishuWorkItem(fields: Record<string, unknown>): ParsedWorkItem {
   const rawStatus = flattenText(fields["状态"])
   const rawWorkflow = flattenText(fields["工作流"])
+  const loopId = flattenText(fields["LoopID"])
+  const rawLoopVersion = flattenText(fields["Loop版本"])
+  const parsedLoopVersion = Number(rawLoopVersion)
 
   const status: WorkItemStatus | "" = STATUS_VALUES.has(rawStatus)
     ? (rawStatus as WorkItemStatus)
@@ -122,8 +129,14 @@ export function parseFeishuWorkItem(fields: Record<string, unknown>): ParsedWork
     resultSummary: flattenText(fields["结果摘要"]),
     resultLink: flattenLink(fields["结果链接"]),
     errorMessage: flattenText(fields["错误信息"]),
+    loopId,
+    loopVersion: rawLoopVersion && Number.isInteger(parsedLoopVersion) && parsedLoopVersion > 0
+      ? parsedLoopVersion
+      : null,
+    lastRunId: flattenText(fields["最后运行ID"]),
     rawStatus,
     rawWorkflow,
+    rawLoopVersion,
   }
 }
 

@@ -20,6 +20,7 @@ import {
   buildCompletePatch,
   buildFailPatch,
   buildReviewPatch,
+  buildRetryPatch,
   buildStartPatch,
   parseFeishuWorkItem,
   transitionWorkItem,
@@ -195,4 +196,12 @@ export function failWorkItem(
     buildFailPatch({ errorMessage: input.errorMessage }),
     (item) => item.errorMessage === input.errorMessage.trim(),
   )
+}
+
+/** 重试：失败 → 待处理。必须先显式失败，禁止从处理中直接跳回待处理。 */
+export function retryWorkItem(
+  store: WorkItemRecordStore,
+  recordId: string,
+): Promise<WorkItemExecutionResult> {
+  return applyTransition(store, recordId, "待处理", buildRetryPatch)
 }

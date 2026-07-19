@@ -51,6 +51,10 @@ export interface MeetingWorkflowInput {
   transcript: string
   projectId?: string
   actorId?: string
+  /** 自动重试序号，从 1 开始；用于为每次允许的真实运行生成独立 Trace。 */
+  attempt?: number
+  /** 调度器持久化生成的唯一运行 ID；存在时直接作为原子 Trace claim 主键。 */
+  traceId?: string
 }
 
 /** 完整洞察的落盘端口（依赖注入）。仓库无合适表时由调用方提供，不建表。 */
@@ -83,15 +87,17 @@ export interface MeetingWorkflowPorts {
   finishTrace?: typeof finishAimTrace
   failTrace?: typeof failAimTrace
   addTraceStep?: typeof addAimTraceStep
+  /** dispatcher 已在任何飞书副作用前原子领取的 Trace。 */
+  claimedTrace?: AimTraceRecorder
 }
 
 export type MeetingWorkflowResult =
   | { ok: true; status: "待人工审核"; idempotent: boolean; recordId: string; aimResultId: string; execution?: AimRunMetadata }
   | { ok: false; status: "失败" | "待处理" | "处理中" | "待人工审核"; error: string; recordId: string; stopReason?: "duplicate_suppressed" | "verification_failed" }
 
-export function buildMeetingInsightTraceId(recordId: string): string {
+export function buildMeetingInsightTraceId(recordId: string, attempt = 1, inputFingerprint = ""): string {
   const loop = getRegisteredLoop("sales-diagnosis-v1")
-  return `sales_diag_${sha256(`${recordId}|${loop.id}|${loop.version}`).slice(0, 28)}`
+  return `sales_diag_${sha256(`${recordId}|${loop.id}|${loop.version}|${attempt}|${inputFingerprint}`).slice(0, 28)}`
 }
 
 async function failStartedWorkItem(
@@ -168,34 +174,42 @@ export async function runMeetingInsightWorkflow(
     }
   }
 
-  // 领取发生在状态启动之后：启动失败不会永久消耗 maxRunsPerWorkItem；
-  // 已进入处理中的并发请求仍由数据库唯一主键原子去重。
-  const claim = ports.claimTrace ?? claimAimTrace
+  // 调度入口会在任何飞书写入前领取 Trace 并注入；独立调用仍在进入处理中后
+  // 自行领取，保持旧 API 兼容。两条路径共用同一数据库唯一约束。
   let trace: AimTraceRecorder
-  try {
-    const claimed = await claim({
-      id: buildMeetingInsightTraceId(input.recordId),
+  if (ports.claimedTrace) {
+    trace = ports.claimedTrace
+  } else {
+    const claim = ports.claimTrace ?? claimAimTrace
+    try {
+      const claimed = await claim({
+      id: input.traceId ?? buildMeetingInsightTraceId(
+        input.recordId,
+        input.attempt,
+        sha256(`${input.projectId ?? ""}|${input.meetingTitle}|${input.customer}|${input.transcript}`),
+      ),
       userId: input.actorId,
       projectId: input.projectId,
       agentId: "business_diagnosis",
       action: "generate",
       inputSummary: `sales-diagnosis-v1:${input.recordId}`,
     })
-    if (!claimed.acquired) {
-      return {
-        ok: false,
-        status: "处理中",
-        error: "该经营事项已有 sales-diagnosis-v1 运行，已抑制重复执行。",
-        recordId: input.recordId,
-        stopReason: "duplicate_suppressed",
+      if (!claimed.acquired) {
+        return {
+          ok: false,
+          status: "处理中",
+          error: "该经营事项已有 sales-diagnosis-v1 运行，已抑制重复执行。",
+          recordId: input.recordId,
+          stopReason: "duplicate_suppressed",
+        }
       }
+      trace = claimed.trace
+    } catch (err) {
+      logger.warn({ error: err, recordId: input.recordId }, "[meeting-insight] execution claim failed")
+      const message = `销售诊断执行 claim 失败，已 fail-closed：${err instanceof Error ? err.message : String(err)}`
+      const failure = await failStartedWorkItem(store, input.recordId, message)
+      return { ok: false, ...failure, recordId: input.recordId }
     }
-    trace = claimed.trace
-  } catch (err) {
-    logger.warn({ error: err, recordId: input.recordId }, "[meeting-insight] execution claim failed")
-    const message = `销售诊断执行 claim 失败，已 fail-closed：${err instanceof Error ? err.message : String(err)}`
-    const failure = await failStartedWorkItem(store, input.recordId, message)
-    return { ok: false, ...failure, recordId: input.recordId }
   }
 
   const markTraceFailed = (error: unknown) => (ports.failTrace ?? failAimTrace)(trace, error)
