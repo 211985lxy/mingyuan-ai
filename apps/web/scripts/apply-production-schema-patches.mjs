@@ -32,6 +32,55 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     CONSTRAINT \`AssetCandidate_userId_fkey\` FOREIGN KEY (\`userId\`) REFERENCES \`User\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT \`AssetCandidate_projectId_fkey\` FOREIGN KEY (\`projectId\`) REFERENCES \`ClientProject\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE
   ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  // ── Inspiration 扩展列（灵感管道 + 回复能力） ──
+  `ALTER TABLE \`Inspiration\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`dedupeKey\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`processingStage\` VARCHAR(32) NULL,
+    ADD COLUMN IF NOT EXISTS \`sourceUrl\` VARCHAR(800) NULL,
+    ADD COLUMN IF NOT EXISTS \`canonicalSourceKey\` VARCHAR(255) NULL,
+    ADD COLUMN IF NOT EXISTS \`videoCopyExtractionId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`knowledgeEntryId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`topicSelectionId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`replyStatus\` VARCHAR(24) NULL,
+    ADD COLUMN IF NOT EXISTS \`replyAttempts\` INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS \`replyErrorMessage\` TEXT NULL,
+    ADD COLUMN IF NOT EXISTS \`replyClaimToken\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`replyClaimedAt\` DATETIME(3) NULL,
+    ADD COLUMN IF NOT EXISTS \`repliedAt\` DATETIME(3) NULL,
+    ADD COLUMN IF NOT EXISTS \`executionModeSnapshot\` VARCHAR(20) NULL`,
+  `ALTER TABLE \`Inspiration\`
+    ADD UNIQUE INDEX IF NOT EXISTS \`Inspiration_dedupeKey_key\`(\`dedupeKey\`),
+    ADD UNIQUE INDEX IF NOT EXISTS \`Inspiration_canonicalSourceKey_key\`(\`canonicalSourceKey\`),
+    ADD UNIQUE INDEX IF NOT EXISTS \`Inspiration_replyClaimToken_key\`(\`replyClaimToken\`),
+    ADD INDEX IF NOT EXISTS \`Inspiration_projectId_createdAt_idx\`(\`projectId\`, \`createdAt\` DESC),
+    ADD INDEX IF NOT EXISTS \`Inspiration_replyStatus_updatedAt_idx\`(\`replyStatus\`, \`updatedAt\`),
+    ADD INDEX IF NOT EXISTS \`Inspiration_executionModeSnapshot_idx\`(\`executionModeSnapshot\`),
+    ADD INDEX IF NOT EXISTS \`Inspiration_source_idx\`(\`source\`)`,
+  // ── ChannelBinding（渠道绑定） ──
+  `CREATE TABLE IF NOT EXISTS \`ChannelBinding\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`platform\` VARCHAR(40) NOT NULL,
+    \`externalChatId\` VARCHAR(191) NOT NULL,
+    \`externalAccountId\` VARCHAR(191) NOT NULL DEFAULT '',
+    \`userId\` VARCHAR(191) NOT NULL,
+    \`projectId\` VARCHAR(191) NOT NULL,
+    \`triggerMode\` VARCHAR(32) NOT NULL DEFAULT 'mention_or_keyword',
+    \`triggerKeywords\` JSON NOT NULL,
+    \`executionMode\` VARCHAR(20) NOT NULL DEFAULT 'live',
+    \`status\` VARCHAR(20) NOT NULL DEFAULT 'active',
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+    UNIQUE INDEX \`ChannelBinding_platform_externalAccountId_externalChatId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`),
+    INDEX \`ChannelBinding_userId_status_idx\`(\`userId\`, \`status\`),
+    PRIMARY KEY (\`id\`),
+    CONSTRAINT \`ChannelBinding_userId_fkey\` FOREIGN KEY (\`userId\`) REFERENCES \`User\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT \`ChannelBinding_projectId_fkey\` FOREIGN KEY (\`projectId\`) REFERENCES \`ClientProject\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE
+  ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  // ── VideoCopyExtraction 扩展列（多 provider 降级） ──
+  `ALTER TABLE \`VideoCopyExtraction\`
+    ADD COLUMN IF NOT EXISTS \`provider\` VARCHAR(40) NOT NULL DEFAULT 'primary',
+    ADD COLUMN IF NOT EXISTS \`fallbackJobId\` VARCHAR(120) NULL`,
 ]
 
 function runMysql(connection, query) {
