@@ -61,6 +61,11 @@ interface RedFoxTrendingItem {
  *
  * @param options.dateRange 日期范围（默认今日）
  */
+/**
+ * @description 请求获取redfoxtrendingtop10
+ * @param options? - options?
+ * @returns Promise<TrendingResult>
+ */
 export async function fetchRedFoxTrendingTop10(options?: {
   startDate?: string
   endDate?: string
@@ -93,6 +98,10 @@ export async function fetchRedFoxTrendingTop10(options?: {
 
 /**
  * 检查热榜 API 是否可用。
+ */
+/**
+ * @description 判断是否包含trendingapi
+ * @returns boolean
  */
 export function hasTrendingApi(): boolean {
   return hasRedFoxApiKey()

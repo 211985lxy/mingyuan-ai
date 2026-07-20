@@ -32,7 +32,7 @@ async function refreshAccount(
     const sortedVideos = [...collected.videos].sort(
       (a, b) => b.createTime - a.createTime,
     )
-    const viralPicks = calculateViralVideos(sortedVideos)
+    const viralPicks = calculateViralVideos(sortedVideos, account.platform)
 
     await prisma.watchAccount.update({
       where: { id: account.id, userId: account.userId },

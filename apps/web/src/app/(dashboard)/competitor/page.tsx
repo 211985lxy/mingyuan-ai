@@ -9,6 +9,7 @@ import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { CompetitorAddAccountPanel } from "@/components/competitor/competitor-add-account-panel"
 import { CompetitorDiscoveryPanel } from "@/components/competitor/competitor-discovery-panel"
 import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-web-research-panel"
+import { CompetitorTopicAnalysisPanel } from "@/components/competitor/competitor-topic-analysis-panel"
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
 import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
 import {
@@ -135,6 +136,8 @@ export default function CompetitorWatchPage() {
             onQueryChange={setResearchQuery}
             onResearch={research}
           />
+
+          <CompetitorTopicAnalysisPanel />
 
           <MonitoredAccountGrid
             accounts={sortedAccounts}

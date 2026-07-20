@@ -29,3 +29,16 @@ export const competitorReportsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
   targetUrl: z.string().trim().max(2_048).optional(),
 }).strict()
+
+// ─── 视频号搜索 ───
+export const searchChannelsVideoBodySchema = z.object({
+  keyword: z.string().trim().min(1).max(200),
+  cursor: z.string().trim().max(200).optional(),
+  count: z.number().int().min(1).max(50).default(20),
+  sortType: z.enum(['comprehensive', 'latest', 'popular']).optional(),
+}).strict()
+
+export const searchChannelsUserBodySchema = z.object({
+  keyword: z.string().trim().min(1).max(200),
+  cursor: z.string().trim().max(200).optional(),
+}).strict()

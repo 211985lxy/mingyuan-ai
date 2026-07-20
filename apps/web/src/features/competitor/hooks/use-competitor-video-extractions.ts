@@ -11,6 +11,10 @@ import {
 } from "@/components/competitor/competitor-video-sections"
 import type { ApiVideoCopyExtraction } from "@/types/api"
 
+/**
+ * @description React Hook：competitorvideoextractions
+ * @returns 无返回值
+ */
 export function useCompetitorVideoExtractions() {
   const [extractingVideoId, setExtractingVideoId] = useState<string | null>(null)
   const [videoExtractions, setVideoExtractions] = useState<Record<string, ApiVideoCopyExtraction>>({})

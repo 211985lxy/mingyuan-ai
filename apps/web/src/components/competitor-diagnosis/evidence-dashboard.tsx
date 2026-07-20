@@ -108,6 +108,11 @@ function PostingHeatmap({ evidence }: { evidence: EvidenceData }) {
   )
 }
 
+/**
+ * @description evidencedashboard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function EvidenceDashboard({ evidence }: { evidence: EvidenceData }) {
   return (
     <section className="space-y-3">

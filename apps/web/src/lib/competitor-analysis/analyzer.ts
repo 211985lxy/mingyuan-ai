@@ -1,4 +1,5 @@
 import { LLMClient } from '@/lib/llm'
+import type { Platform } from '@/lib/tikhub/types'
 import type {
   NormalizedAccount,
   NormalizedVideo,
@@ -9,10 +10,29 @@ import type {
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `你是专业的短视频账号分析师，擅长分析中国主流短视频平台（抖音/小红书/B站/快手）的创作者账号。
+const SYSTEM_PROMPT = `你是专业的短视频账号分析师，擅长分析中国主流短视频平台（抖音/小红书/视频号/B站/快手）的创作者账号。
 你会基于账号数据生成结构化的竞品分析报告，包含6维评分和可操作建议。
 所有分析必须基于数据，不可臆测。输出严格按照 JSON Schema 格式。`
 
+const PLATFORM_CONTEXT: Partial<Record<Platform, string>> = {
+  wechat_channels: `\n\n## 平台特征（微信视频号）
+- 推荐机制：社交推荐（朋友点赞/转发）+ 算法推荐双引擎，社交裂变权重高于抖音
+- 互动模式：点赞=推荐给朋友，分享=转发到微信聊天/朋友圈，社交传播是核心增长引擎
+- 用户画像：偏中老年、下沉市场渗透率高，与抖音年轻用户互补
+- 内容偏好：知识类、生活类、情感类内容表现突出，强营销内容易被降权
+- 数据特点：不公开关注数，播放量包含社交推荐流量，互动率计算需考虑社交裂变因素
+- 分析注意：视频号 followingCount 可能为 0（平台不公开），跳过“关注比”指标，不影响核心评分`,
+  douyin: `\n\n## 平台特征（抖音）
+- 推荐机制：纯算法推荐（完播率 > 互动率 > 关注关系），去中心化流量分配
+- 互动模式：点赞/评论/分享/收藏四维互动，完播率是核心权重
+- 数据特点：播放量精确，互动数据透明，粉丝画像可获取`,
+}
+
+/**
+ * @description 构建publicvideourl
+ * @param video - 视频
+ * @returns string
+ */
 export function buildPublicVideoUrl(video: Pick<NormalizedVideo, 'videoId' | 'videoUrl'>): string {
   if (video.videoUrl.includes('/video/')) return video.videoUrl
   if (video.videoId) return `https://www.douyin.com/video/${video.videoId}`
@@ -143,18 +163,29 @@ function clampAnalysisScores(result: CompetitorAnalysisResult): void {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/**
+ * @description 分析competitor
+ * @param account - 账户
+ * @param videos - videos
+ * @param comments - comments
+ * @param metrics - metrics
+ * @param platform - 平台
+ * @returns Promise<CompetitorAnalysisResult>
+ */
 export async function analyzeCompetitor(
   account: NormalizedAccount,
   videos: NormalizedVideo[],
   comments: NormalizedComment[],
   metrics: CompetitorMetrics,
+  platform: Platform = 'douyin',
 ): Promise<CompetitorAnalysisResult> {
   const llm = LLMClient.shared()
   const stats = buildAnalysisStats(account, videos)
+  const platformContext = PLATFORM_CONTEXT[platform] ?? ''
   const response = await llm.complete({
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildAnalysisPrompt(account, videos, comments, metrics) },
+      { role: 'user', content: buildAnalysisPrompt(account, videos, comments, metrics) + platformContext },
     ],
     temperature: 0.3,
     maxTokens: 3500,

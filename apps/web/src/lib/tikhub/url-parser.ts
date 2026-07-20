@@ -15,6 +15,11 @@ export interface ParsedUrl {
  *   - "复制打开抖音，看看【小明】的视频吧！https://v.douyin.com/aBcDe/ 复制整个段落" -> "https://v.douyin.com/aBcDe/"
  *   - "www.douyin.com/user/MS4wLjABAAAA" -> "https://www.douyin.com/user/MS4wLjABAAAA"
  */
+/**
+ * @description 提取pureurl
+ * @param text - 文本
+ * @returns string | null
+ */
 export function extractPureUrl(text: string): string | null {
   if (!text) return null
   const trimmed = text.trim()
@@ -69,6 +74,11 @@ export function extractPureUrl(text: string): string | null {
  *
  * Never throws — returns null for any unrecognised or unparseable input.
  */
+/**
+ * @description 检测platform
+ * @param url - URL 地址
+ * @returns Platform | null
+ */
 export function detectPlatform(url: string): Platform | null {
   try {
     const pureUrl = extractPureUrl(url)
@@ -102,6 +112,11 @@ export function detectPlatform(url: string): Platform | null {
  * Returns null if the expected path structure is absent or the URL is
  * unparseable. Never throws.
  */
+/**
+ * @description 提取userid
+ * @param url - URL 地址
+ * @returns string | null
+ */
 export function extractUserId(url: string): string | null {
   try {
     const pureUrl = extractPureUrl(url)
@@ -134,6 +149,11 @@ export function extractUserId(url: string): string | null {
  * identifier extracted from the URL path. Returns null if the platform
  * cannot be determined.
  */
+/**
+ * @description 解析url
+ * @param url - URL 地址
+ * @returns ParsedUrl | null
+ */
 export function parseUrl(url: string): ParsedUrl | null {
   const pureUrl = extractPureUrl(url)
   if (!pureUrl) {
@@ -152,6 +172,11 @@ export function parseUrl(url: string): ParsedUrl | null {
 /**
  * Checks if the URL is a video or note URL instead of an account profile.
  * Returns a user-friendly error message if it's a video/note link, or null if it's fine.
+ */
+/**
+ * @description 检查urltype
+ * @param url - URL 地址
+ * @returns string | null
  */
 export function checkUrlType(url: string): string | null {
   const pureUrl = extractPureUrl(url)

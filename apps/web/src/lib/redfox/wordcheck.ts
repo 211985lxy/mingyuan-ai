@@ -70,6 +70,11 @@ const PLATFORM_LABEL: Record<CompliancePlatform, string> = {
  * @param platform 目标发布平台
  * @returns ComplianceResult
  */
+/**
+ * @description 检查redfoxsensitivewords
+ * @param input - 输入数据
+ * @returns Promise<ComplianceResult>
+ */
 export async function checkRedFoxSensitiveWords(input: {
   content: string
   platform: CompliancePlatform
@@ -124,6 +129,12 @@ export async function checkRedFoxSensitiveWords(input: {
  * 本地兜底检测（基于现有 AI 味检测中的常见平台违禁词子集）。
  * 不阻断文案生成，仅做基础拦截。
  */
+/**
+ * @description localfallbackcheck
+ * @param content - 内容
+ * @param platform - 平台
+ * @returns ComplianceResult
+ */
 export function localFallbackCheck(
   content: string,
   platform: CompliancePlatform,
@@ -171,6 +182,10 @@ export function localFallbackCheck(
 
 /**
  * 检查 RedFox API 是否可用（用于前端提示）。
+ */
+/**
+ * @description 判断是否包含wordcheckapi
+ * @returns boolean
  */
 export function hasWordCheckApi(): boolean {
   return hasRedFoxApiKey()

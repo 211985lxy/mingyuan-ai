@@ -75,6 +75,12 @@ function buildCollectionResult(
   }
 }
 
+/**
+ * @description 收集douyincompetitordata
+ * @param input - 输入数据
+ * @param deps - deps
+ * @returns Promise<CompetitorCollectionResult>
+ */
 export async function collectDouyinCompetitorData(
   input: CollectDouyinInput,
   deps: CollectDouyinDeps = {},
@@ -260,6 +266,12 @@ interface CollectInput {
  * - 抖音：走现有的 4 源回退链（external → redfox → local → tikhub）
  * - 小红书：走 TikHub XiaohongshuAdapter（+ local_browser 兜底）
  * - 其他平台：暂不支持
+ */
+/**
+ * @description 收集competitordata
+ * @param input - 输入数据
+ * @param deps - deps
+ * @returns Promise<CompetitorCollectionResult>
  */
 export async function collectCompetitorData(
   input: CollectInput,

@@ -39,6 +39,11 @@ function FieldGroup({ title, children }: { title: string; children: ReactNode })
 /**
  * 原始报告附录：折叠保留旧分析内容，方便查原始报告，不干扰主判断。
  */
+/**
+ * @description rawreportappendix
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function RawReportAppendix({ vm }: { vm: CompetitorDiagnosisViewModel }) {
   const sections = vm.rawAnalysis.analysisResult?.sections
   if (!sections) return null

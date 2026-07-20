@@ -16,10 +16,19 @@ interface ExternalDouyinApiEnvelope {
   comments?: unknown
 }
 
+/**
+ * @description 判断是否包含externaldouyinapi
+ * @returns boolean
+ */
 export function hasExternalDouyinApi(): boolean {
   return Boolean(env.COMPETITOR_DOUYIN_API_URL)
 }
 
+/**
+ * @description 请求获取fromexternaldouyinapi
+ * @param input - 输入数据
+ * @returns Promise<ExternalDouyinApiResult>
+ */
 export async function fetchFromExternalDouyinApi(input: {
   targetUrl: string
   platformUserId: string | null

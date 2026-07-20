@@ -73,6 +73,11 @@ function DiscoveredGroup({ title, description, items, props }: {
   )
 }
 
+/**
+ * @description competitordiscoverypanel
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function CompetitorDiscoveryPanel(props: DiscoveryPanelProps) {
   const account = props.activeAccount
   return (

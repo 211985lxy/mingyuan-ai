@@ -41,6 +41,11 @@ function Field({ label, value }: { label: string; value?: string | string[] }) {
 /**
  * 内容策略证据：保留并强化话题分布、内容形式、钩子、频率、时段、爆款公式。
  */
+/**
+ * @description contentstrategyevidence
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function ContentStrategyEvidence({ data }: { data: ContentStrategyData }) {
   const hasTopic = data.topicDistribution.length > 0
   const hasFormat = data.contentFormats.length > 0

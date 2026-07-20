@@ -3,6 +3,10 @@ import { Bell, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 
+/**
+ * @description competitorworkbenchlinks
+ * @returns 无返回值
+ */
 export function CompetitorWorkbenchLinks() {
   return (
     <div className="grid gap-3 grid-cols-1 md:grid-cols-2">

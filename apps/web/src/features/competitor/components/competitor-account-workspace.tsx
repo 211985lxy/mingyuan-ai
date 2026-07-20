@@ -17,6 +17,18 @@ function RefreshStatusBadge({ account }: { account: WatchAccount }) {
   return <Badge variant="outline">待刷新</Badge>
 }
 
+const PLATFORM_LABELS: Record<string, string> = { douyin: '抖音', wechat_channels: '视频号', xiaohongshu: '小红书', bilibili: 'B站', kuaishou: '快手' }
+function PlatformBadge({ platform }: { platform?: string }) {
+  const label = PLATFORM_LABELS[platform ?? ''] ?? null
+  if (!label) return null
+  return <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700 text-[10px] px-1 py-0">{label}</Badge>
+}
+
+/**
+ * @description competitoraccountworkspace
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorAccountWorkspace({
   loading,
   accounts,
@@ -58,7 +70,7 @@ export function CompetitorAccountWorkspace({
     return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 3 }).map((_, index) => <Card key={index}><CardContent className="p-4"><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="flex-1"><Skeleton className="h-4 w-28" /><Skeleton className="mt-1 h-3 w-20" /></div></div></CardContent></Card>)}</div>
   }
   if (accounts.length === 0) {
-    return <Card><CardContent className="flex flex-col items-center py-16 text-center"><User className="mb-4 h-12 w-12 text-muted-foreground" /><h2 className="text-lg font-semibold">还没有监控账号</h2><p className="mt-1 text-sm text-muted-foreground">在上方输入抖音优质账号主页链接开始监控</p></CardContent></Card>
+    return <Card><CardContent className="flex flex-col items-center py-16 text-center"><User className="mb-4 h-12 w-12 text-muted-foreground" /><h2 className="text-lg font-semibold">还没有监控账号</h2><p className="mt-1 text-sm text-muted-foreground">在上方输入抖音/视频号优质账号主页链接开始监控</p></CardContent></Card>
   }
 
   return (
@@ -69,7 +81,7 @@ export function CompetitorAccountWorkspace({
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 {account.avatar ? <img src={buildProxyImageUrl(account.avatar)} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted"><User className="h-5 w-5 text-muted-foreground" /></div>}
-                <div className="min-w-0"><p className="truncate text-sm font-semibold">{formatAccountName(account)}</p><div className="mt-0.5 flex items-center gap-2"><span className="text-xs text-muted-foreground">{account.followerCount != null ? `${formatCount(account.followerCount)} 粉丝` : "抖音"}</span><RefreshStatusBadge account={account} /></div></div>
+                <div className="min-w-0"><p className="truncate text-sm font-semibold">{formatAccountName(account)}</p><div className="mt-0.5 flex items-center gap-2"><PlatformBadge platform={account.platform} /><span className="text-xs text-muted-foreground">{account.followerCount != null ? `${formatCount(account.followerCount)} 粉丝` : ""}</span><RefreshStatusBadge account={account} /></div></div>
               </div>
               <a href={account.targetUrl} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground" title={account.targetUrl} onClick={(event) => event.stopPropagation()}><ExternalLink className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{compactAccountUrl(account.targetUrl)}</span></a>
               <Button size="sm" variant="outline" className="mt-2.5 flex w-full items-center justify-center gap-1.5 border-primary/20 text-xs font-semibold transition-all hover:bg-primary/5 hover:text-primary" onClick={(event) => { event.stopPropagation(); onAnalyze(account.targetUrl) }} disabled={analyzingUrl === account.targetUrl}>

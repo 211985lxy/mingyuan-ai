@@ -4,6 +4,11 @@
  * metrics  = 关键数值（label/value 已格式化）
  * quotes   = 原文摘录
  */
+/**
+ * @description evidenceblock
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function EvidenceBlock({
   sources,
   metrics,

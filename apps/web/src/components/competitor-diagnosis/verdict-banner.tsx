@@ -7,6 +7,11 @@ import type { VerdictData } from "@/lib/competitor-diagnosis/types"
  * 总判断条：三句话——核心资产 / 最强增长杠杆 / 最大风险。
  * 替代"先看一堆指标"的开场。
  */
+/**
+ * @description verdictbanner
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function VerdictBanner({ verdict }: { verdict: VerdictData }) {
   const items = [
     { icon: Gem, label: "核心资产", value: verdict.assetVerdict, color: "text-violet-600" },

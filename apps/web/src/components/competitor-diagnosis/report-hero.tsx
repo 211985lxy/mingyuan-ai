@@ -125,6 +125,11 @@ function ScoreOverview({ vm }: { vm: CompetitorDiagnosisViewModel }) {
   )
 }
 
+/**
+ * @description reporthero
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function ReportHero({ vm }: { vm: CompetitorDiagnosisViewModel }) {
   return (
     <div className="space-y-4">

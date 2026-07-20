@@ -55,10 +55,19 @@ const REDFOX_BASE = env.REDFOX_BASE_URL || 'https://redfox.hk'
 const TIMEOUT_MS = Number(env.REDFOX_TIMEOUT_MS || 60000)
 const PAGE_SIZE = 20
 
+/**
+ * @description 判断是否包含redfoxdouyinapi
+ * @returns boolean
+ */
 export function hasRedFoxDouyinApi(): boolean {
   return Boolean(process.env.REDFOX_API_KEY?.trim())
 }
 
+/**
+ * @description 请求获取fromredfoxdouyinapi
+ * @param input - 输入数据
+ * @returns Promise<RedFoxDouyinApiResult>
+ */
 export async function fetchFromRedFoxDouyinApi(input: {
   targetUrl: string
   platformUserId: string | null
@@ -87,6 +96,11 @@ export async function fetchFromRedFoxDouyinApi(input: {
   }
 }
 
+/**
+ * @description 解析redfoxdouyinaccountid
+ * @param input - 输入数据
+ * @returns Promise<string>
+ */
 export async function resolveRedFoxDouyinAccountId(input: {
   targetUrl: string
   platformUserId: string | null

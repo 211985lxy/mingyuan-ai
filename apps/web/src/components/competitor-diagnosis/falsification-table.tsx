@@ -3,6 +3,11 @@ import type { FalsificationRow } from "@/lib/competitor-diagnosis/types"
 /**
  * ponytail: 收尾区块只保留错因、验证、修正信号，避免大表格占高度。
  */
+/**
+ * @description falsificationtable
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function FalsificationTable({ rows }: { rows: FalsificationRow[] }) {
   if (!rows.length) return null
 

@@ -10,6 +10,11 @@ import { ProjectSelector } from "@/features/benchmark-profiles/components/projec
 import { PLATFORM_LABELS, type BenchmarkProfileForm, type ImportedFile } from "@/features/benchmark-profiles/model"
 import { cn } from "@/lib/utils"
 
+/**
+ * @description createprofiledialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CreateProfileDialog({
   open,
   mode,

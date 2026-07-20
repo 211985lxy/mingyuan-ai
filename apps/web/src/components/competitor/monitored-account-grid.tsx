@@ -84,6 +84,11 @@ interface MonitoredAccountGridProps {
   onDelete: (id: string) => void
 }
 
+/**
+ * @description monitoredaccountgrid
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function MonitoredAccountGrid({ accounts, loading, activeAccountId, analyzingUrl, refreshingId, deletingId, onActivate, onAnalyze, onRefresh, onDelete }: MonitoredAccountGridProps) {
   if (loading) return <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({ length: 3 }).map((_, index) => <Card key={index}><CardContent className="p-4"><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="flex-1"><Skeleton className="h-4 w-28" /><Skeleton className="h-3 w-20 mt-1" /></div></div></CardContent></Card>)}</div>
   if (accounts.length === 0) return <Card><CardContent className="flex flex-col items-center py-16 text-center"><User className="h-12 w-12 text-muted-foreground mb-4" /><h2 className="text-lg font-semibold">还没有监控账号</h2><p className="text-sm text-muted-foreground mt-1">在上方输入抖音优质账号主页链接开始监控</p></CardContent></Card>

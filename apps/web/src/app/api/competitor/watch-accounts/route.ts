@@ -22,7 +22,7 @@ export const POST = withUserAuth(async (request, { user }) => {
 
   const rawUrl = typeof body.url === "string" ? body.url.trim() : ""
   if (!rawUrl) {
-    return NextResponse.json({ error: "请输入抖音主页链接" }, { status: 400 })
+    return NextResponse.json({ error: "请输入抖音/视频号主页链接" }, { status: 400 })
   }
 
   const urlTypeError = checkUrlType(rawUrl)
@@ -39,7 +39,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const platformGate = getCompetitorPlatformGate(parsed.platform)
   if (!platformGate.supported) {
     return NextResponse.json({
-      error: platformGate.message ?? "第一版只支持抖音主页链接",
+      error: platformGate.message ?? "当前版本暂不支持该平台",
     }, { status: 400 })
   }
 

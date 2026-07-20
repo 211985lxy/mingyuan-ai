@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
+/**
+ * @description projectselector
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function ProjectSelector({ value, onChange }: { value: string; onChange: (projectId: string) => void }) {
   const [projects, setProjects] = useState<Array<{ id: string; name: string; companyName: string | null }>>([])
   const [loading, setLoading] = useState(false)

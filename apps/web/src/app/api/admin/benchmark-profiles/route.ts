@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-const ALLOWED_PLATFORMS = new Set(["douyin", "xiaohongshu", "bilibili", "kuaishou"])
+const ALLOWED_PLATFORMS = new Set(["douyin", "xiaohongshu", "wechat_channels", "bilibili", "kuaishou"])
 
 // GET — 真实档案列表（支持按项目/状态/平台/搜索筛选 + 分页）
 export const GET = withAdminAuth(async (request) => {

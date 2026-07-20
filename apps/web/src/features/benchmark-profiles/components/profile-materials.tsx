@@ -9,6 +9,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { KIND_COLORS, KIND_LABELS, type EditableProfileItem } from "@/features/benchmark-profiles/model"
 import { cn } from "@/lib/utils"
 
+/**
+ * @description profilematerials
+ * @param options - 配置选项
+ * @param field - 字段
+ * @param value - 值
+ * @returns 无返回值
+ */
 export function ProfileMaterials({ items, expandedIds, savingIds, onAdd, onToggle, onUpdate, onSave, onDelete }: { items: EditableProfileItem[]; expandedIds: Set<string>; savingIds: Set<string>; onAdd: () => void; onToggle: (id: string) => void; onUpdate: (id: string, field: "title" | "content" | "kind", value: string) => void; onSave: (id: string) => void; onDelete: (id: string) => void }) {
   return (
     <div className="space-y-3">

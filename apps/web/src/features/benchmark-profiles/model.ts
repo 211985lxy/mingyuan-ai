@@ -114,6 +114,11 @@ export interface EditableProfileItem {
   kind: string
 }
 
+/**
+ * @description 格式化followercount
+ * @param value - 值
+ * @returns string
+ */
 export function formatFollowerCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return ""
   if (value >= 10000) return `${(value / 10000).toFixed(1)}万粉丝`

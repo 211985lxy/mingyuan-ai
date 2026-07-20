@@ -9,6 +9,11 @@ export { XiaohongshuAdapter } from './xiaohongshu'
  * Returns the platform adapter for the given platform.
  * Throws if platform is not supported in this MVP.
  */
+/**
+ * @description 获取adapter
+ * @param platform - 平台
+ * @returns PlatformAdapter
+ */
 export function getAdapter(platform: Platform): PlatformAdapter {
   switch (platform) {
     case 'douyin':

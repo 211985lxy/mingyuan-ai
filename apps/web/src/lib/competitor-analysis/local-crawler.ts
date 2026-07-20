@@ -53,6 +53,13 @@ function findBestPythonInterpreter(sauDir: string): { binary: string; useUv: boo
  * @param targetUrl 博主个人主页 URL
  * @param count 期望抓取的视频/作品数 (默认 50)
  */
+/**
+ * @description 请求获取fromlocalcrawler
+ * @param platform - 平台
+ * @param targetUrl - 目标URL 地址
+ * @param count - 数量
+ * @returns Promise<LocalCrawlerResult>
+ */
 export async function fetchFromLocalCrawler(
   platform: 'douyin' | 'xiaohongshu',
   targetUrl: string,

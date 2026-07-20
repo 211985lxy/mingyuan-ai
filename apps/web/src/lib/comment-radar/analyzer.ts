@@ -11,6 +11,12 @@ const TEXT_CAP = 120
 export interface SampledComment { id: string; text: string; nickname: string | null; likes: number; isTop: boolean }
 
 /** 采样：置顶优先，再按点赞降序，上限 MAX_SAMPLE，文本截断 */
+/**
+ * @description samplecomments
+ * @param comments - comments
+ * @param limit - 数量限制
+ * @returns SampledComment[]
+ */
 export function sampleComments(comments: SampledComment[], limit = MAX_SAMPLE): SampledComment[] {
   const sorted = [...comments].sort((a, b) => {
     if (a.isTop !== b.isTop) return a.isTop ? -1 : 1
@@ -23,6 +29,11 @@ export function sampleComments(comments: SampledComment[], limit = MAX_SAMPLE): 
 }
 
 /** 去除 markdown 代码围栏 */
+/**
+ * @description stripfences
+ * @param raw - 原始数据
+ * @returns string
+ */
 export function stripFences(raw: string): string {
   let s = raw.trim()
   if (s.startsWith('```')) s = s.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')
@@ -30,6 +41,11 @@ export function stripFences(raw: string): string {
 }
 
 /** Zod 解析 + 纠错，失败返回 null */
+/**
+ * @description 解析analysisresult
+ * @param raw - 原始数据
+ * @returns AnalysisResult | null
+ */
 export function parseAnalysisResult(raw: string): AnalysisResult | null {
   try {
     const obj = JSON.parse(stripFences(raw))
@@ -70,6 +86,13 @@ ${JSON.stringify(compact)}
 }
 
 /** 调用 LLM 分析评论，返回结构化结果 */
+/**
+ * @description 分析comments
+ * @param comments - comments
+ * @param total - 总数
+ * @param platform - 平台
+ * @returns Promise<AnalysisResult>
+ */
 export async function analyzeComments(
   comments: SampledComment[],
   total: number,

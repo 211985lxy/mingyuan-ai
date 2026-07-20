@@ -20,6 +20,11 @@ export type CompetitorWatchVideo = NonNullable<WatchAccount["latestVideos"]>[num
   engagementScore?: number
 }
 
+/**
+ * @description 判断视频文案拆解状态是否为活跃处理中状态
+ * @param status - 拆解状态字符串
+ * @returns 处于活跃状态返回 true
+ */
 export function isActiveVideoExtractionStatus(status: string) {
   return ACTIVE_EXTRACTION_STATUSES.has(status)
 }
@@ -33,6 +38,11 @@ function extractionStatusText(record: ApiVideoCopyExtraction | undefined): strin
   return "提取中"
 }
 
+/**
+ * @description 获取对标视频的页面访问 URL
+ * @param video - 对标监控视频对象
+ * @returns 视频页面 URL
+ */
 export function getCompetitorVideoPageUrl(video: CompetitorWatchVideo): string {
   return getWatchVideoPageUrl({
     platform: video.account.platform || null,
@@ -98,6 +108,11 @@ function VideoSection({ title, videos, viral, extractions, extractingVideoId, on
   )
 }
 
+/**
+ * @description competitorlatestvideosection
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorLatestVideoSection({ latestVideos, extractions, extractingVideoId, onExtract }: {
   latestVideos: CompetitorWatchVideo[]
   extractions: Record<string, ApiVideoCopyExtraction>
@@ -107,12 +122,22 @@ export function CompetitorLatestVideoSection({ latestVideos, extractions, extrac
   return <VideoSection title="当前账号最新作品" videos={latestVideos} extractions={extractions} extractingVideoId={extractingVideoId} onExtract={onExtract} />
 }
 
+/**
+ * @description 收集allviralvideos
+ * @param accounts - accounts
+ * @returns CompetitorWatchVideo[]
+ */
 export function collectAllViralVideos(accounts: WatchAccount[]): CompetitorWatchVideo[] {
   return accounts
     .flatMap((account) => (account.viralVideos ?? []).map((video) => ({ ...video, account })))
     .sort((a, b) => (b.engagementScore ?? 0) - (a.engagementScore ?? 0))
 }
 
+/**
+ * @description competitorviralvideopool
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorViralVideoPool({ accounts, extractions, extractingVideoId, onExtract }: {
   accounts: WatchAccount[]
   extractions: Record<string, ApiVideoCopyExtraction>

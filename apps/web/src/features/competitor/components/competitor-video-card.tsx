@@ -9,6 +9,11 @@ import type { ApiVideoCopyExtraction } from "@/types/api"
 
 const ACTIVE_EXTRACTION_STATUSES = new Set(["queued", "extracting", "analyzing"])
 
+/**
+ * @description competitorvideocard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorVideoCard({
   video,
   extraction,

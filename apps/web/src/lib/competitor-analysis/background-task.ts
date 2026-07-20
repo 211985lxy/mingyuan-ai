@@ -9,6 +9,11 @@ function isRetryable(error: unknown) {
   return !/未配置|UNSUPPORTED|INVALID|AccessDenied|Unauthorized|Forbidden/i.test(message)
 }
 
+/**
+ * @description 执行competitoranalysisbackgroundtask
+ * @param taskId - 任务 ID
+ * @returns 无返回值
+ */
 export async function executeCompetitorAnalysisBackgroundTask(taskId: string) {
   const task = await claimBackgroundTask(prisma, taskId)
   if (!task) return false

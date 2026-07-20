@@ -1,4 +1,5 @@
 import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
+import { calculateEngagementScore } from "@/lib/competitor-watch-viral"
 
 export type WatchVideoRecommendationCategory =
   | "问题解答"
@@ -86,12 +87,9 @@ function numberValue(value: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function engagementScore(video: WatchVideoForRecommendation): number {
+function engagementScore(video: WatchVideoForRecommendation, platform?: string): number {
   return numberValue(video.engagementScore)
-    || numberValue(video.likes)
-      + numberValue(video.comments) * 2
-      + numberValue(video.collects) * 3
-      + numberValue(video.shares) * 4
+    || calculateEngagementScore(video, platform)
 }
 
 function videoUrl(account: WatchAccountForRecommendation, video: WatchVideoForRecommendation): string {
@@ -103,6 +101,11 @@ function videoUrl(account: WatchAccountForRecommendation, video: WatchVideoForRe
   })
 }
 
+/**
+ * @description 分类watchvideo
+ * @param title - 标题
+ * @returns WatchVideoRecommendationCategory
+ */
 export function classifyWatchVideo(title: string): WatchVideoRecommendationCategory {
   if (/案例|成交|复盘|前后|真实|项目|学员/.test(title)) return "客户案例"
   if (/为什么|怎么|如何|怎么办|吗|？|\?|避坑|问题|到底|该不该/.test(title)) return "问题解答"
@@ -141,8 +144,9 @@ function scoreVideo(input: {
   categories: WatchVideoRecommendationCategory[]
   targetText?: string
   now: Date
+  platform?: string
 }) {
-  const heat = Math.min(35, Math.round(Math.log10(engagementScore(input.video) + 1) * 8))
+  const heat = Math.min(35, Math.round(Math.log10(engagementScore(input.video, input.platform) + 1) * 8))
   const category = input.categories.includes(input.category) ? 20 : input.category === "待判断" ? 6 : 10
   const target = targetFitScore(input.video.title, input.targetText)
   const recent = recencyScore(input.video.createTime, input.now)
@@ -173,6 +177,11 @@ function suggestedHook(category: WatchVideoRecommendationCategory, title: string
   return "这条内容能火，关键不是标题，是它抓住了一个真实问题。"
 }
 
+/**
+ * @description recommendwatchvideos
+ * @param input - 输入数据
+ * @returns WatchVideoRecommendation[]
+ */
 export function recommendWatchVideos(input: RecommendInput): WatchVideoRecommendation[] {
   const categories = input.categories?.length
     ? input.categories
@@ -194,7 +203,7 @@ export function recommendWatchVideos(input: RecommendInput): WatchVideoRecommend
         seen.add(key)
 
         const category = classifyWatchVideo(video.title || "")
-        const score = scoreVideo({ video, category, categories, targetText: input.targetText, now })
+        const score = scoreVideo({ video, category, categories, targetText: input.targetText, now, platform: account.platform })
         recommendations.push({
           id: `${account.id}:${key}`,
           watchAccountId: account.id,
@@ -212,7 +221,7 @@ export function recommendWatchVideos(input: RecommendInput): WatchVideoRecommend
             comments: numberValue(video.comments),
             shares: numberValue(video.shares),
             collects: numberValue(video.collects),
-            engagementScore: engagementScore(video),
+            engagementScore: engagementScore(video, account.platform),
           },
           category,
           score,

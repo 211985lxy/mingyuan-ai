@@ -9,6 +9,11 @@ import { formatAccountName, formatRelativeTime, refreshStatusText } from "@/feat
 import type { SimilarAccount, WatchAccount } from "@/lib/api/client"
 import type { ApiCompetitorWebResearch } from "@/types/api"
 
+/**
+ * @description competitormonitorpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorMonitorPanel({
   accounts,
   activeAccount,
@@ -74,6 +79,11 @@ export function CompetitorMonitorPanel({
   )
 }
 
+/**
+ * @description addcompetitorpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AddCompetitorPanel({ value, adding, accountCount, onChange, onAdd }: { value: string; adding: boolean; accountCount: number; onChange: (value: string) => void; onAdd: () => void }) {
   return (
     <AiResultPanel title="添加监控账号" icon={<Plus className="h-4 w-4 text-primary" />} meta={<span>粘贴优质账号主页链接，添加后可刷新作品池</span>} flat>
@@ -86,6 +96,11 @@ export function AddCompetitorPanel({ value, adding, accountCount, onChange, onAd
   )
 }
 
+/**
+ * @description competitorresearchpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorResearchPanel({ activeAccount, query, loading, result, onQueryChange, onResearch }: { activeAccount?: WatchAccount; query: string; loading: boolean; result: ApiCompetitorWebResearch | null; onQueryChange: (value: string) => void; onResearch: () => void }) {
   return (
     <AiResultPanel title="全网补证" icon={<Search className="h-4 w-4 text-primary" />} meta={<span>使用 agent-reach 的公开 web / RSS 路径，先补真实外部线索</span>} flat>

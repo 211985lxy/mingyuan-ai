@@ -100,6 +100,10 @@ interface RedFoxXhsNote {
 
 // ── 公共方法 ──
 
+/**
+ * @description 判断是否包含redfoxsimilaraccountsapi
+ * @returns boolean
+ */
 export function hasRedFoxSimilarAccountsApi(): boolean {
   return hasRedFoxApiKey()
 }
@@ -107,6 +111,11 @@ export function hasRedFoxSimilarAccountsApi(): boolean {
 /**
  * 发现相似账号（抖音版）。
  * 基于 accountId 查询，返回同阶对标(benchmarkAccounts) + 头部标杆(topAccounts)。
+ */
+/**
+ * @description discoverdouyinsimilaraccounts
+ * @param input - 输入数据
+ * @returns Promise<SimilarAccountDiscovery>
  */
 export async function discoverDouyinSimilarAccounts(input: {
   accountId: string
@@ -133,6 +142,11 @@ export async function discoverDouyinSimilarAccounts(input: {
  * 发现相似账号（小红书版）。
  * 支持 redId 精确查询，或 track/fans/level 组合筛选。
  * 返回同阶对标(sameLevel) + 高阶标杆(highLevel)。
+ */
+/**
+ * @description discoverxhssimilaraccounts
+ * @param input - 输入数据
+ * @returns Promise<SimilarAccountDiscovery>
  */
 export async function discoverXhsSimilarAccounts(input: {
   redId?: string

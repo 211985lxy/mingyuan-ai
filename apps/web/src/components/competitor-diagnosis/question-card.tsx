@@ -9,6 +9,11 @@ import type { DiagnosisQuestion } from "@/lib/competitor-diagnosis/types"
 /**
  * 五层诊断主卡：核心问题 → 一句话结论 → 证据 → 反证 → 行动建议。
  */
+/**
+ * @description questioncard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function QuestionCard({ question: q }: { question: DiagnosisQuestion }) {
   const visibleCharts = q.keyCharts.slice(0, 3)
   const hiddenChartCount = Math.max(0, q.keyCharts.length - visibleCharts.length)

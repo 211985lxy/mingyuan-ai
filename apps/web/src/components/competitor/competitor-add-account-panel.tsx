@@ -14,13 +14,18 @@ interface AddAccountPanelProps {
   onAdd: () => Promise<void>
 }
 
+/**
+ * @description competitoraddaccountpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorAddAccountPanel({ value, adding, accountCount, onChange, onAdd }: AddAccountPanelProps) {
   const full = accountCount >= 10
   return (
-    <AiResultPanel title="添加监控账号" icon={<Plus className="h-4 w-4 text-primary" />} meta={<span>粘贴优质账号主页链接，添加后可刷新作品池</span>} flat>
+    <AiResultPanel title="添加监控账号" icon={<Plus className="h-4 w-4 text-primary" />} meta={<span>粘贴抖音/视频号主页链接，添加后可刷新作品池</span>} flat>
       <div className="flex gap-3">
         <Input
-          placeholder="https://www.douyin.com/user/..."
+          placeholder="抖音/视频号主页链接，如 https://www.douyin.com/user/... 或 https://channels.weixin.qq.com/..."
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && void onAdd()}

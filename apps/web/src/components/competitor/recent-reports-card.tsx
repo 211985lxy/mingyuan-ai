@@ -6,6 +6,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { competitorReportStatusLabel, competitorReportTitle, formatCompetitorDate } from "@/lib/competitor/display"
 import type { ApiCompetitorReport } from "@/types/api"
 
+/**
+ * @description recentreportscard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function RecentReportsCard({ reports, loading }: { reports: ApiCompetitorReport[]; loading: boolean }) {
   return (
     <Card>

@@ -18,6 +18,10 @@ export class TikHubError extends Error {
 
 const TIKHUB_BASE = env.TIKHUB_BASE_URL || 'https://api.tikhub.io'
 const TIMEOUT_MS = 30_000
+const MAX_RETRIES = 3
+const RETRY_BASE_MS = 1_000 // 1s -> 2s -> 4s
+
+function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)) }
 
 // ─── Core Request Function ───────────────────────────────
 
@@ -27,6 +31,12 @@ const TIMEOUT_MS = 30_000
  * - Times out after 30 seconds
  * - Throws TikHubError on HTTP failure or non-200 API code
  * - Returns the typed `data` field from the response envelope
+ */
+/**
+ * @description tikhubget
+ * @param endpoint - 端点
+ * @param params - 参数对象
+ * @returns Promise<T>
  */
 export async function tikhubGet<T>(
   endpoint: string,
@@ -45,34 +55,60 @@ export async function tikhubGet<T>(
     throw new TikHubError(endpoint, null, 'TIKHUB_API_KEY environment variable is not set')
   }
 
-  let res: Response
-  try {
-    res = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    throw new TikHubError(endpoint, null, `TikHub request failed: ${message}`)
+  let lastError: TikHubError | null = null
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // 指数退避：429 时等待 1s -> 2s -> 4s
+    if (attempt > 0) {
+      await sleep(RETRY_BASE_MS * Math.pow(2, attempt - 1))
+    }
+
+    let res: Response
+    try {
+      res = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new TikHubError(endpoint, null, `TikHub request failed: ${message}`)
+    }
+
+    // 429 限流：指数退避重试
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      lastError = new TikHubError(endpoint, 429, `TikHub ${endpoint} rate limited (429), retrying...`)
+      continue
+    }
+
+    // 402 余额不足：不重试，直接抛出带明确提示的错误
+    if (res.status === 402) {
+      throw new TikHubError(
+        endpoint,
+        402,
+        'TikHub 账户余额不足，请联系管理员充值后重试',
+      )
+    }
+
+    if (!res.ok) {
+      throw new TikHubError(
+        endpoint,
+        res.status,
+        `TikHub ${endpoint} failed: HTTP ${res.status} ${res.statusText}`,
+      )
+    }
+
+    const json: TikHubResponse<T> = await res.json()
+
+    if (json.code !== 200 || json.data === null || json.data === undefined) {
+      throw new TikHubError(
+        endpoint,
+        json.code,
+        `TikHub ${endpoint} returned error: ${json.message} (code: ${json.code})`,
+      )
+    }
+
+    return json.data
   }
 
-  if (!res.ok) {
-    throw new TikHubError(
-      endpoint,
-      res.status,
-      `TikHub ${endpoint} failed: HTTP ${res.status} ${res.statusText}`,
-    )
-  }
-
-  const json: TikHubResponse<T> = await res.json()
-
-  if (json.code !== 200 || json.data === null || json.data === undefined) {
-    throw new TikHubError(
-      endpoint,
-      json.code,
-      `TikHub ${endpoint} returned error: ${json.message} (code: ${json.code})`,
-    )
-  }
-
-  return json.data
+  throw lastError ?? new TikHubError(endpoint, 429, `TikHub ${endpoint} rate limited after ${MAX_RETRIES} retries`)
 }

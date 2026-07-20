@@ -45,6 +45,11 @@ export interface RedFoxRequestConfig {
  * 成功条件：HTTP 2xx 且 (code === 2000 或 code === 200) 且 data !== undefined。
  * 否则抛 RedFoxError。
  */
+/**
+ * @description redfoxrequest
+ * @param config - 配置对象
+ * @returns Promise<T>
+ */
 export async function redfoxRequest<T>(config: RedFoxRequestConfig): Promise<T> {
   const apiKey = process.env.REDFOX_API_KEY?.trim()
   if (!apiKey) {
@@ -107,6 +112,10 @@ export async function redfoxRequest<T>(config: RedFoxRequestConfig): Promise<T> 
 }
 
 /** 检查 RedFox API Key 是否已配置 */
+/**
+ * @description 判断是否包含redfoxapikey
+ * @returns boolean
+ */
 export function hasRedFoxApiKey(): boolean {
   return Boolean(process.env.REDFOX_API_KEY?.trim())
 }
@@ -114,6 +123,12 @@ export function hasRedFoxApiKey(): boolean {
 // ── 便捷方法 ──
 
 /** POST 请求快捷方式 */
+/**
+ * @description redfoxpost
+ * @param path - 路径
+ * @param body - 请求体
+ * @returns Promise<T>
+ */
 export function redfoxPost<T>(
   path: string,
   body: Record<string, unknown>,
@@ -122,6 +137,12 @@ export function redfoxPost<T>(
 }
 
 /** GET 请求快捷方式 */
+/**
+ * @description redfoxget
+ * @param path - 路径
+ * @param params? - params?
+ * @returns Promise<T>
+ */
 export function redfoxGet<T>(
   path: string,
   params?: Record<string, string | number | undefined>,

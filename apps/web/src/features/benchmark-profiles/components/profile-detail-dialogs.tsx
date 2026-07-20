@@ -5,6 +5,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PLATFORM_LABELS, type ImportableAnalysis } from "@/features/benchmark-profiles/model"
 
+/**
+ * @description profiledetaildialogs
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function ProfileDetailDialogs({ archiveOpen, archiving, importOpen, importLoading, importing, analyses, selectedAnalysisId, importError, onArchiveOpenChange, onArchive, onImportOpenChange, onAnalysisChange, onImport }: { archiveOpen: boolean; archiving: boolean; importOpen: boolean; importLoading: boolean; importing: boolean; analyses: ImportableAnalysis[]; selectedAnalysisId: string; importError: string | null; onArchiveOpenChange: (open: boolean) => void; onArchive: () => void; onImportOpenChange: (open: boolean) => void; onAnalysisChange: (id: string) => void; onImport: () => void }) {
   return (
     <>

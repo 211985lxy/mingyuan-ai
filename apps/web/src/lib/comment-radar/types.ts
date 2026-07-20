@@ -1,4 +1,4 @@
-export type CommentRadarPlatform = 'douyin' | 'xiaohongshu'
+export type CommentRadarPlatform = 'douyin' | 'xiaohongshu' | 'wechat_channels'
 export type SourceType = 'video' | 'account' | 'unknown'
 export type JobStatus = 'pending' | 'resolving' | 'collecting' | 'analyzing' | 'completed' | 'partial' | 'failed'
 export interface ResolvedSource { platform: CommentRadarPlatform; sourceType: SourceType; itemId: string | null; videoLimit: number; rawUrl: string }

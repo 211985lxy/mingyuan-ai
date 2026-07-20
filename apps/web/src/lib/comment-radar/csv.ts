@@ -18,6 +18,11 @@ export interface CsvRow {
  * 防护电子表格公式注入。
  * 对以 = + - @ \t 开头的单元格前加单引号。
  */
+/**
+ * @description sanitizecsvcell
+ * @param value - 值
+ * @returns string
+ */
 export function sanitizeCsvCell(value: string): string {
   if (!value) return value
   const first = value.charCodeAt(0)
@@ -35,6 +40,11 @@ function escapeField(value: string): string {
 
 /**
  * 生成带 UTF-8 BOM 的 CSV 字符串。
+ */
+/**
+ * @description 生成csv
+ * @param rows - rows
+ * @returns string
  */
 export function generateCsv(rows: CsvRow[]): string {
   const BOM = '\uFEFF'

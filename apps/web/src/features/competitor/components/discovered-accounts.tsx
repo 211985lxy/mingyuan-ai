@@ -7,6 +7,11 @@ import { extractPureUrl } from "@/lib/tikhub/url-parser"
 import { buildProxyImageUrl } from "@/lib/proxy-image-client"
 import type { SimilarAccount, WatchAccount } from "@/lib/api/client"
 
+/**
+ * @description discoveredaccountgroup
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function DiscoveredAccountGroup({
   title,
   description,

@@ -5,6 +5,11 @@ import type { FalsificationRow } from "@/lib/competitor-diagnosis/types"
 /**
  * 反证条件汇总：从五层诊断汇总"判断可能错在哪里"。
  */
+/**
+ * @description falsificationsection
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function FalsificationSection({ rows }: { rows: FalsificationRow[] }) {
   if (!rows.length) return null
 

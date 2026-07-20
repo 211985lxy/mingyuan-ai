@@ -12,8 +12,13 @@ export interface CompetitorPlatformGate {
  * 支持通过环境变量 COMPETITOR_ENABLED_PLATFORMS 灰度控制（逗号分隔）。
  * 默认放开抖音和小红书。
  */
+/**
+ * @description 获取competitorplatformgate
+ * @param platform - 平台
+ * @returns CompetitorPlatformGate
+ */
 export function getCompetitorPlatformGate(platform: Platform): CompetitorPlatformGate {
-  const enabledPlatforms = (env.COMPETITOR_ENABLED_PLATFORMS || 'douyin,xiaohongshu')
+  const enabledPlatforms = (env.COMPETITOR_ENABLED_PLATFORMS || 'douyin,xiaohongshu,wechat_channels')
     .split(',')
     .map((p) => p.trim().toLowerCase())
 
@@ -32,6 +37,7 @@ function platformLabel(platform: string): string {
   const labels: Record<string, string> = {
     douyin: '抖音',
     xiaohongshu: '小红书',
+    wechat_channels: '视频号',
     bilibili: 'B站',
     kuaishou: '快手',
   }

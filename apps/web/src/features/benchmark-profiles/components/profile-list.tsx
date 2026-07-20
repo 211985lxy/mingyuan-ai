@@ -7,6 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { KIND_COLORS, KIND_LABELS, PLATFORM_COLORS, PLATFORM_LABELS, formatFollowerCount, type ProfileListItem } from "@/features/benchmark-profiles/model"
 import { cn } from "@/lib/utils"
 
+/**
+ * @description benchmarkprofilelist
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function BenchmarkProfileList({ loading, profiles, status, page, total, totalPages, onCreate, onRestore, onPageChange }: { loading: boolean; profiles: ProfileListItem[]; status: string; page: number; total: number; totalPages: number; onCreate: () => void; onRestore: (id: string) => void; onPageChange: (page: number) => void }) {
   if (loading) {
     return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-44 rounded-xl" />)}</div>

@@ -2,6 +2,11 @@ import { Badge } from "@/components/ui/badge"
 import { CONFIDENCE_STYLES } from "@/lib/competitor-diagnosis/format"
 import type { ConfidenceLevel } from "@/lib/competitor-diagnosis/types"
 
+/**
+ * @description confidencetag
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function ConfidenceTag({
   level,
   reason,

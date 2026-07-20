@@ -3,6 +3,11 @@ import { toast } from "sonner"
 import { listCompetitorReports } from "@/lib/api/client"
 import type { ApiCompetitorReport } from "@/types/api"
 
+/**
+ * @description React Hook：competitorreports
+ * @param targetUrl? - 目标Url?
+ * @returns 无返回值
+ */
 export function useCompetitorReports(targetUrl?: string) {
   const [reports, setReports] = useState<ApiCompetitorReport[]>([])
   const [reportsLoading, setReportsLoading] = useState(true)

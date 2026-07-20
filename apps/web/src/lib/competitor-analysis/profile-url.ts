@@ -1,5 +1,5 @@
 import type { ParsedUrl } from "@/lib/tikhub/url-parser"
-import { DouyinAdapter, XiaohongshuAdapter } from "@/lib/tikhub/adapters"
+import { DouyinAdapter, XiaohongshuAdapter, WechatChannelsAdapter } from "@/lib/tikhub/adapters"
 
 interface UrlResolver {
   resolveUrl(url: string): Promise<string>
@@ -10,11 +10,18 @@ export interface ResolvedCompetitorProfileInput {
   platformUserId: string | null
 }
 
+/**
+ * @description 解析competitorprofileinput
+ * @param parsed - 解析后的数据
+ * @param deps - deps
+ * @returns Promise<ResolvedCompetitorProfileInput>
+ */
 export async function resolveCompetitorProfileInput(
   parsed: ParsedUrl,
   deps: {
     douyinResolver?: UrlResolver
     xiaohongshuResolver?: UrlResolver
+    wechatChannelsResolver?: UrlResolver
   } = {},
 ): Promise<ResolvedCompetitorProfileInput> {
   if (parsed.platform === "douyin") {
@@ -31,6 +38,15 @@ export async function resolveCompetitorProfileInput(
     const platformUserId = parsed.rawUserId ?? await resolver.resolveUrl(parsed.pureUrl)
     return {
       targetUrl: `https://www.xiaohongshu.com/user/profile/${platformUserId}`,
+      platformUserId,
+    }
+  }
+
+  if (parsed.platform === "wechat_channels") {
+    const resolver = deps.wechatChannelsResolver ?? new WechatChannelsAdapter()
+    const platformUserId = parsed.rawUserId ?? await resolver.resolveUrl(parsed.pureUrl)
+    return {
+      targetUrl: parsed.pureUrl,
       platformUserId,
     }
   }

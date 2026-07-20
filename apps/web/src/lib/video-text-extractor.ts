@@ -55,6 +55,11 @@ function readNumber(value: unknown): number | undefined {
   return undefined
 }
 
+/**
+ * @description 解析videotextsubmitresult
+ * @param payload - payload
+ * @returns 无返回值
+ */
 export function parseVideoTextSubmitResult(payload: ProviderTaskResponse): { batchId: string } {
   const result = payload.result
   const batchId =
@@ -68,6 +73,11 @@ export function parseVideoTextSubmitResult(payload: ProviderTaskResponse): { bat
   return { batchId }
 }
 
+/**
+ * @description 检测videoplatform
+ * @param url - URL 地址
+ * @returns string
+ */
 export function detectVideoPlatform(url: string): string {
   try {
     const hostname = new URL(url).hostname.toLowerCase()
@@ -84,6 +94,11 @@ export function detectVideoPlatform(url: string): string {
 }
 
 /** 视频号接口尚未完成真实服务商联调，默认保持关闭并明确失败。 */
+/**
+ * @description assertvideotextproviderready
+ * @param platform - 平台
+ * @returns 无返回值
+ */
 export function assertVideoTextProviderReady(platform: string): void {
   if (platform !== "channels") return
   const url = process.env.CHANNELS_EXTRACT_API_URL?.trim()
@@ -94,9 +109,14 @@ export function assertVideoTextProviderReady(platform: string): void {
   throw new Error("视频号 Provider 尚未启用：配置已存在，但仍需完成真实服务商联调和失败语义验收。")
 }
 
+/**
+ * @description assertsupportedvideourl
+ * @param input - 输入数据
+ * @returns string
+ */
 export function assertSupportedVideoUrl(input: string): string {
   const text = input.trim()
-  const url = text.match(/https?:\/\/[^\s，。；；、"'<>]+/i)?.[0]?.replace(/[),.。]+$/, "") ?? text
+  const url = text.match(/https?:\/\/[^\s，。；、"'<>]+/i)?.[0]?.replace(/[),.。]+$/, "") ?? text
   if (!url) throw new Error("请输入视频链接")
 
   let parsed: URL
@@ -109,23 +129,60 @@ export function assertSupportedVideoUrl(input: string): string {
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error("请输入正确的视频链接")
   }
-  const hostname = parsed.hostname.toLowerCase()
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "")
   if (hostname.includes("douyinvod.com")) {
     throw new Error("请粘贴抖音分享页或作品页链接，不要粘贴视频文件直链")
   }
+  if (/\.(?:mp4|mov|m4v|webm|m3u8|mp3|m4a|wav|aac)$/i.test(parsed.pathname)) {
+    throw new Error("请粘贴视频分享页或作品页链接，不要粘贴媒体文件直链")
+  }
   if (
     hostname === "localhost"
+    || hostname.endsWith(".localhost")
+    || hostname.endsWith(".local")
     || hostname === "0.0.0.0"
     || hostname.startsWith("127.")
+    || hostname.startsWith("169.254.")
     || hostname.startsWith("10.")
     || hostname.startsWith("192.168.")
     || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    || hostname === "::1"
+    || hostname.startsWith("fc")
+    || hostname.startsWith("fd")
+    || hostname.startsWith("fe80:")
   ) {
     throw new Error("请粘贴公开视频链接，不要粘贴本站地址")
   }
   return parsed.toString()
 }
 
+/**
+ * @description 提取videourlfromtext
+ * @param input - 输入数据
+ * @returns string | null
+ */
+export function extractVideoUrlFromText(input: string): string | null {
+  const candidate = input.match(/[a-z][a-z\d+.-]*:\/\/[^\s，。；、"'<>]+/i)?.[0]?.replace(/[),.。]+$/, "")
+  if (!candidate) return null
+  const url = assertSupportedVideoUrl(candidate)
+  if (detectVideoPlatform(url) === "unknown") throw new Error("暂不支持这个视频平台，请转发抖音、B站、快手、小红书、视频号或 YouTube 链接。")
+  return url
+}
+
+/**
+ * @description 提取firstpublicurl
+ * @param input - 输入数据
+ * @returns string | null
+ */
+export function extractFirstPublicUrl(input: string): string | null {
+  try { return extractVideoUrlFromText(input) } catch { return null }
+}
+
+/**
+ * @description 格式化videotextextractionerror
+ * @param error - 错误对象
+ * @returns string
+ */
 export function formatVideoTextExtractionError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "")
   const lower = message.toLowerCase()
@@ -151,6 +208,11 @@ export function formatVideoTextExtractionError(error: unknown): string {
   return "文案提取失败，请稍后重试。"
 }
 
+/**
+ * @description 解析videotexttaskresult
+ * @param payload - payload
+ * @returns VideoTextExtractionResult
+ */
 export function parseVideoTextTaskResult(payload: ProviderTaskResponse): VideoTextExtractionResult {
   const result = payload.result
   if (!result || typeof result !== "object") {
@@ -225,6 +287,11 @@ async function readJson(response: Response): Promise<ProviderTaskResponse> {
   return JSON.parse(text) as ProviderTaskResponse
 }
 
+/**
+ * @description 提交videotextextractiontask
+ * @param url - URL 地址
+ * @returns Promise<
+ */
 export async function submitVideoTextExtractionTask(url: string): Promise<{ batchId: string }> {
   const normalizedUrl = assertSupportedVideoUrl(url)
   const response = await fetch(`${BASE_URL}${SUBMIT_PATH}`, {
@@ -238,6 +305,11 @@ export async function submitVideoTextExtractionTask(url: string): Promise<{ batc
   return parseVideoTextSubmitResult(payload)
 }
 
+/**
+ * @description 请求获取videotextextractionresult
+ * @param batchId - batch唯一标识符
+ * @returns Promise<VideoTextExtractionResult>
+ */
 export async function fetchVideoTextExtractionResult(batchId: string): Promise<VideoTextExtractionResult> {
   const url = new URL(`${BASE_URL}${RESULT_PATH}`)
   url.searchParams.set("batchId", batchId)

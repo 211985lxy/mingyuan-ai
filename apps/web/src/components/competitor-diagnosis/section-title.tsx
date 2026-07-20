@@ -1,5 +1,10 @@
 import type { ReactNode } from "react"
 
+/**
+ * @description sectiontitle
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SectionTitle({
   title,
   subtitle,

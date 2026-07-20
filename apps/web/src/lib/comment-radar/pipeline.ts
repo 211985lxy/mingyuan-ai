@@ -11,26 +11,67 @@ const TR: Partial<Record<JobStatus, Set<JobStatus>>> = {
   collecting: new Set(['collecting', 'completed', 'partial', 'analyzing', 'failed']), analyzing: new Set(['completed', 'failed']),
   partial: new Set(['collecting', 'completed', 'failed']),
 }
+/**
+ * @description 判断是否可以transition
+ * @param c - c
+ * @param n - n
+ * @returns boolean
+ */
 export function canTransition(c: JobStatus, n: JobStatus): boolean { return TR[c]?.has(n) ?? false }
+/**
+ * @description 判断是否terminalstatus
+ * @param s - s
+ * @returns boolean
+ */
 export function isTerminalStatus(s: JobStatus): boolean { return s === 'completed' || s === 'failed' }
 export interface StatusCheckInput { totalItems: number; processedItems: number; failedItems: number; hasMoreOnAnyItem: boolean }
+/**
+ * @description 获取nextjobstatus
+ * @param i - i
+ * @returns JobStatus
+ */
 export function getNextJobStatus(i: StatusCheckInput): JobStatus {
   if (i.processedItems + i.failedItems < i.totalItems || i.hasMoreOnAnyItem) return 'collecting'
   return i.failedItems > 0 ? 'partial' : 'completed'
 }
 type JR = { id: string; userId: string; sourceUrl: string; platform: string; sourceType: string; status: string; videoLimit: number; totalItems: number; processedItems: number; failedItems: number; reportedCommentCount: number; collectedCommentCount: number; analyzedSampleCount: number; analysisResult: unknown; partialReason: string | null; errorMessage: string | null; completedAt: Date | null; createdAt: Date; updatedAt: Date; sourceItems: Array<{ id: string; jobId: string; platformItemId: string; sourceUrl: string; title: string; reportedCommentCount: number; cursor: string; hasMore: boolean; status: string; errorMessage: string | null }> }
 async function lj(uid: string, jid: string): Promise<JR | null> { return prisma.commentInsightJob.findFirst({ where: { id: jid, userId: uid }, include: { sourceItems: { orderBy: { createdAt: 'asc' } } } }) as Promise<JR | null> }
+/**
+ * @description 创建job
+ * @param uid - uid
+ * @param inp - inp
+ * @returns 无返回值
+ */
 export async function createJob(uid: string, inp: { url: string; accountVideoLimit?: number }) {
-  const p = createJobSchema.parse(inp); const r = resolveSource(p.url); if (!r) throw new Error('不支持的平台或链接格式，目前支持抖音和小红书')
+  const p = createJobSchema.parse(inp); const r = resolveSource(p.url); if (!r) throw new Error('不支持的平台或链接格式，目前支持抖音、小红书和视频号')
   return prisma.commentInsightJob.create({ data: { userId: uid, sourceUrl: r.rawUrl, platform: r.platform, sourceType: r.sourceType, videoLimit: r.videoLimit, status: 'pending' } })
 }
+/**
+ * @description 列出jobsforuser
+ * @param uid - uid
+ * @param take - take
+ * @returns 无返回值
+ */
 export async function listJobsForUser(uid: string, take = 10) { return prisma.commentInsightJob.findMany({ where: { userId: uid }, orderBy: { createdAt: 'desc' }, take }) }
+/**
+ * @description 获取jobforuser
+ * @param uid - uid
+ * @param jid - jid
+ * @returns 无返回值
+ */
 export async function getJobForUser(uid: string, jid: string) { return lj(uid, jid) }
 export interface SyncResult extends JobProgress { jobId: string }
 function toSR(j: JR): SyncResult {
   const pi = j.sourceItems.find(si => si.status !== 'completed' && si.hasMore); const s = j.status as JobStatus
   return { jobId: j.id, status: s, totalItems: j.totalItems, processedItems: j.processedItems, failedItems: j.failedItems, reportedCommentCount: j.reportedCommentCount, collectedCommentCount: j.collectedCommentCount, currentItemTitle: pi?.title ?? null, canContinue: !isTerminalStatus(s), partialReason: j.partialReason, errorMessage: j.errorMessage }
 }
+/**
+ * @description 同步jobforuser
+ * @param uid - uid
+ * @param jid - jid
+ * @param depth - 深度
+ * @returns Promise<SyncResult | null>
+ */
 export async function syncJobForUser(uid: string, jid: string, depth = 0): Promise<SyncResult | null> {
   const j = await lj(uid, jid); if (!j) return null; const st = j.status as JobStatus
   if (isTerminalStatus(st) || depth > 3) return toSR(j)
@@ -75,6 +116,13 @@ export async function syncJobForUser(uid: string, jid: string, depth = 0): Promi
 export interface ListCommentsParams { page?: number; pageSize?: number; keyword?: string; sortBy?: 'likes' | 'createTime'; sortOrder?: 'asc' | 'desc'; sourceItemId?: string }
 export interface CommentPageResult { items: Array<{ id: string; platformCommentId: string; text: string; nickname: string | null; likes: number; createTime: string; isTop: boolean; sourceItemTitle: string }>; total: number; page: number; pageSize: number }
 
+/**
+ * @description 列出commentsforjob
+ * @param userId - 用户 ID
+ * @param jobId - 作业唯一标识符
+ * @param params - 参数对象
+ * @returns Promise<CommentPageResult | null>
+ */
 export async function listCommentsForJob(userId: string, jobId: string, params: ListCommentsParams): Promise<CommentPageResult | null> {
   const job = await prisma.commentInsightJob.findFirst({ where: { id: jobId, userId } })
   if (!job) return null
@@ -90,6 +138,12 @@ export async function listCommentsForJob(userId: string, jobId: string, params: 
   return { items: items.map(r => ({ id: r.id, platformCommentId: r.platformCommentId, text: r.text, nickname: r.nickname, likes: r.likes, createTime: r.createTime, isTop: r.isTop, sourceItemTitle: r.sourceItem.title })), total, page, pageSize }
 }
 
+/**
+ * @description 导出jobcsv
+ * @param userId - 用户 ID
+ * @param jobId - 作业唯一标识符
+ * @returns Promise<string | null>
+ */
 export async function exportJobCsv(userId: string, jobId: string): Promise<string | null> {
   const job = await prisma.commentInsightJob.findFirst({ where: { id: jobId, userId } })
   if (!job) return null
@@ -98,6 +152,12 @@ export async function exportJobCsv(userId: string, jobId: string): Promise<strin
   return generateCsv(records.map(r => ({ commentId: r.platformCommentId, text: r.text, nickname: r.nickname, likes: r.likes, createTime: r.createTime, isTop: r.isTop })))
 }
 
+/**
+ * @description 分析jobforuser
+ * @param userId - 用户 ID
+ * @param jobId - 作业唯一标识符
+ * @returns Promise<SyncResult | null>
+ */
 export async function analyzeJobForUser(userId: string, jobId: string): Promise<SyncResult | null> {
   const j = await lj(userId, jobId); if (!j) return null
   const st = j.status as JobStatus

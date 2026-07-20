@@ -167,6 +167,12 @@ function calculateContent(videos: NormalizedVideo[]): CompetitorMetrics['content
   }
 }
 
+/**
+ * @description 计算metrics
+ * @param account - 账户
+ * @param videos - videos
+ * @returns CompetitorMetrics
+ */
 export function calculateMetrics(
   account: NormalizedAccount,
   videos: NormalizedVideo[],

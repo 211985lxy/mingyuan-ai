@@ -7,8 +7,8 @@ model CompetitorAnalysis {
 
   // Input
   targetUrl      String  @db.VarChar(500)
-  platform       String  @db.VarChar(20) // douyin | xiaohongshu | bilibili | kuaishou
-  platformUserId String? @db.VarChar(200) // sec_user_id / user_id / uid
+  platform       String  @db.VarChar(20) // douyin | xiaohongshu | wechat_channels | bilibili | kuaishou
+  platformUserId String? @db.VarChar(200) // sec_user_id / user_id / uid / finder_username
 
   // Pipeline status
   status       String  @default("pending") @db.VarChar(20)
@@ -97,6 +97,8 @@ model VideoCopyExtraction {
 
   providerBatchId String? @db.VarChar(120)
   providerTaskId  String? @db.VarChar(120)
+  provider        String  @default("primary") @db.VarChar(40)
+  fallbackJobId   String? @db.VarChar(120)
 
   videoTitle     String? @db.VarChar(500)
   videoCover     String? @db.VarChar(800)
@@ -119,7 +121,7 @@ model BenchmarkProfile {
 
   // ── 结构化头部：账号画像 ──
   name           String // 账号名称
-  platform       String  @db.VarChar(20) // douyin | xiaohongshu | bilibili | kuaishou
+  platform       String  @db.VarChar(20) // douyin | xiaohongshu | wechat_channels | bilibili | kuaishou
   accountUrl     String? @db.VarChar(500) // 主页链接（稳定锚点，一键拉取匹配用）
   platformUserId String? @db.VarChar(200) // sec_user_id / user_id / uid
   followerCount  Int?

@@ -3,6 +3,10 @@ import { toast } from "sonner"
 import { runCompetitorWebResearch } from "@/lib/api/client"
 import type { ApiCompetitorWebResearch } from "@/types/api"
 
+/**
+ * @description React Hook：competitorwebresearch
+ * @returns 无返回值
+ */
 export function useCompetitorWebResearch() {
   const [researchQuery, setResearchQuery] = useState("")
   const [researchLoading, setResearchLoading] = useState(false)

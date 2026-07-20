@@ -85,6 +85,11 @@ interface RedFoxXhsComment {
  * @param itemId 作品ID / 笔记ID
  * @param cursorOrOffset 分页游标：抖音用数字 offset，小红书用字符串 cursor
  */
+/**
+ * @description 请求获取redfoxcomments
+ * @param input - 输入数据
+ * @returns Promise<CommentPage>
+ */
 export async function fetchRedFoxComments(input: {
   platform: CommentPlatform
   itemId: string
@@ -108,6 +113,10 @@ export async function fetchRedFoxComments(input: {
 
 /**
  * 检查评论 API 是否可用。
+ */
+/**
+ * @description 判断是否包含commentapi
+ * @returns boolean
  */
 export function hasCommentApi(): boolean {
   return hasRedFoxApiKey()

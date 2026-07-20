@@ -3,6 +3,10 @@ import { toast } from "sonner"
 import { discoverSimilarAccounts, type SimilarAccount } from "@/lib/api/client"
 import { validateCompetitorUrl } from "@/features/competitor/competitor-url-utils"
 
+/**
+ * @description React Hook：competitordiscovery
+ * @returns 无返回值
+ */
 export function useCompetitorDiscovery() {
   const [discovering, setDiscovering] = useState(false)
   const [discoveryAttempted, setDiscoveryAttempted] = useState(false)

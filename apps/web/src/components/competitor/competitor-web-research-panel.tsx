@@ -39,6 +39,11 @@ function ResearchResults({ result }: { result: ApiCompetitorWebResearch }) {
   )
 }
 
+/**
+ * @description competitorwebresearchpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CompetitorWebResearchPanel({ activeAccount, query, loading, result, onQueryChange, onResearch }: WebResearchPanelProps) {
   const accountName = activeAccount ? formatCompetitorAccountName(activeAccount) : ""
   return (

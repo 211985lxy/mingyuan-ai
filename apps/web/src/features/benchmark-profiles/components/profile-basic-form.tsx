@@ -5,6 +5,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { PLATFORM_LABELS } from "@/features/benchmark-profiles/model"
 
+/**
+ * @description profilebasicform
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function ProfileBasicForm({ name, platform, accountUrl, followerCount, positioning, differentiator, takeaways, notes, onNameChange, onPlatformChange, onAccountUrlChange, onFollowerCountChange, onPositioningChange, onDifferentiatorChange, onTakeawaysChange, onNotesChange }: { name: string; platform: string; accountUrl: string; followerCount: string; positioning: string; differentiator: string; takeaways: string; notes: string; onNameChange: (value: string) => void; onPlatformChange: (value: string) => void; onAccountUrlChange: (value: string) => void; onFollowerCountChange: (value: string) => void; onPositioningChange: (value: string) => void; onDifferentiatorChange: (value: string) => void; onTakeawaysChange: (value: string) => void; onNotesChange: (value: string) => void }) {
   return (
     <Card>

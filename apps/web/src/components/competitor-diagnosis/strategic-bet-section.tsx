@@ -11,6 +11,11 @@ const GROUPS: Array<{ type: StrategicBet["type"]; label: string }> = [
 /**
  * 战略下注：主推 / 备选 / 不建议，含成功条件、资源、止损、30/90 天动作。
  */
+/**
+ * @description strategicbetsection
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function StrategicBetSection({ bets }: { bets: StrategicBet[] }) {
   const visible = GROUPS.filter((g) => bets.some((b) => b.type === g.type))
   if (!visible.length) return null

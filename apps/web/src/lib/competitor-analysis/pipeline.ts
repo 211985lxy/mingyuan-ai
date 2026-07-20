@@ -13,6 +13,11 @@ import { collectCompetitorData } from './collector'
  * The durable background task executor owns retries. This function records the
  * business failure and rethrows so the executor can schedule the next attempt.
  */
+/**
+ * @description 运行competitoranalysispipeline
+ * @param analysisId - 分析唯一标识符
+ * @returns Promise<void>
+ */
 export async function runCompetitorAnalysisPipeline(analysisId: string): Promise<void> {
   const log = logger.child({ analysisId })
 
@@ -39,7 +44,7 @@ export async function runCompetitorAnalysisPipeline(analysisId: string): Promise
 
     await updateStatus(analysisId, 'analyzing')
     log.info('Step 3: AI analysis')
-    const result = await analyzeCompetitor(account, videos, comments, metrics)
+    const result = await analyzeCompetitor(account, videos, comments, metrics, analysis.platform as Platform)
     await saveAnalysisResult(analysisId, result)
 
     log.info({ overallScore: result.scores.overall }, 'Pipeline completed')
@@ -122,6 +127,11 @@ async function updateStatus(id: string, status: string): Promise<void> {
   })
 }
 
+/**
+ * @description sanitizeerrorforuser
+ * @param err - err
+ * @returns string
+ */
 export function sanitizeErrorForUser(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err)
   // User-safe messages from analyzer pass through
@@ -141,6 +151,11 @@ export function sanitizeErrorForUser(err: unknown): string {
   // Explicitly warn about missing TIKHUB_API_KEY (精准匹配，绝不误杀)
   if (msg.includes('TIKHUB_API_KEY environment variable is not set')) {
     return '未配置 TIKHUB_API_KEY 环境变量，请在 .env.local 中配置以启用同行对标功能'
+  }
+  
+  // TikHub 402 余额不足
+  if (msg.includes('余额不足') || msg.includes('402')) {
+    return 'TikHub 账户余额不足，请联系管理员充值后重试'
   }
   
   // Classify common errors into user-friendly messages

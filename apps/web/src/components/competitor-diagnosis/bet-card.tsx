@@ -37,6 +37,11 @@ function BetRow({ label, value, accent }: { label: string; value: string; accent
 /**
  * 战略下注卡：主推 / 备选 / 不建议。
  */
+/**
+ * @description betcard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function BetCard({ bet }: { bet: StrategicBet }) {
   const style = BET_STYLE[bet.type]
   const Icon = style.icon

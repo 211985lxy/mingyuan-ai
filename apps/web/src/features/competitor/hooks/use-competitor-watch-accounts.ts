@@ -98,6 +98,10 @@ function useAccountMaintenance(list: ReturnType<typeof useAccountList>) {
   return { deletingId, refreshAccount, refreshAll, refreshing, refreshingId, removeAccount }
 }
 
+/**
+ * @description React Hook：competitorwatchaccounts
+ * @returns 无返回值
+ */
 export function useCompetitorWatchAccounts() {
   const list = useAccountList()
   return { ...list, ...useAccountAdd(() => list.loadAccounts()), ...useAccountMaintenance(list) }
