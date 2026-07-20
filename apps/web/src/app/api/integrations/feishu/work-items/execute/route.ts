@@ -56,6 +56,11 @@ function conflict(result: Extract<WorkItemExecutionResult, { ok: false }>) {
   return NextResponse.json({ ok: false, error: result.error }, { status: 409 })
 }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   const auth = checkWorkItemApiSecret(request)
   if (auth === "unconfigured") {

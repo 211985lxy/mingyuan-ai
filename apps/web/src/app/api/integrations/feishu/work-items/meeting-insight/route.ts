@@ -62,6 +62,11 @@ function badRequest(message: string) {
   return NextResponse.json({ ok: false, error: message }, { status: 400 })
 }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   const auth = checkWorkItemApiSecret(request)
   if (auth === "unconfigured") {

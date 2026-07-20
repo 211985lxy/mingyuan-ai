@@ -4,6 +4,11 @@ import { processInspiration } from "./process-inspiration"
 
 export const INSPIRATION_PROCESS_TASK_KIND = "inspiration_process"
 
+/**
+ * @description 执行inspirationbackgroundtask
+ * @param taskId - 任务 ID
+ * @returns 无返回值
+ */
 export async function executeInspirationBackgroundTask(taskId: string) {
   const task = await claimBackgroundTask(prisma, taskId)
   if (!task) return false
