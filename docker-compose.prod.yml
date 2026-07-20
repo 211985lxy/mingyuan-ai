@@ -62,9 +62,28 @@ services:
     networks:
       - mingyuan-prod
 
+  video-extractor:
+    profiles: ["video-extractor"]
+    build:
+      context: services/video-extractor
+    container_name: mingyuan-video-extractor
+    restart: unless-stopped
+    environment:
+      VIDEO_EXTRACTOR_API_KEY: ${VIDEO_EXTRACT_FALLBACK_API_KEY}
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      F2_DOUYIN_ENABLED: ${F2_DOUYIN_ENABLED:-true}
+      DOUYIN_COOKIE: ${DOUYIN_COOKIE:-}
+    volumes:
+      - video_extractor_data:/data
+    networks:
+      - mingyuan-prod
+
 volumes:
   mysql_data:
   redis_data:
+  video_extractor_data:
 
 networks:
   mingyuan-prod:

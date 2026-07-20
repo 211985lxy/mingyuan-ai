@@ -15,6 +15,47 @@
       "idempotency": false
     },
     {
+      "route": "/api/account/channel-bindings/[id]",
+      "file": "src/app/api/account/channel-bindings/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/account/channel-bindings/[id]/test",
+      "file": "src/app/api/account/channel-bindings/[id]/test/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/account/channel-bindings",
+      "file": "src/app/api/account/channel-bindings/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/account/hot-sources",
       "file": "src/app/api/account/hot-sources/route.ts",
       "methods": [
@@ -688,6 +729,58 @@
       ],
       "auth": "agent_key",
       "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/inspiration/events/[id]",
+      "file": "src/app/api/agent/v1/inspiration/events/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "agent_key",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/inspiration/events",
+      "file": "src/app/api/agent/v1/inspiration/events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/inspiration/replies/[id]/ack",
+      "file": "src/app/api/agent/v1/inspiration/replies/[id]/ack/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/inspiration/replies/claim",
+      "file": "src/app/api/agent/v1/inspiration/replies/claim/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "zod_json",
       "query": "none",
       "externalService": false,
       "cost": "low",
@@ -1662,9 +1755,9 @@
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
+      "externalService": true,
+      "cost": "high",
+      "idempotency": true
     },
     {
       "route": "/api/integrations/feishu/work-items/execute",
@@ -1691,6 +1784,20 @@
       "externalService": true,
       "cost": "low",
       "idempotency": true
+    },
+    {
+      "route": "/api/integrations/wecom/events",
+      "file": "src/app/api/integrations/wecom/events/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "raw_body",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
     },
     {
       "route": "/api/knowledge/[id]",

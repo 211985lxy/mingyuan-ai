@@ -82,6 +82,8 @@ model ClientProject {
   aimMemories       AimMemory[]
   ipWikiPages       IpWikiPage[]
   benchmarkProfiles BenchmarkProfile[]
+  inspirations      Inspiration[]
+  channelBindings   ChannelBinding[]
 
   @@index([userId, status])
   @@index([userId, createdAt])

@@ -6,6 +6,8 @@ This directory contains the production web workload for AIM.
 
 `mingyuan-web.yaml` defines `Deployment/mingyuan-web`, `Service/mingyuan-web`, and `Ingress/mingyuan-web`.
 
+`video-extractor.yaml` is the optional self-hosted video transcript fallback. Keep the web feature flag disabled until its secret, storage, resource limits, and real-video acceptance test are complete.
+
 ## Required config
 
 Create these resources before applying the manifest:

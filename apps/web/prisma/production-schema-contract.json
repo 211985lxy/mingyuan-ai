@@ -124,6 +124,60 @@
         "crossProjectAllowed",
         "promotedEntryId"
       ]
+    },
+    {
+      "name": "Inspiration",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "dedupeKey",
+        "processingStage",
+        "sourceUrl",
+        "videoCopyExtractionId",
+        "knowledgeEntryId",
+        "topicSelectionId",
+        "replyStatus",
+        "replyClaimToken",
+        "replyErrorMessage"
+      ]
+    },
+    {
+      "name": "ChannelBinding",
+      "columns": [
+        "id",
+        "platform",
+        "externalChatId",
+        "userId",
+        "projectId",
+        "triggerMode",
+        "triggerKeywords",
+        "status"
+      ]
+    },
+    {
+      "name": "BackgroundTask",
+      "columns": [
+        "id",
+        "kind",
+        "idempotencyKey",
+        "status",
+        "attempt",
+        "availableAt",
+        "leaseToken",
+        "leaseExpiresAt"
+      ]
+    },
+    {
+      "name": "VideoCopyExtraction",
+      "columns": [
+        "id",
+        "sourceUrl",
+        "status",
+        "provider",
+        "fallbackJobId",
+        "transcript"
+      ]
     }
   ]
 }

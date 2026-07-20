@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mingyuan-video-extractor-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mingyuan-video-extractor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mingyuan-video-extractor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mingyuan-video-extractor
+    spec:
+      containers:
+        - name: extractor
+          image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/video-extractor:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: VIDEO_EXTRACTOR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mingyuan-web-secrets
+                  key: VIDEO_EXTRACT_FALLBACK_API_KEY
+            - name: WHISPER_MODEL
+              value: small
+            - name: WHISPER_DEVICE
+              value: cpu
+            - name: WHISPER_COMPUTE_TYPE
+              value: int8
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mingyuan-video-extractor-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mingyuan-video-extractor
+spec:
+  selector:
+    app.kubernetes.io/name: mingyuan-video-extractor
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
