@@ -4,5 +4,8 @@
   "targetModuleLineRange": [100, 300],
   "functionLineLimit": 80,
   "legacyDeadline": "2026-07-26",
-  "legacyFiles": []
+  "legacyFiles": [
+    { "path": "src/lib/lark-base-tool.ts", "maxLines": 550, "target": "src/lib/lark-base/" },
+    { "path": "src/lib/oss.ts", "maxLines": 580, "target": "src/lib/oss/" }
+  ]
 }
