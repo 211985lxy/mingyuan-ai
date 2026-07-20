@@ -1,9 +1,11 @@
 import type { Platform, PlatformAdapter } from '../types'
 import { DouyinAdapter } from './douyin'
 import { XiaohongshuAdapter } from './xiaohongshu'
+import { WechatChannelsAdapter } from './wechat-channels'
 
 export { DouyinAdapter } from './douyin'
 export { XiaohongshuAdapter } from './xiaohongshu'
+export { WechatChannelsAdapter } from './wechat-channels'
 
 /**
  * Returns the platform adapter for the given platform.
@@ -20,6 +22,8 @@ export function getAdapter(platform: Platform): PlatformAdapter {
       return new DouyinAdapter()
     case 'xiaohongshu':
       return new XiaohongshuAdapter()
+    case 'wechat_channels':
+      return new WechatChannelsAdapter()
     case 'bilibili':
     case 'kuaishou':
       throw new Error(`Platform '${platform}' is not supported in MVP. Deferred to Phase 2.`)

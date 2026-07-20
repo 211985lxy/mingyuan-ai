@@ -47,7 +47,7 @@ export interface NormalizedComment {
 
 // ─── Platform Adapter Contract ──────────────────────────
 
-export type Platform = 'douyin' | 'xiaohongshu' | 'bilibili' | 'kuaishou';
+export type Platform = 'douyin' | 'xiaohongshu' | 'bilibili' | 'kuaishou' | 'wechat_channels';
 
 export interface VideoStats {
   views: number;
