@@ -259,7 +259,7 @@ const DEEP_COPYWRITER_SKILLS: AimWorkbenchSkill[] = [
 const BUSINESS_SYSTEM_SKILLS: AimWorkbenchSkill[] = [
   { id: "business_bottleneck", label: "诊断业务卡点", description: "找流量、成交、交付中的核心矛盾。", prompt: "请基于当前业务信息诊断核心卡点，找出流量、成交、交付中的主要矛盾，并给本周最小动作。", agentId: "business_system_diagnosis", group: "诊断分析" },
   { id: "content_pillar_from_business", label: "反推内容主线", description: "从商业目标倒推内容方向。", prompt: "请基于当前商业模式，反推出最值得优先做的内容主线和选题方向。", agentId: "business_system_diagnosis", group: "诊断分析" },
-  { id: "content_data_retro", label: "内容数据复盘", description: "把结果、判断和下次打法拆开看。", prompt: "请基于这条内容的发布结果做内容数据复盘（注意：这是单条内容运营复盘，不是商业模式诊断，不需要走四层诊断结构）。固定输出：1. 结果先说人话；2. 这条内容打中了什么，没打中什么；3. 这次判断哪里对，哪里错；4. 下次遇到同类内容该怎么判断；5. 只给 1-3 条能继续执行的动作。不要讲大词。", agentId: "business_system_diagnosis", group: "诊断分析" },
+  { id: "content_data_retro", label: "内容数据复盘", description: "把结果、判断和下次打法拆开看。", prompt: "请基于当前内容的发布结果做内容数据复盘（注意：这是单条内容运营复盘，不是商业模式诊断，不需要走四层诊断结构）。固定输出：1. 结果先说人话；2. 这条内容打中了什么，没打中什么；3. 这次判断哪里对，哪里错；4. 下次遇到同类内容该怎么判断；5. 只给 1-3 条能继续执行的动作。不要讲大词。", agentId: "business_system_diagnosis", group: "诊断分析" },
 ]
 
 const PERSONA_SKILLS: AimWorkbenchSkill[] = [
