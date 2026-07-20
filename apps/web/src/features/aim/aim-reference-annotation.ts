@@ -5,6 +5,13 @@ import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 /**
  * Collect analysis text candidates from source, input, and conversation history.
  */
+/**
+ * @description 收集analysistextcandidates
+ * @param input - 输入数据
+ * @param messages - 消息列表
+ * @param sourceAnalysisText - 来源分析文本
+ * @returns string[]
+ */
 export function collectAnalysisTextCandidates(input: string, messages: AimWorkbenchMessage[], sourceAnalysisText: string): string[] {
   const candidates: string[] = []
   if (sourceAnalysisText.trim()) candidates.push(sourceAnalysisText)
@@ -20,6 +27,12 @@ export function collectAnalysisTextCandidates(input: string, messages: AimWorkbe
 
 /**
  * Annotate reference text with structural markup from analysis candidates.
+ */
+/**
+ * @description 构建annotatedreferencetext
+ * @param sourceOriginalText - 来源原始值文本
+ * @param analysisTextCandidates - 分析文本Candidates
+ * @returns string
  */
 export function buildAnnotatedReferenceText(
   sourceOriginalText: string,

@@ -65,6 +65,11 @@ const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) 
   </div>
 })
 
+/**
+ * @description deliverycontractstrip
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function DeliveryContractStrip({ contract }: { contract: AimDeliveryContract }) {
   const toneClass = {
     success: "text-emerald-700 dark:text-emerald-400",
@@ -103,10 +108,10 @@ function DeliverableResult({ item, copied, onCopy, onEdit }: {
   const display = splitAimMethodNote(item.content)
   return <TabsContent value={item.format} className="space-y-3">
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">{AIM_FORMAT_LABELS[item.format]} · {item.wordCount} 字</span>
+      <span className="text-xs text-muted-foreground">{AIM_FORMAT_LABELS[item.format]} · {display.result.length} 字</span>
       <div className="flex items-center gap-1.5">
-        {onEdit ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => onEdit(item.format, item.content)}>编辑</Button> : null}
-        <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => onCopy(item)}>
+        {onEdit ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => onEdit(item.format, display.result)}>编辑</Button> : null}
+        <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => onCopy({ ...item, content: display.result })}>
           {copied ? <Check className="mr-1 h-3.5 w-3.5" /> : <Clipboard className="mr-1 h-3.5 w-3.5" />}复制
         </Button>
       </div>
@@ -213,6 +218,11 @@ function DeliverableActions(props: DeliverableActionsProps) {
   </ActionStrip>
 }
 
+/**
+ * @description aimdeliverablebubble
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
   const { deliverables, workflowStage, contentAction } = props
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")

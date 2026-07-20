@@ -20,6 +20,11 @@ export interface AimQualityAssessment {
   qualityReport?: Record<string, unknown>
 }
 
+/**
+ * @description 判断是否aimgenerationlike
+ * @param value - 值
+ * @returns value is AimGenerationLike
+ */
 export function isAimGenerationLike(value: unknown): value is AimGenerationLike {
   if (!value || typeof value !== "object") return false
   const results = (value as { results?: unknown }).results
@@ -32,6 +37,11 @@ export function isAimGenerationLike(value: unknown): value is AimGenerationLike 
 
 /**
  * AIM 生成质量评估的唯一实现。评估只读，不自动改写交付物。
+ */
+/**
+ * @description assessaimgeneration
+ * @param input - 输入数据
+ * @returns Promise<AimQualityAssessment>
  */
 export async function assessAimGeneration(input: {
   output: AimGenerationLike

@@ -3,6 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ASSET_FLOW_CARDS } from "@/features/assets/asset-page-shared";
 
+/**
+ * @description assetflowoverview
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AssetFlowOverview({
   assetCount,
 }: {
@@ -32,6 +37,10 @@ export function AssetFlowOverview({
   );
 }
 
+/**
+ * @description assetsskeleton
+ * @returns 无返回值
+ */
 export function AssetsSkeleton() {
   return (
     <div className="space-y-6">

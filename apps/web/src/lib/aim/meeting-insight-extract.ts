@@ -78,6 +78,11 @@ const SYSTEM_PROMPT = [
 /**
  * 构造抽取 prompt（纯函数）。transcript 截断以防超长输入。
  */
+/**
+ * @description 构建extractionprompt
+ * @param transcript - transcript
+ * @returns 无返回值
+ */
 export function buildExtractionPrompt(transcript: string): { system: string; user: string } {
   return {
     system: SYSTEM_PROMPT,
@@ -139,6 +144,11 @@ function asEvidence(value: unknown): MeetingEvidence[] {
  * - 完全无法解析 → ok:false。
  * 返回的 MeetingInsightInput 仍需交 extractMeetingInsight 做枚举收敛/去重/校验。
  */
+/**
+ * @description 解析insightjson
+ * @param raw - 原始数据
+ * @returns MeetingInsightExtractionResult
+ */
 export function parseInsightJson(raw: string): MeetingInsightExtractionResult {
   if (!raw || typeof raw !== "string" || !raw.trim()) {
     return { ok: false, error: "模型输出为空，无法解析为会议洞察 JSON。" }
@@ -193,6 +203,12 @@ export function parseInsightJson(raw: string): MeetingInsightExtractionResult {
  * - transcript 为空/过短 → 在调用模型前拒绝（ok:false）。
  * - complete 端口默认用 LLMClient.shared()；测试可注入替身。
  * - 失败（模型异常/坏 JSON）一律 ok:false，禁止把未验证结果写出。
+ */
+/**
+ * @description 提取meetinginsightfromtranscript
+ * @param extraction - extraction
+ * @param ports? - ports?
+ * @returns Promise<MeetingInsightExtractionResult>
  */
 export async function extractMeetingInsightFromTranscript(
   extraction: MeetingInsightExtractionInput,

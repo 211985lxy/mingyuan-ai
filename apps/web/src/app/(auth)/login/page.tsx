@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Loader2, Mail, Lock } from "lucide-react"
+import { KeyRound, Loader2, Mail, Lock } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ApiError, loginUser } from "@/lib/api/client"
+import { ApiError, devLoginUser, loginUser } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/store"
 import { getSubscriptionStatus } from "@/lib/subscription"
 
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState("")
   const [errors, setErrors] = React.useState<{ email?: string; password?: string }>({})
   const [loading, setLoading] = React.useState(false)
+  const [devLoading, setDevLoading] = React.useState(false)
   const [submitError, setSubmitError] = React.useState<string | null>(null)
 
   function goAfterLogin(expiresAt?: string | null) {
@@ -68,6 +69,22 @@ export default function LoginPage() {
       )
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDevLogin() {
+    setDevLoading(true)
+    setSubmitError(null)
+    try {
+      const session = await devLoginUser()
+      setSession(session.user)
+      goAfterLogin(session.user.expiresAt)
+    } catch (error) {
+      setSubmitError(
+        error instanceof ApiError ? error.message : "本地一键登录失败"
+      )
+    } finally {
+      setDevLoading(false)
     }
   }
 
@@ -121,7 +138,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             size="lg"
-            disabled={loading}
+            disabled={loading || devLoading}
             className="w-full cursor-pointer transition-colors duration-200"
           >
             {loading && <Loader2 className="size-4 animate-spin" />}
@@ -131,6 +148,20 @@ export default function LoginPage() {
             <p className="text-sm text-destructive">{submitError}</p>
           )}
         </form>
+
+        {process.env.NODE_ENV === "development" && (
+          <Button
+            type="button"
+            size="lg"
+            variant="outline"
+            className="mt-3 w-full cursor-pointer"
+            disabled={loading || devLoading}
+            onClick={handleDevLogin}
+          >
+            {devLoading ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+            本地一键登录
+          </Button>
+        )}
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
           没有账号？{" "}

@@ -7,6 +7,11 @@ import { generateInsight } from "./insight-generation"
 import { acquireSingleFlightLock, buildInsightLockKey, releaseSingleFlightLock, waitForInsightCache } from "./locks"
 import { HotTopicIntelligenceError, INSIGHT_FAILURE_COOLDOWN_MS, MIN_EVIDENCE_COUNT, type TopicRow } from "./types"
 
+/**
+ * @description 获取最新的hottopicbyid
+ * @param topicId - 主题唯一标识符
+ * @returns Promise<TopicRow>
+ */
 export async function getLatestHotTopicById(topicId: string): Promise<TopicRow> {
   const latestSnapshot = await prisma.douyinHotSnapshot.findFirst({
     where: { status: "success" },
@@ -58,6 +63,11 @@ export async function getLatestHotTopicById(topicId: string): Promise<TopicRow> 
   return topic
 }
 
+/**
+ * @description 获取orgeneratehottopicinsight
+ * @param topicId - 主题唯一标识符
+ * @returns Promise<
+ */
 export async function getOrGenerateHotTopicInsight(
   topicId: string,
 ): Promise<{ topic: HotTopic; insight: ApiHotTopicInsight }> {

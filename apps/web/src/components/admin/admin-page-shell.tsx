@@ -22,6 +22,11 @@ interface AdminPageShellProps {
   children?: React.ReactNode
 }
 
+/**
+ * @description adminpageshell
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AdminPageShell({
   title,
   subtitle,

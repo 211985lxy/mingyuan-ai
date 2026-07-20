@@ -14,6 +14,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { JIEKOU_PROVIDER_MODELS } from "@/features/knowledge/admin-knowledge-shared"
 
+/**
+ * @description jiekoutestpanel
+ * @returns 无返回值
+ */
 export function JiekouTestPanel() {
   const [open, setOpen] = useState(false)
   const [provider, setProvider] = useState<"jiekou" | "openrouter">("jiekou")

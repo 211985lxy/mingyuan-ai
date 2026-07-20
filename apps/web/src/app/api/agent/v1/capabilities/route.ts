@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { buildAgentCapabilities } from "@/lib/agent-api-contract"
 import { agentAuthErrorResponse, authenticateAgentRequest } from "@/lib/agent-api-auth"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     await authenticateAgentRequest(request)

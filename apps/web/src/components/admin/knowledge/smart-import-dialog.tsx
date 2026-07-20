@@ -16,6 +16,11 @@ function ProcessingStep({ files }: { files: File[] }) {
   </div>
 }
 
+/**
+ * @description smartimportdialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function SmartImportDialog(props: {
   open: boolean
   defaultProjectId: string

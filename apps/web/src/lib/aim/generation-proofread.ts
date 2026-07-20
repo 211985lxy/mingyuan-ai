@@ -2,6 +2,12 @@ import { polishScript, type AimGenerateResponse, type ContentFormat } from "@/li
 
 const PROOFREAD_FORMATS = new Set<ContentFormat>(["raw_copy", "video_script", "koubo_script"])
 
+/**
+ * @description 对 AIM 生成响应进行校对润色
+ * @param response - AIM 生成响应
+ * @param persona - 人设描述
+ * @returns 校对后的生成响应
+ */
 export async function proofreadAimResponse(response: AimGenerateResponse, persona: string): Promise<AimGenerateResponse> {
   const results = await Promise.all(response.results.map(async (result) => {
     if (!PROOFREAD_FORMATS.has(result.format) || result.content.trim().length < 30) return result

@@ -47,6 +47,11 @@ function getSnapshotDelegate(): SnapshotDelegate | undefined {
   }).aimRunSnapshot
 }
 
+/**
+ * @description redactrunspec
+ * @param runSpec - run规格
+ * @returns AimRunSpec
+ */
 export function redactRunSpec(runSpec: AimRunSpec): AimRunSpec {
   return {
     ...runSpec,
@@ -55,6 +60,11 @@ export function redactRunSpec(runSpec: AimRunSpec): AimRunSpec {
 }
 
 /** Persist the full snapshot. Returns the snapshot id, or undefined on failure. */
+/**
+ * @description persistaimrunsnapshot
+ * @param input - 输入数据
+ * @returns Promise<string | undefined>
+ */
 export async function persistAimRunSnapshot(
   input: SnapshotInput
 ): Promise<string | undefined> {
@@ -114,6 +124,15 @@ function getTraceDelegate(): TraceDelegate | undefined {
 }
 
 /** Stamp run metadata onto an existing trace (long-term fields). */
+/**
+ * @description 应用runmetadatatotrace
+ * @param traceId - trace唯一标识符
+ * @param metadata - metadata
+ * @param spec - 规格
+ * @param snapshotId? - 快照Id?
+ * @param qualityStatus? - 质量Status?
+ * @returns Promise<void>
+ */
 export async function applyRunMetadataToTrace(
   traceId: string | undefined,
   metadata: AimRunMetadata,

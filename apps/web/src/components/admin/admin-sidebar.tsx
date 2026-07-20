@@ -102,6 +102,10 @@ const navGroups: NavGroup[] = [
   },
 ]
 
+/**
+ * @description adminsidebar
+ * @returns 无返回值
+ */
 export function AdminSidebar() {
   const pathname = usePathname() ?? ""
   const router = useRouter()

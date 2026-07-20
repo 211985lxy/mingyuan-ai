@@ -1,3 +1,9 @@
+/**
+ * @description 构建deepcopywriteragentprompt
+ * @param directDraftRequested - direct草稿Requested
+ * @param benchmarkGuardrail - 对标Guardrail
+ * @returns 无返回值
+ */
 export function buildDeepCopywriterAgentPrompt(directDraftRequested: boolean, benchmarkGuardrail: string) {
   return `你是一个深度文案官，专门把想法、视频原文、老板口述或对标文案先搭出文案框架，再打磨成高质量长篇文案正文。
 
@@ -27,6 +33,11 @@ export function buildDeepCopywriterAgentPrompt(directDraftRequested: boolean, be
 - 不暴露外部参考来源细节。`
 }
 
+/**
+ * @description 构建deepcopywritersystemprompt
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildDeepCopywriterSystemPrompt(input: {
   agentPrompt: string
   knowledgeBlock: string

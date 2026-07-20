@@ -6,6 +6,11 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 
+/**
+ * @description summaryskeleton
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SummarySkeleton({ failed }: { failed: boolean }) {
   if (failed) {
     return <p className="py-2 text-sm text-muted-foreground">加载失败，请刷新重试。</p>
@@ -23,6 +28,11 @@ type MetricState =
   | { status: "error" }
   | { status: "ok"; value: number | undefined; subtitle?: string }
 
+/**
+ * @description metriccard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function MetricCard({ title, state, icon }: { title: string; state: MetricState; icon: React.ReactNode }) {
   return (
     <Card>
@@ -44,6 +54,11 @@ export function MetricCard({ title, state, icon }: { title: string; state: Metri
   )
 }
 
+/**
+ * @description pendingcard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function PendingCard({ icon, title, count, description, href }: {
   icon: React.ReactNode
   title: string
@@ -70,10 +85,15 @@ export function PendingCard({ icon, title, count, description, href }: {
   )
 }
 
+/**
+ * @description statuscard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function StatusCard({ title, icon, items }: {
   title: string
   icon: React.ReactNode
-  items: Array<{ label: string; value: string | number; variant?: "default" | "destructive" | "secondary" }>
+  items: Array<{ label: string; value: string | number; variant?: "default" | "destructive" | "secondary" | "warning" }>
 }) {
   return (
     <Card>
@@ -86,7 +106,7 @@ export function StatusCard({ title, icon, items }: {
           {items.map((item) => (
             <div key={item.label} className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{item.label}</span>
-              <Badge variant={item.variant ?? "default"}>{item.value}</Badge>
+              <Badge variant={(item.variant as "default" | "secondary" | "destructive" | "outline" | null) ?? "default"} className={item.variant === "warning" ? "bg-amber-100 text-amber-700 border-amber-200" : ""}>{item.value}</Badge>
             </div>
           ))}
         </div>

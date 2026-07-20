@@ -7,6 +7,11 @@ import { createAimWorkbenchCommandRunner } from "@/features/aim/actions/aim-work
 import type { AimEditorActionsOptions } from "@/features/aim/hooks/aim-editor-action-contracts"
 import { useAimImitateAction } from "@/features/aim/hooks/use-aim-imitate-action"
 
+/**
+ * @description React Hook：aimeditoractions
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function useAimEditorActions(options: AimEditorActionsOptions) {
   const imitate = useAimImitateAction(options)
   const transfer = createAimEditorTransferActions(options)

@@ -25,10 +25,20 @@ export const AIM_WORKFLOW_STATUS_OPTIONS = [
   { value: "archived", label: "已归档" },
 ]
 
+/**
+ * @description 获取 AIM 工作流状态标签
+ * @param status - 状态值
+ * @returns 状态标签文本
+ */
 export function getAimWorkflowStatusLabel(status?: string | null) {
   return AIM_WORKFLOW_STATUS_OPTIONS.find((item) => item.value === status)?.label || "草稿"
 }
 
+/**
+ * @description 分离 AIM 方法注释和结果内容
+ * @param content - 包含方法注释的内容
+ * @returns 分离后的方法注释和结果
+ */
 export function splitAimMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
   if (!match) return { methodNote: "", result: content }

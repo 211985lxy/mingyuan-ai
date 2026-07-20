@@ -39,6 +39,10 @@ const testimonials: Testimonial[] = [
   },
 ]
 
+/**
+ * @description testimonialssection
+ * @returns 无返回值
+ */
 export function TestimonialsSection() {
   const t = useTranslations("Testimonials")
 

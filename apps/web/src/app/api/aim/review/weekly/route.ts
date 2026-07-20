@@ -18,6 +18,11 @@ function parseDateParam(value: string | null): Date | null {
  * 每周经营复盘（90 天计划 3.3）：五个主指标 + 第 7 天回填率。
  * 查询参数 start/end（ISO 日期，end 不含）；缺省为最近 7 天。
  */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

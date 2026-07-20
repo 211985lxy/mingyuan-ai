@@ -10,17 +10,33 @@ import type { AimChatToolAction, AimGeneration, ContentFormat } from "@/lib/api/
 
 let sequence = 0
 
+/**
+ * @description 生成下一个 AIM 工作台 ID
+ * @param prefix - ID 前缀
+ * @returns 唯一 ID 字符串
+ */
 export function nextAimWorkbenchId(prefix = "m") {
   sequence += 1
   return `${prefix}-${Date.now()}-${sequence}`
 }
 
+/**
+ * @description 构建 AIM 原始输入（合并用户消息）
+ * @param messages - 工作台消息列表
+ * @param extra - 额外输入文本
+ * @returns 合并后的原始输入
+ */
 export function buildAimRawInput(messages: AimWorkbenchMessage[], extra?: string) {
   const userTexts = messages.filter((message) => message.role === "user").map((message) => message.content)
   if (extra) userTexts.push(extra)
   return userTexts.filter(Boolean).join("\n\n")
 }
 
+/**
+ * @description 检测用户输入中的飞书工具动作
+ * @param text - 用户输入文本
+ * @returns 检测到的工具动作，未检测到时返回 null
+ */
 export function detectAimLarkToolAction(text: string): AimChatToolAction | null {
   if (!/飞书/.test(text)) return null
   if (/同步.*选题|导入.*选题/.test(text)) return "import_lark_topics"
@@ -30,10 +46,20 @@ export function detectAimLarkToolAction(text: string): AimChatToolAction | null 
   return null
 }
 
+/**
+ * @description 查找最新的 AIM 交付物 ID
+ * @param messages - 工作台消息列表
+ * @returns 最新交付物 ID
+ */
 export function findLatestAimDeliverableId(messages: AimWorkbenchMessage[]) {
   return [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
 }
 
+/**
+ * @description 查找最新的 AIM 视频交付物消息 ID
+ * @param messages - 工作台消息列表
+ * @returns 消息 ID
+ */
 export function findLatestAimVideoDeliverableMessageId(messages: AimWorkbenchMessage[]) {
   return [...messages]
     .reverse()
@@ -41,11 +67,21 @@ export function findLatestAimVideoDeliverableMessageId(messages: AimWorkbenchMes
     ?.id
 }
 
+/**
+ * @description 查找最新的 AIM 交付物文本内容
+ * @param messages - 工作台消息列表
+ * @returns 交付物文本
+ */
 export function findLatestAimDeliverableText(messages: AimWorkbenchMessage[]) {
   const latest = [...messages].reverse().find((message) => message.deliverables?.results.length)
   return latest?.deliverables?.results[0]?.content.trim() || ""
 }
 
+/**
+ * @description 获取 AIM 开头片段（前 1-2 段）
+ * @param text - 完整文本
+ * @returns 开头片段和偏移量
+ */
 export function getAimOpeningSegment(text: string) {
   const trimmed = text.trimStart()
   const offset = text.length - trimmed.length
@@ -56,6 +92,11 @@ export function getAimOpeningSegment(text: string) {
   return { offset, segment }
 }
 
+/**
+ * @description 构建 AIM 编辑器上下文
+ * @param input - 构建输入（动作、选区、编辑器文本、标签）
+ * @returns 编辑器上下文对象
+ */
 export function buildAimEditorContext(input: {
   action: string
   referenceSelection: string
@@ -74,6 +115,11 @@ export function buildAimEditorContext(input: {
   }
 }
 
+/**
+ * @description 从内容中提取人设智能体进度百分比
+ * @param content - 包含进度标记的内容
+ * @returns 进度百分比（0-100），未找到时返回 null
+ */
 export function extractPersonaProgress(content: string): number | null {
   const match = content.match(/【进度\s*(\d+)\s*%】/)
   if (!match) return null
@@ -81,6 +127,11 @@ export function extractPersonaProgress(content: string): number | null {
   return Number.isNaN(value) ? null : Math.min(100, Math.max(0, value))
 }
 
+/**
+ * @description 格式化分析结果为提示词文本
+ * @param analysisResult - 分析结果对象
+ * @returns 格式化的文本，无效时返回 null
+ */
 export function formatAnalysisResultForPrompt(analysisResult: unknown) {
   if (!analysisResult) return null
   if (typeof analysisResult === "object" && "markdown" in analysisResult) {
@@ -90,6 +141,11 @@ export function formatAnalysisResultForPrompt(analysisResult: unknown) {
   return JSON.stringify(analysisResult, null, 2)
 }
 
+/**
+ * @description 从文本中提取对标原文
+ * @param text - 包含对标原文标记的文本
+ * @returns 提取的对标原文
+ */
 export function extractBenchmarkOriginalText(text: string) {
   const marker = text.match(/对标原文[：:]/)
   if (marker?.index == null) return ""
@@ -98,6 +154,11 @@ export function extractBenchmarkOriginalText(text: string) {
   return (nextSection >= 0 ? rest.slice(0, nextSection) : rest).trim()
 }
 
+/**
+ * @description 从文本中提取对标拆解分析
+ * @param text - 包含拆解标记的文本
+ * @returns 提取的拆解分析文本
+ */
 export function extractBenchmarkAnalysisText(text: string) {
   const marker = text.match(/(?:已有拆解|结构化拆解)[：:]/)
   if (marker?.index != null) return text.slice(marker.index + marker[0].length).trim()
@@ -105,6 +166,12 @@ export function extractBenchmarkAnalysisText(text: string) {
   return numberedStructure?.index == null ? "" : text.slice(numberedStructure.index).trim()
 }
 
+/**
+ * @description 查找 AIM 对标原文
+ * @param messages - 工作台消息列表
+ * @param sourceOriginalText - 源对标原文
+ * @returns 对标原文文本
+ */
 export function findAimBenchmarkOriginal(messages: AimWorkbenchMessage[], sourceOriginalText = "") {
   return sourceOriginalText.trim() || [...messages]
     .reverse()
@@ -112,6 +179,11 @@ export function findAimBenchmarkOriginal(messages: AimWorkbenchMessage[], source
     .find((content) => content.trim()) || ""
 }
 
+/**
+ * @description 查找最新的 AIM 助手草稿
+ * @param messages - 工作台消息列表
+ * @returns 最新草稿文本
+ */
 export function findLatestAimAssistantDraft(messages: AimWorkbenchMessage[]) {
   return [...messages]
     .reverse()
@@ -120,6 +192,11 @@ export function findLatestAimAssistantDraft(messages: AimWorkbenchMessage[]) {
     .find((content) => content.trim()) || ""
 }
 
+/**
+ * @description 构建 AIM 对标改写输入
+ * @param input - 构建输入（消息、对标原文、拆解、编辑器文本）
+ * @returns 对标改写提示词，无对标原文时返回 null
+ */
 export function buildAimBenchmarkRewriteInput(input: {
   messages: AimWorkbenchMessage[]
   sourceOriginalText: string
@@ -144,6 +221,11 @@ export function buildAimBenchmarkRewriteInput(input: {
   ].filter(Boolean).join("\n\n")
 }
 
+/**
+ * @description 构建 AIM 对标质量检查消息
+ * @param input - 构建输入（消息、对标原文、编辑器文本）
+ * @returns 质量检查消息，无法检查时返回 null
+ */
 export function buildAimBenchmarkQualityMessage(input: {
   messages: AimWorkbenchMessage[]
   sourceOriginalText: string
@@ -169,6 +251,11 @@ export function buildAimBenchmarkQualityMessage(input: {
   ].join("\n\n")
 }
 
+/**
+ * @description 获取 AIM 生成历史内容列表
+ * @param item - AIM 生成记录
+ * @returns 各格式内容数组
+ */
 export function getAimHistoryContents(item: AimGeneration) {
   return [
     item.videoScript ? { format: "video_script" as const, content: item.videoScript } : null,
@@ -180,6 +267,13 @@ export function getAimHistoryContents(item: AimGeneration) {
   ].filter(Boolean) as Array<{ format: ContentFormat; content: string }>
 }
 
+/**
+ * @description 构建 AIM 历史原始输入（合并对话历史）
+ * @param baseInput - 基础输入
+ * @param currentInput - 当前输入
+ * @param messages - 工作台消息列表
+ * @returns 合并后的原始输入
+ */
 export function buildAimHistoryRawInput(baseInput: string, currentInput: string, messages: AimWorkbenchMessage[]) {
   const turns = messages
     .map((message) => {
@@ -197,6 +291,11 @@ export function buildAimHistoryRawInput(baseInput: string, currentInput: string,
   return ["【本轮对话】", ...turns, ...current, "", "【本次生成输入】", baseInput].join("\n")
 }
 
+/**
+ * @description 准备 AIM 聊天轮次
+ * @param input - 准备输入（消息、文本、图片、重试 ID 等）
+ * @returns 聊天轮次准备结果
+ */
 export function prepareAimChatTurn(input: {
   messages: AimWorkbenchMessage[]
   text: string
@@ -230,6 +329,13 @@ export function prepareAimChatTurn(input: {
   }
 }
 
+/**
+ * @description 上报aimchatrevision
+ * @param messages - 消息列表
+ * @param retryMessageId - 重试次数消息唯一标识符
+ * @param startsNewTask - startsNewTask
+ * @returns 无返回值
+ */
 export function reportAimChatRevision(messages: AimWorkbenchMessage[], retryMessageId: string | undefined, startsNewTask: boolean) {
   if (retryMessageId || startsNewTask) return
   const revisedRun = [...messages].reverse().find((message) => message.deliverables && message.runId)?.runId

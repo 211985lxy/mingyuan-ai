@@ -14,6 +14,11 @@ interface WorkflowBriefFormProps {
   onConfirm: () => void
 }
 
+/**
+ * @description workflowbriefform
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function WorkflowBriefForm({ form, busy, onChange, onCancel, onConfirm }: WorkflowBriefFormProps) {
   const setField = (field: keyof ConfirmedWorkflowBrief, value: string) => onChange({ ...form, [field]: value })
   return <>
@@ -32,6 +37,11 @@ export function WorkflowBriefForm({ form, busy, onChange, onCancel, onConfirm }:
   </>
 }
 
+/**
+ * @description workflowbriefdialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function WorkflowBriefDialog({ open, onCancel, ...formProps }: WorkflowBriefFormProps & { open: boolean }) {
   return <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onCancel() }}>
     <DialogContent className="max-w-xl">

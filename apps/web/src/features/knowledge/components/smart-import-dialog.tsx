@@ -56,6 +56,11 @@ type SmartImportEdit = {
   skip?: boolean
 }
 
+/**
+ * @description smartimportdialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SmartImportDialog({
   open,
   projectId,

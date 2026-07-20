@@ -15,6 +15,11 @@ const tooLarge = (message: string): AudioInputResult => ({
   error: { error: message, code: "INTERNAL_BETA_UPLOAD_TOO_LARGE" },
 })
 
+/**
+ * @description 读取asraudioinput
+ * @param request - 请求对象
+ * @returns Promise<AudioInputResult>
+ */
 export async function readAsrAudioInput(request: NextRequest): Promise<AudioInputResult> {
   const contentType = request.headers.get("content-type") || ""
   let audioBuffer: Buffer | null = null

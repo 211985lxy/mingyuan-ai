@@ -13,6 +13,11 @@ async function ensureProject(userId: string, projectId: string) {
 }
 
 /** GET /api/aim/ip-wiki/lint?projectId=... —— 对某 IP 全案的维基页跑体检 */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

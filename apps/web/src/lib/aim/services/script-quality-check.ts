@@ -25,6 +25,11 @@ function parsePersona(persona: unknown): QualityInput["persona"] {
   }
 }
 
+/**
+ * @description 解析scriptqualitycheckinput
+ * @param body - 请求体
+ * @returns ParseResult
+ */
 export function parseScriptQualityCheckInput(body: unknown): ParseResult {
   const record = (body ?? {}) as Record<string, unknown>
   const { content, topicTitle, openingType, structure, endingType, persona } = record
@@ -70,6 +75,11 @@ export function parseScriptQualityCheckInput(body: unknown): ParseResult {
   }
 }
 
+/**
+ * @description 运行scriptqualitycheck
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function runScriptQualityCheck(request: ScriptQualityCheckRequest) {
   const { input, autoRewrite, publishPlatform } = request
   if (autoRewrite) {

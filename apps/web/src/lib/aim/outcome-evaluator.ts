@@ -127,6 +127,11 @@ interface GenerationRow {
  * 互动率 = (likes + comments + saves + shares) / max(views, 1)
  * 仅当 views > 0 时有意义；views=null 或 0 时返回 null。
  */
+/**
+ * @description 计算engagementrate
+ * @param outcome - outcome
+ * @returns number | null
+ */
 export function computeEngagementRate(outcome: {
   views: number | null
   likes: number | null
@@ -147,6 +152,11 @@ export function computeEngagementRate(outcome: {
  * 计算转化率。
  * 转化率 = qualifiedLeadCount / max(views, 1)
  * 仅当 views > 0 时有意义。
+ */
+/**
+ * @description 计算conversionrate
+ * @param outcome - outcome
+ * @returns number | null
  */
 export function computeConversionRate(outcome: {
   views: number | null
@@ -231,6 +241,11 @@ function buildKnowledgeEntryContent(outcome: ExcellentOutcome, generation: Gener
  * @param input.store 数据库抽象
  * @param input.ensureEmbedding 可选的向量化回调（生产环境注入 ensureKnowledgeEmbedding）
  * @returns 评估结果摘要
+ */
+/**
+ * @description 评估outcomes
+ * @param input - 输入数据
+ * @returns Promise<EvaluateOutcomesResult>
  */
 export async function evaluateOutcomes(input: {
   userId: string
@@ -357,6 +372,11 @@ export async function evaluateOutcomes(input: {
 /**
  * 工厂：从 PrismaClient 构造 OutcomeEvaluatorStore。
  * 用于生产环境注入。
+ */
+/**
+ * @description 创建outcomeevaluatorstore
+ * @param prisma - Prisma 客户端
+ * @returns OutcomeEvaluatorStore
  */
 export function createOutcomeEvaluatorStore(prisma: PrismaClient): OutcomeEvaluatorStore {
   // Prisma 类型与 port 接口的 Record<string, unknown> 不直接兼容；

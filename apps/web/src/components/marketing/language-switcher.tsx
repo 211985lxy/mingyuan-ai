@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 
+/**
+ * @description languageswitcher
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function LanguageSwitcher({ currentLocale }: { currentLocale: string }) {
   const router = useRouter()
   const locale = currentLocale.toLowerCase().replace("_", "-").startsWith("en")

@@ -19,6 +19,13 @@ import type { AimGenerateContext } from "@/lib/aim-agent-handlers"
 import type { ContentFormat } from "@/lib/aim-generator"
 import { prisma } from "@/lib/prisma"
 
+/**
+ * @description saveaimgenerationrecord
+ * @param context - 上下文
+ * @param completion - 补全
+ * @param parsed - 解析后的数据
+ * @returns 无返回值
+ */
 export async function saveAimGenerationRecord(
   context: AimGenerateContext,
   completion: { model?: string; usage?: { totalTokens?: number } },
@@ -99,6 +106,11 @@ export async function saveAimGenerationRecord(
   return persist(degradedData)
 }
 
+/**
+ * @description 获取aimgenerationusage
+ * @param id - 唯一标识符
+ * @returns 无返回值
+ */
 export async function getAimGenerationUsage(id: string) {
   return prisma.aimGeneration.findUnique({
     where: { id },
@@ -114,6 +126,12 @@ export async function getAimGenerationUsage(id: string) {
  *
  * @param generationId AimGeneration.id（saveAimGenerationRecord 落库返回）
  * @param userId 执行者 id（隔离校验）
+ */
+/**
+ * @description 标记aimgenerationdegraded
+ * @param generationId - 生成结果唯一标识符
+ * @param userId - 用户 ID
+ * @returns Promise<void>
  */
 export async function flagAimGenerationDegraded(
   generationId: string,

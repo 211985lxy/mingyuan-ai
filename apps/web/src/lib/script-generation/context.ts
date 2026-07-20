@@ -2,6 +2,11 @@ import { buildHotTopicPromptSection } from "@/lib/hot-topic-intelligence"
 import { appendIpSections, appendStructureSection, appendTemplateSections, appendTopicSections } from "./context-sections"
 import type { GenerateScriptCandidatesParams } from "./contracts"
 
+/**
+ * @description 构建contextblock
+ * @param params - 参数对象
+ * @returns string
+ */
 export function buildContextBlock(params: GenerateScriptCandidatesParams): string {
   const sections: string[] = []
   appendIpSections(sections, params)

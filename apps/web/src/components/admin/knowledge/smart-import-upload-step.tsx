@@ -8,6 +8,11 @@ import type { SmartImportProjectOption } from "./smart-import-types"
 
 const ACCEPT = ".pdf,.txt,.md,.csv,.docx,.xls,.xlsx,.pptx,.html,.htm,.json,.xml,.rtf"
 
+/**
+ * @description smartimportuploadstep
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function SmartImportUploadStep(props: {
   files: File[]
   projectId: string

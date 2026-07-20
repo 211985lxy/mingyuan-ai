@@ -1,5 +1,10 @@
 import type { SmartImportEdit, SmartImportPreviewData } from "./smart-import-types"
 
+/**
+ * @description 分析smartimport
+ * @param input - 输入数据
+ * @returns Promise<SmartImportPreviewData>
+ */
 export async function analyzeSmartImport(input: {
   files: File[]
   projectId: string
@@ -21,6 +26,11 @@ export async function analyzeSmartImport(input: {
   return data.data
 }
 
+/**
+ * @description confirmsmartimport
+ * @param input - 输入数据
+ * @returns Promise<number>
+ */
 export async function confirmSmartImport(input: {
   preview: SmartImportPreviewData
   edits: Record<number, SmartImportEdit>

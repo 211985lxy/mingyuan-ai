@@ -1,5 +1,13 @@
 import type { CandidateScore, ScriptGenerationResult } from "./contracts"
 
+/**
+ * @description 构建generationresult
+ * @param candidates - candidates
+ * @param scores - scores
+ * @param promptText - 提示词文本
+ * @param model - 模型
+ * @returns ScriptGenerationResult
+ */
 export function buildGenerationResult(
   candidates: string[],
   scores: CandidateScore[],
@@ -21,6 +29,13 @@ export function buildGenerationResult(
   }
 }
 
+/**
+ * @description withtimeout
+ * @param promise - Promise
+ * @param ms - ms
+ * @param label - 标签
+ * @returns Promise<T>
+ */
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(

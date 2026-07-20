@@ -6,6 +6,12 @@ import { sanitizeOutcomeBody, buildOutcomeUpdate, type SanitizedOutcome } from "
 
 export const dynamic = "force-dynamic"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,6 +43,12 @@ export async function GET(
   }
 }
 
+/**
+ * @description 处理 PUT 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

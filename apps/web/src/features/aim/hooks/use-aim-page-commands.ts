@@ -39,6 +39,11 @@ interface UseAimPageCommandsOptions {
  * Routes slash-commands and structured actions to the appropriate handler.
  * Extracted from aim/page.tsx to reduce page complexity.
  */
+/**
+ * @description React Hook：aimpagecommands
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function useAimPageCommands(options: UseAimPageCommandsOptions) {
   function runWorkbenchCommand(command: AimWorkbenchCommand) {
     options.setInput("")

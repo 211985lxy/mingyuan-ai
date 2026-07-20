@@ -47,6 +47,10 @@ import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-s
  * hook → JSX).  Return type is inferred from concrete hook outputs; do NOT
  * add an explicit interface (it would diverge from actual hook signatures).
  */
+/**
+ * @description React Hook：aimworkbench
+ * @returns 无返回值
+ */
 export function useAimWorkbench() {
   const router = useRouter()
   const routeSearchParams = useSearchParams()

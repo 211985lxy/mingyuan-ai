@@ -24,6 +24,12 @@ export const MEETING_INSIGHT_TASK_SPEC_KIND = "meeting_insight"
 export const MEETING_INSIGHT_TASK_SPEC_VERSION = 1
 
 /** AIM 结果链接的统一构造（计划 2.1 约定格式）。 */
+/**
+ * @description 构建aimresultlink
+ * @param generationId - 生成结果唯一标识符
+ * @param projectId - 项目 ID
+ * @returns string
+ */
 export function buildAimResultLink(generationId: string, projectId: string): string {
   return `/aim?generationId=${encodeURIComponent(generationId)}&projectId=${encodeURIComponent(projectId)}&stage=results`
 }
@@ -33,6 +39,11 @@ function bullet(items: string[]): string {
 }
 
 /** 把结构化洞察渲染为 Markdown（AimGeneration.rawCopy）。 */
+/**
+ * @description 渲染meetinginsightmarkdown
+ * @param insight - 洞察
+ * @returns string
+ */
 export function renderMeetingInsightMarkdown(insight: MeetingInsight): string {
   const decisionStage = insight.decisionStage
     ? insight.decisionStage
@@ -95,6 +106,11 @@ export interface AimGenerationCreatePort {
  * 创建绑定 AimGeneration 的洞察落盘端口。
  * ownerUserId 必须来自服务端配置（AIM_WORK_ITEM_OWNER_USER_ID），
  * 绝不由请求体指定，避免把结果写到他人空间。
+ */
+/**
+ * @description 创建aimgenerationinsightresultsink
+ * @param deps - deps
+ * @returns InsightResultSink
  */
 export function createAimGenerationInsightResultSink(deps: {
   ownerUserId: string

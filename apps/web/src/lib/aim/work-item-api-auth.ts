@@ -10,6 +10,11 @@ import { timingSafeEqual } from "node:crypto"
 import type { NextRequest } from "next/server"
 
 /** 提取 Bearer token；非 Bearer 头返回 null。 */
+/**
+ * @description 提取bearertoken
+ * @param request - 请求对象
+ * @returns string | null
+ */
 export function extractBearerToken(request: NextRequest): string | null {
   const header = request.headers.get("authorization")
   if (!header?.startsWith("Bearer ")) return null
@@ -17,6 +22,12 @@ export function extractBearerToken(request: NextRequest): string | null {
 }
 
 /** 常量时间比较两个密钥；长度不等先返回 false 但仍消耗稳定分支。 */
+/**
+ * @description safesecretequal
+ * @param expected - expected
+ * @param provided - provided
+ * @returns boolean
+ */
 export function safeSecretEqual(expected: string, provided: string): boolean {
   const a = Buffer.from(expected)
   const b = Buffer.from(provided)
@@ -25,6 +36,12 @@ export function safeSecretEqual(expected: string, provided: string): boolean {
 }
 
 /** 校验经营事项入口服务密钥。 */
+/**
+ * @description 检查workitemapisecret
+ * @param request - 请求对象
+ * @param env - env
+ * @returns "ok" | "unconfigured" | "unauthorized"
+ */
 export function checkWorkItemApiSecret(
   request: NextRequest,
   env: Record<string, string | undefined> = process.env,

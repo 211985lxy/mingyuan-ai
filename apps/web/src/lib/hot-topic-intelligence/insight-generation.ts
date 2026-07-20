@@ -4,6 +4,12 @@ import { buildFallbackInsight, deriveFreshness } from "./fallback"
 import { asString, asStringArray, normalizeEvidenceQuality, normalizeRisk, safeJsonParse } from "./formatting"
 import { HotTopicIntelligenceError, type SearchEvidence, type TopicRow } from "./types"
 
+/**
+ * @description 生成insight
+ * @param topic - 主题
+ * @param evidence - evidence
+ * @returns Promise<ApiHotTopicInsight>
+ */
 export async function generateInsight(
   topic: TopicRow,
   evidence: SearchEvidence[],

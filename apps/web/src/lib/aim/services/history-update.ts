@@ -80,6 +80,12 @@ function normalizeHistoryUpdate(body: JsonRecord, createdAt: string) {
   }
 }
 
+/**
+ * @description 解析aimhistoryupdate
+ * @param body - 请求体
+ * @param createdAt - createdAt
+ * @returns ParsedHistoryUpdate
+ */
 export function parseAimHistoryUpdate(body: unknown, createdAt = new Date().toISOString()): ParsedHistoryUpdate {
   const data = normalizeHistoryUpdate(isRecordObject(body) ? body : {}, createdAt)
   if (data.decisionSnapshot && !data.decisionSnapshot.summary) {
@@ -94,6 +100,12 @@ export function parseAimHistoryUpdate(body: unknown, createdAt = new Date().toIS
   return { ok: true, data }
 }
 
+/**
+ * @description 构建aimhistoryupdatedata
+ * @param input - 输入数据
+ * @param existing - existing
+ * @returns 无返回值
+ */
 export function buildAimHistoryUpdateData(
   input: ReturnType<typeof normalizeHistoryUpdate>,
   existing: ExistingHistorySnapshots,

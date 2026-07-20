@@ -25,6 +25,10 @@ const platforms: Platform[] = [
   { nameKey: "salesScripts", Icon: FileText },
 ]
 
+/**
+ * @description platformssection
+ * @returns 无返回值
+ */
 export function PlatformsSection() {
   const t = useTranslations("Platforms")
 

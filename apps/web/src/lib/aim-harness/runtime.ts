@@ -115,6 +115,12 @@ export interface ExecuteAimRunAdapter<TOutput = unknown> {
   }>
 }
 
+/**
+ * @description 执行aimrun
+ * @param request - 请求对象
+ * @param execute - execute
+ * @returns Promise<AimRunResult<TOutput>>
+ */
 export async function executeAimRun<TOutput = unknown>(
   request: AimRunRequest,
   execute: ExecuteAimRunAdapter<TOutput>,
@@ -286,6 +292,11 @@ export interface AimStreamHandle {
   finalize: (fullOutput: string, ok: boolean) => Promise<void>
 }
 
+/**
+ * @description streamaimrun
+ * @param request - 请求对象
+ * @returns Promise<AimStreamHandle>
+ */
 export async function streamAimRun(request: AimRunRequest): Promise<AimStreamHandle> {
   const plan = toPlanInput(request)
   const spec = planAimRun(plan)

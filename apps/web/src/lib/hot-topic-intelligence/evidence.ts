@@ -1,6 +1,11 @@
 import { HotTopicIntelligenceError, MIN_EVIDENCE_COUNT, SEARCH_LIMIT, SEARCH_RETRY_LIMIT, SEARCH_TIMEOUT_MS, type SearchEvidence } from "./types"
 import { toIsoDate } from "./formatting"
 
+/**
+ * @description 请求获取searchevidence
+ * @param topicTitle - 主题标题
+ * @returns Promise<SearchEvidence[]>
+ */
 export async function fetchSearchEvidence(topicTitle: string): Promise<SearchEvidence[]> {
   const queryVariants = dedupeQueries([
     topicTitle,

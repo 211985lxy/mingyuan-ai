@@ -121,6 +121,12 @@ function describeError(err: unknown): string {
 /**
  * 开始处理：待处理 → 处理中。已是处理中视为幂等，不重写。
  */
+/**
+ * @description 启动workitem
+ * @param store - 存储
+ * @param recordId - 记录唯一标识符
+ * @returns Promise<WorkItemExecutionResult>
+ */
 export function startWorkItem(
   store: WorkItemRecordStore,
   recordId: string,
@@ -137,6 +143,13 @@ export interface SubmitReviewInput {
 /**
  * 提交审核：处理中 → 待人工审核，带回写 AIM 结果。
  * 必须有 aimResultId；已处于待人工审核视为幂等。
+ */
+/**
+ * @description 提交workitemforreview
+ * @param store - 存储
+ * @param recordId - 记录唯一标识符
+ * @param input - 输入数据
+ * @returns Promise<WorkItemExecutionResult>
  */
 export function submitWorkItemForReview(
   store: WorkItemRecordStore,
@@ -164,6 +177,13 @@ export interface CompleteWorkItemInput {
 /**
  * 完成：待人工审核 → 已完成，清空旧错误信息。已完成为终态，重复完成幂等。
  */
+/**
+ * @description completeworkitem
+ * @param store - 存储
+ * @param recordId - 记录唯一标识符
+ * @param input - 输入数据
+ * @returns Promise<WorkItemExecutionResult>
+ */
 export function completeWorkItem(
   store: WorkItemRecordStore,
   recordId: string,
@@ -187,6 +207,13 @@ export interface FailWorkItemInput {
 /**
  * 失败：处理中 → 失败，写入可行动错误信息（按 record_id 回写原记录，不伪造结果）。
  */
+/**
+ * @description failworkitem
+ * @param store - 存储
+ * @param recordId - 记录唯一标识符
+ * @param input - 输入数据
+ * @returns Promise<WorkItemExecutionResult>
+ */
 export function failWorkItem(
   store: WorkItemRecordStore,
   recordId: string,
@@ -199,6 +226,12 @@ export function failWorkItem(
 }
 
 /** 重试：失败 → 待处理。必须先显式失败，禁止从处理中直接跳回待处理。 */
+/**
+ * @description 重试workitem
+ * @param store - 存储
+ * @param recordId - 记录唯一标识符
+ * @returns Promise<WorkItemExecutionResult>
+ */
 export function retryWorkItem(
   store: WorkItemRecordStore,
   recordId: string,

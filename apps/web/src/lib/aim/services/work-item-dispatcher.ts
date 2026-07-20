@@ -111,6 +111,13 @@ function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/**
+ * @description 构建dispatchrunid
+ * @param recordId - 记录唯一标识符
+ * @param loop - loop
+ * @param previousRunId - previousRun唯一标识符
+ * @returns string
+ */
 export function buildDispatchRunId(
   recordId: string,
   loop: BusinessLoopSpec,
@@ -199,6 +206,12 @@ async function handleFailure(
 
 /**
  * 扫描并执行待处理经营事项，返回本次调度摘要。
+ */
+/**
+ * @description 分发pendingworkitems
+ * @param ports - ports
+ * @param limit - 数量限制
+ * @returns Promise<WorkItemDispatchSummary>
  */
 export async function dispatchPendingWorkItems(
   ports: WorkItemDispatcherPorts,

@@ -148,6 +148,11 @@ function EditorSplitHandle({ splitRef, onPercentChange }: { splitRef: RefObject<
   return <div className="group flex cursor-row-resize items-center bg-transparent transition-colors hover:bg-primary/5" title="拖动调整上下区域高度" onPointerDown={startResize}><div className="h-px w-full bg-border/60 transition-colors group-hover:bg-primary/35" /></div>
 }
 
+/**
+ * @description benchmarkeditorpanel
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function BenchmarkEditorPanel(props: BenchmarkEditorPanelProps) {
   const splitRef = useRef<HTMLDivElement>(null)
   const [referencePercent, setReferencePercent] = useState(50)

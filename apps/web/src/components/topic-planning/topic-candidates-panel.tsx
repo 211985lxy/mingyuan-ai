@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Loader2, Send, Sparkles } from "lucide-react"
+import { BookOpen, Check, Loader2, Send, Sparkles } from "lucide-react"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -86,6 +86,43 @@ function TopicNovelty({ card }: { card: ApiTopicCard }) {
   )
 }
 
+const TRACE_SOURCE_LABELS: Record<NonNullable<ApiTopicCard["creativeTrace"]>["sources"][number]["kind"], string> = {
+  benchmark: "对标爆款视频",
+  product: "产品卖点",
+  persona: "人设特点",
+}
+
+function TopicCreativeTrace({ card }: { card: ApiTopicCard }) {
+  const trace = card.creativeTrace
+  if (!trace) return null
+  return (
+    <details className="mt-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium text-foreground/80">
+        <BookOpen className="h-3.5 w-3.5" />生成依据与学习拆解
+      </summary>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <p><span className="font-medium text-foreground">风格定位：</span>{trace.stylePositioning}</p>
+          <div>
+            <p className="font-medium text-foreground">推导逻辑：</p>
+            <ol className="mt-1 list-decimal space-y-1 pl-4">
+              {trace.logicSteps.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}
+            </ol>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {trace.sources.map((source) => (
+            <p key={source.kind}><span className="font-medium text-foreground">{TRACE_SOURCE_LABELS[source.kind]}：</span>{source.source}；{source.usage}</p>
+          ))}
+          <p><span className="font-medium text-foreground">八字依据：</span>{trace.destinyAlignment.baziBasis}</p>
+          <p><span className="font-medium text-foreground">紫微依据：</span>{trace.destinyAlignment.ziweiBasis}</p>
+          <p><span className="font-medium text-foreground">命理风格映射：</span>{trace.destinyAlignment.styleMapping}</p>
+        </div>
+      </div>
+    </details>
+  )
+}
+
 function TopicCardItem({ card, index, selectedIndex, onSelect, onWrite }: {
   card: ApiTopicCard
   index: number
@@ -123,6 +160,7 @@ function TopicCardItem({ card, index, selectedIndex, onSelect, onWrite }: {
       </div>
       <TopicScoreBreakdown card={card} />
       <TopicNovelty card={card} />
+      <TopicCreativeTrace card={card} />
     </div>
   )
 }
@@ -137,6 +175,11 @@ interface TopicCandidatesPanelProps {
   onWrite: (card: ApiTopicCard, index: number) => void
 }
 
+/**
+ * @description topiccandidatespanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicCandidatesPanel({ cards, selectedIndex, selectedKnowledgeLabels, knowledgeCount, autoGenerating, onSelect, onWrite }: TopicCandidatesPanelProps) {
   return (
     <AiResultPanel title="备选选题" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<span>今天这条不拍，再从这里换。选中后直接去 AIM 写文案。</span>} flat>

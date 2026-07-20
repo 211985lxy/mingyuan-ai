@@ -8,6 +8,11 @@ type Router = { replace: (href: string) => void }
 type SearchParams = { toString: () => string }
 
 /** Saves the current scope before switching and restores only the target scope. */
+/**
+ * @description React Hook：aimprojectscopeswitch
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimProjectScopeSwitch(input: {
   busy: boolean
   currentProjectScope: string

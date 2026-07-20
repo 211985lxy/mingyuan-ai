@@ -8,6 +8,11 @@ import type { AimMemoryMessage } from "@/lib/aim-memory"
 import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule } from "@/lib/copy-studio"
 
 /** Extract plain text from an OpenAI-compatible content field. */
+/**
+ * @description 提取textcontent
+ * @param content - 内容
+ * @returns string
+ */
 export function extractTextContent(content: unknown): string {
   if (typeof content === "string") return content
   if (!Array.isArray(content)) return ""
@@ -22,6 +27,11 @@ export function extractTextContent(content: unknown): string {
 }
 
 /** Normalize chat messages to the format needed for memory extraction. */
+/**
+ * @description 标准化memorymessages
+ * @param messages - 消息列表
+ * @returns AimMemoryMessage[]
+ */
 export function normalizeMemoryMessages(messages: unknown[]): AimMemoryMessage[] {
   if (!Array.isArray(messages)) return []
   return messages
@@ -61,6 +71,11 @@ export type ParsedAimChatBody =
  * prepare→execute→serialize shape used by the generate entrypoint. The messages
  * validation (previously inline in the route) lives here so the route no longer
  * decides request validity — message text and status code are unchanged.
+ */
+/**
+ * @description 解析aimchatbody
+ * @param body - 请求体
+ * @returns ParsedAimChatBody
  */
 export function parseAimChatBody(body: unknown): ParsedAimChatBody {
   const record = (body ?? {}) as Record<string, unknown>

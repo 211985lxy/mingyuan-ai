@@ -7,6 +7,11 @@ import { SCRIPT_MODEL, STEP_TIMEOUT_MS } from "./models"
 import { scoreWithAI } from "./scoring"
 import { buildGenerationResult, withTimeout } from "./utils"
 
+/**
+ * @description 生成scriptcandidates
+ * @param params - 参数对象
+ * @returns Promise<ScriptGenerationResult>
+ */
 export async function generateScriptCandidates(
   params: GenerateScriptCandidatesParams
 ): Promise<ScriptGenerationResult> {

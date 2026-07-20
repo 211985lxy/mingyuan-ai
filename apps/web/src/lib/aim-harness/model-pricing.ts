@@ -7,7 +7,7 @@ const PRICES: Record<string, ModelTokenPrices> = {
   "doubao|doubao-seed-2-1-turbo-260628": { input: 3, output: 15, cached: 0.6 },
   "openrouter|qwen/qwen3.7-plus": { input: 5, output: 15 },
   "openrouter|moonshotai/kimi-k2.6": { input: 14, output: 56 },
-  "lihuo|gpt-5.5": { input: 36, output: 216, cached: 3.6 },
+  "lihuo|gpt-5.6": { input: 36, output: 216, cached: 3.6 },
 }
 
 function resolvePrices(provider?: string, model?: string): ModelTokenPrices {
@@ -20,6 +20,13 @@ function resolvePrices(provider?: string, model?: string): ModelTokenPrices {
   return { input: 5, output: 20 }
 }
 
+/**
+ * @description 计算costcny
+ * @param provider - provider
+ * @param model - 模型
+ * @param usage - usage
+ * @returns number | undefined
+ */
 export function computeCostCny(provider: string | undefined, model: string | undefined, usage: { inputTokens?: number; outputTokens?: number; cachedTokens?: number }): number | undefined {
   if (usage.inputTokens === undefined && usage.outputTokens === undefined) return undefined
   const prices = resolvePrices(provider, model)

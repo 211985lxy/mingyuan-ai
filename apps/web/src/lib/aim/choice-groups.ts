@@ -7,6 +7,11 @@ function cleanChoiceText(text: string) {
   return text.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim()
 }
 
+/**
+ * @description 从内容中提取 AIM 选项组（A/B/C/D 选项）
+ * @param content - 包含选项的文本内容
+ * @returns 提取的选项组数组
+ */
 export function extractAimChoiceGroups(content: string): AimChoiceGroup[] {
   const lines = content.split("\n")
   const groups: AimChoiceGroup[] = []

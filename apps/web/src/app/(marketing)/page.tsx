@@ -12,6 +12,10 @@ function normalizeLocale(locale: string | undefined) {
   return locale?.toLowerCase().replace("_", "-").startsWith("en") ? "en" : "zh"
 }
 
+/**
+ * @description 生成页面元数据
+ * @returns Promise<Metadata>
+ */
 export async function generateMetadata(): Promise<Metadata> {
   const [store, branding] = await Promise.all([cookies(), getBrandingConfig()])
   const locale = normalizeLocale(store.get("locale")?.value)

@@ -12,6 +12,11 @@ import { MarkdownRenderer } from "@/components/markdown-renderer"
 type Option = { id: string; label: string }
 type EntryForm = { category: string; title: string; content: string; tags: string; projectId: string; valueGrade: string }
 
+/**
+ * @description knowledgedetaildialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function KnowledgeDetailDialog(props: {
   entry: { title: string; content: string; category: string; sourceType: string; status: string; valueGrade?: string | null; project?: { name: string } | null; user?: { email: string } } | null
   categories: Record<string, string>
@@ -35,6 +40,11 @@ export function KnowledgeDetailDialog(props: {
   </Dialog>
 }
 
+/**
+ * @description knowledgedistilldialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function KnowledgeDistillDialog(props: { open: boolean; loading: boolean; result: { distilled: Array<{ index: number; suggestedTitle: string; suggestedContent: string; suggestedCategory: string; tags: string[]; action: "keep" | "merge" | "archive" }>; duplicates: number[][]; suggestions: string } | null; onOpenChange: (open: boolean) => void }) {
   return <Dialog open={props.open} onOpenChange={props.onOpenChange}><DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
     <DialogHeader><DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" />知识蒸馏分析</DialogTitle><DialogDescription>基于 DeepSeek 对选中知识的优化建议</DialogDescription></DialogHeader>
@@ -55,6 +65,11 @@ function EntrySelects(props: { form: EntryForm; categories: Record<string, strin
   </>
 }
 
+/**
+ * @description knowledgeadddialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function KnowledgeAddDialog(props: { open: boolean; form: EntryForm; saving: boolean; categories: Record<string, string>; projects: Option[]; onOpenChange: (open: boolean) => void; onChange: (patch: Partial<EntryForm>) => void; onSave: () => void }) {
   return <Dialog open={props.open} onOpenChange={props.onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>手动录入知识条目</DialogTitle><DialogDescription>手动添加一条知识到知识库</DialogDescription></DialogHeader><div className="space-y-4">
     <EntrySelects form={props.form} categories={props.categories} projects={props.projects} onChange={props.onChange} />
@@ -65,6 +80,11 @@ export function KnowledgeAddDialog(props: { open: boolean; form: EntryForm; savi
   </div></DialogContent></Dialog>
 }
 
+/**
+ * @description knowledgeuploaddialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function KnowledgeUploadDialog(props: { open: boolean; file: File | null; category: string; projectId: string; uploading: boolean; categories: Record<string, string>; projects: Option[]; onOpenChange: (open: boolean) => void; onFileChange: (file: File | null) => void; onCategoryChange: (category: string) => void; onProjectChange: (projectId: string) => void; onUpload: () => void }) {
   return <Dialog open={props.open} onOpenChange={props.onOpenChange}><DialogContent className="max-w-lg"><DialogHeader><DialogTitle>上传文件导入知识</DialogTitle><DialogDescription>支持 PDF、Word、PPT、Excel、HTML、TXT、MD、CSV、JSON、XML、RTF</DialogDescription></DialogHeader><div className="space-y-4">
     <div><Label>分类</Label><Select value={props.category} onValueChange={(value) => props.onCategoryChange(value ?? "")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(props.categories).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select></div>

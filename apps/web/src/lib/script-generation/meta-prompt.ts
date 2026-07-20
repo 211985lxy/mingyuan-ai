@@ -1,5 +1,11 @@
 import type { GenerateScriptCandidatesParams, TopicContext } from "./contracts"
 
+/**
+ * @description 构建metapromptmessages
+ * @param contextBlock - 上下文块
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export function buildMetaPromptMessages(contextBlock: string, params: GenerateScriptCandidatesParams) {
   return [
     {

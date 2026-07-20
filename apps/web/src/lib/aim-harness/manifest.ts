@@ -4,6 +4,11 @@ import { sha256 } from "./hashing"
 import type { AimContextSource, AimRunSpec } from "./types"
 
 /** 将声明式上下文与实际引用的知识条目收口为快照清单。 */
+/**
+ * @description 构建aimcontextmanifest
+ * @param input - 输入数据
+ * @returns Promise<AimContextSource[]>
+ */
 export async function buildAimContextManifest(input: {
   spec: AimRunSpec
   userId?: string

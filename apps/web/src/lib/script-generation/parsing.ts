@@ -1,5 +1,10 @@
 import type { ScriptDirection } from "./contracts"
 
+/**
+ * @description 解析scriptcandidates
+ * @param content - 内容
+ * @returns string[]
+ */
 export function parseScriptCandidates(content: string): string[] {
   const jsonCandidates = [
     content.trim(),
@@ -58,6 +63,11 @@ export function parseScriptCandidates(content: string): string[] {
     .slice(0, 3)
 }
 
+/**
+ * @description 解析scriptdirections
+ * @param content - 内容
+ * @returns ScriptDirection[]
+ */
 export function parseScriptDirections(content: string): ScriptDirection[] {
   const attempts = [
     content.trim(),
@@ -107,6 +117,11 @@ export function parseScriptDirections(content: string): ScriptDirection[] {
   return []
 }
 
+/**
+ * @description sanitizescriptcandidates
+ * @param candidates - candidates
+ * @returns string[]
+ */
 export function sanitizeScriptCandidates(candidates: string[]): string[] {
   const unique = new Set<string>()
   const sanitized: string[] = []

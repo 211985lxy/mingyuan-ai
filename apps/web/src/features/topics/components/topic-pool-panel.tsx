@@ -12,6 +12,11 @@ import type { KnowledgeEntry, TopicChatResponse } from "@/lib/api/client"
 
 export type TopicKnowledgeForms = Record<TopicCategory, { title: string; content: string }>
 
+/**
+ * @description topicpoolpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicPoolPanel({
   topicChatInput,
   topicChatLoading,

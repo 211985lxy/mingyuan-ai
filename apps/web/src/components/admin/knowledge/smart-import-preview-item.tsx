@@ -5,6 +5,11 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { SmartImportEdit, SmartImportItem } from "./smart-import-types"
 
+/**
+ * @description smartimportpreviewitem
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function SmartImportPreviewItem(props: {
   item: SmartImportItem
   edit: SmartImportEdit

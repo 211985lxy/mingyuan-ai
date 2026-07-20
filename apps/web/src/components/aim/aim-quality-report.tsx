@@ -46,6 +46,11 @@ function PublishCheck({ check }: { check: NonNullable<QualityCheckReport["publis
   </div>
 }
 
+/**
+ * @description aimqualityreport
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimQualityReport({ report }: { report: QualityCheckReport }) {
   return <div className="mt-2 w-full rounded-xl border border-primary/20 bg-card p-4">
     <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="h-4 w-4 text-primary" />质检报告<Badge variant={report.overall.passed ? "default" : "destructive"} className="ml-auto">{report.overall.score}分 {report.overall.passed ? "通过" : "需修改"}</Badge></div>

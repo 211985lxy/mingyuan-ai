@@ -18,6 +18,11 @@ import {
   prepareAgentGenerateBody,
 } from "@/lib/aim/services/agent-generation"
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   let context = null as null | Awaited<ReturnType<typeof authenticateAgentRequest>>
   let projectId = ""

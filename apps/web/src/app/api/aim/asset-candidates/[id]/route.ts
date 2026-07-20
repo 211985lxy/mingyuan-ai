@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic"
  * 请求体：{ "action": "approve" | "reject", "promote"?: boolean, "crossProjectAllowed"?: boolean }
  * approve + promote=true 时升级为正式知识；未审核通过前不会升级。
  */
+/**
+ * @description 处理 PATCH 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

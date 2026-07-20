@@ -4,6 +4,11 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { buildWorkflowBrief, parseWorkflowBriefRequest } from "@/lib/aim-workflow-brief"
 import { aimWorkflowBriefBodySchema } from "@/features/aim/contracts/api"
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

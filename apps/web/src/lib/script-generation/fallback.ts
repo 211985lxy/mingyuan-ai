@@ -4,6 +4,11 @@ import type { GenerateScriptCandidatesParams, ScriptGenerationResult } from "./c
 import { DEFAULT_MODEL } from "./models"
 import { resolveScriptScoringFields, scoreWithKeywords } from "./scoring"
 
+/**
+ * @description fallbackresult
+ * @param params - 参数对象
+ * @returns ScriptGenerationResult
+ */
 export function fallbackResult(params: GenerateScriptCandidatesParams): ScriptGenerationResult {
   const candidates = generateWithFallback(params)
   const scores = candidates.map((c) => scoreWithKeywords(c, params))

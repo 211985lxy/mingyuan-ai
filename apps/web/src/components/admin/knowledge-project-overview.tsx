@@ -3,6 +3,11 @@ import type { KnowledgeBrowserProps } from "./knowledge-browser"
 
 type Project = KnowledgeBrowserProps["projects"][number]
 
+/**
+ * @description knowledgeprojectoverview
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeProjectOverview({
   projects,
   onSelectProject,

@@ -37,6 +37,11 @@ function runtimeNotificationEnvironment(): SupervisorNotificationEnvironment {
   }
 }
 
+/**
+ * @description 读取supervisornotificationconfig
+ * @param source - 来源
+ * @returns SupervisorNotificationConfig
+ */
 export function readSupervisorNotificationConfig(
   source: SupervisorNotificationEnvironment = runtimeNotificationEnvironment(),
 ): SupervisorNotificationConfig {
@@ -64,6 +69,11 @@ function notificationTitle(type: SupervisorNotificationType): string {
   return "AIM 需人工接管"
 }
 
+/**
+ * @description sanitizesupervisortext
+ * @param value - 值
+ * @returns string
+ */
 export function sanitizeSupervisorText(value: string): string {
   return value
     .replace(/authorization\s*[:=]\s*bearer\s+\S+/gi, "Authorization: [REDACTED]")
@@ -72,6 +82,11 @@ export function sanitizeSupervisorText(value: string): string {
     .slice(0, 500)
 }
 
+/**
+ * @description supervisedfailuresummary
+ * @param stopReason - stop原因
+ * @returns string
+ */
 export function supervisedFailureSummary(stopReason: string): string {
   if (stopReason === "execution_timeout") return "模型或网络请求超时，未自动扩大调用次数。"
   if (stopReason === "missing_input") return "经营事项输入或配置不完整，请打开任务查看缺失项。"
@@ -80,6 +95,11 @@ export function supervisedFailureSummary(stopReason: string): string {
   return "自动执行失败，请打开经营事项或运行追踪查看详情。"
 }
 
+/**
+ * @description 格式化supervisornotification
+ * @param input - 输入数据
+ * @returns string
+ */
 export function formatSupervisorNotification(input: SupervisorNotification): string {
   return [
     `【${notificationTitle(input.type)}】`,
@@ -92,6 +112,11 @@ export function formatSupervisorNotification(input: SupervisorNotification): str
   ].filter(Boolean).join("\n")
 }
 
+/**
+ * @description 发送feishusupervisornotification
+ * @param input - 输入数据
+ * @returns Promise<void>
+ */
 export async function sendFeishuSupervisorNotification(input: {
   config: SupervisorNotificationConfig
   notification: SupervisorNotification

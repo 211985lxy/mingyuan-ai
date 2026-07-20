@@ -30,6 +30,11 @@ export type AimRouteSetters = {
 }
 
 /** Build stable route setters object for route-sync hooks. */
+/**
+ * @description React Hook：routesetters
+ * @param setters - setters
+ * @returns AimRouteSetters
+ */
 export function useRouteSetters(setters: AimRouteSetters): AimRouteSetters {
   return useMemo(() => ({
     setSelectedAgentId: setters.setSelectedAgentId,
@@ -63,6 +68,11 @@ export function useRouteSetters(setters: AimRouteSetters): AimRouteSetters {
  * Derive the active agent config with mode-specific overrides.
  *
  * Handles content_producer asset_pack mode and single-create mode.
+ */
+/**
+ * @description React Hook：aimagentconfig
+ * @param input - 输入数据
+ * @returns AimAgentOption
  */
 export function useAimAgentConfig(input: {
   selectedAgentId: AimAgentId

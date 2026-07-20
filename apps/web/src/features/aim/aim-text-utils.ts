@@ -3,6 +3,11 @@ import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { FORMAT_LABELS } from "@/features/aim/aim-format-labels"
 import type { ChatMessage } from "@/features/aim/aim-workbench-types"
 
+/**
+ * @description 提取progress
+ * @param content - 内容
+ * @returns number | null
+ */
 export function extractProgress(content: string): number | null {
   const m = content.match(/【进度\s*(\d+)\s*%】/)
   if (!m) return null
@@ -10,6 +15,11 @@ export function extractProgress(content: string): number | null {
   return Number.isNaN(v) ? null : Math.min(100, Math.max(0, v))
 }
 
+/**
+ * @description 拆分methodnote
+ * @param content - 内容
+ * @returns 无返回值
+ */
 export function splitMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
   if (!match) return { methodNote: "", result: content }
@@ -19,6 +29,11 @@ export function splitMethodNote(content: string) {
   }
 }
 
+/**
+ * @description 格式化analysisresultforprompt
+ * @param analysisResult - 分析结果
+ * @returns 无返回值
+ */
 export function formatAnalysisResultForPrompt(analysisResult: unknown) {
   if (!analysisResult) return null
   if (typeof analysisResult === "object" && "markdown" in analysisResult) {
@@ -28,6 +43,11 @@ export function formatAnalysisResultForPrompt(analysisResult: unknown) {
   return JSON.stringify(analysisResult, null, 2)
 }
 
+/**
+ * @description 提取benchmarkoriginaltext
+ * @param text - 文本
+ * @returns 无返回值
+ */
 export function extractBenchmarkOriginalText(text: string) {
   const marker = text.match(/对标原文[：:]/)
   if (marker?.index == null) return ""
@@ -37,6 +57,11 @@ export function extractBenchmarkOriginalText(text: string) {
   return (nextSection >= 0 ? rest.slice(0, nextSection) : rest).trim()
 }
 
+/**
+ * @description 提取benchmarkanalysistext
+ * @param text - 文本
+ * @returns 无返回值
+ */
 export function extractBenchmarkAnalysisText(text: string) {
   const marker = text.match(/(?:已有拆解|结构化拆解)[：:]/)
   if (marker?.index != null) return text.slice(marker.index + marker[0].length).trim()
@@ -44,6 +69,11 @@ export function extractBenchmarkAnalysisText(text: string) {
   return numberedStructure?.index == null ? "" : text.slice(numberedStructure.index).trim()
 }
 
+/**
+ * @description 获取historycontents
+ * @param item - 条目
+ * @returns 无返回值
+ */
 export function getHistoryContents(item: AimGeneration) {
   return [
     item.videoScript ? { format: "video_script" as const, content: item.videoScript } : null,
@@ -55,6 +85,13 @@ export function getHistoryContents(item: AimGeneration) {
   ].filter(Boolean) as Array<{ format: ContentFormat; content: string }>
 }
 
+/**
+ * @description 构建historyrawinput
+ * @param baseInput - 基础值输入数据
+ * @param currentInput - 当前值输入数据
+ * @param messages - 消息列表
+ * @returns 无返回值
+ */
 export function buildHistoryRawInput(baseInput: string, currentInput: string, messages: ChatMessage[]) {
   const turns = messages
     .filter((message) => message.role === "user" || message.role === "assistant")

@@ -40,6 +40,11 @@ function buildContextManifest(fixture: EvalFixture, context: EvalContext): AimCo
   return sources
 }
 
+/**
+ * @description warnedinsufficientinfo
+ * @param drafts - drafts
+ * @returns boolean
+ */
 export function warnedInsufficientInfo(drafts: Array<{ content: string }>): boolean {
   return drafts.some((draft) => /信息不足|未提供|尚未提供|没有提供|待补充|缺少|缺失|不完整|并非完整/.test(draft.content))
 }
@@ -140,6 +145,11 @@ const runRealChat: RealCaseRunner = async (fixture, context) => {
   }
 }
 
+/**
+ * @description 创建realevalexecutor
+ * @param dependencies - dependencies
+ * @returns EvalExecutor
+ */
 export function createRealEvalExecutor(dependencies: RealEvalDependencies = {}): EvalExecutor {
   const generate = dependencies.generate ?? runRealGeneration
   const chat = dependencies.chat ?? runRealChat

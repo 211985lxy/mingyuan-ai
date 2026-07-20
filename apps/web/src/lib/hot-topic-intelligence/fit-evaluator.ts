@@ -3,6 +3,12 @@ import type { ApiHotTopicFit } from "@/types/api"
 import { asString, asStringArray, clampScore, normalizeVerdict, safeJsonParse } from "./formatting"
 import { HotTopicIntelligenceError, type FitInput } from "./types"
 
+/**
+ * @description 评估hottopicfituncached
+ * @param input - 输入数据
+ * @param ipSnapshot - ip快照
+ * @returns Promise<ApiHotTopicFit>
+ */
 export async function evaluateHotTopicFitUncached(
   input: FitInput,
   ipSnapshot: string,

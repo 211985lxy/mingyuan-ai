@@ -4,6 +4,11 @@ import { polishScript } from "@/lib/api/client"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type { AimEditorActionsOptions } from "@/features/aim/hooks/aim-editor-action-contracts"
 
+/**
+ * @description React Hook：aimimitateaction
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function useAimImitateAction(options: AimEditorActionsOptions) {
   const [isImitating, setIsImitating] = useState(false)
   const [imitateStyleId, setImitateStyleId] = useState("default")

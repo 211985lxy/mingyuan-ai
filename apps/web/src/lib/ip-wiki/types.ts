@@ -28,6 +28,11 @@ export const IP_WIKI_PAGE_TYPES: IpWikiPageType[] = [
   "log",
 ]
 
+/**
+ * @description 判断是否ipwikipagetype
+ * @param value - 值
+ * @returns value is IpWikiPageType
+ */
 export function isIpWikiPageType(value: unknown): value is IpWikiPageType {
   return typeof value === "string" && (IP_WIKI_PAGE_TYPES as string[]).includes(value)
 }

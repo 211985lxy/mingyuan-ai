@@ -6,6 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getTopicDisplayLabel } from "@/features/topics/topic-presentation"
 import type { TopicDailyReport } from "@/lib/topic-daily-report"
 
+/**
+ * @description topicdailyreportemptystate
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicDailyReportEmptyState({
   error,
   onGenerate,
@@ -38,6 +43,11 @@ export function TopicDailyReportEmptyState({
   )
 }
 
+/**
+ * @description topicdailyreportpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicDailyReportPanel({ report }: { report: TopicDailyReport }) {
   async function copyAction() {
     try {

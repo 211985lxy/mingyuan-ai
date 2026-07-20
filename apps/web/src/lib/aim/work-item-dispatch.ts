@@ -37,7 +37,12 @@ export const MAX_EXECUTION_RETRIES = 3
 /** 指数退避：1 / 5 / 15 分钟。 */
 export const RETRY_BACKOFF_MS = [60_000, 300_000, 900_000] as const
 
-/** 幂等键 = 记录 ID + 操作类型。 */
+/**
+ * @description 构建幂等键（记录 ID + 操作类型）
+ * @param recordId - 记录 ID
+ * @param action - 操作类型
+ * @returns 幂等键字符串
+ */
 export function buildIdempotencyKey(recordId: string, action: string): string {
   return `${recordId.trim()}:${action.trim()}`
 }
@@ -50,25 +55,45 @@ function asFiniteNumber(value: unknown): number | null {
   return null
 }
 
-/** 租约是否活跃（截止时间在未来）。字段缺失/损坏一律视为不活跃。 */
+/**
+ * @description 判断租约是否活跃
+ * @param fields - 字段记录
+ * @param now - 当前时间
+ * @returns 租约活跃返回 true
+ */
 export function isLeaseActive(fields: Record<string, unknown>, now: Date): boolean {
   const until = asFiniteNumber(fields[DISPATCH_FIELDS.leaseUntil])
   return until != null && until > now.getTime()
 }
 
-/** 下次重试时间是否已到期（缺失字段视为可立即执行）。 */
+/**
+ * @description 判断下次重试时间是否已到期
+ * @param fields - 字段记录
+ * @param now - 当前时间
+ * @returns 已到期返回 true
+ */
 export function isRetryDue(fields: Record<string, unknown>, now: Date): boolean {
   const nextAt = asFiniteNumber(fields[DISPATCH_FIELDS.nextRetryAt])
   return nextAt == null || nextAt <= now.getTime()
 }
 
-/** 已完成的重试次数；缺失/垃圾值按 0 处理，不伪造。 */
+/**
+ * @description 解析已完成的重试次数
+ * @param fields - 字段记录
+ * @returns 重试次数
+ */
 export function parseRetryCount(fields: Record<string, unknown>): number {
   const value = asFiniteNumber(fields[DISPATCH_FIELDS.retryCount])
   return value != null && value > 0 ? Math.trunc(value) : 0
 }
 
-/** 获取租约 patch：写入截止时间与持有者。 */
+/**
+ * @description 构建租约获取 patch
+ * @param holderId - 持有者 ID
+ * @param now - 当前时间
+ * @param ttlMs - 租约 TTL（毫秒）
+ * @returns 租约 patch 对象
+ */
 export function buildLeaseAcquirePatch(
   holderId: string,
   now: Date,
@@ -80,7 +105,10 @@ export function buildLeaseAcquirePatch(
   }
 }
 
-/** 释放租约 patch：清空截止时间与持有者。 */
+/**
+ * @description 构建租约释放 patch
+ * @returns 租约释放 patch 对象
+ */
 export function buildLeaseReleasePatch(): Record<string, unknown> {
   return {
     [DISPATCH_FIELDS.leaseUntil]: null,
@@ -93,9 +121,11 @@ export type ExecutionFailurePlan =
   | { kind: "escalate" }
 
 /**
- * 失败后的处置计划：
- * - 重试次数未达上限 → 退回待处理 + 重试次数+1 + 下次重试时间（指数退避）+ 释放租约
- * - 已达上限 → 升级人工接管（由调用方写失败态 + 需人工接管 + 通知负责人）
+ * @description 规划执行失败后的处置（重试或升级）
+ * @param fields - 字段记录
+ * @param now - 当前时间
+ * @param maxRetries - 最大重试次数
+ * @returns 失败处置计划
  */
 export function planExecutionFailure(
   fields: Record<string, unknown>,

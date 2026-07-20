@@ -6,6 +6,10 @@ import { uploadImageForAimChat } from "@/lib/api/client"
 import { nextAimMessageId } from "@/features/aim/aim-id"
 import type { AimImageAttachment } from "@/features/aim/aim-workbench-types"
 
+/**
+ * @description React Hook：aimimageattachments
+ * @returns 无返回值
+ */
 export function useAimImageAttachments() {
   const [imageAttachments, setImageAttachments] = useState<AimImageAttachment[]>([])
   const [isUploadingImage, setIsUploadingImage] = useState(false)

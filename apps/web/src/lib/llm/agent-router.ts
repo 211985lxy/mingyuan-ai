@@ -8,10 +8,10 @@ import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio
  * 智能体模型路由策略
  *
  * 核心思路：关键创作优先质量，日常生产优先稳定低成本
- * - 深度文案 / 商业选题 → ZenMux Claude 优先，离火 GPT-5.5 兜底
+ * - 深度文案 / 商业选题 → ZenMux Claude 优先，离火 GPT-5.6 兜底
  * - 内容生产 / 质检 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
- * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / openai
+ * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / qianfan / openai
  * model 为可选，覆盖 provider 的默认模型（同一 provider 下不同智能体可用不同模型）
  */
 
@@ -36,15 +36,12 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
   deep_copywriter: [
-    // 深度长文走非流式调用，Claude/gpt-5 整篇生成常超过通用 60s 超时，放宽到 120s。
+    // 旗舰链：Claude → GPT-5.6 → ERNIE 5.1（深度长文走非流式调用，放宽到 120s）
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
+    { name: "lihuo", model: "gpt-5.6", timeoutMs: 120000, capability: "advanced" },
+    { name: "qianfan", model: "ernie-5.1", timeoutMs: 90000, capability: "advanced" },
     { name: "apimart", timeoutMs: 120000, capability: "advanced" },
-    { name: "lihuo", model: "gpt-5.5", capability: "advanced" },
     { name: "deepseek", capability: "standard" },
-    { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
-    { name: "openrouter", model: "moonshotai/kimi-k2.6", capability: "standard" },
-    { name: "jiekou", capability: "basic" },
-    { name: "therouter", capability: "standard" },
     { name: "glm", capability: "standard" },
   ],
   business_diagnosis: [
@@ -53,7 +50,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20000, capability: "advanced" },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000, capability: "advanced" },
     { name: "openrouter", model: "z-ai/glm-5.2", timeoutMs: 20000, capability: "advanced" },
-    { name: "lihuo", model: "gpt-5.5", timeoutMs: 20000, capability: "advanced" },
+    { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
     { name: "deepseek", timeoutMs: 20000, capability: "standard" },
     { name: "jiekou", timeoutMs: 20000, capability: "basic" },
     { name: "therouter", timeoutMs: 20000, capability: "standard" },
@@ -71,12 +68,13 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "glm", capability: "standard" },
   ],
   free_copywriter: [
+    // 自由创作首选文心一言：中文语感、本土表达、创意生成最强，国内端点低延迟
+    { name: "qianfan", model: "ernie-5.1", capability: "advanced" },
     { name: "deepseek", capability: "standard" },
+    { name: "glm", capability: "standard" },
     { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
-    { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
     { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
   ],
   business_system_diagnosis: [
     { name: "deepseek", capability: "standard" },
@@ -108,6 +106,8 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   vision_analysis: [
     { name: "openrouter", model: "qwen/qwen3-vl-8b-instruct", capability: "standard" },
     { name: "openrouter", model: "qwen/qwen3-vl-235b-a22b-instruct", capability: "advanced" },
+    { name: "apimart", model: "gpt-5.6", capability: "advanced" },
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", capability: "advanced" },
   ],
 }
 
@@ -118,6 +118,12 @@ const COPY_STUDIO_ROUTE_ALIASES: Record<string, string> = {
   [COPY_STUDIO_ROUTE_KEYS.free]: "free_copywriter",
 }
 
+/**
+ * @description 解析agentroutekey
+ * @param agentId - 智能体 ID
+ * @param module? - module?
+ * @returns string
+ */
 export function resolveAgentRouteKey(agentId: string, module?: CopyStudioModule): string {
   if (module) return COPY_STUDIO_ROUTE_KEYS[module]
   return agentId
@@ -126,6 +132,12 @@ export function resolveAgentRouteKey(agentId: string, module?: CopyStudioModule)
 /**
  * 根据智能体 ID 获取专用的 LLM 实例
  * 按路由配置构造 provider 链，每个 provider 用指定的模型
+ */
+/**
+ * @description 获取agentllm
+ * @param agentId - 智能体 ID
+ * @param policy? - policy?
+ * @returns LLMClient
  */
 export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMClient {
   const routes = AGENT_ROUTES[COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId]
@@ -173,6 +185,11 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
 
 /**
  * 获取智能体的推荐模型名称（用于日志/可观测）
+ */
+/**
+ * @description 获取agentrecommendedmodel
+ * @param agentId - 智能体 ID
+ * @returns string
  */
 export function getAgentRecommendedModel(agentId: string): string {
   const routes = AGENT_ROUTES[COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId]

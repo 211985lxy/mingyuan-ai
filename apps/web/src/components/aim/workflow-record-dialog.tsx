@@ -88,10 +88,20 @@ const DIALOG_COPY = {
   retro: { title: "填写复盘", description: "只写结果判断和下次同类内容的判断规则。" },
 }
 
+/**
+ * @description 获取workflowrecorddialogcopy
+ * @param mode? - mode?
+ * @returns 无返回值
+ */
 export function getWorkflowRecordDialogCopy(mode?: WorkflowRecordMode) {
   return mode ? DIALOG_COPY[mode] : DIALOG_COPY.retro
 }
 
+/**
+ * @description workflowrecordfields
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function WorkflowRecordFields(props: Pick<WorkflowRecordDialogProps, "dialog" | "decisionForm" | "publishForm" | "retroForm" | "ruleForm" | "outcomeForm" | "outcomeWindow" | "onDecisionChange" | "onPublishChange" | "onRetroChange" | "onRuleChange" | "onOutcomeChange" | "onOutcomeWindowChange">) {
   const mode = props.dialog?.mode
   return <>
@@ -120,6 +130,11 @@ interface WorkflowRecordDialogProps {
   onSubmit: () => void
 }
 
+/**
+ * @description workflowrecorddialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function WorkflowRecordDialog(props: WorkflowRecordDialogProps) {
   const mode = props.dialog?.mode
   const copy = getWorkflowRecordDialogCopy(mode)

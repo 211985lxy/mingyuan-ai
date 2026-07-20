@@ -6,6 +6,11 @@ import { AssetsSkeleton } from "@/features/assets/components/page-sections"
 import { assetFilters, type AssetFilter } from "@/features/assets/asset-page-shared"
 import type { ApiAsset } from "@/types/api"
 
+/**
+ * @description assetstab
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AssetsTab({
   assets,
   loading,

@@ -120,6 +120,11 @@ function TopicCategorySection({
   )
 }
 
+/**
+ * @description topicknowledgepool
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function TopicKnowledgePool(props: TopicKnowledgePoolProps) {
   return (
     <div className="order-4 rounded-xl border bg-muted/20 p-3 text-sm opacity-80">

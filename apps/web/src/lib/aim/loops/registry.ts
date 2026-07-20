@@ -87,6 +87,11 @@ const REGISTRY: ReadonlyMap<BusinessLoopId, BusinessLoopSpec> = new Map([
   [SALES_DIAGNOSIS_V1.id, SALES_DIAGNOSIS_V1],
 ])
 
+/**
+ * @description 获取已注册的业务循环规格
+ * @param id - 循环 ID
+ * @returns 业务循环规格
+ */
 export function getRegisteredLoop(id: string): BusinessLoopSpec {
   if (!isBusinessLoopId(id)) {
     throw new LoopContractError("invalid_loop_id", `未知的 Loop ID：${id}`)
@@ -98,6 +103,11 @@ export function getRegisteredLoop(id: string): BusinessLoopSpec {
   return spec
 }
 
+/**
+ * @description 查找已注册的业务循环规格
+ * @param id - 循环 ID
+ * @returns 业务循环规格，未找到时返回 null
+ */
 export function findRegisteredLoop(id: string): BusinessLoopSpec | null {
   try {
     return getRegisteredLoop(id)
@@ -107,10 +117,20 @@ export function findRegisteredLoop(id: string): BusinessLoopSpec | null {
   }
 }
 
+/**
+ * @description 列出所有已注册的业务循环
+ * @returns 业务循环规格数组
+ */
 export function listRegisteredLoops(): readonly BusinessLoopSpec[] {
   return [...REGISTRY.values()]
 }
 
+/**
+ * @description 断言循环工具已授权
+ * @param id - 循环 ID
+ * @param tool - 工具名称
+ * @returns 无返回值
+ */
 export function assertLoopToolAuthorized(id: string, tool: string): void {
   assertToolAuthorized(getRegisteredLoop(id), tool)
 }

@@ -29,6 +29,11 @@ interface AimPromptComposerProps {
   onRemoveImage?: (id: string) => void
 }
 
+/**
+ * @description aimpromptcomposer
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimPromptComposer({
   value,
   placeholder,
@@ -59,8 +64,18 @@ export function AimPromptComposer({
   const [skillQuery, setSkillQuery] = useState("")
   const filteredSkills = useMemo(() => {
     const query = skillQuery.trim().toLowerCase()
-    if (!query) return skills
-    return skills.filter((skill) => `${skill.label} ${skill.description}`.toLowerCase().includes(query))
+    const base = query
+      ? skills.filter((skill) => `${skill.label} ${skill.description}`.toLowerCase().includes(query))
+      : skills
+    // 按 group 分组（保持定义顺序，无 group 的归入默认组）
+    const groups: Array<{ group: string; items: AimWorkbenchSkill[] }> = []
+    for (const skill of base) {
+      const key = skill.group ?? ""
+      const existing = groups.find((g) => g.group === key)
+      if (existing) existing.items.push(skill)
+      else groups.push({ group: key, items: [skill] })
+    }
+    return groups
   }, [skillQuery, skills])
 
   useEffect(() => {
@@ -135,20 +150,29 @@ export function AimPromptComposer({
             <div className="mt-2 max-h-72 overflow-y-auto">
               {skills.length === 0 ? (
                 <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">当前智能体暂无内置技能</p>
-              ) : filteredSkills.map((skill) => (
-                <button
-                  key={skill.id}
-                  type="button"
-                  className="w-full rounded-lg px-2.5 py-2 text-left hover:bg-muted"
-                  onClick={() => {
-                    onUseSkill?.(skill)
-                    setSkillsOpen(false)
-                    setSkillQuery("")
-                  }}
-                >
-                  <span className="block text-sm font-medium leading-5">{skill.label}</span>
-                  <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{skill.description}</span>
-                </button>
+              ) : filteredSkills.map(({ group, items }) => (
+                <div key={group || "_default"}>
+                  {group && (
+                    <p className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                      {group}
+                    </p>
+                  )}
+                  {items.map((skill) => (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      className="w-full rounded-lg px-2.5 py-2 text-left hover:bg-muted"
+                      onClick={() => {
+                        onUseSkill?.(skill)
+                        setSkillsOpen(false)
+                        setSkillQuery("")
+                      }}
+                    >
+                      <span className="block text-sm font-medium leading-5">{skill.label}</span>
+                      <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{skill.description}</span>
+                    </button>
+                  ))}
+                </div>
               ))}
               {skills.length > 0 && filteredSkills.length === 0 && (
                 <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">没有找到匹配技能</p>

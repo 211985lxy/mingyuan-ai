@@ -10,6 +10,18 @@ import { env } from "@/env"
 
 let _instance: LLMClient | null = null
 
+/** 指数退避：rate_limit / server 错误后短暂等待，避免连续打爆下一个 provider */
+const BACKOFF_BASE_MS = 400
+function backoffDelay(attemptIndex: number, errorKind: string): number {
+  // 只对 rate_limit 和 server 类错误退避，网络/配置错误立即切换
+  if (errorKind !== "rate_limit" && errorKind !== "server") return 0
+  return BACKOFF_BASE_MS * Math.pow(2, attemptIndex) // 400ms, 800ms, 1600ms
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return fallback
@@ -116,6 +128,9 @@ export class LLMClient {
         )
         // Non-retryable errors must not silently switch models.
         if (!classified.retryable) break
+        // 指数退避：rate_limit/server 错误后等待再尝试下一个 provider
+        const delay = backoffDelay(index, classified.kind)
+        if (delay > 0) await sleep(delay)
       }
     }
 
@@ -202,6 +217,9 @@ export class LLMClient {
           lastError.message
         )
         if (!classified.retryable) break
+        // 指数退避：rate_limit/server 错误后等待再尝试下一个 provider
+        const delay = backoffDelay(index, classified.kind)
+        if (delay > 0) await sleep(delay)
       }
     }
 

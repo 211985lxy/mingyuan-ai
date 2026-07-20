@@ -37,6 +37,10 @@ export interface EvalContextAdapter {
 }
 
 /** Build the frozen adapter — used in CI (deterministic, no DB). */
+/**
+ * @description 创建frozencontextadapter
+ * @returns EvalContextAdapter
+ */
 export function createFrozenContextAdapter(): EvalContextAdapter {
   return {
     name: "frozen",
@@ -123,6 +127,13 @@ const RUBRIC_PASS_THRESHOLD = 70
  * validate + grade. In CI this uses a deterministic stub draft derived from the
  * fixture; in prod/nightly the DB adapter is swapped in but this function is
  * unchanged.
+ */
+/**
+ * @description 运行evalcase
+ * @param fixture - fixture
+ * @param adapter - 适配器
+ * @param options - 配置选项
+ * @returns Promise<EvalCaseResult>
  */
 export async function runEvalCase(
   fixture: EvalFixture,
@@ -237,6 +248,12 @@ function deterministicDraftFor(
 }
 
 /** Deterministic sample of N fixtures (stable across runs, exactly N). */
+/**
+ * @description samplefixtures
+ * @param fixtures - fixtures
+ * @param sampleSize? - sampleSize?
+ * @returns EvalFixture[]
+ */
 export function sampleFixtures(
   fixtures: readonly EvalFixture[],
   sampleSize?: number
@@ -253,6 +270,13 @@ export function sampleFixtures(
 }
 
 /** Run a set of fixtures and aggregate. */
+/**
+ * @description 运行evalsuite
+ * @param fixtures - fixtures
+ * @param adapter - 适配器
+ * @param options - 配置选项
+ * @returns Promise<EvalRunReport>
+ */
 export async function runEvalSuite(
   fixtures: readonly EvalFixture[],
   adapter: EvalContextAdapter,
@@ -326,6 +350,12 @@ export async function runEvalSuite(
 
 export type EvalGateMode = "deterministic" | "daily" | "full"
 
+/**
+ * @description 评估evalgate
+ * @param report - 报告
+ * @param mode - 众数
+ * @returns 无返回值
+ */
 export function evaluateEvalGate(
   report: EvalRunReport,
   mode: EvalGateMode,
@@ -366,6 +396,11 @@ export function evaluateEvalGate(
 }
 
 /** Render a report to Markdown for the CI job summary / artifact. */
+/**
+ * @description 渲染evalmarkdown
+ * @param report - 报告
+ * @returns string
+ */
 export function renderEvalMarkdown(report: EvalRunReport): string {
   const pct = (value: number | null) => (value === null ? "n/a" : `${(value * 100).toFixed(1)}%`)
   const lines = [

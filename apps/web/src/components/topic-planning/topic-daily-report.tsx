@@ -8,6 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getTopicDisplayLabel } from "@/lib/topics/display-groups"
 import type { TopicDailyReport } from "@/lib/topic-daily-report"
 
+/**
+ * @description topicdailyreportemptystate
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicDailyReportEmptyState({
   error,
   onGenerate,
@@ -179,6 +184,11 @@ function DailyReportWorkshop({ report }: { report: TopicDailyReport }) {
   )
 }
 
+/**
+ * @description topicdailyreportpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicDailyReportPanel({ report }: { report: TopicDailyReport }) {
   return (
     <div className="space-y-4">

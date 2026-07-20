@@ -256,10 +256,20 @@ function expectedVersion(id: BusinessLoopId): number {
   return Number(id.slice(id.lastIndexOf("-v") + 2))
 }
 
+/**
+ * @description 判断值是否为有效的业务循环 ID
+ * @param value - 待判断的值
+ * @returns 是有效 ID 返回 true
+ */
 export function isBusinessLoopId(value: string): value is BusinessLoopId {
   return BUSINESS_LOOP_IDS.includes(value as BusinessLoopId)
 }
 
+/**
+ * @description 验证业务循环规格
+ * @param spec - 业务循环规格
+ * @returns 无返回值，验证失败时抛出错误
+ */
 export function validateBusinessLoopSpec(spec: BusinessLoopSpec): void {
   if (!isPlainObject(spec)) {
     throw new LoopContractError("invalid_contract", "BusinessLoopSpec 必须为对象。")
@@ -303,6 +313,12 @@ export function validateBusinessLoopSpec(spec: BusinessLoopSpec): void {
   validateSupervisionPolicy(spec.supervisionPolicy)
 }
 
+/**
+ * @description 断言工具已在循环规格中授权
+ * @param spec - 业务循环规格
+ * @param tool - 工具名称
+ * @returns 无返回值，未授权时抛出错误
+ */
 export function assertToolAuthorized(spec: BusinessLoopSpec, tool: string): void {
   if (!spec.allowedTools.includes(tool)) {
     throw new LoopContractError("unauthorized_tool", `Loop ${spec.id} 未授权工具：${tool}`)

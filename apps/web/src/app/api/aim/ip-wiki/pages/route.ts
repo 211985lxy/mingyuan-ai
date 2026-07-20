@@ -15,6 +15,11 @@ async function ensureProject(userId: string, projectId: string) {
 }
 
 /** GET /api/aim/ip-wiki/pages?projectId=... —— 列出某 IP 全案的 active 维基页 */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -38,6 +43,11 @@ export async function GET(request: NextRequest) {
 }
 
 /** POST /api/aim/ip-wiki/pages —— 人工确认后写入维基页（同类型旧页归档、版本递增） */
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

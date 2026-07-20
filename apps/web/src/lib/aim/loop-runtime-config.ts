@@ -20,6 +20,11 @@ function runtimeEnvironment(): LoopRuntimeEnvironment {
   }
 }
 
+/**
+ * @description 读取业务循环运行时配置
+ * @param source - 环境配置源
+ * @returns 循环运行时配置
+ */
 export function readLoopRuntimeConfig(
   source: LoopRuntimeEnvironment = runtimeEnvironment(),
 ): LoopRuntimeConfig {

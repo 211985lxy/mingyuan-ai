@@ -2,6 +2,12 @@ import type { Prisma } from "@/generated/prisma/client"
 import { LLMClient } from "@/lib/llm/client"
 import { prisma } from "@/lib/prisma"
 
+/**
+ * @description 处理inspiration
+ * @param inspirationId - inspiration唯一标识符
+ * @param userId - 用户 ID
+ * @returns 无返回值
+ */
 export async function processInspiration(inspirationId: string, userId: string) {
   const claimed = await prisma.inspiration.updateMany({
     where: { id: inspirationId, userId, aiStatus: { in: ["pending", "failed"] } },

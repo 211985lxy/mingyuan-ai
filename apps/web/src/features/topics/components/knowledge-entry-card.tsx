@@ -9,6 +9,11 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })
 }
 
+/**
+ * @description knowledgeentrycard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeEntryCard({
   entry,
   selected,

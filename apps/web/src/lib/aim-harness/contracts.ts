@@ -58,12 +58,22 @@ export const LEGACY_AGENT_ID_ALIASES: Record<string, AimAgentId> = {
  * 返回 string 而非 AimAgentId：调用方可能传入完全未知的外部 id，归一化阶段
  * 不做合法性断言，留待 isValidAimAgent / getAgentHandler 决定回退策略。
  */
+/**
+ * @description 标准化aimagentid
+ * @param id - 唯一标识符
+ * @returns string
+ */
 export function normalizeAimAgentId(id: string | null | undefined): string {
   if (!id) return DEFAULT_AIM_AGENT
   return LEGACY_AGENT_ID_ALIASES[id] ?? id
 }
 
 /** 判断某个 id 是否是合法的智能体 id（接受旧别名） */
+/**
+ * @description 判断是否validaimagent
+ * @param id - 唯一标识符
+ * @returns id is AimAgentId
+ */
 export function isValidAimAgent(id: string | null | undefined): id is AimAgentId {
   if (!id) return false
   return (AIM_AGENT_IDS as Set<string>).has(id) || id in LEGACY_AGENT_ID_ALIASES

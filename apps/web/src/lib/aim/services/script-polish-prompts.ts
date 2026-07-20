@@ -3,6 +3,11 @@ import type { ChatMessage } from "@/lib/llm"
 export const FORBIDDEN_TERMS =
   "赋能、闭环、抓手、颗粒度、对齐、拉通、打通、沉淀、复盘、迭代、链路、触达、心智、赛道"
 
+/**
+ * @description 构建imitatemessages
+ * @param input - 输入数据
+ * @returns ChatMessage[]
+ */
 export function buildImitateMessages(input: {
   contextBlock: string
   styleOverrideBlock: string
@@ -47,6 +52,11 @@ export function buildImitateMessages(input: {
   ]
 }
 
+/**
+ * @description 构建proofreadmessages
+ * @param content - 内容
+ * @returns ChatMessage[]
+ */
 export function buildProofreadMessages(content: string): ChatMessage[] {
   return [
     {
@@ -65,6 +75,11 @@ export function buildProofreadMessages(content: string): ChatMessage[] {
   ]
 }
 
+/**
+ * @description 构建polishinstructions
+ * @param weakDimensions - weakDimensions
+ * @returns string[]
+ */
 export function buildPolishInstructions(weakDimensions: string[]): string[] {
   const instructions: string[] = []
   if (weakDimensions.includes("aiTaste")) {
@@ -110,6 +125,11 @@ export function buildPolishInstructions(weakDimensions: string[]): string[] {
   return instructions
 }
 
+/**
+ * @description 构建polishmessages
+ * @param input - 输入数据
+ * @returns ChatMessage[]
+ */
 export function buildPolishMessages(input: {
   content: string
   contextSection: string

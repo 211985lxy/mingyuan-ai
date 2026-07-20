@@ -25,6 +25,11 @@ import { prisma } from "@/lib/prisma"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 
 /** 写入一条 Agent API 调用日志（成功或失败共用，逐字迁出原 route）。 */
+/**
+ * @description writeagentlog
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export async function writeAgentLog(params: {
   context: AgentApiContext
   projectId?: string
@@ -65,6 +70,11 @@ export type ParsedAgentGenerateBody = {
   topicRationale?: string
 }
 
+/**
+ * @description 解析agentgeneratebody
+ * @param body - 请求体
+ * @returns ParsedAgentGenerateBody
+ */
 export function parseAgentGenerateBody(body: unknown): ParsedAgentGenerateBody {
   const record = (body ?? {}) as Record<string, unknown>
   const rawInput = typeof record.rawInput === "string" ? record.rawInput.trim() : ""
@@ -85,6 +95,11 @@ export function parseAgentGenerateBody(body: unknown): ParsedAgentGenerateBody {
 }
 
 /** 按原 route 顺序校验解析后的字段；返回首个错误文案，全部通过返回 null。 */
+/**
+ * @description 验证agentgeneratebody
+ * @param parsed - 解析后的数据
+ * @returns string | null
+ */
 export function validateAgentGenerateBody(parsed: ParsedAgentGenerateBody): string | null {
   if (!parsed.rawInput) return "请输入内容"
   if (!parsed.projectId) return "请选择 IP 营销全案"
@@ -104,6 +119,11 @@ export type PreparedAgentGenerateBody =
   | { ok: false; validationError: string }
   | { ok: true } & ParsedAgentGenerateBody
 
+/**
+ * @description prepareagentgeneratebody
+ * @param body - 请求体
+ * @returns PreparedAgentGenerateBody
+ */
 export function prepareAgentGenerateBody(body: unknown): PreparedAgentGenerateBody {
   const parsed = parseAgentGenerateBody(body)
   const validationError = validateAgentGenerateBody(parsed)
@@ -121,6 +141,11 @@ export function prepareAgentGenerateBody(body: unknown): PreparedAgentGenerateBo
  *
  * 返回：归一化后的 agentId、executeAimRun 请求对象、domain 闭包。
  * 行为与原 route 字段一致，仅搬运到调用方。
+ */
+/**
+ * @description prepareagentaimgeneration
+ * @param input - 输入数据
+ * @returns 无返回值
  */
 export function prepareAgentAimGeneration(input: {
   parsed: ParsedAgentGenerateBody
@@ -160,6 +185,11 @@ export function prepareAgentAimGeneration(input: {
 }
 
 /** 把 agent generate 运行结果序列化成对外的 JSON 响应（route 层响应转换）。 */
+/**
+ * @description 构建agentgenerateresponse
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildAgentGenerateResponse(input: {
   result: { id: string; results: unknown }
   agentId: string
@@ -189,6 +219,11 @@ export function buildAgentGenerateResponse(input: {
 }
 
 /** 校验失败的格式化文案（与原 route 一致）。 */
+/**
+ * @description 格式化invalidformatserror
+ * @param invalidFormats - invalidFormats
+ * @returns string
+ */
 export function formatInvalidFormatsError(invalidFormats: string[]): string {
   return `不支持的生成格式：${invalidFormats.join(", ")}`
 }
@@ -197,6 +232,11 @@ export function formatInvalidFormatsError(invalidFormats: string[]): string {
  * 生成成功后的收尾：回查 createdAt、更新 apiKey lastUsedAt、写 success 调用日志。
  * 逐字迁出原 route 的 findUnique → agentApiKey.update → writeAgentLog 顺序。
  * 返回 createdAt（供响应序列化）。
+ */
+/**
+ * @description finalizeagentgeneraterun
+ * @param input - 输入数据
+ * @returns Promise<string | undefined>
  */
 export async function finalizeAgentGenerateRun(input: {
   context: AgentApiContext
@@ -233,6 +273,11 @@ export async function finalizeAgentGenerateRun(input: {
 
 /**
  * 失败收尾：仅当 context 已建立时写 failed 调用日志（逐字迁出原 route 的 catch 段）。
+ */
+/**
+ * @description 记录agentgeneratefailure
+ * @param input - 输入数据
+ * @returns 无返回值
  */
 export async function logAgentGenerateFailure(input: {
   context: AgentApiContext | null

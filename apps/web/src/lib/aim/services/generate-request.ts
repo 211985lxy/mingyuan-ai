@@ -13,6 +13,12 @@ import {
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 import { ownsActiveProject } from "@/lib/resource-ownership"
 
+/**
+ * @description prepareaimgeneraterequest
+ * @param userId - 用户 ID
+ * @param body - 请求体
+ * @returns 无返回值
+ */
 export async function prepareAimGenerateRequest(userId: string, body: Record<string, unknown>) {
   const parsed = parseGenerateBody(body)
   const trace = await createAimTrace({
@@ -65,6 +71,11 @@ export async function prepareAimGenerateRequest(userId: string, body: Record<str
 
 type PreparedRequest = Extract<Awaited<ReturnType<typeof prepareAimGenerateRequest>>, { ok: true }>
 
+/**
+ * @description 执行preparedaimgeneration
+ * @param prepared - prepared
+ * @returns 无返回值
+ */
 export async function executePreparedAimGeneration(prepared: PreparedRequest) {
   const { parsed, trace, userId, workflowBrief, rawInput, runtimeTask } = prepared
   const projectId = workflowBrief?.projectId || parsed.projectId
@@ -110,6 +121,12 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
   }))
 }
 
+/**
+ * @description recordaimgenerationquality
+ * @param trace - 追踪
+ * @param run - run
+ * @returns 无返回值
+ */
 export async function recordAimGenerationQuality(trace: AimTraceRecorder | undefined, run: {
   qualityReport?: Record<string, unknown>
   qualityStatus?: "pass" | "warn" | "fail" | "skipped"
@@ -128,6 +145,11 @@ export async function recordAimGenerationQuality(trace: AimTraceRecorder | undef
   )
 }
 
+/**
+ * @description serializeaimgenerationrun
+ * @param run - run
+ * @returns 无返回值
+ */
 export function serializeAimGenerationRun(run: Awaited<ReturnType<typeof executePreparedAimGeneration>>) {
   return {
     ...run.output,

@@ -28,6 +28,10 @@ const features: Feature[] = [
   { titleKey: "feature6Title", descKey: "feature6Desc", tagKey: "feature6Tag", Icon: Layers },
 ]
 
+/**
+ * @description featuressection
+ * @returns 无返回值
+ */
 export function FeaturesSection() {
   const t = useTranslations("Features")
 

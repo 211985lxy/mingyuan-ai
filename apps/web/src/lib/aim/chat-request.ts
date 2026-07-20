@@ -17,6 +17,12 @@ interface ChatThreadMessage {
   images?: ChatImage[]
 }
 
+/**
+ * @description 构建 AIM 聊天内容（支持多模态图片）
+ * @param text - 文本内容
+ * @param images - 图片列表
+ * @returns 聊天内容（字符串或多模态数组）
+ */
 export function buildAimChatContent(text: string, images: ChatImage[]): AimChatContent {
   if (images.length === 0) return text
   return [
@@ -25,6 +31,11 @@ export function buildAimChatContent(text: string, images: ChatImage[]): AimChatC
   ]
 }
 
+/**
+ * @description 构建 AIM 聊天消息列表
+ * @param thread - 聊天线程消息
+ * @returns AIM 聊天消息数组
+ */
 export function buildAimChatMessages(thread: ChatThreadMessage[]): AimChatMessage[] {
   return thread.map((message) => ({
     role: message.role,
@@ -34,6 +45,11 @@ export function buildAimChatMessages(thread: ChatThreadMessage[]): AimChatMessag
   }))
 }
 
+/**
+ * @description 执行 AIM 聊天请求（流式响应）
+ * @param input - 请求输入（消息、智能体 ID、项目 ID、回调等）
+ * @returns 是否有内容返回
+ */
 export async function runAimChatRequest(input: {
   messages: AimChatMessage[]
   agentId: string

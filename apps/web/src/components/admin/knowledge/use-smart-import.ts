@@ -5,6 +5,11 @@ import { toast } from "sonner"
 import type { SmartImportEdit, SmartImportPreviewData } from "./smart-import-types"
 import { analyzeSmartImport, confirmSmartImport } from "./smart-import-service"
 
+/**
+ * @description React Hook：smartimport
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useSmartImport(input: {
   defaultProjectId: string
   getToken: () => string

@@ -33,6 +33,11 @@ function shouldBypassAuxiliaryContext(agentId: string | undefined, rawInput: str
  * 把普通生成入口的辅助上下文注入收口到 Harness 边界。
  * Route 只负责鉴权、校验和响应序列化。
  */
+/**
+ * @description prepareaimgenerateinput
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function prepareAimGenerateInput(input: {
   userId: string
   agentId?: string

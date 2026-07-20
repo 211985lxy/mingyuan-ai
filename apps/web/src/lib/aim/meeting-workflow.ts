@@ -106,6 +106,13 @@ export type MeetingWorkflowResult =
     }
   | { ok: false; status: "失败" | "待处理" | "处理中" | "待人工审核"; error: string; recordId: string; stopReason?: "duplicate_suppressed" | "verification_failed" }
 
+/**
+ * @description 构建meetinginsighttraceid
+ * @param recordId - 记录唯一标识符
+ * @param attempt - attempt
+ * @param inputFingerprint - 输入数据Fingerprint
+ * @returns string
+ */
 export function buildMeetingInsightTraceId(recordId: string, attempt = 1, inputFingerprint = ""): string {
   const loop = getRegisteredLoop("sales-diagnosis-v1")
   return `sales_diag_${sha256(`${recordId}|${loop.id}|${loop.version}|${attempt}|${inputFingerprint}`).slice(0, 28)}`
@@ -154,6 +161,12 @@ async function readExistingReview(
  * 幂等：已处于待人工审核且结果一致 → 不重写、不重抽。
  *
  * startWorkItem 失败（如记录不在待处理/处理中）会直接返回，不强行抽取，避免无谓模型调用。
+ */
+/**
+ * @description 运行meetinginsightworkflow
+ * @param input - 输入数据
+ * @param ports - ports
+ * @returns Promise<MeetingWorkflowResult>
  */
 export async function runMeetingInsightWorkflow(
   input: MeetingWorkflowInput,

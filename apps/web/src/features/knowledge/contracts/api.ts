@@ -40,6 +40,20 @@ export const inspirationWebhookBodySchema = z.object({
   source: z.enum(["feishu", "wechat", "text"]).optional(),
 }).strict()
 
+export const inspirationEventBodySchema = z.object({
+  platform: z.enum(["feishu", "workbuddy_wechat", "wecom", "webhook"]),
+  externalMessageId: z.string().trim().min(1).max(191).optional(),
+  externalChatId: z.string().trim().min(1).max(191),
+  externalAccountId: z.string().trim().min(1).max(191).optional(),
+  externalSenderId: z.string().trim().min(1).max(191).optional(),
+  projectId: id,
+  content: z.string().trim().min(1).max(10_000),
+  occurredAt: z.string().datetime().optional(),
+  conversationType: z.enum(["direct", "group"]).default("group").optional(),
+  messageType: z.enum(["text", "share", "file"]).default("text").optional(),
+  mentionsBot: z.boolean().optional(),
+}).strict()
+
 export const knowledgeListQuerySchema = z.object({
   category: category.optional(),
   status: z.enum(["active", "archived"]).default("active"),

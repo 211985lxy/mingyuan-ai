@@ -70,6 +70,11 @@ export interface GraderResult {
  * Reference planner: resolve the runtime task exactly as production does.
  * Exposed so the Phase 5 harness planner wraps it and the DB adapter shares it.
  */
+/**
+ * @description referenceruntimetask
+ * @param fixture - fixture
+ * @returns 无返回值
+ */
 export function referenceRuntimeTask(fixture: EvalFixture) {
   const { input } = fixture
   return resolveAimRuntimeTask({
@@ -85,6 +90,11 @@ export function referenceRuntimeTask(fixture: EvalFixture) {
  * Reference knowledge strategy. Note resolveKnowledgeStrategy needs the
  * runtimeTask first, so this composes the two planner steps in order.
  */
+/**
+ * @description referenceknowledgestrategy
+ * @param fixture - fixture
+ * @returns 无返回值
+ */
 export function referenceKnowledgeStrategy(fixture: EvalFixture) {
   const { input } = fixture
   const runtimeTask = referenceRuntimeTask(fixture)
@@ -99,6 +109,11 @@ export function referenceKnowledgeStrategy(fixture: EvalFixture) {
 }
 
 /** All knowledge ids the frozen adapter would surface for this case. */
+/**
+ * @description frozenknowledgeids
+ * @param ctx - 上下文
+ * @returns string[]
+ */
 export function frozenKnowledgeIds(ctx: FrozenContext): string[] {
   return ctx.knowledge.map((entry: FrozenKnowledgeEntry) => entry.id)
 }
@@ -107,6 +122,11 @@ export function frozenKnowledgeIds(ctx: FrozenContext): string[] {
  * Run every deterministic assertion for a fixture. `run` carries what the
  * harness produced (or, for the planner-only checks, undefined to assert the
  * contract independent of any model output).
+ */
+/**
+ * @description gradefixture
+ * @param graderInput - grader输入数据
+ * @returns GraderResult
  */
 export function gradeFixture(graderInput: GraderInput): GraderResult {
   const { fixture } = graderInput

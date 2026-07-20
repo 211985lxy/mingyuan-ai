@@ -7,6 +7,11 @@ interface AdminPageHeaderProps {
   meta?: ReactNode
 }
 
+/**
+ * @description adminpageheader
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AdminPageHeader({ title, description, actions, meta }: AdminPageHeaderProps) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">

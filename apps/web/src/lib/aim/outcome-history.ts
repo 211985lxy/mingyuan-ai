@@ -127,6 +127,11 @@ function computeConversionRate(outcome: {
  * @param input.limit 返回数量（默认 3）
  * @param input.store 数据库抽象
  */
+/**
+ * @description 获取topperformingscripts
+ * @param input - 输入数据
+ * @returns Promise<TopPerformer[]>
+ */
 export async function getTopPerformingScripts(input: {
   userId: string
   projectId?: string | null
@@ -196,6 +201,11 @@ export async function getTopPerformingScripts(input: {
  * 把历史最佳文案拼接成 prompt section，供 buildContextBlock 注入。
  * 无数据时返回空字符串（不注入）。
  */
+/**
+ * @description 构建topperformersection
+ * @param performers - performers
+ * @returns string
+ */
 export function buildTopPerformerSection(performers: TopPerformer[]): string {
   if (performers.length === 0) return ""
 
@@ -229,6 +239,11 @@ export function buildTopPerformerSection(performers: TopPerformer[]): string {
 
 /**
  * 工厂：从 PrismaClient 构造 OutcomeHistoryStore。
+ */
+/**
+ * @description 创建outcomehistorystore
+ * @param prisma - Prisma 客户端
+ * @returns OutcomeHistoryStore
  */
 export function createOutcomeHistoryStore(prisma: PrismaClient): OutcomeHistoryStore {
   return {

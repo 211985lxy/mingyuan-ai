@@ -16,6 +16,11 @@ export interface MeetingEvidence {
   quote: string
 }
 
+/**
+ * @description 判断是否meetingevidencekind
+ * @param value - 值
+ * @returns value is MeetingEvidenceKind
+ */
 export function isMeetingEvidenceKind(value: string): value is MeetingEvidenceKind {
   return MEETING_EVIDENCE_KINDS.includes(value as MeetingEvidenceKind)
 }

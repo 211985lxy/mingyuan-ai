@@ -152,6 +152,12 @@ function lintIpWikiPage(
  * 纯函数体检：不依赖 Prisma，导出以便单测。
  * 入参为某 IP 全案的全部 active 维基页。
  */
+/**
+ * @description lintipwikipages
+ * @param pages - pages
+ * @param options - 配置选项
+ * @returns IpWikiLintReport
+ */
 export function lintIpWikiPages(pages: IpWikiPageRow[], options: IpWikiLintOptions = {}): IpWikiLintReport {
   const findings: IpWikiLintFinding[] = []
   const activeTitles = new Set(pages.map((p) => p.title.trim()).filter(Boolean))
@@ -192,6 +198,11 @@ export function lintIpWikiPages(pages: IpWikiPageRow[], options: IpWikiLintOptio
 /**
  * 加载某 IP 全案的 active 维基页并体检。
  * 会顺带查 sources 引用的定位方案是否仍在库，用于「过时」检测。
+ */
+/**
+ * @description 运行ipwikilint
+ * @param input - 输入数据
+ * @returns Promise<IpWikiLintReport &
  */
 export async function runIpWikiLint(input: {
   projectId: string

@@ -10,6 +10,11 @@ import {
   serializeAimGenerationRun,
 } from "@/lib/aim/services/generate-request"
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
   try {

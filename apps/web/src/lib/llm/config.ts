@@ -1,6 +1,10 @@
 import { env } from "@/env"
 import type { LLMProviderConfig } from "./types"
 
+/**
+ * @description 获取providerconfigs
+ * @returns LLMProviderConfig[]
+ */
 export function getProviderConfigs(): LLMProviderConfig[] {
   const configs: LLMProviderConfig[] = []
 
@@ -82,11 +86,22 @@ export function getProviderConfigs(): LLMProviderConfig[] {
       name: "lihuo",
       apiKey: env.LIHUO_API_KEY,
       baseURL: env.LIHUO_BASE_URL || "https://api.lihuo.me/v1",
-      defaultModel: env.LIHUO_MODEL || "gpt-5.5",
+      defaultModel: env.LIHUO_MODEL || "gpt-5.6",
       defaultHeaders: {
         Accept: "application/json",
         "User-Agent": "Mozilla/5.0",
       },
+    })
+  }
+
+  // 文心一言（ERNIE）: 百度千帆国内端点 — OpenAI-compatible API
+  // 中文语感、本土表达、国内平台适配最强；自由创作首选
+  if (env.QIANFAN_API_KEY) {
+    configs.push({
+      name: "qianfan",
+      apiKey: env.QIANFAN_API_KEY,
+      baseURL: env.QIANFAN_BASE_URL || "https://qianfan.baidubce.com/v2",
+      defaultModel: env.QIANFAN_MODEL || "ernie-5.1",
     })
   }
 

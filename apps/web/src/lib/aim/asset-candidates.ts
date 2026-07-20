@@ -95,6 +95,11 @@ const LATE_DECISION_STAGES = new Set(["方案比较", "决策中", "已成交"])
  * - 已成交且有交付任务 → 恰好一条 case_candidate（low）
  * - diagnosisQuestions → methodology_revision（low）
  */
+/**
+ * @description 构建assetcandidatesfrominsight
+ * @param insight - 洞察
+ * @returns AssetCandidateDraft[]
+ */
 export function buildAssetCandidatesFromInsight(insight: MeetingInsight): AssetCandidateDraft[] {
   const drafts: AssetCandidateDraft[] = []
 

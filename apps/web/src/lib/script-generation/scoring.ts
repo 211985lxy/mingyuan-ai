@@ -14,6 +14,11 @@ export interface ResolvedScoringFields {
   nickname: string
 }
 
+/**
+ * @description 解析scriptscoringfields
+ * @param ipProfile - ip档案
+ * @returns ResolvedScoringFields
+ */
 export function resolveScriptScoringFields(
   ipProfile: GenerateScriptCandidatesParams["ipProfile"]
 ): ResolvedScoringFields {
@@ -34,6 +39,13 @@ export function resolveScriptScoringFields(
 
 // ─── Step 3: AI-based scoring (COPY-05 upgrade) ────────────
 
+/**
+ * @description 评分withai
+ * @param llm - 大语言模型
+ * @param candidates - candidates
+ * @param params - 参数对象
+ * @returns Promise<CandidateScore[]>
+ */
 export async function scoreWithAI(
   llm: LLMClient,
   candidates: string[],
@@ -126,6 +138,12 @@ function extractKeywords(text: string | null | undefined): string[] {
   return text.split(/[\s,，、/;；|]+/).filter((w) => w.length >= 2)
 }
 
+/**
+ * @description 评分withkeywords
+ * @param candidate - candidate
+ * @param params - 参数对象
+ * @returns CandidateScore
+ */
 export function scoreWithKeywords(
   candidate: string,
   params: GenerateScriptCandidatesParams,

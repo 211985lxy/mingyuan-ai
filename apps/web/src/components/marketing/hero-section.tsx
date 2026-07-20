@@ -30,6 +30,10 @@ const outputs = [
   "heroOutput4",
 ] as const
 
+/**
+ * @description herosection
+ * @returns 无返回值
+ */
 export function HeroSection() {
   const t = useTranslations("Hero")
   const tP = useTranslations("Platforms")

@@ -3,6 +3,11 @@ import { applySelectionReplacement, extractReplacementDraft, type AimEditorConte
 import type { ChatMessage } from "@/features/aim/aim-workbench-types"
 import type { AimEditorActionsOptions } from "@/features/aim/hooks/aim-editor-action-contracts"
 
+/**
+ * @description 创建aimeditorcontextactions
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function createAimEditorContextActions(options: AimEditorActionsOptions) {
   function buildEditorContext(action: string): AimEditorContext {
     return {

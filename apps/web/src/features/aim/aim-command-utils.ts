@@ -4,6 +4,11 @@ import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import type { AimChatToolAction, AimImageAttachment, ChatMessage } from "@/features/aim/aim-workbench-types"
 import { extractBenchmarkOriginalText } from "@/features/aim/aim-text-utils"
 
+/**
+ * @description 检测larktoolaction
+ * @param text - 文本
+ * @returns AimChatToolAction | null
+ */
 export function detectLarkToolAction(text: string): AimChatToolAction | null {
   if (!/飞书/.test(text)) return null
   if (/同步.*选题|导入.*选题/.test(text)) return "import_lark_topics"
@@ -13,6 +18,12 @@ export function detectLarkToolAction(text: string): AimChatToolAction | null {
   return null
 }
 
+/**
+ * @description 构建chatcontent
+ * @param text - 文本
+ * @param images - 图片列表
+ * @returns AimChatContent
+ */
 export function buildChatContent(text: string, images: AimImageAttachment[]): AimChatContent {
   if (images.length === 0) return text
   return [
@@ -21,16 +32,32 @@ export function buildChatContent(text: string, images: AimImageAttachment[]): Ai
   ]
 }
 
+/**
+ * @description 构建rawinputfrommessages
+ * @param messages - 消息列表
+ * @param extra? - extra?
+ * @returns 无返回值
+ */
 export function buildRawInputFromMessages(messages: ChatMessage[], extra?: string) {
   const userTexts = messages.filter((message) => message.role === "user").map((message) => message.content)
   if (extra) userTexts.push(extra)
   return userTexts.filter(Boolean).join("\n\n")
 }
 
+/**
+ * @description 获取最新的deliverableid
+ * @param messages - 消息列表
+ * @returns 无返回值
+ */
 export function getLatestDeliverableId(messages: ChatMessage[]) {
   return [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
 }
 
+/**
+ * @description 获取最新的deliverablemessageid
+ * @param messages - 消息列表
+ * @returns 无返回值
+ */
 export function getLatestDeliverableMessageId(messages: ChatMessage[]) {
   return [...messages]
     .reverse()
@@ -38,11 +65,21 @@ export function getLatestDeliverableMessageId(messages: ChatMessage[]) {
     ?.id
 }
 
+/**
+ * @description 获取最新的deliverabletext
+ * @param messages - 消息列表
+ * @returns 无返回值
+ */
 export function getLatestDeliverableText(messages: ChatMessage[]) {
   const latest = [...messages].reverse().find((message) => message.deliverables?.results.length)
   return latest?.deliverables?.results[0]?.content.trim() || ""
 }
 
+/**
+ * @description 获取openingsegment
+ * @param text - 文本
+ * @returns 无返回值
+ */
 export function getOpeningSegment(text: string) {
   const trimmed = text.trimStart()
   const offset = text.length - trimmed.length
@@ -53,6 +90,11 @@ export function getOpeningSegment(text: string) {
   return { offset, segment }
 }
 
+/**
+ * @description 构建benchmarkrewriteinput
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildBenchmarkRewriteInput(input: {
   sourceOriginalText: string
   messages: ChatMessage[]
@@ -81,6 +123,11 @@ export function buildBenchmarkRewriteInput(input: {
   ].filter(Boolean).join("\n\n")
 }
 
+/**
+ * @description 构建benchmarkqualitymessage
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildBenchmarkQualityMessage(input: {
   sourceOriginalText: string
   messages: ChatMessage[]

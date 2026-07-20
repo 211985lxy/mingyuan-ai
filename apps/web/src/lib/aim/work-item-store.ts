@@ -30,6 +30,11 @@ export interface WorkItemStoreConfig {
  * 从环境变量读取经营事项 Base 配置；任一关键项缺失即抛错。
  * 缺 LARK_WORK_ITEM_TABLE_ID 时不退回到其它表，避免写错表（WP-5 未核对前尤其重要）。
  */
+/**
+ * @description 读取workitemstoreconfig
+ * @param env - env
+ * @returns WorkItemStoreConfig
+ */
 export function readWorkItemStoreConfig(env: EnvLike = process.env): WorkItemStoreConfig {
   const baseToken = env.LARK_BASE_TOKEN?.trim()
   const tableId = env.LARK_WORK_ITEM_TABLE_ID?.trim()
@@ -43,6 +48,11 @@ export function readWorkItemStoreConfig(env: EnvLike = process.env): WorkItemSto
 /**
  * 构造一个绑定到真实飞书 Base 的经营事项 store。
  * get：记录缺失时 lark-base-tool 抛错，交由 WP-3 服务转 ok:false。
+ */
+/**
+ * @description 创建larkworkitemstore
+ * @param config - 配置对象
+ * @returns WorkItemRecordStore
  */
 export function createLarkWorkItemStore(config: WorkItemStoreConfig): WorkItemRecordStore {
   return {
@@ -74,6 +84,11 @@ export function createLarkWorkItemStore(config: WorkItemStoreConfig): WorkItemRe
  * 影子运行写隔离：读取真实记录，但所有状态 patch 只落在本次进程内存。
  * 模型、Trace 与结果存储仍可真实执行；飞书经营事项不会被推进。
  */
+/**
+ * @description 创建shadowworkitemstore
+ * @param realStore - real存储
+ * @returns WorkItemRecordStore
+ */
 export function createShadowWorkItemStore(realStore: WorkItemRecordStore): WorkItemRecordStore {
   const records = new Map<string, { recordId: string; fields: Record<string, unknown> }>()
   async function load(recordId: string) {
@@ -99,6 +114,13 @@ export function createShadowWorkItemStore(realStore: WorkItemRecordStore): WorkI
 /**
  * 扫描「待处理」状态的经营事项记录（WP-8 无人值守调度用）。
  * 拉取一页记录后在本地按状态机解析过滤；状态未知/损坏的记录不会混入。
+ */
+/**
+ * @description 列出pendingworkitemrecords
+ * @param config - 配置对象
+ * @param limit - 数量限制
+ * @param runCommand? - runCommand?
+ * @returns Promise<Array<
  */
 export async function listPendingWorkItemRecords(
   config: WorkItemStoreConfig,

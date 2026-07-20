@@ -23,6 +23,11 @@ import {
   uploadFileToStorage,
 } from "@/lib/api/client";
 
+/**
+ * @description assetuploaddialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AssetUploadDialog({ onUploaded }: { onUploaded: () => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");

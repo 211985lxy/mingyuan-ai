@@ -6,6 +6,11 @@ import { nextAimMessageId } from "@/features/aim/aim-id"
 import type { AimEditorActionsOptions } from "@/features/aim/hooks/aim-editor-action-contracts"
 import type { AimEditorContext } from "@/lib/aim-editor"
 
+/**
+ * @description 创建aimopeningaction
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function createAimOpeningAction(options: AimEditorActionsOptions) {
   function handleOptimizeOpening(commandInput: string) {
     const sourceText = options.editorText.trim() || getLatestDeliverableText(options.messages)
@@ -40,6 +45,12 @@ export function createAimOpeningAction(options: AimEditorActionsOptions) {
   return handleOptimizeOpening
 }
 
+/**
+ * @description 创建aimdraftrevisionaction
+ * @param options - 配置选项
+ * @param buildEditorContext - buildEditor上下文
+ * @returns 无返回值
+ */
 export function createAimDraftRevisionAction(options: AimEditorActionsOptions, buildEditorContext: (action: string) => AimEditorContext) {
   function handleReviseCurrentDraft(commandInput: string) {
     const draft = options.editorText.trim() || getLatestDeliverableText(options.messages)

@@ -4,6 +4,11 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { parseQuery } from "@/lib/api-contract"
 import { aimHistoryQuerySchema } from "@/features/aim/contracts/api"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

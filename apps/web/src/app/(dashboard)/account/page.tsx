@@ -18,6 +18,8 @@ import { useAuthStore } from "@/lib/store"
 import { getCurrentUser, listAgentApiKeys, logoutUser } from "@/lib/api/client"
 import { getSubscriptionStatus } from "@/lib/subscription"
 import type { ApiAgentApiKeySummary, ApiUser } from "@/types/api"
+import { ChannelBindingsPanel } from "@/components/account/channel-bindings-panel"
+import { InspirationFailuresPanel } from "@/components/account/inspiration-failures-panel"
 
 /* ── Page ────────────────────────────────────────────────── */
 
@@ -193,6 +195,10 @@ export default function AccountPage() {
           )}
         </CardContent>
       </Card>
+
+      <ChannelBindingsPanel />
+
+      <InspirationFailuresPanel />
 
       {/* Section 3 — 外部账号 */}
       <Card>

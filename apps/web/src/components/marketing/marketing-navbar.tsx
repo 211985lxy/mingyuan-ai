@@ -21,6 +21,10 @@ const navLinks = [
   { key: "useCases", href: "#use-cases" },
 ]
 
+/**
+ * @description marketingnavbar
+ * @returns 无返回值
+ */
 export function MarketingNavbar() {
   const locale = useLocale()
   const t = useTranslations("Navbar")

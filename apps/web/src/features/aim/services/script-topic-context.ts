@@ -25,6 +25,15 @@ interface CopyBeat {
   instruction: string
 }
 
+/**
+ * @description 构建topiccontext
+ * @param topicSelectionId - 主题Selection唯一标识符
+ * @param openingTypeCode - opening类型代码
+ * @param copyStructureCode - copyStructure代码
+ * @param endingTypeCode - ending类型代码
+ * @param userId - 用户 ID
+ * @returns Promise<TopicContext>
+ */
 export async function buildTopicContext(
   topicSelectionId: string,
   openingTypeCode: string,

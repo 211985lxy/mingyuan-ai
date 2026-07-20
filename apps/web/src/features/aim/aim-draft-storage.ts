@@ -5,10 +5,20 @@ import type { AimDraft } from "@/features/aim/aim-workbench-types"
 
 const AIM_DRAFT_STORAGE_KEY_PREFIX = "aim-workbench-draft-v2"
 
+/**
+ * @description aimdraftstoragekey
+ * @param agentId - 智能体 ID
+ * @returns 无返回值
+ */
 export function aimDraftStorageKey(agentId: AimAgentId) {
   return `${AIM_DRAFT_STORAGE_KEY_PREFIX}:${agentId}`
 }
 
+/**
+ * @description 加载aimdraft
+ * @param agentId - 智能体 ID
+ * @returns AimDraft | null
+ */
 export function loadAimDraft(agentId: AimAgentId): AimDraft | null {
   if (typeof window === "undefined") return null
   try {
@@ -37,6 +47,11 @@ export function loadAimDraft(agentId: AimAgentId): AimDraft | null {
   }
 }
 
+/**
+ * @description saveaimdraft
+ * @param draft - 草稿
+ * @returns 无返回值
+ */
 export function saveAimDraft(draft: AimDraft) {
   if (typeof window === "undefined") return
   try {

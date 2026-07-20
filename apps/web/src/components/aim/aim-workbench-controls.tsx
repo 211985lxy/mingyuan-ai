@@ -5,6 +5,11 @@ import {
   type CopyStudioModule,
 } from "@/lib/copy-studio"
 
+/**
+ * @description aimcontentmodeselector
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimContentModeSelector({
   value,
   onChange,
@@ -25,6 +30,11 @@ export function AimContentModeSelector({
 
 const RESEARCH_AGENT_IDS = new Set<AimAgentId>(["business_system_diagnosis", "business_diagnosis"])
 
+/**
+ * @description aimresearchhint
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimResearchHint({ agentId }: { agentId: AimAgentId }) {
   if (!RESEARCH_AGENT_IDS.has(agentId)) return null
   return <p className="mx-auto mb-2 hidden max-w-2xl text-xs text-muted-foreground lg:block">可以直接把官网链接、竞品资料、客户资料或 Research Agent 资料包粘贴到聊天框里，系统会作为诊断上下文使用。</p>

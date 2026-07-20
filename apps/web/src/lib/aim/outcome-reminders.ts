@@ -81,6 +81,11 @@ function hasAnyBusinessMetric(row: OutcomeMetricRow): boolean {
 /**
  * 找出当前用户到期未回填的经营结果提醒，按到期时间升序。
  */
+/**
+ * @description 查找dueoutcomereminders
+ * @param input - 输入数据
+ * @returns Promise<OutcomeReminderDue[]>
+ */
 export async function findDueOutcomeReminders(input: {
   userId: string
   now?: Date

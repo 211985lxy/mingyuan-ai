@@ -68,6 +68,11 @@ interface KnowledgeListTabProps {
   onPageChange: (page: number) => void
 }
 
+/**
+ * @description knowledgelisttab
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function KnowledgeListTab(props: KnowledgeListTabProps) {
   const {
     entries,

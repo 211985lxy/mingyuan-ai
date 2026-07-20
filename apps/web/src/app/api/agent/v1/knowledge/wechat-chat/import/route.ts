@@ -36,6 +36,11 @@ async function writeAgentLog(params: {
   })
 }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   let context: AgentApiContext | null = null
   let projectId = ""

@@ -42,6 +42,11 @@ function looksLikeCustomerCommitment(value: string): boolean {
   return /(?:客户|[\u4e00-\u9fa5]{1,4}(?:总|经理)).{0,8}(?:承诺|答应|表示(?:会|将)|会在|将于|确定|确认|同意)|承诺.{0,12}(?:签约|付款|提供|确认|安排|推进)/.test(value)
 }
 
+/**
+ * @description 校验salesdiagnosis
+ * @param input - 输入数据
+ * @returns LoopVerificationResult
+ */
 export function verifySalesDiagnosis(
   input: SalesDiagnosisVerifierInput,
 ): LoopVerificationResult {

@@ -19,6 +19,10 @@ const steps: Step[] = [
   { num: 5, titleKey: "step5Title", descKey: "step5Desc", Icon: MessageSquareText },
 ]
 
+/**
+ * @description howitworkssection
+ * @returns 无返回值
+ */
 export function HowItWorksSection() {
   const t = useTranslations("HowItWorks")
 

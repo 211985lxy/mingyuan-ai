@@ -16,6 +16,11 @@ import {
   type KnowledgeEntry,
 } from "@/features/knowledge/admin-knowledge-shared"
 
+/**
+ * @description knowledgedetaildialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeDetailDialog({
   entry,
   onClose,
@@ -52,6 +57,11 @@ export function KnowledgeDetailDialog({
   )
 }
 
+/**
+ * @description knowledgedistilldialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeDistillDialog({
   open,
   loading,

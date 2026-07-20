@@ -5,6 +5,10 @@ import {
   getScenarioConfig,
 } from "@/lib/content-scenario-config"
 
+/**
+ * @description 处理 GET 请求
+ * @returns 无返回值
+ */
 export async function GET() {
   const scenarios = Object.keys(SCENARIO_LABELS) as ContentScenario[]
   return NextResponse.json({

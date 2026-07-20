@@ -18,6 +18,11 @@ import type { KnowledgeEntry } from "@/lib/api/client"
 import type { TopicDailyReport } from "@/lib/topic-daily-report"
 import type { ApiTopicCard, ApiTopicRecommendationMode } from "@/types/api"
 
+/**
+ * @description topicresultspanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicResultsPanel({
   dailyReport,
   autoGenerateError,

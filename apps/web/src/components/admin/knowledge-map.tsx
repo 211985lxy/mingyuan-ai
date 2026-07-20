@@ -121,6 +121,11 @@ function embeddingColor(status: string): string {
 
 // ─── 组件 ──────────────────────────────────────────────────────
 
+/**
+ * @description knowledgemap
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeMap({ projects, onDrillDown }: KnowledgeMapProps) {
   const [selectedProjectId, setSelectedProjectId] = useState("")
   const [stats, setStats] = useState<StatsResponse | null>(null)

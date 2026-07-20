@@ -25,6 +25,11 @@ export type AimChatExecutionInput = ReturnType<typeof prepareAimChatExecution>
  *
  * All values match the original route fields exactly — this is a pure move.
  */
+/**
+ * @description prepareaimchatexecution
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function prepareAimChatExecution(input: {
   context: AssembledAimChatContext
   userId: string

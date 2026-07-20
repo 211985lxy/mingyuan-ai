@@ -19,6 +19,10 @@ const diffs: Diff[] = [
   { titleKey: "diff6Title", descKey: "diff6Desc" },
 ]
 
+/**
+ * @description differentiatorssection
+ * @returns 无返回值
+ */
 export function DifferentiatorsSection() {
   const t = useTranslations("Differentiators")
 

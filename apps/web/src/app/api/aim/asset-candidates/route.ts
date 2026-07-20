@@ -5,6 +5,11 @@ import { listAssetCandidates } from "@/lib/aim/asset-candidate-store"
 export const dynamic = "force-dynamic"
 
 /** 列出当前用户的会后资产候选（90 天计划 3.1），支持项目 / 审核状态 / 类型过滤。 */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

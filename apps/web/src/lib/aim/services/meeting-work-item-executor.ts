@@ -17,6 +17,11 @@ function requireClaimedTrace(token: unknown): AimTraceRecorder {
   return trace as AimTraceRecorder
 }
 
+/**
+ * @description 执行meetingworkitem
+ * @param input - 输入数据
+ * @returns Promise<DispatchExecuteOutcome>
+ */
 export async function executeMeetingWorkItem(input: {
   store: WorkItemRecordStore
   resultSink: InsightResultSink

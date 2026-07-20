@@ -189,6 +189,11 @@ function buildSummary(insight: MeetingInsight): string {
  * - 缺失/未知字段不伪造。
  * - 既无目标也无交付任务视为非有效会议 → ok:false。
  */
+/**
+ * @description 提取meetinginsight
+ * @param input - 输入数据
+ * @returns MeetingInsightResult
+ */
 export function extractMeetingInsight(input: MeetingInsightInput): MeetingInsightResult {
   const pains = cleanStrings(input.pains ?? [])
   const goals = cleanStrings(input.goals ?? [])
@@ -241,6 +246,12 @@ export function extractMeetingInsight(input: MeetingInsightInput): MeetingInsigh
  *
  * 字段契约（WP-5 真实联调）：飞书「结果链接」是 **URL 文本字段**，
  * 必须写字符串，不能写 `{ link, text }` 对象（写对象会被飞书拒绝或失真）。
+ */
+/**
+ * @description 构建workitemreviewfields
+ * @param insight - 洞察
+ * @param meta - meta
+ * @returns Record<string, unknown>
  */
 export function buildWorkItemReviewFields(
   insight: MeetingInsight,

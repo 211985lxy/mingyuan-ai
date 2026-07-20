@@ -11,6 +11,11 @@ export const dynamic = "force-dynamic"
  * 返回当前用户已发布内容中，第 7 / 30 天窗口到期而未回填的提醒清单。
  * 只读接口；飞书提醒推送由自动化任务轮询本结果后决定。
  */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

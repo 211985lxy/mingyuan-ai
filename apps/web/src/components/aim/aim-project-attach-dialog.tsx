@@ -8,6 +8,11 @@ import { Input } from "@/components/ui/input"
 import type { ClientProject } from "@/lib/api/client"
 import type { AimProjectAttachMode } from "@/hooks/use-aim-project-attach"
 
+/**
+ * @description aimprojectattachdialog
+ * @param props - 组件属性
+ * @returns 无返回值
+ */
 export function AimProjectAttachDialog(props: {
   open: boolean
   projects: ClientProject[]

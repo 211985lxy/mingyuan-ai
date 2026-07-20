@@ -35,6 +35,11 @@ export interface KnowledgeEditForm {
   valueGrade: string
 }
 
+/**
+ * @description knowledgeentrydialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeEntryDialog({
   open,
   form,
@@ -133,6 +138,11 @@ export function KnowledgeEntryDialog({
   )
 }
 
+/**
+ * @description knowledgeuploaddialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeUploadDialog({
   open,
   file,

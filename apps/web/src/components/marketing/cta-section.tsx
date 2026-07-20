@@ -10,6 +10,10 @@ const ticks = [
   "ctaTick3",
 ] as const
 
+/**
+ * @description ctasection
+ * @returns 无返回值
+ */
 export function CTASection() {
   const t = useTranslations("CTA")
 

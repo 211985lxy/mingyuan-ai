@@ -10,6 +10,12 @@ export interface EvalRubricResult {
   fabricatedFact: boolean
 }
 
+/**
+ * @description 构建rubricprompt
+ * @param fixture - 固件
+ * @param draft - 草稿
+ * @returns string
+ */
 export function buildRubricPrompt(fixture: EvalFixture, draft: string): string {
   const expectedBehavior = fixture.expectations.mustWarnInsufficientInfo
     ? "信息不足时必须明确提示缺口、不编造事实，并给出可执行的补充信息指引。"
@@ -64,6 +70,13 @@ async function judgeDraft(fixture: EvalFixture, draft: string) {
   }
 }
 
+/**
+ * @description judgeevalcase
+ * @param fixture - 固件
+ * @param draft - 草稿
+ * @param skipRubric - skipRubric
+ * @returns Promise<EvalRubricResult>
+ */
 export async function judgeEvalCase(
   fixture: EvalFixture,
   draft: string,

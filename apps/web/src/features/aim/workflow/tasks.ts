@@ -32,6 +32,11 @@ function retroDueLabel(item: AimGeneration) {
  * A task is a derived view of an existing generation, not a second source of
  * truth. This keeps project progress visible without a new table or migration.
  */
+/**
+ * @description 派生aimworkflowtasks
+ * @param records - 记录列表
+ * @returns AimWorkflowTask[]
+ */
 export function deriveAimWorkflowTasks(records: AimGeneration[]): AimWorkflowTask[] {
   return records
     .filter((item) => item.workflowStatus !== "archived")
@@ -59,6 +64,11 @@ export function deriveAimWorkflowTasks(records: AimGeneration[]): AimWorkflowTas
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 }
 
+/**
+ * @description 分组aimworkflowtasks
+ * @param records - 记录列表
+ * @returns 无返回值
+ */
 export function groupAimWorkflowTasks(records: AimGeneration[]) {
   const tasks = deriveAimWorkflowTasks(records)
   return {

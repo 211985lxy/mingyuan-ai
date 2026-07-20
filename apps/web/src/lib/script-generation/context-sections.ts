@@ -1,5 +1,11 @@
 import type { GenerateScriptCandidatesParams, TopicContext } from "./contracts"
 
+/**
+ * @description 追加ipsections
+ * @param sections - sections
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export function appendIpSections(sections: string[], params: GenerateScriptCandidatesParams): void {
   if (params.ipProfile?.promptSnapshot) {
     sections.push("【个人IP档案】", params.ipProfile.promptSnapshot, "")
@@ -14,6 +20,12 @@ export function appendIpSections(sections: string[], params: GenerateScriptCandi
   }
 }
 
+/**
+ * @description 追加topicsections
+ * @param sections - sections
+ * @param topic - 主题
+ * @returns 无返回值
+ */
 export function appendTopicSections(sections: string[], topic: TopicContext | null | undefined): void {
   if (!topic) return
   sections.push("【选题信息】", `选题标题：${topic.topicTitle}`, `营销元素：${topic.elementTags.join("、")}`, "")
@@ -41,6 +53,12 @@ export function appendTopicSections(sections: string[], topic: TopicContext | nu
   )
 }
 
+/**
+ * @description 追加structuresection
+ * @param sections - sections
+ * @param structure - structure
+ * @returns 无返回值
+ */
 export function appendStructureSection(
   sections: string[],
   structure: GenerateScriptCandidatesParams["structure"],
@@ -62,6 +80,12 @@ export function appendStructureSection(
   )
 }
 
+/**
+ * @description 追加templatesections
+ * @param sections - sections
+ * @param template - 模板
+ * @returns 无返回值
+ */
 export function appendTemplateSections(sections: string[], template: GenerateScriptCandidatesParams["template"]): void {
   sections.push("【表达模板】", `模板名：${template.displayName}`, `模板说明：${template.description || "未提供"}`, `钩子类型：${template.hookType || "未提供"}`, `模板蓝图：${template.scriptTemplate}`, "")
   if (!template.expressionBlueprint) return

@@ -26,6 +26,11 @@ interface AimWorkbenchHeaderProps {
   onReset: () => void
 }
 
+/**
+ * @description aimworkbenchheader
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimWorkbenchHeader({
   workflowStage,
   agentTitle,
@@ -140,6 +145,11 @@ export function AimWorkbenchHeader({
   )
 }
 
+/**
+ * @description aimprojectnotices
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimProjectNotices({ projectsCount, selectedProjectId, projectEnabled, projectAccessError, personaProgress }: {
   projectsCount: number
   selectedProjectId: string
@@ -180,6 +190,11 @@ export function AimProjectNotices({ projectsCount, selectedProjectId, projectEna
   )
 }
 
+/**
+ * @description aimevolutionsuggestions
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimEvolutionSuggestions({ suggestions, onDismiss, onSave }: {
   suggestions: AimEvolutionSuggestion[]
   onDismiss: (suggestion: AimEvolutionSuggestion) => void

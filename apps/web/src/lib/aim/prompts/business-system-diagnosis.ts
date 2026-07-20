@@ -1,3 +1,8 @@
+/**
+ * @description 构建businesssystemdiagnosisgenerateprompt
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildBusinessSystemDiagnosisGeneratePrompt(input: {
   businessDiagnosisBlock: string
   knowledgeBlock: string

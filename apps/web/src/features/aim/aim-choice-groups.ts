@@ -7,6 +7,11 @@ function cleanChoiceText(text: string) {
   return text.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim()
 }
 
+/**
+ * @description 提取choicegroups
+ * @param content - 内容
+ * @returns ChoiceGroup[]
+ */
 export function extractChoiceGroups(content: string): ChoiceGroup[] {
   const lines = content.split("\n")
   const groups: ChoiceGroup[] = []

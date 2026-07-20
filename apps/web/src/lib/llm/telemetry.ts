@@ -51,6 +51,12 @@ export interface LlmTelemetryRecorder {
 
 const telemetryStorage = new AsyncLocalStorage<LlmTelemetryRecorder>()
 
+/**
+ * @description 运行withllmtelemetry
+ * @param recorder - recorder
+ * @param fn - 函数
+ * @returns T
+ */
 export function runWithLlmTelemetry<T>(
   recorder: LlmTelemetryRecorder,
   fn: () => T,
@@ -58,6 +64,12 @@ export function runWithLlmTelemetry<T>(
   return telemetryStorage.run(recorder, fn)
 }
 
+/**
+ * @description 包装llmtelemetryiterable
+ * @param recorder - recorder
+ * @param source - 来源
+ * @returns AsyncIterable<T>
+ */
 export function wrapLlmTelemetryIterable<T>(
   recorder: LlmTelemetryRecorder,
   source: AsyncIterable<T>,
@@ -78,6 +90,11 @@ export function wrapLlmTelemetryIterable<T>(
   }
 }
 
+/**
+ * @description 上报providerattempt
+ * @param attempt - attempt
+ * @returns 无返回值
+ */
 export function reportProviderAttempt(attempt: ProviderAttempt): void {
   try {
     telemetryStorage.getStore()?.onAttempt?.(attempt)
@@ -127,6 +144,12 @@ function renderPrompt(messages: LlmInvocation["messages"]): string {
   }).join("\n\n")
 }
 
+/**
+ * @description 上报llminvocation
+ * @param options - 配置选项
+ * @param stream - 流
+ * @returns 无返回值
+ */
 export function reportLlmInvocation(options: CompletionOptions, stream: boolean): void {
   const recorder = telemetryStorage.getStore()
   if (!recorder?.onInvocation) return
@@ -145,6 +168,11 @@ export function reportLlmInvocation(options: CompletionOptions, stream: boolean)
   }
 }
 
+/**
+ * @description 分类providererror
+ * @param error - 错误对象
+ * @returns 无返回值
+ */
 export function classifyProviderError(error: unknown): {
   kind: ProviderErrorKind
   retryable: boolean
@@ -194,5 +222,6 @@ export function classifyProviderError(error: unknown): {
     return { kind: "network", retryable: true }
   }
 
-  return { kind: "unknown", retryable: false }
+  // unknown 错误默认可重试：未分类错误多为瞬时异常，不应中断降级链
+  return { kind: "unknown", retryable: true }
 }

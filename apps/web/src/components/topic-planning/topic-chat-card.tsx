@@ -15,6 +15,11 @@ interface TopicChatCardProps {
   onSubmit: () => void
 }
 
+/**
+ * @description topicchatcard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function TopicChatCard({ value, loading, disabled, reply, onChange, onSubmit }: TopicChatCardProps) {
   return (
     <Card className="order-3 border-primary/20 bg-primary/[0.02]">

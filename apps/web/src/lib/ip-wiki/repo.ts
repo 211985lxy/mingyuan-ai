@@ -33,6 +33,11 @@ export interface IpWikiPageRow {
   updatedAt: Date
 }
 
+/**
+ * @description 列出ipwikipages
+ * @param options - 配置选项
+ * @returns Promise<IpWikiPageRow[]>
+ */
 export async function listIpWikiPages(options: {
   projectId: string
   status?: string
@@ -57,6 +62,11 @@ export async function listIpWikiPages(options: {
 
 /**
  * 保存一批确认后的维基页。同类型旧 active 页归档，新页 version+1。
+ */
+/**
+ * @description saveipwikipagebatch
+ * @param input - 输入数据
+ * @returns Promise<IpWikiPageRow[]>
  */
 export async function saveIpWikiPageBatch(input: {
   userId: string

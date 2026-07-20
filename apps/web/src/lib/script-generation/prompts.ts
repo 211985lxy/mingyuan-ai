@@ -1,5 +1,12 @@
 import type { GenerateScriptCandidatesParams, ScriptDirection } from "./contracts"
 
+/**
+ * @description 构建metaprompttext
+ * @param contextBlock - 上下文块
+ * @param params - 参数对象
+ * @param directions - directions
+ * @returns string
+ */
 export function buildMetaPromptText(
   contextBlock: string,
   params: GenerateScriptCandidatesParams,
@@ -54,6 +61,12 @@ export function buildMetaPromptText(
   return lines.join("\n")
 }
 
+/**
+ * @description 构建directgenerationprompt
+ * @param contextBlock - 上下文块
+ * @param params - 参数对象
+ * @returns string
+ */
 export function buildDirectGenerationPrompt(
   contextBlock: string,
   params: GenerateScriptCandidatesParams,

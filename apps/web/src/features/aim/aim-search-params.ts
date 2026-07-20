@@ -22,6 +22,11 @@ export interface AimSearchParams {
  * Extracts all query-string fields used by the AIM page, with safe defaults
  * and validation for agent ID and topic index.
  */
+/**
+ * @description 解析aimsearchparams
+ * @param searchParams - URL 搜索参数
+ * @returns AimSearchParams
+ */
 export function parseAimSearchParams(searchParams: URLSearchParams): AimSearchParams {
   const agentParam = searchParams.get("agent")
   const workflowStageParam = searchParams.get("stage")

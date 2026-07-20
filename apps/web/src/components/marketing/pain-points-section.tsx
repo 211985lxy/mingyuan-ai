@@ -19,6 +19,10 @@ const pains: Pain[] = [
   { titleKey: "pain4Title", descKey: "pain4Desc", statKey: "pain4Stat", statLabelKey: "pain4StatLabel", Icon: FileQuestion },
 ]
 
+/**
+ * @description painpointssection
+ * @returns 无返回值
+ */
 export function PainPointsSection() {
   const t = useTranslations("PainPoints")
 

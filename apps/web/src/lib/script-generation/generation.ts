@@ -5,6 +5,13 @@ import { parseScriptCandidates, parseScriptDirections, sanitizeScriptCandidates 
 import type { GenerateScriptCandidatesParams } from "./contracts"
 import { META_MODEL, SCRIPT_MODEL } from "./models"
 
+/**
+ * @description 生成metaprompt
+ * @param llm - 大语言模型
+ * @param contextBlock - 上下文块
+ * @param params - 参数对象
+ * @returns Promise<string>
+ */
 export async function generateMetaPrompt(
   llm: LLMClient,
   contextBlock: string,
@@ -29,6 +36,12 @@ export async function generateMetaPrompt(
 
 // ─── Step 2: Generate scripts using meta-prompt ────────────
 
+/**
+ * @description 生成scriptswithprompt
+ * @param llm - 大语言模型
+ * @param metaPrompt - meta提示词
+ * @returns Promise<string[]>
+ */
 export async function generateScriptsWithPrompt(
   llm: LLMClient,
   metaPrompt: string,
@@ -76,6 +89,13 @@ export async function generateScriptsWithPrompt(
   throw new Error("[script-generator] Script candidates invalid")
 }
 
+/**
+ * @description 生成scriptsdirectly
+ * @param llm - 大语言模型
+ * @param contextBlock - 上下文块
+ * @param params - 参数对象
+ * @returns Promise<
+ */
 export async function generateScriptsDirectly(
   llm: LLMClient,
   contextBlock: string,

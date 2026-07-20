@@ -26,6 +26,11 @@ const BLOCK_PAGE_TYPES = [...IP_WIKI_CORE_PAGE_TYPES, "viral_methodology" as IpW
 const MAX_PAGES_IN_BLOCK = 6
 const MAX_CONTENT_CHARS = 1200
 
+/**
+ * @description 构建ipwikiblock
+ * @param input - 输入数据
+ * @returns Promise<string>
+ */
 export async function buildIpWikiBlock(input: IpWikiBlockInput): Promise<string> {
   if (!input.projectId) return ""
   const pages = await listIpWikiPages({
@@ -102,6 +107,11 @@ function formatStrategyFrontmatter(fm: Record<string, unknown>): string {
 /**
  * 纯函数：把维基页行渲染成注入用文本块。导出以便单测，
  * 不依赖 Prisma。
+ */
+/**
+ * @description 格式化ipwikiblock
+ * @param pages - pages
+ * @returns string
  */
 export function formatIpWikiBlock(pages: IpWikiPageRow[]): string {
   const coreOnly = pages.filter((p) => (BLOCK_PAGE_TYPES as string[]).includes(p.pageType))

@@ -10,6 +10,12 @@ type GenerationInput = Parameters<typeof generateAimContent>[0]
 type ChatInput = Parameters<typeof buildAimChatResponse>[1]
 
 /** 运行时到领域执行的唯一生成端口，Route 不再直接调用 generator。 */
+/**
+ * @description 执行aimgenerationdomain
+ * @param spec - 规格
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function executeAimGenerationDomain(
   spec: AimRunSpec,
   input: Omit<GenerationInput, "agentId" | "runtimeTask" | "runSpec">,
@@ -24,6 +30,13 @@ export async function executeAimGenerationDomain(
 }
 
 /** 运行时到领域执行的唯一非流式聊天端口。 */
+/**
+ * @description 执行aimchatdomain
+ * @param spec - 规格
+ * @param input - 输入数据
+ * @param contextManifest? - 上下文Manifest?
+ * @returns 无返回值
+ */
 export async function executeAimChatDomain(
   spec: AimRunSpec,
   input: ChatInput,
@@ -38,6 +51,12 @@ export async function executeAimChatDomain(
 }
 
 /** 运行时到领域执行的唯一流式聊天端口。 */
+/**
+ * @description streamaimchatdomain
+ * @param spec - 规格
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function streamAimChatDomain(spec: AimRunSpec, input: ChatInput) {
   return buildAimChatResponseStream(spec.agentId, {
     ...input,

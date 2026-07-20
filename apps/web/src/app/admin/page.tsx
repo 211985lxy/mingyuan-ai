@@ -19,6 +19,8 @@ import {
   ListChecks,
   Activity,
   Target,
+  ScrollText,
+  Globe,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -27,7 +29,6 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getAdminUserStats, getActivationCodeStats, type UserStats, type CodeStats } from "@/lib/api/admin-client"
 import {
   MetricCard,
   PendingCard,
@@ -44,10 +45,30 @@ interface DashboardData {
     successLast24h: number
     failedLast24h: number
   }
-  pendingKnowledgeCount?: number
-  failedEmbeddingCount?: number
-  pendingProfilesCount?: number
-  recentFailedTraces?: number
+  pendingKnowledgeCount: number
+  failedEmbeddingCount: number
+  pendingProfilesCount: number
+  recentFailedTraces: number
+  codeStats: {
+    total: number
+    unused: number
+    used: number
+    usageRate: number
+  }
+  recentUsers: Array<{
+    id: string
+    name: string
+    email: string
+    plan: string
+    createdAt: string
+  }>
+  recentLogs: Array<{
+    id: string
+    action: string
+    targetType: string
+    targetId: string | null
+    createdAt: string
+  }>
 }
 
 type LoadState<T> = { status: "loading"; data: null } | { status: "error"; data: null } | { status: "ok"; data: T }
@@ -59,13 +80,9 @@ export default function AdminDashboardPage() {
   const activeTab = tabParam === "pending" ? "pending" : tabParam === "status" ? "status" : "overview"
 
   const [dashboard, setDashboard] = React.useState<LoadState<DashboardData>>({ status: "loading", data: null })
-  const [userStats, setUserStats] = React.useState<LoadState<UserStats>>({ status: "loading", data: null })
-  const [codeStats, setCodeStats] = React.useState<LoadState<CodeStats>>({ status: "loading", data: null })
 
   const loadAll = React.useCallback(() => {
     setDashboard({ status: "loading", data: null })
-    setCodeStats({ status: "loading", data: null })
-    setUserStats({ status: "loading", data: null })
 
     fetch("/api/admin/dashboard")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`仪表盘数据加载失败 (${r.status})`))))
@@ -73,20 +90,6 @@ export default function AdminDashboardPage() {
       .catch((err) => {
         setDashboard({ status: "error", data: null })
         toast.error(err instanceof Error ? err.message : "仪表盘数据加载失败")
-      })
-
-    getAdminUserStats()
-      .then((r) => setUserStats({ status: "ok", data: r.data }))
-      .catch((err) => {
-        setUserStats({ status: "error", data: null })
-        toast.error(err instanceof Error ? err.message : "用户统计加载失败")
-      })
-
-    getActivationCodeStats()
-      .then((r) => setCodeStats({ status: "ok", data: r.data }))
-      .catch((err) => {
-        setCodeStats({ status: "error", data: null })
-        toast.error(err instanceof Error ? err.message : "激活码统计加载失败")
       })
   }, [])
 
@@ -102,11 +105,12 @@ export default function AdminDashboardPage() {
     router.replace(params.size ? `/admin?${params.toString()}` : "/admin")
   }
 
-  const anyError = dashboard.status === "error" || codeStats.status === "error" || userStats.status === "error"
-  const pendingCount = (dashboard.data?.pendingKnowledgeCount ?? 0) +
-    (dashboard.data?.failedEmbeddingCount ?? 0) +
-    (dashboard.data?.pendingProfilesCount ?? 0) +
-    (dashboard.data?.recentFailedTraces ?? 0)
+  const data = dashboard.data
+  const anyError = dashboard.status === "error"
+  const pendingCount = (data?.pendingKnowledgeCount ?? 0) +
+    (data?.failedEmbeddingCount ?? 0) +
+    (data?.pendingProfilesCount ?? 0) +
+    (data?.recentFailedTraces ?? 0)
 
   return (
     <div className="space-y-6">
@@ -146,25 +150,25 @@ export default function AdminDashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
               title="用户总数"
-              state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.totalUsers } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
+              state={dashboard.status === "ok" ? { status: "ok", value: data?.totalUsers } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
               icon={<Users className="h-5 w-5 text-primary" />}
             />
             <MetricCard
               title="今日生成"
-              state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.generationsToday } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
+              state={dashboard.status === "ok" ? { status: "ok", value: data?.generationsToday } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
               icon={<Sparkles className="h-5 w-5 text-primary" />}
             />
             <MetricCard
               title="活跃模板"
-              state={dashboard.status === "ok" ? { status: "ok", value: dashboard.data?.activeTemplates } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
+              state={dashboard.status === "ok" ? { status: "ok", value: data?.activeTemplates } : dashboard.status === "error" ? { status: "error" } : { status: "loading" }}
               icon={<FileText className="h-5 w-5 text-primary" />}
             />
             <MetricCard
               title="激活码"
               state={
-                codeStats.status === "ok"
-                  ? { status: "ok", value: codeStats.data?.total, subtitle: codeStats.data ? `${codeStats.data.unused} 未使用` : undefined }
-                  : codeStats.status === "error"
+                dashboard.status === "ok" && data?.codeStats
+                  ? { status: "ok", value: data.codeStats.total, subtitle: `${data.codeStats.unused} 未使用` }
+                  : dashboard.status === "error"
                   ? { status: "error" }
                   : { status: "loading" }
               }
@@ -192,24 +196,28 @@ export default function AdminDashboardPage() {
                 </Link>
               </CardHeader>
               <CardContent>
-                {userStats.status === "ok" ? (
+                {dashboard.status === "ok" ? (
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">本周新增</span>
-                      <span className="font-medium flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3 text-green-600" />
-                        {userStats.data?.newThisWeek ?? 0}
-                      </span>
-                    </div>
-                    {userStats.data?.byPlan.map((p) => (
-                      <div key={p.plan} className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground capitalize">{{ free: "免费", basic: "基础", pro: "专业" }[p.plan] || p.plan} 套餐</span>
-                        <span className="font-medium">{p.count}</span>
+                    <p className="text-sm text-muted-foreground">
+                      共 {data?.totalUsers?.toLocaleString() ?? 0} 名用户
+                    </p>
+                    {data?.recentUsers && data.recentUsers.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <p className="text-xs font-medium text-muted-foreground">最近注册</p>
+                        {data.recentUsers.map((u) => (
+                          <Link key={u.id} href={`/admin/users/${u.id}`}
+                            className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors">
+                            <span className="font-medium truncate">{u.name}</span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {new Date(u.createdAt).toLocaleDateString("zh-CN")}
+                            </span>
+                          </Link>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 ) : (
-                  <SummarySkeleton failed={userStats.status === "error"} />
+                  <SummarySkeleton failed={dashboard.status === "error"} />
                 )}
               </CardContent>
             </Card>
@@ -225,54 +233,61 @@ export default function AdminDashboardPage() {
                 </Link>
               </CardHeader>
               <CardContent>
-                {codeStats.status === "ok" ? (
+                {dashboard.status === "ok" && data?.codeStats ? (
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">总码数</span>
-                      <span className="font-medium">{codeStats.data?.total ?? 0}</span>
+                      <span className="font-medium">{data.codeStats.total}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">未使用</span>
-                      <span className="font-medium">{codeStats.data?.unused ?? 0}</span>
+                      <span className="font-medium">{data.codeStats.unused}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">已使用</span>
-                      <span className="font-medium">{codeStats.data?.used ?? 0}</span>
+                      <span className="font-medium">{data.codeStats.used}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">使用率</span>
-                      <span className="font-medium">{codeStats.data?.usageRate ?? 0}%</span>
+                      <span className="font-medium">{data.codeStats.usageRate}%</span>
                     </div>
                   </div>
                 ) : (
-                  <SummarySkeleton failed={codeStats.status === "error"} />
+                  <SummarySkeleton failed={dashboard.status === "error"} />
                 )}
               </CardContent>
             </Card>
 
-            {/* System Health */}
+            {/* Recent Activity */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">系统状态</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">最近操作</CardTitle>
+                <Link href="/admin/logs">
+                  <Button variant="ghost" size="sm" className="cursor-pointer">
+                    查看全部 <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </Link>
               </CardHeader>
               <CardContent>
-                {dashboard.status === "ok" && dashboard.data ? (
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">热榜抓取 (24h)</span>
-                      <span className="font-medium text-green-600">
-                        {dashboard.data.hotListHealth.successLast24h} 成功
-                      </span>
+                {dashboard.status === "ok" ? (
+                  data?.recentLogs && data.recentLogs.length > 0 ? (
+                    <div className="space-y-2">
+                      {data.recentLogs.map((log) => (
+                        <div key={log.id} className="flex items-center justify-between gap-2 text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ScrollText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <Badge variant="outline" className="text-[10px] font-mono shrink-0">{log.action}</Badge>
+                            <span className="text-muted-foreground truncate">{log.targetType}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {new Date(log.createdAt).toLocaleString("zh-CN")}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                    {dashboard.data.hotListHealth.failedLast24h > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">失败抓取 (24h)</span>
-                        <span className="font-medium text-red-600">
-                          {dashboard.data.hotListHealth.failedLast24h}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <p className="py-4 text-sm text-muted-foreground text-center">暂无操作记录</p>
+                  )
                 ) : (
                   <SummarySkeleton failed={dashboard.status === "error"} />
                 )}
@@ -323,28 +338,28 @@ export default function AdminDashboardPage() {
             <PendingCard
               icon={<BookOpen className="h-5 w-5 text-amber-600" />}
               title="待整理知识"
-              count={dashboard.data?.pendingKnowledgeCount ?? 0}
+              count={data?.pendingKnowledgeCount ?? 0}
               description="未标注价值分级或待清洗的知识条目"
               href="/admin/knowledge"
             />
             <PendingCard
               icon={<AlertTriangle className="h-5 w-5 text-red-600" />}
               title="向量化失败"
-              count={dashboard.data?.failedEmbeddingCount ?? 0}
+              count={data?.failedEmbeddingCount ?? 0}
               description="嵌入处理失败的知识条目"
               href="/admin/knowledge"
             />
             <PendingCard
               icon={<Target className="h-5 w-5 text-blue-600" />}
               title="待审核档案"
-              count={dashboard.data?.pendingProfilesCount ?? 0}
-              description="待审核或需更新的真实档案"
+              count={data?.pendingProfilesCount ?? 0}
+              description="待补充客户资料的真实档案"
               href="/admin/benchmark-profiles"
             />
             <PendingCard
               icon={<XCircle className="h-5 w-5 text-red-600" />}
               title="近24h异常执行"
-              count={dashboard.data?.recentFailedTraces ?? 0}
+              count={data?.recentFailedTraces ?? 0}
               description="智能体执行失败的请求"
               href="/admin/agents"
             />
@@ -377,27 +392,50 @@ export default function AdminDashboardPage() {
               title="知识库"
               icon={<BookOpen className="h-5 w-5 text-primary" />}
               items={[
-                { label: "总条目", value: dashboard.data?.pendingKnowledgeCount ?? "—" },
-                { label: "向量化失败", value: dashboard.data?.failedEmbeddingCount ?? "—", variant: (dashboard.data?.failedEmbeddingCount ?? 0) > 0 ? "destructive" as const : "default" as const },
+                { label: "待整理", value: data?.pendingKnowledgeCount ?? "—", variant: (data?.pendingKnowledgeCount ?? 0) > 0 ? "warning" as const : "default" as const },
+                { label: "向量化失败", value: data?.failedEmbeddingCount ?? "—", variant: (data?.failedEmbeddingCount ?? 0) > 0 ? "destructive" as const : "default" as const },
               ]}
             />
             <StatusCard
               title="智能体"
               icon={<Bot className="h-5 w-5 text-primary" />}
               items={[
-                { label: "今日生成", value: dashboard.data?.generationsToday ?? "—" },
-                { label: "异常 (24h)", value: dashboard.data?.recentFailedTraces ?? "—", variant: (dashboard.data?.recentFailedTraces ?? 0) > 0 ? "destructive" as const : "default" as const },
+                { label: "今日生成", value: data?.generationsToday ?? "—" },
+                { label: "异常 (24h)", value: data?.recentFailedTraces ?? "—", variant: (data?.recentFailedTraces ?? 0) > 0 ? "destructive" as const : "default" as const },
+              ]}
+            />
+            <StatusCard
+              title="真实档案"
+              icon={<Target className="h-5 w-5 text-primary" />}
+              items={[
+                { label: "待补充", value: data?.pendingProfilesCount ?? "—", variant: (data?.pendingProfilesCount ?? 0) > 0 ? "warning" as const : "default" as const },
               ]}
             />
             <StatusCard
               title="热点抓取"
-              icon={<Activity className="h-5 w-5 text-primary" />}
+              icon={<Globe className="h-5 w-5 text-primary" />}
               items={[
-                { label: "成功 (24h)", value: dashboard.data?.hotListHealth.successLast24h ?? "—", variant: "default" as const },
-                ...((dashboard.data?.hotListHealth.failedLast24h ?? 0) > 0 ? [{ label: "失败 (24h)", value: dashboard.data?.hotListHealth.failedLast24h ?? "—", variant: "destructive" as const }] : []),
+                { label: "成功 (24h)", value: data?.hotListHealth.successLast24h ?? "—" },
+                ...((data?.hotListHealth.failedLast24h ?? 0) > 0 ? [{ label: "失败 (24h)", value: data?.hotListHealth.failedLast24h ?? "—", variant: "destructive" as const }] : [] as Array<{ label: string; value: string | number; variant?: "default" | "destructive" | "warning" | "secondary" }>),
+              ]}
+            />
+            <StatusCard
+              title="激活码"
+              icon={<KeyRound className="h-5 w-5 text-primary" />}
+              items={[
+                { label: "总数", value: data?.codeStats?.total ?? "—" },
+                { label: "未使用", value: data?.codeStats?.unused ?? "—" },
+                { label: "使用率", value: data?.codeStats ? `${data.codeStats.usageRate}%` : "—" },
               ]}
             />
           </div>
+          {dashboard.status === "loading" && (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-xl" />
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

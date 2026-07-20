@@ -139,6 +139,7 @@ function buildModelPolicy(
   writerModule?: "social" | "longform" | "free",
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
+  const module = agentModule ?? writerModule
   const needsAdvancedReasoning =
     agentId === "deep_copywriter" || agentId === "business_diagnosis"
   const requiresStandardFloor =
@@ -146,12 +147,28 @@ function buildModelPolicy(
     agentId === "business_system_diagnosis" ||
     agentId === "persona"
 
+  // ── 温度差异化：自由创作高创意，深度创作低温度保准确 ──
+  const temperature = isChat
+    ? 0.7
+    : module === "free" ? 0.92
+    : module === "social" ? 0.85
+    : agentId === "deep_copywriter" ? 0.72
+    : 0.8
+
+  // ── maxTokens 差异化：长文 12k，社交短文 4k，自由创作 6k ──
+  const maxTokens = isChat
+    ? undefined
+    : module === "longform" || agentId === "deep_copywriter" ? 12288
+    : module === "social" ? 4096
+    : module === "free" ? 6144
+    : 8192
+
   return {
     agentId,
-    ...((agentModule ?? writerModule) ? { routeKey: `copy_studio.${agentModule ?? writerModule}` } : {}),
+    ...(module ? { routeKey: `copy_studio.${module}` } : {}),
     stream,
-    temperature: isChat ? 0.7 : 0.8,
-    ...(isChat ? {} : { maxTokens: 8192 }),
+    temperature,
+    ...(maxTokens ? { maxTokens } : {}),
     targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
     maxProviderAttempts: stream ? 2 : 3,
@@ -159,6 +176,11 @@ function buildModelPolicy(
 }
 
 /** Plan a run into an immutable AimRunSpec. Single source of truth for the run. */
+/**
+ * @description planaimrun
+ * @param input - 输入数据
+ * @returns AimRunSpec
+ */
 export function planAimRun(input: PlanRunInput): AimRunSpec {
   const runtimeTask = input.runtimeTask ?? resolveAimRuntimeTask({
     agentId: input.agentId,
@@ -181,6 +203,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     taskType: input.taskType,
     polishInstruction: input.polishInstruction,
     contentScenario: input.contentScenario,
+    copyStudioModule: input.agentModule ?? input.writerModule,
   })
 
   const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)

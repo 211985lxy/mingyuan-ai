@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma"
 import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
 
+/**
+ * @description 加载projectknowledge
+ * @param userId - 用户 ID
+ * @param projectId? - projectId?
+ * @returns Promise<string>
+ */
 export async function loadProjectKnowledge(userId: string, projectId?: string): Promise<string> {
   const entries = await prisma.knowledgeEntry.findMany({
     where: {

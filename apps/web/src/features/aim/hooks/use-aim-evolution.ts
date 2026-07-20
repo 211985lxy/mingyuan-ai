@@ -16,6 +16,11 @@ interface UseAimEvolutionParams {
   selectedProjectId: string
 }
 
+/**
+ * @description React Hook：aimevolution
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function useAimEvolution({
   messages,
   projectEnabled,

@@ -69,6 +69,11 @@ function buildChatContextManifest(input: {
  * Order, gates, catch fallbacks, and trace steps are preserved byte-for-byte
  * from the original route implementation.
  */
+/**
+ * @description 组装aimchatcontext
+ * @param input - 输入数据
+ * @returns Promise<AssembledAimChatContext>
+ */
 export async function assembleAimChatContext(input: {
   userId: string
   projectId: string

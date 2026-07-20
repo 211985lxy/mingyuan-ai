@@ -104,6 +104,11 @@ function extractKnowledgeIds(knowledgeUsed: unknown): string[] {
 /**
  * 计算 [start, end) 周期的经营复盘指标。
  */
+/**
+ * @description 计算weeklyreview
+ * @param input - 输入数据
+ * @returns Promise<WeeklyReviewMetrics>
+ */
 export async function computeWeeklyReview(input: {
   userId: string
   start: Date

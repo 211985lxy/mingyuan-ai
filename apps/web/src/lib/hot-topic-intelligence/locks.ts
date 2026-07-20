@@ -4,14 +4,29 @@ import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import { parseFit, parseInsight } from "./formatting"
 import { HotTopicIntelligenceError, INSIGHT_FAILURE_COOLDOWN_MS, SINGLE_FLIGHT_LOCK_TTL_SECONDS, SINGLE_FLIGHT_POLL_MS, SINGLE_FLIGHT_WAIT_MS, type TopicRow } from "./types"
 
+/**
+ * @description 构建insightlockkey
+ * @param topic - 主题
+ * @returns string
+ */
 export function buildInsightLockKey(topic: TopicRow): string {
   return `lock:hot-topic:insight:${topic.batchId}:${topic.sentenceId}`
 }
 
+/**
+ * @description 构建fitlockkey
+ * @param cacheKey - 缓存键
+ * @returns string
+ */
 export function buildFitLockKey(cacheKey: string): string {
   return `lock:hot-topic:fit:${cacheKey}`
 }
 
+/**
+ * @description acquiresingleflightlock
+ * @param lockKey - lock键
+ * @returns Promise<boolean>
+ */
 export async function acquireSingleFlightLock(lockKey: string): Promise<boolean> {
   try {
     const set = await redis.set(
@@ -27,6 +42,11 @@ export async function acquireSingleFlightLock(lockKey: string): Promise<boolean>
   }
 }
 
+/**
+ * @description releasesingleflightlock
+ * @param lockKey - lock键
+ * @returns Promise<void>
+ */
 export async function releaseSingleFlightLock(lockKey: string): Promise<void> {
   try {
     await redis.del(lockKey)
@@ -35,6 +55,11 @@ export async function releaseSingleFlightLock(lockKey: string): Promise<void> {
   }
 }
 
+/**
+ * @description 等待forinsightcache
+ * @param topicRowId - 主题行唯一标识符
+ * @returns Promise<ApiHotTopicInsight | null>
+ */
 export async function waitForInsightCache(topicRowId: string): Promise<ApiHotTopicInsight | null> {
   const deadline = Date.now() + SINGLE_FLIGHT_WAIT_MS
 
@@ -72,6 +97,11 @@ export async function waitForInsightCache(topicRowId: string): Promise<ApiHotTop
   return null
 }
 
+/**
+ * @description 等待forfitcache
+ * @param cacheKey - 缓存键
+ * @returns Promise<ApiHotTopicFit | null>
+ */
 export async function waitForFitCache(cacheKey: string): Promise<ApiHotTopicFit | null> {
   const deadline = Date.now() + SINGLE_FLIGHT_WAIT_MS
 

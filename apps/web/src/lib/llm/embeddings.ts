@@ -45,7 +45,12 @@ function getClient(): OpenAI | null {
 
 // ─── Vector math ────────────────────────────────────────────────────────────
 
-/** Compute cosine similarity between two vectors. */
+/**
+ * @description 计算两个向量的余弦相似度
+ * @param a - 第一个向量
+ * @param b - 第二个向量
+ * @returns 余弦相似度（0-1，越大越相似）
+ */
 export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length || a.length === 0) return 0
   let dot = 0, nA = 0, nB = 0
@@ -58,7 +63,11 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom
 }
 
-/** L2-normalize a vector in place (modifies the array). */
+/**
+ * @description 对向量进行 L2 归一化（原地修改数组）
+ * @param v - 待归一化的向量
+ * @returns 归一化后的同一数组引用
+ */
 export function normalizeVector(v: number[]): number[] {
   let norm = 0
   for (let i = 0; i < v.length; i++) norm += v[i] * v[i]
@@ -70,6 +79,11 @@ export function normalizeVector(v: number[]): number[] {
 
 // ─── Content hash ───────────────────────────────────────────────────────────
 
+/**
+ * @description 计算内容的 SHA-256 哈希值（用于检测内容变更）
+ * @param content - 待哈希的文本内容
+ * @returns 64 位十六进制哈希字符串
+ */
 export function computeContentHash(content: string): string {
   return createHash("sha256").update(content).digest("hex").slice(0, 64)
 }
@@ -86,6 +100,11 @@ export interface EmbeddingResult {
 /**
  * Generate an embedding vector for the given text.
  * Returns null if embedding service is unavailable.
+ */
+/**
+ * @description 生成embedding
+ * @param text - 文本
+ * @returns Promise<EmbeddingResult | null>
  */
 export async function generateEmbedding(text: string): Promise<EmbeddingResult | null> {
   const client = getClient()
@@ -147,6 +166,11 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult |
  * Ensure a KnowledgeEmbedding row exists for the given knowledge entry.
  * - Skips if the content hasn't changed (contentHash matches).
  * - Gracefully handles missing entry, disabled embedding.
+ */
+/**
+ * @description 确保knowledgeembedding
+ * @param entryId - 条目唯一标识符
+ * @returns Promise<void>
  */
 export async function ensureKnowledgeEmbedding(entryId: string): Promise<void> {
   const config = readConfig()
@@ -232,6 +256,11 @@ export interface KnowledgePrefilter {
  * Retrieve top-K relevant knowledge entries by cosine similarity.
  * Falls back to entry-only (no embedding) when embedding is disabled or empty.
  */
+/**
+ * @description retrieverelevantknowledge
+ * @param input - 输入数据
+ * @returns Promise<
+ */
 export async function retrieveRelevantKnowledge(input: {
   userId: string
   projectId: string
@@ -267,8 +296,8 @@ export async function retrieveRelevantKnowledge(input: {
           status: "completed",
           entry: {
             userId: input.userId,
-            projectId: input.projectId,
             status: "active",
+            OR: [{ projectId: input.projectId }, { projectId: null }],
             ...(hasCategoryFilter ? { category: { in: prefilter!.categories } } : {}),
             ...(hasGradeFilter ? { valueGrade: { in: prefilter!.valueGrades } } : {}),
           },
@@ -315,8 +344,8 @@ export async function retrieveRelevantKnowledge(input: {
   const fallback = await prisma.knowledgeEntry.findMany({
     where: {
       userId: input.userId,
-      projectId: input.projectId,
       status: "active",
+      OR: [{ projectId: input.projectId }, { projectId: null }],
     },
     orderBy: { sortOrder: "asc" },
     take: topK,
@@ -334,6 +363,11 @@ export async function retrieveRelevantKnowledge(input: {
 /**
  * Batch sync: ensure embeddings for all active knowledge entries for a user/project.
  * Returns counts. Useful for admin UI "re-embed" button or script.
+ */
+/**
+ * @description 同步projectembeddings
+ * @param input - 输入数据
+ * @returns Promise<
  */
 export async function syncProjectEmbeddings(input: {
   userId?: string

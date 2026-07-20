@@ -15,6 +15,11 @@ interface CollapsibleContentProps {
  * 长文折叠容器：内容超过阈值高度时自动折叠，底部渐变遮罩 + 展开/收起按钮。
  * 用 ref 实测高度判断是否可折叠，避免对纯文本长度的猜测（渲染后才能确定真实高度）。
  */
+/**
+ * @description collapsiblecontent
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function CollapsibleContent({
   children,
   collapsedMaxHeight = 336,

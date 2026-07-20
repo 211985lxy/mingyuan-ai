@@ -55,6 +55,11 @@ function slicePositioning(text: string): string {
   return text.slice(0, 8000)
 }
 
+/**
+ * @description 构建compileprompt
+ * @param input - 输入数据
+ * @returns string
+ */
 export function buildCompilePrompt(input: CompileWikiInput): string {
   const positioning = slicePositioning(input.positioningText)
   const existing = (input.existingPages ?? [])
@@ -161,6 +166,12 @@ function asSources(value: unknown, fallbackGenerationId?: string) {
   return sources.slice(0, 10)
 }
 
+/**
+ * @description 解析compilejson
+ * @param raw - 原始数据
+ * @param fallbackGenerationId? - 降级值生成Id?
+ * @returns CompiledWikiPage[]
+ */
 export function parseCompileJson(raw: string, fallbackGenerationId?: string): CompiledWikiPage[] {
   try {
     const parsed = JSON.parse(raw) as { pages?: RawCompiledPage[] }
@@ -193,6 +204,11 @@ export function parseCompileJson(raw: string, fallbackGenerationId?: string): Co
   }
 }
 
+/**
+ * @description 编译positioningtowiki
+ * @param input - 输入数据
+ * @returns Promise<CompiledWikiPage[]>
+ */
 export async function compilePositioningToWiki(
   input: CompileWikiInput
 ): Promise<CompiledWikiPage[]> {

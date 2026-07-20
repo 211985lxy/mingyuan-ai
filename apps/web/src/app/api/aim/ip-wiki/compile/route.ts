@@ -11,6 +11,11 @@ export const maxDuration = 60
  * 可传 sourceGenerationId（推荐，从 AimGeneration.rawCopy 取定位方案），
  * 或直接传 positioningText。
  */
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

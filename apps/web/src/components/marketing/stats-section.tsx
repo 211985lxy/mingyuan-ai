@@ -14,6 +14,10 @@ const stats: Stat[] = [
   { valueKey: "stat4Value", labelKey: "stat4Label" },
 ]
 
+/**
+ * @description statssection
+ * @returns 无返回值
+ */
 export function StatsSection() {
   const t = useTranslations("Stats")
 

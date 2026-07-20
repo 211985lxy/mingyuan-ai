@@ -26,6 +26,11 @@ export const INSPIRATION_TARGET_FORMATS = [
  * 按归属查找灵感记录（findFirst 必须按 id + userId 过滤，确保用户隔离）。
  * 返回 null 表示不存在或不属于该用户 → route 回 404。
  */
+/**
+ * @description 查找ownedinspiration
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function findOwnedInspiration(input: {
   id: string
   userId: string
@@ -44,6 +49,11 @@ export type PreparedInspirationGenerateRequest =
  * 校验顺序与原 route 逐字一致：先 findFirst 归属（404 灵感记录不存在），
  * 再 projectId（400 请选择 IP 营销全案）。inspiration 入口无调用日志契约，
  * 故失败可直接 return（路由据此分流），无需像 agent 那样 throw。
+ */
+/**
+ * @description prepareinspirationgeneraterequest
+ * @param input - 输入数据
+ * @returns Promise<PreparedInspirationGenerateRequest>
  */
 export async function prepareInspirationGenerateRequest(input: {
   id: string
@@ -67,6 +77,11 @@ export async function prepareInspirationGenerateRequest(input: {
  * 构造 inspiration generate 的 executeAimRun 请求对象（不调用 Harness —— 由 route
  * 调用以满足架构护栏 R1）。固定 entrypoint=inspiration / agentId=content_producer /
  * taskType=write_script / 三元组格式。
+ */
+/**
+ * @description prepareinspirationgeneration
+ * @param input - 输入数据
+ * @returns 无返回值
  */
 export function prepareInspirationGeneration(input: {
   inspirationContent: string
@@ -94,6 +109,11 @@ export function prepareInspirationGeneration(input: {
  * 把生成结果回写到灵感记录（generatedContent + aimGenerationId）。
  * 逐字迁出原 route 的 inspiration.update。
  */
+/**
+ * @description persistinspirationgeneration
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function persistInspirationGeneration<T extends { id: string }>(input: {
   id: string
   result: T
@@ -108,6 +128,11 @@ export async function persistInspirationGeneration<T extends { id: string }>(inp
 }
 
 /** inspiration generate 响应转换（含 additive harness 诊断字段）。 */
+/**
+ * @description 构建inspirationgenerateresponse
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildInspirationGenerateResponse<T extends { id: string }>(input: {
   result: T
   run: {

@@ -5,6 +5,11 @@ import { evaluateHotTopicFitUncached } from "./fit-evaluator"
 import { acquireSingleFlightLock, buildFitLockKey, releaseSingleFlightLock, waitForFitCache } from "./locks"
 import type { FitInput } from "./types"
 
+/**
+ * @description 评估hottopicfit
+ * @param input - 输入数据
+ * @returns Promise<ApiHotTopicFit>
+ */
 export async function evaluateHotTopicFit(
   input: FitInput,
 ): Promise<ApiHotTopicFit> {
@@ -68,6 +73,12 @@ export async function evaluateHotTopicFit(
   }
 }
 
+/**
+ * @description 构建hottopicpromptsection
+ * @param insight - 洞察
+ * @param fit - fit
+ * @returns string
+ */
 export function buildHotTopicPromptSection(
   insight: ApiHotTopicInsight,
   fit: ApiHotTopicFit,

@@ -15,17 +15,32 @@
 import { createHash } from "node:crypto"
 import type { AimContextSource } from "./types"
 
+/**
+ * @description sha256
+ * @param value - 值
+ * @returns string
+ */
 export function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex")
 }
 
 /** Hash the final composed prompt. */
+/**
+ * @description 哈希prompt
+ * @param prompt - 提示词
+ * @returns string
+ */
 export function hashPrompt(prompt: string): string {
   // Normalize trailing whitespace so cosmetic diffs don't change the version.
   return sha256(prompt.replace(/\s+$/g, ""))
 }
 
 /** Hash an image by content (for the snapshot's imageHashes; no base64 stored). */
+/**
+ * @description 哈希imagebytes
+ * @param bytes - bytes
+ * @returns string
+ */
 export function hashImageBytes(bytes: Buffer | Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex")
 }
@@ -33,6 +48,11 @@ export function hashImageBytes(bytes: Buffer | Uint8Array): string {
 /**
  * Hash the context manifest. Stable ordering: sources are sorted by
  * (kind, id) before hashing so order-independent loads match.
+ */
+/**
+ * @description 哈希contextmanifest
+ * @param sources - sources
+ * @returns string
  */
 export function hashContextManifest(sources: readonly AimContextSource[]): string {
   const canonical = [...sources]

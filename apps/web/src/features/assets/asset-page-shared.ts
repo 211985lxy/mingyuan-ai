@@ -39,6 +39,11 @@ export const ASSET_FLOW_CARDS = [
 ] as const;
 
 
+/**
+ * @description 格式化date
+ * @param dateStr - 日期Str
+ * @returns 无返回值
+ */
 export function formatDate(dateStr: string) {
   const date = new Date(dateStr);
   return date.toLocaleDateString("zh-CN", {

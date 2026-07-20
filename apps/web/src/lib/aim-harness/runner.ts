@@ -54,6 +54,10 @@ export interface RunAimExecutionResult {
 }
 
 /** Build a stable runId (the external execution number). */
+/**
+ * @description 生成runid
+ * @returns string
+ */
 export function makeRunId(): string {
   // Prefix + uuid; kept under the VarChar(40) column.
   const uuid = randomUUID().replace(/-/g, "").slice(0, 28)
@@ -75,6 +79,11 @@ export interface AimHarnessOutcome {
  * Execute a normalized AIM run through the domain executor, capturing full run
  * metadata. Never silently switches models on non-retryable errors — that is
  * enforced inside LLMClient via the telemetry classifier.
+ */
+/**
+ * @description 运行aimharness
+ * @param input - 输入数据
+ * @returns Promise<AimHarnessOutcome>
  */
 export async function runAimHarness(
   input: RunAimHarnessInput

@@ -41,6 +41,11 @@ export type RetrievedChatContextBlocks = {
  * Order, gates, and catch fallbacks are preserved byte-for-byte from the
  * original route implementation.
  */
+/**
+ * @description retrievechatcontextblocks
+ * @param input - 输入数据
+ * @returns Promise<RetrievedChatContextBlocks>
+ */
 export async function retrieveChatContextBlocks(input: {
   userId: string
   projectId: string

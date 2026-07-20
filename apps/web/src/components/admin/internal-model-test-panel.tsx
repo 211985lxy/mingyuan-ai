@@ -175,6 +175,11 @@ function ModelTestActions(props: {
   </>
 }
 
+/**
+ * @description internalmodeltestpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function InternalModelTestPanel({ getToken }: { getToken: () => string }) {
   const [open, setOpen] = React.useState(false)
   const [request, setRequest] = React.useState<ModelTestRequest>({

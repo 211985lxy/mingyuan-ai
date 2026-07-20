@@ -12,6 +12,11 @@ import { aimEvolveStyleBodySchema } from "@/features/aim/contracts/api"
 // 提取 + 合并两次 LLM 调用，给足时间
 export const maxDuration = 60
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

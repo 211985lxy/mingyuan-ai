@@ -14,6 +14,10 @@ type LoadState<T> = { data: T; loading: boolean; error: string | null }
 
 const initial = <T,>(data: T): LoadState<T> => ({ data, loading: true, error: null })
 
+/**
+ * @description React Hook：aimhomesummary
+ * @returns 无返回值
+ */
 export function useAimHomeSummary() {
   const [projects, setProjects] = useState(() => initial<ClientProject[]>([]))
   const [pending, setPending] = useState(() => initial<{ items: AimGeneration[]; total: number }>({ items: [], total: 0 }))

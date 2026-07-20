@@ -7,6 +7,11 @@ import { type AimWorkflowStage, AIM_WORKFLOW_STAGES } from "@/lib/aim-workflow"
 import { groupAimWorkflowTasks } from "@/features/aim/workflow/tasks"
 import type { AimGeneration } from "@/lib/api/client"
 
+/**
+ * @description aimprojecttaskpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AimProjectTaskPanel({
   records,
   loading,

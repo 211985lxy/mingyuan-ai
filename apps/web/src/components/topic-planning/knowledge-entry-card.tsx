@@ -76,6 +76,11 @@ interface KnowledgeEntryCardProps {
   onArchive: () => Promise<void>
 }
 
+/**
+ * @description knowledgeentrycard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function KnowledgeEntryCard({
   entry,
   selected,

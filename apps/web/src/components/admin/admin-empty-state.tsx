@@ -1,3 +1,4 @@
+"use client";
 import { FileText } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -6,6 +7,11 @@ interface AdminEmptyStateProps {
   action?: React.ReactNode
 }
 
+/**
+ * @description adminemptystate
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AdminEmptyState({
   message = "暂无数据",
   action,

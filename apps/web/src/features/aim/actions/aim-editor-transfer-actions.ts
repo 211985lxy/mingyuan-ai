@@ -3,6 +3,11 @@ import { extractEditorDraftFromAssistantText } from "@/lib/aim-editor"
 import { extractBenchmarkOriginalText } from "@/features/aim/aim-text-utils"
 import type { AimEditorActionsOptions } from "@/features/aim/hooks/aim-editor-action-contracts"
 
+/**
+ * @description 创建aimeditortransferactions
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function createAimEditorTransferActions(options: AimEditorActionsOptions) {
   function fillReferenceTextFromConversation() {
     const source = [...options.messages].reverse().map((message) => extractBenchmarkOriginalText(message.content)).find((content) => content.trim())

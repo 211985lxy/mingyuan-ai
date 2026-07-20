@@ -51,6 +51,11 @@ const PAGE_TYPE_LABELS: Record<string, string> = {
  * 由父级按 sourceGenerationId 传 key 控制挂载：每次「打开」都是新挂载，状态天然重置，
  * 挂载即自动编译一次——无需在 effect 里 setState、也无需渲染期读写 ref。
  */
+/**
+ * @description ipwikidialog
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function IpWikiDialog({
   context,
   onClose,

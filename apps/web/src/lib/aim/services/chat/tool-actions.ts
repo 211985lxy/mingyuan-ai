@@ -19,6 +19,11 @@ import { NextResponse } from "next/server"
  * Handle the tool-action branch: validate project ownership, delegate to
  * handleLarkToolAction, and return the JSON response with trace.
  */
+/**
+ * @description 处理toolactionbranch
+ * @param input - 输入数据
+ * @returns Promise<NextResponse>
+ */
 export async function handleToolActionBranch(input: {
   trace?: AimTraceRecorder
   toolAction: string

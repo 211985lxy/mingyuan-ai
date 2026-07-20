@@ -1,6 +1,13 @@
 import type { ApiHotTopicInsight } from "@/types/api"
 import type { SearchEvidence, TopicRow } from "./types"
 
+/**
+ * @description 构建fallbackinsight
+ * @param topic - 主题
+ * @param evidence - evidence
+ * @param freshness - freshness
+ * @returns ApiHotTopicInsight
+ */
 export function buildFallbackInsight(
   topic: TopicRow,
   evidence: SearchEvidence[],
@@ -136,6 +143,12 @@ function sleep(ms: number): Promise<void> {
   })
 }
 
+/**
+ * @description 派生freshness
+ * @param fetchedAt - fetchedAt
+ * @param evidence - evidence
+ * @returns 无返回值
+ */
 export function deriveFreshness(
   fetchedAt: Date,
   evidence: SearchEvidence[],

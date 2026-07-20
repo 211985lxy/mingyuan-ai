@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic"
  * 请求体 { "approve": true } 即人工审核动作（首次生成时必须）；
  * 审核过以后重复调用幂等，不重复创建。
  */
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },

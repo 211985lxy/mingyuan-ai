@@ -3,6 +3,11 @@ import type { HotTopic } from "@/types/content-template"
 import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import type { FitInput, SearchEvidence, TopicRow } from "./types"
 
+/**
+ * @description serializehottopic
+ * @param topic - 主题
+ * @returns HotTopic
+ */
 export function serializeHotTopic(topic: TopicRow): HotTopic {
   return {
     id: topic.sentenceId,
@@ -17,6 +22,11 @@ export function serializeHotTopic(topic: TopicRow): HotTopic {
   }
 }
 
+/**
+ * @description 解析insight
+ * @param value - 值
+ * @returns ApiHotTopicInsight | null
+ */
 export function parseInsight(value: unknown): ApiHotTopicInsight | null {
   if (!value || typeof value !== "object") return null
   const data = value as Record<string, unknown>
@@ -58,6 +68,11 @@ export function parseInsight(value: unknown): ApiHotTopicInsight | null {
   }
 }
 
+/**
+ * @description 解析fit
+ * @param value - 值
+ * @returns ApiHotTopicFit | null
+ */
 export function parseFit(value: unknown): ApiHotTopicFit | null {
   if (!value || typeof value !== "object") return null
   const data = value as Record<string, unknown>
@@ -80,6 +95,11 @@ export function parseFit(value: unknown): ApiHotTopicFit | null {
   }
 }
 
+/**
+ * @description 解析searchevidence
+ * @param value - 值
+ * @returns SearchEvidence[]
+ */
 export function parseSearchEvidence(value: unknown): SearchEvidence[] {
   if (!Array.isArray(value)) return []
 
@@ -105,6 +125,11 @@ export function parseSearchEvidence(value: unknown): SearchEvidence[] {
 }
 
 
+/**
+ * @description safejsonparse
+ * @param value - 值
+ * @returns Record<string, unknown> | null
+ */
 export function safeJsonParse(value: string): Record<string, unknown> | null {
   try {
     let raw = value.trim()
@@ -150,6 +175,12 @@ function unwrapStructuredObject(
   return (nested as Record<string, unknown> | null) ?? record
 }
 
+/**
+ * @description 构建fitcachekey
+ * @param input - 输入数据
+ * @param ipSnapshot - ip快照
+ * @returns string
+ */
 export function buildFitCacheKey(input: FitInput, ipSnapshot: string): string {
   return hashValue({
     topicId: input.insight.topicId,
@@ -199,6 +230,11 @@ function normalizeRecord(
   )
 }
 
+/**
+ * @description clampscore
+ * @param value - 值
+ * @returns number
+ */
 export function clampScore(value: unknown): number {
   const num =
     typeof value === "number"
@@ -210,12 +246,23 @@ export function clampScore(value: unknown): number {
   return Math.max(0, Math.min(100, Math.round(num)))
 }
 
+/**
+ * @description asstring
+ * @param value - 值
+ * @param fallback - 降级值
+ * @returns string
+ */
 export function asString(value: unknown, fallback: string): string {
   if (typeof value !== "string") return fallback
   const trimmed = value.trim()
   return trimmed || fallback
 }
 
+/**
+ * @description asstringarray
+ * @param value - 值
+ * @returns string[]
+ */
 export function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value
@@ -225,6 +272,11 @@ export function asStringArray(value: unknown): string[] {
     .slice(0, 6)
 }
 
+/**
+ * @description 标准化verdict
+ * @param value - 值
+ * @returns ApiHotTopicFit["verdict"]
+ */
 export function normalizeVerdict(value: unknown): ApiHotTopicFit["verdict"] {
   if (value === "strong" || value === "caution" || value === "avoid") {
     return value
@@ -232,6 +284,11 @@ export function normalizeVerdict(value: unknown): ApiHotTopicFit["verdict"] {
   return "caution"
 }
 
+/**
+ * @description 标准化risk
+ * @param value - 值
+ * @returns ApiHotTopicInsight["riskLevel"]
+ */
 export function normalizeRisk(value: unknown): ApiHotTopicInsight["riskLevel"] {
   if (value === "low" || value === "medium" || value === "high") {
     return value
@@ -246,6 +303,11 @@ function normalizeFreshness(value: unknown): ApiHotTopicInsight["freshness"] {
   return "stale"
 }
 
+/**
+ * @description 标准化evidencequality
+ * @param value - 值
+ * @returns ApiHotTopicInsight["evidenceQuality"]
+ */
 export function normalizeEvidenceQuality(
   value: unknown,
 ): ApiHotTopicInsight["evidenceQuality"] {
@@ -255,6 +317,11 @@ export function normalizeEvidenceQuality(
   return "medium"
 }
 
+/**
+ * @description toisodate
+ * @param value - 值
+ * @returns string | null
+ */
 export function toIsoDate(value: string): string | null {
   if (!value) return null
   const date = new Date(value)

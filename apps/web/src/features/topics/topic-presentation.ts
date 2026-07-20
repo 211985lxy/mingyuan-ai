@@ -8,12 +8,22 @@ const SCORE_DIMENSIONS = [
   ["feasibility", "可执行"],
 ] as const
 
+/**
+ * @description 评分entries
+ * @param card - 卡片
+ * @returns 无返回值
+ */
 export function scoreEntries(card: ApiTopicCard) {
   const breakdown = card.scoreBreakdown
   if (!breakdown) return []
   return SCORE_DIMENSIONS.map(([key, label]) => ({ key, label, value: breakdown[key] }))
 }
 
+/**
+ * @description strongestandweakest
+ * @param card - 卡片
+ * @returns 无返回值
+ */
 export function strongestAndWeakest(card: ApiTopicCard) {
   const entries = scoreEntries(card)
   if (entries.length === 0) return null
@@ -43,10 +53,20 @@ function getTopicDisplayGroupKey(card: ApiTopicCard) {
   return "question_answer"
 }
 
+/**
+ * @description 获取topicdisplaylabel
+ * @param card - 卡片
+ * @returns 无返回值
+ */
 export function getTopicDisplayLabel(card: ApiTopicCard) {
   return TOPIC_DISPLAY_GROUPS.find((group) => group.key === getTopicDisplayGroupKey(card))?.label ?? "问题解答类"
 }
 
+/**
+ * @description categorizetopiccards
+ * @param cards - cards
+ * @returns TopicCategoryGroup[]
+ */
 export function categorizeTopicCards(cards: ApiTopicCard[]): TopicCategoryGroup[] {
   const groups: TopicCategoryGroup[] = TOPIC_DISPLAY_GROUPS.map((group) => ({ ...group, cards: [] }))
   for (const card of cards) {

@@ -16,6 +16,13 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/**
+ * @description 通知safely
+ * @param ports - 端口列表
+ * @param summary - 摘要
+ * @param notification - 通知
+ * @returns Promise<void>
+ */
 export async function notifySafely(
   ports: SupervisionPorts,
   summary: SupervisionSummary,
@@ -28,6 +35,14 @@ export async function notifySafely(
   }
 }
 
+/**
+ * @description releasepreexecutionclaim
+ * @param ports - 端口列表
+ * @param token - 令牌
+ * @param recordId - 记录唯一标识符
+ * @param summary - 摘要
+ * @returns Promise<boolean>
+ */
 export async function releasePreExecutionClaim(
   ports: SupervisionPorts,
   token: unknown,
@@ -43,6 +58,12 @@ export async function releasePreExecutionClaim(
   }
 }
 
+/**
+ * @description 构建claimsupervisionpatch
+ * @param runId - run唯一标识符
+ * @param currentStep - 当前值步长
+ * @returns 无返回值
+ */
 export function buildClaimSupervisionPatch(runId: string, currentStep: string) {
   return {
     [DISPATCH_FIELDS.lastRunId]: runId,
@@ -52,10 +73,20 @@ export function buildClaimSupervisionPatch(runId: string, currentStep: string) {
   }
 }
 
+/**
+ * @description 构建retrysupervisionpatch
+ * @returns 无返回值
+ */
 export function buildRetrySupervisionPatch() {
   return { [SUPERVISION_FIELDS.currentStep]: "等待自动重试" }
 }
 
+/**
+ * @description 构建failuresupervisionpatch
+ * @param stopReason - stop原因
+ * @param retryable - retryable
+ * @returns 无返回值
+ */
 export function buildFailureSupervisionPatch(stopReason: LoopStopReason, retryable: boolean) {
   const summaryReason = retryable ? "retry_exhausted" : stopReason
   return {
@@ -65,6 +96,11 @@ export function buildFailureSupervisionPatch(stopReason: LoopStopReason, retryab
   }
 }
 
+/**
+ * @description 构建reviewsupervisionpatch
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildReviewSupervisionPatch(input: {
   verificationStatus?: "pass" | "needs_human"
   verificationSummary?: string

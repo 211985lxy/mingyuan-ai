@@ -11,6 +11,11 @@ interface AimGenerationServiceInput {
   trace: AimTraceRecorder | undefined
 }
 
+/**
+ * @description prepareaimgenerationcontext
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function prepareAimGenerationContext({
   userId,
   parsed,
@@ -49,6 +54,11 @@ interface ExecuteAimGenerationInput extends AimGenerationServiceInput {
   context: Awaited<ReturnType<typeof prepareAimGenerationContext>>
 }
 
+/**
+ * @description 执行preparedaimgeneration
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function executePreparedAimGeneration({
   userId,
   parsed,
@@ -97,6 +107,12 @@ export async function executePreparedAimGeneration({
 
 type AimGenerationRun = Awaited<ReturnType<typeof executePreparedAimGeneration>>
 
+/**
+ * @description recordaimgenerationquality
+ * @param trace - 追踪
+ * @param run - run
+ * @returns 无返回值
+ */
 export async function recordAimGenerationQuality(
   trace: AimTraceRecorder | undefined,
   run: AimGenerationRun,

@@ -1,6 +1,13 @@
 import type { GenerateScriptCandidatesParams } from "./contracts"
 import type { ResolvedScoringFields } from "./scoring"
 
+/**
+ * @description 构建scoringprompt
+ * @param candidates - candidates
+ * @param params - 参数对象
+ * @param resolved - resolved
+ * @returns string
+ */
 export function buildScoringPrompt(
   candidates: string[],
   params: GenerateScriptCandidatesParams,

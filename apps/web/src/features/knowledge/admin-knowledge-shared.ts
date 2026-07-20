@@ -70,6 +70,11 @@ export const JIEKOU_PROVIDER_MODELS: Record<
   ],
 }
 
+/**
+ * @description 请求获取knowledge
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export async function fetchKnowledge(params: {
   page?: number
   pageSize?: number
@@ -98,22 +103,43 @@ export async function fetchKnowledge(params: {
   }>
 }
 
+/**
+ * @description 请求获取projects
+ * @returns 无返回值
+ */
 export async function fetchProjects() {
   const res = await fetch("/api/admin/projects")
   return res.json() as Promise<{ data: AdminProject[] }>
 }
 
+/**
+ * @description projectlabel
+ * @param project - project
+ * @returns 无返回值
+ */
 export function projectLabel(project: AdminProject) {
   const count = typeof project.knowledgeCount === "number" ? ` · ${project.knowledgeCount}条资料` : ""
   return `${project.name}${project.companyName ? ` · ${project.companyName}` : ""}${count}`
 }
 
+/**
+ * @description embeddinglabel
+ * @param entry - 条目
+ * @returns 无返回值
+ */
 export function embeddingLabel(entry: KnowledgeEntry) {
   if (entry.embedding?.status === "completed") return "已向量化"
   if (entry.embedding?.status === "failed") return "失败"
   return "未生成"
 }
 
+/**
+ * @description 批量action
+ * @param ids - 标识符列表
+ * @param action - 操作
+ * @param value? - value?
+ * @returns 无返回值
+ */
 export async function batchAction(ids: string[], action: string, value?: string | string[]) {
   const res = await fetch("/api/admin/knowledge", {
     method: "PUT",
@@ -126,6 +152,11 @@ export async function batchAction(ids: string[], action: string, value?: string 
   return res.json().catch(() => ({ success: true }))
 }
 
+/**
+ * @description 删除entries
+ * @param ids - 标识符列表
+ * @returns 无返回值
+ */
 export async function deleteEntries(ids: string[]) {
   const res = await fetch(`/api/admin/knowledge?ids=${ids.join(",")}`, {
     method: "DELETE",
@@ -134,6 +165,11 @@ export async function deleteEntries(ids: string[]) {
   return res.json().catch(() => ({ success: true }))
 }
 
+/**
+ * @description distillentries
+ * @param ids - 标识符列表
+ * @returns 无返回值
+ */
 export async function distillEntries(ids: string[]) {
   const res = await fetch("/api/admin/knowledge/distill", {
     method: "POST",

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { generateAndStoreAiHotBriefing } from "@/lib/aihot-briefing"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     await authenticateRequest(request)

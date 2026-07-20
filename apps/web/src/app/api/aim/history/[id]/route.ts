@@ -8,6 +8,12 @@ import {
 } from "@/lib/aim/services/history-update"
 import { buildOutcomeUpdate, sanitizeOutcomeBody, type SanitizedOutcome } from "@/lib/content-outcome"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -33,6 +39,12 @@ export async function GET(
   }
 }
 
+/**
+ * @description 处理 PATCH 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -137,6 +149,12 @@ export async function PATCH(
   }
 }
 
+/**
+ * @description 处理 DELETE 请求
+ * @param _request - _request
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

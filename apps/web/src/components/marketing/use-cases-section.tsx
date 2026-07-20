@@ -48,6 +48,10 @@ const useCases: UseCase[] = [
   },
 ]
 
+/**
+ * @description usecasessection
+ * @returns 无返回值
+ */
 export function UseCasesSection() {
   const t = useTranslations("UseCases")
 

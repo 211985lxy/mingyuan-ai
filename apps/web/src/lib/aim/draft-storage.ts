@@ -28,10 +28,22 @@ export interface AimDraft {
   editorPanelOpen?: boolean
 }
 
+/**
+ * @description 获取 AIM 草稿的项目作用域
+ * @param projectEnabled - 是否启用项目
+ * @param projectId - 项目 ID
+ * @returns 项目作用域字符串
+ */
 export function aimDraftProjectScope(projectEnabled: boolean, projectId: string) {
   return projectEnabled && projectId ? projectId : "quick"
 }
 
+/**
+ * @description 生成 AIM 草稿存储键
+ * @param agentId - 智能体 ID
+ * @param projectScope - 项目作用域
+ * @returns 存储键字符串
+ */
 export function aimDraftStorageKey(agentId: AimAgentId, projectScope = "quick") {
   return `${AIM_DRAFT_STORAGE_KEY_PREFIX}:${agentId}:${projectScope}`
 }
@@ -63,6 +75,12 @@ function parseDraft(raw: string | null): AimDraft | null {
   }
 }
 
+/**
+ * @description 加载 AIM 草稿
+ * @param agentId - 智能体 ID
+ * @param requestedScope - 请求的作用域
+ * @returns 草稿对象，不存在时返回 null
+ */
 export function loadAimDraft(agentId: AimAgentId, requestedScope?: AimDraftProjectScope): AimDraft | null {
   if (typeof window === "undefined") return null
   try {
@@ -84,6 +102,12 @@ export function loadAimDraft(agentId: AimAgentId, requestedScope?: AimDraftProje
   }
 }
 
+/**
+ * @description 保存 AIM 草稿
+ * @param draft - 草稿对象
+ * @param projectScope - 项目作用域
+ * @returns 无返回值
+ */
 export function saveAimDraft(draft: AimDraft, projectScope: AimDraftProjectScope) {
   if (typeof window === "undefined") return
   try {
@@ -107,6 +131,12 @@ export function saveAimDraft(draft: AimDraft, projectScope: AimDraftProjectScope
   }
 }
 
+/**
+ * @description 清除 AIM 草稿
+ * @param agentId - 智能体 ID
+ * @param projectScope - 项目作用域
+ * @returns 无返回值
+ */
 export function clearAimDraft(agentId: AimAgentId, projectScope: AimDraftProjectScope) {
   if (typeof window === "undefined") return
   window.sessionStorage.removeItem(aimDraftStorageKey(agentId, projectScope))

@@ -28,6 +28,11 @@ type ScriptPolishResult =
   | { ok: true; data: { original: string; polished: string; polishedDimensions: string[] } }
   | { ok: false; error: string; status: 400 | 500 | 503 }
 
+/**
+ * @description 解析scriptpolishbody
+ * @param body - 请求体
+ * @returns ScriptPolishInput
+ */
 export function parseScriptPolishBody(body: Record<string, unknown>): ScriptPolishInput {
   const mode: PolishMode = body.mode === "proofread"
     ? "proofread"
@@ -149,6 +154,12 @@ async function runPolish(
   return success(input, polished, input.weakDimensions)
 }
 
+/**
+ * @description 运行scriptpolish
+ * @param userId - 用户 ID
+ * @param input - 输入数据
+ * @returns Promise<ScriptPolishResult>
+ */
 export async function runScriptPolish(userId: string, input: ScriptPolishInput): Promise<ScriptPolishResult> {
   if (!input.content || input.content.length < 30) {
     return { ok: false, error: "文案内容不能为空", status: 400 }

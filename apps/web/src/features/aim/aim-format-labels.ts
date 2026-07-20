@@ -22,6 +22,11 @@ export const WORKFLOW_STATUS_OPTIONS = [
   { value: "archived", label: "已归档" },
 ]
 
+/**
+ * @description workflowstatuslabel
+ * @param status? - status?
+ * @returns 无返回值
+ */
 export function workflowStatusLabel(status?: string | null) {
   return WORKFLOW_STATUS_OPTIONS.find((item) => item.value === status)?.label || "草稿"
 }

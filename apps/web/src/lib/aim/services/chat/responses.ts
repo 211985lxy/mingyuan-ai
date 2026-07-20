@@ -15,6 +15,13 @@ import { NextResponse } from "next/server"
 import { streamAimChatDomain } from "@/lib/aim-harness/domain-executor"
 
 /** Wrap an async iterable of text chunks into a streaming Response. */
+/**
+ * @description streamchatcontent
+ * @param chunks - chunks
+ * @param trace? - trace?
+ * @param options? - options?
+ * @returns 无返回值
+ */
 export function streamChatContent(
   chunks: AsyncIterable<string>,
   trace?: AimTraceRecorder,
@@ -72,6 +79,11 @@ export function streamChatContent(
  * Does NOT call streamAimRun — the caller (route) holds the stream to
  * satisfy architecture guardrail R1.
  */
+/**
+ * @description 构建aimchatstreamresponse
+ * @param streamRun - 流Run
+ * @returns 无返回值
+ */
 export function buildAimChatStreamResponse(
   streamRun: {
     spec: unknown
@@ -90,6 +102,11 @@ export function buildAimChatStreamResponse(
 }
 
 /** Build a non-streaming JSON response from a completed chat run. */
+/**
+ * @description 构建aimchatjsonresponse
+ * @param chatRun - 聊天Run
+ * @returns 无返回值
+ */
 export function buildAimChatJsonResponse(chatRun: {
   output: string
   metadata: { runId: string; degraded: boolean; provider: string; model: string }

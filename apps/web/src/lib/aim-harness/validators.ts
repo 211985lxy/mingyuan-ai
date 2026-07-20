@@ -39,6 +39,11 @@ const AI_DISCLOSURE_BANS = [
   "我是一个人工智能",
 ]
 
+/**
+ * @description 验证format
+ * @param input - 输入数据
+ * @returns FormatValidationResult
+ */
 export function validateFormat(input: DeterministicValidationInput): FormatValidationResult {
   const checks: FormatValidationResult["checks"] = []
   const minChars = input.minChars ?? DEFAULT_MIN_CHARS
@@ -88,6 +93,11 @@ export function validateFormat(input: DeterministicValidationInput): FormatValid
 }
 
 /** Overall quality status derived from deterministic + (optional) LLM reports. */
+/**
+ * @description 派生qualitystatus
+ * @param params - 参数对象
+ * @returns "pass" | "warn" | "fail" | "skipped"
+ */
 export function deriveQualityStatus(params: {
   deterministic: FormatValidationResult[]
   llmOverallPassed?: boolean

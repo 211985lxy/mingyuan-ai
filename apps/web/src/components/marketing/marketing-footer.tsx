@@ -29,6 +29,10 @@ const footerColumns = [
   },
 ]
 
+/**
+ * @description marketingfooter
+ * @returns 无返回值
+ */
 export function MarketingFooter() {
   const t = useTranslations("Footer")
   const tN = useTranslations("Navbar")

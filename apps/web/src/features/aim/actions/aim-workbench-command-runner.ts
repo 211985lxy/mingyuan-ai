@@ -12,6 +12,12 @@ interface CommandCallbacks {
   optimizeOpening: (input: string) => boolean
 }
 
+/**
+ * @description 创建aimworkbenchcommandrunner
+ * @param options - 配置选项
+ * @param callbacks - callbacks
+ * @returns 无返回值
+ */
 export function createAimWorkbenchCommandRunner(options: AimEditorActionsOptions, callbacks: CommandCallbacks) {
   function runWorkbenchCommand(command: AimWorkbenchCommand) {
     options.setInput("")

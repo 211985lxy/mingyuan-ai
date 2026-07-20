@@ -35,6 +35,11 @@ interface UseAimSendActionsOptions {
  *
  * Extracted from aim/page.tsx to decouple action dispatch from page state.
  */
+/**
+ * @description React Hook：aimsendactions
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function useAimSendActions(options: UseAimSendActionsOptions) {
   const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
     const prompt = buildSkillPrompt(skill, {

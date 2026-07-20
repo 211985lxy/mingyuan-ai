@@ -80,6 +80,11 @@ export interface PrepareAimContextInput {
  * 与 buildAimGeneration 的 step 1–4 逐字等价。返回的 blocks 已经过压缩 + 预算裁剪，
  * handler 直接消费，无需再处理。
  */
+/**
+ * @description prepareaimcontext
+ * @param input - 输入数据
+ * @returns Promise<PreparedAimContext>
+ */
 export async function prepareAimContext(
   input: PrepareAimContextInput,
 ): Promise<PreparedAimContext> {
@@ -236,7 +241,7 @@ async function compressAndBudgetGenerationInput(input: {
     viralStructureBlock: input.viralStructureBlock,
     eventStorytellingBlock: input.eventStorytellingBlock,
     ipWikiBlock: input.ipWikiBlock,
-  }, runtimeTask)
+  }, runtimeTask, agentId)
   await addAimTraceStep(trace, {
     key: "context_budget",
     label: "上下文预算",

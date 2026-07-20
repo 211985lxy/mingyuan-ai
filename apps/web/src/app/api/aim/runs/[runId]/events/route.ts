@@ -21,6 +21,12 @@ const VALID_REASONS = new Set([
 
 type RouteContext = { params: Promise<{ runId: string }> }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @param context - 上下文
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const user = await authenticateRequest(request)

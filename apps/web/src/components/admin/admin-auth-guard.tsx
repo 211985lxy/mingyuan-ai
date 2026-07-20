@@ -6,6 +6,11 @@ import { useAdminStore } from "@/lib/admin-store"
 import { Skeleton } from "@/components/ui/skeleton"
 import { getCurrentAdmin } from "@/lib/api/admin-client"
 
+/**
+ * @description adminauthguard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, sessionChecked, isHydrated, setSession, clearSession } = useAdminStore()
   const router = useRouter()
