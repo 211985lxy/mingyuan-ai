@@ -276,8 +276,8 @@ describe("aim-harness fallback policy", () => {
     expect(result.provider).toBe("deepseek")
   })
 
-  it("does not silently fall back for an unclassified error", () => {
-    expect(classifyProviderError(new Error("unexpected invalid payload")).retryable).toBe(false)
+  it("treats unclassified errors as retryable (fallback to next provider)", () => {
+    expect(classifyProviderError(new Error("unexpected invalid payload")).retryable).toBe(true)
   })
 
   it("caps the provider fallback chain", async () => {
