@@ -12,7 +12,7 @@ import {
 describe("aim-context-usage", () => {
   it("按中英混合文本估算 token", () => {
     expect(estimateTokensFromText("李相宇 AI 商业顾问")).toBeGreaterThanOrEqual(7)
-    expect(estimateTokensFromText("OpenAI GPT-5.5 context window")).toBeGreaterThanOrEqual(7)
+    expect(estimateTokensFromText("OpenAI GPT-5.6 context window")).toBeGreaterThanOrEqual(7)
   })
 
   it("图片内容按固定预算估算", () => {

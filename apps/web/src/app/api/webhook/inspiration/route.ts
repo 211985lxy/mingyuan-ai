@@ -1,9 +1,8 @@
 import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { inspirationWebhookBodySchema } from "@/features/knowledge/contracts/api"
-import { processInspiration } from "@/features/topics/services/process-inspiration"
+import { ingestInspirationEvent } from "@/features/topics/services/inspiration-events"
 
 /**
  * Webhook 入口：接收来自飞书/微信等外部服务的灵感推送
@@ -15,6 +14,11 @@ import { processInspiration } from "@/features/topics/services/process-inspirati
 export const runtime = "nodejs"
 export const maxDuration = 90
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   const webhookToken = env.INSPIRATION_WEBHOOK_TOKEN
   if (!webhookToken) {
@@ -35,35 +39,33 @@ export async function POST(request: NextRequest) {
     const content = body.content
     const source = body.source || "text"
     const userId = env.INSPIRATION_WEBHOOK_USER_ID
-    if (!userId) {
-      return NextResponse.json({ error: "Webhook 绑定用户未配置" }, { status: 503 })
-    }
-    const exists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
-    if (!exists) {
-      return NextResponse.json({ error: "Webhook 绑定用户不存在" }, { status: 503 })
+    const projectId = env.INSPIRATION_WEBHOOK_PROJECT_ID
+    if (!userId || !projectId) {
+      return NextResponse.json({ error: "Webhook 绑定用户或项目未配置" }, { status: 503 })
     }
 
-    // 创建灵感记录（自动触发 AI 处理）
-    const inspiration = await prisma.inspiration.create({
-      data: {
-        userId,
-        source,
-        content,
-        aiStatus: "pending",
-      },
-    })
-
-    const processed = await processInspiration(inspiration.id, userId)
+    const ingested = await ingestInspirationEvent({
+      platform: "webhook",
+      externalChatId: `legacy-${source}`,
+      externalSenderId: source,
+      projectId,
+      content,
+    }, userId)
 
     return NextResponse.json({
       ok: true,
-      id: inspiration.id,
-      status: processed.status,
-      message: "灵感已保存并完成 AI 分析",
-    })
+      id: ingested.id,
+      status: ingested.status,
+      duplicate: ingested.duplicate,
+      statusUrl: ingested.statusUrl,
+      message: "灵感已保存，AI 将在后台生成正式选题",
+    }, { status: 202 })
   } catch (error) {
     const contractResponse = apiRequestErrorResponse(request, error)
     if (contractResponse) return contractResponse
+    if (error instanceof Error && /视频|链接|协议|公网|分享页|作品页/.test(error.message)) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     console.error("[webhook/inspiration] Error:", error)
     return NextResponse.json(
       { error: "Internal server error" },

@@ -177,6 +177,11 @@ export class WechatOfficialAccount {
 }
 
 /** 获取默认作者名 */
+/**
+ * @description 获取wechatdefaultauthor
+ * @param fallback - 降级值
+ * @returns string
+ */
 export function getWechatDefaultAuthor(fallback: string = "明远"): string {
   return env.WECHAT_DEFAULT_AUTHOR || fallback
 }

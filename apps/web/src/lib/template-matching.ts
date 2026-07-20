@@ -4,6 +4,11 @@ import type { SeasonalEvent } from "@/types/content-template"
 /**
  * Find published templates whose hotTopicKeywords match the given topic word.
  */
+/**
+ * @description 匹配templatesforhottopic
+ * @param topicWord - 主题Word
+ * @returns Promise<
+ */
 export async function matchTemplatesForHotTopic(
   topicWord: string
 ): Promise<{ id: string; name: string }[]> {
@@ -27,6 +32,10 @@ export async function matchTemplatesForHotTopic(
 
 /**
  * Find published templates whose seasonalEvents include the current date.
+ */
+/**
+ * @description 匹配seasonaltemplates
+ * @returns Promise<
  */
 export async function matchSeasonalTemplates(): Promise<
   { id: string; name: string }[]

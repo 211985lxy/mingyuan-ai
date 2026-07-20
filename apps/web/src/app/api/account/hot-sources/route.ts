@@ -5,6 +5,11 @@ import { authenticateRequest } from "@/lib/user-auth"
 
 export const runtime = "nodejs"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request, { requireActivation: false })

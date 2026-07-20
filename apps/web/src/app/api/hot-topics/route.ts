@@ -4,6 +4,11 @@ import { fetchAiHotSelectedItems } from "@/lib/aihot-client"
 import { matchTemplatesForHotTopic, matchSeasonalTemplates } from "@/lib/template-matching"
 import type { HotTopic } from "@/types/content-template"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const source = searchParams.get("source")

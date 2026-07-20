@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, authErrorResponse } from '@/lib/user-auth'
 import { getJobForUser, listCommentsForJob } from '@/lib/comment-radar/pipeline'
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest, { params }: { params: Promise<Record<string, string>> }) {
   let user: { id: string; email: string }
   try {

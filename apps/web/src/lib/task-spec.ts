@@ -63,11 +63,22 @@ export interface TaskSpec {
   execution?: { schemaVersion: 1; copyStudioModule?: CopyStudioModule }
 }
 
+/**
+ * @description withcopystudioexecution
+ * @param taskSpec - task规格
+ * @param copyStudioModule - copyStudio模块
+ * @returns TaskSpec | undefined
+ */
 export function withCopyStudioExecution(taskSpec: TaskSpec | undefined, copyStudioModule: CopyStudioModule | undefined): TaskSpec | undefined {
   if (!taskSpec || !copyStudioModule) return taskSpec
   return { ...taskSpec, execution: { ...taskSpec.execution, schemaVersion: 1, copyStudioModule } }
 }
 
+/**
+ * @description 获取taskspeccopystudiomodule
+ * @param taskSpec - task规格
+ * @returns CopyStudioModule | undefined
+ */
 export function getTaskSpecCopyStudioModule(taskSpec: TaskSpec | null | undefined): CopyStudioModule | undefined {
   return isCopyStudioModule(taskSpec?.execution?.copyStudioModule)
     ? taskSpec.execution.copyStudioModule
@@ -83,6 +94,11 @@ const LOW_TASK_TYPES: AimTaskType[] = ["polish_copy", "repurpose"]
 const HIGH_AGENTS = new Set(["business_diagnosis", "business_system_diagnosis", "persona"])
 const LOW_AGENTS = new Set(["free_copywriter"])
 
+/**
+ * @description inferrisklevel
+ * @param input - 输入数据
+ * @returns RiskLevel
+ */
 export function inferRiskLevel(input: TaskSpecInput): RiskLevel {
   const { agentId, taskType, rawInput } = input
   if (taskType && LOW_TASK_TYPES.includes(taskType)) return "low"
@@ -100,6 +116,12 @@ function isProjectComplete(project: TaskSpecInput["project"]): boolean {
   return hasCustomer && hasOffer
 }
 
+/**
+ * @description infermode
+ * @param risk - risk
+ * @param projectComplete - projectComplete
+ * @returns CollaborationMode
+ */
 export function inferMode(risk: RiskLevel, projectComplete: boolean): CollaborationMode {
   if (risk === "low") return "direct_delivery"
   if (risk === "medium") return "assumption_delivery"
@@ -113,6 +135,11 @@ function deriveGoal(input: TaskSpecInput): string {
   return input.rawInput.trim().slice(0, 80) || "未明确目标"
 }
 
+/**
+ * @description 构建taskspecskeleton
+ * @param input - 输入数据
+ * @returns TaskSpec
+ */
 export function buildTaskSpecSkeleton(input: TaskSpecInput): TaskSpec {
   const risk = inferRiskLevel(input)
   const projectComplete = isProjectComplete(input.project)
@@ -156,6 +183,12 @@ export function buildTaskSpecSkeleton(input: TaskSpecInput): TaskSpec {
 }
 
 /** 校验并合并 LLM 精化结果；丢弃 LLM 试图写入的 knownFacts（铁律）。 */
+/**
+ * @description sanitizellmrefinement
+ * @param skeleton - skeleton
+ * @param refinement - refinement
+ * @returns TaskSpec
+ */
 export function sanitizeLLMRefinement(
   skeleton: TaskSpec,
   refinement: {
@@ -186,6 +219,11 @@ export function sanitizeLLMRefinement(
   }
 }
 
+/**
+ * @description 构建taskspecllmprompt
+ * @param spec - 规格
+ * @returns string
+ */
 export function buildTaskSpecLLMPrompt(spec: TaskSpec): string {
   return [
     "你是任务风险判断助手。只做判断，不得编造任何事实、客户案例或数字。",

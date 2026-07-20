@@ -9,6 +9,11 @@ export const PLATFORM_LABELS: Record<string, string> = {
   kuaishou: "快手",
 }
 
+/**
+ * @description platformlabel
+ * @param platform - 平台
+ * @returns string
+ */
 export function platformLabel(platform: string): string {
   return PLATFORM_LABELS[platform] ?? platform
 }
@@ -30,6 +35,14 @@ export const DAY_LABELS: Record<string, string> = {
 }
 export const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
+/**
+ * @description cellintensity
+ * @param day - day
+ * @param hour - hour
+ * @param heatmap - heatmap
+ * @param max - 最大值
+ * @returns string
+ */
 export function cellIntensity(
   day: string,
   hour: number,
@@ -48,10 +61,20 @@ export function cellIntensity(
 
 // ─── Formatters ─────────────────────────────────────────
 
+/**
+ * @description proxyavatarurl
+ * @param url - URL 地址
+ * @returns string
+ */
 export function proxyAvatarUrl(url: string): string {
   return `/api/proxy-image?url=${encodeURIComponent(url)}`
 }
 
+/**
+ * @description 格式化date
+ * @param dateStr - 日期Str
+ * @returns string
+ */
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr)
   return date.toLocaleDateString("zh-CN", {
@@ -61,12 +84,22 @@ export function formatDate(dateStr: string): string {
   })
 }
 
+/**
+ * @description 格式化count
+ * @param n - n
+ * @returns string
+ */
 export function formatCount(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(1)}万`
   if (n >= 1000) return `${(n / 1000).toFixed(1)}千`
   return String(n)
 }
 
+/**
+ * @description 评分color
+ * @param score - 分数
+ * @returns string
+ */
 export function scoreColor(score: number): string {
   if (score >= 80) return "text-green-600"
   if (score >= 60) return "text-amber-500"

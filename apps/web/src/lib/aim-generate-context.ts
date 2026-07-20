@@ -22,6 +22,13 @@ function formatAnalysisResultForPrompt(analysisResult: unknown) {
   return JSON.stringify(analysisResult, null, 2)
 }
 
+/**
+ * @description 构建带视频文案拆解上下文的原始输入
+ * @param userId - 用户 ID
+ * @param rawInput - 原始输入文本
+ * @param videoCopyExtractionId - 视频文案拆解 ID
+ * @returns 添加拆解上下文后的原始输入
+ */
 export async function buildRawInputWithVideoCopyContext(
   userId: string,
   rawInput: string,
@@ -65,6 +72,13 @@ export async function buildRawInputWithVideoCopyContext(
   ].filter(Boolean).join("\n")
 }
 
+/**
+ * @description 构建带市场爆款作品上下文的原始输入
+ * @param userId - 用户 ID
+ * @param rawInput - 原始输入文本
+ * @param enabled - 是否启用
+ * @returns 添加市场爆款上下文后的原始输入
+ */
 export async function buildRawInputWithMarketViralContext(
   userId: string,
   rawInput: string,
@@ -121,11 +135,10 @@ export async function buildRawInputWithMarketViralContext(
 }
 
 /**
- * 全网热榜上下文注入（RedFox API）。
- *
- * 自动拉取全网热榜 TOP 10，写入 AIM 生成上下文。
- * 仅在 shouldUseMarketViralContext 场景（内容生产/选题策划）生效。
- * 如果用户已手动提供 hotTopic，会合并而非覆盖。
+ * @description 构建带全网热榜上下文的原始输入
+ * @param rawInput - 原始输入文本
+ * @param enabled - 是否启用
+ * @returns 添加热榜上下文后的原始输入
  */
 export async function buildRawInputWithTrendingContext(
   rawInput: string,
@@ -170,11 +183,11 @@ export async function buildRawInputWithTrendingContext(
 }
 
 /**
- * 对标账号热评洞察上下文注入（RedFox API）。
- *
- * 从本地已分析的对标账号中提取最热作品的 itemId，拉取热评，
- * 为 AIM 生成提供"用户声音"洞察。
- * 仅在 shouldUseMarketViralContext 场景生效。
+ * @description 构建带对标账号热评洞察上下文的原始输入
+ * @param userId - 用户 ID
+ * @param rawInput - 原始输入文本
+ * @param enabled - 是否启用
+ * @returns 添加热评洞察上下文后的原始输入
  */
 export async function buildRawInputWithCommentInsightContext(
   userId: string,

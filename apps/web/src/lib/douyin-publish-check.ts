@@ -134,6 +134,11 @@ function detectAiLabelReminder(content: string) {
     : "未发现明确 AI 生成内容声明；如实际使用 AI 画面、配音或数字人，仍需按平台要求标注。"
 }
 
+/**
+ * @description 运行douyinpublishcheck
+ * @param content - 内容
+ * @returns DouyinPublishCheck
+ */
 export function runDouyinPublishCheck(content: string): DouyinPublishCheck {
   const violations: DouyinPublishViolation[] = []
   const seen = new Set<string>()

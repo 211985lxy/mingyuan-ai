@@ -77,6 +77,12 @@ async function isUnlimitedBetaUser(userId: string) {
   return user ? UNLIMITED_BETA_EMAILS.has(user.email.toLowerCase()) : false
 }
 
+/**
+ * @description 强制执行每日内测额度限制（AIM 聊天/生成/文案拆解/对标分析）
+ * @param userId - 用户 ID
+ * @param kind - 限制类型（aim_chat、aim_generate、video_copy_extraction、competitor_analysis）
+ * @returns 超过限制返回 429 响应，未超过或白名单用户返回 null
+ */
 export async function enforceDailyBetaLimit(userId: string, kind: DailyKind) {
   try {
     if (await isUnlimitedBetaUser(userId)) return null
@@ -102,6 +108,11 @@ export async function enforceDailyBetaLimit(userId: string, kind: DailyKind) {
   }
 }
 
+/**
+ * @description 强制执行数量型内测限制（对标账号数/项目数）
+ * @param input - 包含用户 ID 和限制类型的对象
+ * @returns 超过限制返回 429 响应，未超过或白名单用户返回 null
+ */
 export async function enforceCountBetaLimit(input: {
   userId: string
   kind: "watch_account" | "client_project"
@@ -124,6 +135,12 @@ export async function enforceCountBetaLimit(input: {
   }
 }
 
+/**
+ * @description 强制执行对标账号每日刷新次数限制
+ * @param userId - 用户 ID
+ * @param requestedCount - 本次请求刷新的账号数量
+ * @returns 超过限制返回 429 响应，未超过或白名单用户返回 null
+ */
 export async function enforceWatchRefreshBetaLimit(userId: string, requestedCount: number) {
   try {
     if (await isUnlimitedBetaUser(userId)) return null
@@ -141,6 +158,11 @@ export async function enforceWatchRefreshBetaLimit(userId: string, requestedCoun
   }
 }
 
+/**
+ * @description 强制执行知识库条目数量限制（每个项目最多 100 条）
+ * @param input - 包含用户 ID、项目 ID 和新增数量的对象
+ * @returns 超过限制返回 429 响应，未超过或白名单用户返回 null
+ */
 export async function enforceKnowledgeBetaLimit(input: {
   userId: string
   projectId?: string | null
@@ -167,6 +189,11 @@ export async function enforceKnowledgeBetaLimit(input: {
   }
 }
 
+/**
+ * @description 强制执行单文件上传大小限制（10MB）
+ * @param files - 待上传的文件列表
+ * @returns 超过限制返回 413 响应，未超过返回 null
+ */
 export function enforceUploadSizeLimit(files: File[]) {
   const oversized = files.find((file) => file.size > INTERNAL_BETA_LIMITS.uploadBytes)
   return oversized

@@ -11,16 +11,31 @@ export const AIM_SIX_STAGE_LABELS: Record<AimSixStage, string> = {
   results: "信息复盘",
 }
 
+/**
+ * @description 获取 AIM 六阶段流程中的下一个阶段
+ * @param stage - 当前阶段
+ * @returns 下一个阶段，已是最后阶段时返回 null
+ */
 export function getNextAimSixStage(stage: AimSixStage): AimSixStage | null {
   const index = AIM_SIX_STAGES.indexOf(stage)
   return index >= 0 && index < AIM_SIX_STAGES.length - 1 ? AIM_SIX_STAGES[index + 1] : null
 }
 
+/**
+ * @description 判断是否可以从当前阶段推进到目标阶段
+ * @param from - 起始阶段
+ * @param to - 目标阶段
+ * @returns 可以推进返回 true
+ */
 export function canAdvanceAimSixStage(from: AimSixStage, to: AimSixStage): boolean {
   return getNextAimSixStage(from) === to
 }
 
-/** 编辑结果只是待发布稿，不能直接伪造为已发布。 */
+/**
+ * @description 判断阶段是否属于已发布状态（发布或复盘）
+ * @param stage - 待判断的阶段
+ * @returns 属于已发布状态返回 true
+ */
 export function isPublishedAimSixStage(stage: AimSixStage): boolean {
   return stage === "publish" || stage === "results"
 }

@@ -4,11 +4,22 @@ import { useCallback, useEffect, useRef, useState } from "react"
 
 import { listAimHistory, listClientProjects, type AimGeneration, type ClientProject } from "@/lib/api/client"
 
+/**
+ * @description 选择authorizedprojectid
+ * @param currentProjectId - 当前值Project唯一标识符
+ * @param projects - projects
+ * @returns 无返回值
+ */
 export function selectAuthorizedProjectId(currentProjectId: string, projects: ClientProject[]) {
   if (currentProjectId && projects.some((project) => project.id === currentProjectId)) return currentProjectId
   return currentProjectId ? "" : projects[0]?.id || ""
 }
 
+/**
+ * @description React Hook：aimprojectworkspace
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimProjectWorkspace(input: { initialProjectId: string; quickMode: boolean }) {
   const { initialProjectId, quickMode } = input
   const [projects, setProjects] = useState<ClientProject[]>([])

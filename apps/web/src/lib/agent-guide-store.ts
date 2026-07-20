@@ -28,6 +28,11 @@ function settingKey(agentId: string, field: string): string {
 }
 
 /** 取单个智能体的合并文案（TS 默认 + DB 覆盖） */
+/**
+ * @description 获取agentguidewithoverrides
+ * @param agentId - 智能体 ID
+ * @returns Promise<AimAgentGuide &
+ */
 export async function getAgentGuideWithOverrides(
   agentId: AimAgentId
 ): Promise<AimAgentGuide & { _overriddenFields: string[] }> {
@@ -75,6 +80,10 @@ export async function getAgentGuideWithOverrides(
 }
 
 /** 列出全部智能体文案（合并默认 + 覆盖） */
+/**
+ * @description 列出agentguides
+ * @returns 无返回值
+ */
 export async function listAgentGuides() {
   return Promise.all(
     AIM_AGENT_OPTIONS.map(async (a) => {
@@ -90,6 +99,14 @@ export async function listAgentGuides() {
 }
 
 /** 更新单个字段覆盖 */
+/**
+ * @description 设置agentguidefield
+ * @param agentId - 智能体 ID
+ * @param field - 字段
+ * @param value - 值
+ * @param updatedBy - updatedBy
+ * @returns 无返回值
+ */
 export async function setAgentGuideField(
   agentId: AimAgentId,
   field: string,
@@ -112,6 +129,12 @@ export async function setAgentGuideField(
 }
 
 /** 清除单个字段覆盖（回退到 TS 默认） */
+/**
+ * @description 清除agentguidefield
+ * @param agentId - 智能体 ID
+ * @param field - 字段
+ * @returns 无返回值
+ */
 export async function clearAgentGuideField(agentId: AimAgentId, field: string) {
   const key = settingKey(agentId, field)
   try {

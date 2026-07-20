@@ -126,6 +126,12 @@ interface MessageRole {
  * @param messages 完整消息列表（前端保存的格式）
  * @returns 压缩后的上下文
  */
+/**
+ * @description compressaimmessages
+ * @param agentId - 智能体 ID
+ * @param messages - 消息列表
+ * @returns AimCompressedContext
+ */
 export function compressAimMessages(
   agentId: string,
   messages: MessageRole[]
@@ -177,6 +183,11 @@ export function compressAimMessages(
  * @param compressed 压缩上下文
  * @param knowledgeBlock RAG 知识块文本（已由 buildAimKnowledgeContext 生成）
  * @returns 完整的 ChatMessage[] 传给 LLM
+ */
+/**
+ * @description 构建aimcontextmessages
+ * @param input - 输入数据
+ * @returns ChatMessage[]
  */
 export function buildAimContextMessages(input: {
   systemPrompt: string

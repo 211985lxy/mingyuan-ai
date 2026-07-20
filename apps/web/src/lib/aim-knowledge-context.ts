@@ -71,6 +71,11 @@ const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
     "user_insight",
     "hot_topic",
   ],
+  free_copywriter: [
+    // 自由创作知识依赖最低，仅优先最通用的背景类
+    "boss_experience",
+    "user_insight",
+  ],
 }
 
 /** 默认优先级（未匹配到具体 agent 时的兜底） */
@@ -103,9 +108,9 @@ function truncateContent(content: string, maxChars: number): string {
 // ─── 公开函数 ──────────────────────────────────────────────
 
 /**
- * 把策略的 categoryBoost 字典转成检索预过滤白名单。
- * 只取权重 > 1 的类别（被策略"加权"的才进白名单）。
- * deep 档 categoryBoost 为空 → 返回 [] → 上层不传 prefilter → 退化为全量（向后兼容）。
+ * @description 从策略的 categoryBoost 字典提取检索预过滤白名单
+ * @param categoryBoost - 类别权重字典
+ * @returns 权重 > 1 的类别数组
  */
 export function categoriesFromBoost(categoryBoost: Record<string, number>): string[] {
   return Object.entries(categoryBoost)
@@ -124,6 +129,11 @@ export function categoriesFromBoost(categoryBoost: Record<string, number>): stri
  * 4. 拼接成知识块字符串（不超过预算）
  *
  * Embedding 不可用时自动回退到项目级 fallback。
+ */
+/**
+ * @description 构建aimknowledgecontext
+ * @param input - 输入数据
+ * @returns Promise<AimKnowledgeContextResult>
  */
 export async function buildAimKnowledgeContext(
   input: AimKnowledgeContextInput
@@ -176,12 +186,24 @@ export async function buildAimKnowledgeContext(
  *
  * @param maxChars 总字符上限，超出则跳过后续知识
  */
+/**
+ * @description 构建knowledgeblock
+ * @param entries - 条目列表
+ * @returns string
+ */
 export function buildKnowledgeBlock(
   entries: Array<{ category: string; title: string; content: string; tags?: unknown; valueGrade?: string | null }>
 ): string {
   return buildKnowledgeBlockWithBudget(entries, Infinity)
 }
 
+/**
+ * @description rankknowledgeentriesforagent
+ * @param agentId - 智能体 ID
+ * @param entries - 条目列表
+ * @param categoryBoost - 分类Boost
+ * @returns T[]
+ */
 export function rankKnowledgeEntriesForAgent<T extends { category: string; score: number; tags?: unknown; valueGrade?: string | null }>(
   agentId: string,
   entries: T[],
@@ -261,6 +283,12 @@ function buildKnowledgeBlockWithBudget(
 
 /**
  * 触发 embedding 后置更新（Fire-and-forget）
+ */
+/**
+ * @description fireknowledgeembedding
+ * @param entries - 条目列表
+ * @param source - 来源
+ * @returns 无返回值
  */
 export function fireKnowledgeEmbedding(entries: Array<{ id: string }>, source: string): void {
   if (source === "raw") {

@@ -6,6 +6,11 @@ const THEMES: Record<WechatThemeId, { accent: string; text: string; heading: str
   graphite: { accent: "#333333", text: "#463f3a", heading: "#111111" },
 }
 
+/**
+ * @description escapehtml
+ * @param text - 文本
+ * @returns string
+ */
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
@@ -21,6 +26,12 @@ function inline(text: string, accent: string): string {
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
 }
 
+/**
+ * @description markdowntowechathtml
+ * @param markdown - markdown
+ * @param themeId - 主题唯一标识符
+ * @returns string
+ */
 export function markdownToWechatHtml(markdown: string, themeId: WechatThemeId = "classic_blue"): string {
   const theme = THEMES[themeId]
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n")
@@ -58,6 +69,12 @@ export function markdownToWechatHtml(markdown: string, themeId: WechatThemeId = 
   return html.join("\n")
 }
 
+/**
+ * @description 构建wechatclipboardpayload
+ * @param markdown - markdown
+ * @param themeId? - 主题Id?
+ * @returns 无返回值
+ */
 export function buildWechatClipboardPayload(markdown: string, themeId?: WechatThemeId) {
   const html = markdownToWechatHtml(markdown, themeId)
   return { html, text: markdown }

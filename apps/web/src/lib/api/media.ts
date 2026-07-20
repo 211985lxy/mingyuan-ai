@@ -17,6 +17,11 @@ import type {
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
 
+/**
+ * @description 列出assets
+ * @param assetType? - assetType?
+ * @returns Promise<ApiAsset[]>
+ */
 export async function listAssets(
   assetType?: "image" | "video" | "music"
 ): Promise<ApiAsset[]> {
@@ -32,6 +37,12 @@ export async function listAssets(
   return payload.data.results
 }
 
+/**
+ * @description 创建assetuploadurl
+ * @param fileName - 文件名称
+ * @param contentType - 内容类型
+ * @returns 无返回值
+ */
 export async function createAssetUploadUrl(fileName: string, contentType: string) {
   const payload = await request<{ data: { uploadUrl: string; assetUrl: string; readUrl?: string; expiresAt: string } }>(
     "/api/assets/upload-url",
@@ -44,6 +55,11 @@ export async function createAssetUploadUrl(fileName: string, contentType: string
   return payload.data
 }
 
+/**
+ * @description 上传filetostorage
+ * @param file - 文件
+ * @returns 无返回值
+ */
 export async function uploadFileToStorage(file: File) {
   const signed = await createAssetUploadUrl(file.name, file.type || "application/octet-stream")
   const upload = await fetch(signed.uploadUrl, {
@@ -61,6 +77,11 @@ export async function uploadFileToStorage(file: File) {
   return signed.assetUrl
 }
 
+/**
+ * @description 上传imageforaimchat
+ * @param file - 文件
+ * @returns 无返回值
+ */
 export async function uploadImageForAimChat(file: File) {
   const signed = await createAssetUploadUrl(file.name, file.type || "application/octet-stream")
   const upload = await fetch(signed.uploadUrl, {
@@ -81,6 +102,11 @@ export async function uploadImageForAimChat(file: File) {
   }
 }
 
+/**
+ * @description 注册asset
+ * @param input - 输入数据
+ * @returns Promise<ApiAsset>
+ */
 export async function registerAsset(input: {
   name: string
   assetType: string
@@ -94,6 +120,11 @@ export async function registerAsset(input: {
   return payload.data
 }
 
+/**
+ * @description 删除asset
+ * @param id - 唯一标识符
+ * @returns Promise<void>
+ */
 export async function deleteAsset(id: string): Promise<void> {
   await request(`/api/assets/${id}`, {
     method: "DELETE",

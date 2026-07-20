@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation"
 import { useAuthStore } from "@/lib/store"
 import { getSubscriptionStatus } from "@/lib/subscription"
 
+/**
+ * @description authguard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, sessionChecked, isHydrated } = useAuthStore()
   const router = useRouter()

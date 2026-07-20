@@ -14,11 +14,21 @@ function removeExistingFactPriorityRule(contextBlock: string): string {
   return contextBlock.replace(AIM_FACT_PRIORITY_RULE, "").trimStart()
 }
 
+/**
+ * @description 在上下文块前添加 AIM 事实与指令优先级规则
+ * @param contextBlock - 原始上下文块文本
+ * @returns 添加优先级规则后的上下文文本
+ */
 export function withAimFactPriorityRule(contextBlock: string): string {
   const content = removeExistingFactPriorityRule(contextBlock)
   return content ? `${AIM_FACT_PRIORITY_RULE}\n\n${content}` : AIM_FACT_PRIORITY_RULE
 }
 
+/**
+ * @description 组合 AIM 参考上下文（当前素材、项目知识、记忆、风格、外部参考）
+ * @param input - 各类参考上下文输入
+ * @returns 组合并添加优先级规则后的参考上下文
+ */
 export function composeAimReferenceContext(input: {
   currentMaterial?: string
   projectKnowledge?: string

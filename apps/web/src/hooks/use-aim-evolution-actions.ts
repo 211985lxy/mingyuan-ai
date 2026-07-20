@@ -79,6 +79,11 @@ async function saveSuggestion(input: AimEvolutionActionInput, suggestion: AimEvo
   }
 }
 
+/**
+ * @description React Hook：aimevolutionactions
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimEvolutionActions(input: AimEvolutionActionInput) {
   const [isEvolving, setIsEvolving] = useState(false)
   const [evolutionSuggestions, setEvolutionSuggestions] = useState<AimEvolutionSuggestion[]>([])

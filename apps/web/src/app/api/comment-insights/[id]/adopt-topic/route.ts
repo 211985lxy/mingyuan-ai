@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma'
 import type { JobStatus } from '@/lib/comment-radar/types'
 import { apiRequestErrorResponse, parseJsonRecord } from '@/lib/api-contract'
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest, { params }: { params: Promise<Record<string, string>> }) {
   let user: { id: string; email: string }
   try { user = await authenticateRequest(request) } catch (e) { const r = authErrorResponse(e); if (r) return r; return NextResponse.json({ error: 'Internal error' }, { status: 500 }) }

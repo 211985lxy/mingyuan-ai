@@ -1,3 +1,8 @@
+/**
+ * @description 清洗视频文案分析 Markdown，移除多余加粗标记和无关行
+ * @param markdown - 原始 Markdown 文本
+ * @returns 清洗后的 Markdown 文本
+ */
 export function cleanVideoCopyAnalysisMarkdown(markdown: string): string {
   return markdown
     .replace(/\*\*([^*\n：:]{2,24})\*\*([：:])/g, "$1$2")
@@ -20,6 +25,11 @@ export interface VideoCopyAnalysisDisplay {
   supplementalMarkdown: string
 }
 
+/**
+ * @description 解析视频文案分析 Markdown 为结构化展示数据（拆解节点 + 补充内容）
+ * @param markdown - 视频文案分析的 Markdown 文本
+ * @returns 结构化展示对象，包含拆解节点数组和补充 Markdown
+ */
 export function parseVideoCopyAnalysisDisplay(markdown: string): VideoCopyAnalysisDisplay {
   const cleaned = cleanVideoCopyAnalysisMarkdown(markdown)
   const lines = cleaned.split("\n")

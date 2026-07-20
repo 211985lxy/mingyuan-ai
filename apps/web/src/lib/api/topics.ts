@@ -19,6 +19,11 @@ import type {
 
 export const TOPIC_GENERATE_TIMEOUT_MS = 180000
 
+/**
+ * @description 生成topics
+ * @param input? - input?
+ * @returns Promise<ApiTopicGenerateResponse>
+ */
 export async function generateTopics(
   input?: {
     projectId?: string
@@ -59,6 +64,11 @@ export type TopicChatResponse = {
   }
 }
 
+/**
+ * @description 发送topicchatmessage
+ * @param input - 输入数据
+ * @returns Promise<TopicChatResponse>
+ */
 export async function sendTopicChatMessage(input: {
   projectId: string
   content: string
@@ -70,6 +80,12 @@ export async function sendTopicChatMessage(input: {
   })
 }
 
+/**
+ * @description 选择topic
+ * @param topicSelectionId - 主题Selection唯一标识符
+ * @param selectedIndex - selected索引
+ * @returns Promise<ApiTopicSelectResponse>
+ */
 export async function selectTopic(
   topicSelectionId: string,
   selectedIndex: number
@@ -84,16 +100,28 @@ export async function selectTopic(
   return payload.data
 }
 
+/**
+ * @description 列出openingtypes
+ * @returns Promise<ApiOpeningType[]>
+ */
 export async function listOpeningTypes(): Promise<ApiOpeningType[]> {
   const payload = await request<{ data: ApiOpeningType[] }>("/api/topics/opening-types")
   return payload.data
 }
 
+/**
+ * @description 列出copystructures
+ * @returns Promise<ApiCopyStructure[]>
+ */
 export async function listCopyStructures(): Promise<ApiCopyStructure[]> {
   const payload = await request<{ data: ApiCopyStructure[] }>("/api/topics/copy-structures")
   return payload.data
 }
 
+/**
+ * @description 列出endingtypes
+ * @returns Promise<ApiEndingType[]>
+ */
 export async function listEndingTypes(): Promise<ApiEndingType[]> {
   const payload = await request<{ data: ApiEndingType[] }>("/api/topics/ending-types")
   return payload.data
@@ -113,6 +141,11 @@ export interface TodayTopicsResult {
   createdAt?: string
 }
 
+/**
+ * @description 获取todaytopics
+ * @param mode - 众数
+ * @returns Promise<TodayTopicsResult>
+ */
 export async function getTodayTopics(mode: ApiTopicRecommendationMode = "daily"): Promise<TodayTopicsResult> {
   const qs = mode !== "normal" ? `?mode=${mode}` : ""
   return request<TodayTopicsResult>(`/api/topics/today${qs}`)

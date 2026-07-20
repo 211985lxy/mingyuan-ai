@@ -14,6 +14,13 @@ class ApiError extends Error {
   }
 }
 
+/**
+ * @description 获取apierrormessage
+ * @param payload - payload
+ * @param status - 状态
+ * @param statusText - 状态文本
+ * @returns string
+ */
 export function getApiErrorMessage(payload: unknown, status: number, statusText: string): string {
   if (typeof (payload as { error?: unknown } | null)?.error === "string") {
     const error = (payload as { error: string }).error
@@ -30,6 +37,12 @@ export function getApiErrorMessage(payload: unknown, status: number, statusText:
 
 type RequestOptions = RequestInit & { auth?: boolean; timeout?: number }
 
+/**
+ * @description request
+ * @param path - 路径
+ * @param options - 配置选项
+ * @returns Promise<T>
+ */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { auth = true, headers, timeout, signal, ...init } = options
   const controller = new AbortController()

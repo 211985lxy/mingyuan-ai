@@ -17,6 +17,11 @@ export const COPY_TO_VIDEO_STRUCTURE_MAP: Record<string, string> = {
   universal: "contrast-hook",
 }
 
+/**
+ * @description 将用户选择的文案结构代码映射为内部视频结构名称
+ * @param copyStructureCode - 用户侧文案结构代码（如 suspense_reveal）
+ * @returns 对应的视频结构名称，未匹配时返回默认值 contrast-hook
+ */
 export function mapCopyToVideoStructure(copyStructureCode: string): string {
   return COPY_TO_VIDEO_STRUCTURE_MAP[copyStructureCode] ?? FALLBACK_VIDEO_STRUCTURE
 }

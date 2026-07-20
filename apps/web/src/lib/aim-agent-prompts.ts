@@ -61,6 +61,11 @@ export const CONTENT_PRODUCER_OPERATING_LOGIC_RULE = [
   "没有真实案例、数据或客户反馈时不要编造证据；改用可验证的方法、过程和判断边界支撑内容。",
 ].join("\n")
 
+/**
+ * @description 构建内容创作官对话提示词
+ * @param params - 提示词参数（上下文块、方法论、IP Wiki 等）
+ * @returns 内容创作官对话提示词文本
+ */
 export function buildContentProducerChatPrompt(params: ContentProducerChatPromptParams): string {
   const contextBlock = buildChatContextBlock(params)
   return `你是一个身经百战的「太极营销创意总监」，正与企业老板（用户）面对面进行爆款营销文案创意碰撞与思路对齐。
@@ -127,9 +132,8 @@ ${PLAIN_LANGUAGE_RULE_LINE}
 ${BUZZWORD_BAN_LINE}`
 
 /**
- * 小红书图文视觉导演指令（xiaohongshu_post 专用）
- * 吸收 xhs-visual-director-skill 的产品结构（风格判断 / 统一视觉母版 / 8页结构 / 逐页提示词 / 自检），
- * 用 AIM 自家风格映射重写，不照搬外部 prompt。第一版只输出图文方案，不接真实图片生成。
+ * @description 构建小红书图文视觉导演指令
+ * @returns 小红书图文视觉方案提示词
  */
 export function buildXhsVisualDirectorInstruction(): string {
   return `【小红书图文视觉方案】

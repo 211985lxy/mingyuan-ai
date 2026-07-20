@@ -7,6 +7,11 @@ import { assertSupportedVideoUrl } from "@/lib/video-text-extractor"
 
 type DbLike = Pick<typeof prisma, "watchAccount" | "videoCopyExtraction">
 
+/**
+ * @description 创建watchvideoextraction
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function createWatchVideoExtraction(input: {
   userId: string
   watchAccountId: string
@@ -33,6 +38,11 @@ export async function createWatchVideoExtraction(input: {
   return createExtraction(input.userId, sourceUrl)
 }
 
+/**
+ * @description serializewatchvideoextraction
+ * @param record - 记录
+ * @returns 无返回值
+ */
 export function serializeWatchVideoExtraction(
   record: Awaited<ReturnType<typeof createWatchVideoExtraction>>,
 ) {

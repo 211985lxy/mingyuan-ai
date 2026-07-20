@@ -14,6 +14,12 @@ const conflictSet = new Set(
   CONFLICT_PAIRS.flatMap(([a, b]) => [`${a}:${b}`, `${b}:${a}`])
 )
 
+/**
+ * @description 判断是否包含conflict
+ * @param codeA - 代码A
+ * @param codeB - 代码B
+ * @returns boolean
+ */
 export function hasConflict(codeA: string, codeB: string): boolean {
   return conflictSet.has(`${codeA}:${codeB}`)
 }
@@ -21,6 +27,12 @@ export function hasConflict(codeA: string, codeB: string): boolean {
 /**
  * Sample 2-3 non-conflicting elements from the full element code list.
  * Uses Fisher-Yates shuffle then picks greedily while checking conflicts.
+ */
+/**
+ * @description sampleelements
+ * @param allCodes - allCodes
+ * @param count - 数量
+ * @returns string[]
  */
 export function sampleElements(
   allCodes: string[],
@@ -73,6 +85,11 @@ export type DerivationStrategy =
  * Pick a derivation strategy based on how many times the user has
  * refreshed. Early refreshes get fresh combos; later ones get
  * smarter derivations to avoid the "same stuff" feeling.
+ */
+/**
+ * @description pickstrategy
+ * @param refreshCount - refresh数量
+ * @returns DerivationStrategy
  */
 export function pickStrategy(refreshCount: number): DerivationStrategy {
   if (refreshCount <= 1) return "fresh"
@@ -148,6 +165,13 @@ function sampleRemix(
  * Sample elements with history awareness. Avoids repeating the exact
  * same element sets the user has already seen, and uses derivation
  * strategies to create related-but-different combinations.
+ */
+/**
+ * @description samplewithhistory
+ * @param allCodes - allCodes
+ * @param recentElementSets - recent元素Sets
+ * @param strategy - 策略
+ * @returns string[]
  */
 export function sampleWithHistory(
   allCodes: string[],

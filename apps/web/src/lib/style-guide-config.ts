@@ -76,6 +76,11 @@ const STYLE_PROMPTS: Record<StyleGuideId, string> = {
     "用专业理性的语调改写文案。逻辑清晰、论据扎实，善用数据和权威背书增强说服力。表达克制客观，用事实和推理代替情绪渲染。避免过度专业化和生硬的学术腔。",
 }
 
+/**
+ * @description 获取stylepromptblock
+ * @param styleId? - 样式Id?
+ * @returns string
+ */
 export function getStylePromptBlock(styleId?: StyleGuideId): string {
   if (!styleId || !(styleId in STYLE_PROMPTS)) return ""
   return `\n\n【风格指令：${STYLE_GUIDE_LABELS[styleId]}】\n${STYLE_PROMPTS[styleId]}`

@@ -85,6 +85,11 @@ const SYSTEM_PROMPT = `你是知识图谱抽取器。从给定的企业知识文
 /**
  * 构造实体抽取 prompt（纯函数）。
  */
+/**
+ * @description 构建extractionprompt
+ * @param content - 内容
+ * @returns 无返回值
+ */
 export function buildExtractionPrompt(content: string): { system: string; user: string } {
   const trimmed = content.slice(0, 3000)
   return {
@@ -114,6 +119,11 @@ function cleanName(name: unknown): string {
  * 解析 LLM 输出为结构化抽取结果（纯函数，对畸形输入容错）。
  * - 接受裸数组 或 {entities,relations} 或 {items} 包装。
  * - 丢弃非法实体/关系；relations 中引用了不存在实体的会被丢弃。
+ */
+/**
+ * @description 解析extractionresult
+ * @param raw - 原始数据
+ * @returns ExtractionResult
  */
 export function parseExtractionResult(raw: string): ExtractionResult {
   const empty: ExtractionResult = { entities: [], relations: [] }
@@ -195,6 +205,11 @@ export function parseExtractionResult(raw: string): ExtractionResult {
 /**
  * 调用 LLM 抽取实体与关系。失败返回空结果（不抛错），供 fire-and-forget 使用。
  */
+/**
+ * @description 提取entities
+ * @param content - 内容
+ * @returns Promise<ExtractionResult>
+ */
 export async function extractEntities(content: string): Promise<ExtractionResult> {
   const trimmed = content.trim()
   if (trimmed.length < 8) return { entities: [], relations: [] }
@@ -230,6 +245,13 @@ interface PersistContext {
  * - 同 userId+projectId+name+type 的实体归并，aliases 合并去重。
  * - entryId 变化时先清理该 entry 旧的 relation（内容已变，重新抽取）。
  * - 全程容错，失败只 warn 不抛。
+ */
+/**
+ * @description persistentitiesandrelations
+ * @param entryId - 条目唯一标识符
+ * @param extracted - extracted
+ * @param ctx - 上下文
+ * @returns Promise<void>
  */
 export async function persistEntitiesAndRelations(
   entryId: string,
@@ -313,6 +335,13 @@ export async function persistEntitiesAndRelations(
 /**
  * 入口：抽取 + 持久化一条知识。供路由层 fire-and-forget 调用。
  */
+/**
+ * @description 提取andpersistforentry
+ * @param entryId - 条目唯一标识符
+ * @param content - 内容
+ * @param ctx - 上下文
+ * @returns Promise<void>
+ */
 export async function extractAndPersistForEntry(
   entryId: string,
   content: string,
@@ -338,6 +367,11 @@ export interface EntityContextEntry {
  * 按查询文本命中实体，反向找出关联的知识条目。
  * 作为向量检索的「补充召回」，不替换向量 topK。
  * 实现：把 query 切词，匹配实体名/别名，取命中实体的关系对端的 entryId。
+ */
+/**
+ * @description retrieveentitycontext
+ * @param input - 输入数据
+ * @returns Promise<EntityContextEntry[]>
  */
 export async function retrieveEntityContext(input: {
   projectId?: string | null

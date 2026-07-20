@@ -11,6 +11,11 @@ function stripTrailingZero(value: string) {
   return value.replace(/\.0$/, "")
 }
 
+/**
+ * @description 估算文本的 Token 数量（中英文混合估算策略）
+ * @param text - 待估算的文本
+ * @returns 估算的 Token 数
+ */
 export function estimateTokensFromText(text: string): number {
   if (!text.trim()) return 0
 
@@ -32,6 +37,11 @@ export function estimateTokensFromText(text: string): number {
   return tokens
 }
 
+/**
+ * @description 估算消息内容的 Token 数量（支持文本和多模态内容）
+ * @param content - 消息内容（字符串或多模态内容数组）
+ * @returns 估算的 Token 数
+ */
 export function estimateTokensFromContent(content: ChatContent | string | undefined | null): number {
   if (!content) return 0
   if (typeof content === "string") return estimateTokensFromText(content)
@@ -44,6 +54,11 @@ export function estimateTokensFromContent(content: ChatContent | string | undefi
   return tokens
 }
 
+/**
+ * @description 估算完整上下文的 Token 总量（消息 + 知识块 + 固定提示词缓冲）
+ * @param input - 上下文输入（消息列表、知识块、固定缓冲量）
+ * @returns 估算的总 Token 数
+ */
 export function estimateContextTokens(input: {
   messages?: Array<{ content?: ChatContent | string | null }>
   blocks?: Array<string | undefined | null>
@@ -60,11 +75,22 @@ export function estimateContextTokens(input: {
   return messageTokens + blockTokens + (input.fixedPromptBuffer ?? FIXED_PROMPT_BUFFER_TOKENS)
 }
 
+/**
+ * @description 将 Token 数格式化为中文显示（超过 1 万显示为“X万”）
+ * @param tokens - Token 数量
+ * @returns 格式化后的中文字符串
+ */
 export function formatChineseTokenCount(tokens: number): string {
   if (tokens >= 10_000) return `${stripTrailingZero((tokens / 10_000).toFixed(1))}万`
   return `${Math.max(0, Math.round(tokens))}`
 }
 
+/**
+ * @description 格式化上下文容量标签（已用/总量 + 百分比）
+ * @param usedTokens - 已使用的 Token 数
+ * @param capacityTokens - 总容量 Token 数
+ * @returns 格式化的容量标签字符串
+ */
 export function formatContextCapacityLabel(usedTokens: number, capacityTokens = AIM_CONTEXT_CAPACITY_TOKENS): string {
   const safeCapacity = Math.max(1, capacityTokens)
   const percent = ((usedTokens / safeCapacity) * 100).toFixed(1)

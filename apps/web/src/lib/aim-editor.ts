@@ -7,6 +7,13 @@ export const EDITOR_PANEL_MIN_WIDTH = 280
 export const EDITOR_PANEL_MAX_WIDTH = 460
 export const EDITOR_PANEL_DEFAULT_WIDTH = 360
 
+/**
+ * @description 将选中文本替换为新内容
+ * @param text - 原始文本
+ * @param selection - 选中范围（起始和结束位置）
+ * @param replacement - 替换内容
+ * @returns 替换后的文本
+ */
 export function applySelectionReplacement(
   text: string,
   selection: TextSelectionRange,
@@ -18,16 +25,31 @@ export function applySelectionReplacement(
   return `${text.slice(0, start)}${replacement}${text.slice(end)}`
 }
 
+/**
+ * @description 将编辑器面板宽度限制在有效范围内
+ * @param width - 原始宽度值
+ * @returns 限制后的宽度值
+ */
 export function clampEditorPanelWidth(width: number) {
   if (!Number.isFinite(width)) return EDITOR_PANEL_DEFAULT_WIDTH
   return Math.min(EDITOR_PANEL_MAX_WIDTH, Math.max(EDITOR_PANEL_MIN_WIDTH, Math.round(width)))
 }
 
+/**
+ * @description 从文本中提取“替换稿”内容
+ * @param text - 包含替换稿标记的文本
+ * @returns 提取的替换稿内容，未找到时返回空字符串
+ */
 export function extractReplacementDraft(text: string) {
   const match = text.match(/(?:^|\n)替换稿[：:]\s*([\s\S]*)$/)
   return match?.[1]?.trim() ?? ""
 }
 
+/**
+ * @description 从助手回复文本中提取编辑区最终版口播文案
+ * @param text - 助手回复的完整文本
+ * @returns 提取的文案内容，未找到时返回空字符串
+ */
 export function extractEditorDraftFromAssistantText(text: string) {
   const patterns = [
     /(?:^|\n)#{1,6}\s*编辑区\s*[-—－]\s*最终版口播文案\s*\n+([\s\S]*)$/m,
@@ -41,6 +63,11 @@ export function extractEditorDraftFromAssistantText(text: string) {
     .trim()
 }
 
+/**
+ * @description 从结构拆解分析中提取结构标签列表
+ * @param markdown - 包含结构拆解的 Markdown 文本
+ * @returns 提取的结构标签数组（最多 12 个）
+ */
 export function extractStructureLabelsFromAnalysis(markdown: string) {
   const lines = markdown.split("\n")
   const structureStart = lines.findIndex((line) => /^##\s*结构拆解/.test(line.trim()))
@@ -97,6 +124,12 @@ function inferSequentialBodyMarkers(text: string) {
   return markers.length === patterns.length ? markers : []
 }
 
+/**
+ * @description 将结构拆解标签应用到参考文本中（插入结构标题）
+ * @param text - 原始参考文本
+ * @param markdown - 包含结构拆解的 Markdown 文本
+ * @returns 添加结构标题后的文本
+ */
 export function applyStructureLabelsToReference(text: string, markdown: string) {
   if (!text.trim() || !markdown.trim() || /^#{1,6}\s+/m.test(text)) return text
 
@@ -154,6 +187,12 @@ export function applyStructureLabelsToReference(text: string, markdown: string) 
   return output
 }
 
+/**
+ * @description 尝试多个结构拆解结果，应用第一个匹配的结构到参考文本
+ * @param text - 原始参考文本
+ * @param markdowns - 多个结构拆解 Markdown 文本
+ * @returns 应用结构后的文本，无匹配时返回原文本
+ */
 export function applyFirstMatchingStructureToReference(text: string, markdowns: string[]) {
   for (const markdown of markdowns) {
     const nextText = applyStructureLabelsToReference(text, markdown)
@@ -172,6 +211,11 @@ export interface AimEditorContext {
   draftLabel?: string
 }
 
+/**
+ * @description 格式化编辑器上下文为提示词文本
+ * @param context - 编辑器上下文（动作、选区、草稿等）
+ * @returns 格式化的提示词文本，无上下文时返回空字符串
+ */
 export function formatEditorContextForPrompt(context?: AimEditorContext) {
   if (!context) return ""
   const isPlan = context.documentType === "plan"

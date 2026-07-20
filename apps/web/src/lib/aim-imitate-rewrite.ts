@@ -19,6 +19,11 @@ function normalizeForMatch(text: string) {
   return text.replace(/\s+/g, "")
 }
 
+/**
+ * @description 判断用户输入是否包含仿写意图
+ * @param raw - 原始用户输入
+ * @returns 包含仿写意图返回 true
+ */
 export function hasAimImitateRewriteIntent(raw: string): boolean {
   const normalized = normalizeForMatch(raw)
   return normalized.includes(AIM_IMITATE_REWRITE_MARKER)
@@ -33,6 +38,11 @@ export interface BuildAimImitateRewritePromptInput {
   longForm?: boolean
 }
 
+/**
+ * @description 构建 AIM 仿写提示词
+ * @param input - 仿写输入（对标原文、当前草稿、拆解等）
+ * @returns 仿写提示词文本
+ */
 export function buildAimImitateRewritePrompt(input: BuildAimImitateRewritePromptInput): string {
   const requestText = input.requestText?.trim()
   const sourceAnalysisText = input.sourceAnalysisText?.trim()

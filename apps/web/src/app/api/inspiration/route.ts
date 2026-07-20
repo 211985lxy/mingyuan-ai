@@ -6,6 +6,11 @@ import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { NextRequest, NextResponse } from "next/server"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -19,6 +24,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

@@ -3,6 +3,11 @@ export interface TopicPoolDraft {
   content: string
 }
 
+/**
+ * @description 构建topicpooldraftfromsearchparams
+ * @param params - 参数对象
+ * @returns TopicPoolDraft | null
+ */
 export function buildTopicPoolDraftFromSearchParams(
   params: URLSearchParams,
 ): TopicPoolDraft | null {

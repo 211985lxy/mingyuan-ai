@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import fs from "fs"
 import path from "path"
 
+/**
+ * @description 处理 GET 请求
+ * @returns 无返回值
+ */
 export async function GET() {
   try {
     let configFilePath = ""

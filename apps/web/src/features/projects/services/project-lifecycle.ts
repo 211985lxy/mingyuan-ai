@@ -8,11 +8,23 @@ function assertWithinExportLimit(name: string, rows: unknown[]) {
   }
 }
 
+/**
+ * @description 移除projectfromallowedprojects
+ * @param value - 值
+ * @param projectId - 项目 ID
+ * @returns string[]
+ */
 export function removeProjectFromAllowedProjects(value: unknown, projectId: string): string[] {
   if (!Array.isArray(value)) return []
   return value.filter((id): id is string => typeof id === "string" && id !== projectId)
 }
 
+/**
+ * @description 导出ownedproject
+ * @param userId - 用户 ID
+ * @param projectId - 项目 ID
+ * @returns 无返回值
+ */
 export async function exportOwnedProject(userId: string, projectId: string) {
   const project = await prisma.clientProject.findFirst({
     where: { id: projectId, userId },
@@ -48,6 +60,12 @@ export async function exportOwnedProject(userId: string, projectId: string) {
   }
 }
 
+/**
+ * @description permanentlydeleteownedproject
+ * @param userId - 用户 ID
+ * @param projectId - 项目 ID
+ * @returns 无返回值
+ */
 export async function permanentlyDeleteOwnedProject(userId: string, projectId: string) {
   return prisma.$transaction(async (tx) => {
     const project = await tx.clientProject.findFirst({

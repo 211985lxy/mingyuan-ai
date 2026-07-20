@@ -110,44 +110,41 @@ describe("aim agent guides", () => {
       "改开头钩子",
       "重写这版文案",
       "按爆款逻辑重写",
-      "借热点写一版",
-      "生成现场口播",
+      "借热点写观点",
+      "口播脚本",
       "生成小红书图文",
       "生成获客成交文案",
-      "生成观点口播",
-      "一键拆成全平台内容",
-      "生成后续 12 条选题",
+      "内容裂变",
     ]))
   })
 
-  it("adds a hot-topic oral script skill with route-specific guidance", () => {
+  it("adds a unified oral script skill with type-based routing", () => {
     const guide = getAimAgentGuide("content_producer")
-    const skill = guide.skills.find((item) => item.id === "hot_oral_script")
+    const skill = guide.skills.find((item) => item.id === "oral_script")
     const guideText = [guide.defaultInstruction, ...guide.quickPrompts].join("\n")
 
-    expect(skill?.label).toBe("热点口播脚本生成")
+    expect(skill?.label).toBe("口播脚本")
     expect(skill?.prompt).toContain("类型 A")
     expect(skill?.prompt).toContain("类型 B")
     expect(skill?.prompt).toContain("类型 C")
-    expect(skill?.prompt).toContain("热点适配度")
-    expect(skill?.prompt).toContain("不得直接照抄")
-    expect(skill?.prompt).toContain("5-10 条")
+    expect(skill?.prompt).toContain("类型 D")
+    expect(skill?.prompt).toContain("适配度")
+    expect(skill?.prompt).toContain("不得照抄原句")
+    expect(skill?.prompt).toContain("3-5 条")
     expect(skill?.prompt).toContain("前 3 秒钩子")
     expect(skill?.prompt).toContain("镜头表现建议")
-    expect(skill?.prompt).toContain("屏幕字幕重点")
     expect(skill?.prompt).toContain("结尾行动引导")
     expect(guideText).toContain("热点口播")
     expect(guideText).toContain("参考同行文案")
   })
 
-  it("keeps video diary and xiaohongshu skills tied to their methodology", () => {
+  it("keeps oral script and xiaohongshu skills tied to their methodology", () => {
     const guide = getAimAgentGuide("content_producer")
-    const videoDiary = guide.skills.find((item) => item.id === "video_diary")
+    const oralScript = guide.skills.find((item) => item.id === "oral_script")
     const xhs = guide.skills.find((item) => item.id === "xiaohongshu_image_text")
 
-    expect(videoDiary?.prompt).toContain("事件内容化五步法")
-    expect(videoDiary?.prompt).toContain("真实事件 -> 关键矛盾 -> 核心观点 -> 用户价值 -> 内容表达")
-    expect(videoDiary?.prompt).toContain("不写流水账")
+    expect(oralScript?.prompt).toContain("事件内容化五步法")
+    expect(oralScript?.prompt).toContain("真实事件 -> 关键矛盾 -> 核心观点 -> 用户价值 -> 内容表达")
     expect(xhs?.prompt).toContain("小红书图文视觉导演结构")
     expect(xhs?.prompt).toContain("8 页图文结构")
     expect(xhs?.prompt).toContain("品牌/IP/账号相关标签")
@@ -155,12 +152,11 @@ describe("aim agent guides", () => {
 
   it("defines topic planning and review skills", () => {
     const planningLabels = getAimAgentGuide("business_diagnosis").skills.map((skill) => skill.label)
-    expect(planningLabels.slice(0, 5)).toEqual([
-      "判断内容目的",
-      "做曝光选题",
-      "做获客选题",
-      "做信任选题",
-      "做成交选题",
+    expect(planningLabels.slice(0, 4)).toEqual([
+      "选择对标账号 / 对标内容",
+      "按目的生成选题",
+      "按主线生成选题池",
+      "筛选高潜选题",
     ])
     expect(planningLabels).toContain("判断这条值不值得做")
 
@@ -178,11 +174,11 @@ describe("aim agent guides", () => {
   })
 
   it("keeps topic goals decided before copywriting", () => {
-    const goalSkill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "decide_content_goal")
+    const purposeSkill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "purpose_topics")
 
-    expect(goalSkill?.prompt).toContain("曝光、获客、信任、成交")
-    expect(goalSkill?.prompt).toContain("不要直接写文案")
-    expect(goalSkill?.prompt).toContain("下一步交给文案官")
+    expect(purposeSkill?.prompt).toContain("曝光/获客/信任/成交")
+    expect(purposeSkill?.prompt).toContain("不要直接写文案")
+    expect(purposeSkill?.prompt).toContain("为什么不是另外三个目的")
   })
 
   it("adds a benchmark-asset flywheel skill for topic planning", () => {
@@ -200,13 +196,13 @@ describe("aim agent guides", () => {
     expect(guideText).toContain("A级连续栏目选题")
   })
 
-  it("keeps meeting-minutes asset pack grounded and non-generic", () => {
-    const skill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "meeting_minutes_asset_pack")
+  it("keeps meeting-minutes topic skill grounded and non-generic", () => {
+    const skill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "meeting_minutes_topics")
 
-    expect(skill?.prompt).toContain("高密度《会议纪要内容资产包》")
+    expect(skill?.prompt).toContain("单核心选题")
+    expect(skill?.prompt).toContain("完整资产包")
     expect(skill?.prompt).toContain("关键信息抽取表")
     expect(skill?.prompt).toContain("至少 12 条")
-    expect(skill?.prompt).toContain("会议证据")
     expect(skill?.prompt).toContain("不要结尾反问")
   })
 

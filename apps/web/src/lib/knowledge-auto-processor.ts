@@ -33,6 +33,11 @@ const BATCH_SIZE = 15
 
 // ─── 1a. 微信导出检测 ─────────────────────────────────────
 
+/**
+ * @description 检测wechatexport
+ * @param text - 文本
+ * @returns boolean
+ */
 export function detectWeChatExport(text: string): boolean {
   const patterns = [
     /^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?\s+/m,
@@ -43,6 +48,11 @@ export function detectWeChatExport(text: string): boolean {
   return matchCount >= 2
 }
 
+/**
+ * @description 解析wechatexport
+ * @param text - 文本
+ * @returns ChatMessage[]
+ */
 export function parseWeChatExport(text: string): ChatMessage[] {
   const lines = text.split(/\n/)
   const messages: ChatMessage[] = []
@@ -114,6 +124,13 @@ function buildClassificationPrompt(
 
 // ─── 1c. 去重检测 ────────────────────────────────────────
 
+/**
+ * @description 查找potentialduplicates
+ * @param text - 文本
+ * @param userId - 用户 ID
+ * @param projectId? - projectId?
+ * @returns Promise<
+ */
 export async function findPotentialDuplicates(
   text: string,
   userId: string,
@@ -210,6 +227,11 @@ function buildFallbackBatch(batch: string[], startIndex: number, fileName: strin
 
 // ─── 1d. 主处理函数 ──────────────────────────────────────
 
+/**
+ * @description 处理chunksforsmartimport
+ * @param input - 输入数据
+ * @returns Promise<ProcessedChunk[]>
+ */
 export async function processChunksForSmartImport(input: {
   chunks: string[]
   fileName: string

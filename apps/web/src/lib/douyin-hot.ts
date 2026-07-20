@@ -169,6 +169,10 @@ function labelToString(
 
 // ─── Public API ──────────────────────────────────────────
 
+/**
+ * @description 请求获取andstore
+ * @returns Promise<
+ */
 export async function fetchAndStore(): Promise<{
   batchId: string
   itemCount: number
@@ -196,6 +200,10 @@ export async function fetchAndStore(): Promise<{
   return { batchId, itemCount: items.length }
 }
 
+/**
+ * @description 获取最新的hotlist
+ * @returns Promise<HotTopic[]>
+ */
 export async function getLatestHotList(): Promise<HotTopic[]> {
   // Try Redis cache first
   try {

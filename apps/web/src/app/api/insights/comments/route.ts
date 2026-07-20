@@ -7,6 +7,11 @@ import { fetchRedFoxComments } from "@/lib/redfox"
  * 拉取单条作品/笔记的评论（用户主动触发）。
  * 不自动批量采集，避免成本和限流失控。
  */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const platform = searchParams.get("platform") as "douyin" | "xiaohongshu" | null

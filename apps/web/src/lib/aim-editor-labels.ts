@@ -35,6 +35,12 @@ const COPY_EDITOR_LABELS: EditorPanelLabels = {
   documentType: "copy",
 }
 
+/**
+ * @description 根据 Agent 类型和内容格式获取编辑器面板的显示标签配置
+ * @param agentId - AIM Agent 标识（如 content_producer、persona 等）
+ * @param editorFormat - 可选的内容格式（如 video_script、wechat_article 等）
+ * @returns 编辑器面板标签配置对象
+ */
 export function getAimEditorPanelLabels(agentId: AimAgentId, editorFormat?: ContentFormat): EditorPanelLabels {
   if ((editorFormat && COPY_FORMATS.has(editorFormat)) || agentId === "content_producer" || agentId === "free_copywriter" || agentId === "deep_copywriter") {
     return COPY_EDITOR_LABELS

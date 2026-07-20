@@ -53,6 +53,11 @@ const MERGE_MAX_CHARS = 1800
 
 // ─── 提取 prompt ──────────────────────────────────────────
 
+/**
+ * @description 构建写作风格提取 Prompt（从对话中提炼 IP 的长期写作风格）
+ * @param messages - 对话消息数组
+ * @returns 用于 LLM 提取的 Prompt 文本
+ */
 export function buildStyleExtractionPrompt(messages: StyleProfileMessage[]): string {
   const recent = messages
     .slice(-12)
@@ -137,6 +142,11 @@ function hasAnyDimFilled(d: Partial<StyleProfileDelta>): boolean {
   return dims.some((dim) => dim && Object.values(dim).some((v) => asString(v).length > 0))
 }
 
+/**
+ * @description 解析 LLM 返回的风格档案 JSON，容错处理格式异常
+ * @param raw - LLM 返回的原始 JSON 字符串
+ * @returns 解析后的风格增量对象，无效时返回 null
+ */
 export function parseStyleProfileJson(raw: string): StyleProfileDelta | null {
   let parsed: unknown
   try {
@@ -348,6 +358,11 @@ async function mergeStyleProfile(
 
 // ─── 入口：提取 ───────────────────────────────────────────
 
+/**
+ * @description 将未知格式的消息数组标准化为 StyleProfileMessage 数组
+ * @param value - 未知格式的消息数据
+ * @returns 标准化后的消息数组
+ */
 export function normalizeStyleMessages(value: unknown): StyleProfileMessage[] {
   if (!Array.isArray(value)) return []
   return value
@@ -362,6 +377,11 @@ export function normalizeStyleMessages(value: unknown): StyleProfileMessage[] {
     .filter((item): item is StyleProfileMessage => item !== null)
 }
 
+/**
+ * @description 从对话中提取写作风格增量（调用 LLM 进行风格分析）
+ * @param input - 包含对话消息数组的对象
+ * @returns 提取的风格增量，无可沉淀内容时返回 null
+ */
 export async function extractStyleProfileDelta(input: {
   messages: StyleProfileMessage[]
 }): Promise<StyleProfileDelta | null> {
@@ -384,6 +404,11 @@ export interface UpsertStyleProfileResult {
   created: boolean
 }
 
+/**
+ * @description 创建或更新用户的主写作风格档案（合并新增量到现有档案）
+ * @param input - 包含用户 ID、风格增量、日期戳和可选项目 ID 的对象
+ * @returns 更新结果，包含档案 ID、标题、内容及是否为新建
+ */
 export async function upsertMainStyleProfile(input: {
   userId: string
   delta: StyleProfileDelta

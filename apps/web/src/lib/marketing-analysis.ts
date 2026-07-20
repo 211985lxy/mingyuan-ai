@@ -32,6 +32,11 @@ const SYSTEM_PROMPT = `你是一位专业的短视频营销分析师。请根据
 
 请严格只返回 JSON，不要包含其他文字。`
 
+/**
+ * @description 分析marketing
+ * @param scriptContent - script内容
+ * @returns Promise<MarketingAnalysis>
+ */
 export async function analyzeMarketing(
   scriptContent: string
 ): Promise<MarketingAnalysis> {

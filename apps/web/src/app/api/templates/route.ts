@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma/client"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const industry = searchParams.get("industry")

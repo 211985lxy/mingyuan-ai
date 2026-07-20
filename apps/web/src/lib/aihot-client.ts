@@ -26,6 +26,10 @@ const ETAG_KEY = "aihot:etag:selected"
 let memoryEtag: string | null = null
 let memoryData: AiHotResponse | null = null
 
+/**
+ * @description 请求获取aihotselecteditems
+ * @returns Promise<AiHotResponse>
+ */
 export async function fetchAiHotSelectedItems(): Promise<AiHotResponse> {
   let cachedEtag: string | null = null
   let cachedData: AiHotResponse | null = null

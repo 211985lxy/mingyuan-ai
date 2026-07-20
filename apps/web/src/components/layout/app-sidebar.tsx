@@ -158,6 +158,10 @@ function formatHistoryTitle(item: {
   return [`${format ? `${format}｜` : ""}${theme}`, date].filter(Boolean).join(" ")
 }
 
+/**
+ * @description appsidebar
+ * @returns 无返回值
+ */
 export function AppSidebar() {
   const [collapsedAgents, setCollapsedAgents] = useState<Set<AimAgentId>>(new Set())
   const [showAllAgents, setShowAllAgents] = useState<Set<AimAgentId>>(new Set())

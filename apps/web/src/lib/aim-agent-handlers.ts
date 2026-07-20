@@ -82,6 +82,11 @@ const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
 
 const VALID_AGENT_IDS = AIM_AGENT_IDS as ReadonlySet<string>
 
+/**
+ * @description 获取agenthandler
+ * @param agentId - 智能体 ID
+ * @returns AimAgentHandler
+ */
 export function getAgentHandler(agentId: string): AimAgentHandler {
   if (VALID_AGENT_IDS.has(agentId)) {
     return HANDLERS[agentId as AimAgentId]
@@ -154,7 +159,7 @@ async function buildAimChatRuntime(
     viralStructureBlock: "",
     eventStorytellingBlock: "",
     ipWikiBlock,
-  }, params.runtimeTask ?? "rewrite_copy")
+  }, params.runtimeTask ?? "rewrite_copy", agentId)
   await addAimTraceStep(params.trace, {
     key: "context_budget",
     label: "上下文预算",
@@ -176,6 +181,12 @@ async function buildAimChatRuntime(
   }
 }
 
+/**
+ * @description 构建aimchatresponse
+ * @param agentId - 智能体 ID
+ * @param params - 参数对象
+ * @returns Promise<AimChatResponse>
+ */
 export async function buildAimChatResponse(
   agentId: string,
   params: AimChatRuntimeInput,
@@ -267,6 +278,12 @@ async function finishGenerationRun(
   })
 }
 
+/**
+ * @description 构建aimgeneration
+ * @param agentId - 智能体 ID
+ * @param params - 参数对象
+ * @returns Promise<AimGenerateResponse>
+ */
 export async function buildAimGeneration(
   agentId: string,
   params: AimGenerationInput,

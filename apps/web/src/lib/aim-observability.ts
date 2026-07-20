@@ -50,6 +50,12 @@ type TraceUpdate = {
 
 const MAX_SUMMARY_LENGTH = 500
 
+/**
+ * @description 将任意值截断为摘要文本（用于日志和跟踪记录）
+ * @param value - 待截断的值（支持字符串或可 JSON 序列化对象）
+ * @param limit - 最大字符数，默认 500
+ * @returns 截断后的摘要字符串
+ */
 export function summarizeText(value: unknown, limit = MAX_SUMMARY_LENGTH): string {
   if (value == null) return ""
   const text = typeof value === "string" ? value : JSON.stringify(value)
@@ -96,6 +102,11 @@ async function appendStep(trace: AimTraceRecorder | undefined, step: AimTraceSte
   await safeUpdateTrace(trace.id, { steps })
 }
 
+/**
+ * @description 创建 AIM 执行跟踪记录（用于可观测性链路追踪）
+ * @param input - 跟踪创建输入（用户 ID、项目 ID、Agent ID、操作类型等）
+ * @returns 跟踪记录器，创建失败时返回 undefined
+ */
 export async function createAimTrace(input: CreateAimTraceInput): Promise<AimTraceRecorder | undefined> {
   const delegate = getTraceDelegate()
   if (!delegate) return undefined
@@ -124,8 +135,9 @@ function isUniqueConstraintError(error: unknown): boolean {
 }
 
 /**
- * 以调用方提供的确定性主键原子领取一次运行。delegate 缺失或基础设施错误时抛出，
- * 由生产工作流 fail-closed；只有数据库唯一冲突会被识别为重复执行。
+ * @description 原子领取一次 AIM 执行跟踪（用于幂等性控制）
+ * @param input - 领取输入（ID、用户 ID、项目 ID、智能体 ID、动作等）
+ * @returns 领取结果（是否成功、原因、跟踪信息）
  */
 export async function claimAimTrace(input: ClaimAimTraceInput): Promise<ClaimAimTraceResult> {
   const delegate = getTraceDelegate()
@@ -152,8 +164,9 @@ export async function claimAimTrace(input: ClaimAimTraceInput): Promise<ClaimAim
 }
 
 /**
- * 释放尚未进入模型工作流的原子 claim。
- * 仅删除 running 记录；调用方必须保证该 Trace 尚未交给 executeAimRun。
+ * @description 释放尚未进入模型工作流的原子 claim
+ * @param trace - 跟踪记录器
+ * @returns 无返回值
  */
 export async function releaseAimTraceClaim(trace: AimTraceRecorder | undefined): Promise<void> {
   if (!trace) return
@@ -163,6 +176,15 @@ export async function releaseAimTraceClaim(trace: AimTraceRecorder | undefined):
   if (result.count !== 1) throw new Error(`Trace claim 无法安全释放：${trace.id}`)
 }
 
+/**
+ * @description 执行跟踪步骤包装器：自动记录步骤的执行时间、状态和结果
+ * @param trace - 跟踪记录器
+ * @param key - 步骤唯一标识
+ * @param label - 步骤显示名称
+ * @param fn - 待执行的异步/同步函数
+ * @param describe - 可选的结果描述函数，用于提取额外信息
+ * @returns 函数执行结果
+ */
 export async function runAimTraceStep<T>(
   trace: AimTraceRecorder | undefined,
   key: string,
@@ -198,6 +220,11 @@ export async function runAimTraceStep<T>(
   }
 }
 
+/**
+ * @description 手动添加一个跟踪步骤记录
+ * @param trace - 跟踪记录器
+ * @param step - 步骤信息（不含时间戳，自动填充）
+ */
 export async function addAimTraceStep(
   trace: AimTraceRecorder | undefined,
   step: Omit<AimTraceStep, "startedAt" | "finishedAt">,
@@ -209,6 +236,11 @@ export async function addAimTraceStep(
   })
 }
 
+/**
+ * @description 完成 AIM 执行跟踪，记录最终状态和总耗时
+ * @param trace - 跟踪记录器
+ * @param update - 可选的更新信息（状态、模型、Token 数、输出摘要等）
+ */
 export async function finishAimTrace(trace: AimTraceRecorder | undefined, update: TraceUpdate = {}) {
   if (!trace) return
   await safeUpdateTrace(trace.id, {
@@ -218,6 +250,11 @@ export async function finishAimTrace(trace: AimTraceRecorder | undefined, update
   })
 }
 
+/**
+ * @description 标记 AIM 执行跟踪为失败状态，记录错误信息
+ * @param trace - 跟踪记录器
+ * @param error - 捕获的异常对象
+ */
 export async function failAimTrace(trace: AimTraceRecorder | undefined, error: unknown) {
   if (!trace) return
   const message = error instanceof Error ? error.message : String(error)

@@ -15,6 +15,10 @@ function percentEncode(str: string): string {
 /**
  * 自动使用原生的 crypto 模块，计算阿里云签名，换取 NLS Token
  */
+/**
+ * @description 获取aliyunnlstoken
+ * @returns Promise<string>
+ */
 export async function getAliyunNlsToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   // 如果缓存未过期（预留 60 秒缓冲区），直接返回
@@ -91,6 +95,11 @@ export async function getAliyunNlsToken(): Promise<string> {
 /**
  * 调用阿里云一句话识别服务，将 WAV 二进制音频文件转写为文本
  * 限制：音频时长不超过 60 秒，建议采样率为 16000Hz 单声道 16bit WAV 格式
+ */
+/**
+ * @description transcribeaudiowav
+ * @param audioBuffer - audio缓冲区
+ * @returns Promise<string>
  */
 export async function transcribeAudioWav(audioBuffer: Buffer): Promise<string> {
   const appKey = env.ALIYUN_NLS_APP_KEY || ""

@@ -35,6 +35,12 @@ function formatMetric(value: number | undefined): string {
   return String(value)
 }
 
+/**
+ * @description 格式化对标账号监控数据为 AIM 上下文文本
+ * @param query - 用户查询文本
+ * @param accounts - 对标账号列表
+ * @returns 格式化的监控数据文本，无需时返回空字符串
+ */
 export function formatWatchAccountsForAim(query: string, accounts: WatchAccountForAim[]): string {
   if (!wantsWatchAccountContext(query) || accounts.length === 0) return ""
 
@@ -62,6 +68,12 @@ export function formatWatchAccountsForAim(query: string, accounts: WatchAccountF
   return `【对标账号监控数据】\n${blocks.join("\n\n")}\n\n回答要求：用户问近期作品时，直接基于上述作品列表回答；可以归纳内容特点，但要说明这是最近一次刷新缓存，不要说成实时抓取结果。`
 }
 
+/**
+ * @description 构建 AIM 竞品监控上下文（从数据库加载对标账号数据）
+ * @param userId - 用户 ID
+ * @param query - 用户查询文本
+ * @returns 竞品监控上下文文本，无需时返回空字符串
+ */
 export async function buildAimCompetitorWatchContext(userId: string, query: string): Promise<string> {
   if (!wantsWatchAccountContext(query)) return ""
 

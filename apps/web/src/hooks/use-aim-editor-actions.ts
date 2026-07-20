@@ -177,6 +177,11 @@ async function streamDraftRevision(input: AimEditorActionInput, prompt: string, 
   }
 }
 
+/**
+ * @description React Hook：aimeditoractions
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimEditorActions(input: AimEditorActionInput) {
   const [isImitating, setIsImitating] = useState(false)
   const [imitateStyleId, setImitateStyleId] = useState("default")

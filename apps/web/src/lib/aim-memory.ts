@@ -58,6 +58,11 @@ const SUMMARY_SYSTEM_PROMPT = `你是 AIM 智能体的长期记忆提炼器。�
 
 如果没有值得长期沉淀的内容，返回 {"memories":[]}。content 控制在 20-120 字，简洁可复用。`
 
+/**
+ * @description 构建记忆提取提示词（对话转录文本）
+ * @param messages - 对话消息列表
+ * @returns 记忆提取提示词文本
+ */
 export function buildMemoryExtractionPrompt(messages: AimMemoryMessage[]): string {
   const transcript = messages
     .map((m) => `${m.role === "user" ? "用户" : "助手"}：${m.content}`)
@@ -66,6 +71,11 @@ export function buildMemoryExtractionPrompt(messages: AimMemoryMessage[]): strin
   return transcript
 }
 
+/**
+ * @description 构建记忆提取的 LLM 消息列表
+ * @param messages - 对话消息列表
+ * @returns LLM 消息数组
+ */
 export function buildMemoryExtractionMessages(
   messages: AimMemoryMessage[],
 ): ChatMessage[] {
@@ -80,7 +90,9 @@ function isMemoryKind(v: unknown): v is AimMemoryKind {
 }
 
 /**
- * 解析 LLM 输出为记忆草稿列表（纯函数，对畸形输入容错）。
+ * @description 解析 LLM 输出为记忆草稿列表
+ * @param raw - LLM 返回的原始 JSON 字符串
+ * @returns 解析后的记忆草稿数组
  */
 export function parseMemoryExtraction(raw: string): AimMemoryDraft[] {
   if (!raw || typeof raw !== "string") return []
@@ -129,6 +141,11 @@ export function parseMemoryExtraction(raw: string): AimMemoryDraft[] {
 /**
  * 从对话中提炼值得长期沉淀的记忆草稿。失败返回空数组（不抛错）。
  */
+/**
+ * @description 总结conversationformemory
+ * @param messages - 消息列表
+ * @returns Promise<AimMemoryDraft[]>
+ */
 export async function summarizeConversationForMemory(
   messages: AimMemoryMessage[],
 ): Promise<AimMemoryDraft[]> {
@@ -161,6 +178,12 @@ interface PersistContext {
 /**
  * 把记忆草稿幂等写入 AimMemory。
  * 去重策略：同 projectId+agentId+kind+content 已存在则跳过（不重复写）。
+ */
+/**
+ * @description persistaimmemories
+ * @param drafts - drafts
+ * @param ctx - 上下文
+ * @returns Promise<number>
  */
 export async function persistAimMemories(
   drafts: AimMemoryDraft[],
@@ -206,6 +229,12 @@ export async function persistAimMemories(
 /**
  * 入口：提炼 + 持久化。供 generate/chat 路由 fire-and-forget 调用。
  */
+/**
+ * @description persistmemoriesfromconversation
+ * @param messages - 消息列表
+ * @param ctx - 上下文
+ * @returns Promise<number>
+ */
 export async function persistMemoriesFromConversation(
   messages: AimMemoryMessage[],
   ctx: PersistContext,
@@ -236,6 +265,11 @@ function sortAimMemoryRows(rows: AimMemoryRow[], topK: number): AimMemoryRow[] {
 /**
  * 按项目 + agent 召回近 N 条记忆，按 kind 固定优先级排序：
  * decision > preference > fact > conversation_summary
+ */
+/**
+ * @description retrieveaimmemory
+ * @param input - 输入数据
+ * @returns Promise<AimMemoryRow[]>
  */
 export async function retrieveAimMemory(input: {
   userId: string
@@ -273,6 +307,13 @@ export async function retrieveAimMemory(input: {
   }
 }
 
+/**
+ * @description 合并aimmemoryrows
+ * @param primaryRows - primaryRows
+ * @param fallbackRows - 降级值Rows
+ * @param topK - topK
+ * @returns AimMemoryRow[]
+ */
 export function mergeAimMemoryRows(
   primaryRows: AimMemoryRow[],
   fallbackRows: AimMemoryRow[],
@@ -291,6 +332,11 @@ export function mergeAimMemoryRows(
   return sortAimMemoryRows(merged, topK)
 }
 
+/**
+ * @description retrievelayeredaimmemory
+ * @param input - 输入数据
+ * @returns Promise<AimMemoryRow[]>
+ */
 export async function retrieveLayeredAimMemory(input: {
   userId: string
   projectId?: string | null
@@ -313,6 +359,11 @@ const KIND_LABEL: Record<string, string> = {
 
 /**
  * 把召回的记忆格式化为可注入 prompt 的文本块。
+ */
+/**
+ * @description 格式化aimmemoryblock
+ * @param rows - rows
+ * @returns string
  */
 export function formatAimMemoryBlock(rows: AimMemoryRow[]): string {
   if (rows.length === 0) return ""

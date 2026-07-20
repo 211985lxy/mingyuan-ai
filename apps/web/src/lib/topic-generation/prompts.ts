@@ -16,11 +16,23 @@ const TOPIC_SOURCE_LABELS: Record<string, string> = {
   industry_hot: "行业热点",
 }
 
+/**
+ * @description truncatetopicsourcecontent
+ * @param content - 内容
+ * @returns string
+ */
 export function truncateTopicSourceContent(content: string): string {
   const normalized = content.replace(/\s+/g, " ").trim()
   return normalized.length <= 180 ? normalized : `${normalized.slice(0, 180)}...`
 }
 
+/**
+ * @description 构建topicsystemprompt
+ * @param strategy - 策略
+ * @param recentTitles - recentTitles
+ * @param recommendationMode - recommendation众数
+ * @returns string
+ */
 export function buildTopicSystemPrompt(
   strategy: DerivationStrategy,
   recentTitles: string[],
@@ -92,6 +104,12 @@ export function buildTopicSystemPrompt(
   return prompt
 }
 
+/**
+ * @description 构建topicuserprompt
+ * @param input - 输入数据
+ * @param selectedCodes - selectedCodes
+ * @returns string
+ */
 export function buildTopicUserPrompt(input: TopicGenerationInput, selectedCodes: string[]): string {
   const { ipProfile, topicSources, recommendationMode = "normal", contentThemes } = input
   const selectedElements = input.elements.filter((element) => selectedCodes.includes(element.code))

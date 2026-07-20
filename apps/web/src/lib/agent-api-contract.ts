@@ -38,6 +38,11 @@ const AGENT_KNOWLEDGE_IMPORT_DENIED_ACTIONS = AGENT_DENIED_ACTIONS
 const TARGET_FORMAT_SET = new Set<string>(AGENT_TARGET_FORMATS)
 const AGENT_AIM_AGENT_ID_SET = new Set<string>(AGENT_AIM_AGENT_IDS)
 
+/**
+ * @description 解析agenttargetformats
+ * @param value - 值
+ * @returns ContentFormat[]
+ */
 export function parseAgentTargetFormats(value: unknown): ContentFormat[] {
   if (!Array.isArray(value)) return []
   return value.filter(
@@ -46,6 +51,11 @@ export function parseAgentTargetFormats(value: unknown): ContentFormat[] {
   )
 }
 
+/**
+ * @description 查找invalidagenttargetformats
+ * @param value - 值
+ * @returns string[]
+ */
 export function findInvalidAgentTargetFormats(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.filter(
@@ -53,11 +63,20 @@ export function findInvalidAgentTargetFormats(value: unknown): string[] {
   )
 }
 
+/**
+ * @description 总结agentinput
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function summarizeAgentInput(input: string) {
   const trimmed = input.replace(/\s+/g, " ").trim()
   return trimmed.length > 500 ? `${trimmed.slice(0, 500)}...` : trimmed
 }
 
+/**
+ * @description 构建agentcapabilities
+ * @returns 无返回值
+ */
 export function buildAgentCapabilities() {
   return {
     name: "明动 AIM Agent Skill",

@@ -95,6 +95,11 @@ function DimensionCard({
   );
 }
 
+/**
+ * @description qualityreportcard
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function QualityReportCard({
   report,
   onPolish,

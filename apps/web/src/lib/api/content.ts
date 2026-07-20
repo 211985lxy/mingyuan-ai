@@ -17,21 +17,39 @@ import type {
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
 
+/**
+ * @description 列出templates
+ * @returns Promise<PaginatedResponse<PublicTemplateListItem>>
+ */
 export async function listTemplates(): Promise<PaginatedResponse<PublicTemplateListItem>> {
   const payload = await request<{ data: PaginatedResponse<PublicTemplateListItem> }>("/api/templates")
   return payload.data
 }
 
+/**
+ * @description 列出structures
+ * @returns Promise<ApiVideoStructure[]>
+ */
 export async function listStructures(): Promise<ApiVideoStructure[]> {
   const payload = await request<{ data: ApiVideoStructure[] }>("/api/structures")
   return payload.data
 }
 
+/**
+ * @description 获取template
+ * @param id - 唯一标识符
+ * @returns Promise<PublicTemplateDetail>
+ */
 export async function getTemplate(id: string): Promise<PublicTemplateDetail> {
   const payload = await request<{ data: PublicTemplateDetail }>(`/api/templates/${id}`)
   return payload.data
 }
 
+/**
+ * @description aifillbrief
+ * @param input - 输入数据
+ * @returns Promise<
+ */
 export async function aiFillBrief(input: {
   templateId: string
   userInput?: string
@@ -46,6 +64,11 @@ export async function aiFillBrief(input: {
   return payload.data
 }
 
+/**
+ * @description 生成scripts
+ * @param input - 输入数据
+ * @returns Promise<
+ */
 export async function generateScripts(input: {
   templateId: string
   inputs: Record<string, string>
@@ -68,6 +91,12 @@ export async function generateScripts(input: {
   return payload.data
 }
 
+/**
+ * @description 更新script
+ * @param id - 唯一标识符
+ * @param input - 输入数据
+ * @returns Promise<ApiScript>
+ */
 export async function updateScript(
   id: string,
   input: { content?: string; status?: string }
@@ -122,6 +151,11 @@ function toPercent(score1to10: number): number {
   return Math.round(score1to10 * 10)
 }
 
+/**
+ * @description 检查scriptquality
+ * @param input - 输入数据
+ * @returns Promise<QualityCheckReport>
+ */
 export async function checkScriptQuality(input: {
   content: string
   topicTitle?: string
@@ -168,6 +202,11 @@ export interface PolishResult {
   polishedDimensions: string[]
 }
 
+/**
+ * @description polishscript
+ * @param input - 输入数据
+ * @returns Promise<PolishResult>
+ */
 export async function polishScript(input: {
   content: string
   weakDimensions?: string[]

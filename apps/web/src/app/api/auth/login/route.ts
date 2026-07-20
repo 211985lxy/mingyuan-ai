@@ -7,6 +7,11 @@ import { allowAuthAttempt } from "@/features/auth/auth-rate-limit"
 import { apiRequestErrorResponse, parseJsonBody } from "@/lib/api-contract"
 import { setSessionCookie } from "@/lib/auth-session"
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   let credentials
   try {

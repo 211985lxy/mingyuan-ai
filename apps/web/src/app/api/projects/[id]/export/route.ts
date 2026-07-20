@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { exportOwnedProject } from "@/features/projects/services/project-lifecycle"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await authenticateRequest(request)

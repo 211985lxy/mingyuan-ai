@@ -28,6 +28,11 @@ const DEFAULT_TAGS = [
   "confidence:user_claim",
 ]
 
+/**
+ * @description 构建客户偏好提炼提示词
+ * @param messages - 对话消息列表
+ * @returns 提炼偏好的提示词文本
+ */
 export function buildEvolutionPrompt(messages: AimEvolutionMessage[]): string {
   const recent = messages
     .slice(-12)
@@ -66,6 +71,11 @@ export function buildEvolutionPrompt(messages: AimEvolutionMessage[]): string {
 ${recent}`
 }
 
+/**
+ * @description 解析 LLM 返回的偏好提炼 JSON
+ * @param raw - LLM 返回的原始 JSON 字符串
+ * @returns 解析后的偏好建议数组
+ */
 export function parseEvolutionJson(raw: string): AimEvolutionSuggestion[] {
   try {
     const parsed = JSON.parse(raw) as { suggestions?: RawSuggestion[] }
@@ -91,6 +101,11 @@ export function parseEvolutionJson(raw: string): AimEvolutionSuggestion[] {
   }
 }
 
+/**
+ * @description 将未知输入规范化为 AIM 对话消息数组
+ * @param value - 待规范化的输入值
+ * @returns 规范化后的对话消息数组
+ */
 export function normalizeEvolutionMessages(value: unknown): AimEvolutionMessage[] {
   if (!Array.isArray(value)) return []
   return value
@@ -105,6 +120,11 @@ export function normalizeEvolutionMessages(value: unknown): AimEvolutionMessage[
     .filter((item): item is AimEvolutionMessage => item !== null)
 }
 
+/**
+ * @description 从对话中提取 AIM 客户偏好建议
+ * @param input - 提取输入（消息列表和最大建议数）
+ * @returns 提取的偏好建议数组
+ */
 export async function extractAimEvolutionSuggestions(input: {
   messages: AimEvolutionMessage[]
   maxSuggestions?: number

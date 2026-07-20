@@ -29,6 +29,20 @@ describe("authentication boundaries", () => {
     expect(source).not.toContain("skip-password-check")
   })
 
+  it("keeps local one-click login behind development, feature, and host gates", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/app/api/auth/dev-login/route.ts"),
+      "utf8",
+    )
+
+    expect(source).toContain('env.NODE_ENV !== "development"')
+    expect(source).toContain('env.LOCAL_DEV_LOGIN_ENABLED !== "true"')
+    expect(source).toContain("LOCAL_HOSTNAMES.has(request.nextUrl.hostname)")
+    expect(source).toContain('isCsrfSafe(request, "cookie")')
+    expect(source).not.toContain("prisma.user.create")
+    expect(source).not.toContain("prisma.user.update")
+  })
+
   it("does not persist browser session tokens", () => {
     expect(existsSync(resolve(process.cwd(), "src/lib/auth-storage.ts"))).toBe(false)
 

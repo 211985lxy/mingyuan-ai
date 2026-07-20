@@ -73,6 +73,11 @@ const OPENING_RECOMMENDATION_INSTRUCTIONS = [
     "- 选出最适合转化的 3 条，并说明理由。",
 ].join("\n")
 
+/**
+ * @description 构建爆款开头推荐 Prompt（用于生成高吸引力开头候选）
+ * @param input - 包含用户指令、原开头片段和完整稿子的对象
+ * @returns 用于 LLM 生成开头推荐的完整 Prompt
+ */
 export function buildOpeningRecommendationPrompt(input: {
   commandInput: string
   openingSegment: string

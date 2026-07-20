@@ -5,6 +5,11 @@ import { FileText } from "lucide-react"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { parseVideoCopyAnalysisDisplay } from "@/lib/video-copy-display"
 
+/**
+ * @description videocopyanalysiscards
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function VideoCopyAnalysisCards({ markdown }: { markdown: string }) {
   const display = parseVideoCopyAnalysisDisplay(markdown)
 

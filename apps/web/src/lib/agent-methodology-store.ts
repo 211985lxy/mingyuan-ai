@@ -93,6 +93,11 @@ async function readMethodologyFile(meta: MethodologyMeta): Promise<string | null
  * 取方法论文本（已包装好块标题，可直接拼进提示词）。
  * 优先 DB，无则读文件并回填播种到 DB。
  */
+/**
+ * @description 获取methodologyblock
+ * @param key - 键
+ * @returns Promise<string>
+ */
 export async function getMethodologyBlock(key: MethodologyKey): Promise<string> {
   const meta = METHODOLOGY_META[key]
   const cached = cache.get(key)
@@ -150,6 +155,13 @@ async function seedMethodologyFromText(key: MethodologyKey, text: string): Promi
  * 后台编辑：写入新内容并使缓存失效。
  * 返回更新后的行。供 API 调用。
  */
+/**
+ * @description 更新methodologycontent
+ * @param key - 键
+ * @param content - 内容
+ * @param updatedBy? - updatedBy?
+ * @returns 无返回值
+ */
 export async function updateMethodologyContent(
   key: MethodologyKey,
   content: string,
@@ -173,6 +185,11 @@ export async function updateMethodologyContent(
 }
 
 /** 重置为文件原文：删除 DB 行，使加载器回退到文件。 */
+/**
+ * @description 重置methodologytotext
+ * @param key - 键
+ * @returns 无返回值
+ */
 export async function resetMethodologyToText(key: MethodologyKey) {
   try {
     await prisma.agentMethodology.delete({ where: { key } })
@@ -183,11 +200,20 @@ export async function resetMethodologyToText(key: MethodologyKey) {
 }
 
 /** 使所有方法论缓存失效（版本号 bump）。 */
+/**
+ * @description invalidatemethodologycache
+ * @returns 无返回值
+ */
 export function invalidateMethodologyCache() {
   globalVersion += 1
 }
 
 /** 读取一份方法论的元信息 + 当前内容 + 来源（供后台展示）。 */
+/**
+ * @description 获取methodologyforadmin
+ * @param key - 键
+ * @returns 无返回值
+ */
 export async function getMethodologyForAdmin(key: MethodologyKey) {
   const meta = METHODOLOGY_META[key]
   const row = await prisma.agentMethodology.findUnique({ where: { key } }).catch(() => null)
@@ -217,6 +243,10 @@ export async function getMethodologyForAdmin(key: MethodologyKey) {
 }
 
 /** 列出全部方法论（后台总览用）。 */
+/**
+ * @description 列出methodologiesforadmin
+ * @returns 无返回值
+ */
 export async function listMethodologiesForAdmin() {
   const keys = Object.keys(METHODOLOGY_META) as MethodologyKey[]
   return Promise.all(keys.map((k) => getMethodologyForAdmin(k)))

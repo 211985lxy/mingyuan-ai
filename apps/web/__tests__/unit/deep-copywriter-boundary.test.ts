@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/aim-generation-prompts", () => ({
+  CONTENT_CREATION_TRACE_RULE: "透明创作说明",
   buildWorkflowContext: vi.fn(() => ""),
+  ensureContentCreationTrace: vi.fn((content: string) => content),
   executeGenerateLLMWithBenchmarkRetry: mocks.execute,
 }))
 
@@ -44,5 +46,6 @@ describe("deep copywriter boundaries", () => {
     expect(systemPrompt).toContain("私域话术")
     expect(systemPrompt).toContain("正文最后一句写完就停止")
     expect(systemPrompt).toContain("确认尾句")
+    expect(systemPrompt).toContain("透明创作说明")
   })
 })

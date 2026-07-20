@@ -65,6 +65,10 @@ const DEFAULT_SOURCE_FILES = [
   "/Users/xiangyu/Documents/Codex/2026-07-03/new-chat/ai-news-radar/data/account_sources.local.json",
 ]
 
+/**
+ * @description 加载accountsourcebindings
+ * @returns Promise<AccountSourceBinding[]>
+ */
 export async function loadAccountSourceBindings(): Promise<AccountSourceBinding[]> {
   const candidates = [
     env.ACCOUNT_SOURCES_FILE,
@@ -82,6 +86,12 @@ export async function loadAccountSourceBindings(): Promise<AccountSourceBinding[
   return []
 }
 
+/**
+ * @description sourcesforemail
+ * @param bindings - bindings
+ * @param email - 邮箱
+ * @returns 无返回值
+ */
 export function sourcesForEmail(bindings: AccountSourceBinding[], email: string) {
   const seen = new Set<string>()
   return bindings
@@ -96,6 +106,12 @@ export function sourcesForEmail(bindings: AccountSourceBinding[], email: string)
     })
 }
 
+/**
+ * @description 请求获取industrybriefingitems
+ * @param source - 来源
+ * @param baseUrl? - 基础值Url?
+ * @returns Promise<IndustryBriefingItem[]>
+ */
 export async function fetchIndustryBriefingItems(
   source: AccountIndustrySource,
   baseUrl?: string

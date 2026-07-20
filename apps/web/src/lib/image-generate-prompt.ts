@@ -1,9 +1,19 @@
 export type ImageGenerateKind = "raw" | "xhs-card" | "cover"
 
+/**
+ * @description 标准化imagegeneratekind
+ * @param value - 值
+ * @returns ImageGenerateKind
+ */
 export function normalizeImageGenerateKind(value: unknown): ImageGenerateKind {
   return value === "xhs-card" || value === "cover" ? value : "raw"
 }
 
+/**
+ * @description 构建imagegenerateprompt
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildImageGeneratePrompt(input: {
   prompt: string
   kind: ImageGenerateKind

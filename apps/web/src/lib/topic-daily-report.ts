@@ -141,6 +141,14 @@ function buildConclusion(card: ApiTopicCard | null, groups: TopicDailyReport["ev
   return `主推「${card.title}」，主要依据是${labels.join("、")}。`
 }
 
+/**
+ * @description 构建topicdailyreport
+ * @param cards - cards
+ * @param briefingItems - briefing条目列表
+ * @param _mode - _mode
+ * @param sources - sources
+ * @returns TopicDailyReport
+ */
 export function buildTopicDailyReport(
   cards: ApiTopicCard[],
   briefingItems: ApiAiHotBriefingItem[],

@@ -103,6 +103,12 @@ export { AdminApiError }
 
 // ─── Auth ────────────────────────────────────────────────
 
+/**
+ * @description adminlogin
+ * @param email - 邮箱
+ * @param password - 密码
+ * @returns 无返回值
+ */
 export async function adminLogin(email: string, password: string) {
   return request<{ admin: { id: string; email: string; name: string; role: string } }>(
     "/api/admin/auth/login",
@@ -110,18 +116,31 @@ export async function adminLogin(email: string, password: string) {
   )
 }
 
+/**
+ * @description 获取当前admin
+ * @returns 无返回值
+ */
 export async function getCurrentAdmin() {
   return request<{ admin: { id: string; email: string; name: string; role: string } }>(
     "/api/admin/auth/me",
   )
 }
 
+/**
+ * @description adminlogout
+ * @returns Promise<void>
+ */
 export async function adminLogout(): Promise<void> {
   await request<{ ok: true }>("/api/admin/auth/logout", { method: "POST" })
 }
 
 // ─── Users ───────────────────────────────────────────────
 
+/**
+ * @description 获取adminusers
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export async function getAdminUsers(params: { page?: number; pageSize?: number; search?: string; plan?: string }) {
   const qs = new URLSearchParams()
   if (params.page) qs.set("page", String(params.page))
@@ -133,16 +152,32 @@ export async function getAdminUsers(params: { page?: number; pageSize?: number; 
   )
 }
 
+/**
+ * @description 获取adminuserdetail
+ * @param id - 唯一标识符
+ * @returns 无返回值
+ */
 export async function getAdminUserDetail(id: string) {
   return request<{ data: AdminUserDetail }>(`/api/admin/users/${id}`)
 }
 
+/**
+ * @description 获取adminuserstats
+ * @returns 无返回值
+ */
 export async function getAdminUserStats() {
   return request<{ data: UserStats }>("/api/admin/users/stats")
 }
 
 // ─── Activation Codes ────────────────────────────────────
 
+/**
+ * @description 生成activationcodes
+ * @param quantity - quantity
+ * @param durationDays - durationDays
+ * @param batchNote? - batchNote?
+ * @returns 无返回值
+ */
 export async function generateActivationCodes(
   quantity: number,
   durationDays: number,
@@ -154,6 +189,11 @@ export async function generateActivationCodes(
   )
 }
 
+/**
+ * @description 获取activationcodes
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export async function getActivationCodes(params: { page?: number; pageSize?: number; status?: string; batchId?: string }) {
   const qs = new URLSearchParams()
   if (params.page) qs.set("page", String(params.page))
@@ -165,10 +205,19 @@ export async function getActivationCodes(params: { page?: number; pageSize?: num
   )
 }
 
+/**
+ * @description 获取activationcodestats
+ * @returns 无返回值
+ */
 export async function getActivationCodeStats() {
   return request<{ data: CodeStats }>("/api/admin/activation-codes/stats")
 }
 
+/**
+ * @description 获取activationcodesexporturl
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export function getActivationCodesExportUrl(params: { status?: string; batchId?: string }) {
   const qs = new URLSearchParams()
   if (params.status) qs.set("status", params.status)
@@ -176,6 +225,11 @@ export function getActivationCodesExportUrl(params: { status?: string; batchId?:
   return `/api/admin/activation-codes/export?${qs}`
 }
 
+/**
+ * @description 下载activationcodesexport
+ * @param params - 参数对象
+ * @returns 无返回值
+ */
 export async function downloadActivationCodesExport(params: { status?: string; batchId?: string }) {
   const controller = new AbortController()
   const timer = startTimeout(controller, DEFAULT_TIMEOUT_MS)
@@ -224,10 +278,20 @@ export async function downloadActivationCodesExport(params: { status?: string; b
 
 // ─── Settings ────────────────────────────────────────────
 
+/**
+ * @description 获取adminsettings
+ * @returns 无返回值
+ */
 export async function getAdminSettings() {
   return request<{ data: Record<string, SettingItem[]> }>("/api/admin/settings")
 }
 
+/**
+ * @description 更新adminsetting
+ * @param key - 键
+ * @param value - 值
+ * @returns 无返回值
+ */
 export async function updateAdminSetting(key: string, value: string) {
   return request<{ data: SettingItem }>(`/api/admin/settings/${encodeURIComponent(key)}`, {
     method: "PUT",
@@ -235,6 +299,11 @@ export async function updateAdminSetting(key: string, value: string) {
   })
 }
 
+/**
+ * @description 创建adminsetting
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function createAdminSetting(input: { key: string; value: string; type: string; category: string; description?: string }) {
   return request<{ data: SettingItem }>("/api/admin/settings", {
     method: "POST",
@@ -242,10 +311,19 @@ export async function createAdminSetting(input: { key: string; value: string; ty
   })
 }
 
+/**
+ * @description 获取adminhotsources
+ * @returns 无返回值
+ */
 export async function getAdminHotSources() {
   return request<{ data: AdminHotSourceItem[] }>("/api/admin/hot-sources")
 }
 
+/**
+ * @description saveadminhotsource
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function saveAdminHotSource(input: AdminHotSourceInput) {
   return request<{ data: SettingItem }>("/api/admin/hot-sources", {
     method: "POST",

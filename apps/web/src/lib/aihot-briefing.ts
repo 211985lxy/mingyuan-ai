@@ -57,10 +57,20 @@ type GenerateOptions = {
   fetchImpl?: typeof fetch
 }
 
+/**
+ * @description 获取beijingdatekey
+ * @param date - 日期
+ * @returns string
+ */
 export function getBeijingDateKey(date: Date): string {
   return new Date(date.getTime() + BEIJING_OFFSET_MS).toISOString().slice(0, 10)
 }
 
+/**
+ * @description 获取briefingwindow
+ * @param now - now
+ * @returns 无返回值
+ */
 export function getBriefingWindow(now = new Date()) {
   return {
     windowStart: new Date(now.getTime() - DAY_MS),
@@ -68,6 +78,11 @@ export function getBriefingWindow(now = new Date()) {
   }
 }
 
+/**
+ * @description 获取todayaihotbriefing
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function getTodayAiHotBriefing(options: GenerateOptions = {}) {
   const now = options.now ?? new Date()
   const date = getBeijingDateKey(now)
@@ -80,6 +95,11 @@ export async function getTodayAiHotBriefing(options: GenerateOptions = {}) {
   return generateAndStoreAiHotBriefing(options)
 }
 
+/**
+ * @description 生成andstoreaihotbriefing
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function generateAndStoreAiHotBriefing(options: GenerateOptions = {}) {
   const now = options.now ?? new Date()
   const date = getBeijingDateKey(now)
@@ -112,6 +132,12 @@ export async function generateAndStoreAiHotBriefing(options: GenerateOptions = {
   return serializeBriefing(record)
 }
 
+/**
+ * @description 请求获取selecteditems
+ * @param windowStart - window起始值
+ * @param fetchImpl - fetchImpl
+ * @returns 无返回值
+ */
 export async function fetchSelectedItems(windowStart: Date, fetchImpl: typeof fetch = fetch) {
   const params = new URLSearchParams({
     mode: "selected",
@@ -139,6 +165,12 @@ export async function fetchSelectedItems(windowStart: Date, fetchImpl: typeof fe
   }
 }
 
+/**
+ * @description 选择briefingitems
+ * @param items - 条目列表
+ * @param now - now
+ * @returns 无返回值
+ */
 export function selectBriefingItems(items: AiHotItem[], now = new Date()) {
   const validItems = items.filter((item) => isKnownCategory(item.category))
   const selected: AiHotItem[] = []
@@ -162,6 +194,11 @@ export function selectBriefingItems(items: AiHotItem[], now = new Date()) {
   return selected.map((item) => toBriefingItem(item, now))
 }
 
+/**
+ * @description 构建aihotbriefingmarkdown
+ * @param items - 条目列表
+ * @returns 无返回值
+ */
 export function buildAiHotBriefingMarkdown(items: AiHotBriefingItem[]) {
   const lines = [
     `# ${AIHOT_BRIEFING_TITLE}`,
@@ -194,6 +231,11 @@ export function buildAiHotBriefingMarkdown(items: AiHotBriefingItem[]) {
   return lines.join("\n")
 }
 
+/**
+ * @description 获取categorylabel
+ * @param category - 分类
+ * @returns 无返回值
+ */
 export function getCategoryLabel(category: AiHotBriefingCategory) {
   return CATEGORY_LABELS[category]
 }

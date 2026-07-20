@@ -13,6 +13,11 @@ function partitionBenchmarkKnowledge(sources: TopicSource[]) {
   return { benchmark, other }
 }
 
+/**
+ * @description 构建projectsource
+ * @param project - project
+ * @returns TopicSource | null
+ */
 export function buildProjectSource(project: {
   name: string
   industry: string | null
@@ -39,6 +44,11 @@ export function buildProjectSource(project: {
   }
 }
 
+/**
+ * @description 构建benchmarkaccountsources
+ * @param accounts - accounts
+ * @returns TopicSource[]
+ */
 export function buildBenchmarkAccountSources(
   accounts: Array<{ nickname: string | null; targetUrl: string; latestVideos: unknown; viralVideos: unknown }>,
 ): TopicSource[] {
@@ -62,6 +72,7 @@ export function buildBenchmarkAccountSources(
       title: account.nickname || account.targetUrl,
       content: [
         "对标账号已验证内容信号：优先学习选题母题、开头钩子、用户痛点和互动结构，不照搬标题。",
+        `来源账号：${account.targetUrl}`,
         ...videos.map((video, index) => {
           const item = video as { title?: string; likes?: number; comments?: number; shares?: number; collects?: number }
           return `${index + 1}. ${item.title || "无标题"}｜赞${item.likes ?? 0} 评${item.comments ?? 0} 转${item.shares ?? 0} 藏${item.collects ?? 0}`
@@ -76,6 +87,11 @@ function truncateText(value: string | null | undefined, limit = 180) {
   return text.length > limit ? `${text.slice(0, limit)}...` : text
 }
 
+/**
+ * @description 构建videocopyextractionsources
+ * @param extractions - extractions
+ * @returns TopicSource[]
+ */
 export function buildVideoCopyExtractionSources(
   extractions: Array<{ videoTitle: string | null; sourceUrl: string; transcript: string | null; analysisResult: unknown }>,
 ): TopicSource[] {
@@ -96,6 +112,11 @@ export function buildVideoCopyExtractionSources(
   }).slice(0, 4)
 }
 
+/**
+ * @description 构建topicsources
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function buildTopicSources(input: {
   projectSource: TopicSource | null
   selectedKnowledge: TopicSource[]

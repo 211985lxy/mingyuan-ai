@@ -127,6 +127,12 @@ export interface AimGeneration {
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
 }
 
+/**
+ * @description 生成aimcontent
+ * @param data - 数据
+ * @param signal? - signal?
+ * @returns Promise<AimGenerateResponse>
+ */
 export async function generateAimContent(data: AimGenerateRequest, signal?: AbortSignal): Promise<AimGenerateResponse> {
   return request<AimGenerateResponse>("/api/aim/generate", {
     method: "POST",
@@ -136,6 +142,11 @@ export async function generateAimContent(data: AimGenerateRequest, signal?: Abor
   })
 }
 
+/**
+ * @description 创建aimworkflowbrief
+ * @param data - 数据
+ * @returns Promise<AimWorkflowBriefResponse>
+ */
 export async function createAimWorkflowBrief(
   data: AimWorkflowBriefBody,
 ): Promise<AimWorkflowBriefResponse> {
@@ -145,6 +156,13 @@ export async function createAimWorkflowBrief(
   })
 }
 
+/**
+ * @description recordaimrunevent
+ * @param runId - run唯一标识符
+ * @param event - 事件对象
+ * @param metadata? - metadata?
+ * @returns Promise<void>
+ */
 export async function recordAimRunEvent(
   runId: string,
   event: "copied" | "revised" | "accepted",
@@ -163,6 +181,11 @@ export interface AimEvolutionSuggestion {
   tags: string[]
 }
 
+/**
+ * @description evolveaimconversation
+ * @param input - 输入数据
+ * @returns Promise<AimEvolutionSuggestion[]>
+ */
 export async function evolveAimConversation(input: {
   projectId: string
   messages: Array<{ role: "user" | "assistant"; content: string }>
@@ -188,6 +211,11 @@ export interface StyleProfileEvolveResult {
 }
 
 /** 渐进沉淀：从当前对话提炼并更新写作风格档案 */
+/**
+ * @description evolvestyleconversation
+ * @param input - 输入数据
+ * @returns Promise<StyleProfileEvolveResult>
+ */
 export async function evolveStyleConversation(input: {
   messages: Array<{ role: "user" | "assistant"; content: string }>
   projectId?: string
@@ -201,6 +229,11 @@ export async function evolveStyleConversation(input: {
   })
 }
 
+/**
+ * @description 生成script
+ * @param data - 数据
+ * @returns Promise<AimGenerateResponse>
+ */
 export function generateScript(data: {
   projectId: string
   topicTitle?: string
@@ -216,6 +249,11 @@ export function generateScript(data: {
   })
 }
 
+/**
+ * @description 生成positioning
+ * @param data - 数据
+ * @returns Promise<AimGenerateResponse>
+ */
 export function generatePositioning(data: {
   projectId: string
   sourceText: string
@@ -230,6 +268,11 @@ export function generatePositioning(data: {
   })
 }
 
+/**
+ * @description 生成momentscopy
+ * @param data - 数据
+ * @returns Promise<AimGenerateResponse>
+ */
 export function generateMomentsCopy(data: {
   projectId: string
   sourceText: string
@@ -244,6 +287,11 @@ export function generateMomentsCopy(data: {
   })
 }
 
+/**
+ * @description 导入fromlarkbase
+ * @param data - 数据
+ * @returns Promise<
+ */
 export function importFromLarkBase(data: {
   projectId: string
   tableType: "topic_review" | "project_management" | "data_archive"
@@ -254,6 +302,11 @@ export function importFromLarkBase(data: {
   })
 }
 
+/**
+ * @description 导出tolarkbase
+ * @param data - 数据
+ * @returns Promise<
+ */
 export function exportToLarkBase(data: {
   projectId: string
   resultType: "topic" | "script" | "positioning" | "moments_copy"

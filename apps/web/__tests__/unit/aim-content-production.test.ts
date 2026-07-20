@@ -15,7 +15,12 @@ import {
   extractBenchmarkOriginalCopy,
   isBenchmarkCopyTooSimilar,
 } from "@/lib/aim-agent-handlers"
-import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
+import {
+  CONTENT_CREATION_TRACE_RULE,
+  buildProducerSystemPrompt,
+  buildWorkflowContext,
+  ensureContentCreationTrace,
+} from "@/lib/aim-generation-prompts"
 import {
   AIM_OUTPUT_MAX_CHARS,
   BENCHMARK_RECREATION_PREFILL,
@@ -99,6 +104,69 @@ describe("AIM content production positioning", () => {
     expect(context).toContain("主要内容任务：推动咨询行动")
     expect(context).toContain("优先信任证据：案例")
     expect(context).toContain("期望动作：预约诊断")
+  })
+
+  it("requires a teachable and traceable creation note for full copy generation", () => {
+    const prompt = buildProducerSystemPrompt("agent prompt", {
+      runtimeTask: "create_from_scratch",
+      knowledgeBlock: "【产品卖点】陪跑服务",
+      methodologyBlock: "",
+      businessDiagnosisBlock: "",
+      viralStructureBlock: "",
+      eventStorytellingBlock: "",
+      ipWikiBlock: "【人设】实战派\n【天命底盘】已有八字与紫微资料",
+    } as Parameters<typeof buildProducerSystemPrompt>[1])
+
+    expect(CONTENT_CREATION_TRACE_RULE).toContain("[[AIM_METHOD_NOTE]]")
+    expect(prompt).toContain("风格定位")
+    expect(prompt).toContain("教学拆解")
+    expect(prompt).toContain("对标爆款视频来源")
+    expect(prompt).toContain("产品卖点")
+    expect(prompt).toContain("人设特点")
+    expect(prompt).toContain("八字与紫微天命适配")
+    expect(prompt).toContain("未提供/待补充")
+    expect(prompt).toContain("不得编造来源")
+  })
+
+  it("skips the creation note for local light edits", () => {
+    const prompt = buildProducerSystemPrompt("agent prompt", {
+      runtimeTask: "light_edit",
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      businessDiagnosisBlock: "",
+      viralStructureBlock: "",
+      eventStorytellingBlock: "",
+      ipWikiBlock: "",
+    } as Parameters<typeof buildProducerSystemPrompt>[1])
+
+    expect(prompt).not.toContain(CONTENT_CREATION_TRACE_RULE)
+  })
+
+  it("adds a grounded fallback note when the model omits creation trace", () => {
+    const content = ensureContentCreationTrace("这是可直接使用的正文。", {
+      runtimeTask: "rewrite_copy",
+      rawInput: "参考这条对标爆款写一篇文案",
+      topicTitle: "AI 老板为什么要做内容",
+      targetFormats: ["raw_copy"],
+      retrievedEntries: [
+        { title: "AI 陪跑服务卖点", category: "product_usp", content: "陪老板落地 AI 工作流" },
+        { title: "老板人设", category: "persona", content: "直接、实战派" },
+        { title: "紫微天命档案", category: "destiny", content: "紫微命盘资料" },
+      ],
+      taskSpec: {
+        goal: "建立专业信任",
+        targetCustomer: "中小企业老板",
+        contentTask: "推动咨询行动",
+      },
+      ipWikiBlock: "【人设】专业、直接",
+    } as Parameters<typeof ensureContentCreationTrace>[1])
+
+    expect(content).toContain("[[AIM_METHOD_NOTE]]")
+    expect(content).toContain("对标爆款视频来源：选题上下文：AI 老板为什么要做内容")
+    expect(content).toContain("产品卖点：AI 陪跑服务卖点")
+    expect(content).toContain("人设特点：老板人设")
+    expect(content).toContain("紫微依据：紫微天命档案")
+    expect(content).toContain("这是可直接使用的正文。")
   })
 
   it("keeps the required standalone content agents", () => {

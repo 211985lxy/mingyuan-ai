@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
 
+/**
+ * @description 处理 GET 请求
+ * @returns 无返回值
+ */
 export async function GET() {
   try {
     const res = await fetch("https://v2.xxapi.cn/api/douyinhot", {

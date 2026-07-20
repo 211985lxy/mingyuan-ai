@@ -61,6 +61,10 @@ function asBeatArray(value: unknown): Array<{ label: string; instruction: string
   })
 }
 
+/**
+ * @description 构建爆款结构库文本块（开头库、文案结构库、结尾库）
+ * @returns 爆款结构库文本，无数据时返回空字符串
+ */
 export async function buildViralStructureBlock(): Promise<string> {
   const [openingTypes, copyStructures, endingTypes] = await Promise.all([
     prisma.openingType.findMany({
@@ -124,6 +128,12 @@ export async function buildViralStructureBlock(): Promise<string> {
   return block
 }
 
+/**
+ * @description 解析多格式 LLM 响应内容
+ * @param raw - LLM 返回的原始文本
+ * @param formats - 目标格式列表
+ * @returns 各格式对应的内容字典
+ */
 export function parseMultiFormatResponse(
   raw: string,
   formats: ContentFormat[]
@@ -167,6 +177,11 @@ export function parseMultiFormatResponse(
 
 // ─── 代理生成器 ──────────────────────────────────────────────
 
+/**
+ * @description 生成 AIM 内容（统一入口）
+ * @param input - 生成输入（用户 ID、项目 ID、原始输入、目标格式等）
+ * @returns 生成结果
+ */
 export async function generateAimContent(input: AimInput) {
   return buildAimGeneration(input.agentId || "content_producer", {
     userId: input.userId,

@@ -111,6 +111,13 @@ export type TopicGenerationResult =
       error: string
     }
 
+/**
+ * @description 构建topicsystemprompt
+ * @param strategy - 策略
+ * @param recentTitles - recentTitles
+ * @param recommendationMode - recommendation众数
+ * @returns string
+ */
 export function buildTopicSystemPrompt(
   strategy: DerivationStrategy,
   recentTitles: string[],
@@ -120,7 +127,7 @@ export function buildTopicSystemPrompt(
 
 输出要求：
 - 严格返回 JSON 格式，结构为 {"topics": [card1, card2, card3, card4]}
-- 每张卡片包含：title (选题标题，2-20字), elementCodes (使用的元素代码数组), openingTypeCode (推荐开场类型代码), structureCode (推荐文案结构代码), rationale (一句话理由，20-60字), topicType, sourceType, score, scoreReason, scoreBreakdown, reviewVerdict, revisionAdvice
+- 每张卡片包含：title (选题标题，2-20字), elementCodes (使用的元素代码数组), openingTypeCode (推荐开场类型代码), structureCode (推荐文案结构代码), rationale (一句话理由，20-60字), topicType, sourceType, score, scoreReason, scoreBreakdown, reviewVerdict, revisionAdvice, creativeTrace
 - topicType 必须从以下选择：${VALID_TOPIC_TYPES.join("、")}
 - sourceType 必须从以下选择：${VALID_TOPIC_SOURCE_TYPES.join("、")}
 - scoreBreakdown 必须包含五个 0-100 整数：projectFit(客户/项目匹配度，权重25), contentValue(内容价值，权重25), viralHook(传播钩子，权重20), conversionFit(成交关联，权重15), feasibility(执行可行性，权重15)
@@ -131,6 +138,14 @@ export function buildTopicSystemPrompt(
 - openingTypeCode 必须从以下选择：curiosity_open, leverage_open, pain_open, extreme_open, fear_open, contrast_open, benefit_open
 - structureCode 必须从以下选择：suspense_reveal, contrast_hook, three_beat_ramp, proof_first, pain_solution, pov_walkthrough, objection_dialogue, before_after, universal
 - 开场类型和文案结构的推荐要与选题内容和使用的元素逻辑匹配
+
+【教学与溯源要求】每张选题卡必须输出 creativeTrace：
+- stylePositioning：明确风格定位（如幽默、专业、感性、犀利、沉稳），并说明为什么适合这个选题。
+- logicSteps：2-5 条可复用的推导逻辑，说清选题判断、钩子、结构、情绪和承接取舍；只给高层结论，不输出逐字内部思维链。
+- sources：恰好 3 项，kind 分别为 benchmark、product、persona；对应标注对标爆款视频、产品卖点、人设特点的真实来源名称与本题用法。
+- destinyAlignment：包含 baziBasis、ziweiBasis、styleMapping，说明八字和紫微天命信息如何影响文风、用词和情感基调。
+- 所有来源只能从本次 IP 档案和选题素材中选择，不得编造对标视频、产品卖点、人设特点或命理结论。
+- 任一类资料缺失时，对应字段写“未提供/待补充”；没有八字或紫微资料时，不得根据一般人设自行推命。
 
 【陌生化含金量（选题的硬指标）】没有陌生化的选题是没有含金量的，每张卡片必须给出 defamiliarization：
 - scarcityType（稀缺类型，6 选 1）：scenery=稀缺景观（没见过的大海/特殊视觉效果）、emotion=稀缺情感（特别饱满的情感）、beauty=稀缺美好（极其稀有的美好品质）、info=稀缺信息资讯（财经博主式稀缺信息）、curio=稀缺奇闻异事（说书号/电影号式奇闻）、event=稀缺事件（婆媳剑拔弩张/街头抓眼球/稀缺故事）
@@ -211,6 +226,12 @@ function buildTopicProfileSection(ipProfile: TopicGenerationInput["ipProfile"]):
   ].filter(Boolean).join("\n")
 }
 
+/**
+ * @description 构建topicuserprompt
+ * @param input - 输入数据
+ * @param selectedCodes - selectedCodes
+ * @returns string
+ */
 export function buildTopicUserPrompt(
   input: TopicGenerationInput,
   selectedCodes: string[],
@@ -331,6 +352,11 @@ function buildFallbackTopicResult(
   }
 }
 
+/**
+ * @description 生成topiccards
+ * @param input - 输入数据
+ * @returns Promise<TopicGenerationResult>
+ */
 export async function generateTopicCards(
   input: TopicGenerationInput,
 ): Promise<TopicGenerationResult> {

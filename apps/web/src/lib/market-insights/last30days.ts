@@ -30,6 +30,12 @@ export interface Last30DaysResult {
  * @param topic 检索主题关键词
  * @param requestedSources 指定检索的平台数据源，选填
  */
+/**
+ * @description 运行last30daysresearch
+ * @param topic - 主题
+ * @param requestedSources? - requestedSources?
+ * @returns Promise<Last30DaysResult>
+ */
 export async function runLast30DaysResearch(
   topic: string,
   requestedSources?: string[]

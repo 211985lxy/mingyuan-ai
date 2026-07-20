@@ -13,6 +13,12 @@ export interface RefineOptions {
  * 对骨架做 LLM 精化（仅风险非 low 时）。
  * 任何失败（无 client / 超时 / 解析失败 / 校验失败）都退回骨架，classifiedBy=rule_fallback。
  */
+/**
+ * @description refinetaskspec
+ * @param skeleton - skeleton
+ * @param opts - opts
+ * @returns Promise<TaskSpec>
+ */
 export async function refineTaskSpec(skeleton: TaskSpec, opts: RefineOptions): Promise<TaskSpec> {
   if (!opts.enabled) return skeleton
   if (skeleton.riskLevel === "low") return skeleton // 低风险不调用

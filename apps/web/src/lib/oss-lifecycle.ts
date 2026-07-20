@@ -80,6 +80,10 @@ function createOssClient(): OSS {
   return new OSS({ region, bucket, accessKeyId, accessKeySecret });
 }
 
+/**
+ * @description 应用lifecyclepolicy
+ * @returns Promise<void>
+ */
 export async function applyLifecyclePolicy(): Promise<void> {
   const client = createOssClient();
   const lifecycleClient = client as unknown as OssLifecycleClient;
@@ -106,6 +110,10 @@ export async function applyLifecyclePolicy(): Promise<void> {
   }
 }
 
+/**
+ * @description 获取lifecyclepolicy
+ * @returns Promise<LifecycleRule[]>
+ */
 export async function getLifecyclePolicy(): Promise<LifecycleRule[]> {
   const client = createOssClient();
   const lifecycleClient = client as unknown as OssLifecycleClient;

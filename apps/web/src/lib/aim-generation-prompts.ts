@@ -11,6 +11,99 @@ import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 
 const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)/
 
+export const CONTENT_CREATION_TRACE_RULE = `教学式透明交付规则：
+- 每个完整成稿或文章的最前面，先输出 [[AIM_METHOD_NOTE]] ... [[/AIM_METHOD_NOTE]]；正文放在结束标记之后。
+- 说明区只给可学习、可复用、可验证的高层结论，不输出逐字内部思维链。
+- 说明区固定包含以下四部分：
+  1. 「风格定位」：标注主风格与辅助风格（如幽默、专业、感性、犀利、沉稳），并说明与当前场景的关系。
+  2. 「教学拆解」：用 3-5 条概括选题判断、开头钩子、结构推进、情绪基调和转化承接的取舍。
+  3. 「来源标注」：分别列出“对标爆款视频来源”、“产品卖点”、“人设特点”，每项都写出来源名称与在本稿中的用法。
+  4. 「八字与紫微天命适配」：标注引用的八字/紫微资料来源，以及它如何影响文风、用词和情感基调。
+- 只能引用当前用户输入、选题上下文、知识库条目和 IP 定位维基中明确存在的来源名称；不得编造来源、视频、卖点、人设或命理结论。
+- 任一类资料缺失时，必须在对应位置写“未提供/待补充”；没有八字或紫微资料时，不得把一般性格判断写成命理结论。`
+
+const METHOD_NOTE_PATTERN = /\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/
+
+function traceEntryTitle(context: AimGenerateContext, pattern: RegExp): string | null {
+  const entry = (context.retrievedEntries ?? []).find((item) => {
+    if (!item || typeof item !== "object") return false
+    const record = item as Record<string, unknown>
+    return pattern.test([record.category, record.title, record.content].map(String).join("\n"))
+  }) as Record<string, unknown> | undefined
+  return entry && typeof entry.title === "string" && entry.title.trim() ? entry.title.trim() : null
+}
+
+function traceSource(value: string | null | undefined) {
+  return value?.trim() || "未提供/待补充"
+}
+
+function buildFallbackContentCreationTrace(context: AimGenerateContext): string {
+  const productSource = traceEntryTitle(context, /product_usp|product|offer|产品|卖点|服务/)
+  const personaSource = traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/)
+  const baziSource = traceEntryTitle(context, /bazi|八字|四柱|五行/)
+    || (/八字|四柱|五行/.test(context.ipWikiBlock) ? "IP 定位维基" : null)
+  const ziweiSource = traceEntryTitle(context, /ziwei|紫微|命宫|天命/)
+    || (/紫微|命宫|天命/.test(context.ipWikiBlock) ? "IP 定位维基" : null)
+  const benchmarkSource = context.topicTitle
+    ? `选题上下文：${context.topicTitle}`
+    : /对标|爆款|原视频/.test(context.rawInput)
+      ? "用户输入中的对标/爆款素材（未识别到独立标题或链接）"
+      : null
+  const task = context.taskSpec
+  const logicSteps = [
+    task?.targetCustomer ? `目标客户：${task.targetCustomer}` : "目标客户：按当前输入与 IP 定位校准。",
+    task?.contentTask ? `内容任务：${task.contentTask}` : task?.goal ? `内容目标：${task.goal}` : "内容任务：围绕用户本轮明确需求交付。",
+    `结构取舍：按 ${(context.targetFormats ?? []).join("、") || "当前格式"} 的成品要求组织钩子、正文和承接。`,
+  ]
+  const stylePositioning = context.ipWikiBlock || personaSource
+    ? "以 IP 定位与人设资料为主，保持专业、清晰与人格一致。"
+    : "专业、清晰、可信；完整人设风格待补充。"
+  const hasDestiny = Boolean(baziSource || ziweiSource)
+
+  return `[[AIM_METHOD_NOTE]]
+### 风格定位
+- ${stylePositioning}
+
+### 教学拆解
+${logicSteps.map((step) => `- ${step}`).join("\n")}
+
+### 来源标注
+- 对标爆款视频来源：${traceSource(benchmarkSource)}
+- 产品卖点：${traceSource(productSource)}
+- 人设特点：${traceSource(personaSource)}
+
+### 八字与紫微天命适配
+- 八字依据：${traceSource(baziSource)}
+- 紫微依据：${traceSource(ziweiSource)}
+- 风格映射：${hasDestiny ? "现有命理资料已作为文风、用词和情感基调的校准依据。" : "未做命理推断；待补充八字或紫微资料后再校准。"}
+[[/AIM_METHOD_NOTE]]`
+}
+
+/**
+ * @description 确保内容包含创作溯源信息
+ * @param content - 原始内容文本
+ * @param context - AIM 生成上下文
+ * @returns 添加溯源信息后的内容
+ */
+export function ensureContentCreationTrace(content: string, context: AimGenerateContext): string {
+  const trimmed = content.trim()
+  if (context.runtimeTask === "light_edit") return trimmed
+  const existing = trimmed.match(METHOD_NOTE_PATTERN)
+  const note = existing?.[0] || ""
+  const complete = ["风格定位", "教学拆解", "对标爆款视频来源", "产品卖点", "人设特点", "八字", "紫微"]
+    .every((label) => note.includes(label))
+  if (complete) return trimmed
+  const result = existing ? trimmed.replace(existing[0], "").trim() : trimmed
+  return `${buildFallbackContentCreationTrace(context)}\n\n${result}`
+}
+
+/**
+ * @description 查找不支持第一人称案例声明的格式
+ * @param context - AIM 生成上下文
+ * @param parsed - 解析后的多格式内容
+ * @param targetFormats - 目标格式列表
+ * @returns 包含无依据第一人称声明的格式数组
+ */
 export function findUnsupportedFirstPersonClaimFormats(
   context: AimGenerateContext,
   parsed: Partial<Record<ContentFormat, string>>,
@@ -27,6 +120,11 @@ export function findUnsupportedFirstPersonClaimFormats(
   return targetFormats.filter((format) => FIRST_PERSON_EVIDENCE_PATTERN.test(parsed[format] || ""))
 }
 
+/**
+ * @description 构建工作流上下文文本（任务单、选题、热点等）
+ * @param context - AIM 生成上下文
+ * @returns 格式化的工作流上下文文本
+ */
 export function buildWorkflowContext(context: AimGenerateContext): string {
   const taskSpec = context.taskSpec
   return [
@@ -57,6 +155,15 @@ export function buildWorkflowContext(context: AimGenerateContext): string {
     .join("\n\n")
 }
 
+/**
+ * @description 执行 LLM 生成并带对标抄袭检测重试
+ * @param agentId - 智能体 ID
+ * @param systemPrompt - 系统提示词
+ * @param userPrompt - 用户提示词
+ * @param context - AIM 生成上下文
+ * @param targetFormats - 目标格式列表
+ * @returns 生成结果（完成响应和解析内容）
+ */
 export async function executeGenerateLLMWithBenchmarkRetry(
   agentId: string,
   systemPrompt: string,
@@ -113,6 +220,12 @@ ${previousOutput}`
   throw new Error("生成后质检未完成")
 }
 
+/**
+ * @description 构建内容创作官系统提示词
+ * @param agentPrompt - 智能体基础提示词
+ * @param context - AIM 生成上下文
+ * @returns 完整的系统提示词
+ */
 export function buildProducerSystemPrompt(agentPrompt: string, context: AimGenerateContext): string {
   const knowledgeUseRule = context.runtimeTask === "light_edit"
       ? "7. 轻改任务只按用户原文、选区和修改要求做局部优化；替换稿只处理用户点名要改的地方，不要顺手替换、删改未点名内容；可以给开头、结构、结尾等简短可选建议，但不要把建议直接写进替换稿；不要主动扩写客户背景、产品卖点或知识库素材。"
@@ -120,6 +233,9 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
   const lightEditOutputRule = context.runtimeTask === "light_edit"
     ? "\n轻改输出边界：如果用户只要求优化开头/前三秒/第一句话/钩子，输出内容只能是开头候选或开头替换稿，禁止返回整篇文案；如果要求标题只给标题，如果要求结尾只给结尾。"
     : ""
+  const creationTraceRule = context.runtimeTask === "light_edit"
+    ? ""
+    : `\n${CONTENT_CREATION_TRACE_RULE}\n`
 
   return `${agentPrompt}
 
@@ -140,13 +256,14 @@ ${knowledgeUseRule}
 ${lightEditOutputRule}
 8. 如果上下文包含垂类行业热点，只能自然融合和业务相关的部分，禁止硬蹭热点。
 9. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}
+${creationTraceRule}
 
 创作规则：
 - 选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者。
 - 如果输入是热点选题而不是对标文案，成稿与分析里都不要出现"对标文案""对标原文""原视频"这类说法。
 - 开写前先在内部判断"这一稿到底在讲什么"，成稿全篇都必须围绕这个选题推进。
 - 先判断用户输入最适合哪一种开头、文案结构和结尾类型，再开始写。
-- 必须把专业结构融进最终文案里，但不要输出「使用了某某结构」这类解释。
+- 必须把专业结构融进最终文案里；除 [[AIM_METHOD_NOTE]] 中的教学拆解外，正文不要输出「使用了某某结构」这类解释。
 - 开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。
 - 正文每一段都要推进信息，不要堆形容词，不要写营销黑话。
 - 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
@@ -163,6 +280,12 @@ ${BENCHMARK_REWRITE_GUARDRAIL}
 请严格按照下方每种格式的要求，生成对应的内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。`
 }
 
+/**
+ * @description 构建userprompt
+ * @param context - 上下文
+ * @param formatBlocks - 格式Blocks
+ * @returns string
+ */
 export function buildUserPrompt(context: AimGenerateContext, formatBlocks: string): string {
   const workflowContext = buildWorkflowContext(context)
   const isLightEdit = context.runtimeTask === "light_edit"

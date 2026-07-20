@@ -24,6 +24,12 @@ function getRequestOrigin(request: NextRequest): string {
   return request.nextUrl.origin
 }
 
+/**
+ * @description 从请求中读取会话令牌（优先从 Authorization Bearer 头，其次从 Cookie）
+ * @param request - Next.js 请求对象
+ * @param kind - 会话类型（user 或 admin）
+ * @returns 令牌及来源，未找到则返回 null
+ */
 export function readSessionToken(
   request: NextRequest,
   kind: SessionKind,
@@ -40,6 +46,12 @@ export function readSessionToken(
   return token ? { token, source: "cookie" } : null
 }
 
+/**
+ * @description 在响应中设置会话 Cookie（httpOnly、安全传输）
+ * @param response - Next.js 响应对象
+ * @param kind - 会话类型（user 或 admin）
+ * @param token - 会话令牌值
+ */
 export function setSessionCookie(
   response: NextResponse,
   kind: SessionKind,
@@ -55,6 +67,11 @@ export function setSessionCookie(
   })
 }
 
+/**
+ * @description 清除指定类型的会话 Cookie（通过设置 maxAge=0 使其过期）
+ * @param response - Next.js 响应对象
+ * @param kind - 会话类型（user 或 admin）
+ */
 export function clearSessionCookie(response: NextResponse, kind: SessionKind): void {
   response.cookies.set(SESSION_CONFIG[kind].cookie, "", {
     httpOnly: true,
@@ -65,6 +82,12 @@ export function clearSessionCookie(response: NextResponse, kind: SessionKind): v
   })
 }
 
+/**
+ * @description 检查请求是否通过 CSRF 安全校验（同源请求或 Bearer 令牌请求视为安全）
+ * @param request - Next.js 请求对象
+ * @param source - 令牌来源（bearer 或 cookie）
+ * @returns 通过 CSRF 校验返回 true，否则返回 false
+ */
 export function isCsrfSafe(
   request: NextRequest,
   source: SessionTokenSource,

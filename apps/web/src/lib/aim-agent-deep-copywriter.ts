@@ -7,7 +7,12 @@ import {
   PUBLISH_PACKAGE_CHAT_RULE,
 } from "@/lib/aim-agent-prompts"
 import { hasExplicitDirectDraftIntent } from "@/lib/aim-current-user-input"
-import { buildWorkflowContext, executeGenerateLLMWithBenchmarkRetry } from "@/lib/aim-generation-prompts"
+import {
+  CONTENT_CREATION_TRACE_RULE,
+  buildWorkflowContext,
+  ensureContentCreationTrace,
+  executeGenerateLLMWithBenchmarkRetry,
+} from "@/lib/aim-generation-prompts"
 import type { ContentFormat } from "./aim-generator"
 import type {
   AimAgentHandler,
@@ -107,14 +112,23 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
   ✗ "你看节奏和内容是否符合"这类确认尾句
   ✗ 任何平台分发内容
 - 必须是一篇连续长文，不要拆成多个交付模块。
-- 正文最后一句写完就停止，不要追加解释、建议、点评或问句。
+- 除正文前的 [[AIM_METHOD_NOTE]] 透明说明外，正文最后一句写完就停止，不要追加解释、建议、点评或问句。
 - 热点只能基于用户提供的热点、已有上下文或明确行业趋势自然融合，禁止硬蹭或编造。
 - 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
 - 不暴露外部参考来源细节。`
 
+    const creationTraceRule = context.runtimeTask === "light_edit"
+      ? ""
+      : `\n${CONTENT_CREATION_TRACE_RULE}\n`
+
+    const knowledgeSection = context.knowledgeBlock?.trim()
+      ? context.knowledgeBlock
+      : `【知识库状态】当前未检索到与本次创作相关的知识库内容。
+降级策略：完全基于用户输入素材、对话上下文和通用创作能力完成产出，不要编造企业案例、产品信息或老板经历。`
+
     const systemPrompt = `${agentPrompt}
 
-${context.knowledgeBlock}
+${knowledgeSection}
 ${context.methodologyBlock}
 ${context.eventStorytellingBlock}
 ${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
@@ -123,6 +137,7 @@ ${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
 2. 如果有对标文案，先锁定原视频核心选题，再把表达迁移成本IP的案例、身份和承接。
 3. 保持真实口语感、情绪共鸣与深刻洞察，杜绝公文宣传腔和万金油排比句。
 4. 未确认框架时先输出文案框架；已确认框架后，只输出一篇完整深度长文正文，不加任何附加结构标记，正文结束立刻停止。
+${creationTraceRule}
 
 对标改写硬规则：
 ${BENCHMARK_REWRITE_GUARDRAIL}
@@ -139,7 +154,7 @@ ${workflowContext}
 
 ` : ""}
 
-${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n\n` : ""}请根据上下文判断：如果还没有明确文案框架，先输出文案框架；如果已经确认框架，直接输出正文。正文最后一句写完就停止，不要包含解释性文字、拆分方向、私域话术或确认尾句。`
+${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n\n` : ""}请根据上下文判断：如果还没有明确文案框架，先输出文案框架；如果已经确认框架，直接输出正文。除正文前的 [[AIM_METHOD_NOTE]] 外，正文最后一句写完就停止，不要包含解释性文字、拆分方向、私域话术或确认尾句。`
 
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
@@ -149,9 +164,11 @@ ${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n\n` : 
       safeTargets,
     )
 
-    const rawText = parsed.raw_copy || completion.content.trim()
+    const rawText = ensureContentCreationTrace(parsed.raw_copy || completion.content, context)
 
-    const record = await saveAimGenerationRecord(context, completion, parsed)
+    const traced = { ...parsed, raw_copy: rawText }
+
+    const record = await saveAimGenerationRecord(context, completion, traced)
 
     return {
       id: record.id,

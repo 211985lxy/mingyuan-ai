@@ -34,6 +34,11 @@ const CHUNK_THRESHOLD = 5000
 /** 分块最小字数，避免产生过短的碎片 */
 const CHUNK_MIN_SIZE = 500
 
+/**
+ * @description 判断是否supportedfile
+ * @param fileName - 文件名称
+ * @returns boolean
+ */
 export function isSupportedFile(fileName: string): boolean {
   const ext = getExtension(fileName)
   return SUPPORTED_EXTENSIONS.has(ext)
@@ -48,6 +53,12 @@ function getExtension(fileName: string): string {
 /**
  * 解析文档，返回文本块数组。
  * 小文档返回单元素数组，大文档按段落边界分块。
+ */
+/**
+ * @description 解析document
+ * @param buffer - 缓冲区
+ * @param fileName - 文件名称
+ * @returns Promise<string[]>
  */
 export async function parseDocument(
   buffer: Buffer,

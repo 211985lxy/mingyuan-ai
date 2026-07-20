@@ -2,29 +2,28 @@ import { NextRequest, NextResponse } from "next/server"
 import { validateCronSecret } from "@/lib/admin-auth"
 import { reclaimExpiredBackgroundTaskLeases } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
-import { COMPETITOR_ANALYSIS_TASK_KIND, executeCompetitorAnalysisBackgroundTask } from "@/lib/competitor-analysis/background-task"
-import { INSPIRATION_PROCESS_TASK_KIND, executeInspirationBackgroundTask } from "@/features/topics/services/inspiration-background-task"
+import { BACKGROUND_TASK_KINDS, executeBackgroundTaskBatch } from "@/lib/background-task-executors"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   if (!validateCronSecret(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
     const reclaimed = await reclaimExpiredBackgroundTaskLeases(prisma)
     const tasks = await prisma.backgroundTask.findMany({
-      where: { kind: { in: [COMPETITOR_ANALYSIS_TASK_KIND, INSPIRATION_PROCESS_TASK_KIND] }, status: { in: ["queued", "retry_wait"] }, availableAt: { lte: new Date() } },
+      where: { kind: { in: BACKGROUND_TASK_KINDS }, status: { in: ["queued", "retry_wait"] }, availableAt: { lte: new Date() } },
       select: { id: true, kind: true },
-      take: 1,
+      orderBy: { availableAt: "asc" },
+      take: 20,
     })
-    let executed = 0
-    for (const task of tasks) {
-      const ran = task.kind === COMPETITOR_ANALYSIS_TASK_KIND
-        ? await executeCompetitorAnalysisBackgroundTask(task.id)
-        : await executeInspirationBackgroundTask(task.id)
-      if (ran) executed += 1
-    }
+    const executed = await executeBackgroundTaskBatch(tasks, 4)
     return NextResponse.json({ ok: true, reclaimed: reclaimed.count, ready: tasks.length, executed })
   } catch (error) {
     console.error("[cron/background-tasks] failed:", error)

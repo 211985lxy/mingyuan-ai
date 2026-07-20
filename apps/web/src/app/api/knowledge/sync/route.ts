@@ -6,6 +6,11 @@ import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { obsidianSyncBodySchema } from "@/features/knowledge/contracts/api"
 import { isKnowledgeCategory } from "@/lib/knowledge-categories"
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   const syncToken = env.OBSIDIAN_SYNC_TOKEN
   const targetUserId = env.OBSIDIAN_SYNC_USER_ID

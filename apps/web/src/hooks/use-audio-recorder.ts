@@ -12,6 +12,11 @@ export interface UseAudioRecorderOptions {
  * 通用网页录音与 ASR 智能转写 React Hook。
  * 封装录制状态、倒计时、实时频域数据提取、ASR 请求与设备资源释放逻辑。
  */
+/**
+ * @description React Hook：audiorecorder
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function useAudioRecorder({
   onTranscribeSuccess,
   onTranscribeError,

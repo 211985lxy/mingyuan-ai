@@ -35,6 +35,10 @@ Aware 看见：用热点、痛点、反差让目标人群先停下来。Appeal �
  * IP 操盘方法论块（DB 优先 + 文件兜底 + 编辑即时生效）。
  * 实际加载逻辑统一收敛到 agent-methodology-store。
  */
+/**
+ * @description 构建ipcopywritingmethodologyblock
+ * @returns Promise<string>
+ */
 export async function buildIpCopywritingMethodologyBlock(): Promise<string> {
   const block = await getMethodologyBlock("ip_copywriting")
   return `${block}\n\n${COPYWRITING_CORE_METHODOLOGY}\n`

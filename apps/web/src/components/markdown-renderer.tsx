@@ -7,6 +7,11 @@ interface MarkdownRendererProps {
   className?: string
 }
 
+/**
+ * @description 安全校验 Markdown 链接的 href，过滤非法协议（仅允许 http/https/mailto 和相对路径）
+ * @param value - 原始链接地址
+ * @returns 安全的 href 值，非法时返回 null
+ */
 export function safeMarkdownHref(value: string): string | null {
   const href = value.trim()
   if (href.startsWith("/") || href.startsWith("#")) return href
@@ -27,6 +32,11 @@ export function safeMarkdownHref(value: string): string | null {
  *   数字列表 ( 1. )
  *   行内代码
  *   分隔符 ---
+ */
+/**
+ * @description markdownrenderer
+ * @param options - 配置选项
+ * @returns 无返回值
  */
 export function MarkdownRenderer({ content, className = "" }: MarkdownRendererProps) {
   if (!content.trim()) return null

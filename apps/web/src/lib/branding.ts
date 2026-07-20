@@ -12,6 +12,10 @@ import {
 const BRANDING_CACHE_KEY = "system:branding:v3"
 const BRANDING_CACHE_TTL_SECONDS = 60 * 60
 
+/**
+ * @description 获取brandingconfig
+ * @returns Promise<BrandingConfig>
+ */
 export async function getBrandingConfig(): Promise<BrandingConfig> {
   try {
     return await withCache(BRANDING_CACHE_KEY, BRANDING_CACHE_TTL_SECONDS, async () => {
@@ -42,6 +46,10 @@ export async function getBrandingConfig(): Promise<BrandingConfig> {
   }
 }
 
+/**
+ * @description invalidatebrandingcache
+ * @returns 无返回值
+ */
 export async function invalidateBrandingCache() {
   try {
     await redis.del(BRANDING_CACHE_KEY)

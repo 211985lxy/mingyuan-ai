@@ -32,6 +32,11 @@ export interface KnowledgeEntry {
   updatedAt: string
 }
 
+/**
+ * @description 列出knowledge
+ * @param input? - input?
+ * @returns Promise<KnowledgeEntry[]>
+ */
 export async function listKnowledge(input?: {
   category?: string
   projectId?: string
@@ -44,6 +49,11 @@ export async function listKnowledge(input?: {
   return request<KnowledgeEntry[]>(`/api/knowledge?${params}`)
 }
 
+/**
+ * @description 创建knowledge
+ * @param data - 数据
+ * @returns Promise<KnowledgeEntry>
+ */
 export async function createKnowledge(data: {
   projectId?: string
   category: string
@@ -86,6 +96,11 @@ export interface IpWikiPageDTO {
 }
 
 /** Ingest：把定位方案编译成结构化维基页（提议，待人工确认） */
+/**
+ * @description 编译ipwikipositioning
+ * @param input - 输入数据
+ * @returns Promise<
+ */
 export async function compileIpWikiPositioning(input: {
   projectId: string
   sourceGenerationId?: string
@@ -101,6 +116,11 @@ export async function compileIpWikiPositioning(input: {
 }
 
 /** 列出某 IP 全案的 active 维基页 */
+/**
+ * @description 列出ipwikipages
+ * @param projectId - 项目 ID
+ * @returns Promise<IpWikiPageDTO[]>
+ */
 export async function listIpWikiPages(projectId: string): Promise<IpWikiPageDTO[]> {
   const params = new URLSearchParams({ projectId })
   const payload = await request<{ pages: IpWikiPageDTO[] }>(
@@ -110,6 +130,11 @@ export async function listIpWikiPages(projectId: string): Promise<IpWikiPageDTO[
 }
 
 /** 人工确认后写入维基页 */
+/**
+ * @description saveipwikipages
+ * @param input - 输入数据
+ * @returns Promise<IpWikiPageDTO[]>
+ */
 export async function saveIpWikiPages(input: {
   projectId: string
   sourceGenerationId?: string
@@ -141,6 +166,11 @@ export interface IpWikiLintReportDTO {
 }
 
 /** Lint：对某 IP 全案的维基页跑体检（死链/底盘字段缺失/来源过时/比例失衡） */
+/**
+ * @description lintipwikipages
+ * @param projectId - 项目 ID
+ * @returns Promise<IpWikiLintReportDTO>
+ */
 export async function lintIpWikiPages(projectId: string): Promise<IpWikiLintReportDTO> {
   const params = new URLSearchParams({ projectId })
   const payload = await request<{ report: IpWikiLintReportDTO }>(
@@ -149,6 +179,12 @@ export async function lintIpWikiPages(projectId: string): Promise<IpWikiLintRepo
   return payload.report
 }
 
+/**
+ * @description 更新knowledge
+ * @param id - 唯一标识符
+ * @param data - 数据
+ * @returns Promise<KnowledgeEntry>
+ */
 export async function updateKnowledge(
   id: string,
   data: Partial<{
@@ -164,6 +200,11 @@ export async function updateKnowledge(
   })
 }
 
+/**
+ * @description 删除knowledge
+ * @param id - 唯一标识符
+ * @returns Promise<void>
+ */
 export async function deleteKnowledge(id: string): Promise<void> {
   await request(`/api/knowledge/${id}`, { method: "DELETE" })
 }

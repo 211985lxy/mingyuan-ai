@@ -73,6 +73,11 @@ export interface AITasteResult {
  * @param content 文案内容
  * @returns AI 味评分结果
  */
+/**
+ * @description 检测aitaste
+ * @param content - 内容
+ * @returns AITasteResult
+ */
 export function detectAITaste(content: string): AITasteResult {
   const hits: string[] = []
   const patternHits: string[] = []

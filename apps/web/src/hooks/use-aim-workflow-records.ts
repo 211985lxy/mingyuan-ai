@@ -28,6 +28,12 @@ const EMPTY_PUBLISH: PublishRecordForm = { publishPlatform: "抖音", publishUrl
 const EMPTY_RETRO: AimRetroSnapshot = { summary: "", actualData: "", verdict: "", nextRule: "" }
 const EMPTY_RULE: AimCalibrationRule = { rule: "", source: "内容复盘" }
 
+/**
+ * @description 解析aimoutcomenumber
+ * @param form - 表单
+ * @param key - 键
+ * @returns 无返回值
+ */
 export function parseAimOutcomeNumber(form: OutcomeForm, key: string) {
   const raw = form[key]
   if (!raw?.trim()) return null
@@ -153,6 +159,11 @@ interface UseAimWorkflowRecordsInput {
   onPublished?: (generationId: string) => void
 }
 
+/**
+ * @description React Hook：aimworkflowrecords
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
   const forms = useAimRecordForms()
   const [recordDialog, setRecordDialog] = useState<WorkflowRecordDialogState | null>(null)

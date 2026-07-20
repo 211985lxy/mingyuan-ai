@@ -142,6 +142,11 @@ ${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}请直�
 
 // ─── 前采模式检测 ───────────────────────────────────────────
 
+/**
+ * @description 检测人设智能体的工作模式（引导式/前采式/前采整理）
+ * @param input - 用户输入文本
+ * @returns 检测到的工作模式
+ */
 export function detectPersonaMode(input: string): "guided" | "intake" | "intake_compile" {
   const text = input.trim()
   if (text.includes("开始整理")) return "intake_compile"

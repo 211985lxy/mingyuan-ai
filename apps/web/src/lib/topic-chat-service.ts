@@ -11,11 +11,19 @@ import {
   createTopicIpProfile,
   loadTopicChatContext,
 } from "@/lib/topics/chat-context"
+import { buildInspirationReplyText } from "@/features/topics/services/inspiration-reply"
+import { enqueueReply } from "@/features/topics/services/reply-outbox"
 
+/**
+ * @description 处理topicchatmessage
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function handleTopicChatMessage(input: {
   userId: string
   projectId: string
   content: string
+  inspirationId?: string
 }) {
   const content = input.content.trim()
   const [project, elements, ipProfile] = await loadTopicChatContext(input)
@@ -24,20 +32,6 @@ export async function handleTopicChatMessage(input: {
 
   const classification = classifyTopicChatInput(content)
   const draft = buildTopicKnowledgeDraft({ content, classification })
-
-  const knowledgeEntry = await prisma.knowledgeEntry.create({
-    data: {
-      userId: input.userId,
-      projectId: project.id,
-      category: draft.category,
-      title: draft.title,
-      content: draft.content,
-      tags: draft.tags,
-      sourceType: draft.sourceType,
-      status: "active",
-    },
-    select: { id: true, category: true, title: true },
-  })
 
   const projectSource = buildTopicProjectSource(project)
   const topicIpProfile = ipProfile ?? await createTopicIpProfile(input.userId, project)
@@ -56,19 +50,72 @@ export async function handleTopicChatMessage(input: {
   if (!result.success) throw new Error(result.error || "选题生成失败")
 
   const today = new Date().toISOString().split("T")[0]
-  const selection = await prisma.topicSelection.create({
-    data: {
-      userId: input.userId,
-      ipProfileId: topicIpProfile.id,
-      elementCodes: result.elementCodes as unknown as Prisma.InputJsonValue,
-      candidates: result.cards as unknown as Prisma.InputJsonValue,
-      promptText: result.promptText,
-      model: result.model,
-      status: "pending",
-      recommendationMode: "normal",
-      recommendedDate: today,
-    },
-    select: { id: true },
+  const { knowledgeEntry, selection } = await prisma.$transaction(async (tx) => {
+    const knowledgeEntry = await tx.knowledgeEntry.create({
+      data: {
+        userId: input.userId,
+        projectId: project.id,
+        category: draft.category,
+        title: draft.title,
+        content: draft.content,
+        tags: draft.tags,
+        sourceType: draft.sourceType,
+        status: "active",
+      },
+      select: { id: true, category: true, title: true },
+    })
+    const selection = await tx.topicSelection.create({
+      data: {
+        userId: input.userId,
+        ipProfileId: topicIpProfile.id,
+        elementCodes: result.elementCodes as unknown as Prisma.InputJsonValue,
+        candidates: result.cards as unknown as Prisma.InputJsonValue,
+        sourceHighlights: [
+          { category: "client_project", title: project.name, content: projectSource || project.name },
+          { category: draft.category, title: draft.title, content: draft.content },
+        ] as unknown as Prisma.InputJsonValue,
+        promptText: result.promptText,
+        model: result.model,
+        status: "pending",
+        recommendationMode: "normal",
+        recommendedDate: today,
+      },
+      select: { id: true },
+    })
+    if (input.inspirationId) {
+      // Fetch the inspiration record for platform context (needed for outbox reply)
+      const inspiration = await tx.inspiration.findUnique({
+        where: { id: input.inspirationId },
+        select: { source: true, externalChatId: true, externalMessageId: true },
+      })
+      await tx.inspiration.updateMany({
+        where: { id: input.inspirationId, userId: input.userId },
+        data: {
+          aiStatus: "completed",
+          processingStage: "completed",
+          generatedTopics: result.cards as unknown as Prisma.InputJsonValue,
+          knowledgeEntryId: knowledgeEntry.id,
+          topicSelectionId: selection.id,
+          errorMessage: null,
+        },
+      })
+      // Create outbox reply for async delivery instead of legacy replyStatus + background task
+      if (inspiration?.source) {
+        const replyText = buildInspirationReplyText({
+          generatedTopics: result.cards,
+          topicSelectionId: selection.id,
+        })
+        await enqueueReply({
+          inspirationId: input.inspirationId,
+          replyType: "final",
+          platform: inspiration.source,
+          externalChatId: inspiration.externalChatId || "",
+          externalMessageId: inspiration.externalMessageId ?? undefined,
+          replyText,
+        }, tx as never)
+      }
+    }
+    return { knowledgeEntry, selection }
   })
 
   const reply = buildTopicChatReply({

@@ -41,6 +41,11 @@ interface AgentReachDoctorResult {
   rss?: AgentReachDoctorChannel
 }
 
+/**
+ * @description 运行agentreachcompetitorresearch
+ * @param query - 查询条件
+ * @returns Promise<AgentReachResearchResult>
+ */
 export async function runAgentReachCompetitorResearch(query: string): Promise<AgentReachResearchResult> {
   const normalizedQuery = query.trim().slice(0, 120)
   if (!normalizedQuery) {
@@ -154,6 +159,11 @@ async function fetchBingRss(query: string): Promise<AgentReachResearchItem[]> {
   return items
 }
 
+/**
+ * @description 解析bingrss
+ * @param xml - xml
+ * @returns AgentReachResearchItem[]
+ */
 export function parseBingRss(xml: string): AgentReachResearchItem[] {
   const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/g) || []
   return itemMatches

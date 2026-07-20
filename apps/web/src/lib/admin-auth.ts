@@ -26,10 +26,21 @@ interface AdminPayload {
   sessionVersion: number
 }
 
+/**
+ * @description 使用 bcrypt 对密码进行哈希加密
+ * @param password - 原始密码
+ * @returns 哈希后的密码字符串
+ */
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12)
 }
 
+/**
+ * @description 验证密码是否与哈希匹配
+ * @param password - 原始密码
+ * @param hash - 哈希值
+ * @returns 匹配返回 true
+ */
 export async function verifyPassword(
   password: string,
   hash: string
@@ -37,10 +48,20 @@ export async function verifyPassword(
   return bcrypt.compare(password, hash)
 }
 
+/**
+ * @description 签发管理员 JWT 令牌（有效期 8 小时）
+ * @param payload - 管理员载荷（ID、邮箱、角色、会话版本）
+ * @returns JWT 令牌字符串
+ */
 export function signAdminToken(payload: AdminPayload): string {
   return jwt.sign(payload, requireAdminJwtSecret(), { expiresIn: "8h" })
 }
 
+/**
+ * @description 验证并解析管理员 JWT 令牌
+ * @param token - JWT 令牌字符串
+ * @returns 解析后的管理员载荷，无效时返回 null
+ */
 export function verifyAdminToken(token: string): AdminPayload | null {
   const secret = requireAdminJwtSecret()
   try {
@@ -53,6 +74,11 @@ export function verifyAdminToken(token: string): AdminPayload | null {
 /**
  * Admin auth middleware wrapper.
  * Validates admin JWT and optionally checks role.
+ */
+/**
+ * @description withadminauth
+ * @param handler - 处理函数
+ * @returns 无返回值
  */
 export function withAdminAuth(
   handler: (
@@ -120,6 +146,11 @@ export function withAdminAuth(
 
 /**
  * Validate CRON_SECRET for cron endpoint protection.
+ */
+/**
+ * @description 验证cronsecret
+ * @param request - 请求对象
+ * @returns boolean
  */
 export function validateCronSecret(request: NextRequest): boolean {
   const auth = request.headers.get("authorization")

@@ -95,6 +95,22 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
 
 const TRUNCATION_MARKER = "\n（该上下文已按预算截断）"
 
+/**
+ * agent 级预算修正：在 runtimeTask 基准上叠加 agent 维度的总量与块上限调整。
+ * - free_copywriter：知识依赖低，压缩知识块、放大对话块
+ * - deep_copywriter：知识依赖最高，放大知识块与事件叙事块
+ */
+const AGENT_BUDGET_OVERRIDES: Partial<Record<string, { totalChars?: number; blockCaps?: Partial<Record<AimContextBlockKey, number>> }>> = {
+  free_copywriter: {
+    totalChars: 6_000,
+    blockCaps: { knowledgeBlock: 1_500, conversationBlock: 2_500, methodologyBlock: 800 },
+  },
+  deep_copywriter: {
+    totalChars: 16_000,
+    blockCaps: { knowledgeBlock: 6_000, eventStorytellingBlock: 2_500, ipWikiBlock: 3_500 },
+  },
+}
+
 function truncateBlock(value: string, maxChars: number): string {
   if (value.length <= maxChars) return value
   if (maxChars <= 0) return ""
@@ -102,9 +118,17 @@ function truncateBlock(value: string, maxChars: number): string {
   return `${value.slice(0, maxChars - TRUNCATION_MARKER.length)}${TRUNCATION_MARKER}`
 }
 
+/**
+ * @description 按任务类型和 Agent 级预算对上下文块进行截断分配，确保不超出总字符数限制
+ * @param input - 原始上下文块内容
+ * @param runtimeTask - 运行时任务类型（light_edit、rewrite_copy、new_copy 等）
+ * @param agentId - 可选的 Agent ID，用于叠加 agent 级预算修正
+ * @returns 截断后的上下文块及统计信息（预算、原始字符数、包含字符数、被截断的块）
+ */
 export function applyAimContextBudget(
   input: AimContextBlocks,
   runtimeTask: AimRuntimeTask,
+  agentId?: string,
 ): {
   blocks: AimContextBlocks
   stats: {
@@ -114,7 +138,16 @@ export function applyAimContextBudget(
     truncatedBlocks: AimContextBlockKey[]
   }
 } {
-  const profile = AIM_CONTEXT_BUDGET_PROFILES[runtimeTask]
+  const baseProfile = AIM_CONTEXT_BUDGET_PROFILES[runtimeTask]
+  // 叠加 agent 级修正
+  const agentOverride = agentId ? AGENT_BUDGET_OVERRIDES[agentId] : undefined
+  const profile: AimContextBudgetProfile = agentOverride
+    ? {
+        totalChars: agentOverride.totalChars ?? baseProfile.totalChars,
+        priority: baseProfile.priority,
+        blockCaps: { ...baseProfile.blockCaps, ...agentOverride.blockCaps },
+      }
+    : baseProfile
   const blocks = Object.fromEntries(
     (Object.keys(input) as AimContextBlockKey[]).map((key) => [key, ""]),
   ) as unknown as AimContextBlocks

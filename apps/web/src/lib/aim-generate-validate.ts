@@ -53,6 +53,11 @@ export interface ParseGenerateBodyResult {
   writerModule: "social" | "longform" | "free" | undefined
 }
 
+/**
+ * @description 解析生成请求体
+ * @param body - 请求体对象
+ * @returns 解析后的生成参数
+ */
 export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateBodyResult {
   const rawInput = typeof body.rawInput === "string" ? body.rawInput.trim() : ""
   const agentId = typeof body.agentId === "string" ? body.agentId : undefined
@@ -112,6 +117,11 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
   }
 }
 
+/**
+ * @description 验证生成输入参数
+ * @param parsed - 解析后的生成参数
+ * @returns 错误信息，验证通过返回 null
+ */
 export function validateGenerateInput(parsed: {
   rawInput: string
   projectId: string

@@ -36,6 +36,14 @@ function formatMessages(systemPrompt: string, messages: any[]): ChatMessage[] {
   ]
 }
 
+/**
+ * @description 执行chatllm
+ * @param agentId - 智能体 ID
+ * @param systemPrompt - system提示词
+ * @param messages - 消息列表
+ * @param policy? - policy?
+ * @returns Promise<
+ */
 export async function executeChatLLM(
   agentId: string,
   systemPrompt: string,
@@ -67,6 +75,14 @@ export async function* executeChatLLMStream(
   })
 }
 
+/**
+ * @description 执行generatellm
+ * @param agentId - 智能体 ID
+ * @param systemPrompt - system提示词
+ * @param userPrompt - user提示词
+ * @param policy? - policy?
+ * @returns 无返回值
+ */
 export async function executeGenerateLLM(
   agentId: string,
   systemPrompt: string,

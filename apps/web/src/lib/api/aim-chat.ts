@@ -19,6 +19,11 @@ import type {
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
 
+/**
+ * @description transcribeaudio
+ * @param audioBlob - audioBlob
+ * @returns Promise<
+ */
 export async function transcribeAudio(audioBlob: Blob): Promise<{ text: string }> {
   return request<{ text: string }>("/api/aim/transcribe", {
     method: "POST",
@@ -29,6 +34,12 @@ export async function transcribeAudio(audioBlob: Blob): Promise<{ text: string }
   })
 }
 
+/**
+ * @description 上传knowledgedocument
+ * @param file - 文件
+ * @param category - 分类
+ * @returns Promise<
+ */
 export async function uploadKnowledgeDocument(
   file: File,
   category: string
@@ -69,6 +80,12 @@ export type AimChatToolAction =
   | "import_lark_archive_data"
   | "export_lark_generation"
 
+/**
+ * @description chataim
+ * @param messages - 消息列表
+ * @param options? - options?
+ * @returns Promise<
+ */
 export async function chatAim(
   messages: AimChatMessage[],
   options?: {
@@ -91,6 +108,12 @@ export async function chatAim(
   })
 }
 
+/**
+ * @description chataimstream
+ * @param messages - 消息列表
+ * @param options - 配置选项
+ * @returns Promise<
+ */
 export async function chatAimStream(
   messages: AimChatMessage[],
   options: {

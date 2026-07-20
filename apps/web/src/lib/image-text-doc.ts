@@ -3,6 +3,11 @@ export interface ImageTextDoc { header: string; pages: ImageTextPage[] }
 
 const PAGE = /^(?:#*\s*)?(?:第\s*\d+\s*页|Page\s*\d+|【?(?:封面|尾页)】?)(?:\s*[:：|—-]\s*(.*))?$/i
 
+/**
+ * @description 解析imagetextdoc
+ * @param source - 来源
+ * @returns ImageTextDoc
+ */
 export function parseImageTextDoc(source: string): ImageTextDoc {
   const header: string[] = []
   const raw: Array<{ title: string; lines: string[] }> = []
@@ -27,6 +32,12 @@ export function parseImageTextDoc(source: string): ImageTextDoc {
   }
 }
 
+/**
+ * @description serializeimagetextdoc
+ * @param header - 请求头
+ * @param pages - pages
+ * @returns string
+ */
 export function serializeImageTextDoc(header: string, pages: ImageTextPage[]): string {
   const blocks = pages.map((page, index) => {
     const lines = [`第 ${index + 1} 页${page.title.trim() ? `：${page.title.trim()}` : ""}`]

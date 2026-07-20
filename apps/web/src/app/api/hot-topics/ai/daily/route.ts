@@ -16,6 +16,10 @@ function setCache(key: string, data: unknown) {
   cache = { key, data, expires: Date.now() + CACHE_TTL }
 }
 
+/**
+ * @description 处理 GET 请求
+ * @returns 无返回值
+ */
 export async function GET() {
   const cacheKey = "daily:latest"
   const cached = getCache(cacheKey)

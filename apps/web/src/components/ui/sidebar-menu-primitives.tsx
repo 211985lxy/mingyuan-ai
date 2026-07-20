@@ -5,6 +5,11 @@ import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cn } from "@/lib/utils"
 
+/**
+ * @description sidebargroup
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -16,6 +21,11 @@ export function SidebarGroup({ className, ...props }: React.ComponentProps<"div"
   )
 }
 
+/**
+ * @description sidebargrouplabel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarGroupLabel({
   className,
   render,
@@ -40,6 +50,11 @@ export function SidebarGroupLabel({
   })
 }
 
+/**
+ * @description sidebargroupaction
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarGroupAction({
   className,
   render,
@@ -64,6 +79,11 @@ export function SidebarGroupAction({
   })
 }
 
+/**
+ * @description sidebargroupcontent
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarGroupContent({
   className,
   ...props
@@ -78,6 +98,11 @@ export function SidebarGroupContent({
   )
 }
 
+/**
+ * @description sidebarmenu
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -89,6 +114,11 @@ export function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">)
   )
 }
 
+/**
+ * @description sidebarmenuitem
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li

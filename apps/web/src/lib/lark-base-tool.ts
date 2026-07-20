@@ -6,6 +6,11 @@ type EnsureEmbeddingFn = (entryId: string) => Promise<void>
 let _ensureEmbedding: EnsureEmbeddingFn | null = null
 
 /** Optional: register an embedding hook that runs after entry create/update */
+/**
+ * @description 设置embeddinghook
+ * @param fn - 函数
+ * @returns 无返回值
+ */
 export function setEmbeddingHook(fn: EnsureEmbeddingFn): void {
   _ensureEmbedding = fn
 }
@@ -72,6 +77,12 @@ const TABLE_ENV_KEYS: Record<LarkTableType, string> = {
 
 const REQUIRED_FIELDS = ["标题", "内容", "类型"]
 
+/**
+ * @description 读取larkbaseconfig
+ * @param env - 环境变量
+ * @param tableType - 表类型
+ * @returns LarkConfig
+ */
 export function readLarkBaseConfig(env: EnvLike, tableType: LarkTableType): LarkConfig {
   const baseToken = env.LARK_BASE_TOKEN?.trim()
   if (!baseToken) throw new Error("缺少 LARK_BASE_TOKEN")
@@ -102,6 +113,11 @@ function readResultTableConfig(env: EnvLike, resultType: LarkResultType): LarkCo
   }
 }
 
+/**
+ * @description maplarkknowledgecategory
+ * @param value - 值
+ * @returns string
+ */
 export function mapLarkKnowledgeCategory(value: unknown): string {
   const text = String(value || "")
   if (/热点/.test(text)) return "hot_topic"
@@ -112,6 +128,13 @@ export function mapLarkKnowledgeCategory(value: unknown): string {
   return "daily_inspiration"
 }
 
+/**
+ * @description 运行larkbasecommand
+ * @param command - 命令
+ * @param args - 参数列表
+ * @param options - 配置选项
+ * @returns Promise<unknown>
+ */
 export async function runLarkBaseCommand(
   command: string,
   args: string[],
@@ -235,6 +258,11 @@ function narrowRecordResponse(
   return { recordId: record.record_id, fields }
 }
 
+/**
+ * @description 获取larkbaserecord
+ * @param input - 输入数据
+ * @returns Promise<
+ */
 export async function getLarkBaseRecord(input: {
   baseToken: string
   tableId: string
@@ -262,6 +290,11 @@ export async function getLarkBaseRecord(input: {
   return narrowed
 }
 
+/**
+ * @description 更新larkbaserecord
+ * @param input - 输入数据
+ * @returns Promise<
+ */
 export async function updateLarkBaseRecord(input: {
   baseToken: string
   tableId: string
@@ -290,6 +323,11 @@ export async function updateLarkBaseRecord(input: {
 /**
  * 列出表内记录（record 级，供 WP-8 待处理扫描等场景使用）。
  * 返回 { recordId, fields } 形态；不做状态过滤，过滤由调用方负责。
+ */
+/**
+ * @description 列出larkbaserecords
+ * @param input - 输入数据
+ * @returns Promise<Array<
  */
 export async function listLarkBaseRecords(input: {
   baseToken: string
@@ -345,6 +383,11 @@ async function validateFields(runCommand: RunCommand, config: LarkConfig) {
   }
 }
 
+/**
+ * @description 导入larkbaseknowledge
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function importLarkBaseKnowledge(input: {
   userId: string
   projectId: string
@@ -424,6 +467,11 @@ function summarizeAimGeneration(record: Record<string, unknown>) {
   ).slice(0, 2000)
 }
 
+/**
+ * @description 导出larkbaseresult
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function exportLarkBaseResult(input: {
   userId: string
   projectId: string

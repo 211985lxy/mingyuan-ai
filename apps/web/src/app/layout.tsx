@@ -13,6 +13,10 @@ import "./globals.css"
 // workUnitAsyncStorage InvariantError 退出码 1,导致 docker build 失败。
 export const dynamic = "force-dynamic"
 
+/**
+ * @description 生成页面元数据
+ * @returns Promise<Metadata>
+ */
 export async function generateMetadata(): Promise<Metadata> {
   const branding = await getBrandingConfig()
 

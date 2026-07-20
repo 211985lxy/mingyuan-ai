@@ -73,6 +73,10 @@ function renderMarkdownSummary(text: string) {
   )
 }
 
+/**
+ * @description last30dayspanel
+ * @returns 无返回值
+ */
 export function Last30DaysPanel() {
   const [snapshot, setSnapshot] = useState<ApiMarketHotSnapshot | null>(null)
   const [loadingSnapshot, setLoadingSnapshot] = useState(true)

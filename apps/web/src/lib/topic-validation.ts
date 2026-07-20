@@ -52,6 +52,21 @@ export const TopicScoreBreakdownSchema = z.object({
   feasibility: z.number().min(0).max(100).nullable().optional(),
 })
 
+export const TopicCreativeTraceSchema = z.object({
+  stylePositioning: z.string().min(2).max(120),
+  logicSteps: z.array(z.string().min(2).max(160)).min(2).max(5),
+  sources: z.array(z.object({
+    kind: z.enum(["benchmark", "product", "persona"]),
+    source: z.string().min(2).max(160),
+    usage: z.string().min(2).max(200),
+  })).length(3),
+  destinyAlignment: z.object({
+    baziBasis: z.string().min(2).max(160),
+    ziweiBasis: z.string().min(2).max(160),
+    styleMapping: z.string().min(2).max(240),
+  }),
+})
+
 export const TopicCardSchema = z.object({
   title: z.string().min(2, "标题至少2字").max(20, "标题不超过20字"),
   elementCodes: z
@@ -72,6 +87,7 @@ export const TopicCardSchema = z.object({
   angle: z.string().min(2).max(300).optional(),
   cta: z.string().min(2).max(200).optional(),
   contentLine: z.string().min(2).max(40).optional(),
+  creativeTrace: TopicCreativeTraceSchema.optional(),
   defamiliarization: z
     .object({
       scarcityType: z.enum(VALID_SCARCITY_CODES).optional(),

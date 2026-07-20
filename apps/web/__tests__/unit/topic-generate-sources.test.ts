@@ -41,6 +41,7 @@ describe("topic generate sources", () => {
     expect(sources[0].content).toContain("爆款标题")
     expect(sources[0].content).toContain("近期标题")
     expect(sources[0].content).toContain("已验证内容信号")
+    expect(sources[0].content).toContain("来源账号：https://example.com/u")
   })
 
   it("builds benchmark sources from extracted copy analysis", () => {

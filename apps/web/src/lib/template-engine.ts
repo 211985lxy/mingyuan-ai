@@ -4,6 +4,12 @@ import type { TemplateVariable } from "@/types/content-template"
  * Render a template script by replacing {{variableName}} placeholders
  * with user-provided values.
  */
+/**
+ * @description 渲染template
+ * @param scriptTemplate - script模板
+ * @param variables - variables
+ * @returns string
+ */
 export function renderTemplate(
   scriptTemplate: string,
   variables: Record<string, string>
@@ -16,6 +22,12 @@ export function renderTemplate(
 /**
  * Validate that all required variables have values.
  * Returns array of missing required variable keys.
+ */
+/**
+ * @description 验证variables
+ * @param definitions - definitions
+ * @param values - 值列表
+ * @returns string[]
  */
 export function validateVariables(
   definitions: TemplateVariable[],

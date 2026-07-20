@@ -14,6 +14,11 @@ import type {
 function buildChatContextBlock(params: { knowledgeBlock: string; conversationBlock?: string }) {
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
 }
+/**
+ * @description 构建contentreviewchatprompt
+ * @param contextBlock - 上下文块
+ * @returns string
+ */
 export function buildContentReviewChatPrompt(contextBlock: string): string {
   return `你是「发布质检官」，负责对准备发布的口播、短视频脚本、公众号正文、朋友圈文案做发布前自查。
 
@@ -32,6 +37,11 @@ ${AIM_HIGH_RISK_LOOP_RULE}
 请直接根据上文与用户的历史对话，输出发布前质检建议。`
 }
 
+/**
+ * @description 构建contentreviewgenerateprompt
+ * @param knowledgeBlock - 知识块
+ * @returns string
+ */
 export function buildContentReviewGeneratePrompt(knowledgeBlock: string): string {
   return `你是「发布质检官」，负责对准备发布的文案做发布前自查。
 

@@ -13,6 +13,12 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   )
 }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

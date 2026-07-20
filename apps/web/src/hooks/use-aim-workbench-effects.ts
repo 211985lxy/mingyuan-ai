@@ -7,6 +7,12 @@ import { aimDraftProjectScope, saveAimDraft, type AimDraft } from "@/lib/aim/dra
 import { formatAnalysisResultForPrompt } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
+/**
+ * @description React Hook：aimdraftautosave
+ * @param draft - 草稿
+ * @param projectEnabled - project是否启用
+ * @returns 无返回值
+ */
 export function useAimDraftAutosave(draft: AimDraft, projectEnabled: boolean) {
   const {
     selectedAgentId, selectedProjectId, agentModule, input, messages, videoCopyExtractionId,
@@ -26,6 +32,11 @@ export function useAimDraftAutosave(draft: AimDraft, projectEnabled: boolean) {
   ])
 }
 
+/**
+ * @description React Hook：aimmessageautoscroll
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimMessageAutoScroll(input: {
   scrollRef: RefObject<HTMLDivElement | null>
   pendingMessageIdRef: MutableRefObject<string | null>
@@ -47,6 +58,11 @@ export function useAimMessageAutoScroll(input: {
   }, [isGenerating, isThinking, messages, pendingMessageIdRef, scrollRef])
 }
 
+/**
+ * @description React Hook：aimsourcehydration
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimSourceHydration(input: {
   extractionId?: string
   sourceOriginalText: string

@@ -34,6 +34,11 @@ const TASK_LABELS: Record<string, string> = {
   natural_chat: "自然对话",
 }
 
+/**
+ * @description 构建 AIM 交付契约（任务、依据、状态、下一步）
+ * @param input - 交付契约输入（对话模式、知识库、质量状态等）
+ * @returns 构建的交付契约对象
+ */
 export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDeliveryContract {
   const taskLabel = TASK_LABELS[input.conversationMode || ""] || "正式交付"
   const taskDetail = input.isCurrentVersion ? "当前版本" : "历史版本"

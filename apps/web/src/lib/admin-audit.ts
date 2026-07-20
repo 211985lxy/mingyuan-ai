@@ -3,6 +3,11 @@ import type { Prisma } from "@/generated/prisma/client"
 import { generateRequestId } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
 
+/**
+ * @description recordadminaudit
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function recordAdminAudit(input: {
   request: NextRequest
   adminId: string

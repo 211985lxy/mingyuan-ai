@@ -16,6 +16,11 @@ function setCache(key: string, data: unknown) {
   cache = { key, data, expires: Date.now() + CACHE_TTL }
 }
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
 

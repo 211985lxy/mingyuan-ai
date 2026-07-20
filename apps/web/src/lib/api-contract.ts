@@ -8,6 +8,9 @@ const jsonRecordSchema = z.record(z.string(), z.unknown())
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type JsonRecord = Record<string, any>
 
+/**
+ * @description API 请求层业务异常，携带 HTTP 状态码、错误码及可选字段信息
+ */
 export class ApiRequestError extends Error {
   constructor(
     readonly status: number,
@@ -20,6 +23,13 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * @description 解析并校验请求体 JSON，使用 Zod Schema 进行类型安全校验
+ * @param request - 原始请求对象
+ * @param schema - Zod 校验模式
+ * @param options - 可选配置，包含最大字节数限制
+ * @returns 校验通过的解析数据
+ */
 export async function parseJsonBody<T>(
   request: Request,
   schema: ZodType<T>,
@@ -56,6 +66,12 @@ export async function parseJsonBody<T>(
   return result.data
 }
 
+/**
+ * @description 解析请求体为通用 JSON 对象（带大小和格式校验）
+ * @param request - 原始请求对象
+ * @param options - 可选配置，包含最大字节数限制
+ * @returns 解析后的 JSON 对象
+ */
 export function parseJsonRecord(
   request: Request,
   options: { maxBytes?: number } = {},
@@ -65,6 +81,12 @@ export function parseJsonRecord(
   return parseJsonBody(request, jsonRecordSchema, options)
 }
 
+/**
+ * @description 解析并校验 URL 查询参数，使用 Zod Schema 进行类型安全校验
+ * @param request - 原始请求对象
+ * @param schema - Zod 校验模式
+ * @returns 校验通过的查询参数对象
+ */
 export function parseQuery<T>(request: Request, schema: ZodType<T>): T {
   const params = new URL(request.url).searchParams
   const input: Record<string, string | string[]> = {}
@@ -85,6 +107,12 @@ export function parseQuery<T>(request: Request, schema: ZodType<T>): T {
   return result.data
 }
 
+/**
+ * @description 将 ApiRequestError 转换为标准 JSON 错误响应，非 ApiRequestError 返回 null
+ * @param request - 原始请求对象（用于提取 requestId）
+ * @param error - 捕获的异常对象
+ * @returns 标准错误响应，或 null（非 ApiRequestError 时）
+ */
 export function apiRequestErrorResponse(
   request: Request | undefined,
   error: unknown,

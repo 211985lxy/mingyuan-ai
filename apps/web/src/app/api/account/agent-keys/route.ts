@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { authErrorResponse, authenticateRequest } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

@@ -8,6 +8,12 @@ const TEMPLATE_CACHE_KEY = "templates:published"
  * Validate a template status transition.
  * Returns true if the transition from → to is allowed.
  */
+/**
+ * @description 判断是否validtransition
+ * @param from - 起始值
+ * @param to - 目标值
+ * @returns boolean
+ */
 export function isValidTransition(
   from: string,
   to: TemplateStatus
@@ -19,6 +25,10 @@ export function isValidTransition(
 /**
  * Invalidate the published templates cache.
  * Call after any publish/archive/restore operation.
+ */
+/**
+ * @description invalidatetemplatecache
+ * @returns Promise<void>
  */
 export async function invalidateTemplateCache(): Promise<void> {
   try {

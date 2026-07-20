@@ -13,6 +13,11 @@ export const BACKGROUND_TASK_STATUS = {
 const RETRY_BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000]
 const DEFAULT_LEASE_TTL_MS = 6 * 60_000
 
+/**
+ * @description planbackgroundtaskfailure
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function planBackgroundTaskFailure(input: {
   attempt: number
   maxAttempts: number
@@ -29,6 +34,12 @@ export function planBackgroundTaskFailure(input: {
   }
 }
 
+/**
+ * @description enqueuebackgroundtask
+ * @param prisma - prisma
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function enqueueBackgroundTask(
   prisma: PrismaClient,
   input: { kind: string; aggregateType: string; aggregateId: string; idempotencyKey: string; maxAttempts?: number; availableAt?: Date },
@@ -40,6 +51,12 @@ export async function enqueueBackgroundTask(
   })
 }
 
+/**
+ * @description reclaimexpiredbackgroundtaskleases
+ * @param prisma - prisma
+ * @param now - now
+ * @returns 无返回值
+ */
 export async function reclaimExpiredBackgroundTaskLeases(prisma: PrismaClient, now = new Date()) {
   return prisma.backgroundTask.updateMany({
     where: { status: BACKGROUND_TASK_STATUS.leased, leaseExpiresAt: { lte: now } },
@@ -53,6 +70,14 @@ export async function reclaimExpiredBackgroundTaskLeases(prisma: PrismaClient, n
   })
 }
 
+/**
+ * @description claimbackgroundtask
+ * @param prisma - prisma
+ * @param taskId - 任务 ID
+ * @param now - now
+ * @param leaseTtlMs - leaseTtlMs
+ * @returns 无返回值
+ */
 export async function claimBackgroundTask(
   prisma: PrismaClient,
   taskId: string,
@@ -73,6 +98,14 @@ export async function claimBackgroundTask(
   return prisma.backgroundTask.findUnique({ where: { leaseToken } })
 }
 
+/**
+ * @description completebackgroundtask
+ * @param prisma - prisma
+ * @param taskId - 任务 ID
+ * @param leaseToken - lease令牌
+ * @param now - now
+ * @returns 无返回值
+ */
 export async function completeBackgroundTask(prisma: PrismaClient, taskId: string, leaseToken: string, now = new Date()) {
   return prisma.backgroundTask.updateMany({
     where: { id: taskId, status: BACKGROUND_TASK_STATUS.leased, leaseToken },
@@ -80,6 +113,34 @@ export async function completeBackgroundTask(prisma: PrismaClient, taskId: strin
   })
 }
 
+/**
+ * @description deferbackgroundtask
+ * @param prisma - prisma
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
+export async function deferBackgroundTask(
+  prisma: PrismaClient,
+  input: { taskId: string; leaseToken: string; availableAt: Date },
+) {
+  return prisma.backgroundTask.updateMany({
+    where: { id: input.taskId, status: BACKGROUND_TASK_STATUS.leased, leaseToken: input.leaseToken },
+    data: {
+      status: BACKGROUND_TASK_STATUS.retryWait,
+      availableAt: input.availableAt,
+      leaseToken: null,
+      leaseExpiresAt: null,
+      lastError: null,
+    },
+  })
+}
+
+/**
+ * @description failbackgroundtask
+ * @param prisma - prisma
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function failBackgroundTask(
   prisma: PrismaClient,
   input: { taskId: string; leaseToken: string; attempt: number; maxAttempts: number; retryable: boolean; error: string; now?: Date },

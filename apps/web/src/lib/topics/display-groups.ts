@@ -23,11 +23,21 @@ function getTopicDisplayGroupKey(card: ApiTopicCard) {
   return "question_answer"
 }
 
+/**
+ * @description 获取topicdisplaylabel
+ * @param card - 卡片
+ * @returns 无返回值
+ */
 export function getTopicDisplayLabel(card: ApiTopicCard) {
   return TOPIC_DISPLAY_GROUPS.find((group) => group.key === getTopicDisplayGroupKey(card))?.label
     ?? "问题解答类"
 }
 
+/**
+ * @description categorizetopiccards
+ * @param cards - cards
+ * @returns TopicCategoryGroup[]
+ */
 export function categorizeTopicCards(cards: ApiTopicCard[]): TopicCategoryGroup[] {
   const groups = TOPIC_DISPLAY_GROUPS.map((group) => ({ ...group, cards: [] as ApiTopicCard[] }))
   for (const card of cards) {

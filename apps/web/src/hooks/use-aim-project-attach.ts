@@ -7,6 +7,11 @@ import { createClientProject, updateAimWorkflowStatus, type ClientProject } from
 
 export type AimProjectAttachMode = "existing" | "new"
 
+/**
+ * @description React Hook：aimprojectattach
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimProjectAttach(input: {
   projects: ClientProject[]
   refreshProjects: () => Promise<ClientProject[]>

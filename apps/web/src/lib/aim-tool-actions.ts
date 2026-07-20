@@ -11,6 +11,12 @@ export interface LarkToolActionParams {
   resultId: string
 }
 
+/**
+ * @description 处理飞书工具动作（导入选题、导入项目数据、导出生成结果）
+ * @param toolAction - 工具动作名称
+ * @param params - 动作参数（用户 ID、项目 ID、结果 ID）
+ * @returns 处理结果（提示内容和工具结果）
+ */
 export async function handleLarkToolAction(
   toolAction: string,
   params: LarkToolActionParams

@@ -13,10 +13,20 @@ function sanitizeHistoryText(value: string) {
     .trim()
 }
 
+/**
+ * @description 获取contentpreview
+ * @param item - 条目
+ * @returns 无返回值
+ */
 export function getContentPreview(item: AimGeneration) {
   return truncateText(sanitizeHistoryText(item.rawInput), 120)
 }
 
+/**
+ * @description 获取contenttitle
+ * @param item - 条目
+ * @returns 无返回值
+ */
 export function getContentTitle(item: AimGeneration) {
   const title = sanitizeHistoryText(item.topicTitle || "") || getContentPreview(item)
   return truncateText(title, 42) || "未命名内容"

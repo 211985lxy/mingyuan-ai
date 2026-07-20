@@ -27,6 +27,11 @@ const VERDICT_FILTERS = [
   { key: "caution", label: "谨慎追" },
 ] as const
 
+/**
+ * @description hotdecisionpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function HotDecisionPanel({ source }: { source: ApiHotDecisionSource }) {
   const [data, setData] = useState<ApiHotDecisionResponse | null>(null)
   const [query, setQuery] = useState("")

@@ -40,6 +40,12 @@ function formatDate(value: Date): string {
  * 读取写作风格档案文本块。
  * 项目内优先读取项目风格档案，无项目时回退用户全局。
  */
+/**
+ * @description 获取styleprofileblock
+ * @param userId - 用户 ID
+ * @param projectId? - projectId?
+ * @returns Promise<string>
+ */
 export async function getStyleProfileBlock(userId: string, projectId?: string | null): Promise<string> {
   const effectiveProjectId = projectId ?? null
   const entries = await prisma.knowledgeEntry.findMany({

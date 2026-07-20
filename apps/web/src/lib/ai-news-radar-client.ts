@@ -30,6 +30,11 @@ type AiNewsRadarLatest = {
   creator_items_all?: AiNewsRadarCreatorItem[]
 }
 
+/**
+ * @description 请求获取ainewsradarcreatoritems
+ * @param fetchImpl - fetchImpl
+ * @returns Promise<AiHotItem[]>
+ */
 export async function fetchAiNewsRadarCreatorItems(fetchImpl: typeof fetch = fetch): Promise<AiHotItem[]> {
   const res = await fetchImpl(AI_NEWS_RADAR_LATEST_URL, {
     headers: { "User-Agent": AIHOT_USER_AGENT },

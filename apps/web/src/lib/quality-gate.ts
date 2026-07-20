@@ -350,6 +350,11 @@ function buildTargetedRewritePrompt(
 
 // ─── 核心 ────────────────────────────────────────────────
 
+/**
+ * @description 执行四维质量检查（编辑质量、AI味检测、吸引力、逻辑一致），可选进行平台合规检测
+ * @param input - 质量检查输入（包含文案内容、选题、结构、人设等信息）
+ * @returns 四维质量报告，包含各维度得分、是否通过及综合结果
+ */
 export async function runQualityCheck(input: QualityCheckInput): Promise<QualityReport> {
   const llm = LLMClient.shared()
 
@@ -413,6 +418,12 @@ export async function runQualityCheck(input: QualityCheckInput): Promise<Quality
   }
 }
 
+/**
+ * @description 执行质量门控并在未通过时自动触发 AI 靶向重写（最多 3 次）
+ * @param input - 质量检查输入（包含文案内容、选题、结构、人设等信息）
+ * @param onRewrite - 每次重写时的回调函数，接收重写次数和当前报告
+ * @returns 最终文案内容及对应的质量报告
+ */
 export async function runQualityGateWithRewrite(
   input: QualityCheckInput,
   onRewrite?: (attempt: number, report: QualityReport) => void

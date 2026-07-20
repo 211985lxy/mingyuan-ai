@@ -5,6 +5,7 @@ import { FORMAT_INSTRUCTIONS, buildContentProducerChatPrompt } from "@/lib/aim-a
 import {
   buildProducerSystemPrompt,
   buildUserPrompt,
+  ensureContentCreationTrace,
   executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
 import type {
@@ -45,14 +46,20 @@ export class ContentProducerHandler implements AimAgentHandler {
       context,
       context.targetFormats,
     )
-    const record = await saveAimGenerationRecord(context, completion, parsed)
+    const traced = Object.fromEntries(
+      context.targetFormats.map((format) => [
+        format,
+        ensureContentCreationTrace(parsed[format] || "", context),
+      ]),
+    ) as Record<(typeof context.targetFormats)[number], string>
+    const record = await saveAimGenerationRecord(context, completion, traced)
 
     return {
       id: record.id,
       results: context.targetFormats.map((format) => ({
         format,
-        content: parsed[format] || "",
-        wordCount: (parsed[format] || "").length,
+        content: traced[format],
+        wordCount: traced[format].length,
       })),
       knowledgeUsed: record.knowledgeUsed as any[],
     }

@@ -22,6 +22,11 @@ function truncateInput(text: string): string {
   return text.slice(0, MAX_INPUT_CHARS)
 }
 
+/**
+ * @description 构建methodologycompileprompt
+ * @param input - 输入数据
+ * @returns string
+ */
 export function buildMethodologyCompilePrompt(
   input: MethodologyCompileInput
 ): string {
@@ -72,6 +77,11 @@ ${analysis}
 若竞品分析信息不足以产出方法论，返回空数组 []。`
 }
 
+/**
+ * @description 解析methodologycompileresponse
+ * @param raw - 原始数据
+ * @returns CompiledWikiPage[]
+ */
 export function parseMethodologyCompileResponse(
   raw: string
 ): CompiledWikiPage[] {

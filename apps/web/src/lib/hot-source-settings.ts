@@ -17,6 +17,11 @@ export type HotSourceInput = {
   note?: string
 }
 
+/**
+ * @description 构建hotsourcebinding
+ * @param input - 输入数据
+ * @returns AccountSourceBinding
+ */
 export function buildHotSourceBinding(input: HotSourceInput): AccountSourceBinding {
   return {
     email: input.email.trim().toLowerCase(),
@@ -32,6 +37,11 @@ export function buildHotSourceBinding(input: HotSourceInput): AccountSourceBindi
   }
 }
 
+/**
+ * @description hotsourcesettingkey
+ * @param email - 邮箱
+ * @returns 无返回值
+ */
 export function hotSourceSettingKey(email: string) {
   const slug = email
     .trim()
@@ -41,6 +51,10 @@ export function hotSourceSettingKey(email: string) {
   return `hot-source-${slug}`
 }
 
+/**
+ * @description 加载systemaccountsourcebindings
+ * @returns Promise<AccountSourceBinding[]>
+ */
 export async function loadSystemAccountSourceBindings(): Promise<AccountSourceBinding[]> {
   const settings = await prisma.systemSetting.findMany({
     where: { category: HOT_SOURCE_CATEGORY },
@@ -53,11 +67,21 @@ export async function loadSystemAccountSourceBindings(): Promise<AccountSourceBi
     .filter((binding): binding is AccountSourceBinding => Boolean(binding))
 }
 
+/**
+ * @description 加载effectiveaccountsourcebindings
+ * @returns Promise<AccountSourceBinding[]>
+ */
 export async function loadEffectiveAccountSourceBindings(): Promise<AccountSourceBinding[]> {
   const systemBindings = await loadSystemAccountSourceBindings()
   return mergeAccountSourceBindings(systemBindings, await loadAccountSourceBindings())
 }
 
+/**
+ * @description 合并accountsourcebindings
+ * @param systemBindings - systemBindings
+ * @param localBindings - localBindings
+ * @returns AccountSourceBinding[]
+ */
 export function mergeAccountSourceBindings(
   systemBindings: AccountSourceBinding[],
   localBindings: AccountSourceBinding[] = []
@@ -73,6 +97,11 @@ export function mergeAccountSourceBindings(
   ]
 }
 
+/**
+ * @description 解析accountsourcebinding
+ * @param value - 值
+ * @returns AccountSourceBinding | null
+ */
 export function parseAccountSourceBinding(value: string): AccountSourceBinding | null {
   try {
     const parsed = JSON.parse(value) as unknown

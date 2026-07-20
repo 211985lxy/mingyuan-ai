@@ -40,11 +40,21 @@ export interface HotDecisionResponse {
   summary: string
 }
 
+/**
+ * @description 获取hotdecisions
+ * @param source - 来源
+ * @returns Promise<HotDecisionResponse>
+ */
 export async function getHotDecisions(source: HotDecisionSource): Promise<HotDecisionResponse> {
   if (source === "aihot") return buildAiHotDecisions()
   return buildMarketDecisions()
 }
 
+/**
+ * @description 刷新hotdecisions
+ * @param source - 来源
+ * @returns Promise<HotDecisionResponse>
+ */
 export async function refreshHotDecisions(source: HotDecisionSource): Promise<HotDecisionResponse> {
   if (source === "market") {
     await refreshMarketHotSnapshot()
@@ -54,18 +64,33 @@ export async function refreshHotDecisions(source: HotDecisionSource): Promise<Ho
   return buildAiHotDecisions()
 }
 
+/**
+ * @description decidelast30daysitems
+ * @param items - 条目列表
+ * @returns HotDecisionItem[]
+ */
 export function decideLast30DaysItems(items: Last30DaysItem[]): HotDecisionItem[] {
   return clusterAndSelect(items.map(fromLast30Days))
     .filter((item) => item.score >= 40 && item.verdict !== "avoid")
     .slice(0, 60)
 }
 
+/**
+ * @description decidedouyinitems
+ * @param items - 条目列表
+ * @returns HotDecisionItem[]
+ */
 export function decideDouyinItems(items: HotTopic[]): HotDecisionItem[] {
   return clusterAndSelect(items.map(fromDouyin))
     .filter((item) => item.score >= 40 && item.verdict !== "avoid")
     .slice(0, 60)
 }
 
+/**
+ * @description decideaihotitems
+ * @param items - 条目列表
+ * @returns HotDecisionItem[]
+ */
 export function decideAiHotItems(items: AiHotItem[]): HotDecisionItem[] {
   return items.slice(0, 50).map((item, index) => ({
     id: item.id || `aihot-${index}`,

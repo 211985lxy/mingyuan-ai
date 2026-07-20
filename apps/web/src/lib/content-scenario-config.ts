@@ -113,11 +113,21 @@ export const SCENARIO_CONFIGS: Record<ContentScenario, ScenarioConfig> = {
 // ─── 工具函数 ──────────────────────────────────────────
 
 /** 获取指定场景的完整配置 */
+/**
+ * @description 获取scenarioconfig
+ * @param scenario - scenario
+ * @returns ScenarioConfig
+ */
 export function getScenarioConfig(scenario: ContentScenario): ScenarioConfig {
   return SCENARIO_CONFIGS[scenario]
 }
 
 /** 构建场景提示块，若场景为 undefined 则返回空字符串 */
+/**
+ * @description 构建scenariopromptblock
+ * @param scenario? - scenario?
+ * @returns string
+ */
 export function buildScenarioPromptBlock(
   scenario?: ContentScenario,
 ): string {

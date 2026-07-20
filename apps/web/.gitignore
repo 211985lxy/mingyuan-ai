@@ -1,11 +1,8 @@
 node_modules
-# Keep environment variables out of version control
+.next
+*.local
+.turbo
 .env
-
-/src/generated/prisma
-.gstack/
-# aim-harness-v1 eval report output (CI artifacts; not version controlled)
-/aim-eval-report/
-
-# Local database backups may contain customer data and must never be committed.
-/backups/
+dist
+build
+src/generated/

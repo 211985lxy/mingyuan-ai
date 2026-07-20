@@ -47,6 +47,12 @@ export interface WechatHtmlConvertResult {
  * 主入口：Markdown → 微信 HTML
  * 优先使用 baoyu-markdown-to-html，不可用时 fallback 到内置转换器
  */
+/**
+ * @description markdowntowechathtml
+ * @param markdown - markdown
+ * @param options? - options?
+ * @returns Promise<WechatHtmlConvertResult>
+ */
 export async function markdownToWechatHtml(
   markdown: string,
   options?: {
@@ -160,6 +166,11 @@ function escapeHtml(text: string): string {
  * 最小 Markdown → 微信安全 HTML
  * 支持：段落、标题(h1-h3)、引用、有序/无序列表、加粗、斜体、图片、链接、分隔线、换行
  * 链接转纯文本（微信不支持外链）
+ */
+/**
+ * @description minimalmarkdowntohtml
+ * @param markdown - markdown
+ * @returns string
  */
 export function minimalMarkdownToHtml(markdown: string): string {
   const lines = markdown.split("\n")
@@ -275,6 +286,11 @@ function inlineFormat(text: string): string {
 /**
  * 消毒 HTML：移除白名单以外的标签和属性
  * 用于处理 LLM 直接输出 HTML 的情况
+ */
+/**
+ * @description sanitizewechathtml
+ * @param html - HTML 内容
+ * @returns string
  */
 export function sanitizeWechatHtml(html: string): string {
   // 先 escape 全部内容

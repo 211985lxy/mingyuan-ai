@@ -96,6 +96,11 @@ export const RHETORIC_META: Record<
 export const NOVELTY_HIGH = 75 // ≥75 高含金量
 export const NOVELTY_LOW = 60 // <60 含金量偏低（触发标红 + 修改建议）
 
+/**
+ * @description 根据含金量分数判断陌生化等级（高/中/低）
+ * @param score - 含金量分数（0-100）
+ * @returns 陌生化等级：high（≥75）、mid（60-74）、low（<60）
+ */
 export function noveltyLevel(score: number): "high" | "mid" | "low" {
   if (score >= NOVELTY_HIGH) return "high"
   if (score >= NOVELTY_LOW) return "mid"
@@ -132,6 +137,11 @@ function isValidRhetoric(code: unknown): code is RhetoricCode {
 /**
  * 归一化陌生化字段：非法 code 置空、noveltyScore clamp，
  * 并在缺字段或含金量偏低时生成具体的修改建议（软门槛，不影响 reviewVerdict）。
+ */
+/**
+ * @description 标准化defamiliarization
+ * @param raw - 原始数据
+ * @returns Defamiliarization
  */
 export function normalizeDefamiliarization(
   raw: Record<string, unknown> | Defamiliarization | undefined | null,

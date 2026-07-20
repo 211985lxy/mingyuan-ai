@@ -15,6 +15,11 @@ const BrandingContext = React.createContext<BrandingContextValue>({
   updateBranding: () => {},
 })
 
+/**
+ * @description brandingprovider
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function BrandingProvider({
   branding,
   children,
@@ -35,6 +40,10 @@ export function BrandingProvider({
   )
 }
 
+/**
+ * @description React Hook：branding
+ * @returns 无返回值
+ */
 export function useBranding() {
   const branding = React.useContext(BrandingContext)
   return {
@@ -45,6 +54,10 @@ export function useBranding() {
   }
 }
 
+/**
+ * @description React Hook：brandingcontrols
+ * @returns 无返回值
+ */
 export function useBrandingControls() {
   return React.useContext(BrandingContext).updateBranding
 }

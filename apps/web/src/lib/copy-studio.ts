@@ -32,15 +32,31 @@ export const COPY_STUDIO_ROUTE_KEYS: Record<CopyStudioModule, string> = {
   free: "copy_studio.free",
 }
 
+/**
+ * @description 判断是否copystudiomodule
+ * @param value - 值
+ * @returns value is CopyStudioModule
+ */
 export function isCopyStudioModule(value: unknown): value is CopyStudioModule {
   return typeof value === "string" && COPY_STUDIO_MODULES.includes(value as CopyStudioModule)
 }
 
 /** The workbench exposes copy-studio modes only from the content producer. */
+/**
+ * @description 标准化workbenchcopystudiomodule
+ * @param agentId - 智能体 ID
+ * @param value - 值
+ * @returns CopyStudioModule | undefined
+ */
 export function normalizeWorkbenchCopyStudioModule(agentId: string, value: unknown): CopyStudioModule | undefined {
   return agentId === "content_producer" && isCopyStudioModule(value) ? value : undefined
 }
 
+/**
+ * @description copystudiomodulefromroutekey
+ * @param routeKey - route键
+ * @returns CopyStudioModule | undefined
+ */
 export function copyStudioModuleFromRouteKey(routeKey: unknown): CopyStudioModule | undefined {
   if (typeof routeKey !== "string" || !routeKey.startsWith("copy_studio.")) return undefined
   return isCopyStudioModule(routeKey.slice("copy_studio.".length))
@@ -53,15 +69,31 @@ const COPY_STUDIO_COMPATIBLE_AGENT_IDS = new Set([
 ])
 
 /** Normalize the additive API aliases before request validation and routing. */
+/**
+ * @description 标准化requestedcopystudiomodule
+ * @param agentModule - 智能体模块
+ * @param writerModule - writer模块
+ * @returns CopyStudioModule | undefined
+ */
 export function normalizeRequestedCopyStudioModule(agentModule: unknown, writerModule: unknown): CopyStudioModule | undefined {
   const requested = agentModule ?? writerModule
   return isCopyStudioModule(requested) ? requested : undefined
 }
 
+/**
+ * @description supportscopystudiomodule
+ * @param agentId - 智能体 ID
+ * @returns boolean
+ */
 export function supportsCopyStudioModule(agentId: unknown): boolean {
   return typeof agentId === "string" && COPY_STUDIO_COMPATIBLE_AGENT_IDS.has(agentId)
 }
 
+/**
+ * @description 解析copystudioroutekey
+ * @param value - 值
+ * @returns string | null
+ */
 export function resolveCopyStudioRouteKey(value: unknown): string | null {
   return isCopyStudioModule(value) ? COPY_STUDIO_ROUTE_KEYS[value] : null
 }

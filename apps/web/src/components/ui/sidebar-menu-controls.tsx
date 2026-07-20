@@ -31,6 +31,11 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
+/**
+ * @description sidebarmenubutton
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuButton({
   render,
   isActive = false,
@@ -85,6 +90,11 @@ export function SidebarMenuButton({
   )
 }
 
+/**
+ * @description sidebarmenuaction
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuAction({
   className,
   render,
@@ -115,6 +125,11 @@ export function SidebarMenuAction({
   })
 }
 
+/**
+ * @description sidebarmenubadge
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuBadge({
   className,
   ...props
@@ -132,6 +147,11 @@ export function SidebarMenuBadge({
   )
 }
 
+/**
+ * @description sidebarmenuskeleton
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuSkeleton({
   className,
   showIcon = false,
@@ -170,6 +190,11 @@ export function SidebarMenuSkeleton({
   )
 }
 
+/**
+ * @description sidebarmenusub
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -184,6 +209,11 @@ export function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul
   )
 }
 
+/**
+ * @description sidebarmenusubitem
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuSubItem({
   className,
   ...props
@@ -198,6 +228,11 @@ export function SidebarMenuSubItem({
   )
 }
 
+/**
+ * @description sidebarmenusubbutton
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function SidebarMenuSubButton({
   render,
   size = "md",

@@ -27,6 +27,11 @@ function normalizeForMatch(text: string) {
   return text.replace(/\s+/g, "")
 }
 
+/**
+ * @description 从原始输入中提取最新的用户意图文本
+ * @param raw - 原始输入文本
+ * @returns 提取的用户意图文本
+ */
 export function extractLatestAimUserIntentText(raw: string): string {
   const text = raw.trim()
   if (!text) return ""
@@ -53,6 +58,11 @@ export function extractLatestAimUserIntentText(raw: string): string {
   return text
 }
 
+/**
+ * @description 判断用户是否有明确的直接成稿意图
+ * @param raw - 原始输入文本
+ * @returns 有直接成稿意图返回 true
+ */
 export function hasExplicitDirectDraftIntent(raw: string): boolean {
   const text = normalizeForMatch(extractLatestAimUserIntentText(raw))
   return DIRECT_DRAFT_PATTERNS.some((pattern) => text.includes(pattern))
@@ -66,6 +76,11 @@ const WECHAT_DRAFT_PATTERNS = [
   "推到公众号",
 ]
 
+/**
+ * @description 判断用户是否有微信公众号草稿箱发布意图
+ * @param raw - 原始输入文本
+ * @returns 有微信草稿意图返回 true
+ */
 export function hasWechatDraftIntent(raw: string): boolean {
   const text = normalizeForMatch(raw)
   return WECHAT_DRAFT_PATTERNS.some((pattern) => text.includes(pattern))

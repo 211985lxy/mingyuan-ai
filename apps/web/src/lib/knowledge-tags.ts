@@ -21,6 +21,11 @@ export const VALUE_GRADES = new Set<KnowledgeValueGrade>(["S", "A", "B", "C"])
  * 校验并归一化价值分级。
  * 接受 "S"/"A"/"B"/"C"（大小写不敏感），非法/空值返回 null（入库为 null，检索视为 B）。
  */
+/**
+ * @description 标准化valuegrade
+ * @param value - 值
+ * @returns KnowledgeValueGrade | null
+ */
 export function normalizeValueGrade(value: unknown): KnowledgeValueGrade | null {
   if (typeof value !== "string") return null
   const upper = value.trim().toUpperCase()
@@ -51,6 +56,11 @@ const ROLES = new Set<KnowledgeAssetRole>([
 const USABLE_FOR = new Set<KnowledgeUsableFor>(["xhs", "wechat", "video", "sales", "topic"])
 const CONFIDENCES = new Set<KnowledgeConfidence>(["confirmed", "user_claim", "pending_verify"])
 
+/**
+ * @description 解析knowledgetags
+ * @param tags - 标签列表
+ * @returns ParsedKnowledgeTags
+ */
 export function parseKnowledgeTags(tags: unknown): ParsedKnowledgeTags {
   const values = Array.isArray(tags)
     ? tags.filter((tag): tag is string => typeof tag === "string")
@@ -86,6 +96,12 @@ export function parseKnowledgeTags(tags: unknown): ParsedKnowledgeTags {
   }
 }
 
+/**
+ * @description 合并knowledgetags
+ * @param current - 当前值
+ * @param next - 下一步处理函数
+ * @returns string[]
+ */
 export function mergeKnowledgeTags(current: unknown, next: string[]): string[] {
   const values = Array.isArray(current)
     ? current.filter((tag): tag is string => typeof tag === "string")
@@ -93,6 +109,11 @@ export function mergeKnowledgeTags(current: unknown, next: string[]): string[] {
   return [...new Set([...values, ...next])]
 }
 
+/**
+ * @description 构建defaultknowledgetags
+ * @param category - 分类
+ * @returns string[]
+ */
 export function buildDefaultKnowledgeTags(category: string): string[] {
   if (category === "daily_inspiration" || category === "hot_topic") {
     return ["kb_scope:project", "asset_role:inspiration", "usable_for:topic", "confidence:user_claim"]
@@ -122,6 +143,11 @@ export function buildDefaultKnowledgeTags(category: string): string[] {
   return ["confidence:user_claim"]
 }
 
+/**
+ * @description 构建knowledgecleaningsuggestion
+ * @param input - 输入数据
+ * @returns string[]
+ */
 export function buildKnowledgeCleaningSuggestion(input: {
   category: string
   title: string
@@ -142,6 +168,11 @@ export function buildKnowledgeCleaningSuggestion(input: {
   return mergeKnowledgeTags(input.tags, defaults)
 }
 
+/**
+ * @description knowledgecleanuplabel
+ * @param parsed - 解析后的数据
+ * @returns string
+ */
 export function knowledgeCleanupLabel(parsed: ParsedKnowledgeTags): string {
   if (!parsed.isCleaned) return "未清洗"
   const scope = parsed.scope === "ip" ? "IP资产" : parsed.scope === "project" ? "项目资产" : "未分层"

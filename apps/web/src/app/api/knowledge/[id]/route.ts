@@ -6,6 +6,12 @@ import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
 import { knowledgeUpdateBodySchema } from "@/features/knowledge/contracts/api"
 
+/**
+ * @description 处理 PUT 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -50,6 +56,12 @@ export async function PUT(
   }
 }
 
+/**
+ * @description 处理 DELETE 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

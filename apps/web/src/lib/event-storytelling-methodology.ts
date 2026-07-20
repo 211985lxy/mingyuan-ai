@@ -8,6 +8,10 @@ import { getMethodologyBlock } from "@/lib/agent-methodology-store"
  * 与前两者不同——本方法论是「按需注入」，仅当创作内容属于"现场/事件复盘类"
  * 时才加载，避免给普通口播/转化内容增加噪声。触发判断见 shouldUseEventStorytelling。
  */
+/**
+ * @description 构建eventstorytellingmethodologyblock
+ * @returns Promise<string>
+ */
 export async function buildEventStorytellingMethodologyBlock(): Promise<string> {
   return getMethodologyBlock("event_storytelling")
 }
@@ -30,6 +34,11 @@ const EVENT_KEYWORDS = [
   "vlog", "日记", "记录", "随手拍", "日常",
 ]
 
+/**
+ * @description 判断是否应该useeventstorytelling
+ * @param input - 输入数据
+ * @returns boolean
+ */
 export function shouldUseEventStorytelling(input: {
   rawInput?: string
   topicTitle?: string

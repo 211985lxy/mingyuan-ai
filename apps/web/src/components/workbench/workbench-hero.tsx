@@ -13,6 +13,11 @@ interface WorkbenchHeroProps {
   backLabel?: string
 }
 
+/**
+ * @description workbenchhero
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function WorkbenchHero({ title, subtitle, badge, actions, backHref, backLabel }: WorkbenchHeroProps) {
   return (
     <section className="overflow-hidden rounded-xl border border-primary/15 bg-card shadow-sm">

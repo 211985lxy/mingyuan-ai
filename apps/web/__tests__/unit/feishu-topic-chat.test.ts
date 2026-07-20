@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildFeishuTextReply,
   parseFeishuMessageEvent,
+  parseFeishuSdkMessageEvent,
   verifyFeishuEventToken,
 } from "@/lib/integrations/feishu-topic-chat"
 
@@ -48,6 +49,27 @@ describe("feishu topic chat integration", () => {
     })
 
     expect(event).toBeNull()
+  })
+
+  it("parses SDK message data and normalizes bot mentions", () => {
+    expect(parseFeishuSdkMessageEvent({
+      sender: { sender_type: "user", sender_id: { open_id: "ou_1" } },
+      message: {
+        message_id: "om_1",
+        chat_id: "oc_1",
+        create_time: "1784548800000",
+        message_type: "text",
+        content: JSON.stringify({ text: "@_user_1 收选题 https://v.douyin.com/demo/" }),
+        mentions: [{ key: "@_user_1", name: "AIM" }],
+      },
+    })).toEqual({
+      messageId: "om_1",
+      chatId: "oc_1",
+      senderId: "ou_1",
+      text: "@助手 收选题 https://v.douyin.com/demo/",
+      occurredAt: "2026-07-20T12:00:00.000Z",
+      mentionsBot: false,
+    })
   })
 
   it("formats topic chat reply for Feishu text", () => {

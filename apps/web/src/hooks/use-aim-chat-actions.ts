@@ -108,6 +108,11 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   }
 }
 
+/**
+ * @description React Hook：aimchatactions
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimChatActions(input: AimChatActionInput) {
   return { sendText: (text: string, options?: SendAimTextOptions) => sendAimText(input, text, options) }
 }

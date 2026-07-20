@@ -18,6 +18,14 @@ import type {
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
 
+/**
+ * @description 列出aimhistory
+ * @param page - 页码
+ * @param pageSize - 页码大小
+ * @param projectId? - projectId?
+ * @param agentId? - 智能体Id?
+ * @returns Promise<AimGeneration[]>
+ */
 export async function listAimHistory(page = 1, pageSize = 20, projectId?: string, agentId?: string): Promise<AimGeneration[]> {
   const params = new URLSearchParams({
     page: String(page),
@@ -28,10 +36,20 @@ export async function listAimHistory(page = 1, pageSize = 20, projectId?: string
   return request<AimGeneration[]>(`/api/aim/history?${params.toString()}`)
 }
 
+/**
+ * @description 获取aimhistory
+ * @param id - 唯一标识符
+ * @returns Promise<AimGeneration>
+ */
 export async function getAimHistory(id: string): Promise<AimGeneration> {
   return request<AimGeneration>(`/api/aim/history/${encodeURIComponent(id)}`)
 }
 
+/**
+ * @description 列出pendingaimhistory
+ * @param pageSize - 页码大小
+ * @returns Promise<
+ */
 export async function listPendingAimHistory(pageSize = 6): Promise<{ items: AimGeneration[]; total: number }> {
   const params = new URLSearchParams({
     page: "1",
@@ -73,10 +91,20 @@ export interface CreateClientProjectRequest {
   notes?: string
 }
 
+/**
+ * @description 列出clientprojects
+ * @param status - 状态
+ * @returns Promise<ClientProject[]>
+ */
 export async function listClientProjects(status = "active"): Promise<ClientProject[]> {
   return request<ClientProject[]>(`/api/projects?status=${encodeURIComponent(status)}`)
 }
 
+/**
+ * @description 创建clientproject
+ * @param data - 数据
+ * @returns Promise<ClientProject>
+ */
 export async function createClientProject(data: CreateClientProjectRequest): Promise<ClientProject> {
   return request<ClientProject>("/api/projects", {
     method: "POST",
@@ -84,6 +112,12 @@ export async function createClientProject(data: CreateClientProjectRequest): Pro
   })
 }
 
+/**
+ * @description 更新clientproject
+ * @param id - 唯一标识符
+ * @param data - 数据
+ * @returns Promise<ClientProject>
+ */
 export async function updateClientProject(id: string, data: Partial<CreateClientProjectRequest> & { status?: string }): Promise<ClientProject> {
   return request<ClientProject>(`/api/projects/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -91,6 +125,12 @@ export async function updateClientProject(id: string, data: Partial<CreateClient
   })
 }
 
+/**
+ * @description 更新aimworkflowstatus
+ * @param id - 唯一标识符
+ * @param data - 数据
+ * @returns Promise<AimGeneration>
+ */
 export async function updateAimWorkflowStatus(id: string, data: {
   workflowStatus?: string
   reviewNote?: string
@@ -108,6 +148,11 @@ export async function updateAimWorkflowStatus(id: string, data: {
   })
 }
 
+/**
+ * @description 删除aimhistory
+ * @param id - 唯一标识符
+ * @returns Promise<void>
+ */
 export async function deleteAimHistory(id: string): Promise<void> {
   await request(`/api/aim/history/${encodeURIComponent(id)}`, { method: "DELETE" })
 }
@@ -153,6 +198,12 @@ export interface ContentOutcomeInput {
   userVerdict?: string
 }
 
+/**
+ * @description 更新或创建contentoutcome
+ * @param generationId - 生成唯一标识符
+ * @param body - 请求体
+ * @returns Promise<
+ */
 export async function upsertContentOutcome(
   generationId: string,
   body: ContentOutcomeInput,
@@ -163,6 +214,11 @@ export async function upsertContentOutcome(
   })
 }
 
+/**
+ * @description 获取contentoutcome
+ * @param generationId - 生成唯一标识符
+ * @returns Promise<
+ */
 export async function getContentOutcome(
   generationId: string,
 ): Promise<{ outcomes: ContentOutcome[]; topicSelectionId?: string | null; projectId?: string | null }> {

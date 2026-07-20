@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { buildTopicUserPrompt, generateTopicCards } from "@/lib/topic-generation"
+import { buildTopicSystemPrompt, buildTopicUserPrompt, generateTopicCards } from "@/lib/topic-generation"
 
 const completeMock = vi.hoisted(() => vi.fn())
 
@@ -8,6 +8,20 @@ vi.mock("@/lib/llm/agent-router", () => ({
 }))
 
 describe("buildTopicUserPrompt", () => {
+  it("requires every topic to explain its style, sources, logic, and destiny alignment", () => {
+    const prompt = buildTopicSystemPrompt("fresh", [])
+
+    expect(prompt).toContain("creativeTrace")
+    expect(prompt).toContain("风格定位")
+    expect(prompt).toContain("推导逻辑")
+    expect(prompt).toContain("对标爆款视频")
+    expect(prompt).toContain("产品卖点")
+    expect(prompt).toContain("人设特点")
+    expect(prompt).toContain("八字")
+    expect(prompt).toContain("紫微")
+    expect(prompt).toContain("未提供/待补充")
+  })
+
   it("requires benchmark rewrites to follow the current IP profile", () => {
     const prompt = buildTopicUserPrompt({
       ipProfile: {
@@ -69,6 +83,8 @@ describe("buildTopicUserPrompt", () => {
     if (!result.success) return
     expect(result.cards).toHaveLength(4)
     expect(result.cards.every((card) => card.sourceType === "对标参考")).toBe(true)
+    expect(result.cards.every((card) => card.creativeTrace?.sources.some((source) => source.kind === "benchmark" && source.source === "对标账号"))).toBe(true)
+    expect(result.cards.every((card) => card.creativeTrace?.destinyAlignment.baziBasis === "未提供/待补充")).toBe(true)
     expect(result.model).toContain("fallback")
   })
 

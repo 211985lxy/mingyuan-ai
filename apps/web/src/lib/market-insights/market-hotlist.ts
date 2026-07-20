@@ -14,6 +14,10 @@ export interface MarketHotSnapshotPayload {
 const MARKET_HOT_TOPIC = "热点"
 const MARKET_HOT_SOURCES = ["weibo", "xiaohongshu", "bilibili", "zhihu", "douyin", "wechat", "baidu", "toutiao"]
 
+/**
+ * @description 获取最新的markethotsnapshot
+ * @returns Promise<MarketHotSnapshotPayload>
+ */
 export async function getLatestMarketHotSnapshot(): Promise<MarketHotSnapshotPayload> {
   const today = getBeijingDateKey()
   const record = await prisma.marketHotSnapshot.findFirst({
@@ -42,6 +46,10 @@ export async function getLatestMarketHotSnapshot(): Promise<MarketHotSnapshotPay
   }
 }
 
+/**
+ * @description 刷新markethotsnapshot
+ * @returns Promise<MarketHotSnapshotPayload>
+ */
 export async function refreshMarketHotSnapshot(): Promise<MarketHotSnapshotPayload> {
   const date = getBeijingDateKey()
   const generatedAt = new Date()

@@ -64,10 +64,19 @@ function isConfigured(): boolean {
   );
 }
 
+/**
+ * @description 检查 OSS 对象存储服务是否已正确配置（区域、密钥、桶均存在）
+ * @returns 配置完整返回 true，否则返回 false
+ */
 export function isOssConfigured(): boolean {
   return isConfigured();
 }
 
+/**
+ * @description 判断给定 URL 是否属于当前托管的 OSS 存储桶（含历史迁移桶）
+ * @param assetUrl - 待检测的资源 URL
+ * @returns 属于托管 OSS 返回 true，否则返回 false
+ */
 export function isManagedOssUrl(assetUrl: string): boolean {
   if (!isConfigured()) return false;
 
@@ -152,6 +161,12 @@ export type TransferFromUrlResult = {
 /**
  * Generate a presigned upload URL for client-side direct upload.
  */
+/**
+ * @description 生成uploadurl
+ * @param fileName - 文件名称
+ * @param contentType - 内容类型
+ * @returns Promise<
+ */
 export async function generateUploadUrl(
   fileName: string,
   contentType: string,
@@ -209,6 +224,12 @@ function extractOssKey(assetUrl: string): string {
  * Generate a presigned download URL for a private OSS object.
  * Used to give authorized callers temporary read access.
  */
+/**
+ * @description 生成signedurl
+ * @param assetUrl - assetURL 地址
+ * @param expires - expires
+ * @returns string
+ */
 export function generateSignedUrl(assetUrl: string, expires = 7200): string {
   if (!isConfigured() || !isManagedOssUrl(assetUrl)) return assetUrl;
 
@@ -217,6 +238,11 @@ export function generateSignedUrl(assetUrl: string, expires = 7200): string {
   return client.signatureUrl(key, { method: "GET", expires });
 }
 
+/**
+ * @description 删除指定 URL 对应的 OSS 对象（仅限当前存储桶内的对象）
+ * @param assetUrl - 待删除的 OSS 资源 URL
+ * @returns 删除成功返回 true，未配置或非当前桶返回 false
+ */
 export async function deleteManagedOssObject(assetUrl: string): Promise<boolean> {
   if (!isConfigured()) return false;
 
@@ -231,6 +257,12 @@ export async function deleteManagedOssObject(assetUrl: string): Promise<boolean>
 /**
  * Generate a signed thumbnail URL from a private OSS video.
  * Uses Aliyun OSS video snapshot processing.
+ */
+/**
+ * @description 生成videothumbnailurl
+ * @param assetUrl - assetURL 地址
+ * @param expires - expires
+ * @returns string
  */
 export function generateVideoThumbnailUrl(
   assetUrl: string,
@@ -250,6 +282,12 @@ export function generateVideoThumbnailUrl(
 /**
  * Persist a generated thumbnail image for a managed OSS video.
  * Returns the permanent OSS image URL, or null when generation/upload fails.
+ */
+/**
+ * @description persistvideothumbnail
+ * @param assetUrl - assetURL 地址
+ * @param destKey - dest键
+ * @returns Promise<string | null>
  */
 export async function persistVideoThumbnail(
   assetUrl: string,
@@ -281,6 +319,12 @@ export async function persistVideoThumbnail(
  * Stream download from source URL and upload to OSS.
  * Returns the OSS URL, or the original URL if OSS is not configured (degraded mode).
  */
+/**
+ * @description transferfromurl
+ * @param sourceUrl - 来源URL 地址
+ * @param destKey - dest键
+ * @returns Promise<string>
+ */
 export async function transferFromUrl(
   sourceUrl: string,
   destKey: string,
@@ -289,6 +333,12 @@ export async function transferFromUrl(
   return result.url;
 }
 
+/**
+ * @description 从源 URL 流式下载并上传到 OSS，返回详细转存结果（含持久化状态、警告、过期时间）
+ * @param sourceUrl - 源文件下载地址
+ * @param destKey - OSS 目标对象键
+ * @returns 转存结果对象，包含最终 URL、是否持久化、警告信息及过期时间
+ */
 export async function transferFromUrlDetailed(
   sourceUrl: string,
   destKey: string,
@@ -376,6 +426,12 @@ export async function transferFromUrlDetailed(
  * More reliable than `putStream()` for large files (50-100MB 4K videos)
  * that cause "premature close" errors with stream uploads.
  */
+/**
+ * @description transferlargefiletooss
+ * @param sourceUrl - 来源URL 地址
+ * @param destKey - dest键
+ * @returns Promise<TransferFromUrlResult>
+ */
 export async function transferLargeFileToOss(
   sourceUrl: string,
   destKey: string,
@@ -449,6 +505,11 @@ function isAlreadySigned(url: string): boolean {
  * URLs are left untouched.
  * Safe for any shape — primitives, arrays, nested objects, nulls.
  */
+/**
+ * @description signossurls
+ * @param obj - obj
+ * @returns T
+ */
 export function signOssUrls<T>(obj: T): T {
   if (!isConfigured()) return obj;
   if (obj === null || obj === undefined) return obj;
@@ -478,6 +539,13 @@ export function signOssUrls<T>(obj: T): T {
   return obj;
 }
 
+/**
+ * @description 将 Buffer 数据直接上传到 OSS 指定路径
+ * @param destKey - OSS 目标对象键
+ * @param buffer - 待上传的文件二进制数据
+ * @param contentType - 文件 MIME 类型，默认 application/octet-stream
+ * @returns 上传成功后的 OSS 资源访问 URL
+ */
 export async function uploadBufferToOss(
   destKey: string,
   buffer: Buffer,

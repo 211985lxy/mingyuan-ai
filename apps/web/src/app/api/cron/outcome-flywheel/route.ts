@@ -24,6 +24,11 @@ export const maxDuration = 60
  * 注意：平台 API 自动拉取（抖音/小红书互动数据）需要平台开放 API 凭据，
  * 当前仅触发评估和提醒。手动录入走 /api/aim/history/[id]/outcome PUT 路由。
  */
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   if (!validateCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

@@ -66,6 +66,11 @@ const BRANDING_KEY_SET = new Set<string>(
   Object.values(BRANDING_SETTING_KEYS)
 )
 
+/**
+ * @description 判断是否brandingsettingkey
+ * @param key - 键
+ * @returns boolean
+ */
 export function isBrandingSettingKey(key: string): boolean {
   return BRANDING_KEY_SET.has(key)
 }

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
+/**
+ * @description 处理 GET 请求
+ * @param _request - _request
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

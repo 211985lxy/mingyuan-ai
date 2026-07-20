@@ -12,6 +12,11 @@ function compactText(text: string) {
   return text.replace(/\s+/g, "").replace(/[，。！？、；：,.!?;:"“”‘’'\uff08\uff09()《》【】\[\]{}]/g, "")
 }
 
+/**
+ * @description 从原始输入中提取对标原文内容
+ * @param rawInput - 包含对标原文标记的原始输入
+ * @returns 提取的对标原文，未找到时返回空字符串
+ */
 export function extractBenchmarkOriginalCopy(rawInput: string) {
   const marker = rawInput.match(/对标原文[：:]\s*/)
   if (marker?.index == null) return ""
@@ -20,6 +25,13 @@ export function extractBenchmarkOriginalCopy(rawInput: string) {
   return (nextSection >= 0 ? rest.slice(0, nextSection) : rest).trim()
 }
 
+/**
+ * @description 计算对标文案与输出文案的复用率（基于 N-gram 匹配）
+ * @param benchmark - 对标原文
+ * @param output - 输出文案
+ * @param size - N-gram 窗口大小
+ * @returns 复用率（0-1）
+ */
 export function benchmarkCopyReuseRatio(benchmark: string, output: string, size = 12) {
   const source = compactText(benchmark)
   const target = compactText(output)
@@ -62,6 +74,12 @@ function collectReusedSamples(benchmark: string, output: string, size = 12, limi
   return samples
 }
 
+/**
+ * @description 评估对标改写质量（长度比例、复用率、相似度）
+ * @param benchmark - 对标原文
+ * @param output - 输出文案
+ * @returns 对标质量评估报告
+ */
 export function assessBenchmarkRewrite(benchmark: string, output: string): AimBenchmarkQualityReport {
   const originalChars = compactText(benchmark).length
   const outputChars = compactText(output).length
@@ -79,6 +97,12 @@ export function assessBenchmarkRewrite(benchmark: string, output: string): AimBe
   }
 }
 
+/**
+ * @description 判断输出文案是否与对标原文过于相似
+ * @param rawInput - 包含对标原文的原始输入
+ * @param output - 输出文案
+ * @returns 过于相似返回 true
+ */
 export function isBenchmarkCopyTooSimilar(rawInput: string, output: string) {
   const benchmark = extractBenchmarkOriginalCopy(rawInput)
   const source = compactText(benchmark)

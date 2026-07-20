@@ -25,6 +25,8 @@ export interface AimWorkbenchSkill {
   description: string
   prompt: string
   agentId?: AimAgentId
+  /** 技能分组标签（UI 按组渲染，空则不分组） */
+  group?: string
 }
 
 export interface AimAgentGuide {
@@ -60,20 +62,7 @@ const PUBLISH_PLAN_PROMPT = [
   "请基于下面内容生成发布计划，不要自动发布。",
   "固定输出：当前稿发布标题、当前稿发布文案、当前稿发布话题，话题里至少包含 1 个品牌/IP/账号相关话题。",
   "再输出一张「12 条内容排产表」，每条必须包含：序号、选题标题、核心钩子、内容角度、适合平台/形式、发布话题、承接动作。",
-  "内容裂变规则：如果输入是目标人群或多个选题，筛选并组织成 12 条发布内容；如果输入是深度长内容，裂变为短视频、小红书、朋友圈/社群等可发布内容；如果输入是单篇成稿，先给本篇发布信息，再扩展 12 条后续排产。",
-].join("\n")
-
-const HOT_ORAL_SCRIPT_PROMPT = [
-  "请进入「热点口播脚本生成」路由，输出适合真人对镜头拍摄的短视频口播脚本，不要写成品牌宣传稿、公众号文章或空泛鸡汤。",
-  "先判断当前输入属于哪一类：类型 A 参考爆款改写；类型 B 热点原创；类型 C 热点 + 参考口播。",
-  "如果包含热点，先输出一段热点评估：热点适配度：X/10、适合切入角度、风险提示、推荐处理方式。适配度低于 6 分时，明确提示不建议强蹭，并给更适合的切入角度或替代方向。",
-  "如果包含参考口播，先拆结构：前 3 秒钩子、情绪冲突、用户痛点、反常识观点、节奏结构、卖点植入方式、结尾行动引导、哪些结构可以迁移、哪些表达不得直接照抄。",
-  "默认读取当前账号的定位、目标用户、用户痛点、用户想要的结果、产品/服务、人设风格、内容禁区、转化目标、常用平台和过往有效方向；若用户本轮输入冲突，以本轮输入为准。",
-  "默认输出 5-10 条短视频口播脚本；平台未指定时按抖音/小红书短视频口播处理，时长未指定时默认 60 秒以内，转化目标未指定时默认评论关键词或私信引导。",
-  "每条脚本必须固定包含：标题、前 3 秒钩子、口播正文、镜头表现建议、屏幕字幕重点、结尾行动引导、适合平台、建议视频时长。",
-  "口播正文必须像真人说话，使用短句，开头有停留理由，中间有冲突/反差/观点，结尾有明确行动引导。",
-  "必须优先使用以下结构之一：热点反常识型、痛点共鸣型、爆款拆解迁移型、热点类比型、争议观点型。",
-  "不得直接照抄参考口播原句，不得硬蹭热点，不得娱乐化处理敏感、负面、灾难、伤亡、政治争议、社会对立事件；遇到虚假承诺、夸大收益、制造焦虑的参考口播时，必须降风险重写。",
+  "排产规则：如果输入是目标人群或多个选题，筛选并组织成 12 条发布内容；如果输入是单篇成稿或深度长内容，先给本篇发布信息，再围绕同一主题扩展 12 条后续排产。",
 ].join("\n")
 
 const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
@@ -83,6 +72,7 @@ const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
     description: "按爆款开头创作规则，输出更能停留和转化的开头钩子。",
     prompt: "请基于当前文案优化开头钩子：保留原稿核心选题和情绪，调用爆款开头创作规则，优先使用人物标签、业务标签、痛点、利益、反差、悬念和具体场景。至少给 10 条开头候选，每条标注类型和适合场景，再补 3 个开头画面建议，最后选出最适合转化的 3 条并说明理由。不要输出正文，不要顺手重写整篇。",
     agentId: "content_producer",
+    group: "改写优化",
   },
   {
     id: "rewrite_existing_copy",
@@ -90,6 +80,7 @@ const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
     description: "保留原意，重写成更像真人表达的版本。",
     prompt: "请基于当前内容改写现有文案：保留核心意思和关键事实，明显去 AI 味，至少 30% 可感知重写，输出一版可直接发布的文案。",
     agentId: "content_producer",
+    group: "改写优化",
   },
   {
     id: "viral_recreation",
@@ -97,27 +88,33 @@ const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
     description: "学习选题、钩子和冲突，不照搬原句。",
     prompt: "请基于当前对标内容做爆款再创作：只学习选题逻辑、开头机制、观点冲突和情绪触发，用我的立场、人设、案例和业务场景重构；如果我没有另写明确字数，字数再参考对标原文 95%-105%。",
     agentId: "content_producer",
+    group: "改写优化",
   },
   {
     id: "hot_topic_copy",
-    label: "借热点写一版",
-    description: "把热点转成适合账号的观点内容。",
-    prompt: "请基于当前热点和我的业务，追热点写一条适合本账号发布的内容：不要硬蹭，先给我的判断，再落到客户场景、业务价值和行动引导。",
+    label: "借热点写观点",
+    description: "把热点转成适合账号的观点图文，不是口播脚本。",
+    prompt: "请基于当前热点和我的业务，追热点写一条适合本账号发布的观点内容（图文/文案，不是口播脚本）：不要硬蹭，先给我的判断，再落到客户场景、业务价值和行动引导。",
     agentId: "content_producer",
+    group: "改写优化",
   },
   {
-    id: "hot_oral_script",
-    label: "热点口播脚本生成",
-    description: "结合热点或参考爆款，生成可直接拍摄的真人口播脚本。",
-    prompt: HOT_ORAL_SCRIPT_PROMPT,
+    id: "oral_script",
+    label: "口播脚本",
+    description: "热点口播 / 现场口播 / 观点口播，自动识别类型并生成可拍摄脚本。",
+    prompt: [
+      "请基于当前素材生成短视频口播脚本。先自动判断输入类型：",
+      "类型 A 热点口播：包含热点事件 → 先输出热点评估（适配度 X/10、切入角度、风险提示），适配度低于 6 分提示不建议强蹭；",
+      "类型 B 现场口播：包含经历/现场/感受 → 调用事件内容化五步法「真实事件 -> 关键矛盾 -> 核心观点 -> 用户价值 -> 内容表达」，用第一人称还原现场；",
+      "类型 C 观点口播：包含判断/观点 → 第一句先给明确判断，再解释为什么、适合谁、不适合谁；",
+      "类型 D 参考爆款口播：包含参考口播/对标脚本 → 先拆结构（前 3 秒钩子、情绪冲突、节奏结构、可迁移部分），不得照抄原句。",
+      "默认输出 3-5 条脚本，未指定平台按抖音/小红书短视频处理，默认 60 秒以内。",
+      "每条必须包含：标题、前 3 秒钩子、口播正文、镜头表现建议、结尾行动引导。",
+      "口播正文必须像真人说话，使用短句，开头有停留理由，中间有冲突/反差，结尾有行动引导。",
+      "不得硬蹭热点，不得娱乐化处理敏感、负面、灾难、伤亡、政治争议事件。",
+    ].join("\n"),
     agentId: "content_producer",
-  },
-  {
-    id: "video_diary",
-    label: "生成现场口播",
-    description: "把经历、现场和感受转成口播日记。",
-    prompt: "请基于当前素材生成一条视频日记：必须调用事件内容化五步法「真实事件 -> 关键矛盾 -> 核心观点 -> 用户价值 -> 内容表达」。用第一人称，不写流水账；先还原一个真实现场/经历，再挖出矛盾和情绪变化，最后落到一个对用户有启发、能记住的判断。",
-    agentId: "content_producer",
+    group: "热点口播",
   },
   {
     id: "xiaohongshu_image_text",
@@ -125,6 +122,7 @@ const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
     description: "生成标题、正文、封面短句和 8 页图文脚本。",
     prompt: "请基于当前素材生成一套小红书图文笔记：复用 AIM 的小红书图文视觉导演结构，输出小红书标题 5 个、封面主标题/副标题、正文、2-5 个话题标签、8 页图文结构、逐页配图脚本、发布前自检。每页只讲一个信息点，手机端一眼读懂，不要写成 PPT 课件；话题里至少包含 1 个品牌/IP/账号相关标签。",
     agentId: "content_producer",
+    group: "平台内容",
   },
   {
     id: "lead_gen_copy",
@@ -132,149 +130,61 @@ const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
     description: "围绕客户痛点和承接动作写成交向内容。",
     prompt: "请基于当前内容生成获客文案：先点出目标客户的真实问题，再给出我的解决思路和服务价值，最后加入自然的承接动作，不要夸大承诺。",
     agentId: "content_producer",
+    group: "平台内容",
   },
   {
-    id: "point_of_view_copy",
-    label: "生成观点口播",
-    description: "把一个判断写成有立场的短视频口播。",
-    prompt: "请基于当前内容生成观点表达：第一句先给明确判断，再解释为什么、适合谁、不适合谁，最后用一句有记忆点的话收尾。",
+    id: "content_fission",
+    label: "内容裂变",
+    description: "把一篇核心内容拆成全平台可发布物料。",
+    prompt: [
+      "请基于当前核心内容一键裂变为多平台可发布物料：",
+      "输出公众号文章/深度长文、短视频口播、小红书图文笔记、朋友圈文案、Vlog 分镜脚本。",
+      "每种物料独立成稿，可直接发布；话题里至少包含 1 个品牌/IP/账号相关话题。",
+      "不要输出排产表或后续选题（排产请用「生成发布计划」）。",
+    ].join("\n"),
     agentId: "content_producer",
-  },
-  {
-    id: "core_content_split",
-    label: "一键拆成全平台内容",
-    description: "把一篇核心内容拆成多平台发布物料。",
-    prompt: "请基于当前核心内容一键拆解：输出公众号文章/深度长文、短视频口播、小红书图文笔记、朋友圈文案、Vlog 分镜脚本，并补充后续 12 条发布选题。",
-    agentId: "content_producer",
-  },
-  {
-    id: "publish_plan_12",
-    label: "生成后续 12 条选题",
-    description: "生成标题、话题和后续内容排产。",
-    prompt: PUBLISH_PLAN_PROMPT,
-    agentId: "content_producer",
+    group: "裂变排产",
   },
 ]
 
 const TOPIC_PLANNING_SKILLS: AimWorkbenchSkill[] = [
-  {
-    id: "decide_content_goal",
-    label: "判断内容目的",
-    description: "先判断这条内容该服务曝光、获客、信任还是成交。",
-    prompt: "请基于当前业务、目标客户和素材，判断这条内容最适合服务哪个目的：曝光、获客、信任、成交。不要直接写文案。固定输出：1. 推荐目的；2. 为什么不是另外三个目的；3. 适合的选题角度；4. 开头钩子方向；5. 下一步交给文案官时要强调什么。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "exposure_topics",
-    label: "做曝光选题",
-    description: "为了让更多目标客户先看见。",
-    prompt: "请围绕提升曝光生成选题。重点找反差、热点、争议、强痛点、反常识和行业误区。每条输出：选题标题、目标人群、为什么容易被看见、开头钩子、风险边界。不要直接写文案。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "lead_topics",
-    label: "做获客选题",
-    description: "为了让对的人评论、私信、咨询或留资。",
-    prompt: "请围绕获取线索生成选题。重点找客户正在遇到的具体问题、想解决但不会解决的场景、能自然引导咨询的入口。每条输出：选题标题、客户痛点、触发咨询的理由、承接动作、适合平台。不要直接写文案。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "trust_topics",
-    label: "做信任选题",
-    description: "为了让客户相信你真实、专业、靠谱。",
-    prompt: "请围绕建立信任生成选题。重点找真实案例、服务过程、现场细节、专业判断、避坑经验和风险边界。每条输出：选题标题、可信证据、要讲的细节、能建立什么信任、不能夸大的地方。不要直接写文案。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "conversion_topics",
-    label: "做成交选题",
-    description: "为了推动咨询、预约、下单或服务转化。",
-    prompt: "请围绕促进成交生成选题。重点讲清适合谁、不适合谁、解决什么问题、为什么现在该行动、下一步怎么联系。每条输出：选题标题、目标客户、成交前顾虑、内容主线、行动引导。不要直接写文案。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "meeting_minutes_asset_pack",
-    label: "会议纪要完整资产包",
-    description: "需要全量材料时再用。",
-    prompt: "请基于当前会议纪要，生成一份高密度《会议纪要内容资产包》。不要做流水账总结，不要结尾反问是否继续。固定输出：1. 会议一句话结论；2. 关键信息抽取表（原话/事实、说话对象或角色、暴露的问题/顾虑/机会、可转成的内容角度、证据强度，至少 8 条，材料不足写实际条数）；3. 核心矛盾/机会（1 个主矛盾 + 2-3 个次矛盾，必须对应会议原话或事实）；4. 可拍选题池（至少 12 条，字段为选题标题、选题类型、目标受众、会议证据、开头钩子、拍摄场景/素材、承接目的）；5. 优先级最高的 3 条；6. 执行清单；7. 采访追问清单；8. 脚本/分镜方向；9. 可沉淀知识库素材；10. 待补充信息。所有结论必须能追溯到会议纪要，缺失信息标注待补充。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "meeting_minutes_core_topic",
-    label: "会议纪要提炼一个核心选题",
-    description: "只选一个最值得拍的题，直接交给文案创作。",
-    prompt: "请基于当前会议纪要，只提炼一个最值得马上进入文案创作的核心选题。不要输出完整资产包。输出固定为：1. 核心选题标题；2. 为什么只选它；3. 目标受众；4. 开头钩子；5. 内容主线（三段以内）；6. 必用会议原话/事实；7. 文案创作交接说明。最后给一句「可直接带入内容文案创作」。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "meeting_minutes_task_list",
-    label: "生成任务清单",
-    description: "把会议结论拆成执行动作。",
-    prompt: "请基于当前核心选题和会议纪要，只生成任务清单。不要输出选题库、采访清单或脚本。字段固定为：任务、负责人/角色、截止时间或节奏、输入材料、交付物、验收标准、关联选题。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "meeting_minutes_interview_list",
-    label: "生成采访清单",
-    description: "把选题拆成现场采访问题。",
-    prompt: "请基于当前核心选题和会议纪要，只生成采访清单。不要输出任务清单或完整脚本。按采访对象分组，字段固定为：采访对象、问题、追问、想拿到的原话/证据、拍摄提醒。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "meeting_minutes_questionnaire",
-    label: "生成问卷表",
-    description: "把会议里缺的信息变成可收集问题。",
-    prompt: "请基于当前核心选题和会议纪要，只生成问卷表。不要输出选题库或脚本。字段固定为：问题、题型、选项或填空提示、用途、对应选题/判断。问题要短，便于发给客户或一线人员填写。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "meeting_minutes_script_template",
-    label: "生成脚本模板",
-    description: "给下一步文案创作用。",
-    prompt: "请基于当前核心选题和会议纪要，只生成脚本模板。不要输出多个选题和任务清单。结构固定为：3秒开头钩子、背景交代、三段内容推进、必用会议原话/事实、画面建议、结尾承接。这个结果用于下一步内容文案创作。",
-    agentId: "business_diagnosis",
-  },
   {
     id: "choose_benchmark",
     label: "选择对标账号 / 对标内容",
     description: "明确该看谁、看什么、借鉴哪一层。",
     prompt: "请基于当前业务和目标客户，帮我选择对标账号/对标内容：说明选择标准、适合参考的内容类型、不能照抄的部分，以及下一步怎么拆解。",
     agentId: "business_diagnosis",
+    group: "方向判断",
   },
   {
-    id: "choose_content_pillar",
-    label: "选择内容主线",
-    description: "在热点、人设、问题解答和观点中定方向。",
-    prompt: "请基于当前内容，帮我选择内容主线：在热点类、人设类、问题解答类、观点类中做判断，并说明每条主线适合的选题方向。",
+    id: "purpose_topics",
+    label: "按目的生成选题",
+    description: "曝光 / 获客 / 信任 / 成交，先定目的再出选题。",
+    prompt: [
+      "请先判断当前内容最适合服务哪个目的（曝光/获客/信任/成交），并说明为什么不是另外三个目的，再围绕该目的生成选题。不要直接写文案。",
+      "曝光目的：重点找反差、热点、争议、强痛点、反常识和行业误区；",
+      "获客目的：重点找客户正在遇到的具体问题、想解决但不会解决的场景、能自然引导咨询的入口；",
+      "信任目的：重点找真实案例、服务过程、现场细节、专业判断、避坑经验和风险边界；",
+      "成交目的：重点讲清适合谁、不适合谁、解决什么问题、为什么现在该行动、下一步怎么联系。",
+      "每条输出：选题标题、目标人群、开头钩子、承接动作、风险边界。",
+    ].join("\n"),
     agentId: "business_diagnosis",
+    group: "生成选题",
   },
   {
-    id: "persona_story_topics",
-    label: "生成人设类选题",
-    description: "从经历、转折和价值观里找选题。",
-    prompt: "请基于当前素材生成人设类选题：围绕来时路、关键转折、价值观、行业经历和真实案例，输出一组选题池并标注推荐优先级。",
+    id: "pillar_topics",
+    label: "按主线生成选题池",
+    description: "人设 / 热点 / 问题解答 / 观点，四类主线一次出池。",
+    prompt: [
+      "请先判断当前素材最适合哪条内容主线（人设/热点/问题解答/观点），说明判断理由，再按四条主线生成选题池（重点展开推荐主线）：",
+      "人设类：围绕来时路、关键转折、价值观、行业经历和真实案例；",
+      "热点类：热点只能辅助，不硬蹭，每条说明和本账号、目标客户、产品服务的关系；",
+      "问题解答类：优先高频、强痛点、能体现专业能力的问题，客户案例和业务价值并入；",
+      "观点类：每条要有明确判断、争议点、旧认知和新认知。",
+      "每条给出开头钩子和内容角度，并标注推荐优先级。",
+    ].join("\n"),
     agentId: "business_diagnosis",
-  },
-  {
-    id: "hot_topic_topics",
-    label: "生成热点类选题",
-    description: "把行业热点转成账号可讲的内容。",
-    prompt: "请基于当前账号资料、对标素材和行业动态生成热点类选题：热点只能辅助，不硬蹭；每条都要说明和本账号、目标客户、产品服务的关系。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "problem_solution_topics",
-    label: "生成问题解答类选题",
-    description: "围绕客户正在卡住的问题做选题池。",
-    prompt: "请基于当前目标客户生成问题解答类选题：优先选择高频、强痛点、能体现专业能力的问题，客户案例和业务价值也并入这一类，每条给出开头钩子和内容角度。",
-    agentId: "business_diagnosis",
-  },
-  {
-    id: "point_of_view_topics",
-    label: "生成观点类选题",
-    description: "把判断、趋势和立场转成内容方向。",
-    prompt: "请基于当前行业和账号定位生成观点类选题：每条都要有明确判断、争议点、旧认知和新认知，不要只复述热点。",
-    agentId: "business_diagnosis",
+    group: "生成选题",
   },
   {
     id: "select_high_potential_topics",
@@ -282,6 +192,7 @@ const TOPIC_PLANNING_SKILLS: AimWorkbenchSkill[] = [
     description: "从选题池里挑更容易出结果的题。",
     prompt: "请基于当前选题池筛选高潜选题：按热点类、人设类、问题解答类、观点类归类，再按目标人群痛感、传播冲突、账号匹配度、转化承接、可持续拆分五项评分，选出最值得先做的 12 条。",
     agentId: "business_diagnosis",
+    group: "筛选决策",
   },
   {
     id: "pre_publish_decision",
@@ -289,48 +200,78 @@ const TOPIC_PLANNING_SKILLS: AimWorkbenchSkill[] = [
     description: "先把为什么做、想打到谁、准备验证什么说清楚。",
     prompt: "请基于当前选题或文案，判断这条内容值不值得做。固定输出：1. 这条为什么值得做；2. 最可能打中的人是谁；3. 用户会因为哪句话停下来；4. 发完最该看哪一个结果；5. 不值得做时直接说明原因。不要写空话。",
     agentId: "business_diagnosis",
+    group: "筛选决策",
   },
   {
     id: "benchmark_asset_flywheel",
     label: "对标资产生成选题池",
     description: "把账号池、代表作和结构拆解转成分级选题资产。",
-    prompt: "请把我提供的对标账号池、置顶视频/首屏代表作、结构拆解或爆款研究结果，整理成一份《对标选题资产包》。固定输出：1. 赛道共性判断（只保留 5 条最稳定的爆点结构）；2. 账号池摘要（账号名、为什么值得盯、适合学哪一层）；3. 代表作拆解表（至少 8 条，字段固定为：来源账号、原始标题、内容类型、开头钩子、用户痛点、爆点来源、可迁移角度、格式模板）；4. 30 条可直接开拍的候选选题；5. 5 条 S 级优先选题；6. 10 条 A 级连续栏目选题；7. 每条 S/A 选题补充：为什么值得拍、先准备什么、拍完导向哪里。不要照搬对标标题，重点提取可复用结构；没有依据的地方写未提供/待补充。",
+    prompt: "请基于当前对标资产（账号池、置顶视频/首屏代表作、结构拆解或爆款研究结果），整理成一份《对标选题资产包》。固定输出：1. 赛道共性判断（只保留 5 条最稳定的爆点结构）；2. 账号池摘要（账号名、为什么值得盯、适合学哪一层）；3. 代表作拆解表（至少 8 条，字段固定为：来源账号、原始标题、内容类型、开头钩子、用户痛点、爆点来源、可迁移角度、格式模板）；4. 30 条可直接开拍的候选选题；5. 5 条 S 级优先选题；6. 10 条 A 级连续栏目选题；7. 每条 S/A 选题补充：为什么值得拍、先准备什么、拍完导向哪里。不要照搬对标标题，重点提取可复用结构；没有依据的地方写未提供/待补充。",
     agentId: "business_diagnosis",
+    group: "筛选决策",
+  },
+  {
+    id: "meeting_minutes_topics",
+    label: "会议纪要提炼选题",
+    description: "从会议纪要提炼核心选题或完整资产包。",
+    prompt: [
+      "请基于当前会议纪要提炼选题。先判断用户要的是「单核心选题」还是「完整资产包」：",
+      "单核心选题：只提炼一个最值得马上进入文案创作的核心选题，输出：核心选题标题、为什么只选它、目标受众、开头钩子、内容主线（三段以内）、必用会议原话/事实、文案创作交接说明；",
+      "完整资产包：输出：会议一句话结论、关键信息抽取表（至少 8 条）、核心矛盾/机会、可拍选题池（至少 12 条）、优先级最高的 3 条、可沉淀知识库素材、待补充信息。",
+      "不要做流水账总结，不要结尾反问是否继续。所有结论必须能追溯到会议纪要，缺失信息标注待补充。",
+    ].join("\n"),
+    agentId: "business_diagnosis",
+    group: "会议纪要",
+  },
+  {
+    id: "meeting_minutes_execution",
+    label: "会议纪要执行物料",
+    description: "任务清单 / 采访清单 / 问卷表 / 脚本模板。",
+    prompt: [
+      "请基于当前核心选题和会议纪要生成执行物料。先判断用户要哪一类（可多选）：",
+      "任务清单：字段为任务、负责人/角色、截止时间或节奏、输入材料、交付物、验收标准、关联选题；",
+      "采访清单：按采访对象分组，字段为采访对象、问题、追问、想拿到的原话/证据、拍摄提醒；",
+      "问卷表：字段为问题、题型、选项或填空提示、用途、对应选题/判断，问题要短便于填写；",
+      "脚本模板：结构为 3 秒开头钩子、背景交代、三段内容推进、必用会议原话/事实、画面建议、结尾承接。",
+      "未指定时默认输出任务清单 + 脚本模板。不要输出选题库或完整资产包。",
+    ].join("\n"),
+    agentId: "business_diagnosis",
+    group: "会议纪要",
   },
 ]
 
 const REVIEW_SKILLS: AimWorkbenchSkill[] = [
-  { id: "title_review", label: "标题质检", description: "检查标题吸引力、准确性和风险表达。", prompt: "请基于当前文案做标题质检：指出标题是否准确、有钩子、是否夸大或违规，并给最小修改建议。", agentId: "content_review" },
-  { id: "hook_review", label: "开头钩子质检", description: "检查前三秒是否能抓住用户。", prompt: "请基于当前文案做开头钩子质检：判断前三秒是否有注意力机制、是否啰嗦、是否有冲突或代入感，并给最小修改建议。", agentId: "content_review" },
-  { id: "structure_review", label: "内容结构质检", description: "检查推进逻辑和信息密度。", prompt: "请基于当前文案做内容结构质检：检查开头、转折、论证、案例、收尾是否顺畅，只给需要改的地方和最小改法。", agentId: "content_review" },
-  { id: "persona_review", label: "人设一致性质检", description: "检查表达是否像这个账号会说的话。", prompt: "请基于当前文案做人设一致性质检：判断语气、身份、案例和价值观是否符合账号人设，并给最小修改建议。", agentId: "content_review" },
-  { id: "platform_review", label: "平台适配质检", description: "检查是否适合抖音/小红书/公众号等平台。", prompt: "请基于当前文案做平台适配质检：判断它更适合抖音、小红书、公众号还是朋友圈，并指出发布前需要调整的结构和表达。", agentId: "content_review" },
-  { id: "conversion_review", label: "转化路径质检", description: "检查是否有自然承接动作。", prompt: "请基于当前文案做转化路径质检：检查目标用户、需求承接、信任理由和行动引导是否清楚，只给自然不硬广的最小改法。", agentId: "content_review" },
-  { id: "risk_review", label: "风险表达质检", description: "检查违规、限流和 AI 标注提醒。", prompt: "请基于当前文案做风险表达质检：检查违规/限流风险、夸大承诺、绝对化用语、平台敏感表达和 AI 标注提醒，并给最小替换建议。", agentId: "content_review" },
-  { id: "publish_decision", label: "发布前判断", description: "把这条为什么要发先说清楚。", prompt: "请基于当前文案做发布前判断。固定输出：1. 这条内容现在能不能发；2. 真正会吸引谁；3. 这条最该验证什么；4. 哪一句最容易留下来；5. 如果不建议发，最小修改方向是什么。不要整篇重写。", agentId: "content_review" },
+  { id: "title_review", label: "标题质检", description: "检查标题吸引力、准确性和风险表达。", prompt: "请基于当前文案做标题质检：指出标题是否准确、有钩子、是否夸大或违规，并给最小修改建议。", agentId: "content_review", group: "单项质检" },
+  { id: "hook_review", label: "开头钩子质检", description: "检查前三秒是否能抓住用户。", prompt: "请基于当前文案做开头钩子质检：判断前三秒是否有注意力机制、是否啰嗦、是否有冲突或代入感，并给最小修改建议。", agentId: "content_review", group: "单项质检" },
+  { id: "structure_review", label: "内容结构质检", description: "检查推进逻辑和信息密度。", prompt: "请基于当前文案做内容结构质检：检查开头、转折、论证、案例、收尾是否顺畅，只给需要改的地方和最小改法。", agentId: "content_review", group: "单项质检" },
+  { id: "persona_review", label: "人设一致性质检", description: "检查表达是否像这个账号会说的话。", prompt: "请基于当前文案做人设一致性质检：判断语气、身份、案例和价值观是否符合账号人设，并给最小修改建议。", agentId: "content_review", group: "单项质检" },
+  { id: "platform_review", label: "平台适配质检", description: "检查是否适合抖音/小红书/公众号等平台。", prompt: "请基于当前文案做平台适配质检：判断它更适合抖音、小红书、公众号还是朋友圈，并指出发布前需要调整的结构和表达。", agentId: "content_review", group: "单项质检" },
+  { id: "conversion_review", label: "转化路径质检", description: "检查是否有自然承接动作。", prompt: "请基于当前文案做转化路径质检：检查目标用户、需求承接、信任理由和行动引导是否清楚，只给自然不硬广的最小改法。", agentId: "content_review", group: "单项质检" },
+  { id: "risk_review", label: "风险表达质检", description: "检查违规、限流和 AI 标注提醒。", prompt: "请基于当前文案做风险表达质检：检查违规/限流风险、夸大承诺、绝对化用语、平台敏感表达和 AI 标注提醒，并给最小替换建议。", agentId: "content_review", group: "单项质检" },
+  { id: "publish_decision", label: "发布前判断", description: "把这条为什么要发先说清楚。", prompt: "请基于当前文案做发布前判断。固定输出：1. 这条内容现在能不能发；2. 真正会吸引谁；3. 这条最该验证什么；4. 哪一句最容易留下来；5. 如果不建议发，最小修改方向是什么。不要整篇重写。", agentId: "content_review", group: "综合判断" },
 ]
 
 const DEEP_COPYWRITER_SKILLS: AimWorkbenchSkill[] = [
-  { id: "long_outline", label: "先搭长文框架", description: "先定观点、读者和正文结构。", prompt: "请基于当前素材先搭一版长文框架，包含核心观点、目标读者、开头方向和正文推进结构。", agentId: "deep_copywriter" },
-  { id: "long_article", label: "写完整篇长文", description: "写成公众号文章或完整长文。", prompt: "请基于当前素材生成一篇有框架、有观点、有真人表达的公众号文章或深度长文。", agentId: "deep_copywriter" },
+  { id: "long_outline", label: "先搭长文框架", description: "先定观点、读者和正文结构。", prompt: "请基于当前素材先搭一版长文框架，包含核心观点、目标读者、开头方向和正文推进结构。", agentId: "deep_copywriter", group: "长文创作" },
+  { id: "long_article", label: "写完整篇长文", description: "写成公众号文章或完整长文。", prompt: "请基于当前素材生成一篇有框架、有观点、有真人表达的公众号文章或深度长文。", agentId: "deep_copywriter", group: "长文创作" },
 ]
 
 const BUSINESS_SYSTEM_SKILLS: AimWorkbenchSkill[] = [
-  { id: "business_bottleneck", label: "诊断业务卡点", description: "找流量、成交、交付中的核心矛盾。", prompt: "请基于当前业务信息诊断核心卡点，找出流量、成交、交付中的主要矛盾，并给本周最小动作。", agentId: "business_system_diagnosis" },
-  { id: "content_pillar_from_business", label: "反推内容主线", description: "从商业目标倒推内容方向。", prompt: "请基于当前商业模式，反推出最值得优先做的内容主线和选题方向。", agentId: "business_system_diagnosis" },
-  { id: "content_data_retro", label: "内容数据复盘", description: "把结果、判断和下次打法拆开看。", prompt: "请基于这条内容的发布结果做内容数据复盘。固定输出：1. 结果先说人话；2. 这条内容打中了什么，没打中什么；3. 这次判断哪里对，哪里错；4. 下次遇到同类内容该怎么判断；5. 只给 1-3 条能继续执行的动作。不要讲大词。", agentId: "business_system_diagnosis" },
+  { id: "business_bottleneck", label: "诊断业务卡点", description: "找流量、成交、交付中的核心矛盾。", prompt: "请基于当前业务信息诊断核心卡点，找出流量、成交、交付中的主要矛盾，并给本周最小动作。", agentId: "business_system_diagnosis", group: "诊断分析" },
+  { id: "content_pillar_from_business", label: "反推内容主线", description: "从商业目标倒推内容方向。", prompt: "请基于当前商业模式，反推出最值得优先做的内容主线和选题方向。", agentId: "business_system_diagnosis", group: "诊断分析" },
+  { id: "content_data_retro", label: "内容数据复盘", description: "把结果、判断和下次打法拆开看。", prompt: "请基于这条内容的发布结果做内容数据复盘（注意：这是单条内容运营复盘，不是商业模式诊断，不需要走四层诊断结构）。固定输出：1. 结果先说人话；2. 这条内容打中了什么，没打中什么；3. 这次判断哪里对，哪里错；4. 下次遇到同类内容该怎么判断；5. 只给 1-3 条能继续执行的动作。不要讲大词。", agentId: "business_system_diagnosis", group: "诊断分析" },
 ]
 
 const PERSONA_SKILLS: AimWorkbenchSkill[] = [
-  { id: "story_gap", label: "追问来时路", description: "补齐人设故事关键缺口。", prompt: "请基于当前信息，只追问一个最关键的人设故事缺口，并给回答示例。", agentId: "persona" },
-  { id: "pinned_story_video", label: "生成置顶视频", description: "把人设故事写成置顶口播。", prompt: "请基于当前人设故事，生成一条置顶视频口播脚本。", agentId: "persona" },
+  { id: "story_gap", label: "追问来时路", description: "补齐人设故事关键缺口。", prompt: "请基于当前信息，只追问一个最关键的人设故事缺口，并给回答示例。", agentId: "persona", group: "人设梳理" },
+  { id: "pinned_story_video", label: "生成置顶视频", description: "把人设故事写成置顶口播（需先完成来时路梳理）。", prompt: "请检查当前人设故事来时路进度：如果 6 维尚未收齐（进度未到 100%），先指出还缺哪些维度并追问最关键的一个缺口；如果已收齐，直接基于来时路总结生成一条置顶视频口播脚本。", agentId: "persona", group: "人设梳理" },
 ]
 
 export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
   content_producer: {
     intro: "这里是内容文案创作。不是只把句子写顺，而是围绕目标客户、内容任务、信任证据和承接动作，把素材写成能留人、建信任、获客或成交的内容。",
     placeholder: "粘贴选题、原始想法、老板口述、现有文案或爆款拆解，我来生成可发布内容…",
-    defaultInstruction: "先判断这篇内容主要服务曝光、信任、获客还是成交，再锁定一个目标客户、一个真实问题、一个信任证据和一个承接动作，把运营逻辑写进正文推进，不在成稿外面讲方法。去 AI 味，保留真人表达的犹豫、判断和具体细节，少用套话。先判断用户要的是改写、对标再创作、追热点、热点口播、爆款口播、参考同行文案拆解、仿写但不抄、获客文案、观点表达还是核心内容一键拆解；凡是命中热点口播 / 爆款口播 / 参考同行文案 / 拆爆款 / 仿写但不抄 / 短视频脚本，就优先按「热点口播脚本生成」路由处理，再输出适合发布的内容交付物。不是每次都重度结合知识库；只有用户明确要、当前任务确实需要，或缺少必要承接信息时，才少量带 1-2 句人设、案例、卖点或客户场景补位。",
+    defaultInstruction: "先判断这篇内容主要服务曝光、信任、获客还是成交，再锁定一个目标客户、一个真实问题、一个信任证据和一个承接动作，把运营逻辑写进正文推进，不在成稿外面讲方法。去 AI 味，保留真人表达的犹豫、判断和具体细节，少用套话。先判断用户要的是改写、对标再创作、追热点观点、口播脚本、获客文案、观点表达还是核心内容一键拆解；凡是命中口播 / 短视频脚本 / 热点口播 / 爆款口播 / 参考同行文案 / 拆爆款 / 仿写但不抄，就按口播脚本结构处理（先判断输入类型和热点适配度，再输出可拍摄口播正文），再输出适合发布的内容交付物。不是每次都重度结合知识库；只有用户明确要、当前任务确实需要，或缺少必要承接信息时，才少量带 1-2 句人设、案例、卖点或客户场景补位。",
     quickPrompts: [
       "改写这版现有文案，保留我的意思，但更像真人表达。",
       "按这个爆款结构再创作一版，不照抄原句。",
@@ -338,7 +279,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
       "结合这个热点和参考口播，生成 5 条可直接拍的短视频口播脚本。",
       "围绕这个客户问题生成一版获客文案。",
       "把这个观点写成一条短视频口播。",
-      "把这篇深度内容拆成公众号、短视频、小红书、朋友圈和后续 12 条选题。",
+      "把这篇深度内容拆成公众号、短视频、小红书、朋友圈可发布物料。",
     ],
     primaryActionLabel: "生成内容",
     scenarios: ["改写现有文案", "对标爆款再创作", "多平台内容拆解", "12 条发布选题"],
@@ -477,15 +418,31 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
   },
 }
 
+/**
+ * @description 获取aimagentguide
+ * @param agentId - 智能体 ID
+ * @returns AimAgentGuide
+ */
 export function getAimAgentGuide(agentId: string): AimAgentGuide {
   // 归一化旧别名（ip_video → content_producer），兼容历史调用
   return AIM_AGENT_GUIDES[normalizeAimAgentId(agentId) as AimAgentId]
 }
 
+/**
+ * @description 构建aimguidetemplate
+ * @param fields - 字段列表
+ * @returns string
+ */
 export function buildAimGuideTemplate(fields: AimInputTemplateField[]): string {
   return fields.map((field) => `${field.label}：${field.placeholder}`).join("\n")
 }
 
+/**
+ * @description 构建aimnextactionprompt
+ * @param action - 操作
+ * @param content - 内容
+ * @returns string
+ */
 export function buildAimNextActionPrompt(action: AimNextAction, content: string): string {
   return `${action.prompt}\n\n---\n${content.trim()}\n---`
 }

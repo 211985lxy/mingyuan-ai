@@ -132,6 +132,8 @@ export interface ResolveKnowledgeStrategyInput {
   taskType?: string
   /** 润色/修改指令（有 → light_edit） */
   polishInstruction?: string
+  /** 创作台模块（social/longform/free）— 影响知识依赖强度 */
+  copyStudioModule?: "social" | "longform" | "free"
 }
 
 export interface ResolveAimRuntimeTaskInput {
@@ -146,6 +148,11 @@ function includesAny(text: string, words: string[]): boolean {
   return words.some((word) => text.includes(word))
 }
 
+/**
+ * @description 解析 AIM 运行时任务类型
+ * @param input - 解析输入（智能体 ID、任务类型、用户输入等）
+ * @returns 解析后的运行时任务类型
+ */
 export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRuntimeTask {
   const intentInput = extractLatestAimUserIntentText(input.input ?? "")
   const polishInstruction = extractLatestAimUserIntentText(input.polishInstruction ?? "")
@@ -214,40 +221,52 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
   return "rewrite_copy"
 }
 
+/**
+ * @description 判断任务是否需要使用知识库上下文
+ * @param task - 运行时任务类型
+ * @returns 需要使用知识库返回 true
+ */
 export function shouldUseKnowledgeContextForTask(task: AimRuntimeTask): boolean {
   return task !== "light_edit"
 }
 
+/**
+ * @description 判断任务是否需要使用市场爆款上下文
+ * @param task - 运行时任务类型
+ * @returns 需要使用市场爆款上下文返回 true
+ */
 export function shouldUseMarketViralContextForTask(task: AimRuntimeTask): boolean {
   return task === "new_copy" || task === "positioning_topic"
 }
 
 /**
- * 根据输入信号解析出最终的知识调用策略。
- *
- * 优先级（命中即止）：
- *   1. 轻改润色（polishInstruction 或 polish_copy）
- *   2. 内容场景（contentScenario → 场景配置中的知识策略）
- *   3. 热点创作（hotTopic 或对标文案）
- *   4. 内容类型档（人设型/转化型/流量型）
- *   5. 深度创作（默认，=现状）
- *
- * 注意：热点优先级高于 topicType，因为「流量型 + 热点」时
- * 用户更需要的是结合热点的轻量创作，而非全量知识。
+ * @description 根据输入信号解析知识调用策略
+ * @param input - 策略解析输入（任务类型、场景、热点等）
+ * @returns 解析后的知识策略
  */
 export function resolveKnowledgeStrategy(
   input: ResolveKnowledgeStrategyInput
 ): ResolvedKnowledgeStrategy {
-  const { runtimeTask, topicType, contentScenario, hotTopic, videoCopyExtractionId, taskType, polishInstruction } = input
+  const { runtimeTask, topicType, contentScenario, hotTopic, videoCopyExtractionId, taskType, polishInstruction, copyStudioModule } = input
 
   // 1. 轻改润色：用户只想改一段，没必要拉知识库
   if (runtimeTask === "light_edit" || polishInstruction?.trim() || taskType === "polish_copy") {
     return "light_edit"
   }
 
-  // 1.5 对标改写：需要中量知识库做案例/身份替换
+  // 1.5 创作台模块信号：free 模块显式压低知识依赖（知识仅作弱参考）
+  if (copyStudioModule === "free") {
+    return "light_edit"
+  }
+
+  // 1.6 对标改写：需要中量知识库做案例/身份替换
   if (runtimeTask === "rewrite_copy") {
     return "rewrite"
+  }
+
+  // 1.7 长文创作（无显式场景时）：提升知识依赖到深度档
+  if (copyStudioModule === "longform" && !contentScenario) {
+    return "deep"
   }
 
   // 2. 内容场景：场景模式优先级仅次于 light_edit
@@ -270,7 +289,11 @@ export function resolveKnowledgeStrategy(
   return "deep"
 }
 
-/** 取某档策略的画像（非法值兜底到 deep） */
+/**
+ * @description 获取指定知识策略的配置画像
+ * @param strategy - 知识策略类型
+ * @returns 策略配置画像
+ */
 export function getStrategyProfile(strategy: ResolvedKnowledgeStrategy): KnowledgeStrategyProfile {
   return KNOWLEDGE_STRATEGY_PROFILES[strategy] ?? KNOWLEDGE_STRATEGY_PROFILES.deep
 }

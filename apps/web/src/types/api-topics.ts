@@ -25,6 +25,20 @@ export interface ApiTopicCard {
   angle?: string;
   cta?: string;
   contentLine?: string;
+  creativeTrace?: {
+    stylePositioning: string;
+    logicSteps: string[];
+    sources: Array<{
+      kind: "benchmark" | "product" | "persona";
+      source: string;
+      usage: string;
+    }>;
+    destinyAlignment: {
+      baziBasis: string;
+      ziweiBasis: string;
+      styleMapping: string;
+    };
+  };
   defamiliarization?: {
     scarcityType?: "scenery" | "emotion" | "beauty" | "info" | "curio" | "event";
     rhetoric?: "fu" | "bi" | "xing";

@@ -10,6 +10,15 @@ import type {
 
 // ─── Confidence Calculator ───────────────────────────────
 
+/**
+ * @description calcconfidence
+ * @param videoCount - 视频数量
+ * @param hasMetrics - hasMetrics
+ * @param hasContentStrategy - has内容策略
+ * @param hasTopVideos - hasTopVideos
+ * @param isMonetization - isMonetization
+ * @returns ConfidenceLevel
+ */
 export function calcConfidence(
   videoCount: number | null | undefined,
   hasMetrics: boolean,
@@ -353,6 +362,11 @@ function buildEvidence(analysis: ApiCompetitorAnalysis): EvidenceData {
 
 // ─── Main Builder ────────────────────────────────────────
 
+/**
+ * @description 构建competitordiagnosisviewmodel
+ * @param analysis - 分析
+ * @returns CompetitorDiagnosisViewModel
+ */
 export function buildCompetitorDiagnosisViewModel(
   analysis: ApiCompetitorAnalysis,
 ): CompetitorDiagnosisViewModel {

@@ -4,17 +4,33 @@ export interface XhsChecklistItem { item: string; status: "pass" | "warn" | "fai
 const EMOJI = /\p{Extended_Pictographic}/gu
 export const XHS_ABSOLUTE_TERMS = ["国家级", "世界级", "全网最低价", "第一", "唯一", "最强", "最好", "100%"] as const
 
+/**
+ * @description 计算emojidensity
+ * @param text - 文本
+ * @returns number
+ */
 export function computeEmojiDensity(text: string): number {
   const chars = text.replace(/\s/g, "")
   return chars ? Math.round(((text.match(EMOJI) ?? []).length / chars.length) * 1000) / 10 : 0
 }
 
+/**
+ * @description 查找absoluteterms
+ * @param text - 文本
+ * @returns XhsReviewIssue[]
+ */
 export function findAbsoluteTerms(text: string): XhsReviewIssue[] {
   return XHS_ABSOLUTE_TERMS.filter((term) => text.includes(term)).map((term) => ({
     type: "absolute", text: `疑似绝对化用语「${term}」`, suggestion: "改成可验证、有限定条件的表达。",
   }))
 }
 
+/**
+ * @description 构建localchecklist
+ * @param title - 标题
+ * @param content - 内容
+ * @returns XhsChecklistItem[]
+ */
 export function buildLocalChecklist(title: string, content: string): XhsChecklistItem[] {
   const density = computeEmojiDensity(content)
   const absolute = findAbsoluteTerms(content)

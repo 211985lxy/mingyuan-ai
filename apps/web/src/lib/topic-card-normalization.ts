@@ -36,6 +36,94 @@ function inferSourceType(
   return "客户资料"
 }
 
+type CreativeTrace = NonNullable<TopicCard["creativeTrace"]>
+type CreativeTraceSource = CreativeTrace["sources"][number]
+
+function firstMatchingSource(
+  topicSources: TopicGenerationInput["topicSources"],
+  predicate: (source: NonNullable<TopicGenerationInput["topicSources"]>[number]) => boolean,
+) {
+  return (topicSources ?? []).find(predicate)
+}
+
+function profileText(ipProfile: TopicGenerationInput["ipProfile"]): string {
+  if (!ipProfile) return ""
+  return [
+    ipProfile.promptSnapshot,
+    ipProfile.ipTraits,
+    ipProfile.toneOfVoice,
+    JSON.stringify(ipProfile.business ?? ""),
+    JSON.stringify(ipProfile.persona ?? ""),
+    JSON.stringify(ipProfile.content ?? ""),
+  ].filter(Boolean).join("\n")
+}
+
+function traceSource(
+  kind: CreativeTraceSource["kind"],
+  source: string | null | undefined,
+  usage: string,
+): CreativeTraceSource {
+  return {
+    kind,
+    source: source?.trim() || "未提供/待补充",
+    usage: source?.trim() ? usage : "本次未引用，待补充后再校准。",
+  }
+}
+
+function sourceCitation(source: NonNullable<TopicGenerationInput["topicSources"]>[number] | undefined) {
+  if (!source) return null
+  const url = source.content.match(/https?:\/\/[^\s｜]+/)?.[0]
+  return url ? `${source.title}（${url}）` : source.title
+}
+
+function destinyBasis(
+  keyword: RegExp,
+  label: string,
+  input: Pick<TopicGenerationInput, "topicSources" | "ipProfile">,
+) {
+  const source = firstMatchingSource(input.topicSources, (item) => keyword.test(`${item.title}\n${item.content}`))
+  if (source) return source.title
+  return keyword.test(profileText(input.ipProfile)) ? `IP档案（含${label}资料）` : "未提供/待补充"
+}
+
+function normalizeCreativeTrace(
+  trace: TopicCard["creativeTrace"],
+  input: Pick<TopicGenerationInput, "topicSources" | "ipProfile">,
+): CreativeTrace {
+  const benchmark = firstMatchingSource(input.topicSources, (source) => source.category === "benchmark_reference")
+  const product = firstMatchingSource(input.topicSources, (source) => source.category === "product_usp")
+  const persona = firstMatchingSource(input.topicSources, (source) => ["boss_experience", "client_project"].includes(source.category))
+  const raw = trace && typeof trace === "object" ? trace : undefined
+  const logicSteps = Array.isArray(raw?.logicSteps)
+    ? raw.logicSteps.filter((item): item is string => typeof item === "string" && item.trim().length >= 2).slice(0, 5)
+    : []
+  const baziBasis = destinyBasis(/八字|四柱|五行/, "八字", input)
+  const ziweiBasis = destinyBasis(/紫微|命宫|天命/, "紫微", input)
+  const hasDestinySource = baziBasis !== "未提供/待补充" || ziweiBasis !== "未提供/待补充"
+
+  return {
+    stylePositioning: raw?.stylePositioning?.trim()
+      || [input.ipProfile?.toneOfVoice, input.ipProfile?.ipTraits].filter(Boolean).join("、")
+      || "专业、清晰、可信",
+    logicSteps: logicSteps.length >= 2 ? logicSteps : [
+      "先对齐目标客户与真实问题，避免只追求流量。",
+      "再用钩子和结构放大信息差，最后回到本 IP 的业务承接。",
+    ],
+    sources: [
+      traceSource("benchmark", sourceCitation(benchmark), "迁移选题母题、钩子或结构，不照抄原句。"),
+      traceSource("product", sourceCitation(product) || (input.ipProfile?.primaryOffer ? "IP档案：核心产品/服务" : null), "用于校准转化承接与产品关联。"),
+      traceSource("persona", sourceCitation(persona) || (input.ipProfile?.ipTraits || input.ipProfile?.toneOfVoice ? "IP档案：人设与语气" : null), "用于校准表达角度、用词和情绪基调。"),
+    ],
+    destinyAlignment: {
+      baziBasis,
+      ziweiBasis,
+      styleMapping: hasDestinySource
+        ? raw?.destinyAlignment?.styleMapping?.trim() || "已将现有命理资料作为文风、用词与情感基调的校准依据。"
+        : "未做命理适配；待补充八字或紫微资料后再校准。",
+    },
+  }
+}
+
 export type ScoreBreakdownNullable = {
   projectFit: number | null
   contentValue: number | null
@@ -50,6 +138,11 @@ function clampScore(value: unknown): number | null {
   return Math.max(0, Math.min(100, Math.round(n)))
 }
 
+/**
+ * @description 将选题卡片的评分细分归一化为 0-100 整数或 null
+ * @param breakdown - 原始评分细分对象
+ * @returns 归一化后的评分细分对象
+ */
 export function normalizeScoreBreakdown(breakdown: TopicCard["scoreBreakdown"]): ScoreBreakdownNullable {
   return {
     projectFit: breakdown ? clampScore(breakdown.projectFit) : null,
@@ -116,9 +209,15 @@ function revisionAdviceFor(
   return `请先重写角度，优先补强${SCORE_LABELS[weakest]}。`
 }
 
+/**
+ * @description 对 AI 生成的选题卡片进行标准化处理（补全类型、评分、创意轨迹、陌生化等）
+ * @param cards - AI 生成的原始选题卡片数组
+ * @param input - 选题生成输入上下文（素材源、推荐模式、IP 档案）
+ * @returns 标准化后的选题卡片数组
+ */
 export function normalizeTopicCards(
   cards: TopicCard[],
-  input: Pick<TopicGenerationInput, "topicSources" | "recommendationMode">,
+  input: Pick<TopicGenerationInput, "topicSources" | "recommendationMode" | "ipProfile">,
 ): TopicCard[] {
   const recommendationMode = input.recommendationMode ?? "normal"
   return cards.map((card, index) => {
@@ -135,11 +234,18 @@ export function normalizeTopicCards(
       reviewVerdict,
       scoreReason: card.scoreReason || scoreReasonFor(scoreBreakdown),
       revisionAdvice: card.revisionAdvice || revisionAdviceFor(scoreBreakdown, reviewVerdict),
+      creativeTrace: normalizeCreativeTrace(card.creativeTrace, input),
       defamiliarization: normalizeDefamiliarization(card.defamiliarization),
     }
   })
 }
 
+/**
+ * @description 将未知格式的卡片数据强制转换为合法的 TopicCard 结构（容错处理）
+ * @param cards - 未知格式的卡片数据数组
+ * @param selectedCodes - 用户选择的元素代码列表
+ * @returns 强制转换后的 4 张选题卡片
+ */
 export function coerceTopicCards(cards: unknown[], selectedCodes: string[]): TopicCard[] {
   const padded = [...cards.slice(0, 4)]
   while (padded.length < 4) padded.push({})
@@ -171,6 +277,12 @@ export function coerceTopicCards(cards: unknown[], selectedCodes: string[]): Top
   })
 }
 
+/**
+ * @description 当 AI 生成失败时，基于素材源生成回退选题卡片（保证始终返回 4 张）
+ * @param input - 选题生成输入上下文
+ * @param selectedCodes - 用户选择的元素代码列表
+ * @returns 回退选题卡片数组（4 张）
+ */
 export function fallbackTopicCards(input: TopicGenerationInput, selectedCodes: string[]): TopicCard[] {
   const benchmarkSources = (input.topicSources ?? []).filter((source) => source.category === "benchmark_reference")
   const baseSources = benchmarkSources.length > 0 ? benchmarkSources : (input.topicSources ?? [])

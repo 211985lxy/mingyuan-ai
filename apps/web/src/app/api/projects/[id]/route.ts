@@ -18,6 +18,12 @@ function cleanRequiredText(value: unknown, maxLength = 500) {
 
 const VALID_STATUS = new Set(["active", "paused", "archived"])
 
+/**
+ * @description 处理 PATCH 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -62,6 +68,12 @@ export async function PATCH(
   }
 }
 
+/**
+ * @description 处理 DELETE 请求
+ * @param request - 请求对象
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

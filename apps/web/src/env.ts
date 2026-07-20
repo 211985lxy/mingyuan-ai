@@ -50,7 +50,10 @@ export const env = createEnv({
     EMBEDDING_MODEL: z.string().optional(),
     FEISHU_APP_ID: z.string().optional(),
     FEISHU_APP_SECRET: z.string().optional(),
+    FEISHU_ENCRYPT_KEY: z.string().optional(),
+    FEISHU_TOPIC_PIPELINE_ENABLED: z.string().optional(),
     FEISHU_TOPIC_CHAT_PROJECT_ID: z.string().optional(),
+    FEISHU_TOPIC_CHAT_ID: z.string().optional(),
     FEISHU_TOPIC_CHAT_USER_ID: z.string().optional(),
     FEISHU_VERIFICATION_TOKEN: z.string().optional(),
     GLM_API_KEY: z.string().optional(),
@@ -58,6 +61,10 @@ export const env = createEnv({
     GLM_MODEL: z.string().optional(),
     HOSTNAME: z.string().optional(),
     INSPIRATION_WEBHOOK_TOKEN: z.string().optional(),
+    INSPIRATION_WEBHOOK_PROJECT_ID: z.string().optional(),
+    INSPIRATION_PIPELINE_ENABLED: z.string().optional(),
+    INSPIRATION_PIPELINE_EXECUTION_MODE_OVERRIDE: z.string().optional(),
+    INSPIRATION_PIPELINE_SHADOW_MODE: z.string().optional(),
     JIEKOU_API_KEY: z.string().optional(),
     JIEKOU_BASE_URL: z.string().optional(),
     JIEKOU_MODEL: z.string().optional(),
@@ -84,6 +91,8 @@ export const env = createEnv({
     LOCAL_CRAWLER_ENABLED: z.string().optional(),
     LOCAL_CRAWLER_HEADLESS: z.string().optional(),
     LOCAL_CRAWLER_TIMEOUT_MS: z.string().optional(),
+    LOCAL_DEV_LOGIN_EMAIL: z.string().optional(),
+    LOCAL_DEV_LOGIN_ENABLED: z.string().optional(),
     LOG_LEVEL: z.string().optional(),
     INSPIRATION_WEBHOOK_USER_ID: z.string().optional(),
     META_PROMPT_MODEL: z.string().optional(),
@@ -97,6 +106,9 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_BASE_URL: z.string().optional(),
     OPENAI_MODEL: z.string().optional(),
+    QIANFAN_API_KEY: z.string().optional(),
+    QIANFAN_BASE_URL: z.string().optional(),
+    QIANFAN_MODEL: z.string().optional(),
     OPENROUTER_API_KEY: z.string().optional(),
     OPENROUTER_BASE_URL: z.string().optional(),
     OPENROUTER_MODEL: z.string().optional(),
@@ -125,9 +137,17 @@ export const env = createEnv({
     UNLIMITED_BETA_EMAILS: z.string().optional(),
     UNLIMITED_BETA_USER_IDS: z.string().optional(),
     VIDEO_TEXT_EXTRACT_API_KEY: z.string().optional(),
+    VIDEO_EXTRACT_FALLBACK_API_KEY: z.string().optional(),
+    VIDEO_EXTRACT_FALLBACK_ENABLED: z.string().optional(),
+    VIDEO_EXTRACT_FALLBACK_URL: z.string().optional(),
+    WECOM_INSPIRATION_ENABLED: z.string().optional(),
+    WECOM_CALLBACK_TOKEN: z.string().optional(),
+    WECOM_ENCODING_AES_KEY: z.string().optional(),
+    WECOM_CORP_ID: z.string().optional(),
     WECHAT_APP_ID: z.string().optional(),
     WECHAT_APP_SECRET: z.string().optional(),
     WECHAT_DEFAULT_AUTHOR: z.string().optional(),
+    WORKBUDDY_WECHAT_ENABLED: z.string().optional(),
     ZAI_API_KEY: z.string().optional(),
     ZAI_BASE_URL: z.string().optional(),
     ZAI_MODEL: z.string().optional(),
@@ -185,7 +205,10 @@ export const env = createEnv({
     EMBEDDING_MODEL: process.env.EMBEDDING_MODEL,
     FEISHU_APP_ID: process.env.FEISHU_APP_ID,
     FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET,
+    FEISHU_ENCRYPT_KEY: process.env.FEISHU_ENCRYPT_KEY,
+    FEISHU_TOPIC_PIPELINE_ENABLED: process.env.FEISHU_TOPIC_PIPELINE_ENABLED,
     FEISHU_TOPIC_CHAT_PROJECT_ID: process.env.FEISHU_TOPIC_CHAT_PROJECT_ID,
+    FEISHU_TOPIC_CHAT_ID: process.env.FEISHU_TOPIC_CHAT_ID,
     FEISHU_TOPIC_CHAT_USER_ID: process.env.FEISHU_TOPIC_CHAT_USER_ID,
     FEISHU_VERIFICATION_TOKEN: process.env.FEISHU_VERIFICATION_TOKEN,
     GLM_API_KEY: process.env.GLM_API_KEY,
@@ -193,6 +216,10 @@ export const env = createEnv({
     GLM_MODEL: process.env.GLM_MODEL,
     HOSTNAME: process.env.HOSTNAME,
     INSPIRATION_WEBHOOK_TOKEN: process.env.INSPIRATION_WEBHOOK_TOKEN,
+    INSPIRATION_WEBHOOK_PROJECT_ID: process.env.INSPIRATION_WEBHOOK_PROJECT_ID,
+    INSPIRATION_PIPELINE_ENABLED: process.env.INSPIRATION_PIPELINE_ENABLED,
+    INSPIRATION_PIPELINE_EXECUTION_MODE_OVERRIDE: process.env.INSPIRATION_PIPELINE_EXECUTION_MODE_OVERRIDE,
+    INSPIRATION_PIPELINE_SHADOW_MODE: process.env.INSPIRATION_PIPELINE_SHADOW_MODE,
     JIEKOU_API_KEY: process.env.JIEKOU_API_KEY,
     JIEKOU_BASE_URL: process.env.JIEKOU_BASE_URL,
     JIEKOU_MODEL: process.env.JIEKOU_MODEL,
@@ -219,6 +246,8 @@ export const env = createEnv({
     LOCAL_CRAWLER_ENABLED: process.env.LOCAL_CRAWLER_ENABLED,
     LOCAL_CRAWLER_HEADLESS: process.env.LOCAL_CRAWLER_HEADLESS,
     LOCAL_CRAWLER_TIMEOUT_MS: process.env.LOCAL_CRAWLER_TIMEOUT_MS,
+    LOCAL_DEV_LOGIN_EMAIL: process.env.LOCAL_DEV_LOGIN_EMAIL,
+    LOCAL_DEV_LOGIN_ENABLED: process.env.LOCAL_DEV_LOGIN_ENABLED,
     LOG_LEVEL: process.env.LOG_LEVEL,
     INSPIRATION_WEBHOOK_USER_ID: process.env.INSPIRATION_WEBHOOK_USER_ID,
     META_PROMPT_MODEL: process.env.META_PROMPT_MODEL,
@@ -234,6 +263,9 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_BASE_URL: process.env.OPENAI_BASE_URL,
     OPENAI_MODEL: process.env.OPENAI_MODEL,
+    QIANFAN_API_KEY: process.env.QIANFAN_API_KEY,
+    QIANFAN_BASE_URL: process.env.QIANFAN_BASE_URL,
+    QIANFAN_MODEL: process.env.QIANFAN_MODEL,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL,
     OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
@@ -262,9 +294,17 @@ export const env = createEnv({
     UNLIMITED_BETA_EMAILS: process.env.UNLIMITED_BETA_EMAILS,
     UNLIMITED_BETA_USER_IDS: process.env.UNLIMITED_BETA_USER_IDS,
     VIDEO_TEXT_EXTRACT_API_KEY: process.env.VIDEO_TEXT_EXTRACT_API_KEY,
+    VIDEO_EXTRACT_FALLBACK_API_KEY: process.env.VIDEO_EXTRACT_FALLBACK_API_KEY,
+    VIDEO_EXTRACT_FALLBACK_ENABLED: process.env.VIDEO_EXTRACT_FALLBACK_ENABLED,
+    VIDEO_EXTRACT_FALLBACK_URL: process.env.VIDEO_EXTRACT_FALLBACK_URL,
+    WECOM_INSPIRATION_ENABLED: process.env.WECOM_INSPIRATION_ENABLED,
+    WECOM_CALLBACK_TOKEN: process.env.WECOM_CALLBACK_TOKEN,
+    WECOM_ENCODING_AES_KEY: process.env.WECOM_ENCODING_AES_KEY,
+    WECOM_CORP_ID: process.env.WECOM_CORP_ID,
     WECHAT_APP_ID: process.env.WECHAT_APP_ID,
     WECHAT_APP_SECRET: process.env.WECHAT_APP_SECRET,
     WECHAT_DEFAULT_AUTHOR: process.env.WECHAT_DEFAULT_AUTHOR,
+    WORKBUDDY_WECHAT_ENABLED: process.env.WORKBUDDY_WECHAT_ENABLED,
     ZAI_API_KEY: process.env.ZAI_API_KEY,
     ZAI_BASE_URL: process.env.ZAI_BASE_URL,
     ZAI_MODEL: process.env.ZAI_MODEL,
@@ -277,10 +317,20 @@ export const env = createEnv({
 
 // Provider key pools and child-process inheritance need dynamic names or the
 // complete process map. Keep those two escape hatches centralized here.
+/**
+ * @description 获取索引化的环境变量值
+ * @param prefix - 环境变量前缀
+ * @param index - 索引序号
+ * @returns 环境变量值或 undefined
+ */
 export function getIndexedEnvironmentValue(prefix: string, index: number): string | undefined {
   return process.env[`${prefix}_${index}`]?.trim() || undefined
 }
 
+/**
+ * @description 获取完整的进程环境变量映射
+ * @returns 进程环境变量对象
+ */
 export function getProcessEnvironment(): NodeJS.ProcessEnv {
   return process.env
 }

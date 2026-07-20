@@ -12,6 +12,10 @@ import {
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+/**
+ * @description 处理 GET 请求
+ * @returns 无返回值
+ */
 export async function GET() {
   const checks: Record<string, { ok: boolean; latencyMs?: number; error?: string }> = {}
 

@@ -9,6 +9,11 @@ interface TopicChatProject {
   deliveryGoal: string | null
 }
 
+/**
+ * @description 加载topicchatcontext
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export async function loadTopicChatContext(input: { userId: string; projectId: string }) {
   return Promise.all([
     prisma.clientProject.findFirst({
@@ -41,6 +46,11 @@ export async function loadTopicChatContext(input: { userId: string; projectId: s
   ])
 }
 
+/**
+ * @description 构建topicprojectsource
+ * @param project - project
+ * @returns string
+ */
 export function buildTopicProjectSource(project: TopicChatProject): string {
   return [
     project.industry ? `行业：${project.industry}` : null,
@@ -50,6 +60,12 @@ export function buildTopicProjectSource(project: TopicChatProject): string {
   ].filter(Boolean).join("\n")
 }
 
+/**
+ * @description 创建topicipprofile
+ * @param userId - 用户 ID
+ * @param project - project
+ * @returns 无返回值
+ */
 export async function createTopicIpProfile(userId: string, project: TopicChatProject) {
   return prisma.ipProfile.create({
     data: {

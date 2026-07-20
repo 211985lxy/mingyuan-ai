@@ -15,6 +15,38 @@ export type AgentApiContext = {
   allowedAgents: AimAgentId[]
 }
 
+/**
+ * @description 记录 Agent API 调用日志，同时更新 API Key 最后使用时间
+ * @param input - 调用记录输入（上下文、操作名、状态、耗时等）
+ * @returns 无返回值
+ */
+export async function recordAgentApiCall(input: {
+  context: AgentApiContext
+  action: string
+  projectId?: string
+  inputSummary?: string
+  status: "success" | "failed"
+  errorMessage?: string
+  durationMs?: number
+}) {
+  await prisma.$transaction([
+    prisma.agentApiKey.update({ where: { id: input.context.apiKeyId }, data: { lastUsedAt: new Date() } }),
+    prisma.agentApiCallLog.create({
+      data: {
+        apiKeyId: input.context.apiKeyId,
+        userId: input.context.userId,
+        projectId: input.projectId || null,
+        action: input.action,
+        inputSummary: input.inputSummary?.slice(0, 500) || null,
+        outputFormats: [],
+        status: input.status,
+        errorMessage: input.errorMessage || null,
+        durationMs: input.durationMs ?? null,
+      },
+    }),
+  ])
+}
+
 function hashAgentApiKey(key: string) {
   return createHash("sha256").update(key).digest("hex")
 }
@@ -29,6 +61,11 @@ function extractBearerToken(request: NextRequest) {
   return auth.slice(7).trim()
 }
 
+/**
+ * @description 认证 Agent API 请求，验证 Bearer Token 并检查日调用限额
+ * @param request - Next.js 请求对象
+ * @returns Agent API 上下文（Key ID、用户 ID、允许的项目和智能体列表）
+ */
 export async function authenticateAgentRequest(request: NextRequest): Promise<AgentApiContext> {
   const token = extractBearerToken(request)
   if (!token || !token.startsWith(KEY_PREFIX)) {
@@ -69,6 +106,12 @@ export async function authenticateAgentRequest(request: NextRequest): Promise<Ag
   }
 }
 
+/**
+ * @description 断言 Agent API 上下文有权访问指定项目
+ * @param context - Agent API 上下文
+ * @param projectId - 要访问的项目 ID
+ * @returns 无返回值，无权时抛出错误
+ */
 export async function assertAgentProjectAccess(context: AgentApiContext, projectId: string) {
   if (!context.allowedProjects.includes(projectId)) {
     throw new Error("AGENT_PROJECT_FORBIDDEN")
@@ -81,6 +124,12 @@ export async function assertAgentProjectAccess(context: AgentApiContext, project
   if (!project) throw new Error("AGENT_PROJECT_FORBIDDEN")
 }
 
+/**
+ * @description 断言 Agent API 上下文有权访问指定智能体
+ * @param context - Agent API 上下文
+ * @param agentId - 要访问的智能体 ID
+ * @returns 无返回值，无权时抛出错误
+ */
 export function assertAgentAccess(context: AgentApiContext, agentId: string): asserts agentId is AimAgentId {
   // 旧别名（ip_video）归一化为当前规范 id，兼容历史 API key 的 scope 与历史调用方
   const normalized = normalizeAimAgentId(agentId) as AimAgentId
@@ -93,6 +142,11 @@ export function assertAgentAccess(context: AgentApiContext, agentId: string): as
   }
 }
 
+/**
+ * @description 将 Agent API 认证错误转换为对应的 HTTP 错误响应
+ * @param error - 捕获的错误对象
+ * @returns 对应的 NextResponse 错误响应，无法识别时返回 null
+ */
 export function agentAuthErrorResponse(error: unknown): NextResponse | null {
   if (!(error instanceof Error)) return null
   const map: Record<string, { status: number; error: string }> = {

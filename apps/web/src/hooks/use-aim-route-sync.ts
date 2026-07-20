@@ -23,6 +23,12 @@ type Setter<T> = Dispatch<SetStateAction<T>>
 type Router = { replace: (href: string) => void }
 type SearchParams = { toString: () => string }
 
+/**
+ * @description 解析aimhistoryagentmodule
+ * @param agentId - 智能体 ID
+ * @param taskSpec - task规格
+ * @returns 无返回值
+ */
 export function resolveAimHistoryAgentModule(agentId: AimAgentId, taskSpec: AimGeneration["taskSpec"]) {
   return normalizeWorkbenchCopyStudioModule(agentId, getTaskSpecCopyStudioModule(taskSpec))
 }
@@ -46,6 +52,11 @@ export interface AimRouteStateSetters {
   setEditorPanelOpen: Setter<boolean>
 }
 
+/**
+ * @description React Hook：aimagentdraftswitch
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimAgentDraftSwitch(input: {
   agentParam: string | null
   activeAgentId: AimAgentId
@@ -79,6 +90,11 @@ export function useAimAgentDraftSwitch(input: {
   }, [activeAgentId, agentParam, lastAgentParamRef, projectScope, selectedProjectId, setters])
 }
 
+/**
+ * @description React Hook：aimtopicprefill
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimTopicPrefill(input: {
   topicTitle: string | null
   topicRationale: string | null
@@ -115,6 +131,11 @@ export function useAimTopicPrefill(input: {
   }, [idea, projectId, router, searchParams, setters, topicRationale, topicTitle])
 }
 
+/**
+ * @description React Hook：aimvideocopyprefill
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimVideoCopyPrefill(input: {
   extractionId: string | null
   router: Router
@@ -168,6 +189,11 @@ export function useAimVideoCopyPrefill(input: {
   }, [extractionId, router, searchParams, setters])
 }
 
+/**
+ * @description React Hook：aimhistoryload
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimHistoryLoad(input: {
   loadTargetId: string | null
   generationIdParam: string | null

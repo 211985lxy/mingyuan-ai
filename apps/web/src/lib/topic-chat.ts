@@ -37,6 +37,11 @@ function compactTitle(content: string) {
     .slice(0, 28)
 }
 
+/**
+ * @description 分类topicchatinput
+ * @param content - 内容
+ * @returns TopicChatClassification
+ */
 export function classifyTopicChatInput(content: string): TopicChatClassification {
   const text = content.trim()
   if (/https?:\/\/|爆款|对标|参考|链接|标题|开头/.test(text)) {
@@ -48,6 +53,11 @@ export function classifyTopicChatInput(content: string): TopicChatClassification
   return { category: "daily_inspiration", reason: "日常灵感或现场想法" }
 }
 
+/**
+ * @description 构建topicknowledgedraft
+ * @param input - 输入数据
+ * @returns TopicKnowledgeDraft
+ */
 export function buildTopicKnowledgeDraft(input: {
   content: string
   classification: TopicChatClassification
@@ -81,6 +91,11 @@ export function buildTopicKnowledgeDraft(input: {
   }
 }
 
+/**
+ * @description 构建topicchatreply
+ * @param input - 输入数据
+ * @returns TopicChatReply
+ */
 export function buildTopicChatReply(input: {
   savedTitle: string
   cards: TopicChatCard[]

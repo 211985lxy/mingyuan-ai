@@ -26,7 +26,11 @@ const NEW_TASK_PATTERNS = [
   /(?:不要|别)(?:再)?(?:接着|继续)(?:改|写)(?:上一|前一|第一)(?:篇|版|个)?/,
 ]
 
-/** 明确开启另一篇内容时，旧对话和当前编辑稿都不应继续作为本轮上下文。 */
+/**
+ * @description 判断用户是否有明确的新任务意图
+ * @param text - 用户输入文本
+ * @returns 有新任务意图返回 true
+ */
 export function hasExplicitNewTaskIntent(text: string): boolean {
   const input = text.trim().replace(/\s+/g, "")
   return input.length > 0 && NEW_TASK_PATTERNS.some((pattern) => pattern.test(input))
@@ -35,7 +39,12 @@ export function hasExplicitNewTaskIntent(text: string): boolean {
 const CURRENT_TASK_REFERENCE_PATTERN = /(继续|接着|基于|根据|上面|刚才|这篇|这版|当前|原稿|原文|改一下|修改|优化|润色|仿写|重写)/
 const SELF_CONTAINED_WRITING_PATTERN = /(写|生成|创作|策划|输出|做).{0,12}(文案|口播|文章|脚本|内容|选题)|(文案|口播|文章|脚本|内容|选题).{0,12}(写|生成|创作|策划|输出|做)/
 
-/** 多轮对话中，本轮已给出独立写作目标且未引用旧稿时，默认保护本轮不受旧任务污染。 */
+/**
+ * @description 判断是否应隔离当前写作指令（避免旧任务上下文污染）
+ * @param text - 用户输入文本
+ * @param hasHistory - 是否存在历史对话
+ * @returns 应隔离返回 true
+ */
 export function shouldIsolateWritingInstruction(text: string, hasHistory: boolean): boolean {
   if (!hasHistory) return false
   const input = text.trim().replace(/\s+/g, "")
@@ -58,6 +67,11 @@ const COMMAND_PATTERNS: Array<{ id: AimWorkbenchCommandId; pattern: RegExp }> = 
   { id: "remember_preference", pattern: /(记住|沉淀|保存).{0,8}(偏好|规则|习惯|口吻)/ },
 ]
 
+/**
+ * @description 检测用户输入中的 AIM 工作台命令
+ * @param text - 用户输入文本
+ * @returns 检测到的命令对象，未检测到时返回 null
+ */
 export function detectAimWorkbenchCommand(text: string): AimWorkbenchCommand | null {
   const input = text.trim()
   if (!input) return null

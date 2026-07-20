@@ -11,6 +11,11 @@ async function isPublicAllowedTarget(value: string): Promise<boolean> {
   return addresses.length > 0 && addresses.every(({ address }) => !isPrivateIpAddress(address))
 }
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get("url")
 

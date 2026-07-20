@@ -106,6 +106,11 @@ function flattenLink(value: unknown): string {
  * - 状态/工作流未知或缺失时返回空值并保留 raw 值，绝不映射成可执行业务状态。
  * - 缺字段统一为空字符串，不硬编码假数据（零 Mock 铁律）。
  */
+/**
+ * @description 解析feishuworkitem
+ * @param fields - 字段列表
+ * @returns ParsedWorkItem
+ */
 export function parseFeishuWorkItem(fields: Record<string, unknown>): ParsedWorkItem {
   const rawStatus = flattenText(fields["状态"])
   const rawWorkflow = flattenText(fields["工作流"])
@@ -141,6 +146,12 @@ export function parseFeishuWorkItem(fields: Record<string, unknown>): ParsedWork
 }
 
 /** 判断从 `from` 到 `to` 是否是合法状态转换。 */
+/**
+ * @description 判断是否可以transition
+ * @param from - 起始值
+ * @param to - 目标值
+ * @returns boolean
+ */
 export function canTransition(from: WorkItemStatus, to: WorkItemStatus): boolean {
   if (from === to) return true
   const allowed = LEGAL_TRANSITIONS[from]
@@ -156,6 +167,12 @@ export type TransitionResult =
  * - 合法跳转：返回新状态，idempotent=false。
  * - 相同状态：视为幂等，返回当前状态，idempotent=true，不报错。
  * - 非法跳转：返回失败结果，error 含原始状态对，便于上层回写“可行动错误”。
+ */
+/**
+ * @description transitionworkitem
+ * @param current - 当前值
+ * @param target - 目标
+ * @returns TransitionResult
  */
 export function transitionWorkItem(
   current: { status: WorkItemStatus },
@@ -188,6 +205,10 @@ export type WorkItemPatch = Record<string, unknown>
  * 构造“开始处理”patch：进入处理中。
  * 不携带结果字段，避免在尚未执行时伪造结果。
  */
+/**
+ * @description 构建startpatch
+ * @returns WorkItemPatch
+ */
 export function buildStartPatch(): WorkItemPatch {
   return {
     状态: "处理中" as WorkItemStatus,
@@ -204,6 +225,11 @@ export interface ReviewPatchInput {
 /**
  * 构造“提交审核”patch：进入待人工审核，并带回写 AIM 结果。
  * 必须有 aimResultId——没有结果就提交审核属于伪造完成，直接拒绝。
+ */
+/**
+ * @description 构建reviewpatch
+ * @param input - 输入数据
+ * @returns WorkItemPatch
  */
 export function buildReviewPatch(input: ReviewPatchInput): WorkItemPatch {
   if (!input.aimResultId.trim()) {
@@ -228,6 +254,11 @@ export interface CompletePatchInput {
  * 构造“完成”patch：进入已完成终态。
  * 完成必须挂结果ID；同时清空失败残留的错误信息，避免终态里留着旧错误。
  */
+/**
+ * @description 构建completepatch
+ * @param input - 输入数据
+ * @returns WorkItemPatch
+ */
 export function buildCompletePatch(input: CompletePatchInput): WorkItemPatch {
   if (!input.aimResultId.trim()) {
     throw new Error("完成经营事项需要 AIM结果ID，禁止在无结果时伪造已完成。")
@@ -250,6 +281,11 @@ export interface FailPatchInput {
  * 构造“失败”patch：进入失败态，并写入可行动错误信息。
  * 失败语义下绝不伪造结果ID/摘要——失败就是没有结果。
  */
+/**
+ * @description 构建failpatch
+ * @param input - 输入数据
+ * @returns WorkItemPatch
+ */
 export function buildFailPatch(input: FailPatchInput): WorkItemPatch {
   if (!input.errorMessage.trim()) {
     throw new Error("失败 patch 必须提供可行动错误信息，禁止空错误。")
@@ -265,6 +301,10 @@ export function buildFailPatch(input: FailPatchInput): WorkItemPatch {
 /**
  * 构造“重试”patch：从失败退回待处理，并清空旧错误。
  * 不改写结果字段；历史结果是否清理由后续真实业务规则决定。
+ */
+/**
+ * @description 构建retrypatch
+ * @returns WorkItemPatch
  */
 export function buildRetryPatch(): WorkItemPatch {
   return {
@@ -305,6 +345,11 @@ export interface ParsedMeetingWorkItemInput {
 /**
  * 从飞书记录字段解析会议洞察工作流所需的四类输入。
  * 复用 WP-2 的 flattenText 收窄多行/段落数组形态；缺字段统一为空字符串。
+ */
+/**
+ * @description 解析meetingworkiteminput
+ * @param fields - 字段列表
+ * @returns ParsedMeetingWorkItemInput
  */
 export function parseMeetingWorkItemInput(
   fields: Record<string, unknown>,

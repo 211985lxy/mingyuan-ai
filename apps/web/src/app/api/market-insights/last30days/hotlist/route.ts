@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getLatestMarketHotSnapshot } from "@/lib/market-insights/market-hotlist"
 
+/**
+ * @description 处理 GET 请求
+ * @returns 无返回值
+ */
 export async function GET() {
   try {
     const snapshot = await getLatestMarketHotSnapshot()

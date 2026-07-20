@@ -5,6 +5,11 @@ import { fetchAndStore } from "@/lib/douyin-hot"
 export const runtime = "nodejs"
 export const maxDuration = 30
 
+/**
+ * @description 处理 GET 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function GET(request: NextRequest) {
   if (!validateCronSecret(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

@@ -7,6 +7,11 @@ function parseSource(request: NextRequest): HotDecisionSource {
   return "aihot"
 }
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   const data = await refreshHotDecisions(parseSource(request))
   return NextResponse.json({ data })

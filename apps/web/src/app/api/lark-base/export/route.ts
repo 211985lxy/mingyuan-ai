@@ -6,6 +6,11 @@ import { exportLarkBaseResult, type LarkResultType } from "@/lib/lark-base-tool"
 
 const RESULT_TYPES = new Set(["topic", "script", "positioning", "moments_copy"])
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)

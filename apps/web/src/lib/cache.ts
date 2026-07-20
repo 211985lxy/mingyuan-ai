@@ -4,6 +4,13 @@ import { redis } from "./redis"
  * Generic Redis cache wrapper.
  * Tries cache first, falls back to fetcher on miss, stores result.
  */
+/**
+ * @description withcache
+ * @param key - 键
+ * @param ttlSeconds - ttlSeconds
+ * @param fetcher - fetcher
+ * @returns Promise<T>
+ */
 export async function withCache<T>(
   key: string,
   ttlSeconds: number,

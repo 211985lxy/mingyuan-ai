@@ -14,6 +14,10 @@ export type SidebarContextProps = {
 
 export const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
+/**
+ * @description React Hook：sidebar
+ * @returns 无返回值
+ */
 export function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) throw new Error("useSidebar must be used within a SidebarProvider.")

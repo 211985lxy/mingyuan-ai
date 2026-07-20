@@ -78,6 +78,12 @@ interface GenerateOptions {
   startsNewTask?: boolean
 }
 
+/**
+ * @description 获取aimpendinggenerationmessage
+ * @param projectEnabled - project是否启用
+ * @param actionLabel - 操作标签
+ * @returns 无返回值
+ */
 export function getAimPendingGenerationMessage(projectEnabled: boolean, actionLabel: string) {
   return projectEnabled
     ? `正在${actionLabel}，会读取当前项目资料并匹配知识库，再生成交付物…`
@@ -235,6 +241,11 @@ async function checkDeliverableQuality(input: AimGenerationActionInput, messageI
   }
 }
 
+/**
+ * @description React Hook：aimgenerationactions
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimGenerationActions(input: AimGenerationActionInput) {
   return {
     generateWithInput: (currentInput: string, options?: GenerateOptions) => generateWithInput(input, currentInput, options),

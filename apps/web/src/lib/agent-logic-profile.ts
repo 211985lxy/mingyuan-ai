@@ -23,7 +23,7 @@ export const PROVIDER_LABELS: Record<string, string> = {
   openrouter: "OpenRouter（国产模型池）",
   therouter: "TheRouter",
   glm: "智谱 GLM",
-  lihuo: "离火 GPT-5.5",
+  lihuo: "离火 GPT-5.6",
 }
 
 /** 单个智能体的逻辑档案 */
@@ -107,6 +107,11 @@ const AGENT_OTHER_CONTEXT: Record<AimAgentId, string[]> = {
 }
 
 /** 构建单个智能体的逻辑档案 */
+/**
+ * @description 获取agentlogicprofile
+ * @param agentId - 智能体 ID
+ * @returns AgentLogicProfile
+ */
 export function getAgentLogicProfile(agentId: AimAgentId): AgentLogicProfile {
   const meta = AIM_AGENT_OPTIONS.find((a) => a.id === agentId)!
   const guide = AIM_AGENT_GUIDES[agentId]
@@ -134,6 +139,10 @@ export function getAgentLogicProfile(agentId: AimAgentId): AgentLogicProfile {
 }
 
 /** 全部智能体逻辑档案（档案页/拓扑图用） */
+/**
+ * @description 获取所有agentlogicprofiles
+ * @returns AgentLogicProfile[]
+ */
 export function getAllAgentLogicProfiles(): AgentLogicProfile[] {
   return AIM_AGENT_OPTIONS.map((a) => getAgentLogicProfile(a.id))
 }
@@ -148,6 +157,10 @@ export interface AgentFlowEdge {
   label: string
 }
 
+/**
+ * @description 获取agentflowedges
+ * @returns AgentFlowEdge[]
+ */
 export function getAgentFlowEdges(): AgentFlowEdge[] {
   const edges: AgentFlowEdge[] = []
   const seen = new Set<string>()

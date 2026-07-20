@@ -7,10 +7,20 @@ export interface BatchSuggestion {
   message: string
 }
 
+/**
+ * @description 判断输入文本是否超过分批建议阈值
+ * @param text - 用户输入的文本内容
+ * @returns 超过阈值返回 true，建议分批发送
+ */
 export function shouldSuggestBatch(text: string): boolean {
   return text.length > BATCH_INPUT_THRESHOLD
 }
 
+/**
+ * @description 获取分批建议信息（包含是否建议分批、字符数及提示消息）
+ * @param text - 用户输入的文本内容
+ * @returns 分批建议对象
+ */
 export function getBatchSuggestion(text: string): BatchSuggestion {
   if (!shouldSuggestBatch(text)) {
     return { shouldSuggest: false, charCount: text.length, message: "" }

@@ -8,6 +8,10 @@ export const LAUNCH_RULES = {
   ALLOW_DEGRADED_SCRIPTS: true,
 }
 
+/**
+ * @description 检查launchreadiness
+ * @returns Promise<
+ */
 export async function checkLaunchReadiness(): Promise<{ ready: boolean; issues: string[] }> {
   const issues: string[] = []
 

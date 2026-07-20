@@ -13,6 +13,11 @@ interface AiResultPanelProps {
   flat?: boolean
 }
 
+/**
+ * @description airesultpanel
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
 export function AiResultPanel({
   title,
   icon,

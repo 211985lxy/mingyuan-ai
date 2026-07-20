@@ -30,6 +30,11 @@ export interface ReleaseManifest {
 }
 
 /** 解析发布清单对象；非法输入返回 null（纯函数，便于测试）。 */
+/**
+ * @description 解析releasemanifest
+ * @param input - 输入数据
+ * @returns ReleaseManifest | null
+ */
 export function parseReleaseManifest(input: unknown): ReleaseManifest | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null
   return input as ReleaseManifest
@@ -40,6 +45,12 @@ function nonEmpty(value: unknown): string | undefined {
 }
 
 /** 合成发布事实：清单优先，环境变量兜底（纯函数，便于测试）。 */
+/**
+ * @description 解析releasefacts
+ * @param manifest - manifest
+ * @param env - env
+ * @returns ReleaseFacts
+ */
 export function resolveReleaseFacts(
   manifest: ReleaseManifest | null,
   env: Record<string, string | undefined>,
@@ -65,6 +76,11 @@ export const FEISHU_WORK_ITEM_REQUIRED_ENV = [
 ] as const
 
 /** 飞书经营事项执行环境是否就绪（只看存在性，不泄露取值）。 */
+/**
+ * @description 计算feishuworkitemready
+ * @param env - env
+ * @returns boolean
+ */
 export function computeFeishuWorkItemReady(
   env: Record<string, string | undefined>,
 ): boolean {
@@ -72,6 +88,11 @@ export function computeFeishuWorkItemReady(
 }
 
 /** 海外模型代理（Xray）是否已配置服务器端出口（只看存在性）。 */
+/**
+ * @description 计算proxyready
+ * @param env - env
+ * @returns boolean
+ */
 export function computeProxyReady(env: Record<string, string | undefined>): boolean {
   return nonEmpty(env.APIMART_PROXY_URL) !== undefined
 }
@@ -88,6 +109,10 @@ function readManifestFromDisk(): ReleaseManifest | null {
 }
 
 /** 读取当前进程的发布事实（带缓存；本地开发返回 unknown）。 */
+/**
+ * @description 获取releasefacts
+ * @returns ReleaseFacts
+ */
 export function getReleaseFacts(): ReleaseFacts {
   if (!cachedFacts) {
     cachedFacts = resolveReleaseFacts(readManifestFromDisk(), process.env)

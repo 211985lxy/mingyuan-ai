@@ -16,12 +16,22 @@ const ALLOWED_DOMAINS = [
   "xhslink.com",
 ]
 
+/**
+ * @description 判断是否domainallowed
+ * @param hostname - hostname
+ * @returns boolean
+ */
 export function isDomainAllowed(hostname: string): boolean {
   return ALLOWED_DOMAINS.some(
     (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
   )
 }
 
+/**
+ * @description 获取imagecandidateurls
+ * @param url - URL 地址
+ * @returns string[]
+ */
 export function getImageCandidateUrls(url: string): string[] {
   if (!url.includes(".heic")) return [url]
 
@@ -29,6 +39,11 @@ export function getImageCandidateUrls(url: string): string[] {
   return webpUrl === url ? [url] : [webpUrl, url]
 }
 
+/**
+ * @description 判断是否privateipaddress
+ * @param address - address
+ * @returns boolean
+ */
 export function isPrivateIpAddress(address: string): boolean {
   if (isIP(address) === 4) {
     const [a, b] = address.split(".").map(Number)

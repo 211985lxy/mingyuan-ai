@@ -35,6 +35,11 @@ function toNullableDecimal(value: unknown): NullableDecimal {
 }
 
 /** Normalize explicit numeric inputs while keeping omitted values distinct from zero. */
+/**
+ * @description sanitizeoutcomebody
+ * @param body - 请求体
+ * @returns SanitizedOutcome
+ */
 export function sanitizeOutcomeBody(body: Record<string, unknown>): SanitizedOutcome {
   if (typeof body.collectWindowDay !== "number" || ![7, 14, 30].includes(body.collectWindowDay)) {
     throw new Error("collectWindowDay 必须是 7/14/30")
@@ -76,6 +81,12 @@ const PATCHABLE_FIELDS = [
  * 构造 upsert 的 update 片段：只包含请求体里明确出现过的字段。
  * - collectWindowDay 永远用 sanitized 值（它决定 upsert 定位哪一行）。
  * - 其余字段：请求体里有该 key 才写入（哪怕是 null）；没有则不触碰，保留旧值。
+ */
+/**
+ * @description 构建outcomeupdate
+ * @param sanitized - sanitized
+ * @param presentKeys - present键列表
+ * @returns Partial<SanitizedOutcome>
  */
 export function buildOutcomeUpdate(
   sanitized: SanitizedOutcome,

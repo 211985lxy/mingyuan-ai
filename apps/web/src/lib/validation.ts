@@ -86,6 +86,12 @@ interface ValidationResult {
   errors: string[]
 }
 
+/**
+ * @description 校验训练视频/图片文件是否符合指定克隆类型的规则要求
+ * @param cloneType - 克隆类型标识（如 professional、fast、image）
+ * @param meta - 文件元数据（包含尺寸、时长、格式等信息）
+ * @returns 校验结果，包含是否通过及错误信息列表
+ */
 export function validateTrainingVideo(
   cloneType: string,
   meta: FileMetadata
@@ -146,6 +152,12 @@ export function validateTrainingVideo(
   return { valid: errors.length === 0, errors }
 }
 
+/**
+ * @description 校验素材文件（视频/图片/音频）是否符合对应类型的规则要求
+ * @param type - 素材类型（video、image、audio）
+ * @param meta - 文件元数据（包含尺寸、时长、格式等信息）
+ * @returns 校验结果，包含是否通过及错误信息列表
+ */
 export function validateMaterial(
   type: string,
   meta: FileMetadata
@@ -171,6 +183,12 @@ export function validateMaterial(
   return { valid: errors.length === 0, errors }
 }
 
+/**
+ * @description 校验声音克隆音频文件是否符合指定模型的规则要求
+ * @param model - 声音克隆模型标识（如 v1、v2、s1 等）
+ * @param meta - 音频文件元数据（包含时长、大小、格式等）
+ * @returns 校验结果，包含是否通过及错误信息列表
+ */
 export function validateVoiceAudio(
   model: string,
   meta: FileMetadata

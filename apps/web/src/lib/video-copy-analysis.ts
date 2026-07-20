@@ -24,6 +24,11 @@ function buildFallbackStructureEffect(): string {
   return "结构作用：文案动作：承接上一个信息点，继续推进冲突、解释或判断。用户心理：让用户顺着问题继续追问原因。商业意图：把泛泛看热闹的人筛成愿意理解方法的人。可复用模板：先抛出现象，再拆关键原因，最后落到可判断的结论。"
 }
 
+/**
+ * @description 构建fallbackvideocopyanalysis
+ * @param input - 输入数据
+ * @returns VideoCopyAnalysis
+ */
 export function buildFallbackVideoCopyAnalysis(input: VideoCopyAnalysisInput): VideoCopyAnalysis {
   const sentences = splitSentences(input.transcript)
   const hook = sentences[0] ?? input.transcript.slice(0, 80)
@@ -85,6 +90,11 @@ export function buildFallbackVideoCopyAnalysis(input: VideoCopyAnalysisInput): V
   }
 }
 
+/**
+ * @description 构建videocopyanalysismessages
+ * @param input - 输入数据
+ * @returns ChatMessage[]
+ */
 export function buildVideoCopyAnalysisMessages(input: VideoCopyAnalysisInput): ChatMessage[] {
   return [
     {
@@ -154,6 +164,11 @@ export function buildVideoCopyAnalysisMessages(input: VideoCopyAnalysisInput): C
   ]
 }
 
+/**
+ * @description 解析videocopyanalysis
+ * @param content - 内容
+ * @returns VideoCopyAnalysis
+ */
 export function parseVideoCopyAnalysis(content: string): VideoCopyAnalysis {
   // LLM 现在直接输出纯 Markdown，不再包裹 JSON
   const trimmed = content
@@ -166,6 +181,12 @@ export function parseVideoCopyAnalysis(content: string): VideoCopyAnalysis {
   return { markdown }
 }
 
+/**
+ * @description 分析videocopy
+ * @param input - 输入数据
+ * @param provider - provider
+ * @returns Promise<VideoCopyAnalysis>
+ */
 export async function analyzeVideoCopy(
   input: VideoCopyAnalysisInput,
   provider: LLMProvider | LLMClient = LLMClient.shared()

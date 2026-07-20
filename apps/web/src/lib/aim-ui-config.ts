@@ -82,7 +82,11 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
 // 已迁入 @/lib/aim-harness/contracts（顶部 import 并 re-export）。
 // 下面保留 getAimAgent：它是 UI 元数据（AIM_AGENT_OPTIONS）专有逻辑，留在 UI 层。
 
-/** 按 id 取智能体元信息；非法 id 回退到默认智能体 */
+/**
+ * @description 根据 ID 获取智能体元信息，非法 ID 回退到默认智能体
+ * @param id - 智能体 ID
+ * @returns 智能体元信息对象
+ */
 export function getAimAgent(id: string | null | undefined): AimAgentMeta {
   const normalized = normalizeAimAgentId(id)
   const matched = AIM_AGENT_OPTIONS.find((a) => a.id === (normalized as AimAgentId))

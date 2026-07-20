@@ -40,18 +40,38 @@ const STAGE_BY_AGENT: Partial<Record<AimAgentId, AimWorkflowStage>> = {
   content_review: "publish",
 }
 
+/**
+ * @description 判断值是否为有效的 AIM 工作流阶段
+ * @param value - 待判断的值
+ * @returns 是有效阶段返回 true
+ */
 export function isAimWorkflowStage(value: unknown): value is AimWorkflowStage {
   return typeof value === "string" && AIM_WORKFLOW_STAGES.some((stage) => stage.id === value)
 }
 
+/**
+ * @description 获取指定工作流阶段的配置
+ * @param stage - 工作流阶段 ID
+ * @returns 阶段配置对象
+ */
 export function getAimWorkflowStage(stage: AimWorkflowStage) {
   return AIM_WORKFLOW_STAGES.find((item) => item.id === stage)!
 }
 
+/**
+ * @description 根据智能体 ID 获取对应的工作流阶段
+ * @param agentId - AIM 智能体 ID
+ * @returns 对应的工作流阶段
+ */
 export function getWorkflowStageForAgent(agentId: AimAgentId): AimWorkflowStage {
   return STAGE_BY_AGENT[agentId] || "content"
 }
 
+/**
+ * @description 判断值是否为有效的 AIM 内容动作
+ * @param value - 待判断的值
+ * @returns 是有效动作返回 true
+ */
 export function isAimContentAction(value: unknown): value is AimContentAction {
   return typeof value === "string" && AIM_CONTENT_ACTIONS.some((action) => action.id === value)
 }
@@ -77,7 +97,11 @@ function cleanText(value: unknown, max = 500): string | undefined {
   return text || undefined
 }
 
-/** Accept only user-editable brief fields. Facts remain server-sourced. */
+/**
+ * @description 解析用户确认的工作流简报
+ * @param value - 待解析的输入值
+ * @returns 解析后的工作流简报，无效时返回 undefined
+ */
 export function parseConfirmedWorkflowBrief(value: unknown): ConfirmedWorkflowBrief | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
   const input = value as Record<string, unknown>
@@ -96,6 +120,11 @@ export function parseConfirmedWorkflowBrief(value: unknown): ConfirmedWorkflowBr
   }
 }
 
+/**
+ * @description 解析工作流简报请求体
+ * @param value - 待解析的请求体
+ * @returns 解析后的请求对象，无效时返回 null
+ */
 export function parseWorkflowBriefRequest(value: unknown): {
   stage: AimWorkflowStage
   projectId?: string
@@ -116,6 +145,12 @@ export function parseWorkflowBriefRequest(value: unknown): {
   }
 }
 
+/**
+ * @description 将用户确认的工作流简报应用到任务规格
+ * @param base - 基础任务规格
+ * @param confirmed - 用户确认的工作流简报
+ * @returns 合并后的任务规格
+ */
 export function applyConfirmedWorkflowBrief(base: TaskSpec, confirmed?: ConfirmedWorkflowBrief): TaskSpec {
   if (!confirmed) return base
   const additions = confirmed.userSupplement

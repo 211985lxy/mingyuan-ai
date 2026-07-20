@@ -5,6 +5,11 @@ import { refreshMarketHotSnapshot } from "@/lib/market-insights/market-hotlist"
 export const runtime = "nodejs"
 export const maxDuration = 180
 
+/**
+ * @description 处理 POST 请求
+ * @param request - 请求对象
+ * @returns 无返回值
+ */
 export async function POST(request: NextRequest) {
   try {
     await authenticateRequest(request)

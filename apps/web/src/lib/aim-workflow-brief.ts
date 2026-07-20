@@ -34,7 +34,11 @@ function isTaskSpec(value: unknown): value is TaskSpec {
     && Array.isArray((value as TaskSpec).assumptions)
 }
 
-/** Rebuild a workflow brief from records the current user can actually access. */
+/**
+ * @description 构建工作流简报（从用户可访问的记录重建任务规格）
+ * @param input - 构建输入（用户 ID、阶段、项目 ID、来源生成 ID 等）
+ * @returns 工作流简报结果（阶段、项目 ID、任务规格）
+ */
 export async function buildWorkflowBrief(input: BuildWorkflowBriefInput): Promise<WorkflowBriefResult> {
   if (!isAimWorkflowStage(input.stage)) throw new Error("无效的工作流阶段")
   const [project, source] = await Promise.all([

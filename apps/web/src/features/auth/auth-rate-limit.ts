@@ -47,6 +47,14 @@ function checkMemory(key: string, rule: RateLimitRule): boolean {
   return current.count <= rule.limit
 }
 
+/**
+ * @description 允许authattempt
+ * @param scope - scope
+ * @param request - 请求对象
+ * @param identity - identity
+ * @param rule - 规则
+ * @returns Promise<boolean>
+ */
 export async function allowAuthAttempt(
   scope: string,
   request: NextRequest,

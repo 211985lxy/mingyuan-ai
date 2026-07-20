@@ -13,6 +13,10 @@ export const BENCHMARK_RECREATION_PREFILL = {
 
 export const AIM_OUTPUT_MAX_CHARS = 5000
 
+/**
+ * @description 构建爆款选题再创作 SOP 规则文本块
+ * @returns SOP 规则的多行文本
+ */
 export function buildBenchmarkRecreationSopBlock() {
   return [
     "爆款选题再创作 SOP：",
@@ -20,12 +24,22 @@ export function buildBenchmarkRecreationSopBlock() {
   ].join("\n")
 }
 
+/**
+ * @description 检测用户输入中是否包含明确的字数要求（如“至少 2000 字”）
+ * @param text - 用户输入文本
+ * @returns 包含明确字数要求返回 true
+ */
 export function hasExplicitWordCountRequirement(text: string | null | undefined) {
   const input = text || ""
   return /(?:至少|不少于|不低于|大概|约|控制在|写|生成|输出)?\s*\d{3,5}\s*字/.test(input)
     || /(?:一千|两千|三千|四千|五千|千字|万字)/.test(input)
 }
 
+/**
+ * @description 检测用户输入中是否包含保持篇幅意图（如“别越改越短”）
+ * @param text - 用户输入文本
+ * @returns 包含保持篇幅意图返回 true
+ */
 export function hasWordCountPreservationIntent(text: string | null | undefined) {
   const input = text || ""
   return /(别|不要|不能).{0,6}(越改越短|越写越短|缩水|压缩)/.test(input)
@@ -34,6 +48,11 @@ export function hasWordCountPreservationIntent(text: string | null | undefined) 
     || /(按|照着).{0,6}(原稿|原文|原版).{0,6}(长度|字数|体量)/.test(input)
 }
 
+/**
+ * @description 构建用户显式字数优先规则（用户字数要求优先于模板默认规则）
+ * @param text - 用户输入文本
+ * @returns 字数优先规则文本，无显式要求时返回 null
+ */
 export function buildExplicitWordCountPriorityRule(text: string | null | undefined) {
   if (hasExplicitWordCountRequirement(text)) {
     return `用户输入里已有明确字数要求，必须优先服从用户字数；格式模板的默认字数范围、对标原文字数 95%-105% 和原文字数硬规则都只能作为节奏参考，不能压缩用户要求的长度；但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
@@ -44,6 +63,12 @@ export function buildExplicitWordCountPriorityRule(text: string | null | undefin
   return null
 }
 
+/**
+ * @description 构建对标文案字数参考规则（基于原文字数生成 95%-105% 范围）
+ * @param transcript - 对标原文转录文本
+ * @param userInstruction - 可选的用户指令文本
+ * @returns 字数参考规则文本，无法生成时返回 null
+ */
 export function buildBenchmarkLengthRule(transcript: string | null | undefined, userInstruction?: string | null) {
   const explicitRule = buildExplicitWordCountPriorityRule(userInstruction)
   if (explicitRule) return explicitRule

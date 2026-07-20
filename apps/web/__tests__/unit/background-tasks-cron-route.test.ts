@@ -44,7 +44,7 @@ describe("GET /api/cron/background-tasks", () => {
     expect(mocks.findMany).not.toHaveBeenCalled()
   })
 
-  it("processes one ready task per bounded invocation", async () => {
+  it("processes a bounded batch of ready tasks", async () => {
     mocks.reclaimExpiredBackgroundTaskLeases.mockResolvedValue({ count: 2 })
     mocks.findMany.mockResolvedValue([{ id: "task-1", kind: "competitor_analysis" }])
     mocks.executeCompetitorAnalysisBackgroundTask.mockResolvedValue(true)
@@ -52,7 +52,7 @@ describe("GET /api/cron/background-tasks", () => {
     const response = await GET(request())
 
     expect(maxDuration).toBe(300)
-    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 1 }))
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 20 }))
     expect(mocks.executeCompetitorAnalysisBackgroundTask).toHaveBeenCalledWith("task-1")
     await expect(response.json()).resolves.toEqual({ ok: true, reclaimed: 2, ready: 1, executed: 1 })
   })

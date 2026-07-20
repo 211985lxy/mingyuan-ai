@@ -146,6 +146,11 @@ function confirmWorkflowBrief(input: AimWorkflowActionInput) {
   toast.success("任务单已确认，开始内容创作")
 }
 
+/**
+ * @description React Hook：aimworkflowactions
+ * @param input - 输入数据
+ * @returns 无返回值
+ */
 export function useAimWorkflowActions(input: AimWorkflowActionInput) {
   return {
     beginWorkflowStage: (stage: AimWorkflowStage) => beginWorkflowStage(input, stage),
