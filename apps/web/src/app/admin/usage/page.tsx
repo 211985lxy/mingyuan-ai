@@ -1,142 +1,31 @@
 "use client"
-
 import React from "react"
 import { toast } from "sonner"
-import { Loader2, RotateCw } from "lucide-react"
-
+import { RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { AdminPageHeader } from "@/components/admin/admin-page-header"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AdminPageShell } from "@/components/admin/admin-page-shell"
 
-interface UsageRecord {
-  id: string
-  userId: string | null
-  agentId: string | null
-  action: string
-  status: string
-  durationMs: number | null
-  model: string | null
-  totalTokens: number | null
-  errorMessage: string | null
-  createdAt: string
-}
+interface UsageRecord { id: string; userId: string | null; agentId: string | null; action: string; status: string; durationMs: number | null; model: string | null; totalTokens: number | null; errorMessage: string | null; createdAt: string }
 
 export default function AdminUsagePage() {
-  const [records, setRecords] = React.useState<UsageRecord[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [total, setTotal] = React.useState(0)
-  const [statusFilter, setStatusFilter] = React.useState("all")
-
+  const [records, setRecords] = React.useState<UsageRecord[]>([]); const [loading, setLoading] = React.useState(true); const [error, setError] = React.useState<string | null>(null)
   const fetchRecords = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/admin/agents/traces?limit=50")
-      if (!res.ok) throw new Error("加载失败")
-      const json = await res.json()
-      setRecords(json.data?.traces ?? [])
-      setTotal(json.data?.stats?.total24h ?? 0)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "使用记录加载失败")
-      setRecords([])
-    } finally {
-      setLoading(false)
-    }
+    setLoading(true); setError(null)
+    try { const res = await fetch("/api/admin/agents/traces?limit=50"); if (!res.ok) throw new Error("err"); const json = await res.json(); setRecords(json.data?.traces ?? []) }
+    catch (err) { const msg = err instanceof Error ? err.message : "加载失败"; setError(msg); toast.error(msg); setRecords([]) }
+    finally { setLoading(false) }
   }, [])
-
-  React.useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchRecords()
-  }, [fetchRecords])
-
-  const filteredRecords = statusFilter === "all" ? records : records.filter((record) => record.status === statusFilter)
-
+  React.useEffect(() => { fetchRecords() }, [fetchRecords])
   return (
-    <div className="space-y-6">
-      <AdminPageHeader
-        title="使用记录"
-        description="查看智能体调用、模型消耗和失败信息，定位异常请求。"
-        actions={<Button variant="outline" size="sm" onClick={fetchRecords} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-          刷新
-        </Button>}
-      />
-
-      <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
-        <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">全部状态</SelectItem>
-          <SelectItem value="success">成功</SelectItem>
-          <SelectItem value="failed">失败</SelectItem>
-          <SelectItem value="running">运行中</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">最近执行记录（共 {total} 条/24h）</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left p-3 font-medium">智能体</th>
-                  <th className="text-left p-3 font-medium">操作</th>
-                  <th className="text-left p-3 font-medium">状态</th>
-                  <th className="text-left p-3 font-medium">模型</th>
-                  <th className="text-right p-3 font-medium">耗时</th>
-                  <th className="text-right p-3 font-medium">Token</th>
-                  <th className="text-left p-3 font-medium">时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b">
-                      {Array.from({ length: 7 }).map((_, j) => (
-                        <td key={j} className="p-3">
-                          <Skeleton className="h-4 w-full" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : filteredRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                      {statusFilter === "all" ? "暂无使用记录" : "没有匹配的使用记录"}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRecords.map((record) => (
-                    <tr key={record.id} className="border-b hover:bg-muted/30 transition-colors">
-                      <td className="p-3 font-medium">{record.agentId || "—"}</td>
-                      <td className="p-3 text-muted-foreground">{record.action}</td>
-                      <td className="p-3">
-                        <Badge variant={record.status === "success" ? "default" : "destructive"} className="text-xs">
-                          {record.status === "success" ? "成功" : record.status === "failed" ? "失败" : record.status}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-muted-foreground text-xs">{record.model || "—"}</td>
-                      <td className="p-3 text-right text-muted-foreground">
-                        {record.durationMs != null ? `${(record.durationMs / 1000).toFixed(1)}s` : "—"}
-                      </td>
-                      <td className="p-3 text-right text-muted-foreground">
-                        {record.totalTokens?.toLocaleString() ?? "—"}
-                      </td>
-                      <td className="p-3 text-muted-foreground text-xs">
-                        {new Date(record.createdAt).toLocaleString("zh-CN")}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <AdminPageShell title="使用记录" subtitle="智能体 API 调用记录" error={error} onRetry={fetchRecords} loading={loading} skeletonRows={5}
+      empty={!loading && !error && records.length === 0} emptyMessage="暂无使用记录">
+      <Card><CardContent className="p-0"><table className="w-full text-sm">
+        <thead><tr className="border-b bg-muted/50"><th className="p-3 font-medium text-left">智能体</th><th className="p-3 font-medium text-left">操作</th><th className="p-3 font-medium text-left">状态</th><th className="p-3 font-medium text-left">模型</th><th className="p-3 font-medium text-right">耗时</th><th className="p-3 font-medium text-right">Token</th><th className="p-3 font-medium text-left">时间</th></tr></thead>
+        <tbody>{records.map(r => (
+          <tr key={r.id} className="border-b hover:bg-muted/30"><td className="p-3 font-medium">{r.agentId||"—"}</td><td className="p-3 text-muted-foreground">{r.action}</td><td className="p-3"><Badge variant={r.status==="success"?"default":"destructive"} className="text-xs">{r.status==="success"?"成功":"失败"}</Badge></td><td className="p-3 text-xs text-muted-foreground">{r.model||"—"}</td><td className="p-3 text-right text-muted-foreground">{r.durationMs!=null?`${(r.durationMs/1000).toFixed(1)}s`:"—"}</td><td className="p-3 text-right text-muted-foreground">{r.totalTokens?.toLocaleString()??"—"}</td><td className="p-3 text-xs text-muted-foreground">{new Date(r.createdAt).toLocaleString("zh-CN")}</td></tr>))}</tbody>
+      </table></CardContent></Card>
+    </AdminPageShell>
   )
 }
