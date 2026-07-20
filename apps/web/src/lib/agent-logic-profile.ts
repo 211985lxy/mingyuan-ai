@@ -24,6 +24,9 @@ export const PROVIDER_LABELS: Record<string, string> = {
   therouter: "TheRouter",
   glm: "智谱 GLM",
   lihuo: "离火 GPT-5.6",
+  zenmux: "ZenMux（Claude 旗舰）",
+  qianfan: "百度千帆 ERNIE",
+  apimart: "APIMart 聚合",
 }
 
 /** 单个智能体的逻辑档案 */
@@ -63,13 +66,13 @@ const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
  * 来源：src/lib/llm/agent-router.ts AGENT_ROUTES。
  */
 const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
-  content_producer: ["deepseek", "openrouter", "jiekou", "glm"],
-  free_copywriter: ["deepseek", "openrouter", "jiekou", "glm"],
-  deep_copywriter: ["lihuo", "deepseek", "openrouter", "openrouter", "jiekou", "therouter", "glm"],
-  business_diagnosis: ["lihuo", "deepseek", "openrouter", "openrouter", "jiekou", "therouter", "glm"],
-  business_system_diagnosis: ["deepseek", "openrouter", "openrouter", "jiekou", "glm"],
-  content_review: ["deepseek", "openrouter", "openrouter", "jiekou", "glm"],
-  persona: ["deepseek", "openrouter", "openrouter", "jiekou", "glm"],
+  content_producer: ["deepseek", "apimart", "zenmux", "openrouter", "jiekou", "glm"],
+  free_copywriter: ["qianfan", "deepseek", "glm", "apimart", "zenmux", "jiekou"],
+  deep_copywriter: ["zenmux", "lihuo", "qianfan", "apimart", "deepseek", "glm"],
+  business_diagnosis: ["apimart", "zenmux", "openrouter", "openrouter", "lihuo", "deepseek", "jiekou", "therouter", "glm"],
+  business_system_diagnosis: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
+  content_review: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
+  persona: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
 }
 
 /**

@@ -6,3 +6,10 @@ node_modules
 dist
 build
 src/generated/
+
+# Tool lock files
+.gstack/
+# Database backups
+backups/
+# Eval reports (generated)
+aim-eval-report/

@@ -228,4 +228,59 @@ describe("aim agent guides", () => {
     expect(businessSystemText).not.toContain("飞轮")
     expect(businessSystemText).not.toContain("闭环")
   })
+
+  it("separates content fission from publish plan scheduling", () => {
+    const fission = getAimAgentGuide("content_producer").skills.find((s) => s.id === "content_fission")
+    const publishAction = getAimAgentGuide("content_producer").nextActions.find((a) => a.id === "publish_package")
+
+    // 裂变技能不输出排产表
+    expect(fission?.prompt).toContain("不要输出排产表")
+    expect(fission?.prompt).toContain("生成发布计划")
+    // 发布计划 nextAction 承担排产职责
+    expect(publishAction?.prompt).toContain("12 条内容排产表")
+    // 发布计划不再做平台裂变（与 content_fission 职责分离）
+    expect(publishAction?.prompt).not.toContain("裂变为短视频")
+  })
+
+  it("disambiguates hot topic opinion from oral script", () => {
+    const hotTopic = getAimAgentGuide("content_producer").skills.find((s) => s.id === "hot_topic_copy")
+    const oralScript = getAimAgentGuide("content_producer").skills.find((s) => s.id === "oral_script")
+
+    // 热点观点明确声明不是口播
+    expect(hotTopic?.label).toBe("借热点写观点")
+    expect(hotTopic?.prompt).toContain("不是口播脚本")
+    expect(hotTopic?.group).toBe("改写优化")
+    // 口播脚本保持独立分组
+    expect(oralScript?.group).toBe("热点口播")
+  })
+
+  it("requires persona progress check before generating pinned video", () => {
+    const skill = getAimAgentGuide("persona").skills.find((s) => s.id === "pinned_story_video")
+
+    expect(skill?.prompt).toContain("6 维尚未收齐")
+    expect(skill?.prompt).toContain("进度未到 100%")
+    expect(skill?.prompt).toContain("追问最关键的一个缺口")
+  })
+
+  it("assigns a group to every skill for UI rendering", () => {
+    for (const agent of AIM_AGENT_OPTIONS) {
+      for (const skill of getAimAgentGuide(agent.id).skills) {
+        expect(skill.group, `${agent.id}/${skill.id} missing group`).toBeTruthy()
+      }
+    }
+  })
+
+  it("ensures all skill prompts reference context to avoid awkward prefix", () => {
+    const CONTEXT_REFS = [
+      "当前内容", "当前文案", "当前素材", "当前业务", "当前热点",
+      "当前信息", "当前人设", "当前核心", "当前选题", "当前会议",
+      "当前对标", "当前商业模式", "当前来时路", "当前人设故事",
+    ]
+    for (const agent of AIM_AGENT_OPTIONS) {
+      for (const skill of getAimAgentGuide(agent.id).skills) {
+        const hasRef = CONTEXT_REFS.some((ref) => skill.prompt.includes(ref))
+        expect(hasRef, `${agent.id}/${skill.id} lacks context ref`).toBe(true)
+      }
+    }
+  })
 })
