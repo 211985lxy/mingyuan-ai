@@ -152,6 +152,34 @@
         "projectId",
         "triggerMode",
         "triggerKeywords",
+        "routeTarget",
+        "defaultAgentId",
+        "status"
+      ]
+    },
+    {
+      "name": "AimConversation",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "platform",
+        "externalChatId",
+        "agentId",
+        "lastMessageAt"
+      ]
+    },
+    {
+      "name": "AimConversationMessage",
+      "columns": [
+        "id",
+        "conversationId",
+        "role",
+        "content",
+        "agentId",
+        "externalMessageId",
+        "dedupeKey",
+        "aimGenerationId",
         "status"
       ]
     },
