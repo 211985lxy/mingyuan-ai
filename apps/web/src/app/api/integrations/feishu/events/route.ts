@@ -3,10 +3,11 @@ import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { env } from "@/env"
 import { parseJsonRecord } from "@/lib/api-contract"
-import { parseFeishuSdkMessageEvent, verifyFeishuEventToken } from "@/lib/integrations/feishu-topic-chat"
+import { parseFeishuSdkMessageEvent, verifyFeishuEventToken, getFeishuTenantAccessToken, replyFeishuTextMessage } from "@/lib/integrations/feishu-topic-chat"
 import { ingestInspirationEvent, resolveChannelBinding, resolveBindingExecutionMode } from "@/features/topics/services/inspiration-events"
 import { INSPIRATION_ACCEPTED_REPLY } from "@/features/topics/services/inspiration-reply"
 import { isReplySuppressed } from "@/lib/execution-mode"
+import { ingestAimChannelMessage } from "@/features/aim-channels/aim-channel-ingest"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -97,6 +98,31 @@ export async function POST(request: Request) {
       if (!event) return { ok: true, ignored: true }
       const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: event.chatId })
       if (!binding) return { ok: true, ignored: true, reason: "channel_unbound" }
+
+      // ── AIM 对话路由：routeTarget=aim 的绑定走 AIM 智能体链路 ──
+      if (binding.routeTarget === "aim") {
+        const ingested = await ingestAimChannelMessage({
+          platform: "feishu",
+          externalMessageId: event.messageId,
+          externalChatId: event.chatId,
+          externalSenderId: event.senderId,
+          userId: binding.userId,
+          projectId: binding.projectId,
+          content: event.text,
+          defaultAgentId: binding.defaultAgentId,
+        })
+        // 需要即时回复时（"收到…"或帮助文案），在 live 模式下线程回复用户
+        if (ingested.shouldReply && ingested.immediateReply) {
+          await sendImmediateFeishuReply(event.messageId, ingested.immediateReply)
+        }
+        return {
+          ok: true,
+          accepted: ingested.status === "accepted",
+          ignored: ingested.status === "ignored",
+          reason: ingested.reason,
+        }
+      }
+
       try {
         const ingested = await ingestInspirationEvent({
           platform: "feishu",
@@ -139,4 +165,25 @@ export async function POST(request: Request) {
   }
   if (!handled && result === undefined) return NextResponse.json({ error: "Feishu signature verification failed" }, { status: 401 })
   return NextResponse.json(result ?? { ok: true, ignored: true })
+}
+
+/**
+ * 在 AIM 对话链路里，收到消息后立即线程回复一条提示（"收到…"或帮助文案）。
+ * 凭证缺失或发送失败时不抛错，避免阻断消息接收与后台任务入队。
+ */
+async function sendImmediateFeishuReply(messageId: string, text: string): Promise<void> {
+  const appId = env.FEISHU_APP_ID
+  const appSecret = env.FEISHU_APP_SECRET
+  if (!appId || !appSecret) return
+  try {
+    const token = await getFeishuTenantAccessToken({ appId, appSecret })
+    await replyFeishuTextMessage({
+      messageId,
+      text,
+      tenantAccessToken: token,
+      idempotencyKey: `aim-channel-ack:${messageId}`,
+    })
+  } catch (error) {
+    console.error("[integrations/feishu/events] immediate reply failed", error)
+  }
 }

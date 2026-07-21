@@ -40,6 +40,10 @@ export interface ChannelBindingItem {
   triggerMode: "mention_or_keyword" | "all"
   triggerKeywords: string[]
   executionMode: "capture_only" | "evaluate" | "live"
+  /** 路由目标：topic（选题采集）| aim（AIM 智能体对话） */
+  routeTarget?: "topic" | "aim"
+  /** routeTarget=aim 时的默认智能体；为空则要求消息带 /命令 */
+  defaultAgentId?: string | null
   status: "active" | "disabled"
   project: { id: string; name: string; status: string }
   createdAt: string
@@ -73,6 +77,8 @@ export async function saveChannelBinding(input: {
   triggerMode: ChannelBindingItem["triggerMode"]
   triggerKeywords: string[]
   executionMode?: ChannelBindingItem["executionMode"]
+  routeTarget?: "topic" | "aim"
+  defaultAgentId?: string | null
 }): Promise<ChannelBindingItem> {
   return request("/api/account/channel-bindings", { method: "POST", body: JSON.stringify(input) })
 }
@@ -83,7 +89,7 @@ export async function saveChannelBinding(input: {
  * @param input - 输入数据
  * @returns Promise<ChannelBindingItem>
  */
-export async function updateChannelBinding(id: string, input: Partial<Pick<ChannelBindingItem, "projectId" | "triggerMode" | "triggerKeywords" | "status">>): Promise<ChannelBindingItem> {
+export async function updateChannelBinding(id: string, input: Partial<Pick<ChannelBindingItem, "projectId" | "triggerMode" | "triggerKeywords" | "status" | "routeTarget" | "defaultAgentId">>): Promise<ChannelBindingItem> {
   return request(`/api/account/channel-bindings/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) })
 }
 

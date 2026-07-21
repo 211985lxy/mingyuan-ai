@@ -3,6 +3,9 @@ import { z } from "zod"
 import { parseJsonBody } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { AIM_AGENT_IDS } from "@/lib/aim-harness/contracts"
+
+const VALID_AGENT_IDS = Array.from(AIM_AGENT_IDS)
 
 const updateSchema = z.object({
   projectId: z.string().trim().min(1).max(80).optional(),
@@ -10,6 +13,8 @@ const updateSchema = z.object({
   triggerKeywords: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
   executionMode: z.enum(["capture_only", "evaluate", "live"]).optional(),
   status: z.enum(["active", "disabled"]).optional(),
+  routeTarget: z.enum(["topic", "aim"]).optional(),
+  defaultAgentId: z.enum(VALID_AGENT_IDS as [string, ...string[]]).optional().nullable(),
 }).strict().refine((body) => Object.keys(body).length > 0, "至少提供一个更新字段")
 
 /**

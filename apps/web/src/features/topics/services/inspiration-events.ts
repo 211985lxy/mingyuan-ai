@@ -158,11 +158,11 @@ export async function resolveChannelBinding(input: { platform: string; externalC
         externalChatId: input.externalChatId,
       },
     },
-    select: { userId: true, projectId: true, status: true, executionMode: true, externalAccountId: true },
+    select: { userId: true, projectId: true, status: true, executionMode: true, externalAccountId: true, routeTarget: true, defaultAgentId: true },
   })
   if (binding?.status === "active") return binding
   if (input.platform === "feishu" && env.FEISHU_TOPIC_CHAT_ID === input.externalChatId && env.FEISHU_TOPIC_CHAT_USER_ID && env.FEISHU_TOPIC_CHAT_PROJECT_ID) {
-    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const, externalAccountId: "" as const }
+    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const, externalAccountId: "" as const, routeTarget: "topic" as const, defaultAgentId: null }
   }
   return null
 }

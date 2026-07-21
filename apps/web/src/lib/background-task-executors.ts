@@ -4,12 +4,14 @@ import { INSPIRATION_PIPELINE_TASK_KIND } from "@/features/topics/services/inspi
 import { executeInspirationPipelineBackgroundTask } from "@/features/topics/services/inspiration-pipeline-background-task"
 import { OUTBOX_SEND_TASK_KIND } from "@/features/topics/services/reply-outbox"
 import { executeOutboxSendBackgroundTask } from "@/features/topics/services/reply-outbox-background-task"
+import { AIM_CHANNEL_GENERATE_TASK_KIND, executeAimChannelGenerateBackgroundTask } from "@/features/aim-channels/aim-channel-generate-task"
 
 const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [COMPETITOR_ANALYSIS_TASK_KIND]: executeCompetitorAnalysisBackgroundTask,
   [INSPIRATION_PROCESS_TASK_KIND]: executeInspirationBackgroundTask,
   [INSPIRATION_PIPELINE_TASK_KIND]: executeInspirationPipelineBackgroundTask,
   [OUTBOX_SEND_TASK_KIND]: executeOutboxSendBackgroundTask,
+  [AIM_CHANNEL_GENERATE_TASK_KIND]: executeAimChannelGenerateBackgroundTask,
 }
 
 export const BACKGROUND_TASK_KINDS = Object.keys(executors)

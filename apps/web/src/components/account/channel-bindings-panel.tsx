@@ -11,11 +11,17 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { deleteChannelBinding, listChannelBindings, saveChannelBinding, testChannelBinding, updateChannelBinding, type ChannelBindingItem } from "@/lib/api/inspiration"
 import { listClientProjects, type ClientProject } from "@/lib/api/projects"
+import { AIM_AGENT_OPTIONS } from "@/lib/aim-ui-config"
 
 const PLATFORM_LABELS: Record<ChannelBindingItem["platform"], string> = {
   feishu: "飞书群",
   workbuddy_wechat: "WorkBuddy 微信群",
   wecom: "企业微信",
+}
+
+const ROUTE_TARGET_LABELS: Record<NonNullable<ChannelBindingItem["routeTarget"]>, string> = {
+  topic: "选题采集",
+  aim: "AIM 智能体对话",
 }
 
 const EXECUTION_MODE_LABELS: Record<ChannelBindingItem["executionMode"], string> = {
@@ -60,6 +66,8 @@ export function ChannelBindingsPanel() {
   const [externalChatId, setExternalChatId] = useState("")
   const [keywords, setKeywords] = useState("收选题")
   const [executionMode, setExecutionMode] = useState<ChannelBindingItem["executionMode"]>("live")
+  const [routeTarget, setRouteTarget] = useState<NonNullable<ChannelBindingItem["routeTarget"]>>("topic")
+  const [defaultAgentId, setDefaultAgentId] = useState<string>("")
   const [busy, setBusy] = useState(false)
 
   async function reload() {
@@ -82,6 +90,8 @@ export function ChannelBindingsPanel() {
         triggerMode: "mention_or_keyword",
         triggerKeywords: keywords.split(/[，,]/).map((item) => item.trim()).filter(Boolean),
         executionMode,
+        routeTarget,
+        defaultAgentId: routeTarget === "aim" ? (defaultAgentId || null) : null,
       })
       setExternalChatId("")
       await reload()
@@ -145,6 +155,34 @@ export function ChannelBindingsPanel() {
         </div>
         <Button onClick={() => void submit()} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}绑定</Button>
       </div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end">
+        <div className="w-full space-y-1.5 md:w-56">
+          <Label>消息用途</Label>
+          <Select value={routeTarget} onValueChange={(value) => setRouteTarget((value || "topic") as NonNullable<ChannelBindingItem["routeTarget"]>)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {Object.entries(ROUTE_TARGET_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {routeTarget === "aim" && (
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Label>默认智能体（可选）</Label>
+            <Select value={defaultAgentId} onValueChange={(value) => setDefaultAgentId(!value || value === "__none__" ? "" : value)}>
+              <SelectTrigger><SelectValue placeholder="不指定（需用 /命令）" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">不指定（需用 /命令）</SelectItem>
+                {AIM_AGENT_OPTIONS.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>{agent.displayTitle ?? agent.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">群里可用 /命令 切换智能体，如 /内容创作、/作品编辑、/商业诊断。</p>
+          </div>
+        )}
+      </div>
 
       {items.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-md border p-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0 flex-1">
@@ -152,6 +190,9 @@ export function ChannelBindingsPanel() {
             <span className="text-sm font-medium">{PLATFORM_LABELS[item.platform]}</span>
             <Badge variant={item.status === "active" ? "default" : "secondary"}>{item.status === "active" ? "启用" : "停用"}</Badge>
             <Badge variant="outline" className="text-xs">{EXECUTION_MODE_LABELS[item.executionMode]}</Badge>
+            {item.routeTarget === "aim" && (
+              <Badge variant="outline" className="text-xs text-primary">AIM 对话{item.defaultAgentId ? ` · ${item.defaultAgentId}` : ""}</Badge>
+            )}
             <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium ${HEALTH_LABELS[item.healthStatus].className}`}>
               {item.healthStatus === "degraded" && <AlertTriangle className="mr-0.5 h-3 w-3" />}
               {HEALTH_LABELS[item.healthStatus].label}

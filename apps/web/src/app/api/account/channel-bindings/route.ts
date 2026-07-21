@@ -3,6 +3,9 @@ import { z } from "zod"
 import { parseJsonBody } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { AIM_AGENT_IDS } from "@/lib/aim-harness/contracts"
+
+const VALID_AGENT_IDS = Array.from(AIM_AGENT_IDS)
 
 const createSchema = z.object({
   platform: z.enum(["feishu", "workbuddy_wechat", "wecom"]),
@@ -12,6 +15,10 @@ const createSchema = z.object({
   triggerMode: z.enum(["mention_or_keyword", "all"]).default("mention_or_keyword"),
   triggerKeywords: z.array(z.string().trim().min(1).max(40)).max(10).default(["收选题"]),
   executionMode: z.enum(["capture_only", "evaluate", "live"]).default("live"),
+  /** 路由目标：topic（选题采集，默认）| aim（AIM 智能体对话） */
+  routeTarget: z.enum(["topic", "aim"]).default("topic"),
+  /** routeTarget=aim 时的默认智能体；为空则要求消息带 /命令 */
+  defaultAgentId: z.enum(VALID_AGENT_IDS as [string, ...string[]]).optional().nullable(),
 }).strict()
 
 /**
@@ -100,7 +107,15 @@ export async function POST(request: NextRequest) {
     const binding = await prisma.channelBinding.upsert({
       where: { platform_externalAccountId_externalChatId: { platform: body.platform, externalAccountId: body.externalAccountId || "", externalChatId: body.externalChatId } },
       create: { ...body, userId: user.id, status: "active" },
-      update: { projectId: body.projectId, triggerMode: body.triggerMode, triggerKeywords: body.triggerKeywords, executionMode: body.executionMode, status: "active" },
+      update: {
+        projectId: body.projectId,
+        triggerMode: body.triggerMode,
+        triggerKeywords: body.triggerKeywords,
+        executionMode: body.executionMode,
+        routeTarget: body.routeTarget,
+        defaultAgentId: body.defaultAgentId,
+        status: "active",
+      },
       include: { project: { select: { id: true, name: true, status: true } } },
     })
     return NextResponse.json(binding, { status: existing ? 200 : 201 })
