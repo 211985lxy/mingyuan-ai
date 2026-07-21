@@ -64,12 +64,18 @@ export async function allowChannelMessage(input: {
   const now = Date.now()
 
   try {
-    const blocked = Number(await redis.eval(SLIDING_WINDOW_SCRIPT, 1, key, String(windowMs), String(limit), String(now)))
+    const blocked = Number(
+      await Promise.race([
+        redis.eval(SLIDING_WINDOW_SCRIPT, 1, key, String(windowMs), String(limit), String(now)),
+        // Timeout after 2s — degrade to allow if Redis is slow
+        new Promise((_, reject) => setTimeout(() => reject(new Error("RATE_LIMIT_REDIS_TIMEOUT")), 2000)),
+      ]),
+    )
     return blocked === 1
       ? { allowed: false, retryAfterMs: windowMs }
       : { allowed: true, retryAfterMs: 0 }
   } catch {
-    // Redis error → allow (graceful degradation, consistent with auth-rate-limit)
+    // Redis error or timeout → allow (graceful degradation, consistent with auth-rate-limit)
     return { allowed: true, retryAfterMs: 0 }
   }
 }

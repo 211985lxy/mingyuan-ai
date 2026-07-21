@@ -86,7 +86,7 @@ export async function handleTopicChatMessage(input: {
       // Fetch the inspiration record for platform context (needed for outbox reply)
       const inspiration = await tx.inspiration.findUnique({
         where: { id: input.inspirationId },
-        select: { source: true, externalChatId: true, externalMessageId: true },
+        select: { source: true, externalChatId: true, externalMessageId: true, externalAccountId: true },
       })
       await tx.inspiration.updateMany({
         where: { id: input.inspirationId, userId: input.userId },
@@ -109,6 +109,7 @@ export async function handleTopicChatMessage(input: {
           inspirationId: input.inspirationId,
           replyType: "final",
           platform: inspiration.source,
+          externalAccountId: inspiration.externalAccountId || undefined,
           externalChatId: inspiration.externalChatId || "",
           externalMessageId: inspiration.externalMessageId ?? undefined,
           replyText,

@@ -319,6 +319,7 @@ model ChannelReplyOutbox {
   //                 → suppressed
   claimToken        String?   @unique @db.VarChar(191)
   claimExpiresAt    DateTime?
+  availableAt       DateTime?  // Earliest time this reply is eligible for (re)delivery
   attempts          Int       @default(0)
   maxAttempts       Int       @default(5)
   lastError         String?   @db.Text
@@ -331,4 +332,6 @@ model ChannelReplyOutbox {
   @@index([status, createdAt])
   @@index([platform, status])
   @@index([status, claimExpiresAt])
+  @@index([status, availableAt])
+  @@unique([inspirationId, replyType])
 }

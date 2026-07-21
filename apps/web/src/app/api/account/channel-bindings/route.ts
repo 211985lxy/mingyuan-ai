@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       ? await prisma.channelReplyOutbox.groupBy({
           by: ["platform", "status"],
           where: {
-            platform: { in: bindings.map((b) => b.platform) },
+            inspiration: { userId: user.id },
             createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
           },
           _count: { id: true },

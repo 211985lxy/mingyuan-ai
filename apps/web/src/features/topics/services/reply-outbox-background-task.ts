@@ -4,7 +4,7 @@
 
 import { claimBackgroundTask, completeBackgroundTask, failBackgroundTask } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
-import { sendOutboxReply, OUTBOX_SEND_TASK_KIND, MAX_OUTBOX_ATTEMPTS } from "./reply-outbox"
+import { sendOutboxReply, OUTBOX_SEND_TASK_KIND, MAX_OUTBOX_ATTEMPTS, computeOutboxRetryAvailableAt } from "./reply-outbox"
 import { recordChannelMetric } from "@/lib/channel-metrics"
 
 /**
@@ -39,6 +39,7 @@ export async function executeOutboxSendBackgroundTask(taskId: string) {
         status: isFailed ? "dead_letter" : "retry_wait",
         claimToken: null,
         claimExpiresAt: null,
+        availableAt: isFailed ? null : computeOutboxRetryAvailableAt(task.attempt),
         lastError: message,
       },
     })

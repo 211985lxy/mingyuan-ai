@@ -6,7 +6,6 @@ import { parseJsonRecord } from "@/lib/api-contract"
 import { parseFeishuSdkMessageEvent, verifyFeishuEventToken } from "@/lib/integrations/feishu-topic-chat"
 import { ingestInspirationEvent, resolveChannelBinding, resolveBindingExecutionMode } from "@/features/topics/services/inspiration-events"
 import { INSPIRATION_ACCEPTED_REPLY } from "@/features/topics/services/inspiration-reply"
-import { enqueueReply } from "@/features/topics/services/reply-outbox"
 import { isReplySuppressed } from "@/lib/execution-mode"
 
 export const runtime = "nodejs"
@@ -103,24 +102,21 @@ export async function POST(request: Request) {
           platform: "feishu",
           externalMessageId: event.messageId,
           externalChatId: event.chatId,
+          externalAccountId: binding.externalAccountId || undefined,
           externalSenderId: event.senderId,
           projectId: binding.projectId,
           content: event.text,
           occurredAt: event.occurredAt,
           conversationType: "group",
           mentionsBot: event.mentionsBot,
-        }, binding.userId)
-        // Enqueue "accepted" reply to Outbox (async delivery via background task)
-        if (!ingested.duplicate && !ingested.shadowMode) {
-          await enqueueReply({
-            inspirationId: ingested.id,
-            replyType: "accepted",
-            platform: "feishu",
+        }, binding.userId, {
+          // Accepted reply is enqueued atomically inside the ingest transaction
+          acceptedReplyContext: {
             externalChatId: event.chatId,
             externalMessageId: event.messageId,
             replyText: INSPIRATION_ACCEPTED_REPLY,
-          })
-        }
+          },
+        })
         return { ok: true, accepted: true, id: ingested.id, duplicate: ingested.duplicate }
       } catch (error) {
         if (error instanceof Error && error.message.startsWith("INSPIRATION_TRIGGER")) {

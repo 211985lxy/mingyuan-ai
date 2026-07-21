@@ -11,6 +11,7 @@ import { InspirationPipelineError } from "@/lib/inspiration-pipeline-error"
 import { recordChannelMetric } from "@/lib/channel-metrics"
 import { isReplySuppressed, isExecutionMode, resolveExecutionMode, type ExecutionMode } from "@/lib/execution-mode"
 import { evaluateIngressPolicy } from "@/lib/ingress-policy"
+import { enqueueReply as enqueueReplyOutbox, type EnqueueReplyInput } from "@/features/topics/services/reply-outbox"
 import type { inspirationEventBodySchema } from "@/features/knowledge/contracts/api"
 import type { z } from "zod"
 
@@ -84,12 +85,13 @@ function getGlobalExecutionModeOverride(): string | undefined {
  * @param input - 输入数据
  * @returns 无返回值
  */
-export function buildInspirationDedupeKey(input: Pick<InspirationEventInput, "platform" | "externalMessageId" | "externalChatId" | "externalSenderId" | "content" | "occurredAt">) {
-  if (input.externalMessageId) return `${input.platform}:${input.externalMessageId}`
+export function buildInspirationDedupeKey(input: Pick<InspirationEventInput, "platform" | "externalAccountId" | "externalMessageId" | "externalChatId" | "externalSenderId" | "content" | "occurredAt">) {
+  const accountPrefix = input.externalAccountId ? `${input.externalAccountId}:` : ""
+  if (input.externalMessageId) return `${input.platform}:${accountPrefix}${input.externalMessageId}`
   const timestamp = input.occurredAt ? Date.parse(input.occurredAt) : Date.now()
   const bucket = Math.floor(timestamp / (5 * 60 * 1000))
   return createHash("sha256")
-    .update([input.platform, input.externalChatId, input.externalSenderId || "", normalizeContent(input.content), bucket].join("\n"))
+    .update([input.platform, input.externalAccountId || "", input.externalChatId, input.externalSenderId || "", normalizeContent(input.content), bucket].join("\n"))
     .digest("hex")
 }
 
@@ -156,11 +158,11 @@ export async function resolveChannelBinding(input: { platform: string; externalC
         externalChatId: input.externalChatId,
       },
     },
-    select: { userId: true, projectId: true, status: true, executionMode: true },
+    select: { userId: true, projectId: true, status: true, executionMode: true, externalAccountId: true },
   })
   if (binding?.status === "active") return binding
   if (input.platform === "feishu" && env.FEISHU_TOPIC_CHAT_ID === input.externalChatId && env.FEISHU_TOPIC_CHAT_USER_ID && env.FEISHU_TOPIC_CHAT_PROJECT_ID) {
-    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const }
+    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const, externalAccountId: "" as const }
   }
   return null
 }
@@ -183,9 +185,17 @@ export function resolveBindingExecutionMode(bindingMode?: string | null): Execut
  * @description ingestinspirationevent
  * @param input - 输入数据
  * @param userId - 用户 ID
+ * @param options? - 可选参数
  * @returns Promise<InspirationEventResult>
  */
-export async function ingestInspirationEvent(input: InspirationEventInput, userId: string): Promise<InspirationEventResult> {
+export async function ingestInspirationEvent(
+  input: InspirationEventInput,
+  userId: string,
+  options?: {
+    /** When provided, an "accepted" reply is enqueued in the same transaction as the Inspiration create. */
+    acceptedReplyContext?: Pick<EnqueueReplyInput, "externalChatId" | "externalMessageId" | "replyText">
+  },
+): Promise<InspirationEventResult> {
   if (!areBackgroundTasksEnabled()) throw new Error("BACKGROUND_TASKS_UNAVAILABLE")
   if (env.INSPIRATION_PIPELINE_ENABLED === "false") throw new Error("INSPIRATION_PIPELINE_DISABLED")
   if (!INSPIRATION_EVENT_SOURCES.has(input.platform)) throw new Error("INSPIRATION_PLATFORM_UNSUPPORTED")
@@ -276,6 +286,7 @@ export async function ingestInspirationEvent(input: InspirationEventInput, userI
 
   const proposedId = randomUUID()
   const replySuppressed = isReplySuppressed(executionMode)
+  const shouldEnqueueAcceptedReply = !replySuppressed && !!options?.acceptedReplyContext
   const inspiration = await prisma.$transaction(async (tx) => {
     const record = await tx.inspiration.upsert({
       where: { dedupeKey },
@@ -308,6 +319,19 @@ export async function ingestInspirationEvent(input: InspirationEventInput, userI
       idempotencyKey: `inspiration-pipeline:${record.id}`,
       maxAttempts: 12,
     })
+    // Enqueue accepted reply inside the same transaction for atomicity
+    if (record.id === proposedId && shouldEnqueueAcceptedReply && options?.acceptedReplyContext) {
+      await enqueueReplyOutbox(
+        {
+          inspirationId: record.id,
+          replyType: "accepted",
+          platform: input.platform,
+          externalAccountId: input.externalAccountId,
+          ...options.acceptedReplyContext,
+        },
+        tx as never,
+      )
+    }
     return record
   })
 

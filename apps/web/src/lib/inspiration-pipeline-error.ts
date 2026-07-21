@@ -195,6 +195,18 @@ const ERROR_DEFINITIONS = {
     fallbackAllowed: false,
     userMessage: "灵感记录不存在",
   },
+  REPLY_SEND_FAILED: {
+    category: "system" as const,
+    retryable: true,
+    fallbackAllowed: false,
+    userMessage: "回复发送失败，请稍后重试",
+  },
+  REPLY_PLATFORM_NOT_INTERNAL: {
+    category: "system" as const,
+    retryable: false,
+    fallbackAllowed: false,
+    userMessage: "不支持的平台回复类型",
+  },
   BACKGROUND_TASKS_UNAVAILABLE: {
     category: "system" as const,
     retryable: true,

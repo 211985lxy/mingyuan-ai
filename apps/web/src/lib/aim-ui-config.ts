@@ -56,7 +56,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   },
   {
     id: "deep_copywriter",
-    title: "深度长文创作",
+    title: "作品编辑",
     displayTitle: "作品编辑官",
     description: "文字二改、公众号排版、小红书图文",
     icon: Edit3,

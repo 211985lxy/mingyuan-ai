@@ -20,8 +20,8 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
   const task = await claimBackgroundTask(prisma, taskId)
   if (!task) return false
   try {
-    const outcome = await processInspirationPipeline(task.aggregateId)
-    if (outcome === "deferred") {
+    const result = await processInspirationPipeline(task.aggregateId)
+    if (result.outcome === "deferred") {
       await deferBackgroundTask(prisma, {
         taskId: task.id,
         leaseToken: task.leaseToken!,
@@ -41,7 +41,7 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
       // Fetch inspiration for platform context
       const inspiration = await prisma.inspiration.findUnique({
         where: { id: task.aggregateId },
-        select: { source: true, externalChatId: true, externalMessageId: true },
+        select: { source: true, externalChatId: true, externalMessageId: true, externalAccountId: true },
       })
       await prisma.$transaction(async (tx) => {
         await tx.inspiration.updateMany({
@@ -55,6 +55,7 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
             inspirationId: task.aggregateId,
             replyType: "error",
             platform: inspiration.source,
+            externalAccountId: inspiration.externalAccountId || undefined,
             externalChatId: inspiration.externalChatId || "",
             externalMessageId: inspiration.externalMessageId ?? undefined,
             replyText: userMessage,

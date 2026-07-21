@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest"
 // Mock redis module
 const mockPipeline = {
   incr: vi.fn().mockReturnThis(),
+  expire: vi.fn().mockReturnThis(),
   exec: vi.fn().mockResolvedValue([1, 1]),
 }
 vi.mock("@/lib/redis", () => ({
@@ -18,20 +19,25 @@ describe("recordChannelMetric", () => {
     mockPipeline.exec.mockResolvedValue([1, 1])
   })
 
-  it("increments counters via Redis pipeline", async () => {
+  it("increments counters via Redis pipeline (global + account + channel)", async () => {
     const { recordChannelMetric } = await import("@/lib/channel-metrics")
     await recordChannelMetric({ metric: "received", platform: "feishu", externalChatId: "oc_test" })
 
-    // Should call pipeline.incr at least once (global counter)
-    expect(mockPipeline.incr).toHaveBeenCalledTimes(2)
+    // 3 incr calls: global, per-account, per-channel
+    expect(mockPipeline.incr).toHaveBeenCalledTimes(3)
+    // 3 expire calls (one per key)
+    expect(mockPipeline.expire).toHaveBeenCalledTimes(3)
     expect(mockPipeline.exec).toHaveBeenCalled()
   })
 
-  it("only increments global counter when no chatId", async () => {
+  it("increments global + account counter when no chatId", async () => {
     const { recordChannelMetric } = await import("@/lib/channel-metrics")
     await recordChannelMetric({ metric: "received", platform: "feishu" })
 
-    expect(mockPipeline.incr).toHaveBeenCalledTimes(1)
+    // 2 incr calls: global, per-account
+    expect(mockPipeline.incr).toHaveBeenCalledTimes(2)
+    // 2 expire calls
+    expect(mockPipeline.expire).toHaveBeenCalledTimes(2)
   })
 
   it("does not throw when Redis is unavailable", async () => {

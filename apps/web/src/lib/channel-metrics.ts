@@ -42,15 +42,24 @@ export async function recordChannelMetric(input: {
   try {
     const ts = input.timestamp ?? new Date()
     const date = ts.toISOString().slice(0, 10) // YYYY-MM-DD
-    const parts = [KEY_PREFIX, input.metric, input.platform, date]
+    const accountId = input.externalAccountId || "default"
+    const parts = [KEY_PREFIX, input.metric, input.platform, accountId, date]
     if (input.externalChatId) parts.push(input.externalChatId)
 
     const pipeline = redis.pipeline()
+    const dayKey = [KEY_PREFIX, input.metric, input.platform, date].join(":")
+    const accountKey = [KEY_PREFIX, input.metric, input.platform, accountId, date].join(":")
     // Global per-platform counter
-    pipeline.incr([KEY_PREFIX, input.metric, input.platform, date].join(":"))
+    pipeline.incr(dayKey)
+    pipeline.expire(dayKey, 7 * 24 * 60 * 60) // 7-day TTL
+    // Per-account counter (enables multi-account isolation)
+    pipeline.incr(accountKey)
+    pipeline.expire(accountKey, 7 * 24 * 60 * 60)
     // Per-channel counter (if chat ID provided)
     if (input.externalChatId) {
-      pipeline.incr(parts.join(":"))
+      const channelKey = parts.join(":")
+      pipeline.incr(channelKey)
+      pipeline.expire(channelKey, 7 * 24 * 60 * 60)
     }
     await pipeline.exec()
   } catch {

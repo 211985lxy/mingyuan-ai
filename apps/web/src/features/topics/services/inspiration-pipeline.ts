@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@/generated/prisma/client"
 import { handleTopicChatMessage } from "@/lib/topic-chat-service"
 import {
   createVideoCopyExtraction,
@@ -9,8 +10,22 @@ import {
 import { isVideoExtractionFallbackEnabled } from "@/lib/video-extraction-fallback"
 import { isCaptureOnly, isGenerationSuppressed, isExecutionMode } from "@/lib/execution-mode"
 import type { ExecutionMode } from "@/lib/execution-mode"
+import { generateTopicCards } from "@/lib/topic-generation"
+import {
+  classifyTopicChatInput,
+  buildTopicKnowledgeDraft,
+} from "@/lib/topic-chat"
+import {
+  buildTopicProjectSource,
+  loadTopicChatContext,
+} from "@/lib/topics/chat-context"
 
 export type InspirationPipelineOutcome = "completed" | "deferred"
+
+export type InspirationPipelineResult = {
+  outcome: InspirationPipelineOutcome
+  topicSelectionId?: string
+}
 
 function buildTopicInput(input: {
   original: string
@@ -28,6 +43,27 @@ function buildTopicInput(input: {
     `提取文案：${input.transcript}`,
     analysis ? `结构化拆解：${analysis}` : null,
   ].filter(Boolean).join("\n").slice(0, 30_000)
+}
+
+/** Known permanent extraction failure patterns — these should NOT be retried via fallback. */
+const PERMANENT_EXTRACTION_FAILURE_PATTERNS = [
+  /video.*too.*long/i,
+  /video.*too.*large/i,
+  /no.*transcript/i,
+  /unsupported.*video/i,
+  /direct.*link/i,
+  /share.*page/i,
+  // Backward compat: existing Chinese error messages in DB
+  /超过10分钟/,
+  /超过200MB/,
+  /没有识别到/,
+  /不支持/,
+  /分享页/,
+  /直链/,
+]
+
+function isPermanentExtractionFailure(errorMessage: string): boolean {
+  return PERMANENT_EXTRACTION_FAILURE_PATTERNS.some((p) => p.test(errorMessage))
 }
 
 async function loadOrAdvanceExtraction(record: {
@@ -52,7 +88,7 @@ async function loadOrAdvanceExtraction(record: {
 
   if (extraction?.status === "failed" && isVideoExtractionFallbackEnabled()) {
     const retrySelfHosted = extraction.provider === "self_hosted"
-      && !/(超过10分钟|超过200MB|没有识别到|不支持|分享页|直链)/.test(extraction.errorMessage || "")
+      && !isPermanentExtractionFailure(extraction.errorMessage || "")
     if (extraction.provider !== "self_hosted" || retrySelfHosted) {
       extraction = await startVideoCopyExtractionFallback(record.userId, extraction.id)
     }
@@ -73,10 +109,10 @@ function resolveEffectiveMode(snapshot: string | null): ExecutionMode {
  * @param inspirationId - inspiration唯一标识符
  * @returns Promise<InspirationPipelineOutcome>
  */
-export async function processInspirationPipeline(inspirationId: string): Promise<InspirationPipelineOutcome> {
+export async function processInspirationPipeline(inspirationId: string): Promise<InspirationPipelineResult> {
   const inspiration = await prisma.inspiration.findUnique({ where: { id: inspirationId } })
   if (!inspiration) throw new Error("灵感记录不存在")
-  if (inspiration.aiStatus === "completed") return "completed"
+  if (inspiration.aiStatus === "completed") return { outcome: "completed" }
   if (!inspiration.projectId) throw new Error("自动收录记录缺少项目绑定")
 
   const mode = resolveEffectiveMode(inspiration.executionModeSnapshot)
@@ -95,7 +131,7 @@ export async function processInspirationPipeline(inspirationId: string): Promise
       videoCopyExtractionId: inspiration.videoCopyExtractionId,
     })
     if (!extraction) throw new Error("视频文案提取记录不存在")
-    if (["queued", "extracting", "analyzing"].includes(extraction.status)) return "deferred"
+    if (["queued", "extracting", "analyzing"].includes(extraction.status)) return { outcome: "deferred" }
     if (extraction.status === "failed" || !extraction.transcript) {
       throw new Error(extraction.errorMessage || "该视频暂时无法提取文案，请换一个链接试试。")
     }
@@ -115,26 +151,69 @@ export async function processInspirationPipeline(inspirationId: string): Promise
       where: { id: inspiration.id },
       data: { aiStatus: "completed", processingStage: "captured", replyStatus: "suppressed", errorMessage: null },
     })
-    return "completed"
+    return { outcome: "completed" }
   }
 
   // --- evaluate: run AI generation but do NOT write TopicSelection or reply ---
   if (isGenerationSuppressed(mode)) {
-    // In evaluate mode we still complete the pipeline for observation
-    // but mark as shadow_completed without calling handleTopicChatMessage
-    await prisma.inspiration.update({
-      where: { id: inspiration.id },
-      data: { aiStatus: "completed", processingStage: "shadow_completed", replyStatus: "suppressed", errorMessage: null },
-    })
-    return "completed"
+    try {
+      const [project, elements, ipProfile] = await loadTopicChatContext({
+        userId: inspiration.userId,
+        projectId: inspiration.projectId,
+      })
+      if (project && ipProfile) {
+        const classification = classifyTopicChatInput(topicInput)
+        const draft = buildTopicKnowledgeDraft({ content: topicInput, classification })
+        const projectSource = buildTopicProjectSource(project)
+        const genResult = await generateTopicCards({
+          ipProfile,
+          elements,
+          topicSources: [
+            { category: "client_project", title: project.name, content: projectSource || project.name },
+            { category: draft.category, title: draft.title, content: draft.content },
+          ],
+          recommendationMode: "normal",
+          refreshCount: 0,
+        })
+        // Store generated candidates on the Inspiration for observation,
+        // but do NOT write TopicSelection or KnowledgeEntry
+        if (genResult.success) {
+          await prisma.inspiration.update({
+            where: { id: inspiration.id },
+            data: {
+              aiStatus: "completed",
+              processingStage: "shadow_completed",
+              generatedTopics: genResult.cards as unknown as Prisma.InputJsonValue,
+              replyStatus: "suppressed",
+              errorMessage: null,
+            },
+          })
+          return { outcome: "completed" }
+        }
+      }
+      // Fallback: no project context or generation failed
+      await prisma.inspiration.update({
+        where: { id: inspiration.id },
+        data: { aiStatus: "completed", processingStage: "shadow_completed", replyStatus: "suppressed", errorMessage: null },
+      })
+      return { outcome: "completed" }
+    } catch (evalError) {
+      const evalMsg = evalError instanceof Error ? evalError.message : String(evalError)
+      // Evaluate mode should not hard-fail — record the error but mark as shadow_completed
+      await prisma.inspiration.update({
+        where: { id: inspiration.id },
+        data: { aiStatus: "completed", processingStage: "shadow_completed", replyStatus: "suppressed", errorMessage: evalMsg },
+      })
+      return { outcome: "completed" }
+    }
   }
 
   // --- live: full pipeline ---
-  await handleTopicChatMessage({
+  const result = await handleTopicChatMessage({
     userId: inspiration.userId,
     projectId: inspiration.projectId,
     content: topicInput,
     inspirationId: inspiration.id,
   })
-  return "completed"
+  return { outcome: "completed", topicSelectionId: result.topicSelectionId }
 }

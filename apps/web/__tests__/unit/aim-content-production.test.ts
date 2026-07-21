@@ -186,10 +186,10 @@ describe("AIM content production positioning", () => {
     expect(freeCopywriter?.defaultFormats).toEqual(["raw_copy"])
   })
 
-  it("positions the deep copywriter as framework-first", () => {
+  it("positions the deep copywriter as the work editor", () => {
     const deepCopywriter = AIM_AGENT_OPTIONS.find((agent) => agent.id === "deep_copywriter")
 
-    expect(deepCopywriter?.title).toBe("深度长文创作")
+    expect(deepCopywriter?.title).toBe("作品编辑")
     expect(deepCopywriter?.displayTitle).toBe("作品编辑官")
     expect(deepCopywriter?.defaultFormats).toEqual(["raw_copy"])
   })

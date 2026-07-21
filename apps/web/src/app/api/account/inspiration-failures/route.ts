@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
       OR: [
         { aiStatus: "failed" },
         { processingStage: "failed" },
+        // Include inspirations with dead-letter outbox replies even if pipeline succeeded
+        { outboxReplies: { some: { status: "dead_letter" } } },
       ],
     }
 
@@ -121,6 +123,7 @@ export async function POST(request: NextRequest) {
         // Re-enqueue dead-letter outbox replies
         const deadLetters = await prisma.channelReplyOutbox.findMany({
           where: { inspirationId: id, status: "dead_letter" },
+          select: { id: true, platform: true },
         })
         if (deadLetters.length === 0) {
           results.push({ id, action: "resend", status: "skipped", reason: "无死信回复" })
@@ -129,16 +132,20 @@ export async function POST(request: NextRequest) {
         for (const dl of deadLetters) {
           await prisma.channelReplyOutbox.update({
             where: { id: dl.id },
-            data: { status: "pending", attempts: 0, lastError: null, claimToken: null, claimExpiresAt: null },
+            data: { status: "pending", attempts: 0, lastError: null, claimToken: null, claimExpiresAt: null, availableAt: null },
           })
-          const { enqueueBackgroundTask } = await import("@/lib/background-tasks")
-          await enqueueBackgroundTask(prisma, {
-            kind: "inspiration_outbox_send",
-            aggregateType: "ChannelReplyOutbox",
-            aggregateId: dl.id,
-            idempotencyKey: `resend:${dl.id}:${Date.now()}`,
-            maxAttempts: 5,
-          })
+          // Only enqueue background task for internal platforms (Feishu)
+          // External platforms (wecom, workbuddy_wechat) will be claimed by their agents
+          if (dl.platform === "feishu") {
+            const { enqueueBackgroundTask } = await import("@/lib/background-tasks")
+            await enqueueBackgroundTask(prisma, {
+              kind: "inspiration_outbox_send",
+              aggregateType: "ChannelReplyOutbox",
+              aggregateId: dl.id,
+              idempotencyKey: `resend:${dl.id}:${Date.now()}`,
+              maxAttempts: 5,
+            })
+          }
         }
         results.push({ id, action: "resend", status: "queued" })
       }

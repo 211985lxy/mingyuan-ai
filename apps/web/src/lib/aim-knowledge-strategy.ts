@@ -264,7 +264,7 @@ export function resolveKnowledgeStrategy(
     return "rewrite"
   }
 
-  // 1.7 长文创作（无显式场景时）：提升知识依赖到深度档
+  // 1.7 长文模式（content_producer 的 longform 模块，无显式场景时）：提升知识依赖到深度档
   if (copyStudioModule === "longform" && !contentScenario) {
     return "deep"
   }
