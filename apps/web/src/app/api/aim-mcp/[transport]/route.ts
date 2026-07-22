@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { createMcpHandler, withMcpAuth } from "mcp-handler"
+import { createMcpHandler, withMcpAuth } from "@/lib/aim-remote/mcp-handler-stub"
 import { isMcpEnabled, getAllowedMcpHosts } from "@/lib/aim-remote/feature-flags"
 import { verifyMcpToken } from "@/lib/aim-remote/mcp-auth"
 import { registerAimMcpTools } from "@/lib/aim-remote/mcp-tools"
