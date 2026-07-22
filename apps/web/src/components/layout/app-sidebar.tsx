@@ -11,8 +11,10 @@ import {
   BriefcaseBusiness,
   BarChart2,
   Bell,
-  ListChecks,
+  FileCheck,
   Target,
+  Search,
+  Bookmark,
   ChevronRight,
   MoreHorizontal,
   Trash2,
@@ -63,24 +65,31 @@ interface NavGroup {
 
 const navGroups: NavGroup[] = [
   {
-    label: "工作台",
+    label: "今日工作",
     items: [
       { title: "工作总览", href: "/home", icon: LayoutDashboard },
-      { title: "IP营销全案", href: "/projects", icon: BriefcaseBusiness },
+      { title: "待审核内容", href: "/home?tab=review", icon: FileCheck },
     ],
   },
   {
-    label: "内容生产",
+    label: "客户全案",
     items: [
-      { title: "全网热点洞察", href: "/ai-hot", icon: Bell },
-      { title: "选题工作台", href: "/topic-planning", icon: Target },
-      { title: "竞品研究", href: "/competitor", icon: BarChart2 },
+      { title: "客户项目", href: "/projects", icon: BriefcaseBusiness },
     ],
   },
   {
-    label: "运营管理",
+    label: "内容机会",
     items: [
-      { title: "定时任务清单", href: "/scheduled-tasks", icon: ListChecks },
+      { title: "主动搜索", href: "/opportunities", icon: Search },
+      { title: "今日机会", href: "/opportunities?tab=daily", icon: Bell },
+      { title: "对标账号", href: "/opportunities?tab=benchmarks", icon: BarChart2 },
+      { title: "已收藏研究", href: "/opportunities?tab=collections", icon: Bookmark },
+    ],
+  },
+  {
+    label: "AIM 创作",
+    items: [
+      { title: "推进工作流", href: "/aim", icon: Target },
     ],
   },
 ]
