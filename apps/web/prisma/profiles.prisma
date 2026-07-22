@@ -84,6 +84,7 @@ model ClientProject {
   benchmarkProfiles BenchmarkProfile[]
   inspirations      Inspiration[]
   channelBindings   ChannelBinding[]
+  opportunityCollections OpportunityCollection[]
 
   @@index([userId, status])
   @@index([userId, createdAt])
