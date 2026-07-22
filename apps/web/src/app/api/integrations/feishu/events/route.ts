@@ -8,9 +8,10 @@ import { ingestInspirationEvent, isExplicitInspirationCaptureMessage, resolveCha
 import { INSPIRATION_ACCEPTED_REPLY } from "@/features/topics/services/inspiration-reply"
 import { isReplySuppressed } from "@/lib/execution-mode"
 import { ingestAimChannelMessage } from "@/features/aim-channels/aim-channel-ingest"
+import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
 
 export const runtime = "nodejs"
-export const maxDuration = 30
+export const maxDuration = 120
 
 function requestHeaders(request: Request) {
   return Object.fromEntries(request.headers.entries())
@@ -96,10 +97,45 @@ export async function POST(request: Request) {
       if (data.token !== env.FEISHU_VERIFICATION_TOKEN) throw new Error("FEISHU_INVALID_TOKEN")
       const event = parseFeishuSdkMessageEvent(data)
       if (!event) return { ok: true, ignored: true }
-      const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: event.chatId })
-      if (!binding) return { ok: true, ignored: true, reason: "channel_unbound" }
+      const binding = await resolveChannelBinding({ platform: “feishu”, externalChatId: event.chatId })
+      if (!binding) return { ok: true, ignored: true, reason: “channel_unbound” }
 
-      // AIM 群保留日常对话；只有明确的“收集关键词 + 视频链接”绕到灵感入库。
+      // ─── 视频链接分流：含视频链接的消息 → 内容处理流水线 ───
+      if (env.CONTENT_PIPELINE_ENABLED !== “false”) {
+        const detection = detectVideoLinks(event.text)
+        if (detection.hasLinks) {
+          const firstLink = detection.links[0]
+          const platformLabel =
+            firstLink.platform === “douyin” ? “抖音” :
+            firstLink.platform === “channels” ? “视频号” :
+            firstLink.platform === “bilibili” ? “B站” :
+            firstLink.platform === “xiaohongshu” ? “小红书” : firstLink.platform
+
+          if (!isReplySuppressed(globalMode)) {
+            await sendImmediateFeishuReply(event.messageId,
+              `✅ 收到${platformLabel}视频链接，正在执行处理流水线...\n🔗 ${firstLink.url}\n\n📦 5a提取 → 5b总结 → 5c选题 → 5d竞品 → 5e文案`)
+          }
+
+          // 异步执行完整流水线，不阻塞飞书响应
+          processVideo({
+            videoUrl: firstLink.url,
+            source: `${platformLabel}群`,
+            contextText: detection.textWithoutLinks,
+            userId: binding.userId || undefined,
+          }).then(async (result) => {
+            if (isReplySuppressed(globalMode)) return
+            try {
+              const token = await getFeishuTenantAccessToken({ appId: env.FEISHU_APP_ID!, appSecret: env.FEISHU_APP_SECRET! })
+              const text = result.success ? buildVideoCompletionMessage(result) : `❌ 处理失败：${result.error}`
+              await replyFeishuTextMessage({ messageId: event.messageId, text, tenantAccessToken: token, idempotencyKey: `video-pipeline:${event.messageId}` })
+            } catch { /* silent */ }
+          }).catch(() => {})
+
+          return { ok: true, routed: “video_pipeline”, url: firstLink.url, platform: firstLink.platform }
+        }
+      }
+
+      // AIM 群保留日常对话；只有明确的”收集关键词 + 视频链接”绕到灵感入库。
       const captureFromAimChat = binding.routeTarget === "aim"
         && isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords)
       if (binding.routeTarget === "aim" && !captureFromAimChat) {
@@ -188,4 +224,63 @@ async function sendImmediateFeishuReply(messageId: string, text: string): Promis
   } catch (error) {
     console.error("[integrations/feishu/events] immediate reply failed", error)
   }
+}
+
+/**
+ * 构建视频处理完成后的飞书回复消息。
+ */
+function buildVideoCompletionMessage(
+  result: Awaited<ReturnType<typeof processVideo>>,
+): string {
+  const lines: string[] = []
+  const duration = `${Math.round((result.durationMs || 0) / 1000)}秒`
+  lines.push(`🎬 处理完成（耗时${duration}）`)
+
+  // 5a
+  if (result.extraction) {
+    const d = result.extraction.duration ? ` | ${result.extraction.duration}` : ""
+    lines.push(`\n📋 [5a 文案提取] ${result.extraction.title || "未知"}${d}`)
+  }
+
+  // 5b
+  if (result.aiSummary) {
+    lines.push(`\n📝 [5b AI 总结] ${result.aiSummary.title}`)
+    lines.push(result.aiSummary.summary)
+    if (result.aiSummary.keyPoints.length > 0) {
+      lines.push(`\n🔑 要点：\n${result.aiSummary.keyPoints.map((p) => `• ${p}`).join("\n")}`)
+    }
+  }
+
+  // 5c
+  if (result.topicExtraction?.success && result.topicExtraction.cards.length > 0) {
+    lines.push(`\n🎯 [5c 选题提取] 生成 ${result.topicExtraction.cards.length} 个选题：`)
+    for (const card of result.topicExtraction.cards.slice(0, 3)) {
+      lines.push(`  • ${card.title}${card.topicType ? `（${card.topicType}）` : ""}`)
+    }
+    if (result.topicExtraction.topicSelectionId) {
+      lines.push(`  💾 选题已存入 DB: ${result.topicExtraction.topicSelectionId.slice(0, 8)}...`)
+    }
+  } else if (result.topicExtraction?.error) {
+    lines.push(`\n🎯 [5c 选题] ⚠️ ${result.topicExtraction.error}`)
+  }
+
+  // 5d
+  if (result.competitorMatch?.isCompetitor) {
+    lines.push(`\n⚔️ [5d 竞品标记] ⚠️ 检测到竞品：${result.competitorMatch.competitorName}`)
+  } else if (result.competitorMatch) {
+    lines.push(`\n⚔️ [5d 竞品标记] ✅ 非关注竞品`)
+  }
+
+  // 5e
+  if (result.copyInspiration?.success) {
+    lines.push(`\n✨ [5e 文案灵感]`)
+    if (result.copyInspiration.hook) lines.push(`  开头方向：${result.copyInspiration.hook}`)
+    if (result.copyInspiration.direction) lines.push(`  内容方向：${result.copyInspiration.direction}`)
+    if (result.copyInspiration.recommendedPlatform) lines.push(`  推荐平台：${result.copyInspiration.recommendedPlatform}`)
+  } else if (result.copyInspiration?.error) {
+    lines.push(`\n✨ [5e 文案灵感] ⚠️ ${result.copyInspiration.error}`)
+  }
+
+  lines.push(`\n📁 已写入飞书素材库`)
+  return lines.join("\n")
 }
