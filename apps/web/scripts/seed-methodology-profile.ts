@@ -17,20 +17,31 @@
  *   DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' npx tsx scripts/seed-methodology-profile.ts --file=./docs/methodologies/xuhusheng-content-creation-compiled.md
  */
 import { createHash } from "crypto"
-import { readFileSync } from "fs"
-import path from "path"
+import { readFileSync, existsSync } from "fs"
+import { resolve, isAbsolute } from "path"
 
 import { PrismaMariaDb } from "@prisma/adapter-mariadb"
 import { PrismaClient } from "../src/generated/prisma/client"
 
 const SLUG = "xuhusheng-content-creation"
 
-/** 解析 CLI 参数 --file=... */
+/**
+ * 解析 compiledPrompt 文件路径。优先级：
+ *   1. --file=<path> 参数（支持相对 cwd 或绝对路径）；
+ *   2. 仓库根 docs/methodologies/xuhusheng-content-creation-compiled.md（尝试 cwd 与 cwd/../.. 两种形态）。
+ * 返回第一个存在的路径；都不存在返回 null（脚本回退到骨架占位）。
+ */
 function resolveCompiledPromptFile(): string | null {
   const arg = process.argv.find((a) => a.startsWith("--file="))
-  if (arg) return path.resolve(process.cwd(), arg.slice("--file=".length))
-  const defaultPath = path.resolve(process.cwd(), "docs/methodologies/xuhusheng-content-creation-compiled.md")
-  return defaultPath
+  if (arg) {
+    const p = arg.slice("--file=".length)
+    return resolve(isAbsolute(p) ? p : resolve(process.cwd(), p))
+  }
+  const candidates = [
+    resolve(process.cwd(), "docs/methodologies/xuhusheng-content-creation-compiled.md"),
+    resolve(process.cwd(), "../../docs/methodologies/xuhusheng-content-creation-compiled.md"),
+  ]
+  return candidates.find((p) => existsSync(p)) ?? null
 }
 
 /** 从 markdown 文件提取首尾 --- 之间的主体作为 compiledPrompt；无 frontmatter 结构则取全文（去掉标题块）。 */
