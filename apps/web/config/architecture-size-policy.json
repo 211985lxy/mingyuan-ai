@@ -6,6 +6,7 @@
   "legacyDeadline": "2026-07-26",
   "legacyFiles": [
     { "path": "src/lib/lark-base-tool.ts", "maxLines": 550, "target": "src/lib/lark-base/" },
-    { "path": "src/lib/oss.ts", "maxLines": 580, "target": "src/lib/oss/" }
+    { "path": "src/lib/oss.ts", "maxLines": 580, "target": "src/lib/oss/" },
+    { "path": "src/lib/aim-harness/context-assembly.ts", "maxLines": 550, "target": "src/lib/aim-harness/context/" }
   ]
 }
