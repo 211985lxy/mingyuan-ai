@@ -1,5 +1,4 @@
-import { execFile } from "node:child_process"
-import { promisify } from "node:util"
+import { runLarkCliCommand } from "@/lib/integrations/lark-cli-runner"
 
 // Embedding hook type — we import dynamically to avoid circular deps
 type EnsureEmbeddingFn = (entryId: string) => Promise<void>
@@ -50,24 +49,7 @@ type DbLike = {
   }
 }
 
-const execFileAsync = promisify(execFile)
 
-const ALLOWED_COMMANDS = new Set<LarkCommand>([
-  "+table-get",
-  "+field-list",
-  "+record-list",
-  "+record-get",
-  "+record-upsert",
-])
-
-// 不再硬编码开发者本机绝对路径(生产会 ENOENT)。LARK_CLI_PATH 必须由环境变量提供。
-function requireLarkCliPath(env: EnvLike = process.env): string {
-  const p = env.LARK_CLI_PATH?.trim()
-  if (!p) {
-    throw new Error("缺少 LARK_CLI_PATH:请在环境变量中配置 lark-cli 可执行文件的绝对路径")
-  }
-  return p
-}
 
 const TABLE_ENV_KEYS: Record<LarkTableType, string> = {
   topic_review: "LARK_TOPIC_TABLE_ID",
@@ -134,6 +116,8 @@ export function mapLarkKnowledgeCategory(value: unknown): string {
  * @param args - 参数列表
  * @param options - 配置选项
  * @returns Promise<unknown>
+ *
+ * 内部委托到统一 lark-cli-runner（WP-1），对外接口保持不变。
  */
 export async function runLarkBaseCommand(
   command: string,
@@ -144,25 +128,15 @@ export async function runLarkBaseCommand(
     runner?: (file: string, args: string[]) => Promise<{ stdout: string; stderr: string }>
   } = {},
 ): Promise<unknown> {
-  if (!ALLOWED_COMMANDS.has(command as LarkCommand)) {
-    throw new Error(`不允许执行飞书 Base 命令：${command}`)
-  }
-
-  const cliPath = options.cliPath || (options.runner ? "/mock/lark-cli" : requireLarkCliPath())
-  // 默认 runner 加 15s 超时 + 10MB maxBuffer,防止 lark-cli 卡死或大表 stdout 溢出
-  const runner =
-    options.runner ||
-    ((file, argv) =>
-      execFileAsync(file, argv, {
-        timeout: 15_000,
-        maxBuffer: 10 * 1024 * 1024,
-      }))
-  const identityArgs = options.identity ? ["--as", options.identity] : []
-  const { stdout } = await runner(cliPath, [
-    "base", command, ...args, ...identityArgs, "--format", "json",
-  ])
-  const text = stdout.trim()
-  return text ? JSON.parse(text) : {}
+  return runLarkCliCommand({
+    domain: "base",
+    command,
+    args,
+    identity: options.identity,
+    runner: options.runner,
+    cliPath: options.cliPath,
+    timeoutMs: 15_000, // 保持原有 15s 超时
+  })
 }
 
 function asRecordList(payload: unknown): Array<{ record_id?: string; fields?: Record<string, unknown> }> {
