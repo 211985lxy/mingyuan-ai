@@ -30,4 +30,23 @@ describe("production schema patches", () => {
     expect(messagePatch).toContain("AimConversationMessage_dedupeKey_key")
     expect(messagePatch).toContain("AimConversationMessage_conversationId_fkey")
   })
+
+  it("repairs the channel inspiration and reply outbox schema idempotently", () => {
+    const inspirationPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("ALTER TABLE `Inspiration`") && patch.includes("externalMessageId"),
+    )
+    const outboxPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("CREATE TABLE IF NOT EXISTS `ChannelReplyOutbox`"),
+    )
+    const outboxUpgradePatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("ALTER TABLE `ChannelReplyOutbox`"),
+    )
+
+    expect(inspirationPatch).toContain("ADD COLUMN IF NOT EXISTS `externalChatId`")
+    expect(inspirationPatch).toContain("ADD COLUMN IF NOT EXISTS `externalAccountId`")
+    expect(outboxPatch).toContain("ChannelReplyOutbox_inspirationId_fkey")
+    expect(outboxPatch).toContain("ChannelReplyOutbox_inspirationId_replyType_key")
+    expect(outboxUpgradePatch).toContain("ADD COLUMN IF NOT EXISTS `availableAt`")
+    expect(outboxUpgradePatch).toContain("ADD INDEX IF NOT EXISTS `ChannelReplyOutbox_status_availableAt_idx`")
+  })
 })

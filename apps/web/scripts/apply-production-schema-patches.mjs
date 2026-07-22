@@ -35,6 +35,11 @@ export const PRODUCTION_SCHEMA_PATCHES = [
   // ── Inspiration 扩展列（灵感管道 + 回复能力） ──
   `ALTER TABLE \`Inspiration\`
     ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`externalMessageId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`externalChatId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`externalAccountId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`externalSenderId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`externalOccurredAt\` DATETIME(3) NULL,
     ADD COLUMN IF NOT EXISTS \`dedupeKey\` VARCHAR(191) NULL,
     ADD COLUMN IF NOT EXISTS \`processingStage\` VARCHAR(32) NULL,
     ADD COLUMN IF NOT EXISTS \`sourceUrl\` VARCHAR(800) NULL,
@@ -54,6 +59,7 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     ADD UNIQUE INDEX IF NOT EXISTS \`Inspiration_canonicalSourceKey_key\`(\`canonicalSourceKey\`),
     ADD UNIQUE INDEX IF NOT EXISTS \`Inspiration_replyClaimToken_key\`(\`replyClaimToken\`),
     ADD INDEX IF NOT EXISTS \`Inspiration_projectId_createdAt_idx\`(\`projectId\`, \`createdAt\` DESC),
+    ADD INDEX IF NOT EXISTS \`Inspiration_source_externalChatId_idx\`(\`source\`, \`externalChatId\`),
     ADD INDEX IF NOT EXISTS \`Inspiration_replyStatus_updatedAt_idx\`(\`replyStatus\`, \`updatedAt\`),
     ADD INDEX IF NOT EXISTS \`Inspiration_executionModeSnapshot_idx\`(\`executionModeSnapshot\`),
     ADD INDEX IF NOT EXISTS \`Inspiration_source_idx\`(\`source\`)`,
@@ -80,6 +86,39 @@ export const PRODUCTION_SCHEMA_PATCHES = [
   `ALTER TABLE \`ChannelBinding\`
     ADD COLUMN IF NOT EXISTS \`routeTarget\` VARCHAR(16) NOT NULL DEFAULT 'topic',
     ADD COLUMN IF NOT EXISTS \`defaultAgentId\` VARCHAR(40) NULL`,
+  // ── 渠道回复发件箱（飞书即时确认 + 最终结果异步回复） ──
+  `CREATE TABLE IF NOT EXISTS \`ChannelReplyOutbox\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`inspirationId\` VARCHAR(191) NOT NULL,
+    \`replyType\` VARCHAR(20) NOT NULL,
+    \`platform\` VARCHAR(40) NOT NULL,
+    \`externalAccountId\` VARCHAR(191) NULL,
+    \`externalChatId\` VARCHAR(191) NOT NULL,
+    \`externalMessageId\` VARCHAR(191) NULL,
+    \`replyText\` TEXT NOT NULL,
+    \`status\` VARCHAR(24) NOT NULL DEFAULT 'pending',
+    \`claimToken\` VARCHAR(191) NULL,
+    \`claimExpiresAt\` DATETIME(3) NULL,
+    \`availableAt\` DATETIME(3) NULL,
+    \`attempts\` INTEGER NOT NULL DEFAULT 0,
+    \`maxAttempts\` INTEGER NOT NULL DEFAULT 5,
+    \`lastError\` TEXT NULL,
+    \`sentAt\` DATETIME(3) NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+    UNIQUE INDEX \`ChannelReplyOutbox_claimToken_key\`(\`claimToken\`),
+    UNIQUE INDEX \`ChannelReplyOutbox_inspirationId_replyType_key\`(\`inspirationId\`, \`replyType\`),
+    INDEX \`ChannelReplyOutbox_status_createdAt_idx\`(\`status\`, \`createdAt\`),
+    INDEX \`ChannelReplyOutbox_platform_status_idx\`(\`platform\`, \`status\`),
+    INDEX \`ChannelReplyOutbox_status_claimExpiresAt_idx\`(\`status\`, \`claimExpiresAt\`),
+    INDEX \`ChannelReplyOutbox_status_availableAt_idx\`(\`status\`, \`availableAt\`),
+    PRIMARY KEY (\`id\`),
+    CONSTRAINT \`ChannelReplyOutbox_inspirationId_fkey\` FOREIGN KEY (\`inspirationId\`) REFERENCES \`Inspiration\`(\`id\`) ON DELETE CASCADE ON UPDATE CASCADE
+  ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  `ALTER TABLE \`ChannelReplyOutbox\`
+    ADD COLUMN IF NOT EXISTS \`availableAt\` DATETIME(3) NULL,
+    ADD UNIQUE INDEX IF NOT EXISTS \`ChannelReplyOutbox_inspirationId_replyType_key\`(\`inspirationId\`, \`replyType\`),
+    ADD INDEX IF NOT EXISTS \`ChannelReplyOutbox_status_availableAt_idx\`(\`status\`, \`availableAt\`)`,
   // ── AIM 渠道会话（飞书等外部渠道调用 AIM 智能体） ──
   `CREATE TABLE IF NOT EXISTS \`AimConversation\` (
     \`id\` VARCHAR(30) NOT NULL,

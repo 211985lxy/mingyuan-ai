@@ -131,15 +131,27 @@
         "id",
         "userId",
         "projectId",
+        "source",
+        "aiStatus",
+        "externalMessageId",
+        "externalChatId",
+        "externalAccountId",
+        "externalSenderId",
+        "externalOccurredAt",
         "dedupeKey",
         "processingStage",
         "sourceUrl",
+        "canonicalSourceKey",
         "videoCopyExtractionId",
         "knowledgeEntryId",
         "topicSelectionId",
         "replyStatus",
+        "replyAttempts",
         "replyClaimToken",
-        "replyErrorMessage"
+        "replyClaimedAt",
+        "replyErrorMessage",
+        "repliedAt",
+        "executionModeSnapshot"
       ]
     },
     {
@@ -148,13 +160,38 @@
         "id",
         "platform",
         "externalChatId",
+        "externalAccountId",
         "userId",
         "projectId",
         "triggerMode",
         "triggerKeywords",
+        "executionMode",
         "routeTarget",
         "defaultAgentId",
         "status"
+      ]
+    },
+    {
+      "name": "ChannelReplyOutbox",
+      "columns": [
+        "id",
+        "inspirationId",
+        "replyType",
+        "platform",
+        "externalAccountId",
+        "externalChatId",
+        "externalMessageId",
+        "replyText",
+        "status",
+        "claimToken",
+        "claimExpiresAt",
+        "availableAt",
+        "attempts",
+        "maxAttempts",
+        "lastError",
+        "sentAt",
+        "createdAt",
+        "updatedAt"
       ]
     },
     {
