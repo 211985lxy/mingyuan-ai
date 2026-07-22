@@ -44,20 +44,24 @@ function resolveCompiledPromptFile(): string | null {
   return candidates.find((p) => existsSync(p)) ?? null
 }
 
-/** 从 markdown 文件提取首尾 --- 之间的主体作为 compiledPrompt；无 frontmatter 结构则取全文（去掉标题块）。 */
+/**
+ * 从 markdown 文件提取 compiledPrompt 主体。
+ * 文件结构约定：标题 + 前言说明在前，最后一个 `---` 分隔线之后为实际进 prompt 的 compiledPrompt。
+ * 若文件不含 `---`，则去掉首个 `#` 标题行后取全文兜底。
+ */
 function loadCompiledPrompt(filePath: string): string {
   const raw = readFileSync(filePath, "utf8")
   const lines = raw.split("\n")
-  // 跳过首个 --- ... --- frontmatter/前言块，取其后到下一个 --- 之前的内容（compiledPrompt 主体）
-  const firstSep = lines.findIndex((l) => l.trim() === "---")
-  if (firstSep === -1) return raw.trim()
-  let secondSep = lines.findIndex((idx, i) => i > firstSep && idx.trim() === "---")
-  if (secondSep === -1) secondSep = lines.length
-  // 主体 = 第二个 --- 之后；若无第二个 ---，则取首个 --- 之前的内容兜底
-  const body = secondSep < lines.length
-    ? lines.slice(secondSep + 1).join("\n")
-    : lines.slice(0, firstSep).join("\n")
-  return body.trim()
+  const sepIndices = lines
+    .map((l, i) => (l.trim() === "---" ? i : -1))
+    .filter((i) => i >= 0)
+  if (sepIndices.length > 0) {
+    const lastSep = sepIndices[sepIndices.length - 1]
+    return lines.slice(lastSep + 1).join("\n").trim()
+  }
+  // 兜底：去掉首行标题
+  const start = lines[0]?.startsWith("#") ? 1 : 0
+  return lines.slice(start).join("\n").trim()
 }
 
 // 兜底骨架（找不到 compiledPrompt 文件时使用，便于空库首次跑通）
