@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { parseJsonBody } from "@/lib/api-contract"
-import { agentAuthErrorResponse, assertAgentProjectAccess, authenticateAgentRequest, recordAgentApiCall, type AgentApiContext } from "@/lib/agent-api-auth"
+import { agentAuthErrorResponse, assertAgentProjectAccess, assertAgentScope, authenticateAgentRequest, recordAgentApiCall, type AgentApiContext } from "@/lib/agent-api-auth"
 import { inspirationEventBodySchema } from "@/features/knowledge/contracts/api"
 import { ingestInspirationEvent } from "@/features/topics/services/inspiration-events"
 import { InspirationPipelineError } from "@/lib/inspiration-pipeline-error"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 import { createHash } from "node:crypto"
 
 /**
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
   const startedAt = Date.now()
   try {
     context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.inspirationIngest)
     const body = await parseJsonBody(request, inspirationEventBodySchema, { maxBytes: 16 * 1024 })
     projectId = body.projectId
     inputSummary = buildPrivacySafeSummary(body)

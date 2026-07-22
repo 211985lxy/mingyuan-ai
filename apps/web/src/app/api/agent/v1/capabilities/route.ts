@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { buildAgentCapabilities } from "@/lib/agent-api-contract"
-import { agentAuthErrorResponse, authenticateAgentRequest } from "@/lib/agent-api-auth"
+import { agentAuthErrorResponse, authenticateAgentRequest, assertAgentScope } from "@/lib/agent-api-auth"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 
 /**
  * @description 处理 GET 请求
@@ -10,7 +11,8 @@ import { agentAuthErrorResponse, authenticateAgentRequest } from "@/lib/agent-ap
  */
 export async function GET(request: NextRequest) {
   try {
-    await authenticateAgentRequest(request)
+    const context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.capabilitiesRead)
     return NextResponse.json(buildAgentCapabilities())
   } catch (error) {
     const authResponse = agentAuthErrorResponse(error)

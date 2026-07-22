@@ -5,6 +5,7 @@ import { executeInspirationPipelineBackgroundTask } from "@/features/topics/serv
 import { OUTBOX_SEND_TASK_KIND } from "@/features/topics/services/reply-outbox"
 import { executeOutboxSendBackgroundTask } from "@/features/topics/services/reply-outbox-background-task"
 import { AIM_CHANNEL_GENERATE_TASK_KIND, executeAimChannelGenerateBackgroundTask } from "@/features/aim-channels/aim-channel-generate-task"
+import { AGENT_REMOTE_GENERATE_TASK_KIND, executeRemoteInvocationBackgroundTask } from "@/lib/aim/services/remote-invocation-task"
 
 const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [COMPETITOR_ANALYSIS_TASK_KIND]: executeCompetitorAnalysisBackgroundTask,
@@ -12,6 +13,7 @@ const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [INSPIRATION_PIPELINE_TASK_KIND]: executeInspirationPipelineBackgroundTask,
   [OUTBOX_SEND_TASK_KIND]: executeOutboxSendBackgroundTask,
   [AIM_CHANNEL_GENERATE_TASK_KIND]: executeAimChannelGenerateBackgroundTask,
+  [AGENT_REMOTE_GENERATE_TASK_KIND]: executeRemoteInvocationBackgroundTask,
 }
 
 export const BACKGROUND_TASK_KINDS = Object.keys(executors)

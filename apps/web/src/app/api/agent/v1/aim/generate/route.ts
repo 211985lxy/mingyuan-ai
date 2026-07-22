@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   assertAgentAccess,
   assertAgentProjectAccess,
+  assertAgentScope,
   agentAuthErrorResponse,
   authenticateAgentRequest,
 } from "@/lib/agent-api-auth"
@@ -10,6 +11,7 @@ import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 import {
   buildAgentGenerateResponse,
   finalizeAgentGenerateRun,
@@ -33,6 +35,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.draftsSubmit)
     const body = await parseJsonRecord(request)
 
     const prepared = prepareAgentGenerateBody(body)

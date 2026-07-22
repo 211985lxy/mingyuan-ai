@@ -30,6 +30,7 @@ model User {
   channelBindings       ChannelBinding[]
   agentApiKeys          AgentApiKey[]
   agentApiCallLogs      AgentApiCallLog[]
+  agentInvocations      AgentInvocation[]
   aimExecutionTraces    AimExecutionTrace[]
   aimRunSnapshots       AimRunSnapshot[]
   aimRunEvents          AimRunEvent[]

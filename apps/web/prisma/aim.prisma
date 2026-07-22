@@ -129,11 +129,19 @@ model AgentApiKey {
   allowedAgents   Json      @default("[]")
   dailyLimit      Int       @default(50)
   lastUsedAt      DateTime?
+  // ── AIM Remote Invocation (V2.1) ──
+  clientType      String?   @db.VarChar(20) // codex | workbuddy | custom (null = legacy)
+  allowedScopes   Json      @default("[]") // string[] of AGENT_SCOPE; empty = legacy full access until enforced
+  minuteLimit     Int       @default(60) // requests per minute (sliding window)
+  dailyTokenLimit Int? // null = unlimited token budget
+  maxInputChars   Int       @default(50000) // per-message rawInput ceiling for draft submission
+  expiresAt       DateTime? // null = never expires
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  user User              @relation(fields: [userId], references: [id])
-  logs AgentApiCallLog[]
+  user         User               @relation(fields: [userId], references: [id])
+  logs         AgentApiCallLog[]
+  invocations  AgentInvocation[]
 
   @@index([userId, status])
   @@index([keyPrefix])
@@ -152,6 +160,7 @@ model AgentApiCallLog {
   errorMessage    String?  @db.Text
   durationMs      Int?
   aimGenerationId String?
+  invocationId    String? // optional link to a remote AgentInvocation (append-only audit)
   createdAt       DateTime @default(now())
 
   apiKey AgentApiKey? @relation(fields: [apiKeyId], references: [id])
@@ -160,6 +169,49 @@ model AgentApiCallLog {
   @@index([apiKeyId, createdAt])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+/// Remote request envelope for async draft generation invoked via MCP or REST.
+/// This is NOT a second agent state machine — it only records the remote
+/// request lifecycle and links to the BackgroundTask + AimGeneration produced
+/// by the existing AIM Harness (the sole execution runtime).
+model AgentInvocation {
+  id              String   @id @default(cuid())
+  apiKeyId        String
+  userId          String
+  projectId       String
+  agentId         String
+  action          String   @default("draft.generate") // the action that produced this invocation
+  idempotencyKey  String   @db.VarChar(128)
+  requestHash     String   @db.VarChar(64) // sha256 of the request payload, for idempotency conflict detection
+  rawInput        String   @db.MediumText
+  targetFormats   Json     @default("[]") // ContentFormat[]
+  instruction     String?  @db.Text
+  status          String   @default("queued") // queued | running | succeeded | failed
+  backgroundTaskId String? @db.VarChar(191)
+  runId           String?  @db.VarChar(64)
+  aimGenerationId String?  @db.VarChar(30)
+  provider        String?  @db.VarChar(64)
+  model           String?  @db.VarChar(128)
+  degraded        Boolean  @default(false)
+  inputTokens     Int?
+  outputTokens    Int?
+  costCny         Decimal? @db.Decimal(10, 6)
+  errorCode       String?  @db.VarChar(48)
+  errorMessage    String?  @db.Text
+  queuedAt        DateTime @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  apiKey AgentApiKey @relation(fields: [apiKeyId], references: [id])
+  user   User        @relation(fields: [userId], references: [id])
+
+  @@unique([apiKeyId, action, idempotencyKey])
+  @@index([apiKeyId, status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, queuedAt])
 }
 
 model AimExecutionTrace {

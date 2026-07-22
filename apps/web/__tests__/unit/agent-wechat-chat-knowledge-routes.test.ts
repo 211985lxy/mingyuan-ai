@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 const mocks = vi.hoisted(() => ({
   authenticateAgentRequest: vi.fn(),
   assertAgentProjectAccess: vi.fn(),
+  assertAgentScope: vi.fn(),
   agentAuthErrorResponse: vi.fn<(error: unknown) => NextResponse | null>(() => null),
   processChunksForSmartImport: vi.fn(),
   enforceKnowledgeBetaLimit: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/agent-api-auth", () => ({
   authenticateAgentRequest: mocks.authenticateAgentRequest,
   assertAgentProjectAccess: mocks.assertAgentProjectAccess,
+  assertAgentScope: mocks.assertAgentScope,
   agentAuthErrorResponse: mocks.agentAuthErrorResponse,
 }))
 vi.mock("@/lib/knowledge-auto-processor", () => ({ processChunksForSmartImport: mocks.processChunksForSmartImport }))

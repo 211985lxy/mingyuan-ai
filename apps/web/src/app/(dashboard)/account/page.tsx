@@ -20,6 +20,7 @@ import { getSubscriptionStatus } from "@/lib/subscription"
 import type { ApiAgentApiKeySummary, ApiUser } from "@/types/api"
 import { ChannelBindingsPanel } from "@/components/account/channel-bindings-panel"
 import { InspirationFailuresPanel } from "@/components/account/inspiration-failures-panel"
+import { AgentKeysPanel } from "@/components/account/agent-keys-panel"
 
 /* ── Page ────────────────────────────────────────────────── */
 
@@ -77,6 +78,7 @@ export default function AccountPage() {
   const origin = typeof window === "undefined" ? "" : window.location.origin
   const skillUrl = origin ? `${origin}/skill.md` : "/skill.md"
   const wechatSkillUrl = origin ? `${origin}/skill-wechat-chat.md` : "/skill-wechat-chat.md"
+  const mcpUrl = origin ? `${origin}/api/aim-mcp/mcp` : "/api/aim-mcp/mcp"
   const activeAgentKeys = agentKeys.filter((key) => key.status === "active")
 
   return (
@@ -154,6 +156,21 @@ export default function AccountPage() {
             </Button>
           </div>
 
+          <div className="flex items-start justify-between gap-3 rounded-lg border p-3">
+            <div className="flex min-w-0 gap-3">
+              <Bot className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">MCP 接入地址（Codex）</p>
+                <p className="mt-1 break-all text-sm text-muted-foreground">{mcpUrl}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Streamable HTTP，Bearer Token 使用下方 maim_ Key。当前由管理员发放专用 Codex Key 后开通。</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => copyText(mcpUrl)}>
+              <Copy className="mr-1 h-3.5 w-3.5" />
+              复制
+            </Button>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">绑定状态</p>
@@ -197,6 +214,8 @@ export default function AccountPage() {
       </Card>
 
       <ChannelBindingsPanel />
+
+      <AgentKeysPanel />
 
       <InspirationFailuresPanel />
 
