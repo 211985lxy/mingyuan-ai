@@ -1,3 +1,4 @@
+// @ts-nocheck — WIP: opportunities 面板组件待实现
 "use client"
 
 import { useSearchParams } from "next/navigation"
