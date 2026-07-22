@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import { areBackgroundTasksEnabled } from "@/lib/background-task-runtime"
 import { env } from "@/env"
-import { extractVideoUrlFromText } from "@/lib/video-text-extractor"
+import { extractFirstPublicUrl, extractVideoUrlFromText } from "@/lib/video-text-extractor"
 import { resolveCanonicalSourceKey } from "@/lib/video-canonical-key"
 import { allowChannelMessage } from "@/lib/channel-rate-limiter"
 import { InspirationPipelineError } from "@/lib/inspiration-pipeline-error"
@@ -36,6 +36,14 @@ function sourceToStoredSource(platform: InspirationEventInput["platform"]) {
 
 function normalizeContent(content: string) {
   return content.replace(/\s+/g, " ").trim()
+}
+
+export function isExplicitInspirationCaptureMessage(content: string, triggerKeywords: unknown) {
+  if (!extractFirstPublicUrl(content)) return false
+  const keywords = Array.isArray(triggerKeywords)
+    ? triggerKeywords.filter((value): value is string => typeof value === "string")
+    : ["收选题"]
+  return keywords.some((keyword) => keyword.trim() && content.includes(keyword.trim()))
 }
 
 /**
@@ -158,11 +166,11 @@ export async function resolveChannelBinding(input: { platform: string; externalC
         externalChatId: input.externalChatId,
       },
     },
-    select: { userId: true, projectId: true, status: true, executionMode: true, externalAccountId: true, routeTarget: true, defaultAgentId: true },
+    select: { userId: true, projectId: true, status: true, executionMode: true, externalAccountId: true, triggerMode: true, triggerKeywords: true, routeTarget: true, defaultAgentId: true },
   })
   if (binding?.status === "active") return binding
   if (input.platform === "feishu" && env.FEISHU_TOPIC_CHAT_ID === input.externalChatId && env.FEISHU_TOPIC_CHAT_USER_ID && env.FEISHU_TOPIC_CHAT_PROJECT_ID) {
-    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const, externalAccountId: "" as const, routeTarget: "topic" as const, defaultAgentId: null }
+    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const, externalAccountId: "" as const, triggerMode: "mention_or_keyword" as const, triggerKeywords: ["收选题"], routeTarget: "topic" as const, defaultAgentId: null }
   }
   return null
 }

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import { env } from "@/env"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { parseFeishuSdkMessageEvent, verifyFeishuEventToken, getFeishuTenantAccessToken, replyFeishuTextMessage } from "@/lib/integrations/feishu-topic-chat"
-import { ingestInspirationEvent, resolveChannelBinding, resolveBindingExecutionMode } from "@/features/topics/services/inspiration-events"
+import { ingestInspirationEvent, isExplicitInspirationCaptureMessage, resolveChannelBinding, resolveBindingExecutionMode } from "@/features/topics/services/inspiration-events"
 import { INSPIRATION_ACCEPTED_REPLY } from "@/features/topics/services/inspiration-reply"
 import { isReplySuppressed } from "@/lib/execution-mode"
 import { ingestAimChannelMessage } from "@/features/aim-channels/aim-channel-ingest"
@@ -99,8 +99,10 @@ export async function POST(request: Request) {
       const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: event.chatId })
       if (!binding) return { ok: true, ignored: true, reason: "channel_unbound" }
 
-      // ── AIM 对话路由：routeTarget=aim 的绑定走 AIM 智能体链路 ──
-      if (binding.routeTarget === "aim") {
+      // AIM 群保留日常对话；只有明确的“收集关键词 + 视频链接”绕到灵感入库。
+      const captureFromAimChat = binding.routeTarget === "aim"
+        && isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords)
+      if (binding.routeTarget === "aim" && !captureFromAimChat) {
         const ingested = await ingestAimChannelMessage({
           platform: "feishu",
           externalMessageId: event.messageId,

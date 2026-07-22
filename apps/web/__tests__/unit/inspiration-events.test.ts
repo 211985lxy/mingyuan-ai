@@ -12,7 +12,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }))
 vi.mock("@/lib/background-tasks", () => ({ enqueueBackgroundTask: vi.fn() }))
 vi.mock("@/lib/background-task-runtime", () => ({ areBackgroundTasksEnabled: () => true }))
 
-import { buildInspirationDedupeKey, isInspirationPlatformEnabled, isInspirationShadowMode } from "@/features/topics/services/inspiration-events"
+import { buildInspirationDedupeKey, isExplicitInspirationCaptureMessage, isInspirationPlatformEnabled, isInspirationShadowMode } from "@/features/topics/services/inspiration-events"
 
 describe("inspiration event contract", () => {
   beforeEach(() => {
@@ -62,5 +62,17 @@ describe("inspiration event contract", () => {
     expect(isInspirationShadowMode()).toBe(false)
     runtimeEnv.INSPIRATION_PIPELINE_SHADOW_MODE = "true"
     expect(isInspirationShadowMode()).toBe(true)
+  })
+
+  it("routes only explicit video capture messages out of AIM chats", () => {
+    expect(isExplicitInspirationCaptureMessage(
+      "@助手 收选题 https://v.douyin.com/demo/",
+      ["收选题"],
+    )).toBe(true)
+    expect(isExplicitInspirationCaptureMessage(
+      "@助手 帮我分析 https://v.douyin.com/demo/",
+      ["收选题"],
+    )).toBe(false)
+    expect(isExplicitInspirationCaptureMessage("@助手 收选题：报价为什么高", ["收选题"])).toBe(false)
   })
 })
