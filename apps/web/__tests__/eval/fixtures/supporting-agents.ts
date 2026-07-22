@@ -24,7 +24,7 @@ function fixturesFor(agent: SupportingAgent, prefix: string, label: string): Eva
       },
       seedContext,
       expectations: {
-        runtimeTask: runtimeFor(agent, "new_copy"),
+        runtimeTask: agent === "persona" ? "positioning_topic" : runtimeFor(agent, "new_copy"),
         outputFormats: ["raw_copy"],
         minCharsPerFormat: 20,
       },
@@ -87,7 +87,7 @@ function fixturesFor(agent: SupportingAgent, prefix: string, label: string): Eva
       },
       seedContext,
       expectations: {
-        runtimeTask: runtimeFor(agent, "new_copy"),
+        runtimeTask: agent === "persona" ? "positioning_topic" : runtimeFor(agent, "new_copy"),
         outputFormats: ["raw_copy"],
         mustWarnInsufficientInfo: true,
         bannedSubstrings: ["根据去年的成交数据可以看出"],

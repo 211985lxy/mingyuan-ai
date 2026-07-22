@@ -163,7 +163,7 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
     return "quality_review"
   }
 
-  if (input.agentId === "business_diagnosis" || input.agentId === "persona") {
+  if (input.agentId === "business_diagnosis") {
     return "positioning_topic"
   }
 
@@ -213,6 +213,11 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
     )
   ) {
     return "light_edit"
+  }
+
+  // persona 智能体默认走定位策划（新任务场景，非轻改/重写）
+  if (input.agentId === "persona") {
+    return "positioning_topic"
   }
 
   if (asksForRewrite) {
