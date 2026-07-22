@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { redis } from "@/lib/redis"
 
 export type AimTraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -23,6 +24,7 @@ export interface AimTraceRecorder {
 }
 
 interface CreateAimTraceInput {
+  id?: string
   userId?: string | null
   projectId?: string | null
   agentId?: string | null
@@ -46,6 +48,12 @@ type TraceUpdate = {
   outputSummary?: string | null
   errorMessage?: string | null
   aimGenerationId?: string | null
+}
+
+const TRACE_CHANNEL_PREFIX = "aim:trace:"
+
+function publishTraceEvent(traceId: string, event: { type: string; step?: AimTraceStep; status?: string }) {
+  redis.publish(`${TRACE_CHANNEL_PREFIX}${traceId}`, JSON.stringify(event)).catch(() => {})
 }
 
 const MAX_SUMMARY_LENGTH = 500
@@ -100,6 +108,7 @@ async function appendStep(trace: AimTraceRecorder | undefined, step: AimTraceSte
   const steps = await readSteps(trace.id)
   steps.push(step)
   await safeUpdateTrace(trace.id, { steps })
+  publishTraceEvent(trace.id, { type: "step", step })
 }
 
 /**
@@ -113,6 +122,7 @@ export async function createAimTrace(input: CreateAimTraceInput): Promise<AimTra
   try {
     const record = await delegate.create({
       data: {
+        ...(input.id ? { id: input.id } : {}),
         userId: input.userId || null,
         projectId: input.projectId || null,
         agentId: input.agentId || null,
@@ -248,6 +258,7 @@ export async function finishAimTrace(trace: AimTraceRecorder | undefined, update
     status: update.status || "success",
     durationMs: Date.now() - trace.startedAt,
   })
+  publishTraceEvent(trace.id, { type: "done", status: "success" })
 }
 
 /**
@@ -263,4 +274,5 @@ export async function failAimTrace(trace: AimTraceRecorder | undefined, error: u
     durationMs: Date.now() - trace.startedAt,
     errorMessage: summarizeText(message),
   })
+  publishTraceEvent(trace.id, { type: "done", status: "failed" })
 }

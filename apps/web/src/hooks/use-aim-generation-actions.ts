@@ -175,9 +175,13 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
   const controller = new AbortController()
   input.requestAbortRef.current = controller
   const { assistantMessageId, baseMessages } = appendPendingGeneration(input, currentInput, options)
+  const traceId = crypto.randomUUID()
+  input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
+    ? { ...message, traceId, traceType: "generate" as const }
+    : message))
   input.setIsGenerating(true)
   try {
-    const response = await generateAimContent(buildGenerationRequest(input, rawInput, currentInput, baseMessages, options), controller.signal)
+    const response = await generateAimContent({ ...buildGenerationRequest(input, rawInput, currentInput, baseMessages, options), traceId }, controller.signal)
     const correctedResponse = await proofreadAimResponse(response, input.agent.defaultInstruction)
     applyGenerationResponse(input, assistantMessageId, currentInput, response, correctedResponse)
   } catch (error) {

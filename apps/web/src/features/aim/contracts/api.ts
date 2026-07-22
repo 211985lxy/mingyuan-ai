@@ -99,6 +99,7 @@ export const aimGenerateBodySchema = z.object({
   workflow: aimWorkflowBriefBodySchema.optional(),
   agentModule: z.enum(["social", "longform", "free"]).optional(),
   writerModule: z.enum(["social", "longform", "free"]).optional(),
+  traceId: optionalId,
 }).strict()
 
 export const aimEvolveBodySchema = z.object({

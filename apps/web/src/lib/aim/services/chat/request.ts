@@ -57,6 +57,7 @@ export type AimChatRequestBody = {
   editorContext?: AimEditorContext
   agentModule?: "social" | "longform" | "free"
   writerModule?: "social" | "longform" | "free"
+  traceId?: string
 }
 
 /** Result of parsing the chat body: either a validated request or an error response. */
@@ -101,5 +102,6 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
       : undefined,
     agentModule,
     writerModule: agentModule,
+    traceId: typeof record.traceId === "string" ? (record.traceId as string).trim() : undefined,
   }
 }

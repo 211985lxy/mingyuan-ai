@@ -61,6 +61,7 @@ export async function runAimChatRequest(input: {
   onContent: (content: string) => void
   agentModule?: "social" | "longform" | "free"
   writerModule?: "social" | "longform" | "free"
+  traceId?: string
 }): Promise<{ hasContent: boolean }> {
   const options = {
     agentId: input.agentId,
@@ -69,6 +70,7 @@ export async function runAimChatRequest(input: {
     agentModule: input.agentModule,
     writerModule: input.writerModule,
     signal: input.signal,
+    traceId: input.traceId,
   }
   if (input.toolAction) {
     const { content } = await chatAim(input.messages, {

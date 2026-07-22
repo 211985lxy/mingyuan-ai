@@ -49,6 +49,7 @@ async function executeChatRequest(
   controller: AbortController,
   assistantId: string,
   thread: AimWorkbenchMessage[],
+  traceId: string,
 ) {
   const toolAction = detectAimLarkToolAction(text)
   if (toolAction && input.projectEnabled && !input.selectedProjectId) {
@@ -70,6 +71,7 @@ async function executeChatRequest(
     agentModule: input.agentModule,
     writerModule: input.agentModule,
     signal: controller.signal,
+    traceId,
     onContent: (content) => setAssistantMessage(input, assistantId, content),
   })
   if (!hasContent) {
@@ -89,13 +91,17 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   const controller = new AbortController()
   input.requestAbortRef.current = controller
   const turn = prepareAimChatTurn({ messages: input.messages, text, images, retryMessageId: options.retryMessageId, startsNewTask, editorApplyRange: options.editorApplyRange })
+  const traceId = crypto.randomUUID()
   if (startsNewTask) input.clearCurrentTaskContext()
   input.setMessages(turn.pendingMessages)
+  input.setMessages((messages) => messages.map((message) => message.id === turn.assistantId
+    ? { ...message, traceId, traceType: "chat" as const }
+    : message))
   input.setInput("")
   if (images.length) input.clearImages()
   input.setIsThinking(true)
   try {
-    await executeChatRequest(input, text, { ...options, editorContext: startsNewTask ? undefined : options.editorContext }, controller, turn.assistantId, turn.thread)
+    await executeChatRequest(input, text, { ...options, editorContext: startsNewTask ? undefined : options.editorContext }, controller, turn.assistantId, turn.thread, traceId)
   } catch (error) {
     const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
     const content = stopped ? "已停止本次回复。" : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`

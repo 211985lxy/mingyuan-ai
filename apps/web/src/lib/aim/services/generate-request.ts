@@ -22,6 +22,7 @@ import { ownsActiveProject } from "@/lib/resource-ownership"
 export async function prepareAimGenerateRequest(userId: string, body: Record<string, unknown>) {
   const parsed = parseGenerateBody(body)
   const trace = await createAimTrace({
+    id: typeof body.traceId === "string" ? (body.traceId as string).trim() || undefined : undefined,
     userId,
     projectId: parsed.projectId || null,
     agentId: parsed.agentId || null,

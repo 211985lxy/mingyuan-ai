@@ -4,6 +4,7 @@ import { forwardRef, useState } from "react"
 import { ArrowRight } from "lucide-react"
 import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
 import { AimQualityReport } from "@/components/aim/aim-quality-report"
+import { ThinkingProcessPanel } from "@/components/aim/thinking-process-panel"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { Button } from "@/components/ui/button"
 import { getAimAgentGuide, type AimNextAction } from "@/lib/aim-agent-guides"
@@ -98,7 +99,7 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
   const choices = message.role === "assistant" ? extractAimChoiceGroups(message.content) : []
   return <div data-message-id={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
     <div className={`${message.deliverables ? "w-full max-w-full" : "max-w-[96%]"} ${message.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
-      <div className={`leading-relaxed ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground" : "bg-transparent p-0 text-sm font-medium text-foreground/90 sm:text-base"}`}><MessageContent message={message} /></div>
+      <div className={`leading-relaxed ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground" : "bg-transparent p-0 text-sm font-medium text-foreground/90 sm:text-base"}`}>{message.role === "assistant" && message.traceId ? <ThinkingProcessPanel traceId={message.traceId} type={message.traceType ?? "chat"} /> : null}<MessageContent message={message} /></div>
       {choices.length ? <ChoiceStepper groups={choices} busy={busy} onSubmit={actions.onSubmitChoice} /> : null}
       {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
       {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onApplyReplacement(message)}>应用到右侧选区</Button> : null}

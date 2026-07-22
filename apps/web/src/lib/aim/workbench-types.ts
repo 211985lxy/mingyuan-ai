@@ -25,6 +25,8 @@ export interface AimWorkbenchMessage {
   workflowStage?: AimWorkflowStage
   contentAction?: AimContentAction | null
   failure?: { kind: "chat" | "generate"; retryText: string } | null
+  traceId?: string | null
+  traceType?: "chat" | "generate" | null
 }
 
 export interface IpWikiDialogContext {

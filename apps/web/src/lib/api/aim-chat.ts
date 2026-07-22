@@ -124,9 +124,10 @@ export async function chatAimStream(
     writerModule?: "social" | "longform" | "free"
     signal?: AbortSignal
     onDelta: (delta: string, content: string) => void
+    traceId?: string
   },
 ): Promise<{ content: string }> {
-  const { signal, onDelta, ...bodyOptions } = options
+  const { signal, onDelta, traceId, ...bodyOptions } = options
   let response: Response
   try {
     response = await fetch("/api/aim/chat", {
@@ -136,7 +137,7 @@ export async function chatAimStream(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages, ...bodyOptions, stream: true }),
+      body: JSON.stringify({ messages, ...bodyOptions, stream: true, traceId }),
     })
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
