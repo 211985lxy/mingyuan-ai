@@ -1,0 +1,67 @@
+// Content Opportunity domain models
+
+model OpportunitySearchRun {
+  id             String   @id @default(cuid())
+  userId         String
+  keyword        String
+  platforms      Json     // ["douyin", "wechat_channels"]
+  filters        Json?    // { sortOrder, timeRange, ... }
+  status         String   @default("completed") // running | completed | partial | failed
+  platformStatus Json?    // { douyin: "ok", wechat_channels: "error:..." }
+  resultCount    Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  user      User                      @relation(fields: [userId], references: [id])
+  snapshots OpportunityItemSnapshot[]
+
+  @@index([userId, createdAt])
+  @@index([keyword])
+}
+
+model OpportunityItemSnapshot {
+  id               String   @id @default(cuid())
+  searchRunId      String
+  platform         String   // douyin | wechat_channels
+  sourceId         String   // 平台原始 ID
+  sourceUrl        String?
+  title            String?  @db.Text
+  authorName       String?
+  authorId         String?
+  followerCount    Int?
+  publishedAt      DateTime?
+  durationSeconds  Int?
+  views            Int?
+  likes            Int?
+  comments         Int?
+  shares           Int?
+  collects         Int?
+  opportunityScore Float?
+  scoreBreakdown   Json?
+  createdAt        DateTime @default(now())
+
+  searchRun OpportunitySearchRun @relation(fields: [searchRunId], references: [id], onDelete: Cascade)
+
+  @@unique([searchRunId, platform, sourceId])
+  @@index([searchRunId])
+  @@index([platform, sourceId])
+}
+
+model OpportunityCollection {
+  id               String   @id @default(cuid())
+  userId           String
+  projectId        String?
+  name             String
+  items            Json     // 选中的样本快照数组
+  status           String   @default("draft") // draft | analyzing | analyzed | failed
+  analysisResult   Json?    // CollectionAnalysis
+  analysisError    String?  @db.Text
+  backgroundTaskId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
