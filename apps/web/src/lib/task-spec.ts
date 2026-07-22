@@ -61,6 +61,21 @@ export interface TaskSpec {
   classifiedAt: string
   /** 执行时实际采用的内容路由；不参与事实或业务判断。 */
   execution?: { schemaVersion: 1; copyStudioModule?: CopyStudioModule }
+  // ── 计划模式扩展字段（Plan Mode）──
+  /** 核心信息（本次内容要传达的一句话要点） */
+  coreMessage?: string
+  /** 发布平台（抖音/小红书/视频号等） */
+  platform?: string
+  /** 使用场景（引流/转化/品宣等） */
+  useScenario?: string
+  /** 输出格式（口播脚本/图文/朋友圈等） */
+  outputFormat?: string
+  /** 风格（专业/亲和/犀利等） */
+  style?: string
+  /** 长度规则（如"300字以内""1分钟口播"） */
+  lengthRule?: string
+  /** CTA 自由文本（避免用户表达被枚举校验静默丢弃） */
+  ctaText?: string
 }
 
 /**

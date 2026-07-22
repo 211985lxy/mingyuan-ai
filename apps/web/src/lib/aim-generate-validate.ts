@@ -1,5 +1,5 @@
 import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
-import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule } from "@/lib/copy-studio"
+import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
 import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
 
@@ -49,8 +49,25 @@ export interface ParseGenerateBodyResult {
   topicSelectionId: string | undefined
   selectedTopicIndex: number | undefined
   workflow: ReturnType<typeof parseWorkflowBriefRequest> | undefined
-  agentModule: "social" | "longform" | "free" | undefined
-  writerModule: "social" | "longform" | "free" | undefined
+  agentModule: CopyStudioModule | undefined
+  writerModule: CopyStudioModule | undefined
+  methodologyProfileIds: string[] | undefined
+}
+
+/**
+ * 从请求体解析 methodologyProfileIds（ADR-002）。
+ * MVP 最多 1 个；接受字符串数组，逐项 trim + 过滤，去重。
+ * 供 generate / chat / scripts 三入口复用，保证解析口径一致。
+ */
+export function parseMethodologyProfileIds(body: Record<string, unknown>): string[] | undefined {
+  const raw = body.methodologyProfileIds
+  if (!Array.isArray(raw)) return undefined
+  const ids = raw
+    .filter((id): id is string => typeof id === "string")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0)
+    .slice(0, 1) // MVP：最多 1 个主方法论
+  return ids.length > 0 ? Array.from(new Set(ids)) : undefined
 }
 
 /**
@@ -114,6 +131,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
     workflow: parseWorkflowBriefRequest(body.workflow) || undefined,
     agentModule,
     writerModule: agentModule,
+    methodologyProfileIds: parseMethodologyProfileIds(body),
   }
 }
 
@@ -127,7 +145,7 @@ export function validateGenerateInput(parsed: {
   projectId: string
   targetFormats: ContentFormat[]
   agentId?: string
-  agentModule?: "social" | "longform" | "free"
+  agentModule?: CopyStudioModule
 }): string | null {
   if (parsed.agentModule && !supportsCopyStudioModule(parsed.agentId)) return "agentModule 只能用于内容创作官"
   if (!parsed.rawInput) return "请输入内容"

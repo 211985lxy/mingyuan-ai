@@ -1,0 +1,60 @@
+// Methodology domain models
+//
+// 通用「命名方法论」载体（ADR-002）。与现有三处方法论语义的边界：
+//  - AgentMethodology（aim.prisma）：全局 3-key 系统内置方法论，保持现状不动。
+//  - IpWikiPage.viral_methodology：项目级爆款打法，不升级为通用方法论库。
+//  - KnowledgeEntry.writing_style_profile：写作风格档案，与方法论分开建模。
+//
+// MethodologyProfile 是通用命名方法论的唯一权威载体。每份方法论可有多版本，
+// 只有 published 版本进生成链路；修改方法论即创建新版本（version+1），旧版本
+// 不可原地修改 —— 保证历史 Prompt 可复现。沿用 IpWikiPage 的 version+status 范式。
+
+model MethodologyProfile {
+  id              String   @id @default(cuid())
+  // null = 全局（如官方方法论）；非 null = 用户私有
+  userId          String?
+  name            String
+  slug            String   @unique
+  originatorName  String?
+  // 文本精确命中用：["徐沪生方法论","做号方法论"]。仅做精确匹配，不做模糊语义。
+  aliases         Json     @default("[]")
+  methodologyType String   // e.g. "content_creation" | "business_diagnosis"
+  scope           String   // "global" | "user"
+  description     String?  @db.Text
+  applicableAgents   Json  @default("[]")
+  applicableTasks    Json  @default("[]")
+  applicableChannels Json  @default("[]")
+  priority        Int      @default(100)
+  status          String   @default("active") // active | archived
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  versions MethodologyProfileVersion[]
+  user     User?  @relation(fields: [userId], references: [id])
+
+  @@index([status])
+  @@index([userId, status])
+}
+
+model MethodologyProfileVersion {
+  id              String    @id @default(cuid())
+  profileId       String
+  version         Int
+  // 完整蒸馏内容（含原始结构，供后台展示/溯源）
+  contentMarkdown String    @db.LongText
+  // 进 prompt 的可执行规则（≤2500 字），由三入口统一加载
+  compiledPrompt  String    @db.LongText
+  // 原始章节 / 书摘溯源
+  sourceRefs      Json      @default("[]")
+  // compiledPrompt 的 SHA-256，保证历史可复现
+  checksum        String    @db.VarChar(64)
+  status          String    @default("published") // published | draft
+  rightsNote      String?
+  createdAt       DateTime  @default(now())
+  publishedAt     DateTime?
+
+  profile MethodologyProfile @relation(fields: [profileId], references: [id])
+
+  @@unique([profileId, version])
+  @@index([profileId, status])
+}

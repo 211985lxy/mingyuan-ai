@@ -18,6 +18,7 @@ import {
   saveIpWikiPages,
   listIpWikiPages,
   lintIpWikiPages,
+  updateIpWikiPage,
   type IpWikiCompiledPage,
   type IpWikiPageDTO,
   type IpWikiLintReportDTO,
@@ -72,6 +73,9 @@ export function IpWikiDialog({
   const [loadingWiki, setLoadingWiki] = useState(false)
   const [lintReport, setLintReport] = useState<IpWikiLintReportDTO | null>(null)
   const [linting, setLinting] = useState(false)
+  // Wiki 总览 inline 编辑：editingPages 是 wikiPages 的可编辑副本；savingPageId 标记正在保存的页
+  const [editingPages, setEditingPages] = useState<IpWikiPageDTO[] | null>(null)
+  const [savingPageId, setSavingPageId] = useState<string | null>(null)
 
   const projectId = context.projectId
 
@@ -128,11 +132,46 @@ export function IpWikiDialog({
     if (!projectId) return
     setLoadingWiki(true)
     try {
-      setWikiPages(await listIpWikiPages(projectId))
+      const pages = await listIpWikiPages(projectId)
+      setWikiPages(pages)
+      setEditingPages(pages.map((p) => ({ ...p })))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "加载维基失败")
     } finally {
       setLoadingWiki(false)
+    }
+  }
+
+  // 改动某页的本地草稿（未保存）
+  function updateEditingPage(id: string, patch: Partial<IpWikiPageDTO>) {
+    setEditingPages((prev) =>
+      prev ? prev.map((p) => (p.id === id ? { ...p, ...patch } : p)) : prev,
+    )
+  }
+
+  // 保存单页：调 PUT 接口，成功后刷新整批（version+1 在新数据里体现）
+  async function handleSavePage(page: IpWikiPageDTO) {
+    if (!projectId) return
+    setSavingPageId(page.id)
+    try {
+      const updated = await updateIpWikiPage(page.id, {
+        projectId,
+        title: page.title,
+        content: page.content,
+        frontmatter: page.frontmatter,
+        links: page.links,
+      })
+      setWikiPages((prev) =>
+        prev ? prev.map((p) => (p.id === page.id ? updated : p)) : prev,
+      )
+      setEditingPages((prev) =>
+        prev ? prev.map((p) => (p.id === page.id ? { ...updated } : p)) : prev,
+      )
+      toast.success(`已更新「${updated.title}」（v${updated.version}）`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "维基页保存失败")
+    } finally {
+      setSavingPageId(null)
     }
   }
 
@@ -348,18 +387,44 @@ export function IpWikiDialog({
 
             {wikiPages && wikiPages.length > 0 ? (
               <div className="space-y-2">
-                {wikiPages.map((page) => (
-                  <div key={page.id} className="rounded-lg border p-3 bg-background">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-[10px]">
-                        {PAGE_TYPE_LABELS[page.pageType] ?? page.pageType}
-                      </Badge>
-                      <span className="text-sm font-medium">{page.title}</span>
-                      <span className="text-[10px] text-muted-foreground ml-auto">v{page.version}</span>
+                {(editingPages ?? []).map((page) => {
+                  const saved = wikiPages.find((p) => p.id === page.id)
+                  const dirty =
+                    !!saved && (saved.title !== page.title || saved.content !== page.content)
+                  const saving = savingPageId === page.id
+                  return (
+                    <div key={page.id} className="rounded-lg border p-3 bg-background">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Badge variant="secondary" className="text-[10px]">
+                          {PAGE_TYPE_LABELS[page.pageType] ?? page.pageType}
+                        </Badge>
+                        <input
+                          value={page.title}
+                          onChange={(e) => updateEditingPage(page.id, { title: e.target.value })}
+                          className="flex-1 text-sm font-medium bg-transparent outline-none focus:bg-muted/40 rounded px-1 py-0.5"
+                        />
+                        <span className="text-[10px] text-muted-foreground">v{page.version}</span>
+                      </div>
+                      <textarea
+                        value={page.content}
+                        onChange={(e) => updateEditingPage(page.id, { content: e.target.value })}
+                        className="w-full min-h-24 max-h-60 p-2 text-xs leading-relaxed bg-muted/10 border border-border/60 rounded-md outline-none focus:ring-1 focus:ring-primary resize-y"
+                      />
+                      <div className="flex justify-end mt-1.5">
+                        <Button
+                          size="sm"
+                          variant={dirty ? "default" : "outline"}
+                          onClick={() => handleSavePage(page)}
+                          disabled={!dirty || saving}
+                          className="h-7 px-2 text-xs"
+                        >
+                          {saving ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : null}
+                          {dirty ? "保存此页" : "已保存"}
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground line-clamp-3 whitespace-pre-wrap">{page.content}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : wikiPages && wikiPages.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">

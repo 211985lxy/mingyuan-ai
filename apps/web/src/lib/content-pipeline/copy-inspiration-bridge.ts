@@ -98,7 +98,7 @@ function buildSystemPrompt(input: CopyInspirationInput): string {
 4. 提供风格参考
 
 请严格按以下 JSON 格式输出：
-{"hook": "开头方向", "direction": "内容方向描述", "style_reference": "适合的风格", "recommended_platform": "douyin/xhs/wechat"}`
+{"hook": "开头方向", "direction": "内容方向描述", "style_reference": "适合的风格", "recommended_platform": "douyin/xhs/wechat"}
 
 ${input.platform === "douyin" ? "参考平台：抖音短视频（15-60秒）" : ""}
 ${input.platform === "xiaohongshu" ? "参考平台：小红书图文/视频" : ""}

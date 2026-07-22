@@ -97,19 +97,19 @@ export async function POST(request: Request) {
       if (data.token !== env.FEISHU_VERIFICATION_TOKEN) throw new Error("FEISHU_INVALID_TOKEN")
       const event = parseFeishuSdkMessageEvent(data)
       if (!event) return { ok: true, ignored: true }
-      const binding = await resolveChannelBinding({ platform: “feishu”, externalChatId: event.chatId })
-      if (!binding) return { ok: true, ignored: true, reason: “channel_unbound” }
+      const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: event.chatId })
+      if (!binding) return { ok: true, ignored: true, reason: "channel_unbound" }
 
       // ─── 视频链接分流：含视频链接的消息 → 内容处理流水线 ───
-      if (env.CONTENT_PIPELINE_ENABLED !== “false”) {
+      if (env.CONTENT_PIPELINE_ENABLED !== "false") {
         const detection = detectVideoLinks(event.text)
         if (detection.hasLinks) {
           const firstLink = detection.links[0]
           const platformLabel =
-            firstLink.platform === “douyin” ? “抖音” :
-            firstLink.platform === “channels” ? “视频号” :
-            firstLink.platform === “bilibili” ? “B站” :
-            firstLink.platform === “xiaohongshu” ? “小红书” : firstLink.platform
+            firstLink.platform === "douyin" ? "抖音" :
+            firstLink.platform === "channels" ? "视频号" :
+            firstLink.platform === "bilibili" ? "B站" :
+            firstLink.platform === "xiaohongshu" ? "小红书" : firstLink.platform
 
           if (!isReplySuppressed(globalMode)) {
             await sendImmediateFeishuReply(event.messageId,
@@ -131,11 +131,11 @@ export async function POST(request: Request) {
             } catch { /* silent */ }
           }).catch(() => {})
 
-          return { ok: true, routed: “video_pipeline”, url: firstLink.url, platform: firstLink.platform }
+          return { ok: true, routed: "video_pipeline", url: firstLink.url, platform: firstLink.platform }
         }
       }
 
-      // AIM 群保留日常对话；只有明确的”收集关键词 + 视频链接”绕到灵感入库。
+      // AIM 群保留日常对话；只有明确的"收集关键词 + 视频链接"绕到灵感入库。
       const captureFromAimChat = binding.routeTarget === "aim"
         && isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords)
       if (binding.routeTarget === "aim" && !captureFromAimChat) {

@@ -6,13 +6,15 @@ export type CopyStudioModule =
   | "social"
   | "longform"
   | "free"
+  | "moments"
 
-export const COPY_STUDIO_MODULES = ["social", "longform", "free"] as const satisfies readonly CopyStudioModule[]
+export const COPY_STUDIO_MODULES = ["social", "longform", "free", "moments"] as const satisfies readonly CopyStudioModule[]
 
 export const COPY_STUDIO_MODULE_LABELS: Record<CopyStudioModule, string> = {
   social: "社媒速产",
   longform: "深度长文",
   free: "自由交付",
+  moments: "朋友圈文案",
 }
 
 export const COPY_STUDIO_TITLE = "内容创作官"
@@ -30,6 +32,7 @@ export const COPY_STUDIO_ROUTE_KEYS: Record<CopyStudioModule, string> = {
   social: "copy_studio.social",
   longform: "copy_studio.longform",
   free: "copy_studio.free",
+  moments: "copy_studio.moments",
 }
 
 /**

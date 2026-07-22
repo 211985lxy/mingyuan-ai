@@ -97,6 +97,8 @@ export interface GenerateScriptCandidatesParams {
   styleProfileBlock?: string | null
   // IP 定位维基/项目定位上下文（由调用方从 IP Wiki 或知识库回退读取后注入）
   ipWikiBlock?: string | null
+  // ADR-002：本次指定命名方法论（由调用方解析后注入，未选择时为空串）
+  selectedMethodologyBlock?: string | null
 }
 
 export interface CandidateScore {

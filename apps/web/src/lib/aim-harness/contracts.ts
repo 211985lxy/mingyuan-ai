@@ -10,6 +10,8 @@
  * 仍在 aim-ui-config.ts 维护，只把这里的类型作为 id 的事实源。
  */
 
+import type { CopyStudioModule } from "@/lib/copy-studio"
+
 /** AIM 七个内容智能体的规范 id（唯一事实源） */
 export type AimAgentId =
   | "content_producer"
@@ -102,6 +104,7 @@ import type {
   AimRunMetadata,
   AimContextSource,
   AimModelPolicyOverride,
+  AimMethodologyPolicy,
 } from "./types"
 
 /**
@@ -127,8 +130,8 @@ export interface AimRunRequest {
   agentId: string
   /** 用户原始输入（已含被注入的爆款/热榜/评论等来源文本，阶段 2 由 prepareAimContext 产出） */
   rawInput: string
-  agentModule?: "social" | "longform" | "free"
-  writerModule?: "social" | "longform" | "free"
+  agentModule?: CopyStudioModule
+  writerModule?: CopyStudioModule
   /** 期望输出格式 */
   targetFormats?: ContentFormat[]
   /** 任务类型（驱动 runtimeTask 解析） */
@@ -172,6 +175,8 @@ export interface AimRunRequest {
   stream?: boolean
   /** 受约束的单次模型策略覆盖；由 planner 校验并冻结。 */
   modelPolicy?: AimModelPolicyOverride
+  /** ADR-002：显式选择的命名方法论 profile id（MVP 最多 1 个）。 */
+  methodologyProfileIds?: string[]
 }
 
 /**
@@ -193,6 +198,8 @@ export interface PreparedAimContext {
     viralStructure: string
     eventStorytelling: string
     ipWiki: string
+    /** ADR-002：本次指定命名方法论（独立预算块）。 */
+    selectedMethodology: string
     /** 对话记忆（generate 路径此前未接入，阶段 2 接入） */
     memory?: string
     /** chat 场景的对话上下文块 */
@@ -251,4 +258,4 @@ export interface AimRunResult<TOutput = AimAgentOutput> {
   spec: AimRunSpec
 }
 
-export type { AimRunSpec, AimRunMetadata, AimContextSource }
+export type { AimRunSpec, AimRunMetadata, AimContextSource, AimMethodologyPolicy }

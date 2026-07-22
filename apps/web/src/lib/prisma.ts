@@ -25,6 +25,7 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
     agentApiKey?: { findUnique?: unknown; update?: unknown }
     agentApiCallLog?: { create?: unknown; count?: unknown }
     aimExecutionTrace?: { create?: unknown; update?: unknown; findMany?: unknown }
+    methodologyProfile?: { findUnique?: unknown; findMany?: unknown }
   }
 
   return (
@@ -46,6 +47,8 @@ function hasRequiredDelegates(client: PrismaClient): boolean {
     && typeof prismaClient.aimExecutionTrace?.create === "function"
     && typeof prismaClient.aimExecutionTrace?.update === "function"
     && typeof prismaClient.aimExecutionTrace?.findMany === "function"
+    && typeof prismaClient.methodologyProfile?.findUnique === "function"
+    && typeof prismaClient.methodologyProfile?.findMany === "function"
   )
 }
 

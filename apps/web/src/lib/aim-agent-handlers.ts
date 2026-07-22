@@ -159,6 +159,8 @@ async function buildAimChatRuntime(
     viralStructureBlock: "",
     eventStorytellingBlock: "",
     ipWikiBlock,
+    // 命名方法论块由 chat context-assembly 层注入；此处运行时上下文不重复装配
+    selectedMethodologyBlock: params.selectedMethodologyBlock ?? "",
   }, params.runtimeTask ?? "rewrite_copy", agentId)
   await addAimTraceStep(params.trace, {
     key: "context_budget",
@@ -218,10 +220,14 @@ type AimGenerationInput = Omit<
   | "viralStructureBlock"
   | "eventStorytellingBlock"
   | "ipWikiBlock"
+  | "selectedMethodologyBlock"
   | "retrievedEntries"
   | "retrievedSource"
   | "knowledgeStrategy"
->
+> & {
+  /** ADR-002：显式选择的命名方法论 profile id（透传到 prepareAimContext 解析）。 */
+  methodologyProfileIds?: string[]
+}
 
 function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
   const plannedSpec = planAimRun({
@@ -235,6 +241,7 @@ function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
     hotTopic: params.hotTopic,
     actorId: params.userId,
     projectId: params.projectId,
+    methodologyProfileIds: params.methodologyProfileIds,
   })
 
   return params.runSpec ?? (params.runtimeTask
@@ -305,6 +312,7 @@ export async function buildAimGeneration(
     videoCopyExtractionId: params.videoCopyExtractionId,
     contentScenario: params.contentScenario,
     contextOverride: params.contextOverride,
+    methodologyProfileIds: params.methodologyProfileIds,
   })
   const generationMode = resolveGenerationConversationMode(agentId, params)
   const taskSpec = withCopyStudioExecution(
@@ -326,6 +334,7 @@ export async function buildAimGeneration(
       viralStructureBlock: prepared.blocks.viralStructure,
       eventStorytellingBlock: prepared.blocks.eventStorytelling,
       ipWikiBlock: prepared.blocks.ipWiki,
+      selectedMethodologyBlock: prepared.blocks.selectedMethodology,
       retrievedEntries: (prepared.retrievedEntries ?? []) as any[],
       retrievedSource: prepared.retrievedSource ?? "raw",
       knowledgeStrategy: prepared.spec.knowledgeStrategy,

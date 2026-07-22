@@ -101,6 +101,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     taskSpec: workflowBrief?.taskSpec,
     actorId: userId,
     projectId,
+    methodologyProfileIds: parsed.methodologyProfileIds,
     trace,
   }, (spec) => executeAimGenerationDomain(spec, {
     userId,
@@ -117,6 +118,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     existingGenerationId: parsed.existingGenerationId,
     topicSelectionId: parsed.topicSelectionId,
     selectedTopicIndex: parsed.selectedTopicIndex,
+    methodologyProfileIds: parsed.methodologyProfileIds,
     trace,
     taskSpec: workflowBrief?.taskSpec,
   }))

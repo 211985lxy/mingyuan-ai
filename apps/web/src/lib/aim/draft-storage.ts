@@ -26,6 +26,8 @@ export interface AimDraft {
   editorSourceMessageId?: string
   editorPanelWidth?: number
   editorPanelOpen?: boolean
+  /** ADR-002：本次选中的命名方法论 profile id（MVP 最多 1 个）。 */
+  selectedMethodologyProfileIds?: string[]
 }
 
 /**

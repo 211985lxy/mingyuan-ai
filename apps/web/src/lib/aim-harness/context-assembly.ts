@@ -41,10 +41,16 @@ import {
 } from "@/lib/aim-observability"
 import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { AimAgentId } from "./contracts"
-import type { AimRunSpec, AimContextSource } from "./types"
+import type { AimRunSpec, AimContextSource, AimMethodologyPolicy } from "./types"
 import type { PreparedAimContext } from "./contracts"
 import type { AimGenerationContextOverride } from "@/lib/aim-agent-handlers"
 import { AIM_FACT_PRIORITY_VERSION, withAimFactPriorityRule } from "@/lib/aim-context-priority"
+import { sha256 } from "./hashing"
+import {
+  resolveMethodologyPolicy,
+  buildMethodologyProfileBlock,
+  type MethodologyPolicy,
+} from "@/lib/methodology-profile-store"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -71,6 +77,8 @@ export interface PrepareAimContextInput {
   contentScenario?: ContentScenario
   /** Eval-only：用冻结上下文替代 live DB 加载 */
   contextOverride?: AimGenerationContextOverride
+  /** ADR-002：显式选择的命名方法论 profile id（解析在装配阶段完成）。 */
+  methodologyProfileIds?: string[]
 }
 
 /**
@@ -98,7 +106,7 @@ export async function prepareAimContext(
   // （buildAimGeneration 接受 params.runtimeTask 覆盖；v2 下 planner 是唯一源）。
   const runtimeTask = spec.runtimeTask as AimRuntimeTask
 
-  // 2. 知识调用策略只读 planner 冻结结果，不再二次解析。
+  // 2. 知识调用策略只读 planner 军结结果，不再二次解析。
   const knowledgeStrategy = spec.knowledgeStrategy
 
   // 3. 并行读取通用背景资产（与 buildAimGeneration:1508 一致，gating 逐字保留）
@@ -107,10 +115,23 @@ export async function prepareAimContext(
     businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock,
   } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, trace })
 
+  // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > none。
+  // 在现有 6 块加载之后单独计算，不触碰字节等价红线；解析结果冻结进 spec.methodologyPolicy。
+  const methodologyPolicy = await resolveMethodologyPolicy({
+    userId: params.userId,
+    methodologyProfileIds: params.methodologyProfileIds ?? spec.methodologyProfileIds,
+    rawInput: spec.rawInput,
+  })
+  const selectedMethodologyBlock = buildMethodologyProfileBlock(methodologyPolicy)
+  // spec 冻结后不可变；把解析出的 policy 合并入副本，使落 AimGeneration.runSpec 的那份含命中版本
+  const specWithMethodology: AimRunSpec = methodologyPolicy.source === "none" && spec.methodologyPolicy === undefined
+    ? spec
+    : { ...spec, methodologyPolicy: toSpecMethodologyPolicy(methodologyPolicy) }
+
   // ── TaskSpec 构建（与 buildAimGeneration:1568 一致，含二次查 project/topicSelection）
   const taskSpec = await buildContextTaskSpec({ spec, params, knowledgeEntries: knowledgeCtx.entries ?? [] })
 
-  // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致）
+  // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致；selectedMethodologyBlock 作为独立预算块）
   const budgeted = await compressAndBudgetGenerationInput({
     agentId,
     spec,
@@ -121,14 +142,28 @@ export async function prepareAimContext(
     viralStructureBlock,
     eventStorytellingBlock,
     ipWikiBlock,
+    selectedMethodologyBlock,
     trace,
   })
 
-  // 声明式来源清单（阶段 2.2 新增；此前 harness 事后反查，此处装配时即记录）
-  const contextManifest = buildContextManifest(spec, knowledgeCtx.entries ?? [], budgeted.stats.includedChars)
+  // 声明式来源清单（阶段 2.2 新增；ADR-002 连带修复：methodology/ipWiki/viral 一并记录，
+  // 使 contextHash 真正反映方法论变更 → 历史版本可复现）
+  const contextManifest = buildContextManifest({
+    spec: specWithMethodology,
+    knowledgeEntries: knowledgeCtx.entries ?? [],
+    includedChars: budgeted.stats.includedChars,
+    methodologyPolicy,
+    methodologyBlock: budgeted.blocks.methodologyBlock,
+    businessDiagnosisBlock: budgeted.blocks.businessDiagnosisBlock,
+    eventStorytellingBlock: budgeted.blocks.eventStorytellingBlock,
+    ipWikiBlock: budgeted.blocks.ipWikiBlock,
+    viralStructureBlock: budgeted.blocks.viralStructureBlock,
+    selectedMethodologyBlock: budgeted.blocks.selectedMethodologyBlock,
+    taskSpec,
+  })
 
   return {
-    spec,
+    spec: specWithMethodology,
     rawInput: spec.rawInput,
     blocks: {
       knowledge: budgeted.blocks.knowledgeBlock,
@@ -137,6 +172,7 @@ export async function prepareAimContext(
       viralStructure: budgeted.blocks.viralStructureBlock,
       eventStorytelling: budgeted.blocks.eventStorytellingBlock,
       ipWiki: budgeted.blocks.ipWikiBlock,
+      selectedMethodology: budgeted.blocks.selectedMethodologyBlock,
       // generate 路径此前不注入对话记忆；阶段 2 预留，暂为空
       memory: "",
     },
@@ -149,6 +185,20 @@ export async function prepareAimContext(
     retrievedSource: knowledgeCtx.source,
     contextManifest,
     budgetApplied: true,
+  }
+}
+
+/** MethodologyPolicy（store 产物，含 versionRows）→ AimMethodologyPolicy（spec 冻结结果，无 versionRows）。 */
+function toSpecMethodologyPolicy(policy: MethodologyPolicy): AimMethodologyPolicy {
+  return {
+    source: policy.source,
+    selections: policy.selections.map((s) => ({
+      profileId: s.profileId,
+      versionId: s.versionId,
+      version: s.version,
+      mode: s.mode,
+      reason: s.reason,
+    })),
   }
 }
 
@@ -214,6 +264,7 @@ async function compressAndBudgetGenerationInput(input: {
   viralStructureBlock: string
   eventStorytellingBlock: string
   ipWikiBlock: string
+  selectedMethodologyBlock: string
   trace?: AimTraceRecorder
 }) {
   const { agentId, spec, runtimeTask, knowledgeBlock, trace } = input
@@ -240,6 +291,7 @@ async function compressAndBudgetGenerationInput(input: {
     viralStructureBlock: input.viralStructureBlock,
     eventStorytellingBlock: input.eventStorytellingBlock,
     ipWikiBlock: input.ipWikiBlock,
+    selectedMethodologyBlock: input.selectedMethodologyBlock,
   }, runtimeTask, agentId)
   await addAimTraceStep(trace, {
     key: "context_budget",
@@ -380,13 +432,30 @@ async function buildContextTaskSpec(input: {
   return params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
 }
 
-/** 装配阶段的声明式来源清单（取代 harness 事后反查）。 */
-function buildContextManifest(
-  spec: AimRunSpec,
-  knowledgeEntries: Array<{ id: string }>,
-  includedChars: number,
-): AimContextSource[] {
+/**
+ * 装配阶段的声明式来源清单（取代 harness 事后反查）。
+ *
+ * ADR-002 连带修复：此前只记 knowledge + request，系统方法论 / IP Wiki / 爆款结构
+ * 的变更不会反映到 contextHash，导致编辑方法论后历史无法复现。现在把每类实际装配进
+ * prompt 的 block 都记录一条，使 contextHash 真正反映本次运行的全部输入。
+ */
+function buildContextManifest(input: {
+  spec: AimRunSpec
+  knowledgeEntries: Array<{ id: string }>
+  includedChars: number
+  methodologyPolicy: MethodologyPolicy
+  methodologyBlock: string
+  businessDiagnosisBlock: string
+  eventStorytellingBlock: string
+  ipWikiBlock: string
+  viralStructureBlock: string
+  selectedMethodologyBlock: string
+  taskSpec?: import("@/lib/task-spec").TaskSpec | null
+}): AimContextSource[] {
+  const { spec, knowledgeEntries, includedChars } = input
   const sources: AimContextSource[] = []
+
+  // 知识条目
   for (const entry of knowledgeEntries) {
     sources.push({
       kind: "knowledge",
@@ -394,13 +463,59 @@ function buildContextManifest(
       charCount: includedChars,
     })
   }
+
+  // ── 方法论来源（系统 + 命名）──
+  // 系统方法论：用实际装配 block 的内容 hash 作为 contentHash（version 等价物），
+  // 这样后台编辑方法论内容后 contextHash 真正变化。
+  pushBlockSource(sources, "methodology", "agent_methodology:ip_copywriting", input.methodologyBlock)
+  pushBlockSource(sources, "methodology", "agent_methodology:business_diagnosis", input.businessDiagnosisBlock)
+  pushBlockSource(sources, "methodology", "agent_methodology:event_storytelling", input.eventStorytellingBlock)
+  // 命名方法论：用 versionRow 的 versionId + checksum，精确到发布的版本
+  for (const row of input.methodologyPolicy.versionRows) {
+    sources.push({
+      kind: "methodology",
+      id: `named_methodology:${row.versionId}`,
+      updatedAt: row.updatedAt,
+      charCount: input.selectedMethodologyBlock.length,
+      contentHash: row.checksum,
+    })
+  }
+
+  // ── IP Wiki / 爆款结构 ──
+  pushBlockSource(sources, "ip_wiki", "ip_wiki:block", input.ipWikiBlock)
+  pushBlockSource(sources, "market_viral", "viral_structure", input.viralStructureBlock)
+
+  // ── 计划模式任务单来源（workflow_brief）──
+  // 当 taskSpec 存在时记录其内容哈希，使 contextHash 反映任务单变更
+  if (input.taskSpec) {
+    const briefJson = JSON.stringify(input.taskSpec)
+    sources.push({
+      kind: "workflow_brief",
+      id: "workflow_brief:task_spec",
+      charCount: briefJson.length,
+      contentHash: sha256(briefJson),
+    })
+  }
+
   // request 来源（rawInput）始终记录，作为 contextHash 的稳定基线
   sources.push({
     kind: "request",
     id: "raw_input",
     charCount: spec.rawInput.length,
+    contentHash: sha256(spec.rawInput),
   })
   return sources
+}
+
+/** 非空 block 才记进 manifest（内容 hash 作为变更追踪依据）。 */
+function pushBlockSource(
+  sources: AimContextSource[],
+  kind: AimContextSource["kind"],
+  id: string,
+  content: string,
+): void {
+  if (!content) return
+  sources.push({ kind, id, charCount: content.length, contentHash: sha256(content) })
 }
 
 export { resolveAimRuntimeTask }

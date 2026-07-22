@@ -21,6 +21,10 @@ export function appendIpSections(sections: string[], params: GenerateScriptCandi
       "",
     )
   }
+  // ADR-002：命名方法论块（含来源边界 + 事实优先级声明，内容已由调用方装配好）
+  if (params.selectedMethodologyBlock) {
+    sections.push(params.selectedMethodologyBlock, "")
+  }
 }
 
 /**

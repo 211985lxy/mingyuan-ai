@@ -6,6 +6,8 @@ export interface ContentProducerChatPromptParams {
   knowledgeBlock: string
   methodologyBlock: string
   ipWikiBlock: string
+  /** ADR-002：本次指定命名方法论（独立块，未选择时为空串）。 */
+  selectedMethodologyBlock?: string
 }
 function buildChatContextBlock(params: Pick<ContentProducerChatPromptParams, "conversationBlock" | "knowledgeBlock">) {
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
@@ -76,7 +78,7 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
 当前对话上下文：
 ${contextBlock}
 
-IP操盘方法论（写作与判断规则）：
+${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}IP操盘方法论（写作与判断规则）：
 ${params.methodologyBlock}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
 

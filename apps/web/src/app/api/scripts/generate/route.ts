@@ -17,6 +17,11 @@ import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-temp
 import { ownsActiveProject } from "@/lib/resource-ownership"
 import { buildTopicContext } from "@/features/aim/services/script-topic-context"
 import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
+import { parseMethodologyProfileIds } from "@/lib/aim-generate-validate"
+import {
+  resolveMethodologyPolicy,
+  buildMethodologyProfileBlock,
+} from "@/lib/methodology-profile-store"
 
 // Allow up to 120 seconds for script generation (3-step LLM chain can take 30-60s)
 export const maxDuration = 120
@@ -44,6 +49,8 @@ export const POST = withUserAuth(async (request, { user }) => {
   const hotTopicFusionTitle = typeof body.hotTopicFusionTitle === "string" ? body.hotTopicFusionTitle : null
   const hotTopicFusionPoints = Array.isArray(body.hotTopicFusionPoints) ? body.hotTopicFusionPoints as string[] : null
   const projectId = typeof body.projectId === "string" && body.projectId ? body.projectId : undefined
+  // ADR-002：显式选择的命名方法论 profile id（MVP 最多 1 个）
+  const methodologyProfileIds = parseMethodologyProfileIds(body)
 
   console.log(`[${requestId}] Request params: templateId=${templateId}, structureId=${structureId}, hotTopicId=${hotTopicId || 'none'}, topicSelectionId=${topicSelectionId || 'none'}, inputKeys=${inputs ? Object.keys(inputs).join(',') : 'none'}`)
 
@@ -219,6 +226,13 @@ export const POST = withUserAuth(async (request, { user }) => {
     const ipWikiBlock = projectId
       ? await buildIpWikiBlock({ projectId }).catch(() => "")
       : ""
+    // ADR-002：命名方法论（与 generate/chat 共用同一解析函数，保证三入口一致）
+    const methodologyPolicy = await resolveMethodologyPolicy({
+      userId: user.id,
+      methodologyProfileIds,
+      rawInput: inputs ? Object.values(inputs).join(" ") : "",
+    }).catch(() => ({ source: "none" as const, selections: [], versionRows: [] }))
+    const selectedMethodologyBlock = buildMethodologyProfileBlock(methodologyPolicy)
     const generation = await generateScriptCandidates({
       template: {
         ...template,
@@ -244,6 +258,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       hotTopicFusion,
       styleProfileBlock,
       ipWikiBlock,
+      selectedMethodologyBlock,
     })
 
     const duration = Date.now() - startTime

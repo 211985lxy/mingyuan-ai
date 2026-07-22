@@ -6,6 +6,7 @@ import {
   type AimChatToolAction,
   type AimEditorContext,
 } from "@/lib/api/client"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 
 interface ChatImage {
   readUrl: string
@@ -59,8 +60,8 @@ export async function runAimChatRequest(input: {
   editorContext?: AimEditorContext
   signal: AbortSignal
   onContent: (content: string) => void
-  agentModule?: "social" | "longform" | "free"
-  writerModule?: "social" | "longform" | "free"
+  agentModule?: CopyStudioModule
+  writerModule?: CopyStudioModule
   traceId?: string
 }): Promise<{ hasContent: boolean }> {
   const options = {

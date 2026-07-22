@@ -109,6 +109,15 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "apimart", model: "gpt-5.6", capability: "advanced" },
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", capability: "advanced" },
   ],
+
+  // ── 朋友圈文案：口语化 + 钩子感 + 中文语感优先 ──
+  moments_copywriter: [
+    { name: "qianfan", model: "ernie-5.1", timeoutMs: 60000, capability: "advanced" },
+    { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
+    { name: "glm", capability: "standard" },
+    { name: "jiekou", capability: "basic" },
+  ],
 }
 
 // 统一创作台模块复用现有生产链，避免在合并阶段改变主线的生产首选顺序。
@@ -116,6 +125,7 @@ const COPY_STUDIO_ROUTE_ALIASES: Record<string, string> = {
   [COPY_STUDIO_ROUTE_KEYS.social]: "content_producer",
   [COPY_STUDIO_ROUTE_KEYS.longform]: "deep_copywriter",
   [COPY_STUDIO_ROUTE_KEYS.free]: "free_copywriter",
+  [COPY_STUDIO_ROUTE_KEYS.moments]: "moments_copywriter",
 }
 
 /**

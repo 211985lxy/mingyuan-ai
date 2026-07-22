@@ -71,11 +71,15 @@ export interface AimGenerationActionInput {
   refreshHistory: (options?: { projectId?: string; agentId?: string; force?: boolean }) => Promise<void>
   refreshProjectWorkflow: () => Promise<void>
   agentModule?: CopyStudioModule
+  /** ADR-002：本次选中的命名方法论 profile id。 */
+  selectedMethodologyProfileIds?: string[]
 }
 
 interface GenerateOptions {
   retryMessageId?: string
   startsNewTask?: boolean
+  /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
+  workflowBriefOverride?: AimWorkflowBriefState | null
 }
 
 /**
@@ -132,11 +136,12 @@ function buildGenerationRequest(
       ? AIM_CONTENT_ACTIONS.find((item) => item.id === input.contentAction)?.taskType || "write_script"
       : "write_script",
     useMarketViralVideos: input.selectedAgentId === "business_diagnosis",
-    workflow: input.workflowBrief ? {
+    workflow: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief) ? {
       stage: "content" as const,
-      sourceGenerationId: input.workflowBrief.sourceGenerationId,
-      confirmed: input.workflowBrief.confirmed,
+      sourceGenerationId: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief)!.sourceGenerationId,
+      confirmed: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief)!.confirmed,
     } : undefined,
+    methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
   }
 }
 

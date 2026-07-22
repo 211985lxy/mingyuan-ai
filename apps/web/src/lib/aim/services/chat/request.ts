@@ -5,7 +5,8 @@
  */
 import type { AimEditorContext } from "@/lib/aim-editor"
 import type { AimMemoryMessage } from "@/lib/aim-memory"
-import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule } from "@/lib/copy-studio"
+import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
+import { parseMethodologyProfileIds } from "@/lib/aim-generate-validate"
 
 /** Extract plain text from an OpenAI-compatible content field. */
 /**
@@ -55,9 +56,11 @@ export type AimChatRequestBody = {
   resultId: string
   shouldStream: boolean
   editorContext?: AimEditorContext
-  agentModule?: "social" | "longform" | "free"
-  writerModule?: "social" | "longform" | "free"
+  agentModule?: CopyStudioModule
+  writerModule?: CopyStudioModule
   traceId?: string
+  /** ADR-002：显式选择的命名方法论 profile id（MVP 最多 1 个）。 */
+  methodologyProfileIds?: string[]
 }
 
 /** Result of parsing the chat body: either a validated request or an error response. */
@@ -103,5 +106,6 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     agentModule,
     writerModule: agentModule,
     traceId: typeof record.traceId === "string" ? (record.traceId as string).trim() : undefined,
+    methodologyProfileIds: parseMethodologyProfileIds(record),
   }
 }

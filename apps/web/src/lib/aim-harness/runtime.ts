@@ -72,6 +72,7 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     agentModule: request.agentModule,
     writerModule: request.writerModule,
     modelPolicy: request.modelPolicy,
+    methodologyProfileIds: request.methodologyProfileIds,
   }
 }
 

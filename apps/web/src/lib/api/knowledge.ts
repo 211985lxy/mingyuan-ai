@@ -148,6 +148,31 @@ export async function saveIpWikiPages(input: {
   return payload.pages
 }
 
+/** 客户自助编辑单页：只改 title/content/frontmatter/links，旧 active 归档、version+1 */
+/**
+ * @description 更新ipwikipage
+ * @param id - 维基页 id
+ * @param data - 可编辑字段补丁
+ * @returns Promise<IpWikiPageDTO>
+ */
+export async function updateIpWikiPage(
+  id: string,
+  data: {
+    projectId: string
+    title?: string
+    content?: string
+    frontmatter?: Record<string, unknown>
+    links?: string[]
+  },
+): Promise<IpWikiPageDTO> {
+  const payload = await request<{ page: IpWikiPageDTO }>(`/api/aim/ip-wiki/pages/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+    timeout: 30000,
+  })
+  return payload.page
+}
+
 export interface IpWikiLintFindingDTO {
   severity: "error" | "warning"
   rule: string

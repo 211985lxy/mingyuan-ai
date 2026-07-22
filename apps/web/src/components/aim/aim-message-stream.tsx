@@ -40,7 +40,9 @@ function ChoiceStepper({ groups, busy, onSubmit }: { groups: AimChoiceGroup[]; b
 function MessageContent({ message }: { message: AimWorkbenchMessage }) {
   if (message.role === "assistant") {
     const display = splitAimMethodNote(message.content)
-    return <>{display.methodNote ? <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary><div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div></details> : null}<MarkdownRenderer content={display.result} /></>
+    // 已有实时思考过程面板（traceId）时不再重复展示「思考依据」折叠块，避免一条消息里出现两处"思考"
+    const showMethodNote = Boolean(display.methodNote) && !message.traceId
+    return <>{showMethodNote ? <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary><div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div></details> : null}<MarkdownRenderer content={display.result} /></>
   }
   return <>{message.images?.length ? <div className="mb-2 flex max-w-64 flex-wrap gap-2">{message.images.map((image) => <img key={image.id} src={image.previewUrl} alt={image.name} className="h-20 w-20 rounded-md border object-cover" />)}</div> : null}<p className="whitespace-pre-wrap break-words">{message.content}</p></>
 }

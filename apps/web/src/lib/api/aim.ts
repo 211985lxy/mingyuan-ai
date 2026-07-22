@@ -157,6 +157,23 @@ export async function createAimWorkflowBrief(
 }
 
 /**
+ * 计划模式：请求档案驱动追问
+ * @param data - 计划请求体
+ * @param signal - 可选 AbortSignal
+ * @returns 计划响应（问题、假设、任务单快照）
+ */
+export async function requestAimPlan(
+  data: import("@/lib/aim/plan-types").PlanRequest,
+  signal?: AbortSignal,
+): Promise<import("@/lib/aim/plan-types").PlanResponse> {
+  return request<import("@/lib/aim/plan-types").PlanResponse>("/api/aim/workflow/plan", {
+    method: "POST",
+    body: JSON.stringify(data),
+    signal,
+  })
+}
+
+/**
  * @description recordaimrunevent
  * @param runId - run唯一标识符
  * @param event - 事件对象
@@ -317,3 +334,26 @@ export function exportToLarkBase(data: {
     body: JSON.stringify(data),
   })
 }
+
+/** ADR-002：命名方法论列表项（前端选择器用）。 */
+export interface MethodologyProfileSummary {
+  id: string
+  name: string
+  originatorName: string | null
+  description: string | null
+  scope: string
+  latestVersion: number | null
+  updatedAt: string
+}
+
+/**
+ * 拉取当前用户可见的命名方法论列表（供「参考方法论」选择器）。
+ * 功能开关关闭时后端返回空数组，前端据此隐藏选择器。
+ *
+ * @description 拉取methodologyprofiles
+ * @returns Promise<MethodologyProfileSummary[]>
+ */
+export function fetchMethodologyProfiles(): Promise<MethodologyProfileSummary[]> {
+  return request<MethodologyProfileSummary[]>("/api/methodology-profiles")
+}
+

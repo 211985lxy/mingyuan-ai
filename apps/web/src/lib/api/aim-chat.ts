@@ -6,6 +6,7 @@ import type { KnowledgeEntry } from "./knowledge"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type { AimChatBody } from "@/features/aim/contracts/api"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 import type {
   ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiScript, ApiUser,
@@ -94,8 +95,8 @@ export async function chatAim(
     toolAction?: AimChatToolAction
     resultId?: string
     editorContext?: AimEditorContext
-    agentModule?: "social" | "longform" | "free"
-    writerModule?: "social" | "longform" | "free"
+    agentModule?: CopyStudioModule
+    writerModule?: CopyStudioModule
     signal?: AbortSignal
   },
 ): Promise<{ content: string; toolResult?: unknown }> {
@@ -120,8 +121,8 @@ export async function chatAimStream(
     agentId?: string
     projectId?: string
     editorContext?: AimEditorContext
-    agentModule?: "social" | "longform" | "free"
-    writerModule?: "social" | "longform" | "free"
+    agentModule?: CopyStudioModule
+    writerModule?: CopyStudioModule
     signal?: AbortSignal
     onDelta: (delta: string, content: string) => void
     traceId?: string

@@ -1,6 +1,7 @@
 import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
 import { extractLatestAimUserIntentText } from "@/lib/aim-current-user-input"
 import { type ContentScenario, getScenarioConfig } from "@/lib/content-scenario-config"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 
 /**
  * 知识调用策略（resolved）
@@ -132,8 +133,8 @@ export interface ResolveKnowledgeStrategyInput {
   taskType?: string
   /** 润色/修改指令（有 → light_edit） */
   polishInstruction?: string
-  /** 创作台模块（social/longform/free）— 影响知识依赖强度 */
-  copyStudioModule?: "social" | "longform" | "free"
+  /** 创作台模块（social/longform/free/moments）— 影响知识依赖强度 */
+  copyStudioModule?: CopyStudioModule
 }
 
 export interface ResolveAimRuntimeTaskInput {

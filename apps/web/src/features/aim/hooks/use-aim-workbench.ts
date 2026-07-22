@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useCallback } from "react"
+import { useState, useMemo, useRef, useCallback, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
 import { transcribeAudio, type ContentFormat } from "@/lib/api/client"
@@ -40,6 +40,8 @@ import { useAimProjectAttach } from "@/hooks/use-aim-project-attach"
 import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/features/aim/aim-reference-annotation"
 import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-mode"
 import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
+import { useAimPlanSession, planTaskSpecToWorkflowBrief } from "@/features/aim/hooks/use-aim-plan-session"
+import type { AimComposerMode } from "@/components/aim/aim-prompt-composer"
 
 /**
  * Master hook — consolidates all AIM workbench state, refs, and hook
@@ -66,6 +68,10 @@ export function useAimWorkbench() {
   const initialQuickMode = modeParam === "quick" || (!projectIdParam && initialDraft?.selectedProjectId === "")
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
   const { agentModule, setAgentModule } = useAimCopyStudioMode({ selectedAgentId, initialModule: initialDraft?.agentModule })
+  // ADR-002：本次选中的命名方法论 profile id（MVP 最多 1 个；从 draft 恢复）
+  const [selectedMethodologyProfileIds, setSelectedMethodologyProfileIds] = useState<string[]>(
+    () => initialDraft?.selectedMethodologyProfileIds ?? [],
+  )
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
@@ -193,6 +199,7 @@ export function useAimWorkbench() {
     videoCopyExtractionId: sourceVideoCopyExtractionId,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
     editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
+    selectedMethodologyProfileIds,
   }, projectEnabled)
   useAimSourceHydration({
     extractionId: sourceVideoCopyExtractionId, sourceOriginalText, sourceAnalysisText,
@@ -240,7 +247,7 @@ export function useAimWorkbench() {
     setWorkflowBrief, setContentAction, setIsGenerating, setIsQualityChecking,
     agent, selectedAgentId, selectedProjectId, projectEnabled, currentWorkflowStage, agentModule,
     contentAction, workflowBrief, sourceVideoCopyExtractionId,
-    sourceTopicTitle, sourceTopicRationale,
+    sourceTopicTitle, sourceTopicRationale, selectedMethodologyProfileIds,
     topicSelectionId: topicSelectionIdParam, selectedTopicIndex: selectedTopicIndexParam,
     requestAbortRef, pendingScrollMessageIdRef, clearCurrentTaskContext,
     openEditorFromResult, refreshHistory, refreshProjectWorkflow,
@@ -267,6 +274,8 @@ export function useAimWorkbench() {
     setInput("")
     clearCurrentTaskContext()
     clearAimDraft(selectedAgentId, currentProjectScope)
+    planSession.resetPlan()
+    setComposerMode("direct")
   }
 
   const restoreScopeDraft = (nextDraft: AimDraft | null) => {
@@ -291,6 +300,9 @@ export function useAimWorkbench() {
     setWorkflowBrief(null)
     setContentAction(null)
     clearImages()
+    // 切换项目时废弃旧计划，防止跨客户上下文混用
+    planSession.abandonPlan()
+    setComposerMode("direct")
   }
 
   const { changeProjectScope } = useAimProjectScopeSwitch({
@@ -329,12 +341,57 @@ export function useAimWorkbench() {
     requestLoad(id)
   }
 
+  // ---- Plan mode ----
+  const [composerMode, setComposerMode] = useState<AimComposerMode>("direct")
+  const planSession = useAimPlanSession()
+  const canUsePlanMode = projectEnabled && Boolean(selectedProjectId)
+
+  // 页面刷新后恢复计划草稿（仅当当前无活跃会话时）
+  useEffect(() => {
+    if (selectedProjectId) planSession.restoreDraft(selectedProjectId)
+  }, [selectedProjectId, planSession.restoreDraft])
+
+  /** 计划模式下“开始规划”按钮的处理 */
+  const handleStartPlan = useCallback(async () => {
+    const requirement = input.trim()
+    if (!requirement) return
+    if (!selectedProjectId) return
+    setInput("")
+    await planSession.startPlan(requirement, selectedProjectId)
+  }, [input, selectedProjectId, setInput, planSession])
+
+  /** 计划模式确认生成：把任务单转为 ConfirmedWorkflowBrief，走现有生成链路 */
+  const handlePlanConfirm = useCallback(() => {
+    const brief = planSession.confirmPlan()
+    if (!brief) return
+    const briefState = { nextInput: planSession.session?.requirement || "", confirmed: brief }
+    setWorkflowBrief(briefState)
+    setComposerMode("direct")
+    // 通过显式参数传递任务单，不依赖 React 状态刚写入后的异步读取
+    void generateWithInput(planSession.session?.requirement || "", { startsNewTask: true, workflowBriefOverride: briefState })
+  }, [planSession, setWorkflowBrief, generateWithInput])
+
+  /** 计划模式放弃 */
+  const handlePlanAbandon = useCallback(() => {
+    planSession.abandonPlan()
+    setComposerMode("direct")
+  }, [planSession])
+
   // ---- Send actions ----
   const { handleUseSkill, handleGenerate, retryFailedMessage } = useAimSendActions({
     messages, input, hasEditorSelection, referenceSelection, draftSelection,
     editorText, sourceOriginalText, sourceAnalysisText, sourceTopicTitle,
     editorPanelLabels, imageAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
   })
+
+  /** 统一的生成入口：计划模式走规划，直接模式走原有生成 */
+  const handleGenerateOrPlan = useCallback(() => {
+    if (composerMode === "plan") {
+      void handleStartPlan()
+    } else {
+      handleGenerate()
+    }
+  }, [composerMode, handleStartPlan, handleGenerate])
 
   // ---- Derived flags ----
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
@@ -382,13 +439,18 @@ export function useAimWorkbench() {
     setInput, setWikiDialog, setWorkflowBriefForm,
     changeProjectScope,
     projectAttach,
-    resetConversation, retryFailed, handleGenerate, handleStop, handleRepurpose, handleQuality,
+    resetConversation, retryFailed, handleGenerate: handleGenerateOrPlan, handleStop, handleRepurpose, handleQuality,
     sendText, handleUseSkill, openEditorFromResult, openProjectWorkflowTask,
+    // 计划模式
+    composerMode, setComposerMode, canUsePlanMode, planSession,
+    handlePlanConfirm, handlePlanAbandon,
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),
     latestGenerationId,
     agentModule,
     setAgentModule,
+    selectedMethodologyProfileIds,
+    setSelectedMethodologyProfileIds,
   }
 }

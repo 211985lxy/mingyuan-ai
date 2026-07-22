@@ -18,6 +18,7 @@ import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { ContentScenario } from "@/lib/content-scenario-config"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 
 import type {
   AimAgentId,
@@ -47,9 +48,11 @@ export interface PlanRunInput {
   runtimeTask?: AimRuntimeTask
   knowledgeStrategy?: ResolvedKnowledgeStrategy
   conversationMode?: AimConversationMode
-  agentModule?: "social" | "longform" | "free"
-  writerModule?: "social" | "longform" | "free"
+  agentModule?: CopyStudioModule
+  writerModule?: CopyStudioModule
   modelPolicy?: AimModelPolicyOverride
+  /** ADR-002：显式选择的命名方法论 profile id（纯输入，解析在装配阶段）。 */
+  methodologyProfileIds?: string[]
 }
 
 function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
@@ -135,8 +138,8 @@ function buildModelPolicy(
   agentId: AimAgentId,
   entrypoint: AimEntrypoint,
   stream: boolean,
-  agentModule?: "social" | "longform" | "free",
-  writerModule?: "social" | "longform" | "free",
+  agentModule?: CopyStudioModule,
+  writerModule?: CopyStudioModule,
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
   const module = agentModule ?? writerModule
@@ -147,20 +150,22 @@ function buildModelPolicy(
     agentId === "business_system_diagnosis" ||
     agentId === "persona"
 
-  // ── 温度差异化：自由创作高创意，深度创作低温度保准确 ──
+  // ── 温度差异化：自由创作高创意，深度创作低温度保准确，朋友圈口语化略高 ──
   const temperature = isChat
     ? 0.7
     : module === "free" ? 0.92
+    : module === "moments" ? 0.88
     : module === "social" ? 0.85
     : agentId === "deep_copywriter" ? 0.72
     : 0.8
 
-  // ── maxTokens 差异化：长文 12k，社交短文 4k，自由创作 6k ──
+  // ── maxTokens 差异化：长文 12k，社交短文 4k，自由创作 6k，朋友圈多版本 6k ──
   const maxTokens = isChat
     ? undefined
     : module === "longform" || agentId === "deep_copywriter" ? 12288
     : module === "social" ? 4096
     : module === "free" ? 6144
+    : module === "moments" ? 6144
     : 8192
 
   return {
@@ -223,5 +228,6 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     rawInput: input.rawInput,
     actorId: input.actorId,
     projectId: input.projectId,
+    methodologyProfileIds: input.methodologyProfileIds,
   })
 }

@@ -65,7 +65,7 @@ export type AimModelPolicyOverride = Readonly<Required<Pick<
 
 /** A single context source loaded for the run, for the manifest + hash. */
 export interface AimContextSource {
-  kind: "request" | "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history"
+  kind: "request" | "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history" | "workflow_brief"
   /** source id (knowledge entry id, wiki page id, …) or stable label */
   id: string
   /** when the source was last updated (ISO), if known */
@@ -102,6 +102,30 @@ export interface AimRunSpec {
    * 升级阶段 1.2：并入冻结 spec，统一质检开关的事实源。
    */
   runLlmQuality?: boolean
+  /**
+   * 用户/前端显式选择的命名方法论 profile id（ADR-002）。纯输入快照，由 planner
+   * 直接冻结；解析（命中 published 版本）在 prepareAimContext 阶段完成，解析结果
+   * 通过 methodologyPolicy 冻结。未传或功能开关关闭时为空。
+   */
+  methodologyProfileIds?: string[]
+  /**
+   * 解析后的命名方法论策略（profile + published 版本）。由装配阶段产出并通过
+   * withSpecOverrides 并入冻结 spec，使 snapshot 同时记录输入选择与命中版本，
+   * 保证历史可重放、可追溯。planner 本身不解析（保持纯同步）。
+   */
+  methodologyPolicy?: AimMethodologyPolicy
+}
+
+/** 冻结后的命名方法论策略（ADR-002）。 */
+export interface AimMethodologyPolicy {
+  source: "explicit_parameter" | "explicit_text" | "none"
+  selections: Array<{
+    profileId: string
+    versionId: string
+    version: number
+    mode: "primary"
+    reason: string
+  }>
 }
 
 /** Per-run metadata captured during execution (the acceptance-criteria payload). */

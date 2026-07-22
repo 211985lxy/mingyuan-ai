@@ -26,6 +26,10 @@ export type AssembledAimChatContext = {
   query: string
   knowledgeEntries: number
   knowledgeSource: string
+  /** ADR-002：本次指定命名方法论块。 */
+  selectedMethodologyBlock: string
+  /** ADR-002：解析后的方法论策略（供 chatParams 透传到 handler）。 */
+  methodologyPolicy: import("@/lib/methodology-profile-store").MethodologyPolicy
 }
 
 /** Build contextManifest from assembled blocks and normalized messages. */
@@ -59,6 +63,16 @@ function buildChatContextManifest(input: {
   for (const [kind, id, content] of contextBlocks) {
     if (content) manifest.push({ kind, id, charCount: content.length, contentHash: sha256(content) })
   }
+  // ADR-002：命名方法论精确到发布的版本（versionId + checksum），保证可追溯
+  for (const row of blocks.methodologyPolicy.versionRows) {
+    manifest.push({
+      kind: "methodology",
+      id: `named_methodology:${row.versionId}`,
+      updatedAt: row.updatedAt,
+      charCount: blocks.selectedMethodologyBlock.length,
+      contentHash: row.checksum,
+    })
+  }
   return manifest
 }
 
@@ -81,6 +95,8 @@ export async function assembleAimChatContext(input: {
   messages: unknown[]
   editorContext?: AimEditorContext
   trace?: AimTraceRecorder
+  /** ADR-002：显式选择的命名方法论 profile id。 */
+  methodologyProfileIds?: string[]
 }): Promise<AssembledAimChatContext> {
   const { userId, projectId, agentId, messages, editorContext, trace } = input
   const lastMessage = messages[messages.length - 1] as { content?: unknown } | undefined
@@ -115,6 +131,7 @@ export async function assembleAimChatContext(input: {
     conversationIntent,
     runtimeTask,
     trace,
+    methodologyProfileIds: input.methodologyProfileIds,
   })
 
   const allNormalizedMessages = normalizeMemoryMessages(messages)
@@ -133,5 +150,7 @@ export async function assembleAimChatContext(input: {
     query,
     knowledgeEntries: blocks.knowledgeContext.entries.length,
     knowledgeSource: blocks.knowledgeContext.source,
+    selectedMethodologyBlock: blocks.selectedMethodologyBlock,
+    methodologyPolicy: blocks.methodologyPolicy,
   }
 }

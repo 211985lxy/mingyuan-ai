@@ -34,6 +34,8 @@ export interface AimChatParams {
   businessDiagnosisBlock: string
   /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
   ipWikiBlock: string
+  /** ADR-002：本次指定命名方法论（chat 装配层注入，未选择时为空串） */
+  selectedMethodologyBlock?: string
   conversationIntent?: AimConversationIntent
   runtimeTask?: AimRuntimeTask
   modelPolicy?: AimModelPolicy
@@ -74,6 +76,8 @@ export interface AimGenerateContext {
   eventStorytellingBlock: string
   /** IP 定位维基（已编译定位底盘），无 projectId 或无维基页时为空串 */
   ipWikiBlock: string
+  /** ADR-002：本次指定命名方法论（独立预算块，未选择时为空串） */
+  selectedMethodologyBlock: string
   retrievedEntries: any[]
   retrievedSource: string
   /** 本次实际生效的知识调用策略（解析后回传，供 UI 反馈） */

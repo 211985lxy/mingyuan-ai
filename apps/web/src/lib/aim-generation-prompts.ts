@@ -139,6 +139,14 @@ export function buildWorkflowContext(context: AimGenerateContext): string {
           taskSpec.exclusiveEvidence ? `- 专属证据：${taskSpec.exclusiveEvidence}` : null,
           taskSpec.desiredAction ? `- 期望动作：${taskSpec.desiredAction}` : null,
           taskSpec.dealPath ? `- 成交承接：${taskSpec.dealPath}` : null,
+          // ── 计划模式扩展字段（必须真实控制输出，不得只作为备注）──
+          taskSpec.coreMessage ? `- 核心信息：${taskSpec.coreMessage}` : null,
+          taskSpec.platform ? `- 发布平台：${taskSpec.platform}` : null,
+          taskSpec.useScenario ? `- 使用场景：${taskSpec.useScenario}` : null,
+          taskSpec.outputFormat ? `- 输出格式：${taskSpec.outputFormat}` : null,
+          taskSpec.style ? `- 风格：${taskSpec.style}` : null,
+          taskSpec.lengthRule ? `- 长度要求：${taskSpec.lengthRule}` : null,
+          taskSpec.ctaText ? `- CTA：${taskSpec.ctaText}` : null,
         ].filter(Boolean).join("\n")
       : null,
     context.topicTitle
@@ -240,6 +248,7 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
   return `${agentPrompt}
 
 ${context.knowledgeBlock}
+${context.selectedMethodologyBlock}
 ${context.methodologyBlock}
 ${context.businessDiagnosisBlock}
 ${context.viralStructureBlock}

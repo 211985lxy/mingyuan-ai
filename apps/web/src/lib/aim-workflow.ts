@@ -86,6 +86,21 @@ export interface ConfirmedWorkflowBrief {
   desiredAction?: DesiredAction
   suggestedFormat?: string
   userSupplement?: string
+  // ── 计划模式扩展字段（Plan Mode）──
+  /** 核心信息 */
+  coreMessage?: string
+  /** 发布平台 */
+  platform?: string
+  /** 使用场景 */
+  useScenario?: string
+  /** 输出格式 */
+  outputFormat?: string
+  /** 风格 */
+  style?: string
+  /** 长度规则 */
+  lengthRule?: string
+  /** CTA 自由文本（不做枚举校验） */
+  ctaText?: string
 }
 
 const CONTENT_TASKS: ContentTask[] = ["吸引目标客户", "建立专业信任", "展示真实案例", "筛选不适合客户", "解释问题与方法", "推动咨询行动"]
@@ -117,6 +132,14 @@ export function parseConfirmedWorkflowBrief(value: unknown): ConfirmedWorkflowBr
     desiredAction: desiredAction && DESIRED_ACTIONS.includes(desiredAction as DesiredAction) ? desiredAction as DesiredAction : undefined,
     suggestedFormat: cleanText(input.suggestedFormat, 100),
     userSupplement: cleanText(input.userSupplement, 1000),
+    // 计划模式扩展字段
+    coreMessage: cleanText(input.coreMessage, 300),
+    platform: cleanText(input.platform, 60),
+    useScenario: cleanText(input.useScenario, 100),
+    outputFormat: cleanText(input.outputFormat, 100),
+    style: cleanText(input.style, 100),
+    lengthRule: cleanText(input.lengthRule, 100),
+    ctaText: cleanText(input.ctaText, 300),
   }
 }
 
@@ -160,6 +183,12 @@ export function applyConfirmedWorkflowBrief(base: TaskSpec, confirmed?: Confirme
     confirmed.mustKeep ? `必须保留：${confirmed.mustKeep}` : "",
     confirmed.avoid ? `禁区：${confirmed.avoid}` : "",
     confirmed.suggestedFormat ? `建议形式：${confirmed.suggestedFormat}` : "",
+    confirmed.platform ? `发布平台：${confirmed.platform}` : "",
+    confirmed.useScenario ? `使用场景：${confirmed.useScenario}` : "",
+    confirmed.outputFormat ? `输出格式：${confirmed.outputFormat}` : "",
+    confirmed.style ? `风格：${confirmed.style}` : "",
+    confirmed.lengthRule ? `长度要求：${confirmed.lengthRule}` : "",
+    confirmed.ctaText ? `CTA：${confirmed.ctaText}` : "",
   ].filter(Boolean)
   return {
     ...base,
@@ -169,9 +198,17 @@ export function applyConfirmedWorkflowBrief(base: TaskSpec, confirmed?: Confirme
     contentTask: confirmed.contentTask || base.contentTask,
     exclusiveEvidence: confirmed.mustKeep || base.exclusiveEvidence,
     desiredAction: confirmed.desiredAction || base.desiredAction,
+    // 计划模式扩展字段
+    coreMessage: confirmed.coreMessage || base.coreMessage,
+    platform: confirmed.platform || base.platform,
+    useScenario: confirmed.useScenario || base.useScenario,
+    outputFormat: confirmed.outputFormat || base.outputFormat,
+    style: confirmed.style || base.style,
+    lengthRule: confirmed.lengthRule || base.lengthRule,
+    ctaText: confirmed.ctaText || base.ctaText,
     knownFacts: [...base.knownFacts, ...additions].slice(0, 12),
     assumptions: constraints.length
-      ? [...base.assumptions, ...constraints.map((statement) => ({ statement, impact: "medium" as const }))].slice(0, 6)
+      ? [...base.assumptions, ...constraints.map((statement) => ({ statement, impact: "medium" as const }))].slice(0, 10)
       : base.assumptions,
   }
 }

@@ -14,6 +14,7 @@ import {
   persistMemoriesFromConversation,
 } from "@/lib/aim-memory"
 import type { AssembledAimChatContext } from "./context-assembly"
+import type { CopyStudioModule } from "@/lib/copy-studio"
 
 export type AimChatExecutionInput = ReturnType<typeof prepareAimChatExecution>
 
@@ -37,8 +38,8 @@ export function prepareAimChatExecution(input: {
   agentId: string
   shouldStream: boolean
   trace?: AimTraceRecorder
-  agentModule?: "social" | "longform" | "free"
-  writerModule?: "social" | "longform" | "free"
+  agentModule?: CopyStudioModule
+  writerModule?: CopyStudioModule
 }) {
   const { context, userId, projectId, agentId, trace } = input
   const { query, normalizedMessages, runtimeTask, conversationIntent, knowledgeBlock } = context
@@ -51,6 +52,8 @@ export function prepareAimChatExecution(input: {
     conversationIntent,
     runtimeTask,
     trace,
+    // ADR-002：命名方法论块透传到 handler（buildAimChatRuntime 会纳入预算）
+    selectedMethodologyBlock: context.selectedMethodologyBlock,
   }
 
   const summaryStep = {

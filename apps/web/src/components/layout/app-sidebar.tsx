@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Trash2,
   LogIn,
+  CalendarDays,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -46,6 +47,8 @@ import {
   type AimAgentId,
 } from "@/lib/aim-ui-config"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
+import { useAuthStore } from "@/lib/store"
+import { getSubscriptionStatus } from "@/lib/subscription"
 
 interface NavItem {
   title: string
@@ -156,6 +159,29 @@ function formatHistoryTitle(item: {
   const theme = compactHistoryTheme(item.topicTitle || extractHistoryTheme(item.rawInput))
   const format = getHistoryFormatLabel(item)
   return [`${format ? `${format}｜` : ""}${theme}`, date].filter(Boolean).join(" ")
+}
+
+/** 侧边栏左下角账号徽标：邮箱 + 到期时间 */
+function SidebarAccountBadge() {
+  const user = useAuthStore((s) => s.user)
+  if (!user) return null
+
+  const status = getSubscriptionStatus(user.expiresAt ?? null)
+  const expiryLabel =
+    status === "inactive" ? "未激活"
+    : status === "expired" ? "已过期"
+    : !user.expiresAt ? "未设置"
+    : new Date(user.expiresAt).toLocaleDateString("zh-CN")
+
+  return (
+    <div className="mb-2 flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground">
+      <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-foreground/80">{user.email}</p>
+        <p>到期 {expiryLabel}</p>
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -388,6 +414,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-3 border-t border-border/20">
+        <SidebarAccountBadge />
         <SidebarMenu>
           {footerItems.map((item) => {
             const active = pathname.startsWith(item.href)

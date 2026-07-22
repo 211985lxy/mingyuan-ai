@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronDown, ImagePlus, Loader2, Mic, Search, Send, Square, X } from "lucide-react"
+import { ChevronDown, ImagePlus, ListChecks, Loader2, Mic, Search, Send, Square, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+
+export type AimComposerMode = "direct" | "plan"
 
 interface AimPromptComposerProps {
   value: string
@@ -27,6 +29,14 @@ interface AimPromptComposerProps {
   imageAttachments?: Array<{ id: string; name: string; previewUrl: string }>
   onAddImages?: (files: FileList) => void
   onRemoveImage?: (id: string) => void
+  /** 计划模式：当前模式（默认 direct） */
+  composerMode?: AimComposerMode
+  /** 计划模式：切换模式回调 */
+  onComposerModeChange?: (mode: AimComposerMode) => void
+  /** 计划模式：是否允许开启（需已选客户项目） */
+  canUsePlanMode?: boolean
+  /** 计划模式：是否处于计划会话中（隐藏切换） */
+  isPlanSessionActive?: boolean
 }
 
 /**
@@ -54,7 +64,12 @@ export function AimPromptComposer({
   imageAttachments = [],
   onAddImages,
   onRemoveImage,
+  composerMode = "direct",
+  onComposerModeChange,
+  canUsePlanMode = false,
+  isPlanSessionActive = false,
 }: AimPromptComposerProps) {
+  const isPlanMode = composerMode === "plan"
   const canSend = !busy && !isRecording && (value.trim().length > 0 || imageAttachments.length > 0)
   const canSubmit = canSend && canGenerate
   const canStop = busy && !isRecording && Boolean(onStop)
@@ -186,11 +201,28 @@ export function AimPromptComposer({
               <span className="text-primary">语音转写中...</span>
             ) : isRecording ? (
               <span className="text-red-500">正在录音，点击停止后可发送</span>
+            ) : isPlanMode ? (
+              <span className="text-primary">计划模式：输入一句大概需求，AI 帮你规划</span>
             ) : (
               "Enter 发送 · Shift+Enter 换行"
             )}
           </p>
           <div className="flex items-center justify-end gap-1.5">
+            {/* 计划模式开关（仅新写文案场景、未处于计划会话中时显示） */}
+            {!isPlanSessionActive && onComposerModeChange && (
+              <Button
+                type="button"
+                size="sm"
+                variant={isPlanMode ? "secondary" : "ghost"}
+                className={`h-8 gap-1 px-2 text-xs ${isPlanMode ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")}
+                disabled={busy || (!canUsePlanMode && !isPlanMode)}
+                title={!canUsePlanMode && !isPlanMode ? "请先选择 IP 营销全案" : isPlanMode ? "切回直接模式" : "开启计划模式"}
+              >
+                <ListChecks className="h-3.5 w-3.5" />
+                计划
+              </Button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -254,10 +286,11 @@ export function AimPromptComposer({
               size="sm"
               onClick={onGenerate}
               disabled={!canSubmit}
-              className="h-8 w-8 p-0 shadow-xs"
-              title={primaryActionLabel}
+              className={`h-8 shadow-xs ${isPlanMode ? "gap-1.5 px-3" : "w-8 p-0"}`}
+              title={isPlanMode ? "开始规划" : primaryActionLabel}
             >
-              {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isPlanMode ? <ListChecks className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+              {isPlanMode && <span className="text-xs">开始规划</span>}
             </Button>
           </div>
         </div>

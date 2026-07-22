@@ -25,6 +25,11 @@ import {
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationIntent } from "@/lib/aim-conversation-intent"
 import { composeAimReferenceContext } from "@/lib/aim-context-priority"
+import {
+  resolveMethodologyPolicy,
+  buildMethodologyProfileBlock,
+  type MethodologyPolicy,
+} from "@/lib/methodology-profile-store"
 
 export type RetrievedChatContextBlocks = {
   knowledgeBlock: string
@@ -33,6 +38,10 @@ export type RetrievedChatContextBlocks = {
   competitorWatchBlock: string
   editorBlock: string
   memoryBlock: string
+  /** ADR-002：本次指定命名方法论（独立块，未选择时为空串）。 */
+  selectedMethodologyBlock: string
+  /** ADR-002：解析后的方法论策略（供 manifest 记录）。 */
+  methodologyPolicy: MethodologyPolicy
 }
 
 /**
@@ -55,6 +64,8 @@ export async function retrieveChatContextBlocks(input: {
   conversationIntent: AimConversationIntent
   runtimeTask: AimRuntimeTask
   trace?: AimTraceRecorder
+  /** ADR-002：显式选择的命名方法论 profile id。 */
+  methodologyProfileIds?: string[]
 }): Promise<RetrievedChatContextBlocks> {
   const { userId, projectId, agentId, query, editorContext, conversationIntent, runtimeTask, trace } = input
 
@@ -130,5 +141,22 @@ export async function retrieveChatContextBlocks(input: {
     externalReference: competitorWatchBlock,
   })
 
-  return { knowledgeBlock, knowledgeContext, styleBlock, competitorWatchBlock, editorBlock, memoryBlock }
+  // ADR-002：命名方法论（显式 ID > 文本精确命中 > none），与 generate/scripts 共用同一解析函数
+  const methodologyPolicy = await resolveMethodologyPolicy({
+    userId,
+    methodologyProfileIds: input.methodologyProfileIds,
+    rawInput: query,
+  })
+  const selectedMethodologyBlock = buildMethodologyProfileBlock(methodologyPolicy)
+
+  return {
+    knowledgeBlock,
+    knowledgeContext,
+    styleBlock,
+    competitorWatchBlock,
+    editorBlock,
+    memoryBlock,
+    selectedMethodologyBlock,
+    methodologyPolicy,
+  }
 }

@@ -4,6 +4,8 @@ const id = z.string().trim().min(1).max(80)
 const optionalId = id.optional()
 const shortText = z.string().max(2_000)
 const longText = z.string().max(100_000)
+// ADR-002：命名方法论 profile id（MVP 最多 1 个主方法论）
+const methodologyProfileIdsSchema = z.array(z.string().trim().min(1).max(80)).max(1).optional()
 
 const confirmedBriefSchema = z.object({
   goal: z.string().max(500).optional(),
@@ -65,8 +67,9 @@ export const aimChatBodySchema = z.object({
   resultId: optionalId,
   stream: z.boolean().optional(),
   editorContext: editorContextSchema.optional(),
-  agentModule: z.enum(["social", "longform", "free"]).optional(),
-  writerModule: z.enum(["social", "longform", "free"]).optional(),
+  agentModule: z.enum(["social", "longform", "free", "moments"]).optional(),
+  writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
+  methodologyProfileIds: methodologyProfileIdsSchema,
 }).strict()
 
 const contentFormatSchema = z.enum([
@@ -97,9 +100,10 @@ export const aimGenerateBodySchema = z.object({
   topicSelectionId: optionalId,
   selectedTopicIndex: z.number().int().min(0).max(20).optional(),
   workflow: aimWorkflowBriefBodySchema.optional(),
-  agentModule: z.enum(["social", "longform", "free"]).optional(),
-  writerModule: z.enum(["social", "longform", "free"]).optional(),
+  agentModule: z.enum(["social", "longform", "free", "moments"]).optional(),
+  writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   traceId: optionalId,
+  methodologyProfileIds: methodologyProfileIdsSchema,
 }).strict()
 
 export const aimEvolveBodySchema = z.object({

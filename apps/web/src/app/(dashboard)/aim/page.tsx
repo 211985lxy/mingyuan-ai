@@ -9,7 +9,9 @@ import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
-import { AimContentModeSelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
+import { AimContentModeSelector, AimMethodologySelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
+import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
+import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 
 export default function AimPage() {
@@ -42,7 +44,7 @@ export default function AimPage() {
           personaProgress={w.personaProgress}
         />
 
-        {w.selectedAgentId === "content_producer" && <AimContentModeSelector value={w.agentModule} onChange={w.setAgentModule} />}
+        <AimMethodologySelector value={w.selectedMethodologyProfileIds} onChange={w.setSelectedMethodologyProfileIds} />
 
         {w.selectedProjectId && (
           <AimProjectTaskPanel
@@ -59,11 +61,40 @@ export default function AimPage() {
           onSave={(s) => void w.handleSaveEvolutionSuggestion(s)}
         />
 
+        {/* 计划模式：问题卡片 / 任务单卡片（覆盖在对话区上方） */}
+        {w.planSession.session?.status === "asking" && w.planSession.currentQuestion && (
+          <div className="px-3 py-2 sm:px-5">
+            <AimPlanQuestionCard
+              question={w.planSession.currentQuestion}
+              questionNumber={w.planSession.questionNumber}
+              totalQuestions={w.planSession.totalQuestions}
+              loading={w.planSession.session.loading}
+              canGoBack={w.planSession.session.currentIndex > 0}
+              onSelectOption={w.planSession.answerOption}
+              onSelectCustom={w.planSession.answerCustom}
+              onGoBack={w.planSession.goBack}
+            />
+          </div>
+        )}
+        {w.planSession.session?.status === "reviewing" && (
+          <div className="px-3 py-2 sm:px-5">
+            <AimPlanTaskSpecCard
+              taskSpec={w.planSession.session.taskSpec}
+              assumptions={w.planSession.session.assumptions}
+              requirement={w.planSession.session.requirement}
+              busy={w.busy}
+              onConfirm={w.handlePlanConfirm}
+              onAbandon={w.handlePlanAbandon}
+              onReSelect={() => w.planSession.goBack()}
+            />
+          </div>
+        )}
+
         <AimMessageStream
           ref={w.scrollRef}
           messages={w.messages}
           busy={w.busy}
-          workflowLanding={w.showWorkflowLanding}
+          workflowLanding={w.showWorkflowLanding && !w.planSession.isPlanMode}
           agentIntro={w.agent.intro}
           workflowStage={w.currentWorkflowStage}
           selectedAgentId={w.selectedAgentId}
@@ -88,10 +119,11 @@ export default function AimPage() {
 
         {/* 输入区 */}
         <footer className="border-t px-3 py-2 sm:px-5">
+          {w.selectedAgentId === "content_producer" && <AimContentModeSelector value={w.agentModule} onChange={w.setAgentModule} />}
           <AimResearchHint agentId={w.selectedAgentId} />
           <AimPromptComposer
             value={w.input}
-            placeholder={w.agent.placeholder}
+            placeholder={w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : w.agent.placeholder}
             busy={w.busy}
             isRecording={w.isRecording}
             isTranscribing={w.isTranscribing}
@@ -113,6 +145,10 @@ export default function AimPage() {
             imageAttachments={w.imageAttachments}
             onAddImages={(files) => void w.addImages(files)}
             onRemoveImage={w.removeImage}
+            composerMode={w.composerMode}
+            onComposerModeChange={w.setComposerMode}
+            canUsePlanMode={w.canUsePlanMode}
+            isPlanSessionActive={w.planSession.isPlanMode}
           />
         </footer>
       </section>

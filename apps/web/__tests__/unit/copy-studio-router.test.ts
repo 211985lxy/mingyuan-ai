@@ -3,17 +3,20 @@ import { COPY_STUDIO_ROUTE_KEYS, copyStudioModuleFromRouteKey, isCopyStudioModul
 import { getAgentRecommendedModel, resolveAgentRouteKey } from "@/lib/llm/agent-router"
 
 describe("copy studio module contract", () => {
-  it("only accepts the three supported creator modes", () => {
+  it("only accepts the four supported creator modes", () => {
     expect(isCopyStudioModule("social")).toBe(true)
     expect(isCopyStudioModule("longform")).toBe(true)
     expect(isCopyStudioModule("free")).toBe(true)
+    expect(isCopyStudioModule("moments")).toBe(true)
     expect(isCopyStudioModule("video")).toBe(false)
   })
 
   it("maps modules to existing agent routes without changing production order", () => {
     expect(resolveCopyStudioRouteKey("social")).toBe(COPY_STUDIO_ROUTE_KEYS.social)
+    expect(resolveCopyStudioRouteKey("moments")).toBe(COPY_STUDIO_ROUTE_KEYS.moments)
     expect(resolveAgentRouteKey("content_producer", "social")).toBe(COPY_STUDIO_ROUTE_KEYS.social)
     expect(resolveAgentRouteKey("deep_copywriter", "longform")).toBe(COPY_STUDIO_ROUTE_KEYS.longform)
+    expect(resolveAgentRouteKey("content_producer", "moments")).toBe(COPY_STUDIO_ROUTE_KEYS.moments)
     expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.social)).toBe(getAgentRecommendedModel("content_producer"))
     expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.longform)).toBe(getAgentRecommendedModel("deep_copywriter"))
   })
@@ -28,6 +31,7 @@ describe("copy studio module contract", () => {
 
   it("round-trips copy-studio route keys only", () => {
     expect(copyStudioModuleFromRouteKey("copy_studio.free")).toBe("free")
+    expect(copyStudioModuleFromRouteKey("copy_studio.moments")).toBe("moments")
     expect(copyStudioModuleFromRouteKey("business_diagnosis")).toBeUndefined()
   })
 })

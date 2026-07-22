@@ -8,6 +8,8 @@ export interface AimContextBlocks {
   viralStructureBlock: string
   eventStorytellingBlock: string
   ipWikiBlock: string
+  /** ADR-002：本次指定命名方法论（独立预算块，不与系统方法论争预算）。 */
+  selectedMethodologyBlock: string
 }
 
 type AimContextBlockKey = keyof AimContextBlocks
@@ -21,6 +23,7 @@ interface AimContextBudgetProfile {
 const DEFAULT_PRIORITY: AimContextBlockKey[] = [
   "conversationBlock",
   "ipWikiBlock",
+  "selectedMethodologyBlock",
   "knowledgeBlock",
   "methodologyBlock",
   "businessDiagnosisBlock",
@@ -32,18 +35,19 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
   light_edit: {
     totalChars: 5_000,
     priority: DEFAULT_PRIORITY,
-    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 2_000, ipWikiBlock: 1_000, methodologyBlock: 500 },
+    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 2_000, ipWikiBlock: 1_000, selectedMethodologyBlock: 1_200, methodologyBlock: 500 },
   },
   rewrite_copy: {
     totalChars: 9_000,
     priority: DEFAULT_PRIORITY,
-    blockCaps: { conversationBlock: 1_500, ipWikiBlock: 2_500, knowledgeBlock: 3_500, methodologyBlock: 1_500 },
+    blockCaps: { conversationBlock: 1_500, ipWikiBlock: 2_500, selectedMethodologyBlock: 1_500, knowledgeBlock: 3_500, methodologyBlock: 1_500 },
   },
   new_copy: {
     totalChars: 14_000,
     priority: [
       "conversationBlock",
       "ipWikiBlock",
+      "selectedMethodologyBlock",
       "knowledgeBlock",
       "eventStorytellingBlock",
       "viralStructureBlock",
@@ -53,6 +57,7 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
     blockCaps: {
       conversationBlock: 1_000,
       ipWikiBlock: 3_000,
+      selectedMethodologyBlock: 2_000,
       knowledgeBlock: 4_500,
       eventStorytellingBlock: 1_800,
       viralStructureBlock: 1_200,
@@ -64,6 +69,7 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
     priority: [
       "conversationBlock",
       "ipWikiBlock",
+      "selectedMethodologyBlock",
       "businessDiagnosisBlock",
       "methodologyBlock",
       "knowledgeBlock",
@@ -73,6 +79,7 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
     blockCaps: {
       conversationBlock: 1_500,
       ipWikiBlock: 4_500,
+      selectedMethodologyBlock: 2_500,
       businessDiagnosisBlock: 3_000,
       methodologyBlock: 3_500,
       knowledgeBlock: 3_500,
@@ -83,13 +90,14 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
     priority: [
       "conversationBlock",
       "knowledgeBlock",
+      "selectedMethodologyBlock",
       "methodologyBlock",
       "ipWikiBlock",
       "businessDiagnosisBlock",
       "viralStructureBlock",
       "eventStorytellingBlock",
     ],
-    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 4_500, methodologyBlock: 1_500, ipWikiBlock: 500 },
+    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 4_500, selectedMethodologyBlock: 1_200, methodologyBlock: 1_500, ipWikiBlock: 500 },
   },
 }
 

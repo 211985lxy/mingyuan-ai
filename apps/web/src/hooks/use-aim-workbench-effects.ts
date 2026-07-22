@@ -18,17 +18,20 @@ export function useAimDraftAutosave(draft: AimDraft, projectEnabled: boolean) {
     selectedAgentId, selectedProjectId, agentModule, input, messages, videoCopyExtractionId,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
     editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
+    selectedMethodologyProfileIds,
   } = draft
   useEffect(() => {
     saveAimDraft({
       selectedAgentId, selectedProjectId, agentModule, input, messages, videoCopyExtractionId,
       sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale,
       editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
+      selectedMethodologyProfileIds,
     }, aimDraftProjectScope(projectEnabled, selectedProjectId))
   }, [
     editorFormat, editorPanelOpen, editorPanelWidth, editorSourceMessageId, editorText,
     agentModule, input, messages, projectEnabled, selectedAgentId, selectedProjectId, sourceAnalysisText,
     sourceOriginalText, sourceTopicRationale, sourceTopicTitle, videoCopyExtractionId,
+    selectedMethodologyProfileIds,
   ])
 }
 

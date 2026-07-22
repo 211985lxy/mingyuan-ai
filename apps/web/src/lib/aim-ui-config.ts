@@ -43,7 +43,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     id: "content_producer",
     title: "内容文案创作",
     displayTitle: "内容创作官",
-    description: "社媒速产、深度长文、自由交付",
+    description: "社媒速产、深度长文、自由交付、朋友圈文案",
     icon: Video,
     defaultFormats: ["video_script"],
   },

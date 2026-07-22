@@ -38,6 +38,7 @@ model User {
   assetCandidates       AssetCandidate[]
   commentInsightJobs    CommentInsightJob[]
   aimContentVersions    AimContentVersion[]
+  methodologyProfiles   MethodologyProfile[]
 }
 
 model AdminUser {

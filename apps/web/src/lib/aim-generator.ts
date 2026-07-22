@@ -42,6 +42,8 @@ export interface AimInput {
   selectedTopicIndex?: number
   taskSpec?: import("@/lib/task-spec").TaskSpec
   runSpec?: AimRunSpec
+  /** ADR-002：显式选择的命名方法论 profile id（透传到 buildAimGeneration → prepareAimContext）。 */
+  methodologyProfileIds?: string[]
 }
 
 function asStringArray(value: unknown): string[] {
@@ -202,5 +204,6 @@ export async function generateAimContent(input: AimInput) {
     selectedTopicIndex: input.selectedTopicIndex,
     taskSpec: input.taskSpec,
     runSpec: input.runSpec,
+    methodologyProfileIds: input.methodologyProfileIds,
   })
 }
