@@ -163,7 +163,7 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
     return "quality_review"
   }
 
-  if (input.agentId === "business_diagnosis") {
+  if (input.agentId === "business_diagnosis" || input.agentId === "persona") {
     return "positioning_topic"
   }
 
