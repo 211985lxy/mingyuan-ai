@@ -1,5 +1,5 @@
-"use client"
 // @ts-nocheck — WIP: opportunities 模块类型待修复
+"use client"
 
 import { useState } from "react"
 import { Search, Loader2, AlertTriangle } from "lucide-react"
