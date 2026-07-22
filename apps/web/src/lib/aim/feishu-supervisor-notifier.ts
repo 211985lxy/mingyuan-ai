@@ -1,3 +1,7 @@
+/**
+ * 单 Bot 监督通知（默认 FEISHU_APP_ID）。
+ * 多 Bot 场景请使用 feishu-agent-bot-notify.ts 的 pushSupervisorNotificationAsBot。
+ */
 import { getFeishuTenantAccessToken } from "@/lib/integrations/feishu-topic-chat"
 import { env } from "@/env"
 

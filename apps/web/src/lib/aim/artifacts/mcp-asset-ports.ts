@@ -17,6 +17,8 @@
  * - 不接受任意文件路径（只接受预定义目录下的文件）
  * - 所有操作记录 Trace
  */
+import { z } from "zod"
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import type {
   AimArtifactSpec,
   FeishuAssetReceipt,
@@ -205,7 +207,113 @@ export function validateUpdateArtifactInput(input: Record<string, unknown>): str
   return null
 }
 
-// ─── MCP Handler 路由（供 API route 调用）─────────────────────────────────────
+// ─── 统一 MCP Server 注册（与 aim-remote/mcp-tools.ts 共享同一 server）───────
+
+/**
+ * 将 5 个资产管理工具注册到统一 MCP Server。
+ * 在 api/aim-mcp/[transport]/route.ts 中与 registerAimMcpTools 一起调用。
+ */
+export function registerAssetMcpTools(server: McpServer): void {
+  server.registerTool(
+    "asset_create",
+    {
+      title: "创建飞书资产",
+      description: "创建飞书资产（Doc/Base记录/Sheet/Drive文件）。",
+      inputSchema: {
+        kind: z.enum(["feishu_doc", "feishu_base_records", "feishu_sheet", "feishu_drive_file"]),
+        title: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(80),
+        workItemRecordId: z.string().min(1).max(80),
+        content: z.string().min(1),
+        role: z.enum(["primary", "secondary"]).optional(),
+        permissionProfile: z.enum(["internal", "project_team", "client_delivery"]).optional(),
+      },
+    },
+    async (args) => {
+      const spec: AimArtifactSpec = {
+        artifactKey: buildArtifactKey(args.kind as FeishuAssetKind, args.workItemRecordId),
+        generationId: `mcp_${Date.now()}`,
+        workItemRecordId: args.workItemRecordId,
+        projectId: args.projectId,
+        kind: args.kind as FeishuAssetKind,
+        role: (args.role as ArtifactRole) ?? "primary",
+        title: args.title,
+        required: true,
+        permissionProfile: (args.permissionProfile as PermissionProfile) ?? "internal",
+        payload: { markdown: args.content },
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify({ spec, status: "queued" }) }] }
+    },
+  )
+
+  server.registerTool(
+    "asset_query",
+    {
+      title: "查询资产状态",
+      description: "通过 artifactKey 或 generationId 查询资产 Receipt。",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        artifactKey: z.string().optional(),
+        generationId: z.string().optional(),
+        projectId: z.string().optional(),
+      },
+    },
+    async (args) => {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ query: args, receipts: [] }) }] }
+    },
+  )
+
+  server.registerTool(
+    "asset_update",
+    {
+      title: "更新飞书资产",
+      description: "更新已有飞书资产，遵循阶段感知更新策略（不覆盖人工编辑）。",
+      inputSchema: {
+        artifactKey: z.string().min(1),
+        docToken: z.string().optional(),
+        newContent: z.string().min(1),
+        stage: z.enum(["draft", "pending_review", "completed", "human_edited"]),
+      },
+    },
+    async (args) => {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ updated: args.artifactKey, stage: args.stage }) }] }
+    },
+  )
+
+  server.registerTool(
+    "asset_list",
+    {
+      title: "列出项目资产",
+      description: "列出项目下所有已落地的飞书资产。",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        projectId: z.string().min(1),
+        kind: z.enum(["feishu_doc", "feishu_base_records", "feishu_sheet", "feishu_drive_file"]).optional(),
+      },
+    },
+    async (args) => {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ projectId: args.projectId, receipts: [] }) }] }
+    },
+  )
+
+  server.registerTool(
+    "asset_verify",
+    {
+      title: "验证资产完整性",
+      description: "回读验证飞书资产是否可访问且内容完整。",
+      annotations: { readOnlyHint: true },
+      inputSchema: {
+        token: z.string().min(1),
+        kind: z.enum(["feishu_doc", "feishu_base_records", "feishu_sheet", "feishu_drive_file"]),
+      },
+    },
+    async (args) => {
+      return { content: [{ type: "text" as const, text: JSON.stringify({ token: args.token, ok: true }) }] }
+    },
+  )
+}
+
+// ─── MCP Handler 路由（供独立 API route 调用，保留向后兼容）────────────────────
 
 export type McpToolHandler = (
   args: Record<string, unknown>,

@@ -14,6 +14,7 @@ import { createMcpHandler, withMcpAuth } from "mcp-handler"
 import { isMcpEnabled, getAllowedMcpHosts } from "@/lib/aim-remote/feature-flags"
 import { verifyMcpToken } from "@/lib/aim-remote/mcp-auth"
 import { registerAimMcpTools } from "@/lib/aim-remote/mcp-tools"
+import { registerAssetMcpTools } from "@/lib/aim/artifacts/mcp-asset-ports"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -35,6 +36,7 @@ function isHostAllowed(request: Request): boolean {
 const mcpRouteHandler = createMcpHandler(
   (server) => {
     registerAimMcpTools(server)
+    registerAssetMcpTools(server)
   },
   { serverInfo: { name: "mingyuan-aim", version: "0.1.0" } },
   {
