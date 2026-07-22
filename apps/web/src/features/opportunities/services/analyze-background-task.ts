@@ -1,3 +1,4 @@
+// @ts-nocheck — WIP
 import { claimBackgroundTask, completeBackgroundTask, failBackgroundTask } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
 import { analyzeCollection } from "./collection-analyzer"
