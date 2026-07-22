@@ -69,6 +69,7 @@ describe("submitInvocation idempotency", () => {
     vi.clearAllMocks()
     invocationStore.clear()
     createdInvocationId = "inv-1"
+    mocks.agentInvocationFindUnique.mockResolvedValue(null)
     mocks.clientProjectFindFirst.mockResolvedValue({ id: "proj-1" })
     // Default transaction: runs callback with the mocked prisma methods
     mocks.transaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
@@ -113,6 +114,9 @@ describe("submitInvocation idempotency", () => {
     // Simulate the row existing in DB now
     const stored = invocationStore.get("inv-1")
     mocks.agentInvocationFindUnique.mockResolvedValue(stored)
+    // Clear call history from first submit so assertions only reflect second submit
+    mocks.agentInvocationCreate.mockClear()
+    mocks.enqueueBackgroundTask.mockClear()
 
     // Second submit — same idempotency key, same content
     const second = await submitInvocation(makeContext(), makeInput())
@@ -129,6 +133,7 @@ describe("submitInvocation idempotency", () => {
     // First submit
     await submitInvocation(makeContext(), makeInput())
     mocks.agentInvocationFindUnique.mockResolvedValue(invocationStore.get("inv-1"))
+    mocks.agentInvocationCreate.mockClear()
 
     // Second submit — same key, DIFFERENT rawInput
     const differentInput = makeInput()
