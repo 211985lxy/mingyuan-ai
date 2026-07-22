@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       skipCompetitorCheck?: boolean
       skipCopyInspiration?: boolean
     }
+    const { url, source, contextText, userId, skipAiProcessing, skipTopicExtraction, skipCompetitorCheck, skipCopyInspiration } = body
 
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "缺少 url 参数" }, { status: 400 })
