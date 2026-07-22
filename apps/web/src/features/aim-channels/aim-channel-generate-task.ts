@@ -16,6 +16,9 @@ import {
   replyFeishuTextMessage,
 } from "@/lib/integrations/feishu-topic-chat"
 import { planAimChannelReply } from "./aim-channel-reply"
+import { getBotRoleConstraint, shouldInjectBotPersona } from "@/lib/feishu-agent-persona"
+import { resolveBotById, type FeishuAgentBotId } from "@/lib/feishu-agent-registry"
+import { replyAsBot } from "@/lib/feishu-bot-identity"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimAgentId } from "@/lib/aim-harness/contracts"
 
@@ -101,9 +104,21 @@ export async function processAimChannelGenerate(messageId: string): Promise<void
   // 加载多轮历史（最近 N 条，不含当前这条）
   const history = await loadConversationHistory(conversation.id, messageId)
 
+  // 从 platform 字段解析 botId（格式："feishu:content_growth"）
+  const botId = parseBotIdFromPlatform(conversation.platform)
+
   // 调 AIM 生成（复用现有入口）。有历史时把历史拼到本轮输入前，使智能体感知多轮上下文。
   const targetFormat = AGENT_DEFAULT_FORMAT[agentId] || "raw_copy"
-  const rawInput = history ? `${history}\n${cleanedInput}` : cleanedInput
+  let rawInput = history ? `${history}\n${cleanedInput}` : cleanedInput
+
+  // 注入 bot 角色约束（不改变核心提示词结构，仅在用户输入前追加角色段落）
+  if (shouldInjectBotPersona(botId)) {
+    const roleConstraint = getBotRoleConstraint(botId as FeishuAgentBotId)
+    if (roleConstraint) {
+      rawInput = `${roleConstraint}\n\n${rawInput}`
+    }
+  }
+
   const result = await generateAimContent({
     userId: conversation.userId,
     projectId: conversation.projectId,
@@ -170,7 +185,8 @@ async function loadConversationHistory(conversationId: string, excludeMessageId:
 }
 
 /**
- * 发送回复到渠道。目前只实现飞书（线程内回复）。
+ * 发送回复到渠道。支持飞书（含多 bot 身份）。
+ * platform 格式："feishu" 或 "feishu:<botId>"。
  * 微信/企业微信等后续接入时在此扩展。
  */
 async function sendAimChannelReply(input: {
@@ -179,12 +195,28 @@ async function sendAimChannelReply(input: {
   externalChatId: string
   replyText: string
 }): Promise<void> {
-  if (input.platform !== "feishu") {
+  if (!input.platform.startsWith("feishu")) {
     // 非飞书平台暂未接入，跳过（不阻断任务完成）
     return
   }
   if (!input.externalMessageId) return
 
+  // 多 bot 身份回复：platform 为 "feishu:<botId>" 时用对应 bot 的 token
+  const botId = parseBotIdFromPlatform(input.platform)
+  if (botId) {
+    const bot = resolveBotById(botId as FeishuAgentBotId)
+    if (bot) {
+      await replyAsBot({
+        bot,
+        messageId: input.externalMessageId,
+        text: input.replyText,
+        idempotencyKey: `aim-channel-${input.externalMessageId}`,
+      })
+      return
+    }
+  }
+
+  // 回落到旧单机器人凭证
   const appId = env.FEISHU_APP_ID
   const appSecret = env.FEISHU_APP_SECRET
   if (!appId || !appSecret) {
@@ -198,6 +230,14 @@ async function sendAimChannelReply(input: {
     tenantAccessToken: token,
     idempotencyKey: `aim-channel-${input.externalMessageId}`,
   })
+}
+
+/** 从 platform 字段解析 botId。格式："feishu:content_growth" → "content_growth"。 */
+function parseBotIdFromPlatform(platform: string): string | null {
+  if (!platform.includes(":")) return null
+  const parts = platform.split(":")
+  if (parts[0] !== "feishu" || parts.length < 2) return null
+  return parts[1] || null
 }
 
 /** 生成彻底失败时：标记消息失败并发一条错误提示给用户。 */
