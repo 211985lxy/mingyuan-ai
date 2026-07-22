@@ -80,6 +80,17 @@ describe("aim-conversation-intent", () => {
     expect(result.intent.useMethodology).toBe(true)
   })
 
+  it("把常见的写一条口播识别为正式交付并加载项目上下文", () => {
+    const result = resolveAimConversationIntentWithRules({
+      agentId: "content_producer",
+      messages: [{ role: "user", content: "围绕这个客户问题写一条相宇可以直接拍的口播。" }],
+    })
+
+    expect(result.intent.mode).toBe("formal_delivery")
+    expect(result.intent.useKnowledge).toBe(true)
+    expect(result.intent.useMethodology).toBe(true)
+  })
+
   it("明确另开一篇时，优先识别为独立新任务", () => {
     const result = resolveAimConversationIntentWithRules({
       agentId: "content_producer",

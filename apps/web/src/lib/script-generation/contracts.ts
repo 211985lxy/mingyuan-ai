@@ -95,6 +95,8 @@ export interface GenerateScriptCandidatesParams {
   hotTopicFusion?: HotTopicFusionContext | null
   // IP 写作风格档案（用户级全局，由调用方从知识库读取后注入）
   styleProfileBlock?: string | null
+  // IP 定位维基/项目定位上下文（由调用方从 IP Wiki 或知识库回退读取后注入）
+  ipWikiBlock?: string | null
 }
 
 export interface CandidateScore {

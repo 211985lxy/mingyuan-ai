@@ -116,18 +116,21 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult |
   // 截断到安全长度，避免批量调用时刷屏 400。
   const maxChars = config.model.startsWith("BAAI/bge") ? 1500 : 8000
   const truncated = text.slice(0, maxChars)
+  const retryInput = config.model.startsWith("BAAI/bge")
+    ? truncated.slice(0, Math.min(400, truncated.length))
+    : truncated
 
-  const tryCreate = () =>
+  const tryCreate = (input: string) =>
     client.embeddings.create({
       model: config.model,
-      input: truncated,
+      input,
       // 部分模型（如 OpenAI ada-002）支持 dimensions 参数，部分（如 BGE）不支持
       // 仅当模型名以 text-embedding 开头时传递 dimensions
       ...(config.model.startsWith("text-embedding") ? { dimensions: config.dimensions } : {}),
     })
 
   try {
-    const response = await tryCreate()
+    const response = await tryCreate(truncated)
 
     const data = response.data[0]
     if (!data) return null
@@ -139,9 +142,10 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult |
       tokensUsed: response.usage?.prompt_tokens ?? 0,
     }
   } catch {
-    // 失败一次重试（间歇性 400/网络抖动），仍失败则降级返回 null（上层会回退到 raw 检索）
+    // BGE 对中文 token/字符比波动较大；首次 1500 字符失败时用 400 字符重试。
+    // 其它模型仍按原输入重试一次，覆盖间歇性网络错误。
     try {
-      const response = await tryCreate()
+      const response = await tryCreate(retryInput)
       const data = response.data[0]
       if (!data) return null
       return {
@@ -152,7 +156,7 @@ export async function generateEmbedding(text: string): Promise<EmbeddingResult |
       }
     } catch (retryError) {
       console.warn(
-        `[embedding] generation failed (model=${config.model}, inputLen=${truncated.length}):`,
+        `[embedding] generation failed (model=${config.model}, inputLen=${truncated.length}, retryLen=${retryInput.length}):`,
         retryError,
       )
       return null
@@ -341,19 +345,48 @@ export async function retrieveRelevantKnowledge(input: {
   }
 
   // Fallback: return recent active entries (matching old behavior)
-  const fallback = await prisma.knowledgeEntry.findMany({
-    where: {
-      userId: input.userId,
-      status: "active",
-      OR: [{ projectId: input.projectId }, { projectId: null }],
-    },
-    orderBy: { sortOrder: "asc" },
-    take: topK,
-    select: { id: true, title: true, content: true, category: true, tags: true, valueGrade: true },
-  })
+  // 优化：先拉取定位核心类条目，再补充其余条目，保证关键定位资料不被挤掉
+  const CORE_FALLBACK_CATEGORIES = ["positioning_material", "boss_experience", "product_usp", "customer_pain", "user_insight"]
+  const coreTopK = Math.min(Math.ceil(topK / 2), 6)
+
+  const [coreEntries, otherEntries] = await Promise.all([
+    prisma.knowledgeEntry.findMany({
+      where: {
+        userId: input.userId,
+        status: "active",
+        OR: [{ projectId: input.projectId }, { projectId: null }],
+        category: { in: CORE_FALLBACK_CATEGORIES },
+      },
+      orderBy: { sortOrder: "asc" },
+      take: coreTopK,
+      select: { id: true, title: true, content: true, category: true, tags: true, valueGrade: true },
+    }),
+    prisma.knowledgeEntry.findMany({
+      where: {
+        userId: input.userId,
+        status: "active",
+        OR: [{ projectId: input.projectId }, { projectId: null }],
+        category: { notIn: CORE_FALLBACK_CATEGORIES },
+      },
+      orderBy: { sortOrder: "asc" },
+      take: topK,
+      select: { id: true, title: true, content: true, category: true, tags: true, valueGrade: true },
+    }),
+  ])
+
+  // 合并去重，核心类优先，总数不超 topK
+  const seen = new Set(coreEntries.map((e) => e.id))
+  const merged = [...coreEntries]
+  for (const e of otherEntries) {
+    if (merged.length >= topK) break
+    if (!seen.has(e.id)) {
+      merged.push(e)
+      seen.add(e.id)
+    }
+  }
 
   return {
-    entries: fallback.map((e) => ({ ...e, score: 0 })),
+    entries: merged.map((e) => ({ ...e, score: 0 })),
     source: "raw",
   }
 }

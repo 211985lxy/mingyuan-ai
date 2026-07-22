@@ -17,7 +17,6 @@
 import { prisma } from "@/lib/prisma"
 import {
   resolveAimRuntimeTask,
-  shouldUseKnowledgeContextForTask,
   type AimRuntimeTask,
   type ResolvedKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
@@ -106,7 +105,7 @@ export async function prepareAimContext(
   const {
     knowledgeCtx, viralStructureBlock, methodologyBlock,
     businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock,
-  } = await loadGenerationContextBlocks({ spec, params, agentId, runtimeTask, knowledgeStrategy, generationIntent, trace })
+  } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, trace })
 
   // ── TaskSpec 构建（与 buildAimGeneration:1568 一致，含二次查 project/topicSelection）
   const taskSpec = await buildContextTaskSpec({ spec, params, knowledgeEntries: knowledgeCtx.entries ?? [] })
@@ -263,12 +262,11 @@ async function loadGenerationContextBlocks(input: {
   spec: AimRunSpec
   params: PrepareAimContextInput
   agentId: AimAgentId
-  runtimeTask: AimRuntimeTask
   knowledgeStrategy: ResolvedKnowledgeStrategy | undefined
   generationIntent: { useKnowledge: boolean; useMethodology: boolean }
   trace?: AimTraceRecorder
 }) {
-  const { spec, params, agentId, runtimeTask, knowledgeStrategy, generationIntent, trace } = input
+  const { spec, params, agentId, knowledgeStrategy, generationIntent, trace } = input
   const useEventStorytelling = shouldUseEventStorytelling({
     rawInput: spec.rawInput,
     topicTitle: params.topicTitle,
@@ -294,8 +292,9 @@ async function loadGenerationContextBlocks(input: {
           params.contextOverride!.eventStorytellingBlock ?? "",
         ] as const)
       : Promise.all([
-          spec.projectId && shouldUseKnowledgeContextForTask(runtimeTask)
-            && generationIntent.useKnowledge
+          // 知识检索始终允许（包括 light_edit），由策略画像 topK 控制预算；
+          // 避免轻改时定位/人设信息完全缺失导致文案不结合 IP。
+          spec.projectId && generationIntent.useKnowledge
             ? buildAimKnowledgeContext({
                 userId: params.userId,
                 projectId: spec.projectId,

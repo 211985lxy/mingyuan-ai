@@ -139,6 +139,76 @@ describe("Script Generation E2E", () => {
     expect(body.data.isComplete).toBe(false)
   })
 
+  it("allows an incomplete active profile when an active project provides IP positioning context", async () => {
+    await prisma.ipProfile.create({
+      data: {
+        userId: user.id,
+        displayName: "项目型 IP",
+        isComplete: false,
+        isActive: true,
+      },
+    })
+    const project = await prisma.clientProject.create({
+      data: { userId: user.id, name: "项目型 IP 全案", status: "active" },
+    })
+    await prisma.knowledgeEntry.create({
+      data: {
+        userId: user.id,
+        projectId: project.id,
+        category: "positioning_material",
+        title: "核心定位",
+        content: "帮助老板把经验沉淀为可成交的个人 IP 内容资产。",
+      },
+    })
+
+    const res = await GENERATE_SCRIPTS(
+      userReq("/api/scripts/generate", {
+        method: "POST",
+        body: {
+          templateId,
+          structureId,
+          projectId: project.id,
+          inputs: { city: "深圳", propertyType: "改善型三房", highlight: "地铁口+学区" },
+        },
+      }),
+      undefined as never,
+    )
+
+    expect(res.status).toBe(200)
+    const body = await json(res)
+    expect(body.data.run.promptText).toContain("IP 定位上下文")
+    expect(body.data.run.promptText).toContain("核心定位")
+  })
+
+  it("rejects an inactive IP profile even when a project is provided", async () => {
+    await prisma.ipProfile.create({
+      data: {
+        userId: user.id,
+        displayName: "已停用 IP",
+        isComplete: true,
+        isActive: false,
+      },
+    })
+    const project = await prisma.clientProject.create({
+      data: { userId: user.id, name: "已停用 IP 全案", status: "active" },
+    })
+
+    const res = await GENERATE_SCRIPTS(
+      userReq("/api/scripts/generate", {
+        method: "POST",
+        body: {
+          templateId,
+          structureId,
+          projectId: project.id,
+          inputs: { city: "深圳", propertyType: "改善型三房", highlight: "地铁口+学区" },
+        },
+      }),
+      undefined as never,
+    )
+
+    expect(res.status).toBe(412)
+  })
+
   it("rejects generation when template does not exist", async () => {
     const profileInput = {
       displayName: "老王说房",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatIpWikiBlock } from "@/lib/ip-wiki/context"
+import { formatFallbackPositioningBlock, formatIpWikiBlock } from "@/lib/ip-wiki/context"
 import type { IpWikiPageRow } from "@/lib/ip-wiki/repo"
 
 function makeRow(overrides: Partial<IpWikiPageRow>): IpWikiPageRow {
@@ -93,5 +93,34 @@ describe("formatIpWikiBlock", () => {
         }),
       ])
     ).not.toThrow()
+  })
+})
+
+describe("formatFallbackPositioningBlock", () => {
+  it("prioritizes positioning and product facts over private-domain material", () => {
+    const block = formatFallbackPositioningBlock([
+      { title: "私域话术", content: "低优先级承接", category: "private_domain_material" },
+      { title: "核心定位", content: "帮助老板构建 AI 一人公司", category: "positioning_material" },
+      { title: "核心产品", content: "IP 操盘服务", category: "product_usp" },
+    ])
+
+    expect(block).toContain("IP Wiki 尚未编译")
+    expect(block).toContain("业务定位、服务对象、价值主张和转化承接")
+    expect(block.indexOf("核心定位")).toBeLessThan(block.indexOf("核心产品"))
+    expect(block.indexOf("核心产品")).toBeLessThan(block.indexOf("私域话术"))
+  })
+
+  it("limits the fallback block to eight entries", () => {
+    const block = formatFallbackPositioningBlock(
+      Array.from({ length: 10 }, (_, index) => ({
+        title: `定位资料${index + 1}`,
+        content: "定位事实",
+        category: "positioning_material",
+        sortOrder: index,
+      })),
+    )
+
+    expect(block).toContain("定位资料8")
+    expect(block).not.toContain("定位资料9")
   })
 })

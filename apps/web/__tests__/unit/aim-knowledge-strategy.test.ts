@@ -93,6 +93,17 @@ describe("AIM runtime task routing", () => {
     expect(shouldUseKnowledgeContextForTask(task)).toBe(true)
   })
 
+  it("keeps a script request as new_copy when its topic mentions 选题", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "为什么老板每天还要亲自给选题？请写一条相宇可以直接拍的口播。",
+      taskType: "write_script",
+      targetFormats: ["video_script"],
+    })
+
+    expect(task).toBe("new_copy")
+  })
+
   it("only uses market viral context for new copy and positioning/topic tasks", () => {
     expect(shouldUseMarketViralContextForTask("light_edit")).toBe(false)
     expect(shouldUseMarketViralContextForTask("quality_review")).toBe(false)

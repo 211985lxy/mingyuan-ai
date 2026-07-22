@@ -10,6 +10,9 @@ export function appendIpSections(sections: string[], params: GenerateScriptCandi
   if (params.ipProfile?.promptSnapshot) {
     sections.push("【个人IP档案】", params.ipProfile.promptSnapshot, "")
   }
+  if (params.ipWikiBlock) {
+    sections.push(params.ipWikiBlock, "")
+  }
   if (params.styleProfileBlock) {
     sections.push(
       "【写作风格档案 · 全局风格】",

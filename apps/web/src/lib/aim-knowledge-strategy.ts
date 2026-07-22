@@ -162,7 +162,17 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
     return "quality_review"
   }
 
-  if (input.agentId === "business_diagnosis" || includesAny(text, ["定位", "选题", "账号方向", "内容方向", "IP策划", "策划方案", "人设卖点", "人设梳理"])) {
+  if (input.agentId === "business_diagnosis") {
+    return "positioning_topic"
+  }
+
+  // 显式请求口播/文章等交付物时，正文里出现“选题/定位”只是创作素材，
+  // 不能盖过 write_script / targetFormats 把文案生成误路由成定位策划。
+  const hasExplicitContentOutput = input.taskType === "write_script" || (input.targetFormats?.length ?? 0) > 0
+  if (
+    !hasExplicitContentOutput
+    && includesAny(text, ["定位", "选题", "账号方向", "内容方向", "IP策划", "策划方案", "人设卖点", "人设梳理"])
+  ) {
     return "positioning_topic"
   }
 
@@ -225,6 +235,8 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
  * @description 判断任务是否需要使用知识库上下文
  * @param task - 运行时任务类型
  * @returns 需要使用知识库返回 true
+ * @remarks 此函数控制“重型”上下文（爆款拆解、市场信号等）的门控。
+ * 知识库检索本身始终允许（由策略画像 topK 控制预算），参见 context-assembly 中的注释。
  */
 export function shouldUseKnowledgeContextForTask(task: AimRuntimeTask): boolean {
   return task !== "light_edit"

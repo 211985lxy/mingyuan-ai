@@ -4,6 +4,7 @@ import {
   IP_WIKI_PAGE_TYPE_LABELS,
   type IpWikiPageType,
 } from "@/lib/ip-wiki/types"
+import { prisma } from "@/lib/prisma"
 
 /**
  * IP 定位维基 · 查询层（Query）
@@ -37,8 +38,95 @@ export async function buildIpWikiBlock(input: IpWikiBlockInput): Promise<string>
     projectId: input.projectId,
     pageTypes: BLOCK_PAGE_TYPES,
   })
-  if (pages.length === 0) return ""
+  if (pages.length === 0) {
+    // IP Wiki 尚未编译时，从项目知识库中构建定位回退上下文
+    return buildFallbackPositioningBlock(input.projectId)
+  }
   return formatIpWikiBlock(pages)
+}
+
+/** IP 核心定位相关的知识分类（用于 Wiki 为空时的回退召回） */
+const FALLBACK_POSITIONING_CATEGORIES = [
+  "positioning_material",
+  "boss_experience",
+  "product_usp",
+  "customer_pain",
+  "user_insight",
+  "private_domain_material",
+]
+
+const FALLBACK_MAX_ENTRIES = 8
+const FALLBACK_MAX_ENTRY_CHARS = 600
+
+const FALLBACK_CATEGORY_ORDER = [
+  "positioning_material",
+  "product_usp",
+  "boss_experience",
+  "customer_pain",
+  "user_insight",
+  "private_domain_material",
+]
+
+type FallbackPositioningEntry = {
+  title: string
+  content: string
+  category: string
+  valueGrade?: string | null
+  sortOrder?: number
+}
+
+function fallbackCategoryRank(category: string): number {
+  const index = FALLBACK_CATEGORY_ORDER.indexOf(category)
+  return index === -1 ? FALLBACK_CATEGORY_ORDER.length : index
+}
+
+function fallbackGradeRank(valueGrade?: string | null): number {
+  return ({ S: 0, A: 1, B: 2, C: 3 } as Record<string, number>)[valueGrade ?? "B"] ?? 2
+}
+
+/**
+ * Wiki 尚未编译时，仍以定位底盘优先级而不是数据库字母序选择资料。
+ */
+export function formatFallbackPositioningBlock(entries: FallbackPositioningEntry[]): string {
+  const selected = [...entries]
+    .sort((a, b) =>
+      fallbackCategoryRank(a.category) - fallbackCategoryRank(b.category)
+      || fallbackGradeRank(a.valueGrade) - fallbackGradeRank(b.valueGrade)
+      || (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    )
+    .slice(0, FALLBACK_MAX_ENTRIES)
+
+  if (selected.length === 0) return ""
+
+  return [
+    "=== IP 定位上下文（知识库回退，IP Wiki 尚未编译）===",
+    "以下资料用于锁定业务定位、服务对象、价值主张和转化承接；不要把它们当作互不相关的灵感。",
+    "",
+    ...selected.map((entry) => `- ${entry.title}：${entry.content.trim().slice(0, FALLBACK_MAX_ENTRY_CHARS)}`),
+  ].join("\n")
+}
+
+/**
+ * IP Wiki 为空时的回退：从项目知识库中拉取定位相关条目，
+ * 构建一个最小化的定位上下文块，确保 IP 核心定位信息不会因 Wiki 未编译而完全缺失。
+ */
+async function buildFallbackPositioningBlock(projectId: string): Promise<string> {
+  try {
+    const entries = await prisma.knowledgeEntry.findMany({
+      where: {
+        projectId,
+        status: "active",
+        category: { in: FALLBACK_POSITIONING_CATEGORIES },
+      },
+      // 先取足候选，再在内存按业务优先级稳定排序；不能用类别字母序代替定位优先级。
+      take: 40,
+      select: { title: true, content: true, category: true, valueGrade: true, sortOrder: true },
+    })
+    return formatFallbackPositioningBlock(entries)
+  } catch {
+    // 回退失败不阻塞主流程
+    return ""
+  }
 }
 
 /** 按核心页固定阅读顺序排序，content_strategy（底盘）紧跟 positioning 之后 */

@@ -16,6 +16,7 @@ import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
 import { ownsActiveProject } from "@/lib/resource-ownership"
 import { buildTopicContext } from "@/features/aim/services/script-topic-context"
+import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 
 // Allow up to 120 seconds for script generation (3-step LLM chain can take 30-60s)
 export const maxDuration = 120
@@ -100,11 +101,23 @@ export const POST = withUserAuth(async (request, { user }) => {
   const ipProfile = await prisma.ipProfile.findUnique({
     where: { userId: user.id },
   })
-  if (!ipProfile?.isComplete || !ipProfile.isActive) {
+  // 有项目级上下文（IP Wiki/知识库）时，放宽 IP 档案完整性门控：
+  // 即使 promptSnapshot 为空，项目知识也能提供定位上下文
+  if (!ipProfile) {
+    return NextResponse.json(
+      { error: "IP profile not found", data: { isComplete: false } },
+      { status: 412 },
+    )
+  }
+  // 项目上下文只能补足未完成的档案，不能绕过已停用 IP 的业务状态。
+  if (!ipProfile.isActive || (!ipProfile.isComplete && !projectId)) {
     return NextResponse.json(
       { error: "IP profile is incomplete", data: { isComplete: false } },
       { status: 412 },
     )
+  }
+  if (!ipProfile.isComplete && projectId) {
+    console.log(`[${requestId}] IP profile incomplete but projectId provided, proceeding with project context`)
   }
 
   console.log(`[${requestId}] Loaded template "${template.displayName}" and structure "${videoStructure.displayName}"`)
@@ -202,6 +215,10 @@ export const POST = withUserAuth(async (request, { user }) => {
   try {
     // 用户级写作风格档案（项目内读项目风格，无项目读全局）
     const styleProfileBlock = await getStyleProfileBlock(user.id, projectId ?? null).catch(() => "")
+    // 项目级 IP 定位维基/知识库回退上下文（确保传统入口也能结合 IP 定位）
+    const ipWikiBlock = projectId
+      ? await buildIpWikiBlock({ projectId }).catch(() => "")
+      : ""
     const generation = await generateScriptCandidates({
       template: {
         ...template,
@@ -226,6 +243,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       topicContext,
       hotTopicFusion,
       styleProfileBlock,
+      ipWikiBlock,
     })
 
     const duration = Date.now() - startTime
