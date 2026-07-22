@@ -70,6 +70,10 @@ describe("inspiration event contract", () => {
       ["收选题"],
     )).toBe(true)
     expect(isExplicitInspirationCaptureMessage(
+      "@助手 收选题 https://v.douyin.com/demo/",
+      [],
+    )).toBe(true)
+    expect(isExplicitInspirationCaptureMessage(
       "@助手 帮我分析 https://v.douyin.com/demo/",
       ["收选题"],
     )).toBe(false)

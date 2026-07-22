@@ -38,11 +38,16 @@ function normalizeContent(content: string) {
   return content.replace(/\s+/g, " ").trim()
 }
 
+function normalizeTriggerKeywords(value: unknown) {
+  const keywords = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    : []
+  return keywords.length > 0 ? keywords : ["收选题"]
+}
+
 export function isExplicitInspirationCaptureMessage(content: string, triggerKeywords: unknown) {
   if (!extractFirstPublicUrl(content)) return false
-  const keywords = Array.isArray(triggerKeywords)
-    ? triggerKeywords.filter((value): value is string => typeof value === "string")
-    : ["收选题"]
+  const keywords = normalizeTriggerKeywords(triggerKeywords)
   return keywords.some((keyword) => keyword.trim() && content.includes(keyword.trim()))
 }
 
@@ -137,9 +142,7 @@ async function assertChannelBinding(input: InspirationEventInput, userId: string
   }
 
   // Evaluate trigger policy via IngressPolicy pure function
-  const keywords = Array.isArray(binding.triggerKeywords)
-    ? binding.triggerKeywords.filter((value): value is string => typeof value === "string")
-    : ["收选题"]
+  const keywords = normalizeTriggerKeywords(binding.triggerKeywords)
   const policy = evaluateIngressPolicy({
     triggerMode: binding.triggerMode as "all" | "mention_or_keyword",
     triggerKeywords: keywords,
