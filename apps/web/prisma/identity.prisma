@@ -39,8 +39,6 @@ model User {
   commentInsightJobs    CommentInsightJob[]
   aimContentVersions    AimContentVersion[]
   methodologyProfiles   MethodologyProfile[]
-  opportunitySearchRuns OpportunitySearchRun[]
-  opportunityCollections OpportunityCollection[]
 }
 
 model AdminUser {
