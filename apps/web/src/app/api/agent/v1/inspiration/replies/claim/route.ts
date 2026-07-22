@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { parseJsonBody } from "@/lib/api-contract"
-import { agentAuthErrorResponse, authenticateAgentRequest } from "@/lib/agent-api-auth"
+import { agentAuthErrorResponse, authenticateAgentRequest, assertAgentScope } from "@/lib/agent-api-auth"
 import { claimOutboxReplies } from "@/features/topics/services/reply-outbox"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 
 const bodySchema = z.object({
   platform: z.enum(["workbuddy_wechat", "wecom"]),
@@ -17,6 +18,7 @@ const bodySchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.repliesClaim)
     const body = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 })
     const items = await claimOutboxReplies({
       userId: context.userId,

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { parseJsonBody } from "@/lib/api-contract"
-import { agentAuthErrorResponse, authenticateAgentRequest } from "@/lib/agent-api-auth"
+import { agentAuthErrorResponse, authenticateAgentRequest, assertAgentScope } from "@/lib/agent-api-auth"
 import { acknowledgeOutboxReply } from "@/features/topics/services/reply-outbox"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 
 const bodySchema = z.object({
   claimToken: z.string().uuid(),
@@ -19,6 +20,7 @@ const bodySchema = z.object({
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.repliesAck)
     const body = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 })
     const { id } = await params
     const acknowledged = await acknowledgeOutboxReply({

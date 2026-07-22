@@ -4,12 +4,14 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   agentAuthErrorResponse,
   assertAgentProjectAccess,
+  assertAgentScope,
   authenticateAgentRequest,
   type AgentApiContext,
 } from "@/lib/agent-api-auth"
 import { processChunksForSmartImport } from "@/lib/knowledge-auto-processor"
 import { prisma } from "@/lib/prisma"
 import { agentWechatImportBodySchema } from "@/features/aim/contracts/agent-api"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 
 const MAX_WECHAT_CHAT_CHARS = 50_000
 
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.knowledgePreview)
     const body = await parseJsonBody(request, agentWechatImportBodySchema, { maxBytes: 64 * 1024 })
 
     projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""

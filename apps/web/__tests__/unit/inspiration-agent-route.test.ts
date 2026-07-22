@@ -4,6 +4,7 @@ import { NextRequest } from "next/server"
 const mocks = vi.hoisted(() => ({
   authenticateAgentRequest: vi.fn(),
   assertAgentProjectAccess: vi.fn(),
+  assertAgentScope: vi.fn(),
   recordAgentApiCall: vi.fn(),
   ingestInspirationEvent: vi.fn(),
 }))
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/agent-api-auth", () => ({
   authenticateAgentRequest: mocks.authenticateAgentRequest,
   assertAgentProjectAccess: mocks.assertAgentProjectAccess,
+  assertAgentScope: mocks.assertAgentScope,
   recordAgentApiCall: mocks.recordAgentApiCall,
   agentAuthErrorResponse: () => null,
 }))

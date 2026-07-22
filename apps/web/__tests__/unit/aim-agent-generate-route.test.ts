@@ -9,6 +9,7 @@ const {
   authenticateAgentRequest,
   assertAgentAccess,
   assertAgentProjectAccess,
+  assertAgentScope,
   agentAuthErrorResponse,
   executeAimRun,
   executeAimGenerationDomain,
@@ -19,6 +20,7 @@ const {
   authenticateAgentRequest: vi.fn(),
   assertAgentAccess: vi.fn(),
   assertAgentProjectAccess: vi.fn(),
+  assertAgentScope: vi.fn(),
   agentAuthErrorResponse: vi.fn((): Response | null => null),
   executeAimRun: vi.fn(),
   executeAimGenerationDomain: vi.fn(async () => ({ output: {}, generationId: "gen-1" })),
@@ -31,6 +33,7 @@ vi.mock("@/lib/agent-api-auth", () => ({
   authenticateAgentRequest,
   assertAgentAccess,
   assertAgentProjectAccess,
+  assertAgentScope,
   agentAuthErrorResponse,
 }))
 
@@ -80,6 +83,7 @@ describe("POST /api/agent/v1/aim/generate", () => {
     authenticateAgentRequest.mockResolvedValue({ apiKeyId: "key-1", userId: "user-1" })
     assertAgentAccess.mockReturnValue(undefined)
     assertAgentProjectAccess.mockReturnValue(undefined)
+    assertAgentScope.mockReturnValue(undefined)
     agentAuthErrorResponse.mockReturnValue(null)
     executeAimRun.mockResolvedValue({
       output: { id: "gen-1", results: [{ format: "video_script", content: "正文", wordCount: 2 }] },

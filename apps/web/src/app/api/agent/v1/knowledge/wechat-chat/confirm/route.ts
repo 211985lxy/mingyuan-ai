@@ -4,12 +4,14 @@ import { NextRequest, NextResponse } from "next/server"
 import {
   agentAuthErrorResponse,
   assertAgentProjectAccess,
+  assertAgentScope,
   authenticateAgentRequest,
   type AgentApiContext,
 } from "@/lib/agent-api-auth"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { prisma } from "@/lib/prisma"
 import { enforceKnowledgeBetaLimit } from "@/lib/internal-beta-limits"
+import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 import { agentWechatConfirmBodySchema } from "@/features/aim/contracts/agent-api"
 
 const ALLOWED_CATEGORIES = new Set([
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
 
   try {
     context = await authenticateAgentRequest(request)
+    assertAgentScope(context, AGENT_SCOPE.knowledgeConfirm)
     const body = await parseJsonBody(request, agentWechatConfirmBodySchema, { maxBytes: 3 * 1024 * 1024 })
 
     projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
