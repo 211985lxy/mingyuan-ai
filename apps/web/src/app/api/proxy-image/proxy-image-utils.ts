@@ -35,8 +35,27 @@ export function isDomainAllowed(hostname: string): boolean {
 export function getImageCandidateUrls(url: string): string[] {
   if (!url.includes(".heic")) return [url]
 
-  const webpUrl = url.replace(/\.heic/g, ".webp")
-  return webpUrl === url ? [url] : [webpUrl, url]
+  const candidates = [
+    url.replace(/\.heic/g, ".webp"),
+    url.replace(/\.heic/g, ".jpeg"),
+    url.replace(/\.heic/g, ".jpg"),
+    url,
+  ]
+  return [...new Set(candidates.filter(Boolean))]
+}
+
+/**
+ * 抖音等 CDN 签名图常带 x-expires（unix 秒）。过期后上游会 403，代理也无法挽救，只能重新采集封面。
+ */
+export function isSignedImageUrlExpired(url: string, nowSec = Math.floor(Date.now() / 1000)): boolean {
+  try {
+    const expires = new URL(url).searchParams.get("x-expires")
+    if (!expires) return false
+    const ts = Number(expires)
+    return Number.isFinite(ts) && ts > 0 && ts < nowSec
+  } catch {
+    return false
+  }
 }
 
 /**

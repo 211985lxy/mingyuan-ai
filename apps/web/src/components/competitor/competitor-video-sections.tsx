@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { WatchAccount } from "@/lib/api/client"
 import { formatCompetitorCount } from "@/lib/competitor/display"
-import { buildProxyImageUrl, handleProxyImageError } from "@/lib/proxy-image-client"
+import { buildProxyImageUrlIfFresh, handleProxyImageError, isSignedImageUrlExpired } from "@/lib/proxy-image-client"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { getWatchVideoPageUrl } from "@/lib/watch-video-url"
 import type { ApiVideoCopyExtraction } from "@/types/api"
@@ -76,11 +76,18 @@ function CompetitorVideoCard({ video, extraction, busy, viral, rank, onExtract }
   rank?: number
   onExtract: () => void
 }) {
+  const coverSrc = buildProxyImageUrlIfFresh(video.coverUrl || "")
+  const coverExpired = Boolean(video.coverUrl) && isSignedImageUrlExpired(video.coverUrl)
   return (
     <div className="space-y-2">
       <a href={video.account.targetUrl || getCompetitorVideoPageUrl(video)} target="_blank" rel="noopener noreferrer" className={`group/video relative block aspect-[9/16] rounded-lg overflow-hidden bg-muted ${viral ? "ring-1 ring-orange-300/50" : ""}`}>
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-b from-muted/30 to-muted-foreground/10 p-4"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-background/50 backdrop-blur-xs text-muted-foreground/60 shadow-xs"><Video className="h-5 w-5" /></span></div>
-        <img src={buildProxyImageUrl(video.coverUrl)} alt={video.title || (viral ? "爆款作品" : "作品")} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover/video:scale-105" onError={(event) => handleProxyImageError(event, video.coverUrl || "")} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-linear-to-b from-muted/30 to-muted-foreground/10 p-4">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-background/50 backdrop-blur-xs text-muted-foreground/60 shadow-xs"><Video className="h-5 w-5" /></span>
+          {coverExpired ? <span className="text-center text-[10px] leading-tight text-muted-foreground">封面已过期<br />请刷新账号</span> : null}
+        </div>
+        {coverSrc ? (
+          <img src={coverSrc} alt={video.title || (viral ? "爆款作品" : "作品")} className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover/video:scale-105" onError={(event) => handleProxyImageError(event, video.coverUrl || "")} />
+        ) : null}
         <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-2"><p className="text-xs text-white font-medium line-clamp-1">{video.title || "无标题"}</p><div className="flex items-center gap-2 text-[10px] text-white/70 mt-0.5"><span>赞 {formatCompetitorCount(video.likes)}</span><span>评 {formatCompetitorCount(video.comments)}</span>{viral && video.engagementScore != null ? <span className="text-orange-300">热 {formatCompetitorCount(video.engagementScore)}</span> : null}</div></div>
         <div className="absolute top-1.5 left-1.5 right-1.5 flex justify-between"><span className="text-[10px] px-1 py-0.5 rounded bg-black/50 text-white/80 truncate max-w-20 block">{video.account.nickname || ""}</span>{viral ? <span className="text-[10px] px-1 py-0.5 rounded bg-orange-500/80 text-white font-bold">TOP {rank ?? "?"}</span> : <ExternalLink className="h-3 w-3 text-white/50 opacity-0 group-hover/video:opacity-100 transition-opacity" />}</div>
@@ -100,9 +107,17 @@ function VideoSection({ title, videos, viral, extractions, extractingVideoId, on
   onExtract: (video: CompetitorWatchVideo) => void
 }) {
   if (videos.length === 0) return null
+  const expiredCoverCount = videos.filter((video) => isSignedImageUrlExpired(video.coverUrl || "")).length
   return (
     <Card>
-      <CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base">{viral ? <Flame className="h-4 w-4 text-orange-500" /> : <Video className="h-4 w-4" />}{title}<Badge variant="secondary" className="text-xs ml-1">{videos.length}</Badge></CardTitle></CardHeader>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">{viral ? <Flame className="h-4 w-4 text-orange-500" /> : <Video className="h-4 w-4" />}{title}<Badge variant="secondary" className="text-xs ml-1">{videos.length}</Badge></CardTitle>
+        {expiredCoverCount > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            有 {expiredCoverCount} 条封面链接已过期（抖音 CDN 签名失效）。请在上方监控账号卡片点击刷新，重新拉取封面。
+          </p>
+        ) : null}
+      </CardHeader>
       <CardContent><div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">{videos.map((video, index) => { const key = `${video.account.id}-${video.videoId}`; const extraction = extractions[key]; return <CompetitorVideoCard key={`${viral ? "viral-" : ""}${key}`} video={video} extraction={extraction} busy={extractingVideoId === key || Boolean(extraction && isActiveVideoExtractionStatus(extraction.status))} viral={viral} rank={viral ? index + 1 : undefined} onExtract={() => onExtract(video)} /> })}</div></CardContent>
     </Card>
   )

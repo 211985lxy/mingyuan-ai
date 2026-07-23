@@ -1,5 +1,9 @@
 import type { SyntheticEvent } from "react"
 
+import { isSignedImageUrlExpired } from "@/app/api/proxy-image/proxy-image-utils"
+
+export { isSignedImageUrlExpired }
+
 /**
  * @description 构建proxyimageurl
  * @param url - URL 地址
@@ -7,6 +11,15 @@ import type { SyntheticEvent } from "react"
  */
 export function buildProxyImageUrl(url: string): string {
   return `/api/proxy-image?url=${encodeURIComponent(url)}`
+}
+
+/**
+ * 过期签名图直接返回 null，避免刷一堆 502；调用方应展示占位并引导刷新账号。
+ */
+export function buildProxyImageUrlIfFresh(url: string): string | null {
+  const trimmed = url.trim()
+  if (!trimmed || isSignedImageUrlExpired(trimmed)) return null
+  return buildProxyImageUrl(trimmed)
 }
 
 /**
