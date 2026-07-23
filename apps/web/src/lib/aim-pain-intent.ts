@@ -90,18 +90,23 @@ export async function loadPainPointCatalog(projectId: string): Promise<PainCatal
     take: CATALOG_ENTRY_LIMIT,
   })
 
-  return rows
-    .map((row) => {
-      const painId = extractPainId(row.title) || (row.title.includes("索引") ? "INDEX" : "")
-      if (!painId || painId === "INDEX") return null
-      return {
-        ...row,
-        painId,
-        triggerLine: extractTriggerLine(row.content),
-        summaryLine: extractSummaryLine(row.content),
-      }
+  const catalog: PainCatalogRow[] = []
+  for (const row of rows) {
+    const painId = extractPainId(row.title) || (row.title.includes("索引") ? "INDEX" : "")
+    if (!painId || painId === "INDEX") continue
+    catalog.push({
+      id: row.id,
+      title: row.title,
+      content: row.content,
+      category: row.category,
+      tags: row.tags,
+      valueGrade: row.valueGrade,
+      painId,
+      triggerLine: extractTriggerLine(row.content),
+      summaryLine: extractSummaryLine(row.content),
     })
-    .filter((row): row is PainCatalogRow => Boolean(row))
+  }
+  return catalog
 }
 
 function formatCatalogForPrompt(catalog: PainCatalogRow[]): string {
@@ -256,9 +261,11 @@ export async function resolvePainPointIntent(input: {
     }
   }
 
-  const pinnedRows = painIds
-    .map((id) => catalogById.get(id))
-    .filter((row): row is PainCatalogRow => Boolean(row))
+  const pinnedRows: PainCatalogRow[] = []
+  for (const id of painIds) {
+    const row = catalogById.get(id)
+    if (row) pinnedRows.push(row)
+  }
 
   const pinnedEntries: ScoredKnowledgeEntry[] = pinnedRows.map((row, index) => ({
     id: row.id,
