@@ -27,6 +27,8 @@ export interface AimWorkbenchMessage {
   failure?: { kind: "chat" | "generate"; retryText: string } | null
   traceId?: string | null
   traceType?: "chat" | "generate" | null
+  /** 同线程重新生成中：保留旧交付物可见，避免闪断 */
+  regenerating?: boolean
 }
 
 export interface IpWikiDialogContext {

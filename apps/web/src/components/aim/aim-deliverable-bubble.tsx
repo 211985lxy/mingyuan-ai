@@ -37,6 +37,8 @@ export interface AimDeliverableBubbleProps {
   onMarkStatus: (status: string) => void
   onNextAction?: (action: AimNextAction, content: string, generationId: string) => void
   isBusy: boolean
+  /** 重新生成中：旧稿变淡并显示进度条 */
+  regenerating?: boolean
   onEditResult?: (format: ContentFormat, content: string) => void
   onCompileToWiki?: () => void
   onOpenDecision?: () => void
@@ -248,7 +250,8 @@ function DeliverableActions(props: DeliverableActionsProps) {
  * @returns 无返回值
  */
 export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
-  const { deliverables, workflowStage, contentAction } = props
+  const { deliverables, workflowStage, contentAction, regenerating = false } = props
+  const actionsBusy = props.isBusy || regenerating
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null)
   const activeFormat = deliverables.results.some((item) => item.format === activeTab) ? activeTab : deliverables.results[0]?.format || "raw_copy"
@@ -275,9 +278,19 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
     reportAimRunEvent(props.runId, "copied", { format: item.format, ...(workflowStage ? { workflowStage } : {}), ...(contentAction ? { contentAction } : {}) })
     toast.success("已复制")
   }
-  return <div className="mt-2 w-full"><AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
-    <DeliveryContractStrip contract={contract} />
-    <DeliverableTabs results={deliverables.results} activeFormat={activeFormat} copiedFormat={copiedFormat} onTabChange={setActiveTab} onCopy={copyResult} onEdit={props.onEditResult} />
-    <DeliverableActions {...props} activeResult={activeResult} />
-  </AiResultPanel></div>
+  return <div className={`mt-2 w-full transition-opacity duration-300 ${regenerating ? "opacity-55" : "opacity-100"}`}>
+    {regenerating ? (
+      <div className="mb-2 space-y-1.5" aria-live="polite">
+        <div className="h-0.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-primary/50" />
+        </div>
+        <p className="text-[11px] text-muted-foreground">正在重出一版…</p>
+      </div>
+    ) : null}
+    <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
+      <DeliveryContractStrip contract={contract} />
+      <DeliverableTabs results={deliverables.results} activeFormat={activeFormat} copiedFormat={copiedFormat} onTabChange={setActiveTab} onCopy={copyResult} onEdit={regenerating ? undefined : props.onEditResult} />
+      <DeliverableActions {...props} isBusy={actionsBusy} activeResult={activeResult} />
+    </AiResultPanel>
+  </div>
 }

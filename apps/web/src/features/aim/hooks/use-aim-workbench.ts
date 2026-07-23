@@ -212,7 +212,8 @@ export function useAimWorkbench() {
 
   // ---- openEditorFromResult (needed by generation + history load) ----
   const openEditorFromResult = useCallback((messageId: string, format: ContentFormat, content: string) => {
-    setEditorText(content)
+    // 正文未变则跳过写入，避免校对软替换时编辑区空窗/光标跳动
+    setEditorText((current) => (current === content ? current : content))
     setEditorFormat(format)
     setEditorSourceMessageId(messageId)
     setEditorPanelOpen(true)

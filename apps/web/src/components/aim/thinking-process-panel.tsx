@@ -256,7 +256,7 @@ export function ThinkingProcessPanel({
     let cancelled = false
     const es = new EventSource(
       `/api/aim/trace/${encodeURIComponent(traceId)}`,
-      { withCredentials: false },
+      { withCredentials: true },
     )
     eventSourceRef.current = es
 

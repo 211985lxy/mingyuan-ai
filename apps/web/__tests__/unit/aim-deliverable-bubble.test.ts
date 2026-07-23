@@ -46,6 +46,24 @@ describe("AimDeliverableBubble", () => {
     expect(html).toContain("登记发布")
     expect(html).toContain("填写复盘")
   })
+
+  it("keeps old deliverable content visible while regenerating", () => {
+    const html = renderToStaticMarkup(createElement(AimDeliverableBubble, {
+      deliverables,
+      isCurrentVersion: true,
+      agentId: "content_producer",
+      nextActions: [{ id: "publish_package", label: "生成发布包", prompt: "生成发布包" }],
+      onRepurpose: vi.fn(),
+      onQuality: vi.fn(),
+      onMarkStatus: vi.fn(),
+      isBusy: true,
+      regenerating: true,
+    }))
+
+    expect(html).toContain("这是当前正文")
+    expect(html).toContain("正在重出一版")
+    expect(html).toContain("opacity-55")
+  })
 })
 
 describe("DeliveryContractStrip", () => {

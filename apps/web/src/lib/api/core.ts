@@ -27,11 +27,13 @@ export function getApiErrorMessage(payload: unknown, status: number, statusText:
     if (status === 401 && ["Invalid token", "Unauthorized", "User not found"].includes(error)) {
       return "登录状态已失效，请重新登录"
     }
-    if (/<html[\s>]/i.test(error) || /504 Gateway Time-?out/i.test(error)) {
+    if (/<html[\s>]/i.test(error) || /504 Gateway Time-?out/i.test(error) || /502 Bad Gateway/i.test(error)) {
       return "AI 服务响应超时，请稍后重试"
     }
     return error
   }
+  if (status === 504 || status === 502) return "AI 服务响应超时，请稍后重试"
+  if (status === 408) return "请求超时，请稍后重试"
   return statusText ? `${status} ${statusText}` : `Request failed: ${status}`
 }
 

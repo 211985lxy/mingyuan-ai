@@ -20,12 +20,30 @@ describe("AIM composer generate button", () => {
     const pendingBlock = generationSource.match(/function appendPendingGeneration[\s\S]*?function buildGenerationRequest/)?.[0] ?? ""
     const executeBlock = generationSource.match(/async function executeGeneration[\s\S]*?async function generateWithInput/)?.[0] ?? ""
 
-    expect(pendingBlock).toContain("setMessages((messages) => [")
     expect(pendingBlock).toContain("getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel)")
     expect(generationSource).toContain("正在${actionLabel}，会读取当前项目资料并匹配知识库")
     expect(generationSource).toContain("正在${actionLabel}，将根据本次输入生成交付物")
     expect(executeBlock).toContain("appendPendingGeneration")
     expect(executeBlock.indexOf("appendPendingGeneration")).toBeLessThan(executeBlock.indexOf("await generateAimContent"))
+  })
+
+  it("applies the raw generation result before background proofread", () => {
+    const executeBlock = generationSource.match(/async function executeGeneration[\s\S]*?async function generateWithInput/)?.[0] ?? ""
+    expect(executeBlock).toContain("applyGenerationResponse(input, assistantMessageId, currentInput, response)")
+    expect(executeBlock).toContain("softProofreadInBackground")
+    expect(executeBlock.indexOf("applyGenerationResponse")).toBeLessThan(executeBlock.indexOf("softProofreadInBackground"))
+    expect(executeBlock).not.toMatch(/await proofreadAimResponse/)
+    expect(generationSource).toContain("async function softProofreadInBackground")
+    expect(generationSource).toMatch(/await proofreadAimResponse\(response, input\.agent\.defaultInstruction\)/)
+  })
+
+  it("regenerates in place when a deliverable already exists", () => {
+    const pendingBlock = generationSource.match(/function appendPendingGeneration[\s\S]*?function buildGenerationRequest/)?.[0] ?? ""
+    expect(pendingBlock).toContain("findLatestDeliverableMessage")
+    expect(pendingBlock).toContain("regenerating: true")
+    expect(pendingBlock).toContain("inPlace: true")
+    // 原地重生成路径先 return，startsNewTask 才会清编辑器
+    expect(pendingBlock.indexOf("inPlace: true")).toBeLessThan(pendingBlock.indexOf("clearCurrentTaskContext()"))
   })
 
   it("keeps chat request status inside the assistant message", () => {
@@ -44,5 +62,19 @@ describe("AIM composer generate button", () => {
     const generateClientBlock = aimApiSource.match(/export async function generateAimContent[\s\S]*?\n}/)?.[0] ?? ""
 
     expect(generateClientBlock).toContain("timeout: 180000")
+  })
+
+  it("aborts the previous in-flight request before starting a new generation", () => {
+    expect(generationSource).toContain("beginExclusiveRequest")
+    expect(generationSource).toContain("requestAbortRef.current?.abort()")
+    expect(generationSource).toContain("endExclusiveRequest")
+    expect(generationSource).toContain("generateAimContentWithTransientRetry")
+    expect(generationSource).toContain("isTransientGenerateFailure")
+  })
+
+  it("does not clear busy when a newer request has taken over the abort ref", () => {
+    const endBlock = generationSource.match(/function endExclusiveRequest[\s\S]*?\n}/)?.[0] ?? ""
+    expect(endBlock).toContain("requestAbortRef.current === controller")
+    expect(endBlock).toContain("clearBusy()")
   })
 })

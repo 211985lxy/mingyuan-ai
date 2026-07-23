@@ -94,7 +94,45 @@ export function getAimPendingGenerationMessage(projectEnabled: boolean, actionLa
     : `正在${actionLabel}，将根据本次输入生成交付物…`
 }
 
+function getDeliverableReadyMessage(agentTitle: string) {
+  return `${agentTitle} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`
+}
+
+function findLatestDeliverableMessage(messages: AimWorkbenchMessage[]) {
+  return [...messages].reverse().find((message) => Boolean(message.deliverables?.results?.length))
+}
+
 function appendPendingGeneration(input: AimGenerationActionInput, currentInput: string, options: GenerateOptions) {
+  // 同线程再生成：原地 regenerating，保留旧交付物与编辑器，避免闪断
+  const inplaceTarget = !options.startsNewTask && !options.retryMessageId
+    ? findLatestDeliverableMessage(input.messages)
+    : undefined
+
+  if (inplaceTarget) {
+    input.pendingScrollMessageIdRef.current = inplaceTarget.id
+    const baseMessages = input.messages
+    const pendingContent = getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel)
+    input.setMessages((messages) => {
+      const withUser = currentInput
+        ? [...messages, { id: nextAimWorkbenchId(), role: "user" as const, content: currentInput }]
+        : messages
+      return withUser.map((message) => {
+        if (message.id === inplaceTarget.id) {
+          return {
+            ...message,
+            content: pendingContent,
+            regenerating: true,
+            failure: null,
+            agentId: input.agent.id,
+          }
+        }
+        return message.regenerating ? { ...message, regenerating: false } : message
+      })
+    })
+    if (currentInput) input.setInput("")
+    return { assistantMessageId: inplaceTarget.id, baseMessages, inPlace: true as const }
+  }
+
   const assistantMessageId = nextAimWorkbenchId()
   input.pendingScrollMessageIdRef.current = assistantMessageId
   const baseMessages = options.startsNewTask
@@ -106,10 +144,16 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
   input.setMessages((messages) => [
     ...(options.startsNewTask ? [] : options.retryMessageId ? messages.filter((message) => message.id !== options.retryMessageId) : messages),
     ...(currentInput && !options.retryMessageId ? [{ id: nextAimWorkbenchId(), role: "user" as const, content: currentInput }] : []),
-    { id: assistantMessageId, role: "assistant" as const, content: getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel), agentId: input.agent.id },
+    {
+      id: assistantMessageId,
+      role: "assistant" as const,
+      content: getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel),
+      agentId: input.agent.id,
+      regenerating: false,
+    },
   ])
   if (currentInput) input.setInput("")
-  return { assistantMessageId, baseMessages }
+  return { assistantMessageId, baseMessages, inPlace: false as const }
 }
 
 function buildGenerationRequest(
@@ -150,7 +194,6 @@ function applyGenerationResponse(
   assistantMessageId: string,
   currentInput: string,
   response: AimGenerateResponse,
-  correctedResponse: AimGenerateResponse,
 ) {
   const originalText = extractBenchmarkOriginalText(currentInput)
   const analysisText = extractBenchmarkAnalysisText(currentInput)
@@ -158,16 +201,18 @@ function applyGenerationResponse(
   if (analysisText) input.setSourceAnalysisText(analysisText)
   input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId ? {
     ...message,
-    content: `${input.agent.title} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`,
+    content: getDeliverableReadyMessage(input.agent.title),
     agentId: input.agent.id,
-    deliverables: correctedResponse,
+    deliverables: response,
     runId: response.runId ?? null,
     degraded: response.degraded ?? null,
     qualityStatus: response.qualityStatus ?? null,
     workflowStage: input.currentWorkflowStage,
     contentAction: input.contentAction,
+    regenerating: false,
+    failure: null,
   } : message))
-  const mainResult = correctedResponse.results[0] ?? response.results[0]
+  const mainResult = response.results[0]
   if (mainResult) input.openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
   void input.refreshHistory({ force: true, agentId: input.selectedAgentId })
   if (input.selectedProjectId) void input.refreshProjectWorkflow()
@@ -176,28 +221,139 @@ function applyGenerationResponse(
   toast.success(`${input.agent.primaryActionLabel}完毕`)
 }
 
-async function executeGeneration(input: AimGenerationActionInput, currentInput: string, rawInput: string, options: GenerateOptions) {
+/** 校对不挡首出：后台软替换交付物与编辑器 */
+async function softProofreadInBackground(
+  input: AimGenerationActionInput,
+  assistantMessageId: string,
+  response: AimGenerateResponse,
+  signal: AbortSignal,
+) {
+  try {
+    const corrected = await proofreadAimResponse(response, input.agent.defaultInstruction)
+    if (signal.aborted) return
+    const mainResult = corrected.results[0]
+    let didApply = false
+    input.setMessages((messages) => {
+      const target = messages.find((message) => message.id === assistantMessageId)
+      if (!target?.deliverables || target.deliverables.id !== response.id || target.regenerating) {
+        return messages
+      }
+      didApply = true
+      return messages.map((message) => message.id === assistantMessageId
+        ? { ...message, deliverables: corrected }
+        : message)
+    })
+    if (didApply && mainResult && !signal.aborted) {
+      input.openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
+    }
+  } catch {
+    // 校对失败静默保留原稿
+  }
+}
+
+function markGenerationStopped(
+  input: AimGenerationActionInput,
+  assistantMessageId: string,
+  inPlace: boolean,
+) {
+  input.setMessages((messages) => messages.map((message) => {
+    if (message.id !== assistantMessageId) return message
+    if (inPlace && message.deliverables) {
+      return {
+        ...message,
+        content: getDeliverableReadyMessage(input.agent.title),
+        regenerating: false,
+        failure: null,
+      }
+    }
+    return { ...message, content: "已停止本次生成。", regenerating: false, failure: null }
+  }))
+}
+
+function isTransientGenerateFailure(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return error instanceof TypeError || (error instanceof Error && /fetch failed|network|Failed to fetch/i.test(error.message))
+  }
+  return error.status === 408 || error.status === 502 || error.status === 503 || error.status === 504
+}
+
+async function generateAimContentWithTransientRetry(
+  body: Parameters<typeof generateAimContent>[0],
+  signal: AbortSignal,
+): Promise<AimGenerateResponse> {
+  const maxAttempts = 2
+  let lastError: unknown
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await generateAimContent(body, signal)
+    } catch (error) {
+      lastError = error
+      if (signal.aborted || attempt >= maxAttempts - 1 || !isTransientGenerateFailure(error)) throw error
+      await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)))
+    }
+  }
+  throw lastError
+}
+
+function beginExclusiveRequest(requestAbortRef: MutableRefObject<AbortController | null>) {
+  // 连续「重新生成」时先中止上一次未完成请求，避免 AbortController 被覆盖后
+  // finally 误把 busy 清掉、或旧请求晚到覆盖新结果。
+  requestAbortRef.current?.abort()
   const controller = new AbortController()
-  input.requestAbortRef.current = controller
-  const { assistantMessageId, baseMessages } = appendPendingGeneration(input, currentInput, options)
+  requestAbortRef.current = controller
+  return controller
+}
+
+function endExclusiveRequest(
+  requestAbortRef: MutableRefObject<AbortController | null>,
+  controller: AbortController,
+  clearBusy: () => void,
+) {
+  // 仅当仍持有本次 controller 时才清 busy，防止被后续请求接管后误解锁
+  if (requestAbortRef.current === controller) {
+    requestAbortRef.current = null
+    clearBusy()
+  }
+}
+
+async function executeGeneration(input: AimGenerationActionInput, currentInput: string, rawInput: string, options: GenerateOptions) {
+  const controller = beginExclusiveRequest(input.requestAbortRef)
+  const { assistantMessageId, baseMessages, inPlace } = appendPendingGeneration(input, currentInput, options)
   const traceId = crypto.randomUUID()
   input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
     ? { ...message, traceId, traceType: "generate" as const }
     : message))
   input.setIsGenerating(true)
   try {
-    const response = await generateAimContent({ ...buildGenerationRequest(input, rawInput, currentInput, baseMessages, options), traceId }, controller.signal)
-    const correctedResponse = await proofreadAimResponse(response, input.agent.defaultInstruction)
-    applyGenerationResponse(input, assistantMessageId, currentInput, response, correctedResponse)
+    const response = await generateAimContentWithTransientRetry(
+      { ...buildGenerationRequest(input, rawInput, currentInput, baseMessages, options), traceId },
+      controller.signal,
+    )
+    if (controller.signal.aborted) {
+      markGenerationStopped(input, assistantMessageId, inPlace)
+      return
+    }
+    // 先出稿：不等校对
+    applyGenerationResponse(input, assistantMessageId, currentInput, response)
+    endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
+    // 后台校对软替换（不挡继续改稿）
+    void softProofreadInBackground(input, assistantMessageId, response, controller.signal)
   } catch (error) {
     const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-    const content = stopped ? "已停止本次生成。" : `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`
-    input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
-      ? { ...message, content, failure: stopped ? null : { kind: "generate", retryText: currentInput } }
-      : message))
+    if (stopped) {
+      markGenerationStopped(input, assistantMessageId, inPlace)
+    } else {
+      input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
+        ? {
+            ...message,
+            content: `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`,
+            regenerating: false,
+            failure: { kind: "generate" as const, retryText: currentInput },
+          }
+        : message))
+    }
   } finally {
-    if (input.requestAbortRef.current === controller) input.requestAbortRef.current = null
-    input.setIsGenerating(false)
+    endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
   }
 }
 
@@ -251,7 +407,7 @@ async function checkDeliverableQuality(input: AimGenerationActionInput, messageI
 }
 
 /**
- * @description React Hook：aimgenerationactions
+ * @description React Hook：aimgenerationed
  * @param input - 输入数据
  * @returns 无返回值
  */

@@ -59,19 +59,19 @@ export async function GET(
       // DB 回放：先读取已有步骤作为兜底（修复时序竞态）
       try {
         const delegate = (prisma as typeof prisma & {
-          aimExecutionTrace?: { findUnique(args: unknown): Promise<{ steps: unknown } | null> }
+          aimExecutionTrace?: { findUnique(args: unknown): Promise<{ steps: unknown; status?: string } | null> }
         }).aimExecutionTrace
         if (delegate?.findUnique) {
           const record = await delegate.findUnique({
             where: { id: traceId },
-            select: { steps: true },
+            select: { steps: true, status: true },
           })
           const existingSteps = Array.isArray(record?.steps) ? record.steps as unknown[] : []
           for (const step of existingSteps) {
             sendSSE(JSON.stringify({ type: "replay", step }))
           }
-          // 如果 trace 已完成，回放完直接关闭
-          const status = (record as Record<string, unknown>)?.status
+          // 如果 trace 已完成，回放完直接关闭（避免错过 Redis done 后挂 90s）
+          const status = record?.status
           if (status === "success" || status === "failed") {
             sendSSE(JSON.stringify({ type: "done", status }))
             cleanup()
@@ -141,10 +141,7 @@ export async function GET(
 /** 轻量级认证检查，失败时返回 Response 而非抛异常 */
 async function authenticateSafe(request: NextRequest): Promise<Response | null> {
   try {
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader) {
-      return new Response("Unauthorized", { status: 401 })
-    }
+    // 与其它 AIM API 一致：支持 Cookie session（EventSource 无法带 Authorization）
     const { authenticateRequest } = await import("@/lib/user-auth")
     await authenticateRequest(request)
     return null
