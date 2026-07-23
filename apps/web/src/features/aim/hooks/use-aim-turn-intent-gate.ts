@@ -9,7 +9,6 @@ import {
   type AimTurnIntent,
 } from "@/lib/aim-turn-intent"
 import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand } from "@/lib/aim-workbench-commands"
-import type { AimComposerMode } from "@/components/aim/aim-prompt-composer"
 import type { AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 
 export type PendingTurnIntent = {
@@ -24,8 +23,6 @@ export type PendingTurnIntent = {
  * 抽出以控制 use-aim-workbench 文件体量（arch:size ≤500）。
  */
 export function useAimTurnIntentGate(input: {
-  composerMode: AimComposerMode
-  handleStartPlan: () => void | Promise<void>
   hasEditorSelection: boolean
   imageCount: number
   handleGenerate: () => void
@@ -60,10 +57,6 @@ export function useAimTurnIntentGate(input: {
   }, [])
 
   const handleGenerateOrPlan = useCallback(() => {
-    if (input.composerMode === "plan") {
-      void input.handleStartPlan()
-      return
-    }
     if (pendingTurnIntent || intentResolving) return
     if (input.hasEditorSelection || input.imageCount > 0) {
       input.handleGenerate()

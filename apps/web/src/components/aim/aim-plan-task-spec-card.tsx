@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, RotateCcw, Send, X } from "lucide-react"
+import { RotateCcw, Send, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -63,32 +63,7 @@ export function AimPlanTaskSpecCard({
 
         {/* 字段列表 */}
         <div className="flex flex-col divide-y px-4">
-          {filledFields.map(({ key, label }) => {
-            const isAssumed = assumptionFields.has(key as PlanTaskSpecField)
-            const assumption = assumptions.find((a) => a.field === key)
-            return (
-              <div key={key} className="flex items-start gap-3 py-2.5">
-                <span className="mt-0.5 w-16 shrink-0 text-xs text-muted-foreground">{label}</span>
-                <span className="min-w-0 flex-1 text-sm leading-relaxed">
-                  {taskSpec[key]}
-                  {isAssumed && assumption && (
-                    <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-normal align-middle">
-                      档案：{assumption.sourceRefs[0]?.label ?? "项目"}
-                    </Badge>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-primary"
-                  onClick={() => onReSelect(key)}
-                  title="重新选择"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                </button>
-              </div>
-            )
-          })}
-
+          <PlanTaskSpecFields filledFields={filledFields} taskSpec={taskSpec} assumptions={assumptions} assumptionFields={assumptionFields} onReSelect={onReSelect} />
           {filledFields.length === 0 && (
             <p className="py-4 text-center text-xs text-muted-foreground">
               暂无已确认字段，请返回补充选择
@@ -127,4 +102,26 @@ export function AimPlanTaskSpecCard({
       </div>
     </div>
   )
+}
+
+function PlanTaskSpecFields({ filledFields, taskSpec, assumptions, assumptionFields, onReSelect }: {
+  filledFields: Array<{ key: keyof PlanTaskSpec; label: string }>
+  taskSpec: Partial<PlanTaskSpec>
+  assumptions: PlanAssumption[]
+  assumptionFields: Set<string>
+  onReSelect: (field: string) => void
+}) {
+  return <>{filledFields.map(({ key, label }) => {
+    const assumption = assumptions.find((a) => a.field === key)
+    return <div key={key} className="flex items-start gap-3 py-2.5">
+      <span className="mt-0.5 w-16 shrink-0 text-xs text-muted-foreground">{label}</span>
+      <span className="min-w-0 flex-1 text-sm leading-relaxed">
+        {taskSpec[key]}
+        {assumptionFields.has(key as PlanTaskSpecField) && assumption ? <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px] font-normal align-middle">档案：{assumption.sourceRefs[0]?.label ?? "项目"}</Badge> : null}
+      </span>
+      <button type="button" className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground/60 transition-colors hover:text-primary" onClick={() => onReSelect(key)} title="重新选择">
+        <RotateCcw className="h-3 w-3" />
+      </button>
+    </div>
+  })}</>
 }

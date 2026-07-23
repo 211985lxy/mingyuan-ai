@@ -3,8 +3,8 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { generatePlanQuestions } from "@/lib/aim/plan-option-engine"
 import { ownsActiveProject } from "@/lib/resource-ownership"
-import type { PlanRequest } from "@/lib/aim/plan-types"
-import { PLAN_MAX_ROUNDS } from "@/lib/aim/plan-types"
+import type { PlanTaskSpec, PlanTaskSpecField } from "@/lib/aim/plan-types"
+import { PLAN_MAX_ROUNDS, PLAN_MAX_TOTAL_QUESTIONS, PLAN_TASK_SPEC_FIELDS } from "@/lib/aim/plan-types"
 
 /**
  * POST /api/aim/workflow/plan
@@ -30,18 +30,18 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 解析可选参数 ──
-    const confirmedFields = (body.confirmedFields && typeof body.confirmedFields === "object" && !Array.isArray(body.confirmedFields))
-      ? body.confirmedFields as Partial<PlanRequest["confirmedFields"]>
-      : {}
+    const confirmedFields = sanitizeConfirmedFields(body.confirmedFields)
     const answeredQuestionIds = Array.isArray(body.answeredQuestionIds)
-      ? (body.answeredQuestionIds as unknown[]).filter((id): id is string => typeof id === "string")
+      ? Array.from(new Set((body.answeredQuestionIds as unknown[])
+        .filter((id): id is string => typeof id === "string")
+        .map((id) => id.trim())
+        .filter(Boolean)))
       : []
-    const round = typeof body.round === "number" && body.round >= 1
+    const round = typeof body.round === "number" && Number.isInteger(body.round) && body.round >= 1
       ? Math.min(body.round, PLAN_MAX_ROUNDS)
       : 1
-    const totalQuestionsAsked = typeof body.totalQuestionsAsked === "number" && body.totalQuestionsAsked >= 0
-      ? body.totalQuestionsAsked
-      : answeredQuestionIds.length
+    // 不信任客户端自报的计数；以去重后的已回答问题 ID 为准并封顶。
+    const totalQuestionsAsked = Math.min(answeredQuestionIds.length, PLAN_MAX_TOTAL_QUESTIONS)
 
     // ── 生成问题 ──
     const result = await generatePlanQuestions({
@@ -67,4 +67,17 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     )
   }
+}
+
+function sanitizeConfirmedFields(value: unknown): Partial<PlanTaskSpec> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {}
+  const input = value as Record<string, unknown>
+  const fields: Partial<PlanTaskSpec> = {}
+  for (const field of PLAN_TASK_SPEC_FIELDS) {
+    const raw = input[field]
+    if (typeof raw !== "string") continue
+    const text = raw.trim().slice(0, 1000)
+    if (text) fields[field as PlanTaskSpecField] = text
+  }
+  return fields
 }

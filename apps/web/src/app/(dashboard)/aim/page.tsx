@@ -128,7 +128,7 @@ export default function AimPage() {
               busy={w.busy}
               onConfirm={w.handlePlanConfirm}
               onAbandon={w.handlePlanAbandon}
-              onReSelect={() => w.planSession.goBack()}
+              onReSelect={(field) => w.planSession.reselectField(field)}
             />
           </div>
         )}

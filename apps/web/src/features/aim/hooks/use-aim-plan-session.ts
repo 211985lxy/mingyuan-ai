@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
 import { requestAimPlan } from "@/lib/api/aim"
 import {
   createEmptyPlanSession,
@@ -87,6 +87,8 @@ export interface UseAimPlanSessionReturn {
   answerCustom: (questionId: string, customText: string) => void
   /** 返回上一题重新选择 */
   goBack: () => void
+  /** 从任务单指定字段返回对应问题重新选择 */
+  reselectField: (field: string) => void
   /** 确认任务单并生成 */
   confirmPlan: () => ConfirmedWorkflowBrief | null
   /** 放弃计划 */
@@ -107,7 +109,6 @@ export function useAimPlanSession(): UseAimPlanSessionReturn {
   const [session, setSession] = useState<CopyPlanSession | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
-  /** 向服务端请求下一批问题 */
   const fetchQuestions = useCallback(async (
     current: CopyPlanSession,
   ): Promise<CopyPlanSession> => {
@@ -150,7 +151,6 @@ export function useAimPlanSession(): UseAimPlanSessionReturn {
     }
   }, [])
 
-  /** 启动计划会话 */
   const startPlan = useCallback(async (requirement: string, projectId: string) => {
     abortRef.current?.abort()
     const fresh = createEmptyPlanSession(requirement, projectId)
@@ -159,153 +159,12 @@ export function useAimPlanSession(): UseAimPlanSessionReturn {
     await fetchQuestions(fresh)
   }, [fetchQuestions])
 
-  /** 应用答案并推进到下一题或请求下一轮 */
-  const applyAnswer = useCallback((answer: PlanAnswer) => {
-    setSession((prev) => {
-      if (!prev) return prev
+  const { answerOption, answerCustom } = usePlanSessionAnswers(setSession, fetchQuestions)
+  const { goBack, reselectField } = usePlanSessionNavigation(setSession)
+  const { confirmPlan, abandonPlan, resetPlan, restoreDraft } = usePlanSessionLifecycle(session, setSession, abortRef)
 
-      const answers = [...prev.answers, answer]
-      // 将答案写入任务单
-      const question = prev.questions.find((q) => q.id === answer.questionId)
-      const taskSpec = { ...prev.taskSpec }
-      if (question) {
-        taskSpec[question.targetField] = answer.resolvedText
-      }
-
-      const nextIndex = prev.currentIndex + 1
-      const hasMoreLocal = nextIndex < prev.questions.length
-
-      const updated: CopyPlanSession = {
-        ...prev,
-        answers,
-        taskSpec,
-        currentIndex: nextIndex,
-      }
-
-      if (hasMoreLocal) {
-        // 还有本地未展示的问题
-        savePlanDraft(updated)
-        return updated
-      }
-
-      // 本地问题已答完，判断是否需要下一轮
-      const shouldFetchMore = prev.round < PLAN_MAX_ROUNDS && prev.questions.length < 5
-      if (shouldFetchMore) {
-        // 异步请求下一轮（不阻塞 UI）
-        const nextRoundSession = { ...updated, round: prev.round + 1 }
-        void fetchQuestions(nextRoundSession)
-        return { ...updated, loading: true }
-      }
-
-      // 所有轮次完成，进入任务单审阅
-      const reviewing: CopyPlanSession = { ...updated, status: "reviewing" }
-      savePlanDraft(reviewing)
-      return reviewing
-    })
-  }, [fetchQuestions])
-
-  /** 回答当前问题（A/B/C 选择） */
-  const answerOption = useCallback((questionId: string, key: "A" | "B" | "C") => {
-    setSession((prev) => {
-      if (!prev) return prev
-      const question = prev.questions.find((q) => q.id === questionId)
-      if (!question) return prev
-      const option = question.options.find((o) => o.key === key)
-      if (!option) return prev
-
-      // 异步应用答案（避免在 setState 内调用另一个 setState）
-      const answer: PlanAnswer = {
-        questionId,
-        selectedKey: key,
-        resolvedText: option.text,
-        source: "archive",
-      }
-      // 使用 queueMicrotask 避免 React 批处理问题
-      queueMicrotask(() => applyAnswer(answer))
-      return prev
-    })
-  }, [applyAnswer])
-
-  /** 回答当前问题（D 自定义补充） */
-  const answerCustom = useCallback((questionId: string, customText: string) => {
-    const trimmed = customText.trim()
-    if (!trimmed) return
-
-    const answer: PlanAnswer = {
-      questionId,
-      selectedKey: "D",
-      customText: trimmed,
-      resolvedText: trimmed,
-      source: "user_supplement",
-    }
-    applyAnswer(answer)
-  }, [applyAnswer])
-
-  /** 返回上一题重新选择 */
-  const goBack = useCallback(() => {
-    setSession((prev) => {
-      if (!prev || prev.currentIndex <= 0) return prev
-      const prevIndex = prev.currentIndex - 1
-      const prevQuestion = prev.questions[prevIndex]
-      if (!prevQuestion) return prev
-
-      // 移除上一题的答案
-      const answers = prev.answers.filter((a) => a.questionId !== prevQuestion.id)
-      // 从任务单中移除对应字段
-      const taskSpec = { ...prev.taskSpec }
-      delete taskSpec[prevQuestion.targetField]
-
-      const updated: CopyPlanSession = {
-        ...prev,
-        answers,
-        taskSpec,
-        currentIndex: prevIndex,
-        status: "asking",
-      }
-      savePlanDraft(updated)
-      return updated
-    })
-  }, [])
-
-  /** 确认任务单并生成 */
-  const confirmPlan = useCallback((): ConfirmedWorkflowBrief | null => {
-    if (!session || session.status !== "reviewing") return null
-    const brief = planTaskSpecToWorkflowBrief(session.taskSpec)
-    setSession((prev) => prev ? { ...prev, status: "confirmed" } : prev)
-    clearPlanDraft(session.projectId)
-    return brief
-  }, [session])
-
-  /** 放弃计划 */
-  const abandonPlan = useCallback(() => {
-    abortRef.current?.abort()
-    if (session) clearPlanDraft(session.projectId)
-    setSession(null)
-  }, [session])
-
-  /** 重置（新任务） */
-  const resetPlan = useCallback(() => {
-    abortRef.current?.abort()
-    if (session) clearPlanDraft(session.projectId)
-    setSession(null)
-  }, [session])
-
-  /** 从 sessionStorage 恢复草稿（页面刷新后） */
-  const restoreDraft = useCallback((projectId: string) => {
-    if (!projectId) return
-    setSession((prev) => {
-      // 已有活跃会话时不覆盖
-      if (prev) return prev
-      const draft = loadPlanDraft(projectId)
-      return draft
-    })
-  }, [])
-
-  // 派生值
   const isPlanMode = session !== null && session.status !== "abandoned"
-  const currentQuestion = session?.status === "asking" && !session.loading && session.currentIndex < session.questions.length
-    ? session.questions[session.currentIndex]
-    : null
+  const currentQuestion = session?.status === "asking" && !session.loading && session.currentIndex < session.questions.length ? session.questions[session.currentIndex] : null
   const questionNumber = session ? session.currentIndex + 1 : 0
   const totalQuestions = session?.questions.length ?? 0
 
@@ -319,9 +178,100 @@ export function useAimPlanSession(): UseAimPlanSessionReturn {
     answerOption,
     answerCustom,
     goBack,
+    reselectField,
     confirmPlan,
     abandonPlan,
     resetPlan,
     restoreDraft,
   }
+}
+
+function usePlanSessionAnswers(
+  setSession: Dispatch<SetStateAction<CopyPlanSession | null>>,
+  fetchQuestions: (session: CopyPlanSession) => Promise<CopyPlanSession>,
+) {
+  const applyAnswer = usePlanAnswerApplier(setSession, fetchQuestions)
+  const answerOption = useCallback((questionId: string, key: "A" | "B" | "C") => {
+    setSession((prev) => {
+      const question = prev?.questions.find((item) => item.id === questionId)
+      const option = question?.options.find((item) => item.key === key)
+      if (!question || !option) return prev
+      queueMicrotask(() => applyAnswer({ questionId, selectedKey: key, resolvedText: option.text, source: "archive" }))
+      return prev
+    })
+  }, [applyAnswer, setSession])
+  const answerCustom = useCallback((questionId: string, customText: string) => {
+    const trimmed = customText.trim()
+    if (trimmed) applyAnswer({ questionId, selectedKey: "D", customText: trimmed, resolvedText: trimmed, source: "user_supplement" })
+  }, [applyAnswer])
+  return { answerOption, answerCustom }
+}
+
+function usePlanAnswerApplier(
+  setSession: Dispatch<SetStateAction<CopyPlanSession | null>>,
+  fetchQuestions: (session: CopyPlanSession) => Promise<CopyPlanSession>,
+) {
+  return useCallback((answer: PlanAnswer) => {
+    setSession((prev) => {
+      if (!prev) return prev
+      const question = prev.questions.find((item) => item.id === answer.questionId)
+      const taskSpec = { ...prev.taskSpec }
+      if (question) taskSpec[question.targetField] = answer.resolvedText
+      const updated = { ...prev, answers: [...prev.answers, answer], taskSpec, currentIndex: prev.currentIndex + 1 }
+      if (updated.currentIndex < prev.questions.length) { savePlanDraft(updated); return updated }
+      if (prev.round < PLAN_MAX_ROUNDS && prev.questions.length < 5) {
+        const nextRoundSession = { ...updated, round: prev.round + 1 }
+        queueMicrotask(() => { void fetchQuestions(nextRoundSession) })
+        return { ...updated, loading: true }
+      }
+      const reviewing = { ...updated, status: "reviewing" as const }
+      savePlanDraft(reviewing)
+      return reviewing
+    })
+  }, [fetchQuestions, setSession])
+}
+
+function usePlanSessionNavigation(setSession: Dispatch<SetStateAction<CopyPlanSession | null>>) {
+  const goBack = useCallback(() => {
+    setSession((prev) => {
+      if (!prev || prev.currentIndex <= 0) return prev
+      const question = prev.questions[prev.currentIndex - 1]
+      if (!question) return prev
+      const taskSpec = { ...prev.taskSpec }
+      delete taskSpec[question.targetField]
+      const updated = { ...prev, answers: prev.answers.filter((a) => a.questionId !== question.id), taskSpec, currentIndex: prev.currentIndex - 1, status: "asking" as const }
+      savePlanDraft(updated)
+      return updated
+    })
+  }, [setSession])
+
+  const reselectField = useCallback((field: string) => {
+    setSession((prev) => {
+      if (!prev) return prev
+      const match = [...prev.questions].map((question, index) => ({ question, index })).reverse().find(({ question }) => question.targetField === field)
+      if (!match) return prev
+      const updated = { ...prev, answers: prev.answers.filter((answer) => answer.questionId !== match.question.id), taskSpec: Object.fromEntries(Object.entries(prev.taskSpec).filter(([key]) => key !== field)), currentIndex: match.index, status: "asking" as const }
+      savePlanDraft(updated)
+      return updated
+    })
+  }, [setSession])
+
+  return { goBack, reselectField }
+}
+
+function usePlanSessionLifecycle(session: CopyPlanSession | null, setSession: Dispatch<SetStateAction<CopyPlanSession | null>>, abortRef: MutableRefObject<AbortController | null>) {
+  const confirmPlan = useCallback((): ConfirmedWorkflowBrief | null => {
+    if (!session || session.status !== "reviewing") return null
+    const brief = planTaskSpecToWorkflowBrief(session.taskSpec)
+    setSession((prev) => prev ? { ...prev, status: "confirmed" } : prev)
+    clearPlanDraft(session.projectId)
+    return brief
+  }, [session, setSession])
+  const abandonPlan = useCallback(() => { abortRef.current?.abort(); if (session) clearPlanDraft(session.projectId); setSession(null) }, [abortRef, session, setSession])
+  const resetPlan = useCallback(() => { abortRef.current?.abort(); if (session) clearPlanDraft(session.projectId); setSession(null) }, [abortRef, session, setSession])
+  const restoreDraft = useCallback((projectId: string) => {
+    if (!projectId) return
+    setSession((prev) => prev || loadPlanDraft(projectId))
+  }, [setSession])
+  return { confirmPlan, abandonPlan, resetPlan, restoreDraft }
 }
