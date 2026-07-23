@@ -31,19 +31,27 @@ export interface PlanOption {
 
 /** 计划问题维度（按影响排序） */
 export type PlanQuestionDimension =
-  | "goal_and_message"   // 目标与核心信息
-  | "audience_and_pain"  // 受众与痛点
-  | "scenario_format"    // 场景/格式
-  | "style_length"       // 风格/长度
-  | "cta"                // CTA
+  | "core_message"
+  | "audience"
+  | "pain"
+  | "platform"
+  | "scenario"
+  | "format"
+  | "style"
+  | "length"
+  | "cta"
 
 /** 维度排序权重（数值越小越先问） */
 export const PLAN_DIMENSION_ORDER: PlanQuestionDimension[] = [
-  "goal_and_message",
-  "audience_and_pain",
-  "scenario_format",
-  "style_length",
+  "core_message",
+  "audience",
+  "pain",
+  "platform",
+  "format",
+  "style",
   "cta",
+  "scenario",
+  "length",
 ]
 
 /** 单个计划问题 */
@@ -227,6 +235,6 @@ export const PLAN_MAX_ROUNDS = 2
 /** 每轮最大问题数 */
 export const PLAN_MAX_QUESTIONS_PER_ROUND = 3
 /** 总问题数上限 */
-export const PLAN_MAX_TOTAL_QUESTIONS = 5
+export const PLAN_MAX_TOTAL_QUESTIONS = 6
 /** 档案选项最少数量（不足时只保留 D） */
 export const PLAN_MIN_ARCHIVE_OPTIONS = 2

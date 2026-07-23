@@ -5,11 +5,14 @@ import { requestAimPlan } from "@/lib/api/aim"
 import {
   createEmptyPlanSession,
   PLAN_MAX_ROUNDS,
+  PLAN_MAX_TOTAL_QUESTIONS,
   type CopyPlanSession,
   type PlanAnswer,
   type PlanQuestion,
+  type PlanQuestionDimension,
   type PlanResponse,
   type PlanTaskSpec,
+  type PlanTaskSpecField,
 } from "@/lib/aim/plan-types"
 import type { ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
 
@@ -18,20 +21,6 @@ const PLAN_STORAGE_PREFIX = "aim_plan_session_"
 
 function storageKey(projectId: string): string {
   return `${PLAN_STORAGE_PREFIX}${projectId}`
-}
-
-/** 从 sessionStorage 恢复计划草稿 */
-export function loadPlanDraft(projectId: string): CopyPlanSession | null {
-  if (typeof window === "undefined" || !projectId) return null
-  try {
-    const raw = sessionStorage.getItem(storageKey(projectId))
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as CopyPlanSession
-    if (parsed.status === "confirmed" || parsed.status === "abandoned") return null
-    return parsed
-  } catch {
-    return null
-  }
 }
 
 /** 保存计划草稿到 sessionStorage */
@@ -95,8 +84,8 @@ export interface UseAimPlanSessionReturn {
   abandonPlan: () => void
   /** 重置（新任务） */
   resetPlan: () => void
-  /** 从 sessionStorage 恢复草稿（页面刷新后） */
-  restoreDraft: (projectId: string) => void
+  /** 失败后重试当前一轮 */
+  retryPlan: () => Promise<void>
 }
 
 /**
@@ -108,48 +97,7 @@ export interface UseAimPlanSessionReturn {
 export function useAimPlanSession(): UseAimPlanSessionReturn {
   const [session, setSession] = useState<CopyPlanSession | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-
-  const fetchQuestions = useCallback(async (
-    current: CopyPlanSession,
-  ): Promise<CopyPlanSession> => {
-    const controller = new AbortController()
-    abortRef.current = controller
-    const loadingSession = { ...current, loading: true, error: undefined }
-    setSession(loadingSession)
-    savePlanDraft(loadingSession)
-
-    try {
-      const response: PlanResponse = await requestAimPlan({
-        projectId: current.projectId,
-        requirement: current.requirement,
-        confirmedFields: current.taskSpec,
-        answeredQuestionIds: current.answers.map((a) => a.questionId),
-        round: current.round,
-      }, controller.signal)
-
-      const updated: CopyPlanSession = {
-        ...current,
-        loading: false,
-        questions: [...current.questions, ...response.questions],
-        assumptions: response.assumptions,
-        taskSpec: response.taskSpec,
-        round: response.round,
-        status: response.ready && response.questions.length === 0 ? "reviewing" : "asking",
-      }
-      setSession(updated)
-      savePlanDraft(updated)
-      return updated
-    } catch (error) {
-      if (controller.signal.aborted) return current
-      const failed: CopyPlanSession = {
-        ...current,
-        loading: false,
-        error: error instanceof Error ? error.message : "计划生成失败",
-      }
-      setSession(failed)
-      return failed
-    }
-  }, [])
+  const fetchQuestions = usePlanQuestionFetcher(setSession, abortRef)
 
   const startPlan = useCallback(async (requirement: string, projectId: string) => {
     abortRef.current?.abort()
@@ -159,9 +107,13 @@ export function useAimPlanSession(): UseAimPlanSessionReturn {
     await fetchQuestions(fresh)
   }, [fetchQuestions])
 
-  const { answerOption, answerCustom } = usePlanSessionAnswers(setSession, fetchQuestions)
-  const { goBack, reselectField } = usePlanSessionNavigation(setSession)
-  const { confirmPlan, abandonPlan, resetPlan, restoreDraft } = usePlanSessionLifecycle(session, setSession, abortRef)
+  const { answerOption, answerCustom } = usePlanSessionAnswers(session, setSession, fetchQuestions)
+  const { goBack, reselectField } = usePlanSessionNavigation(session, setSession)
+  const { confirmPlan, abandonPlan, resetPlan } = usePlanSessionLifecycle(session, setSession, abortRef)
+  const retryPlan = useCallback(async () => {
+    if (!session || session.loading) return
+    await fetchQuestions({ ...session, error: undefined })
+  }, [fetchQuestions, session])
 
   const isPlanMode = session !== null && session.status !== "abandoned"
   const currentQuestion = session?.status === "asking" && !session.loading && session.currentIndex < session.questions.length ? session.questions[session.currentIndex] : null
@@ -182,96 +134,199 @@ export function useAimPlanSession(): UseAimPlanSessionReturn {
     confirmPlan,
     abandonPlan,
     resetPlan,
-    restoreDraft,
+    retryPlan,
   }
 }
 
+function usePlanQuestionFetcher(
+  setSession: Dispatch<SetStateAction<CopyPlanSession | null>>,
+  abortRef: MutableRefObject<AbortController | null>,
+) {
+  return useCallback(async (current: CopyPlanSession): Promise<CopyPlanSession> => {
+    const controller = new AbortController()
+    abortRef.current = controller
+    const loadingSession = { ...current, loading: true, error: undefined }
+    setSession(loadingSession)
+    savePlanDraft(loadingSession)
+    try {
+      const response: PlanResponse = await requestAimPlan({
+        projectId: current.projectId,
+        requirement: current.requirement,
+        confirmedFields: current.taskSpec,
+        answeredQuestionIds: current.answers.map((answer) => answer.questionId),
+        round: current.round,
+      }, controller.signal)
+      const updated: CopyPlanSession = {
+        ...current,
+        loading: false,
+        questions: [...current.questions, ...response.questions],
+        assumptions: response.assumptions,
+        taskSpec: response.taskSpec,
+        round: response.round,
+        status: response.ready && response.questions.length === 0 ? "reviewing" : "asking",
+      }
+      setSession(updated)
+      savePlanDraft(updated)
+      return updated
+    } catch (error) {
+      if (controller.signal.aborted) return current
+      const failed = { ...current, loading: false, error: error instanceof Error ? error.message : "计划生成失败" }
+      setSession(failed)
+      savePlanDraft(failed)
+      return failed
+    }
+  }, [abortRef, setSession])
+}
+
 function usePlanSessionAnswers(
+  session: CopyPlanSession | null,
   setSession: Dispatch<SetStateAction<CopyPlanSession | null>>,
   fetchQuestions: (session: CopyPlanSession) => Promise<CopyPlanSession>,
 ) {
-  const applyAnswer = usePlanAnswerApplier(setSession, fetchQuestions)
+  const applyAnswer = usePlanAnswerApplier(session, setSession, fetchQuestions)
   const answerOption = useCallback((questionId: string, key: "A" | "B" | "C") => {
-    setSession((prev) => {
-      const question = prev?.questions.find((item) => item.id === questionId)
-      const option = question?.options.find((item) => item.key === key)
-      if (!question || !option) return prev
-      queueMicrotask(() => applyAnswer({ questionId, selectedKey: key, resolvedText: option.text, source: "archive" }))
-      return prev
-    })
-  }, [applyAnswer, setSession])
+    const question = session?.questions.find((item) => item.id === questionId)
+    const option = question?.options.find((item) => item.key === key)
+    if (!question || !option) return
+    applyAnswer({ questionId, selectedKey: key, resolvedText: option.text, source: "archive" })
+  }, [applyAnswer, session])
   const answerCustom = useCallback((questionId: string, customText: string) => {
-    const trimmed = customText.trim()
+    const trimmed = customText.trim().slice(0, 1000)
     if (trimmed) applyAnswer({ questionId, selectedKey: "D", customText: trimmed, resolvedText: trimmed, source: "user_supplement" })
   }, [applyAnswer])
   return { answerOption, answerCustom }
 }
 
 function usePlanAnswerApplier(
+  session: CopyPlanSession | null,
   setSession: Dispatch<SetStateAction<CopyPlanSession | null>>,
   fetchQuestions: (session: CopyPlanSession) => Promise<CopyPlanSession>,
 ) {
   return useCallback((answer: PlanAnswer) => {
-    setSession((prev) => {
-      if (!prev) return prev
-      const question = prev.questions.find((item) => item.id === answer.questionId)
-      const taskSpec = { ...prev.taskSpec }
-      if (question) taskSpec[question.targetField] = answer.resolvedText
-      const updated = { ...prev, answers: [...prev.answers, answer], taskSpec, currentIndex: prev.currentIndex + 1 }
-      if (updated.currentIndex < prev.questions.length) { savePlanDraft(updated); return updated }
-      if (prev.round < PLAN_MAX_ROUNDS && prev.questions.length < 5) {
-        const nextRoundSession = { ...updated, round: prev.round + 1 }
-        queueMicrotask(() => { void fetchQuestions(nextRoundSession) })
-        return { ...updated, loading: true }
-      }
-      const reviewing = { ...updated, status: "reviewing" as const }
-      savePlanDraft(reviewing)
-      return reviewing
-    })
-  }, [fetchQuestions, setSession])
+    if (!session || session.loading) return
+    const question = session.questions.find((item) => item.id === answer.questionId)
+    if (!question || session.answers.some((item) => item.questionId === answer.questionId)) return
+    const taskSpec = { ...session.taskSpec, [question.targetField]: answer.resolvedText }
+    const updated = {
+      ...session,
+      answers: [...session.answers, answer],
+      taskSpec,
+      currentIndex: session.currentIndex + 1,
+    }
+    if (updated.currentIndex < session.questions.length) {
+      setSession(updated)
+      savePlanDraft(updated)
+      return
+    }
+    if (session.round < PLAN_MAX_ROUNDS && session.questions.length < PLAN_MAX_TOTAL_QUESTIONS) {
+      void fetchQuestions({ ...updated, round: session.round + 1 })
+      return
+    }
+    const reviewing = { ...updated, status: "reviewing" as const }
+    setSession(reviewing)
+    savePlanDraft(reviewing)
+  }, [fetchQuestions, session, setSession])
 }
 
-function usePlanSessionNavigation(setSession: Dispatch<SetStateAction<CopyPlanSession | null>>) {
+function usePlanSessionNavigation(
+  session: CopyPlanSession | null,
+  setSession: Dispatch<SetStateAction<CopyPlanSession | null>>,
+) {
   const goBack = useCallback(() => {
-    setSession((prev) => {
-      if (!prev || prev.currentIndex <= 0) return prev
-      const question = prev.questions[prev.currentIndex - 1]
-      if (!question) return prev
-      const taskSpec = { ...prev.taskSpec }
-      delete taskSpec[question.targetField]
-      const updated = { ...prev, answers: prev.answers.filter((a) => a.questionId !== question.id), taskSpec, currentIndex: prev.currentIndex - 1, status: "asking" as const }
-      savePlanDraft(updated)
-      return updated
-    })
-  }, [setSession])
+    if (!session || session.currentIndex <= 0) return
+    const question = session.questions[session.currentIndex - 1]
+    if (!question) return
+    const taskSpec = { ...session.taskSpec }
+    delete taskSpec[question.targetField]
+    const updated = {
+      ...session,
+      answers: session.answers.filter((answer) => answer.questionId !== question.id),
+      taskSpec,
+      currentIndex: session.currentIndex - 1,
+      status: "asking" as const,
+    }
+    setSession(updated)
+    savePlanDraft(updated)
+  }, [session, setSession])
 
   const reselectField = useCallback((field: string) => {
-    setSession((prev) => {
-      if (!prev) return prev
-      const match = [...prev.questions].map((question, index) => ({ question, index })).reverse().find(({ question }) => question.targetField === field)
-      if (!match) return prev
-      const updated = { ...prev, answers: prev.answers.filter((answer) => answer.questionId !== match.question.id), taskSpec: Object.fromEntries(Object.entries(prev.taskSpec).filter(([key]) => key !== field)), currentIndex: match.index, status: "asking" as const }
+    if (!session) return
+    const match = [...session.questions].map((question, index) => ({ question, index })).reverse().find(({ question }) => question.targetField === field)
+    if (!match) {
+      const overrideQuestion = buildOverrideQuestion(field)
+      if (!overrideQuestion) return
+      const taskSpec = { ...session.taskSpec }
+      delete taskSpec[overrideQuestion.targetField]
+      const updated = {
+        ...session,
+        questions: [...session.questions, overrideQuestion],
+        assumptions: session.assumptions.filter((assumption) => assumption.field !== field),
+        taskSpec,
+        currentIndex: session.questions.length,
+        status: "asking" as const,
+      }
+      setSession(updated)
       savePlanDraft(updated)
-      return updated
-    })
-  }, [setSession])
+      return
+    }
+    const replayQuestions = session.questions.slice(match.index)
+    const replayQuestionIds = new Set(replayQuestions.map((question) => question.id))
+    const replayFields = new Set(replayQuestions.map((question) => question.targetField))
+    const updated = {
+      ...session,
+      answers: session.answers.filter((answer) => !replayQuestionIds.has(answer.questionId)),
+      taskSpec: Object.fromEntries(Object.entries(session.taskSpec).filter(([key]) => !replayFields.has(key as PlanTaskSpecField))),
+      currentIndex: match.index,
+      status: "asking" as const,
+    }
+    setSession(updated)
+    savePlanDraft(updated)
+  }, [session, setSession])
 
   return { goBack, reselectField }
+}
+
+const FIELD_OVERRIDE_QUESTIONS: Partial<Record<PlanTaskSpecField, {
+  dimension: PlanQuestionDimension
+  prompt: string
+}>> = {
+  contentGoal: { dimension: "core_message", prompt: "请补充本次内容真正要达成的目标。" },
+  coreMessage: { dimension: "core_message", prompt: "请补充这条内容最核心要传达的信息。" },
+  targetCustomer: { dimension: "audience", prompt: "请补充这条内容真正要说给哪类人听。" },
+  realProblem: { dimension: "pain", prompt: "请补充这次最值得击中的真实痛点。" },
+  platform: { dimension: "platform", prompt: "请补充这条内容准备发布的平台。" },
+  useScenario: { dimension: "scenario", prompt: "请补充这条内容的具体使用场景。" },
+  outputFormat: { dimension: "format", prompt: "请补充这次需要的内容形式。" },
+  style: { dimension: "style", prompt: "请补充希望采用的表达风格。" },
+  lengthRule: { dimension: "length", prompt: "请补充希望控制的内容长度。" },
+  ctaText: { dimension: "cta", prompt: "请补充内容结尾的行动号召。" },
+  mustKeep: { dimension: "style", prompt: "请补充成稿中必须保留的信息。" },
+  avoid: { dimension: "style", prompt: "请补充这次表达必须避开的内容。" },
+}
+
+function buildOverrideQuestion(field: string): PlanQuestion | null {
+  const targetField = field as PlanTaskSpecField
+  const config = FIELD_OVERRIDE_QUESTIONS[targetField]
+  if (!config) return null
+  return {
+    id: `q_override_${targetField}_${Date.now().toString(36)}`,
+    dimension: config.dimension,
+    prompt: config.prompt,
+    options: [],
+    hasCustomOption: true,
+    targetField,
+  }
 }
 
 function usePlanSessionLifecycle(session: CopyPlanSession | null, setSession: Dispatch<SetStateAction<CopyPlanSession | null>>, abortRef: MutableRefObject<AbortController | null>) {
   const confirmPlan = useCallback((): ConfirmedWorkflowBrief | null => {
     if (!session || session.status !== "reviewing") return null
     const brief = planTaskSpecToWorkflowBrief(session.taskSpec)
-    setSession((prev) => prev ? { ...prev, status: "confirmed" } : prev)
+    setSession(null)
     clearPlanDraft(session.projectId)
     return brief
   }, [session, setSession])
   const abandonPlan = useCallback(() => { abortRef.current?.abort(); if (session) clearPlanDraft(session.projectId); setSession(null) }, [abortRef, session, setSession])
   const resetPlan = useCallback(() => { abortRef.current?.abort(); if (session) clearPlanDraft(session.projectId); setSession(null) }, [abortRef, session, setSession])
-  const restoreDraft = useCallback((projectId: string) => {
-    if (!projectId) return
-    setSession((prev) => prev || loadPlanDraft(projectId))
-  }, [setSession])
-  return { confirmPlan, abandonPlan, resetPlan, restoreDraft }
+  return { confirmPlan, abandonPlan, resetPlan }
 }

@@ -11,6 +11,7 @@ import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
 import { AimContentModeSelector, AimMethodologySelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
 import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
+import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 
@@ -62,6 +63,16 @@ export default function AimPage() {
         />
 
         {/* 计划模式：问题卡片 / 任务单卡片（覆盖在对话区上方） */}
+        {w.planSession.session?.status === "asking" && !w.planSession.currentQuestion && (
+          <div className="px-3 py-2 sm:px-5">
+            <AimPlanStatusCard
+              loading={w.planSession.session.loading}
+              error={w.planSession.session.error}
+              onRetry={() => void w.planSession.retryPlan()}
+              onAbandon={w.handlePlanAbandon}
+            />
+          </div>
+        )}
         {w.planSession.session?.status === "asking" && w.planSession.currentQuestion && (
           <div className="px-3 py-2 sm:px-5">
             <AimPlanQuestionCard
@@ -117,40 +128,41 @@ export default function AimPage() {
           }}
         />
 
-        {/* 输入区 */}
-        <footer className="border-t px-3 py-2 sm:px-5">
-          {w.selectedAgentId === "content_producer" && <AimContentModeSelector value={w.agentModule} onChange={w.setAgentModule} />}
-          <AimResearchHint agentId={w.selectedAgentId} />
-          <AimPromptComposer
-            value={w.input}
-            placeholder={w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : w.agent.placeholder}
-            busy={w.busy}
-            isRecording={w.isRecording}
-            isTranscribing={w.isTranscribing}
-            isGenerating={w.isGenerating || w.isUploadingImage}
-            canGenerate={
-              (w.input.trim().length > 0 || w.imageAttachments.length > 0) &&
-              (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
-              !w.isUploadingImage
-            }
-            primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
-            onChange={w.setInput}
-            onGenerate={w.handleGenerate}
-            onStop={w.handleStop}
-            onStartRecording={w.startRecording}
-            onStopRecording={w.stopRecording}
-            showSkills={Boolean(w.params.agentParam)}
-            skills={w.agent.skills}
-            onUseSkill={w.handleUseSkill}
-            imageAttachments={w.imageAttachments}
-            onAddImages={(files) => void w.addImages(files)}
-            onRemoveImage={w.removeImage}
-            composerMode={w.composerMode}
-            onComposerModeChange={w.setComposerMode}
-            canUsePlanMode={w.canUsePlanMode}
-            isPlanSessionActive={w.planSession.isPlanMode}
-          />
-        </footer>
+        {/* 输入区：计划会话启动后由问题卡片接管，避免重复提交另一份计划。 */}
+        {!w.planSession.isPlanMode && (
+          <footer className="border-t px-3 py-2 sm:px-5">
+            {w.selectedAgentId === "content_producer" && <AimContentModeSelector value={w.agentModule} onChange={w.setAgentModule} />}
+            <AimResearchHint agentId={w.selectedAgentId} />
+            <AimPromptComposer
+              value={w.input}
+              placeholder={w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : w.agent.placeholder}
+              busy={w.busy}
+              isRecording={w.isRecording}
+              isTranscribing={w.isTranscribing}
+              isGenerating={w.isGenerating || w.isUploadingImage}
+              canGenerate={
+                (w.input.trim().length > 0 || w.imageAttachments.length > 0) &&
+                (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
+                !w.isUploadingImage
+              }
+              primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
+              onChange={w.setInput}
+              onGenerate={w.handleGenerate}
+              onStop={w.handleStop}
+              onStartRecording={w.startRecording}
+              onStopRecording={w.stopRecording}
+              showSkills={Boolean(w.params.agentParam)}
+              skills={w.agent.skills}
+              onUseSkill={w.handleUseSkill}
+              imageAttachments={w.imageAttachments}
+              onAddImages={(files) => void w.addImages(files)}
+              onRemoveImage={w.removeImage}
+              composerMode={w.composerMode}
+              onComposerModeChange={w.setComposerMode}
+              canUsePlanMode={w.canUsePlanMode}
+            />
+          </footer>
+        )}
       </section>
 
       {w.hasEditor && (

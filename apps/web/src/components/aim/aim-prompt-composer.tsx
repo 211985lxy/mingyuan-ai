@@ -35,8 +35,6 @@ interface AimPromptComposerProps {
   onComposerModeChange?: (mode: AimComposerMode) => void
   /** 计划模式：是否允许开启（需已选客户项目） */
   canUsePlanMode?: boolean
-  /** 计划模式：是否处于计划会话中（隐藏切换） */
-  isPlanSessionActive?: boolean
 }
 
 /**
@@ -67,11 +65,11 @@ export function AimPromptComposer({
   composerMode = "direct",
   onComposerModeChange,
   canUsePlanMode = false,
-  isPlanSessionActive = false,
 }: AimPromptComposerProps) {
   const isPlanMode = composerMode === "plan"
   const canSend = !busy && !isRecording && (value.trim().length > 0 || imageAttachments.length > 0)
-  const canSubmit = canSend && canGenerate
+  const canPlan = !busy && !isRecording && value.trim().length > 0
+  const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate
   const canStop = busy && !isRecording && Boolean(onStop)
   const rootRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -209,7 +207,7 @@ export function AimPromptComposer({
           </p>
           <div className="flex items-center justify-end gap-1.5">
             {/* 计划模式开关（仅新写文案场景、未处于计划会话中时显示） */}
-            {!isPlanSessionActive && onComposerModeChange && (
+            {onComposerModeChange && (
               <Button
                 type="button"
                 size="sm"

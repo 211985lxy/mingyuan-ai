@@ -1,9 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react"
+import { useCallback, useState, type Dispatch, type SetStateAction } from "react"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-composer"
 import { useAimPlanSession } from "@/features/aim/hooks/use-aim-plan-session"
 import type { AimWorkflowBriefState } from "@/hooks/use-aim-generation-actions"
+import {
+  parseExplicitDirectModeCommand,
+  parseExplicitPlanModeCommand,
+} from "@/lib/aim/plan-mode-command"
 
 interface UseAimPlanOrchestrationInput {
   input: string
@@ -21,12 +25,7 @@ interface UseAimPlanOrchestrationInput {
 export function useAimPlanOrchestration(input: UseAimPlanOrchestrationInput) {
   const [composerMode, setComposerMode] = useState<AimComposerMode>("direct")
   const planSession = useAimPlanSession()
-  const { restoreDraft } = planSession
   const canUsePlanMode = input.projectEnabled && Boolean(input.selectedProjectId)
-
-  useEffect(() => {
-    if (input.selectedProjectId) restoreDraft(input.selectedProjectId)
-  }, [input.selectedProjectId, restoreDraft])
 
   const handleStartPlan = useCallback(async () => {
     const requirement = input.input.trim()
@@ -56,9 +55,25 @@ export function useAimPlanOrchestration(input: UseAimPlanOrchestrationInput) {
   }, [planSession])
 
   const handleGenerateOrPlan = useCallback((directGenerate: () => void) => {
-    if (composerMode === "plan") void handleStartPlan()
-    else directGenerate()
-  }, [composerMode, handleStartPlan])
+    if (composerMode === "plan") {
+      const directCommand = parseExplicitDirectModeCommand(input.input)
+      if (directCommand.matched) {
+        setComposerMode("direct")
+        input.setInput(directCommand.remainingInput)
+        return
+      }
+      void handleStartPlan()
+      return
+    }
+
+    const planCommand = parseExplicitPlanModeCommand(input.input)
+    if (planCommand.matched) {
+      setComposerMode("plan")
+      input.setInput(planCommand.remainingInput)
+      return
+    }
+    directGenerate()
+  }, [composerMode, handleStartPlan, input])
 
   return {
     composerMode,
