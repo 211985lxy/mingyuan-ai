@@ -60,7 +60,7 @@ interface MessageActions {
   onSubmitChoice: (text: string) => void
   onRetry: (message: AimWorkbenchMessage) => void
   onApplyReplacement: (message: AimWorkbenchMessage) => void
-  onRepurpose: (messageId: string) => (format: ContentFormat) => void
+  onRepurpose: (messageId: string) => (formats: ContentFormat | ContentFormat[]) => void
   onQuality: (messageId: string) => () => void
   onMarkStatus: (messageId: string) => (status: string) => void
   onNextAction: (action: AimNextAction, content: string, generationId: string) => void
@@ -82,6 +82,7 @@ interface MessageActions {
   persona?: string
   topicTitle?: string
   projectId?: string
+  onCanonicalUpdated?: (messageId: string, taskSpec: import("@/lib/task-spec").TaskSpec) => void
 }
 
 function MessageDeliverable({ message, selectedAgentId, selectedProjectId, latestDeliverableMessageId, busy, actions }: {
@@ -101,7 +102,7 @@ function MessageDeliverable({ message, selectedAgentId, selectedProjectId, lates
     sourceGenerationId: deliverables.id,
     positioningText: rawCopy,
   } : null
-  return <div className="mt-2 w-full"><AimDeliverableBubble messageId={message.id} deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} regenerating={Boolean(message.regenerating)} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onInlineEditKeyChange={actions.onInlineEditKeyChange} inlineEditKey={actions.inlineEditKey} onInlineContentSaved={(format, content) => actions.onInlineContentSaved(message.id, format, content)} onInlineSelectionRewrite={(input) => actions.onInlineSelectionRewrite(message.id, input)} referenceText={actions.referenceText} persona={actions.persona} topicTitle={actions.topicTitle} projectId={actions.projectId} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} /></div>
+  return <div className="mt-2 w-full"><AimDeliverableBubble messageId={message.id} deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} regenerating={Boolean(message.regenerating)} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onInlineEditKeyChange={actions.onInlineEditKeyChange} inlineEditKey={actions.inlineEditKey} onInlineContentSaved={(format, content) => actions.onInlineContentSaved(message.id, format, content)} onInlineSelectionRewrite={(input) => actions.onInlineSelectionRewrite(message.id, input)} referenceText={actions.referenceText} persona={actions.persona} topicTitle={actions.topicTitle} projectId={actions.projectId} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} onCanonicalUpdated={({ taskSpec }) => actions.onCanonicalUpdated?.(message.id, taskSpec)} /></div>
 }
 
 function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, latestDeliverableMessageId, actions }: {
