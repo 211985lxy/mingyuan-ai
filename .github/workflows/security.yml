@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
   security-events: write
 
 jobs:
@@ -52,6 +54,9 @@ jobs:
           languages: javascript-typescript
       - name: Analyze CodeQL
         uses: github/codeql-action/analyze@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
+        with:
+          # Private repos without Actions read on GITHUB_TOKEN fail wait-for-processing.
+          wait-for-processing: false
 
   container:
     name: Container and SBOM
@@ -68,6 +73,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+          trivyignores: .trivyignore
       - name: Generate image SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:

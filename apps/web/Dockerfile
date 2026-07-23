@@ -27,6 +27,7 @@ FROM node:20-alpine AS web-runner
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat \
+  && apk upgrade --no-cache libcrypto3 libssl3 \
   && rm -rf /usr/local/lib/node_modules/npm \
     /usr/local/bin/npm \
     /usr/local/bin/npx \
