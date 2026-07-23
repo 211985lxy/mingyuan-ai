@@ -193,7 +193,7 @@ const TraceStepItem = memo(function TraceStepItem({
 
         {/* 展开详情 */}
         {expanded && (
-          <div className="mt-1 ml-4.5 space-y-1 border-l border-border/30 pl-3">
+          <div className="mt-1 ml-4 space-y-1 border-l border-border/30 pl-3">
             {step.summary && (
               <p className="text-[11px] leading-4 text-muted-foreground/70">{step.summary}</p>
             )}
@@ -389,19 +389,19 @@ export function ThinkingProcessPanel({
   return (
     <div
       className={cn(
-        "w-full rounded-lg border transition-all duration-200",
+        "w-full overflow-hidden rounded-lg border transition-colors duration-200",
         isComplete
           ? isFailed
-            ? "border-red-500/20 bg-red-500/[0.03]"
-            : "border-border/50 bg-muted/10"
-          : "border-primary/20 bg-primary/[0.03]",
+            ? "border-red-500/15"
+            : "border-border/40"
+          : "border-primary/20",
       )}
     >
       {/* 头部 */}
       <button
         type="button"
         onClick={() => isComplete && setPanelExpanded((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        className="flex w-full items-center gap-2 bg-muted/20 px-3 py-2 text-left"
       >
         {isComplete ? (
           isFailed ? (
