@@ -2,7 +2,7 @@
  * Eval runner — deterministic CI run (frozen adapter, no model).
  *
  * Asserts the runner produces a report where:
- *   - all 70 cases pass the contract grader (routing/format/context)
+ *   - all fixtures pass the contract grader (routing/format/context)
  *   - contractPassRate === 100% (the hard acceptance gate)
  *   - per-agent breakdowns are computed
  *   - sampling is deterministic
@@ -35,13 +35,13 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(a).toHaveLength(15)
   })
 
-  it("reports 100% contract pass rate across all 70 cases (no model)", async () => {
+  it("reports 100% contract pass rate across all fixtures (no model)", async () => {
     const report = await runEvalSuite(ALL_FIXTURES, createFrozenContextAdapter(), {
       skipRubric: true,
     })
 
     expect(report.adapter).toBe("frozen")
-    expect(report.totalCases).toBe(70)
+    expect(report.totalCases).toBe(ALL_FIXTURES.length)
     expect(report.contractPassRate).toBe(1)
     expect(report.results.every((r) => r.contractPassed)).toBe(true)
     // rubric is skipped in deterministic CI
