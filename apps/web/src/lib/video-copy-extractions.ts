@@ -315,6 +315,16 @@ export async function syncVideoCopyExtraction(
         })
       }
 
+      if (!result.transcript?.trim()) {
+        return prisma.videoCopyExtraction.update({
+          where: { id: record.id },
+          data: {
+            status: "failed",
+            errorMessage: "未能提取到可用文案，请换一个链接试试。",
+          },
+        })
+      }
+
       const transcript = await polishTranscript(result.transcript)
       await prisma.videoCopyExtraction.update({
         where: { id: record.id },
