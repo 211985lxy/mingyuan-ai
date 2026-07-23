@@ -36,6 +36,7 @@ import { parseAimSearchParams } from "@/features/aim/aim-search-params"
 import { useAimAgentConfig, useRouteSetters } from "@/features/aim/aim-agent-derivation"
 import { useAimPageCommands } from "@/features/aim/hooks/use-aim-page-commands"
 import { useAimSendActions } from "@/features/aim/hooks/use-aim-send-actions"
+import { useAimInlineEditorBridge } from "@/features/aim/hooks/use-aim-inline-editor-bridge"
 import { useAimProjectAttach } from "@/hooks/use-aim-project-attach"
 import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/features/aim/aim-reference-annotation"
 import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-mode"
@@ -84,7 +85,7 @@ export function useAimWorkbench() {
   const [editorFormat, setEditorFormat] = useState<ContentFormat | undefined>(() => initialDraft?.editorFormat)
   const [editorSourceMessageId, setEditorSourceMessageId] = useState<string | undefined>(() => initialDraft?.editorSourceMessageId)
   const [editorPanelWidth, setEditorPanelWidth] = useState(() => initialDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
-  const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? true)
+  const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? false)
   const [referenceSelection, setReferenceSelection] = useState<AimEditorSelection>({ text: "", range: { start: 0, end: 0 } })
   const [draftSelection, setDraftSelection] = useState<AimEditorSelection>({ text: "", range: { start: 0, end: 0 } })
   const [isThinking, setIsThinking] = useState(false)
@@ -212,16 +213,14 @@ export function useAimWorkbench() {
   useAimVideoCopyPrefill({ extractionId: videoCopyExtractionIdParam, router, searchParams, setters: routeSetters })
 
   // ---- openEditorFromResult (needed by generation + history load) ----
-  const openEditorFromResult = useCallback((messageId: string, format: ContentFormat, content: string) => {
-    // 正文未变则跳过写入，避免校对软替换时编辑区空窗/光标跳动
-    setEditorText((current) => (current === content ? current : content))
-    setEditorFormat(format)
-    setEditorSourceMessageId(messageId)
-    setEditorPanelOpen(true)
-    setDraftSelection({ text: "", range: { start: 0, end: 0 } })
-  }, [setDraftSelection, setEditorFormat, setEditorPanelOpen, setEditorSourceMessageId, setEditorText])
+  // 默认同步编辑上下文，不自动打开右侧面板（内联编辑优先）
+  // sync / inline handlers are created after sendText below
+  const openEditorFromResultRef = useRef<(messageId: string, format: ContentFormat, content: string) => void>(() => {})
+  const syncEditorFromResultProxy = useCallback((messageId: string, format: ContentFormat, content: string) => {
+    openEditorFromResultRef.current(messageId, format, content)
+  }, [])
 
-  useAimHistoryLoad({ loadTargetId, generationIdParam, history: storeHistory, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters: routeSetters })
+  useAimHistoryLoad({ loadTargetId, generationIdParam, history: storeHistory, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult: syncEditorFromResultProxy, setters: routeSetters })
   useAimMessageAutoScroll({ scrollRef, pendingMessageIdRef: pendingScrollMessageIdRef, messages, isThinking, isGenerating })
 
   // ---- Persona progress ----
@@ -252,7 +251,7 @@ export function useAimWorkbench() {
     sourceTopicTitle, sourceTopicRationale, selectedMethodologyProfileIds,
     topicSelectionId: topicSelectionIdParam, selectedTopicIndex: selectedTopicIndexParam,
     requestAbortRef, pendingScrollMessageIdRef, clearCurrentTaskContext,
-    openEditorFromResult, refreshHistory, refreshProjectWorkflow,
+    openEditorFromResult: syncEditorFromResultProxy, refreshHistory, refreshProjectWorkflow,
   })
 
   // ---- Workflow actions ----
@@ -295,7 +294,7 @@ export function useAimWorkbench() {
     setEditorFormat(nextDraft?.editorFormat)
     setEditorSourceMessageId(nextDraft?.editorSourceMessageId)
     setEditorPanelWidth(nextDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
-    setEditorPanelOpen(nextDraft?.editorPanelOpen ?? true)
+    setEditorPanelOpen(nextDraft?.editorPanelOpen ?? false)
   }
 
   const afterScopeChange = () => {
@@ -338,6 +337,29 @@ export function useAimWorkbench() {
     selectedAgentId, selectedProjectId, projectEnabled, agentModule,
     requestAbortRef, clearCurrentTaskContext, clearImages, runWorkbenchCommand,
   })
+
+  const {
+    inlineEditKey,
+    setInlineEditKey,
+    syncEditorFromResult,
+    handleInlineContentSaved,
+    handleInlineSelectionRewrite,
+  } = useAimInlineEditorBridge({
+    setMessages,
+    setEditorText,
+    setEditorFormat,
+    setEditorSourceMessageId,
+    setDraftSelection,
+    editorPanelLabels,
+    sendText,
+  })
+
+  const openEditorFromResult = useCallback((messageId: string, format: ContentFormat, content: string) => {
+    syncEditorFromResult(messageId, format, content)
+    setEditorPanelOpen(true)
+  }, [setEditorPanelOpen, syncEditorFromResult])
+
+  openEditorFromResultRef.current = syncEditorFromResult
 
   // ---- openProjectWorkflowTask ----
   async function openProjectWorkflowTask(id: string) {
@@ -440,6 +462,7 @@ export function useAimWorkbench() {
     projectAttach,
     resetConversation, retryFailed, handleGenerate: handleGenerateOrPlan, handleStop, handleRepurpose, handleQuality,
     sendText, handleUseSkill, openEditorFromResult, openProjectWorkflowTask,
+    inlineEditKey, setInlineEditKey, handleInlineContentSaved, handleInlineSelectionRewrite,
     // 计划模式
     composerMode: planOrchestration.composerMode,
     setComposerMode: planOrchestration.setComposerMode,

@@ -247,8 +247,24 @@ export function useAimEditorActions(input: AimEditorActionInput) {
     const replacement = extractReplacementDraft(message.content)
     const range = message.editorApply?.range
     if (!replacement || !range) return
-    input.setEditorText((current) => applySelectionReplacement(current, range, replacement))
-    toast.success("已应用到右侧选区")
+    const next = applySelectionReplacement(input.editorText, range, replacement)
+    input.setEditorText(next)
+    if (input.editorSourceMessageId && input.editorFormat) {
+      input.setMessages((messages) => messages.map((item) =>
+        item.id === input.editorSourceMessageId && item.deliverables
+          ? {
+              ...item,
+              deliverables: {
+                ...item.deliverables,
+                results: item.deliverables.results.map((result) =>
+                  result.format === input.editorFormat
+                    ? { ...result, content: next, wordCount: next.length }
+                    : result),
+              },
+            }
+          : item))
+    }
+    toast.success("已应用到文案选区")
   }
   const applyRestoredContent = (content: string) => {
     input.setEditorText(content)

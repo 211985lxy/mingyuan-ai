@@ -61,7 +61,7 @@ function startPanelResize(event: React.PointerEvent, onWidthChange: (width: numb
 }
 
 function CollapsedEditor({ labels, editorText, onOpen }: Pick<BenchmarkEditorPanelProps, "labels" | "editorText" | "onOpen">) {
-  return <button type="button" className="flex w-9 shrink-0 flex-col items-center justify-center gap-2 border-l bg-background text-xs text-muted-foreground hover:bg-muted/40" onClick={onOpen} title={labels.collapsedTitle}><FileText className="h-4 w-4" /><span className="[writing-mode:vertical-rl]">{editorText.length}字</span></button>
+  return <button type="button" className="flex w-9 shrink-0 flex-col items-center justify-center gap-2 border-l bg-background text-xs text-muted-foreground hover:bg-muted/40" onClick={onOpen} title="展开高级编辑"><FileText className="h-4 w-4" /><span className="[writing-mode:vertical-rl]">高级编辑 · {editorText.length}字</span></button>
 }
 
 function EditorHeader(props: Pick<BenchmarkEditorPanelProps, "labels" | "editorFormat" | "editorText" | "referenceText" | "imitateStyleId" | "onImitateStyleChange" | "imitating" | "onImitate" | "onSave" | "onClose" | "saving">) {

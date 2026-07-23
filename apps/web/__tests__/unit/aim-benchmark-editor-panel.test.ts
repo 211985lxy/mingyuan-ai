@@ -40,11 +40,11 @@ function renderEditor(open: boolean) {
 }
 
 describe("BenchmarkEditorPanel", () => {
-  it("keeps a compact entry visible when collapsed", () => {
+  it("keeps a compact advanced-edit entry visible when collapsed", () => {
     const html = renderEditor(false)
 
-    expect(html).toContain("展开文案编辑")
-    expect(html).toContain("4字")
+    expect(html).toContain("展开高级编辑")
+    expect(html).toContain("高级编辑 · 4字")
   })
 
   it("renders the reference and editable draft when open", () => {

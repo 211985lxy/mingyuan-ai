@@ -191,6 +191,14 @@ export default function AimPage() {
                 onOpenRecord: w.openRecordDialog,
                 onCompileToWiki: (ctx) => w.setWikiDialog({ open: true, context: ctx }),
                 onAttachProject: w.projectEnabled ? undefined : w.projectAttach.openDialog,
+                inlineEditKey: w.inlineEditKey,
+                onInlineEditKeyChange: w.setInlineEditKey,
+                onInlineContentSaved: w.handleInlineContentSaved,
+                onInlineSelectionRewrite: w.handleInlineSelectionRewrite,
+                referenceText: w.sourceOriginalText,
+                persona: w.agent.defaultInstruction,
+                topicTitle: w.sourceTopicTitle,
+                projectId: w.selectedProjectId || undefined,
               }}
             />
 

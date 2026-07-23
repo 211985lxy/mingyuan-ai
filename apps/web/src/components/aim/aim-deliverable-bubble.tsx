@@ -1,8 +1,7 @@
 "use client"
 
 import { memo, useMemo, useState } from "react"
-import { ArrowRight, Check, Clipboard, Database, ShieldCheck, Sparkles, Target } from "lucide-react"
-import { toast } from "sonner"
+import { ArrowRight, Database, ShieldCheck, Sparkles, Target } from "lucide-react"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { ActionStrip } from "@/components/workbench/action-strip"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
@@ -14,7 +13,6 @@ import type { AimNextAction } from "@/lib/aim-agent-guides"
 import { buildAimDeliveryContract, type AimDeliveryContract } from "@/lib/aim-delivery-contract"
 import { resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import { KNOWLEDGE_STRATEGY_PROFILES } from "@/lib/aim-knowledge-strategy"
-import { reportAimRunEvent } from "@/lib/aim/run-events"
 import {
   AIM_FORMAT_LABELS,
   AIM_SOFT_ACTION_CLASS,
@@ -24,8 +22,11 @@ import {
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
 import type { AimGenerateResponse, AimGenerateResult, ContentFormat } from "@/lib/api/client"
+import { AimInlineDocumentCard } from "@/components/aim/aim-inline-document-card"
+import type { TextSelectionRange } from "@/lib/aim-editor"
 
 export interface AimDeliverableBubbleProps {
+  messageId: string
   deliverables: AimGenerateResponse
   runId?: string | null
   isCurrentVersion: boolean
@@ -46,6 +47,21 @@ export interface AimDeliverableBubbleProps {
   onOpenPublish?: () => void
   onOpenRetro?: () => void
   onAttachProject?: (generationId: string) => void
+  /** 内联编辑会话：当前占用的 messageId:format */
+  inlineEditKey?: string | null
+  onInlineEditKeyChange?: (key: string | null) => void
+  onInlineContentSaved?: (format: ContentFormat, content: string) => void
+  onInlineSelectionRewrite?: (input: {
+    format: ContentFormat
+    prompt: string
+    selectionText: string
+    range: TextSelectionRange
+    draftContent: string
+  }) => void
+  referenceText?: string
+  persona?: string
+  topicTitle?: string
+  projectId?: string
 }
 
 const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
@@ -102,44 +118,77 @@ export function DeliveryContractStrip({ contract }: { contract: AimDeliveryContr
   </div>
 }
 
-function DeliverableResult({ item, copied, onCopy, onEdit }: {
+function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, onOpenAdvanced, referenceText, persona, topicTitle, projectId }: {
   item: AimGenerateResult
-  copied: boolean
-  onCopy: (item: AimGenerateResult) => void
-  onEdit?: (format: ContentFormat, content: string) => void
+  generationId: string
+  messageKey: string
+  inlineEditKey?: string | null
+  onInlineEditKeyChange?: (key: string | null) => void
+  onInlineContentSaved?: (format: ContentFormat, content: string) => void
+  onInlineSelectionRewrite?: AimDeliverableBubbleProps["onInlineSelectionRewrite"]
+  onOpenAdvanced?: (format: ContentFormat, content: string) => void
+  referenceText?: string
+  persona?: string
+  topicTitle?: string
+  projectId?: string
 }) {
   const display = splitAimMethodNote(item.content)
+  const sessionKey = `${messageKey}:${item.format}`
   return <TabsContent value={item.format} className="space-y-3">
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">{AIM_FORMAT_LABELS[item.format]} · {display.result.length} 字</span>
-      <div className="flex items-center gap-1.5">
-        {onEdit ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => onEdit(item.format, display.result)}>编辑</Button> : null}
-        <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => onCopy({ ...item, content: display.result })}>
-          {copied ? <Check className="mr-1 h-3.5 w-3.5" /> : <Clipboard className="mr-1 h-3.5 w-3.5" />}复制
-        </Button>
-      </div>
-    </div>
     {display.methodNote ? <details className="rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
       <summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary>
       <div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div>
     </details> : null}
-    <div className="py-1">{item.format === "video_script" ? <ZhuJianContent text={display.result} /> : <MarkdownRenderer content={display.result} />}</div>
+    <AimInlineDocumentCard
+      messageId={messageKey}
+      generationId={generationId}
+      format={item.format}
+      content={display.result}
+      renderView={(text) => item.format === "video_script" ? <ZhuJianContent text={text} /> : <MarkdownRenderer content={text} />}
+      isSessionOwner={inlineEditKey === sessionKey}
+      canStartEdit={!inlineEditKey || inlineEditKey === sessionKey}
+      onRequestEditOwnership={() => {
+        if (inlineEditKey && inlineEditKey !== sessionKey) return false
+        onInlineEditKeyChange?.(sessionKey)
+        return true
+      }}
+      onReleaseEditOwnership={() => {
+        if (inlineEditKey === sessionKey) onInlineEditKeyChange?.(null)
+      }}
+      onContentSaved={(content) => {
+        onInlineContentSaved?.(item.format, content)
+      }}
+      onOpenAdvanced={(content) => onOpenAdvanced?.(item.format, content)}
+      onSelectionRewrite={(input) => onInlineSelectionRewrite?.({ format: item.format, ...input })}
+      referenceText={referenceText}
+      persona={persona}
+      topicTitle={topicTitle}
+      projectId={projectId}
+    />
   </TabsContent>
 }
 
-function DeliverableTabs({ results, activeFormat, copiedFormat, onTabChange, onCopy, onEdit }: {
+function DeliverableTabs({ results, activeFormat, onTabChange, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, onOpenAdvanced, referenceText, persona, topicTitle, projectId }: {
   results: AimGenerateResult[]
   activeFormat: ContentFormat
-  copiedFormat: string | null
   onTabChange: (format: ContentFormat) => void
-  onCopy: (item: AimGenerateResult) => void
-  onEdit?: (format: ContentFormat, content: string) => void
+  generationId: string
+  messageKey: string
+  inlineEditKey?: string | null
+  onInlineEditKeyChange?: (key: string | null) => void
+  onInlineContentSaved?: (format: ContentFormat, content: string) => void
+  onInlineSelectionRewrite?: AimDeliverableBubbleProps["onInlineSelectionRewrite"]
+  onOpenAdvanced?: (format: ContentFormat, content: string) => void
+  referenceText?: string
+  persona?: string
+  topicTitle?: string
+  projectId?: string
 }) {
   return <Tabs value={activeFormat} onValueChange={(value) => onTabChange(value as ContentFormat)} className="w-full">
     <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
       {results.map((item) => <TabsTrigger key={item.format} value={item.format} className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none">{AIM_FORMAT_LABELS[item.format]}</TabsTrigger>)}
     </TabsList>
-    {results.map((item) => <DeliverableResult key={item.format} item={item} copied={copiedFormat === item.format} onCopy={onCopy} onEdit={onEdit} />)}
+    {results.map((item) => <DeliverableResult key={item.format} item={item} generationId={generationId} messageKey={messageKey} inlineEditKey={inlineEditKey} onInlineEditKeyChange={onInlineEditKeyChange} onInlineContentSaved={onInlineContentSaved} onInlineSelectionRewrite={onInlineSelectionRewrite} onOpenAdvanced={onOpenAdvanced} referenceText={referenceText} persona={persona} topicTitle={topicTitle} projectId={projectId} />)}
   </Tabs>
 }
 
@@ -254,7 +303,6 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
   const { deliverables, workflowStage, contentAction, regenerating = false } = props
   const actionsBusy = props.isBusy || regenerating
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
-  const [copiedFormat, setCopiedFormat] = useState<string | null>(null)
   const activeFormat = deliverables.results.some((item) => item.format === activeTab) ? activeTab : deliverables.results[0]?.format || "raw_copy"
   const activeResult = deliverables.results.find((item) => item.format === activeFormat) || deliverables.results[0]
   const primaryAction = props.nextActions?.find((action) => action.id === "publish_package" || action.id === "publish_check")
@@ -281,13 +329,6 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
     turnIntentSummary: turnIntent.summary,
     archiveGaps: turnIntent.archiveGaps,
   })
-  const copyResult = async (item: AimGenerateResult) => {
-    await navigator.clipboard.writeText(item.content)
-    setCopiedFormat(item.format)
-    setTimeout(() => setCopiedFormat(null), 600)
-    reportAimRunEvent(props.runId, "copied", { format: item.format, ...(workflowStage ? { workflowStage } : {}), ...(contentAction ? { contentAction } : {}) })
-    toast.success("已复制")
-  }
   return <div className={`mt-2 w-full transition-opacity duration-300 ${regenerating ? "opacity-55" : "opacity-100"}`}>
     {regenerating ? (
       <div className="mb-2 space-y-1.5" aria-live="polite">
@@ -299,7 +340,22 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
     ) : null}
     <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
       <DeliveryContractStrip contract={contract} />
-      <DeliverableTabs results={deliverables.results} activeFormat={activeFormat} copiedFormat={copiedFormat} onTabChange={setActiveTab} onCopy={copyResult} onEdit={regenerating ? undefined : props.onEditResult} />
+      <DeliverableTabs
+        results={deliverables.results}
+        activeFormat={activeFormat}
+        onTabChange={setActiveTab}
+        generationId={deliverables.id}
+        messageKey={props.messageId}
+        inlineEditKey={regenerating ? null : props.inlineEditKey}
+        onInlineEditKeyChange={props.onInlineEditKeyChange}
+        onInlineContentSaved={props.onInlineContentSaved}
+        onInlineSelectionRewrite={props.onInlineSelectionRewrite}
+        onOpenAdvanced={regenerating ? undefined : props.onEditResult}
+        referenceText={props.referenceText}
+        persona={props.persona}
+        topicTitle={props.topicTitle}
+        projectId={props.projectId}
+      />
       <DeliverableActions {...props} isBusy={actionsBusy} activeResult={activeResult} />
     </AiResultPanel>
   </div>

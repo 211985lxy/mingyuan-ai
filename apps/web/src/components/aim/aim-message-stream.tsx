@@ -68,6 +68,20 @@ interface MessageActions {
   onOpenRecord: (messageId: string, mode: WorkflowRecordMode) => void
   onCompileToWiki: (context: IpWikiDialogContext) => void
   onAttachProject?: (generationId: string) => void
+  inlineEditKey?: string | null
+  onInlineEditKeyChange?: (key: string | null) => void
+  onInlineContentSaved: (messageId: string, format: ContentFormat, content: string) => void
+  onInlineSelectionRewrite: (messageId: string, input: {
+    format: ContentFormat
+    prompt: string
+    selectionText: string
+    range: { start: number; end: number }
+    draftContent: string
+  }) => void
+  referenceText?: string
+  persona?: string
+  topicTitle?: string
+  projectId?: string
 }
 
 function MessageDeliverable({ message, selectedAgentId, selectedProjectId, latestDeliverableMessageId, busy, actions }: {
@@ -87,7 +101,7 @@ function MessageDeliverable({ message, selectedAgentId, selectedProjectId, lates
     sourceGenerationId: deliverables.id,
     positioningText: rawCopy,
   } : null
-  return <div className="mt-2 w-full"><AimDeliverableBubble deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} regenerating={Boolean(message.regenerating)} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} /></div>
+  return <div className="mt-2 w-full"><AimDeliverableBubble messageId={message.id} deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} regenerating={Boolean(message.regenerating)} onEditResult={(format, content) => actions.onEditResult(message.id, format, content)} onInlineEditKeyChange={actions.onInlineEditKeyChange} inlineEditKey={actions.inlineEditKey} onInlineContentSaved={(format, content) => actions.onInlineContentSaved(message.id, format, content)} onInlineSelectionRewrite={(input) => actions.onInlineSelectionRewrite(message.id, input)} referenceText={actions.referenceText} persona={actions.persona} topicTitle={actions.topicTitle} projectId={actions.projectId} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} /></div>
 }
 
 function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, latestDeliverableMessageId, actions }: {
@@ -104,7 +118,7 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
       <div className={`leading-relaxed ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground" : "bg-transparent p-0 text-sm font-medium text-foreground/90 sm:text-base"}`}>{message.role === "assistant" && message.traceId ? <ThinkingProcessPanel traceId={message.traceId} type={message.traceType ?? "chat"} /> : null}<MessageContent message={message} /></div>
       {choices.length ? <ChoiceStepper groups={choices} busy={busy} onSubmit={actions.onSubmitChoice} /> : null}
       {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
-      {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onApplyReplacement(message)}>应用到右侧选区</Button> : null}
+      {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onApplyReplacement(message)}>应用到文案选区</Button> : null}
       <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} />
       <RunDiagnostics message={message} />
       {message.qualityReport ? <AimQualityReport report={message.qualityReport} /> : null}

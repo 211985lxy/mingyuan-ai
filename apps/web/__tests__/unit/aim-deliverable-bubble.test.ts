@@ -20,6 +20,7 @@ const deliverables: AimGenerateResponse = {
 describe("AimDeliverableBubble", () => {
   it("keeps the current result, evidence and publishing actions visible", () => {
     const html = renderToStaticMarkup(createElement(AimDeliverableBubble, {
+      messageId: "message-1",
       deliverables,
       isCurrentVersion: true,
       agentId: "content_producer",
@@ -30,6 +31,8 @@ describe("AimDeliverableBubble", () => {
       onNextAction: vi.fn(),
       isBusy: false,
       onEditResult: vi.fn(),
+      onInlineContentSaved: vi.fn(),
+      onInlineSelectionRewrite: vi.fn(),
       onOpenDecision: vi.fn(),
       onOpenPublish: vi.fn(),
       onOpenRetro: vi.fn(),
@@ -42,6 +45,8 @@ describe("AimDeliverableBubble", () => {
     expect(html).toContain("来自客户访谈")
     expect(html).toContain("这是当前正文")
     expect(html).toContain("生成发布包")
+    expect(html).toContain("编辑")
+    expect(html).toContain("高级编辑")
     // Radix Select renders secondary publishing actions in the opened menu,
     // which is not part of static SSR markup. The menu trigger remains visible.
     expect(html).toContain("更多")
@@ -49,6 +54,7 @@ describe("AimDeliverableBubble", () => {
 
   it("keeps old deliverable content visible while regenerating", () => {
     const html = renderToStaticMarkup(createElement(AimDeliverableBubble, {
+      messageId: "message-1",
       deliverables,
       isCurrentVersion: true,
       agentId: "content_producer",
@@ -58,6 +64,8 @@ describe("AimDeliverableBubble", () => {
       onMarkStatus: vi.fn(),
       isBusy: true,
       regenerating: true,
+      onInlineContentSaved: vi.fn(),
+      onInlineSelectionRewrite: vi.fn(),
     }))
 
     expect(html).toContain("这是当前正文")
