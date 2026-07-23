@@ -41,10 +41,10 @@ export default function DashboardLayout({
       <SidebarProvider>
         <AppSidebar />
         <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
-          <header className="flex h-11 shrink-0 items-center gap-2 px-3">
-            <SidebarTrigger className="h-7 w-7 shrink-0 text-muted-foreground" />
+          <header className="flex h-12 shrink-0 items-center gap-2 px-3 md:px-4">
+            <SidebarTrigger className="h-8 w-8 shrink-0 text-muted-foreground" />
           </header>
-          <div className="min-w-0 flex-1 p-4 md:p-5">{children}</div>
+          <div className="min-w-0 flex-1 p-4 md:p-6">{children}</div>
         </main>
       </SidebarProvider>
     </AuthGuard>

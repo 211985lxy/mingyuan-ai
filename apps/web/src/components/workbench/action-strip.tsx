@@ -11,7 +11,7 @@ interface ActionStripProps {
  */
 export function ActionStrip({ children }: ActionStripProps) {
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-2.5">
+    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-3">
       {children}
     </div>
   )

@@ -182,13 +182,13 @@ function SidebarAccountMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none transition-colors",
+          "flex h-10 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm outline-none transition-colors",
           active
             ? "bg-primary/10 font-medium text-primary"
             : "text-foreground/75 hover:bg-secondary/60 hover:text-foreground",
         )}
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-medium text-secondary-foreground">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
           {initial}
         </span>
         <span className="min-w-0 flex-1 truncate">{email}</span>
@@ -289,22 +289,22 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-border/40 bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="gap-2.5 px-3 pb-2 pt-3">
+      <SidebarHeader className="gap-3 px-3 pb-2.5 pt-3.5">
         <Link
           href="/home"
           onClick={closeMobile}
-          className="flex items-center gap-2 rounded-md px-1 py-0.5 text-[13px] font-medium tracking-tight text-foreground/85 hover:text-foreground"
+          className="flex items-center gap-2 rounded-md px-1 py-0.5 text-sm font-medium tracking-tight text-foreground/85 hover:text-foreground"
         >
-          <BrandLogo className="h-5 w-5 rounded-[5px]" />
+          <BrandLogo className="h-6 w-6 rounded-[5px]" />
           <span className="truncate">{branding.name}</span>
         </Link>
 
         <Link
           href="/aim?agent=content_producer"
           onClick={closeMobile}
-          className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 text-[13px] font-medium text-primary-foreground shadow-[0_4px_14px_rgba(209,74,51,0.22)] transition-[transform,opacity] hover:-translate-y-0.5 hover:opacity-95"
+          className="flex h-10 items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 text-sm font-medium text-primary-foreground shadow-[0_4px_14px_rgba(209,74,51,0.22)] transition-[transform,opacity] hover:-translate-y-0.5 hover:opacity-95"
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus className="h-4 w-4" />
           新建文案
         </Link>
       </SidebarHeader>
@@ -321,13 +321,13 @@ export function AppSidebar() {
                       render={<Link href={item.href} onClick={closeMobile} />}
                       isActive={active}
                       className={cn(
-                        "h-9 w-full rounded-md px-2.5 text-[13px] font-normal md:h-8",
+                        "h-10 w-full rounded-md px-2.5 text-sm font-normal md:h-9",
                         active
                           ? "bg-foreground/[0.07] font-medium text-foreground"
                           : "text-foreground/75 hover:bg-foreground/[0.04] hover:text-foreground",
                       )}
                     >
-                      <item.icon className="h-3.5 w-3.5 opacity-70" />
+                      <item.icon className="h-4 w-4 opacity-70" />
                       <span className="truncate">{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -338,7 +338,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="mt-3 p-0">
-          <SidebarGroupLabel className="mb-1 h-6 px-2.5 text-[11px] font-medium tracking-wide text-muted-foreground">
+          <SidebarGroupLabel className="mb-1.5 h-7 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             AIM 专家
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -353,13 +353,13 @@ export function AppSidebar() {
                       render={<Link href={`/aim?agent=${agent.id}`} onClick={closeMobile} />}
                       isActive={active}
                       className={cn(
-                        "h-9 w-full rounded-md px-2.5 text-[13px] font-normal md:h-8",
+                        "h-10 w-full rounded-md px-2.5 text-sm font-normal md:h-9",
                         active
                           ? "bg-primary/10 font-medium text-primary"
                           : "text-foreground/75 hover:bg-secondary/60 hover:text-foreground",
                       )}
                     >
-                      <Icon className="h-3.5 w-3.5 opacity-70" />
+                      <Icon className="h-4 w-4 opacity-70" />
                       <span className="truncate">{agent.displayTitle ?? agent.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -370,13 +370,13 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="mt-3 p-0">
-          <SidebarGroupLabel className="mb-1 h-6 px-2.5 text-[11px] font-medium tracking-wide text-muted-foreground">
+          <SidebarGroupLabel className="mb-1.5 h-7 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             最近任务
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="space-y-0.5">
               {recentThreads.length === 0 ? (
-                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">暂无任务，点上方新建</p>
+                <p className="px-2.5 py-2 text-sm text-muted-foreground">暂无任务，点上方新建</p>
               ) : (
                 recentThreads.map((item) => {
                   const title = formatHistoryTitle(item)
@@ -384,7 +384,7 @@ export function AppSidebar() {
                   return (
                     <div
                       key={item.id}
-                      className="group/item flex h-9 items-center rounded-md text-[13px] text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground md:h-8"
+                      className="group/item flex h-10 items-center rounded-md text-sm text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground md:h-9"
                     >
                       <button
                         type="button"
@@ -401,7 +401,7 @@ export function AppSidebar() {
                       >
                         <span className="flex items-center gap-2">
                           <span className="min-w-0 flex-1 truncate">{title}</span>
-                          {date ? <span className="shrink-0 text-[11px] text-muted-foreground">{date}</span> : null}
+                          {date ? <span className="shrink-0 text-xs text-muted-foreground">{date}</span> : null}
                         </span>
                       </button>
                       <DropdownMenu>

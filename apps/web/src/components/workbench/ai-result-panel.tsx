@@ -33,11 +33,11 @@ export function AiResultPanel({
       <div className={`mt-4 border-t border-border/50 pt-4 w-full ${className ?? ""}`}>
         <div className="flex flex-row items-center justify-between gap-3 mb-3">
           <div className="min-w-0 flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <div className="flex items-center gap-1.5 text-base font-semibold text-foreground">
               {icon}
               <span className="truncate">{title}</span>
             </div>
-            {meta ? <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{meta}</div> : null}
+            {meta ? <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">{meta}</div> : null}
           </div>
           {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div> : null}
         </div>
@@ -50,11 +50,11 @@ export function AiResultPanel({
     <Card className={`overflow-hidden border-primary/15 shadow-sm ${className ?? ""}`}>
       <CardHeader className="flex flex-row items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
         <div className="min-w-0 space-y-1">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-lg">
             {icon}
             <span className="truncate">{title}</span>
           </CardTitle>
-          {meta ? <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{meta}</div> : null}
+          {meta ? <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">{meta}</div> : null}
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div> : null}
       </CardHeader>

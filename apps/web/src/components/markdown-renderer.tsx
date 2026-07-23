@@ -50,29 +50,29 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
 
   if (elements.length === 0) return null
 
-  return <div className={`space-y-2 ${className}`}>{elements}</div>
+  return <div className={`space-y-3 ${className}`}>{elements}</div>
 }
 
 function renderBlockLine(line: string, key: number): React.ReactNode {
   if (/^## (.+)/.test(line)) {
-    return <h2 key={key} className="mb-3 mt-5 text-lg sm:text-xl font-bold text-foreground first:mt-0">{renderInline(line.replace(/^## /, ""))}</h2>
+    return <h2 key={key} className="mb-3 mt-6 text-xl font-bold tracking-tight text-foreground first:mt-0 sm:text-2xl">{renderInline(line.replace(/^## /, ""))}</h2>
   }
   if (/^### (.+)/.test(line)) {
-    return <h3 key={key} className="mb-2 mt-4 text-base font-semibold text-foreground">{renderInline(line.replace(/^### /, ""))}</h3>
+    return <h3 key={key} className="mb-2 mt-5 text-lg font-semibold text-foreground">{renderInline(line.replace(/^### /, ""))}</h3>
   }
   if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
-    return <hr key={key} className="my-4 border-t border-border" />
+    return <hr key={key} className="my-5 border-t border-border" />
   }
   if (/^[-*]\s+(.+)/.test(line)) {
-    return <li key={key} className="ml-4 list-disc text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">{renderInline(line.replace(/^[-*]\s+/, ""))}</li>
+    return <li key={key} className="ml-5 list-disc text-base leading-8 text-foreground/90 [&_strong]:text-foreground">{renderInline(line.replace(/^[-*]\s+/, ""))}</li>
   }
   if (/^\d+[.)]\s+(.+)/.test(line)) {
-    return <li key={key} className="ml-5 list-decimal text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">{renderInline(line.replace(/^\d+[.)]\s+/, ""))}</li>
+    return <li key={key} className="ml-5 list-decimal text-base leading-8 text-foreground/90 [&_strong]:text-foreground">{renderInline(line.replace(/^\d+[.)]\s+/, ""))}</li>
   }
   if (/^>\s+(.+)/.test(line)) {
-    return <blockquote key={key} className="border-l-4 border-primary/30 pl-3 my-2 text-sm sm:text-[15px] leading-7 text-muted-foreground italic">{renderInline(line.replace(/^>\s+/, ""))}</blockquote>
+    return <blockquote key={key} className="my-3 border-l-4 border-primary/30 pl-4 text-base leading-8 text-foreground/80 italic">{renderInline(line.replace(/^>\s+/, ""))}</blockquote>
   }
-  return <p key={key} className="text-sm sm:text-[15px] leading-7 text-muted-foreground [&_strong]:text-foreground">{renderInline(line)}</p>
+  return <p key={key} className="text-base leading-8 text-foreground/90 [&_strong]:text-foreground">{renderInline(line)}</p>
 }
 
 /**

@@ -161,7 +161,7 @@ export function AimPromptComposer({
           rows={2}
           placeholder={placeholder}
           disabled={busy}
-          className="max-h-44 min-h-[72px] w-full resize-none bg-transparent px-4 pb-2 pt-3.5 text-[15px] leading-relaxed tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
+          className="max-h-52 min-h-[88px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-base leading-7 tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
         />
 
         {imageAttachments.length > 0 && (
@@ -209,11 +209,11 @@ export function AimPromptComposer({
                     setModeOpen(false)
                   }}
                 >
-                  <span className={cn("text-[13px]", active ? "font-medium text-foreground" : "text-foreground/85")}>
+                  <span className={cn("text-sm", active ? "font-medium text-foreground" : "text-foreground/85")}>
                     {option.label}
                   </span>
                   {option.hint ? (
-                    <span className="text-[11px] text-muted-foreground">{option.hint}</span>
+                    <span className="text-xs text-muted-foreground">{option.hint}</span>
                   ) : null}
                 </button>
               )
@@ -277,16 +277,16 @@ export function AimPromptComposer({
                   setSkillsOpen(false)
                 }}
                 className={cn(
-                  "inline-flex h-8 max-w-[9.5rem] items-center gap-1 rounded-full px-2.5 text-[12px] transition-colors",
+                  "inline-flex h-9 max-w-[10.5rem] items-center gap-1 rounded-full px-3 text-sm transition-colors",
                   modeOpen || contentMode
                     ? "bg-foreground/[0.06] font-medium text-foreground"
                     : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
                 )}
                 title="创作模式"
               >
-                <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <Sparkles className="h-4 w-4 shrink-0 opacity-70" />
                 <span className="truncate">{contentModeLabel}</span>
-                <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
               </button>
             ) : null}
 
@@ -296,14 +296,14 @@ export function AimPromptComposer({
                 size="sm"
                 variant="ghost"
                 className={cn(
-                  "h-8 gap-1 rounded-full px-2.5 text-[12px]",
+                  "h-9 gap-1 rounded-full px-3 text-sm",
                   isPlanMode ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")}
                 disabled={busy || (!canUsePlanMode && !isPlanMode)}
                 title={!canUsePlanMode && !isPlanMode ? "请先选择 IP 营销全案" : isPlanMode ? "切回直接模式" : "开启计划模式"}
               >
-                <ListChecks className="h-3.5 w-3.5" />
+                <ListChecks className="h-4 w-4" />
                 计划
               </Button>
             ) : null}
@@ -323,7 +323,7 @@ export function AimPromptComposer({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+              className="h-9 w-9 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               title="添加图片"
@@ -337,7 +337,7 @@ export function AimPromptComposer({
                 size="sm"
                 variant="ghost"
                 className={cn(
-                  "h-8 gap-1 rounded-full px-2.5 text-[12px]",
+                  "h-9 gap-1 rounded-full px-3 text-sm",
                   skillsOpen ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => {
@@ -347,12 +347,12 @@ export function AimPromptComposer({
                 disabled={busy}
               >
                 技能
-                <ChevronDown className="h-3 w-3 opacity-50" />
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
             ) : null}
 
             {(isTranscribing || isRecording || isPlanMode) && (
-              <span className="ml-1 truncate text-[11px] text-muted-foreground">
+              <span className="ml-1 truncate text-xs text-muted-foreground">
                 {isTranscribing
                   ? "语音转写中…"
                   : isRecording
@@ -367,12 +367,12 @@ export function AimPromptComposer({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+              className="h-9 w-9 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={isRecording ? onStopRecording : onStartRecording}
               disabled={busy && !isRecording}
               title="语音输入"
             >
-              {isRecording ? <span className="text-[11px] text-red-500">停</span> : <Mic className="h-4 w-4" />}
+              {isRecording ? <span className="text-xs text-red-500">停</span> : <Mic className="h-4 w-4" />}
             </Button>
 
             {canStop && (
@@ -380,7 +380,7 @@ export function AimPromptComposer({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-8 gap-1 rounded-full px-2.5 text-[12px] text-red-600"
+                className="h-9 gap-1 rounded-full px-3 text-sm text-red-600"
                 onClick={onStop}
                 title="停止"
               >
@@ -395,19 +395,19 @@ export function AimPromptComposer({
               onClick={onGenerate}
               disabled={!canSubmit}
               className={cn(
-                "h-8 rounded-full shadow-none",
-                isPlanMode ? "gap-1.5 px-3.5" : "w-8 p-0",
+                "h-9 rounded-full shadow-none",
+                isPlanMode ? "gap-1.5 px-4" : "w-9 p-0",
               )}
               title={isPlanMode ? "开始规划" : primaryActionLabel}
             >
               {isGenerating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : isPlanMode ? (
-                <ListChecks className="h-3.5 w-3.5" />
+                <ListChecks className="h-4 w-4" />
               ) : (
-                <Send className="h-3.5 w-3.5" />
+                <Send className="h-4 w-4" />
               )}
-              {isPlanMode && <span className="text-xs">规划</span>}
+              {isPlanMode && <span className="text-sm">规划</span>}
             </Button>
           </div>
         </div>

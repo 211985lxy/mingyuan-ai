@@ -11,7 +11,7 @@ export const AIM_FORMAT_LABELS: Record<ContentFormat, string> = {
   xiaohongshu_post: "小红书图文",
 }
 
-export const AIM_SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-muted/45 px-2 text-xs text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
+export const AIM_SOFT_ACTION_CLASS = "h-8 rounded-md border-0 bg-muted/45 px-2.5 text-sm text-muted-foreground shadow-none hover:bg-muted hover:text-foreground"
 export const AIM_ACTIVE_SOFT_ACTION_CLASS = "h-7 rounded-md border-0 bg-primary/10 px-2 text-xs text-primary shadow-none hover:bg-primary/15"
 
 export const AIM_WORKFLOW_STATUS_OPTIONS = [

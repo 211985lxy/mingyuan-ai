@@ -78,7 +78,7 @@ const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) 
   return <div className="space-y-3 select-text font-serif leading-loose tracking-wider text-foreground/95 antialiased">
     {lines.map((line, index) => {
       const parts = line.replace(/\*\*/g, "").split(/(【[^】]+】)/g)
-      return <p key={index} className="my-2 min-h-6 text-sm leading-loose text-[#2c2b2a] dark:text-[#f3ede2] sm:text-base">
+      return <p key={index} className="my-2.5 min-h-7 text-base leading-loose text-[#2c2b2a] dark:text-[#f3ede2] sm:text-lg">
         {parts.map((part, partIndex) => {
           if (!part.startsWith("【") || !part.endsWith("】")) return <span key={partIndex}>{part}</span>
           const style = part === "【画面】"
@@ -86,7 +86,7 @@ const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) 
             : part === "【旁白】"
               ? "gold-ink-narration border border-amber-700/20 dark:border-amber-500/20"
               : "badge-gold border border-primary/30"
-          return <span key={partIndex} className={`mx-1 inline-block rounded-xs px-2 py-0.5 text-xs font-serif font-bold ${style}`}>{part}</span>
+          return <span key={partIndex} className={`mx-1 inline-block rounded-xs px-2 py-0.5 text-sm font-serif font-bold ${style}`}>{part}</span>
         })}
       </p>
     })}
@@ -113,12 +113,12 @@ export function DeliveryContractStrip({ contract }: { contract: AimDeliveryContr
   ]
   return <div className="mb-4 border-y border-border/70 bg-muted/20">
     <div className="grid grid-cols-2 lg:grid-cols-4">{items.map(({ label, value, detail, icon: Icon, className }, index) =>
-      <div key={label} className={`min-w-0 px-3 py-2.5 ${index % 2 === 1 ? "border-l border-border/60" : ""} ${index > 1 ? "border-t border-border/60 lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`} title={detail}>
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Icon className="h-3 w-3 shrink-0" /><span>{label}</span></div>
-        <p className={`mt-1 truncate text-xs font-medium ${className}`}>{value}</p>
-        <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{detail}</p>
+      <div key={label} className={`min-w-0 px-3 py-3 ${index % 2 === 1 ? "border-l border-border/60" : ""} ${index > 1 ? "border-t border-border/60 lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`} title={detail}>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5 shrink-0" /><span>{label}</span></div>
+        <p className={`mt-1 truncate text-sm font-medium ${className}`}>{value}</p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
       </div>)}</div>
-    {contract.expanded ? <div className="border-t border-border/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+    {contract.expanded ? <div className="border-t border-border/40 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
       {contract.taskSpec?.mode === "discovery_exploration" ? <p className="text-amber-600 dark:text-amber-400">当前信息不足，无法给出确定方案；请先补充关键资料，再生成正式方案。</p> : null}
       {contract.assumptions?.length ? <p className="mt-1"><span className="font-medium text-foreground">本次假设：</span>{contract.assumptions.map((item) => `${item.statement}（影响${item.impact}）`).join("；")}</p> : null}
       {contract.unknowns?.length ? <p className="mt-1"><span className="font-medium text-foreground">待确认：</span>{contract.unknowns.join("；")}</p> : null}
@@ -143,8 +143,8 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
   const display = splitAimMethodNote(item.content)
   const sessionKey = `${messageKey}:${item.format}`
   return <TabsContent value={item.format} className="space-y-3">
-    {display.methodNote ? <details className="rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-      <summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary>
+    {display.methodNote ? <details className="rounded-md border border-border bg-muted/25 px-3 py-2.5 text-sm text-muted-foreground">
+      <summary className="cursor-pointer select-none font-medium text-foreground/80">思考依据</summary>
       <div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div>
     </details> : null}
     <AimInlineDocumentCard
@@ -191,8 +191,8 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
   projectId?: string
 }) {
   return <Tabs value={activeFormat} onValueChange={(value) => onTabChange(value as ContentFormat)} className="w-full">
-    <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
-      {results.map((item) => <TabsTrigger key={item.format} value={item.format} className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none">{AIM_FORMAT_LABELS[item.format]}</TabsTrigger>)}
+    <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1.5 rounded-none bg-transparent p-0">
+      {results.map((item) => <TabsTrigger key={item.format} value={item.format} className="rounded-md px-3 py-2 text-sm text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none">{AIM_FORMAT_LABELS[item.format]}</TabsTrigger>)}
     </TabsList>
     {results.map((item) => <DeliverableResult key={item.format} item={item} generationId={generationId} messageKey={messageKey} inlineEditKey={inlineEditKey} onInlineEditKeyChange={onInlineEditKeyChange} onInlineContentSaved={onInlineContentSaved} onInlineSelectionRewrite={onInlineSelectionRewrite} referenceText={referenceText} persona={persona} topicTitle={topicTitle} projectId={projectId} />)}
   </Tabs>
@@ -211,7 +211,7 @@ function PrimaryActions({ primaryActions, activeResult, deliverables, hasPublish
   onQuality: () => void
   onNextAction?: AimDeliverableBubbleProps["onNextAction"]
 }) {
-  return <>{primaryActions.map((action) => <Button key={action.id} size="sm" variant={action.id === "publish_package" ? "default" : "ghost"} className={action.id === "publish_package" ? "h-7 rounded-md px-2 text-xs" : AIM_SOFT_ACTION_CLASS} onClick={() => {
+  return <>{primaryActions.map((action) => <Button key={action.id} size="sm" variant={action.id === "publish_package" ? "default" : "ghost"} className={action.id === "publish_package" ? "h-8 rounded-md px-2.5 text-sm" : AIM_SOFT_ACTION_CLASS} onClick={() => {
     if (action.id === "publish_check") return onQuality()
     if (activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
   }} disabled={isBusy || !activeResult?.content.trim() || (action.id === "publish_check" && !hasPublishScript)}>
@@ -253,7 +253,7 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
   const hasWorkflow = Boolean(onAttachProject) || showPublishCheck
   const disabled = isBusy || (!hasWorkflow && !visibleOptions.length && !onCompileToWiki && !secondaryActions.length)
   return <Select onValueChange={handleAction} disabled={disabled}>
-    <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="更多" /></SelectTrigger>
+    <SelectTrigger className="h-8 w-[96px] border-0 bg-muted/45 text-sm text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="更多" /></SelectTrigger>
     <SelectContent>
       {onAttachProject ? <SelectItem value="save_project">保存到客户全案</SelectItem> : null}
       {showPublishCheck ? <SelectItem value="publish_check" disabled={!hasPublishScript}>发布前自查</SelectItem> : null}
@@ -282,7 +282,7 @@ function DeliverableActions(props: DeliverableActionsProps) {
     allowedStatuses.has(item.value as AimWorkflowStatus),
   )
   return <ActionStrip>
-    {qualityFail ? <Button size="sm" className="h-7 rounded-md px-2 text-xs" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
+    {qualityFail ? <Button size="sm" className="h-8 rounded-md px-2.5 text-sm" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
     {props.onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenDecision} disabled={isBusy}>发布前判断</Button> : null}
     {props.onOpenPublish ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenPublish} disabled={isBusy || qualityFail}>登记发布</Button> : null}
     {props.onOpenRetro ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenRetro} disabled={isBusy}>填写复盘</Button> : null}
@@ -305,7 +305,7 @@ function DeliverableActions(props: DeliverableActionsProps) {
       value={currentStatus}
       onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}
     >
-      <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>
+      <SelectTrigger className="h-8 w-[96px] border-0 bg-muted/45 text-sm text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>
       <SelectContent>
         {statusOptions.map((item) => (
           <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
@@ -356,10 +356,10 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         <div className="h-0.5 overflow-hidden rounded-full bg-muted">
           <div className="h-full w-1/3 animate-pulse rounded-full bg-primary/50" />
         </div>
-        <p className="text-[11px] text-muted-foreground">正在重出一版…</p>
+        <p className="text-xs text-muted-foreground">正在重出一版…</p>
       </div>
     ) : null}
-    <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
+    <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-xs">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
       {deliverables.id && deliverables.taskSpec ? (
         <CanonicalContentPanel
           generationId={deliverables.id}

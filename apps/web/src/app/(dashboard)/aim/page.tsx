@@ -60,9 +60,9 @@ export default function AimPage() {
   )
 
   return (
-    <div className="-mx-4 -my-4 flex h-[calc(100dvh-2.75rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
+    <div className="-mx-4 -my-4 flex h-[calc(100dvh-3rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
       {/* 对话区（智能体列表与最近内容已移至全局侧边栏） */}
-      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-4 md:px-6">
+      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-4 md:px-8">
         <AimWorkbenchHeader
           workflowStage={w.currentWorkflowStage}
           agentTitle={w.agent.title}
@@ -145,7 +145,7 @@ export default function AimPage() {
 
         {w.intentResolving && !w.planSession.isPlanMode && (
           <div className="px-3 py-2 sm:px-5">
-            <p className="mx-auto max-w-lg text-center text-xs text-muted-foreground">
+            <p className="mx-auto max-w-lg text-center text-sm text-muted-foreground">
               正在辨认本轮意图…
             </p>
           </div>

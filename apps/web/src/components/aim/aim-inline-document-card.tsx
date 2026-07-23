@@ -329,7 +329,7 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
 
   const toolbar = useMemo(() => (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">{formatLabel} · {viewText.length} 字{dirty ? " · 已修改" : ""}</span>
+      <span className="text-sm text-muted-foreground">{formatLabel} · {viewText.length} 字{dirty ? " · 已修改" : ""}</span>
       <div className="flex flex-wrap items-center gap-1">
         {editing ? (
           <>
@@ -359,7 +359,7 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
       {editing ? (
         <textarea
           ref={textareaRef}
-          className="min-h-56 w-full resize-y rounded-md border bg-background p-3 text-sm leading-6 outline-none focus:border-primary/30"
+          className="min-h-64 w-full resize-y rounded-md border bg-background p-4 text-base leading-8 outline-none focus:border-primary/30"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onSelect={(event) => setSelection(readSelection(event.currentTarget))}

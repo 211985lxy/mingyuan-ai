@@ -28,11 +28,11 @@ function ChoiceStepper({ groups, busy, onSubmit }: { groups: AimChoiceGroup[]; b
     if (step < groups.length - 1) return setStep((current) => current + 1)
     onSubmit(groups.map((item, index) => `${index + 1}. ${item.question}\n${answers[index]}`).join("\n\n"))
   }
-  return <div className="mt-3 max-w-xl rounded-xl border bg-muted/20 p-3">
-    <div className="mb-2 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-muted-foreground">{step + 1}/{groups.length} · {group.question}</p><Button size="sm" variant="ghost" className="h-7 px-2" disabled={busy || !selected} onClick={next}><ArrowRight className="h-4 w-4" /></Button></div>
+  return <div className="mt-3 max-w-2xl rounded-xl border bg-muted/20 p-4">
+    <div className="mb-3 flex items-center justify-between gap-2"><p className="text-sm font-semibold text-muted-foreground">{step + 1}/{groups.length} · {group.question}</p><Button size="sm" variant="ghost" className="h-8 px-2.5" disabled={busy || !selected} onClick={next}><ArrowRight className="h-4 w-4" /></Button></div>
     <div className="grid gap-2">{group.options.map((option) => {
       const value = `${option.label}. ${option.text}`
-      return <Button key={value} type="button" variant={selected === value ? "default" : "outline"} className="h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs" disabled={busy} onClick={() => setAnswers((current) => ({ ...current, [step]: value }))}><span className="mr-1 font-semibold">{option.label}</span>{option.text}</Button>
+      return <Button key={value} type="button" variant={selected === value ? "default" : "outline"} className="h-auto justify-start whitespace-normal px-3 py-2.5 text-left text-sm" disabled={busy} onClick={() => setAnswers((current) => ({ ...current, [step]: value }))}><span className="mr-1 font-semibold">{option.label}</span>{option.text}</Button>
     })}</div>
   </div>
 }
@@ -42,15 +42,15 @@ function MessageContent({ message }: { message: AimWorkbenchMessage }) {
     const display = splitAimMethodNote(message.content)
     // 已有实时思考过程面板（traceId）时不再重复展示「思考依据」折叠块，避免一条消息里出现两处"思考"
     const showMethodNote = Boolean(display.methodNote) && !message.traceId
-    return <>{showMethodNote ? <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2 text-xs text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/70">思考依据</summary><div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div></details> : null}<MarkdownRenderer content={display.result} /></>
+    return <>{showMethodNote ? <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2.5 text-sm text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/80">思考依据</summary><div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div></details> : null}<MarkdownRenderer content={display.result} /></>
   }
   return <>{message.images?.length ? <div className="mb-2 flex max-w-64 flex-wrap gap-2">{message.images.map((image) => <img key={image.id} src={image.previewUrl} alt={image.name} className="h-20 w-20 rounded-md border object-cover" />)}</div> : null}<p className="whitespace-pre-wrap break-words">{message.content}</p></>
 }
 
 function RunDiagnostics({ message }: { message: AimWorkbenchMessage }) {
   if (!message.deliverables || (!message.degraded && (!message.qualityStatus || message.qualityStatus === "pass")) || !message.runId) return null
-  return <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-    <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${message.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>{message.degraded ? "已使用备用模型完成" : "质量提示"}</span>
+  return <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${message.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>{message.degraded ? "已使用备用模型完成" : "质量提示"}</span>
     <span>执行编号 {message.runId}</span>
     {message.qualityStatus && message.qualityStatus !== "pass" ? <span>· 质量 {message.qualityStatus === "warn" ? "待优化" : message.qualityStatus === "fail" ? "未通过" : message.qualityStatus}</span> : null}
   </div>
@@ -115,10 +115,10 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
   const choices = message.role === "assistant" ? extractAimChoiceGroups(message.content) : []
   return <div data-message-id={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
     <div className={`${message.deliverables ? "w-full max-w-full" : "max-w-[96%]"} ${message.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
-      <div className={`leading-relaxed ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2 text-sm text-foreground" : "bg-transparent p-0 text-sm font-medium text-foreground/90 sm:text-base"}`}>{message.role === "assistant" && message.traceId ? <div className="mb-3"><ThinkingProcessPanel traceId={message.traceId} type={message.traceType ?? "chat"} /></div> : null}<MessageContent message={message} /></div>
+      <div className={`leading-8 ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2.5 text-base text-foreground" : "bg-transparent p-0 text-base font-medium text-foreground/90"}`}>{message.role === "assistant" && message.traceId ? <div className="mb-3"><ThinkingProcessPanel traceId={message.traceId} type={message.traceType ?? "chat"} /></div> : null}<MessageContent message={message} /></div>
       {choices.length ? <ChoiceStepper groups={choices} busy={busy} onSubmit={actions.onSubmitChoice} /> : null}
-      {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
-      {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-7 px-2 text-xs" onClick={() => actions.onApplyReplacement(message)}>应用到文案选区</Button> : null}
+      {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-8 px-2.5 text-sm" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
+      {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-8 px-2.5 text-sm" onClick={() => actions.onApplyReplacement(message)}>应用到文案选区</Button> : null}
       <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} />
       <RunDiagnostics message={message} />
       {message.qualityReport ? <AimQualityReport report={message.qualityReport} /> : null}
@@ -132,7 +132,7 @@ function EmptyMessageState({ agentIntro, workflowStage, selectedAgentId, onBegin
   selectedAgentId: AimAgentId
   onBeginContentAction: (action: AimContentAction) => void
 }) {
-  return <div className="mx-auto flex w-full max-w-3xl flex-col py-5"><div className="max-w-2xl text-left"><p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && selectedAgentId === "content_producer" ? <div className="mt-3 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div></div>
+  return <div className="mx-auto flex w-full max-w-3xl flex-col py-6"><div className="max-w-2xl text-left"><p className="line-clamp-3 text-base leading-7 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && selectedAgentId === "content_producer" ? <div className="mt-4 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-9 rounded-md text-sm" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div></div>
 }
 
 interface AimMessageStreamProps {
@@ -148,7 +148,7 @@ interface AimMessageStreamProps {
 }
 
 export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps>(function AimMessageStream(props, ref) {
-  return <div ref={ref} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
-    {props.messages.length === 0 ? <EmptyMessageState agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-none flex-col gap-4">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
+  return <div ref={ref} className="flex-1 overflow-y-auto px-3 py-5 sm:px-5">
+    {props.messages.length === 0 ? <EmptyMessageState agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
   </div>
 })
