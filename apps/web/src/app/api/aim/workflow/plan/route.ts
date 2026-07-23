@@ -11,7 +11,7 @@ import { PLAN_MAX_ROUNDS, PLAN_MAX_TOTAL_QUESTIONS, PLAN_TASK_SPEC_FIELDS } from
  *
  * 无状态计划追问接口：接收 projectId、一句话需求、已确认字段和已回答字段，
  * 返回标准化任务单、最多 3 个必要问题、假设项和 ready 状态。
- * 最多补充一轮，总问题数不超过 5。
+ * 最多补充一轮，总问题数不超过 6。
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     // ── 入参校验 ──
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
-    const requirement = typeof body.requirement === "string" ? body.requirement.trim() : ""
+    const requirement = typeof body.requirement === "string" ? body.requirement.trim().slice(0, 1000) : ""
     if (!projectId) return NextResponse.json({ error: "请先选择 IP 营销全案" }, { status: 400 })
     if (!requirement) return NextResponse.json({ error: "请输入一句话需求" }, { status: 400 })
 
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     console.error("[aim/workflow/plan] Error:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "计划生成失败" },
+      { error: "计划生成失败，请稍后重试" },
       { status: 500 },
     )
   }

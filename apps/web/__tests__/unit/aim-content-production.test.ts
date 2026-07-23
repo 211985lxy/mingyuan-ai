@@ -91,6 +91,11 @@ describe("AIM content production positioning", () => {
         exclusiveEvidence: "真实客户交付过程",
         desiredAction: "预约诊断",
         dealPath: "内容教育 → 预约诊断",
+        coreMessage: "内容不是曝光工具，而是客户筛选系统",
+        platform: "视频号",
+        outputFormat: "60秒口播",
+        style: "专业、真诚、短句",
+        ctaText: "评论区回复诊断",
         knownFacts: [],
         unknowns: [],
         assumptions: [],
@@ -104,6 +109,11 @@ describe("AIM content production positioning", () => {
     expect(context).toContain("主要内容任务：推动咨询行动")
     expect(context).toContain("优先信任证据：案例")
     expect(context).toContain("期望动作：预约诊断")
+    expect(context).toContain("核心信息：内容不是曝光工具，而是客户筛选系统")
+    expect(context).toContain("发布平台：视频号")
+    expect(context).toContain("输出格式：60秒口播")
+    expect(context).toContain("风格：专业、真诚、短句")
+    expect(context).toContain("CTA：评论区回复诊断")
   })
 
   it("requires a teachable and traceable creation note for full copy generation", () => {

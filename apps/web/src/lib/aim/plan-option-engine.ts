@@ -51,42 +51,88 @@ interface DimensionSourceConfig {
   targetField: PlanTaskSpecField
   /** 问题模板 */
   promptTemplate: string
+  /** 参与选项生成的项目档案字段 */
+  projectFields?: Array<keyof ProjectPlanProfile>
+  /** 同一知识类型内的轻量重排提示 */
+  relevanceHints: string[]
 }
 
 const DIMENSION_SOURCES: Record<PlanQuestionDimension, DimensionSourceConfig> = {
-  goal_and_message: {
+  core_message: {
     wikiPageTypes: ["positioning", "topic_direction", "content_strategy"],
     knowledgeCategories: ["positioning_material", "product_usp"],
     targetField: "coreMessage",
     promptTemplate: "这条内容最核心要传达的信息是什么？",
+    projectFields: ["offer"],
+    relevanceHints: ["核心主张", "价值承诺", "产品服务", "差异化", "定位"],
   },
-  audience_and_pain: {
+  audience: {
     wikiPageTypes: ["audience", "positioning"],
+    knowledgeCategories: ["user_insight", "customer_pain"],
+    targetField: "targetCustomer",
+    promptTemplate: "这条内容主要说给哪类人听？",
+    projectFields: ["targetCustomer"],
+    relevanceHints: ["目标客户", "目标人群", "受众", "老板", "创业者"],
+  },
+  pain: {
+    wikiPageTypes: ["audience", "positioning", "content_strategy"],
     knowledgeCategories: ["customer_pain", "customer_qa", "user_insight"],
     targetField: "realProblem",
-    promptTemplate: "主要面向哪类客户？他们最痛的问题是什么？",
+    promptTemplate: "这次最值得击中的真实痛点是什么？",
+    relevanceHints: ["痛点", "难题", "焦虑", "卡点", "困境"],
   },
-  scenario_format: {
+  platform: {
+    wikiPageTypes: ["content_strategy", "topic_direction"],
+    knowledgeCategories: ["benchmark_reference", "hot_topic"],
+    targetField: "platform",
+    promptTemplate: "这条内容准备发布到哪个平台？",
+    relevanceHints: ["抖音", "视频号", "小红书", "朋友圈", "公众号", "平台"],
+  },
+  scenario: {
+    wikiPageTypes: ["content_strategy", "conversion_path"],
+    knowledgeCategories: ["private_domain_material", "project_case"],
+    targetField: "useScenario",
+    promptTemplate: "这条内容会用在什么具体场景？",
+    relevanceHints: ["发布", "私域", "朋友圈", "直播", "投放", "咨询"],
+  },
+  format: {
     wikiPageTypes: ["content_strategy", "topic_direction"],
     knowledgeCategories: ["benchmark_reference"],
     targetField: "outputFormat",
-    promptTemplate: "内容用在什么场景？需要什么格式？",
+    promptTemplate: "这次最合适的内容形式是什么？",
+    relevanceHints: ["短视频", "口播", "图文", "长文", "脚本", "形式"],
   },
-  style_length: {
+  style: {
     wikiPageTypes: ["persona", "content_strategy"],
-    knowledgeCategories: ["boss_experience"],
+    knowledgeCategories: ["boss_experience", "benchmark_reference"],
     targetField: "style",
-    promptTemplate: "希望用什么风格和长度？",
+    promptTemplate: "这条内容应该采用什么表达风格？",
+    relevanceHints: ["口吻", "语气", "风格", "表达", "人设"],
+  },
+  length: {
+    wikiPageTypes: ["content_strategy", "viral_methodology"],
+    knowledgeCategories: ["benchmark_reference"],
+    targetField: "lengthRule",
+    promptTemplate: "这条内容控制在什么长度？",
+    relevanceHints: ["字数", "时长", "秒", "分钟", "篇幅"],
   },
   cta: {
     wikiPageTypes: ["conversion_path"],
     knowledgeCategories: ["product_usp", "private_domain_material"],
     targetField: "ctaText",
     promptTemplate: "内容结尾希望引导读者做什么？",
+    projectFields: ["deliveryGoal"],
+    relevanceHints: ["私信", "评论", "咨询", "预约", "领取", "成交"],
   },
 }
 
 // ─── 提取的原始素材 ───
+
+interface ProjectPlanProfile {
+  targetCustomer: string | null
+  offer: string | null
+  deliveryGoal: string | null
+}
 
 interface ExtractedSnippet {
   text: string
@@ -98,8 +144,8 @@ function extractSnippetsFromWikiPage(page: IpWikiPageRow, maxSnippets: number): 
   const label = `${IP_WIKI_PAGE_TYPE_LABELS[page.pageType] ?? page.pageType} Wiki`
   const lines = page.content
     .split(/\n+/)
-    .map((line) => line.replace(/^[-•*\d.]+\s*/, "").trim())
-    .filter((line) => line.length >= 6 && line.length <= 120)
+    .map(normalizeSnippetText)
+    .filter((line) => line.length >= 6 && line.length <= 180)
 
   return lines.slice(0, maxSnippets).map((text) => ({
     text,
@@ -114,9 +160,9 @@ function extractSnippetsFromKnowledge(
 ): ExtractedSnippet[] {
   const label = `${KNOWLEDGE_CATEGORY_LABELS[entry.category] ?? entry.category}条目`
   const candidates = [
-    entry.title.trim(),
-    ...entry.content.split(/\n+/).map((l) => l.trim()).filter((l) => l.length >= 6 && l.length <= 120),
-  ].filter(Boolean)
+    normalizeSnippetText(entry.title),
+    ...entry.content.split(/\n+/).map(normalizeSnippetText).filter((line) => line.length >= 6 && line.length <= 180),
+  ].filter((text) => text.length >= 6)
 
   return candidates.slice(0, maxSnippets).map((text) => ({
     text,
@@ -142,11 +188,11 @@ interface PlanEngineInput {
  * 1. 并行加载 IP Wiki 页 + 知识条目
  * 2. 按维度优先级遍历，跳过已有明确答案的字段
  * 3. 每个维度提取选项，丢弃无来源的
- * 4. 选项 >= 2 → 生成问题；< 2 → 跳过（不用通用答案凑数）
- * 5. 最多返回 3 个问题，总问题数不超过 5
+ * 4. 选项 >= 2 → 生成 A/B/C；< 2 → 保留问题但只提供 D 自定义
+ * 5. 最多返回 3 个问题，总问题数不超过 6
  */
 export async function generatePlanQuestions(input: PlanEngineInput): Promise<PlanResponse> {
-  const { projectId, userId, confirmedFields, round, totalQuestionsAsked } = input
+  const { projectId, userId, round, totalQuestionsAsked } = input
 
   // 1. 并行加载档案数据
   const [wikiPages, knowledgeEntries, project] = await Promise.all([
@@ -154,7 +200,8 @@ export async function generatePlanQuestions(input: PlanEngineInput): Promise<Pla
     prisma.knowledgeEntry.findMany({
       where: { projectId, userId, status: "active" },
       select: { id: true, title: true, content: true, category: true },
-      take: 60,
+      orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+      take: 120,
     }),
     prisma.clientProject.findFirst({
       where: { id: projectId, userId },
@@ -162,8 +209,18 @@ export async function generatePlanQuestions(input: PlanEngineInput): Promise<Pla
     }),
   ])
 
+  const confirmedFields = { ...extractRequirementFields(input.requirement), ...input.confirmedFields }
   const { assumptions, assumedFields } = buildProjectAssumptions(project)
-  const questions = buildPlanQuestions({ confirmedFields, assumedFields, wikiPages, knowledgeEntries, round, totalQuestionsAsked })
+  const questions = buildPlanQuestions({
+    requirement: input.requirement,
+    confirmedFields,
+    assumedFields,
+    wikiPages,
+    knowledgeEntries,
+    project,
+    round,
+    totalQuestionsAsked,
+  })
 
   // 4. 构建当前任务单快照
   const taskSpec: Partial<PlanTaskSpec> = { ...confirmedFields }
@@ -186,28 +243,26 @@ export async function generatePlanQuestions(input: PlanEngineInput): Promise<Pla
   }
 }
 
-function buildProjectAssumptions(project: {
-  targetCustomer: string | null
-  offer: string | null
-} | null): { assumptions: PlanAssumption[]; assumedFields: Set<PlanTaskSpecField> } {
+function buildProjectAssumptions(project: ProjectPlanProfile | null): {
+  assumptions: PlanAssumption[]
+  assumedFields: Set<PlanTaskSpecField>
+} {
   const assumptions: PlanAssumption[] = []
   const assumedFields = new Set<PlanTaskSpecField>()
   if (project?.targetCustomer?.trim()) {
     assumptions.push({ field: "targetCustomer", value: project.targetCustomer.trim(), sourceRefs: [{ kind: "project", id: "targetCustomer", label: "项目-目标客户" }] })
     assumedFields.add("targetCustomer")
   }
-  if (project?.offer?.trim()) {
-    assumptions.push({ field: "coreMessage", value: project.offer.trim(), sourceRefs: [{ kind: "project", id: "offer", label: "项目-主推产品/服务" }] })
-    assumedFields.add("coreMessage")
-  }
   return { assumptions, assumedFields }
 }
 
-function buildPlanQuestions({ confirmedFields, assumedFields, wikiPages, knowledgeEntries, round, totalQuestionsAsked }: {
+function buildPlanQuestions({ requirement, confirmedFields, assumedFields, wikiPages, knowledgeEntries, project, round, totalQuestionsAsked }: {
+  requirement: string
   confirmedFields: Partial<PlanTaskSpec>
   assumedFields: Set<PlanTaskSpecField>
   wikiPages: IpWikiPageRow[]
   knowledgeEntries: Array<{ id: string; title: string; content: string; category: string }>
+  project: ProjectPlanProfile | null
   round: number
   totalQuestionsAsked: number
 }): PlanQuestion[] {
@@ -217,13 +272,17 @@ function buildPlanQuestions({ confirmedFields, assumedFields, wikiPages, knowled
     if (questions.length >= remainingSlots) break
     const config = DIMENSION_SOURCES[dimension]
     if (confirmedFields[config.targetField] || assumedFields.has(config.targetField)) continue
-    const snippets = deduplicateSnippets(extractDimensionSnippets(dimension, wikiPages, knowledgeEntries)).slice(0, 3)
-    if (snippets.length < PLAN_MIN_ARCHIVE_OPTIONS) continue
+    const snippets = rankSnippetsForRequirement(
+      extractDimensionSnippets(dimension, wikiPages, knowledgeEntries, project),
+      requirement,
+      config.relevanceHints,
+    ).slice(0, 3)
+    const reliableOptions = snippets.length >= PLAN_MIN_ARCHIVE_OPTIONS ? snippets : []
     questions.push({
       id: `q_${dimension}_r${round}_${Date.now().toString(36)}`,
       dimension,
       prompt: config.promptTemplate,
-      options: snippets.map((snippet, index) => ({ key: (["A", "B", "C"] as const)[index], text: snippet.text, sourceRefs: [snippet.sourceRef] })),
+      options: reliableOptions.map((snippet, index) => ({ key: (["A", "B", "C"] as const)[index], text: snippet.text, sourceRefs: [snippet.sourceRef] })),
       hasCustomOption: true,
       targetField: config.targetField,
     })
@@ -236,6 +295,7 @@ function extractDimensionSnippets(
   dimension: PlanQuestionDimension,
   wikiPages: IpWikiPageRow[],
   knowledgeEntries: Array<{ id: string; title: string; content: string; category: string }>,
+  project: ProjectPlanProfile | null,
 ): ExtractedSnippet[] {
   const config = DIMENSION_SOURCES[dimension]
   const snippets: ExtractedSnippet[] = []
@@ -243,13 +303,27 @@ function extractDimensionSnippets(
   // 从 IP Wiki 页提取
   for (const page of wikiPages) {
     if (!config.wikiPageTypes.includes(page.pageType)) continue
-    snippets.push(...extractSnippetsFromWikiPage(page, 4))
+    snippets.push(...extractSnippetsFromWikiPage(page, 12))
   }
 
   // 从知识条目提取
   for (const entry of knowledgeEntries) {
     if (!config.knowledgeCategories.includes(entry.category)) continue
-    snippets.push(...extractSnippetsFromKnowledge(entry, 2))
+    snippets.push(...extractSnippetsFromKnowledge(entry, 6))
+  }
+
+  for (const field of config.projectFields ?? []) {
+    const value = project?.[field]?.trim()
+    if (!value) continue
+    const labels: Record<keyof ProjectPlanProfile, string> = {
+      targetCustomer: "项目-目标客户",
+      offer: "项目-主推产品/服务",
+      deliveryGoal: "项目-交付目标",
+    }
+    snippets.push({
+      text: value,
+      sourceRef: { kind: "project", id: field, label: labels[field] },
+    })
   }
 
   return snippets
@@ -264,4 +338,70 @@ function deduplicateSnippets(snippets: ExtractedSnippet[]): ExtractedSnippet[] {
     seen.add(normalized)
     return true
   })
+}
+
+function normalizeSnippetText(text: string): string {
+  return text
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/^[-•*]\s+/, "")
+    .replace(/^\d+[.)、]\s*/, "")
+    .replace(/\*\*/g, "")
+    .trim()
+}
+
+function rankSnippetsForRequirement(
+  snippets: ExtractedSnippet[],
+  requirement: string,
+  relevanceHints: string[],
+): ExtractedSnippet[] {
+  const queryTerms = extractMatchTerms(requirement)
+  const hintTerms = extractMatchTerms(relevanceHints.join(" "))
+  return deduplicateSnippets(snippets)
+    .map((snippet, index) => {
+      const normalized = snippet.text.toLowerCase()
+      const queryScore = queryTerms.reduce((score, term) => score + (normalized.includes(term) ? Math.min(term.length, 6) * 4 : 0), 0)
+      const hintScore = hintTerms.reduce((score, term) => score + (normalized.includes(term) ? Math.min(term.length, 4) : 0), 0)
+      const sourceScore = snippet.sourceRef.kind === "project" ? 3 : snippet.sourceRef.kind === "ip_wiki" ? 2 : 1
+      return { snippet, index, score: queryScore + hintScore + sourceScore }
+    })
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map(({ snippet }) => snippet)
+}
+
+function extractMatchTerms(text: string): string[] {
+  const normalized = text.toLowerCase().replace(/[^\p{Script=Han}a-z0-9]+/gu, " ")
+  const stopTerms = new Set(["一个", "一条", "帮我", "这条", "内容", "文案", "生成", "需要", "希望", "怎么", "什么"])
+  const terms = new Set<string>()
+  for (const segment of normalized.match(/[a-z0-9]{2,}|[\p{Script=Han}]{2,}/gu) ?? []) {
+    if (!stopTerms.has(segment)) terms.add(segment)
+    if (/^[\p{Script=Han}]+$/u.test(segment)) {
+      for (let index = 0; index < segment.length - 1; index += 1) {
+        const term = segment.slice(index, index + 2)
+        if (!stopTerms.has(term)) terms.add(term)
+      }
+    }
+  }
+  return [...terms]
+}
+
+function extractRequirementFields(requirement: string): Partial<PlanTaskSpec> {
+  const fields: Partial<PlanTaskSpec> = { contentGoal: requirement.slice(0, 500) }
+  const platforms = ["抖音", "视频号", "小红书", "朋友圈", "公众号", "微博", "快手", "B站", "知乎", "LinkedIn"]
+    .filter((platform) => requirement.toLowerCase().includes(platform.toLowerCase()))
+  if (platforms.length) fields.platform = platforms.join("、")
+
+  const formats = ["短视频", "口播", "朋友圈文案", "公众号文章", "长文", "图文", "直播脚本", "销售页", "标题"]
+    .filter((format) => requirement.includes(format))
+  if (formats.length) fields.outputFormat = formats.join("、")
+
+  const lengthRule = requirement.match(/\d{1,4}\s*(?:字|秒|分钟)/)?.[0]
+  if (lengthRule) fields.lengthRule = lengthRule.replace(/\s+/g, "")
+
+  const styles = ["专业", "口语化", "犀利", "温暖", "幽默", "克制", "真诚", "高端", "接地气"]
+    .filter((style) => requirement.includes(style))
+  if (styles.length) fields.style = styles.join("、")
+
+  const scenario = requirement.match(/(?:用于|用在|发布到|发在)([^，。；\n]{2,30})/)?.[1]?.trim()
+  if (scenario) fields.useScenario = scenario
+  return fields
 }

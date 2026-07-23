@@ -88,7 +88,8 @@ export function AimPromptComposer({
 }: AimPromptComposerProps) {
   const isPlanMode = composerMode === "plan"
   const canSend = !busy && !isRecording && (value.trim().length > 0 || imageAttachments.length > 0)
-  const canSubmit = canSend && canGenerate
+  const canPlan = !busy && !isRecording && value.trim().length > 0
+  const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate
   const canStop = busy && !isRecording && Boolean(onStop)
   const rootRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -265,7 +266,6 @@ export function AimPromptComposer({
             </div>
           </div>
         )}
-
         <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5 pt-0.5">
           <div className="flex min-w-0 items-center gap-0.5">
             {showContentMode && onContentModeChange ? (

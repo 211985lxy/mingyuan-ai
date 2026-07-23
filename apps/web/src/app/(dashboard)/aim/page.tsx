@@ -11,6 +11,7 @@ import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
 import { AimMethodologySelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
 import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
+import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
@@ -105,6 +106,16 @@ export default function AimPage() {
         />
 
         {/* 计划模式：问题卡片 / 任务单卡片（覆盖在对话区上方） */}
+        {w.planSession.session?.status === "asking" && !w.planSession.currentQuestion && (
+          <div className="px-3 py-2 sm:px-5">
+            <AimPlanStatusCard
+              loading={w.planSession.session.loading}
+              error={w.planSession.session.error}
+              onRetry={() => void w.planSession.retryPlan()}
+              onAbandon={w.handlePlanAbandon}
+            />
+          </div>
+        )}
         {w.planSession.session?.status === "asking" && w.planSession.currentQuestion && (
           <div className="px-3 py-2 sm:px-5">
             <AimPlanQuestionCard
@@ -184,7 +195,9 @@ export default function AimPage() {
             />
 
             {/* 输入区：悬浮卡片，对标 Claude composer */}
-            <footer className="px-3 pb-4 pt-1 sm:px-5 sm:pb-5">{composer}</footer>
+            {!w.planSession.isPlanMode && (
+              <footer className="px-3 pb-4 pt-1 sm:px-5 sm:pb-5">{composer}</footer>
+            )}
           </>
         )}
       </section>

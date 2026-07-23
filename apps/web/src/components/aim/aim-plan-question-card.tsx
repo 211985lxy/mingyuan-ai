@@ -57,7 +57,7 @@ export function AimPlanQuestionCard({
           <PlanQuestionOptions question={question} loading={loading} onSelect={onSelectOption} />
 
           {/* D 选项：都不符合，我来补充 */}
-          <PlanCustomOption customMode={customMode} customText={customText} loading={loading} setCustomMode={setCustomMode} setCustomText={setCustomText} onConfirm={handleCustomConfirm} />
+          <PlanCustomOption hasArchiveOptions={question.options.length > 0} customMode={customMode} customText={customText} loading={loading} setCustomMode={setCustomMode} setCustomText={setCustomText} onConfirm={handleCustomConfirm} />
         </div>
 
         {/* 加载状态 */}
@@ -82,12 +82,13 @@ function PlanQuestionProgress({ questionNumber, totalQuestions, canGoBack, onGoB
   </div>
 }
 
-function PlanCustomOption({ customMode, customText, loading, setCustomMode, setCustomText, onConfirm }: {
-  customMode: boolean; customText: string; loading: boolean
+function PlanCustomOption({ hasArchiveOptions, customMode, customText, loading, setCustomMode, setCustomText, onConfirm }: {
+  hasArchiveOptions: boolean; customMode: boolean; customText: string; loading: boolean
   setCustomMode: (value: boolean) => void; setCustomText: (value: string) => void; onConfirm: () => void
 }) {
-  if (!customMode) return <button type="button" disabled={loading} className="group flex w-full items-center gap-3 rounded-lg border border-dashed border-border/60 px-3.5 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50" onClick={() => setCustomMode(true)}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/30 text-[11px] font-semibold text-muted-foreground">D</span><span className="flex items-center gap-1.5 text-sm text-muted-foreground"><PenLine className="h-3.5 w-3.5" />都不符合，我来补充</span></button>
-  return <div className="rounded-lg border border-primary/30 bg-primary/5 p-3"><textarea value={customText} onChange={(e) => setCustomText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onConfirm() } }} placeholder="输入你的想法…" rows={2} autoFocus className="w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground/60" /><div className="mt-2 flex items-center justify-end gap-2"><Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setCustomMode(false); setCustomText("") }}>取消</Button><Button type="button" size="sm" className="h-7 gap-1 text-xs" disabled={!customText.trim()} onClick={onConfirm}><Check className="h-3 w-3" />确认</Button></div></div>
+  const label = hasArchiveOptions ? "都不符合，我来补充" : "档案暂无可靠选项，我来补充"
+  if (!customMode) return <button type="button" disabled={loading} className="group flex w-full items-center gap-3 rounded-lg border border-dashed border-border/60 px-3.5 py-2.5 text-left transition-all hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50" onClick={() => setCustomMode(true)}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/30 text-[11px] font-semibold text-muted-foreground">D</span><span className="flex items-center gap-1.5 text-sm text-muted-foreground"><PenLine className="h-3.5 w-3.5" />{label}</span></button>
+  return <div className="rounded-lg border border-primary/30 bg-primary/5 p-3"><textarea value={customText} maxLength={1000} onChange={(e) => setCustomText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); onConfirm() } }} placeholder="输入你的想法…" rows={2} autoFocus className="w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground/60" /><div className="mt-2 flex items-center justify-end gap-2"><Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setCustomMode(false); setCustomText("") }}>取消</Button><Button type="button" size="sm" className="h-7 gap-1 text-xs" disabled={!customText.trim()} onClick={onConfirm}><Check className="h-3 w-3" />确认</Button></div></div>
 }
 
 function PlanQuestionOptions({ question, loading, onSelect }: {
