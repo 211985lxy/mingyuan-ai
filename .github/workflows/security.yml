@@ -32,9 +32,14 @@ jobs:
       - name: Dependency audit with expiring exceptions
         run: pnpm security:audit
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Use CLI directly: gitleaks-action needs pull-requests:read and still
+        # hits API permission edge cases on some private repos.
+        run: |
+          set -euo pipefail
+          VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --verbose --redact --no-banner
       - name: Initialize CodeQL
         uses: github/codeql-action/init@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
         with:

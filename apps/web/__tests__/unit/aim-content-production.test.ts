@@ -115,7 +115,7 @@ describe("AIM content production positioning", () => {
       viralStructureBlock: "",
       eventStorytellingBlock: "",
       ipWikiBlock: "【人设】实战派\n【天命底盘】已有八字与紫微资料",
-    } as Parameters<typeof buildProducerSystemPrompt>[1])
+    } as unknown as Parameters<typeof buildProducerSystemPrompt>[1])
 
     expect(CONTENT_CREATION_TRACE_RULE).toContain("[[AIM_METHOD_NOTE]]")
     expect(prompt).toContain("风格定位")
@@ -137,7 +137,7 @@ describe("AIM content production positioning", () => {
       viralStructureBlock: "",
       eventStorytellingBlock: "",
       ipWikiBlock: "",
-    } as Parameters<typeof buildProducerSystemPrompt>[1])
+    } as unknown as Parameters<typeof buildProducerSystemPrompt>[1])
 
     expect(prompt).not.toContain(CONTENT_CREATION_TRACE_RULE)
   })

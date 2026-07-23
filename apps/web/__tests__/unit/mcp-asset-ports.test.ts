@@ -125,14 +125,14 @@ describe("mcp-asset-ports", () => {
     }
 
     it("create_artifact 校验失败时返回 isError", async () => {
-      const handlers = createMcpToolHandlers(mockServices)
+      const handlers = createMcpToolHandlers(mockServices as never)
       const result = await handlers.create_artifact({ kind: "bad" })
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain("校验失败")
     })
 
     it("create_artifact 成功时调用 service", async () => {
-      const handlers = createMcpToolHandlers(mockServices)
+      const handlers = createMcpToolHandlers(mockServices as never)
       const result = await handlers.create_artifact({
         kind: "feishu_doc",
         title: "测试",
@@ -146,19 +146,19 @@ describe("mcp-asset-ports", () => {
     })
 
     it("update_artifact 校验失败时返回 isError", async () => {
-      const handlers = createMcpToolHandlers(mockServices)
+      const handlers = createMcpToolHandlers(mockServices as never)
       const result = await handlers.update_artifact({ stage: "bad" })
       expect(result.isError).toBe(true)
     })
 
     it("list_project_assets 缺少 projectId 时返回错误", async () => {
-      const handlers = createMcpToolHandlers(mockServices)
+      const handlers = createMcpToolHandlers(mockServices as never)
       const result = await handlers.list_project_assets({})
       expect(result.isError).toBe(true)
     })
 
     it("verify_artifact 成功时返回验证结果", async () => {
-      const handlers = createMcpToolHandlers(mockServices)
+      const handlers = createMcpToolHandlers(mockServices as never)
       const result = await handlers.verify_artifact({ token: "doc_x", kind: "feishu_doc" })
       expect(result.isError).toBeUndefined()
       expect(mockServices.verifyArtifact).toHaveBeenCalledWith({ token: "doc_x", kind: "feishu_doc" })

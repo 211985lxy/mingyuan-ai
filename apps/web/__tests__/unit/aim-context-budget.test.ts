@@ -15,6 +15,7 @@ function blocks(size: number): AimContextBlocks {
     viralStructureBlock: "V".repeat(size),
     eventStorytellingBlock: "E".repeat(size),
     ipWikiBlock: "I".repeat(size),
+    selectedMethodologyBlock: "S".repeat(size),
   }
 }
 
