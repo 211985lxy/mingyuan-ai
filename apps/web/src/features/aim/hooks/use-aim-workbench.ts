@@ -166,10 +166,11 @@ export function useAimWorkbench() {
 
   // ---- Editor actions ----
   const {
-    isImitating, imitateStyleId, setImitateStyleId, handleImitate,
+    isImitating, isSavingEditor, imitateStyleId, setImitateStyleId, handleImitate,
     fillReferenceFromConversation: fillReferenceTextFromConversation,
     integrateAssistantDraft: integrateLatestAssistantDraftToEditor,
     saveEditorToDeliverable,
+    applyRestoredContent,
     optimizeOpening: handleOptimizeOpening,
     reviseCurrentDraft: handleReviseCurrentDraft,
     applyEditorReplacement,
@@ -392,6 +393,9 @@ export function useAimWorkbench() {
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
   const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
   const latestGenerationId = [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
+  const editorGenerationId = editorSourceMessageId
+    ? messages.find((message) => message.id === editorSourceMessageId)?.deliverables?.id
+    : undefined
 
   const projectAttach = useAimProjectAttach({
     projects,
@@ -427,7 +431,7 @@ export function useAimWorkbench() {
     retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow,
     retroRuleForm, setRetroRuleForm, handleMarkStatus, openRecordDialog, submitRecordDialog,
     wikiDialog,
-    isImitating, imitateStyleId, setImitateStyleId, handleImitate, saveEditorToDeliverable, applyEditorReplacement,
+    isImitating, isSavingEditor, imitateStyleId, setImitateStyleId, handleImitate, saveEditorToDeliverable, applyEditorReplacement, applyRestoredContent,
     scrollRef,
     startRecording, stopRecording,
     setEditorPanelOpen, setEditorPanelWidth, setEditorText, setReferenceSelection, setDraftSelection,
@@ -449,6 +453,7 @@ export function useAimWorkbench() {
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),
     latestGenerationId,
+    editorGenerationId,
     agentModule,
     setAgentModule,
     selectedMethodologyProfileIds,

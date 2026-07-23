@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@/generated/prisma/client"
+import { syncAimGenerationContent } from "@/lib/aim/content-version-sync"
 
 export const maxDuration = 30
 
@@ -12,24 +13,41 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   const target = await prisma.aimContentVersion.findFirst({ where: { id, userId: user.id } })
   if (!target) return NextResponse.json({ error: "版本不存在" }, { status: 404 })
 
-  const version = await prisma.$transaction(async (tx) => {
-    const latest = target.generationId
-      ? await lockLatest(tx, user.id, target.generationId, null, target.format)
-      : await lockLatest(tx, user.id, null, target.conversationId, target.format)
-    return tx.aimContentVersion.create({
-      data: {
-        userId: user.id,
-        generationId: target.generationId,
-        conversationId: target.conversationId,
-        format: target.format,
-        content: target.content,
-        source: "manual_edit",
-        versionNo: (latest?.versionNo ?? 0) + 1,
-        parentVersionId: target.id,
-      },
+  try {
+    const version = await prisma.$transaction(async (tx) => {
+      const latest = target.generationId
+        ? await lockLatest(tx, user.id, target.generationId, null, target.format)
+        : await lockLatest(tx, user.id, null, target.conversationId, target.format)
+
+      if (target.generationId) {
+        await syncAimGenerationContent(tx, {
+          userId: user.id,
+          generationId: target.generationId,
+          format: target.format,
+          content: target.content,
+        })
+      }
+
+      return tx.aimContentVersion.create({
+        data: {
+          userId: user.id,
+          generationId: target.generationId,
+          conversationId: target.conversationId,
+          format: target.format,
+          content: target.content,
+          source: "manual_edit",
+          versionNo: (latest?.versionNo ?? 0) + 1,
+          parentVersionId: target.id,
+        },
+      })
     })
-  })
-  return NextResponse.json({ data: version })
+    return NextResponse.json({ data: version })
+  } catch (error) {
+    if (error instanceof Error && error.message === "GENERATION_NOT_FOUND") {
+      return NextResponse.json({ error: "生成记录不存在或无权访问" }, { status: 404 })
+    }
+    throw error
+  }
 })
 
 async function lockLatest(

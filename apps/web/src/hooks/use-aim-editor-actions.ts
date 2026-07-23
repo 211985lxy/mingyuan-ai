@@ -74,11 +74,11 @@ function integrateAssistantDraft(input: AimEditorActionInput) {
   return true
 }
 
-function saveEditorToDeliverable(input: AimEditorActionInput) {
-  if (!input.editorSourceMessageId || !input.editorFormat) {
-    toast.error("当前编辑稿还没有关联交付物")
-    return false
-  }
+function patchDeliverableContent(
+  input: AimEditorActionInput,
+  content: string,
+) {
+  if (!input.editorSourceMessageId || !input.editorFormat) return
   input.setMessages((messages) => messages.map((message) =>
     message.id === input.editorSourceMessageId && message.deliverables
       ? {
@@ -86,13 +86,61 @@ function saveEditorToDeliverable(input: AimEditorActionInput) {
           deliverables: {
             ...message.deliverables,
             results: message.deliverables.results.map((result) => result.format === input.editorFormat
-              ? { ...result, content: input.editorText, wordCount: input.editorText.length }
+              ? { ...result, content, wordCount: content.length }
               : result),
           },
         }
       : message))
-  toast.success("已保存到交付物")
-  return true
+}
+
+function resolveEditorGenerationId(input: AimEditorActionInput): string | undefined {
+  if (!input.editorSourceMessageId) return undefined
+  return input.messages.find((message) => message.id === input.editorSourceMessageId)?.deliverables?.id
+}
+
+async function saveEditorToDeliverable(input: AimEditorActionInput): Promise<boolean> {
+  if (!input.editorSourceMessageId || !input.editorFormat) {
+    toast.error("当前编辑稿还没有关联交付物")
+    return false
+  }
+  const content = input.editorText
+  if (!content.trim()) {
+    toast.error("正文不能为空")
+    return false
+  }
+
+  const generationId = resolveEditorGenerationId(input)
+  if (!generationId) {
+    // 无服务端生成记录时仅回写对话态（兼容本地草稿）
+    patchDeliverableContent(input, content)
+    toast.success("已保存到交付物")
+    return true
+  }
+
+  try {
+    const response = await fetch("/api/content-versions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generationId,
+        format: input.editorFormat,
+        content,
+        source: "manual_edit",
+      }),
+    })
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      toast.error(typeof payload?.error === "string" ? payload.error : "保存失败，请重试")
+      return false
+    }
+    const savedContent = typeof payload?.data?.content === "string" ? payload.data.content : content
+    patchDeliverableContent(input, savedContent)
+    toast.success("已保存到交付物")
+    return true
+  } catch {
+    toast.error("保存失败，请检查网络后重试")
+    return false
+  }
 }
 
 async function imitateEditorDraft(input: AimEditorActionInput, styleId: string) {
@@ -187,6 +235,7 @@ async function streamDraftRevision(input: AimEditorActionInput, prompt: string, 
  */
 export function useAimEditorActions(input: AimEditorActionInput) {
   const [isImitating, setIsImitating] = useState(false)
+  const [isSavingEditor, setIsSavingEditor] = useState(false)
   const [imitateStyleId, setImitateStyleId] = useState("default")
   const handleImitate = () => {
     setIsImitating(true)
@@ -201,14 +250,28 @@ export function useAimEditorActions(input: AimEditorActionInput) {
     input.setEditorText((current) => applySelectionReplacement(current, range, replacement))
     toast.success("已应用到右侧选区")
   }
+  const applyRestoredContent = (content: string) => {
+    input.setEditorText(content)
+    patchDeliverableContent(input, content)
+  }
   return {
     isImitating,
+    isSavingEditor,
     imitateStyleId,
     setImitateStyleId,
     handleImitate,
     fillReferenceFromConversation: () => fillReferenceFromConversation(input),
     integrateAssistantDraft: () => integrateAssistantDraft(input),
-    saveEditorToDeliverable: () => saveEditorToDeliverable(input),
+    saveEditorToDeliverable: async () => {
+      if (isSavingEditor) return false
+      setIsSavingEditor(true)
+      try {
+        return await saveEditorToDeliverable(input)
+      } finally {
+        setIsSavingEditor(false)
+      }
+    },
+    applyRestoredContent,
     optimizeOpening: (command: string) => optimizeOpening(input, command),
     reviseCurrentDraft: (command: string) => reviseCurrentDraft(input, command),
     applyEditorReplacement,

@@ -221,7 +221,9 @@ export default function AimPage() {
           imitating={w.isImitating}
           imitateStyleId={w.imitateStyleId}
           onImitateStyleChange={w.setImitateStyleId}
-          generationId={w.latestGenerationId}
+          generationId={w.editorGenerationId}
+          saving={w.isSavingEditor}
+          onRestoreContent={w.applyRestoredContent}
         />
       )}
 

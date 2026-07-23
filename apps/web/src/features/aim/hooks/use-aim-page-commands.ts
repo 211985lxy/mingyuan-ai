@@ -27,7 +27,7 @@ interface UseAimPageCommandsOptions {
   handleQuality: (messageId: string) => () => Promise<void>
   integrateLatestAssistantDraftToEditor: () => boolean
   fillReferenceTextFromConversation: () => boolean
-  saveEditorToDeliverable: () => boolean
+  saveEditorToDeliverable: () => boolean | Promise<boolean>
   handleReviseCurrentDraft: (input: string) => boolean
   handleOptimizeOpening: (input: string) => boolean
   rememberWorkbenchPreference: (input: string) => void
@@ -60,7 +60,10 @@ export function useAimPageCommands(options: UseAimPageCommandsOptions) {
       toast.success(`已隐藏右侧${options.editorPanelLabels.title}`)
       return true
     }
-    if (command.id === "save_editor") return options.saveEditorToDeliverable()
+    if (command.id === "save_editor") {
+      void Promise.resolve(options.saveEditorToDeliverable())
+      return true
+    }
     if (command.id === "reset_conversation") {
       options.resetConversation()
       toast.success("已清空当前对话")

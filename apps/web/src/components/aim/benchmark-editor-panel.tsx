@@ -34,12 +34,14 @@ interface BenchmarkEditorPanelProps {
   onEditorTextChange: (text: string) => void
   onReferenceSelection: (selection: AimEditorSelection) => void
   onDraftSelection: (selection: AimEditorSelection) => void
-  onSave: () => void
+  onSave: () => void | Promise<boolean | void>
   onImitate: () => void
   imitating: boolean
   imitateStyleId: string
   onImitateStyleChange: (styleId: string) => void
   generationId?: string
+  saving?: boolean
+  onRestoreContent?: (content: string) => void
 }
 
 function readSelection(element: HTMLTextAreaElement): AimEditorSelection {
@@ -62,14 +64,14 @@ function CollapsedEditor({ labels, editorText, onOpen }: Pick<BenchmarkEditorPan
   return <button type="button" className="flex w-9 shrink-0 flex-col items-center justify-center gap-2 border-l bg-background text-xs text-muted-foreground hover:bg-muted/40" onClick={onOpen} title={labels.collapsedTitle}><FileText className="h-4 w-4" /><span className="[writing-mode:vertical-rl]">{editorText.length}字</span></button>
 }
 
-function EditorHeader(props: Pick<BenchmarkEditorPanelProps, "labels" | "editorFormat" | "editorText" | "referenceText" | "imitateStyleId" | "onImitateStyleChange" | "imitating" | "onImitate" | "onSave" | "onClose">) {
-  const { labels, editorFormat, editorText, referenceText, imitateStyleId, onImitateStyleChange, imitating, onImitate, onSave, onClose } = props
+function EditorHeader(props: Pick<BenchmarkEditorPanelProps, "labels" | "editorFormat" | "editorText" | "referenceText" | "imitateStyleId" | "onImitateStyleChange" | "imitating" | "onImitate" | "onSave" | "onClose" | "saving">) {
+  const { labels, editorFormat, editorText, referenceText, imitateStyleId, onImitateStyleChange, imitating, onImitate, onSave, onClose, saving } = props
   return (
     <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
       <div className="min-w-0"><p className="text-sm font-semibold">{labels.title}</p><p className="truncate text-xs text-muted-foreground">{editorFormat ? AIM_FORMAT_LABELS[editorFormat] : labels.currentLabel} · {editorText.length} 字</p></div>
       <div className="flex items-center gap-1">
         {referenceText.length >= 30 ? <><Select value={imitateStyleId} onValueChange={(value) => onImitateStyleChange(value ?? "default")}><SelectTrigger size="sm" className="h-7 w-[104px] text-xs"><SelectValue placeholder="文风" /></SelectTrigger><SelectContent><SelectItem value="default">默认（我的风格）</SelectItem>{Object.entries(STYLE_GUIDE_LABELS).map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}</SelectContent></Select><Button size="sm" variant="ghost" className={AIM_ACTIVE_SOFT_ACTION_CLASS} disabled={imitating || editorText.trim().length < 30} onClick={onImitate} title="把上面对标爆款的结构逻辑迁移到你的稿子">{imitating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}仿写</Button></> : null}
-        <Button size="sm" variant="ghost" className={AIM_ACTIVE_SOFT_ACTION_CLASS} onClick={onSave}>保存</Button>
+        <Button size="sm" variant="ghost" className={AIM_ACTIVE_SOFT_ACTION_CLASS} disabled={saving} onClick={() => void onSave()}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}{saving ? "保存中" : "保存"}</Button>
         <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onClose}>隐藏</Button>
       </div>
     </div>
@@ -81,7 +83,17 @@ type VersionSummary = { id: string; versionNo: number; source: string; createdAt
 function VersionTimeline({ generationId, format, editorText, onRestore }: { generationId: string; format: ContentFormat; editorText: string; onRestore: (content: string) => void }) {
   const [versions, setVersions] = useState<VersionSummary[]>([])
   const [selected, setSelected] = useState<string | null>(null)
-  useEffect(() => { fetch(`/api/content-versions?generationId=${encodeURIComponent(generationId)}&format=${encodeURIComponent(format)}`).then((r) => r.ok ? r.json() : null).then(async (payload) => { const existing = payload?.data ?? []; if (existing.length === 0 && editorText.trim()) { const created = await fetch("/api/content-versions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ generationId, format, content: editorText, source: "generated" }) }).then((r) => r.ok ? r.json() : null); setVersions(created?.data ? [created.data] : []) } else setVersions(existing) }).catch(() => {}) }, [generationId, format, editorText])
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/content-versions?generationId=${encodeURIComponent(generationId)}&format=${encodeURIComponent(format)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((payload) => {
+        if (cancelled) return
+        setVersions(payload?.data ?? [])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [generationId, format])
   async function restore(id: string) {
     const response = await fetch(`/api/content-versions/${id}/restore`, { method: "POST" })
     if (!response.ok) return
@@ -157,18 +169,16 @@ export function BenchmarkEditorPanel(props: BenchmarkEditorPanelProps) {
   const splitRef = useRef<HTMLDivElement>(null)
   const [referencePercent, setReferencePercent] = useState(50)
   const [view, setView] = useState<"edit" | "versions" | "wechat" | "xiaohongshu">("edit")
-  async function saveWithVersion() {
-    props.onSave()
-    if (!props.generationId || !props.editorFormat || !props.editorText.trim()) return
-    await fetch("/api/content-versions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ generationId: props.generationId, format: props.editorFormat, content: props.editorText, source: "manual_edit" }) }).catch(() => {})
+  async function handleSave() {
+    await props.onSave()
   }
   if (!props.open) return <CollapsedEditor labels={props.labels} editorText={props.editorText} onOpen={props.onOpen} />
   return (
     <aside className="relative flex shrink-0 flex-col border-l bg-background" style={{ width: props.width }}>
       <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-primary/30" onPointerDown={(event) => startPanelResize(event, props.onWidthChange)} />
-      <EditorHeader {...props} onSave={saveWithVersion} />
+      <EditorHeader {...props} onSave={handleSave} saving={props.saving} />
       <div className="flex flex-wrap gap-1 border-b px-4 py-2"><Button size="sm" variant={view === "edit" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("edit")}>编辑</Button>{props.editorFormat === "wechat_article" ? <Button size="sm" variant={view === "wechat" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("wechat")}>公众号</Button> : null}{props.editorFormat === "xiaohongshu_post" ? <Button size="sm" variant={view === "xiaohongshu" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("xiaohongshu")}>小红书</Button> : null}{props.generationId ? <Button size="sm" variant={view === "versions" ? "secondary" : "ghost"} className="h-7 text-xs" onClick={() => setView("versions")}>版本</Button> : null}</div>
-      {view === "versions" && props.generationId && props.editorFormat ? <VersionTimeline generationId={props.generationId} format={props.editorFormat} editorText={props.editorText} onRestore={props.onEditorTextChange} /> : view === "wechat" ? <WechatPreview editorText={props.editorText} /> : view === "xiaohongshu" ? <XhsEditor editorText={props.editorText} onEditorTextChange={props.onEditorTextChange} /> : <div ref={splitRef} className="grid min-h-0 flex-1 bg-muted/15" style={{ gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}>
+      {view === "versions" && props.generationId && props.editorFormat ? <VersionTimeline generationId={props.generationId} format={props.editorFormat} editorText={props.editorText} onRestore={props.onRestoreContent ?? props.onEditorTextChange} /> : view === "wechat" ? <WechatPreview editorText={props.editorText} /> : view === "xiaohongshu" ? <XhsEditor editorText={props.editorText} onEditorTextChange={props.onEditorTextChange} /> : <div ref={splitRef} className="grid min-h-0 flex-1 bg-muted/15" style={{ gridTemplateRows: `${referencePercent}% 6px minmax(0, 1fr)` }}>
         <EditorSection title={props.labels.referenceTitle} value={props.referenceText} placeholder={props.labels.referencePlaceholder} readOnly muted hideEmptyCount onSelection={props.onReferenceSelection} />
         <EditorSplitHandle splitRef={splitRef} onPercentChange={setReferencePercent} />
         <EditorSection title={props.labels.draftTitle} value={props.editorText} placeholder={props.labels.draftPlaceholder} onChange={props.onEditorTextChange} onSelection={props.onDraftSelection} />

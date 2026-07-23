@@ -3,6 +3,10 @@ import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import { parseJsonRecord } from "@/lib/api-contract"
 import type { Prisma, AimContentVersion } from "@/generated/prisma/client"
+import {
+  readAimGenerationContent,
+  syncAimGenerationContent,
+} from "@/lib/aim/content-version-sync"
 
 export const maxDuration = 30
 
@@ -76,24 +80,29 @@ export const POST = withUserAuth(async (request, { user }) => {
   let version!: AimContentVersion
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     try {
-      version = await prisma.$transaction((tx) => createNextVersion(tx, {
-        userId: user.id,
-        generationId,
-        conversationId,
-        format,
-        content,
-        source,
-      }))
+      version = await prisma.$transaction(async (tx) =>
+        saveContentVersion(tx, {
+          userId: user.id,
+          generationId,
+          conversationId,
+          format,
+          content,
+          source,
+        }),
+      )
       break
     } catch (error) {
+      if (error instanceof Error && error.message === "GENERATION_NOT_FOUND") {
+        return NextResponse.json({ error: "生成记录不存在或无权访问" }, { status: 404 })
+      }
       if (attempt === MAX_RETRIES) throw error
       await new Promise((resolve) => setTimeout(resolve, attempt * 50))
     }
   }
-  return NextResponse.json({ data: summary(version) })
+  return NextResponse.json({ data: { ...summary(version), content: version.content } })
 })
 
-async function createNextVersion(
+async function saveContentVersion(
   tx: Prisma.TransactionClient,
   input: {
     userId: string
@@ -114,7 +123,55 @@ async function createNextVersion(
         WHERE userId = ${input.userId} AND conversationId = ${input.conversationId} AND format = ${input.format}
         ORDER BY versionNo DESC LIMIT 1 FOR UPDATE`
   const latest = rows[0]
-  if (latest && latest.content === input.content && latest.source === input.source) return tx.aimContentVersion.findUniqueOrThrow({ where: { id: latest.id } })
+  if (latest && latest.content === input.content && latest.source === input.source) {
+    if (input.generationId) {
+      await syncAimGenerationContent(tx, {
+        userId: input.userId,
+        generationId: input.generationId,
+        format: input.format,
+        content: input.content,
+      })
+    }
+    return tx.aimContentVersion.findUniqueOrThrow({ where: { id: latest.id } })
+  }
+
+  let parentVersionId = latest?.id ?? null
+  let nextVersionNo = (latest?.versionNo ?? 0) + 1
+
+  // 首次非 generated 保存：先把服务端当前正文落成 generated v1，再写本次版本
+  if (!latest && input.generationId && input.source !== "generated") {
+    const prior = await readAimGenerationContent(tx, {
+      userId: input.userId,
+      generationId: input.generationId,
+      format: input.format,
+    })
+    if (prior && prior !== input.content) {
+      const seeded = await tx.aimContentVersion.create({
+        data: {
+          userId: input.userId,
+          generationId: input.generationId,
+          conversationId: input.conversationId,
+          format: input.format,
+          content: prior,
+          source: "generated",
+          versionNo: 1,
+          parentVersionId: null,
+        },
+      })
+      parentVersionId = seeded.id
+      nextVersionNo = 2
+    }
+  }
+
+  if (input.generationId) {
+    await syncAimGenerationContent(tx, {
+      userId: input.userId,
+      generationId: input.generationId,
+      format: input.format,
+      content: input.content,
+    })
+  }
+
   return tx.aimContentVersion.create({
     data: {
       userId: input.userId,
@@ -123,8 +180,8 @@ async function createNextVersion(
       format: input.format,
       content: input.content,
       source: input.source,
-      versionNo: (latest?.versionNo ?? 0) + 1,
-      parentVersionId: latest?.id ?? null,
+      versionNo: nextVersionNo,
+      parentVersionId,
     },
   })
 }
