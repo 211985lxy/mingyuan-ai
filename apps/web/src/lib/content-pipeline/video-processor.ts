@@ -21,6 +21,7 @@ import {
 } from "@/lib/video-text-extractor"
 import type { VideoTextExtractionResult } from "@/lib/video-text-extractor"
 import { getVideoTextProvider } from "@/lib/video-text-providers"
+import { polishTranscript } from "@/lib/transcript-polish"
 import {
   upsertContentItem,
   createPendingContentItem,
@@ -272,7 +273,12 @@ async function extractVideoTranscript(
   for (let i = 0; i < MAX_POLLS; i++) {
     await sleep(POLL_INTERVAL_MS)
     const result = await provider.fetchResult(batchId)
-    if (result.status === "completed") return result
+    if (result.status === "completed") {
+      const transcript = result.transcript
+        ? await polishTranscript(result.transcript)
+        : result.transcript
+      return { ...result, transcript }
+    }
     if (result.status === "failed") {
       throw new Error(result.errorMessage || "视频文案提取失败")
     }

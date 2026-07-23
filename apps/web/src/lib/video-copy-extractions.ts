@@ -18,6 +18,7 @@ import {
   fetchFallbackVideoExtraction,
   submitFallbackVideoExtraction,
 } from "@/lib/video-extraction-fallback"
+import { polishTranscript } from "@/lib/transcript-polish"
 
 const VIDEO_COPY_ANALYSIS_VERSION = "timeline-12s-v1"
 
@@ -267,6 +268,7 @@ export async function syncVideoCopyExtraction(
           })
         }
         assertFallbackResultLimits(result)
+        const transcript = await polishTranscript(result.transcript)
         await prisma.videoCopyExtraction.update({
           where: { id: record.id },
           data: {
@@ -274,7 +276,7 @@ export async function syncVideoCopyExtraction(
             videoTitle: result.title,
             videoCover: result.coverUrl,
             videoDuration: result.durationSeconds ? String(result.durationSeconds) : null,
-            transcript: result.transcript,
+            transcript,
             errorMessage: null,
           },
         })
@@ -313,6 +315,7 @@ export async function syncVideoCopyExtraction(
         })
       }
 
+      const transcript = await polishTranscript(result.transcript)
       await prisma.videoCopyExtraction.update({
         where: { id: record.id },
         data: {
@@ -321,7 +324,7 @@ export async function syncVideoCopyExtraction(
           videoTitle: result.title,
           videoCover: result.coverUrl,
           videoDuration: result.duration,
-          transcript: result.transcript,
+          transcript,
           providerTaskId: result.providerTaskId,
           errorMessage: null,
         },
