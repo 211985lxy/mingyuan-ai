@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useCallback, useEffect } from "react"
+import { useState, useMemo, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
 import { transcribeAudio, type ContentFormat } from "@/lib/api/client"
@@ -40,8 +40,7 @@ import { useAimProjectAttach } from "@/hooks/use-aim-project-attach"
 import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/features/aim/aim-reference-annotation"
 import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-mode"
 import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
-import { useAimPlanSession, planTaskSpecToWorkflowBrief } from "@/features/aim/hooks/use-aim-plan-session"
-import type { AimComposerMode } from "@/components/aim/aim-prompt-composer"
+import { useAimPlanOrchestration } from "@/features/aim/hooks/use-aim-plan-orchestration"
 
 /**
  * Master hook — consolidates all AIM workbench state, refs, and hook
@@ -274,8 +273,8 @@ export function useAimWorkbench() {
     setInput("")
     clearCurrentTaskContext()
     clearAimDraft(selectedAgentId, currentProjectScope)
-    planSession.resetPlan()
-    setComposerMode("direct")
+    planOrchestration.planSession.resetPlan()
+    planOrchestration.setComposerMode("direct")
   }
 
   const restoreScopeDraft = (nextDraft: AimDraft | null) => {
@@ -301,8 +300,8 @@ export function useAimWorkbench() {
     setContentAction(null)
     clearImages()
     // 切换项目时废弃旧计划，防止跨客户上下文混用
-    planSession.abandonPlan()
-    setComposerMode("direct")
+    planOrchestration.planSession.abandonPlan()
+    planOrchestration.setComposerMode("direct")
   }
 
   const { changeProjectScope } = useAimProjectScopeSwitch({
@@ -342,40 +341,14 @@ export function useAimWorkbench() {
   }
 
   // ---- Plan mode ----
-  const [composerMode, setComposerMode] = useState<AimComposerMode>("direct")
-  const planSession = useAimPlanSession()
-  const canUsePlanMode = projectEnabled && Boolean(selectedProjectId)
-
-  // 页面刷新后恢复计划草稿（仅当当前无活跃会话时）
-  useEffect(() => {
-    if (selectedProjectId) planSession.restoreDraft(selectedProjectId)
-  }, [selectedProjectId, planSession.restoreDraft])
-
-  /** 计划模式下“开始规划”按钮的处理 */
-  const handleStartPlan = useCallback(async () => {
-    const requirement = input.trim()
-    if (!requirement) return
-    if (!selectedProjectId) return
-    setInput("")
-    await planSession.startPlan(requirement, selectedProjectId)
-  }, [input, selectedProjectId, setInput, planSession])
-
-  /** 计划模式确认生成：把任务单转为 ConfirmedWorkflowBrief，走现有生成链路 */
-  const handlePlanConfirm = useCallback(() => {
-    const brief = planSession.confirmPlan()
-    if (!brief) return
-    const briefState = { nextInput: planSession.session?.requirement || "", confirmed: brief }
-    setWorkflowBrief(briefState)
-    setComposerMode("direct")
-    // 通过显式参数传递任务单，不依赖 React 状态刚写入后的异步读取
-    void generateWithInput(planSession.session?.requirement || "", { startsNewTask: true, workflowBriefOverride: briefState })
-  }, [planSession, setWorkflowBrief, generateWithInput])
-
-  /** 计划模式放弃 */
-  const handlePlanAbandon = useCallback(() => {
-    planSession.abandonPlan()
-    setComposerMode("direct")
-  }, [planSession])
+  const planOrchestration = useAimPlanOrchestration({
+    input,
+    setInput,
+    selectedProjectId,
+    projectEnabled,
+    setWorkflowBrief,
+    generateWithInput,
+  })
 
   // ---- Send actions ----
   const { handleUseSkill, handleGenerate, retryFailedMessage } = useAimSendActions({
@@ -386,12 +359,8 @@ export function useAimWorkbench() {
 
   /** 统一的生成入口：计划模式走规划，直接模式走原有生成 */
   const handleGenerateOrPlan = useCallback(() => {
-    if (composerMode === "plan") {
-      void handleStartPlan()
-    } else {
-      handleGenerate()
-    }
-  }, [composerMode, handleStartPlan, handleGenerate])
+    planOrchestration.handleGenerateOrPlan(handleGenerate)
+  }, [handleGenerate, planOrchestration])
 
   // ---- Derived flags ----
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
@@ -442,8 +411,12 @@ export function useAimWorkbench() {
     resetConversation, retryFailed, handleGenerate: handleGenerateOrPlan, handleStop, handleRepurpose, handleQuality,
     sendText, handleUseSkill, openEditorFromResult, openProjectWorkflowTask,
     // 计划模式
-    composerMode, setComposerMode, canUsePlanMode, planSession,
-    handlePlanConfirm, handlePlanAbandon,
+    composerMode: planOrchestration.composerMode,
+    setComposerMode: planOrchestration.setComposerMode,
+    canUsePlanMode: planOrchestration.canUsePlanMode,
+    planSession: planOrchestration.planSession,
+    handlePlanConfirm: planOrchestration.handlePlanConfirm,
+    handlePlanAbandon: planOrchestration.handlePlanAbandon,
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),

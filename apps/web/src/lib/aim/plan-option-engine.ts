@@ -17,7 +17,6 @@ import {
   PLAN_MAX_TOTAL_QUESTIONS,
   PLAN_MIN_ARCHIVE_OPTIONS,
   type PlanAssumption,
-  type PlanOption,
   type PlanOptionSourceRef,
   type PlanQuestion,
   type PlanQuestionDimension,
@@ -147,82 +146,24 @@ interface PlanEngineInput {
  * 5. 最多返回 3 个问题，总问题数不超过 5
  */
 export async function generatePlanQuestions(input: PlanEngineInput): Promise<PlanResponse> {
-  const { projectId, userId, confirmedFields, answeredQuestionIds, round, totalQuestionsAsked } = input
+  const { projectId, userId, confirmedFields, round, totalQuestionsAsked } = input
 
   // 1. 并行加载档案数据
   const [wikiPages, knowledgeEntries, project] = await Promise.all([
-    listIpWikiPages({ projectId }).catch(() => [] as IpWikiPageRow[]),
+    listIpWikiPages({ projectId }),
     prisma.knowledgeEntry.findMany({
       where: { projectId, userId, status: "active" },
       select: { id: true, title: true, content: true, category: true },
       take: 60,
-    }).catch(() => [] as Array<{ id: string; title: string; content: string; category: string }>),
+    }),
     prisma.clientProject.findFirst({
       where: { id: projectId, userId },
       select: { id: true, name: true, targetCustomer: true, industry: true, offer: true, deliveryGoal: true },
-    }).catch(() => null),
+    }),
   ])
 
-  // 2. 构建假设项（档案已有明确答案的字段）
-  const assumptions: PlanAssumption[] = []
-  const assumedFields = new Set<PlanTaskSpecField>()
-
-  if (project?.targetCustomer?.trim()) {
-    assumptions.push({
-      field: "targetCustomer",
-      value: project.targetCustomer.trim(),
-      sourceRefs: [{ kind: "project", id: "targetCustomer", label: "项目-目标客户" }],
-    })
-    assumedFields.add("targetCustomer")
-  }
-  if (project?.offer?.trim()) {
-    assumptions.push({
-      field: "coreMessage",
-      value: project.offer.trim(),
-      sourceRefs: [{ kind: "project", id: "offer", label: "项目-主推产品/服务" }],
-    })
-  }
-
-  // 3. 按维度优先级生成问题
-  const questions: PlanQuestion[] = []
-  const remainingSlots = Math.min(
-    PLAN_MAX_QUESTIONS_PER_ROUND,
-    PLAN_MAX_TOTAL_QUESTIONS - totalQuestionsAsked,
-  )
-
-  for (const dimension of PLAN_DIMENSION_ORDER) {
-    if (questions.length >= remainingSlots) break
-
-    const config = DIMENSION_SOURCES[dimension]
-
-    // 跳过已有明确答案的字段（用户已确认或档案假设）
-    if (confirmedFields[config.targetField]) continue
-    if (assumedFields.has(config.targetField)) continue
-
-    // 提取选项素材
-    const snippets = extractDimensionSnippets(dimension, wikiPages, knowledgeEntries)
-
-    // 去重 + 截断到 3 个
-    const uniqueSnippets = deduplicateSnippets(snippets).slice(0, 3)
-
-    // 不足 2 个可靠选项时不生成问题（不用通用答案凑数）
-    if (uniqueSnippets.length < PLAN_MIN_ARCHIVE_OPTIONS) continue
-
-    const options: PlanOption[] = uniqueSnippets.map((snippet, index) => ({
-      key: (["A", "B", "C"] as const)[index],
-      text: snippet.text,
-      sourceRefs: [snippet.sourceRef],
-    }))
-
-    questions.push({
-      id: `q_${dimension}_r${round}_${Date.now().toString(36)}`,
-      dimension,
-      prompt: config.promptTemplate,
-      options,
-      hasCustomOption: true,
-      targetField: config.targetField,
-    })
-  }
+  const { assumptions, assumedFields } = buildProjectAssumptions(project)
+  const questions = buildPlanQuestions({ confirmedFields, assumedFields, wikiPages, knowledgeEntries, round, totalQuestionsAsked })
 
   // 4. 构建当前任务单快照
   const taskSpec: Partial<PlanTaskSpec> = { ...confirmedFields }
@@ -233,7 +174,7 @@ export async function generatePlanQuestions(input: PlanEngineInput): Promise<Pla
   }
 
   const newTotalAsked = totalQuestionsAsked + questions.length
-  const ready = questions.length === 0 || newTotalAsked >= PLAN_MAX_TOTAL_QUESTIONS || round >= 2
+  const ready = questions.length === 0 || newTotalAsked >= PLAN_MAX_TOTAL_QUESTIONS
 
   return {
     round,
@@ -243,6 +184,51 @@ export async function generatePlanQuestions(input: PlanEngineInput): Promise<Pla
     taskSpec,
     totalQuestionsAsked: newTotalAsked,
   }
+}
+
+function buildProjectAssumptions(project: {
+  targetCustomer: string | null
+  offer: string | null
+} | null): { assumptions: PlanAssumption[]; assumedFields: Set<PlanTaskSpecField> } {
+  const assumptions: PlanAssumption[] = []
+  const assumedFields = new Set<PlanTaskSpecField>()
+  if (project?.targetCustomer?.trim()) {
+    assumptions.push({ field: "targetCustomer", value: project.targetCustomer.trim(), sourceRefs: [{ kind: "project", id: "targetCustomer", label: "项目-目标客户" }] })
+    assumedFields.add("targetCustomer")
+  }
+  if (project?.offer?.trim()) {
+    assumptions.push({ field: "coreMessage", value: project.offer.trim(), sourceRefs: [{ kind: "project", id: "offer", label: "项目-主推产品/服务" }] })
+    assumedFields.add("coreMessage")
+  }
+  return { assumptions, assumedFields }
+}
+
+function buildPlanQuestions({ confirmedFields, assumedFields, wikiPages, knowledgeEntries, round, totalQuestionsAsked }: {
+  confirmedFields: Partial<PlanTaskSpec>
+  assumedFields: Set<PlanTaskSpecField>
+  wikiPages: IpWikiPageRow[]
+  knowledgeEntries: Array<{ id: string; title: string; content: string; category: string }>
+  round: number
+  totalQuestionsAsked: number
+}): PlanQuestion[] {
+  const questions: PlanQuestion[] = []
+  const remainingSlots = Math.min(PLAN_MAX_QUESTIONS_PER_ROUND, PLAN_MAX_TOTAL_QUESTIONS - totalQuestionsAsked)
+  for (const dimension of PLAN_DIMENSION_ORDER) {
+    if (questions.length >= remainingSlots) break
+    const config = DIMENSION_SOURCES[dimension]
+    if (confirmedFields[config.targetField] || assumedFields.has(config.targetField)) continue
+    const snippets = deduplicateSnippets(extractDimensionSnippets(dimension, wikiPages, knowledgeEntries)).slice(0, 3)
+    if (snippets.length < PLAN_MIN_ARCHIVE_OPTIONS) continue
+    questions.push({
+      id: `q_${dimension}_r${round}_${Date.now().toString(36)}`,
+      dimension,
+      prompt: config.promptTemplate,
+      options: snippets.map((snippet, index) => ({ key: (["A", "B", "C"] as const)[index], text: snippet.text, sourceRefs: [snippet.sourceRef] })),
+      hasCustomOption: true,
+      targetField: config.targetField,
+    })
+  }
+  return questions
 }
 
 /** 按维度配置提取选项素材 */

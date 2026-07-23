@@ -76,6 +76,14 @@ export type PlanTaskSpecField =
   | "targetCustomer"
   | "realProblem"
   | "contentGoal"
+  | "desiredAction"
+  | "mustKeep"
+  | "avoid"
+
+export const PLAN_TASK_SPEC_FIELDS: readonly PlanTaskSpecField[] = [
+  "coreMessage", "platform", "useScenario", "outputFormat", "style", "lengthRule", "ctaText",
+  "targetCustomer", "realProblem", "contentGoal", "desiredAction", "mustKeep", "avoid",
+]
 
 /** 结构化任务单（扩展 ConfirmedWorkflowBrief） */
 export interface PlanTaskSpec {
