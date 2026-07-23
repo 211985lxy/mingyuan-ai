@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { getImageCandidateUrls, isSignedImageUrlExpired } from "@/app/api/proxy-image/proxy-image-utils"
+import { getImageCandidateUrls } from "@/app/api/proxy-image/proxy-image-utils"
+import { isSignedImageUrlExpired } from "@/lib/proxy-image-shared"
 
 describe("proxy image URL candidates", () => {
   it("keeps the signed heic URL as fallback after webp/jpeg variants", () => {

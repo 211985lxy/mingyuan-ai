@@ -1,6 +1,6 @@
 import type { SyntheticEvent } from "react"
 
-import { isSignedImageUrlExpired } from "@/app/api/proxy-image/proxy-image-utils"
+import { isSignedImageUrlExpired } from "@/lib/proxy-image-shared"
 
 export { isSignedImageUrlExpired }
 
