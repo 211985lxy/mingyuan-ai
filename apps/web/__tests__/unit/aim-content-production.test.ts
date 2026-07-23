@@ -169,6 +169,41 @@ describe("AIM content production positioning", () => {
     expect(content).toContain("这是可直接使用的正文。")
   })
 
+  it("backfills product USP when the model marks it as missing", () => {
+    const content = ensureContentCreationTrace(`[[AIM_METHOD_NOTE]]
+### 风格定位
+- 专业、清晰
+
+### 教学拆解
+- 先讲问题再给方法
+
+### 来源标注
+- 对标爆款视频来源：未提供/待补充
+- 产品卖点：未提供/待补充
+- 人设特点：未提供/待补充
+
+### 八字与紫微天命适配
+- 八字依据：未提供/待补充
+- 紫微依据：未提供/待补充
+- 风格映射：未做命理推断；待补充八字或紫微资料后再校准。
+[[/AIM_METHOD_NOTE]]
+
+正文开始`, {
+      runtimeTask: "new_copy",
+      rawInput: "写一条口播",
+      targetFormats: ["raw_copy"],
+      retrievedEntries: [
+        { title: "核心产品卖点：365-29800阶梯与90天陪跑", category: "product_usp", content: "29800三个月陪跑" },
+        { title: "相宇个人IP能力底色", category: "positioning_material", content: "务实增长顾问" },
+      ],
+      ipWikiBlock: "",
+    } as Parameters<typeof ensureContentCreationTrace>[1])
+
+    expect(content).toContain("产品卖点：核心产品卖点：365-29800阶梯与90天陪跑")
+    expect(content).toContain("人设特点：相宇个人IP能力底色")
+    expect(content).not.toMatch(/产品卖点：\s*未提供\/待补充/)
+  })
+
   it("keeps the required standalone content agents", () => {
     const titles = AIM_AGENT_OPTIONS.map((agent) => agent.title)
 

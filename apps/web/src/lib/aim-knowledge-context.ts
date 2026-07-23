@@ -36,7 +36,17 @@ export interface AimKnowledgeContextResult {
  * 保留所有类别，避免信息缺失。
  */
 const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
+  content_producer: [
+    "customer_pain",
+    "user_insight",
+    "product_usp",
+    "project_case",
+    "private_domain_material",
+    "hot_topic",
+    "benchmark_reference",
+  ],
   deep_copywriter: [
+    "customer_pain",
     "boss_experience",
     "product_usp",
     "user_insight",
@@ -56,14 +66,6 @@ const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
     "boss_experience",
     "product_usp",
     "customer_pain",
-  ],
-  content_producer: [
-    "user_insight",
-    "product_usp",
-    "project_case",
-    "private_domain_material",
-    "hot_topic",
-    "benchmark_reference",
   ],
   content_review: [
     "project_case",

@@ -89,9 +89,10 @@ export const KNOWLEDGE_STRATEGY_PROFILES: Record<ResolvedKnowledgeStrategy, Know
     topK: 10,
     maxBlockChars: 6500,
     maxEntryChars: 1100,
-    categoryBoost: { product_usp: 1.3, customer_pain: 1.3, customer_qa: 1.3 },
+    // benchmark_reference：七步过关标准 / 脚本调用模板等生产规范，转化脚本也必须能调到
+    categoryBoost: { product_usp: 1.3, customer_pain: 1.3, customer_qa: 1.3, benchmark_reference: 1.2 },
     label: "转化型",
-    description: "突出产品卖点、客户痛点与客户问答",
+    description: "突出产品卖点、客户痛点、客户问答与内容生产规范",
   },
   traffic: {
     topK: 6,

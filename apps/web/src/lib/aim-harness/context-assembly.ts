@@ -30,6 +30,11 @@ import {
   shouldUseEventStorytelling,
 } from "@/lib/event-storytelling-methodology"
 import { buildAimKnowledgeContext } from "@/lib/aim-knowledge-context"
+import {
+  enrichKnowledgeQueryWithPainIntent,
+  mergePainIntentIntoKnowledgeContext,
+  resolvePainPointIntent,
+} from "@/lib/aim-pain-intent"
 import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 import { buildViralStructureBlock } from "@/lib/aim-generator"
 import { buildTaskSpecSkeleton } from "@/lib/task-spec"
@@ -327,6 +332,37 @@ async function loadGenerationContextBlocks(input: {
     topicRationale: params.topicRationale,
   })
 
+  const shouldResolvePainIntent = Boolean(
+    spec.projectId
+    && generationIntent.useKnowledge
+    && !params.contextOverride
+    && (agentId === "content_producer" || agentId === "deep_copywriter" || agentId === "free_copywriter"),
+  )
+
+  const painIntent = shouldResolvePainIntent
+    ? await runAimTraceStep(
+        trace,
+        "pain_intent",
+        "痛点意图识别",
+        () => resolvePainPointIntent({
+          projectId: spec.projectId!,
+          userText: [spec.rawInput, params.topicTitle, params.topicRationale].filter(Boolean).join("\n"),
+        }).catch(() => null),
+        (result) => ({
+          summary: result?.painIds?.length
+            ? `锚定 ${result.painIds.join("、")}`
+            : "未锚定痛点",
+          metadata: {
+            painIds: result?.painIds ?? [],
+            confidence: result?.confidence ?? 0,
+            reason: result?.reason ?? "",
+          },
+        }),
+      )
+    : null
+
+  const knowledgeQuery = enrichKnowledgeQueryWithPainIntent(spec.rawInput, painIntent)
+
   const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock] = await runAimTraceStep(
     trace,
     "load_generation_context",
@@ -352,10 +388,17 @@ async function loadGenerationContextBlocks(input: {
                 userId: params.userId,
                 projectId: spec.projectId,
                 agentId,
-                query: spec.rawInput,
+                query: knowledgeQuery,
                 topicTitle: params.topicTitle,
                 topicRationale: params.topicRationale,
                 strategy: knowledgeStrategy,
+              }).then((result) => {
+                const merged = mergePainIntentIntoKnowledgeContext({
+                  knowledgeBlock: result.knowledgeBlock,
+                  entries: result.entries,
+                  intent: painIntent,
+                })
+                return { ...result, ...merged }
               })
             : Promise.resolve({ knowledgeBlock: "", entries: [], source: "raw" as const }),
           buildViralStructureBlock(),
@@ -379,6 +422,7 @@ async function loadGenerationContextBlocks(input: {
         ipWikiChars: ipWiki.length,
         eventStorytellingChars: eventStory.length,
         eventStorytellingActive: useEventStorytelling,
+        painIds: painIntent?.painIds ?? [],
       },
     }),
   )

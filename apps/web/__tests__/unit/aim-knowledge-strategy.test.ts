@@ -344,11 +344,12 @@ describe("KNOWLEDGE_STRATEGY_PROFILES completeness", () => {
     expect(hot.categoryBoost["benchmark_reference"]).toBeGreaterThan(1)
   })
 
-  it("conversion boosts product_usp, customer_pain, and customer_qa", () => {
+  it("conversion boosts product_usp, customer_pain, customer_qa, and benchmark_reference", () => {
     const conv = KNOWLEDGE_STRATEGY_PROFILES.conversion
     expect(conv.categoryBoost["product_usp"]).toBeGreaterThan(1)
     expect(conv.categoryBoost["customer_pain"]).toBeGreaterThan(1)
     expect(conv.categoryBoost["customer_qa"]).toBeGreaterThan(1)
+    expect(conv.categoryBoost["benchmark_reference"]).toBeGreaterThan(1)
   })
 
   it("persona boosts boss_experience and positioning_material", () => {

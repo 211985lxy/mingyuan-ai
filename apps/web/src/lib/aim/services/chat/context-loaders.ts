@@ -6,6 +6,11 @@
  * Extracted from chat-context.ts (WP-3).
  */
 import { buildAimKnowledgeContext } from "@/lib/aim-knowledge-context"
+import {
+  enrichKnowledgeQueryWithPainIntent,
+  mergePainIntentIntoKnowledgeContext,
+  resolvePainPointIntent,
+} from "@/lib/aim-pain-intent"
 import { buildAimCompetitorWatchContext } from "@/lib/aim-competitor-watch-context"
 import {
   shouldUseKnowledgeContextForTask,
@@ -73,6 +78,31 @@ export async function retrieveChatContextBlocks(input: {
   const shouldUseMarketContext =
     conversationIntent.useKnowledge && shouldUseMarketViralContextForTask(runtimeTask)
 
+  const shouldResolvePainIntent = Boolean(
+    shouldUseKnowledgeContext
+    && projectId
+    && projectId !== "<no-project>"
+    && (agentId === "content_producer" || agentId === "deep_copywriter" || agentId === "free_copywriter"),
+  )
+
+  const painIntent = shouldResolvePainIntent
+    ? await runAimTraceStep(
+        trace,
+        "pain_intent",
+        "痛点意图识别",
+        () => resolvePainPointIntent({ projectId, userText: query }).catch(() => null),
+        (result) => ({
+          summary: result?.painIds?.length ? `锚定 ${result.painIds.join("、")}` : "未锚定痛点",
+          metadata: {
+            painIds: result?.painIds ?? [],
+            confidence: result?.confidence ?? 0,
+          },
+        }),
+      )
+    : null
+
+  const knowledgeQuery = enrichKnowledgeQueryWithPainIntent(query, painIntent)
+
   const knowledgeContext = shouldUseKnowledgeContext
     ? await runAimTraceStep(
         trace,
@@ -82,11 +112,20 @@ export async function retrieveChatContextBlocks(input: {
           userId,
           projectId: projectId || "<no-project>",
           agentId,
-          query,
-        }).catch(() => ({ knowledgeBlock: "", entries: [], source: "raw" as const })),
+          query: knowledgeQuery,
+        })
+          .then((result) => {
+            const merged = mergePainIntentIntoKnowledgeContext({
+              knowledgeBlock: result.knowledgeBlock,
+              entries: result.entries,
+              intent: painIntent,
+            })
+            return { ...result, ...merged }
+          })
+          .catch(() => ({ knowledgeBlock: "", entries: [], source: "raw" as const })),
         (result) => ({
           summary: `命中 ${result.entries.length} 条知识`,
-          metadata: { entries: result.entries.length, source: result.source },
+          metadata: { entries: result.entries.length, source: result.source, painIds: painIntent?.painIds ?? [] },
         }),
       )
     : { knowledgeBlock: "", entries: [], source: "skipped" as const }

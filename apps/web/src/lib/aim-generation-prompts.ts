@@ -24,12 +24,18 @@ export const CONTENT_CREATION_TRACE_RULE = `教学式透明交付规则：
 
 const METHOD_NOTE_PATTERN = /\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/
 
-function traceEntryTitle(context: AimGenerateContext, pattern: RegExp): string | null {
-  const entry = (context.retrievedEntries ?? []).find((item) => {
-    if (!item || typeof item !== "object") return false
-    const record = item as Record<string, unknown>
-    return pattern.test([record.category, record.title, record.content].map(String).join("\n"))
-  }) as Record<string, unknown> | undefined
+function asTraceRecord(item: unknown): Record<string, unknown> | null {
+  return item && typeof item === "object" ? (item as Record<string, unknown>) : null
+}
+
+function traceEntryTitle(context: AimGenerateContext, pattern: RegExp, preferredCategory?: string): string | null {
+  const entries = (context.retrievedEntries ?? [])
+    .map(asTraceRecord)
+    .filter((record): record is Record<string, unknown> => Boolean(record))
+  const preferred = preferredCategory
+    ? entries.find((record) => String(record.category ?? "") === preferredCategory && pattern.test([record.category, record.title, record.content].map(String).join("\n")))
+    : undefined
+  const entry = preferred ?? entries.find((record) => pattern.test([record.category, record.title, record.content].map(String).join("\n")))
   return entry && typeof entry.title === "string" && entry.title.trim() ? entry.title.trim() : null
 }
 
@@ -37,9 +43,29 @@ function traceSource(value: string | null | undefined) {
   return value?.trim() || "未提供/待补充"
 }
 
+function resolveTraceProductSource(context: AimGenerateContext): string | null {
+  return traceEntryTitle(context, /product_usp|product|offer|产品|卖点|服务|陪跑|阶梯/, "product_usp")
+    || (/产品阶梯|产品卖点|陪跑|29800|核心交付/.test(context.ipWikiBlock ?? "") ? "IP 定位维基：成交路径与产品阶梯" : null)
+}
+
+function patchPlaceholderTraceSources(note: string, context: AimGenerateContext): string {
+  let patched = note
+  const productSource = resolveTraceProductSource(context)
+  if (productSource) {
+    patched = patched.replace(/产品卖点：\s*未提供\/待补充/g, `产品卖点：${productSource}`)
+  }
+  const personaSource = traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/, "positioning_material")
+    || traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/)
+  if (personaSource) {
+    patched = patched.replace(/人设特点：\s*未提供\/待补充/g, `人设特点：${personaSource}`)
+  }
+  return patched
+}
+
 function buildFallbackContentCreationTrace(context: AimGenerateContext): string {
-  const productSource = traceEntryTitle(context, /product_usp|product|offer|产品|卖点|服务/)
-  const personaSource = traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/)
+  const productSource = resolveTraceProductSource(context)
+  const personaSource = traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/, "positioning_material")
+    || traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/)
   const baziSource = traceEntryTitle(context, /bazi|八字|四柱|五行/)
     || (/八字|四柱|五行/.test(context.ipWikiBlock) ? "IP 定位维基" : null)
   const ziweiSource = traceEntryTitle(context, /ziwei|紫微|命宫|天命/)
@@ -92,7 +118,10 @@ export function ensureContentCreationTrace(content: string, context: AimGenerate
   const note = existing?.[0] || ""
   const complete = ["风格定位", "教学拆解", "对标爆款视频来源", "产品卖点", "人设特点", "八字", "紫微"]
     .every((label) => note.includes(label))
-  if (complete) return trimmed
+  if (complete) {
+    const patchedNote = patchPlaceholderTraceSources(note, context)
+    return patchedNote === note ? trimmed : trimmed.replace(note, patchedNote)
+  }
   const result = existing ? trimmed.replace(existing[0], "").trim() : trimmed
   return `${buildFallbackContentCreationTrace(context)}\n\n${result}`
 }
