@@ -16,7 +16,10 @@ import {
   buildTopicSources,
   buildVideoCopyExtractionSources,
 } from "@/lib/topic-source-builders"
-import { topicGenerateBodySchema } from "@/features/topics/contracts/api"
+import {
+  TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS,
+  topicGenerateBodySchema,
+} from "@/features/topics/contracts/api"
 
 export const maxDuration = 60
 
@@ -133,7 +136,7 @@ export const POST = withUserAuth(async (request, { user }) => {
             ...(projectId ? { projectId } : {}),
           },
           select: { category: true, title: true, content: true },
-          take: 12,
+          take: TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS,
         })
       : Promise.resolve([]),
     // Fetch IpProfile for content line themes (降级：不存在时跳过)
