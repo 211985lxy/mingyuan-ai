@@ -50,7 +50,6 @@ export interface AimDeliverableBubbleProps {
   isBusy: boolean
   /** 重新生成中：旧稿变淡并显示进度条 */
   regenerating?: boolean
-  onEditResult?: (format: ContentFormat, content: string) => void
   onCompileToWiki?: () => void
   onOpenDecision?: () => void
   onOpenPublish?: () => void
@@ -128,7 +127,7 @@ export function DeliveryContractStrip({ contract }: { contract: AimDeliveryContr
   </div>
 }
 
-function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, onOpenAdvanced, referenceText, persona, topicTitle, projectId }: {
+function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, referenceText, persona, topicTitle, projectId }: {
   item: AimGenerateResult
   generationId: string
   messageKey: string
@@ -136,7 +135,6 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
   onInlineEditKeyChange?: (key: string | null) => void
   onInlineContentSaved?: (format: ContentFormat, content: string) => void
   onInlineSelectionRewrite?: AimDeliverableBubbleProps["onInlineSelectionRewrite"]
-  onOpenAdvanced?: (format: ContentFormat, content: string) => void
   referenceText?: string
   persona?: string
   topicTitle?: string
@@ -168,7 +166,6 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
       onContentSaved={(content) => {
         onInlineContentSaved?.(item.format, content)
       }}
-      onOpenAdvanced={(content) => onOpenAdvanced?.(item.format, content)}
       onSelectionRewrite={(input) => onInlineSelectionRewrite?.({ format: item.format, ...input })}
       referenceText={referenceText}
       persona={persona}
@@ -178,7 +175,7 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
   </TabsContent>
 }
 
-function DeliverableTabs({ results, activeFormat, onTabChange, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, onOpenAdvanced, referenceText, persona, topicTitle, projectId }: {
+function DeliverableTabs({ results, activeFormat, onTabChange, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, referenceText, persona, topicTitle, projectId }: {
   results: AimGenerateResult[]
   activeFormat: ContentFormat
   onTabChange: (format: ContentFormat) => void
@@ -188,7 +185,6 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
   onInlineEditKeyChange?: (key: string | null) => void
   onInlineContentSaved?: (format: ContentFormat, content: string) => void
   onInlineSelectionRewrite?: AimDeliverableBubbleProps["onInlineSelectionRewrite"]
-  onOpenAdvanced?: (format: ContentFormat, content: string) => void
   referenceText?: string
   persona?: string
   topicTitle?: string
@@ -198,7 +194,7 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
     <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
       {results.map((item) => <TabsTrigger key={item.format} value={item.format} className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none">{AIM_FORMAT_LABELS[item.format]}</TabsTrigger>)}
     </TabsList>
-    {results.map((item) => <DeliverableResult key={item.format} item={item} generationId={generationId} messageKey={messageKey} inlineEditKey={inlineEditKey} onInlineEditKeyChange={onInlineEditKeyChange} onInlineContentSaved={onInlineContentSaved} onInlineSelectionRewrite={onInlineSelectionRewrite} onOpenAdvanced={onOpenAdvanced} referenceText={referenceText} persona={persona} topicTitle={topicTitle} projectId={projectId} />)}
+    {results.map((item) => <DeliverableResult key={item.format} item={item} generationId={generationId} messageKey={messageKey} inlineEditKey={inlineEditKey} onInlineEditKeyChange={onInlineEditKeyChange} onInlineContentSaved={onInlineContentSaved} onInlineSelectionRewrite={onInlineSelectionRewrite} referenceText={referenceText} persona={persona} topicTitle={topicTitle} projectId={projectId} />)}
   </Tabs>
 }
 
@@ -397,7 +393,6 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         onInlineEditKeyChange={props.onInlineEditKeyChange}
         onInlineContentSaved={props.onInlineContentSaved}
         onInlineSelectionRewrite={props.onInlineSelectionRewrite}
-        onOpenAdvanced={regenerating ? undefined : props.onEditResult}
         referenceText={props.referenceText}
         persona={props.persona}
         topicTitle={props.topicTitle}

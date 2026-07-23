@@ -40,7 +40,6 @@ export interface AimInlineDocumentCardProps {
   onRequestEditOwnership: () => boolean
   onReleaseEditOwnership: () => void
   onContentSaved: (content: string) => void
-  onOpenAdvanced: (content: string) => void
   onSelectionRewrite: (input: {
     prompt: string
     selectionText: string
@@ -350,7 +349,6 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
         <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => { setShowVersions((v) => !v); setShowImitate(false) }}>
           <History className="h-3.5 w-3.5" />版本
         </Button>
-        <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => props.onOpenAdvanced(viewText)}>高级编辑</Button>
       </div>
     </div>
   ), [editing, saving, dirty, formatLabel, viewText, copied, props])
@@ -440,4 +438,3 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
     </div>
   )
 }
-

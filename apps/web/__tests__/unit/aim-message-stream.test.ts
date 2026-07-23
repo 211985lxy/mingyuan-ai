@@ -12,7 +12,6 @@ const actions = {
   onQuality: vi.fn(() => vi.fn()),
   onMarkStatus: vi.fn(() => vi.fn()),
   onNextAction: vi.fn(),
-  onEditResult: vi.fn(),
   onOpenRecord: vi.fn(),
   onCompileToWiki: vi.fn(),
 }

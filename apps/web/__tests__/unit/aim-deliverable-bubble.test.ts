@@ -30,7 +30,6 @@ describe("AimDeliverableBubble", () => {
       onMarkStatus: vi.fn(),
       onNextAction: vi.fn(),
       isBusy: false,
-      onEditResult: vi.fn(),
       onInlineContentSaved: vi.fn(),
       onInlineSelectionRewrite: vi.fn(),
       onOpenDecision: vi.fn(),
@@ -46,7 +45,7 @@ describe("AimDeliverableBubble", () => {
     expect(html).toContain("这是当前正文")
     expect(html).toContain("生成发布包")
     expect(html).toContain("编辑")
-    expect(html).toContain("高级编辑")
+    expect(html).not.toContain("高级编辑")
     // Radix Select renders secondary publishing actions in the opened menu,
     // which is not part of static SSR markup. The menu trigger remains visible.
     expect(html).toContain("更多")

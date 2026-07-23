@@ -37,13 +37,19 @@ describe("AIM composer generate button", () => {
     expect(generationSource).toMatch(/await proofreadAimResponse\(response, input\.agent\.defaultInstruction\)/)
   })
 
-  it("regenerates in place when a deliverable already exists", () => {
+  it("appends a new assistant turn after every follow-up generation request", () => {
     const pendingBlock = generationSource.match(/function appendPendingGeneration[\s\S]*?function buildGenerationRequest/)?.[0] ?? ""
-    expect(pendingBlock).toContain("findLatestDeliverableMessage")
-    expect(pendingBlock).toContain("regenerating: true")
-    expect(pendingBlock).toContain("inPlace: true")
-    // 原地重生成路径先 return，startsNewTask 才会清编辑器
-    expect(pendingBlock.indexOf("inPlace: true")).toBeLessThan(pendingBlock.indexOf("clearCurrentTaskContext()"))
+    expect(pendingBlock).not.toContain("findLatestDeliverableMessage")
+    expect(pendingBlock).not.toContain("inPlace")
+    expect(pendingBlock).toContain('role: "user" as const')
+    expect(pendingBlock).toContain('role: "assistant" as const')
+    expect(pendingBlock.indexOf('role: "user" as const')).toBeLessThan(pendingBlock.indexOf('role: "assistant" as const'))
+    expect(pendingBlock).toContain("pendingScrollMessageIdRef.current = assistantMessageId")
+  })
+
+  it("keeps generated documents in the conversation instead of rendering a right editor panel", () => {
+    expect(source).not.toContain("BenchmarkEditorPanel")
+    expect(source).not.toContain("onEditResult")
   })
 
   it("keeps chat request status inside the assistant message", () => {

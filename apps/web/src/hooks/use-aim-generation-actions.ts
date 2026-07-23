@@ -101,41 +101,7 @@ function getDeliverableReadyMessage(agentTitle: string) {
   return `${agentTitle} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`
 }
 
-function findLatestDeliverableMessage(messages: AimWorkbenchMessage[]) {
-  return [...messages].reverse().find((message) => Boolean(message.deliverables?.results?.length))
-}
-
 function appendPendingGeneration(input: AimGenerationActionInput, currentInput: string, options: GenerateOptions) {
-  // 同线程再生成：原地 regenerating，保留旧交付物与编辑器，避免闪断
-  const inplaceTarget = !options.startsNewTask && !options.retryMessageId
-    ? findLatestDeliverableMessage(input.messages)
-    : undefined
-
-  if (inplaceTarget) {
-    input.pendingScrollMessageIdRef.current = inplaceTarget.id
-    const baseMessages = input.messages
-    const pendingContent = getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel)
-    input.setMessages((messages) => {
-      const withUser = currentInput
-        ? [...messages, { id: nextAimWorkbenchId(), role: "user" as const, content: currentInput }]
-        : messages
-      return withUser.map((message) => {
-        if (message.id === inplaceTarget.id) {
-          return {
-            ...message,
-            content: pendingContent,
-            regenerating: true,
-            failure: null,
-            agentId: input.agent.id,
-          }
-        }
-        return message.regenerating ? { ...message, regenerating: false } : message
-      })
-    })
-    if (currentInput) input.setInput("")
-    return { assistantMessageId: inplaceTarget.id, baseMessages, inPlace: true as const }
-  }
-
   const assistantMessageId = nextAimWorkbenchId()
   input.pendingScrollMessageIdRef.current = assistantMessageId
   const baseMessages = options.startsNewTask
@@ -156,7 +122,7 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
     },
   ])
   if (currentInput) input.setInput("")
-  return { assistantMessageId, baseMessages, inPlace: false as const }
+  return { assistantMessageId, baseMessages }
 }
 
 function buildGenerationRequest(
@@ -255,21 +221,9 @@ async function softProofreadInBackground(
   }
 }
 
-function markGenerationStopped(
-  input: AimGenerationActionInput,
-  assistantMessageId: string,
-  inPlace: boolean,
-) {
+function markGenerationStopped(input: AimGenerationActionInput, assistantMessageId: string) {
   input.setMessages((messages) => messages.map((message) => {
     if (message.id !== assistantMessageId) return message
-    if (inPlace && message.deliverables) {
-      return {
-        ...message,
-        content: getDeliverableReadyMessage(input.agent.title),
-        regenerating: false,
-        failure: null,
-      }
-    }
     return { ...message, content: "已停止本次生成。", regenerating: false, failure: null }
   }))
 }
@@ -322,7 +276,7 @@ function endExclusiveRequest(
 
 async function executeGeneration(input: AimGenerationActionInput, currentInput: string, rawInput: string, options: GenerateOptions) {
   const controller = beginExclusiveRequest(input.requestAbortRef)
-  const { assistantMessageId, baseMessages, inPlace } = appendPendingGeneration(input, currentInput, options)
+  const { assistantMessageId, baseMessages } = appendPendingGeneration(input, currentInput, options)
   const traceId = crypto.randomUUID()
   input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
     ? { ...message, traceId, traceType: "generate" as const }
@@ -334,7 +288,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
       controller.signal,
     )
     if (controller.signal.aborted) {
-      markGenerationStopped(input, assistantMessageId, inPlace)
+      markGenerationStopped(input, assistantMessageId)
       return
     }
     // 先出稿：不等校对
@@ -345,7 +299,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
   } catch (error) {
     const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
     if (stopped) {
-      markGenerationStopped(input, assistantMessageId, inPlace)
+      markGenerationStopped(input, assistantMessageId)
     } else {
       input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
         ? {

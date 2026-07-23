@@ -3,7 +3,6 @@
 import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
-import { BenchmarkEditorPanel } from "@/components/aim/benchmark-editor-panel"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
@@ -187,7 +186,6 @@ export default function AimPage() {
                 onQuality: w.handleQuality,
                 onMarkStatus: w.handleMarkStatus,
                 onNextAction: w.handleAimNextAction,
-                onEditResult: w.openEditorFromResult,
                 onOpenRecord: w.openRecordDialog,
                 onCompileToWiki: (ctx) => w.setWikiDialog({ open: true, context: ctx }),
                 onAttachProject: w.projectEnabled ? undefined : w.projectAttach.openDialog,
@@ -218,31 +216,6 @@ export default function AimPage() {
           </>
         )}
       </section>
-
-      {w.hasEditor && (
-        <BenchmarkEditorPanel
-          open={w.editorPanelOpen}
-          width={w.editorPanelWidth}
-          labels={w.editorPanelLabels}
-          referenceText={w.annotatedReferenceText}
-          editorText={w.editorText}
-          editorFormat={w.editorFormat}
-          onOpen={() => w.setEditorPanelOpen(true)}
-          onClose={() => w.setEditorPanelOpen(false)}
-          onWidthChange={w.setEditorPanelWidth}
-          onEditorTextChange={w.setEditorText}
-          onReferenceSelection={w.setReferenceSelection}
-          onDraftSelection={w.setDraftSelection}
-          onSave={w.saveEditorToDeliverable}
-          onImitate={w.handleImitate}
-          imitating={w.isImitating}
-          imitateStyleId={w.imitateStyleId}
-          onImitateStyleChange={w.setImitateStyleId}
-          generationId={w.editorGenerationId}
-          saving={w.isSavingEditor}
-          onRestoreContent={w.applyRestoredContent}
-        />
-      )}
 
       {w.wikiDialog.open && w.wikiDialog.context && (
         <IpWikiDialog
