@@ -122,8 +122,9 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.temperature).toBe(0.8)
     expect(spec.modelPolicy.maxTokens).toBe(8192)
     expect(spec.modelPolicy.stream).toBe(false)
-    expect(spec.modelPolicy.targetCapability).toBe("standard")
-    expect(spec.modelPolicy.minimumCapability).toBe("basic")
+    // 内容生产官走 advanced 主链（多平台内容包 / 母内容质量）
+    expect(spec.modelPolicy.targetCapability).toBe("advanced")
+    expect(spec.modelPolicy.minimumCapability).toBe("standard")
     expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
   })
 
