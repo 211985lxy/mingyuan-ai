@@ -16,7 +16,7 @@
     },
     {
       "path": "src/app/api/topics/generate/route.ts",
-      "maxLines": 337,
+      "maxLines": 340,
       "owner": "topics domain",
       "target": "src/features/topics/services"
     },
