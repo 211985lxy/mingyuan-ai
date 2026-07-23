@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { buildKnowledgeCleaningSuggestion, parseKnowledgeTags } from "@/lib/knowledge-tags"
 import { KnowledgeMap } from "@/components/admin/knowledge-map"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
-import { KnowledgeBrowser, type KnowledgeEntry as BrowserKnowledgeEntry, type AdminProject as BrowserAdminProject } from "@/components/admin/knowledge-browser"
+import { AdminKnowledgeBrowseTab } from "@/components/admin/admin-knowledge-browse-tab"
 import { KnowledgeDetailDialog, KnowledgeDistillDialog } from "@/features/knowledge/components/knowledge-review-dialogs"
 import { KnowledgeEntryDialog, KnowledgeUploadDialog } from "@/features/knowledge/components/knowledge-entry-dialogs"
 import { SmartImportDialog } from "@/features/knowledge/components/smart-import-dialog"
@@ -22,7 +22,7 @@ import {
   type DistillResult,
   type KnowledgeEntry,
 } from "@/features/knowledge/admin-knowledge-shared"
-import type { KnowledgeAssetHealthResult } from "@/lib/knowledge-asset-health"
+import { useAdminKnowledgeBrowser } from "@/hooks/use-admin-knowledge-browser"
 
 export default function AdminKnowledgePage() {
   // 列表状态
@@ -37,22 +37,15 @@ export default function AdminKnowledgePage() {
   const [loading, setLoading] = React.useState(true)
   const pageSize = 20
 
-  // 项目
   const [projects, setProjects] = React.useState<AdminProject[]>([])
-
-  // Tab 切换：默认进入「知识浏览」，进入即可看到具体内容
   const [activeTab, setActiveTab] = React.useState("browser")
-
-  // 选中
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
   const [detailEntry, setDetailEntry] = React.useState<KnowledgeEntry | null>(null)
 
-  // 蒸馏
   const [distillDialogOpen, setDistillDialogOpen] = React.useState(false)
   const [distillResult, setDistillResult] = React.useState<DistillResult | null>(null)
   const [distilling, setDistilling] = React.useState(false)
 
-  // 新增/编辑
   const [addDialogOpen, setAddDialogOpen] = React.useState(false)
   const [editForm, setEditForm] = React.useState({
     title: "",
@@ -65,117 +58,33 @@ export default function AdminKnowledgePage() {
   })
   const [saving, setSaving] = React.useState(false)
 
-  // 上传
   const [uploadDialogOpen, setUploadDialogOpen] = React.useState(false)
   const [uploadFile, setUploadFile] = React.useState<File | null>(null)
   const [uploadCategory, setUploadCategory] = React.useState("product_usp")
   const [uploadProjectId, setUploadProjectId] = React.useState("none")
   const [uploading, setUploading] = React.useState(false)
 
-  // 智能导入
   const [smartImportOpen, setSmartImportOpen] = React.useState(false)
   const [smartImportProjectId, setSmartImportProjectId] = React.useState("none")
 
-  // 知识浏览 Tab（默认）：独立的列表状态，与「条目列表」Tab 解耦，但共享 projectFilter/categoryFilter
-  // 这样「知识地图」的下钻（设置 categoryFilter）也能联动浏览视图
-  const [browserEntries, setBrowserEntries] = React.useState<BrowserKnowledgeEntry[]>([])
-  const [browserTotal, setBrowserTotal] = React.useState(0)
-  const [browserPage, setBrowserPage] = React.useState(1)
-  const [browserSearch, setBrowserSearch] = React.useState("")
-  const [browserSearchInput, setBrowserSearchInput] = React.useState("")
-  const [browserLoading, setBrowserLoading] = React.useState(false)
-  const browserPageSize = 20
-  // 浏览视图的导航筛选（项目 / 分类）。默认全部，不与条目列表的筛选互相干扰
-  const [browserProject, setBrowserProject] = React.useState("")
-  const [browserCategory, setBrowserCategory] = React.useState("")
-  // 浏览视图的分类计数（来自 /stats，按当前选中项目刷新）
-  const [browserStats, setBrowserStats] = React.useState<{
-    totalEntries: number
-    categoryDistribution: Array<{ category: string; categoryLabel: string; count: number }>
-  } | null>(null)
-  /** 服务端计算的五盒健康度 */
-  const [assetHealth, setAssetHealth] = React.useState<KnowledgeAssetHealthResult | null>(null)
-  const [healthTick, setHealthTick] = React.useState(0)
-
-  const fetchBrowserData = React.useCallback(async () => {
-    if (!browserProject) {
-      setBrowserEntries([])
-      setBrowserTotal(0)
-      setBrowserLoading(false)
-      return
-    }
-    setBrowserLoading(true)
-    try {
-      const res = await fetchKnowledge({
-        page: browserPage,
-        pageSize: browserPageSize,
-        search: browserSearch,
-        category: browserCategory,
-        projectId: browserProject,
-        status: "active",
-      })
-      setBrowserEntries(Array.isArray(res.data?.results) ? res.data.results : [])
-      setBrowserTotal(typeof res.data?.total === "number" ? res.data.total : 0)
-    } catch (error) {
-      setBrowserEntries([])
-      setBrowserTotal(0)
-      toast.error(error instanceof Error ? error.message : "知识加载失败，请重试")
-    } finally {
-      setBrowserLoading(false)
-    }
-  }, [browserPage, browserSearch, browserCategory, browserProject])
-
-  React.useEffect(() => {
-    void Promise.resolve().then(fetchBrowserData)
-  }, [fetchBrowserData])
-
-  // 搜索输入防抖 300ms
-  React.useEffect(() => {
-    const t = window.setTimeout(() => {
-      setBrowserSearch(browserSearchInput)
-      setBrowserPage(1)
-    }, 300)
-    return () => window.clearTimeout(t)
-  }, [browserSearchInput])
-
-  // 拉取浏览视图的分类计数（按当前项目）
-  React.useEffect(() => {
-    const qs = browserProject ? `?projectId=${encodeURIComponent(browserProject)}` : ""
-    void fetch(`/api/admin/knowledge/stats${qs}`)
-      .then((r) => r.json())
-      .then((json) => {
-        const data = json.data ?? json
-        setBrowserStats({
-          totalEntries: data?.totalEntries ?? 0,
-          categoryDistribution: Array.isArray(data?.categoryDistribution) ? data.categoryDistribution : [],
-        })
-      })
-      .catch(() => setBrowserStats(null))
-  }, [browserProject])
-
-  // 拉取项目知识资产健康度（服务端全量 slim 扫描，避免列表分页漏计）
-  React.useEffect(() => {
-    if (!browserProject || browserProject === "unbound") {
-      setAssetHealth(null)
-      return
-    }
-    let cancelled = false
-    void fetch(
-      `/api/admin/knowledge/asset-health?projectId=${encodeURIComponent(browserProject)}`,
-    )
-      .then((r) => r.json())
-      .then((json) => {
-        if (cancelled) return
-        const health = json?.data?.health ?? null
-        setAssetHealth(health)
-      })
-      .catch(() => {
-        if (!cancelled) setAssetHealth(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [browserProject, healthTick])
+  const {
+    browserEntries,
+    browserTotal,
+    browserPage,
+    browserPageSize,
+    browserSearchInput,
+    browserLoading,
+    browserProject,
+    browserCategory,
+    browserStats,
+    assetHealth,
+    setBrowserPage,
+    setBrowserSearchInput,
+    setBrowserProject,
+    setBrowserCategory,
+    fetchBrowserData,
+    bumpHealth,
+  } = useAdminKnowledgeBrowser()
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -334,7 +243,7 @@ export default function AdminKnowledgePage() {
       toast.success("知识条目已创建")
       fetchData()
       void fetchBrowserData()
-      setHealthTick((tick) => tick + 1)
+      bumpHealth()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "创建失败，请重试")
     } finally {
@@ -362,7 +271,7 @@ export default function AdminKnowledgePage() {
       toast.success("文件已上传")
       fetchData()
       void fetchBrowserData()
-      setHealthTick((tick) => tick + 1)
+      bumpHealth()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "上传失败，请重试")
     } finally {
@@ -387,18 +296,19 @@ export default function AdminKnowledgePage() {
 
       {/* 知识浏览 Tab（默认）：左树右文，进入即可看具体内容 */}
         <TabsContent value="browser">
-          <KnowledgeBrowser
-            entries={browserEntries}
-            total={browserTotal}
-            loading={browserLoading}
-            page={browserPage}
-            pageSize={browserPageSize}
-            projects={projects as unknown as BrowserAdminProject[]}
-            stats={browserStats}
-            selectedProject={browserProject}
-            selectedCategory={browserCategory}
-            searchValue={browserSearchInput}
+          <AdminKnowledgeBrowseTab
+            browserEntries={browserEntries}
+            browserTotal={browserTotal}
+            browserLoading={browserLoading}
+            browserPage={browserPage}
+            browserPageSize={browserPageSize}
+            projects={projects as unknown as import("@/components/admin/knowledge-browser").AdminProject[]}
+            browserStats={browserStats}
+            browserProject={browserProject}
+            browserCategory={browserCategory}
+            browserSearchInput={browserSearchInput}
             selectedIds={selectedIds}
+            assetHealth={assetHealth}
             onSelectProject={(value) => {
               setBrowserProject(value)
               setBrowserCategory("")
@@ -424,7 +334,6 @@ export default function AdminKnowledgePage() {
               setSmartImportProjectId(browserProject === "unbound" ? "none" : browserProject || "none")
               setSmartImportOpen(true)
             }}
-            assetHealth={assetHealth}
             onSupplement={({ category }) => {
               setBrowserCategory(category)
               setBrowserPage(1)
