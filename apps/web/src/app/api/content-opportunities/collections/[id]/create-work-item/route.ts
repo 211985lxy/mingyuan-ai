@@ -6,8 +6,11 @@ import { prisma } from "@/lib/prisma"
  * POST /api/content-opportunities/collections/:id/create-work-item
  * 基于研究结果创建 AIM 经营事项（复用现有 AimGeneration 状态机）
  */
-export const POST = withUserAuth(async (request, { user, params }) => {
-  const { id } = await params
+export const POST = withUserAuth(async (_request, { user, params }) => {
+  const id = params?.id
+  if (!id) {
+    return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
+  }
 
   const collection = await prisma.opportunityCollection.findFirst({
     where: { id, userId: user.id },
@@ -20,7 +23,6 @@ export const POST = withUserAuth(async (request, { user, params }) => {
   const analysis = collection.analysisResult as Record<string, unknown> | null
   const items = collection.items as unknown as Array<{ title?: string; platform?: string; sourceUrl?: string }>
 
-  // Build a concise brief from the analysis
   const topics = (analysis?.candidateTopics as Array<{ title: string }>) ?? []
   const topicSummary = topics.slice(0, 3).map((t, i) => `${i + 1}. ${t.title}`).join("\n")
 
@@ -31,7 +33,6 @@ export const POST = withUserAuth(async (request, { user, params }) => {
     "请基于以上研究结论，为当前客户项目创作原创内容。",
   ].filter(Boolean).join("\n\n")
 
-  // Create AimGeneration as work item (reuses existing state machine)
   const generation = await prisma.aimGeneration.create({
     data: {
       userId: user.id,

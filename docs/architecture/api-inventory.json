@@ -1695,6 +1695,86 @@
       "idempotency": false
     },
     {
+      "route": "/api/content-opportunities/collections/[id]/analyze",
+      "file": "src/app/api/content-opportunities/collections/[id]/analyze/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": true
+    },
+    {
+      "route": "/api/content-opportunities/collections/[id]/create-topic",
+      "file": "src/app/api/content-opportunities/collections/[id]/create-topic/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/content-opportunities/collections/[id]/create-work-item",
+      "file": "src/app/api/content-opportunities/collections/[id]/create-work-item/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/content-opportunities/collections/[id]",
+      "file": "src/app/api/content-opportunities/collections/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/content-opportunities/collections",
+      "file": "src/app/api/content-opportunities/collections/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "manual",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/content-opportunities/search",
+      "file": "src/app/api/content-opportunities/search/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/content-versions/[id]/restore",
       "file": "src/app/api/content-versions/[id]/restore/route.ts",
       "methods": [

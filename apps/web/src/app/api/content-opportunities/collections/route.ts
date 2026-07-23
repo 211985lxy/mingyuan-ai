@@ -48,7 +48,6 @@ export const GET = withUserAuth(async (request, { user }) => {
       analysisError: true,
       createdAt: true,
       updatedAt: true,
-      _count: { select: { id: true } },
     },
   })
 

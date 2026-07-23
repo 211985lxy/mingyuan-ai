@@ -9,7 +9,10 @@ import { createTopicBodySchema } from "@/features/opportunities/contracts/api"
  * 将研究篮中的候选选题转入选题工作台（TopicSelection）
  */
 export const POST = withUserAuth(async (request, { user, params }) => {
-  const id = params!.id
+  const id = params?.id
+  if (!id) {
+    return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
+  }
   const body = await parseJsonBody(request, createTopicBodySchema, { maxBytes: 4 * 1024 })
 
   const collection = await prisma.opportunityCollection.findFirst({

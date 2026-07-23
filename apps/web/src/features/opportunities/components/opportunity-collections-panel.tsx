@@ -1,6 +1,8 @@
-// @ts-nocheck — WIP stub
 "use client"
 
+import TopicPlanningPage from "@/app/(dashboard)/topic-planning/page"
+
+/** 已收藏研究：复用既有选题规划工作台 */
 export function OpportunityCollectionsPanel() {
-  return <div className="p-8 text-center text-muted-foreground">即将上线</div>
+  return <TopicPlanningPage />
 }

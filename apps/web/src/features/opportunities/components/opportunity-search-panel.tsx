@@ -151,7 +151,7 @@ export function OpportunitySearchPanel() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Select value={sortOrder} onValueChange={setSortOrder}>
+            <Select value={sortOrder} onValueChange={(value) => { if (value) setSortOrder(value) }}>
               <SelectTrigger className="w-28">
                 <SelectValue />
               </SelectTrigger>
@@ -162,7 +162,7 @@ export function OpportunitySearchPanel() {
               </SelectContent>
             </Select>
 
-            <Select value={timeRange} onValueChange={setTimeRange}>
+            <Select value={timeRange} onValueChange={(value) => { if (value) setTimeRange(value) }}>
               <SelectTrigger className="w-28">
                 <SelectValue />
               </SelectTrigger>

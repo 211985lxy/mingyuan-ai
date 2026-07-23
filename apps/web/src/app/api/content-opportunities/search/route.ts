@@ -8,14 +8,14 @@ import { orchestrateSearch } from "@/features/opportunities/services/search-orch
  * POST /api/content-opportunities/search
  * 跨平台内容搜索（RedFox 优先 → TikHub 兜底）
  */
-export const POST = withUserAuth(async (request, { user }) => {
+export const POST = withUserAuth(async (request, { user: _user }) => {
   const body = await parseJsonBody(request, searchBodySchema, { maxBytes: 4 * 1024 })
 
   try {
     const result = await orchestrateSearch({
       keyword: body.keyword,
       platforms: body.platforms,
-      count: body.count,
+      count: body.count ?? 20,
       filters: body.filters,
     })
 

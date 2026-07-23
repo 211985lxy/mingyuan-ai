@@ -10,7 +10,10 @@ import { OPPORTUNITY_ANALYZE_TASK_KIND } from "@/features/opportunities/services
  * 触发 AI 批量分析（后台任务）
  */
 export const POST = withUserAuth(async (_request, { user, params }) => {
-  const id = params!.id
+  const id = params?.id
+  if (!id) {
+    return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
+  }
 
   if (!areBackgroundTasksEnabled()) {
     return NextResponse.json({ error: "BACKGROUND_TASKS_UNAVAILABLE" }, { status: 503 })

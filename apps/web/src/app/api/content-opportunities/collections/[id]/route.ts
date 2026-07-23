@@ -2,14 +2,15 @@ import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 
-type Params = { params: Promise<{ id: string }> }
-
 /**
  * GET /api/content-opportunities/collections/[id]
  * 获取研究篮详情（含分析结果）
  */
-export const GET = withUserAuth(async (_request, { user }, params: Params) => {
-  const { id } = await params.params
+export const GET = withUserAuth(async (_request, { user, params }) => {
+  const id = params?.id
+  if (!id) {
+    return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
+  }
 
   const collection = await prisma.opportunityCollection.findFirst({
     where: { id, userId: user.id },
@@ -25,8 +26,11 @@ export const GET = withUserAuth(async (_request, { user }, params: Params) => {
 /**
  * DELETE /api/content-opportunities/collections/[id]
  */
-export const DELETE = withUserAuth(async (_request, { user }, params: Params) => {
-  const { id } = await params.params
+export const DELETE = withUserAuth(async (_request, { user, params }) => {
+  const id = params?.id
+  if (!id) {
+    return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
+  }
 
   const result = await prisma.opportunityCollection.deleteMany({
     where: { id, userId: user.id },

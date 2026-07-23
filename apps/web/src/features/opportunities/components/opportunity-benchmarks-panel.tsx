@@ -1,6 +1,8 @@
-// @ts-nocheck — WIP stub
 "use client"
 
+import CompetitorPage from "@/app/(dashboard)/competitor/page"
+
+/** 对标账号：复用既有竞品监控工作台 */
 export function OpportunityBenchmarksPanel() {
-  return <div className="p-8 text-center text-muted-foreground">即将上线</div>
+  return <CompetitorPage />
 }
