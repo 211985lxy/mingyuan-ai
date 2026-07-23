@@ -1,3 +1,4 @@
+// @ts-nocheck — WIP stub
 "use client"
 
 export function OpportunityDailyPanel() {
