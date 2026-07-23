@@ -61,6 +61,7 @@ function buildChatParams(overrides: Partial<AimChatParams> = {}): AimChatParams 
     methodologyBlock: "【IP操盘方法论】IP账号定位与内容策略策划阶段",
     businessDiagnosisBlock: "",
     ipWikiBlock: "",
+    selectedMethodologyBlock: "",
     ...overrides,
   }
 }
@@ -77,11 +78,12 @@ function buildGenerateContext(overrides: Partial<AimGenerateContext> = {}): AimG
     viralStructureBlock: "",
     eventStorytellingBlock: "",
     ipWikiBlock: "",
+    selectedMethodologyBlock: "",
     retrievedEntries: [],
     retrievedSource: "raw",
     knowledgeStrategy: "deep",
     ...overrides,
-  }
+  } as AimGenerateContext
 }
 
 /** 从 LLM complete 的入参里取出 systemPrompt（messages[0].content） */

@@ -13,7 +13,7 @@ vi.mock("@/lib/user-auth", () => ({
   // 模拟真实 authErrorResponse：识别带 status 的错误（如 ApiRequestError），其余返回 null
   authErrorResponse: (error: unknown) => {
     if (error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number") {
-      return NextResponse.json({ error: (error as Error).message }, { status: (error as { status: number }).status })
+      return NextResponse.json({ error: (error as { message?: string }).message ?? "error" }, { status: (error as { status: number }).status })
     }
     return null
   },

@@ -1,4 +1,5 @@
 import type { NormalizedAccount, NormalizedVideo, CompetitorMetrics } from './types'
+import { shanghaiWeekdayAndHour } from './shanghai-time'
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
@@ -83,7 +84,6 @@ function calculateEngagement(
 }
 
 function calculatePublishing(videos: NormalizedVideo[]): CompetitorMetrics['publishing'] {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
   const totalVideos = videos.length
   const sorted = [...videos].sort((a, b) => a.createTime - b.createTime)
   const firstTime = sorted[0].createTime
@@ -95,10 +95,9 @@ function calculatePublishing(videos: NormalizedVideo[]): CompetitorMetrics['publ
   const hourCounts: Record<string, number> = {}
 
   for (const video of videos) {
-    const date = new Date(video.createTime * 1000)
-    const dayKey = days[date.getDay()]
-    const hourKey = String(date.getHours())
-    dayCounts[dayKey] = (dayCounts[dayKey] ?? 0) + 1
+    const { day, hour } = shanghaiWeekdayAndHour(video.createTime)
+    const hourKey = String(hour)
+    dayCounts[day] = (dayCounts[day] ?? 0) + 1
     hourCounts[hourKey] = (hourCounts[hourKey] ?? 0) + 1
   }
   const topDayEntry = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]

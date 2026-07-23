@@ -22,6 +22,9 @@ import {
   prepareAimChatExecution,
 } from "@/lib/aim/services/chat-context"
 
+/** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
+export const maxDuration = 180
+
 /**
  * @description 处理 POST 请求
  * @param request - 请求对象

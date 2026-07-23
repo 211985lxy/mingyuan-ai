@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { NextResponse } from "next/server"
 import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
 
@@ -8,13 +9,13 @@ import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
  *   WECHAT_MP_TOKEN      — 公众号后台设置的 Token
  *   WECHAT_MP_APP_ID     — 公众号 AppID
  */
+// api-inventory: auth=signed_integration
 
 // ─── 签名验证 ──────────────────────────────────────────────────
 
 function verifySignature(token: string, signature: string, timestamp: string, nonce: string): boolean {
-  const crypto = require("node:crypto")
   const arr = [token, timestamp, nonce].sort()
-  const hash = crypto.createHash("sha1").update(arr.join("")).digest("hex")
+  const hash = createHash("sha1").update(arr.join("")).digest("hex")
   return hash === signature
 }
 

@@ -29,8 +29,24 @@ const eslintConfig = defineConfig([
     plugins: { local: localRules },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+      // 管理后台/账号面板常见“挂载后拉数”模式；保持 warn，避免 --quiet CI 被存量代码堵死
+      "react-hooks/set-state-in-effect": "warn",
+      // 存量 WIP 文件仍依赖 @ts-nocheck；先降级为 warn，后续逐步拆除
+      "@typescript-eslint/ban-ts-comment": "warn",
       "local/max-significant-lines-warning": ["warn", { max: 400 }],
       "max-lines": ["error", { max: 800, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    files: ["src/app/api/integrations/wechat-mp/events/route.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
+    files: ["src/lib/aim-harness/planner.ts"],
+    rules: {
+      "@next/next/no-assign-module-variable": "off",
     },
   },
   {

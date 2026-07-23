@@ -9,6 +9,9 @@ const reprocessSchema = z.object({
   inspirationIds: z.array(z.string().trim().min(1)).min(1).max(50),
 }).strict()
 
+/** 单条灵感重发的死信回复上限：渠道有限，超出视为异常并忽略。 */
+const DEAD_LETTER_RESEND_LIMIT = 50
+
 /**
  * @description 处理 GET 请求
  * @param request - 请求对象
@@ -80,6 +83,7 @@ export async function POST(request: NextRequest) {
     // Verify ownership
     const inspirations = await prisma.inspiration.findMany({
       where: { id: { in: body.inspirationIds }, userId: user.id },
+      take: body.inspirationIds.length,
       select: { id: true, aiStatus: true, processingStage: true, source: true },
     })
 
@@ -123,6 +127,7 @@ export async function POST(request: NextRequest) {
         // Re-enqueue dead-letter outbox replies
         const deadLetters = await prisma.channelReplyOutbox.findMany({
           where: { inspirationId: id, status: "dead_letter" },
+          take: DEAD_LETTER_RESEND_LIMIT,
           select: { id: true, platform: true },
         })
         if (deadLetters.length === 0) {

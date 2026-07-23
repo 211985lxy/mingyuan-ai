@@ -1,6 +1,8 @@
-// @ts-nocheck — WIP stub
 "use client"
 
+import AiHotPage from "@/app/(dashboard)/ai-hot/page"
+
+/** 今日机会：复用既有 AI 热点工作台 */
 export function OpportunityDailyPanel() {
-  return <div className="p-8 text-center text-muted-foreground">即将上线</div>
+  return <AiHotPage />
 }

@@ -142,7 +142,7 @@ function buildModelPolicy(
   writerModule?: CopyStudioModule,
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
-  const module = agentModule ?? writerModule
+  const studioModule = agentModule ?? writerModule
   const needsAdvancedReasoning =
     agentId === "deep_copywriter" || agentId === "business_diagnosis"
   const requiresStandardFloor =
@@ -153,24 +153,24 @@ function buildModelPolicy(
   // ── 温度差异化：自由创作高创意，深度创作低温度保准确，朋友圈口语化略高 ──
   const temperature = isChat
     ? 0.7
-    : module === "free" ? 0.92
-    : module === "moments" ? 0.88
-    : module === "social" ? 0.85
+    : studioModule === "free" ? 0.92
+    : studioModule === "moments" ? 0.88
+    : studioModule === "social" ? 0.85
     : agentId === "deep_copywriter" ? 0.72
     : 0.8
 
   // ── maxTokens 差异化：长文 12k，社交短文 4k，自由创作 6k，朋友圈多版本 6k ──
   const maxTokens = isChat
     ? undefined
-    : module === "longform" || agentId === "deep_copywriter" ? 12288
-    : module === "social" ? 4096
-    : module === "free" ? 6144
-    : module === "moments" ? 6144
+    : studioModule === "longform" || agentId === "deep_copywriter" ? 12288
+    : studioModule === "social" ? 4096
+    : studioModule === "free" ? 6144
+    : studioModule === "moments" ? 6144
     : 8192
 
   return {
     agentId,
-    ...(module ? { routeKey: `copy_studio.${module}` } : {}),
+    ...(studioModule ? { routeKey: `copy_studio.${studioModule}` } : {}),
     stream,
     temperature,
     ...(maxTokens ? { maxTokens } : {}),

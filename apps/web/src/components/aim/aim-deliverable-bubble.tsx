@@ -37,6 +37,8 @@ export interface AimDeliverableBubbleProps {
   onMarkStatus: (status: string) => void
   onNextAction?: (action: AimNextAction, content: string, generationId: string) => void
   isBusy: boolean
+  /** 重新生成中：旧稿变淡并显示进度条 */
+  regenerating?: boolean
   onEditResult?: (format: ContentFormat, content: string) => void
   onCompileToWiki?: () => void
   onOpenDecision?: () => void
@@ -161,7 +163,7 @@ function PrimaryActions({ primaryActions, activeResult, deliverables, hasPublish
   </Button>)}</>
 }
 
-function MoreActions({ formats, secondaryActions, activeResult, deliverables, isBusy, onRepurpose, onNextAction, onCompileToWiki, onAttachProject, onQuality, onOpenDecision, onOpenPublish, onOpenRetro, canRunPublishCheck, hasPublishScript, hasPublishCheckAction, qualityFail }: {
+function MoreActions({ formats, secondaryActions, activeResult, deliverables, isBusy, onRepurpose, onNextAction, onCompileToWiki, onAttachProject, onQuality, canRunPublishCheck, hasPublishScript, hasPublishCheckAction }: {
   formats: Set<ContentFormat>
   secondaryActions: AimNextAction[]
   activeResult?: AimGenerateResult
@@ -172,13 +174,9 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
   onCompileToWiki?: () => void
   onAttachProject?: (generationId: string) => void
   onQuality?: () => void
-  onOpenDecision?: () => void
-  onOpenPublish?: () => void
-  onOpenRetro?: () => void
   canRunPublishCheck: boolean
   hasPublishScript: boolean
   hasPublishCheckAction: boolean
-  qualityFail: boolean
 }) {
   const hasVideo = formats.has("video_script")
   const options: Array<[ContentFormat, string]> = [
@@ -193,22 +191,16 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
     if (value === "compile_wiki") return onCompileToWiki?.()
     if (value === "save_project") return onAttachProject?.(deliverables.id)
     if (value === "publish_check") return onQuality?.()
-    if (value === "decision") return onOpenDecision?.()
-    if (value === "publish") return onOpenPublish?.()
-    if (value === "retro") return onOpenRetro?.()
     const action = secondaryActions.find((item) => `action:${item.id}` === value)
     if (action && activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
   }
-  const hasWorkflow = Boolean(onAttachProject) || showPublishCheck || Boolean(onOpenDecision) || Boolean(onOpenPublish) || Boolean(onOpenRetro)
+  const hasWorkflow = Boolean(onAttachProject) || showPublishCheck
   const disabled = isBusy || (!hasWorkflow && !visibleOptions.length && !onCompileToWiki && !secondaryActions.length)
   return <Select onValueChange={handleAction} disabled={disabled}>
     <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="更多" /></SelectTrigger>
     <SelectContent>
       {onAttachProject ? <SelectItem value="save_project">保存到客户全案</SelectItem> : null}
       {showPublishCheck ? <SelectItem value="publish_check" disabled={!hasPublishScript}>发布前自查</SelectItem> : null}
-      {onOpenDecision ? <SelectItem value="decision">发布前判断</SelectItem> : null}
-      {onOpenPublish ? <SelectItem value="publish" disabled={qualityFail}>登记发布</SelectItem> : null}
-      {onOpenRetro ? <SelectItem value="retro">填写复盘</SelectItem> : null}
       {visibleOptions.map(([format, label]) => <SelectItem key={format} value={`format:${format}`}>{label}</SelectItem>)}
       {onCompileToWiki ? <SelectItem value="compile_wiki">编译进 IP 维基</SelectItem> : null}
       {secondaryActions.map((action) => <SelectItem key={action.id} value={`action:${action.id}`} disabled={!activeResult?.content.trim()}>{action.label}</SelectItem>)}
@@ -227,6 +219,9 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const hasPublishCheckAction = nextActions.some((action) => action.id === "publish_check")
   return <ActionStrip>
     {qualityFail ? <Button size="sm" className="h-7 rounded-md px-2 text-xs" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
+    {props.onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenDecision} disabled={isBusy}>发布前判断</Button> : null}
+    {props.onOpenPublish ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenPublish} disabled={isBusy || qualityFail}>登记发布</Button> : null}
+    {props.onOpenRetro ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenRetro} disabled={isBusy}>填写复盘</Button> : null}
     <MoreActions
       formats={formats}
       secondaryActions={secondaryActions}
@@ -238,13 +233,9 @@ function DeliverableActions(props: DeliverableActionsProps) {
       onCompileToWiki={props.onCompileToWiki}
       onAttachProject={props.onAttachProject}
       onQuality={props.onQuality}
-      onOpenDecision={props.onOpenDecision}
-      onOpenPublish={props.onOpenPublish}
-      onOpenRetro={props.onOpenRetro}
       canRunPublishCheck={canRunPublishCheck}
       hasPublishScript={hasPublishScript}
       hasPublishCheckAction={hasPublishCheckAction}
-      qualityFail={qualityFail}
     />
     <Select onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}>
       <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>
@@ -259,7 +250,8 @@ function DeliverableActions(props: DeliverableActionsProps) {
  * @returns 无返回值
  */
 export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
-  const { deliverables, workflowStage, contentAction } = props
+  const { deliverables, workflowStage, contentAction, regenerating = false } = props
+  const actionsBusy = props.isBusy || regenerating
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
   const [copiedFormat, setCopiedFormat] = useState<string | null>(null)
   const activeFormat = deliverables.results.some((item) => item.format === activeTab) ? activeTab : deliverables.results[0]?.format || "raw_copy"
@@ -286,9 +278,19 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
     reportAimRunEvent(props.runId, "copied", { format: item.format, ...(workflowStage ? { workflowStage } : {}), ...(contentAction ? { contentAction } : {}) })
     toast.success("已复制")
   }
-  return <div className="mt-2 w-full"><AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
-    <DeliveryContractStrip contract={contract} />
-    <DeliverableTabs results={deliverables.results} activeFormat={activeFormat} copiedFormat={copiedFormat} onTabChange={setActiveTab} onCopy={copyResult} onEdit={props.onEditResult} />
-    <DeliverableActions {...props} activeResult={activeResult} />
-  </AiResultPanel></div>
+  return <div className={`mt-2 w-full transition-opacity duration-300 ${regenerating ? "opacity-55" : "opacity-100"}`}>
+    {regenerating ? (
+      <div className="mb-2 space-y-1.5" aria-live="polite">
+        <div className="h-0.5 overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-1/3 animate-pulse rounded-full bg-primary/50" />
+        </div>
+        <p className="text-[11px] text-muted-foreground">正在重出一版…</p>
+      </div>
+    ) : null}
+    <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
+      <DeliveryContractStrip contract={contract} />
+      <DeliverableTabs results={deliverables.results} activeFormat={activeFormat} copiedFormat={copiedFormat} onTabChange={setActiveTab} onCopy={copyResult} onEdit={regenerating ? undefined : props.onEditResult} />
+      <DeliverableActions {...props} isBusy={actionsBusy} activeResult={activeResult} />
+    </AiResultPanel>
+  </div>
 }

@@ -105,6 +105,7 @@ export function registerAimMcpTools(server: McpServer): void {
       assertAgentScope(resolved.context, AGENT_SCOPE.projectsRead)
       const projects = await prisma.clientProject.findMany({
         where: { id: { in: resolved.context.allowedProjects }, status: "active" },
+        take: resolved.context.allowedProjects.length,
         select: { id: true, name: true },
       })
       return toolSuccess(`当前 Key 可访问 ${projects.length} 个项目`, { projects })

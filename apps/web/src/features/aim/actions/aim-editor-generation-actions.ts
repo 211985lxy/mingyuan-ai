@@ -66,6 +66,7 @@ export function createAimDraftRevisionAction(options: AimEditorActionsOptions, b
       `3. 当前用户要求：${commandInput}`,
     ].join("\n")
     const controller = new AbortController()
+    options.requestAbortRef.current?.abort()
     options.requestAbortRef.current = controller
     const assistantId = nextAimMessageId()
     options.setMessages((current) => [...current,
@@ -85,8 +86,10 @@ export function createAimDraftRevisionAction(options: AimEditorActionsOptions, b
       const content = stopped ? "已停止本次改写。" : `改写失败：${error instanceof Error ? error.message : "请稍后重试"}`
       options.setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, content, agentId: options.selectedAgentId } : message))
     }).finally(() => {
-      if (options.requestAbortRef.current === controller) options.requestAbortRef.current = null
-      options.setIsThinking(false)
+      if (options.requestAbortRef.current === controller) {
+        options.requestAbortRef.current = null
+        options.setIsThinking(false)
+      }
     })
     return true
   }

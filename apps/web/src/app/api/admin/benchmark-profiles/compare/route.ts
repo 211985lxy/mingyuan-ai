@@ -2,6 +2,9 @@ import { NextResponse } from "next/server"
 import { withAdminAuth } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
+/** 跨平台对比时单个 name 命中的账号上限：平台数有限，超出视为异常。 */
+const COMPARE_PROFILE_LIMIT = 200
+
 /**
  * GET /api/admin/benchmark-profiles/compare?name=xxx&projectId=xxx
  * 跨平台竞品对比：按账号名称聚合同一 IP 在不同平台的画像数据
@@ -24,6 +27,7 @@ export const GET = withAdminAuth(async (request) => {
   const profiles = await prisma.benchmarkProfile.findMany({
     where,
     orderBy: { platform: 'asc' },
+    take: COMPARE_PROFILE_LIMIT,
     include: {
       project: { select: { id: true, name: true } },
       _count: { select: { items: true } },

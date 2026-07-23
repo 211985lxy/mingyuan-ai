@@ -88,6 +88,8 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   const command = detectAimWorkbenchCommand(text)
   if (!startsNewTask && command && input.runWorkbenchCommand(command)) return
   reportAimChatRevision(input.messages, options.retryMessageId, startsNewTask)
+  // 与生成链路共用 requestAbortRef：启动前中止旧请求，避免 busy 被旧 finally 误清
+  input.requestAbortRef.current?.abort()
   const controller = new AbortController()
   input.requestAbortRef.current = controller
   const turn = prepareAimChatTurn({ messages: input.messages, text, images, retryMessageId: options.retryMessageId, startsNewTask, editorApplyRange: options.editorApplyRange })
@@ -109,8 +111,10 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
       ? { ...message, content, failure: stopped ? null : { kind: "chat", retryText: text } }
       : message))
   } finally {
-    if (input.requestAbortRef.current === controller) input.requestAbortRef.current = null
-    input.setIsThinking(false)
+    if (input.requestAbortRef.current === controller) {
+      input.requestAbortRef.current = null
+      input.setIsThinking(false)
+    }
   }
 }
 

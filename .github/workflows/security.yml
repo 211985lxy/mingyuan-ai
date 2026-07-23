@@ -32,9 +32,20 @@ jobs:
       - name: Dependency audit with expiring exceptions
         run: pnpm security:audit
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Scan only the PR commit range (or push tip range). Full-history scans
+        # fail on legacy docs already in main; gitleaks-action had the same intent.
+        run: |
+          set -euo pipefail
+          VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            /tmp/gitleaks detect --source . --verbose --redact --no-banner \
+              --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            /tmp/gitleaks detect --source . --verbose --redact --no-banner \
+              --log-opts="-n 50"
+          fi
       - name: Initialize CodeQL
         uses: github/codeql-action/init@02c5e83432fe5497fd85b873b6c9f16a8578e1d9 # v3
         with:

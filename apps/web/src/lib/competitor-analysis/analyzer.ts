@@ -7,6 +7,7 @@ import type {
   CompetitorMetrics,
   CompetitorAnalysisResult,
 } from './types'
+import { shanghaiWeekdayAndHour } from './shanghai-time'
 
 // ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -40,11 +41,10 @@ export function buildPublicVideoUrl(video: Pick<NormalizedVideo, 'videoId' | 'vi
 }
 
 function buildAnalysisStats(account: NormalizedAccount, videos: NormalizedVideo[]) {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
   const postingHeatmap: Record<string, number> = {}
   for (const video of videos) {
-    const date = new Date(video.createTime * 1000)
-    const key = `${days[date.getDay()]}-${String(date.getHours()).padStart(2, '0')}`
+    const { day, hour } = shanghaiWeekdayAndHour(video.createTime)
+    const key = `${day}-${String(hour).padStart(2, '0')}`
     postingHeatmap[key] = (postingHeatmap[key] ?? 0) + 1
   }
 

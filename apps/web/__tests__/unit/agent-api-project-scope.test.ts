@@ -15,6 +15,12 @@ const context: AgentApiContext = {
   userId: "user-1",
   allowedProjects: ["project-1"],
   allowedAgents: ["content_producer"],
+  clientType: null,
+  allowedScopes: [],
+  expiresAt: null,
+  maxInputChars: 20_000,
+  minuteLimit: 60,
+  dailyTokenLimit: null,
 }
 
 describe("agent API project scope", () => {

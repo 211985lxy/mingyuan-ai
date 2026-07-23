@@ -247,7 +247,10 @@ export function ThinkingProcessPanel({
   const [connected, setConnected] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
   const onCompleteRef = useRef(onComplete)
-  onCompleteRef.current = onComplete
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
 
   // 连接 SSE
   useEffect(() => {
@@ -256,7 +259,7 @@ export function ThinkingProcessPanel({
     let cancelled = false
     const es = new EventSource(
       `/api/aim/trace/${encodeURIComponent(traceId)}`,
-      { withCredentials: false },
+      { withCredentials: true },
     )
     eventSourceRef.current = es
 

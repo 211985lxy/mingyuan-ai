@@ -19,6 +19,9 @@ import { prisma } from "@/lib/prisma"
 import { env } from "@/env"
 import { sha256 } from "@/lib/aim-harness/hashing"
 
+/** 可见 active 方法论的加载上限：配置型集合，超出视为异常。 */
+const METHODOLOGY_PROFILE_LIMIT = 200
+
 /** 功能开关：关闭时忽略 methodologyProfileIds，恢复当前上下文（不注入命名方法论）。 */
 export function isNamedMethodologyEnabled(): boolean {
   return env.AIM_NAMED_METHODOLOGY_ENABLED === "true"
@@ -171,6 +174,8 @@ async function resolveByText(
         { scope: "user", userId: userId ?? null },
       ],
     },
+    orderBy: { name: "asc" },
+    take: METHODOLOGY_PROFILE_LIMIT,
     select: { id: true, name: true, aliases: true },
   })
 
@@ -314,6 +319,7 @@ export async function listMethodologyProfiles(userId: string): Promise<Methodolo
       OR: [{ scope: "global" }, { scope: "user", userId }],
     },
     orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+    take: METHODOLOGY_PROFILE_LIMIT,
     select: {
       id: true,
       name: true,

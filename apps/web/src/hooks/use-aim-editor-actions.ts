@@ -145,6 +145,7 @@ function reviseCurrentDraft(input: AimEditorActionInput, commandInput: string) {
     "2. 如果用户表达了“别越改越短”“保持原稿长度/体量”“不要压缩”的意思，就默认保留当前稿子的主体信息密度和篇幅，除非用户明确要求精简。",
     `3. 当前用户要求：${commandInput}`,
   ].join("\n")
+  input.requestAbortRef.current?.abort()
   const controller = new AbortController()
   input.requestAbortRef.current = controller
   const assistantId = nextAimWorkbenchId()
@@ -172,8 +173,10 @@ async function streamDraftRevision(input: AimEditorActionInput, prompt: string, 
     const content = stopped ? "已停止本次改写。" : `改写失败：${error instanceof Error ? error.message : "请稍后重试"}`
     input.setMessages((messages) => messages.map((message) => message.id === assistantId ? { ...message, content, agentId: input.selectedAgentId } : message))
   } finally {
-    if (input.requestAbortRef.current === controller) input.requestAbortRef.current = null
-    input.setIsThinking(false)
+    if (input.requestAbortRef.current === controller) {
+      input.requestAbortRef.current = null
+      input.setIsThinking(false)
+    }
   }
 }
 

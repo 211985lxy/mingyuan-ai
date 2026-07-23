@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseJsonBody } from "@/lib/api-contract"
 import { assertSupportedVideoUrl, detectVideoPlatform } from "@/lib/video-text-extractor"
 import { processVideo } from "@/lib/content-pipeline"
 
 export const maxDuration = 120
+
+const processVideoSchema = z.object({
+  url: z.string().trim().min(1).max(2048),
+  source: z.string().trim().max(60).optional(),
+  contextText: z.string().max(8000).optional(),
+  userId: z.string().trim().max(120).optional(),
+  skipAiProcessing: z.boolean().optional(),
+  skipTopicExtraction: z.boolean().optional(),
+  skipCompetitorCheck: z.boolean().optional(),
+  skipCopyInspiration: z.boolean().optional(),
+}).strict()
 
 /**
  * 视频处理 API 端点
@@ -12,21 +25,8 @@ export const maxDuration = 120
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as {
-      url?: string
-      source?: string
-      contextText?: string
-      userId?: string
-      skipAiProcessing?: boolean
-      skipTopicExtraction?: boolean
-      skipCompetitorCheck?: boolean
-      skipCopyInspiration?: boolean
-    }
+    const body = await parseJsonBody(request, processVideoSchema)
     const { url, source, contextText, userId, skipAiProcessing, skipTopicExtraction, skipCompetitorCheck, skipCopyInspiration } = body
-
-    if (!url || typeof url !== "string") {
-      return NextResponse.json({ error: "缺少 url 参数" }, { status: 400 })
-    }
 
     let validatedUrl: string
     try {
