@@ -1,15 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import type { ComponentType } from "react"
-import { Check, Plus, Sparkles } from "lucide-react"
+import type { ComponentType, ReactNode } from "react"
+import { Check, Edit3, FileSearch, Plus, Repeat2, Sparkles } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import type { AimEvolutionSuggestion } from "@/lib/api/client"
 import type { ClientProject } from "@/lib/api/client"
-import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimWorkflowStage } from "@/lib/aim-workflow"
+import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
 
 interface AimWorkbenchHeaderProps {
   workflowStage: AimWorkflowStage
@@ -20,6 +20,8 @@ interface AimWorkbenchHeaderProps {
   selectedProjectId: string
   canEvolve: boolean
   isEvolving: boolean
+  /** 空状态（未开始任务）时不展示完整四阶段步骤条，避免与正文快捷入口重复 */
+  showStageProgress: boolean
   onStageChange: (stage: AimWorkflowStage) => void
   onProjectScopeChange: (scope: string) => void
   onEvolve: () => void
@@ -40,6 +42,7 @@ export function AimWorkbenchHeader({
   selectedProjectId,
   canEvolve,
   isEvolving,
+  showStageProgress,
   onStageChange,
   onProjectScopeChange,
   onEvolve,
@@ -48,98 +51,134 @@ export function AimWorkbenchHeader({
   const currentIndex = AIM_WORKFLOW_STAGES.findIndex((stage) => stage.id === workflowStage)
   const activeDescription = AIM_WORKFLOW_STAGES.find((stage) => stage.id === workflowStage)?.description
 
+  const newTaskButton = (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      className="h-9 shrink-0 gap-1 px-2 md:h-8"
+      onClick={onReset}
+      aria-label="新任务：清空旧稿并开始新任务"
+      title="清空旧稿并开始新任务"
+    >
+      <Plus className="h-4 w-4" />
+      <span className="text-xs">新任务</span>
+    </Button>
+  )
+
+  const evolveButton = (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="h-9 shrink-0 px-2 md:h-8"
+      onClick={onEvolve}
+      disabled={!canEvolve}
+      aria-label={isEvolving ? "偏好沉淀：提炼中" : "偏好沉淀：从当前对话提炼客户偏好并更新全局写作风格档案"}
+      title="从当前对话提炼客户偏好 + 更新全局写作风格档案"
+    >
+      <Sparkles className="h-4 w-4" />
+    </Button>
+  )
+
+  const projectSelect = (
+    <select
+      value={projectEnabled ? selectedProjectId : "quick"}
+      onChange={(event) => onProjectScopeChange(event.target.value)}
+      aria-label="选择客户全案或快速出稿模式"
+      className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto sm:flex-none md:h-8"
+    >
+      {projectEnabled && !selectedProjectId ? <option value="" disabled>项目不可用</option> : null}
+      <option value="quick">快速出稿</option>
+      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+    </select>
+  )
+
   return (
-    <header className="flex items-center justify-between gap-3 border-b px-3 py-2">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-        <div className="flex flex-col gap-0.5 md:hidden">
-          <select
-            value={workflowStage}
-            onChange={(event) => {
-              if (isAimWorkflowStage(event.target.value)) onStageChange(event.target.value)
-            }}
-            className="h-9 w-[150px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {AIM_WORKFLOW_STAGES.map((stage) => (
-              <option key={stage.id} value={stage.id}>{stage.title}</option>
-            ))}
-          </select>
-          {activeDescription && (
-            <p className="max-w-[150px] truncate text-[11px] text-muted-foreground">{activeDescription}</p>
+    <header className="flex flex-col gap-2 px-3 py-2 md:flex-row md:items-center md:justify-between md:gap-3">
+      {/* 移动端第一行：当前阶段 + 新任务；桌面端：智能体标题 + 完整步骤条 */}
+      <div className="flex min-w-0 items-center gap-2 md:flex-1 md:flex-wrap">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
+          {showStageProgress ? (
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <select
+                value={workflowStage}
+                onChange={(event) => {
+                  if (isAimWorkflowStage(event.target.value)) onStageChange(event.target.value)
+                }}
+                aria-label="当前工作流阶段"
+                className="h-9 w-full max-w-[170px] rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {AIM_WORKFLOW_STAGES.map((stage) => (
+                  <option key={stage.id} value={stage.id}>{stage.title}</option>
+                ))}
+              </select>
+              {activeDescription && (
+                <p className="max-w-[170px] truncate text-[11px] text-muted-foreground">{activeDescription}</p>
+              )}
+            </div>
+          ) : (
+            <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{agentTitle}</p>
           )}
         </div>
+        <div className="shrink-0 md:hidden">{newTaskButton}</div>
+
         <span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary md:flex">
           <AgentIcon className="h-4 w-4" />
         </span>
         <p className="hidden shrink-0 truncate text-sm font-semibold text-foreground md:block">{agentTitle}</p>
-        <nav className="hidden min-w-0 flex-col gap-1 md:flex" aria-label="AIM 工作流">
-          <ol className="flex min-w-0 items-center gap-1 overflow-x-auto">
-            {AIM_WORKFLOW_STAGES.map((stage, index) => {
-              const isCurrent = stage.id === workflowStage
-              const isDone = index < currentIndex
-              return (
-                <li key={stage.id} className="flex shrink-0 items-center">
-                  <button
-                    type="button"
-                    onClick={() => onStageChange(stage.id)}
-                    aria-current={isCurrent ? "step" : undefined}
-                    className={cn(
-                      "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
-                      isCurrent && "bg-primary/10 text-primary",
-                      isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                      !isCurrent && !isDone && "text-muted-foreground/50 hover:bg-muted/60 hover:text-muted-foreground",
-                    )}
-                  >
-                    <span
+        {showStageProgress && (
+          <nav className="hidden min-w-0 flex-col gap-1 md:flex" aria-label="AIM 工作流">
+            <ol className="flex min-w-0 items-center gap-1 overflow-x-auto">
+              {AIM_WORKFLOW_STAGES.map((stage, index) => {
+                const isCurrent = stage.id === workflowStage
+                const isDone = index < currentIndex
+                return (
+                  <li key={stage.id} className="flex shrink-0 items-center">
+                    <button
+                      type="button"
+                      onClick={() => onStageChange(stage.id)}
+                      aria-current={isCurrent ? "step" : undefined}
                       className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
-                        isCurrent && "bg-primary text-primary-foreground",
-                        isDone && "bg-muted-foreground/20 text-muted-foreground",
-                        !isCurrent && !isDone && "border border-muted-foreground/30 text-transparent",
+                        "flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
+                        isCurrent && "bg-primary/10 text-primary",
+                        isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                        !isCurrent && !isDone && "text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground",
                       )}
                     >
-                      {isDone ? <Check className="h-3 w-3" /> : index + 1}
-                    </span>
-                    {stage.title}
-                  </button>
-                  {index < AIM_WORKFLOW_STAGES.length - 1 && (
-                    <span className="mx-0.5 h-px w-4 shrink-0 bg-border" aria-hidden />
-                  )}
-                </li>
-              )
-            })}
-          </ol>
-          {activeDescription && (
-            <p className="truncate pl-6 text-[11px] text-muted-foreground">{activeDescription}</p>
-          )}
-        </nav>
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
+                          isCurrent && "bg-primary text-primary-foreground",
+                          isDone && "bg-muted-foreground/20 text-muted-foreground",
+                          !isCurrent && !isDone && "border border-muted-foreground/30 text-transparent",
+                        )}
+                      >
+                        {isDone ? <Check className="h-3 w-3" /> : index + 1}
+                      </span>
+                      {stage.title}
+                    </button>
+                    {index < AIM_WORKFLOW_STAGES.length - 1 && (
+                      <span className="mx-0.5 h-px w-4 shrink-0 bg-border" aria-hidden />
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+            {activeDescription && (
+              <p className="truncate pl-6 text-[11px] text-muted-foreground">{activeDescription}</p>
+            )}
+          </nav>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <select
-          value={projectEnabled ? selectedProjectId : "quick"}
-          onChange={(event) => onProjectScopeChange(event.target.value)}
-          className="h-8 w-[108px] max-w-[220px] rounded-md border border-input bg-background px-2 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto"
-          title="选择客户全案或快速出稿模式"
-        >
-          {projectEnabled && !selectedProjectId ? <option value="" disabled>项目不可用</option> : null}
-          <option value="quick">快速出稿</option>
-          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-        </select>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-8 px-2"
-          onClick={onEvolve}
-          disabled={!canEvolve}
-          title="从当前对话提炼客户偏好 + 更新全局写作风格档案"
-        >
-          <Sparkles className="h-4 w-4" />
-          <span className="sr-only">{isEvolving ? "提炼中" : "沉淀偏好与风格"}</span>
-        </Button>
-        <Button type="button" size="sm" variant="ghost" className="h-8 gap-1 px-2" onClick={onReset} title="清空旧稿并开始新任务">
-          <Plus className="h-4 w-4" />
-          <span className="hidden text-xs sm:inline">新任务</span>
-        </Button>
+
+      {/* 移动端第二行：项目选择 + 辅助操作；桌面端：项目选择、偏好沉淀、新任务 */}
+      <div className="flex items-center gap-2 md:shrink-0">
+        {projectSelect}
+        <div className="flex shrink-0 items-center gap-2">
+          {evolveButton}
+          <div className="hidden md:block">{newTaskButton}</div>
+        </div>
       </div>
     </header>
   )
@@ -215,6 +254,64 @@ export function AimEvolutionSuggestions({ suggestions, onDismiss, onSave }: {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+interface AimLandingAction {
+  label: string
+  icon: ComponentType<{ className?: string }>
+}
+
+const AIM_LANDING_CONTENT_ACTIONS: Record<"new_copy" | "edit_current" | "rewrite_reference", AimLandingAction> = {
+  new_copy: { label: "从想法出一稿", icon: Sparkles },
+  edit_current: { label: "修改现有文案", icon: Edit3 },
+  rewrite_reference: { label: "按对标重写", icon: Repeat2 },
+}
+
+/**
+ * @description AIM 空状态：结果导向标题 + 4 个快捷入口 + composer 组成同一居中区域，
+ * 用户开始任务后此区域即被替换为正常工作台布局（composer 沉底）。
+ * @param options - 配置选项
+ * @returns 无返回值
+ */
+export function AimLandingHero({
+  onBeginContentAction,
+  children,
+}: {
+  onBeginContentAction: (action: AimContentAction) => void
+  children: ReactNode
+}) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-3 py-6">
+      <div className="flex w-full max-w-2xl flex-col items-center gap-6">
+        <h1 className="text-center text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+          今天想得到什么结果？
+        </h1>
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
+          {(Object.entries(AIM_LANDING_CONTENT_ACTIONS) as Array<[AimContentAction, AimLandingAction]>).map(
+            ([id, action]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onBeginContentAction(id)}
+                className="flex h-11 items-center gap-2 rounded-xl border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              >
+                <action.icon className="h-4 w-4 shrink-0 opacity-70" />
+                <span className="truncate">{action.label}</span>
+              </button>
+            ),
+          )}
+          <Link
+            href="/video-copy"
+            className="flex h-11 items-center gap-2 rounded-xl border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+          >
+            <FileSearch className="h-4 w-4 shrink-0 opacity-70" />
+            <span className="truncate">爆款拆解</span>
+          </Link>
+        </div>
+        <div className="w-full">{children}</div>
       </div>
     </div>
   )

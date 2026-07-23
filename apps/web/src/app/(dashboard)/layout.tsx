@@ -40,11 +40,11 @@ export default function DashboardLayout({
     <AuthGuard>
       <SidebarProvider>
         <AppSidebar />
-        <main className="flex-1 min-w-0 min-h-screen">
-          <header className="flex items-center border-b px-4 h-14 gap-3 min-w-0">
-            <SidebarTrigger className="shrink-0" />
+        <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
+          <header className="flex h-11 shrink-0 items-center gap-2 px-3">
+            <SidebarTrigger className="h-7 w-7 shrink-0 text-muted-foreground" />
           </header>
-          <div className="p-4 md:p-6">{children}</div>
+          <div className="min-w-0 flex-1 p-4 md:p-5">{children}</div>
         </main>
       </SidebarProvider>
     </AuthGuard>

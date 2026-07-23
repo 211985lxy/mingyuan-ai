@@ -18,25 +18,21 @@ const actions = {
 }
 
 describe("AIM message stream", () => {
-  it("renders the workflow entry when the conversation is empty", () => {
+  it("renders content quick actions when the content stage conversation is empty", () => {
     const html = renderToStaticMarkup(createElement(AimMessageStream, {
       messages: [],
       busy: false,
-      workflowLanding: true,
       agentIntro: "内容工作台",
       workflowStage: "content",
       selectedAgentId: "content_producer",
       selectedProjectId: "",
-      onBeginStage: vi.fn(),
       onBeginContentAction: vi.fn(),
       actions,
     }))
 
-    expect(html).toContain("你今天要推进哪一步")
-    expect(html).toContain("想清楚方向")
-    expect(html).toContain("开始做内容")
-    expect(html).toContain("准备发布")
-    expect(html).toContain("复盘沉淀")
+    expect(html).toContain("内容工作台")
+    expect(html).toContain("新写一版")
+    expect(html).toContain("修改当前稿")
   })
 
   it("keeps method notes, assistant output and choices visible", () => {
@@ -44,12 +40,10 @@ describe("AIM message stream", () => {
     const html = renderToStaticMarkup(createElement(AimMessageStream, {
       messages: [{ id: "message-1", role: "assistant", content }],
       busy: false,
-      workflowLanding: false,
       agentIntro: "内容工作台",
       workflowStage: "content",
       selectedAgentId: "content_producer",
       selectedProjectId: "project-1",
-      onBeginStage: vi.fn(),
       onBeginContentAction: vi.fn(),
       actions,
     }))

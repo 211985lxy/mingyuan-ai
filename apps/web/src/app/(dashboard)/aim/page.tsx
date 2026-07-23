@@ -5,7 +5,7 @@ import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
 import { BenchmarkEditorPanel } from "@/components/aim/benchmark-editor-panel"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
-import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
+import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
@@ -17,6 +17,47 @@ import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 
 export default function AimPage() {
   const w = useAimWorkbench()
+  // 空状态（未选定 agent/阶段、无消息、无待处理意图）：正文用结果导向 Hero + composer 组成
+  // 同一居中区域；顶部不展示完整四阶段步骤条，避免与正文快捷入口重复。
+  const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
+
+  const composer = (
+    <>
+      <AimResearchHint agentId={w.selectedAgentId} />
+      <AimPromptComposer
+        value={w.input}
+        placeholder={w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : w.agent.placeholder}
+        busy={w.busy}
+        isRecording={w.isRecording}
+        isTranscribing={w.isTranscribing}
+        isGenerating={w.isGenerating || w.isUploadingImage}
+        canGenerate={
+          (w.input.trim().length > 0 || w.imageAttachments.length > 0) &&
+          (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
+          !w.isUploadingImage
+        }
+        primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
+        onChange={w.setInput}
+        onGenerate={w.handleGenerate}
+        onStop={w.handleStop}
+        onStartRecording={w.startRecording}
+        onStopRecording={w.stopRecording}
+        showSkills={Boolean(w.params.agentParam)}
+        skills={w.agent.skills}
+        onUseSkill={w.handleUseSkill}
+        imageAttachments={w.imageAttachments}
+        onAddImages={(files) => void w.addImages(files)}
+        onRemoveImage={w.removeImage}
+        composerMode={w.composerMode}
+        onComposerModeChange={w.setComposerMode}
+        canUsePlanMode={w.canUsePlanMode}
+        isPlanSessionActive={w.planSession.isPlanMode}
+        showContentMode={w.selectedAgentId === "content_producer"}
+        contentMode={w.agentModule}
+        onContentModeChange={w.setAgentModule}
+      />
+    </>
+  )
 
   return (
     <div className="-mx-4 -my-4 flex h-[calc(100dvh-2.75rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
@@ -31,6 +72,7 @@ export default function AimPage() {
           selectedProjectId={w.selectedProjectId}
           canEvolve={!w.isThinking && !w.isGenerating && !w.isEvolving && w.messages.length >= 2}
           isEvolving={w.isEvolving}
+          showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
           onProjectScopeChange={w.changeProjectScope}
           onEvolve={() => void w.handleEvolveConversation()}
@@ -112,69 +154,39 @@ export default function AimPage() {
           </div>
         )}
 
-        <AimMessageStream
-          ref={w.scrollRef}
-          messages={w.messages}
-          busy={w.busy}
-          workflowLanding={w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent}
-          agentIntro={w.agent.intro}
-          workflowStage={w.currentWorkflowStage}
-          selectedAgentId={w.selectedAgentId}
-          selectedProjectId={w.selectedProjectId}
-          latestDeliverableMessageId={w.latestDeliverableMessageId}
-          onBeginStage={w.beginWorkflowStage}
-          onBeginContentAction={w.beginContentAction}
-          actions={{
-            onSubmitChoice: (text) => void w.sendText(text),
-            onRetry: w.retryFailed,
-            onApplyReplacement: w.applyEditorReplacement,
-            onRepurpose: w.handleRepurpose,
-            onQuality: w.handleQuality,
-            onMarkStatus: w.handleMarkStatus,
-            onNextAction: w.handleAimNextAction,
-            onEditResult: w.openEditorFromResult,
-            onOpenRecord: w.openRecordDialog,
-            onCompileToWiki: (ctx) => w.setWikiDialog({ open: true, context: ctx }),
-            onAttachProject: w.projectEnabled ? undefined : w.projectAttach.openDialog,
-          }}
-        />
+        {isLanding ? (
+          <AimLandingHero onBeginContentAction={w.beginContentAction}>{composer}</AimLandingHero>
+        ) : (
+          <>
+            <AimMessageStream
+              ref={w.scrollRef}
+              messages={w.messages}
+              busy={w.busy}
+              agentIntro={w.agent.intro}
+              workflowStage={w.currentWorkflowStage}
+              selectedAgentId={w.selectedAgentId}
+              selectedProjectId={w.selectedProjectId}
+              latestDeliverableMessageId={w.latestDeliverableMessageId}
+              onBeginContentAction={w.beginContentAction}
+              actions={{
+                onSubmitChoice: (text) => void w.sendText(text),
+                onRetry: w.retryFailed,
+                onApplyReplacement: w.applyEditorReplacement,
+                onRepurpose: w.handleRepurpose,
+                onQuality: w.handleQuality,
+                onMarkStatus: w.handleMarkStatus,
+                onNextAction: w.handleAimNextAction,
+                onEditResult: w.openEditorFromResult,
+                onOpenRecord: w.openRecordDialog,
+                onCompileToWiki: (ctx) => w.setWikiDialog({ open: true, context: ctx }),
+                onAttachProject: w.projectEnabled ? undefined : w.projectAttach.openDialog,
+              }}
+            />
 
-        {/* 输入区：悬浮卡片，对标 Claude composer */}
-        <footer className="px-3 pb-4 pt-1 sm:px-5 sm:pb-5">
-          <AimResearchHint agentId={w.selectedAgentId} />
-          <AimPromptComposer
-            value={w.input}
-            placeholder={w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : w.agent.placeholder}
-            busy={w.busy}
-            isRecording={w.isRecording}
-            isTranscribing={w.isTranscribing}
-            isGenerating={w.isGenerating || w.isUploadingImage}
-            canGenerate={
-              (w.input.trim().length > 0 || w.imageAttachments.length > 0) &&
-              (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
-              !w.isUploadingImage
-            }
-            primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
-            onChange={w.setInput}
-            onGenerate={w.handleGenerate}
-            onStop={w.handleStop}
-            onStartRecording={w.startRecording}
-            onStopRecording={w.stopRecording}
-            showSkills={Boolean(w.params.agentParam)}
-            skills={w.agent.skills}
-            onUseSkill={w.handleUseSkill}
-            imageAttachments={w.imageAttachments}
-            onAddImages={(files) => void w.addImages(files)}
-            onRemoveImage={w.removeImage}
-            composerMode={w.composerMode}
-            onComposerModeChange={w.setComposerMode}
-            canUsePlanMode={w.canUsePlanMode}
-            isPlanSessionActive={w.planSession.isPlanMode}
-            showContentMode={w.selectedAgentId === "content_producer"}
-            contentMode={w.agentModule}
-            onContentModeChange={w.setAgentModule}
-          />
-        </footer>
+            {/* 输入区：悬浮卡片，对标 Claude composer */}
+            <footer className="px-3 pb-4 pt-1 sm:px-5 sm:pb-5">{composer}</footer>
+          </>
+        )}
       </section>
 
       {w.hasEditor && (

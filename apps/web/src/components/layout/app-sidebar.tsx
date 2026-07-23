@@ -1,25 +1,26 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo } from "react"
 import Link from "next/link"
-import { usePathname, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { BrandLogo } from "@/components/branding/brand-logo"
 import { useBranding } from "@/components/providers/branding-provider"
 import {
   LayoutDashboard,
   Settings,
   BriefcaseBusiness,
-  BarChart2,
-  Bell,
-  FileCheck,
   Target,
   Search,
-  Bookmark,
-  ChevronRight,
+  FileText,
+  Plus,
   MoreHorizontal,
   Trash2,
   LogIn,
-  CalendarDays,
+  ChevronsUpDown,
+  Sun,
+  Moon,
+  Monitor,
+  Check,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -50,7 +51,7 @@ import {
 } from "@/lib/aim-ui-config"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { useAuthStore } from "@/lib/store"
-import { getSubscriptionStatus } from "@/lib/subscription"
+import { useTheme } from "@/components/providers/theme-provider"
 
 interface NavItem {
   title: string
@@ -58,57 +59,45 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
 }
 
-interface NavGroup {
-  label: string
-  items: NavItem[]
-}
-
-const navGroups: NavGroup[] = [
-  {
-    label: "今日工作",
-    items: [
-      { title: "工作总览", href: "/home", icon: LayoutDashboard },
-      { title: "待审核内容", href: "/home?tab=review", icon: FileCheck },
-    ],
-  },
-  {
-    label: "客户全案",
-    items: [
-      { title: "客户项目", href: "/projects", icon: BriefcaseBusiness },
-    ],
-  },
-  {
-    label: "内容机会",
-    items: [
-      { title: "主动搜索", href: "/opportunities", icon: Search },
-      { title: "今日机会", href: "/opportunities?tab=daily", icon: Bell },
-      { title: "对标账号", href: "/opportunities?tab=benchmarks", icon: BarChart2 },
-      { title: "已收藏研究", href: "/opportunities?tab=collections", icon: Bookmark },
-    ],
-  },
-  {
-    label: "AIM 创作",
-    items: [
-      { title: "推进工作流", href: "/aim", icon: Target },
-    ],
-  },
+/** 一级导航：固定 5 项，「爆款拆解」保留高频一级入口 */
+const quickNav: NavItem[] = [
+  { title: "AIM 推进工作流", href: "/aim", icon: Target },
+  { title: "爆款拆解", href: "/video-copy", icon: FileText },
+  { title: "内容机会", href: "/opportunities", icon: Search },
+  { title: "客户项目", href: "/projects", icon: BriefcaseBusiness },
+  { title: "工作总览", href: "/home", icon: LayoutDashboard },
 ]
 
-const footerItems: NavItem[] = [
-  { title: "账户设置", href: "/account", icon: Settings },
-  { title: "切换账号", href: "/login?switch=1", icon: LogIn },
-]
-
-const coreAimAgentIds: AimAgentId[] = [
-  "business_system_diagnosis",
-  "business_diagnosis",
+/** AIM 专家：6 个用户可见智能体，始终展开，不提供折叠/更多入口 */
+const aimExpertAgentIds: AimAgentId[] = [
   "content_producer",
   "deep_copywriter",
+  "business_diagnosis",
+  "business_system_diagnosis",
   "content_review",
   "persona",
 ]
 
-const RECENT_ITEMS_PER_AGENT = 4
+const RECENT_THREAD_LIMIT = 4
+
+function isNavActive(pathname: string, searchParams: URLSearchParams, href: string) {
+  const url = new URL(href, "http://local")
+  const path = url.pathname
+  if (pathname !== path && !pathname.startsWith(`${path}/`)) return false
+
+  if (path === "/aim") {
+    const expectedAgent = url.searchParams.get("agent")
+    const actualAgent = searchParams.get("agent")
+    // 「推进工作流」= 无 agent；「文案创作」等 = 精确匹配 agent
+    if (expectedAgent) return actualAgent === expectedAgent
+    return !actualAgent
+  }
+
+  for (const [key, value] of url.searchParams.entries()) {
+    if (searchParams.get(key) !== value) return false
+  }
+  return true
+}
 
 function formatHistoryDate(value: string) {
   const date = new Date(value)
@@ -132,7 +121,7 @@ function extractHistoryTheme(input: string) {
 function compactHistoryTheme(text: string) {
   const clean = text
     .replace(/#\S+/g, "")
-    .replace(/[《》"“”]/g, "")
+    .replace(/[《》"“”']/g, "")
     .replace(/\s+/g, " ")
     .trim()
   const firstClause = clean.split(/[。；;，,]/).find((part) => part.trim().length >= 4)?.trim() || clean
@@ -142,10 +131,16 @@ function compactHistoryTheme(text: string) {
   if (/Codex|AI变现工作台/.test(firstClause) && /工作台|变现/.test(firstClause)) {
     return "Codex AI变现工作台"
   }
-  return firstClause.slice(0, 18)
+  return firstClause.slice(0, 22)
 }
 
-function getHistoryFormatLabel(item: { videoScript: string | null; rawCopy: string | null; wechatArticle: string | null; momentsPost: string | null; communityMessage: string | null }) {
+function getHistoryFormatLabel(item: {
+  videoScript: string | null
+  rawCopy: string | null
+  wechatArticle: string | null
+  momentsPost: string | null
+  communityMessage: string | null
+}) {
   if (item.videoScript) return "口播"
   if (item.wechatArticle) return "公众号"
   if (item.momentsPost) return "朋友圈"
@@ -164,66 +159,119 @@ function formatHistoryTitle(item: {
   momentsPost: string | null
   communityMessage: string | null
 }) {
-  const date = formatHistoryDate(item.createdAt)
   const theme = compactHistoryTheme(item.topicTitle || extractHistoryTheme(item.rawInput))
   const format = getHistoryFormatLabel(item)
-  return [`${format ? `${format}｜` : ""}${theme}`, date].filter(Boolean).join(" ")
+  return format ? `${format}｜${theme}` : theme
 }
 
-/** 侧边栏左下角账号徽标：邮箱 + 到期时间 */
-function SidebarAccountBadge() {
+/** 底部账户：一行摘要，设置与切换收进菜单 */
+function SidebarAccountMenu({
+  active,
+  onNavigate,
+}: {
+  active: boolean
+  onNavigate: () => void
+}) {
+  const router = useRouter()
+  const { colorMode, setColorMode } = useTheme()
   const user = useAuthStore((s) => s.user)
-  if (!user) return null
-
-  const status = getSubscriptionStatus(user.expiresAt ?? null)
-  const expiryLabel =
-    status === "inactive" ? "未激活"
-    : status === "expired" ? "已过期"
-    : !user.expiresAt ? "未设置"
-    : new Date(user.expiresAt).toLocaleDateString("zh-CN")
+  const email = user?.email?.trim() || "账户"
+  const initial = email.slice(0, 1).toUpperCase()
 
   return (
-    <div className="mb-2 flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground">
-      <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium text-foreground/80">{user.email}</p>
-        <p>到期 {expiryLabel}</p>
-      </div>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(
+          "flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] outline-none transition-colors",
+          active
+            ? "bg-primary/10 font-medium text-primary"
+            : "text-foreground/75 hover:bg-secondary/60 hover:text-foreground",
+        )}
+      >
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-medium text-secondary-foreground">
+          {initial}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{email}</span>
+        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-45" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top" className="w-52">
+        <DropdownMenuItem
+          onClick={() => {
+            setColorMode("light")
+          }}
+        >
+          <Sun className="h-4 w-4" />
+          <span className="flex-1">白天模式</span>
+          {colorMode === "light" ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setColorMode("dark")
+          }}
+        >
+          <Moon className="h-4 w-4" />
+          <span className="flex-1">夜晚模式</span>
+          {colorMode === "dark" ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            setColorMode("system")
+          }}
+        >
+          <Monitor className="h-4 w-4" />
+          <span className="flex-1">跟随系统</span>
+          {colorMode === "system" ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            onNavigate()
+            router.push("/account")
+          }}
+        >
+          <Settings className="h-4 w-4" />
+          账户设置
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            onNavigate()
+            router.push("/login?switch=1")
+          }}
+        >
+          <LogIn className="h-4 w-4" />
+          切换账号
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
 /**
- * @description appsidebar
- * @returns 无返回值
+ * Codex 风格侧栏：新建任务 CTA + 扁平线程列表 + 安静的选中态。
  */
 export function AppSidebar() {
-  const [collapsedAgents, setCollapsedAgents] = useState<Set<AimAgentId>>(new Set())
-  const [showAllAgents, setShowAllAgents] = useState<Set<AimAgentId>>(new Set())
-  const [advancedModeOpen, setAdvancedModeOpen] = useState(false)
   const pathname = usePathname() ?? ""
   const searchParams = useSearchParams() ?? new URLSearchParams()
+  const router = useRouter()
   const branding = useBranding()
   const { setOpenMobile } = useSidebar()
 
   const isAim = pathname === "/aim"
   const agentParam = searchParams.get("agent")
-  const activeAgent: AimAgentId = isValidAimAgent(agentParam) ? agentParam : DEFAULT_AIM_AGENT
 
   const history = useAimWorkspaceStore((s) => s.history)
   const fetchHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const deleteHistory = useAimWorkspaceStore((s) => s.deleteHistory)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
 
-  // 进入 /aim 时拉取当前智能体最近生成记录
+  // 「最近任务」为全局最近记录（不按智能体过滤），按更新时间倒序展示
   useEffect(() => {
-    if (isAim) fetchHistory({ agentId: activeAgent }).catch(() => {})
-  }, [activeAgent, isAim, fetchHistory])
+    fetchHistory().catch(() => {})
+  }, [fetchHistory])
 
   const closeMobile = () => setOpenMobile(false)
 
   async function handleDeleteHistory(id: string, title: string) {
-    if (!window.confirm(`删除这条内容？\n${title}`)) return
+    if (!window.confirm(`删除这条任务？\n${title}`)) return
     try {
       await deleteHistory(id)
       toast.success("已删除")
@@ -232,223 +280,161 @@ export function AppSidebar() {
     }
   }
 
-  const historyGroups = coreAimAgentIds
-    .map((agentId) => {
-      const agent = getAimAgent(agentId)
-      const items = history.filter((item) => {
-        const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
-        return itemAgentId === agentId
-      })
-      return { agent, items }
-    })
+  const recentThreads = useMemo(() => {
+    const ranked = [...history].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    return ranked.slice(0, RECENT_THREAD_LIMIT)
+  }, [history])
 
   return (
-    <Sidebar className="border-r border-border/40 bg-sidebar/95 backdrop-blur-md">
-      <SidebarHeader className="p-4 border-b border-border/20">
-        <Link href="/home" className="flex items-center gap-3 cursor-pointer group">
-          <BrandLogo className="h-8 w-8 rounded-md transition-transform duration-500 group-hover:rotate-180" />
-          <span className="text-lg font-bold tracking-wider bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent">
-            {branding.name}
-          </span>
+    <Sidebar className="border-r border-border/40 bg-sidebar text-sidebar-foreground">
+      <SidebarHeader className="gap-2.5 px-3 pb-2 pt-3">
+        <Link
+          href="/home"
+          onClick={closeMobile}
+          className="flex items-center gap-2 rounded-md px-1 py-0.5 text-[13px] font-medium tracking-tight text-foreground/85 hover:text-foreground"
+        >
+          <BrandLogo className="h-5 w-5 rounded-[5px]" />
+          <span className="truncate">{branding.name}</span>
+        </Link>
+
+        <Link
+          href="/aim?agent=content_producer"
+          onClick={closeMobile}
+          className="flex h-9 items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 text-[13px] font-medium text-primary-foreground shadow-[0_4px_14px_rgba(209,74,51,0.22)] transition-[transform,opacity] hover:-translate-y-0.5 hover:opacity-95"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          新建文案
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="pt-4">
-        {/* 导航分组 */}
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel className="px-3 text-sm font-semibold tracking-wide text-foreground/80">
-              {group.label}
-            </SidebarGroupLabel>
-            <SidebarGroupContent className="mt-1">
-              <SidebarMenu>
-                {group.items.map((item) => {
-                  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-
-                  return (
-                    <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton
-                        render={<Link href={item.href} />}
-                        isActive={active}
-                        className={cn(
-                          "cursor-pointer w-full transition-all duration-200 rounded-md py-2.5 px-3 flex items-center gap-3",
-                          active
-                            ? "bg-primary/8 text-primary font-semibold border-l-[3px] border-l-primary rounded-l-none pl-2.5"
-                            : "hover:bg-secondary/40 text-foreground/80 hover:text-foreground",
-                        )}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        <span className="text-sm tracking-wide">{item.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-
-        {/* 默认引导用户推进工作流；专家入口仅在主动展开后显示。 */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-3 text-sm font-semibold tracking-wide text-foreground/80">
-            AIM 工作流
-          </SidebarGroupLabel>
-            <SidebarGroupContent className="mt-1">
-              <div className="space-y-3 px-1.5">
-                <Link
-                  href="/aim"
-                  onClick={closeMobile}
-                  className={cn(
-                    "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm font-semibold transition-colors",
-                    isAim && !agentParam ? "bg-primary/10 text-primary" : "bg-muted/60 text-foreground hover:bg-muted",
-                  )}
-                >
-                  <Target className="h-4 w-4" />
-                  推进内容工作流
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => setAdvancedModeOpen((open) => !open)}
-                  className="flex h-8 w-full items-center justify-between rounded-md px-2.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                  aria-expanded={advancedModeOpen}
-                >
-                  高级模式
-                  <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", advancedModeOpen && "rotate-90")} />
-                </button>
-                {advancedModeOpen && historyGroups.map(({ agent, items }) => {
-                  const Icon = agent.icon
-                  const active = isAim && agent.id === activeAgent
-                  const collapsed = collapsedAgents.has(agent.id)
-                  const showAll = showAllAgents.has(agent.id)
-                  const visibleItems = showAll ? items : items.slice(0, RECENT_ITEMS_PER_AGENT)
-                  return (
-                    <div key={agent.id} className="space-y-0.5">
-                      <div
-                        className={cn(
-                          "flex h-8 w-full items-center rounded-md text-sm font-semibold transition-colors",
-                          active ? "bg-muted/70 text-foreground" : "text-foreground/85 hover:bg-muted/60 hover:text-foreground",
-                        )}
-                      >
-                        <button
-                          type="button"
-                          aria-label={collapsed ? "展开历史" : "折叠历史"}
-                          disabled={!isAim || items.length === 0}
-                          onClick={() => {
-                            setCollapsedAgents((current) => {
-                              const next = new Set(current)
-                              if (next.has(agent.id)) next.delete(agent.id)
-                              else next.add(agent.id)
-                              return next
-                            })
-                          }}
-                          className="flex h-8 w-6 shrink-0 items-center justify-center rounded-l-md text-muted-foreground disabled:opacity-0"
-                        >
-                          <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", !collapsed && "rotate-90")} />
-                        </button>
-                        <Link
-                          href={`/aim?agent=${agent.id}`}
-                          onClick={closeMobile}
-                          className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-r-md pr-1.5"
-                        >
-                          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          <span className="truncate">{agent.displayTitle ?? agent.title}</span>
-                        </Link>
-                      </div>
-
-                      {isAim && items.length > 0 && !collapsed && (
-                        <div className="space-y-0.5 pl-8">
-                          {visibleItems.map((item) => {
-                            const title = formatHistoryTitle(item)
-                            return (
-                              <div
-                                key={item.id}
-                                className="group/item flex h-8 items-center rounded-md text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    requestLoad(item.id)
-                                    closeMobile()
-                                  }}
-                                  className="min-w-0 flex-1 px-1.5 text-left"
-                                  title={title}
-                                >
-                                  <span className="block truncate">{title}</span>
-                                </button>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger
-                                    className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 hover:bg-muted group-hover/item:opacity-100"
-                                    aria-label="更多操作"
-                                  >
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-28">
-                                    <DropdownMenuItem
-                                      variant="destructive"
-                                      onClick={() => void handleDeleteHistory(item.id, title)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      删除
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            )
-                          })}
-
-                          {items.length > RECENT_ITEMS_PER_AGENT && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAllAgents((current) => {
-                                  const next = new Set(current)
-                                  if (next.has(agent.id)) next.delete(agent.id)
-                                  else next.add(agent.id)
-                                  return next
-                                })
-                              }}
-                              className="block h-8 w-full rounded-md px-1.5 text-left text-sm font-semibold text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                            >
-                              {showAll ? "收起显示" : "展开显示"}
-                            </button>
-                          )}
-                        </div>
+      <SidebarContent className="gap-1 px-2 pb-2">
+        <SidebarGroup className="p-0">
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {quickNav.map((item) => {
+                const active = isNavActive(pathname, searchParams, item.href)
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      render={<Link href={item.href} onClick={closeMobile} />}
+                      isActive={active}
+                      className={cn(
+                        "h-9 w-full rounded-md px-2.5 text-[13px] font-normal md:h-8",
+                        active
+                          ? "bg-foreground/[0.07] font-medium text-foreground"
+                          : "text-foreground/75 hover:bg-foreground/[0.04] hover:text-foreground",
                       )}
+                    >
+                      <item.icon className="h-3.5 w-3.5 opacity-70" />
+                      <span className="truncate">{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="mt-3 p-0">
+          <SidebarGroupLabel className="mb-1 h-6 px-2.5 text-[11px] font-medium tracking-wide text-muted-foreground">
+            AIM 专家
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {aimExpertAgentIds.map((agentId) => {
+                const agent = getAimAgent(agentId)
+                const Icon = agent.icon
+                const active = isAim && agentParam === agent.id
+                return (
+                  <SidebarMenuItem key={agent.id}>
+                    <SidebarMenuButton
+                      render={<Link href={`/aim?agent=${agent.id}`} onClick={closeMobile} />}
+                      isActive={active}
+                      className={cn(
+                        "h-9 w-full rounded-md px-2.5 text-[13px] font-normal md:h-8",
+                        active
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-foreground/75 hover:bg-secondary/60 hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 opacity-70" />
+                      <span className="truncate">{agent.displayTitle ?? agent.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="mt-3 p-0">
+          <SidebarGroupLabel className="mb-1 h-6 px-2.5 text-[11px] font-medium tracking-wide text-muted-foreground">
+            最近任务
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className="space-y-0.5">
+              {recentThreads.length === 0 ? (
+                <p className="px-2.5 py-2 text-[12px] text-muted-foreground">暂无任务，点上方新建</p>
+              ) : (
+                recentThreads.map((item) => {
+                  const title = formatHistoryTitle(item)
+                  const date = formatHistoryDate(item.createdAt)
+                  return (
+                    <div
+                      key={item.id}
+                      className="group/item flex h-9 items-center rounded-md text-[13px] text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground md:h-8"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const agentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
+                          requestLoad(item.id)
+                          if (!isAim || agentParam !== agentId) {
+                            router.push(`/aim?agent=${agentId}`)
+                          }
+                          closeMobile()
+                        }}
+                        className="min-w-0 flex-1 px-2.5 text-left"
+                        title={title}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate">{title}</span>
+                          {date ? <span className="shrink-0 text-[11px] text-muted-foreground">{date}</span> : null}
+                        </span>
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 hover:bg-foreground/[0.06] group-hover/item:opacity-100"
+                          aria-label="更多操作"
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-28">
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => void handleDeleteHistory(item.id, title)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            删除
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   )
-                })}
-              </div>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                })
+              )}
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3 border-t border-border/20">
-        <SidebarAccountBadge />
-        <SidebarMenu>
-          {footerItems.map((item) => {
-            const active = pathname.startsWith(item.href)
-            return (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  render={<Link href={item.href} />}
-                  isActive={active}
-                  className={cn(
-                    "cursor-pointer w-full transition-all duration-200 rounded-md py-2 px-3 flex items-center gap-3",
-                    active
-                      ? "bg-primary/8 text-primary font-semibold"
-                      : "hover:bg-secondary/40 text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span className="text-sm tracking-wide">{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )
-          })}
-        </SidebarMenu>
-        <p className="text-[10px] tracking-widest text-muted-foreground/60 text-center font-mono uppercase mt-2">
-          {branding.name} v1.0
-        </p>
+      <SidebarFooter className="p-2">
+        <SidebarAccountMenu
+          active={pathname.startsWith("/account")}
+          onNavigate={closeMobile}
+        />
       </SidebarFooter>
     </Sidebar>
   )

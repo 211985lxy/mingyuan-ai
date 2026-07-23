@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { getAimAgentGuide, type AimNextAction } from "@/lib/aim-agent-guides"
 import { extractReplacementDraft } from "@/lib/aim-editor"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
-import { AIM_CONTENT_ACTIONS, AIM_WORKFLOW_STAGES, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
+import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
 import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-groups"
 import { splitAimMethodNote } from "@/lib/aim/workbench-display"
 import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
@@ -112,33 +112,29 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
   </div>
 }
 
-function EmptyMessageState({ workflowLanding, agentIntro, workflowStage, selectedAgentId, onBeginStage, onBeginContentAction }: {
-  workflowLanding: boolean
+function EmptyMessageState({ agentIntro, workflowStage, selectedAgentId, onBeginContentAction }: {
   agentIntro: string
   workflowStage: AimWorkflowStage
   selectedAgentId: AimAgentId
-  onBeginStage: (stage: AimWorkflowStage) => void
   onBeginContentAction: (action: AimContentAction) => void
 }) {
-  return <div className="mx-auto flex w-full max-w-3xl flex-col py-5">{workflowLanding ? <div><p className="mb-3 text-sm font-semibold text-foreground">你今天要推进哪一步？</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{AIM_WORKFLOW_STAGES.map((stage) => <button key={stage.id} type="button" className="h-10 rounded-lg border bg-background px-3 text-left text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary" onClick={() => onBeginStage(stage.id)}>{stage.id === "direction" ? "想清楚方向" : stage.id === "content" ? "开始做内容" : stage.id === "publish" ? "准备发布" : "复盘沉淀"}</button>)}</div></div> : <div className="max-w-2xl text-left"><p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && selectedAgentId === "content_producer" ? <div className="mt-3 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div>}</div>
+  return <div className="mx-auto flex w-full max-w-3xl flex-col py-5"><div className="max-w-2xl text-left"><p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && selectedAgentId === "content_producer" ? <div className="mt-3 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-8 rounded-md text-xs" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div></div>
 }
 
 interface AimMessageStreamProps {
   messages: AimWorkbenchMessage[]
   busy: boolean
-  workflowLanding: boolean
   agentIntro: string
   workflowStage: AimWorkflowStage
   selectedAgentId: AimAgentId
   selectedProjectId: string
   latestDeliverableMessageId?: string
-  onBeginStage: (stage: AimWorkflowStage) => void
   onBeginContentAction: (action: AimContentAction) => void
   actions: MessageActions
 }
 
 export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps>(function AimMessageStream(props, ref) {
   return <div ref={ref} className="flex-1 overflow-y-auto px-2 py-4 sm:px-3">
-    {props.messages.length === 0 ? <EmptyMessageState workflowLanding={props.workflowLanding} agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginStage={props.onBeginStage} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-none flex-col gap-4">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
+    {props.messages.length === 0 ? <EmptyMessageState agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-none flex-col gap-4">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
   </div>
 })

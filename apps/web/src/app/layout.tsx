@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { NextIntlClientProvider } from "next-intl"
 import { getMessages } from "next-intl/server"
 import { BrandingProvider } from "@/components/providers/branding-provider"
+import { ThemeBootScript, ThemeProvider } from "@/components/providers/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
 import { getBrandingConfig } from "@/lib/branding"
@@ -35,8 +36,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 }
 
 export default async function RootLayout({
@@ -50,12 +49,15 @@ export default async function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <BrandingProvider branding={branding}>
-          <NextIntlClientProvider messages={messages}>
-            <TooltipProvider>{children}</TooltipProvider>
-            <Toaster richColors position="top-center" />
-          </NextIntlClientProvider>
-        </BrandingProvider>
+        <ThemeBootScript />
+        <ThemeProvider>
+          <BrandingProvider branding={branding}>
+            <NextIntlClientProvider messages={messages}>
+              <TooltipProvider>{children}</TooltipProvider>
+              <Toaster richColors position="top-center" />
+            </NextIntlClientProvider>
+          </BrandingProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

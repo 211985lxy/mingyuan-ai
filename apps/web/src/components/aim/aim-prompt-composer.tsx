@@ -160,7 +160,7 @@ export function AimPromptComposer({
           rows={2}
           placeholder={placeholder}
           disabled={busy}
-          className="max-h-44 min-h-[72px] w-full resize-none bg-transparent px-4 pb-2 pt-3.5 text-[15px] leading-relaxed tracking-[-0.01em] outline-none placeholder:text-muted-foreground/55 disabled:opacity-60"
+          className="max-h-44 min-h-[72px] w-full resize-none bg-transparent px-4 pb-2 pt-3.5 text-[15px] leading-relaxed tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
         />
 
         {imageAttachments.length > 0 && (
