@@ -1,11 +1,28 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ChevronDown, ImagePlus, ListChecks, Loader2, Mic, Search, Send, Square, X } from "lucide-react"
+import {
+  ChevronDown,
+  ImagePlus,
+  ListChecks,
+  Loader2,
+  Mic,
+  Search,
+  Send,
+  Sparkles,
+  Square,
+  X,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import {
+  COPY_STUDIO_MODULES,
+  COPY_STUDIO_MODULE_LABELS,
+  type CopyStudioModule,
+} from "@/lib/copy-studio"
+import { cn } from "@/lib/utils"
 
 export type AimComposerMode = "direct" | "plan"
 
@@ -29,20 +46,17 @@ interface AimPromptComposerProps {
   imageAttachments?: Array<{ id: string; name: string; previewUrl: string }>
   onAddImages?: (files: FileList) => void
   onRemoveImage?: (id: string) => void
-  /** 计划模式：当前模式（默认 direct） */
   composerMode?: AimComposerMode
-  /** 计划模式：切换模式回调 */
   onComposerModeChange?: (mode: AimComposerMode) => void
-  /** 计划模式：是否允许开启（需已选客户项目） */
   canUsePlanMode?: boolean
-  /** 计划模式：是否处于计划会话中（隐藏切换） */
   isPlanSessionActive?: boolean
+  contentMode?: CopyStudioModule | undefined
+  onContentModeChange?: (value: CopyStudioModule | undefined) => void
+  showContentMode?: boolean
 }
 
 /**
- * @description aimpromptcomposer
- * @param options - 配置选项
- * @returns 无返回值
+ * 对标 Claude / ChatGPT：悬浮输入卡片 + 工具条内模式下拉。
  */
 export function AimPromptComposer({
   value,
@@ -68,6 +82,9 @@ export function AimPromptComposer({
   onComposerModeChange,
   canUsePlanMode = false,
   isPlanSessionActive = false,
+  contentMode,
+  onContentModeChange,
+  showContentMode = false,
 }: AimPromptComposerProps) {
   const isPlanMode = composerMode === "plan"
   const canSend = !busy && !isRecording && (value.trim().length > 0 || imageAttachments.length > 0)
@@ -76,13 +93,17 @@ export function AimPromptComposer({
   const rootRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [skillsOpen, setSkillsOpen] = useState(false)
+  const [modeOpen, setModeOpen] = useState(false)
   const [skillQuery, setSkillQuery] = useState("")
+
+  const contentModeLabel =
+    contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[contentMode]
+
   const filteredSkills = useMemo(() => {
     const query = skillQuery.trim().toLowerCase()
     const base = query
       ? skills.filter((skill) => `${skill.label} ${skill.description}`.toLowerCase().includes(query))
       : skills
-    // 按 group 分组（保持定义顺序，无 group 的归入默认组）
     const groups: Array<{ group: string; items: AimWorkbenchSkill[] }> = []
     for (const skill of base) {
       const key = skill.group ?? ""
@@ -94,17 +115,19 @@ export function AimPromptComposer({
   }, [skillQuery, skills])
 
   useEffect(() => {
-    if (!skillsOpen) return
+    if (!skillsOpen && !modeOpen) return
 
     function closeOnOutside(event: PointerEvent) {
       if (rootRef.current?.contains(event.target as Node)) return
       setSkillsOpen(false)
+      setModeOpen(false)
       setSkillQuery("")
     }
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return
       setSkillsOpen(false)
+      setModeOpen(false)
       setSkillQuery("")
     }
 
@@ -114,11 +137,18 @@ export function AimPromptComposer({
       document.removeEventListener("pointerdown", closeOnOutside)
       document.removeEventListener("keydown", closeOnEscape)
     }
-  }, [skillsOpen])
+  }, [skillsOpen, modeOpen])
 
   return (
-    <div ref={rootRef} className="mx-auto max-w-6xl w-full">
-      <div className="relative overflow-visible rounded-2xl border border-primary/20 bg-card shadow-sm focus-within:ring-2 focus-within:ring-primary/20">
+    <div ref={rootRef} className="mx-auto w-full max-w-3xl">
+      <div
+        className={cn(
+          "relative overflow-visible rounded-[18px] bg-card/95 backdrop-blur-md",
+          "shadow-[0_0_0_1px_rgba(239,231,220,0.9),0_10px_36px_-14px_rgba(37,33,29,0.14)]",
+          "focus-within:shadow-[0_0_0_1px_rgba(209,74,51,0.28),0_14px_44px_-14px_rgba(209,74,51,0.18)]",
+          "transition-shadow",
+        )}
+      >
         <textarea
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -127,15 +157,16 @@ export function AimPromptComposer({
             event.preventDefault()
             if (canSubmit) onGenerate()
           }}
-          rows={1}
+          rows={2}
           placeholder={placeholder}
           disabled={busy}
-          className="max-h-40 min-h-[44px] w-full resize-none bg-transparent px-4 py-2.5 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+          className="max-h-44 min-h-[72px] w-full resize-none bg-transparent px-4 pb-2 pt-3.5 text-[15px] leading-relaxed tracking-[-0.01em] outline-none placeholder:text-muted-foreground/55 disabled:opacity-60"
         />
+
         {imageAttachments.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-3 pb-2">
+          <div className="flex gap-2 overflow-x-auto px-4 pb-2">
             {imageAttachments.map((image) => (
-              <div key={image.id} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border bg-muted">
+              <div key={image.id} className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted">
                 <img src={image.previewUrl} alt={image.name} className="h-full w-full object-cover" />
                 <button
                   type="button"
@@ -150,15 +181,54 @@ export function AimPromptComposer({
             ))}
           </div>
         )}
+
+        {showContentMode && onContentModeChange && modeOpen && (
+          <div className="absolute bottom-14 left-3 z-20 w-52 overflow-hidden rounded-xl bg-popover p-1 text-popover-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.14)]">
+            {(
+              [
+                { id: undefined as CopyStudioModule | undefined, label: "智能选择", hint: "按内容自动路由" },
+                ...COPY_STUDIO_MODULES.map((module) => ({
+                  id: module as CopyStudioModule | undefined,
+                  label: COPY_STUDIO_MODULE_LABELS[module],
+                  hint: "",
+                })),
+              ]
+            ).map((option) => {
+              const active = contentMode === option.id
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  className={cn(
+                    "flex w-full flex-col rounded-lg px-2.5 py-2 text-left transition-colors",
+                    active ? "bg-foreground/[0.06]" : "hover:bg-foreground/[0.04]",
+                  )}
+                  onClick={() => {
+                    onContentModeChange(option.id)
+                    setModeOpen(false)
+                  }}
+                >
+                  <span className={cn("text-[13px]", active ? "font-medium text-foreground" : "text-foreground/85")}>
+                    {option.label}
+                  </span>
+                  {option.hint ? (
+                    <span className="text-[11px] text-muted-foreground">{option.hint}</span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {showSkills && skillsOpen && (
-          <div className="absolute bottom-12 left-3 z-20 w-[min(420px,calc(100vw-2rem))] rounded-xl border bg-popover p-2 text-popover-foreground shadow-lg">
+          <div className="absolute bottom-14 left-3 z-20 w-[min(420px,calc(100vw-2rem))] rounded-xl bg-popover p-2 text-popover-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.14)]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={skillQuery}
                 onChange={(event) => setSkillQuery(event.target.value)}
                 placeholder="搜索技能"
-                className="h-8 pl-8 text-xs"
+                className="h-8 border-0 bg-muted/50 pl-8 text-xs shadow-none"
                 autoFocus
               />
             </div>
@@ -168,7 +238,7 @@ export function AimPromptComposer({
               ) : filteredSkills.map(({ group, items }) => (
                 <div key={group || "_default"}>
                   {group && (
-                    <p className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                    <p className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-[10px] font-medium tracking-wide text-muted-foreground/80">
                       {group}
                     </p>
                   )}
@@ -195,26 +265,40 @@ export function AimPromptComposer({
             </div>
           </div>
         )}
-        <div className="flex flex-col gap-2 border-t bg-muted/10 px-3 py-1.5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="min-h-4 text-[11px] leading-4 text-muted-foreground">
-            {isTranscribing ? (
-              <span className="text-primary">语音转写中...</span>
-            ) : isRecording ? (
-              <span className="text-red-500">正在录音，点击停止后可发送</span>
-            ) : isPlanMode ? (
-              <span className="text-primary">计划模式：输入一句大概需求，AI 帮你规划</span>
-            ) : (
-              "Enter 发送 · Shift+Enter 换行"
-            )}
-          </p>
-          <div className="flex items-center justify-end gap-1.5">
-            {/* 计划模式开关（仅新写文案场景、未处于计划会话中时显示） */}
-            {!isPlanSessionActive && onComposerModeChange && (
+
+        <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5 pt-0.5">
+          <div className="flex min-w-0 items-center gap-0.5">
+            {showContentMode && onContentModeChange ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setModeOpen((open) => !open)
+                  setSkillsOpen(false)
+                }}
+                className={cn(
+                  "inline-flex h-8 max-w-[9.5rem] items-center gap-1 rounded-full px-2.5 text-[12px] transition-colors",
+                  modeOpen || contentMode
+                    ? "bg-foreground/[0.06] font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
+                )}
+                title="创作模式"
+              >
+                <Sparkles className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                <span className="truncate">{contentModeLabel}</span>
+                <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+              </button>
+            ) : null}
+
+            {!isPlanSessionActive && onComposerModeChange ? (
               <Button
                 type="button"
                 size="sm"
-                variant={isPlanMode ? "secondary" : "ghost"}
-                className={`h-8 gap-1 px-2 text-xs ${isPlanMode ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                variant="ghost"
+                className={cn(
+                  "h-8 gap-1 rounded-full px-2.5 text-[12px]",
+                  isPlanMode ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
                 onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")}
                 disabled={busy || (!canUsePlanMode && !isPlanMode)}
                 title={!canUsePlanMode && !isPlanMode ? "请先选择 IP 营销全案" : isPlanMode ? "切回直接模式" : "开启计划模式"}
@@ -222,7 +306,8 @@ export function AimPromptComposer({
                 <ListChecks className="h-3.5 w-3.5" />
                 计划
               </Button>
-            )}
+            ) : null}
+
             <input
               ref={fileInputRef}
               type="file"
@@ -238,42 +323,64 @@ export function AimPromptComposer({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               title="添加图片"
             >
               <ImagePlus className="h-4 w-4" />
-              上传图片
             </Button>
-            {showSkills ? <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setSkillsOpen((open) => !open)}
-              disabled={busy}
-            >
-              技能
-              <ChevronDown className="h-3.5 w-3.5" />
-            </Button> : null}
+
+            {showSkills ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className={cn(
+                  "h-8 gap-1 rounded-full px-2.5 text-[12px]",
+                  skillsOpen ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => {
+                  setSkillsOpen((open) => !open)
+                  setModeOpen(false)
+                }}
+                disabled={busy}
+              >
+                技能
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </Button>
+            ) : null}
+
+            {(isTranscribing || isRecording || isPlanMode) && (
+              <span className="ml-1 truncate text-[11px] text-muted-foreground">
+                {isTranscribing
+                  ? "语音转写中…"
+                  : isRecording
+                    ? "录音中"
+                    : "计划模式"}
+              </span>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
             <Button
               type="button"
               size="sm"
               variant="ghost"
-              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={isRecording ? onStopRecording : onStartRecording}
               disabled={busy && !isRecording}
               title="语音输入"
             >
-              {isRecording ? <span className="text-xs text-red-500">停止</span> : <Mic className="h-4 w-4" />}
+              {isRecording ? <span className="text-[11px] text-red-500">停</span> : <Mic className="h-4 w-4" />}
             </Button>
+
             {canStop && (
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
-                className="h-8 gap-1.5 text-xs text-red-600"
+                variant="ghost"
+                className="h-8 gap-1 rounded-full px-2.5 text-[12px] text-red-600"
                 onClick={onStop}
                 title="停止"
               >
@@ -281,16 +388,26 @@ export function AimPromptComposer({
                 停止
               </Button>
             )}
+
             <Button
               type="button"
               size="sm"
               onClick={onGenerate}
               disabled={!canSubmit}
-              className={`h-8 shadow-xs ${isPlanMode ? "gap-1.5 px-3" : "w-8 p-0"}`}
+              className={cn(
+                "h-8 rounded-full shadow-none",
+                isPlanMode ? "gap-1.5 px-3.5" : "w-8 p-0",
+              )}
               title={isPlanMode ? "开始规划" : primaryActionLabel}
             >
-              {isGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isPlanMode ? <ListChecks className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-              {isPlanMode && <span className="text-xs">开始规划</span>}
+              {isGenerating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : isPlanMode ? (
+                <ListChecks className="h-3.5 w-3.5" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              {isPlanMode && <span className="text-xs">规划</span>}
             </Button>
           </div>
         </div>
