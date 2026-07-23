@@ -8,7 +8,11 @@ import {
   knowledgeCreateBodySchema,
   obsidianSyncBodySchema,
 } from "@/features/knowledge/contracts/api"
-import { topicGenerateBodySchema } from "@/features/topics/contracts/api"
+import {
+  TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS,
+  capTopicKnowledgeEntryIds,
+  topicGenerateBodySchema,
+} from "@/features/topics/contracts/api"
 import {
   competitorDiscoverBodySchema,
   watchRecommendationsBodySchema,
@@ -90,9 +94,16 @@ describe("domain API contracts", () => {
   })
 
   it("bounds topic sources and competitor inputs", () => {
-    expect(topicGenerateBodySchema.safeParse({
-      knowledgeEntryIds: Array.from({ length: 13 }, (_, index) => `entry-${index}`),
-    }).success).toBe(false)
+    const withinLimit = Array.from(
+      { length: TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS },
+      (_, index) => `entry-${index}`,
+    )
+    const overLimit = [...withinLimit, "entry-overflow"]
+
+    expect(topicGenerateBodySchema.safeParse({ knowledgeEntryIds: withinLimit }).success).toBe(true)
+    expect(topicGenerateBodySchema.safeParse({ knowledgeEntryIds: overLimit }).success).toBe(false)
+    expect(capTopicKnowledgeEntryIds(overLimit)).toEqual(withinLimit)
+    expect(capTopicKnowledgeEntryIds([])).toBeUndefined()
     expect(competitorDiscoverBodySchema.safeParse({ targetUrl: "x".repeat(2_049) }).success).toBe(false)
     expect(watchRecommendationsBodySchema.safeParse({ limit: 13 }).success).toBe(false)
   })
