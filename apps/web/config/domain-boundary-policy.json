@@ -31,6 +31,12 @@
       "maxLines": 263,
       "owner": "benchmark profiles domain",
       "target": "src/features/benchmark-profiles/services"
+    },
+    {
+      "path": "src/app/api/integrations/feishu/events/route.ts",
+      "maxLines": 287,
+      "owner": "integrations domain",
+      "target": "src/lib/integrations/feishu"
     }
   ]
 }
