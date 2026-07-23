@@ -1,0 +1,4 @@
+# Accepted in security/dependency-audit-exceptions.json until fixed upstream.
+# Image still copies workspace node_modules for Prisma/runtime parity.
+CVE-2026-13149
+GHSA-f88m-g3jw-g9cj
