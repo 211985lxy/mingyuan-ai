@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto"
 import { z } from "zod"
 
 import { authErrorResponse, authenticateRequest } from "@/lib/user-auth"
+import { parseJsonBody } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import {
   AGENT_CLIENT_TYPES,
@@ -103,11 +104,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const body = await parseCreateBody(request)
+    const body = await parseJsonBody(request, createSchema)
 
     // Validate projects belong to the user and are active
     const projects = await prisma.clientProject.findMany({
       where: { id: { in: body.projects }, userId: user.id, status: "active" },
+      take: body.projects.length,
       select: { id: true },
     })
     if (projects.length !== body.projects.length) {
@@ -116,8 +118,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `项目不存在或不可用：${missing.join(", ")}` }, { status: 403 })
     }
 
-    // Validate agents
-    const invalidAgents = body.agents.filter((a) => !AGENT_AGENT_ALLOWLIST.includes(a))
+    // Validate agents (schema defaults to the allowlist when omitted)
+    const agents = body.agents ?? AGENT_AGENT_ALLOWLIST
+    const invalidAgents = agents.filter((a) => !AGENT_AGENT_ALLOWLIST.includes(a))
     if (invalidAgents.length > 0) {
       return NextResponse.json({ error: `不支持的智能体：${invalidAgents.join(", ")}` }, { status: 400 })
     }
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
         keyPrefix: plainKey.slice(0, 14),
         keyHash: hashKey(plainKey),
         allowedProjects: body.projects,
-        allowedAgents: body.agents,
+        allowedAgents: agents,
         dailyLimit: body.dailyLimit,
         clientType: body.clientType,
         allowedScopes: scopes,
@@ -170,9 +173,4 @@ export async function POST(request: NextRequest) {
     console.error("[account/agent-keys/create] Error:", error)
     return NextResponse.json({ error: "创建 API Key 失败" }, { status: 500 })
   }
-}
-
-async function parseCreateBody(request: NextRequest) {
-  const raw = await request.json()
-  return createSchema.parse(raw)
 }

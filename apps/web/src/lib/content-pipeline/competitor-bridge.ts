@@ -12,6 +12,9 @@
 
 import { prisma } from "@/lib/prisma"
 
+/** 竞品匹配时按平台加载的 WatchAccount 上限：监控账号是有限集合，超出视为异常。 */
+const WATCH_ACCOUNT_MATCH_LIMIT = 500
+
 // ─── 类型定义 ──────────────────────────────────────────────────────
 
 export interface CompetitorMatchResult {
@@ -62,6 +65,7 @@ export async function checkCompetitorMatch(
     // 查询该平台的所有 WatchAccount
     const accounts = await prisma.watchAccount.findMany({
       where: { AND: conditions },
+      take: WATCH_ACCOUNT_MATCH_LIMIT,
       select: {
         id: true,
         nickname: true,

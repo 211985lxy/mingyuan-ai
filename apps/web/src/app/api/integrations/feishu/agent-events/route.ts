@@ -3,6 +3,7 @@
 // 通过事件中的 verification token 识别"哪个机器人收到了消息"，
 // 然后路由到对应工作流，以该机器人身份回复。
 // 与旧 /api/integrations/feishu/events 并存，互不干扰。
+// api-inventory: auth=signed_integration
 
 import { createHash } from "node:crypto"
 import * as lark from "@larksuiteoapi/node-sdk"

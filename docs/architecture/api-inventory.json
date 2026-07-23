@@ -2,13 +2,27 @@
   "generatedBy": "scripts/api-inventory.mjs",
   "routes": [
     {
+      "route": "/api/account/agent-keys/[id]",
+      "file": "src/app/api/account/agent-keys/[id]/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/account/agent-keys",
       "file": "src/app/api/account/agent-keys/route.ts",
       "methods": [
-        "GET"
+        "GET",
+        "POST"
       ],
       "auth": "user_session",
-      "input": "none",
+      "input": "zod_json",
       "query": "none",
       "externalService": false,
       "cost": "low",
@@ -67,6 +81,20 @@
       "externalService": false,
       "cost": "low",
       "idempotency": false
+    },
+    {
+      "route": "/api/account/inspiration-failures",
+      "file": "src/app/api/account/inspiration-failures/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
     },
     {
       "route": "/api/admin/activation-codes/export",
@@ -295,6 +323,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/benchmark-profiles/compare",
+      "file": "src/app/api/admin/benchmark-profiles/compare/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/benchmark-profiles/import-text",
       "file": "src/app/api/admin/benchmark-profiles/import-text/route.ts",
       "methods": [
@@ -329,6 +370,19 @@
       ],
       "auth": "admin_session",
       "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/channel-metrics",
+      "file": "src/app/api/admin/channel-metrics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
       "query": "manual",
       "externalService": false,
       "cost": "low",
@@ -787,6 +841,32 @@
       "idempotency": false
     },
     {
+      "route": "/api/agent/v1/invocations/[id]",
+      "file": "src/app/api/agent/v1/invocations/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "agent_key",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/invocations",
+      "file": "src/app/api/agent/v1/invocations/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/agent/v1/knowledge/wechat-chat/confirm",
       "file": "src/app/api/agent/v1/knowledge/wechat-chat/confirm/route.ts",
       "methods": [
@@ -849,6 +929,20 @@
       "query": "manual",
       "externalService": false,
       "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim-mcp/[transport]",
+      "file": "src/app/api/aim-mcp/[transport]/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "public",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -998,6 +1092,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/ip-wiki/pages/[id]",
+      "file": "src/app/api/aim/ip-wiki/pages/[id]/route.ts",
+      "methods": [
+        "PUT"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/ip-wiki/pages",
       "file": "src/app/api/aim/ip-wiki/pages/route.ts",
       "methods": [
@@ -1035,6 +1142,19 @@
       "query": "none",
       "externalService": false,
       "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/process-video",
+      "file": "src/app/api/aim/process-video/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -1077,6 +1197,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/trace/[traceId]",
+      "file": "src/app/api/aim/trace/[traceId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/transcribe",
       "file": "src/app/api/aim/transcribe/route.ts",
       "methods": [
@@ -1100,6 +1233,19 @@
       "query": "none",
       "externalService": false,
       "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/workflow/plan",
+      "file": "src/app/api/aim/workflow/plan/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
       "idempotency": false
     },
     {
@@ -1150,6 +1296,19 @@
       ],
       "auth": "user_session",
       "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/dev-login",
+      "file": "src/app/api/auth/dev-login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "none",
       "query": "none",
       "externalService": false,
       "cost": "low",
@@ -1340,6 +1499,45 @@
       "idempotency": true
     },
     {
+      "route": "/api/competitor/channels-collections",
+      "file": "src/app/api/competitor/channels-collections/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/channels-collections/videos",
+      "file": "src/app/api/competitor/channels-collections/videos/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/channels-live-replays",
+      "file": "src/app/api/competitor/channels-live-replays/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/competitor/discover-similar",
       "file": "src/app/api/competitor/discover-similar/route.ts",
       "methods": [
@@ -1363,6 +1561,58 @@
       "query": "zod",
       "externalService": false,
       "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/search-channels-user",
+      "file": "src/app/api/competitor/search-channels-user/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/search-channels/analyze",
+      "file": "src/app/api/competitor/search-channels/analyze/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/search-channels",
+      "file": "src/app/api/competitor/search-channels/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/search-within-channel",
+      "file": "src/app/api/competitor/search-within-channel/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -1747,6 +1997,32 @@
       "idempotency": true
     },
     {
+      "route": "/api/integrations/feishu/agent-events",
+      "file": "src/app/api/integrations/feishu/agent-events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": true
+    },
+    {
+      "route": "/api/integrations/feishu/card-actions",
+      "file": "src/app/api/integrations/feishu/card-actions/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/integrations/feishu/events",
       "file": "src/app/api/integrations/feishu/events/route.ts",
       "methods": [
@@ -1784,6 +2060,20 @@
       "externalService": true,
       "cost": "low",
       "idempotency": true
+    },
+    {
+      "route": "/api/integrations/wechat-mp/events",
+      "file": "src/app/api/integrations/wechat-mp/events/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "raw_body",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
     },
     {
       "route": "/api/integrations/wecom/events",
@@ -1939,6 +2229,32 @@
       ],
       "auth": "user_session",
       "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/methodology-profiles/[id]",
+      "file": "src/app/api/methodology-profiles/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/methodology-profiles",
+      "file": "src/app/api/methodology-profiles/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
       "query": "none",
       "externalService": false,
       "cost": "low",

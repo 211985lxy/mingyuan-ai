@@ -161,7 +161,7 @@ function PrimaryActions({ primaryActions, activeResult, deliverables, hasPublish
   </Button>)}</>
 }
 
-function MoreActions({ formats, secondaryActions, activeResult, deliverables, isBusy, onRepurpose, onNextAction, onCompileToWiki, onAttachProject, onQuality, onOpenDecision, onOpenPublish, onOpenRetro, canRunPublishCheck, hasPublishScript, hasPublishCheckAction, qualityFail }: {
+function MoreActions({ formats, secondaryActions, activeResult, deliverables, isBusy, onRepurpose, onNextAction, onCompileToWiki, onAttachProject, onQuality, canRunPublishCheck, hasPublishScript, hasPublishCheckAction }: {
   formats: Set<ContentFormat>
   secondaryActions: AimNextAction[]
   activeResult?: AimGenerateResult
@@ -172,13 +172,9 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
   onCompileToWiki?: () => void
   onAttachProject?: (generationId: string) => void
   onQuality?: () => void
-  onOpenDecision?: () => void
-  onOpenPublish?: () => void
-  onOpenRetro?: () => void
   canRunPublishCheck: boolean
   hasPublishScript: boolean
   hasPublishCheckAction: boolean
-  qualityFail: boolean
 }) {
   const hasVideo = formats.has("video_script")
   const options: Array<[ContentFormat, string]> = [
@@ -193,22 +189,16 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
     if (value === "compile_wiki") return onCompileToWiki?.()
     if (value === "save_project") return onAttachProject?.(deliverables.id)
     if (value === "publish_check") return onQuality?.()
-    if (value === "decision") return onOpenDecision?.()
-    if (value === "publish") return onOpenPublish?.()
-    if (value === "retro") return onOpenRetro?.()
     const action = secondaryActions.find((item) => `action:${item.id}` === value)
     if (action && activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
   }
-  const hasWorkflow = Boolean(onAttachProject) || showPublishCheck || Boolean(onOpenDecision) || Boolean(onOpenPublish) || Boolean(onOpenRetro)
+  const hasWorkflow = Boolean(onAttachProject) || showPublishCheck
   const disabled = isBusy || (!hasWorkflow && !visibleOptions.length && !onCompileToWiki && !secondaryActions.length)
   return <Select onValueChange={handleAction} disabled={disabled}>
     <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="更多" /></SelectTrigger>
     <SelectContent>
       {onAttachProject ? <SelectItem value="save_project">保存到客户全案</SelectItem> : null}
       {showPublishCheck ? <SelectItem value="publish_check" disabled={!hasPublishScript}>发布前自查</SelectItem> : null}
-      {onOpenDecision ? <SelectItem value="decision">发布前判断</SelectItem> : null}
-      {onOpenPublish ? <SelectItem value="publish" disabled={qualityFail}>登记发布</SelectItem> : null}
-      {onOpenRetro ? <SelectItem value="retro">填写复盘</SelectItem> : null}
       {visibleOptions.map(([format, label]) => <SelectItem key={format} value={`format:${format}`}>{label}</SelectItem>)}
       {onCompileToWiki ? <SelectItem value="compile_wiki">编译进 IP 维基</SelectItem> : null}
       {secondaryActions.map((action) => <SelectItem key={action.id} value={`action:${action.id}`} disabled={!activeResult?.content.trim()}>{action.label}</SelectItem>)}
@@ -227,6 +217,9 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const hasPublishCheckAction = nextActions.some((action) => action.id === "publish_check")
   return <ActionStrip>
     {qualityFail ? <Button size="sm" className="h-7 rounded-md px-2 text-xs" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
+    {props.onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenDecision} disabled={isBusy}>发布前判断</Button> : null}
+    {props.onOpenPublish ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenPublish} disabled={isBusy || qualityFail}>登记发布</Button> : null}
+    {props.onOpenRetro ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenRetro} disabled={isBusy}>填写复盘</Button> : null}
     <MoreActions
       formats={formats}
       secondaryActions={secondaryActions}
@@ -238,13 +231,9 @@ function DeliverableActions(props: DeliverableActionsProps) {
       onCompileToWiki={props.onCompileToWiki}
       onAttachProject={props.onAttachProject}
       onQuality={props.onQuality}
-      onOpenDecision={props.onOpenDecision}
-      onOpenPublish={props.onOpenPublish}
-      onOpenRetro={props.onOpenRetro}
       canRunPublishCheck={canRunPublishCheck}
       hasPublishScript={hasPublishScript}
       hasPublishCheckAction={hasPublishCheckAction}
-      qualityFail={qualityFail}
     />
     <Select onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}>
       <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>

@@ -4,6 +4,7 @@
 //
 // 飞书卡片回调格式：POST body 包含 action.value = { action, recordId, workflowId }
 // 鉴权：通过 bot 的 verification token 校验（与事件订阅共用）。
+// api-inventory: auth=signed_integration
 
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"

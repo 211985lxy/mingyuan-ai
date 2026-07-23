@@ -9,6 +9,9 @@ import { prisma } from "@/lib/prisma"
 import { generateTopicCards } from "@/lib/topic-generation"
 import type { TopicCard } from "@/lib/topic-validation"
 
+/** 加载已发布营销元素的上限：配置型集合，超出视为异常。 */
+const PUBLISHED_TOPIC_ELEMENT_LIMIT = 500
+
 // ─── 类型定义 ──────────────────────────────────────────────────────
 
 export interface TopicExtractionResult {
@@ -86,6 +89,8 @@ export async function extractTopicsFromVideo(
     // 2. 加载已发布的营销元素
     const elements = await prisma.topicElement.findMany({
       where: { status: "published" },
+      orderBy: { code: "asc" },
+      take: PUBLISHED_TOPIC_ELEMENT_LIMIT,
       select: { code: true, name: true, typeLabel: true, description: true },
     })
 

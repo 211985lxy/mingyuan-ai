@@ -8,6 +8,7 @@ import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
  *   WECHAT_MP_TOKEN      — 公众号后台设置的 Token
  *   WECHAT_MP_APP_ID     — 公众号 AppID
  */
+// api-inventory: auth=signed_integration
 
 // ─── 签名验证 ──────────────────────────────────────────────────
 
