@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
-import {
-  buildContentDistributionClaimDraft,
-  submitContentDistributionClaim,
-} from "@/lib/aim/content-distribution-claim"
+import { buildContentDistributionClaimDraft } from "@/lib/aim/content-distribution-claim"
+import { submitContentDistributionClaim } from "@/lib/aim/content-distribution-claim-submit"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { TaskSpec } from "@/lib/task-spec"
 

@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest"
 import {
   buildContentDistributionClaimDraft,
   buildFeishuWorkItemOpenUrl,
-  submitContentDistributionClaim,
 } from "@/lib/aim/content-distribution-claim"
+import { submitContentDistributionClaim } from "@/lib/aim/content-distribution-claim-submit"
 import type { TaskSpec } from "@/lib/task-spec"
 
 const taskSpec = {

@@ -1,18 +1,13 @@
 /**
  * 内容包飞书领取事项（阶段 5 WP5.1）
  * AiM 为正本；飞书经营事项为领取协作正本。
- * 复用现有 upsertBaseRecord + 经营事项表字段契约，不新建 Agent / 表结构。
+ * 本文件仅拼装草稿，可被客户端引用；写入飞书见 content-distribution-claim-submit。
  */
 
 import { CONTENT_PACKAGE_FORMAT_LABELS, getContentPackageFromTaskSpec } from "@/lib/content-package-spec"
 import { getCanonicalFromTaskSpec } from "@/lib/canonical-content-spec"
 import type { TaskSpec } from "@/lib/task-spec"
 import type { ContentFormat } from "@/lib/aim-generator"
-import {
-  readWorkItemStoreConfig,
-  type WorkItemStoreConfig,
-} from "@/lib/aim/work-item-store"
-import { upsertBaseRecord } from "@/lib/integrations/feishu-base-publisher"
 
 export interface ContentDistributionClaimDraft {
   workflow: "内容增长"
@@ -134,82 +129,4 @@ export function buildFeishuWorkItemOpenUrl(input: {
   return input.recordId
     ? `${base}&record=${encodeURIComponent(input.recordId)}`
     : base
-}
-
-export type SubmitContentDistributionClaimResult =
-  | {
-      ok: true
-      created: boolean
-      recordId: string
-      openUrl: string
-      draft: ContentDistributionClaimDraft
-      mode: "feishu_upsert"
-    }
-  | {
-      ok: true
-      created: false
-      recordId: null
-      openUrl: string | null
-      draft: ContentDistributionClaimDraft
-      mode: "copy_only"
-      reason: string
-    }
-  | { ok: false; error: string; draft?: ContentDistributionClaimDraft }
-
-/**
- * @description 一键写入飞书经营事项（配置缺失时回退为仅草稿，不伪造成功）
- */
-export async function submitContentDistributionClaim(input: {
-  draft: ContentDistributionClaimDraft
-  env?: Record<string, string | undefined>
-  upsert?: typeof upsertBaseRecord
-  readConfig?: (env?: Record<string, string | undefined>) => WorkItemStoreConfig
-}): Promise<SubmitContentDistributionClaimResult> {
-  const draft = input.draft
-  let config: WorkItemStoreConfig
-  try {
-    config = (input.readConfig || readWorkItemStoreConfig)(input.env)
-  } catch (error) {
-    return {
-      ok: true,
-      created: false,
-      recordId: null,
-      openUrl: null,
-      draft,
-      mode: "copy_only",
-      reason: error instanceof Error ? error.message : "飞书经营事项未配置",
-    }
-  }
-
-  try {
-    const upsert = input.upsert || upsertBaseRecord
-    const result = await upsert({
-      baseToken: config.baseToken,
-      tableId: config.tableId,
-      fields: draft.feishuFields,
-      // 经营事项表已有 AIM结果ID（见 aim-feishu-work-item），不依赖资产落地专用「AIM资产键」
-      idempotencyField: "AIM结果ID",
-      idempotencyKey: String(draft.feishuFields["AIM结果ID"] || "").trim() || draft.idempotencyKey,
-      identity: "bot",
-      cliPath: config.cliPath,
-    })
-    return {
-      ok: true,
-      created: result.created,
-      recordId: result.recordId,
-      openUrl: buildFeishuWorkItemOpenUrl({
-        baseToken: config.baseToken,
-        tableId: config.tableId,
-        recordId: result.recordId,
-      }),
-      draft,
-      mode: "feishu_upsert",
-    }
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "写入飞书经营事项失败",
-      draft,
-    }
-  }
 }
