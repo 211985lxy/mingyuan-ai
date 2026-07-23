@@ -9,18 +9,19 @@ import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
-import { AimContentModeSelector, AimMethodologySelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
+import { AimMethodologySelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
 import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
+import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 
 export default function AimPage() {
   const w = useAimWorkbench()
 
   return (
-    <div className="-mx-4 -my-4 flex h-[calc(100dvh-3.5rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
+    <div className="-mx-4 -my-4 flex h-[calc(100dvh-2.75rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
       {/* 对话区（智能体列表与最近内容已移至全局侧边栏） */}
-      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-card px-4 md:px-6">
+      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-4 md:px-6">
         <AimWorkbenchHeader
           workflowStage={w.currentWorkflowStage}
           agentTitle={w.agent.title}
@@ -90,11 +91,32 @@ export default function AimPage() {
           </div>
         )}
 
+        {w.intentResolving && !w.planSession.isPlanMode && (
+          <div className="px-3 py-2 sm:px-5">
+            <p className="mx-auto max-w-lg text-center text-xs text-muted-foreground">
+              正在辨认本轮意图…
+            </p>
+          </div>
+        )}
+
+        {w.pendingTurnIntent && !w.planSession.isPlanMode && (
+          <div className="px-3 py-2 sm:px-5">
+            <AimTurnIntentConfirmBar
+              key={`${w.pendingTurnIntent.text}:${w.pendingTurnIntent.intent.summary}`}
+              intent={w.pendingTurnIntent.intent}
+              busy={w.busy}
+              source={w.pendingTurnIntent.source}
+              onConfirm={w.handleConfirmTurnIntent}
+              onCancel={w.handleCancelTurnIntent}
+            />
+          </div>
+        )}
+
         <AimMessageStream
           ref={w.scrollRef}
           messages={w.messages}
           busy={w.busy}
-          workflowLanding={w.showWorkflowLanding && !w.planSession.isPlanMode}
+          workflowLanding={w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent}
           agentIntro={w.agent.intro}
           workflowStage={w.currentWorkflowStage}
           selectedAgentId={w.selectedAgentId}
@@ -117,9 +139,8 @@ export default function AimPage() {
           }}
         />
 
-        {/* 输入区 */}
-        <footer className="border-t px-3 py-2 sm:px-5">
-          {w.selectedAgentId === "content_producer" && <AimContentModeSelector value={w.agentModule} onChange={w.setAgentModule} />}
+        {/* 输入区：悬浮卡片，对标 Claude composer */}
+        <footer className="px-3 pb-4 pt-1 sm:px-5 sm:pb-5">
           <AimResearchHint agentId={w.selectedAgentId} />
           <AimPromptComposer
             value={w.input}
@@ -149,6 +170,9 @@ export default function AimPage() {
             onComposerModeChange={w.setComposerMode}
             canUsePlanMode={w.canUsePlanMode}
             isPlanSessionActive={w.planSession.isPlanMode}
+            showContentMode={w.selectedAgentId === "content_producer"}
+            contentMode={w.agentModule}
+            onContentModeChange={w.setAgentModule}
           />
         </footer>
       </section>

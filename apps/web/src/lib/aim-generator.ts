@@ -44,6 +44,8 @@ export interface AimInput {
   runSpec?: AimRunSpec
   /** ADR-002：显式选择的命名方法论 profile id（透传到 buildAimGeneration → prepareAimContext）。 */
   methodologyProfileIds?: string[]
+  /** 用户确认的本轮意图（优先于规则推断） */
+  confirmedTurnIntent?: import("@/lib/aim-turn-intent").AimTurnIntent
 }
 
 function asStringArray(value: unknown): string[] {
@@ -205,5 +207,6 @@ export async function generateAimContent(input: AimInput) {
     taskSpec: input.taskSpec,
     runSpec: input.runSpec,
     methodologyProfileIds: input.methodologyProfileIds,
+    confirmedTurnIntent: input.confirmedTurnIntent,
   })
 }

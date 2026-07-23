@@ -88,7 +88,40 @@ export interface AimHarnessOutcome {
 export async function runAimHarness(
   input: RunAimHarnessInput
 ): Promise<AimHarnessOutcome> {
-  const spec = planAimRun(input.plan)
+  let spec = planAimRun(input.plan)
+
+  // 用户确认意图已冻结 runtimeTask：禁止向量/高稳 LLM 再次改判
+  if (!input.plan.intentFrozen) {
+    const { isStableRoutingEnabled, resolveStableAimRouting, applyStableRoutingToSpec } = await import("@/lib/aim-stable-routing")
+    const { isIntentVectorFallbackEnabled } = await import("@/lib/aim-intent-vector")
+    const stableOn = isStableRoutingEnabled(input.plan.stableRouting)
+    if (stableOn || isIntentVectorFallbackEnabled()) {
+      try {
+        const routing = await resolveStableAimRouting({
+          agentId: input.plan.agentId,
+          rawInput: input.plan.rawInput,
+          taskType: input.plan.taskType,
+          polishInstruction: input.plan.polishInstruction,
+          targetFormats: spec.outputFormats,
+          topicType: input.plan.topicType,
+          hotTopic: input.plan.hotTopic,
+          videoCopyExtractionId: input.plan.videoCopyExtractionId,
+          contentScenario: input.plan.contentScenario,
+          copyStudioModule: input.plan.agentModule ?? input.plan.writerModule,
+          messages: input.plan.messages,
+          conversationMode: spec.conversationMode,
+          ruleRuntimeTask: spec.runtimeTask,
+          stableRouting: stableOn,
+        })
+        if (stableOn || routing.classifiedBy === "vector") {
+          spec = applyStableRoutingToSpec(spec, routing)
+        }
+      } catch {
+        // 保持规则版 spec
+      }
+    }
+  }
+
   const runId = makeRunId()
 
   // Capture every provider attempt for this run via the LLM telemetry seam.

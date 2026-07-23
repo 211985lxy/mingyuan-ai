@@ -13,6 +13,7 @@ import {
   ensureContentCreationTrace,
   executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
+import { AIM_NORTH_STAR_GOAL, AIM_SESSION_PRIORITY_RULES, LIGHT_EDIT_OUTPUT_BOUNDARY } from "@/lib/aim-intent-boundaries"
 import type { ContentFormat } from "./aim-generator"
 import type {
   AimAgentHandler,
@@ -34,15 +35,26 @@ export class DeepCopywriterHandler implements AimAgentHandler {
 
   private buildChatPrompt(params: AimChatParams): string {
     const contextBlock = buildChatContextBlock(params)
+    const latestUser = [...(params.messages ?? [])]
+      .reverse()
+      .find((m) => m?.role === "user" && typeof m?.content === "string")?.content || ""
+    const workflowContext = buildWorkflowContext({
+      taskSpec: params.taskSpec,
+      rawInput: latestUser,
+      runtimeTask: params.runtimeTask,
+    })
+    const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
     return `你是一个深度文案官，负责把想法、视频原文、老板口述或对标文案，打磨成一篇高质量的完整长篇文案。
+
+北极星目标：${AIM_NORTH_STAR_GOAL}
 
 企业已有核心知识库（参考背景）：
 ${contextBlock}
-
+${workflowContext ? `\n工作流任务单：\n${workflowContext}\n` : ""}
 IP操盘方法论（写作与判断规则）：
 ${params.methodologyBlock}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
-
+${lightEditBlock}
 ${AIM_HIGH_RISK_LOOP_RULE}
 
 你的对话原则：
@@ -64,8 +76,7 @@ C. 选项内容
 ${BENCHMARK_REWRITE_GUARDRAIL}
 13. 如果用户要求把成稿整理成发布文案/发布话题/发布包，必须遵守：
 ${PUBLISH_PACKAGE_CHAT_RULE}
-14. 如果用户要求"结合他的资料/人设/IP故事/来时路自然融入"，要把资料自然化进正文推进、案例、判断和身份表达里，不要单独拼一段资料摘要或履历。
-15. 如果用户表达了"别越改越短""保持原稿长度/体量""不要压缩"这类意图，就默认保留当前稿子的主体信息密度和篇幅；除非用户明确要求精简，否则不要主动缩成短版。
+14. ${AIM_SESSION_PRIORITY_RULES}
 
 请直接根据上文与用户的历史对话，产出下一轮内容。`
   }

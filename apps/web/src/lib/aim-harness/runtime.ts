@@ -73,6 +73,8 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     writerModule: request.writerModule,
     modelPolicy: request.modelPolicy,
     methodologyProfileIds: request.methodologyProfileIds,
+    stableRouting: request.stableRouting,
+    intentFrozen: request.intentFrozen,
   }
 }
 
@@ -300,7 +302,38 @@ export interface AimStreamHandle {
  */
 export async function streamAimRun(request: AimRunRequest): Promise<AimStreamHandle> {
   const plan = toPlanInput(request)
-  const spec = planAimRun(plan)
+  let spec = planAimRun(plan)
+  // 用户确认意图已冻结：禁止向量/高稳 LLM 再次改判
+  if (!plan.intentFrozen) {
+    const { isStableRoutingEnabled, applyStableRoutingToSpec, resolveStableAimRouting } = await import("@/lib/aim-stable-routing")
+    const { isIntentVectorFallbackEnabled } = await import("@/lib/aim-intent-vector")
+    const stableOn = isStableRoutingEnabled(plan.stableRouting)
+    if (stableOn || isIntentVectorFallbackEnabled()) {
+      try {
+        const routing = await resolveStableAimRouting({
+          agentId: plan.agentId,
+          rawInput: plan.rawInput,
+          taskType: plan.taskType,
+          polishInstruction: plan.polishInstruction,
+          targetFormats: spec.outputFormats,
+          topicType: plan.topicType,
+          hotTopic: plan.hotTopic,
+          videoCopyExtractionId: plan.videoCopyExtractionId,
+          contentScenario: plan.contentScenario,
+          copyStudioModule: plan.agentModule ?? plan.writerModule,
+          messages: plan.messages,
+          conversationMode: spec.conversationMode,
+          ruleRuntimeTask: spec.runtimeTask,
+          stableRouting: stableOn,
+        })
+        if (stableOn || routing.classifiedBy === "vector") {
+          spec = applyStableRoutingToSpec(spec, routing)
+        }
+      } catch {
+        // keep rule spec
+      }
+    }
+  }
   // runId 统一走 runner.makeRunId（与 executeAimRun / runAimHarness 同源）
   const runId = makeRunId()
 

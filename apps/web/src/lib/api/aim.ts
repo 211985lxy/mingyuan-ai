@@ -157,6 +157,29 @@ export async function createAimWorkflowBrief(
 }
 
 /**
+ * 规则 +（低置信）向量兜底解析本轮意图，供生成前确认。
+ */
+export async function resolveAimTurnIntentRemote(data: {
+  rawInput: string
+  targetFormats?: ContentFormat[]
+  projectId?: string
+  archive?: {
+    hasProject?: boolean
+    knowledgeCount?: number
+    knownFactCount?: number
+    hasOfferSignal?: boolean
+    hasCaseSignal?: boolean
+    unknowns?: string[]
+  }
+}): Promise<import("@/lib/aim-intent-vector").ResolveTurnIntentResult> {
+  return request("/api/aim/intent-resolve", {
+    method: "POST",
+    body: JSON.stringify(data),
+    timeout: 45_000,
+  })
+}
+
+/**
  * 计划模式：请求档案驱动追问
  * @param data - 计划请求体
  * @param signal - 可选 AbortSignal

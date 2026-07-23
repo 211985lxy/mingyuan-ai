@@ -171,8 +171,14 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
   // 显式请求口播/文章等交付物时，正文里出现“选题/定位”只是创作素材，
   // 不能盖过 write_script / targetFormats 把文案生成误路由成定位策划。
   const hasExplicitContentOutput = input.taskType === "write_script" || (input.targetFormats?.length ?? 0) > 0
+  // 自然语言交付物信号：种草/口播/小红书等优先于定位关键词
+  const asksForContentDelivery = includesAny(text, [
+    "种草", "小红书", "口播", "短视频", "朋友圈", "公众号", "拍摄交接",
+    "写一篇", "写一条", "帮我写", "出一版", "出一篇", "来一篇", "来一条",
+  ])
   if (
     !hasExplicitContentOutput
+    && !asksForContentDelivery
     && includesAny(text, ["定位", "选题", "账号方向", "内容方向", "IP策划", "策划方案", "人设卖点", "人设梳理"])
   ) {
     return "positioning_topic"
@@ -182,8 +188,8 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
     includesAny(text, ["结合", "参考", "用上", "调用"]) &&
     includesAny(text, ["会议纪要", "访谈", "案例", "产品", "客户", "对标", "知识库", "老板经历", "老板卖点", "人设", "IP故事", "来时路", "资料", "卖点", "痛点"])
   const asksForLocalCopyPart =
-    includesAny(text, ["优化", "改", "润色", "换个说法", "调整"]) &&
-    includesAny(text, ["开头", "前3秒", "前三秒", "第一句话", "钩子", "起手", "开场", "标题", "结尾", "收尾"])
+    includesAny(text, ["优化", "改", "润色", "换个说法", "调整", "只改", "只优化"]) &&
+    includesAny(text, ["开头", "前3秒", "前三秒", "第一句话", "第一句", "钩子", "起手", "开场", "标题", "结尾", "收尾", "CTA", "行动引导"])
   // "优化这篇文案" 等不含局部词的优化意图也视为轻改（需有原稿指代）
   const asksForGenericPolish =
     includesAny(text, ["优化", "润色", "顺一下", "自然点", "更自然", "口语化"])
@@ -193,13 +199,26 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
   // 创建动词：用户要的是新稿；"写一版并优化转化"仍属新写，
   // "优化/自然一点/口语化"不能压过创建动词单独决定任务类型
   const asksForCreation =
-    includesAny(text, ["写一版", "写个", "生成", "起草", "创作", "出一条"])
+    includesAny(text, [
+      "写一版", "写个", "写一篇", "写一条", "帮我写", "生成", "起草", "创作",
+      "出一条", "出一版", "出一篇", "来一篇", "来一条", "种草",
+    ]) || asksForContentDelivery
   // 指代已有原稿：有原稿的纯润色才是轻改；无原稿的"写得更自然"按新写处理
   const referencesOriginalCopy =
     includesAny(text, ["这篇", "这条", "这段", "原稿", "原文", "上述", "上面", "这一版", "稿子"])
   // 这些说法本身隐含原稿存在
   const impliesOriginalCopy =
     includesAny(text, ["换个说法", "改得", "改成", "这里改", "这句话"])
+
+  // 局部改优先：即使同时出现「写」类词，只要明确点名局部部位且无整体重写，仍走 light_edit
+  if (
+    asksForLocalCopyPart &&
+    !asksForRewrite &&
+    !asksForExternalContext &&
+    (referencesOriginalCopy || impliesOriginalCopy || includesAny(text, ["只", "不要改正文", "别改正文"]))
+  ) {
+    return "light_edit"
+  }
 
   if (
     !asksForExternalContext &&

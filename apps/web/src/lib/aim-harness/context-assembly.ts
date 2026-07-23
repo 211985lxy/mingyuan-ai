@@ -20,7 +20,6 @@ import {
   type AimRuntimeTask,
   type ResolvedKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
-import { resolveAimConversationIntentWithRules } from "@/lib/aim-conversation-intent"
 import { compressAimMessages } from "@/lib/aim-context-compressor"
 import { applyAimContextBudget } from "@/lib/aim-context-budget"
 import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
@@ -37,8 +36,9 @@ import {
 } from "@/lib/aim-pain-intent"
 import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 import { buildViralStructureBlock } from "@/lib/aim-generator"
-import { buildTaskSpecSkeleton } from "@/lib/task-spec"
+import { buildTaskSpecSkeleton, enrichTaskSpecFromRawInput } from "@/lib/task-spec"
 import { refineTaskSpec } from "@/lib/task-spec-llm"
+import { formatLabelForTaskSpec, inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
 import {
   addAimTraceStep,
   runAimTraceStep,
@@ -85,6 +85,8 @@ export interface PrepareAimContextInput {
   contextOverride?: AimGenerationContextOverride
   /** ADR-002：显式选择的命名方法论 profile id（解析在装配阶段完成）。 */
   methodologyProfileIds?: string[]
+  /** 高稳路由/TaskSpec LLM 精化开关（默认开；eval 可关） */
+  stableRouting?: boolean
 }
 
 /**
@@ -238,8 +240,9 @@ async function checkProjectAndResolveIntent(input: {
     trace,
     "resolve_generation_intent",
     "生成模式识别",
-    async () =>
-      resolveAimConversationIntentWithRules({
+    async () => {
+      const { resolveAimConversationIntentWithRules } = await import("@/lib/aim-conversation-intent")
+      return resolveAimConversationIntentWithRules({
         agentId,
         messages: [
           {
@@ -247,7 +250,8 @@ async function checkProjectAndResolveIntent(input: {
             content: [spec.rawInput, params.polishInstruction].filter(Boolean).join("\n"),
           },
         ],
-      }).intent,
+      }).intent
+    },
     (intent) => ({
       summary: intent.mode,
       metadata: { useKnowledge: intent.useKnowledge, useMethodology: intent.useMethodology },
@@ -474,7 +478,12 @@ async function buildContextTaskSpec(input: {
     } : null,
     knowledgeTitles,
   })
-  return params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
+  const base = params.taskSpec || await refineTaskSpec(taskSpecSkeleton, { enabled: false })
+  const formats = (spec.outputFormats?.length
+    ? spec.outputFormats
+    : inferContentFormatsFromRawInput(spec.rawInput)) as import("@/lib/aim-generator").ContentFormat[]
+  const outputFormatHint = formats[0] ? formatLabelForTaskSpec(formats[0]) : undefined
+  return enrichTaskSpecFromRawInput(base, spec.rawInput, { outputFormatHint })
 }
 
 /**

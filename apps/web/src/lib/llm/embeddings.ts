@@ -107,60 +107,49 @@ export interface EmbeddingResult {
  * @returns Promise<EmbeddingResult | null>
  */
 export async function generateEmbedding(text: string): Promise<EmbeddingResult | null> {
+  const results = await generateEmbeddings([text])
+  return results[0] ?? null
+}
+
+/**
+ * 批量生成 embedding（一次 API 调用多个 input）。
+ * 失败时返回等长 null 数组；部分实现按 index 对齐。
+ */
+export async function generateEmbeddings(texts: string[]): Promise<Array<EmbeddingResult | null>> {
+  if (!texts.length) return []
   const client = getClient()
-  if (!client) return null
+  if (!client) return texts.map(() => null)
 
   const config = readConfig()
-
-  // BGE 系列模型 token 上限约 512（≈1500 中文字符），过长的 input 会触发 400。
-  // 截断到安全长度，避免批量调用时刷屏 400。
   const maxChars = config.model.startsWith("BAAI/bge") ? 1500 : 8000
-  const truncated = text.slice(0, maxChars)
-  const retryInput = config.model.startsWith("BAAI/bge")
-    ? truncated.slice(0, Math.min(400, truncated.length))
-    : truncated
-
-  const tryCreate = (input: string) =>
-    client.embeddings.create({
-      model: config.model,
-      input,
-      // 部分模型（如 OpenAI ada-002）支持 dimensions 参数，部分（如 BGE）不支持
-      // 仅当模型名以 text-embedding 开头时传递 dimensions
-      ...(config.model.startsWith("text-embedding") ? { dimensions: config.dimensions } : {}),
-    })
+  const inputs = texts.map((t) => (t || " ").slice(0, maxChars))
 
   try {
-    const response = await tryCreate(truncated)
-
-    const data = response.data[0]
-    if (!data) return null
-
-    return {
-      vector: data.embedding,
-      model: response.model,
-      dimensions: config.dimensions,
-      tokensUsed: response.usage?.prompt_tokens ?? 0,
+    const response = await client.embeddings.create({
+      model: config.model,
+      input: inputs,
+      ...(config.model.startsWith("text-embedding") ? { dimensions: config.dimensions } : {}),
+    })
+    const byIndex = new Map<number, number[]>()
+    for (const row of response.data ?? []) {
+      byIndex.set(row.index, row.embedding)
     }
-  } catch {
-    // BGE 对中文 token/字符比波动较大；首次 1500 字符失败时用 400 字符重试。
-    // 其它模型仍按原输入重试一次，覆盖间歇性网络错误。
-    try {
-      const response = await tryCreate(retryInput)
-      const data = response.data[0]
-      if (!data) return null
+    return inputs.map((_, i) => {
+      const vector = byIndex.get(i) ?? response.data?.[i]?.embedding
+      if (!vector?.length) return null
       return {
-        vector: data.embedding,
+        vector,
         model: response.model,
         dimensions: config.dimensions,
-        tokensUsed: response.usage?.prompt_tokens ?? 0,
+        tokensUsed: i === 0 ? (response.usage?.prompt_tokens ?? 0) : 0,
       }
-    } catch (retryError) {
-      console.warn(
-        `[embedding] generation failed (model=${config.model}, inputLen=${truncated.length}, retryLen=${retryInput.length}):`,
-        retryError,
-      )
-      return null
-    }
+    })
+  } catch (error) {
+    console.warn(
+      `[embedding] batch generation failed (model=${config.model}, n=${inputs.length}):`,
+      error,
+    )
+    return texts.map(() => null)
   }
 }
 

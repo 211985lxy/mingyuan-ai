@@ -10,6 +10,10 @@ export interface AimDeliveryContractInput {
   isCurrentVersion: boolean
   primaryNextActionLabel?: string
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
+  /** 本轮意图一句话（Intent-first，优先于内部任务类型展示） */
+  turnIntentSummary?: string
+  /** 档案缺口（生成时已提示；交付时并入 unknowns） */
+  archiveGaps?: string[]
 }
 
 export interface AimDeliveryContract {
@@ -41,7 +45,8 @@ const TASK_LABELS: Record<string, string> = {
  */
 export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDeliveryContract {
   const taskLabel = TASK_LABELS[input.conversationMode || ""] || "正式交付"
-  const taskDetail = input.isCurrentVersion ? "当前版本" : "历史版本"
+  const taskDetail = input.turnIntentSummary?.trim()
+    || (input.isCurrentVersion ? "当前版本" : "历史版本")
 
   const titles = (input.knowledgeTitles || []).filter(Boolean)
   const evidenceLabel = input.knowledgeCount > 0
@@ -73,12 +78,13 @@ export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDe
 
   // ── 协作认知层（TaskSpec）：按模式折叠/展开假设与缺口 ──
   const spec = input.taskSpec
-  const expanded = !!(spec && spec.mode !== "direct_delivery")
+  const archiveGaps = (input.archiveGaps || []).filter(Boolean)
+  const expanded = !!(spec && spec.mode !== "direct_delivery") || archiveGaps.length > 0
   const assumptions = spec?.assumptions?.slice(0, 2)
-  const unknowns = spec?.unknowns
+  const unknowns = [...archiveGaps, ...(spec?.unknowns || [])].slice(0, 6)
   const knownFacts = spec?.knownFacts
   // 低风险直接交付：状态补充「已按现有资料直接完成」（不追问）
-  if (spec?.mode === "direct_delivery" && !input.degraded && input.qualityStatus !== "fail") {
+  if (spec?.mode === "direct_delivery" && !input.degraded && input.qualityStatus !== "fail" && archiveGaps.length === 0) {
     status = { ...status, detail: "已按现有资料直接完成。" }
   }
 
@@ -91,7 +97,7 @@ export function buildAimDeliveryContract(input: AimDeliveryContractInput): AimDe
       detail: input.isCurrentVersion ? "操作当前版本" : "建议返回当前版本",
     },
     assumptions,
-    unknowns,
+    unknowns: unknowns.length ? unknowns : undefined,
     knownFacts,
     taskSpec: spec ?? null,
     expanded,

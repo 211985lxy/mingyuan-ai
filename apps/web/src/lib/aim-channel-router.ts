@@ -22,7 +22,7 @@ export interface AimChannelIntent {
 const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
   {
     agentId: "content_producer",
-    aliases: ["内容创作", "内容文案", "内容文案创作", "写文案", "口播", "短视频", "社媒"],
+    aliases: ["内容创作", "内容文案", "内容文案创作", "内容创作官", "写文案", "口播", "短视频", "社媒", "种草"],
   },
   {
     agentId: "deep_copywriter",
@@ -30,7 +30,7 @@ const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
   },
   {
     agentId: "free_copywriter",
-    aliases: ["自由", "自由文案", "交货", "交货文案", "直接写"],
+    aliases: ["自由", "自由文案", "自由撰稿人", "交货", "交货文案", "交货文案创作", "直接写"],
   },
   {
     agentId: "business_diagnosis",
@@ -46,7 +46,7 @@ const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
   },
   {
     agentId: "persona",
-    aliases: ["人设", "人设故事", "来时路", "置顶视频"],
+    aliases: ["人设", "人设故事", "人设故事官", "人设梳理官", "人设故事梳理", "人设梳理", "来时路", "置顶视频"],
   },
 ]
 

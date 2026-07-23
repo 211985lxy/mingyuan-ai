@@ -42,6 +42,7 @@ import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-m
 import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
 import { useAimPlanSession, planTaskSpecToWorkflowBrief } from "@/features/aim/hooks/use-aim-plan-session"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-composer"
+import { useAimTurnIntentGate } from "@/features/aim/hooks/use-aim-turn-intent-gate"
 
 /**
  * Master hook — consolidates all AIM workbench state, refs, and hook
@@ -268,6 +269,7 @@ export function useAimWorkbench() {
 
   // ---- resetConversation (shared by page commands + header) ----
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
+  const clearTurnIntentRef = useRef<(() => void) | null>(null)
 
   function resetConversation() {
     requestAbortRef.current?.abort()
@@ -277,6 +279,7 @@ export function useAimWorkbench() {
     clearAimDraft(selectedAgentId, currentProjectScope)
     planSession.resetPlan()
     setComposerMode("direct")
+    clearTurnIntentRef.current?.()
   }
 
   const restoreScopeDraft = (nextDraft: AimDraft | null) => {
@@ -304,6 +307,7 @@ export function useAimWorkbench() {
     // 切换项目时废弃旧计划，防止跨客户上下文混用
     planSession.abandonPlan()
     setComposerMode("direct")
+    clearTurnIntentRef.current?.()
   }
 
   const { changeProjectScope } = useAimProjectScopeSwitch({
@@ -385,14 +389,28 @@ export function useAimWorkbench() {
     editorPanelLabels, imageAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
   })
 
-  /** 统一的生成入口：计划模式走规划，直接模式走原有生成 */
-  const handleGenerateOrPlan = useCallback(() => {
-    if (composerMode === "plan") {
-      void handleStartPlan()
-    } else {
-      handleGenerate()
-    }
-  }, [composerMode, handleStartPlan, handleGenerate])
+  const {
+    pendingTurnIntent,
+    intentResolving,
+    clearPendingTurnIntent,
+    handleConfirmTurnIntent,
+    handleCancelTurnIntent,
+    handleGenerateOrPlan,
+  } = useAimTurnIntentGate({
+    composerMode,
+    handleStartPlan,
+    hasEditorSelection,
+    imageCount: imageAttachments.length,
+    handleGenerate,
+    text: input,
+    messageCount: messages.length,
+    runWorkbenchCommand,
+    defaultFormats: agent.defaultFormats,
+    projectEnabled,
+    selectedProjectId,
+    generateWithInput,
+  })
+  clearTurnIntentRef.current = clearPendingTurnIntent
 
   // ---- Derived flags ----
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
@@ -445,6 +463,8 @@ export function useAimWorkbench() {
     // 计划模式
     composerMode, setComposerMode, canUsePlanMode, planSession,
     handlePlanConfirm, handlePlanAbandon,
+    // 本轮意图确认
+    pendingTurnIntent, handleConfirmTurnIntent, handleCancelTurnIntent, intentResolving,
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),

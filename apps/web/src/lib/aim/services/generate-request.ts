@@ -2,6 +2,7 @@ import { parseGenerateBody, validateGenerateInput } from "@/lib/aim-generate-val
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { prepareAimGenerateInput } from "@/lib/aim-harness/request-context"
 import { executeAimRun } from "@/lib/aim-harness/runtime"
+import { actionToRuntimeTask } from "@/lib/aim-intent-vector"
 import {
   addAimTraceStep,
   createAimTrace,
@@ -67,7 +68,35 @@ export async function prepareAimGenerateRequest(userId: string, body: Record<str
     useMarketViralVideos: parsed.useMarketViralVideos,
     trace,
   })
-  return { ok: true as const, userId, parsed, trace, workflowBrief, ...preparedInput }
+  // 用户确认意图是本次运行唯一权威：action → runtimeTask，禁止后续再向量/LLM 改判
+  const frozenTask = parsed.confirmedTurnIntent
+    ? actionToRuntimeTask(parsed.confirmedTurnIntent.action)
+    : undefined
+  const runtimeTask = frozenTask ?? preparedInput.runtimeTask
+  const intentFrozen = Boolean(frozenTask)
+  if (intentFrozen) {
+    await addAimTraceStep(trace, {
+      key: "freeze_confirmed_intent",
+      label: "确认意图冻结",
+      status: "success",
+      summary: `runtimeTask=${runtimeTask}（来自用户确认 ${parsed.confirmedTurnIntent!.action}）`,
+      metadata: {
+        action: parsed.confirmedTurnIntent!.action,
+        scope: parsed.confirmedTurnIntent!.scope,
+        runtimeTask,
+      },
+    })
+  }
+  return {
+    ok: true as const,
+    userId,
+    parsed,
+    trace,
+    workflowBrief,
+    rawInput: preparedInput.rawInput,
+    runtimeTask,
+    intentFrozen,
+  }
 }
 
 type PreparedRequest = Extract<Awaited<ReturnType<typeof prepareAimGenerateRequest>>, { ok: true }>
@@ -78,7 +107,7 @@ type PreparedRequest = Extract<Awaited<ReturnType<typeof prepareAimGenerateReque
  * @returns 无返回值
  */
 export async function executePreparedAimGeneration(prepared: PreparedRequest) {
-  const { parsed, trace, userId, workflowBrief, rawInput, runtimeTask } = prepared
+  const { parsed, trace, userId, workflowBrief, rawInput, runtimeTask, intentFrozen } = prepared
   const projectId = workflowBrief?.projectId || parsed.projectId
   return executeAimRun({
     entrypoint: "generate",
@@ -96,6 +125,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     topicSelectionId: parsed.topicSelectionId,
     selectedTopicIndex: parsed.selectedTopicIndex,
     runtimeTask,
+    intentFrozen,
     agentModule: parsed.agentModule,
     writerModule: parsed.writerModule,
     taskSpec: workflowBrief?.taskSpec,
@@ -121,6 +151,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     methodologyProfileIds: parsed.methodologyProfileIds,
     trace,
     taskSpec: workflowBrief?.taskSpec,
+    confirmedTurnIntent: parsed.confirmedTurnIntent,
   }))
 }
 

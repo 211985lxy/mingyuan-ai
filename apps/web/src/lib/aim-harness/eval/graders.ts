@@ -20,6 +20,12 @@ import {
   resolveAimRuntimeTask,
   resolveKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
+import { formatLabelForTaskSpec, inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
+import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
+import {
+  buildTaskSpecSkeleton,
+  enrichTaskSpecFromRawInput,
+} from "@/lib/task-spec"
 
 import type { ContentFormat } from "@/lib/aim-generator"
 
@@ -51,6 +57,8 @@ export interface GraderInput {
   warnedInsufficientInfo?: boolean
   /** the draft text concatenated for banned-substring checks */
   draftText?: string
+  /** optional final prompt text for TaskSpec / grounding assertions */
+  promptText?: string
 }
 
 export interface GraderAssertion {
@@ -77,13 +85,55 @@ export interface GraderResult {
  */
 export function referenceRuntimeTask(fixture: EvalFixture) {
   const { input } = fixture
+  const targetFormats = input.targetFormats?.length
+    ? input.targetFormats
+    : inferContentFormatsFromRawInput(input.rawInput)
   return resolveAimRuntimeTask({
     agentId: input.agentId,
     input: input.rawInput,
     taskType: input.taskType,
     polishInstruction: input.polishInstruction,
-    targetFormats: input.targetFormats,
+    targetFormats,
   })
+}
+
+/** 为 prompt_quality 断言构建与生产一致的任务单渲染文本 */
+function referenceWorkflowPrompt(fixture: EvalFixture): string {
+  const skeleton = buildTaskSpecSkeleton({
+    agentId: fixture.input.agentId,
+    taskType: fixture.input.taskType,
+    rawInput: fixture.input.rawInput,
+    project: null,
+    topicSelection: fixture.input.topicTitle
+      ? { title: fixture.input.topicTitle, rationale: fixture.input.topicRationale }
+      : null,
+    knowledgeTitles: fixture.seedContext.knowledge.map((k) => k.title),
+  })
+  const inferred = inferContentFormatsFromRawInput(fixture.input.rawInput)
+  const taskSpec = enrichTaskSpecFromRawInput(skeleton, fixture.input.rawInput, {
+    outputFormatHint: inferred[0] ? formatLabelForTaskSpec(inferred[0]) : undefined,
+  })
+  // 把 seed known facts 并入渲染，模拟档案注入
+  if (fixture.seedContext.knowledge.length) {
+    taskSpec.knownFacts = [
+      ...taskSpec.knownFacts,
+      ...fixture.seedContext.knowledge.slice(0, 4).map((k) => ({
+        statement: k.content.slice(0, 80),
+        source: k.title,
+      })),
+    ]
+  }
+  const workflow = buildWorkflowContext({
+    taskSpec,
+    rawInput: fixture.input.rawInput,
+    runtimeTask: fixture.expectations.runtimeTask,
+    targetFormats: fixture.input.targetFormats ?? fixture.expectations.outputFormats,
+    topicTitle: fixture.input.topicTitle,
+    topicRationale: fixture.input.topicRationale,
+    hotTopic: fixture.input.hotTopic,
+    polishInstruction: fixture.input.polishInstruction,
+  })
+  return [workflow, fixture.seedContext.ipWikiBlock || ""].filter(Boolean).join("\n\n")
 }
 
 /**
@@ -196,6 +246,49 @@ export function gradeFixture(graderInput: GraderInput): GraderResult {
       name: "no_banned_substrings",
       passed: hit.length === 0,
       detail: hit.length ? `hit=[${hit.join(",")}]` : "ok",
+    })
+  }
+
+  // 7. prompt_quality — TaskSpec fields must appear in rendered workflow prompt
+  if (fixture.expectations.mustIncludeTaskSpecFields?.length) {
+    const prompt = graderInput.promptText ?? referenceWorkflowPrompt(fixture)
+    const missing = fixture.expectations.mustIncludeTaskSpecFields.filter(
+      (field) => !prompt.includes(field),
+    )
+    assertions.push({
+      name: "taskspec_fields_in_prompt",
+      passed: missing.length === 0,
+      detail: missing.length ? `missing=[${missing.join(",")}]` : "ok",
+    })
+  }
+
+  // 8. prompt_quality — seed facts / IP anchors must be present in prompt or draft
+  if (fixture.expectations.mustGroundInSeedFacts?.length) {
+    const corpus = [
+      graderInput.promptText ?? referenceWorkflowPrompt(fixture),
+      graderInput.draftText ?? "",
+      fixture.seedContext.ipWikiBlock ?? "",
+      ...fixture.seedContext.knowledge.map((k) => `${k.title}\n${k.content}`),
+    ].join("\n")
+    const missing = fixture.expectations.mustGroundInSeedFacts.filter(
+      (fact) => !corpus.includes(fact),
+    )
+    assertions.push({
+      name: "ground_in_seed_facts",
+      passed: missing.length === 0,
+      detail: missing.length ? `missing=[${missing.join(",")}]` : "ok",
+    })
+  }
+
+  // 9. prompt_quality — output scope (opening_only vs full_draft)
+  if (fixture.expectations.maxScope === "opening_only" && graderInput.draftText) {
+    const draft = graderInput.draftText
+    const tooLong = draft.length > 400
+    const looksFull = /===FORMAT:|正文|完整成稿/.test(draft) && draft.length > 200
+    assertions.push({
+      name: "max_scope_opening_only",
+      passed: !tooLong && !looksFull,
+      detail: `chars=${draft.length} looksFull=${looksFull}`,
     })
   }
 

@@ -25,7 +25,11 @@ import { planAimRun } from "@/lib/aim-harness/planner"
 import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 import { ContentProducerHandler } from "@/lib/aim-agent-content-producer"
 import { copyStudioModuleFromRouteKey } from "@/lib/copy-studio"
-import { withCopyStudioExecution } from "@/lib/task-spec"
+import {
+  buildTaskSpecSkeleton,
+  enrichTaskSpecFromRawInput,
+  withCopyStudioExecution,
+} from "@/lib/task-spec"
 import { FreeCopywriterHandler } from "@/lib/aim-agent-free-copywriter"
 import { DeepCopywriterHandler } from "@/lib/aim-agent-deep-copywriter"
 import { BusinessSystemDiagnosisHandler } from "@/lib/aim-agent-business-system-diagnosis"
@@ -170,6 +174,23 @@ async function buildAimChatRuntime(
     metadata: { ...budgeted.stats, factPriority: AIM_FACT_PRIORITY_VERSION },
   })
 
+  const latestUserText = [...params.messages]
+    .reverse()
+    .find((m) => m?.role === "user" && typeof m?.content === "string")?.content
+    || ""
+  const taskSpec = params.taskSpec
+    ? enrichTaskSpecFromRawInput(params.taskSpec, latestUserText)
+    : enrichTaskSpecFromRawInput(
+        buildTaskSpecSkeleton({
+          agentId,
+          rawInput: latestUserText,
+          project: null,
+          topicSelection: null,
+          knowledgeTitles: [],
+        }),
+        latestUserText,
+      )
+
   return {
     handler: getAgentHandler(agentId),
     params: {
@@ -179,6 +200,7 @@ async function buildAimChatRuntime(
       methodologyBlock: budgeted.blocks.methodologyBlock,
       businessDiagnosisBlock: budgeted.blocks.businessDiagnosisBlock,
       ipWikiBlock: budgeted.blocks.ipWikiBlock,
+      taskSpec,
     },
   }
 }
