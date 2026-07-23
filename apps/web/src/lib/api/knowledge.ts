@@ -16,6 +16,7 @@ import type {
   ApiAiHotBriefing, ApiHotDecisionResponse, ApiHotDecisionSource, ApiMarketHotSnapshot,
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
+import type { KnowledgeAssetHealthResult } from "@/lib/knowledge-asset-health"
 
 export interface KnowledgeEntry {
   id: string
@@ -66,6 +67,25 @@ export async function createKnowledge(data: {
     method: "POST",
     body: JSON.stringify(data),
   })
+}
+
+export interface KnowledgeAssetHealthApiPayload {
+  health: KnowledgeAssetHealthResult
+  scannedCount: number
+  truncated: boolean
+}
+
+/**
+ * @description 读取当前用户项目知识资产健康度（服务端确定性聚合）
+ */
+export async function fetchKnowledgeAssetHealth(
+  projectId: string,
+): Promise<KnowledgeAssetHealthApiPayload> {
+  const params = new URLSearchParams({ projectId })
+  const res = await request<{ data: KnowledgeAssetHealthApiPayload }>(
+    `/api/knowledge/asset-health?${params}`,
+  )
+  return res.data
 }
 
 // ─── IP 定位维基（Karpathy LLM-Wiki 模式） ──────────────

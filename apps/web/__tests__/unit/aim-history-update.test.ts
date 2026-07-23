@@ -14,7 +14,7 @@ describe("AIM history update", () => {
       publishPlatform: "  抖音  ",
       retroSnapshot: { summary: "  有效  ", actualData: "  10 个咨询  " },
       calibrationRule: { rule: "  下次保留案例  " },
-    }, CREATED_AT)
+    }, CREATED_AT, { fromStatus: "ready_to_publish" })
 
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
@@ -35,6 +35,41 @@ describe("AIM history update", () => {
     expect(data.calibrationRules).toEqual([
       { rule: "下次保留案例", source: undefined, createdAt: CREATED_AT },
     ])
+  })
+
+  it("rejects illegal workflow jumps with a clear error", () => {
+    expect(
+      parseAimHistoryUpdate(
+        { workflowStatus: "published", publishPlatform: "抖音" },
+        CREATED_AT,
+        { fromStatus: "draft" },
+      ),
+    ).toEqual({
+      ok: false,
+      error: "不能从「草稿」直接跳到「已发布」",
+    })
+  })
+
+  it("rejects published without platform", () => {
+    expect(
+      parseAimHistoryUpdate(
+        { workflowStatus: "published" },
+        CREATED_AT,
+        { fromStatus: "ready_to_publish" },
+      ),
+    ).toEqual({
+      ok: false,
+      error: "登记已发布时必须填写发布平台",
+    })
+  })
+
+  it("allows published when existing platform is present", () => {
+    const parsed = parseAimHistoryUpdate(
+      { workflowStatus: "published" },
+      CREATED_AT,
+      { fromStatus: "ready_to_publish", existingPublishPlatform: "小红书" },
+    )
+    expect(parsed.ok).toBe(true)
   })
 
   it.each([

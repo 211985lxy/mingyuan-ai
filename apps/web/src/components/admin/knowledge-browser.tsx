@@ -22,7 +22,18 @@ import {
   knowledgeCleanupLabel,
   parseKnowledgeTags,
 } from "@/lib/knowledge-tags"
-import { CATEGORY_LABELS as BROWSER_CATEGORY_LABELS, SOURCE_TYPE_LABELS } from "@/lib/knowledge-categories"
+import {
+  CATEGORY_LABELS as BROWSER_CATEGORY_LABELS,
+  SOURCE_TYPE_LABELS,
+  type KnowledgeCategory,
+} from "@/lib/knowledge-categories"
+import {
+  ASSET_BOX_DEFINITIONS,
+  computeKnowledgeAssetHealth,
+  type AssetBoxId,
+  type KnowledgeAssetHealthResult,
+} from "@/lib/knowledge-asset-health"
+import { KnowledgeAssetHealthPanel } from "./knowledge-asset-health-panel"
 import { KnowledgeProjectOverview } from "./knowledge-project-overview"
 
 // ─── 类型定义（与 knowledge/page.tsx 保持一致） ────────────
@@ -128,6 +139,18 @@ export interface KnowledgeBrowserProps {
   onManualAdd: () => void
   onUpload: () => void
   onSmartImport: () => void
+  /**
+   * 服务端计算的五盒健康度（优先）；未传时回退用当前列表 entries 估算
+   */
+  assetHealth?: KnowledgeAssetHealthResult | null
+  /** @deprecated 请改用 assetHealth；保留兼容本地估算 */
+  healthEntries?: Array<{ category: string; status?: string | null; tags?: unknown }>
+  /** 点击待补充/待确认时，跳转现有手动录入并预填分类 */
+  onSupplement?: (input: {
+    boxId: AssetBoxId
+    category: KnowledgeCategory
+    prompts: string[]
+  }) => void
 }
 
 /**
@@ -156,9 +179,18 @@ export function KnowledgeBrowser({
   onManualAdd,
   onUpload,
   onSmartImport,
+  assetHealth: assetHealthProp,
+  healthEntries,
+  onSupplement,
 }: KnowledgeBrowserProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const [workspace, setWorkspace] = React.useState<"attention" | "core" | "library">("library")
+  const [selectedBoxId, setSelectedBoxId] = React.useState<AssetBoxId | null>(null)
+
+  const assetHealth = useMemo(() => {
+    if (assetHealthProp) return assetHealthProp
+    return computeKnowledgeAssetHealth(healthEntries ?? entries)
+  }, [assetHealthProp, healthEntries, entries])
 
   // 构建项目分组（全局/未绑定 + 各项目）。计数优先用 stats，回退到项目自身的 knowledgeCount。
   const projectGroups: NavProjectGroup[] = useMemo(() => {
@@ -213,6 +245,10 @@ export function KnowledgeBrowser({
     "writing_style_profile",
   ])
   const visibleEntries = entries.filter((entry) => {
+    if (selectedBoxId) {
+      const box = ASSET_BOX_DEFINITIONS.find((item) => item.id === selectedBoxId)
+      if (box && !(box.categories as readonly string[]).includes(entry.category)) return false
+    }
     if (workspace === "core") return coreCategories.has(entry.category)
     if (workspace === "attention") {
       const cleanup = parseKnowledgeTags(entry.tags)
@@ -284,7 +320,10 @@ export function KnowledgeBrowser({
           <nav className="space-y-0.5">
             <button
               type="button"
-              onClick={() => onSelectCategory("")}
+              onClick={() => {
+                setSelectedBoxId(null)
+                onSelectCategory("")
+              }}
               className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
                 selectedCategory === ""
                   ? "bg-primary/10 font-medium text-primary"
@@ -300,7 +339,10 @@ export function KnowledgeBrowser({
                 <button
                   key={c.category}
                   type="button"
-                  onClick={() => onSelectCategory(active ? "" : c.category)}
+                  onClick={() => {
+                    setSelectedBoxId(null)
+                    onSelectCategory(active ? "" : c.category)
+                  }}
                   className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
                     active
                       ? "bg-primary/10 font-medium text-primary"
@@ -327,16 +369,45 @@ export function KnowledgeBrowser({
 
       {/* ─── 右侧文档区 ─── */}
       <div className="min-w-0 flex-1">
+        {selectedProject && selectedProject !== "unbound" ? (
+          <KnowledgeAssetHealthPanel
+            health={assetHealth}
+            onSelectBox={(box) => {
+              setSelectedBoxId(box.id)
+              setWorkspace("library")
+              onSelectCategory("")
+              onPageChange(1)
+            }}
+            onSupplement={({ boxId, category, prompts }) => {
+              setSelectedBoxId(boxId)
+              setWorkspace("library")
+              onSelectCategory(category)
+              onPageChange(1)
+              if (onSupplement) {
+                onSupplement({ boxId, category, prompts })
+              } else {
+                onManualAdd()
+              }
+            }}
+          />
+        ) : null}
         {/* 工具条 */}
         <div className="mb-4 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => onSelectProject("")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedBoxId(null)
+                onSelectProject("")
+              }}
+            >
               <ArrowLeft className="mr-1 h-4 w-4" />项目总览
             </Button>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               {activeProjectGroup ? <span>{activeProjectGroup.name}</span> : null}
               <span className="text-muted-foreground/60">·</span>
-              <span>{workspace === "attention" ? "待整理" : workspace === "core" ? "核心知识" : "全部资料"} · {visibleEntries.length} 条</span>
+              <span>{workspace === "attention" ? "待整理" : workspace === "core" ? "核心知识" : selectedBoxId ? (ASSET_BOX_DEFINITIONS.find((box) => box.id === selectedBoxId)?.label ?? "资产盒子") : "全部资料"} · {visibleEntries.length} 条</span>
             </div>
             <div className="ml-auto flex flex-wrap gap-2">
               <Button size="sm" onClick={onSmartImport}>
@@ -347,10 +418,30 @@ export function KnowledgeBrowser({
           </div>
           <div className="flex flex-wrap gap-2">
             {([['attention', '待整理'], ['core', '核心知识'], ['library', '全部资料']] as const).map(([key, label]) => (
-              <Button key={key} size="sm" variant={workspace === key ? "secondary" : "ghost"} onClick={() => { setWorkspace(key); onSelectCategory(""); onPageChange(1) }}>
+              <Button
+                key={key}
+                size="sm"
+                variant={workspace === key && !selectedBoxId ? "secondary" : "ghost"}
+                onClick={() => {
+                  setSelectedBoxId(null)
+                  setWorkspace(key)
+                  onSelectCategory("")
+                  onPageChange(1)
+                }}
+              >
                 {key === "attention" ? <AlertCircle className="mr-1 h-4 w-4" /> : null}{label}
               </Button>
             ))}
+            {selectedBoxId ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setSelectedBoxId(null)}
+              >
+                {ASSET_BOX_DEFINITIONS.find((box) => box.id === selectedBoxId)?.label ?? "资产盒子"}
+                <span className="ml-1 text-muted-foreground">×</span>
+              </Button>
+            ) : null}
             <Button variant="outline" size="sm" onClick={onManualAdd}>手动录入</Button>
             <Button variant="outline" size="sm" onClick={onUpload}><Upload className="mr-1 h-4 w-4" />普通上传</Button>
           </div>

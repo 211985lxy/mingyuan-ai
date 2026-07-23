@@ -6,7 +6,8 @@ import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { extractEditorDraftFromAssistantText, type AimEditorContext, type TextSelectionRange } from "@/lib/aim-editor"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import type { AimImageAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
-import type { AimChatToolAction, AimGeneration, ContentFormat } from "@/lib/api/client"
+import { getContentPackageFromTaskSpec } from "@/lib/content-package-spec"
+import type { AimChatToolAction, AimGenerateResponse, AimGeneration, ContentFormat } from "@/lib/api/client"
 
 let sequence = 0
 
@@ -252,12 +253,12 @@ export function buildAimBenchmarkQualityMessage(input: {
 }
 
 /**
- * @description 获取 AIM 生成历史内容列表
+ * @description 获取 AIM 生成历史内容列表（含 contentPackage.artifacts 中的派生格式）
  * @param item - AIM 生成记录
  * @returns 各格式内容数组
  */
 export function getAimHistoryContents(item: AimGeneration) {
-  return [
+  const fromColumns = [
     item.videoScript ? { format: "video_script" as const, content: item.videoScript } : null,
     item.wechatArticle ? { format: "wechat_article" as const, content: item.wechatArticle } : null,
     item.momentsPost ? { format: "moments_post" as const, content: item.momentsPost } : null,
@@ -265,6 +266,76 @@ export function getAimHistoryContents(item: AimGeneration) {
     item.shootingBrief ? { format: "shooting_brief" as const, content: item.shootingBrief } : null,
     item.rawCopy ? { format: "raw_copy" as const, content: item.rawCopy } : null,
   ].filter(Boolean) as Array<{ format: ContentFormat; content: string }>
+
+  const seen = new Set(fromColumns.map((item) => item.format))
+  const artifacts = getContentPackageFromTaskSpec(item.taskSpec)?.artifacts ?? {}
+  const fromArtifacts = (Object.entries(artifacts) as Array<[ContentFormat, string | undefined]>)
+    .filter(([, content]) => typeof content === "string" && content.trim().length > 0)
+    .filter(([format]) => !seen.has(format) && format !== "koubo_script")
+    .map(([format, content]) => ({ format, content: content as string }))
+
+  // koubo_script 仅在没有 video_script 时回填，避免重复口播 tab
+  const koubo = artifacts.koubo_script?.trim()
+  if (koubo && !seen.has("video_script") && !seen.has("koubo_script")) {
+    fromArtifacts.push({ format: "koubo_script", content: koubo })
+  }
+
+  return [...fromColumns, ...fromArtifacts]
+}
+
+/**
+ * @description 将历史 AimGeneration 映射为气泡 deliverables（含 workflowStatus）
+ */
+export function mapAimGenerationToDeliverables(item: AimGeneration): AimGenerateResponse {
+  const contents = getAimHistoryContents(item)
+  const knowledgeUsed = Array.isArray(item.knowledgeUsed)
+    ? item.knowledgeUsed.filter(
+      (entry): entry is { id: string; title: string; category: string } =>
+        Boolean(entry && typeof entry === "object" && typeof (entry as { id?: unknown }).id === "string"),
+    )
+    : []
+  return {
+    id: item.id,
+    results: contents.map((content) => ({
+      ...content,
+      wordCount: content.content.length,
+    })),
+    knowledgeUsed,
+    taskSpec: item.taskSpec ?? undefined,
+    workflowStatus: item.workflowStatus || "draft",
+    projectId: item.projectId ?? null,
+    reviewNote: item.reviewNote ?? null,
+    publishPlatform: item.publishPlatform ?? null,
+    publishUrl: item.publishUrl ?? null,
+  }
+}
+
+/**
+ * @description 状态推进后同步本地消息里的 deliverables 工作流字段
+ */
+export function patchDeliverableWorkflowFields(
+  messages: AimWorkbenchMessage[],
+  generationId: string,
+  patch: {
+    workflowStatus?: string
+    publishPlatform?: string | null
+    publishUrl?: string | null
+    reviewNote?: string | null
+  },
+): AimWorkbenchMessage[] {
+  return messages.map((message) => {
+    if (!message.deliverables || message.deliverables.id !== generationId) return message
+    return {
+      ...message,
+      deliverables: {
+        ...message.deliverables,
+        ...(patch.workflowStatus !== undefined ? { workflowStatus: patch.workflowStatus } : {}),
+        ...(patch.publishPlatform !== undefined ? { publishPlatform: patch.publishPlatform } : {}),
+        ...(patch.publishUrl !== undefined ? { publishUrl: patch.publishUrl } : {}),
+        ...(patch.reviewNote !== undefined ? { reviewNote: patch.reviewNote } : {}),
+      },
+    }
+  })
 }
 
 /**

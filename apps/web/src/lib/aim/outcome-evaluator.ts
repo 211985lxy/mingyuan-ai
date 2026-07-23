@@ -1,17 +1,17 @@
 /**
- * 效果→知识库回写（数据飞轮 D4）。
+ * 效果→资产候选（数据飞轮 D4，阶段 4 收口）。
  *
- * 查询「优秀」ContentOutcome（用户标记 userVerdict 非空，或互动率/转化率超阈值），
- * 关联 AimGeneration 提取文案，写入 KnowledgeEntry（category=benchmark_reference），
- * 并触发向量化（ensureKnowledgeEmbedding）。
+ * 查询「优秀」ContentOutcome，生成 AssetCandidate（pending），
+ * **不直接写入正式 KnowledgeEntry**；须人工 approve + promote。
  *
  * 原则：
  * - null 不当 0：views=null 不参与互动率计算，只有 views>0 才算。
- * - 幂等：同一 ContentOutcome 不重复写入（靠 sourceType 标记 + outcomeId 去重）。
- * - 只提取确定性字段，不调用 LLM 猜测文案特征（LLM 特征提取留作后续增强）。
+ * - 幂等：同一 outcomeId+kind 不重复创建候选。
+ * - 无 projectId 的结果跳过（AssetCandidate 要求项目归属）。
  */
 
 import type { PrismaClient } from "@/generated/prisma/client"
+import { buildAssetCandidatesFromOutcome } from "@/lib/aim/outcome-asset-candidates"
 
 // ── 阈值常量（单源） ──────────────────────────────────────
 
@@ -24,8 +24,7 @@ const CONVERSION_RATE_THRESHOLD = 0.001 // 0.1%
 /** 每次评估最多处理的 ContentOutcome 数量。 */
 const EVALUATE_BATCH_SIZE = 100
 
-/** KnowledgeEntry.sourceType 标记，用于幂等去重。 */
-const BENCHMARK_SOURCE_TYPE = "outcome_evaluator"
+const CANDIDATE_EVIDENCE_PREFIX = "outcomeId="
 
 // ── 类型 ─────────────────────────────────────────────────
 
@@ -61,6 +60,7 @@ export interface ExcellentOutcome {
 export interface EvaluateOutcomesResult {
   evaluated: number
   excellent: number
+  /** 已写入待确认资产候选数 */
   writtenBack: number
   skipped: number
   errors: string[]
@@ -82,7 +82,7 @@ export interface OutcomeEvaluatorStore {
       take?: number
     }): Promise<GenerationRow[]>
   }
-  knowledgeEntry: {
+  assetCandidate: {
     findFirst(args: {
       where: Record<string, unknown>
       select: Record<string, boolean>
@@ -190,52 +190,7 @@ function evaluateExcellent(row: OutcomeRow): { excellent: boolean; reason: Excel
 }
 
 /**
- * 构造 KnowledgeEntry 的 title 和 content。
- * 纯确定性拼接，不调用 LLM。
- */
-function buildKnowledgeEntryContent(outcome: ExcellentOutcome, generation: GenerationRow): {
-  title: string
-  content: string
-  tags: string[]
-} {
-  const copy = generation.videoScript || generation.rawCopy || "(文案不可用)"
-  const metrics: string[] = []
-  if (outcome.views != null) metrics.push(`播放 ${outcome.views}`)
-  if (outcome.likes != null) metrics.push(`点赞 ${outcome.likes}`)
-  if (outcome.comments != null) metrics.push(`评论 ${outcome.comments}`)
-  if (outcome.saves != null) metrics.push(`收藏 ${outcome.saves}`)
-  if (outcome.shares != null) metrics.push(`转发 ${outcome.shares}`)
-  if (outcome.qualifiedLeadCount != null) metrics.push(`有效线索 ${outcome.qualifiedLeadCount}`)
-  if (outcome.appointmentCount != null) metrics.push(`预约 ${outcome.appointmentCount}`)
-  if (outcome.dealCount != null) metrics.push(`成交 ${outcome.dealCount}`)
-  if (outcome.revenue != null) metrics.push(`收入 ¥${outcome.revenue}`)
-  if (outcome.engagementRate != null) metrics.push(`互动率 ${(outcome.engagementRate * 100).toFixed(1)}%`)
-  if (outcome.conversionRate != null) metrics.push(`转化率 ${(outcome.conversionRate * 100).toFixed(2)}%`)
-
-  const tags: string[] = [
-    "performance:excellent",
-    `reason:${outcome.reason}`,
-  ]
-  if (outcome.platform) tags.push(`platform:${outcome.platform}`)
-  if (outcome.userVerdict) tags.push(`verdict:${outcome.userVerdict.slice(0, 20)}`)
-
-  const title = `优秀文案标杆 | ${generation.topicTitle || outcome.generationId.slice(-6)}`
-  const content = [
-    "【效果数据】",
-    metrics.join(" | "),
-    "",
-    "【用户判断】",
-    outcome.userVerdict || "(未填写)",
-    "",
-    "【文案原文】",
-    copy,
-  ].join("\n")
-
-  return { title, content, tags }
-}
-
-/**
- * 评估用户的 ContentOutcome，将优秀的回写到知识库。
+ * 评估用户的 ContentOutcome，将优秀的写入待确认资产候选。
  *
  * @param input.userId 用户 ID
  * @param input.store 数据库抽象
@@ -250,6 +205,7 @@ function buildKnowledgeEntryContent(outcome: ExcellentOutcome, generation: Gener
 export async function evaluateOutcomes(input: {
   userId: string
   store: OutcomeEvaluatorStore
+  /** @deprecated 候选路径不再直写知识库，保留参数兼容旧调用 */
   ensureEmbedding?: (entryId: string) => Promise<void>
 }): Promise<EvaluateOutcomesResult> {
   const result: EvaluateOutcomesResult = {
@@ -260,7 +216,6 @@ export async function evaluateOutcomes(input: {
     errors: [],
   }
 
-  // 1. 查询该用户所有 ContentOutcome（按 collectedAt 降序，优先最新）
   const outcomes = await input.store.contentOutcome.findMany({
     where: { userId: input.userId },
     orderBy: { collectedAt: "desc" },
@@ -270,7 +225,6 @@ export async function evaluateOutcomes(input: {
 
   if (outcomes.length === 0) return result
 
-  // 2. 筛选优秀项
   const excellentOutcomes: ExcellentOutcome[] = []
   for (const row of outcomes) {
     const eval_ = evaluateExcellent(row)
@@ -284,7 +238,7 @@ export async function evaluateOutcomes(input: {
       userId: row.userId,
       projectId: row.projectId,
       platform: row.platform,
-      copy: null, // 从 AimGeneration 填充
+      copy: null,
       views: row.views,
       likes: row.likes,
       comments: row.comments,
@@ -304,65 +258,83 @@ export async function evaluateOutcomes(input: {
 
   if (excellentOutcomes.length === 0) return result
 
-  // 3. 批量查询关联的 AimGeneration（取文案）
   const generationIds = [...new Set(excellentOutcomes.map((o) => o.generationId))]
-  const generations = await input.store.aimGeneration.findMany({
+    const generations = await input.store.aimGeneration.findMany({
     where: { id: { in: generationIds } },
-    select: { id: true, rawCopy: true, finalizedCopy: true, topicTitle: true },
+    select: { id: true, rawCopy: true, videoScript: true, topicTitle: true },
     take: EVALUATE_BATCH_SIZE,
   })
   const genMap = new Map(generations.map((g) => [g.id, g]))
 
-  // 4. 逐条写入 KnowledgeEntry（幂等：靠 outcomeId 去重）
   for (const outcome of excellentOutcomes) {
+    if (!outcome.projectId) {
+      result.errors.push(`skip outcome without projectId: ${outcome.outcomeId}`)
+      result.skipped++
+      continue
+    }
+
     const generation = genMap.get(outcome.generationId)
     if (!generation) {
       result.errors.push(`AimGeneration not found: ${outcome.generationId}`)
       continue
     }
 
-    // 幂等检查：同一 outcomeId 不重复写入
-    const existing = await input.store.knowledgeEntry.findFirst({
-      where: {
-        userId: outcome.userId,
-        sourceType: BENCHMARK_SOURCE_TYPE,
-        // Prisma 的 Json 过滤不直接支持，靠 tags 包含 outcomeId 来做应用层去重
-        // 此处用 sourceType + title 匹配（title 含 generationId 后缀）
-      },
-      select: { id: true },
+    const copy = generation.rawCopy || generation.videoScript || null
+    const drafts = buildAssetCandidatesFromOutcome({
+      outcomeId: outcome.outcomeId,
+      generationId: outcome.generationId,
+      projectId: outcome.projectId,
+      platform: outcome.platform,
+      copy,
+      topicTitle: generation.topicTitle,
+      qualifiedLeadCount: outcome.qualifiedLeadCount,
+      appointmentCount: outcome.appointmentCount,
+      dealCount: outcome.dealCount,
+      revenue: outcome.revenue,
+      userVerdict: outcome.userVerdict,
+      reason: outcome.reason,
     })
-    if (existing) {
+
+    if (drafts.length === 0) {
       result.skipped++
       continue
     }
 
-    const { title, content, tags } = buildKnowledgeEntryContent(outcome, generation)
-
-    try {
-      const created = await input.store.knowledgeEntry.create({
-        data: {
+    for (const draft of drafts) {
+      const evidence = draft.evidence || `${CANDIDATE_EVIDENCE_PREFIX}${outcome.outcomeId}`
+      const existing = await input.store.assetCandidate.findFirst({
+        where: {
           userId: outcome.userId,
-          projectId: outcome.projectId,
-          category: "benchmark_reference",
-          title,
-          content,
-          tags: JSON.stringify(tags),
-          sourceType: BENCHMARK_SOURCE_TYPE,
-          valueGrade: "S", // 战略级：表现验证过的文案
-          status: "active",
+          generationId: outcome.generationId,
+          kind: draft.kind,
+          evidence,
         },
+        select: { id: true },
       })
-
-      // 触发向量化（非阻塞，失败不回滚）
-      if (input.ensureEmbedding) {
-        input.ensureEmbedding(created.id).catch(() => {
-          result.errors.push(`embedding failed: ${created.id}`)
-        })
+      if (existing) {
+        result.skipped++
+        continue
       }
 
-      result.writtenBack++
-    } catch (e) {
-      result.errors.push(`create failed: ${(e as Error).message}`)
+      try {
+        await input.store.assetCandidate.create({
+          data: {
+            userId: outcome.userId,
+            projectId: outcome.projectId,
+            generationId: outcome.generationId,
+            kind: draft.kind,
+            title: draft.title.slice(0, 200),
+            content: draft.content,
+            evidence,
+            confidence: draft.confidence,
+            reviewStatus: "pending",
+            crossProjectAllowed: false,
+          },
+        })
+        result.writtenBack++
+      } catch (e) {
+        result.errors.push(`create candidate failed: ${(e as Error).message}`)
+      }
     }
   }
 
@@ -402,11 +374,11 @@ export function createOutcomeEvaluatorStore(prisma: PrismaClient): OutcomeEvalua
         }) as unknown as Promise<GenerationRow[]>
       },
     },
-    knowledgeEntry: {
+    assetCandidate: {
       findFirst: (args) =>
-        prisma.knowledgeEntry.findFirst(args as never),
+        prisma.assetCandidate.findFirst(args as never),
       create: (args) =>
-        prisma.knowledgeEntry.create(args as never),
+        prisma.assetCandidate.create(args as never),
     },
   }
 }

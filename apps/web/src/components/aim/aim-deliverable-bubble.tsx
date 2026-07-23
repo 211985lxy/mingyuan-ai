@@ -24,6 +24,15 @@ import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
 import type { AimGenerateResponse, AimGenerateResult, ContentFormat } from "@/lib/api/client"
 import { AimInlineDocumentCard } from "@/components/aim/aim-inline-document-card"
 import type { TextSelectionRange } from "@/lib/aim-editor"
+import { CanonicalContentPanel } from "@/components/aim/canonical-content-panel"
+import { ContentPackagePanel } from "@/components/aim/content-package-panel"
+import { PublishPackActions } from "@/components/aim/publish-pack-actions"
+import type { TaskSpec } from "@/lib/task-spec"
+import {
+  getAllowedWorkflowTransitions,
+  normalizeAimWorkflowStatus,
+  type AimWorkflowStatus,
+} from "@/lib/aim/workflow-status"
 
 export interface AimDeliverableBubbleProps {
   messageId: string
@@ -34,7 +43,7 @@ export interface AimDeliverableBubbleProps {
   workflowStage?: AimWorkflowStage
   contentAction?: AimContentAction | null
   nextActions?: AimNextAction[]
-  onRepurpose: (format: ContentFormat) => void
+  onRepurpose: (formats: ContentFormat | ContentFormat[]) => void
   onQuality: () => void
   onMarkStatus: (status: string) => void
   onNextAction?: (action: AimNextAction, content: string, generationId: string) => void
@@ -62,6 +71,7 @@ export interface AimDeliverableBubbleProps {
   persona?: string
   topicTitle?: string
   projectId?: string
+  onCanonicalUpdated?: (input: { generationId: string; taskSpec: TaskSpec }) => void
 }
 
 const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
@@ -219,7 +229,7 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
   activeResult?: AimGenerateResult
   deliverables: AimGenerateResponse
   isBusy: boolean
-  onRepurpose: (format: ContentFormat) => void
+  onRepurpose: (formats: ContentFormat | ContentFormat[]) => void
   onNextAction?: AimDeliverableBubbleProps["onNextAction"]
   onCompileToWiki?: () => void
   onAttachProject?: (generationId: string) => void
@@ -228,9 +238,9 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
   hasPublishScript: boolean
   hasPublishCheckAction: boolean
 }) {
-  const hasVideo = formats.has("video_script")
+  const hasVideo = formats.has("video_script") || formats.has("koubo_script")
   const options: Array<[ContentFormat, string]> = [
-    ["koubo_script", "口播文案"], ["xiaohongshu_post", "小红书图文"], ["shooting_brief", "拍摄交接单"],
+    ["xiaohongshu_post", "小红书图文"], ["shooting_brief", "拍摄交接单"],
     ["moments_post", "朋友圈文案"], ["community_message", "社群运营"], ["wechat_article", "公众号文章"],
   ]
   const visibleOptions = hasVideo ? options.filter(([format]) => !formats.has(format)) : []
@@ -267,6 +277,14 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const primaryActions = nextActions.filter((action) => action.id === "publish_package" || action.id === "publish_check")
   const secondaryActions = nextActions.filter((action) => action.id !== "publish_package" && action.id !== "publish_check")
   const hasPublishCheckAction = nextActions.some((action) => action.id === "publish_check")
+  const currentStatus = normalizeAimWorkflowStatus(deliverables.workflowStatus)
+  const allowedStatuses = new Set<AimWorkflowStatus>([
+    currentStatus,
+    ...getAllowedWorkflowTransitions(currentStatus),
+  ])
+  const statusOptions = AIM_WORKFLOW_STATUS_OPTIONS.filter((item) =>
+    allowedStatuses.has(item.value as AimWorkflowStatus),
+  )
   return <ActionStrip>
     {qualityFail ? <Button size="sm" className="h-7 rounded-md px-2 text-xs" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
     {props.onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenDecision} disabled={isBusy}>发布前判断</Button> : null}
@@ -287,9 +305,16 @@ function DeliverableActions(props: DeliverableActionsProps) {
       hasPublishScript={hasPublishScript}
       hasPublishCheckAction={hasPublishCheckAction}
     />
-    <Select onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}>
+    <Select
+      value={currentStatus}
+      onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}
+    >
       <SelectTrigger className="h-7 w-[88px] border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>
-      <SelectContent>{AIM_WORKFLOW_STATUS_OPTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+      <SelectContent>
+        {statusOptions.map((item) => (
+          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+        ))}
+      </SelectContent>
     </Select>
   </ActionStrip>
 }
@@ -339,6 +364,28 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
       </div>
     ) : null}
     <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
+      {deliverables.id && deliverables.taskSpec ? (
+        <CanonicalContentPanel
+          generationId={deliverables.id}
+          taskSpec={deliverables.taskSpec}
+          knowledgeUsed={deliverables.knowledgeUsed}
+          onUpdated={({ taskSpec }) => {
+            props.onCanonicalUpdated?.({ generationId: deliverables.id, taskSpec })
+          }}
+        />
+      ) : null}
+      <ContentPackagePanel
+        deliverables={deliverables}
+        isBusy={actionsBusy}
+        onGeneratePackage={(formats) => props.onRepurpose(formats)}
+      />
+      <PublishPackActions
+        deliverables={deliverables}
+        projectId={deliverables.projectId}
+        publishPlatform={deliverables.publishPlatform}
+        publishUrl={deliverables.publishUrl}
+        reviewNote={deliverables.reviewNote}
+      />
       <DeliveryContractStrip contract={contract} />
       <DeliverableTabs
         results={deliverables.results}

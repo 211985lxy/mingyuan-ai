@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest"
 import {
   findDueOutcomeReminders,
+  OUTCOME_REMINDER_WINDOWS,
   type OutcomeReminderStorePort,
 } from "@/lib/aim/outcome-reminders"
 
-// 经营结果回填提醒（90 天计划 3.2）：发布后第 7 / 30 天提醒回填。
+// 经营结果回填提醒（阶段 4 WP4.3）：发布后第 7 / 14 / 30 天提醒回填。
 // 关键契约：
 // - 只统计已发布（workflowStatus=published 且有 publishedAt）的内容
-// - 第 7/30 天窗口到期且无对应行 → missing=row
+// - 第 7/14/30 天窗口到期且无对应行 → missing=row
 // - 有行但业务字段（有效评论/私信/线索/预约/成交/收入/用户判断）全空 → missing=metrics
 // - 任一业务字段已填即视为已回填，不再提醒
 // - 空值不填 0，不让 AI 猜测
@@ -77,6 +78,12 @@ function gen(id: string, publishedDaysAgo: number | null): FakeGeneration {
   }
 }
 
+describe("OUTCOME_REMINDER_WINDOWS", () => {
+  it("covers day 7 / 14 / 30", () => {
+    expect([...OUTCOME_REMINDER_WINDOWS]).toEqual([7, 14, 30])
+  })
+})
+
 describe("findDueOutcomeReminders", () => {
   it("发布未满 7 天不提醒", async () => {
     const reminders = await findDueOutcomeReminders({
@@ -127,33 +134,55 @@ describe("findDueOutcomeReminders", () => {
     expect(reminders).toEqual([])
   })
 
-  it("满 30 天且第 7 天已填、第 30 天无行 → 只提醒第 30 天 missing=row", async () => {
+  it("满 14 天且第 7 天已填、第 14 天无行 → 只提醒第 14 天", async () => {
     const day7 = { ...blankOutcome("g1", 7), dmCount: 1 }
     const reminders = await findDueOutcomeReminders({
       userId: USER,
       now: NOW,
-      store: makeStore([gen("g1", 31)], [day7]),
+      store: makeStore([gen("g1", 15)], [day7]),
+    })
+    expect(reminders).toHaveLength(1)
+    expect(reminders[0]).toMatchObject({ windowDay: 14, missing: "row" })
+  })
+
+  it("满 14 天、第 7/14 都缺 → 按窗口升序提醒", async () => {
+    const reminders = await findDueOutcomeReminders({
+      userId: USER,
+      now: NOW,
+      store: makeStore([gen("g1", 15)], []),
+    })
+    expect(reminders.map((r) => r.windowDay)).toEqual([7, 14])
+  })
+
+  it("满 30 天且第 7/14 天已填、第 30 天无行 → 只提醒第 30 天 missing=row", async () => {
+    const day7 = { ...blankOutcome("g1", 7), dmCount: 1 }
+    const day14 = { ...blankOutcome("g1", 14), qualifiedLeadCount: 1 }
+    const reminders = await findDueOutcomeReminders({
+      userId: USER,
+      now: NOW,
+      store: makeStore([gen("g1", 31)], [day7, day14]),
     })
     expect(reminders).toHaveLength(1)
     expect(reminders[0]).toMatchObject({ windowDay: 30, missing: "row" })
   })
 
-  it("满 30 天、两个窗口都缺 → 按窗口升序各提醒一次", async () => {
+  it("满 30 天、三个窗口都缺 → 按窗口升序各提醒一次", async () => {
     const reminders = await findDueOutcomeReminders({
       userId: USER,
       now: NOW,
       store: makeStore([gen("g1", 40)], []),
     })
-    expect(reminders.map((r) => r.windowDay)).toEqual([7, 30])
+    expect(reminders.map((r) => r.windowDay)).toEqual([7, 14, 30])
   })
 
   it("第 30 天行已填 → 30 天窗口不提醒", async () => {
     const day7 = { ...blankOutcome("g1", 7), dmCount: 1 }
+    const day14 = { ...blankOutcome("g1", 14), appointmentCount: 0 }
     const day30 = { ...blankOutcome("g1", 30), userVerdict: "转化一般" }
     const reminders = await findDueOutcomeReminders({
       userId: USER,
       now: NOW,
-      store: makeStore([gen("g1", 31)], [day7, day30]),
+      store: makeStore([gen("g1", 31)], [day7, day14, day30]),
     })
     expect(reminders).toEqual([])
   })
@@ -173,12 +202,28 @@ describe("findDueOutcomeReminders", () => {
       now: NOW,
       store: makeStore([gen("g_new", 8), gen("g_old", 20)], []),
     })
-    expect(reminders.map((r) => r.generationId)).toEqual(["g_old", "g_new"])
+    expect(reminders.map((r) => r.generationId)).toEqual(["g_old", "g_old", "g_new"])
     expect(reminders[0]).toMatchObject({
       topicTitle: "内容 g_old",
       platform: "xiaohongshu",
       publishUrl: "https://example.com/note/1",
+      windowDay: 7,
     })
     expect(reminders[0].dueAt.getTime()).toBeLessThan(reminders[1].dueAt.getTime())
+  })
+})
+
+describe("formatOutcomeReminderDigest", () => {
+  it("formats a digest for Feishu / UI push", async () => {
+    const { formatOutcomeReminderDigest } = await import("@/lib/aim/outcome-reminders")
+    const reminders = await findDueOutcomeReminders({
+      userId: USER,
+      now: NOW,
+      store: makeStore([gen("g1", 8)], []),
+    })
+    const text = formatOutcomeReminderDigest(reminders)
+    expect(text).toContain("经营结果回填提醒")
+    expect(text).toContain("第 7 天")
+    expect(text).toContain("内容 g1")
   })
 })

@@ -1,4 +1,9 @@
 import { Prisma } from "@/generated/prisma/client"
+import {
+  assertWorkflowTransition,
+  isAimWorkflowStatus,
+  type AimWorkflowStatus,
+} from "@/lib/aim/workflow-status"
 
 const VALID_WORKFLOW_STATUS = new Set([
   "draft",
@@ -17,6 +22,7 @@ interface ExistingHistorySnapshots {
   retroSnapshots: unknown
   calibrationRules: unknown
   decisionSnapshot: unknown
+  workflowStatus?: string | null
 }
 
 type ParsedHistoryUpdate =
@@ -84,9 +90,15 @@ function normalizeHistoryUpdate(body: JsonRecord, createdAt: string) {
  * @description 解析aimhistoryupdate
  * @param body - 请求体
  * @param createdAt - createdAt
+ * @param options.fromStatus - 当前状态（用于转换校验）
+ * @param options.existingPublishPlatform - 已登记平台（进入 published 时可复用）
  * @returns ParsedHistoryUpdate
  */
-export function parseAimHistoryUpdate(body: unknown, createdAt = new Date().toISOString()): ParsedHistoryUpdate {
+export function parseAimHistoryUpdate(
+  body: unknown,
+  createdAt = new Date().toISOString(),
+  options?: { fromStatus?: string | null; existingPublishPlatform?: string | null },
+): ParsedHistoryUpdate {
   const data = normalizeHistoryUpdate(isRecordObject(body) ? body : {}, createdAt)
   if (data.decisionSnapshot && !data.decisionSnapshot.summary) {
     return { ok: false, error: "发布前判断不能为空" }
@@ -96,6 +108,18 @@ export function parseAimHistoryUpdate(body: unknown, createdAt = new Date().toIS
   }
   if (data.calibrationRule && !data.calibrationRule.rule) {
     return { ok: false, error: "下次判断规则不能为空" }
+  }
+  if (data.workflowStatus) {
+    if (!isAimWorkflowStatus(data.workflowStatus)) {
+      return { ok: false, error: `无效工作流状态：${data.workflowStatus}` }
+    }
+    const transition = assertWorkflowTransition({
+      from: options?.fromStatus,
+      to: data.workflowStatus,
+      publishPlatform: data.publishPlatform ?? options?.existingPublishPlatform,
+      publishUrl: data.publishUrl,
+    })
+    if (!transition.ok) return { ok: false, error: transition.error }
   }
   return { ok: true, data }
 }

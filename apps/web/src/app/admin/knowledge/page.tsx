@@ -22,6 +22,7 @@ import {
   type DistillResult,
   type KnowledgeEntry,
 } from "@/features/knowledge/admin-knowledge-shared"
+import type { KnowledgeAssetHealthResult } from "@/lib/knowledge-asset-health"
 
 export default function AdminKnowledgePage() {
   // 列表状态
@@ -92,6 +93,9 @@ export default function AdminKnowledgePage() {
     totalEntries: number
     categoryDistribution: Array<{ category: string; categoryLabel: string; count: number }>
   } | null>(null)
+  /** 服务端计算的五盒健康度 */
+  const [assetHealth, setAssetHealth] = React.useState<KnowledgeAssetHealthResult | null>(null)
+  const [healthTick, setHealthTick] = React.useState(0)
 
   const fetchBrowserData = React.useCallback(async () => {
     if (!browserProject) {
@@ -148,6 +152,30 @@ export default function AdminKnowledgePage() {
       })
       .catch(() => setBrowserStats(null))
   }, [browserProject])
+
+  // 拉取项目知识资产健康度（服务端全量 slim 扫描，避免列表分页漏计）
+  React.useEffect(() => {
+    if (!browserProject || browserProject === "unbound") {
+      setAssetHealth(null)
+      return
+    }
+    let cancelled = false
+    void fetch(
+      `/api/admin/knowledge/asset-health?projectId=${encodeURIComponent(browserProject)}`,
+    )
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return
+        const health = json?.data?.health ?? null
+        setAssetHealth(health)
+      })
+      .catch(() => {
+        if (!cancelled) setAssetHealth(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [browserProject, healthTick])
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -305,6 +333,8 @@ export default function AdminKnowledgePage() {
       setEditForm({ title: "", content: "", category: "product_usp", tags: "", sourceType: "manual", projectId: "none", valueGrade: "" })
       toast.success("知识条目已创建")
       fetchData()
+      void fetchBrowserData()
+      setHealthTick((tick) => tick + 1)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "创建失败，请重试")
     } finally {
@@ -331,6 +361,8 @@ export default function AdminKnowledgePage() {
       setUploadProjectId("none")
       toast.success("文件已上传")
       fetchData()
+      void fetchBrowserData()
+      setHealthTick((tick) => tick + 1)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "上传失败，请重试")
     } finally {
@@ -391,6 +423,22 @@ export default function AdminKnowledgePage() {
             onSmartImport={() => {
               setSmartImportProjectId(browserProject === "unbound" ? "none" : browserProject || "none")
               setSmartImportOpen(true)
+            }}
+            assetHealth={assetHealth}
+            onSupplement={({ category }) => {
+              setBrowserCategory(category)
+              setBrowserPage(1)
+              setEditForm((f) => ({
+                ...f,
+                category,
+                projectId: browserProject === "unbound" ? "none" : browserProject || "none",
+                title: "",
+                content: "",
+                tags: "",
+                sourceType: "manual",
+                valueGrade: "",
+              }))
+              setAddDialogOpen(true)
             }}
           />
         </TabsContent>

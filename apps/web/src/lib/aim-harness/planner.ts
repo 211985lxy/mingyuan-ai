@@ -154,10 +154,12 @@ function buildModelPolicy(
   const isChat = entrypoint === "chat"
   const studioModule = agentModule ?? writerModule
   const needsAdvancedReasoning =
-    agentId === "deep_copywriter" || agentId === "business_diagnosis"
+    agentId === "content_producer" ||
+    agentId === "deep_copywriter" ||
+    agentId === "business_diagnosis" ||
+    agentId === "business_system_diagnosis"
   const requiresStandardFloor =
     needsAdvancedReasoning ||
-    agentId === "business_system_diagnosis" ||
     agentId === "persona"
 
   // ── 温度差异化：自由创作高创意，深度创作低温度保准确，朋友圈口语化略高 ──

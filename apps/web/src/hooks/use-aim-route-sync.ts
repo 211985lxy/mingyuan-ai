@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
 import { toast } from "sonner"
 
-import { getAimHistory, getVideoCopyExtraction, type AimGenerateResponse, type AimGeneration, type ContentFormat } from "@/lib/api/client"
+import { getAimHistory, getVideoCopyExtraction, type AimGeneration, type ContentFormat } from "@/lib/api/client"
 import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { loadAimDraft } from "@/lib/aim/draft-storage"
 import { normalizeWorkbenchCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
@@ -14,7 +14,7 @@ import {
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
   formatAnalysisResultForPrompt,
-  getAimHistoryContents,
+  mapAimGenerationToDeliverables,
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
@@ -218,7 +218,8 @@ export function useAimHistoryLoad(input: {
         ? history.find((record) => record.id === loadTargetId)
         : generationIdParam ? await getAimHistory(generationIdParam) : undefined
       if (!active || !item) return
-      const contents = getAimHistoryContents(item)
+      const deliverables = mapAimGenerationToDeliverables(item)
+      const contents = deliverables.results
       const assistantId = nextAimWorkbenchId()
       const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
       startTransition(() => {
@@ -232,7 +233,14 @@ export function useAimHistoryLoad(input: {
         setters.setSourceAnalysisText(extractBenchmarkAnalysisText(item.rawInput))
         setters.setMessages([
           { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
-          ...(contents.length ? [{ id: assistantId, role: "assistant" as const, content: `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`, agentId: item.agentId ?? undefined, deliverables: { id: item.id, results: contents.map((content) => ({ ...content, wordCount: content.content.length })), knowledgeUsed: [], taskSpec: item.taskSpec ?? null } as AimGenerateResponse }]
+          ...(contents.length
+            ? [{
+                id: assistantId,
+                role: "assistant" as const,
+                content: `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
+                agentId: item.agentId ?? undefined,
+                deliverables,
+              }]
             : [{ id: nextAimWorkbenchId(), role: "assistant" as const, content: "已加载历史素材，可直接让我改写。" }]),
         ])
         if (contents[0]) openEditorFromResult(assistantId, contents[0].format, contents[0].content)

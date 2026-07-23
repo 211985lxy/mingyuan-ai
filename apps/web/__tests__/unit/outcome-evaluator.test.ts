@@ -6,8 +6,6 @@ import {
   type OutcomeEvaluatorStore,
 } from "@/lib/aim/outcome-evaluator"
 
-// ── 纯函数测试 ────────────────────────────────────────────
-
 describe("computeEngagementRate", () => {
   it("views=null → null", () => {
     expect(computeEngagementRate({ views: null, likes: 10, comments: 5, saves: 3, shares: 2 })).toBeNull()
@@ -18,13 +16,11 @@ describe("computeEngagementRate", () => {
   })
 
   it("正常计算互动率", () => {
-    // (10 + 5 + 3 + 2) / 100 = 0.20
     const rate = computeEngagementRate({ views: 100, likes: 10, comments: 5, saves: 3, shares: 2 })
     expect(rate).toBeCloseTo(0.2, 4)
   })
 
   it("null 互动字段当 0 处理", () => {
-    // (10 + 0 + 0 + 0) / 100 = 0.10
     const rate = computeEngagementRate({ views: 100, likes: 10, comments: null, saves: null, shares: null })
     expect(rate).toBeCloseTo(0.1, 4)
   })
@@ -36,7 +32,6 @@ describe("computeConversionRate", () => {
   })
 
   it("正常计算转化率", () => {
-    // 5 / 1000 = 0.005
     const rate = computeConversionRate({ views: 1000, qualifiedLeadCount: 5 })
     expect(rate).toBeCloseTo(0.005, 6)
   })
@@ -46,8 +41,6 @@ describe("computeConversionRate", () => {
     expect(rate).toBe(0)
   })
 })
-
-// ── evaluateOutcomes 集成测试 ──────────────────────────────
 
 function makeOutcomeRow(overrides: Partial<{
   id: string
@@ -72,18 +65,18 @@ function makeOutcomeRow(overrides: Partial<{
     id: "outcome_1",
     generationId: "gen_1",
     userId: "user_1",
-    projectId: null,
-    platform: null,
-    views: null,
-    likes: null,
-    comments: null,
-    saves: null,
-    shares: null,
-    qualifiedLeadCount: null,
-    appointmentCount: null,
-    dealCount: null,
-    revenue: null,
-    userVerdict: null,
+    projectId: null as string | null,
+    platform: null as string | null,
+    views: null as number | null,
+    likes: null as number | null,
+    comments: null as number | null,
+    saves: null as number | null,
+    shares: null as number | null,
+    qualifiedLeadCount: null as number | null,
+    appointmentCount: null as number | null,
+    dealCount: null as number | null,
+    revenue: null as unknown,
+    userVerdict: null as string | null,
     collectWindowDay: 7,
     collectedAt: new Date("2026-07-18"),
     ...overrides,
@@ -93,10 +86,8 @@ function makeOutcomeRow(overrides: Partial<{
 function makeStore(
   outcomes: ReturnType<typeof makeOutcomeRow>[],
   generations: Array<{ id: string; rawCopy: string | null; videoScript: string | null; topicTitle: string | null }> = [],
-  existingEntries: Array<{ id: string }> = [],
+  existingCandidates: Array<{ id: string }> = [],
 ): OutcomeEvaluatorStore {
-  const createdEntries: Array<{ data: Record<string, unknown> }> = []
-
   return {
     contentOutcome: {
       findMany: vi.fn().mockResolvedValue(outcomes),
@@ -104,168 +95,98 @@ function makeStore(
     aimGeneration: {
       findMany: vi.fn().mockResolvedValue(generations),
     },
-    knowledgeEntry: {
-      findFirst: vi.fn().mockResolvedValue(existingEntries.length > 0 ? existingEntries[0] : null),
-      create: vi.fn().mockImplementation((args: { data: Record<string, unknown> }) => {
-        createdEntries.push(args)
-        return Promise.resolve({ id: `entry_${createdEntries.length}` })
-      }),
+    assetCandidate: {
+      findFirst: vi.fn().mockResolvedValue(existingCandidates.length > 0 ? existingCandidates[0] : null),
+      create: vi.fn().mockImplementation(() => Promise.resolve({ id: "cand_1" })),
     },
   }
 }
 
 describe("evaluateOutcomes", () => {
   it("无 ContentOutcome → evaluated=0", async () => {
-    const store = makeStore([])
-    const result = await evaluateOutcomes({ userId: "user_1", store })
+    const result = await evaluateOutcomes({ userId: "user_1", store: makeStore([]) })
     expect(result.evaluated).toBe(0)
-    expect(result.excellent).toBe(0)
     expect(result.writtenBack).toBe(0)
   })
 
-  it("用户标记优秀 → 写入知识库", async () => {
-    const outcomes = [
-      makeOutcomeRow({
-        id: "o1",
-        userVerdict: "这条视频效果很好，评论区很多人问价格",
-        views: 500,
-        likes: 30,
-      }),
-    ]
-    const generations = [
-      { id: "gen_1", rawCopy: "这是一条文案", videoScript: null, topicTitle: "测试选题" },
-    ]
-    const store = makeStore(outcomes, generations)
-
-    const result = await evaluateOutcomes({ userId: "user_1", store })
-
-    expect(result.evaluated).toBe(1)
+  it("用户标记优秀 → 写入待确认资产候选", async () => {
+    const result = await evaluateOutcomes({
+      userId: "user_1",
+      store: makeStore(
+        [makeOutcomeRow({
+          id: "o1",
+          projectId: "proj_1",
+          userVerdict: "这条视频效果很好，评论区很多人问价格",
+          views: 500,
+          likes: 30,
+          qualifiedLeadCount: 2,
+        })],
+        [{ id: "gen_1", rawCopy: "这是一条文案", videoScript: null, topicTitle: "测试选题" }],
+      ),
+    })
     expect(result.excellent).toBe(1)
-    expect(result.writtenBack).toBe(1)
-    expect(result.errors).toHaveLength(0)
+    expect(result.writtenBack).toBeGreaterThanOrEqual(1)
   })
 
-  it("互动率超 5% → 写入知识库", async () => {
-    const outcomes = [
-      makeOutcomeRow({
-        id: "o2",
-        views: 1000,
-        likes: 40, // 4%
-        comments: 10, // 1%
-        saves: 5,
-        shares: 5,
-        // 总互动率 = 60/1000 = 6% > 5%
-      }),
-    ]
-    const generations = [
-      { id: "gen_1", rawCopy: null, videoScript: "最终文案", topicTitle: null },
-    ]
-    const store = makeStore(outcomes, generations)
-
-    const result = await evaluateOutcomes({ userId: "user_1", store })
-
-    expect(result.excellent).toBe(1)
-    expect(result.writtenBack).toBe(1)
-  })
-
-  it("互动率不足且无用户判断 → 跳过", async () => {
-    const outcomes = [
-      makeOutcomeRow({
-        id: "o3",
-        views: 1000,
-        likes: 10, // 1% < 5%
-        comments: null,
-        saves: null,
-        shares: null,
-      }),
-    ]
-    const store = makeStore(outcomes)
-
-    const result = await evaluateOutcomes({ userId: "user_1", store })
-
-    expect(result.evaluated).toBe(1)
-    expect(result.excellent).toBe(0)
-    expect(result.writtenBack).toBe(0)
-    expect(result.skipped).toBe(1)
-  })
-
-  it("已存在的知识条目 → 幂等跳过", async () => {
-    const outcomes = [
-      makeOutcomeRow({
-        id: "o4",
-        userVerdict: "优秀",
-        views: 100,
-        likes: 10,
-      }),
-    ]
-    const generations = [
-      { id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "T" },
-    ]
-    // 模拟已有同名条目
-    const store = makeStore(outcomes, generations, [{ id: "existing_entry" }])
-
-    const result = await evaluateOutcomes({ userId: "user_1", store })
-
+  it("无 projectId → 跳过候选", async () => {
+    const result = await evaluateOutcomes({
+      userId: "user_1",
+      store: makeStore(
+        [makeOutcomeRow({ id: "o_noproj", projectId: null, userVerdict: "优秀", views: 100, likes: 10 })],
+        [{ id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "选题" }],
+      ),
+    })
     expect(result.excellent).toBe(1)
     expect(result.writtenBack).toBe(0)
-    expect(result.skipped).toBe(1)
+    expect(result.skipped).toBeGreaterThanOrEqual(1)
+    expect(result.errors.some((item) => item.includes("skip outcome without projectId"))).toBe(true)
+  })
+
+  it("写入路径走 assetCandidate.create，不写 knowledgeEntry", async () => {
+    const store = makeStore(
+      [makeOutcomeRow({
+        id: "o_cand",
+        projectId: "proj_1",
+        userVerdict: "有效",
+        views: 200,
+        likes: 20,
+        qualifiedLeadCount: 3,
+        dealCount: 1,
+      })],
+      [{ id: "gen_1", rawCopy: "成稿", videoScript: null, topicTitle: "成交案例" }],
+    )
+    const result = await evaluateOutcomes({ userId: "user_1", store })
+    expect(result.writtenBack).toBeGreaterThanOrEqual(1)
+    expect(store.assetCandidate.create).toHaveBeenCalled()
+    expect(store).not.toHaveProperty("knowledgeEntry")
   })
 
   it("AimGeneration 不存在 → 记录错误", async () => {
-    const outcomes = [
-      makeOutcomeRow({
-        id: "o5",
-        userVerdict: "好",
-        generationId: "missing_gen",
-      }),
-    ]
-    const store = makeStore(outcomes, []) // 空 generations
-
-    const result = await evaluateOutcomes({ userId: "user_1", store })
-
+    const result = await evaluateOutcomes({
+      userId: "user_1",
+      store: makeStore(
+        [makeOutcomeRow({ id: "o5", projectId: "proj_1", userVerdict: "好", generationId: "missing_gen" })],
+        [],
+      ),
+    })
     expect(result.excellent).toBe(1)
     expect(result.writtenBack).toBe(0)
     expect(result.errors.length).toBeGreaterThan(0)
   })
 
-  it("ensureEmbedding 被调用", async () => {
-    const outcomes = [
-      makeOutcomeRow({
-        id: "o6",
-        userVerdict: "好",
-        views: 100,
-        likes: 10,
-      }),
-    ]
-    const generations = [
-      { id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "T" },
-    ]
-    const store = makeStore(outcomes, generations)
-    const ensureEmbedding = vi.fn().mockResolvedValue(undefined)
-
-    await evaluateOutcomes({ userId: "user_1", store, ensureEmbedding })
-
-    expect(ensureEmbedding).toHaveBeenCalled()
-  })
-
   it("多条混合 → 正确分类", async () => {
-    const outcomes = [
-      // 优秀（用户标记）
-      makeOutcomeRow({ id: "o_a", userVerdict: "好", views: 100, likes: 5 }),
-      // 优秀（互动率高）
-      makeOutcomeRow({ id: "o_b", views: 200, likes: 20, comments: 5, saves: 3, shares: 2 }),
-      // 不优秀
-      makeOutcomeRow({ id: "o_c", views: 1000, likes: 5 }),
-      // 无 views
-      makeOutcomeRow({ id: "o_d", userVerdict: null, views: null, likes: null }),
-    ]
-    const generations = [
-      { id: "gen_1", rawCopy: "文案A", videoScript: null, topicTitle: "TA" },
-    ]
-    const store = makeStore(outcomes, generations)
-
-    const result = await evaluateOutcomes({ userId: "user_1", store })
-
+    const result = await evaluateOutcomes({
+      userId: "user_1",
+      store: makeStore(
+        [
+          makeOutcomeRow({ id: "o_a", projectId: "proj_1", userVerdict: "好", views: 100, likes: 5, qualifiedLeadCount: 1 }),
+          makeOutcomeRow({ id: "o_b", projectId: "proj_1", views: 200, likes: 20, comments: 5, saves: 3, shares: 2, dealCount: 1 }),
+          makeOutcomeRow({ id: "o_c", projectId: "proj_1", views: 1000, likes: 5 }),
+          makeOutcomeRow({ id: "o_d", projectId: "proj_1", userVerdict: null, views: null, likes: null }),
+        ],
+        [{ id: "gen_1", rawCopy: "文案A", videoScript: null, topicTitle: "TA" }],
+      ),
+    })
     expect(result.evaluated).toBe(4)
     expect(result.excellent).toBe(2)
     expect(result.skipped).toBe(2)

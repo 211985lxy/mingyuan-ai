@@ -19,6 +19,7 @@ import {
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { getAimWorkflowStatusLabel } from "@/lib/aim/workbench-display"
+import { patchDeliverableWorkflowFields } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { TaskSpec } from "@/lib/task-spec"
 
@@ -54,12 +55,31 @@ async function saveDecisionRecord(generationId: string, form: AimDecisionSnapsho
   toast.success("已记下发布前判断")
 }
 
-async function savePublishRecord(generationId: string, form: PublishRecordForm, messages: AimWorkbenchMessage[]) {
+async function savePublishRecord(
+  generationId: string,
+  form: PublishRecordForm,
+  messages: AimWorkbenchMessage[],
+  setMessages?: Dispatch<SetStateAction<AimWorkbenchMessage[]>>,
+) {
+  const publishPlatform = form.publishPlatform.trim() || "抖音"
+  if (!publishPlatform) throw new Error("请填写发布平台")
+  // 先进入待发布（状态机合法路径），再登记已发布
+  try {
+    await updateAimWorkflowStatus(generationId, { workflowStatus: "ready_to_publish" })
+  } catch {
+    // 已在更后状态或同态时忽略，下一步会再校验
+  }
+  const publishUrl = form.publishUrl.trim()
   await updateAimWorkflowStatus(generationId, {
     workflowStatus: "published",
-    publishPlatform: form.publishPlatform.trim() || "抖音",
-    publishUrl: form.publishUrl.trim(),
+    publishPlatform,
+    publishUrl,
   })
+  setMessages?.((current) => patchDeliverableWorkflowFields(current, generationId, {
+    workflowStatus: "published",
+    publishPlatform,
+    publishUrl,
+  }))
   const message = messages.find((item) => item.deliverables?.id === generationId)
   reportAimRunEvent(message?.runId, "accepted", { workflowStatus: "published" })
   toast.success("已登记发布")
@@ -152,6 +172,7 @@ function resetFormForMode(mode: WorkflowRecordMode, taskSpec: TaskSpec | null | 
 
 interface UseAimWorkflowRecordsInput {
   messages: AimWorkbenchMessage[]
+  setMessages?: Dispatch<SetStateAction<AimWorkbenchMessage[]>>
   selectedAgentId: AimAgentId
   selectedProjectId: string
   refreshHistory: (options: { force: boolean; agentId: AimAgentId }) => Promise<void>
@@ -177,13 +198,16 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     if (!deliverable?.id || deliverable.id.startsWith("polish-")) return toast.error("只有已保存的内容才能推进状态")
     try {
       await updateAimWorkflowStatus(deliverable.id, { workflowStatus: status })
+      input.setMessages?.((current) => patchDeliverableWorkflowFields(current, deliverable.id, {
+        workflowStatus: status,
+      }))
       if (ACCEPTED_WORKFLOW_STATUSES.has(status)) reportAimRunEvent(message?.runId, "accepted", { workflowStatus: status })
       refreshRecords()
       toast.success(`已标记为：${getAimWorkflowStatusLabel(status)}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "状态更新失败")
     }
-  }, [input.messages, refreshRecords])
+  }, [input, refreshRecords])
   const openRecordDialog = useCallback((messageId: string, mode: WorkflowRecordMode) => {
     const deliverable = input.messages.find((message) => message.id === messageId)?.deliverables
     if (!deliverable?.id || deliverable.id.startsWith("polish-")) return toast.error("只有已保存的内容才能记录")
@@ -195,7 +219,7 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     try {
       if (recordDialog.mode === "decision") await saveDecisionRecord(recordDialog.generationId, forms.decisionForm)
       else if (recordDialog.mode === "publish") {
-        await savePublishRecord(recordDialog.generationId, forms.publishForm, input.messages)
+        await savePublishRecord(recordDialog.generationId, forms.publishForm, input.messages, input.setMessages)
         input.onPublished?.(recordDialog.generationId)
       }
       else await saveRetroRecord({

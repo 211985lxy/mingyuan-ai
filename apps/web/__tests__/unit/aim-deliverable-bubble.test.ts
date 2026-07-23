@@ -50,6 +50,9 @@ describe("AimDeliverableBubble", () => {
     // Radix Select renders secondary publishing actions in the opened menu,
     // which is not part of static SSR markup. The menu trigger remains visible.
     expect(html).toContain("更多")
+    expect(html).toContain("复制发布包")
+    expect(html).toContain("一键创建飞书领取")
+    expect(html).toContain("复制草稿")
   })
 
   it("keeps old deliverable content visible while regenerating", () => {

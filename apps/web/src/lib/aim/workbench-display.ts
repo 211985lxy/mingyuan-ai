@@ -6,7 +6,7 @@ export const AIM_FORMAT_LABELS: Record<ContentFormat, string> = {
   moments_post: "朋友圈文案",
   community_message: "社群运营文案",
   shooting_brief: "拍摄交接单",
-  raw_copy: "诊断报告",
+  raw_copy: "原始文案",
   koubo_script: "口播文案",
   xiaohongshu_post: "小红书图文",
 }

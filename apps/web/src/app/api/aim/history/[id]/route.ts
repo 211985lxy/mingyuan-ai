@@ -63,13 +63,18 @@ export async function PATCH(
         decisionSnapshot: true,
         projectId: true,
         topicSelectionId: true,
+        workflowStatus: true,
+        publishPlatform: true,
       },
     })
     if (!existing) {
       return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
     }
 
-    const input = parseAimHistoryUpdate(body)
+    const input = parseAimHistoryUpdate(body, new Date().toISOString(), {
+      fromStatus: existing.workflowStatus,
+      existingPublishPlatform: existing.publishPlatform,
+    })
     if (!input.ok) {
       return NextResponse.json({ error: input.error }, { status: 400 })
     }

@@ -110,6 +110,7 @@ ${compactTask ? `\n${compactTask}` : ""}`
       id: record.id,
       results: [{ format, content, wordCount: content.length }],
       knowledgeUsed: record.knowledgeUsed as any[],
+      taskSpec: (record as { taskSpec?: import("@/lib/task-spec").TaskSpec }).taskSpec,
     }
   }
 }

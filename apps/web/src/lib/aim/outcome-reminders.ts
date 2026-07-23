@@ -2,7 +2,7 @@
  * 经营结果回填提醒（90 天计划 3.2）。
  *
  * 发布事实以 AimGeneration 为准：workflowStatus=published 且有 publishedAt。
- * 发布后第 7 / 30 天为回填窗口：
+ * 发布后第 7 / 14 / 30 天为回填窗口：
  * - 窗口到期且没有对应 ContentOutcome 行 → missing="row"
  * - 有行但业务字段（有效评论/私信/有效线索/诊断预约/成交数/收入/用户判断）
  *   全部为空 → missing="metrics"
@@ -12,7 +12,7 @@
  * 本模块只读不写；提醒的推送（飞书）由上层调用方决定。
  */
 
-export const OUTCOME_REMINDER_WINDOWS = [7, 30] as const
+export const OUTCOME_REMINDER_WINDOWS = [7, 14, 30] as const
 export type OutcomeReminderWindow = (typeof OUTCOME_REMINDER_WINDOWS)[number]
 
 export interface OutcomeReminderDue {
@@ -130,4 +130,24 @@ export async function findDueOutcomeReminders(input: {
   }
 
   return reminders.sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
+}
+
+/**
+ * @description 格式化到期回填提醒文案（供 cron 飞书推送 / UI 展示）
+ */
+export function formatOutcomeReminderDigest(reminders: OutcomeReminderDue[], limit = 8): string {
+  if (reminders.length === 0) return ""
+  const lines = reminders.slice(0, limit).map((item) => {
+    const title = item.topicTitle?.trim() || item.generationId.slice(0, 8)
+    const missing = item.missing === "row" ? "尚未建回填行" : "业务指标仍为空"
+    return `- ${title} · 第 ${item.windowDay} 天 · ${missing}`
+  })
+  const more = reminders.length > limit ? `\n…另有 ${reminders.length - limit} 条` : ""
+  return [
+    "【经营结果回填提醒】",
+    `共 ${reminders.length} 条已发布内容需回填 7/14/30 天结果：`,
+    ...lines,
+    more,
+    "请打开 AiM 填写复盘 / 结果回填。",
+  ].filter(Boolean).join("\n")
 }

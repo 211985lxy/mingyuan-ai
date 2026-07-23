@@ -71,6 +71,12 @@ export interface AimGenerateResponse {
   }>
   /** 协作认知层产物：风险/模式/事实/缺口/假设 */
   taskSpec?: import("@/lib/task-spec").TaskSpec
+  /** 工作流状态（历史回填或状态推进后可选出现） */
+  workflowStatus?: string
+  projectId?: string | null
+  reviewNote?: string | null
+  publishPlatform?: string | null
+  publishUrl?: string | null
 }
 
 export interface AimDecisionSnapshot {
@@ -140,6 +146,34 @@ export async function generateAimContent(data: AimGenerateRequest, signal?: Abor
     timeout: 180000,
     signal,
   })
+}
+
+/**
+ * @description 确认或修订母内容（写入 generation.taskSpec.canonical）
+ */
+export async function confirmAimCanonicalContent(input: {
+  generationId: string
+  action: "confirm" | "revise"
+  canonical?: Partial<import("@/lib/canonical-content-spec").CanonicalContentSpec>
+}): Promise<{
+  id: string
+  canonical: import("@/lib/canonical-content-spec").CanonicalContentSpec
+  taskSpec: import("@/lib/task-spec").TaskSpec
+}> {
+  const res = await request<{
+    data: {
+      id: string
+      canonical: import("@/lib/canonical-content-spec").CanonicalContentSpec
+      taskSpec: import("@/lib/task-spec").TaskSpec
+    }
+  }>(`/api/aim/history/${encodeURIComponent(input.generationId)}/canonical`, {
+    method: "POST",
+    body: JSON.stringify({
+      action: input.action,
+      ...(input.canonical ? { canonical: input.canonical } : {}),
+    }),
+  })
+  return res.data
 }
 
 /**

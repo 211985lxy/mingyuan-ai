@@ -199,6 +199,15 @@ export default function AimPage() {
                 persona: w.agent.defaultInstruction,
                 topicTitle: w.sourceTopicTitle,
                 projectId: w.selectedProjectId || undefined,
+                onCanonicalUpdated: (messageId, taskSpec) => {
+                  w.setMessages((messages) =>
+                    messages.map((message) =>
+                      message.id === messageId && message.deliverables
+                        ? { ...message, deliverables: { ...message.deliverables, taskSpec } }
+                        : message,
+                    ),
+                  )
+                },
               }}
             />
 

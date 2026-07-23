@@ -1,5 +1,7 @@
 import type { AimTaskType } from "@/lib/aim-generator"
 import { isCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
+import type { CanonicalContentSpec } from "@/lib/canonical-content-spec"
+import type { ContentPackageSpec } from "@/lib/content-package-spec"
 
 export type CollaborationMode =
   | "direct_delivery"
@@ -76,6 +78,10 @@ export interface TaskSpec {
   lengthRule?: string
   /** CTA 自由文本（避免用户表达被枚举校验静默丢弃） */
   ctaText?: string
+  /** 母内容资产（阶段 2）；确认后作为多平台派生基准 */
+  canonical?: CanonicalContentSpec
+  /** 多平台内容包状态（阶段 3） */
+  contentPackage?: ContentPackageSpec
 }
 
 /**

@@ -199,6 +199,7 @@ export async function generateAimContent(input: AimInput) {
     hotTopic: input.hotTopic,
     polishInstruction: input.polishInstruction,
     videoCopyExtractionId: input.videoCopyExtractionId,
+    existingGenerationId: input.existingGenerationId,
     runtimeTask: input.runtimeTask,
     contentScenario: input.contentScenario,
     trace: input.trace,

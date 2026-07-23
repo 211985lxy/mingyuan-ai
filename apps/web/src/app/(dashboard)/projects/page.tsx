@@ -17,6 +17,8 @@ import {
   listClientProjects,
   type ClientProject,
 } from "@/lib/api/client"
+import { ProjectKnowledgeAssetHealth } from "@/components/projects/project-knowledge-asset-health"
+import { ProjectAssetCandidateReview } from "@/components/projects/project-asset-candidate-review"
 
 export default function ProjectsPage() {
   const router = useRouter()
@@ -237,6 +239,8 @@ export default function ProjectsPage() {
                         <p className="text-xs text-muted-foreground">
                           已生成 {project._count?.aimGenerations ?? 0} 条内容
                         </p>
+                        <ProjectKnowledgeAssetHealth projectId={project.id} />
+                        <ProjectAssetCandidateReview projectId={project.id} />
                       </div>
                       <Button
                         variant="outline"

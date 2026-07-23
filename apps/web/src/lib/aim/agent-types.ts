@@ -133,6 +133,9 @@ export interface AimGenerateResponse {
   knowledgeStrategy?: ResolvedKnowledgeStrategy
   /** 协作认知层产物：风险/模式/事实/缺口/假设（由 buildAimGeneration 注入） */
   taskSpec?: TaskSpec
+  /** 工作流状态（生成落库后回填，供状态下拉使用真实当前态） */
+  workflowStatus?: string
+  projectId?: string | null
 }
 
 export interface AimAgentHandler {

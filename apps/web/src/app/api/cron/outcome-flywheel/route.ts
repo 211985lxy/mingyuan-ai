@@ -7,19 +7,24 @@ import {
 } from "@/lib/aim/outcome-evaluator"
 import {
   findDueOutcomeReminders,
+  formatOutcomeReminderDigest,
   type OutcomeReminderStorePort,
 } from "@/lib/aim/outcome-reminders"
+import {
+  readSupervisorNotificationConfig,
+  sendFeishuSupervisorNotification,
+} from "@/lib/aim/feishu-supervisor-notifier"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
 /**
- * 效果数据飞轮 cron（数据飞轮 D3）。
+ * 效果数据飞轮 cron（数据飞轮 D3 / 阶段 4）。
  *
  * 每日执行：
  *   1. 扫描所有有已发布内容的用户
- *   2. 对每个用户运行 outcome-evaluator（优秀文案→知识库回写）
- *   3. 对每个用户运行 outcome-reminders（到期未回填提醒）
+ *   2. 对每个用户运行 outcome-evaluator（优秀结果 → pending AssetCandidate，不直写 KnowledgeEntry）
+ *   3. 对每个用户运行 outcome-reminders（发布后第 7 / 14 / 30 天到期未回填提醒）
  *
  * 注意：平台 API 自动拉取（抖音/小红书互动数据）需要平台开放 API 凭据，
  * 当前仅触发评估和提醒。手动录入走 /api/aim/history/[id]/outcome PUT 路由。
@@ -96,6 +101,29 @@ export async function GET(request: NextRequest) {
           userId,
           store: reminderStore,
         })
+
+        // 4. 若监督通知已启用，把到期回填提醒推到飞书监督群（复用现有 notifier，不新建通道）
+        if (reminders.length > 0) {
+          try {
+            const notifyConfig = readSupervisorNotificationConfig()
+            if (notifyConfig.enabled) {
+              await sendFeishuSupervisorNotification({
+                config: notifyConfig,
+                notification: {
+                  type: "human_judgment",
+                  recordId: `outcome-reminders:${userId}`,
+                  loopId: "outcome-flywheel",
+                  summary: formatOutcomeReminderDigest(reminders),
+                  nextAction: "打开 AiM 对该内容填写复盘 / 7·14·30 天结果回填",
+                },
+              })
+            }
+          } catch (notifyError) {
+            allErrors.push(
+              `[${userId}] reminder notify: ${(notifyError as Error).message}`,
+            )
+          }
+        }
 
         totalEvaluated += evalResult.evaluated
         totalExcellent += evalResult.excellent

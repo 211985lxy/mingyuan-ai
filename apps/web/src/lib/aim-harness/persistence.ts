@@ -17,6 +17,17 @@ import { randomUUID } from "node:crypto"
 import type { Prisma } from "@/generated/prisma/client"
 import type { AimGenerateContext } from "@/lib/aim-agent-handlers"
 import type { ContentFormat } from "@/lib/aim-generator"
+import {
+  buildCanonicalContentSpec,
+  getCanonicalFromTaskSpec,
+  isCanonicalConfirmed,
+  withCanonicalOnTaskSpec,
+} from "@/lib/canonical-content-spec"
+import {
+  buildContentPackageSpec,
+  getContentPackageFromTaskSpec,
+  withContentPackageOnTaskSpec,
+} from "@/lib/content-package-spec"
 import { prisma } from "@/lib/prisma"
 
 /**
@@ -42,10 +53,118 @@ export async function saveAimGenerationRecord(
     category: entry.category,
   }))
 
+  // 阶段 2：生成时自动装配母内容草稿（已确认则保留，不覆盖）
+  let taskSpecForPersist = context.taskSpec
+  if (taskSpecForPersist) {
+    const existingCanonical = getCanonicalFromTaskSpec(taskSpecForPersist)
+    if (!existingCanonical || existingCanonical.status !== "confirmed") {
+      const draft = buildCanonicalContentSpec({
+        taskSpec: taskSpecForPersist,
+        currentInput: context.rawInput,
+        knowledgeUsed,
+      })
+      taskSpecForPersist = withCanonicalOnTaskSpec(taskSpecForPersist, draft)
+    }
+  }
+
+  const startedAt = Date.now()
+  const generationIdForPackage = context.existingGenerationId || ""
+
   if (context.skipPersistence) {
+    let skipTaskSpec = taskSpecForPersist
+    if (skipTaskSpec && isCanonicalConfirmed(getCanonicalFromTaskSpec(skipTaskSpec))) {
+      const pkg = buildContentPackageSpec({
+        canonicalGenerationId: generationIdForPackage || "draft",
+        requestedFormats: context.targetFormats,
+        parsed,
+        knowledgeUsed,
+        previous: getContentPackageFromTaskSpec(skipTaskSpec),
+        model: completion.model,
+        totalTokens: completion.usage?.totalTokens,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      })
+      skipTaskSpec = withContentPackageOnTaskSpec(skipTaskSpec, pkg)
+    }
     return {
       id: `eval_${randomUUID().replace(/-/g, "").slice(0, 24)}`,
       knowledgeUsed,
+      taskSpec: skipTaskSpec,
+    }
+  }
+
+  // 派生写入时合并宽表列，避免覆盖母稿已有格式
+  let existingRow: {
+    id: string
+    videoScript: string | null
+    wechatArticle: string | null
+    momentsPost: string | null
+    communityMessage: string | null
+    shootingBrief: string | null
+    rawCopy: string | null
+    formatsRequested: unknown
+    taskSpec: unknown
+  } | null = null
+
+  if (context.existingGenerationId) {
+    existingRow = await prisma.aimGeneration.findFirst({
+      where: { id: context.existingGenerationId, userId: context.userId },
+      select: {
+        id: true,
+        videoScript: true,
+        wechatArticle: true,
+        momentsPost: true,
+        communityMessage: true,
+        shootingBrief: true,
+        rawCopy: true,
+        formatsRequested: true,
+        taskSpec: true,
+      },
+    })
+    if (existingRow?.taskSpec && typeof existingRow.taskSpec === "object" && !Array.isArray(existingRow.taskSpec)) {
+      const existingCanonical = getCanonicalFromTaskSpec(existingRow.taskSpec)
+      if (existingCanonical && isCanonicalConfirmed(existingCanonical)) {
+        taskSpecForPersist = {
+          ...(taskSpecForPersist ?? (existingRow.taskSpec as import("@/lib/task-spec").TaskSpec)),
+          canonical: existingCanonical,
+          contentPackage: getContentPackageFromTaskSpec(existingRow.taskSpec) ?? undefined,
+        }
+      }
+    }
+  }
+
+  const pickColumn = (next: string | null | undefined, prev: string | null | undefined) => {
+    const cleaned = sanitizeDbText(next)
+    if (cleaned && cleaned.trim()) return cleaned
+    return prev ?? null
+  }
+
+  const videoScript = pickColumn(parsed.video_script ?? parsed.koubo_script, existingRow?.videoScript)
+  const wechatArticle = pickColumn(parsed.wechat_article, existingRow?.wechatArticle)
+  const momentsPost = pickColumn(parsed.moments_post, existingRow?.momentsPost)
+  const communityMessage = pickColumn(parsed.community_message, existingRow?.communityMessage)
+  const shootingBrief = pickColumn(parsed.shooting_brief, existingRow?.shootingBrief)
+  const rawCopy = pickColumn(parsed.raw_copy, existingRow?.rawCopy)
+
+  const prevFormats = Array.isArray(existingRow?.formatsRequested)
+    ? (existingRow!.formatsRequested as string[])
+    : []
+  const formatsRequested = [...new Set([...prevFormats, ...context.targetFormats])]
+
+  if (taskSpecForPersist) {
+    const canonical = getCanonicalFromTaskSpec(taskSpecForPersist)
+    if (canonical && isCanonicalConfirmed(canonical)) {
+      const pkg = buildContentPackageSpec({
+        canonicalGenerationId: existingRow?.id || generationIdForPackage || "pending",
+        requestedFormats: context.targetFormats,
+        parsed,
+        knowledgeUsed,
+        previous: getContentPackageFromTaskSpec(taskSpecForPersist),
+        model: completion.model,
+        totalTokens: completion.usage?.totalTokens,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      })
+      // 若尚无 generationId，创建后再回填；先用 pending
+      taskSpecForPersist = withContentPackageOnTaskSpec(taskSpecForPersist, pkg)
     }
   }
 
@@ -55,18 +174,18 @@ export async function saveAimGenerationRecord(
     projectId: context.projectId || null,
     rawInput: sanitizeDbText(context.rawInput) ?? "",
     inputSource: "text",
-    videoScript: sanitizeDbText(parsed.video_script),
-    wechatArticle: sanitizeDbText(parsed.wechat_article),
-    momentsPost: sanitizeDbText(parsed.moments_post),
-    communityMessage: sanitizeDbText(parsed.community_message),
-    shootingBrief: sanitizeDbText(parsed.shooting_brief),
-    rawCopy: sanitizeDbText(parsed.raw_copy),
-    formatsRequested: context.targetFormats,
+    videoScript,
+    wechatArticle,
+    momentsPost,
+    communityMessage,
+    shootingBrief,
+    rawCopy,
+    formatsRequested,
     knowledgeUsed,
     topicTitle: clampVarchar(context.topicTitle),
     topicSelectionId: context.topicSelectionId,
     selectedTopicIndex: context.selectedTopicIndex,
-    taskSpec: context.taskSpec ? (context.taskSpec as unknown as Prisma.InputJsonValue) : undefined,
+    taskSpec: taskSpecForPersist ? (taskSpecForPersist as unknown as Prisma.InputJsonValue) : undefined,
     hotTopic: clampVarchar(context.hotTopic),
     polishInstruction: sanitizeDbText(context.polishInstruction),
     model: completion.model,
@@ -77,25 +196,67 @@ export async function saveAimGenerationRecord(
   const degradedData = {
     ...data,
     rawInput: "[omitted: original input could not be persisted safely]",
-    videoScript: null,
-    wechatArticle: null,
-    momentsPost: null,
-    communityMessage: null,
-    shootingBrief: null,
-    rawCopy: null,
+    videoScript: existingRow?.videoScript ?? null,
+    wechatArticle: existingRow?.wechatArticle ?? null,
+    momentsPost: existingRow?.momentsPost ?? null,
+    communityMessage: existingRow?.communityMessage ?? null,
+    shootingBrief: existingRow?.shootingBrief ?? null,
+    rawCopy: existingRow?.rawCopy ?? null,
     polishInstruction: null,
   }
 
-  const persist = (payload: typeof data) => {
+  const persist = async (payload: typeof data) => {
     if (context.existingGenerationId) {
-      return prisma.aimGeneration.findFirst({
+      const existing = existingRow ?? await prisma.aimGeneration.findFirst({
         where: { id: context.existingGenerationId, userId: context.userId },
         select: { id: true },
-      }).then((existing) => existing
-        ? prisma.aimGeneration.update({ where: { id: existing.id }, data: payload })
-        : prisma.aimGeneration.create({ data: payload }))
+      })
+      if (existing) {
+        // 更新时不要用空 rawInput 覆盖母稿输入
+        const { rawInput: _ignored, userId: _u, ...updateData } = payload
+        const updated = await prisma.aimGeneration.update({
+          where: { id: existing.id },
+          data: {
+            ...updateData,
+            // 回填 canonicalGenerationId
+            ...(payload.taskSpec && typeof payload.taskSpec === "object"
+              ? {
+                  taskSpec: (() => {
+                    const ts = payload.taskSpec as Record<string, unknown>
+                    const contentPackage = ts.contentPackage as Record<string, unknown> | undefined
+                    if (contentPackage && contentPackage.canonicalGenerationId === "pending") {
+                      return {
+                        ...ts,
+                        contentPackage: { ...contentPackage, canonicalGenerationId: existing.id },
+                      } as Prisma.InputJsonValue
+                    }
+                    return payload.taskSpec
+                  })(),
+                }
+              : {}),
+          },
+        })
+        return updated
+      }
+      return prisma.aimGeneration.create({ data: payload })
     }
-    return prisma.aimGeneration.create({ data: payload })
+    const created = await prisma.aimGeneration.create({ data: payload })
+    // 新建后若 contentPackage 仍是 pending，回填真实 id
+    if (created.taskSpec && typeof created.taskSpec === "object" && !Array.isArray(created.taskSpec)) {
+      const ts = created.taskSpec as Record<string, unknown>
+      const contentPackage = ts.contentPackage as Record<string, unknown> | undefined
+      if (contentPackage && contentPackage.canonicalGenerationId === "pending") {
+        const nextTaskSpec = {
+          ...ts,
+          contentPackage: { ...contentPackage, canonicalGenerationId: created.id },
+        }
+        return prisma.aimGeneration.update({
+          where: { id: created.id },
+          data: { taskSpec: nextTaskSpec as Prisma.InputJsonValue },
+        })
+      }
+    }
+    return created
   }
 
   try {

@@ -13,6 +13,7 @@ import {
 } from "@/lib/aim-observability"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 import { ownsActiveProject } from "@/lib/resource-ownership"
+import { prisma } from "@/lib/prisma"
 
 /**
  * @description prepareaimgeneraterequest
@@ -109,6 +110,19 @@ type PreparedRequest = Extract<Awaited<ReturnType<typeof prepareAimGenerateReque
 export async function executePreparedAimGeneration(prepared: PreparedRequest) {
   const { parsed, trace, userId, workflowBrief, rawInput, runtimeTask, intentFrozen } = prepared
   const projectId = workflowBrief?.projectId || parsed.projectId
+
+  // 派生到已有母稿时，复用其已确认母内容 / 内容包状态
+  let taskSpec = workflowBrief?.taskSpec
+  if (parsed.existingGenerationId && !taskSpec) {
+    const existing = await prisma.aimGeneration.findFirst({
+      where: { id: parsed.existingGenerationId, userId },
+      select: { taskSpec: true },
+    })
+    if (existing?.taskSpec && typeof existing.taskSpec === "object" && !Array.isArray(existing.taskSpec)) {
+      taskSpec = existing.taskSpec as unknown as import("@/lib/task-spec").TaskSpec
+    }
+  }
+
   return executeAimRun({
     entrypoint: "generate",
     rawInput,
@@ -128,7 +142,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     intentFrozen,
     agentModule: parsed.agentModule,
     writerModule: parsed.writerModule,
-    taskSpec: workflowBrief?.taskSpec,
+    taskSpec,
     actorId: userId,
     projectId,
     methodologyProfileIds: parsed.methodologyProfileIds,
@@ -150,7 +164,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     selectedTopicIndex: parsed.selectedTopicIndex,
     methodologyProfileIds: parsed.methodologyProfileIds,
     trace,
-    taskSpec: workflowBrief?.taskSpec,
+    taskSpec,
     confirmedTurnIntent: parsed.confirmedTurnIntent,
   }))
 }

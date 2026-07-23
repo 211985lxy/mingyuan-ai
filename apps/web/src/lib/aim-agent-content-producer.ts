@@ -10,6 +10,8 @@ import {
   executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
 import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
+import { buildContentPackageConstraintBlock } from "@/lib/content-package-spec"
+import { getCanonicalFromTaskSpec, isCanonicalConfirmed } from "@/lib/canonical-content-spec"
 import type {
   AimAgentHandler,
   AimChatParams,
@@ -55,8 +57,32 @@ export class ContentProducerHandler implements AimAgentHandler {
     const formatBlocks = context.targetFormats
       .map((format) => FORMAT_INSTRUCTIONS[format])
       .join("\n\n---\n\n")
+    const packageConstraints = buildContentPackageConstraintBlock(context.targetFormats)
+    const canonical = getCanonicalFromTaskSpec(context.taskSpec)
+    const canonicalBlock =
+      canonical && isCanonicalConfirmed(canonical)
+        ? [
+            "【已确认母内容——派生时不得改事实】",
+            `核心观点：${canonical.coreMessage}`,
+            `目标客户：${canonical.targetCustomer}`,
+            `真实问题：${canonical.realProblem}`,
+            `内容目标：${canonical.contentGoal}`,
+            `期望行动：${canonical.desiredAction}`,
+            canonical.mustKeep.length ? `必须保留：${canonical.mustKeep.join("；")}` : "",
+            canonical.avoid.length ? `禁区：${canonical.avoid.join("；")}` : "",
+            canonical.evidence.length
+              ? `证据：${canonical.evidence.map((item) => item.statement).slice(0, 8).join("；")}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : ""
     const scenarioBlock = buildScenarioPromptBlock(context.contentScenario)
-    const systemPrompt = buildProducerSystemPrompt(agentPrompt, context) + scenarioBlock
+    const systemPrompt =
+      buildProducerSystemPrompt(agentPrompt, context) +
+      scenarioBlock +
+      (canonicalBlock ? `\n\n${canonicalBlock}` : "") +
+      (packageConstraints ? `\n\n${packageConstraints}` : "")
     const userPrompt = buildUserPrompt(context, formatBlocks)
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
@@ -81,6 +107,9 @@ export class ContentProducerHandler implements AimAgentHandler {
         wordCount: traced[format].length,
       })),
       knowledgeUsed: record.knowledgeUsed as any[],
+      taskSpec: (record as { taskSpec?: import("@/lib/task-spec").TaskSpec }).taskSpec,
+      workflowStatus: (record as { workflowStatus?: string }).workflowStatus || "draft",
+      projectId: (record as { projectId?: string | null }).projectId ?? context.projectId ?? null,
     }
   }
 }

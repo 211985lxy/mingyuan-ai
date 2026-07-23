@@ -36,6 +36,7 @@ describe("prepareAimContext 装配（阶段 2.2）", () => {
     const prepared = await prepareAimContext({
       spec,
       userId: "aim-eval",
+      stableRouting: false,
       contextOverride: {
         knowledgeBlock: "【知识】护肤成分科普",
         entries: [
@@ -90,14 +91,19 @@ describe("prepareAimContext 装配（阶段 2.2）", () => {
       spec,
       userId: "aim-eval",
       taskSpec: authorizedTaskSpec,
+      stableRouting: false,
       contextOverride: {
         knowledgeBlock: "",
         entries: [],
         source: "raw",
       },
     })
-    // 传入的 taskSpec 应被直接采用，不被 refineTaskSpec 覆盖
-    expect(prepared.taskSpec).toEqual(authorizedTaskSpec)
+    // 传入的 taskSpec 作为基底保留；规则级补全只填充空运营字段，不覆盖已确认值
+    expect(prepared.taskSpec?.goal).toBe(authorizedTaskSpec.goal)
+    expect(prepared.taskSpec?.mode).toBe(authorizedTaskSpec.mode)
+    expect(prepared.taskSpec?.knownFacts).toEqual(authorizedTaskSpec.knownFacts)
+    expect(prepared.taskSpec?.nextAction).toBe(authorizedTaskSpec.nextAction)
+    expect(prepared.taskSpec?.classifiedBy).toBe("rule")
   })
 
   it("contextManifest 的 request 来源 charCount 等于 rawInput 长度（contextHash 稳定基线）", async () => {
@@ -106,6 +112,7 @@ describe("prepareAimContext 装配（阶段 2.2）", () => {
     const prepared = await prepareAimContext({
       spec,
       userId: "aim-eval",
+      stableRouting: false,
       contextOverride: { knowledgeBlock: "", entries: [], source: "raw" },
     })
     const reqSource = prepared.contextManifest.find((s) => s.kind === "request")

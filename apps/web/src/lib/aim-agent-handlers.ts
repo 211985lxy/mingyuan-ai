@@ -380,6 +380,9 @@ export async function buildAimGeneration(
     ...response,
     conversationMode: generationMode,
     knowledgeStrategy: prepared.spec.knowledgeStrategy,
-    taskSpec,
+    // 落库后的 taskSpec（含 canonical / contentPackage）优先于装配期草稿
+    taskSpec: response.taskSpec ?? taskSpec,
+    workflowStatus: response.workflowStatus || "draft",
+    projectId: response.projectId ?? params.projectId ?? null,
   }
 }

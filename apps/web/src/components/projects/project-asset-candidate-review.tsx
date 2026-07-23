@@ -1,0 +1,149 @@
+"use client"
+
+import { useCallback, useEffect, useState } from "react"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
+import { request } from "@/lib/api/core"
+import { ASSET_CANDIDATE_KIND_LABELS } from "@/lib/aim/asset-candidates"
+
+interface AssetCandidateItem {
+  id: string
+  kind: string
+  title: string
+  content: string
+  confidence: string
+  reviewStatus: string
+  evidence?: string | null
+}
+
+interface ProjectAssetCandidateReviewProps {
+  projectId: string
+}
+
+/**
+ * @description 项目内待审资产候选最小入口（不新建大页，挂在知识健康度旁）
+ */
+export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidateReviewProps) {
+  const [items, setItems] = useState<AssetCandidateItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try {
+      const payload = await request<{ candidates: AssetCandidateItem[] }>(
+        `/api/aim/asset-candidates?projectId=${encodeURIComponent(projectId)}&reviewStatus=pending&take=20`,
+      )
+      setItems(payload.candidates || [])
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
+
+  async function review(id: string, action: "approve" | "reject", promote = false) {
+    setBusyId(id)
+    try {
+      await request(`/api/aim/asset-candidates/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action, promote }),
+      })
+      toast.success(action === "approve" ? (promote ? "已批准并写入知识库" : "已批准") : "已拒绝")
+      await reload()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "审核失败")
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        检查资产候选…
+      </p>
+    )
+  }
+
+  if (items.length === 0) return null
+
+  return (
+    <div className="mt-3 rounded-xl border border-border/80 bg-secondary/20 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-foreground">待审资产候选</p>
+          <p className="text-[11px] text-muted-foreground">
+            {items.length} 条待人工确认；批准后可写入知识库，AI 不会自动落库
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? "收起" : "展开审核"}
+        </Button>
+      </div>
+
+      {expanded ? (
+        <ul className="mt-3 space-y-3">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-lg border border-border/70 bg-card p-2.5">
+              <p className="text-xs font-medium text-foreground">
+                {ASSET_CANDIDATE_KIND_LABELS[item.kind as keyof typeof ASSET_CANDIDATE_KIND_LABELS] || item.kind}
+                {" · "}
+                {item.title}
+              </p>
+              <p className="mt-1 line-clamp-3 text-[11px] text-muted-foreground whitespace-pre-wrap">
+                {item.content}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={busyId === item.id}
+                  onClick={() => void review(item.id, "approve", true)}
+                >
+                  {busyId === item.id ? <Loader2 className="size-3 animate-spin" /> : null}
+                  批准并入库
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  disabled={busyId === item.id}
+                  onClick={() => void review(item.id, "approve", false)}
+                >
+                  仅批准
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs text-muted-foreground"
+                  disabled={busyId === item.id}
+                  onClick={() => void review(item.id, "reject")}
+                >
+                  拒绝
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  )
+}

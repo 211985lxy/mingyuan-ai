@@ -135,6 +135,7 @@ export function useAimWorkbench() {
     handleMarkStatus, openRecordDialog, submitRecordDialog,
   } = useAimWorkflowRecords({
     messages,
+    setMessages,
     selectedAgentId,
     selectedProjectId,
     refreshHistory,
@@ -458,6 +459,7 @@ export function useAimWorkbench() {
     startRecording, stopRecording,
     setEditorPanelOpen, setEditorPanelWidth, setEditorText, setReferenceSelection, setDraftSelection,
     setInput, setWikiDialog, setWorkflowBriefForm,
+    setMessages,
     changeProjectScope,
     projectAttach,
     resetConversation, retryFailed, handleGenerate: handleGenerateOrPlan, handleStop, handleRepurpose, handleQuality,
