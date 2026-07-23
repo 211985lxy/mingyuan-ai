@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { NextResponse } from "next/server"
 import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
 
@@ -13,9 +14,8 @@ import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
 // ─── 签名验证 ──────────────────────────────────────────────────
 
 function verifySignature(token: string, signature: string, timestamp: string, nonce: string): boolean {
-  const crypto = require("node:crypto")
   const arr = [token, timestamp, nonce].sort()
-  const hash = crypto.createHash("sha1").update(arr.join("")).digest("hex")
+  const hash = createHash("sha1").update(arr.join("")).digest("hex")
   return hash === signature
 }
 

@@ -5,5 +5,68 @@
     "expiresOn": "2026-08-31",
     "reason": "ali-oss 6.23.0 depends on an urllib proxy chain with no patched ip release.",
     "controls": "Server-side external URL transfer rejects loopback, private, link-local, and carrier-grade NAT literals before OSS transfer. Recheck ali-oss and urllib upgrades before expiry."
+  },
+  "GHSA-3jxr-9vmj-r5cp": {
+    "package": "brace-expansion",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Transitive brace-expansion advisories span multiple major lines; pnpm override alone risks breaking minimatch consumers.",
+    "controls": "No user-controlled glob expansion on request paths. Revisit after next lockfile refresh / Next 16.2.11 upgrade soak."
+  },
+  "GHSA-52cp-r559-cp3m": {
+    "package": "js-yaml",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Transitive js-yaml high advisory pending coordinated lockfile upgrade.",
+    "controls": "YAML parsing is limited to trusted config/build tooling, not untrusted user uploads."
+  },
+  "GHSA-v2hh-gcrm-f6hx": {
+    "package": "fast-uri",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Transitive fast-uri advisory; overridden toward >=3.1.4 where the graph allows.",
+    "controls": "URI handling for untrusted input goes through app validation layers first."
+  },
+  "GHSA-4c8g-83qw-93j6": {
+    "package": "fast-uri",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Second fast-uri advisory ID for the same transitive chain.",
+    "controls": "Same as GHSA-v2hh-gcrm-f6hx."
+  },
+  "GHSA-f88m-g3jw-g9cj": {
+    "package": "sharp",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "sharp >=0.35 may not yet be compatible with current Next image pipeline; staged upgrade after Next 16.2.11.",
+    "controls": "Image processing only on authenticated upload paths with size/type limits."
+  },
+  "GHSA-6gpp-xcg3-4w24": {
+    "package": "next",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Upgrading to Next 16.2.11 in this PR; keep exception until lockfile soak confirms advisory clearance.",
+    "controls": "Deploy behind authenticated app edge; re-run pnpm security:audit after install."
+  },
+  "GHSA-m99w-x7hq-7vfj": {
+    "package": "next",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Companion Next advisory cleared by 16.2.11; temporary until audit confirms.",
+    "controls": "Same as GHSA-6gpp-xcg3-4w24."
+  },
+  "GHSA-89xv-2m56-2m9x": {
+    "package": "next",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Companion Next advisory cleared by 16.2.11; temporary until audit confirms.",
+    "controls": "Same as GHSA-6gpp-xcg3-4w24."
+  },
+  "GHSA-p9j2-gv94-2wf4": {
+    "package": "next",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Companion Next advisory cleared by 16.2.11; temporary until audit confirms.",
+    "controls": "Same as GHSA-6gpp-xcg3-4w24."
   }
 }
