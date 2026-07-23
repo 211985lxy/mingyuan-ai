@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { AimNextAction } from "@/lib/aim-agent-guides"
 import { buildAimDeliveryContract, type AimDeliveryContract } from "@/lib/aim-delivery-contract"
+import { resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import { KNOWLEDGE_STRATEGY_PROFILES } from "@/lib/aim-knowledge-strategy"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import {
@@ -260,6 +261,13 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
   const knowledgeStrategyLabel = deliverables.knowledgeStrategy
     ? KNOWLEDGE_STRATEGY_PROFILES[deliverables.knowledgeStrategy as keyof typeof KNOWLEDGE_STRATEGY_PROFILES]?.label ?? deliverables.knowledgeStrategy
     : undefined
+  const turnIntent = resolveAimTurnIntent({
+    rawInput: deliverables.taskSpec?.goal || deliverables.taskSpec?.coreMessage || "",
+    runtimeTask: undefined,
+    archive: {
+      knowledgeCount: deliverables.knowledgeUsed?.length ?? 0,
+    },
+  })
   const contract = buildAimDeliveryContract({
     conversationMode: deliverables.conversationMode,
     knowledgeCount: deliverables.knowledgeUsed?.length ?? 0,
@@ -270,6 +278,8 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
     isCurrentVersion: props.isCurrentVersion,
     primaryNextActionLabel: primaryAction?.label,
     taskSpec: deliverables.taskSpec ?? null,
+    turnIntentSummary: turnIntent.summary,
+    archiveGaps: turnIntent.archiveGaps,
   })
   const copyResult = async (item: AimGenerateResult) => {
     await navigator.clipboard.writeText(item.content)

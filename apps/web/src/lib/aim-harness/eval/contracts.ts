@@ -44,6 +44,7 @@ export type EvalScenario =
   | "cite_knowledge"
   | "info_insufficient"
   | "task_semantics"
+  | "prompt_quality"
 
 /**
  * A single knowledge entry provided by the frozen-context adapter. This is the
@@ -99,6 +100,12 @@ export interface EvalExpectations {
   bannedSubstrings?: string[]
   /** minimum char length per format in the produced draft (sanity floor) */
   minCharsPerFormat?: number
+  /** prompt_quality：最终 prompt 必须包含这些 TaskSpec 字段标签 */
+  mustIncludeTaskSpecFields?: string[]
+  /** prompt_quality：成稿/prompt 必须出现的档案锚点词 */
+  mustGroundInSeedFacts?: string[]
+  /** prompt_quality：输出范围约束 */
+  maxScope?: "opening_only" | "full_draft"
 }
 
 /**

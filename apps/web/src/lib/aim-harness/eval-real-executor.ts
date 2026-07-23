@@ -68,6 +68,7 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
     contextManifest,
     runLlmQuality: false,
     persistSnapshot: false,
+    stableRouting: false,
   }, async (spec) => {
     const output = await buildAimGeneration(spec.agentId, {
       userId: "aim-eval",
@@ -125,6 +126,7 @@ const runRealChat: RealCaseRunner = async (fixture, context) => {
     conversationMode: conversationIntent.mode,
     contextManifest,
     persistSnapshot: false,
+    stableRouting: false,
   }, async (spec) => {
     const response = await buildAimChatResponse(spec.agentId, {
       userId: "aim-eval",

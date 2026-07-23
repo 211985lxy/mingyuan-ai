@@ -14,6 +14,7 @@
 
 import { resolveAimRuntimeTask, resolveKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import { resolveAimConversationIntentWithRules } from "@/lib/aim-conversation-intent"
+import { inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
@@ -53,6 +54,15 @@ export interface PlanRunInput {
   modelPolicy?: AimModelPolicyOverride
   /** ADR-002：显式选择的命名方法论 profile id（纯输入，解析在装配阶段）。 */
   methodologyProfileIds?: string[]
+  /**
+   * 高稳路由：写作类 Agent 默认开启 LLM 意图复核。
+   * false / AIM_STABLE_ROUTING=0 时仅用规则（eval 确定性路径）。
+   */
+  stableRouting?: boolean
+  /**
+   * 用户已确认本轮意图并映射 runtimeTask：禁止向量/LLM 再次改判。
+   */
+  intentFrozen?: boolean
 }
 
 function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
@@ -187,12 +197,17 @@ function buildModelPolicy(
  * @returns AimRunSpec
  */
 export function planAimRun(input: PlanRunInput): AimRunSpec {
+  // 未显式指定格式时，从自然语言推断（种草→小红书等），供路由与输出契约共用
+  const targetFormats = input.targetFormats?.length
+    ? input.targetFormats
+    : inferContentFormatsFromRawInput(input.rawInput)
+
   const runtimeTask = input.runtimeTask ?? resolveAimRuntimeTask({
     agentId: input.agentId,
     input: input.rawInput,
     taskType: input.taskType,
     polishInstruction: input.polishInstruction,
-    targetFormats: input.targetFormats,
+    targetFormats,
   })
 
   const conversationMode = input.conversationMode ?? resolveAimConversationIntentWithRules({
@@ -222,7 +237,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     runtimeTask,
     conversationMode,
     knowledgeStrategy,
-    outputFormats: input.targetFormats,
+    outputFormats: targetFormats,
     contextPolicy,
     modelPolicy,
     rawInput: input.rawInput,

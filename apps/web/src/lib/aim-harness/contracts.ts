@@ -177,6 +177,15 @@ export interface AimRunRequest {
   modelPolicy?: AimModelPolicyOverride
   /** ADR-002：显式选择的命名方法论 profile id（MVP 最多 1 个）。 */
   methodologyProfileIds?: string[]
+  /**
+   * 高稳 LLM 任务路由开关。默认关闭；设 AIM_STABLE_ROUTING=1 或显式 true 后启用。
+   * 等有用户使用经验再开。当前优先规则意图 + 本轮意图契约。
+   */
+  stableRouting?: boolean
+  /**
+   * 用户已确认本轮意图：runtimeTask 已由确认 action 映射，禁止再次向量/LLM 路由。
+   */
+  intentFrozen?: boolean
 }
 
 /**

@@ -1,4 +1,10 @@
 import { AIM_OUTPUT_MAX_CHARS } from "@/lib/aim-benchmark-length"
+import {
+  AIM_NORTH_STAR_GOAL,
+  AIM_SESSION_PRIORITY_RULES,
+  LIGHT_EDIT_OUTPUT_BOUNDARY,
+} from "@/lib/aim-intent-boundaries"
+import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import type { ContentFormat } from "./aim-generator"
 
 export interface ContentProducerChatPromptParams {
@@ -8,6 +14,10 @@ export interface ContentProducerChatPromptParams {
   ipWikiBlock: string
   /** ADR-002：本次指定命名方法论（独立块，未选择时为空串）。 */
   selectedMethodologyBlock?: string
+  /** 任务单上下文（由 buildWorkflowContext 生成，可截断） */
+  workflowContext?: string
+  runtimeTask?: AimRuntimeTask
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
 }
 function buildChatContextBlock(params: Pick<ContentProducerChatPromptParams, "conversationBlock" | "knowledgeBlock">) {
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
@@ -46,12 +56,51 @@ export const AIM_HIGH_RISK_LOOP_RULE = [
   "正式交付内容结尾追加一个简短“验证结果”区块，只允许包含三类信息：已确认什么、待补什么、下一步最小动作。",
 ].join("\n")
 
+/** 兼容旧引用：默认轻量知识策略文案 */
 export const CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE = [
   "默认不要每次都重度结合企业知识库。",
   "只有在用户明确要求、当前任务确实需要承接业务信息，或缺少必要的人设/产品/案例支撑时，才少量调用知识库素材。",
   "知识库素材只做点到为止的补位：优先带 1-2 句人设、一个案例、一个产品卖点或一个客户场景，不要整段灌进去。",
   "如果用户已经给够了表达、人设或正文素材，就优先按用户原文完成，不要为了“结合知识库”把稿子写重、写散、写跑题。",
 ].join("\n")
+
+/**
+ * 任务感知的知识库调用规则：按 runtimeTask + knowledgeStrategy 分支。
+ */
+export function buildContentProducerKnowledgeRule(input: {
+  runtimeTask?: AimRuntimeTask
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
+}): string {
+  const { runtimeTask, knowledgeStrategy } = input
+  if (runtimeTask === "light_edit") {
+    return "轻改任务禁止主动扩写企业知识库；只按用户原文、选区和修改要求做局部优化。"
+  }
+  if (knowledgeStrategy === "hot_topic") {
+    return [
+      "热点优先：先锁热点与选题，知识库/IP 资料只做承接身份、案例和行动引导。",
+      "禁止硬蹭无关热点；找不到真实关联时放弃热点强行植入。",
+    ].join("\n")
+  }
+  if (runtimeTask === "rewrite_copy" || knowledgeStrategy === "rewrite") {
+    return [
+      "对标/重写任务允许中量调用知识库：优先替换身份表达、案例、产品卖点和承接动作。",
+      "知识库素材只服务原选题，不允许把主题改写成知识库里另一个更熟悉的话题。",
+      "优先带 1-2 句人设、一个可追溯案例或卖点，不要整段灌进去。",
+    ].join("\n")
+  }
+  if (
+    knowledgeStrategy === "conversion"
+    || knowledgeStrategy === "persona"
+    || knowledgeStrategy === "deep"
+  ) {
+    return [
+      "转化/人设/深度任务必须落地档案：至少写入 1 个目标客户可对号入座的场景，以及 1 条来自 IP Wiki 或知识库的可追溯卖点/案例/过程证据。",
+      "做不到时在对应位置标注「未提供/待补充」，禁止编造第一人称学员/客户经历。",
+      "知识库点到为止，服务选题推进，不要整段粘贴或跑题扩写。",
+    ].join("\n")
+  }
+  return CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE
+}
 
 export const CONTENT_PRODUCER_OPERATING_LOGIC_RULE = [
   "文案本身必须承载内容运营逻辑，但只在内部完成判断，最终不要输出运营分析、模板名称或写作步骤。",
@@ -70,18 +119,25 @@ export const CONTENT_PRODUCER_OPERATING_LOGIC_RULE = [
  */
 export function buildContentProducerChatPrompt(params: ContentProducerChatPromptParams): string {
   const contextBlock = buildChatContextBlock(params)
+  const knowledgeRule = buildContentProducerKnowledgeRule({
+    runtimeTask: params.runtimeTask,
+    knowledgeStrategy: params.knowledgeStrategy,
+  })
+  const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
   return `你是一个身经百战的「太极营销创意总监」，正与企业老板（用户）面对面进行爆款营销文案创意碰撞与思路对齐。
+
+北极星目标：${AIM_NORTH_STAR_GOAL}
 
 你的使命：
 根据用户已经给出的素材、热点选题、对标文案、企业知识库和方法论，直接给出可执行的文案方向、初稿或改写建议。
 
 当前对话上下文：
 ${contextBlock}
-
+${params.workflowContext ? `\n工作流任务单：\n${params.workflowContext}\n` : ""}
 ${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}IP操盘方法论（写作与判断规则）：
 ${params.methodologyBlock}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
-
+${lightEditBlock}
 ${AIM_HIGH_RISK_LOOP_RULE}
 
 你的对话原则：
@@ -100,14 +156,10 @@ ${AIM_HIGH_RISK_LOOP_RULE}
 ${BENCHMARK_REWRITE_GUARDRAIL}
 13. 如果用户要求把成稿整理成发布文案/发布话题/发布包，必须遵守：
 ${PUBLISH_PACKAGE_CHAT_RULE}
-14. ${CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE}
+14. ${knowledgeRule}
 15. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}
-16. 会话优先级固定为：当前轮用户修改要求 > 用户刚确认或刚点名的那版成稿 > 最近相关上下文 > 更早背景素材与知识库。用户说"这篇""这版""上面那个"时，默认指当前对话里最近相关的成稿或候选，不要回跳到更早那版。
-17. 如果用户在纠偏、表达不满，或明确说"不要换""别重写""我不是这个意思"，先按他的纠正修改，不要继续执行上一轮默认流程。
-18. 如果用户说"改开头""改第一句""改前3秒""结合这篇稿子去改上面文案"，就按局部修改处理：只改用户点名的部分，默认保留当前稿子的主题、正文主体和有效表达，不要擅自整篇重写或切回最早素材。
-19. 如果用户要求"结合他的资料/人设/IP故事/来时路自然融入"，要把资料化进正文推进、案例、判断和身份表达里，不要单独拼一段履历总结，也不要生硬堆标签。
-20. 如果用户表达了"别越改越短""保持原稿长度/体量""不要压缩"这类意图，就默认保留当前稿子的主体信息密度和篇幅；除非用户明确要求精简，否则不要主动缩成短版。
-21. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
+16. ${AIM_SESSION_PRIORITY_RULES}
+17. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 请直接根据上文与用户的历史对话，产出下一轮内容。`
 }
@@ -131,7 +183,10 @@ ${RHYTHM_RULE_LINE}
 ${PLAIN_LANGUAGE_RULE_LINE}
 - 用口语化表达，短句为主，保留必要停顿和语气词，禁止书面语
 - 一段话就是一个完整口播段落，可以直接录制
-${BUZZWORD_BAN_LINE}`
+${BUZZWORD_BAN_LINE}
+必含要素：具体冲突/利益开头、一个可对号入座的客户场景、一个鲜明判断、一个可追溯证据或方法、一个匹配任务的轻承接。
+禁用开场：今天给大家分享、很多人不知道、在这个时代、作为一名。
+平台语气：像真人面对镜头说话，不要播音腔或宣传稿。`
 
 /**
  * @description 构建小红书图文视觉导演指令
@@ -203,7 +258,11 @@ export function buildXhsVisualDirectorInstruction(): string {
 ## 禁止
 - 廉价蓝紫渐变、随机霓虹、文字变形、塑料质感、儿童卡通感
 - 每页都中心构图、巨大页码喧宾夺主、辅助元素比核心信息更抢眼
-- 只写"高级、科技、极简"而不给具体视觉做法`
+- 只写"高级、科技、极简"而不给具体视觉做法
+
+必含要素（发布文案层）：具体反差或代价开头、一个可执行方法或判断、适合谁/不适合谁边界、轻 CTA。
+禁用开场：超好用、强烈安利、闭眼入、姐妹们冲。
+平台语气：小红书种草口吻，短句分段，可少量 emoji 但不堆砌。`
 }
 
 export const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
@@ -228,7 +287,10 @@ export const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
 - 内容结构必须有「冲突/洞察/行动」三段感，但不要写小标题
 - 可以用emoji但不要过多
 - 最后一句引导互动（提问/评论/私信）
-- 不要用#话题标签`,
+- 不要用#话题标签
+必含要素：第一行钩子、一句洞察、一句互动引导。
+禁用开场：感恩遇见、持续输出价值、有需要的朋友欢迎咨询。
+平台语气：像老板随手发的真实状态，不要海报文案腔。`,
 
   community_message: `【社群运营文案】
 要求：
@@ -237,7 +299,10 @@ export const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
 - 正文用「共情/洞察/行动」结构，但不要写小标题
 - 语气自然，像群主或运营负责人在群里提醒大家
 - 必须有一个轻量互动动作，例如回复关键词、评论问题、私信领取、报名咨询
-- 不要承诺结果，不要制造暴富焦虑，不要使用夸张符号刷屏`,
+- 不要承诺结果，不要制造暴富焦虑，不要使用夸张符号刷屏
+必含要素：与群相关的具体提醒、一个轻行动指令。
+禁用开场：家人们、冲冲冲、错过再等一年。
+平台语气：群主提醒，不硬广。`,
 
   raw_copy: `【原始文案】
 要求：
@@ -246,7 +311,10 @@ export const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
 - 不做去AI味处理，保持自然流畅
 - 围绕用户输入的核心信息展开，保留信息密度
 - 可以适当分段，但不要加小标题
-- 适合作为后续精修、改编的基础初稿`,
+- 适合作为后续精修、改编的基础初稿
+必含要素：围绕用户核心信息完整展开，不丢关键事实。
+禁用开场：无强制模板；仍禁止空泛口号堆叠。
+平台语气：服从用户指定风格；未指定时保持自然书面/口语混合。`,
 
   shooting_brief: `【拍摄交接单】
 要求：

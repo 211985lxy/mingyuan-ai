@@ -1,0 +1,159 @@
+import { describe, expect, it } from "vitest"
+
+import {
+  resolveAimTurnIntent,
+  formatAimTurnIntentBlock,
+  assessArchiveGaps,
+  applyTurnIntentEdits,
+  shouldConfirmTurnIntent,
+  normalizeConfirmedTurnIntent,
+} from "@/lib/aim-turn-intent"
+import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
+import { isStableRoutingEnabled } from "@/lib/aim-stable-routing"
+
+describe("AimTurnIntent（意图优先）", () => {
+  it("优化开头 → local_edit + opening，摘要点名保留正文", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "只优化这篇开头，不要改正文",
+      runtimeTask: "light_edit",
+    })
+    expect(intent.action).toBe("local_edit")
+    expect(intent.scope).toBe("opening")
+    expect(intent.summary).toContain("局部修改")
+    expect(intent.avoid.some((a) => a.includes("整篇"))).toBe(true)
+  })
+
+  it("小红书种草 → create + 交付物小红书", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "帮我写一篇小红书种草文",
+      targetFormats: ["xiaohongshu_post"],
+    })
+    expect(intent.action).toBe("create")
+    expect(intent.deliverable).toContain("小红书")
+  })
+
+  it("人设词+种草仍判 create，不走人设梳理", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "结合人设写一篇小红书种草文",
+    })
+    expect(intent.action).toBe("create")
+    expect(intent.action).not.toBe("position")
+  })
+
+  it("format block 声明最高优先级", () => {
+    const block = formatAimTurnIntentBlock(resolveAimTurnIntent({
+      rawInput: "写一版口播",
+      runtimeTask: "new_copy",
+      targetFormats: ["video_script"],
+    }))
+    expect(block).toContain("【本轮意图】")
+    expect(block).toContain("最高优先级")
+  })
+
+  it("buildWorkflowContext 顶部注入本轮意图", () => {
+    const text = buildWorkflowContext({
+      rawInput: "优化这篇开头",
+      runtimeTask: "light_edit",
+      taskSpec: undefined,
+    })
+    expect(text.startsWith("【本轮意图】")).toBe(true)
+    expect(text).toContain("局部修改")
+  })
+
+  it("确认意图优先于规则推断写入 workflow context", () => {
+    const confirmed = resolveAimTurnIntent({
+      rawInput: "帮我写一篇小红书",
+      targetFormats: ["xiaohongshu_post"],
+    })
+    const edited = applyTurnIntentEdits(confirmed, {
+      summary: "本轮意图：用户确认——只写小红书种草，不要口播。",
+    })
+    const text = buildWorkflowContext({
+      rawInput: "随便写点什么",
+      runtimeTask: "new_copy",
+      taskSpec: undefined,
+      confirmedTurnIntent: edited,
+    })
+    expect(text).toContain("只写小红书种草")
+    expect(text).not.toContain("随便写点什么")
+  })
+})
+
+describe("档案缺口", () => {
+  it("未绑项目时 create 提示缺口", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "写一篇小红书种草",
+      archive: { hasProject: false },
+    })
+    expect(intent.action).toBe("create")
+    expect(intent.archiveGaps.some((g) => g.includes("未绑定客户项目"))).toBe(true)
+    expect(intent.avoid.some((a) => a.includes("档案缺口"))).toBe(true)
+  })
+
+  it("未传知识条数时不误报空库", () => {
+    const gaps = assessArchiveGaps(
+      { action: "create" },
+      { hasProject: true },
+    )
+    expect(gaps.some((g) => g.includes("知识库"))).toBe(false)
+  })
+
+  it("显式 knowledgeCount=0 才报空库", () => {
+    const gaps = assessArchiveGaps(
+      { action: "create" },
+      { hasProject: true, knowledgeCount: 0 },
+    )
+    expect(gaps.some((g) => g.includes("知识库"))).toBe(true)
+  })
+
+  it("local_edit 不评估档案缺口", () => {
+    const gaps = assessArchiveGaps(
+      { action: "local_edit" },
+      { hasProject: false, knowledgeCount: 0 },
+    )
+    expect(gaps).toEqual([])
+  })
+
+  it("format block 含档案缺口行", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "写一篇种草文",
+      archive: { hasProject: false, knowledgeCount: 0 },
+    })
+    const block = formatAimTurnIntentBlock(intent)
+    expect(block).toContain("档案缺口")
+    expect(block).toContain("未提供/待补充")
+  })
+})
+
+describe("意图确认辅助", () => {
+  it("create/rewrite/local_edit/position 需要确认", () => {
+    expect(shouldConfirmTurnIntent(resolveAimTurnIntent({ rawInput: "写一篇小红书" }))).toBe(true)
+    expect(shouldConfirmTurnIntent(resolveAimTurnIntent({ rawInput: "优化开头" }))).toBe(true)
+  })
+
+  it("normalizeConfirmedTurnIntent 校验结构", () => {
+    const ok = normalizeConfirmedTurnIntent({
+      summary: "本轮意图：新建",
+      action: "create",
+      scope: "full",
+      deliverable: "小红书图文",
+      keep: ["选题"],
+      avoid: ["编造"],
+      archiveGaps: ["缺案例"],
+    })
+    expect(ok?.action).toBe("create")
+    expect(ok?.archiveGaps).toEqual(["缺案例"])
+    expect(normalizeConfirmedTurnIntent({ summary: "x" })).toBeNull()
+  })
+})
+
+describe("stable routing default off", () => {
+  it("默认关闭，需显式开启", () => {
+    const prev = process.env.AIM_STABLE_ROUTING
+    delete process.env.AIM_STABLE_ROUTING
+    expect(isStableRoutingEnabled()).toBe(false)
+    expect(isStableRoutingEnabled(true)).toBe(true)
+    if (prev === undefined) delete process.env.AIM_STABLE_ROUTING
+    else process.env.AIM_STABLE_ROUTING = prev
+  })
+})

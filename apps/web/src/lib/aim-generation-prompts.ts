@@ -4,8 +4,19 @@ import { isBenchmarkCopyTooSimilar } from "@/lib/aim-benchmark-quality"
 import {
   BENCHMARK_REWRITE_GUARDRAIL,
   CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
-  CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE,
+  buildContentProducerKnowledgeRule,
 } from "@/lib/aim-agent-prompts"
+import {
+  AIM_INTERNAL_INTENT_GATE,
+  AIM_NORTH_STAR_GOAL,
+  AIM_SESSION_PRIORITY_RULES,
+  LIGHT_EDIT_OUTPUT_BOUNDARY,
+  LIGHT_EDIT_USER_INSTRUCTION,
+  RUNTIME_TASK_LABELS,
+} from "@/lib/aim-intent-boundaries"
+import { buildPromptFewshotBlock } from "@/lib/aim-prompt-fewshots"
+import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
+import { formatAimTurnIntentBlock, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 
@@ -149,34 +160,82 @@ export function findUnsupportedFirstPersonClaimFormats(
   return targetFormats.filter((format) => FIRST_PERSON_EVIDENCE_PATTERN.test(parsed[format] || ""))
 }
 
+function renderKnownFacts(facts: TaskSpec["knownFacts"] | undefined, limit?: number): string | null {
+  if (!facts?.length) return null
+  const rows = (limit ? facts.slice(0, limit) : facts)
+    .map((f) => `  · ${f.statement}${f.source ? `（来源：${f.source}）` : ""}`)
+  return `- 已知事实（不可编造增改）：\n${rows.join("\n")}`
+}
+
+function renderTaskSpecLines(taskSpec: TaskSpec, opts?: { compact?: boolean }): string[] {
+  const compact = opts?.compact === true
+  const lines: Array<string | null> = [
+    `- 内容目标：${taskSpec.goal}`,
+    `- 协作模式：${COLLABORATION_MODE_LABELS[taskSpec.mode] || taskSpec.mode}`,
+    `- 风险等级：${taskSpec.riskLevel}`,
+    taskSpec.targetCustomer ? `- 目标客户：${taskSpec.targetCustomer}` : null,
+    taskSpec.realProblem ? `- 真实问题：${taskSpec.realProblem}` : null,
+    taskSpec.contentTask ? `- 主要内容任务：${taskSpec.contentTask}` : null,
+    taskSpec.trustAssetType ? `- 优先信任证据：${taskSpec.trustAssetType}` : null,
+    taskSpec.exclusiveEvidence ? `- 专属证据：${taskSpec.exclusiveEvidence}` : null,
+    taskSpec.desiredAction ? `- 期望动作：${taskSpec.desiredAction}` : null,
+    taskSpec.dealPath ? `- 成交承接：${taskSpec.dealPath}` : null,
+    taskSpec.coreMessage ? `- 核心信息：${taskSpec.coreMessage}` : null,
+    taskSpec.platform ? `- 发布平台：${taskSpec.platform}` : null,
+    taskSpec.useScenario ? `- 使用场景：${taskSpec.useScenario}` : null,
+    taskSpec.outputFormat ? `- 输出格式：${taskSpec.outputFormat}` : null,
+    taskSpec.style ? `- 风格：${taskSpec.style}` : null,
+    taskSpec.lengthRule ? `- 长度要求：${taskSpec.lengthRule}` : null,
+    taskSpec.ctaText ? `- CTA：${taskSpec.ctaText}` : null,
+    renderKnownFacts(taskSpec.knownFacts, compact ? 5 : undefined),
+  ]
+
+  if (!compact) {
+    if (taskSpec.unknowns?.length) {
+      lines.push(`- 信息缺口（不得写成事实）：${taskSpec.unknowns.join("；")}`)
+    }
+    if (taskSpec.assumptions?.length) {
+      lines.push(
+        `- 交付假设（必须标注为假设，不可写成已验证事实）：${taskSpec.assumptions
+          .map((a) => `${a.statement}[${a.impact}]`)
+          .join("；")}`,
+      )
+    }
+    if (taskSpec.nextAction) {
+      lines.push(`- 内部下一步（勿原样输出给用户）：${taskSpec.nextAction}`)
+    }
+  }
+
+  return lines.filter(Boolean) as string[]
+}
+
 /**
- * @description 构建工作流上下文文本（任务单、选题、热点等）
+ * @description 构建工作流上下文文本（本轮意图 + 任务单、选题、热点等）
  * @param context - AIM 生成上下文
  * @returns 格式化的工作流上下文文本
  */
-export function buildWorkflowContext(context: AimGenerateContext): string {
+export function buildWorkflowContext(context: {
+  taskSpec?: AimGenerateContext["taskSpec"]
+  topicTitle?: AimGenerateContext["topicTitle"]
+  topicRationale?: AimGenerateContext["topicRationale"]
+  hotTopic?: AimGenerateContext["hotTopic"]
+  polishInstruction?: AimGenerateContext["polishInstruction"]
+  rawInput?: string
+  runtimeTask?: AimGenerateContext["runtimeTask"]
+  targetFormats?: AimGenerateContext["targetFormats"]
+  confirmedTurnIntent?: AimGenerateContext["confirmedTurnIntent"]
+}): string {
+  const turnIntent = context.confirmedTurnIntent || resolveAimTurnIntent({
+    rawInput: context.rawInput || context.taskSpec?.goal || "",
+    runtimeTask: context.runtimeTask,
+    targetFormats: context.targetFormats,
+    polishInstruction: context.polishInstruction,
+  })
   const taskSpec = context.taskSpec
   return [
+    formatAimTurnIntentBlock(turnIntent),
     taskSpec
-      ? [
-          "本次内容运营任务单：",
-          `- 内容目标：${taskSpec.goal}`,
-          taskSpec.targetCustomer ? `- 目标客户：${taskSpec.targetCustomer}` : null,
-          taskSpec.realProblem ? `- 真实问题：${taskSpec.realProblem}` : null,
-          taskSpec.contentTask ? `- 主要内容任务：${taskSpec.contentTask}` : null,
-          taskSpec.trustAssetType ? `- 优先信任证据：${taskSpec.trustAssetType}` : null,
-          taskSpec.exclusiveEvidence ? `- 专属证据：${taskSpec.exclusiveEvidence}` : null,
-          taskSpec.desiredAction ? `- 期望动作：${taskSpec.desiredAction}` : null,
-          taskSpec.dealPath ? `- 成交承接：${taskSpec.dealPath}` : null,
-          // ── 计划模式扩展字段（必须真实控制输出，不得只作为备注）──
-          taskSpec.coreMessage ? `- 核心信息：${taskSpec.coreMessage}` : null,
-          taskSpec.platform ? `- 发布平台：${taskSpec.platform}` : null,
-          taskSpec.useScenario ? `- 使用场景：${taskSpec.useScenario}` : null,
-          taskSpec.outputFormat ? `- 输出格式：${taskSpec.outputFormat}` : null,
-          taskSpec.style ? `- 风格：${taskSpec.style}` : null,
-          taskSpec.lengthRule ? `- 长度要求：${taskSpec.lengthRule}` : null,
-          taskSpec.ctaText ? `- CTA：${taskSpec.ctaText}` : null,
-        ].filter(Boolean).join("\n")
+      ? ["本次内容运营任务单：", ...renderTaskSpecLines(taskSpec)].join("\n")
       : null,
     context.topicTitle
       ? `选定爆款选题：${context.topicTitle}${context.topicRationale ? `\n选题依据：${context.topicRationale}` : ""}`
@@ -190,6 +249,68 @@ export function buildWorkflowContext(context: AimGenerateContext): string {
   ]
     .filter(Boolean)
     .join("\n\n")
+}
+
+/**
+ * 交货文案等轻量 Agent 使用的精简任务单（不含方法论/viral，只保留执行约束与事实）。
+ */
+export function buildCompactWorkflowContext(
+  taskSpec: TaskSpec | undefined | null,
+  opts?: {
+    rawInput?: string
+    runtimeTask?: AimGenerateContext["runtimeTask"]
+    confirmedTurnIntent?: AimGenerateContext["confirmedTurnIntent"]
+  },
+): string {
+  const turnIntent = opts?.confirmedTurnIntent || resolveAimTurnIntent({
+    rawInput: opts?.rawInput || taskSpec?.goal || "",
+    runtimeTask: opts?.runtimeTask,
+    polishInstruction: undefined,
+  })
+  const intentBlock = formatAimTurnIntentBlock(turnIntent)
+  if (!taskSpec) return intentBlock
+  const lines = [
+    taskSpec.platform ? `- 发布平台：${taskSpec.platform}` : null,
+    taskSpec.outputFormat ? `- 输出格式：${taskSpec.outputFormat}` : null,
+    taskSpec.lengthRule ? `- 长度要求：${taskSpec.lengthRule}` : null,
+    taskSpec.style ? `- 风格：${taskSpec.style}` : null,
+    taskSpec.ctaText ? `- CTA：${taskSpec.ctaText}` : null,
+    taskSpec.coreMessage ? `- 核心信息：${taskSpec.coreMessage}` : null,
+    renderKnownFacts(taskSpec.knownFacts, 5),
+  ].filter(Boolean)
+  if (!lines.length) return intentBlock
+  return `${intentBlock}\n\n本次任务约束（听指令优先，但不得违背以下已确认事实）：\n${lines.join("\n")}`
+}
+
+export interface LayeredAimPromptInput {
+  roleBlock: string
+  runtimeTask?: string
+  taskConstraintExtra?: string
+  contextBlocks: string[]
+  formatBlock?: string
+  qualityRedlines: string[]
+}
+
+/**
+ * 统一分层 Prompt：系统角色 → 任务约束 → 上下文素材 → 输出格式 → 质量红线。
+ */
+export function composeLayeredAimPrompt(input: LayeredAimPromptInput): string {
+  const taskLabel = input.runtimeTask
+    ? (RUNTIME_TASK_LABELS[input.runtimeTask] || input.runtimeTask)
+    : "未标注"
+  const sections = [
+    `【系统角色】\n北极星目标：${AIM_NORTH_STAR_GOAL}\n\n${input.roleBlock}`,
+    [
+      `【任务约束】\n【任务类型: ${taskLabel}】`,
+      input.runtimeTask === "light_edit" ? LIGHT_EDIT_OUTPUT_BOUNDARY : null,
+      AIM_INTERNAL_INTENT_GATE,
+      input.taskConstraintExtra || null,
+    ].filter(Boolean).join("\n"),
+    `【上下文素材】\n${input.contextBlocks.filter(Boolean).join("\n\n") || "（无额外上下文）"}`,
+    input.formatBlock ? `【输出格式】\n${input.formatBlock}` : null,
+    `【质量红线】\n${input.qualityRedlines.filter(Boolean).join("\n")}`,
+  ]
+  return sections.filter(Boolean).join("\n\n")
 }
 
 /**
@@ -264,58 +385,59 @@ ${previousOutput}`
  * @returns 完整的系统提示词
  */
 export function buildProducerSystemPrompt(agentPrompt: string, context: AimGenerateContext): string {
-  const knowledgeUseRule = context.runtimeTask === "light_edit"
-      ? "7. 轻改任务只按用户原文、选区和修改要求做局部优化；替换稿只处理用户点名要改的地方，不要顺手替换、删改未点名内容；可以给开头、结构、结尾等简短可选建议，但不要把建议直接写进替换稿；不要主动扩写客户背景、产品卖点或知识库素材。"
-      : `7. ${CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE}`
-  const lightEditOutputRule = context.runtimeTask === "light_edit"
-    ? "\n轻改输出边界：如果用户只要求优化开头/前三秒/第一句话/钩子，输出内容只能是开头候选或开头替换稿，禁止返回整篇文案；如果要求标题只给标题，如果要求结尾只给结尾。"
-    : ""
-  const creationTraceRule = context.runtimeTask === "light_edit"
-    ? ""
-    : `\n${CONTENT_CREATION_TRACE_RULE}\n`
+  const knowledgeUseRule = buildContentProducerKnowledgeRule({
+    runtimeTask: context.runtimeTask,
+    knowledgeStrategy: context.knowledgeStrategy,
+  })
+  const creationTraceRule = context.runtimeTask === "light_edit" ? "" : CONTENT_CREATION_TRACE_RULE
+  const fewshot = buildPromptFewshotBlock(context.runtimeTask, context.targetFormats)
 
-  return `${agentPrompt}
+  // 上下文按优先级：TaskSpec 由 user prompt 注入；此处 IP Wiki > 知识 > 方法论/爆款（弱参考）
+  const contextBlocks = [
+    context.ipWikiBlock ? `IP 定位维基（高优先级档案）：\n${context.ipWikiBlock}` : "",
+    context.knowledgeBlock ? `企业知识库（高相关条目）：\n${context.knowledgeBlock}` : "",
+    context.selectedMethodologyBlock ? `指定方法论：\n${context.selectedMethodologyBlock}` : "",
+    context.methodologyBlock ? `IP操盘方法论（弱参考）：\n${context.methodologyBlock}` : "",
+    context.businessDiagnosisBlock ? `商业诊断方法（弱参考）：\n${context.businessDiagnosisBlock}` : "",
+    context.eventStorytellingBlock ? `事件叙事方法：\n${context.eventStorytellingBlock}` : "",
+    context.viralStructureBlock ? `爆款结构库（弱参考）：\n${context.viralStructureBlock}` : "",
+    fewshot ? `风格对照示例：\n${fewshot}` : "",
+  ]
 
-${context.knowledgeBlock}
-${context.selectedMethodologyBlock}
-${context.methodologyBlock}
-${context.businessDiagnosisBlock}
-${context.viralStructureBlock}
-${context.eventStorytellingBlock}
-${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
-内部工作流程：
-1. 先判断输入内容类型：公众号长文、老板口述、原始文案、客户问题、产品卖点、对标文案或热点选题。
-2. 如果用户提供对标文案或爆款文案拆解，先锁定它的核心选题，只学习它的开头方式、结构节奏、表达密度和转化设计，不照抄具体表达。
-3. IP特色、企业知识库、产品卖点和项目案例只能用于替换案例、身份表达、承接动作和语言风格，不能把核心选题改成另一个主题。
-4. 如果用户提供公众号长文，优先提炼其中最适合短视频传播的一个核心观点，不要把整篇文章压缩成流水账。
-5. 开头必须单独优化：用冲突、反差、痛点、利益或好奇心打开，避免平铺直叙。
-6. 正文必须单独优化结构：按问题、判断、案例、行动或反差递进组织，让用户能听懂、能拍摄、能转化。
-${knowledgeUseRule}
-${lightEditOutputRule}
-8. 如果上下文包含垂类行业热点，只能自然融合和业务相关的部分，禁止硬蹭热点。
-9. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}
-${creationTraceRule}
+  const taskConstraintExtra = [
+    "内部工作流程：",
+    "1. 先判断输入内容类型：公众号长文、老板口述、原始文案、客户问题、产品卖点、对标文案或热点选题。",
+    "2. 如果用户提供对标文案或爆款文案拆解，先锁定它的核心选题，只学习开头方式、结构节奏、表达密度和转化设计，不照抄具体表达。",
+    "3. IP特色、企业知识库、产品卖点和项目案例只能用于替换案例、身份表达、承接动作和语言风格，不能把核心选题改成另一个主题。",
+    "4. 如果用户提供公众号长文，优先提炼其中最适合短视频传播的一个核心观点，不要把整篇文章压缩成流水账。",
+    "5. 开头必须单独优化：用冲突、反差、痛点、利益或好奇心打开，避免平铺直叙。",
+    "6. 正文必须单独优化结构：按问题、判断、案例、行动或反差递进组织，让用户能听懂、能拍摄、能转化。",
+    `7. ${knowledgeUseRule}`,
+    "8. 如果上下文包含垂类行业热点，只能自然融合和业务相关的部分，禁止硬蹭热点。",
+    `9. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}`,
+    AIM_SESSION_PRIORITY_RULES,
+  ].join("\n")
 
-创作规则：
-- 选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者。
-- 如果输入是热点选题而不是对标文案，成稿与分析里都不要出现"对标文案""对标原文""原视频"这类说法。
-- 开写前先在内部判断"这一稿到底在讲什么"，成稿全篇都必须围绕这个选题推进。
-- 先判断用户输入最适合哪一种开头、文案结构和结尾类型，再开始写。
-- 必须把专业结构融进最终文案里；除 [[AIM_METHOD_NOTE]] 中的教学拆解外，正文不要输出「使用了某某结构」这类解释。
-- 开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。
-- 正文每一段都要推进信息，不要堆形容词，不要写营销黑话。
-- 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
-- 保留必要的口语、停顿、重复和语气词；不要为了显得高级主动加金句、宏大比喻或整齐三段式。
-- 文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。
-- 如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。
-- 没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。
-- 成稿前做内部质检：是否遵守用户修改意图、是否保留原文有效表达、是否过度调用背景导致跑题、是否有明显 AI 套话；生成模式下不要输出验证结果区块或质检报告，验证结果只在聊天质检场景生效。
-- 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
-
-对标改写硬规则：
-${BENCHMARK_REWRITE_GUARDRAIL}
-
-请严格按照下方每种格式的要求，生成对应的内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。`
+  return composeLayeredAimPrompt({
+    roleBlock: agentPrompt,
+    runtimeTask: context.runtimeTask,
+    taskConstraintExtra,
+    contextBlocks,
+    formatBlock: "请严格按照下方每种格式的要求生成对应内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。格式细则见用户消息。",
+    qualityRedlines: [
+      "选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者。",
+      "如果输入是热点选题而不是对标文案，成稿与分析里都不要出现「对标文案」「对标原文」「原视频」这类说法。",
+      "开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。",
+      "正文每一段都要推进信息，不要堆形容词，不要写营销黑话。",
+      "先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。",
+      "文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。",
+      "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。",
+      "没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。",
+      `所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。`,
+      `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}`,
+      creationTraceRule,
+    ],
+  })
 }
 
 /**
@@ -331,11 +453,13 @@ export function buildUserPrompt(context: AimGenerateContext, formatBlocks: strin
   // 冲突10：light_edit 不需要字数保留规则（只改局部，字数规则无意义）
   const explicitWordCountRule = isLightEdit ? null : buildExplicitWordCountPriorityRule(context.rawInput)
 
-  // 冲突8：light_edit 覆盖格式说明，明确只输出替换稿/候选
-  // 冲突5：非 light_edit 的指令改为"选择性结合"，与 system prompt 的 SELECTIVE_KNOWLEDGE_RULE 一致
+  const knowledgeHint = buildContentProducerKnowledgeRule({
+    runtimeTask: context.runtimeTask,
+    knowledgeStrategy: context.knowledgeStrategy,
+  })
   const contextInstruction = isLightEdit
-    ? "请只根据用户原文、选区和修改要求做局部优化；替换稿只改用户点名的内容，不要顺手改未点名的开头、工具名、结尾或结构；如果用户只要求优化开头/前三秒/第一句话/钩子，只输出 3-5 个开头候选或一个开头替换稿，禁止输出整篇文案；可以给开头、结构、结尾等简短可选建议，但不要主动结合企业知识库扩写。"
-    : "请根据以上内容，按上方规则选择性结合企业知识库素材，生成以下格式的营销内容："
+    ? LIGHT_EDIT_USER_INSTRUCTION
+    : `请根据以上内容与任务单，按知识规则生成以下格式的营销内容：\n${knowledgeHint}`
 
   // 冲突2：light_edit 跳过选题锁定和 GUARDRAIL（局部优化不需要对标改写硬规则）
   const topicLockBlock = isLightEdit

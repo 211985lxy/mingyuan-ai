@@ -42,6 +42,13 @@ import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-m
 import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
 import { useAimPlanSession, planTaskSpecToWorkflowBrief } from "@/features/aim/hooks/use-aim-plan-session"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-composer"
+import {
+  resolveAimTurnIntent,
+  shouldConfirmTurnIntent,
+  type AimTurnIntent,
+} from "@/lib/aim-turn-intent"
+import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand } from "@/lib/aim-workbench-commands"
+import { resolveAimTurnIntentRemote } from "@/lib/api/aim"
 
 /**
  * Master hook — consolidates all AIM workbench state, refs, and hook
@@ -277,6 +284,8 @@ export function useAimWorkbench() {
     clearAimDraft(selectedAgentId, currentProjectScope)
     planSession.resetPlan()
     setComposerMode("direct")
+    setPendingTurnIntent(null)
+    setIntentResolving(false)
   }
 
   const restoreScopeDraft = (nextDraft: AimDraft | null) => {
@@ -304,6 +313,7 @@ export function useAimWorkbench() {
     // 切换项目时废弃旧计划，防止跨客户上下文混用
     planSession.abandonPlan()
     setComposerMode("direct")
+    setPendingTurnIntent(null)
   }
 
   const { changeProjectScope } = useAimProjectScopeSwitch({
@@ -385,14 +395,93 @@ export function useAimWorkbench() {
     editorPanelLabels, imageAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
   })
 
-  /** 统一的生成入口：计划模式走规划，直接模式走原有生成 */
+  /** 生成前意图确认（直接模式） */
+  const [pendingTurnIntent, setPendingTurnIntent] = useState<{
+    text: string
+    intent: AimTurnIntent
+    startsNewTask: boolean
+    source?: string
+  } | null>(null)
+  const [intentResolving, setIntentResolving] = useState(false)
+
+  const handleConfirmTurnIntent = useCallback((intent: AimTurnIntent) => {
+    if (!pendingTurnIntent) return
+    const { text, startsNewTask } = pendingTurnIntent
+    setPendingTurnIntent(null)
+    void generateWithInput(text, { startsNewTask, confirmedTurnIntent: intent })
+  }, [pendingTurnIntent, generateWithInput])
+
+  const handleCancelTurnIntent = useCallback(() => {
+    setPendingTurnIntent(null)
+  }, [])
+
+  /** 统一的生成入口：计划模式走规划；直接模式先意图确认再生成 */
   const handleGenerateOrPlan = useCallback(() => {
     if (composerMode === "plan") {
       void handleStartPlan()
-    } else {
-      handleGenerate()
+      return
     }
-  }, [composerMode, handleStartPlan, handleGenerate])
+    if (pendingTurnIntent || intentResolving) return
+    if (hasEditorSelection || imageAttachments.length > 0) {
+      handleGenerate()
+      return
+    }
+    const currentInput = input.trim()
+    if (!currentInput) return
+    const startsNewTask = shouldIsolateWritingInstruction(currentInput, messages.length > 0)
+    const workbenchCommand = detectAimWorkbenchCommand(currentInput)
+    if (!startsNewTask && workbenchCommand && runWorkbenchCommand(workbenchCommand)) return
+
+    const archive = {
+      hasProject: projectEnabled ? Boolean(selectedProjectId) : false,
+    }
+
+    void (async () => {
+      // 统一走一次 intent-resolve：规则 +（可选）向量 + 服务端档案缺口
+      setIntentResolving(true)
+      let intent = resolveAimTurnIntent({
+        rawInput: currentInput,
+        targetFormats: agent.defaultFormats,
+        archive,
+      })
+      let source = "rule"
+      try {
+        const remote = await resolveAimTurnIntentRemote({
+          rawInput: currentInput,
+          targetFormats: agent.defaultFormats,
+          projectId: selectedProjectId || undefined,
+          archive,
+        })
+        intent = remote.intent
+        source = remote.source
+      } catch {
+        // 网络失败：保留本地规则意图
+      } finally {
+        setIntentResolving(false)
+      }
+
+      if (shouldConfirmTurnIntent(intent)) {
+        setPendingTurnIntent({ text: currentInput, intent, startsNewTask, source })
+        return
+      }
+      void generateWithInput(currentInput, { startsNewTask, confirmedTurnIntent: intent })
+    })()
+  }, [
+    composerMode,
+    handleStartPlan,
+    pendingTurnIntent,
+    intentResolving,
+    hasEditorSelection,
+    imageAttachments.length,
+    handleGenerate,
+    input,
+    messages.length,
+    runWorkbenchCommand,
+    agent.defaultFormats,
+    projectEnabled,
+    selectedProjectId,
+    generateWithInput,
+  ])
 
   // ---- Derived flags ----
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
@@ -445,6 +534,8 @@ export function useAimWorkbench() {
     // 计划模式
     composerMode, setComposerMode, canUsePlanMode, planSession,
     handlePlanConfirm, handlePlanAbandon,
+    // 本轮意图确认
+    pendingTurnIntent, handleConfirmTurnIntent, handleCancelTurnIntent, intentResolving,
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),

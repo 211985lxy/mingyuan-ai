@@ -38,6 +38,10 @@ export interface AimChatParams {
   selectedMethodologyBlock?: string
   conversationIntent?: AimConversationIntent
   runtimeTask?: AimRuntimeTask
+  /** 任务单（chat 路径注入，供提示词绑定档案与运营字段） */
+  taskSpec?: TaskSpec
+  /** 解析后的知识策略（可选，驱动任务感知知识规则） */
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
   modelPolicy?: AimModelPolicy
   trace?: AimTraceRecorder
 }
@@ -89,6 +93,8 @@ export interface AimGenerateContext {
   contextOverride?: AimGenerationContextOverride
   /** Eval-only: execute the production prompt/model path without writing history. */
   skipPersistence?: boolean
+  /** 用户确认的本轮意图（生成前确认条；有则优先写入 prompt） */
+  confirmedTurnIntent?: import("@/lib/aim-turn-intent").AimTurnIntent
 }
 
 export interface AimGenerationContextOverride {

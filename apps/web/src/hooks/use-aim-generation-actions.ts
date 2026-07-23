@@ -23,6 +23,7 @@ import {
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import type { AimTurnIntent } from "@/lib/aim-turn-intent"
 
 type MessageSetter = Dispatch<SetStateAction<AimWorkbenchMessage[]>>
 type StringSetter = Dispatch<SetStateAction<string>>
@@ -80,6 +81,8 @@ interface GenerateOptions {
   startsNewTask?: boolean
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
+  /** 用户确认的本轮意图 */
+  confirmedTurnIntent?: AimTurnIntent
 }
 
 /**
@@ -186,6 +189,7 @@ function buildGenerationRequest(
       confirmed: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief)!.confirmed,
     } : undefined,
     methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
+    confirmedTurnIntent: options.confirmedTurnIntent,
   }
 }
 

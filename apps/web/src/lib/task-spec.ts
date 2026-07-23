@@ -150,6 +150,132 @@ function deriveGoal(input: TaskSpecInput): string {
   return input.rawInput.trim().slice(0, 80) || "未明确目标"
 }
 
+const CONTENT_TASK_RULES: Array<{ words: string[]; task: ContentTask }> = [
+  { words: ["种草", "吸引", "涨粉", "曝光", "停留", "转发"], task: "吸引目标客户" },
+  { words: ["信任", "专业", "权威", "资历", "背书"], task: "建立专业信任" },
+  { words: ["案例", "学员", "客户故事", "真实经历", "成交案例"], task: "展示真实案例" },
+  { words: ["不适合", "筛选", "边界", "劝退"], task: "筛选不适合客户" },
+  { words: ["解释", "方法", "怎么做", "方法论", "步骤"], task: "解释问题与方法" },
+  { words: ["咨询", "私信", "预约", "转化", "成交", "引流", "获客"], task: "推动咨询行动" },
+]
+
+const DESIRED_ACTION_RULES: Array<{ words: string[]; action: DesiredAction }> = [
+  { words: ["评论", "留言"], action: "评论" },
+  { words: ["私信", "私聊", "DM"], action: "私信" },
+  { words: ["资料", "领取", "白资料"], action: "领取资料" },
+  { words: ["预约", "诊断", "约谈"], action: "预约诊断" },
+  { words: ["咨询", "进一步"], action: "进一步咨询" },
+]
+
+const PLATFORM_RULES: Array<{ words: string[]; platform: string }> = [
+  { words: ["小红书", "种草"], platform: "小红书" },
+  { words: ["抖音", "短视频", "口播"], platform: "抖音" },
+  { words: ["视频号"], platform: "视频号" },
+  { words: ["朋友圈"], platform: "朋友圈" },
+  { words: ["公众号", "长文"], platform: "公众号" },
+  { words: ["社群", "微信群", "企微群"], platform: "社群" },
+]
+
+const OUTPUT_FORMAT_RULES: Array<{ words: string[]; outputFormat: string }> = [
+  { words: ["小红书", "种草图文"], outputFormat: "小红书图文" },
+  { words: ["口播", "短视频脚本", "视频脚本"], outputFormat: "口播脚本" },
+  { words: ["朋友圈"], outputFormat: "朋友圈文案" },
+  { words: ["公众号"], outputFormat: "公众号文章" },
+  { words: ["拍摄交接", "分镜"], outputFormat: "拍摄交接单" },
+]
+
+function matchRule<T extends string>(text: string, rules: Array<{ words: string[]; value: T }>): T | undefined {
+  for (const rule of rules) {
+    if (rule.words.some((w) => text.includes(w))) return rule.value
+  }
+  return undefined
+}
+
+/**
+ * 规则级补全 TaskSpec 运营字段（不调用 LLM）。
+ * 仅填充空字段；已有计划确认值不被覆盖。缺失时写入 unknowns。
+ */
+export function enrichTaskSpecFromRawInput(
+  spec: TaskSpec,
+  rawInput: string,
+  opts?: { platformHint?: string; outputFormatHint?: string },
+): TaskSpec {
+  const text = (rawInput || "").trim()
+  if (!text && !opts?.platformHint && !opts?.outputFormatHint) return spec
+
+  const next: TaskSpec = { ...spec, unknowns: [...spec.unknowns], assumptions: [...spec.assumptions] }
+
+  if (!next.contentTask) {
+    const inferred = matchRule(text, CONTENT_TASK_RULES.map((r) => ({ words: r.words, value: r.task })))
+    if (inferred) next.contentTask = inferred
+    else if (!next.unknowns.some((u) => u.includes("主要内容任务"))) {
+      next.unknowns.push("待确认：主要内容任务")
+    }
+  }
+
+  if (!next.desiredAction) {
+    const inferred = matchRule(text, DESIRED_ACTION_RULES.map((r) => ({ words: r.words, value: r.action })))
+    if (inferred) next.desiredAction = inferred
+  }
+
+  if (!next.realProblem) {
+    const painMatch = text.match(/(?:痛点|问题|困扰|焦虑)[是为：:：]?\s*([^\n。！？]{6,40})/)
+    if (painMatch?.[1]) next.realProblem = painMatch[1].trim()
+    else if (!next.unknowns.some((u) => u.includes("真实问题"))) {
+      next.unknowns.push("待确认：真实问题/痛点")
+    }
+  }
+
+  if (!next.platform) {
+    next.platform = opts?.platformHint
+      || matchRule(text, PLATFORM_RULES.map((r) => ({ words: r.words, value: r.platform })))
+  }
+
+  if (!next.outputFormat) {
+    next.outputFormat = opts?.outputFormatHint
+      || matchRule(text, OUTPUT_FORMAT_RULES.map((r) => ({ words: r.words, value: r.outputFormat })))
+  }
+
+  if (!next.style) {
+    if (/(犀利|锋利|直接)/.test(text)) next.style = "犀利"
+    else if (/(亲和|温和|亲切)/.test(text)) next.style = "亲和"
+    else if (/(专业|严谨)/.test(text)) next.style = "专业"
+    else if (/(幽默|轻松)/.test(text)) next.style = "幽默"
+  }
+
+  if (!next.useScenario) {
+    if (/(转化|成交|获客)/.test(text)) next.useScenario = "转化"
+    else if (/(引流|涨粉|曝光)/.test(text)) next.useScenario = "引流"
+    else if (/(品宣|品牌)/.test(text)) next.useScenario = "品宣"
+    else if (/(种草)/.test(text)) next.useScenario = "种草"
+  }
+
+  if (!next.lengthRule) {
+    const lengthMatch = text.match(/(\d{2,4})\s*字|(\d{1,2})\s*分钟|保持.{0,6}(长度|体量|篇幅)/)
+    if (lengthMatch) {
+      if (lengthMatch[1]) next.lengthRule = `${lengthMatch[1]}字以内`
+      else if (lengthMatch[2]) next.lengthRule = `${lengthMatch[2]}分钟口播`
+      else next.lengthRule = "保持原稿体量"
+    }
+  }
+
+  if (!next.ctaText) {
+    const ctaMatch = text.match(/(?:引导|CTA|行动号召)[：:]\s*([^\n。]{2,30})/i)
+    if (ctaMatch?.[1]) next.ctaText = ctaMatch[1].trim()
+    else if (next.desiredAction) next.ctaText = next.desiredAction
+  }
+
+  next.unknowns = next.unknowns.slice(0, 8)
+  return next
+}
+
+export const COLLABORATION_MODE_LABELS: Record<CollaborationMode, string> = {
+  direct_delivery: "直接交付",
+  assumption_delivery: "按假设交付",
+  feedback_iteration: "反馈迭代",
+  discovery_exploration: "探索补资料",
+}
+
 /**
  * @description 构建taskspecskeleton
  * @param input - 输入数据

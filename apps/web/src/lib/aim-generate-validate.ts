@@ -2,6 +2,7 @@ import type { ContentFormat, AimTaskType } from "@/lib/aim-generator"
 import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
 import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
+import { normalizeConfirmedTurnIntent, type AimTurnIntent } from "@/lib/aim-turn-intent"
 
 const VALID_FORMATS = new Set([
   "video_script",
@@ -52,6 +53,7 @@ export interface ParseGenerateBodyResult {
   agentModule: CopyStudioModule | undefined
   writerModule: CopyStudioModule | undefined
   methodologyProfileIds: string[] | undefined
+  confirmedTurnIntent: AimTurnIntent | undefined
 }
 
 /**
@@ -132,6 +134,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
     agentModule,
     writerModule: agentModule,
     methodologyProfileIds: parseMethodologyProfileIds(body),
+    confirmedTurnIntent: normalizeConfirmedTurnIntent(body.confirmedTurnIntent) || undefined,
   }
 }
 

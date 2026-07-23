@@ -104,6 +104,17 @@ export const aimGenerateBodySchema = z.object({
   writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   traceId: optionalId,
   methodologyProfileIds: methodologyProfileIdsSchema,
+  /** 用户确认的本轮意图（生成前确认条回传；有则优先于规则推断） */
+  confirmedTurnIntent: z.object({
+    summary: z.string().min(1).max(500),
+    action: z.enum(["create", "local_edit", "rewrite", "review", "position", "chat"]),
+    scope: z.enum(["opening", "title", "ending", "cta", "full", "unspecified"]),
+    deliverable: z.string().min(1).max(120),
+    keep: z.array(z.string().max(200)).max(8).default([]),
+    avoid: z.array(z.string().max(200)).max(8).default([]),
+    archiveGaps: z.array(z.string().max(300)).max(4).default([]),
+    userSupplement: z.string().max(500).optional(),
+  }).strict().optional(),
 }).strict()
 
 export const aimEvolveBodySchema = z.object({

@@ -5,9 +5,11 @@ import { FORMAT_INSTRUCTIONS, buildContentProducerChatPrompt } from "@/lib/aim-a
 import {
   buildProducerSystemPrompt,
   buildUserPrompt,
+  buildWorkflowContext,
   ensureContentCreationTrace,
   executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
+import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
 import type {
   AimAgentHandler,
   AimChatParams,
@@ -20,7 +22,24 @@ export class ContentProducerHandler implements AimAgentHandler {
   agentId = "content_producer" as const
 
   private buildChatPrompt(params: AimChatParams): string {
-    return buildContentProducerChatPrompt(params)
+    const latestUser = [...(params.messages ?? [])]
+      .reverse()
+      .find((m) => m?.role === "user" && typeof m?.content === "string")?.content || ""
+    const workflowContext = buildWorkflowContext({
+      taskSpec: params.taskSpec,
+      rawInput: latestUser,
+      runtimeTask: params.runtimeTask,
+    })
+    return buildContentProducerChatPrompt({
+      conversationBlock: params.conversationBlock,
+      knowledgeBlock: params.knowledgeBlock,
+      methodologyBlock: params.methodologyBlock,
+      ipWikiBlock: params.ipWikiBlock,
+      selectedMethodologyBlock: params.selectedMethodologyBlock,
+      workflowContext,
+      runtimeTask: params.runtimeTask,
+      knowledgeStrategy: params.knowledgeStrategy,
+    })
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
@@ -32,7 +51,7 @@ export class ContentProducerHandler implements AimAgentHandler {
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
-    const agentPrompt = "你是一个企业营销内容专家。根据用户提供的信息，选择性结合企业知识库素材，生成高质量的营销内容。"
+    const agentPrompt = `你是企业营销内容专家（内容创作官）。${AIM_NORTH_STAR_GOAL}根据用户提供的信息与客户档案，生成高质量、可拍摄可发布的营销内容。`
     const formatBlocks = context.targetFormats
       .map((format) => FORMAT_INSTRUCTIONS[format])
       .join("\n\n---\n\n")
