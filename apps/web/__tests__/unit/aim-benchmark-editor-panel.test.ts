@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { describe, expect, it, vi } from "vitest"
 import { BenchmarkEditorPanel } from "@/components/aim/benchmark-editor-panel"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
-import { getAimWorkflowStatusLabel, splitAimMethodNote } from "@/lib/aim/workbench-display"
+import {
+  getAimWorkflowStatusLabel,
+  normalizeScriptBodySpacing,
+  splitAimMethodNote,
+} from "@/lib/aim/workbench-display"
 
 const labels: EditorPanelLabels = {
   title: "文案编辑",
@@ -66,6 +70,18 @@ describe("AIM workbench display helpers", () => {
     expect(splitAimMethodNote("正文\n[[AIM_METHOD_NOTE]]依据说明[[/AIM_METHOD_NOTE]]")).toEqual({
       methodNote: "依据说明",
       result: "正文",
+    })
+  })
+
+  it("collapses excessive blank lines in script bodies", () => {
+    expect(normalizeScriptBodySpacing("第一段\n\n\n\n第二段\n\n\n第三段")).toBe(
+      "第一段\n\n第二段\n\n第三段",
+    )
+    expect(
+      splitAimMethodNote("甲\n\n\n乙\n[[AIM_METHOD_NOTE]]note[[/AIM_METHOD_NOTE]]"),
+    ).toEqual({
+      methodNote: "note",
+      result: "甲\n\n乙",
     })
   })
 

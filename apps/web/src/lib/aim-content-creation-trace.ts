@@ -3,6 +3,7 @@ import {
   upsertKnowledgeCitationInMethodNote,
 } from "@/lib/aim-knowledge-cite"
 import { buildMethodologyPlanTraceSection } from "@/lib/methodology/compose-matched-methodology-block"
+import { normalizeScriptBodySpacing } from "@/lib/aim/workbench-display"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 
 export const CONTENT_CREATION_TRACE_RULE = `教学式透明交付规则：
@@ -136,14 +137,17 @@ ${citationBlock}
  */
 export function ensureContentCreationTrace(content: string, context: AimGenerateContext): string {
   const trimmed = content.trim()
-  if (context.runtimeTask === "light_edit") return trimmed
+  if (context.runtimeTask === "light_edit") {
+    return normalizeTracedContentSpacing(trimmed)
+  }
   const existing = trimmed.match(METHOD_NOTE_PATTERN)
   const note = existing?.[0] || ""
   const complete = ["目标判定", "内容路由", "调用卡片", "结构拆解", "风格定位", "教学拆解", "对标爆款视频来源", "产品卖点", "人设特点", "八字", "紫微"]
     .every((label) => note.includes(label))
   if (complete) {
     const patchedNote = attachDeterministicCitationNote(patchPlaceholderTraceSources(note, context), context)
-    return patchedNote === note ? trimmed : trimmed.replace(note, patchedNote)
+    const next = patchedNote === note ? trimmed : trimmed.replace(note, patchedNote)
+    return normalizeTracedContentSpacing(next)
   }
   // 旧版 METHOD_NOTE 缺方法论段：保留原文说明并前置补齐目标/路由/卡片/结构
   if (note && ["风格定位", "教学拆解"].every((label) => note.includes(label))) {
@@ -153,8 +157,16 @@ export function ensureContentCreationTrace(content: string, context: AimGenerate
     const patchedInner = note
       .replace("[[AIM_METHOD_NOTE]]", `[[AIM_METHOD_NOTE]]\n${planSection}\n`)
     const withCite = attachDeterministicCitationNote(patchPlaceholderTraceSources(patchedInner, context), context)
-    return trimmed.replace(note, withCite)
+    return normalizeTracedContentSpacing(trimmed.replace(note, withCite))
   }
   const result = existing ? trimmed.replace(existing[0], "").trim() : trimmed
-  return `${buildFallbackContentCreationTrace(context)}\n\n${result}`
+  return normalizeTracedContentSpacing(`${buildFallbackContentCreationTrace(context)}\n\n${result}`)
+}
+
+/** METHOD_NOTE 保留；仅压缩正文区多余空行 */
+function normalizeTracedContentSpacing(content: string): string {
+  const match = content.match(METHOD_NOTE_PATTERN)
+  if (!match) return normalizeScriptBodySpacing(content)
+  const body = normalizeScriptBodySpacing(content.replace(match[0], ""))
+  return `${match[0]}\n\n${body}`.trim()
 }

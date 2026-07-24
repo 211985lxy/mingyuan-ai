@@ -41,9 +41,20 @@ export function getAimWorkflowStatusLabel(status?: string | null) {
  */
 export function splitAimMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
-  if (!match) return { methodNote: "", result: content }
+  if (!match) return { methodNote: "", result: normalizeScriptBodySpacing(content) }
   return {
     methodNote: match[1].trim(),
-    result: content.replace(match[0], "").trim(),
+    result: normalizeScriptBodySpacing(content.replace(match[0], "")),
   }
+}
+
+/**
+ * 压缩成稿多余空行：连续空行最多保留 1 个，避免口播一句一段被撑得很疏。
+ */
+export function normalizeScriptBodySpacing(text: string): string {
+  return String(text || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
 }

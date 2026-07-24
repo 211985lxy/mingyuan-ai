@@ -75,24 +75,48 @@ export interface AimDeliverableBubbleProps {
 }
 
 const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
-  const lines = useMemo(() => (text ? text.split("\n") : []), [text])
-  return <div className="space-y-1.5 select-text font-serif leading-relaxed tracking-wide text-foreground/95 antialiased">
-    {lines.map((line, index) => {
-      if (!line.trim()) return null
-      const parts = line.replace(/\*\*/g, "").split(/(【[^】]+】)/g)
-      return <p key={index} className="text-base leading-7 text-[#2c2b2a] dark:text-[#f3ede2] sm:text-lg">
-        {parts.map((part, partIndex) => {
-          if (!part.startsWith("【") || !part.endsWith("】")) return <span key={partIndex}>{part}</span>
-          const style = part === "【画面】"
-            ? "bamboo-scene-tag"
-            : part === "【旁白】"
-              ? "gold-ink-narration border border-amber-700/20 dark:border-amber-500/20"
-              : "badge-gold border border-primary/30"
-          return <span key={partIndex} className={`mx-1 inline-block rounded-xs px-2 py-0.5 text-sm font-serif font-bold ${style}`}>{part}</span>
-        })}
-      </p>
-    })}
-  </div>
+  const paragraphs = useMemo(() => {
+    const normalized = String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+    if (!normalized) return [] as string[]
+    // 只按空行分段；段内软换行保留，避免「一句一个大段距」
+    return normalized.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean)
+  }, [text])
+  return (
+    <div className="space-y-2 select-text font-serif leading-7 tracking-wide text-foreground/95 antialiased">
+      {paragraphs.map((paragraph, index) => {
+        const parts = paragraph.replace(/\*\*/g, "").split(/(【[^】]+】)/g)
+        return (
+          <p
+            key={index}
+            className="whitespace-pre-line text-base leading-7 text-[#2c2b2a] dark:text-[#f3ede2] sm:text-[1.05rem]"
+          >
+            {parts.map((part, partIndex) => {
+              if (!part.startsWith("【") || !part.endsWith("】")) {
+                return <span key={partIndex}>{part}</span>
+              }
+              const style = part === "【画面】"
+                ? "bamboo-scene-tag"
+                : part === "【旁白】"
+                  ? "gold-ink-narration border border-amber-700/20 dark:border-amber-500/20"
+                  : "badge-gold border border-primary/30"
+              return (
+                <span
+                  key={partIndex}
+                  className={`mx-1 inline-block rounded-xs px-2 py-0.5 text-sm font-serif font-bold ${style}`}
+                >
+                  {part}
+                </span>
+              )
+            })}
+          </p>
+        )
+      })}
+    </div>
+  )
 })
 
 /**
@@ -188,7 +212,11 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
       generationId={generationId}
       format={item.format}
       content={display.result}
-      renderView={(text) => item.format === "video_script" ? <ZhuJianContent text={text} /> : <MarkdownRenderer content={text} />}
+      renderView={(text) =>
+        item.format === "video_script" || item.format === "koubo_script"
+          ? <ZhuJianContent text={text} />
+          : <MarkdownRenderer content={text} />
+      }
       isSessionOwner={inlineEditKey === sessionKey}
       canStartEdit={!inlineEditKey || inlineEditKey === sessionKey}
       onRequestEditOwnership={() => {
