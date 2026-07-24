@@ -121,7 +121,9 @@ export async function generateEmbeddings(texts: string[]): Promise<Array<Embeddi
   if (!client) return texts.map(() => null)
 
   const config = readConfig()
-  const maxChars = config.model.startsWith("BAAI/bge") ? 1500 : 8000
+  // SiliconFlow BAAI/bge-* 实际约 512 tokens；中文近似 1 字 ≈ 1 token。
+  // 旧值 1500 会触发 400，ensureKnowledgeEmbedding 静默失败，知识无法被 AIM 检索到。
+  const maxChars = config.model.startsWith("BAAI/bge") ? 500 : 8000
   const inputs = texts.map((t) => (t || " ").slice(0, maxChars))
 
   try {
