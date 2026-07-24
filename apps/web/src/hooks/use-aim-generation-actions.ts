@@ -19,6 +19,7 @@ import {
   buildAimRawInput,
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
+  findLatestAimDeliverableId,
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
@@ -101,6 +102,18 @@ function getDeliverableReadyMessage(agentTitle: string) {
   return `${agentTitle} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`
 }
 
+/**
+ * 同会话追问/改写复用最新交付物 id，避免「最近任务」每问新建一条。
+ * 明确新任务或尚无交付物时返回 undefined，走新建。
+ */
+export function resolveFollowUpGenerationId(
+  startsNewTask: boolean | undefined,
+  messages: AimWorkbenchMessage[],
+): string | undefined {
+  if (startsNewTask) return undefined
+  return findLatestAimDeliverableId(messages)
+}
+
 function appendPendingGeneration(input: AimGenerationActionInput, currentInput: string, options: GenerateOptions) {
   const assistantMessageId = nextAimWorkbenchId()
   input.pendingScrollMessageIdRef.current = assistantMessageId
@@ -133,6 +146,7 @@ function buildGenerationRequest(
   options: GenerateOptions,
 ) {
   const keepContext = !options.startsNewTask
+  const existingGenerationId = resolveFollowUpGenerationId(options.startsNewTask, baseMessages)
   return {
     agentId: input.selectedAgentId,
     agentModule: input.agentModule,
@@ -145,6 +159,7 @@ function buildGenerationRequest(
     topicRationale: keepContext ? input.sourceTopicRationale.trim() || undefined : undefined,
     topicSelectionId: keepContext ? input.topicSelectionId || undefined : undefined,
     selectedTopicIndex: keepContext && Number.isFinite(input.selectedTopicIndex) ? input.selectedTopicIndex : undefined,
+    existingGenerationId,
     taskType: input.contentAction
       ? AIM_CONTENT_ACTIONS.find((item) => item.id === input.contentAction)?.taskType || "write_script"
       : "write_script",

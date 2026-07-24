@@ -276,8 +276,8 @@ export async function getMethodologyProfileVersion(
 export function buildMethodologyProfileBlock(policy: MethodologyPolicy): string {
   if (policy.versionRows.length === 0) return ""
   const sections: string[] = [
-    "=== 本次指定参考方法论 ===",
-    "使用方式：借鉴其方法与框架，不要模仿作者的身份、立场与语言口吻。",
+    "=== 本次指定方法论（强参考） ===",
+    "使用方式：必须按该方法论的结构、钩子、判断标准与写作规范执行；借鉴框架，不要模仿作者的身份、立场与语言口吻。",
     "事实优先级：本方法论中的任何人物、业务、产品案例与假设，均不得覆盖或替换当前项目的真实资料与用户本次的明确要求。",
     "",
   ]

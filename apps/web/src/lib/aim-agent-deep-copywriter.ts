@@ -51,7 +51,8 @@ export class DeepCopywriterHandler implements AimAgentHandler {
 企业已有核心知识库（参考背景）：
 ${contextBlock}
 ${workflowContext ? `\n工作流任务单：\n${workflowContext}\n` : ""}
-IP操盘方法论（写作与判断规则）：
+IP操盘方法论（强参考：写作与判断规则，必须执行）：
+必须按下列方法论的结构、钩子、判断标准与写作规范执行；除非用户本轮明确要求覆盖，否则不得跳过或用通用模板替代。不得把方法论原文整段抄进回复；方法论案例不得覆盖客户真实资料。
 ${params.methodologyBlock}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
 ${lightEditBlock}
@@ -71,7 +72,7 @@ C. 选项内容
 8. 成稿前先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
 9. 输出最终正文时，正文最后一句写完就停止，不要追加任何拆分方向、私域话术、平台改写版本、总结点评或"你看是否符合"这类确认尾句。
 10. 不暴露外部参考来源细节。
-11. 方法论和知识库用于辅助判断与打磨，不要拿固定流程压过用户当前这轮的明确要求。
+11. IP操盘方法论是强参考：结构、钩子、判断标准必须执行；知识库辅助事实与表达。二者都不得盖过用户当前这轮的明确要求。
 12. 如果涉及对标文案改写，必须遵守：
 ${BENCHMARK_REWRITE_GUARDRAIL}
 13. 如果用户要求把成稿整理成发布文案/发布话题/发布包，必须遵守：
@@ -140,7 +141,9 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
     const systemPrompt = `${agentPrompt}
 
 ${knowledgeSection}
-${context.methodologyBlock}
+${context.methodologyBlock
+  ? `IP操盘方法论（强参考·仅已选卡片）：\n必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过或用通用模板替代。成稿正文禁止方法论说明书腔。\n${context.methodologyBlock}`
+  : ""}
 ${context.eventStorytellingBlock}
 ${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
 内部工作流程：

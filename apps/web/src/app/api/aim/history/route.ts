@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const [records, total] = await Promise.all([
       prisma.aimGeneration.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { updatedAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

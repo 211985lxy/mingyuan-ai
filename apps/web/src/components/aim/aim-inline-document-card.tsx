@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Check, Clipboard, History, Loader2, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,16 @@ type VersionSummary = {
   createdAt: string
   preview: string
   content?: string
+}
+
+/** 底部悬浮输入框 + 安全边距，编辑框需铺满到其上方 */
+const EDITOR_BOTTOM_RESERVE_PX = 148
+const EDITOR_MIN_HEIGHT_PX = 360
+
+function syncEditorViewportHeight(el: HTMLTextAreaElement) {
+  const top = el.getBoundingClientRect().top
+  const available = Math.floor(window.innerHeight - top - EDITOR_BOTTOM_RESERVE_PX)
+  el.style.height = `${Math.max(EDITOR_MIN_HEIGHT_PX, available)}px`
 }
 
 export interface AimInlineDocumentCardProps {
@@ -222,6 +232,25 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
     }
   }, [props.content, editing])
 
+  // 编辑态：把文案框高度铺满到工作台底部输入区上方（用户标注的可视区域）
+  useLayoutEffect(() => {
+    if (!editing) return
+    const el = textareaRef.current
+    if (!el) return
+
+    const sync = () => syncEditorViewportHeight(el)
+    // 先把工具栏顶到可视区，再按「工具栏下方 → 底部输入框」剩余高度铺满
+    el.parentElement?.scrollIntoView({ block: "start", behavior: "auto" })
+    sync()
+    const timer = window.setTimeout(sync, 60)
+    window.addEventListener("resize", sync)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener("resize", sync)
+      el.style.height = ""
+    }
+  }, [editing])
+
   const dirty = editing && draft !== props.content
   const formatLabel = AIM_FORMAT_LABELS[props.format] ?? props.format
 
@@ -354,12 +383,12 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
   ), [editing, saving, dirty, formatLabel, viewText, copied, props])
 
   return (
-    <div className="space-y-3">
+    <div className={editing ? "flex flex-col gap-3" : "space-y-3"}>
       {toolbar}
       {editing ? (
         <textarea
           ref={textareaRef}
-          className="min-h-64 w-full resize-y rounded-md border bg-background p-4 text-base leading-8 outline-none focus:border-primary/30"
+          className="min-h-[22rem] w-full resize-y rounded-md border bg-background p-4 text-base leading-8 outline-none focus:border-primary/30"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onSelect={(event) => setSelection(readSelection(event.currentTarget))}

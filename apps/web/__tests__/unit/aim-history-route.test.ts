@@ -44,6 +44,7 @@ describe("aim history route", () => {
         userId: "user-1",
         agentId: { in: ["content_producer", "ip_video"] },
       }),
+      orderBy: { updatedAt: "desc" },
     }))
     expect(body).toEqual([
       expect.objectContaining({

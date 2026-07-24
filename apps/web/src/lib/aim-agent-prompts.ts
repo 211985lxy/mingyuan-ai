@@ -18,6 +18,8 @@ export interface ContentProducerChatPromptParams {
   workflowContext?: string
   runtimeTask?: AimRuntimeTask
   knowledgeStrategy?: ResolvedKnowledgeStrategy
+  /** IP 方法论动态选卡计划（目标模糊时可追问） */
+  methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
 }
 function buildChatContextBlock(params: Pick<ContentProducerChatPromptParams, "conversationBlock" | "knowledgeBlock">) {
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
@@ -124,6 +126,10 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     knowledgeStrategy: params.knowledgeStrategy,
   })
   const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
+  const goalClarify =
+    params.methodologyPlan?.businessGoal === "unclear" && (params.methodologyPlan.confidence ?? 0) < 0.6
+      ? `\n目标确认（仅当目标仍模糊时，最多追问 1 题 + 下列选项，不要开放追问）：\n这条内容更想达成哪个目标？\nA. 获客线索（留资/私信/预约诊断）\nB. 成交转化（报名/购买）\nC. 人设信任（来时路/专业可信）\nD. 品牌曝光（起号/流量/品宣）\n`
+      : ""
   return `你是一个身经百战的「太极营销创意总监」，正与企业老板（用户）面对面进行爆款营销文案创意碰撞与思路对齐。
 
 北极星目标：${AIM_NORTH_STAR_GOAL}
@@ -134,14 +140,15 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
 当前对话上下文：
 ${contextBlock}
 ${params.workflowContext ? `\n工作流任务单：\n${params.workflowContext}\n` : ""}
-${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}IP操盘方法论（写作与判断规则）：
+${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}IP操盘方法论（强参考·仅已选卡片）：
+必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过或用通用模板替代。不得把方法论原文整段抄进回复；方法论案例不得覆盖客户真实资料；成稿正文禁止方法论说明书腔。
 ${params.methodologyBlock}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
-${lightEditBlock}
+${lightEditBlock}${goalClarify}
 ${AIM_HIGH_RISK_LOOP_RULE}
 
 你的对话原则：
-1. 当用户明显缺失会影响成稿的关键信息（如目标受众、品牌调性、核心卖点、使用场景）时，主动追问 1-3 个最核心的问题；问法必须简洁、友好、具体。
+1. 当用户明显缺失会影响成稿的关键信息（如目标受众、品牌调性、核心卖点、使用场景）时，主动追问 1-3 个最核心的问题；问法必须简洁、友好、具体。若仅缺内容目标，优先用上方「目标确认」单题选项，不要另开开放题。
 2. 追问时尽量给出示例或选项来降低回答门槛，例如："这篇文案主要面向 B 端企业客户，还是 C 端消费者？"
 3. 如果信息基本完整、只缺少不影响主方向的个别细节，可以基于上下文做合理假设并直接交付可用版本，同时在结果中简短标注待用户确认的假设项。
 4. 禁止输出"您好，请问有什么可以帮您？"这类追问式开场白。只有在信息确实不足时才针对性追问，不重复询问用户已经提供的信息。
@@ -151,7 +158,7 @@ ${AIM_HIGH_RISK_LOOP_RULE}
 8. 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
 9. 如果用户需要的是完整定位或商业诊断，给一句简短建议引导去定位策划官或商业诊断官；内容生产必需的受众、卖点、场景等信息，仍可按上述原则适度追问。
 10. 如果输入是热点选题，只能说"热点/选题/事件/来源"，不要说"对标文案/对标原文/原视频"。
-11. 方法论、知识库和历史稿件都只用于辅助理解与创作，不要盖过用户当前这一轮的明确要求。
+11. IP操盘方法论是强参考：只执行已注入卡片；知识库和历史稿件只辅助事实与表达。三者都不得盖过用户当前这一轮的明确要求。
 12. 如果涉及对标文案改写，必须遵守：
 ${BENCHMARK_REWRITE_GUARDRAIL}
 13. 如果用户要求把成稿整理成发布文案/发布话题/发布包，必须遵守：

@@ -78,7 +78,7 @@ const aimExpertAgentIds: AimAgentId[] = [
   "persona",
 ]
 
-const RECENT_THREAD_LIMIT = 4
+const RECENT_THREAD_LIMIT = 20
 
 function isNavActive(pathname: string, searchParams: URLSearchParams, href: string) {
   const url = new URL(href, "http://local")
@@ -131,7 +131,7 @@ function compactHistoryTheme(text: string) {
   if (/Codex|AI变现工作台/.test(firstClause) && /工作台|变现/.test(firstClause)) {
     return "Codex AI变现工作台"
   }
-  return firstClause.slice(0, 22)
+  return firstClause.slice(0, 48)
 }
 
 function getHistoryFormatLabel(item: {
@@ -282,7 +282,11 @@ export function AppSidebar() {
 
   const recentThreads = useMemo(() => {
     const ranked = [...history].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      (a, b) => {
+        const aTime = new Date(a.updatedAt || a.createdAt).getTime()
+        const bTime = new Date(b.updatedAt || b.createdAt).getTime()
+        return bTime - aTime
+      },
     )
     return ranked.slice(0, RECENT_THREAD_LIMIT)
   }, [history])
@@ -309,7 +313,7 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="gap-1 px-2 pb-2">
+      <SidebarContent className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-2 pb-2">
         <SidebarGroup className="p-0">
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
@@ -369,12 +373,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="mt-3 p-0">
-          <SidebarGroupLabel className="mb-1.5 h-7 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
+        <SidebarGroup className="mt-3 flex min-h-0 flex-1 flex-col p-0">
+          <SidebarGroupLabel className="mb-1.5 h-7 shrink-0 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             最近任务
           </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <div className="space-y-0.5">
+          <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto">
+            <div className="space-y-0.5 pb-1">
               {recentThreads.length === 0 ? (
                 <p className="px-2.5 py-2 text-sm text-muted-foreground">暂无任务，点上方新建</p>
               ) : (

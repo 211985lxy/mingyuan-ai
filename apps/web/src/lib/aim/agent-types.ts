@@ -40,6 +40,8 @@ export interface AimChatParams {
   runtimeTask?: AimRuntimeTask
   /** 任务单（chat 路径注入，供提示词绑定档案与运营字段） */
   taskSpec?: TaskSpec
+  /** IP 方法论动态选卡计划 */
+  methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
   /** 解析后的知识策略（可选，驱动任务感知知识规则） */
   knowledgeStrategy?: ResolvedKnowledgeStrategy
   modelPolicy?: AimModelPolicy
@@ -88,6 +90,8 @@ export interface AimGenerateContext {
   knowledgeStrategy: ResolvedKnowledgeStrategy
   /** 内容场景模式（由前端或路由层传入，驱动提示块和知识策略差异化） */
   contentScenario?: ContentScenario
+  /** IP 方法论动态选卡计划（intent → cards → structureModules） */
+  methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
   trace?: AimTraceRecorder
   /** Eval-only: use frozen context instead of live DB loaders. */
   contextOverride?: AimGenerationContextOverride

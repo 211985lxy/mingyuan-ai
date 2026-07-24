@@ -224,6 +224,8 @@ export interface PreparedAimContext {
   }
   /** 已解析/重建的 TaskSpec（落 AimGeneration.taskSpec） */
   taskSpec?: TaskSpec
+  /** IP 方法论动态选卡计划（与 taskSpec.methodologyPlan 同步） */
+  methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
   /** RAG 命中的知识条目（含 id，用于引用校验与 manifest） */
   retrievedEntries?: Array<{ id: string; title: string; category?: string }>
   retrievedSource?: string

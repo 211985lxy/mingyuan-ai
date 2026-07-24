@@ -128,6 +128,8 @@ describe("AIM content production positioning", () => {
     } as unknown as Parameters<typeof buildProducerSystemPrompt>[1])
 
     expect(CONTENT_CREATION_TRACE_RULE).toContain("[[AIM_METHOD_NOTE]]")
+    expect(CONTENT_CREATION_TRACE_RULE).toContain("目标判定")
+    expect(CONTENT_CREATION_TRACE_RULE).toContain("调用卡片")
     expect(prompt).toContain("风格定位")
     expect(prompt).toContain("教学拆解")
     expect(prompt).toContain("对标爆款视频来源")

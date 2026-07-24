@@ -41,6 +41,7 @@ export class ContentProducerHandler implements AimAgentHandler {
       workflowContext,
       runtimeTask: params.runtimeTask,
       knowledgeStrategy: params.knowledgeStrategy,
+      methodologyPlan: params.methodologyPlan ?? params.taskSpec?.methodologyPlan,
     })
   }
 

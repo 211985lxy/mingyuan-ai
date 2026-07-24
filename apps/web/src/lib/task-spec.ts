@@ -91,6 +91,8 @@ export interface TaskSpec {
   collectionId?: string
   sampleCount?: number
   analysisStatus?: string
+  /** IP 方法论动态选卡计划（prepareAimContext 写入，供 prompt / METHOD_NOTE 共用） */
+  methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
 }
 
 /**

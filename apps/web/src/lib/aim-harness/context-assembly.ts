@@ -61,6 +61,7 @@ import { runBoundedToolLoop } from "./tool-loop"
 import { sanitizeUntrustedContextText } from "./context-trust"
 import { buildAimSkillBlock, loadAimSkills } from "./skill-loader"
 import { env } from "@/env"
+import { resolveAndComposeMethodologyBlock } from "@/lib/methodology/compose-matched-methodology-block"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -166,7 +167,6 @@ export async function prepareAimContext(
   const skillEnabled = env.AIM_SKILL_LOADING_ENABLED?.trim().toLowerCase() !== "false"
   const skills = await loadAimSkills({ agentId, runtimeTask, enabled: skillEnabled })
   const skillBlock = buildAimSkillBlock(skills)
-  const methodologyWithSkills = [methodologyBlock, skillBlock].filter(Boolean).join("\n\n")
 
   // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > none。
   // 在现有 6 块加载之后单独计算，不触碰字节等价红线；解析结果冻结进 spec.methodologyPolicy。
@@ -183,6 +183,65 @@ export async function prepareAimContext(
 
   // ── TaskSpec 构建（与 buildAimGeneration:1568 一致，含二次查 project/topicSelection）
   const taskSpec = await buildContextTaskSpec({ spec, params, knowledgeEntries: knowledgeCtx.entries ?? [] })
+
+  // 3.6 IP 方法论动态选卡：intent → plan → 只注入匹配卡片（eval override 保留冻结块）
+  const useFrozenMethodology = Boolean(params.contextOverride?.methodologyBlock)
+  const methodologyEnabled = generationIntent.useMethodology || useFrozenMethodology
+  const { plan: methodologyPlan, block: methodologyWithSkills } = !methodologyEnabled
+    ? {
+        plan: resolveAndComposeMethodologyBlock({
+          agentId,
+          rawInput: spec.rawInput,
+          taskSpec,
+          runtimeTask,
+          topicType: params.topicType,
+          mode: "generate" as const,
+          fallbackBlock: "",
+        }).plan,
+        block: skillBlock,
+      }
+    : useFrozenMethodology
+      ? {
+          plan: resolveAndComposeMethodologyBlock({
+            agentId,
+            rawInput: spec.rawInput,
+            taskSpec,
+            runtimeTask,
+            topicType: params.topicType,
+            mode: "generate" as const,
+            skillBlock,
+            fallbackBlock: methodologyBlock,
+          }).plan,
+          block: [methodologyBlock, skillBlock].filter(Boolean).join("\n\n"),
+        }
+      : resolveAndComposeMethodologyBlock({
+          agentId,
+          rawInput: spec.rawInput,
+          taskSpec,
+          runtimeTask,
+          topicType: params.topicType,
+          mode: "generate",
+          skillBlock,
+          fallbackBlock: methodologyBlock,
+        })
+
+  const taskSpecWithPlan = taskSpec
+    ? { ...taskSpec, methodologyPlan }
+    : taskSpec
+
+  await addAimTraceStep(trace, {
+    key: "methodology_plan",
+    label: "方法论选卡",
+    status: "success",
+    summary: `goal=${methodologyPlan.businessGoal} route=${methodologyPlan.contentRoute}`,
+    metadata: {
+      cardIds: methodologyPlan.cardIds,
+      source: methodologyPlan.source,
+      confidence: methodologyPlan.confidence,
+      structureModules: methodologyPlan.structureModules,
+      dynamicCards: !useFrozenMethodology,
+    },
+  })
 
   // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致；selectedMethodologyBlock 作为独立预算块）
   const budgeted = await compressAndBudgetGenerationInput({
@@ -212,7 +271,7 @@ export async function prepareAimContext(
     ipWikiBlock: budgeted.blocks.ipWikiBlock,
     viralStructureBlock: budgeted.blocks.viralStructureBlock,
     selectedMethodologyBlock: budgeted.blocks.selectedMethodologyBlock,
-    taskSpec,
+    taskSpec: taskSpecWithPlan,
   })
 
   return {
@@ -229,7 +288,8 @@ export async function prepareAimContext(
       // generate 路径此前不注入对话记忆；阶段 2 预留，暂为空
       memory: "",
     },
-    taskSpec,
+    taskSpec: taskSpecWithPlan,
+    methodologyPlan,
     retrievedEntries: (knowledgeCtx.entries ?? []).map((e: { id: string; title: string; category?: string }) => ({
       id: e.id,
       title: e.title,

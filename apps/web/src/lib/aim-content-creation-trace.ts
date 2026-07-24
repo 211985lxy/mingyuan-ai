@@ -2,17 +2,24 @@ import {
   buildKnowledgeCitationMarkdown,
   upsertKnowledgeCitationInMethodNote,
 } from "@/lib/aim-knowledge-cite"
+import { buildMethodologyPlanTraceSection } from "@/lib/methodology/compose-matched-methodology-block"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 
 export const CONTENT_CREATION_TRACE_RULE = `教学式透明交付规则：
 - 每个完整成稿或文章的最前面，先输出 [[AIM_METHOD_NOTE]] ... [[/AIM_METHOD_NOTE]]；正文放在结束标记之后。
 - 说明区只给可学习、可复用、可验证的高层结论，不输出逐字内部思维链。
-- 说明区固定包含以下五部分：
-  1. 「风格定位」：标注主风格与辅助风格（如幽默、专业、感性、犀利、沉稳），并说明与当前场景的关系。
-  2. 「教学拆解」：用 3-5 条概括选题判断、开头钩子、结构推进、情绪基调和转化承接的取舍。
-  3. 「来源标注」：分别列出“对标爆款视频来源”、“产品卖点”、“人设特点”，每项都写出来源名称与在本稿中的用法；名称必须来自当前知识块/选题上下文中的真实标题，不得编造。
-  4. 「八字与紫微天命适配」：标注引用的八字/紫微资料来源，以及它如何影响文风、用词和情感基调。
-  5. 「相关原文」：按知识块中真实命中的条目列出「相关原文见 《标题》（分类）」；没有命中时写“未提供/待补充”。服务端会用实际召回条目覆盖本小节，勿编造条目。
+- 说明区固定包含以下部分（顺序可按下列标题组织）：
+  1. 「目标判定」：写明 businessGoal（traffic/lead/trust/convert/brand）与依据（显式词 / TaskSpec / 假设）；目标模糊时必须写清假设。
+  2. 「内容路由」：四选一（persona_trust / point_of_view / problem_solve / case_convert）并简述为何。
+  3. 「调用卡片」：只列出本轮实际注入的卡片 id + 中文名；声称的卡片必须 ⊆ 已注入列表，禁止虚构未注入卡片。
+  4. 「结构拆解」：按本轮 structureModules 逐段说明「本段服务什么 / 用了哪张卡」。
+  5. 「风格定位」：标注主风格与辅助风格（如幽默、专业、感性、犀利、沉稳），并说明与当前场景的关系。
+  6. 「教学拆解」：用 3-5 条概括选题判断、开头钩子、结构推进、情绪基调和转化承接的取舍。
+  7. 「来源标注」：分别列出“对标爆款视频来源”、“产品卖点”、“人设特点”，每项都写出来源名称与在本稿中的用法；名称必须来自当前知识块/选题上下文中的真实标题，不得编造。
+  8. 「八字与紫微天命适配」：标注引用的八字/紫微资料来源，以及它如何影响文风、用词和情感基调。
+  9. 「相关原文」：按知识块中真实命中的条目列出「相关原文见 《标题》（分类）」；没有命中时写“未提供/待补充”。服务端会用实际召回条目覆盖本小节，勿编造条目。
+  10. 若经历目标达成度重写，增加「目标匹配度 / 优化点」说明补了哪些模块。
+- 成稿正文（===FORMAT=== 内）保持可发布干净文本：禁止把方法论说明书、卡片名、结构模块标题原样打进口播/短视频正文。
 - 只能引用当前用户输入、选题上下文、知识库条目和 IP 定位维基中明确存在的来源名称；不得编造来源、视频、卖点、人设或命理结论。
 - 任一类资料缺失时，必须在对应位置写“未提供/待补充”；没有八字或紫微资料时，不得把一般性格判断写成命理结论。
 - 禁止把「相关原文见」写进口播/短视频正文；只放在 AIM_METHOD_NOTE 说明区。`
@@ -102,6 +109,8 @@ function buildFallbackContentCreationTrace(context: AimGenerateContext): string 
     || "### 相关原文\n- 未提供/待补充"
 
   return attachDeterministicCitationNote(`[[AIM_METHOD_NOTE]]
+${buildMethodologyPlanTraceSection(context.methodologyPlan ?? context.taskSpec?.methodologyPlan)}
+
 ### 风格定位
 - ${stylePositioning}
 
@@ -130,11 +139,21 @@ export function ensureContentCreationTrace(content: string, context: AimGenerate
   if (context.runtimeTask === "light_edit") return trimmed
   const existing = trimmed.match(METHOD_NOTE_PATTERN)
   const note = existing?.[0] || ""
-  const complete = ["风格定位", "教学拆解", "对标爆款视频来源", "产品卖点", "人设特点", "八字", "紫微"]
+  const complete = ["目标判定", "内容路由", "调用卡片", "结构拆解", "风格定位", "教学拆解", "对标爆款视频来源", "产品卖点", "人设特点", "八字", "紫微"]
     .every((label) => note.includes(label))
   if (complete) {
     const patchedNote = attachDeterministicCitationNote(patchPlaceholderTraceSources(note, context), context)
     return patchedNote === note ? trimmed : trimmed.replace(note, patchedNote)
+  }
+  // 旧版 METHOD_NOTE 缺方法论段：保留原文说明并前置补齐目标/路由/卡片/结构
+  if (note && ["风格定位", "教学拆解"].every((label) => note.includes(label))) {
+    const planSection = buildMethodologyPlanTraceSection(
+      context.methodologyPlan ?? context.taskSpec?.methodologyPlan,
+    )
+    const patchedInner = note
+      .replace("[[AIM_METHOD_NOTE]]", `[[AIM_METHOD_NOTE]]\n${planSection}\n`)
+    const withCite = attachDeterministicCitationNote(patchPlaceholderTraceSources(patchedInner, context), context)
+    return trimmed.replace(note, withCite)
   }
   const result = existing ? trimmed.replace(existing[0], "").trim() : trimmed
   return `${buildFallbackContentCreationTrace(context)}\n\n${result}`

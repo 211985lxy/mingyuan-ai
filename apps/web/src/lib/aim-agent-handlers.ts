@@ -1,5 +1,6 @@
 import { getAimGenerationUsage } from "@/lib/aim-harness/persistence"
 import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
+import { resolveAndComposeMethodologyBlock } from "@/lib/methodology/compose-matched-methodology-block"
 import { buildBusinessDiagnosisMethodologyBlock } from "@/lib/business-diagnosis-methodology"
 import { fireKnowledgeEmbedding } from "@/lib/aim-knowledge-context"
 import { compressAimMessages } from "@/lib/aim-context-compressor"
@@ -131,7 +132,7 @@ async function buildAimChatRuntime(
     ? buildConversationIntentBlock(params.conversationIntent)
     : ""
 
-  const [methodologyBlock, businessDiagnosisBlock, ipWikiBlock] = await runAimTraceStep(
+  const [methodologyBlockRaw, businessDiagnosisBlock, ipWikiBlock] = await runAimTraceStep(
     params.trace,
     "build_runtime_context",
     "方法论/IP Wiki 上下文",
@@ -155,10 +156,54 @@ async function buildAimChatRuntime(
       },
     }),
   )
+
+  const latestUserText = [...params.messages]
+    .reverse()
+    .find((m) => m?.role === "user" && typeof m?.content === "string")?.content
+    || ""
+  const taskSpecBase = params.taskSpec
+    ? enrichTaskSpecFromRawInput(params.taskSpec, latestUserText)
+    : enrichTaskSpecFromRawInput(
+        buildTaskSpecSkeleton({
+          agentId,
+          rawInput: latestUserText,
+          project: null,
+          topicSelection: null,
+          knowledgeTitles: [],
+        }),
+        latestUserText,
+      )
+
+  const skipMethodology = params.conversationIntent?.useMethodology === false
+  const { plan: methodologyPlan, block: methodologyMatched } = skipMethodology
+    ? {
+        plan: resolveAndComposeMethodologyBlock({
+          agentId,
+          rawInput: latestUserText,
+          taskSpec: taskSpecBase,
+          runtimeTask: params.runtimeTask,
+          mode: "chat",
+          fallbackBlock: "",
+        }).plan,
+        block: "",
+      }
+    : resolveAndComposeMethodologyBlock({
+        agentId,
+        rawInput: latestUserText,
+        taskSpec: taskSpecBase,
+        runtimeTask: params.runtimeTask,
+        mode: "chat",
+        fallbackBlock: methodologyBlockRaw,
+      })
+
+  const taskSpec = taskSpecBase
+    ? { ...taskSpecBase, methodologyPlan }
+    : taskSpecBase
+
   const budgeted = applyAimContextBudget({
     conversationBlock,
     knowledgeBlock: enrichedKnowledgeBlock,
-    methodologyBlock,
+    methodologyBlock: methodologyMatched,
     businessDiagnosisBlock,
     viralStructureBlock: "",
     eventStorytellingBlock: "",
@@ -174,23 +219,6 @@ async function buildAimChatRuntime(
     metadata: { ...budgeted.stats, factPriority: AIM_FACT_PRIORITY_VERSION },
   })
 
-  const latestUserText = [...params.messages]
-    .reverse()
-    .find((m) => m?.role === "user" && typeof m?.content === "string")?.content
-    || ""
-  const taskSpec = params.taskSpec
-    ? enrichTaskSpecFromRawInput(params.taskSpec, latestUserText)
-    : enrichTaskSpecFromRawInput(
-        buildTaskSpecSkeleton({
-          agentId,
-          rawInput: latestUserText,
-          project: null,
-          topicSelection: null,
-          knowledgeTitles: [],
-        }),
-        latestUserText,
-      )
-
   return {
     handler: getAgentHandler(agentId),
     params: {
@@ -201,6 +229,7 @@ async function buildAimChatRuntime(
       businessDiagnosisBlock: budgeted.blocks.businessDiagnosisBlock,
       ipWikiBlock: budgeted.blocks.ipWikiBlock,
       taskSpec,
+      methodologyPlan,
     },
   }
 }
@@ -361,6 +390,7 @@ export async function buildAimGeneration(
       retrievedSource: prepared.retrievedSource ?? "raw",
       knowledgeStrategy: prepared.spec.knowledgeStrategy,
       taskSpec,
+      methodologyPlan: prepared.methodologyPlan ?? taskSpec?.methodologyPlan,
     }),
     (result) => ({
       summary: `生成 ${result.results.length} 个交付物`,

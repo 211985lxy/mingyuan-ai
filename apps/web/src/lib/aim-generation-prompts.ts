@@ -25,6 +25,10 @@ import {
   ensureContentCreationTrace,
 } from "./aim-content-creation-trace"
 import { getMaterialAnchorsFromTaskSpec } from "@/features/newsroom/services/build-source-brief"
+import {
+  buildGoalRewritePromptAppendix,
+  verifyMethodologyGoal,
+} from "@/lib/methodology/goal-verifier"
 
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 
@@ -224,6 +228,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
 ) {
   let activePrompt = userPrompt
   const isLightEdit = context.runtimeTask === "light_edit"
+  const methodologyPlan = context.methodologyPlan ?? context.taskSpec?.methodologyPlan
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
@@ -239,11 +244,22 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       targetFormats,
     )
 
-    if (copiedFormats.length === 0 && unsupportedClaimFormats.length === 0) {
-      return { completion, parsed }
+    const goalVerify = !isLightEdit && methodologyPlan
+      ? verifyMethodologyGoal(
+          methodologyPlan,
+          targetFormats.map((format) => ({ format, content: parsed[format] || "" })),
+        )
+      : { ok: true, issues: [], summary: "" }
+
+    if (copiedFormats.length === 0 && unsupportedClaimFormats.length === 0 && goalVerify.ok) {
+      return { completion, parsed, goalVerify }
     }
     if (attempt === 2) {
-      throw new Error("生成结果连续出现无依据的案例或过度近似原文，已停止交付")
+      if (copiedFormats.length || unsupportedClaimFormats.length) {
+        throw new Error("生成结果连续出现无依据的案例或过度近似原文，已停止交付")
+      }
+      // 目标质检末次仍失败：交付最后一版，由 METHOD_NOTE 记录；不硬抛
+      return { completion, parsed, goalVerify }
     }
 
     const previousOutput = targetFormats
@@ -257,7 +273,9 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         ? `上一版 ${unsupportedClaimFormats.join("、")} 出现了上下文无依据的“我的学员/客户/朋友/亲历”，判定为事实风险。`
         : "",
     ].filter(Boolean).join("\n")
-    activePrompt = `${userPrompt}
+
+    if (copiedFormats.length || unsupportedClaimFormats.length) {
+      activePrompt = `${userPrompt}
 
 【自动质检结果】
 ${retryReasons}
@@ -266,6 +284,10 @@ ${retryReasons}
 
 上一版输出：
 ${previousOutput}`
+    } else if (methodologyPlan && !goalVerify.ok) {
+      activePrompt = `${userPrompt}
+${buildGoalRewritePromptAppendix(methodologyPlan, goalVerify, previousOutput)}`
+    }
   }
 
   throw new Error("生成后质检未完成")
@@ -294,12 +316,15 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     : ""
   const fewshot = buildPromptFewshotBlock(context.runtimeTask, context.targetFormats)
 
-  // 上下文按优先级：TaskSpec 由 user prompt 注入；此处 IP Wiki > 知识 > 方法论/爆款（弱参考）
+  // 上下文按优先级：TaskSpec 由 user prompt 注入；IP Wiki / 知识为事实素材；
+  // IP 操盘方法论为强参考（结构/钩子/判断标准必须执行）；爆款库仍为弱参考。
   const contextBlocks = [
     context.ipWikiBlock ? `IP 定位维基（高优先级档案）：\n${context.ipWikiBlock}` : "",
     context.knowledgeBlock ? `企业知识库（高相关条目）：\n${context.knowledgeBlock}` : "",
-    context.selectedMethodologyBlock ? `指定方法论：\n${context.selectedMethodologyBlock}` : "",
-    context.methodologyBlock ? `IP操盘方法论（弱参考）：\n${context.methodologyBlock}` : "",
+    context.selectedMethodologyBlock ? `指定方法论（强参考）：\n${context.selectedMethodologyBlock}` : "",
+    context.methodologyBlock
+      ? `IP操盘方法论（强参考·仅已选卡片）：\n必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过、稀释或用通用模板替代。\n不得把方法论原文整段抄进成稿；方法论中的人物/业务案例不得覆盖当前项目真实资料；成稿正文禁止方法论说明书腔。\n${context.methodologyBlock}`
+      : "",
     context.businessDiagnosisBlock ? `商业诊断方法（弱参考）：\n${context.businessDiagnosisBlock}` : "",
     context.eventStorytellingBlock ? `事件叙事方法：\n${context.eventStorytellingBlock}` : "",
     context.viralStructureBlock ? `爆款结构库（弱参考）：\n${context.viralStructureBlock}` : "",
@@ -327,7 +352,7 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     contextBlocks,
     formatBlock: "请严格按照下方每种格式的要求生成对应内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。格式细则见用户消息。",
     qualityRedlines: [
-      "选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者。",
+      "选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > IP操盘方法论（强参考：结构/钩子/判断） > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者；方法论不得被通用模板绕过。",
       "如果输入是热点选题而不是对标文案，成稿与分析里都不要出现「对标文案」「对标原文」「原视频」这类说法。",
       "开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。",
       "正文每一段都要推进信息，不要堆形容词，不要写营销黑话。",
