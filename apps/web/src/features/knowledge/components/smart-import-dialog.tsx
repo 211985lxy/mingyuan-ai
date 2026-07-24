@@ -191,7 +191,7 @@ export function SmartImportDialog({
               </Select>
             </div>
             <div>
-              <Label>选择文件（支持 PDF/Word/PPT/Excel/HTML/TXT/MD/CSV/JSON/XML/RTF）</Label>
+              <Label>选择文件（支持 PDF / Word（.docx） / PPT / Excel / HTML / TXT / MD 等）</Label>
               <Input
                 type="file"
                 accept={KNOWLEDGE_UPLOAD_ACCEPT}

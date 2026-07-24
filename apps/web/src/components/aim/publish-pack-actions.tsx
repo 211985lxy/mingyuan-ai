@@ -1,13 +1,14 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Clipboard, Check, Loader2, ExternalLink } from "lucide-react"
+import { Clipboard, Check, Loader2, ExternalLink, FileDown } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { formatPublishPackText } from "@/lib/aim/publish-pack"
 import { buildContentDistributionClaimDraft } from "@/lib/aim/content-distribution-claim"
-import { request } from "@/lib/api/core"
+import { request, ApiError } from "@/lib/api/core"
+import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import type { AimGenerateResponse } from "@/lib/api/client"
 
 export interface PublishPackActionsProps {
@@ -31,7 +32,7 @@ export function PublishPackActions({
   reviewNote,
 }: PublishPackActionsProps) {
   const [copied, setCopied] = useState<"pack" | "claim" | null>(null)
-  const [busy, setBusy] = useState<"pack" | "claim" | "submit" | null>(null)
+  const [busy, setBusy] = useState<"pack" | "claim" | "submit" | "docx" | null>(null)
 
   const packText = useMemo(
     () =>
@@ -112,6 +113,63 @@ export function PublishPackActions({
     }
   }
 
+  async function exportWord() {
+    const sections = deliverables.results
+      .filter((item) => item.content.trim())
+      .map((item) => ({
+        heading: AIM_FORMAT_LABELS[item.format] || item.format,
+        content: item.content,
+      }))
+    if (sections.length === 0) {
+      toast.error("当前没有可导出的正文")
+      return
+    }
+
+    const title =
+      deliverables.taskSpec?.canonical?.coreMessage?.trim().slice(0, 40) ||
+      `AIM-${deliverables.id.slice(0, 8)}`
+
+    setBusy("docx")
+    try {
+      const response = await fetch("/api/aim/export-office", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generationId: deliverables.id.startsWith("polish-") ? undefined : deliverables.id,
+          title,
+          sections,
+        }),
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new ApiError(
+          typeof payload?.error === "string" ? payload.error : "导出 Word 失败",
+          response.status,
+          payload,
+        )
+      }
+      const blob = await response.blob()
+      const disposition = response.headers.get("Content-Disposition") || ""
+      const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const plainMatch = disposition.match(/filename="([^"]+)"/i)
+      const fileName = utfMatch
+        ? decodeURIComponent(utfMatch[1])
+        : plainMatch?.[1] || `${title}.docx`
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = fileName
+      anchor.click()
+      URL.revokeObjectURL(url)
+      toast.success("Word 已下载")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "导出 Word 失败")
+    } finally {
+      setBusy(null)
+    }
+  }
+
   return (
     <div className="mb-3 flex flex-wrap gap-2">
       <Button
@@ -130,6 +188,21 @@ export function PublishPackActions({
           <Clipboard className="mr-1 size-3.5" />
         )}
         复制发布包
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 text-xs"
+        disabled={Boolean(busy)}
+        onClick={() => void exportWord()}
+      >
+        {busy === "docx" ? (
+          <Loader2 className="mr-1 size-3.5 animate-spin" />
+        ) : (
+          <FileDown className="mr-1 size-3.5" />
+        )}
+        导出 Word
       </Button>
       <Button
         type="button"

@@ -26,6 +26,8 @@ const SUPPORTED_EXTENSIONS = new Set([
 ])
 
 const MARKITDOWN_EXTENSIONS = new Set([".pdf", ".docx", ".xls", ".xlsx", ".pptx", ".html", ".htm", ".json", ".xml", ".rtf"])
+/** OfficeCLI 擅长的 Office 格式（可选增强；未安装则跳过） */
+const OFFICECLI_EXTENSIONS = new Set([".docx", ".xlsx", ".pptx"])
 const execFileAsync = promisify(execFile)
 
 /** 分块阈值：超过此字数按段落边界拆分 */
@@ -33,6 +35,11 @@ const CHUNK_THRESHOLD = 5000
 
 /** 分块最小字数，避免产生过短的碎片 */
 const CHUNK_MIN_SIZE = 500
+
+function officeCliBin(): string {
+  const configured = process.env.OFFICECLI_BIN?.trim()
+  return configured || "officecli"
+}
 
 /**
  * @description 判断是否supportedfile
@@ -53,6 +60,8 @@ function getExtension(fileName: string): string {
 /**
  * 解析文档，返回文本块数组。
  * 小文档返回单元素数组，大文档按段落边界分块。
+ *
+ * Office 格式抽正文优先级：OfficeCLI（若可用）→ MarkItDown → 内置回退（mammoth/xlsx/pdf）。
  */
 /**
  * @description 解析document
@@ -72,7 +81,16 @@ export async function parseDocument(
 
   let fullText: string
 
-  if (MARKITDOWN_EXTENSIONS.has(ext)) {
+  if (OFFICECLI_EXTENSIONS.has(ext)) {
+    const viaOfficeCli = await parseWithOfficeCli(buffer, ext)
+    if (viaOfficeCli?.trim()) {
+      fullText = viaOfficeCli
+    } else if (MARKITDOWN_EXTENSIONS.has(ext)) {
+      fullText = await parseWithMarkitdown(buffer, ext)
+    } else {
+      fullText = await parseOfficeFallback(buffer, ext)
+    }
+  } else if (MARKITDOWN_EXTENSIONS.has(ext)) {
     fullText = await parseWithMarkitdown(buffer, ext)
   } else switch (ext) {
     case ".txt":
@@ -89,14 +107,6 @@ export async function parseDocument(
       fullText = await parsePdf(buffer)
       break
 
-    case ".docx":
-      fullText = await parseDocx(buffer)
-      break
-
-    case ".xlsx":
-      fullText = parseXlsx(buffer)
-      break
-
     default:
       throw new Error(`不支持的文件格式: ${ext}`)
   }
@@ -110,6 +120,34 @@ export async function parseDocument(
 }
 
 // ─── 格式解析器 ─────────────────────────────────────────────
+
+/**
+ * @description 用 OfficeCLI `view … text` 抽正文；未安装或失败返回 null（不抛错）
+ */
+async function parseWithOfficeCli(buffer: Buffer, ext: string): Promise<string | null> {
+  const dir = await mkdtemp(path.join(tmpdir(), "aim-officecli-"))
+  const input = path.join(dir, `input${ext}`)
+  try {
+    await writeFile(input, buffer)
+    const { stdout } = await execFileAsync(
+      officeCliBin(),
+      ["view", input, "text"],
+      { timeout: 60_000, maxBuffer: 5 * 1024 * 1024 },
+    )
+    const text = String(stdout ?? "").trim()
+    return text || null
+  } catch {
+    return null
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
+
+async function parseOfficeFallback(buffer: Buffer, ext: string): Promise<string> {
+  if (ext === ".docx") return parseDocx(buffer)
+  if (ext === ".xls" || ext === ".xlsx") return parseXlsx(buffer)
+  throw new Error(`无内置回退解析器: ${ext}`)
+}
 
 async function parseWithMarkitdown(buffer: Buffer, ext: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), "aim-markitdown-"))

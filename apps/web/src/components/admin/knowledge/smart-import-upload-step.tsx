@@ -34,7 +34,7 @@ export function SmartImportUploadStep(props: {
       </Select>
     </div>
     <div>
-      <Label>选择文件（支持 PDF/Word/PPT/Excel/HTML/TXT/MD/CSV/JSON/XML/RTF）</Label>
+      <Label>选择文件（支持 PDF/Word（.docx）/PPT/Excel/HTML/TXT/MD/CSV/JSON/XML/RTF）</Label>
       <Input type="file" accept={ACCEPT} multiple onChange={(event) => props.onFilesChange(Array.from(event.target.files ?? []))} className="mt-1 cursor-pointer" />
     </div>
     {props.files.length > 0 && <div className="space-y-1">

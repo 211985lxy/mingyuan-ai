@@ -173,7 +173,7 @@ export function KnowledgeUploadDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>上传文件导入知识</DialogTitle>
-          <DialogDescription>支持 PDF、Word、PPT、Excel、HTML、TXT、MD、CSV、JSON、XML、RTF</DialogDescription>
+          <DialogDescription>支持 PDF、Word（.docx）、PPT、Excel、HTML、TXT、MD、CSV、JSON、XML、RTF</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
