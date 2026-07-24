@@ -81,6 +81,39 @@ describe("resolveCopyMethodologyPlan", () => {
     })
     expect(plan.businessGoal).toBe("unclear")
   })
+
+  it("点名 logo模型 时强制注入 AIDA 宽进窄出结构", () => {
+    const plan = resolveCopyMethodologyPlan({
+      rawInput: "用logo模型改一下这篇口播，结尾落到我们陪跑",
+      mode: "generate",
+      runtimeTask: "rewrite_copy",
+    })
+    expect(plan.structureModel).toBe("logo_aida")
+    expect(plan.cardIds).toContain("structure.logo_aida")
+    expect(plan.structureModules[0]).toContain("Attention")
+    expect(plan.structureModules.at(-1)).toContain("Action")
+    expect(plan.localOptimize).toBe("structure")
+  })
+
+  it("点名 漏斗模型 同样选中 AIDA 结构卡", () => {
+    const plan = resolveCopyMethodologyPlan({
+      rawInput: "用漏斗模型改一下这条文案",
+      mode: "generate",
+      runtimeTask: "rewrite_copy",
+    })
+    expect(plan.structureModel).toBe("logo_aida")
+    expect(plan.cardIds).toContain("structure.logo_aida")
+    expect(plan.structureModules).toHaveLength(4)
+  })
+
+  it("点名 AIDA 同样选中 LOGO 结构卡", () => {
+    const plan = resolveCopyMethodologyPlan({
+      rawInput: "按AIDA结构重写",
+      mode: "generate",
+    })
+    expect(plan.structureModel).toBe("logo_aida")
+    expect(plan.cardIds[0]).toBe("structure.logo_aida")
+  })
 })
 
 describe("matched card injection", () => {

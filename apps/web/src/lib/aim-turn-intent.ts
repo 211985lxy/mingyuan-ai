@@ -143,9 +143,9 @@ const STRONG_WRITE_WORDS = [
   "重写", "改写", "重新写", "大改", "重做",
 ] as const
 
-/** 结构拆解 / 分析问句：应走对话，禁止擅自出整篇成稿 */
+/** 结构拆解 / 优化建议问句：应走对话，禁止擅自出整篇成稿 */
 const COPY_ANALYSIS_PATTERN =
-  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用/
+  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用|怎么优化|如何优化|该怎么(?:改|优化)|有没有问题|哪里有问题|问题在哪|哪里不对|哪里需要改|怎么改更好|优化建议|帮我看看这篇|检查一下(?:这篇|这版|逻辑)|文案逻辑|逻辑(?:有问题|对不对|通不通)|哪里薄弱|痛点是不是太散/
 
 const PASSAGE_POLISH_WORDS = [
   "优化", "润色", "顺一下", "自然点", "更自然", "口语化", "改一下", "改改", "润一润",
@@ -189,7 +189,10 @@ export function resolveAimTurnIntent(input: {
   let action = actionFromRuntimeTask(input.runtimeTask) || "chat"
 
   // 输入信号可覆盖/细化（意图优先于模糊任务类型）
-  if (
+  // 优化建议/分析问句优先于「优化这篇」润色，避免问怎么改却直接出新稿
+  if (looksLikeCopyAnalysisQuestion(text)) {
+    action = "chat"
+  } else if (
     includesAny(text, [...LOCAL_EDIT_PART_WORDS])
     && includesAny(text, ["优化", "改", "润色", "调整", "只改", "只优化"])
     && !includesAny(text, ["重写", "改写", "重做", "整篇"])
@@ -208,18 +211,16 @@ export function resolveAimTurnIntent(input: {
     && !includesAny(text, ["种草", "小红书", "口播", "文案"])
   ) {
     action = "position"
-  } else if (looksLikeCopyAnalysisQuestion(text)) {
-    action = "chat"
   }
 
   if (input.forceAction) action = input.forceAction
   if (input.forceScope) scope = input.forceScope
 
-  // 段落润色 / 分析问句优先于 runtimeTask 带来的 create，除非外部强制
-  if (!input.forceAction && looksLikePassagePolish(text)) {
-    action = "local_edit"
-  } else if (!input.forceAction && looksLikeCopyAnalysisQuestion(text)) {
+  // 分析/建议问句优先于 runtimeTask 带来的 create/rewrite，以及段落润色
+  if (!input.forceAction && looksLikeCopyAnalysisQuestion(text)) {
     action = "chat"
+  } else if (!input.forceAction && looksLikePassagePolish(text)) {
+    action = "local_edit"
   }
 
   const keep: string[] = []
@@ -249,8 +250,8 @@ export function resolveAimTurnIntent(input: {
     keep.push("原选题核心")
     avoid.push("照抄原句", "另起一个主题")
   } else if (action === "chat" && looksLikeCopyAnalysisQuestion(text)) {
-    keep.push("针对用户点名文案的结构说明")
-    avoid.push("擅自输出整篇成稿", "另起一篇口播或种草文")
+    keep.push("针对用户点名文案的问题诊断与最小改法说明")
+    avoid.push("擅自输出整篇成稿", "另起一篇口播或种草文", "用新稿代替优化建议")
   }
 
   if (/别越改越短|保持原稿|不要压缩|保持体量/.test(text)) {
@@ -281,7 +282,7 @@ export function resolveAimTurnIntent(input: {
     : action === "local_edit"
       ? `本轮意图：${actionLabel[action]}——${scopeLabel[scope]}（交付：${deliverable}）；未点名部分一律保留。`
       : action === "chat" && looksLikeCopyAnalysisQuestion(text)
-        ? "本轮意图：对话协助——拆解/说明文案结构；禁止擅自另写整篇成稿。"
+        ? "本轮意图：对话协助——诊断问题并给优化建议/结构说明；禁止擅自另写整篇成稿。"
         : `本轮意图：${actionLabel[action]}，交付「${deliverable}」；严格按用户本轮要求执行，不得擅自扩大任务范围。`
 
   const draft: AimTurnIntent = {

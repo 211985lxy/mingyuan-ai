@@ -47,9 +47,13 @@ export const AIM_TURN_INTENT_PROTOTYPES: AimIntentPrototype[] = [
   { id: "position_persona", phrase: "帮我梳理账号人设和定位方向", action: "position" },
   { id: "position_topic", phrase: "先做人设定位和选题策划不要写正文", action: "position" },
 
-  // chat / clarify-ish（结构分析问句要足够近，避免被「按结构改写」原型抢走）
+  // chat / clarify-ish（结构分析/优化建议问句要足够近，避免被「按结构改写」「优化这篇」原型抢走）
   { id: "chat_ask", phrase: "这个选题还能怎么做解释一下思路", action: "chat" },
   { id: "chat_structure", phrase: "这篇文案结构是什么", action: "chat" },
   { id: "chat_structure_2", phrase: "帮我拆解一下结构", action: "chat" },
   { id: "chat_structure_3", phrase: "分析这版文案结构", action: "chat" },
+  { id: "chat_how_optimize", phrase: "这篇文案应该怎么优化", action: "chat" },
+  { id: "chat_how_optimize_2", phrase: "怎么优化这条口播给建议不要重写", action: "chat" },
+  { id: "chat_any_problem", phrase: "这篇文章有没有问题", action: "chat" },
+  { id: "chat_logic", phrase: "检查一下这篇文案逻辑哪里薄弱", action: "chat" },
 ]

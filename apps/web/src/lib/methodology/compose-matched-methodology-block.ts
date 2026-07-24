@@ -90,7 +90,7 @@ export function buildMethodologyPlanTraceSection(plan: CopyMethodologyPlan | und
 - 假设：${plan.assumptions.length ? plan.assumptions.join("；") : "无"}
 
 ### 内容路由
-- ${plan.contentRoute}${plan.localOptimize ? `；局部优化=${plan.localOptimize}` : ""}
+- ${plan.contentRoute}${plan.localOptimize ? `；局部优化=${plan.localOptimize}` : ""}${plan.structureModel === "logo_aida" ? "；结构模型=漏斗模型（AIDA宽进窄出）" : ""}
 
 ### 调用卡片
 ${cardLines.length ? cardLines.map((line) => `- ${line}`).join("\n") : "- 未提供/待补充"}

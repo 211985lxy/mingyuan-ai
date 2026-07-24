@@ -208,6 +208,41 @@ export const IP_COPYWRITING_CARDS: MethodologyCard[] = [
     priority: 30,
   },
   {
+    id: "structure.logo_aida",
+    title: "漏斗模型（AIDA宽进窄出 / LOGO）",
+    kind: "toolbox",
+    goals: ["traffic", "lead", "trust", "convert", "brand", "unclear"],
+    triggers: [
+      "漏斗模型", "漏斗 模型",
+      "logo模型", "logo 模型", "LOGO模型", "LOGO 模型",
+      "AIDA", "AIDA模型", "aida模型",
+      "注意兴趣欲望行动", "宽进窄出", "漏斗结构",
+    ],
+    structureModules: [
+      "Attention注意·泛话题停留",
+      "Interest兴趣·收窄到目标人群",
+      "Desire欲望·判断标准与结果渴望",
+      "Action行动·落到自己业务的单一CTA",
+    ],
+    promptBody: `【漏斗模型 = 经典 AIDA 单条文案漏斗】用户点名「漏斗模型 / logo模型 / AIDA」时必须按此结构重写或生成。
+
+宽进窄出四段（按序写满，禁止跳段）：
+1. Attention（注意）：用泛话题/行业现象/普遍痛点/反差开场，让谁都能听懂并愿意停。开头禁止业务自述、禁止「大家好我是」、禁止直接推产品。
+2. Interest（兴趣）：从泛话题收窄到目标客户能对号入座的具体处境，说明「这事跟你有关」。
+3. Desire（欲望）：给小切口判断标准、代价/误判或结果路径，让人觉得「我想解决 / 我想要这个结果」；可自然露出专业判断，仍不要硬卖功能清单。
+4. Action（行动）：结尾才漏到自己的业务——只给一个低摩擦承接（评论关键词/私信/领取清单/预约诊断），并说明行动后能得到什么。
+
+改写规则：保留原选题与事实；按 A→I→D→A 重排节奏；中段可以筛人，结尾才承接业务；正文禁止出现「AIDA」「漏斗模型」「LOGO模型」等理论标签。`,
+    antiPatterns: [
+      "开头推产品",
+      "大家好我是",
+      "全文功能清单",
+      "没有单一行动",
+      "理论标签进口播",
+    ],
+    priority: 40,
+  },
+  {
     id: "toolbox.hooks7",
     title: "工具箱·七大爆款开头",
     kind: "toolbox",

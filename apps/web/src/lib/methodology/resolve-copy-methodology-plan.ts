@@ -15,6 +15,8 @@ export interface CopyMethodologyPlan {
   contentRoute: MethodologyContentRoute
   cardIds: string[]
   localOptimize?: MethodologyLocalOptimize
+  /** 显式点名的结构模型（如 LOGO/AIDA）；有则结构模块以该模型为准 */
+  structureModel?: "logo_aida"
   structureModules: string[]
   confidence: number
   source: "explicit" | "keyword" | "task_spec" | "inferred"
@@ -88,6 +90,16 @@ const LOCAL_KEYWORD_GROUPS: Array<{
   { local: "structure", patterns: [/结构|节奏|中段|展开|逻辑|太散/], cardId: "local.structure" },
   { local: "oral", patterns: [/去AI味|口语化|像人说话|太书面|太端着|人味/], cardId: "local.oral" },
 ]
+
+/** 漏斗模型 = LOGO/AIDA 宽进窄出；用户显式点名时优先生效 */
+const LOGO_AIDA_PATTERN =
+  /漏斗\s*模型|logo\s*模型|LOGO\s*模型|AIDA\s*模型?|\bA\.?I\.?D\.?A\b|注意[→\-—]?兴趣[→\-—]?欲望[→\-—]?行动|宽进窄出|用AIDA|按AIDA|漏斗结构/
+
+const LOGO_AIDA_CARD_ID = "structure.logo_aida"
+
+function detectLogoAidaModel(text: string): boolean {
+  return LOGO_AIDA_PATTERN.test(text)
+}
 
 const GOAL_TO_BUSINESS_CARD: Record<Exclude<MethodologyBusinessGoal, "unclear">, string> = {
   traffic: "card.traffic",
@@ -225,6 +237,7 @@ export interface ResolveCopyMethodologyPlanInput {
 
 /**
  * 解析本轮方法论计划。优先级：显式词 → TaskSpec → light_edit 局部卡 → 推断默认。
+ * 若点名 LOGO/AIDA 模型，强制注入 structure.logo_aida，并以该结构模块为准。
  */
 export function resolveCopyMethodologyPlan(
   input: ResolveCopyMethodologyPlanInput,
@@ -232,6 +245,7 @@ export function resolveCopyMethodologyPlan(
   const raw = String(input.rawInput || "")
   const assumptions: string[] = []
   const isLightEdit = input.runtimeTask === "light_edit"
+  const wantsLogoAida = detectLogoAidaModel(raw)
 
   const localHit = detectLocalOptimize(raw)
   const explicitGoal = scoreGoalFromText(raw)
@@ -258,6 +272,12 @@ export function resolveCopyMethodologyPlan(
     businessGoal = "traffic"
     source = "keyword"
     confidence = 0.7
+  } else if (wantsLogoAida) {
+    // 只点名结构模型、未说业务目标：默认按线索获客承接（结尾落到业务）
+    businessGoal = "lead"
+    source = "explicit"
+    confidence = 0.85
+    assumptions.push("已点名漏斗/LOGO/AIDA模型；业务目标未另写明，默认按线索获客收束到业务CTA")
   } else {
     // generate：老板 IP 默认偏获客；chat 可保持 unclear 供追问
     if (input.mode === "chat") {
@@ -289,7 +309,7 @@ export function resolveCopyMethodologyPlan(
 
   const cardIds: string[] = []
 
-  if (isLightEdit && localHit.cardId) {
+  if (isLightEdit && localHit.cardId && !wantsLogoAida) {
     cardIds.push(localHit.cardId)
     // light_edit：不换整卡业务目标，只带局部卡；若有明确 goal 再附一张业务卡作约束
     if (businessGoal !== "unclear") {
@@ -302,7 +322,7 @@ export function resolveCopyMethodologyPlan(
       cardIds.push("card.lead_gen")
     }
     cardIds.push(ROUTE_TO_CARD[contentRoute])
-    if (localHit.cardId && !isLightEdit) {
+    if (localHit.cardId && !isLightEdit && !wantsLogoAida) {
       cardIds.push(localHit.cardId)
     }
     // 口播/去AI味时附带人味工具箱；开头优化附带七大开头
@@ -310,15 +330,31 @@ export function resolveCopyMethodologyPlan(
     if (localHit.local === "hook") cardIds.push("toolbox.hooks7")
   }
 
-  // 同 goal 最多 2 业务卡 + 1 路由 + 可选 1 局部（注册表已按 id 去重）
+  if (wantsLogoAida) {
+    cardIds.unshift(LOGO_AIDA_CARD_ID)
+    assumptions.push("结构模型=漏斗（AIDA宽进窄出）：开头泛话题，结尾落到自己业务")
+    if (isLightEdit || /改|重写|按.*结构|用.*模型/.test(raw)) {
+      assumptions.push("本轮按漏斗/AIDA结构改写，保留原选题与事实")
+    }
+    source = source === "inferred" ? "explicit" : source
+    confidence = Math.max(confidence, 0.9)
+  }
+
+  // 同 goal 最多 2 业务卡 + 1 路由 + 可选结构/局部（注册表已按 id 去重）
   const limited = uniquePreserveOrder(cardIds).slice(0, 5)
+
+  const logoCard = wantsLogoAida ? getMethodologyCardById(LOGO_AIDA_CARD_ID) : undefined
+  const structureModules = logoCard?.structureModules?.length
+    ? logoCard.structureModules
+    : mergeStructureModules(limited)
 
   return {
     businessGoal,
     contentRoute,
     cardIds: limited,
-    localOptimize: localHit.local,
-    structureModules: mergeStructureModules(limited),
+    localOptimize: wantsLogoAida ? "structure" : localHit.local,
+    structureModel: wantsLogoAida ? "logo_aida" : undefined,
+    structureModules,
     confidence,
     source,
     assumptions,
@@ -329,6 +365,9 @@ export function resolveCopyMethodologyPlan(
 export function formatMethodologyPlanForPrompt(plan: CopyMethodologyPlan): string {
   const lines = [
     `【本轮方法论计划】goal=${plan.businessGoal} route=${plan.contentRoute} cards=[${plan.cardIds.join(", ")}] confidence=${plan.confidence.toFixed(2)} source=${plan.source}`,
+    plan.structureModel === "logo_aida"
+      ? "结构模型：漏斗模型（AIDA宽进窄出）——开头泛话题，结尾落到自己业务；禁止跳段"
+      : "",
     plan.localOptimize ? `局部优化点：${plan.localOptimize}` : "",
     plan.structureModules.length
       ? `【结构模块（按序写满，禁止跳模块）】${plan.structureModules.join(" → ")}`

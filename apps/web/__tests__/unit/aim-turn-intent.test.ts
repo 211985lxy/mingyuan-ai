@@ -186,6 +186,30 @@ describe("意图确认辅助", () => {
     expect(ok?.archiveGaps).toEqual(["缺案例"])
     expect(normalizeConfirmedTurnIntent({ summary: "x" })).toBeNull()
   })
+
+  it("「这篇文案应该怎么优化」→ chat，不走润色出新稿", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "这篇文案应该怎么优化",
+      runtimeTask: "rewrite_copy",
+    })
+    expect(intent.action).toBe("chat")
+    expect(intent.summary).toContain("优化建议")
+    expect(intent.avoid.some((a) => a.includes("整篇"))).toBe(true)
+  })
+
+  it("「这篇文章有没有问题」→ chat", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "这篇文章有没有问题",
+    })
+    expect(intent.action).toBe("chat")
+  })
+
+  it("命令式「优化这篇文案」仍可走 local_edit 润色", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "优化这篇文案",
+    })
+    expect(intent.action).toBe("local_edit")
+  })
 })
 
 describe("stable routing default off", () => {
