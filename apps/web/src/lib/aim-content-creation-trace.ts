@@ -17,6 +17,13 @@ export const CONTENT_CREATION_TRACE_RULE = `教学式透明交付规则：
 - 任一类资料缺失时，必须在对应位置写“未提供/待补充”；没有八字或紫微资料时，不得把一般性格判断写成命理结论。
 - 禁止把「相关原文见」写进口播/短视频正文；只放在 AIM_METHOD_NOTE 说明区。`
 
+export const NEWSROOM_SAMPLE_CITATION_RULE = `编辑室样本锚点规则（当输入含「内容机会样本锚点」或 taskSpec.materialAnchors 时强制生效）：
+- 只能使用列出的样本与知识库中的事实；缺失写「未提供/待补充」。
+- 正文每个主要段落至少挂 1 个合法引用标记，格式固定为 [样本N]，N 必须对应锚点列表中的序号。
+- METHOD_NOTE「来源标注」中的对标/样本名称必须能对应到 [样本N] 或真实知识条目标题，不得编造样本。
+- 禁止照搬样本原句；学习结构与角度，用客户 IP 原创表达。
+- 引用的样本 id / 序号必须 ⊆ 锚点列表；不得引用未提供的样本编号。`
+
 const METHOD_NOTE_PATTERN = /\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/
 
 function asTraceRecord(item: unknown): Record<string, unknown> | null {

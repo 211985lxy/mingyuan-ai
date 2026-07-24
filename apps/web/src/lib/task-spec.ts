@@ -82,6 +82,15 @@ export interface TaskSpec {
   canonical?: CanonicalContentSpec
   /** 多平台内容包状态（阶段 3） */
   contentPackage?: ContentPackageSpec
+  /** 编辑室样本锚点（内容机会 SourceBrief） */
+  materialAnchors?: import("@/features/newsroom/contracts").SourceBrief
+  /** 编辑室流水线阶段（独立于 workflowStatus） */
+  newsroom?: import("@/features/newsroom/contracts").NewsroomTaskMeta
+  /** 经营事项/内容机会溯源（create-work-item 等松散字段） */
+  source?: string
+  collectionId?: string
+  sampleCount?: number
+  analysisStatus?: string
 }
 
 /**

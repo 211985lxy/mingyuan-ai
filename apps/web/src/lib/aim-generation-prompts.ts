@@ -21,10 +21,12 @@ import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 import {
   CONTENT_CREATION_TRACE_RULE,
+  NEWSROOM_SAMPLE_CITATION_RULE,
   ensureContentCreationTrace,
 } from "./aim-content-creation-trace"
+import { getMaterialAnchorsFromTaskSpec } from "@/features/newsroom/services/build-source-brief"
 
-export { CONTENT_CREATION_TRACE_RULE, ensureContentCreationTrace }
+export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 
 const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)/
 
@@ -281,6 +283,15 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     knowledgeStrategy: context.knowledgeStrategy,
   })
   const creationTraceRule = context.runtimeTask === "light_edit" ? "" : CONTENT_CREATION_TRACE_RULE
+  const rawInputText = context.rawInput || ""
+  const hasNewsroomAnchors = Boolean(
+    getMaterialAnchorsFromTaskSpec(context.taskSpec)
+    || rawInputText.includes("内容机会样本锚点")
+    || rawInputText.includes("taskSpec.materialAnchors"),
+  )
+  const newsroomRule = hasNewsroomAnchors && context.runtimeTask !== "light_edit"
+    ? NEWSROOM_SAMPLE_CITATION_RULE
+    : ""
   const fewshot = buildPromptFewshotBlock(context.runtimeTask, context.targetFormats)
 
   // 上下文按优先级：TaskSpec 由 user prompt 注入；此处 IP Wiki > 知识 > 方法论/爆款（弱参考）
@@ -327,7 +338,8 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
       `所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。`,
       `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}`,
       creationTraceRule,
-    ],
+      newsroomRule,
+    ].filter(Boolean),
   })
 }
 

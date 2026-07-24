@@ -24,6 +24,18 @@ vi.mock("@/features/aim-channels/aim-channel-generate-task", () => ({
   AIM_CHANNEL_GENERATE_TASK_KIND: "aim_channel_generate",
   executeAimChannelGenerateBackgroundTask: vi.fn(),
 }))
+vi.mock("@/lib/aim/services/remote-invocation-task", () => ({
+  AGENT_REMOTE_GENERATE_TASK_KIND: "agent.remote.generate",
+  executeRemoteInvocationBackgroundTask: vi.fn(),
+}))
+vi.mock("@/features/opportunities/services/analyze-background-task", () => ({
+  OPPORTUNITY_ANALYZE_TASK_KIND: "opportunity_analyze",
+  executeOpportunityAnalyzeBackgroundTask: vi.fn(),
+}))
+vi.mock("@/features/newsroom/services/newsroom-pipeline-task", () => ({
+  NEWSROOM_PIPELINE_TASK_KIND: "newsroom_pipeline",
+  executeNewsroomPipelineBackgroundTask: vi.fn(),
+}))
 
 import {
   BACKGROUND_TASK_KINDS,
@@ -36,6 +48,8 @@ describe("background task executor registry", () => {
       "inspiration_pipeline",
       "inspiration_outbox_send",
       "aim_channel_generate",
+      "newsroom_pipeline",
+      "opportunity_analyze",
     ]))
     expect(BACKGROUND_TASK_KINDS).not.toContain("inspiration_reply")
     await expect(executeRegisteredBackgroundTask("inspiration_reply", "task-1")).resolves.toBe(false)

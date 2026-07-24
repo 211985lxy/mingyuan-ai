@@ -231,17 +231,31 @@ export function useAimHistoryLoad(input: {
         setters.setSourceTopicRationale("")
         setters.setSourceOriginalText(extractBenchmarkOriginalText(item.rawInput))
         setters.setSourceAnalysisText(extractBenchmarkAnalysisText(item.rawInput))
+        const newsroom = item.taskSpec && typeof item.taskSpec === "object" && !Array.isArray(item.taskSpec)
+          ? (item.taskSpec as { newsroom?: { stage?: string; sourceCount?: number; editorDiffSummary?: string } }).newsroom
+          : undefined
+        const stageHint = newsroom?.stage
+          ? `编辑室阶段：${newsroom.stage}${newsroom.sourceCount != null ? ` · 样本 ${newsroom.sourceCount}` : ""}`
+          : ""
         setters.setMessages([
           { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
           ...(contents.length
             ? [{
                 id: assistantId,
                 role: "assistant" as const,
-                content: `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
+                content: [
+                  `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
+                  stageHint,
+                ].filter(Boolean).join("\n"),
                 agentId: item.agentId ?? undefined,
                 deliverables,
+                editorDiffSummary: newsroom?.editorDiffSummary || null,
               }]
-            : [{ id: nextAimWorkbenchId(), role: "assistant" as const, content: "已加载历史素材，可直接让我改写。" }]),
+            : [{
+                id: nextAimWorkbenchId(),
+                role: "assistant" as const,
+                content: ["已加载历史素材，可直接让我改写。", stageHint].filter(Boolean).join("\n"),
+              }]),
         ])
         if (contents[0]) openEditorFromResult(assistantId, contents[0].format, contents[0].content)
       })

@@ -269,3 +269,45 @@ export async function buildRawInputWithCommentInsightContext(
     ...lines,
   ].join("\n")
 }
+
+/**
+ * 把 SourceBrief 结构化锚点注入 rawInput（镜像视频文案拆解上下文）。
+ */
+export function buildRawInputWithOpportunityBrief(
+  rawInput: string,
+  brief: import("@/features/newsroom/contracts").SourceBrief | null | undefined,
+): string {
+  if (!brief?.samples.length) return rawInput
+
+  const block = [
+    "=== 内容机会样本锚点（生成时必须引用） ===",
+    UNTRUSTED_CONTEXT_RULE,
+    "硬规则：正文与 METHOD_NOTE 引用的样本标记必须 ⊆ 下列样本；缺失事实写「未提供/待补充」；禁止照搬原句与编造客户经历。",
+    brief.mustCite.length
+      ? `必引样本：${brief.mustCite.map((id) => {
+          const sample = brief.samples.find((s) => s.id === id)
+          return sample ? `[样本${sample.index}]` : id
+        }).join("、")}`
+      : "",
+    brief.avoidCopy.length ? `禁止照搬：${brief.avoidCopy.slice(0, 6).join("；")}` : "",
+    ...brief.samples.map((s) => {
+      const metrics = s.metrics
+        ? Object.entries(s.metrics).map(([k, v]) => `${k}:${v}`).join(" ")
+        : ""
+      return [
+        `[样本${s.index}] id=${s.id}`,
+        `标题：${s.title}`,
+        `平台：${s.platform}`,
+        s.authorName ? `作者：${s.authorName}` : null,
+        metrics ? `互动：${metrics}` : null,
+        `链接：${s.sourceUrl}`,
+      ].filter(Boolean).join("\n")
+    }),
+  ].filter(Boolean).join("\n\n")
+
+  if (rawInput.includes("内容机会样本锚点") || rawInput.includes("[样本1] id=")) {
+    return rawInput
+  }
+  return [rawInput, "", block].join("\n")
+}
+

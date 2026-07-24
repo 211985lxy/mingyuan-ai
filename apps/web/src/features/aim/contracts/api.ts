@@ -115,6 +115,8 @@ export const aimGenerateBodySchema = z.object({
     archiveGaps: z.array(z.string().max(300)).max(4).default([]),
     userSupplement: z.string().max(500).optional(),
   }).strict().optional(),
+  /** 发布质检官：review_report=只出报告；editor_revise=改稿终稿 */
+  reviewMode: z.enum(["review_report", "editor_revise"]).optional(),
 }).strict()
 
 export const aimEvolveBodySchema = z.object({

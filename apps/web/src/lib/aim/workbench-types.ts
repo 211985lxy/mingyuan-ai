@@ -18,6 +18,8 @@ export interface AimWorkbenchMessage {
   agentId?: string | null
   deliverables?: AimGenerateResponse | null
   qualityReport?: QualityCheckReport | null
+  /** 主编改稿摘要（editor_revise） */
+  editorDiffSummary?: string | null
   editorApply?: { range: TextSelectionRange } | null
   runId?: string | null
   degraded?: boolean | null

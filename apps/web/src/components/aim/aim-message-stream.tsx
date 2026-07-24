@@ -122,6 +122,12 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
       <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} />
       <RunDiagnostics message={message} />
       {message.qualityReport ? <AimQualityReport report={message.qualityReport} /> : null}
+      {message.editorDiffSummary ? (
+        <div className="mt-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">主编改动：</span>
+          {message.editorDiffSummary}
+        </div>
+      ) : null}
     </div>
   </div>
 }

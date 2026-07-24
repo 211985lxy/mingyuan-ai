@@ -108,7 +108,7 @@ type PreparedRequest = Extract<Awaited<ReturnType<typeof prepareAimGenerateReque
  * @returns 无返回值
  */
 export async function executePreparedAimGeneration(prepared: PreparedRequest) {
-  const { parsed, trace, userId, workflowBrief, rawInput, runtimeTask, intentFrozen } = prepared
+  const { parsed, trace, userId, workflowBrief, runtimeTask, intentFrozen } = prepared
   const projectId = workflowBrief?.projectId || parsed.projectId
 
   // 派生到已有母稿时，复用其已确认母内容 / 内容包状态
@@ -122,6 +122,12 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
       taskSpec = existing.taskSpec as unknown as import("@/lib/task-spec").TaskSpec
     }
   }
+
+  // 编辑室：从 taskSpec.materialAnchors 注入样本锚点块
+  const { getMaterialAnchorsFromTaskSpec } = await import("@/features/newsroom/services/build-source-brief")
+  const { buildRawInputWithOpportunityBrief } = await import("@/lib/aim-generate-context")
+  const anchors = getMaterialAnchorsFromTaskSpec(taskSpec)
+  const rawInput = buildRawInputWithOpportunityBrief(prepared.rawInput, anchors)
 
   return executeAimRun({
     entrypoint: "generate",
@@ -166,6 +172,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     trace,
     taskSpec,
     confirmedTurnIntent: parsed.confirmedTurnIntent,
+    reviewMode: parsed.reviewMode,
   }))
 }
 

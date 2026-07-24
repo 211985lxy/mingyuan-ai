@@ -54,6 +54,8 @@ export interface ParseGenerateBodyResult {
   writerModule: CopyStudioModule | undefined
   methodologyProfileIds: string[] | undefined
   confirmedTurnIntent: AimTurnIntent | undefined
+  /** 发布质检官模式：报告 / 改稿 */
+  reviewMode: "review_report" | "editor_revise" | undefined
 }
 
 /**
@@ -135,6 +137,10 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
     writerModule: agentModule,
     methodologyProfileIds: parseMethodologyProfileIds(body),
     confirmedTurnIntent: normalizeConfirmedTurnIntent(body.confirmedTurnIntent) || undefined,
+    reviewMode:
+      body.reviewMode === "editor_revise" || body.reviewMode === "review_report"
+        ? body.reviewMode
+        : undefined,
   }
 }
 

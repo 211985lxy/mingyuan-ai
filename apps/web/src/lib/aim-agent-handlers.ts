@@ -66,7 +66,7 @@ export {
 export {
   buildContentReviewChatPrompt,
   buildContentReviewGeneratePrompt,
-} from "@/lib/aim-agent-content-review"
+} from "@/lib/aim-agent-content-review-prompts"
 export { detectPersonaMode } from "@/lib/aim-agent-persona"
 export {
   benchmarkCopyReuseRatio,

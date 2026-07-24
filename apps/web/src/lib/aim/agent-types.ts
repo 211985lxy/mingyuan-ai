@@ -95,6 +95,8 @@ export interface AimGenerateContext {
   skipPersistence?: boolean
   /** 用户确认的本轮意图（生成前确认条；有则优先写入 prompt） */
   confirmedTurnIntent?: import("@/lib/aim-turn-intent").AimTurnIntent
+  /** 发布质检官模式 */
+  reviewMode?: import("@/features/newsroom/contracts").ContentReviewMode
 }
 
 export interface AimGenerationContextOverride {

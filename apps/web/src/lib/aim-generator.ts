@@ -46,6 +46,8 @@ export interface AimInput {
   methodologyProfileIds?: string[]
   /** 用户确认的本轮意图（优先于规则推断） */
   confirmedTurnIntent?: import("@/lib/aim-turn-intent").AimTurnIntent
+  /** 发布质检官模式 */
+  reviewMode?: import("@/features/newsroom/contracts").ContentReviewMode
 }
 
 function asStringArray(value: unknown): string[] {
@@ -209,5 +211,6 @@ export async function generateAimContent(input: AimInput) {
     runSpec: input.runSpec,
     methodologyProfileIds: input.methodologyProfileIds,
     confirmedTurnIntent: input.confirmedTurnIntent,
+    reviewMode: input.reviewMode,
   })
 }
