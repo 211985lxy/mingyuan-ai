@@ -39,6 +39,9 @@ export function useAimTurnIntentGate(input: {
 }) {
   const [pendingTurnIntent, setPendingTurnIntent] = useState<PendingTurnIntent | null>(null)
   const [intentResolving, setIntentResolving] = useState(false)
+  // 只解构出确认回调真正用到的 generateWithInput（上游已用 ref 稳定引用），
+  // 避免依赖整个 input 大对象导致每次击键都重建回调。
+  const { generateWithInput } = input
 
   const clearPendingTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -49,8 +52,8 @@ export function useAimTurnIntentGate(input: {
     if (!pendingTurnIntent) return
     const { text, startsNewTask } = pendingTurnIntent
     setPendingTurnIntent(null)
-    void input.generateWithInput(text, { startsNewTask, confirmedTurnIntent: intent })
-  }, [pendingTurnIntent, input])
+    void generateWithInput(text, { startsNewTask, confirmedTurnIntent: intent })
+  }, [pendingTurnIntent, generateWithInput])
 
   const handleCancelTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)

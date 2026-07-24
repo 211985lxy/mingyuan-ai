@@ -36,18 +36,23 @@ export async function transcribeAudio(audioBlob: Blob): Promise<{ text: string }
 }
 
 /**
- * @description 上传knowledgedocument
+ * @description 用户侧上传文档入库（必须绑定项目）
  * @param file - 文件
  * @param category - 分类
- * @returns Promise<
+ * @param projectId - 归属项目
  */
 export async function uploadKnowledgeDocument(
   file: File,
-  category: string
+  category: string,
+  projectId: string,
 ): Promise<{ created: number; entries: KnowledgeEntry[] }> {
+  if (!projectId.trim()) {
+    throw new ApiError("请选择归属全案", 400, { code: "PROJECT_REQUIRED" })
+  }
   const formData = new FormData()
   formData.append("file", file)
   formData.append("category", category)
+  formData.append("projectId", projectId)
 
   const response = await fetch("/api/knowledge/upload", {
     method: "POST",

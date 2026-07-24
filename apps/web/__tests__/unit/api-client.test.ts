@@ -34,13 +34,20 @@ describe("api client error messages", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe("/api/aim/history?page=1&pageSize=12&agentId=content_producer")
   })
 
-  it("does not throw when document upload succeeds with an empty body", async () => {
-    vi
+  it("uploads knowledge documents with projectId", async () => {
+    const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 204 }))
 
     await expect(
-      uploadKnowledgeDocument(new File(["hello"], "hello.txt"), "project_case"),
+      uploadKnowledgeDocument(new File(["hello"], "hello.txt"), "project_case", "proj_1"),
     ).resolves.toEqual({ created: 0, entries: [] })
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("/api/knowledge/upload")
+    expect(init.body).toBeInstanceOf(FormData)
+    const form = init.body as FormData
+    expect(form.get("projectId")).toBe("proj_1")
+    expect(form.get("category")).toBe("project_case")
   })
 })

@@ -1,6 +1,6 @@
 "use client"
 
-import type { Dispatch, MutableRefObject, SetStateAction } from "react"
+import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
 import { toast } from "sonner"
 
 import {
@@ -345,8 +345,23 @@ async function checkDeliverableQuality(input: AimGenerationActionInput, messageI
  * @returns 无返回值
  */
 export function useAimGenerationActions(input: AimGenerationActionInput) {
+  // 用 ref 持有最新 input，对外返回引用稳定的 generateWithInput：
+  // 避免 input 对象每次渲染换引用时，下游依赖它的 useCallback（如
+  // 意图门闩的 handleConfirmTurnIntent）被连锁重建。
+  // 注意：ref 的更新放进 effect（react-hooks/refs 禁止渲染期写 ref）。
+  // generateWithInput 只在用户交互（点击生成等）时触发，彼时 effect 已执行，
+  // inputRef.current 必为最新值，行为与渲染期同步一致。
+  const inputRef = useRef(input)
+  useEffect(() => {
+    inputRef.current = input
+  })
+  const stableGenerateWithInput = useCallback(
+    (currentInput: string, options?: GenerateOptions) =>
+      generateWithInput(inputRef.current, currentInput, options),
+    [],
+  )
   return {
-    generateWithInput: (currentInput: string, options?: GenerateOptions) => generateWithInput(input, currentInput, options),
+    generateWithInput: stableGenerateWithInput,
     stopGeneration: () => input.requestAbortRef.current?.abort(),
     repurposeDeliverable: (messageId: string) => (formats: ContentFormat | ContentFormat[]) =>
       repurposeDeliverable(input, messageId, formats),

@@ -34,15 +34,21 @@ export function ContentPackagePanel({
     [deliverables.results],
   )
 
-  const available = CONTENT_PACKAGE_FORMATS.filter((format) => {
+  const isFormatAvailable = (format: ContentPackageFormat) => {
     if (format === "video_script") return !existing.has("video_script") && !existing.has("koubo_script")
     return !existing.has(format)
-  })
+  }
+  const available = CONTENT_PACKAGE_FORMATS.filter(isFormatAvailable)
 
   const [selected, setSelected] = useState<ContentPackageFormat[]>(() =>
     available.slice(0, Math.min(3, available.length)),
   )
   const [open, setOpen] = useState(false)
+
+  // derive-don't-sync：渲染期直接取「选中 ∩ 当前可用」。
+  // 相比 useEffect 同步，消除了 effect 生效前的一帧过期窗口——
+  // 按钮计数与实际发送的格式永远不会包含已完成格式。
+  const effectiveSelected = selected.filter(isFormatAvailable)
 
   if (!canonicalOk) {
     return (
@@ -57,9 +63,11 @@ export function ContentPackagePanel({
 
   function toggle(format: ContentPackageFormat) {
     setSelected((current) => {
-      if (current.includes(format)) return current.filter((item) => item !== format)
-      if (current.length >= 5) return current
-      return [...current, format]
+      // 以「可用交集」为基准增删，顺带清理已失效格式，上限 5 个按有效项计。
+      const effective = current.filter(isFormatAvailable)
+      if (effective.includes(format)) return effective.filter((item) => item !== format)
+      if (effective.length >= 5) return effective
+      return [...effective, format]
     })
   }
 
@@ -108,7 +116,7 @@ export function ContentPackagePanel({
         <div className="mt-3 space-y-2">
           <div className="flex flex-wrap gap-2">
             {available.map((format) => {
-              const checked = selected.includes(format)
+              const checked = effectiveSelected.includes(format)
               return (
                 <button
                   key={format}
@@ -132,11 +140,11 @@ export function ContentPackagePanel({
               type="button"
               size="sm"
               className="h-8 w-full text-xs"
-              disabled={isBusy || selected.length === 0}
-              onClick={() => onGeneratePackage(selected)}
+              disabled={isBusy || effectiveSelected.length === 0}
+              onClick={() => onGeneratePackage(effectiveSelected)}
             >
               {isBusy ? <Loader2 className="size-3.5 animate-spin" /> : null}
-              一次生成 {selected.length} 个格式
+              一次生成 {effectiveSelected.length} 个格式
             </Button>
           )}
         </div>
