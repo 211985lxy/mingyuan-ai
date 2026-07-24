@@ -58,3 +58,5 @@ output/
 apps/desktop/src-tauri/target
 apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/.window-state.json
+# Added by code-review-graph
+.code-review-graph/

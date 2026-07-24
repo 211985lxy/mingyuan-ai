@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "code-review-graph": {
+      "command": "/opt/homebrew/bin/code-review-graph",
+      "args": [
+        "serve",
+        "--repo",
+        "/Users/xiangyu/Desktop/明动aim智能体/mingyuan"
+      ],
+      "cwd": "/Users/xiangyu/Desktop/明动aim智能体/mingyuan",
+      "type": "stdio"
+    }
+  }
+}
