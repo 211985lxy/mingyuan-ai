@@ -55,7 +55,12 @@ export const useAimWorkspaceStore = create<AimWorkspaceState>()((set, get) => ({
     ) {
       return
     }
-    set({ isLoading: true })
+    // 切换智能体时先清空，避免短暂展示上一专家的任务
+    if (!filterUnchanged) {
+      set({ history: [], historyAgentId: nextAgentId, isLoading: true })
+    } else {
+      set({ isLoading: true })
+    }
     try {
       const data = await listAimHistory(1, HISTORY_PAGE_SIZE, opts?.projectId, opts?.agentId)
       set({
