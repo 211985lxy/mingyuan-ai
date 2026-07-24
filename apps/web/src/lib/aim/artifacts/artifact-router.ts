@@ -119,53 +119,6 @@ export async function routeAndLandArtifacts(
   return { ok: true, receipts, primaryUrl }
 }
 
-// ─── 多资产交付封面 Doc（WP-5.2）─────────────────────────────────────────────
-
-/**
- * 多资产场景生成封面 Doc。
- * 经营事项结果链接只写封面 Doc URL。
- */
-export async function createDeliveryCoverDoc(input: {
-  title: string
-  receipts: FeishuAssetReceipt[]
-  folderToken: string
-  runner?: LarkCliRunner
-  cliPath?: string
-}): Promise<{ token: string; url: string }> {
-  const lines = [
-    `# ${input.title}`,
-    "",
-    "## 交付资产清单",
-    "",
-    "| 资产类型 | 标题 | 链接 |",
-    "| --- | --- | --- |",
-  ]
-
-  for (const receipt of input.receipts) {
-    const kindLabel = ASSET_KIND_LABELS[receipt.kind] ?? receipt.kind
-    lines.push(`| ${kindLabel} | ${receipt.artifactKey} | [打开](${receipt.url}) |`)
-  }
-
-  lines.push("", `> 生成时间：${new Date().toISOString()}`, "")
-
-  const created = await createFeishuDoc({
-    title: input.title,
-    content: lines.join("\n"),
-    folderToken: input.folderToken,
-    runner: input.runner,
-    cliPath: input.cliPath,
-  })
-
-  return { token: created.token, url: created.url }
-}
-
-const ASSET_KIND_LABELS: Record<string, string> = {
-  feishu_doc: "飞书文档",
-  feishu_base_records: "多维表格记录",
-  feishu_sheet: "电子表格",
-  feishu_drive_file: "云空间文件",
-}
-
 // ─── 单资产落地 ──────────────────────────────────────────────────────────────
 
 async function landSingleArtifact(

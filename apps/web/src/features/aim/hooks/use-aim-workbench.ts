@@ -22,7 +22,6 @@ import { useAimWorkflowActions } from "@/hooks/use-aim-workflow-actions"
 import { useAimDraftAutosave, useAimMessageAutoScroll, useAimSourceHydration } from "@/hooks/use-aim-workbench-effects"
 import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVideoCopyPrefill } from "@/hooks/use-aim-route-sync"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
-import { EDITOR_PANEL_DEFAULT_WIDTH } from "@/lib/aim-editor"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
 import { aimDraftProjectScope, clearAimDraft, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
 import {
@@ -30,7 +29,6 @@ import {
   findLatestAimVideoDeliverableMessageId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimAgentId } from "@/lib/aim-ui-config"
-import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { IpWikiDialogContext, AimWorkbenchMessage as ChatMessage } from "@/lib/aim/workbench-types"
 import { parseAimSearchParams } from "@/features/aim/aim-search-params"
 import { useAimAgentConfig, useRouteSetters } from "@/features/aim/aim-agent-derivation"
@@ -43,6 +41,7 @@ import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-m
 import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
 import { useAimPlanOrchestration } from "@/features/aim/hooks/use-aim-plan-orchestration"
 import { useAimTurnIntentGate } from "@/features/aim/hooks/use-aim-turn-intent-gate"
+import { useAimSourceEditorState } from "@/features/aim/hooks/use-aim-source-editor-state"
 
 /**
  * Master hook — consolidates all AIM workbench state, refs, and hook
@@ -76,18 +75,24 @@ export function useAimWorkbench() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
-  const [sourceVideoCopyExtractionId, setSourceVideoCopyExtractionId] = useState<string | undefined>(() => initialDraft?.videoCopyExtractionId)
-  const [sourceOriginalText, setSourceOriginalText] = useState(() => initialDraft?.sourceOriginalText || "")
-  const [sourceAnalysisText, setSourceAnalysisText] = useState(() => initialDraft?.sourceAnalysisText || "")
-  const [sourceTopicTitle, setSourceTopicTitle] = useState(() => initialDraft?.sourceTopicTitle || "")
-  const [sourceTopicRationale, setSourceTopicRationale] = useState(() => initialDraft?.sourceTopicRationale || "")
-  const [editorText, setEditorText] = useState(() => initialDraft?.editorText || "")
-  const [editorFormat, setEditorFormat] = useState<ContentFormat | undefined>(() => initialDraft?.editorFormat)
-  const [editorSourceMessageId, setEditorSourceMessageId] = useState<string | undefined>(() => initialDraft?.editorSourceMessageId)
-  const [editorPanelWidth, setEditorPanelWidth] = useState(() => initialDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
-  const [editorPanelOpen, setEditorPanelOpen] = useState(() => initialDraft?.editorPanelOpen ?? false)
-  const [referenceSelection, setReferenceSelection] = useState<AimEditorSelection>({ text: "", range: { start: 0, end: 0 } })
-  const [draftSelection, setDraftSelection] = useState<AimEditorSelection>({ text: "", range: { start: 0, end: 0 } })
+  const sourceEditor = useAimSourceEditorState(initialDraft)
+  const {
+    sourceVideoCopyExtractionId, setSourceVideoCopyExtractionId,
+    sourceOriginalText, setSourceOriginalText,
+    sourceAnalysisText, setSourceAnalysisText,
+    sourceTopicTitle, setSourceTopicTitle,
+    sourceTopicRationale, setSourceTopicRationale,
+    editorText, setEditorText,
+    editorFormat, setEditorFormat,
+    editorSourceMessageId, setEditorSourceMessageId,
+    editorPanelWidth, setEditorPanelWidth,
+    editorPanelOpen, setEditorPanelOpen,
+    referenceSelection, setReferenceSelection,
+    draftSelection, setDraftSelection,
+    clearCurrentTaskContext, restoreFromDraft, clearSelections,
+    hasEditorSelection, hasEditor,
+  } = sourceEditor
+
   const [isThinking, setIsThinking] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isQualityChecking, setIsQualityChecking] = useState(false)
@@ -154,7 +159,6 @@ export function useAimWorkbench() {
   const editorPanelLabels = useMemo(() => getAimEditorPanelLabels(selectedAgentId, editorFormat), [editorFormat, selectedAgentId])
   const currentWorkflowStage = isAimWorkflowStage(workflowStageParam) ? workflowStageParam : getWorkflowStageForAgent(selectedAgentId)
   const showWorkflowLanding = !agentParam && !workflowStageParam && messages.length === 0 && !input.trim() && !ideaParam
-  const hasEditorSelection = Boolean(referenceSelection.text.trim() || draftSelection.text.trim())
 
   // ---- Analysis + annotation ----
   const analysisTextCandidates = useMemo(() => collectAnalysisTextCandidates(input, messages, sourceAnalysisText), [input, messages, sourceAnalysisText])
@@ -231,18 +235,6 @@ export function useAimWorkbench() {
     return lastAssistant ? extractProgress(lastAssistant.content) : null
   }, [messages, agent.id])
 
-  // ---- clearCurrentTaskContext (shared by generation + workflow + reset) ----
-  function clearCurrentTaskContext() {
-    setSourceVideoCopyExtractionId(undefined)
-    setSourceOriginalText("")
-    setSourceAnalysisText("")
-    setSourceTopicTitle("")
-    setSourceTopicRationale("")
-    setEditorText("")
-    setEditorFormat(undefined)
-    setEditorSourceMessageId(undefined)
-  }
-
   // ---- Generation actions ----
   const { generateWithInput, stopGeneration: handleStop, repurposeDeliverable: handleRepurpose, checkDeliverableQuality: handleQuality } = useAimGenerationActions({
     messages, setMessages, setInput, setSourceOriginalText, setSourceAnalysisText,
@@ -286,21 +278,11 @@ export function useAimWorkbench() {
     setAgentModule(nextDraft?.agentModule)
     setMessages(nextDraft?.messages || [])
     setInput(nextDraft?.input || "")
-    setSourceVideoCopyExtractionId(nextDraft?.videoCopyExtractionId)
-    setSourceOriginalText(nextDraft?.sourceOriginalText || "")
-    setSourceAnalysisText(nextDraft?.sourceAnalysisText || "")
-    setSourceTopicTitle(nextDraft?.sourceTopicTitle || "")
-    setSourceTopicRationale(nextDraft?.sourceTopicRationale || "")
-    setEditorText(nextDraft?.editorText || "")
-    setEditorFormat(nextDraft?.editorFormat)
-    setEditorSourceMessageId(nextDraft?.editorSourceMessageId)
-    setEditorPanelWidth(nextDraft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
-    setEditorPanelOpen(nextDraft?.editorPanelOpen ?? false)
+    restoreFromDraft(nextDraft)
   }
 
   const afterScopeChange = () => {
-    setReferenceSelection({ text: "", range: { start: 0, end: 0 } })
-    setDraftSelection({ text: "", range: { start: 0, end: 0 } })
+    clearSelections()
     setWorkflowBrief(null)
     setContentAction(null)
     clearImages()
@@ -414,7 +396,6 @@ export function useAimWorkbench() {
 
   // ---- Derived flags ----
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
-  const hasEditor = Boolean(sourceOriginalText.trim() || editorText.trim())
   const latestGenerationId = [...messages].reverse().find((message) => message.deliverables?.id)?.deliverables?.id
   const editorGenerationId = editorSourceMessageId
     ? messages.find((message) => message.id === editorSourceMessageId)?.deliverables?.id

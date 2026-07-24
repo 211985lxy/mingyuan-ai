@@ -431,15 +431,6 @@ export function getAimAgentGuide(agentId: string): AimAgentGuide {
 }
 
 /**
- * @description 构建aimguidetemplate
- * @param fields - 字段列表
- * @returns string
- */
-export function buildAimGuideTemplate(fields: AimInputTemplateField[]): string {
-  return fields.map((field) => `${field.label}：${field.placeholder}`).join("\n")
-}
-
-/**
  * @description 构建aimnextactionprompt
  * @param action - 操作
  * @param content - 内容

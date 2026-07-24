@@ -30,12 +30,3 @@ export function getNextAimSixStage(stage: AimSixStage): AimSixStage | null {
 export function canAdvanceAimSixStage(from: AimSixStage, to: AimSixStage): boolean {
   return getNextAimSixStage(from) === to
 }
-
-/**
- * @description 判断阶段是否属于已发布状态（发布或复盘）
- * @param stage - 待判断的阶段
- * @returns 属于已发布状态返回 true
- */
-export function isPublishedAimSixStage(stage: AimSixStage): boolean {
-  return stage === "publish" || stage === "results"
-}

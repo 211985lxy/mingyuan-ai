@@ -67,15 +67,6 @@ export function getWorkflowStageForAgent(agentId: AimAgentId): AimWorkflowStage 
   return STAGE_BY_AGENT[agentId] || "content"
 }
 
-/**
- * @description 判断值是否为有效的 AIM 内容动作
- * @param value - 待判断的值
- * @returns 是有效动作返回 true
- */
-export function isAimContentAction(value: unknown): value is AimContentAction {
-  return typeof value === "string" && AIM_CONTENT_ACTIONS.some((action) => action.id === value)
-}
-
 export interface ConfirmedWorkflowBrief {
   goal?: string
   targetCustomer?: string

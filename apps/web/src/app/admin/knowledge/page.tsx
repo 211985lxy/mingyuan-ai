@@ -1,10 +1,6 @@
 "use client"
 
-import React from "react"
-import { toast } from "sonner"
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { buildKnowledgeCleaningSuggestion, parseKnowledgeTags } from "@/lib/knowledge-tags"
 import { KnowledgeMap } from "@/components/admin/knowledge-map"
 import { AdminPageHeader } from "@/components/admin/admin-page-header"
 import { AdminKnowledgeBrowseTab } from "@/components/admin/admin-knowledge-browse-tab"
@@ -12,272 +8,10 @@ import { KnowledgeDetailDialog, KnowledgeDistillDialog } from "@/features/knowle
 import { KnowledgeEntryDialog, KnowledgeUploadDialog } from "@/features/knowledge/components/knowledge-entry-dialogs"
 import { SmartImportDialog } from "@/features/knowledge/components/smart-import-dialog"
 import { KnowledgeListTab } from "@/features/knowledge/components/knowledge-list-tab"
-import {
-  batchAction,
-  deleteEntries,
-  distillEntries,
-  fetchKnowledge,
-  fetchProjects,
-  type AdminProject,
-  type DistillResult,
-  type KnowledgeEntry,
-} from "@/features/knowledge/admin-knowledge-shared"
-import { useAdminKnowledgeBrowser } from "@/hooks/use-admin-knowledge-browser"
+import { useAdminKnowledgePage } from "@/hooks/use-admin-knowledge-page"
 
 export default function AdminKnowledgePage() {
-  // 列表状态
-  const [entries, setEntries] = React.useState<KnowledgeEntry[]>([])
-  const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(1)
-  const [search, setSearch] = React.useState("")
-  const [categoryFilter, setCategoryFilter] = React.useState("")
-  const [projectFilter, setProjectFilter] = React.useState("")
-  const [cleanupFilter, setCleanupFilter] = React.useState("")
-  const [gradeFilter, setGradeFilter] = React.useState("")
-  const [loading, setLoading] = React.useState(true)
-  const pageSize = 20
-
-  const [projects, setProjects] = React.useState<AdminProject[]>([])
-  const [activeTab, setActiveTab] = React.useState("browser")
-  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
-  const [detailEntry, setDetailEntry] = React.useState<KnowledgeEntry | null>(null)
-
-  const [distillDialogOpen, setDistillDialogOpen] = React.useState(false)
-  const [distillResult, setDistillResult] = React.useState<DistillResult | null>(null)
-  const [distilling, setDistilling] = React.useState(false)
-
-  const [addDialogOpen, setAddDialogOpen] = React.useState(false)
-  const [editForm, setEditForm] = React.useState({
-    title: "",
-    content: "",
-    category: "product_usp",
-    tags: "",
-    sourceType: "manual" as string,
-    projectId: "none",
-    valueGrade: "" as string,
-  })
-  const [saving, setSaving] = React.useState(false)
-
-  const [uploadDialogOpen, setUploadDialogOpen] = React.useState(false)
-  const [uploadFile, setUploadFile] = React.useState<File | null>(null)
-  const [uploadCategory, setUploadCategory] = React.useState("product_usp")
-  const [uploadProjectId, setUploadProjectId] = React.useState("none")
-  const [uploading, setUploading] = React.useState(false)
-
-  const [smartImportOpen, setSmartImportOpen] = React.useState(false)
-  const [smartImportProjectId, setSmartImportProjectId] = React.useState("none")
-
-  const {
-    browserEntries,
-    browserTotal,
-    browserPage,
-    browserPageSize,
-    browserSearchInput,
-    browserLoading,
-    browserProject,
-    browserCategory,
-    browserStats,
-    assetHealth,
-    setBrowserPage,
-    setBrowserSearchInput,
-    setBrowserProject,
-    setBrowserCategory,
-    fetchBrowserData,
-    bumpHealth,
-  } = useAdminKnowledgeBrowser()
-
-  const fetchData = React.useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetchKnowledge({
-        page,
-        pageSize,
-        search,
-        category: categoryFilter,
-        projectId: projectFilter,
-        valueGrade: gradeFilter,
-      })
-      setEntries(Array.isArray(res.data?.results) ? res.data.results : [])
-      setTotal(typeof res.data?.total === "number" ? res.data.total : 0)
-    } catch (error) {
-      setEntries([])
-      setTotal(0)
-      toast.error(error instanceof Error ? error.message : "知识列表加载失败，请重试")
-    } finally {
-      setLoading(false)
-    }
-  }, [page, search, categoryFilter, projectFilter, gradeFilter])
-
-  React.useEffect(() => {
-    void Promise.resolve().then(fetchData)
-  }, [fetchData])
-
-  React.useEffect(() => {
-    fetchProjects().then((res) => setProjects(Array.isArray(res.data) ? res.data : [])).catch(() => setProjects([]))
-  }, [])
-
-  const totalPages = Math.ceil(total / pageSize)
-  const visibleEntries = React.useMemo(() => {
-    if (!cleanupFilter) return entries
-    return entries.filter((entry) => {
-      const parsed = parseKnowledgeTags(entry.tags)
-      if (cleanupFilter === "ip") return parsed.scope === "ip"
-      if (cleanupFilter === "project") return parsed.scope === "project"
-      if (cleanupFilter === "pending_verify") return parsed.confidence === "pending_verify"
-      if (cleanupFilter === "topic") return parsed.usableFor.includes("topic")
-      if (cleanupFilter === "sales") return parsed.usableFor.includes("sales")
-      if (cleanupFilter === "uncleaned") return !parsed.isCleaned
-      return true
-    })
-  }, [cleanupFilter, entries])
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
-    setPage(1)
-    fetchData()
-  }
-
-  function toggleSelect(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  function toggleSelectAll() {
-    if (selectedIds.size === visibleEntries.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(visibleEntries.map((e) => e.id)))
-    }
-  }
-
-  async function handleSuggestCleanup(entry: KnowledgeEntry) {
-    const tags = buildKnowledgeCleaningSuggestion(entry)
-    try {
-      await batchAction([entry.id], "mergeTags", tags)
-      toast.success("已应用清洗建议")
-      fetchData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "应用清洗建议失败，请重试")
-    }
-  }
-
-  async function handleBatchArchive() {
-    if (selectedIds.size === 0) return
-    if (!confirm(`确定归档 ${selectedIds.size} 条知识条目？`)) return
-    try {
-      await batchAction([...selectedIds], "archive")
-      toast.success(`已归档 ${selectedIds.size} 条`)
-      setSelectedIds(new Set())
-      fetchData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "归档失败，请重试")
-    }
-  }
-
-  async function handleBatchChangeGrade(grade: string) {
-    if (selectedIds.size === 0) return
-    try {
-      await batchAction([...selectedIds], "changeValueGrade", grade)
-      toast.success("已批量修改分级")
-      setSelectedIds(new Set())
-      fetchData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "批量改等级失败，请重试")
-    }
-  }
-
-  async function handleBatchDelete() {
-    if (selectedIds.size === 0) return
-    if (!confirm(`确定永久删除 ${selectedIds.size} 条知识条目？此操作不可恢复！`)) return
-    try {
-      await deleteEntries([...selectedIds])
-      toast.success(`已删除 ${selectedIds.size} 条`)
-      setSelectedIds(new Set())
-      fetchData()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "删除失败，请重试")
-    }
-  }
-
-  async function handleDistill() {
-    if (selectedIds.size === 0) return
-    setDistilling(true)
-    setDistillDialogOpen(true)
-    try {
-      const res = await distillEntries([...selectedIds])
-      setDistillResult(res.data.result)
-    } catch (error) {
-      setDistillResult(null)
-      toast.error(error instanceof Error ? error.message : "知识蒸馏失败，请重试")
-    } finally {
-      setDistilling(false)
-    }
-  }
-
-  async function handleAddEntry() {
-    if (!editForm.title || !editForm.content) return
-    setSaving(true)
-    try {
-      const res = await fetch("/api/admin/knowledge", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: editForm.title,
-          content: editForm.content,
-          category: editForm.category,
-          tags: editForm.tags ? editForm.tags.split(/[,，、]/).map((t: string) => t.trim()).filter(Boolean) : [],
-          sourceType: editForm.sourceType,
-          valueGrade: editForm.valueGrade || undefined,
-          ...(editForm.projectId !== "none" ? { projectId: editForm.projectId } : {}),
-        }),
-      })
-      if (!res.ok) throw new Error("创建失败")
-      setAddDialogOpen(false)
-      setEditForm({ title: "", content: "", category: "product_usp", tags: "", sourceType: "manual", projectId: "none", valueGrade: "" })
-      toast.success("知识条目已创建")
-      fetchData()
-      void fetchBrowserData()
-      bumpHealth()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "创建失败，请重试")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleUploadFile() {
-    if (!uploadFile) return
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append("file", uploadFile)
-      formData.append("category", uploadCategory)
-      if (uploadProjectId !== "none") formData.append("projectId", uploadProjectId)
-
-      const res = await fetch("/api/admin/knowledge/upload", {
-        method: "POST",
-        body: formData,
-      })
-      if (!res.ok) throw new Error("上传失败")
-      setUploadDialogOpen(false)
-      setUploadFile(null)
-      setUploadProjectId("none")
-      toast.success("文件已上传")
-      fetchData()
-      void fetchBrowserData()
-      bumpHealth()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "上传失败，请重试")
-    } finally {
-      setUploading(false)
-    }
-  }
+  const k = useAdminKnowledgePage()
 
   return (
     <div className="space-y-6">
@@ -286,171 +20,145 @@ export default function AdminKnowledgePage() {
         description="按项目管理资料，优先处理待整理内容，再沉淀为可供智能体调用的核心知识。"
       />
 
-      {/* Tab 切换 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={k.activeTab} onValueChange={k.setActiveTab}>
         <TabsList>
           <TabsTrigger value="browser">知识工作台</TabsTrigger>
           <TabsTrigger value="map">高级：知识地图</TabsTrigger>
           <TabsTrigger value="list">高级：条目管理</TabsTrigger>
         </TabsList>
 
-      {/* 知识浏览 Tab（默认）：左树右文，进入即可看具体内容 */}
         <TabsContent value="browser">
           <AdminKnowledgeBrowseTab
-            browserEntries={browserEntries}
-            browserTotal={browserTotal}
-            browserLoading={browserLoading}
-            browserPage={browserPage}
-            browserPageSize={browserPageSize}
-            projects={projects as unknown as import("@/components/admin/knowledge-browser").AdminProject[]}
-            browserStats={browserStats}
-            browserProject={browserProject}
-            browserCategory={browserCategory}
-            browserSearchInput={browserSearchInput}
-            selectedIds={selectedIds}
-            assetHealth={assetHealth}
+            browserEntries={k.browserEntries}
+            browserTotal={k.browserTotal}
+            browserLoading={k.browserLoading}
+            browserPage={k.browserPage}
+            browserPageSize={k.browserPageSize}
+            projects={k.projects as unknown as import("@/components/admin/knowledge-browser").AdminProject[]}
+            browserStats={k.browserStats}
+            browserProject={k.browserProject}
+            browserCategory={k.browserCategory}
+            browserSearchInput={k.browserSearchInput}
+            selectedIds={k.selectedIds}
+            assetHealth={k.assetHealth}
             onSelectProject={(value) => {
-              setBrowserProject(value)
-              setBrowserCategory("")
-              setBrowserPage(1)
+              k.setBrowserProject(value)
+              k.setBrowserCategory("")
+              k.setBrowserPage(1)
             }}
             onSelectCategory={(value) => {
-              setBrowserCategory(value)
-              setBrowserPage(1)
+              k.setBrowserCategory(value)
+              k.setBrowserPage(1)
             }}
-            onSearchChange={setBrowserSearchInput}
-            onPageChange={setBrowserPage}
-            onToggleSelect={toggleSelect}
-            onOpenDetail={setDetailEntry}
-            onManualAdd={() => {
-              setEditForm((f) => ({ ...f, projectId: browserProject === "unbound" ? "none" : browserProject || "none" }))
-              setAddDialogOpen(true)
-            }}
-            onUpload={() => {
-              setUploadProjectId(browserProject === "unbound" ? "none" : browserProject || "none")
-              setUploadDialogOpen(true)
-            }}
-            onSmartImport={() => {
-              setSmartImportProjectId(browserProject === "unbound" ? "none" : browserProject || "none")
-              setSmartImportOpen(true)
-            }}
-            onSupplement={({ category }) => {
-              setBrowserCategory(category)
-              setBrowserPage(1)
-              setEditForm((f) => ({
-                ...f,
-                category,
-                projectId: browserProject === "unbound" ? "none" : browserProject || "none",
-                title: "",
-                content: "",
-                tags: "",
-                sourceType: "manual",
-                valueGrade: "",
-              }))
-              setAddDialogOpen(true)
-            }}
+            onSearchChange={k.setBrowserSearchInput}
+            onPageChange={k.setBrowserPage}
+            onToggleSelect={k.toggleSelect}
+            onOpenDetail={k.setDetailEntry}
+            onManualAdd={() => k.openAddForBrowser(k.browserProject)}
+            onUpload={() => k.openUploadForBrowser(k.browserProject)}
+            onSmartImport={() => k.openSmartImportForBrowser(k.browserProject)}
+            onSupplement={k.openSupplement}
           />
         </TabsContent>
 
-      {/* 知识地图 Tab */}
         <TabsContent value="map">
           <KnowledgeMap
-            projects={projects}
+            projects={k.projects}
             onDrillDown={(filters) => {
               if (filters.category) {
-                setBrowserCategory(filters.category)
-                setBrowserPage(1)
-                setActiveTab("browser")
+                k.setBrowserCategory(filters.category)
+                k.setBrowserPage(1)
+                k.setActiveTab("browser")
               }
             }}
           />
         </TabsContent>
 
-      <KnowledgeListTab
-        entries={visibleEntries}
-        loading={loading}
-        search={search}
-        categoryFilter={categoryFilter}
-        projectFilter={projectFilter}
-        cleanupFilter={cleanupFilter}
-        gradeFilter={gradeFilter}
-        projects={projects}
-        selectedIds={selectedIds}
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        totalPages={totalPages}
-        onSearch={handleSearch}
-        onSearchChange={setSearch}
-        onCategoryChange={(value) => {
-          setCategoryFilter(value)
-          setPage(1)
-        }}
-        onProjectChange={(value) => {
-          setProjectFilter(value)
-          setPage(1)
-        }}
-        onCleanupChange={(value) => {
-          setCleanupFilter(value)
-          setSelectedIds(new Set())
-        }}
-        onGradeChange={(value) => {
-          setGradeFilter(value)
-          setPage(1)
-        }}
-        onOpenAdd={() => setAddDialogOpen(true)}
-        onOpenUpload={() => setUploadDialogOpen(true)}
-        onOpenSmartImport={() => setSmartImportOpen(true)}
-        onToggleSelect={toggleSelect}
-        onToggleSelectAll={toggleSelectAll}
-        onOpenDetail={setDetailEntry}
-        onSuggestCleanup={handleSuggestCleanup}
-        onDistill={handleDistill}
-        onBatchChangeGrade={handleBatchChangeGrade}
-        onBatchArchive={handleBatchArchive}
-        onBatchDelete={handleBatchDelete}
-        onPageChange={setPage}
-      />
+        <KnowledgeListTab
+          entries={k.entries}
+          loading={k.loading}
+          search={k.search}
+          categoryFilter={k.categoryFilter}
+          projectFilter={k.projectFilter}
+          cleanupFilter={k.cleanupFilter}
+          gradeFilter={k.gradeFilter}
+          projects={k.projects}
+          selectedIds={k.selectedIds}
+          page={k.page}
+          pageSize={k.pageSize}
+          total={k.total}
+          totalPages={k.totalPages}
+          onSearch={k.handleSearch}
+          onSearchChange={k.setSearch}
+          onCategoryChange={(value) => {
+            k.setCategoryFilter(value)
+            k.setPage(1)
+          }}
+          onProjectChange={(value) => {
+            k.setProjectFilter(value)
+            k.setPage(1)
+          }}
+          onCleanupChange={(value) => {
+            k.setCleanupFilter(value)
+            k.setSelectedIds(new Set())
+          }}
+          onGradeChange={(value) => {
+            k.setGradeFilter(value)
+            k.setPage(1)
+          }}
+          onOpenAdd={() => k.setAddDialogOpen(true)}
+          onOpenUpload={() => k.setUploadDialogOpen(true)}
+          onOpenSmartImport={() => k.setSmartImportOpen(true)}
+          onToggleSelect={k.toggleSelect}
+          onToggleSelectAll={k.toggleSelectAll}
+          onOpenDetail={k.setDetailEntry}
+          onSuggestCleanup={k.handleSuggestCleanup}
+          onDistill={k.handleDistill}
+          onBatchChangeGrade={k.handleBatchChangeGrade}
+          onBatchArchive={k.handleBatchArchive}
+          onBatchDelete={k.handleBatchDelete}
+          onPageChange={k.setPage}
+        />
       </Tabs>
 
-      <KnowledgeDetailDialog entry={detailEntry} onClose={() => setDetailEntry(null)} />
+      <KnowledgeDetailDialog entry={k.detailEntry} onClose={() => k.setDetailEntry(null)} />
       <KnowledgeDistillDialog
-        open={distillDialogOpen}
-        loading={distilling}
-        result={distillResult}
-        onOpenChange={setDistillDialogOpen}
+        open={k.distillDialogOpen}
+        loading={k.distilling}
+        result={k.distillResult}
+        onOpenChange={k.setDistillDialogOpen}
       />
 
       <KnowledgeEntryDialog
-        open={addDialogOpen}
-        form={editForm}
-        projects={projects}
-        saving={saving}
-        onOpenChange={setAddDialogOpen}
-        onFormChange={setEditForm}
-        onSave={handleAddEntry}
+        open={k.addDialogOpen}
+        form={k.editForm}
+        projects={k.projects}
+        saving={k.saving}
+        onOpenChange={k.setAddDialogOpen}
+        onFormChange={k.setEditForm}
+        onSave={k.handleAddEntry}
       />
       <KnowledgeUploadDialog
-        open={uploadDialogOpen}
-        file={uploadFile}
-        category={uploadCategory}
-        projectId={uploadProjectId}
-        projects={projects}
-        uploading={uploading}
-        onOpenChange={setUploadDialogOpen}
-        onFileChange={setUploadFile}
-        onCategoryChange={setUploadCategory}
-        onProjectChange={setUploadProjectId}
-        onUpload={handleUploadFile}
+        open={k.uploadDialogOpen}
+        file={k.uploadFile}
+        category={k.uploadCategory}
+        projectId={k.uploadProjectId}
+        projects={k.projects}
+        uploading={k.uploading}
+        onOpenChange={k.setUploadDialogOpen}
+        onFileChange={k.setUploadFile}
+        onCategoryChange={k.setUploadCategory}
+        onProjectChange={k.setUploadProjectId}
+        onUpload={k.handleUploadFile}
       />
 
       <SmartImportDialog
-        open={smartImportOpen}
-        projectId={smartImportProjectId}
-        projects={projects}
-        onOpenChange={setSmartImportOpen}
-        onProjectChange={setSmartImportProjectId}
-        onImported={fetchData}
+        open={k.smartImportOpen}
+        projectId={k.smartImportProjectId}
+        projects={k.projects}
+        onOpenChange={k.setSmartImportOpen}
+        onProjectChange={k.setSmartImportProjectId}
+        onImported={k.fetchData}
       />
     </div>
   )
