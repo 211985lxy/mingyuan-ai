@@ -77,6 +77,16 @@
 - Agent 不得在工作区根目录创建包含真实凭证的文件；如需临时使用，必须在任务结束后立即清理。
 - 对外写入、删除、发布、消息发送和权限变更前，必须确认对象、范围和用户意图；完成后回读真实结果。
 
+## 8.1 AIM 意图与上下文（内容台）
+
+修「乱出整篇 / 没记忆 / 结构问答」类问题时必须遵守：
+
+- **分析问句**（如「这个文案结构是什么」）不得走 generate；意图 `chat` 必须走 `/api/aim/chat`。
+- 用户说「这篇 / 这个 / 这段」时，模型上下文必须带上成稿正文或 `editorContext`（见 `formatAimMessageContentForModel`），禁止只喂「交付物已生成」stub。
+- **段落润色**（「优化这段话」+ 粘贴）走 `local_edit` / `light_edit`，禁止扩成全新长口播。
+- 相关单测：`aim-turn-intent`、`aim-workbench-helpers`、`aim-context-compressor`、`aim-prompt-optimization`。
+- 交付门闩：`typecheck` → harness → `arch:size`；上线用 `bash scripts/deploy-ecs-standalone.sh`，以服务器内网 healthz 的 `releaseSha` 为准。
+
 ## 9. 提交、发布与停止条件
 
 `mingyuan` 正常发布流程：相关改动完成 → 本地验证 → Conventional Commit → 从明确提交部署 → 线上验证。Prisma 变更必须显式检查 Schema 和迁移状态，不依赖人工记忆。

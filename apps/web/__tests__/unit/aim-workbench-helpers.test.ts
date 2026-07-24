@@ -96,6 +96,27 @@ describe("AIM workbench helpers", () => {
     expect(history).toContain("这个文案结构是什么")
   })
 
+  it("golden: structure ask history still carries prior 口播 body", () => {
+    const prior = "养了一个内容团队，月底一算账，来了几个有效客户？"
+    const messages = [
+      { id: "u1", role: "user" as const, content: "写一口播讲内容团队成本" },
+      {
+        id: "a1",
+        role: "assistant" as const,
+        content: "交付物已生成，可直接复制使用。",
+        deliverables: {
+          id: "g1",
+          results: [{ format: "video_script" as const, content: prior, wordCount: 30 }],
+          knowledgeUsed: [],
+        },
+      },
+    ]
+    const history = buildAimHistoryRawInput(prior, "这个文案结构是什么", messages)
+    expect(history).toContain(prior)
+    expect(history).toContain("【口播文案正文】")
+    expect(history).toContain("这个文案结构是什么")
+  })
+
   it("builds opening and editor selection context", () => {
     expect(getAimOpeningSegment("短标题\n\n第二段\n\n第三段").segment).toBe("短标题\n\n第二段")
     expect(buildAimEditorContext({

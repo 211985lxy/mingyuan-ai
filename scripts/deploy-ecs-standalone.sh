@@ -64,9 +64,11 @@ node -e "const { createRequire } = require('node:module'); const { resolve } = r
 "${SSH[@]}" "set -a; . /etc/mingyuan/mingyuan.env; set +a; /usr/bin/node '$REMOTE_INCOMING_DIR/ops/verify-production-schema.mjs' '$REMOTE_INCOMING_DIR/ops/production-schema-contract.json'"
 "${SSH[@]}" "if ! systemctl cat '$SERVICE_NAME' | grep -q 'ExecStart=/usr/bin/node server.js'; then sed -i 's#^ExecStart=.*#ExecStart=/usr/bin/node server.js#' /etc/systemd/system/'$SERVICE_NAME'.service && systemctl daemon-reload; fi"
 "${SSH[@]}" "set -e; rm -rf '$REMOTE_BACKUP_DIR'; if [ -d '$REMOTE_DIR' ]; then mv '$REMOTE_DIR' '$REMOTE_BACKUP_DIR'; fi; mv '$REMOTE_INCOMING_DIR' '$REMOTE_DIR'; if ! systemctl restart '$SERVICE_NAME'; then rm -rf '$REMOTE_DIR'; if [ -d '$REMOTE_BACKUP_DIR' ]; then mv '$REMOTE_BACKUP_DIR' '$REMOTE_DIR'; systemctl restart '$SERVICE_NAME'; fi; exit 1; fi; systemctl is-active '$SERVICE_NAME'"
+
+# 切换后健康检查必须走 ECS 内网，避免本机 DNS 解析失败误触发回滚。
 healthy=0
-for attempt in {1..20}; do
-  if curl -fsS "$HEALTH_URL" >/dev/null; then
+for attempt in {1..30}; do
+  if "${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/api/healthz >/dev/null"; then
     healthy=1
     break
   fi
@@ -74,16 +76,23 @@ for attempt in {1..20}; do
 done
 if [ "$healthy" -ne 1 ]; then
   "${SSH[@]}" "set -e; systemctl stop '$SERVICE_NAME' || true; rm -rf '${REMOTE_DIR}.failed'; if [ -d '$REMOTE_DIR' ]; then mv '$REMOTE_DIR' '${REMOTE_DIR}.failed'; fi; if [ -d '$REMOTE_BACKUP_DIR' ]; then mv '$REMOTE_BACKUP_DIR' '$REMOTE_DIR'; systemctl start '$SERVICE_NAME'; fi"
-  echo "Health check failed: $HEALTH_URL" >&2
+  echo "Health check failed on ECS localhost: http://127.0.0.1:3000/api/healthz" >&2
   exit 1
 fi
 
 "${SSH[@]}" "set -e; if grep -q '^BACKGROUND_TASKS_ENABLED=' /etc/mingyuan/mingyuan.env; then sed -i 's/^BACKGROUND_TASKS_ENABLED=.*/BACKGROUND_TASKS_ENABLED=true/' /etc/mingyuan/mingyuan.env; else printf '\nBACKGROUND_TASKS_ENABLED=true\n' >> /etc/mingyuan/mingyuan.env; fi; chmod 600 /etc/mingyuan/mingyuan.env; systemctl daemon-reload; systemctl enable --now '$BACKGROUND_TASK_TIMER'; systemctl restart '$SERVICE_NAME'; systemctl is-active '$SERVICE_NAME'; ready=0; for attempt in {1..30}; do if /usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/api/healthz >/dev/null; then ready=1; break; fi; sleep 1; done; if [ \"\$ready\" -ne 1 ]; then exit 1; fi; systemctl start '$BACKGROUND_TASK_SERVICE'; systemctl is-active '$BACKGROUND_TASK_TIMER'"
 
-# 回读线上发布事实：releaseSha 必须等于本地 HEAD，否则视为发布事实不一致。
-LIVE_SHA="$(curl -fsS "$HEALTH_URL" | node -e "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).releaseSha??'unknown')}catch{console.log('unknown')}})")"
+# 回读线上发布事实：releaseSha 必须等于本地 HEAD（经 SSH 内网，不依赖本机 DNS）。
+LIVE_SHA="$("${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 5 http://127.0.0.1:3000/api/healthz" | node -e "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).releaseSha??'unknown')}catch{console.log('unknown')}})")"
 echo "healthz releaseSha=$LIVE_SHA (expected $RELEASE_SHA)"
 if [ "$LIVE_SHA" != "$RELEASE_SHA" ]; then
-  echo "WARNING: live releaseSha does not match local HEAD; 线上版本与代码版本不一致，需人工确认。" >&2
+  echo "ERROR: live releaseSha does not match local HEAD; aborting as failed release." >&2
+  exit 1
 fi
-echo "deployed: $HEALTH_URL"
+
+# 对外冒烟：失败只告警，不回滚（避免本机 DNS/网络抖动误伤）。
+if ! curl -fsS --max-time 8 "$HEALTH_URL" >/dev/null; then
+  echo "WARNING: public smoke failed for $HEALTH_URL (deploy still accepted via ECS localhost)." >&2
+else
+  echo "deployed: $HEALTH_URL"
+fi

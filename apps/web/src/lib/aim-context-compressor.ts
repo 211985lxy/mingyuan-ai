@@ -308,6 +308,16 @@ function buildSummary(
         }
       }
     } else if (msg.role === "assistant") {
+      // 已展开的成稿正文优先保留（避免摘要只剩「交付物已生成」stub）
+      const deliverableBlock = content.match(/【[^】]*正文】\n([\s\S]{1,800})/)
+      if (deliverableBlock) {
+        const excerpt = deliverableBlock[1].trim().replace(/\s+/g, " ").slice(0, 400)
+        if (excerpt && excerpt !== lastContent) {
+          summaryContent += `AI成稿：${excerpt}\n`
+          lastContent = excerpt
+        }
+        continue
+      }
       // AI 回复：只保留关键输出，过滤寒暄
       const firstLine = content.split("\n")[0]?.trim()
       if (firstLine && firstLine.length > 10 && !/^(好的|明白了|我[知明]道了|让我|我先|我来)/.test(firstLine)) {

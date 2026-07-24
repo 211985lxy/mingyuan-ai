@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { buildWorkflowContext, buildCompactWorkflowContext, composeLayeredAimPrompt } from "@/lib/aim-generation-prompts"
+import { buildWorkflowContext, buildCompactWorkflowContext, composeLayeredAimPrompt, buildUserPrompt } from "@/lib/aim-generation-prompts"
 import { inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
 import { buildContentProducerKnowledgeRule } from "@/lib/aim-agent-prompts"
 import { buildPromptFewshotBlock } from "@/lib/aim-prompt-fewshots"
@@ -67,6 +67,18 @@ describe("format inference + routing", () => {
       agentId: "content_producer",
       input: "优化这篇开头",
     })).toBe("light_edit")
+  })
+
+  it("passage polish user prompt frames SOURCE and forbids long rewrite", () => {
+    const prompt = buildUserPrompt({
+      rawInput: "养了一个内容团队，月底却算不出获客。\n\n优化这段话",
+      runtimeTask: "light_edit",
+      knowledgeStrategy: "light_edit",
+      targetFormats: ["video_script"],
+      agentId: "content_producer",
+    } as never, "===FORMAT:video_script===")
+    expect(prompt).toContain("【待润色原文与要求】")
+    expect(prompt).toContain("禁止另起长口播")
   })
 
   it("channel aliases cover 人设梳理官 and 自由撰稿人", () => {
