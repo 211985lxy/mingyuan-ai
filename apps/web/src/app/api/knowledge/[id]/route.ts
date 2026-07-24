@@ -7,6 +7,31 @@ import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
 import { knowledgeUpdateBodySchema } from "@/features/knowledge/contracts/api"
 
 /**
+ * @description 读取单条知识条目（工作台原文预览）
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await authenticateRequest(request)
+    const { id } = await params
+    const entry = await prisma.knowledgeEntry.findFirst({
+      where: { id, userId: user.id },
+    })
+    if (!entry) {
+      return NextResponse.json({ error: "不存在" }, { status: 404 })
+    }
+    return NextResponse.json(entry)
+  } catch (error) {
+    return authErrorResponse(error) ?? NextResponse.json(
+      { error: "知识读取失败" },
+      { status: 500 }
+    )
+  }
+}
+
+/**
  * @description 处理 PUT 请求
  * @param request - 请求对象
  * @param options - 配置选项

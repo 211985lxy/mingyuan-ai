@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { confirmAimCanonicalContent } from "@/lib/api/aim"
+import { KnowledgeCitationPanel } from "@/components/aim/knowledge-citation-panel"
 import {
   buildCanonicalContentSpec,
   buildCanonicalSourceView,
@@ -17,11 +18,12 @@ import {
   type CanonicalContentSpec,
 } from "@/lib/canonical-content-spec"
 import type { TaskSpec } from "@/lib/task-spec"
+import type { AimKnowledgeUsedRef } from "@/lib/aim-knowledge-cite"
 
 export interface CanonicalContentPanelProps {
   generationId: string
   taskSpec?: TaskSpec | null
-  knowledgeUsed?: Array<{ id: string; title: string; category: string }>
+  knowledgeUsed?: AimKnowledgeUsedRef[]
   rawInputHint?: string
   onUpdated?: (input: { canonical: CanonicalContentSpec; taskSpec: TaskSpec }) => void
 }
@@ -71,6 +73,7 @@ export function CanonicalContentPanel({
 
   const view = buildCanonicalSourceView(canonical)
   const confirmed = isCanonicalConfirmed(canonical)
+  const citeRefs = knowledgeUsed.length > 0 ? knowledgeUsed : view.knowledgeUsed
 
   async function handleConfirm() {
     setSaving(true)
@@ -104,11 +107,11 @@ export function CanonicalContentPanel({
   }
 
   return (
-    <section className="mb-3 rounded-xl border border-border bg-card p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+    <section className="mb-2 rounded-lg border border-border bg-card p-2.5">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">母内容</h3>
-          <p className="text-[11px] text-muted-foreground">
+          <h3 className="text-xs font-semibold text-foreground">母内容</h3>
+          <p className="text-[10px] text-muted-foreground">
             确认后冻结核心观点与证据；拆多平台不得改事实。
             {confirmed ? ` · 当前 v${canonical.version}` : " · 草稿待确认"}
           </p>
@@ -198,15 +201,14 @@ export function CanonicalContentPanel({
         <SourceBlock title="当前输入" empty="无">
           {view.currentInput ? <li>{view.currentInput}</li> : null}
         </SourceBlock>
-        <SourceBlock title="采用的知识" empty="未引用知识条目">
-          {view.knowledgeUsed.map((item) => (
-            <li key={item.id}>
-              {item.title}
-              <span className="text-border"> · </span>
-              {item.category}
-            </li>
-          ))}
-        </SourceBlock>
+        <div className="rounded-lg border border-border/70 bg-secondary/30 px-2.5 py-2">
+          <p className="mb-1 font-medium text-foreground">采用的知识</p>
+          {citeRefs.length > 0 ? (
+            <KnowledgeCitationPanel knowledgeUsed={citeRefs} compact className="" />
+          ) : (
+            <p>未引用知识条目</p>
+          )}
+        </div>
         <SourceBlock title="企业事实 / 证据" empty="暂无已锚定事实">
           {view.enterpriseFacts.map((item, index) => (
             <li key={`${item.statement}-${index}`}>

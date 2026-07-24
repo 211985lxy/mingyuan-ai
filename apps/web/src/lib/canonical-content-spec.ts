@@ -30,6 +30,8 @@ export interface CanonicalKnowledgeRef {
   id: string
   title: string
   category: string
+  categoryLabel?: string
+  snippet?: string
 }
 
 export interface CanonicalModelAssumption {
@@ -174,6 +176,8 @@ export function buildCanonicalContentSpec(input: BuildCanonicalContentInput): Ca
       id: item.id,
       title: cleanText(item.title, 200),
       category: cleanText(item.category, 80) || "unknown",
+      ...(item.categoryLabel ? { categoryLabel: cleanText(item.categoryLabel, 80) } : {}),
+      ...(item.snippet ? { snippet: cleanText(item.snippet, 160) } : {}),
     }))
 
   const evidence: CanonicalEvidenceItem[] = []

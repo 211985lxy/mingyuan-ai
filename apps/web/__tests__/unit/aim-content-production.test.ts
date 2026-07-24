@@ -177,6 +177,7 @@ describe("AIM content production positioning", () => {
     expect(content).toContain("人设特点：老板人设")
     expect(content).toContain("紫微依据：紫微天命档案")
     expect(content).toContain("这是可直接使用的正文。")
+    expect(content).toContain("### 相关原文")
   })
 
   it("backfills product USP when the model marks it as missing", () => {

@@ -1,6 +1,7 @@
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
+import { normalizeKnowledgeUsed } from "@/lib/aim-knowledge-cite"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { extractEditorDraftFromAssistantText, type AimEditorContext, type TextSelectionRange } from "@/lib/aim-editor"
@@ -288,12 +289,7 @@ export function getAimHistoryContents(item: AimGeneration) {
  */
 export function mapAimGenerationToDeliverables(item: AimGeneration): AimGenerateResponse {
   const contents = getAimHistoryContents(item)
-  const knowledgeUsed = Array.isArray(item.knowledgeUsed)
-    ? item.knowledgeUsed.filter(
-      (entry): entry is { id: string; title: string; category: string } =>
-        Boolean(entry && typeof entry === "object" && typeof (entry as { id?: unknown }).id === "string"),
-    )
-    : []
+  const knowledgeUsed = normalizeKnowledgeUsed(item.knowledgeUsed)
   return {
     id: item.id,
     results: contents.map((content) => ({

@@ -5,6 +5,7 @@ import {
   type ResolvedKnowledgeStrategy,
   getStrategyProfile,
 } from "@/lib/aim-knowledge-strategy"
+import { formatKnowledgeEntryAnchor } from "@/lib/aim-knowledge-cite"
 import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
 
 // ─── 类型定义 ──────────────────────────────────────────────
@@ -194,7 +195,7 @@ export async function buildAimKnowledgeContext(
  * @returns string
  */
 export function buildKnowledgeBlock(
-  entries: Array<{ category: string; title: string; content: string; tags?: unknown; valueGrade?: string | null }>
+  entries: Array<{ id?: string; category: string; title: string; content: string; tags?: unknown; valueGrade?: string | null }>
 ): string {
   return buildKnowledgeBlockWithBudget(entries, Infinity)
 }
@@ -237,7 +238,7 @@ export function rankKnowledgeEntriesForAgent<T extends { category: string; score
 }
 
 function buildKnowledgeBlockWithBudget(
-  entries: Array<{ category: string; title: string; content: string; tags?: unknown; valueGrade?: string | null }>,
+  entries: Array<{ id?: string; category: string; title: string; content: string; tags?: unknown; valueGrade?: string | null }>,
   maxChars: number
 ): string {
   if (entries.length === 0) return ""
@@ -262,7 +263,10 @@ function buildKnowledgeBlockWithBudget(
       const title = parsed.confidence === "pending_verify"
         ? `${gradePrefix}${item.title}（待核验）`
         : `${gradePrefix}${item.title}`
-      const entryLine = `- ${title}：${item.content}\n`
+      const anchor = item.id
+        ? `${formatKnowledgeEntryAnchor({ id: item.id, category: item.category })} `
+        : ""
+      const entryLine = `- ${anchor}${title}：${item.content}\n`
       categoryBlock += entryLine
     }
 

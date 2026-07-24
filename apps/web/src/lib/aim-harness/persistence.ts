@@ -28,6 +28,7 @@ import {
   getContentPackageFromTaskSpec,
   withContentPackageOnTaskSpec,
 } from "@/lib/content-package-spec"
+import { mapEntriesToKnowledgeUsed } from "@/lib/aim-knowledge-cite"
 import { prisma } from "@/lib/prisma"
 
 /**
@@ -47,11 +48,7 @@ export async function saveAimGenerationRecord(
   const sanitizeDbText = (value: string | null | undefined) =>
     value ? value.replace(/\u0000/g, "").replace(/[\u{10000}-\u{10FFFF}]/gu, "") : null
 
-  const knowledgeUsed = context.retrievedEntries.map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    category: entry.category,
-  }))
+  const knowledgeUsed = mapEntriesToKnowledgeUsed(context.retrievedEntries)
 
   // 阶段 2：生成时自动装配母内容草稿（已确认则保留，不覆盖）
   let taskSpecForPersist = context.taskSpec
@@ -181,7 +178,7 @@ export async function saveAimGenerationRecord(
     shootingBrief,
     rawCopy,
     formatsRequested,
-    knowledgeUsed,
+    knowledgeUsed: knowledgeUsed as unknown as Prisma.InputJsonValue,
     topicTitle: clampVarchar(context.topicTitle),
     topicSelectionId: context.topicSelectionId,
     selectedTopicIndex: context.selectedTopicIndex,

@@ -51,6 +51,13 @@ export async function listKnowledge(input?: {
 }
 
 /**
+ * @description 读取单条知识条目（原文预览）
+ */
+export async function getKnowledge(id: string): Promise<KnowledgeEntry> {
+  return request<KnowledgeEntry>(`/api/knowledge/${encodeURIComponent(id)}`)
+}
+
+/**
  * @description 创建knowledge
  * @param data - 数据
  * @returns Promise<KnowledgeEntry>

@@ -65,6 +65,12 @@ export function parseCanonicalContentSpec(value: unknown): CanonicalContentSpec 
           id: item.id,
           title: cleanText(item.title, 200),
           category: cleanText(item.category, 80) || "unknown",
+          ...(typeof (item as CanonicalKnowledgeRef).categoryLabel === "string"
+            ? { categoryLabel: cleanText((item as CanonicalKnowledgeRef).categoryLabel || "", 80) }
+            : {}),
+          ...(typeof (item as CanonicalKnowledgeRef).snippet === "string"
+            ? { snippet: cleanText((item as CanonicalKnowledgeRef).snippet || "", 160) }
+            : {}),
         }))
         .slice(0, 30)
     : []

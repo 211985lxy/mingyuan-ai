@@ -14,6 +14,10 @@ import {
   LIGHT_EDIT_USER_INSTRUCTION,
   RUNTIME_TASK_LABELS,
 } from "@/lib/aim-intent-boundaries"
+import {
+  buildKnowledgeCitationMarkdown,
+  upsertKnowledgeCitationInMethodNote,
+} from "@/lib/aim-knowledge-cite"
 import { buildPromptFewshotBlock } from "@/lib/aim-prompt-fewshots"
 import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
 import { formatAimTurnIntentBlock, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
@@ -25,13 +29,15 @@ const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:�
 export const CONTENT_CREATION_TRACE_RULE = `教学式透明交付规则：
 - 每个完整成稿或文章的最前面，先输出 [[AIM_METHOD_NOTE]] ... [[/AIM_METHOD_NOTE]]；正文放在结束标记之后。
 - 说明区只给可学习、可复用、可验证的高层结论，不输出逐字内部思维链。
-- 说明区固定包含以下四部分：
+- 说明区固定包含以下五部分：
   1. 「风格定位」：标注主风格与辅助风格（如幽默、专业、感性、犀利、沉稳），并说明与当前场景的关系。
   2. 「教学拆解」：用 3-5 条概括选题判断、开头钩子、结构推进、情绪基调和转化承接的取舍。
-  3. 「来源标注」：分别列出“对标爆款视频来源”、“产品卖点”、“人设特点”，每项都写出来源名称与在本稿中的用法。
+  3. 「来源标注」：分别列出“对标爆款视频来源”、“产品卖点”、“人设特点”，每项都写出来源名称与在本稿中的用法；名称必须来自当前知识块/选题上下文中的真实标题，不得编造。
   4. 「八字与紫微天命适配」：标注引用的八字/紫微资料来源，以及它如何影响文风、用词和情感基调。
+  5. 「相关原文」：按知识块中真实命中的条目列出「相关原文见 《标题》（分类）」；没有命中时写“未提供/待补充”。服务端会用实际召回条目覆盖本小节，勿编造条目。
 - 只能引用当前用户输入、选题上下文、知识库条目和 IP 定位维基中明确存在的来源名称；不得编造来源、视频、卖点、人设或命理结论。
-- 任一类资料缺失时，必须在对应位置写“未提供/待补充”；没有八字或紫微资料时，不得把一般性格判断写成命理结论。`
+- 任一类资料缺失时，必须在对应位置写“未提供/待补充”；没有八字或紫微资料时，不得把一般性格判断写成命理结论。
+- 禁止把「相关原文见」写进口播/短视频正文；只放在 AIM_METHOD_NOTE 说明区。`
 
 const METHOD_NOTE_PATTERN = /\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/
 
@@ -73,6 +79,17 @@ function patchPlaceholderTraceSources(note: string, context: AimGenerateContext)
   return patched
 }
 
+function attachDeterministicCitationNote(noteWithMarkers: string, context: AimGenerateContext): string {
+  const citationBlock = buildKnowledgeCitationMarkdown(context.retrievedEntries ?? [])
+  const match = noteWithMarkers.match(/^\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]$/)
+  if (!match) return noteWithMarkers
+  const inner = upsertKnowledgeCitationInMethodNote(
+    match[1],
+    citationBlock || "### 相关原文\n- 未提供/待补充",
+  )
+  return `[[AIM_METHOD_NOTE]]\n${inner}\n[[/AIM_METHOD_NOTE]]`
+}
+
 function buildFallbackContentCreationTrace(context: AimGenerateContext): string {
   const productSource = resolveTraceProductSource(context)
   const personaSource = traceEntryTitle(context, /persona|positioning|style|人设|定位|风格|故事/, "positioning_material")
@@ -96,8 +113,10 @@ function buildFallbackContentCreationTrace(context: AimGenerateContext): string 
     ? "以 IP 定位与人设资料为主，保持专业、清晰与人格一致。"
     : "专业、清晰、可信；完整人设风格待补充。"
   const hasDestiny = Boolean(baziSource || ziweiSource)
+  const citationBlock = buildKnowledgeCitationMarkdown(context.retrievedEntries ?? [])
+    || "### 相关原文\n- 未提供/待补充"
 
-  return `[[AIM_METHOD_NOTE]]
+  return attachDeterministicCitationNote(`[[AIM_METHOD_NOTE]]
 ### 风格定位
 - ${stylePositioning}
 
@@ -113,7 +132,9 @@ ${logicSteps.map((step) => `- ${step}`).join("\n")}
 - 八字依据：${traceSource(baziSource)}
 - 紫微依据：${traceSource(ziweiSource)}
 - 风格映射：${hasDestiny ? "现有命理资料已作为文风、用词和情感基调的校准依据。" : "未做命理推断；待补充八字或紫微资料后再校准。"}
-[[/AIM_METHOD_NOTE]]`
+
+${citationBlock}
+[[/AIM_METHOD_NOTE]]`, context)
 }
 
 /**
@@ -130,7 +151,7 @@ export function ensureContentCreationTrace(content: string, context: AimGenerate
   const complete = ["风格定位", "教学拆解", "对标爆款视频来源", "产品卖点", "人设特点", "八字", "紫微"]
     .every((label) => note.includes(label))
   if (complete) {
-    const patchedNote = patchPlaceholderTraceSources(note, context)
+    const patchedNote = attachDeterministicCitationNote(patchPlaceholderTraceSources(note, context), context)
     return patchedNote === note ? trimmed : trimmed.replace(note, patchedNote)
   }
   const result = existing ? trimmed.replace(existing[0], "").trim() : trimmed

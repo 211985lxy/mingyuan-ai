@@ -59,7 +59,13 @@ export interface ContentPackageSpec {
   requestedFormats: ContentFormat[]
   completedFormats: ContentFormat[]
   failedFormats: ContentPackageFailedFormat[]
-  knowledgeUsed: Array<{ id: string; title: string; category: string }>
+  knowledgeUsed: Array<{
+    id: string
+    title: string
+    category: string
+    categoryLabel?: string
+    snippet?: string
+  }>
   /** 无独立列的格式正文备份（如小红书），刷新可恢复 */
   artifacts?: Partial<Record<ContentFormat, string>>
   formatMeta?: ContentPackageFormatMeta[]
@@ -98,7 +104,13 @@ export function buildContentPackageSpec(input: {
   canonicalGenerationId: string
   requestedFormats: readonly ContentFormat[]
   parsed: Partial<Record<ContentFormat, string | undefined>>
-  knowledgeUsed?: Array<{ id: string; title: string; category: string }>
+  knowledgeUsed?: Array<{
+    id: string
+    title: string
+    category: string
+    categoryLabel?: string
+    snippet?: string
+  }>
   previous?: ContentPackageSpec | null
   model?: string
   totalTokens?: number
@@ -217,7 +229,13 @@ export function parseContentPackageSpec(value: unknown): ContentPackageSpec | nu
     failedFormats,
     knowledgeUsed: Array.isArray(input.knowledgeUsed)
       ? input.knowledgeUsed
-          .filter((item): item is { id: string; title: string; category: string } => {
+          .filter((item): item is {
+            id: string
+            title: string
+            category: string
+            categoryLabel?: string
+            snippet?: string
+          } => {
             if (!item || typeof item !== "object" || Array.isArray(item)) return false
             const row = item as Record<string, unknown>
             return typeof row.id === "string" && typeof row.title === "string"
@@ -226,6 +244,8 @@ export function parseContentPackageSpec(value: unknown): ContentPackageSpec | nu
             id: item.id,
             title: item.title,
             category: typeof item.category === "string" ? item.category : "unknown",
+            ...(typeof item.categoryLabel === "string" ? { categoryLabel: item.categoryLabel } : {}),
+            ...(typeof item.snippet === "string" ? { snippet: item.snippet } : {}),
           }))
       : [],
     artifacts:

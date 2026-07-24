@@ -48,7 +48,13 @@ export interface AimGenerateResult {
 export interface AimGenerateResponse {
   id: string
   results: AimGenerateResult[]
-  knowledgeUsed: { id: string; title: string; category: string }[]
+  knowledgeUsed: Array<{
+    id: string
+    title: string
+    category: string
+    categoryLabel?: string
+    snippet?: string
+  }>
   conversationMode?: string
   /** 本次实际生效的知识调用策略（由服务端解析，供 UI 反馈） */
   knowledgeStrategy?: string
@@ -113,7 +119,13 @@ export interface AimGeneration {
   shootingBrief: string | null
   rawCopy: string | null
   formatsRequested: string[]
-  knowledgeUsed: { id: string; title: string; category: string }[]
+  knowledgeUsed: Array<{
+    id: string
+    title: string
+    category: string
+    categoryLabel?: string
+    snippet?: string
+  }>
   createdAt: string
   updatedAt?: string
   hotTopic?: string | null

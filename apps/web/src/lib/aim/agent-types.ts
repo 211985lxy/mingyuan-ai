@@ -127,6 +127,8 @@ export interface AimGenerateResponse {
     id: string
     title: string
     category: string
+    categoryLabel?: string
+    snippet?: string
   }>
   conversationMode?: AimConversationMode
   /** 本次实际生效的知识调用策略（由 buildAimGeneration 解析后注入，供 UI 反馈） */
