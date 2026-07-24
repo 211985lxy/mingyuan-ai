@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildAimEditorContext,
+  buildAimHistoryRawInput,
   buildAimRawInput,
   detectAimLarkToolAction,
   extractBenchmarkAnalysisText,
@@ -9,6 +10,7 @@ import {
   extractPersonaProgress,
   findLatestAimDeliverableText,
   findLatestAimVideoDeliverableMessageId,
+  formatAimMessageContentForModel,
   getAimOpeningSegment,
   prepareAimChatTurn,
 } from "@/lib/aim/workbench-helpers"
@@ -69,6 +71,29 @@ describe("AIM workbench helpers", () => {
     ]
     expect(findLatestAimVideoDeliverableMessageId(messages)).toBe("new")
     expect(findLatestAimDeliverableText(messages)).toBe("新稿")
+  })
+
+  it("injects deliverable body into model-facing history (not just stub)", () => {
+    const messages = [
+      { id: "u1", role: "user" as const, content: "写一口播" },
+      {
+        id: "a1",
+        role: "assistant" as const,
+        content: "内容创作官 · 单篇创作 交付物已生成，可直接复制使用。",
+        deliverables: {
+          id: "g1",
+          results: [{ format: "video_script" as const, content: "养了一个内容团队，月底却算不出获客。", wordCount: 20 }],
+          knowledgeUsed: [],
+        },
+      },
+    ]
+    const forModel = formatAimMessageContentForModel(messages[1])
+    expect(forModel).toContain("养了一个内容团队")
+    expect(forModel).toContain("【口播文案正文】")
+
+    const history = buildAimHistoryRawInput("优化这段话", "这个文案结构是什么", messages)
+    expect(history).toContain("养了一个内容团队")
+    expect(history).toContain("这个文案结构是什么")
   })
 
   it("builds opening and editor selection context", () => {

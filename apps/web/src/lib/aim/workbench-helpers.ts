@@ -79,6 +79,38 @@ export function findLatestAimDeliverableText(messages: AimWorkbenchMessage[]) {
   return latest?.deliverables?.results[0]?.content.trim() || ""
 }
 
+/** 注入模型上下文时的单份成稿上限，避免撑爆窗口 */
+export const AIM_MODEL_DELIVERABLE_MAX_CHARS = 12_000
+
+/**
+ * 把助手消息里的交付物正文展开进模型可见文本。
+ * UI 仍可只显示 stub；否则「这篇/这个文案」追问会看不到成稿。
+ */
+export function formatAimMessageContentForModel(message: {
+  role: string
+  content: string
+  deliverables?: AimWorkbenchMessage["deliverables"]
+}): string {
+  const text = message.content.trim()
+  const results = message.deliverables?.results?.filter((result) => result.content?.trim()) ?? []
+  if (message.role !== "assistant" || results.length === 0) return text
+
+  const bodies = results.map((result) => {
+    const label = AIM_FORMAT_LABELS[result.format] || result.format
+    let body = result.content.trim()
+    if (body.length > AIM_MODEL_DELIVERABLE_MAX_CHARS) {
+      body = `${body.slice(0, AIM_MODEL_DELIVERABLE_MAX_CHARS)}\n…（已截断）`
+    }
+    return `【${label}正文】\n${body}`
+  })
+
+  // 若 stub 已含正文（极少见）则不再重复
+  if (bodies.every((block) => text.includes(block.slice(0, Math.min(80, block.length))))) {
+    return text
+  }
+  return [text, ...bodies].filter(Boolean).join("\n\n")
+}
+
 /**
  * @description 获取 AIM 开头片段（前 1-2 段）
  * @param text - 完整文本
@@ -344,11 +376,7 @@ export function patchDeliverableWorkflowFields(
 export function buildAimHistoryRawInput(baseInput: string, currentInput: string, messages: AimWorkbenchMessage[]) {
   const turns = messages
     .map((message) => {
-      const text = message.content.trim()
-      const deliverableNote = message.deliverables?.results.length
-        ? `生成了：${message.deliverables.results.map((result) => AIM_FORMAT_LABELS[result.format] || result.format).join("、")}`
-        : ""
-      const content = [text, deliverableNote].filter(Boolean).join("\n")
+      const content = formatAimMessageContentForModel(message)
       if (!content) return ""
       return `${message.role === "user" ? "用户" : "助手"}：${content}`
     })

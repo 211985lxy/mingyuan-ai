@@ -16,7 +16,7 @@ import {
 } from "@/lib/aim-intent-boundaries"
 import { buildPromptFewshotBlock } from "@/lib/aim-prompt-fewshots"
 import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
-import { formatAimTurnIntentBlock, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
+import { formatAimTurnIntentBlock, looksLikePassagePolish, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 import {
@@ -377,6 +377,7 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
 export function buildUserPrompt(context: AimGenerateContext, formatBlocks: string): string {
   const workflowContext = buildWorkflowContext(context)
   const isLightEdit = context.runtimeTask === "light_edit"
+  const passagePolish = isLightEdit && looksLikePassagePolish(context.rawInput || "")
 
   // 冲突10：light_edit 不需要字数保留规则（只改局部，字数规则无意义）
   const explicitWordCountRule = isLightEdit ? null : buildExplicitWordCountPriorityRule(context.rawInput)
@@ -398,8 +399,11 @@ export function buildUserPrompt(context: AimGenerateContext, formatBlocks: strin
 - 成稿必须让用户一眼看出：这仍然是在讲热点/原选题，只是换成了本IP的表达和承接。
 - ${BENCHMARK_REWRITE_GUARDRAIL}`
 
-  return `用户输入的原始内容：
-"${context.rawInput}"
+  const rawInputBlock = passagePolish
+    ? `【待润色原文与要求】（只在此基础上润色，保持相近篇幅，禁止另起长口播/长文）\n"${context.rawInput}"`
+    : `用户输入的原始内容：\n"${context.rawInput}"`
+
+  return `${rawInputBlock}
 
 ${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}
 

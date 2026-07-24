@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from "react"
 import type { ContentFormat } from "@/lib/api/client"
+import type { AimEditorContext } from "@/lib/aim-editor"
+import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import { resolveAimTurnIntentRemote } from "@/lib/api/aim"
 import {
   resolveAimTurnIntent,
@@ -10,6 +12,8 @@ import {
 } from "@/lib/aim-turn-intent"
 import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 import type { AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
+import { buildAimEditorContext, findLatestAimDeliverableText } from "@/lib/aim/workbench-helpers"
+import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
 export type PendingTurnIntent = {
   text: string
@@ -18,18 +22,49 @@ export type PendingTurnIntent = {
   source?: string
 }
 
+export type AimSendTextFn = (
+  text: string,
+  options?: { editorContext?: AimEditorContext },
+) => Promise<unknown>
+
+function resolveChatEditorContext(input: {
+  editorText: string
+  messages: AimWorkbenchMessage[]
+  labels: Pick<EditorPanelLabels, "documentType" | "referenceTitle" | "draftTitle">
+}): AimEditorContext | undefined {
+  const draftText = input.editorText.trim() || findLatestAimDeliverableText(input.messages)
+  if (!draftText) return undefined
+  return buildAimEditorContext({
+    action: "对话追问（引用当前成稿）",
+    referenceSelection: "",
+    draftSelection: "",
+    editorText: draftText,
+    labels: input.labels,
+  })
+}
+
 function dispatchByIntent(input: {
   text: string
   intent: AimTurnIntent
   startsNewTask: boolean
-  sendText: (text: string) => Promise<unknown>
+  editorText: string
+  messages: AimWorkbenchMessage[]
+  editorLabels: Pick<EditorPanelLabels, "documentType" | "referenceTitle" | "draftTitle">
+  sendText: AimSendTextFn
   generateWithInput: (
     raw: string,
     options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
   ) => Promise<unknown>
 }) {
   if (input.intent.action === "chat") {
-    void input.sendText(input.text)
+    const editorContext = input.startsNewTask
+      ? undefined
+      : resolveChatEditorContext({
+          editorText: input.editorText,
+          messages: input.messages,
+          labels: input.editorLabels,
+        })
+    void input.sendText(input.text, editorContext ? { editorContext } : undefined)
     return
   }
   void input.generateWithInput(input.text, {
@@ -41,7 +76,7 @@ function dispatchByIntent(input: {
 /**
  * 直接模式：生成前意图解析/确认门闩。
  * 抽出以控制 use-aim-workbench 文件体量（arch:size ≤500）。
- * chat 意图走对话入口，避免分析问句被 write_script 强制成 new_copy。
+ * chat 意图走对话入口，并挂载当前成稿，避免「这篇/这个文案」无上下文。
  */
 export function useAimTurnIntentGate(input: {
   hasEditorSelection: boolean
@@ -49,11 +84,14 @@ export function useAimTurnIntentGate(input: {
   handleGenerate: () => void
   text: string
   messageCount: number
+  messages: AimWorkbenchMessage[]
+  editorText: string
+  editorLabels: Pick<EditorPanelLabels, "documentType" | "referenceTitle" | "draftTitle">
   runWorkbenchCommand: (command: AimWorkbenchCommand) => boolean
   defaultFormats: ContentFormat[]
   projectEnabled: boolean
   selectedProjectId: string
-  sendText: (text: string) => Promise<unknown>
+  sendText: AimSendTextFn
   generateWithInput: (
     raw: string,
     options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
@@ -73,8 +111,17 @@ export function useAimTurnIntentGate(input: {
     if (!pendingTurnIntent) return
     const { text, startsNewTask } = pendingTurnIntent
     setPendingTurnIntent(null)
-    dispatchByIntent({ text, intent, startsNewTask, sendText, generateWithInput })
-  }, [pendingTurnIntent, generateWithInput, sendText])
+    dispatchByIntent({
+      text,
+      intent,
+      startsNewTask,
+      editorText: input.editorText,
+      messages: input.messages,
+      editorLabels: input.editorLabels,
+      sendText,
+      generateWithInput,
+    })
+  }, [pendingTurnIntent, generateWithInput, sendText, input.editorText, input.messages, input.editorLabels])
 
   const handleCancelTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -127,6 +174,9 @@ export function useAimTurnIntentGate(input: {
         text: currentInput,
         intent,
         startsNewTask,
+        editorText: input.editorText,
+        messages: input.messages,
+        editorLabels: input.editorLabels,
         sendText: input.sendText,
         generateWithInput: input.generateWithInput,
       })

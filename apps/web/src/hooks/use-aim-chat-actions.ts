@@ -11,6 +11,7 @@ import { buildAimChatMessages, runAimChatRequest } from "@/lib/aim/chat-request"
 import {
   detectAimLarkToolAction,
   findLatestAimDeliverableId,
+  formatAimMessageContentForModel,
   prepareAimChatTurn,
   reportAimChatRevision,
 } from "@/lib/aim/workbench-helpers"
@@ -62,7 +63,11 @@ async function executeChatRequest(
     return
   }
   const { hasContent } = await runAimChatRequest({
-    messages: buildAimChatMessages(thread),
+    messages: buildAimChatMessages(thread.map((message) => ({
+      role: message.role,
+      content: formatAimMessageContentForModel(message),
+      images: message.images,
+    }))),
     agentId: input.selectedAgentId,
     projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,
     toolAction,
