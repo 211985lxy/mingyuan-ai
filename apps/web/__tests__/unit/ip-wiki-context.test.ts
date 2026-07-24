@@ -82,6 +82,18 @@ describe("formatIpWikiBlock", () => {
     expect(block).toContain("应出现")
   })
 
+  it("keeps a project-adapted methodology page explicitly customer-scoped", () => {
+    const block = formatIpWikiBlock([
+      makeRow({ pageType: "viral_methodology", title: "相宇原创 IP 方法", content: "用于明远 AI 商业内容" }),
+      makeRow({ pageType: "positioning", title: "客户定位", content: "项目专属信息" }),
+    ])
+
+    expect(block).toContain("【项目爆款策略（客户专属）】相宇原创 IP 方法")
+    expect(block).toContain("用于明远 AI 商业内容")
+    expect(block).toContain("客户定位")
+    expect(block).toContain("项目专属信息")
+  })
+
   it("tolerates malformed frontmatter without throwing", () => {
     expect(() =>
       formatIpWikiBlock([

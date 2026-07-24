@@ -30,7 +30,7 @@ describe("project knowledge retrieval", () => {
     mocks.findMany.mockResolvedValue([])
   })
 
-  it("includes global methodology with the current project's knowledge only", async () => {
+  it("retrieves only the current project's exclusive knowledge", async () => {
     await retrieveRelevantKnowledge({
       userId: "user-1",
       projectId: "project-1",
@@ -41,7 +41,23 @@ describe("project knowledge retrieval", () => {
       where: expect.objectContaining({
         userId: "user-1",
         status: "active",
-        OR: [{ projectId: "project-1" }, { projectId: null }],
+        projectId: "project-1",
+      }),
+    }))
+  })
+
+  it("retrieves only unbound global entries in quick mode", async () => {
+    await retrieveRelevantKnowledge({
+      userId: "user-1",
+      projectId: "<no-project>",
+      query: "写一条通用文案",
+    })
+
+    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        userId: "user-1",
+        status: "active",
+        projectId: null,
       }),
     }))
   })

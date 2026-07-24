@@ -28,7 +28,7 @@ export function SmartImportUploadStep(props: {
       <Select value={props.projectId} onValueChange={(value) => props.onProjectChange(value ?? "none")}>
         <SelectTrigger><SelectValue /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
+          <SelectItem value="none">全局资料（不属于客户 IP）</SelectItem>
           {props.projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.label}</SelectItem>)}
         </SelectContent>
       </Select>

@@ -110,6 +110,16 @@ type AimChatRuntimeInput = Omit<
   "conversationBlock" | "methodologyBlock" | "businessDiagnosisBlock" | "ipWikiBlock"
 >
 
+/**
+ * IP Wiki 是项目事实底盘，不属于可选方法论。
+ * 只要本轮绑定了项目，分析、追问和轻改也必须注入。
+ */
+export function shouldInjectChatIpWiki(input: {
+  projectId?: string | null
+}): boolean {
+  return Boolean(input.projectId?.trim())
+}
+
 async function buildAimChatRuntime(
   agentId: string,
   params: AimChatRuntimeInput,
@@ -143,9 +153,11 @@ async function buildAimChatRuntime(
       params.conversationIntent?.useMethodology === false || agentId !== "business_system_diagnosis"
         ? Promise.resolve("")
         : buildBusinessDiagnosisMethodologyBlock(),
-      params.conversationIntent?.useMethodology === false || !params.projectId
-        ? Promise.resolve("")
-        : buildIpWikiBlock({ projectId: params.projectId }),
+      shouldInjectChatIpWiki({
+        projectId: params.projectId,
+      })
+        ? buildIpWikiBlock({ projectId: params.projectId })
+        : Promise.resolve(""),
     ]),
     ([methodology, businessDiagnosis, ipWiki]) => ({
       summary: "运行上下文已构建",

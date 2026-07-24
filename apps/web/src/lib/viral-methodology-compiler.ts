@@ -3,8 +3,9 @@ import type { CompiledWikiPage } from "@/lib/ip-wiki/compile"
 /**
  * 爆款方法论编译器
  *
- * 把竞品分析文本编译成一份结构化「爆款方法论」文档，
- * 遵循 IP Wiki compile.ts 的模式，供下游内容生产使用。
+ * 把竞品分析文本编译成一份绑定当前项目的「项目爆款策略」文档，
+ * 遵循 IP Wiki compile.ts 的模式，供该客户项目下游内容生产使用。
+ * 这不是全局方法论源，不会进入公共方法论库。
  */
 
 export interface MethodologyCompileInput {
@@ -32,7 +33,7 @@ export function buildMethodologyCompilePrompt(
 ): string {
   const analysis = truncateInput(input.competitorAnalysisText)
 
-  return `你是一个「爆款方法论」编译器。你的任务是把一份竞品分析文本编译成一份结构化的「爆款方法论」文档，供下游内容生产官在创作时直接读取作为方法论参考。
+  return `你是一个「项目爆款策略」编译器。你的任务是把一份竞品分析文本编译成一份绑定当前客户项目的「项目爆款策略」文档，供该项目的内容生产官创作时参考。
 
 ## 输入
 
@@ -46,7 +47,7 @@ ${analysis}
 
 ## 输出要求
 
-请从竞品分析中提炼出可复用的爆款方法论，必须包含以下内容结构板块：
+请从竞品分析中提炼只服务当前项目的爆款策略，必须包含以下内容结构板块：
 
 1. **开头打法**：竞品如何在开头 3 秒内抓住注意力（钩子模式、痛点提问、数字吸引、悬念设置等）
 2. **中段推进**：中段如何维持观看/阅读（情绪曲线、案例穿插、节奏把控等）
@@ -57,6 +58,7 @@ ${analysis}
 ## 规则
 
 - content 为凝练后的方法论正文，去 AI 味、干练实用
+- 只允许写当前项目可采用的策略，不得把它登记为全局公共方法论
 - frontmatter 按需放置结构化元数据（如 competitorSource）
 - sources 标注信息来源。来自竞品分析的写 { kind: "aim_generation", id: "${input.sourceCompetitorId ?? ""}", label: "竞品分析" }
 - links 用页 title 列表标注本页应交叉引用到的其它维基页

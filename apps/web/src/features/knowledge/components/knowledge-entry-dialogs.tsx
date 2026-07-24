@@ -81,7 +81,7 @@ export function KnowledgeEntryDialog({
             <Select value={form.projectId} onValueChange={(value) => onFormChange((current) => ({ ...current, projectId: value ?? "none" }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
+                <SelectItem value="none">全局资料（不属于客户 IP）</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>{projectLabel(project)}</SelectItem>
                 ))}
@@ -192,7 +192,7 @@ export function KnowledgeUploadDialog({
             <Select value={projectId} onValueChange={(value) => onProjectChange(value ?? "none")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">全局方法论 / 不绑定项目</SelectItem>
+                <SelectItem value="none">全局资料（不属于客户 IP）</SelectItem>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>{projectLabel(project)}</SelectItem>
                 ))}

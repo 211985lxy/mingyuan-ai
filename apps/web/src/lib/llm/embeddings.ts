@@ -248,6 +248,20 @@ export interface KnowledgePrefilter {
 }
 
 /**
+ * 客户项目知识与全局资料严格隔离：
+ * - 绑定项目时，只允许召回该 projectId 的专属知识；
+ * - 快速模式未绑定项目时，只允许召回 projectId=null 的全局资料。
+ *
+ * 公共方法论不经 KnowledgeEntry 混入客户知识，统一走独立方法论装配链路。
+ */
+export function resolveKnowledgeProjectScope(projectId: string): { projectId: string | null } {
+  const normalized = projectId.trim()
+  return normalized && normalized !== "<no-project>"
+    ? { projectId: normalized }
+    : { projectId: null }
+}
+
+/**
  * Retrieve top-K relevant knowledge entries by cosine similarity.
  * Falls back to entry-only (no embedding) when embedding is disabled or empty.
  */
@@ -271,6 +285,7 @@ export async function retrieveRelevantKnowledge(input: {
   const config = readConfig()
   const topK = input.topK ?? 12
   const prefilter = input.prefilter
+  const projectScope = resolveKnowledgeProjectScope(input.projectId)
 
   // Build the query text: combine input + topic context for richer embedding
   const queryParts = [input.query]
@@ -292,7 +307,7 @@ export async function retrieveRelevantKnowledge(input: {
           entry: {
             userId: input.userId,
             status: "active",
-            OR: [{ projectId: input.projectId }, { projectId: null }],
+            ...projectScope,
             ...(hasCategoryFilter ? { category: { in: prefilter!.categories } } : {}),
             ...(hasGradeFilter ? { valueGrade: { in: prefilter!.valueGrades } } : {}),
           },
@@ -345,7 +360,7 @@ export async function retrieveRelevantKnowledge(input: {
       where: {
         userId: input.userId,
         status: "active",
-        OR: [{ projectId: input.projectId }, { projectId: null }],
+        ...projectScope,
         category: { in: CORE_FALLBACK_CATEGORIES },
       },
       orderBy: { sortOrder: "asc" },
@@ -356,7 +371,7 @@ export async function retrieveRelevantKnowledge(input: {
       where: {
         userId: input.userId,
         status: "active",
-        OR: [{ projectId: input.projectId }, { projectId: null }],
+        ...projectScope,
         category: { notIn: CORE_FALLBACK_CATEGORIES },
       },
       orderBy: { sortOrder: "asc" },

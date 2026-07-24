@@ -319,11 +319,11 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
   // 上下文按优先级：TaskSpec 由 user prompt 注入；IP Wiki / 知识为事实素材；
   // IP 操盘方法论为强参考（结构/钩子/判断标准必须执行）；爆款库仍为弱参考。
   const contextBlocks = [
-    context.ipWikiBlock ? `IP 定位维基（高优先级档案）：\n${context.ipWikiBlock}` : "",
-    context.knowledgeBlock ? `企业知识库（高相关条目）：\n${context.knowledgeBlock}` : "",
-    context.selectedMethodologyBlock ? `指定方法论（强参考）：\n${context.selectedMethodologyBlock}` : "",
+    context.ipWikiBlock ? `客户 IP 专属档案（仅当前项目，高优先级事实）：\n${context.ipWikiBlock}` : "",
+    context.knowledgeBlock ? `当前客户项目知识库（高相关事实条目）：\n${context.knowledgeBlock}` : "",
+    context.selectedMethodologyBlock ? `公共指定方法论（强参考，只决定怎么写）：\n${context.selectedMethodologyBlock}` : "",
     context.methodologyBlock
-      ? `IP操盘方法论（强参考·仅已选卡片）：\n必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过、稀释或用通用模板替代。\n不得把方法论原文整段抄进成稿；方法论中的人物/业务案例不得覆盖当前项目真实资料；成稿正文禁止方法论说明书腔。\n${context.methodologyBlock}`
+      ? `公共 IP 操盘方法论（强参考·仅已选卡片，只决定怎么写）：\n必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过、稀释或用通用模板替代。\n公共方法论不能提供或推断客户身份、业务、观点归属、产品与案例；这些事实只能来自当前输入、当前项目知识库和客户 IP 专属档案。不得把方法论原文整段抄进成稿；方法论中的人物/业务案例不得覆盖当前项目真实资料；成稿正文禁止方法论说明书腔。\n${context.methodologyBlock}`
       : "",
     context.businessDiagnosisBlock ? `商业诊断方法（弱参考）：\n${context.businessDiagnosisBlock}` : "",
     context.eventStorytellingBlock ? `事件叙事方法：\n${context.eventStorytellingBlock}` : "",

@@ -140,10 +140,11 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
 当前对话上下文：
 ${contextBlock}
 ${params.workflowContext ? `\n工作流任务单：\n${params.workflowContext}\n` : ""}
-${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}IP操盘方法论（强参考·仅已选卡片）：
+${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}公共 IP 操盘方法论（强参考·仅已选卡片）：
 必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过或用通用模板替代。不得把方法论原文整段抄进回复；方法论案例不得覆盖客户真实资料；成稿正文禁止方法论说明书腔。
+边界：公共方法论只决定“怎么写”，不能提供或推断“客户是谁、做什么、说过什么”；客户事实、观点归属、产品、案例和口吻只能来自当前用户输入、当前项目知识库与客户 IP 专属档案。
 ${params.methodologyBlock}
-${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
+${params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${params.ipWikiBlock}` : ""}
 ${lightEditBlock}${goalClarify}
 ${AIM_HIGH_RISK_LOOP_RULE}
 

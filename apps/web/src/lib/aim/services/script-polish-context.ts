@@ -8,11 +8,14 @@ import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
  * @returns Promise<string>
  */
 export async function loadProjectKnowledge(userId: string, projectId?: string): Promise<string> {
+  const knowledgeScope = projectId?.trim()
+    ? { projectId: projectId.trim() }
+    : { projectId: null }
   const entries = await prisma.knowledgeEntry.findMany({
     where: {
       userId,
       status: "active",
-      ...(projectId ? { OR: [{ projectId }, { projectId: null }] } : {}),
+      ...knowledgeScope,
     },
     orderBy: { sortOrder: "asc" },
     take: 200,

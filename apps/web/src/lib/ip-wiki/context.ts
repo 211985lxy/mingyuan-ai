@@ -22,6 +22,9 @@ export interface IpWikiBlockInput {
 }
 
 /** 仅取与下游内容生产最相关的核心页，避免 index/log 等导航页污染 prompt */
+// 这里只允许装配带 projectId 的客户专属页。
+// viral_methodology 是历史类型名，在 IP Wiki 中表示“针对当前客户适配后的项目爆款策略”，
+// 不是全局方法论源；全局方法论仍通过独立 methodologyBlock 注入。
 const BLOCK_PAGE_TYPES = [...IP_WIKI_CORE_PAGE_TYPES, "viral_methodology" as IpWikiPageType]
 
 const MAX_PAGES_IN_BLOCK = 6
@@ -207,7 +210,9 @@ export function formatIpWikiBlock(pages: IpWikiPageRow[]): string {
   if (ordered.length === 0) return ""
 
   const sections = ordered.map((page) => {
-    const label = IP_WIKI_PAGE_TYPE_LABELS[page.pageType] ?? page.pageType
+    const label = page.pageType === "viral_methodology"
+      ? "项目爆款策略（客户专属）"
+      : IP_WIKI_PAGE_TYPE_LABELS[page.pageType] ?? page.pageType
     const header = `【${label}】${page.title}`.trim()
     const body = page.content.trim().slice(0, MAX_CONTENT_CHARS)
     const strategy =

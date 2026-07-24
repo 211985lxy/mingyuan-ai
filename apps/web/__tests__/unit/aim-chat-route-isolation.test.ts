@@ -30,6 +30,7 @@ const {
   streamAimRun,
   executeAimChatDomain,
   streamAimChatDomain,
+  ownsActiveProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   authErrorResponse: vi.fn((): Response | null => null),
@@ -59,6 +60,7 @@ const {
   streamAimRun: vi.fn(),
   executeAimChatDomain: vi.fn(),
   streamAimChatDomain: vi.fn(),
+  ownsActiveProject: vi.fn(async () => true),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
@@ -91,6 +93,7 @@ vi.mock("@/lib/aim-observability", () => ({
 vi.mock("@/lib/aim-harness/runtime", () => ({ executeAimRun, streamAimRun }))
 vi.mock("@/lib/aim-harness/domain-executor", () => ({ executeAimChatDomain, streamAimChatDomain }))
 vi.mock("@/lib/aim-harness/hashing", () => ({ sha256: vi.fn(() => "hash") }))
+vi.mock("@/lib/resource-ownership", () => ({ ownsActiveProject }))
 
 import { POST } from "@/app/api/aim/chat/route"
 
@@ -124,6 +127,24 @@ describe("POST /api/aim/chat", () => {
     authenticateRequest.mockResolvedValue({ id: "user-1" })
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
+    ownsActiveProject.mockResolvedValue(true)
+  })
+
+  it("rejects a project that is not owned before loading customer context", async () => {
+    ownsActiveProject.mockResolvedValueOnce(false)
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      projectId: "project-from-another-user",
+      messages: [{ role: "user", content: "写一段" }],
+    }))
+    const body = await res.json()
+
+    expect(res.status).toBe(404)
+    expect(body.error).toBe("IP 营销全案不存在或已归档")
+    expect(ownsActiveProject).toHaveBeenCalledWith("user-1", "project-from-another-user")
+    expect(executeAimRun).not.toHaveBeenCalled()
+    expect(streamAimRun).not.toHaveBeenCalled()
   })
 
   it("returns 400 when messages array is missing or empty", async () => {

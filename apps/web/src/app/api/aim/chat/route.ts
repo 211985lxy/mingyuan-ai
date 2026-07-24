@@ -21,6 +21,7 @@ import {
   parseAimChatBody,
   prepareAimChatExecution,
 } from "@/lib/aim/services/chat-context"
+import { ownsActiveProject } from "@/lib/resource-ownership"
 
 /** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
 export const maxDuration = 180
@@ -42,6 +43,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
     const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds } = parsed
+
+    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
+      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
+    }
 
     trace = await createAimTrace({
       id: traceId || undefined,

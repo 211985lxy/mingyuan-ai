@@ -32,6 +32,27 @@ export type AssembledAimChatContext = {
   methodologyPolicy: import("@/lib/methodology-profile-store").MethodologyPolicy
 }
 
+/**
+ * 对话模式是最终路由结论；runtimeTask 只负责选择生成预算和知识策略，
+ * 不能再把局部修改或版本选择升级成新文案创作。
+ */
+export function resolveAimChatRuntimeTask(
+  inferredTask: AimRuntimeTask,
+  conversationMode: AimConversationIntent["mode"],
+): AimRuntimeTask {
+  if (
+    conversationMode === "local_edit"
+    || conversationMode === "select_version"
+    || conversationMode === "clarify_task_boundary"
+  ) {
+    return "light_edit"
+  }
+  if (conversationMode === "follow_up_edit" && inferredTask === "new_copy") {
+    return "rewrite_copy"
+  }
+  return inferredTask
+}
+
 /** Build contextManifest from assembled blocks and normalized messages. */
 function buildChatContextManifest(input: {
   query: string
@@ -102,7 +123,7 @@ export async function assembleAimChatContext(input: {
   const lastMessage = messages[messages.length - 1] as { content?: unknown } | undefined
   const query = extractTextContent(lastMessage?.content).slice(0, 500)
 
-  const runtimeTask = resolveAimRuntimeTask({ agentId, input: query })
+  const inferredRuntimeTask = resolveAimRuntimeTask({ agentId, input: query })
 
   const conversationIntent = await runAimTraceStep(
     trace,
@@ -120,6 +141,7 @@ export async function assembleAimChatContext(input: {
       },
     }),
   )
+  const runtimeTask = resolveAimChatRuntimeTask(inferredRuntimeTask, conversationIntent.mode)
 
   const isolatesCurrentTurn = conversationIntent.mode === "new_task" || conversationIntent.mode === "clarify_task_boundary"
   const blocks = await retrieveChatContextBlocks({
