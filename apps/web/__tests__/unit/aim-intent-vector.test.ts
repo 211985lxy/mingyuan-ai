@@ -36,6 +36,15 @@ describe("意图规则置信度", () => {
     expect(shouldTryVectorIntentFallback(conf)).toBe(true)
   })
 
+  it("结构分析问句 → chat 高置信，不触发向量兜底", () => {
+    const text = "这个文案结构是什么"
+    const intent = resolveAimTurnIntent({ rawInput: text })
+    expect(intent.action).toBe("chat")
+    const conf = scoreTurnIntentRuleConfidence(intent, text)
+    expect(conf).toBeGreaterThanOrEqual(INTENT_VECTOR_RULE_CONFIDENCE_THRESHOLD)
+    expect(shouldTryVectorIntentFallback(conf)).toBe(false)
+  })
+
   it("人设+种草冲突必须降置信（不可被 create 0.88 提前 return 挡住）", () => {
     const text = "结合人设写一篇小红书种草文"
     const intent = resolveAimTurnIntent({ rawInput: text })

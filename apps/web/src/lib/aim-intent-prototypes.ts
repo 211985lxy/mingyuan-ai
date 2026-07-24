@@ -31,6 +31,8 @@ export const AIM_TURN_INTENT_PROTOTYPES: AimIntentPrototype[] = [
   { id: "edit_ending", phrase: "只润色结尾收束", action: "local_edit", scope: "ending" },
   { id: "edit_cta", phrase: "只改最后的行动引导CTA", action: "local_edit", scope: "cta" },
   { id: "edit_local", phrase: "局部改一下这段表述别重写全文", action: "local_edit" },
+  { id: "edit_passage", phrase: "优化这段话", action: "local_edit" },
+  { id: "edit_passage_2", phrase: "润色一下这篇文案别扩写", action: "local_edit" },
 
   // rewrite
   { id: "rewrite_full", phrase: "整篇重写这一版文案", action: "rewrite", scope: "full" },
@@ -45,6 +47,9 @@ export const AIM_TURN_INTENT_PROTOTYPES: AimIntentPrototype[] = [
   { id: "position_persona", phrase: "帮我梳理账号人设和定位方向", action: "position" },
   { id: "position_topic", phrase: "先做人设定位和选题策划不要写正文", action: "position" },
 
-  // chat / clarify-ish（低优先级，避免轻易盖过写作意图）
+  // chat / clarify-ish（结构分析问句要足够近，避免被「按结构改写」原型抢走）
   { id: "chat_ask", phrase: "这个选题还能怎么做解释一下思路", action: "chat" },
+  { id: "chat_structure", phrase: "这篇文案结构是什么", action: "chat" },
+  { id: "chat_structure_2", phrase: "帮我拆解一下结构", action: "chat" },
+  { id: "chat_structure_3", phrase: "分析这版文案结构", action: "chat" },
 ]

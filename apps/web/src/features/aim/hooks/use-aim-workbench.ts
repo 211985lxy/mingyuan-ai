@@ -405,6 +405,7 @@ export function useAimWorkbench() {
     defaultFormats: agent.defaultFormats,
     projectEnabled,
     selectedProjectId,
+    sendText,
     generateWithInput,
   })
   clearTurnIntentRef.current = clearPendingTurnIntent

@@ -170,6 +170,16 @@ describe("AIM runtime task routing", () => {
     expect(task).toBe("light_edit")
     expect(shouldUseKnowledgeContextForTask(task)).toBe(false)
   })
+
+  it("优化这段话 + write_script/formats 仍是 light_edit", () => {
+    const task = resolveAimRuntimeTask({
+      agentId: "content_producer",
+      input: "养了一个内容团队，视频也一条没断过。\n\n优化这段话",
+      taskType: "write_script",
+      targetFormats: ["video_script"],
+    })
+    expect(task).toBe("light_edit")
+  })
 })
 
 // ─── resolveKnowledgeStrategy 优先级矩阵 ────────────────────────

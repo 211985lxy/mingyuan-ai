@@ -138,6 +138,37 @@ function actionFromRuntimeTask(task?: AimRuntimeTask): AimTurnIntentAction | nul
   return null
 }
 
+const STRONG_WRITE_WORDS = [
+  "写一篇", "写一版", "写一条", "帮我写", "种草", "出一版", "出一条", "生成", "创作",
+  "重写", "改写", "重新写", "大改", "重做",
+] as const
+
+/** 结构拆解 / 分析问句：应走对话，禁止擅自出整篇成稿 */
+const COPY_ANALYSIS_PATTERN =
+  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用/
+
+const PASSAGE_POLISH_WORDS = [
+  "优化", "润色", "顺一下", "自然点", "更自然", "口语化", "改一下", "改改", "润一润",
+] as const
+
+const PASSAGE_REF_WORDS = [
+  "这篇", "这条", "这段", "这段话", "这段文字", "原稿", "原文", "上述", "上面", "这一版", "稿子",
+] as const
+
+export function looksLikeCopyAnalysisQuestion(text: string): boolean {
+  return COPY_ANALYSIS_PATTERN.test(text) && !includesAny(text, [...STRONG_WRITE_WORDS])
+}
+
+/** 优化/润色已粘贴或点名的这段/这篇：走轻改，禁止扩成全新长稿。
+ * 若已点名开头/标题等局部部位，交给部位轻改规则，不走段落润色。
+ */
+export function looksLikePassagePolish(text: string): boolean {
+  if (includesAny(text, [...LOCAL_EDIT_PART_WORDS])) return false
+  return includesAny(text, [...PASSAGE_POLISH_WORDS])
+    && includesAny(text, [...PASSAGE_REF_WORDS])
+    && !includesAny(text, [...STRONG_WRITE_WORDS])
+}
+
 /**
  * 从用户输入规则推导本轮意图（不调用 LLM）。
  */
@@ -164,6 +195,8 @@ export function resolveAimTurnIntent(input: {
     && !includesAny(text, ["重写", "改写", "重做", "整篇"])
   ) {
     action = "local_edit"
+  } else if (looksLikePassagePolish(text)) {
+    action = "local_edit"
   } else if (includesAny(text, ["重写", "改写", "重新写", "大改", "重做"])) {
     action = "rewrite"
   } else if (includesAny(text, ["写一篇", "写一版", "写一条", "帮我写", "种草", "出一版", "出一条", "生成", "创作"])) {
@@ -175,17 +208,30 @@ export function resolveAimTurnIntent(input: {
     && !includesAny(text, ["种草", "小红书", "口播", "文案"])
   ) {
     action = "position"
+  } else if (looksLikeCopyAnalysisQuestion(text)) {
+    action = "chat"
   }
 
   if (input.forceAction) action = input.forceAction
   if (input.forceScope) scope = input.forceScope
 
+  // 段落润色 / 分析问句优先于 runtimeTask 带来的 create，除非外部强制
+  if (!input.forceAction && looksLikePassagePolish(text)) {
+    action = "local_edit"
+  } else if (!input.forceAction && looksLikeCopyAnalysisQuestion(text)) {
+    action = "chat"
+  }
+
   const keep: string[] = []
   const avoid: string[] = []
+  const passagePolish = looksLikePassagePolish(text)
 
   if (action === "local_edit") {
     keep.push("原稿主题与未点名部分")
-    if (scope === "opening") {
+    if (passagePolish) {
+      keep.push("用户粘贴原文的信息点与相近篇幅")
+      avoid.push("扩写成全新长口播", "另起一篇成稿", "擅自拉长数倍")
+    } else if (scope === "opening") {
       keep.push("正文主体与结尾")
       avoid.push("输出整篇文案", "擅自扩写知识库背景")
     } else if (scope === "title") {
@@ -202,6 +248,9 @@ export function resolveAimTurnIntent(input: {
   } else if (action === "rewrite") {
     keep.push("原选题核心")
     avoid.push("照抄原句", "另起一个主题")
+  } else if (action === "chat" && looksLikeCopyAnalysisQuestion(text)) {
+    keep.push("针对用户点名文案的结构说明")
+    avoid.push("擅自输出整篇成稿", "另起一篇口播或种草文")
   }
 
   if (/别越改越短|保持原稿|不要压缩|保持体量/.test(text)) {
@@ -227,9 +276,13 @@ export function resolveAimTurnIntent(input: {
     chat: "对话协助",
   }
 
-  const summary = action === "local_edit"
-    ? `本轮意图：${actionLabel[action]}——${scopeLabel[scope]}（交付：${deliverable}）；未点名部分一律保留。`
-    : `本轮意图：${actionLabel[action]}，交付「${deliverable}」；严格按用户本轮要求执行，不得擅自扩大任务范围。`
+  const summary = action === "local_edit" && passagePolish
+    ? "本轮意图：局部修改——在用户粘贴原文上润色优化；保持相近篇幅，禁止扩成全新长稿。"
+    : action === "local_edit"
+      ? `本轮意图：${actionLabel[action]}——${scopeLabel[scope]}（交付：${deliverable}）；未点名部分一律保留。`
+      : action === "chat" && looksLikeCopyAnalysisQuestion(text)
+        ? "本轮意图：对话协助——拆解/说明文案结构；禁止擅自另写整篇成稿。"
+        : `本轮意图：${actionLabel[action]}，交付「${deliverable}」；严格按用户本轮要求执行，不得擅自扩大任务范围。`
 
   const draft: AimTurnIntent = {
     summary,

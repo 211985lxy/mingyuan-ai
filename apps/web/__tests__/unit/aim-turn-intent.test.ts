@@ -40,6 +40,47 @@ describe("AimTurnIntent（意图优先）", () => {
     expect(intent.action).not.toBe("position")
   })
 
+  it("这个文案结构是什么 → chat，禁止擅自整篇成稿", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "这个文案结构是什么",
+      targetFormats: ["video_script"],
+      runtimeTask: "new_copy",
+    })
+    expect(intent.action).toBe("chat")
+    expect(intent.avoid.some((a) => a.includes("擅自输出整篇成稿"))).toBe(true)
+    expect(intent.summary).toContain("结构")
+  })
+
+  it("优化这段话（含粘贴原文）→ local_edit，禁止扩成长口播", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: [
+        "养了一个内容团队，配了策划、文案、拍摄、剪辑，每个月工资场地设备往里砸。",
+        "",
+        "优化这段话",
+      ].join("\n"),
+      targetFormats: ["video_script"],
+      runtimeTask: "new_copy",
+    })
+    expect(intent.action).toBe("local_edit")
+    expect(intent.avoid.some((a) => a.includes("扩写成全新长口播"))).toBe(true)
+    expect(intent.summary).toContain("润色")
+  })
+
+  it("帮我写一篇口播仍 → create", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "帮我写一篇口播",
+      targetFormats: ["video_script"],
+    })
+    expect(intent.action).toBe("create")
+  })
+
+  it("按这个结构写一篇仍 → create（写稿词优先）", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "按这个结构写一篇口播",
+    })
+    expect(intent.action).toBe("create")
+  })
+
   it("format block 声明最高优先级", () => {
     const block = formatAimTurnIntentBlock(resolveAimTurnIntent({
       rawInput: "写一版口播",

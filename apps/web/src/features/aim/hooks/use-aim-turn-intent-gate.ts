@@ -18,9 +18,30 @@ export type PendingTurnIntent = {
   source?: string
 }
 
+function dispatchByIntent(input: {
+  text: string
+  intent: AimTurnIntent
+  startsNewTask: boolean
+  sendText: (text: string) => Promise<unknown>
+  generateWithInput: (
+    raw: string,
+    options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
+  ) => Promise<unknown>
+}) {
+  if (input.intent.action === "chat") {
+    void input.sendText(input.text)
+    return
+  }
+  void input.generateWithInput(input.text, {
+    startsNewTask: input.startsNewTask,
+    confirmedTurnIntent: input.intent,
+  })
+}
+
 /**
  * 直接模式：生成前意图解析/确认门闩。
  * 抽出以控制 use-aim-workbench 文件体量（arch:size ≤500）。
+ * chat 意图走对话入口，避免分析问句被 write_script 强制成 new_copy。
  */
 export function useAimTurnIntentGate(input: {
   hasEditorSelection: boolean
@@ -32,6 +53,7 @@ export function useAimTurnIntentGate(input: {
   defaultFormats: ContentFormat[]
   projectEnabled: boolean
   selectedProjectId: string
+  sendText: (text: string) => Promise<unknown>
   generateWithInput: (
     raw: string,
     options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
@@ -39,9 +61,8 @@ export function useAimTurnIntentGate(input: {
 }) {
   const [pendingTurnIntent, setPendingTurnIntent] = useState<PendingTurnIntent | null>(null)
   const [intentResolving, setIntentResolving] = useState(false)
-  // 只解构出确认回调真正用到的 generateWithInput（上游已用 ref 稳定引用），
-  // 避免依赖整个 input 大对象导致每次击键都重建回调。
-  const { generateWithInput } = input
+  // 只解构确认/分发真正用到的稳定引用，避免依赖整个 input 大对象导致每次击键都重建回调。
+  const { generateWithInput, sendText } = input
 
   const clearPendingTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -52,8 +73,8 @@ export function useAimTurnIntentGate(input: {
     if (!pendingTurnIntent) return
     const { text, startsNewTask } = pendingTurnIntent
     setPendingTurnIntent(null)
-    void generateWithInput(text, { startsNewTask, confirmedTurnIntent: intent })
-  }, [pendingTurnIntent, generateWithInput])
+    dispatchByIntent({ text, intent, startsNewTask, sendText, generateWithInput })
+  }, [pendingTurnIntent, generateWithInput, sendText])
 
   const handleCancelTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -102,7 +123,13 @@ export function useAimTurnIntentGate(input: {
         setPendingTurnIntent({ text: currentInput, intent, startsNewTask, source })
         return
       }
-      void input.generateWithInput(currentInput, { startsNewTask, confirmedTurnIntent: intent })
+      dispatchByIntent({
+        text: currentInput,
+        intent,
+        startsNewTask,
+        sendText: input.sendText,
+        generateWithInput: input.generateWithInput,
+      })
     })()
   }, [input, pendingTurnIntent, intentResolving])
 
