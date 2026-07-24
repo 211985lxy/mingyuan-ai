@@ -18,24 +18,9 @@ import { prisma } from "@/lib/prisma"
 import {
   resolveAimRuntimeTask,
   type AimRuntimeTask,
-  type ResolvedKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
 import { compressAimMessages } from "@/lib/aim-context-compressor"
 import { applyAimContextBudget } from "@/lib/aim-context-budget"
-import { buildIpCopywritingMethodologyBlock } from "@/lib/ip-copywriting-methodology"
-import { buildBusinessDiagnosisMethodologyBlock } from "@/lib/business-diagnosis-methodology"
-import {
-  buildEventStorytellingMethodologyBlock,
-  shouldUseEventStorytelling,
-} from "@/lib/event-storytelling-methodology"
-import { buildAimKnowledgeContext } from "@/lib/aim-knowledge-context"
-import {
-  enrichKnowledgeQueryWithPainIntent,
-  mergePainIntentIntoKnowledgeContext,
-  resolvePainPointIntent,
-} from "@/lib/aim-pain-intent"
-import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
-import { buildViralStructureBlock } from "@/lib/aim-generator"
 import { buildTaskSpecSkeleton, enrichTaskSpecFromRawInput } from "@/lib/task-spec"
 import { refineTaskSpec } from "@/lib/task-spec-llm"
 import { formatLabelForTaskSpec, inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
@@ -61,7 +46,8 @@ import { runBoundedToolLoop } from "./tool-loop"
 import { sanitizeUntrustedContextText } from "./context-trust"
 import { buildAimSkillBlock, loadAimSkills } from "./skill-loader"
 import { env } from "@/env"
-import { resolveAndComposeMethodologyBlock } from "@/lib/methodology/compose-matched-methodology-block"
+import { loadGenerationContextBlocks } from "./context/load-generation-blocks"
+import { resolveMethodologyInjectionForGenerate } from "./context/resolve-methodology-injection"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -185,63 +171,18 @@ export async function prepareAimContext(
   const taskSpec = await buildContextTaskSpec({ spec, params, knowledgeEntries: knowledgeCtx.entries ?? [] })
 
   // 3.6 IP 方法论动态选卡：intent → plan → 只注入匹配卡片（eval override 保留冻结块）
-  const useFrozenMethodology = Boolean(params.contextOverride?.methodologyBlock)
-  const methodologyEnabled = generationIntent.useMethodology || useFrozenMethodology
-  const { plan: methodologyPlan, block: methodologyWithSkills } = !methodologyEnabled
-    ? {
-        plan: resolveAndComposeMethodologyBlock({
-          agentId,
-          rawInput: spec.rawInput,
-          taskSpec,
-          runtimeTask,
-          topicType: params.topicType,
-          mode: "generate" as const,
-          fallbackBlock: "",
-        }).plan,
-        block: skillBlock,
-      }
-    : useFrozenMethodology
-      ? {
-          plan: resolveAndComposeMethodologyBlock({
-            agentId,
-            rawInput: spec.rawInput,
-            taskSpec,
-            runtimeTask,
-            topicType: params.topicType,
-            mode: "generate" as const,
-            skillBlock,
-            fallbackBlock: methodologyBlock,
-          }).plan,
-          block: [methodologyBlock, skillBlock].filter(Boolean).join("\n\n"),
-        }
-      : resolveAndComposeMethodologyBlock({
-          agentId,
-          rawInput: spec.rawInput,
-          taskSpec,
-          runtimeTask,
-          topicType: params.topicType,
-          mode: "generate",
-          skillBlock,
-          fallbackBlock: methodologyBlock,
-        })
-
-  const taskSpecWithPlan = taskSpec
-    ? { ...taskSpec, methodologyPlan }
-    : taskSpec
-
-  await addAimTraceStep(trace, {
-    key: "methodology_plan",
-    label: "方法论选卡",
-    status: "success",
-    summary: `goal=${methodologyPlan.businessGoal} route=${methodologyPlan.contentRoute}`,
-    metadata: {
-      cardIds: methodologyPlan.cardIds,
-      source: methodologyPlan.source,
-      confidence: methodologyPlan.confidence,
-      structureModules: methodologyPlan.structureModules,
-      dynamicCards: !useFrozenMethodology,
-    },
-  })
+  const { methodologyPlan, methodologyWithSkills, taskSpecWithPlan } =
+    await resolveMethodologyInjectionForGenerate({
+      agentId,
+      spec,
+      params,
+      taskSpec,
+      runtimeTask,
+      generationIntent,
+      methodologyBlock,
+      skillBlock,
+      trace,
+    })
 
   // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致；selectedMethodologyBlock 作为独立预算块）
   const budgeted = await compressAndBudgetGenerationInput({
@@ -418,127 +359,6 @@ async function compressAndBudgetGenerationInput(input: {
     metadata: { ...budgeted.stats, factPriority: AIM_FACT_PRIORITY_VERSION },
   })
   return budgeted
-}
-
-/**
- * 并行读取通用背景资产（知识 / 结构 / 方法论 / 竞品诊断 / IP Wiki / 事件叙事）。
- * 从 prepareAimContext step 3 逐字迁出：Promise.all 6 元素顺序、gating（projectId /
- * useKnowledge / useMethodology / agentId / useEventStorytelling）、contextOverride
- * eval 分支、trace summary/metadata 全部一字不改——这是与 buildAimGeneration 字节
- * 等价的核心，不得调整门控或顺序。
- */
-async function loadGenerationContextBlocks(input: {
-  spec: AimRunSpec
-  params: PrepareAimContextInput
-  agentId: AimAgentId
-  knowledgeStrategy: ResolvedKnowledgeStrategy | undefined
-  generationIntent: { useKnowledge: boolean; useMethodology: boolean }
-  trace?: AimTraceRecorder
-}) {
-  const { spec, params, agentId, knowledgeStrategy, generationIntent, trace } = input
-  const useEventStorytelling = shouldUseEventStorytelling({
-    rawInput: spec.rawInput,
-    topicTitle: params.topicTitle,
-    topicType: params.topicType,
-    topicRationale: params.topicRationale,
-  })
-
-  const shouldResolvePainIntent = Boolean(
-    spec.projectId
-    && generationIntent.useKnowledge
-    && !params.contextOverride
-    && (agentId === "content_producer" || agentId === "deep_copywriter" || agentId === "free_copywriter"),
-  )
-
-  const painIntent = shouldResolvePainIntent
-    ? await runAimTraceStep(
-        trace,
-        "pain_intent",
-        "痛点意图识别",
-        () => resolvePainPointIntent({
-          projectId: spec.projectId!,
-          userText: [spec.rawInput, params.topicTitle, params.topicRationale].filter(Boolean).join("\n"),
-        }).catch(() => null),
-        (result) => ({
-          summary: result?.painIds?.length
-            ? `锚定 ${result.painIds.join("、")}`
-            : "未锚定痛点",
-          metadata: {
-            painIds: result?.painIds ?? [],
-            confidence: result?.confidence ?? 0,
-            reason: result?.reason ?? "",
-          },
-        }),
-      )
-    : null
-
-  const knowledgeQuery = enrichKnowledgeQueryWithPainIntent(spec.rawInput, painIntent)
-
-  const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock] = await runAimTraceStep(
-    trace,
-    "load_generation_context",
-    "知识/结构/方法论读取",
-    () => params.contextOverride
-      ? Promise.resolve([
-          {
-            knowledgeBlock: params.contextOverride!.knowledgeBlock,
-            entries: params.contextOverride!.entries,
-            source: params.contextOverride!.source,
-          },
-          params.contextOverride!.viralStructureBlock ?? "",
-          params.contextOverride!.methodologyBlock ?? "",
-          params.contextOverride!.businessDiagnosisBlock ?? "",
-          params.contextOverride!.ipWikiBlock ?? "",
-          params.contextOverride!.eventStorytellingBlock ?? "",
-        ] as const)
-      : Promise.all([
-          // 知识检索始终允许（包括 light_edit），由策略画像 topK 控制预算；
-          // 避免轻改时定位/人设信息完全缺失导致文案不结合 IP。
-          spec.projectId && generationIntent.useKnowledge
-            ? buildAimKnowledgeContext({
-                userId: params.userId,
-                projectId: spec.projectId,
-                agentId,
-                query: knowledgeQuery,
-                topicTitle: params.topicTitle,
-                topicRationale: params.topicRationale,
-                strategy: knowledgeStrategy,
-              }).then((result) => {
-                const merged = mergePainIntentIntoKnowledgeContext({
-                  knowledgeBlock: result.knowledgeBlock,
-                  entries: result.entries,
-                  intent: painIntent,
-                })
-                return { ...result, ...merged }
-              })
-            : Promise.resolve({ knowledgeBlock: "", entries: [], source: "raw" as const }),
-          buildViralStructureBlock(),
-          generationIntent.useMethodology ? buildIpCopywritingMethodologyBlock() : Promise.resolve(""),
-          generationIntent.useMethodology && agentId === "business_system_diagnosis"
-            ? buildBusinessDiagnosisMethodologyBlock()
-            : Promise.resolve(""),
-          generationIntent.useMethodology && spec.projectId ? buildIpWikiBlock({ projectId: spec.projectId }) : Promise.resolve(""),
-          generationIntent.useMethodology && (agentId === "content_producer" || agentId === "deep_copywriter") && useEventStorytelling
-            ? buildEventStorytellingMethodologyBlock()
-            : Promise.resolve(""),
-        ]),
-    ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory]) => ({
-      summary: `命中 ${knowledge.entries.length} 条知识`,
-      metadata: {
-        knowledgeEntries: knowledge.entries.length,
-        knowledgeSource: knowledge.source,
-        viralStructureChars: viralStructure.length,
-        methodologyChars: methodology.length,
-        businessDiagnosisChars: businessDiagnosis.length,
-        ipWikiChars: ipWiki.length,
-        eventStorytellingChars: eventStory.length,
-        eventStorytellingActive: useEventStorytelling,
-        painIds: painIntent?.painIds ?? [],
-      },
-    }),
-  )
-
-  return { knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock }
 }
 
 /**
