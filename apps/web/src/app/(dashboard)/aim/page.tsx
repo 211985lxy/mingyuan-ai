@@ -2,7 +2,6 @@
 
 import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
-import { AimProjectTaskPanel } from "@/components/aim/aim-project-task-panel"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
@@ -60,9 +59,9 @@ export default function AimPage() {
   )
 
   return (
-    <div className="-mx-4 -my-4 flex h-[calc(100dvh-3rem)] min-h-115 overflow-hidden md:-mx-6 md:-my-6">
+    <div className="-mx-3 -my-3 flex h-[calc(100dvh-2.25rem)] min-h-115 overflow-hidden md:-mx-4 md:-my-4">
       {/* 对话区（智能体列表与最近内容已移至全局侧边栏） */}
-      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-4 md:px-8">
+      <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-2 md:px-4">
         <AimWorkbenchHeader
           workflowStage={w.currentWorkflowStage}
           agentTitle={w.agent.title}
@@ -77,6 +76,15 @@ export default function AimPage() {
           onProjectScopeChange={w.changeProjectScope}
           onEvolve={() => void w.handleEvolveConversation()}
           onReset={w.resetConversation}
+          projectTasks={
+            w.selectedProjectId
+              ? {
+                  records: w.projectWorkflowRecords,
+                  loading: w.isLoadingProjectWorkflow,
+                  onOpenTask: (id) => void w.openProjectWorkflowTask(id),
+                }
+              : undefined
+          }
         />
 
         <AimProjectNotices
@@ -88,15 +96,6 @@ export default function AimPage() {
         />
 
         <AimMethodologySelector value={w.selectedMethodologyProfileIds} onChange={w.setSelectedMethodologyProfileIds} />
-
-        {w.selectedProjectId && (
-          <AimProjectTaskPanel
-            records={w.projectWorkflowRecords}
-            loading={w.isLoadingProjectWorkflow}
-            onOpenTask={(id) => void w.openProjectWorkflowTask(id)}
-            onStartStage={w.beginWorkflowStage}
-          />
-        )}
 
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}
