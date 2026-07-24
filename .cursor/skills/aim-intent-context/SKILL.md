@@ -17,6 +17,7 @@ description: >-
 
 2. **「优化这段话」扩成全新长口播**  
    - 意图应为 `local_edit`（`looksLikePassagePolish`）。  
+   - 覆盖：`改顺一点` / `写短一点` / `太啰嗦了` / 短指令 `帮我润色下`；`点评一下这篇` 走 chat。  
    - 运行时任务 `light_edit`；[`LIGHT_EDIT_OUTPUT_BOUNDARY`](apps/web/src/lib/aim-intent-boundaries.ts) + `buildUserPrompt` 的 `【待润色原文与要求】`。
 
 3. **追问像没记忆**  

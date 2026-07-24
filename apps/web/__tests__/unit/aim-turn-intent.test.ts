@@ -66,6 +66,37 @@ describe("AimTurnIntent（意图优先）", () => {
     expect(intent.summary).toContain("润色")
   })
 
+  it("这段帮我改顺一点 / 写短 / 太啰嗦 → local_edit，禁止新建长稿", () => {
+    for (const rawInput of ["这段帮我改顺一点", "把这段写短一点", "这段太啰嗦了"]) {
+      const intent = resolveAimTurnIntent({
+        rawInput,
+        targetFormats: ["video_script"],
+        runtimeTask: "new_copy",
+      })
+      expect(intent.action).toBe("local_edit")
+      expect(intent.avoid.some((a) => a.includes("扩写成全新长口播"))).toBe(true)
+    }
+  })
+
+  it("帮我润色下（无指代短指令）→ local_edit", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "帮我润色下",
+      targetFormats: ["video_script"],
+      runtimeTask: "new_copy",
+    })
+    expect(intent.action).toBe("local_edit")
+  })
+
+  it("点评一下这篇 → chat，禁止擅自整篇成稿", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "点评一下这篇",
+      targetFormats: ["video_script"],
+      runtimeTask: "new_copy",
+    })
+    expect(intent.action).toBe("chat")
+    expect(intent.avoid.some((a) => a.includes("擅自输出整篇成稿"))).toBe(true)
+  })
+
   it("帮我写一篇口播仍 → create", () => {
     const intent = resolveAimTurnIntent({
       rawInput: "帮我写一篇口播",

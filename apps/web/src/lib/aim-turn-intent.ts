@@ -145,15 +145,19 @@ const STRONG_WRITE_WORDS = [
 
 /** 结构拆解 / 优化建议问句：应走对话，禁止擅自出整篇成稿 */
 const COPY_ANALYSIS_PATTERN =
-  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用|怎么优化|如何优化|该怎么(?:改|优化)|有没有问题|哪里有问题|问题在哪|哪里不对|哪里需要改|怎么改更好|优化建议|帮我看看这篇|检查一下(?:这篇|这版|逻辑)|文案逻辑|逻辑(?:有问题|对不对|通不通)|哪里薄弱|痛点是不是太散/
+  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|点评一下|点评这|点评下|评价一下|评一下这|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用|怎么优化|如何优化|该怎么(?:改|优化)|有没有问题|哪里有问题|问题在哪|哪里不对|哪里需要改|怎么改更好|优化建议|帮我看看这篇|检查一下(?:这篇|这版|逻辑)|文案逻辑|逻辑(?:有问题|对不对|通不通)|哪里薄弱|痛点是不是太散/
 
 const PASSAGE_POLISH_WORDS = [
-  "优化", "润色", "顺一下", "自然点", "更自然", "口语化", "改一下", "改改", "润一润",
+  "优化", "润色", "顺一下", "顺一点", "改顺", "自然点", "更自然", "口语化",
+  "改一下", "改改", "润一润", "写短", "缩短", "精简", "压缩一下", "啰嗦", "太长",
 ] as const
 
 const PASSAGE_REF_WORDS = [
   "这篇", "这条", "这段", "这段话", "这段文字", "原稿", "原文", "上述", "上面", "这一版", "稿子",
 ] as const
+
+/** 短指令「帮我润色下」：无指代也默认轻改，避免 new_copy 误建整篇 */
+const BARE_POLISH_PATTERN = /^(?:帮我)?(?:润色|优化|顺一下|改改|改一下)(?:一下|下|下吧)?[。.!！？?]*$/
 
 export function looksLikeCopyAnalysisQuestion(text: string): boolean {
   return COPY_ANALYSIS_PATTERN.test(text) && !includesAny(text, [...STRONG_WRITE_WORDS])
@@ -164,9 +168,10 @@ export function looksLikeCopyAnalysisQuestion(text: string): boolean {
  */
 export function looksLikePassagePolish(text: string): boolean {
   if (includesAny(text, [...LOCAL_EDIT_PART_WORDS])) return false
-  return includesAny(text, [...PASSAGE_POLISH_WORDS])
-    && includesAny(text, [...PASSAGE_REF_WORDS])
-    && !includesAny(text, [...STRONG_WRITE_WORDS])
+  if (includesAny(text, [...STRONG_WRITE_WORDS])) return false
+  if (!includesAny(text, [...PASSAGE_POLISH_WORDS])) return false
+  if (includesAny(text, [...PASSAGE_REF_WORDS])) return true
+  return BARE_POLISH_PATTERN.test(text.trim())
 }
 
 /**
