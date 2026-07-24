@@ -73,7 +73,7 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     \`projectId\` VARCHAR(191) NOT NULL,
     \`triggerMode\` VARCHAR(32) NOT NULL DEFAULT 'mention_or_keyword',
     \`triggerKeywords\` JSON NOT NULL,
-    \`executionMode\` VARCHAR(20) NOT NULL DEFAULT 'live',
+    \`executionMode\` VARCHAR(20) NOT NULL DEFAULT 'capture_only',
     \`status\` VARCHAR(20) NOT NULL DEFAULT 'active',
     \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     \`updatedAt\` DATETIME(3) NOT NULL,
@@ -158,6 +158,22 @@ export const PRODUCTION_SCHEMA_PATCHES = [
   `ALTER TABLE \`VideoCopyExtraction\`
     ADD COLUMN IF NOT EXISTS \`provider\` VARCHAR(40) NOT NULL DEFAULT 'primary',
     ADD COLUMN IF NOT EXISTS \`fallbackJobId\` VARCHAR(120) NULL`,
+  // ── AimMemory 治理字段（14 周正本阶段 4） ──
+  `ALTER TABLE \`AimMemory\`
+    MODIFY COLUMN \`status\` VARCHAR(24) NOT NULL DEFAULT 'candidate'`,
+  `ALTER TABLE \`AimMemory\`
+    ADD COLUMN IF NOT EXISTS \`confidence\` DOUBLE NULL,
+    ADD COLUMN IF NOT EXISTS \`sourceRef\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`reviewerId\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`reviewedAt\` DATETIME(3) NULL,
+    ADD COLUMN IF NOT EXISTS \`expiresAt\` DATETIME(3) NULL,
+    ADD COLUMN IF NOT EXISTS \`supersededById\` VARCHAR(191) NULL,
+    ADD COLUMN IF NOT EXISTS \`creationBasis\` VARCHAR(80) NULL`,
+  `ALTER TABLE \`AimMemory\`
+    ADD INDEX IF NOT EXISTS \`AimMemory_userId_projectId_status_idx\`(\`userId\`, \`projectId\`, \`status\`)`,
+  // 渠道绑定默认灰度从 capture_only 起（不改既有行的取值，只改列默认）
+  `ALTER TABLE \`ChannelBinding\`
+    MODIFY COLUMN \`executionMode\` VARCHAR(20) NOT NULL DEFAULT 'capture_only'`,
 ]
 
 function runMysql(connection, query) {

@@ -41,7 +41,7 @@ const {
   readLoopRuntimeConfig: vi.fn(() => ({
     enabled: true,
     shadowMode: false,
-    operatingMode: "supervised_auto" as const,
+    operatingMode: "supervised_auto" as import("@/lib/aim/loops/contracts").LoopOperatingMode,
     pilotProjectIds: new Set(["proj_1"]),
   })),
   findProject: vi.fn(async () => ({ userId: "user_owner_1" })),
