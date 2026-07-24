@@ -32,6 +32,8 @@ export function safeMarkdownHref(value: string): string | null {
  *   数字列表 ( 1. )
  *   行内代码
  *   分隔符 ---
+ *
+ * 普通正文按空行分段（口播短句不会每行都撑出大段距）；段内软换行保留。
  */
 /**
  * @description markdownrenderer
@@ -43,36 +45,70 @@ export function MarkdownRenderer({ content, className = "" }: MarkdownRendererPr
 
   const elements: React.ReactNode[] = []
   let key = 0
-  for (const line of content.split("\n")) {
-    if (!line.trim()) continue
-    elements.push(renderBlockLine(line.trim(), key++))
+  let paragraphLines: string[] = []
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0) return
+    const text = paragraphLines.join("\n")
+    elements.push(
+      <p key={key++} className="whitespace-pre-line text-base leading-7 text-foreground/90 [&_strong]:text-foreground">
+        {renderInline(text)}
+      </p>,
+    )
+    paragraphLines = []
   }
+
+  for (const raw of content.split("\n")) {
+    const line = raw.trimEnd()
+    const trimmed = line.trim()
+    if (!trimmed) {
+      flushParagraph()
+      continue
+    }
+
+    const isSpecial =
+      /^##\s+/.test(trimmed) ||
+      /^###\s+/.test(trimmed) ||
+      /^(-{3,}|\*{3,}|_{3,})$/.test(trimmed) ||
+      /^[-*]\s+/.test(trimmed) ||
+      /^\d+[.)]\s+/.test(trimmed) ||
+      /^>\s+/.test(trimmed)
+
+    if (isSpecial) {
+      flushParagraph()
+      elements.push(renderBlockLine(trimmed, key++))
+      continue
+    }
+
+    paragraphLines.push(trimmed)
+  }
+  flushParagraph()
 
   if (elements.length === 0) return null
 
-  return <div className={`space-y-3 ${className}`}>{elements}</div>
+  return <div className={`space-y-2 ${className}`}>{elements}</div>
 }
 
 function renderBlockLine(line: string, key: number): React.ReactNode {
   if (/^## (.+)/.test(line)) {
-    return <h2 key={key} className="mb-3 mt-6 text-xl font-bold tracking-tight text-foreground first:mt-0 sm:text-2xl">{renderInline(line.replace(/^## /, ""))}</h2>
+    return <h2 key={key} className="mb-2 mt-4 text-xl font-bold tracking-tight text-foreground first:mt-0 sm:text-2xl">{renderInline(line.replace(/^## /, ""))}</h2>
   }
   if (/^### (.+)/.test(line)) {
-    return <h3 key={key} className="mb-2 mt-5 text-lg font-semibold text-foreground">{renderInline(line.replace(/^### /, ""))}</h3>
+    return <h3 key={key} className="mb-1.5 mt-3 text-lg font-semibold text-foreground">{renderInline(line.replace(/^### /, ""))}</h3>
   }
   if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
-    return <hr key={key} className="my-5 border-t border-border" />
+    return <hr key={key} className="my-3 border-t border-border" />
   }
   if (/^[-*]\s+(.+)/.test(line)) {
-    return <li key={key} className="ml-5 list-disc text-base leading-8 text-foreground/90 [&_strong]:text-foreground">{renderInline(line.replace(/^[-*]\s+/, ""))}</li>
+    return <li key={key} className="ml-5 list-disc text-base leading-7 text-foreground/90 [&_strong]:text-foreground">{renderInline(line.replace(/^[-*]\s+/, ""))}</li>
   }
   if (/^\d+[.)]\s+(.+)/.test(line)) {
-    return <li key={key} className="ml-5 list-decimal text-base leading-8 text-foreground/90 [&_strong]:text-foreground">{renderInline(line.replace(/^\d+[.)]\s+/, ""))}</li>
+    return <li key={key} className="ml-5 list-decimal text-base leading-7 text-foreground/90 [&_strong]:text-foreground">{renderInline(line.replace(/^\d+[.)]\s+/, ""))}</li>
   }
   if (/^>\s+(.+)/.test(line)) {
-    return <blockquote key={key} className="my-3 border-l-4 border-primary/30 pl-4 text-base leading-8 text-foreground/80 italic">{renderInline(line.replace(/^>\s+/, ""))}</blockquote>
+    return <blockquote key={key} className="my-2 border-l-4 border-primary/30 pl-4 text-base leading-7 text-foreground/80 italic">{renderInline(line.replace(/^>\s+/, ""))}</blockquote>
   }
-  return <p key={key} className="text-base leading-8 text-foreground/90 [&_strong]:text-foreground">{renderInline(line)}</p>
+  return <p key={key} className="text-base leading-7 text-foreground/90 [&_strong]:text-foreground">{renderInline(line)}</p>
 }
 
 /**

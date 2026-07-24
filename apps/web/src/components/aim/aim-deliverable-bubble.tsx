@@ -76,10 +76,11 @@ export interface AimDeliverableBubbleProps {
 
 const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) {
   const lines = useMemo(() => (text ? text.split("\n") : []), [text])
-  return <div className="space-y-3 select-text font-serif leading-loose tracking-wider text-foreground/95 antialiased">
+  return <div className="space-y-1.5 select-text font-serif leading-relaxed tracking-wide text-foreground/95 antialiased">
     {lines.map((line, index) => {
+      if (!line.trim()) return null
       const parts = line.replace(/\*\*/g, "").split(/(【[^】]+】)/g)
-      return <p key={index} className="my-2.5 min-h-7 text-base leading-loose text-[#2c2b2a] dark:text-[#f3ede2] sm:text-lg">
+      return <p key={index} className="text-base leading-7 text-[#2c2b2a] dark:text-[#f3ede2] sm:text-lg">
         {parts.map((part, partIndex) => {
           if (!part.startsWith("【") || !part.endsWith("】")) return <span key={partIndex}>{part}</span>
           const style = part === "【画面】"
@@ -246,7 +247,7 @@ function PrimaryActions({ primaryActions, activeResult, deliverables, hasPublish
   onQuality: () => void
   onNextAction?: AimDeliverableBubbleProps["onNextAction"]
 }) {
-  return <>{primaryActions.map((action) => <Button key={action.id} size="sm" variant={action.id === "publish_package" ? "default" : "ghost"} className={action.id === "publish_package" ? "h-8 rounded-md px-2.5 text-sm" : AIM_SOFT_ACTION_CLASS} onClick={() => {
+  return <>{primaryActions.map((action) => <Button key={action.id} size="sm" variant={action.id === "publish_package" ? "default" : "ghost"} className={action.id === "publish_package" ? "h-7 shrink-0 rounded-md px-2.5 text-xs" : AIM_SOFT_ACTION_CLASS} onClick={() => {
     if (action.id === "publish_check") return onQuality()
     if (activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
   }} disabled={isBusy || !activeResult?.content.trim() || (action.id === "publish_check" && !hasPublishScript)}>
@@ -254,9 +255,10 @@ function PrimaryActions({ primaryActions, activeResult, deliverables, hasPublish
   </Button>)}</>
 }
 
-function MoreActions({ formats, secondaryActions, activeResult, deliverables, isBusy, onRepurpose, onNextAction, onCompileToWiki, onAttachProject, onQuality, canRunPublishCheck, hasPublishScript, hasPublishCheckAction }: {
+function MoreActions({ formats, secondaryActions, workflowExtras, activeResult, deliverables, isBusy, onRepurpose, onNextAction, onCompileToWiki, onAttachProject, onQuality, canRunPublishCheck, hasPublishScript, hasPublishCheckAction }: {
   formats: Set<ContentFormat>
   secondaryActions: AimNextAction[]
+  workflowExtras: Array<{ id: string; label: string; disabled?: boolean; onSelect: () => void }>
   activeResult?: AimGenerateResult
   deliverables: AimGenerateResponse
   isBusy: boolean
@@ -282,14 +284,21 @@ function MoreActions({ formats, secondaryActions, activeResult, deliverables, is
     if (value === "compile_wiki") return onCompileToWiki?.()
     if (value === "save_project") return onAttachProject?.(deliverables.id)
     if (value === "publish_check") return onQuality?.()
+    if (value.startsWith("workflow:")) {
+      const extra = workflowExtras.find((item) => `workflow:${item.id}` === value)
+      return extra?.onSelect()
+    }
     const action = secondaryActions.find((item) => `action:${item.id}` === value)
     if (action && activeResult) onNextAction?.(action, activeResult.content, deliverables.id)
   }
-  const hasWorkflow = Boolean(onAttachProject) || showPublishCheck
+  const hasWorkflow = Boolean(onAttachProject) || showPublishCheck || workflowExtras.length > 0
   const disabled = isBusy || (!hasWorkflow && !visibleOptions.length && !onCompileToWiki && !secondaryActions.length)
   return <Select onValueChange={handleAction} disabled={disabled}>
-    <SelectTrigger className="h-8 w-[96px] border-0 bg-muted/45 text-sm text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="更多" /></SelectTrigger>
+    <SelectTrigger className="h-7 w-[72px] shrink-0 border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="更多" /></SelectTrigger>
     <SelectContent>
+      {workflowExtras.map((item) => (
+        <SelectItem key={item.id} value={`workflow:${item.id}`} disabled={item.disabled}>{item.label}</SelectItem>
+      ))}
       {onAttachProject ? <SelectItem value="save_project">保存到客户全案</SelectItem> : null}
       {showPublishCheck ? <SelectItem value="publish_check" disabled={!hasPublishScript}>发布前自查</SelectItem> : null}
       {visibleOptions.map(([format, label]) => <SelectItem key={format} value={`format:${format}`}>{label}</SelectItem>)}
@@ -316,14 +325,29 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const statusOptions = AIM_WORKFLOW_STATUS_OPTIONS.filter((item) =>
     allowedStatuses.has(item.value as AimWorkflowStatus),
   )
+  const workflowExtras = [
+    props.onOpenDecision ? { id: "decision", label: "发布前判断", onSelect: () => props.onOpenDecision?.() } : null,
+    props.onOpenPublish ? { id: "publish", label: "登记发布", disabled: qualityFail, onSelect: () => props.onOpenPublish?.() } : null,
+    props.onOpenRetro ? { id: "retro", label: "填写复盘", onSelect: () => props.onOpenRetro?.() } : null,
+  ].filter((item): item is { id: string; label: string; disabled?: boolean; onSelect: () => void } => Boolean(item))
+
   return <ActionStrip>
-    {qualityFail ? <Button size="sm" className="h-8 rounded-md px-2.5 text-sm" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
-    {props.onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenDecision} disabled={isBusy}>发布前判断</Button> : null}
-    {props.onOpenPublish ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenPublish} disabled={isBusy || qualityFail}>登记发布</Button> : null}
-    {props.onOpenRetro ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={props.onOpenRetro} disabled={isBusy}>填写复盘</Button> : null}
+    {qualityFail ? <Button size="sm" className="h-7 shrink-0 rounded-md px-2.5 text-xs" onClick={props.onQuality} disabled={isBusy}><ShieldCheck className="mr-1 h-3.5 w-3.5" />优化后再用</Button> : <PrimaryActions primaryActions={primaryActions} activeResult={activeResult} deliverables={deliverables} hasPublishScript={hasPublishScript} isBusy={isBusy} onQuality={props.onQuality} onNextAction={props.onNextAction} />}
+    <Select
+      value={currentStatus}
+      onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}
+    >
+      <SelectTrigger className="h-7 w-[76px] shrink-0 border-0 bg-muted/45 text-xs text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>
+      <SelectContent>
+        {statusOptions.map((item) => (
+          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
     <MoreActions
       formats={formats}
       secondaryActions={secondaryActions}
+      workflowExtras={workflowExtras}
       activeResult={activeResult}
       deliverables={deliverables}
       isBusy={isBusy}
@@ -336,17 +360,6 @@ function DeliverableActions(props: DeliverableActionsProps) {
       hasPublishScript={hasPublishScript}
       hasPublishCheckAction={hasPublishCheckAction}
     />
-    <Select
-      value={currentStatus}
-      onValueChange={(value) => { if (typeof value === "string") props.onMarkStatus(value) }}
-    >
-      <SelectTrigger className="h-8 w-[96px] border-0 bg-muted/45 text-sm text-muted-foreground shadow-none hover:bg-muted"><SelectValue placeholder="状态" /></SelectTrigger>
-      <SelectContent>
-        {statusOptions.map((item) => (
-          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   </ActionStrip>
 }
 
@@ -417,7 +430,7 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         topicTitle={props.topicTitle}
         projectId={props.projectId}
       />
-      <div className="mt-2 space-y-2 border-t border-border/50 pt-2">
+      <div className="mt-2 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-t border-border/50 pt-2">
         <DeliverableActions {...props} isBusy={actionsBusy} activeResult={activeResult} />
         <PublishPackActions
           deliverables={deliverables}

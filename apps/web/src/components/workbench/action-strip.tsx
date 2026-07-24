@@ -11,7 +11,7 @@ interface ActionStripProps {
  */
 export function ActionStrip({ children }: ActionStripProps) {
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-3">
+    <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
       {children}
     </div>
   )

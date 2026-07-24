@@ -22,10 +22,14 @@ interface AimWorkspaceState {
   lastFetchAt: number
   /** 待加载进对话的历史记录 id（侧边栏点击后设置，工作台页面消费后清空） */
   loadTargetId: string | null
+  /** 侧栏「新建文案」：工作台消费后清空对话并进入内容创作官空会话 */
+  pendingNewCopy: boolean
   fetchHistory: (opts?: FetchHistoryOpts) => Promise<void>
   deleteHistory: (id: string) => Promise<void>
   requestLoad: (id: string) => void
   clearLoadTarget: () => void
+  requestNewCopy: () => void
+  clearNewCopyRequest: () => void
 }
 
 const HISTORY_THROTTLE_MS = 2000
@@ -41,6 +45,7 @@ export const useAimWorkspaceStore = create<AimWorkspaceState>()((set, get) => ({
   isLoading: false,
   lastFetchAt: 0,
   loadTargetId: null,
+  pendingNewCopy: false,
 
   fetchHistory: async (opts) => {
     if (get().isLoading) return
@@ -83,6 +88,8 @@ export const useAimWorkspaceStore = create<AimWorkspaceState>()((set, get) => ({
     }))
   },
 
-  requestLoad: (id) => set({ loadTargetId: id }),
+  requestLoad: (id) => set({ loadTargetId: id, pendingNewCopy: false }),
   clearLoadTarget: () => set({ loadTargetId: null }),
+  requestNewCopy: () => set({ pendingNewCopy: true, loadTargetId: null }),
+  clearNewCopyRequest: () => set({ pendingNewCopy: false }),
 }))

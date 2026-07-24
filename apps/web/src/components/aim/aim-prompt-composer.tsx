@@ -92,6 +92,7 @@ export function AimPromptComposer({
   const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate
   const canStop = busy && !isRecording && Boolean(onStop)
   const rootRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
@@ -99,6 +100,15 @@ export function AimPromptComposer({
 
   const contentModeLabel =
     contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[contentMode]
+
+  // 对标 ChatGPT：随行数自动增高，超出上限后内部滚动
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "0px"
+    const next = Math.min(el.scrollHeight, 320)
+    el.style.height = `${Math.max(next, 48)}px`
+  }, [value])
 
   const filteredSkills = useMemo(() => {
     const query = skillQuery.trim().toLowerCase()
@@ -151,6 +161,7 @@ export function AimPromptComposer({
         )}
       >
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
@@ -161,7 +172,7 @@ export function AimPromptComposer({
           rows={1}
           placeholder={placeholder}
           disabled={busy}
-          className="max-h-36 min-h-[44px] w-full resize-none bg-transparent px-3 pb-1 pt-2.5 text-sm leading-6 tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
+          className="max-h-[320px] min-h-[48px] w-full resize-none overflow-y-auto bg-transparent px-4 pb-2 pt-3.5 text-base leading-7 tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
         />
 
         {imageAttachments.length > 0 && (

@@ -264,6 +264,7 @@ export function AppSidebar() {
   const fetchHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const deleteHistory = useAimWorkspaceStore((s) => s.deleteHistory)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
+  const requestNewCopy = useAimWorkspaceStore((s) => s.requestNewCopy)
 
   // 「最近任务」按当前 AIM 专家划分；切换智能体时强制刷新
   useEffect(() => {
@@ -298,24 +299,28 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-border/40 bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="gap-3 px-3 pb-2.5 pt-3.5">
+      <SidebarHeader className="gap-2 px-3 pb-2 pt-3">
         <Link
           href="/home"
           onClick={closeMobile}
-          className="flex items-center gap-2 rounded-md px-1 py-0.5 text-sm font-medium tracking-tight text-foreground/85 hover:text-foreground"
+          className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-1 text-foreground hover:bg-foreground/[0.03]"
         >
-          <BrandLogo className="h-6 w-6 rounded-[5px]" />
-          <span className="truncate">{branding.name}</span>
+          <BrandLogo className="h-7 w-7 shrink-0 rounded-md" />
+          <span className="truncate text-[15px] font-semibold tracking-tight">{branding.name}</span>
         </Link>
 
-        <Link
-          href="/aim?agent=content_producer"
-          onClick={closeMobile}
-          className="flex h-10 items-center justify-center gap-1.5 rounded-[10px] bg-primary px-3 text-sm font-medium text-primary-foreground shadow-[0_4px_14px_rgba(209,74,51,0.22)] transition-[transform,opacity] hover:-translate-y-0.5 hover:opacity-95"
+        <button
+          type="button"
+          onClick={() => {
+            requestNewCopy()
+            closeMobile()
+            router.push("/aim?agent=content_producer")
+          }}
+          className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-3.5 w-3.5" />
           新建文案
-        </Link>
+        </button>
       </SidebarHeader>
 
       <SidebarContent className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden px-2 pb-2">

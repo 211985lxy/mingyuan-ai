@@ -171,7 +171,7 @@ export function PublishPackActions({
   }
 
   return (
-    <div className="mb-3 flex flex-wrap gap-2">
+    <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
       <Button
         type="button"
         size="sm"

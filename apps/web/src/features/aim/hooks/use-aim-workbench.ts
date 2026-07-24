@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useCallback } from "react"
+import { useState, useMemo, useRef, useCallback, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
 import { transcribeAudio, type ContentFormat } from "@/lib/api/client"
@@ -128,6 +128,8 @@ export function useAimWorkbench() {
   const refreshHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const clearLoadTarget = useAimWorkspaceStore((s) => s.clearLoadTarget)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
+  const pendingNewCopy = useAimWorkspaceStore((s) => s.pendingNewCopy)
+  const clearNewCopyRequest = useAimWorkspaceStore((s) => s.clearNewCopyRequest)
 
   const {
     recordDialog, closeRecordDialog,
@@ -360,6 +362,24 @@ export function useAimWorkbench() {
     setWorkflowBrief,
     generateWithInput,
   })
+
+  // 侧栏「新建文案」：清空当前会话，进入内容创作官空稿态（与顶栏「新任务」一致，并固定到 content_producer）
+  useEffect(() => {
+    if (!pendingNewCopy) return
+    clearAimDraft(selectedAgentId, currentProjectScope)
+    clearAimDraft("content_producer", currentProjectScope)
+    resetConversation()
+    setContentAction(null)
+    clearImages()
+    setEditorPanelOpen(false)
+    setSelectedAgentId("content_producer")
+    lastAgentParamRef.current = "content_producer"
+    const nextParams = new URLSearchParams()
+    nextParams.set("agent", "content_producer")
+    router.replace(`/aim?${nextParams.toString()}`)
+    clearNewCopyRequest()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to pendingNewCopy signal
+  }, [pendingNewCopy])
 
   // ---- Send actions ----
   const { handleUseSkill, handleGenerate, retryFailedMessage } = useAimSendActions({
