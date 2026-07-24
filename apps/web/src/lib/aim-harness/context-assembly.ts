@@ -57,6 +57,10 @@ import {
   buildMethodologyProfileBlock,
   type MethodologyPolicy,
 } from "@/lib/methodology-profile-store"
+import { runBoundedToolLoop } from "./tool-loop"
+import { sanitizeUntrustedContextText } from "./context-trust"
+import { buildAimSkillBlock, loadAimSkills } from "./skill-loader"
+import { env } from "@/env"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -123,6 +127,47 @@ export async function prepareAimContext(
     businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock,
   } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, trace })
 
+  // 3.2 有界工具环：先查再写（仅 executionPolicy.mode=bounded_tool_loop；eval override 跳过）
+  let knowledgeBlock = knowledgeCtx.knowledgeBlock
+  if (spec.executionPolicy.mode === "bounded_tool_loop" && !params.contextOverride) {
+    const loopResult = await runAimTraceStep(
+      trace,
+      "bounded_tool_loop",
+      "有界检索",
+      () =>
+        runBoundedToolLoop({
+          agentId,
+          runtimeTask,
+          rawInput: spec.rawInput,
+          userId: params.userId,
+          projectId: spec.projectId,
+          maxSteps: spec.executionPolicy.maxSteps,
+          timeoutMs: spec.executionPolicy.timeoutMs,
+        }),
+      (result) => ({
+        summary: result.stopReason,
+        metadata: {
+          steps: result.steps.length,
+          stopReason: result.stopReason,
+          toolStepCount: result.steps.length,
+          toolFailureCount: result.toolFailureCount,
+        },
+      }),
+    )
+    if (loopResult.notes.trim()) {
+      const notes = sanitizeUntrustedContextText(loopResult.notes, {
+        label: "bounded_tool_loop",
+      })
+      knowledgeBlock = `【有界检索笔记】\n${notes}\n\n${knowledgeBlock}`
+    }
+  }
+
+  // 3.3 Skill 岗位手册按需加载（默认开；AIM_SKILL_LOADING_ENABLED=false 关闭）
+  const skillEnabled = env.AIM_SKILL_LOADING_ENABLED?.trim().toLowerCase() !== "false"
+  const skills = await loadAimSkills({ agentId, runtimeTask, enabled: skillEnabled })
+  const skillBlock = buildAimSkillBlock(skills)
+  const methodologyWithSkills = [methodologyBlock, skillBlock].filter(Boolean).join("\n\n")
+
   // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > none。
   // 在现有 6 块加载之后单独计算，不触碰字节等价红线；解析结果冻结进 spec.methodologyPolicy。
   const methodologyPolicy = await resolveMethodologyPolicy({
@@ -144,8 +189,8 @@ export async function prepareAimContext(
     agentId,
     spec,
     runtimeTask,
-    knowledgeBlock: knowledgeCtx.knowledgeBlock,
-    methodologyBlock,
+    knowledgeBlock,
+    methodologyBlock: methodologyWithSkills,
     businessDiagnosisBlock,
     viralStructureBlock,
     eventStorytellingBlock,
@@ -298,7 +343,9 @@ async function compressAndBudgetGenerationInput(input: {
     knowledgeBlock: prioritizedKnowledge,
     methodologyBlock: input.methodologyBlock,
     businessDiagnosisBlock: input.businessDiagnosisBlock,
-    viralStructureBlock: input.viralStructureBlock,
+    viralStructureBlock: sanitizeUntrustedContextText(input.viralStructureBlock, {
+      label: "market_viral",
+    }),
     eventStorytellingBlock: input.eventStorytellingBlock,
     ipWikiBlock: input.ipWikiBlock,
     selectedMethodologyBlock: input.selectedMethodologyBlock,

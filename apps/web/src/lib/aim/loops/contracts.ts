@@ -27,6 +27,7 @@ export type BusinessLoopTrigger =
   | "work_item_ready"
   | "meeting_completed"
   | "todo_card_scheduled"
+  | "inspiration_captured"
 
 export const LOOP_STEP_IDS = [
   "validate_input",
@@ -154,6 +155,7 @@ const TRIGGERS: readonly BusinessLoopTrigger[] = [
   "work_item_ready",
   "meeting_completed",
   "todo_card_scheduled",
+  "inspiration_captured",
 ]
 const MEMORY_POLICIES: readonly BusinessLoopSpec["memoryPolicy"][] = [
   "none",

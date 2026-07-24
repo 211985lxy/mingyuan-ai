@@ -26,6 +26,46 @@ export const HARNESS_VERSION = "aim-harness-v1" as const
 // 以保持现有 import 路径（@/lib/aim-harness/types）向后兼容。
 export type { AimAgentId, AimEntrypoint }
 
+/**
+ * Harness 执行模式（14 周正本阶段 1/3）。
+ * - single_shot：默认；Planner 冻结后一次/少数次生成（现有路径）
+ * - bounded_tool_loop：有界 ReAct；须命中 allowlist，否则 planner 拒绝
+ */
+export type AimExecutionMode = "single_shot" | "bounded_tool_loop"
+
+export const AIM_EXECUTION_MODES: readonly AimExecutionMode[] = [
+  "single_shot",
+  "bounded_tool_loop",
+] as const
+
+/** 冻结的执行策略（正本契约；未传时解析为 single_shot）。 */
+export interface AimExecutionPolicy {
+  mode: AimExecutionMode
+  allowedToolNames: string[]
+  maxSteps: number
+  timeoutMs: number
+  maxAutoRetries: number
+}
+
+/** 上下文源信任级别（正本阶段 2/5）。 */
+export type AimContextTrustLevel =
+  | "system_trusted"
+  | "user_provided"
+  | "external_untrusted"
+
+export type AimRunStopReason =
+  | "completed"
+  | "max_steps"
+  | "timeout"
+  | "token_budget_exceeded"
+  | "tool_unauthorized"
+  | "tool_failed"
+  | "insufficient_evidence"
+  | "human_required"
+  | "validation_failed"
+  | "model_degraded"
+  | "single_shot"
+
 /** Context policy: how aggressively to load external context for this run. */
 export interface AimContextPolicy {
   /** whether to load knowledge (RAG) context */
@@ -74,6 +114,10 @@ export interface AimContextSource {
   charCount: number
   /** SHA-256 of the actual source content used for this run. */
   contentHash?: string
+  /** 信任级别；缺省按 kind 推断，外部/群聊/工具结果必须显式标 external_untrusted */
+  trustLevel?: AimContextTrustLevel
+  /** 可选来源引用（URL、消息 id、工具名等），供引用追踪 */
+  sourceRef?: string
 }
 
 /** The immutable, normalized run plan. Built once; the rest of the run reads it. */
@@ -114,6 +158,12 @@ export interface AimRunSpec {
    * 保证历史可重放、可追溯。planner 本身不解析（保持纯同步）。
    */
   methodologyPolicy?: AimMethodologyPolicy
+  /**
+   * @deprecated 过渡字段，等于 executionPolicy.mode；新代码读 executionPolicy。
+   */
+  executionMode: AimExecutionMode
+  /** 冻结执行策略；未传入口一律 single_shot。 */
+  executionPolicy: AimExecutionPolicy
 }
 
 /** 冻结后的命名方法论策略（ADR-002）。 */
@@ -163,6 +213,11 @@ export interface AimRunMetadata {
     completionTokens?: number
     cachedTokens?: number
   }>
+  /** Tool Loop / 运行停止原因（SingleShot 默认为 single_shot） */
+  stopReason?: AimRunStopReason
+  toolStepCount?: number
+  toolFailureCount?: number
+  humanHandoff?: boolean
 }
 
 /** Result of running the harness for a generation. */

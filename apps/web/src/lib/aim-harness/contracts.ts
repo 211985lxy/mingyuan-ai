@@ -105,6 +105,8 @@ import type {
   AimContextSource,
   AimModelPolicyOverride,
   AimMethodologyPolicy,
+  AimExecutionMode,
+  AimExecutionPolicy,
 } from "./types"
 
 /**
@@ -186,6 +188,10 @@ export interface AimRunRequest {
    * 用户已确认本轮意图：runtimeTask 已由确认 action 映射，禁止再次向量/LLM 路由。
    */
   intentFrozen?: boolean
+  /** Harness 执行模式；默认 single_shot。bounded_tool_loop 须命中白名单。 */
+  executionMode?: AimExecutionMode
+  /** 完整执行策略；未传则按 single_shot 冻结默认值。 */
+  executionPolicy?: Partial<AimExecutionPolicy>
 }
 
 /**

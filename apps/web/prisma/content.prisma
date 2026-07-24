@@ -288,7 +288,7 @@ model ChannelBinding {
   projectId         String
   triggerMode       String   @default("mention_or_keyword") @db.VarChar(32)
   triggerKeywords   Json     @default("[\"\u6536\u9009\u9898\"]")
-  executionMode     String   @default("live") @db.VarChar(20) // capture_only | evaluate | live
+  executionMode     String   @default("capture_only") @db.VarChar(20) // capture_only | evaluate | live — 正式灰度从 capture_only 起
   /// Routing target for messages in this chat: "topic" (collect inspiration, default)
   /// or "aim" (invoke an AIM agent conversation). When "aim", defaultAgentId picks
   /// the agent unless the message uses a /command prefix.

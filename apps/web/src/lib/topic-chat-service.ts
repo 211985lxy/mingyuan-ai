@@ -13,6 +13,10 @@ import {
 } from "@/lib/topics/chat-context"
 import { buildInspirationReplyText } from "@/features/topics/services/inspiration-reply"
 import { enqueueReply } from "@/features/topics/services/reply-outbox"
+import {
+  formatContentTopicVerificationNote,
+  runContentTopicVerification,
+} from "@/lib/aim/content-topic/run-verification"
 
 /**
  * @description 处理topicchatmessage
@@ -49,6 +53,30 @@ export async function handleTopicChatMessage(input: {
 
   if (!result.success) throw new Error(result.error || "选题生成失败")
 
+  const { verification, blockFormalWrite, processingStageHint } = runContentTopicVerification({
+    projectId: project.id,
+    sourceText: content,
+    cards: result.cards,
+  })
+  const verificationNote = formatContentTopicVerificationNote(verification)
+
+  // 核验关键失败：不写正式 TopicSelection / KnowledgeEntry，仅落灵感观察
+  if (blockFormalWrite) {
+    if (input.inspirationId) {
+      await prisma.inspiration.updateMany({
+        where: { id: input.inspirationId, userId: input.userId },
+        data: {
+          aiStatus: "completed",
+          processingStage: processingStageHint ?? "verification_failed",
+          generatedTopics: result.cards as unknown as Prisma.InputJsonValue,
+          errorMessage: verificationNote,
+          replyStatus: "suppressed",
+        },
+      })
+    }
+    throw new Error(verificationNote || "内容选题核验失败，已停止写入正式选题")
+  }
+
   const today = new Date().toISOString().split("T")[0]
   const { knowledgeEntry, selection } = await prisma.$transaction(async (tx) => {
     const knowledgeEntry = await tx.knowledgeEntry.create({
@@ -83,7 +111,6 @@ export async function handleTopicChatMessage(input: {
       select: { id: true },
     })
     if (input.inspirationId) {
-      // Fetch the inspiration record for platform context (needed for outbox reply)
       const inspiration = await tx.inspiration.findUnique({
         where: { id: input.inspirationId },
         select: { source: true, externalChatId: true, externalMessageId: true, externalAccountId: true },
@@ -92,14 +119,13 @@ export async function handleTopicChatMessage(input: {
         where: { id: input.inspirationId, userId: input.userId },
         data: {
           aiStatus: "completed",
-          processingStage: "completed",
+          processingStage: processingStageHint ?? "completed",
           generatedTopics: result.cards as unknown as Prisma.InputJsonValue,
           knowledgeEntryId: knowledgeEntry.id,
           topicSelectionId: selection.id,
-          errorMessage: null,
+          errorMessage: verificationNote,
         },
       })
-      // Create outbox reply for async delivery instead of legacy replyStatus + background task
       if (inspiration?.source) {
         const replyText = buildInspirationReplyText({
           generatedTopics: result.cards,
@@ -135,5 +161,6 @@ export async function handleTopicChatMessage(input: {
     topicSelectionId: selection.id,
     cards: result.cards,
     reply,
+    verification,
   }
 }

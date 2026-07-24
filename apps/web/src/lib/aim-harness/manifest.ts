@@ -2,13 +2,9 @@ import { prisma } from "@/lib/prisma"
 
 import { sha256 } from "./hashing"
 import type { AimContextSource, AimRunSpec } from "./types"
+import { withDefaultTrustLevel } from "./context-trust"
 
 /** 将声明式上下文与实际引用的知识条目收口为快照清单。 */
-/**
- * @description 构建aimcontextmanifest
- * @param input - 输入数据
- * @returns Promise<AimContextSource[]>
- */
 export async function buildAimContextManifest(input: {
   spec: AimRunSpec
   userId?: string
@@ -16,14 +12,14 @@ export async function buildAimContextManifest(input: {
   citedKnowledgeIds?: string[]
   provided?: AimContextSource[]
 }): Promise<AimContextSource[]> {
-  const sources: AimContextSource[] = [...(input.provided ?? [])]
+  const sources: AimContextSource[] = [...(input.provided ?? [])].map(withDefaultTrustLevel)
   if (!sources.some((source) => source.kind === "request")) {
-    sources.push({
+    sources.push(withDefaultTrustLevel({
       kind: "request",
       id: "raw_input",
       charCount: input.spec.rawInput.length,
       contentHash: sha256(input.spec.rawInput),
-    })
+    }))
   }
 
   const knowledgeIds = input.citedKnowledgeIds ?? []
@@ -43,13 +39,13 @@ export async function buildAimContextManifest(input: {
       take: 100,
     })
     for (const row of rows) {
-      sources.push({
+      sources.push(withDefaultTrustLevel({
         kind: "knowledge",
         id: row.id,
         updatedAt: row.updatedAt.toISOString(),
         charCount: row.content.length,
         contentHash: sha256(row.content),
-      })
+      }))
     }
   } catch {
     // 快照是 best-effort，不能阻断已完成的交付。

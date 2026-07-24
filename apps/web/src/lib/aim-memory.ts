@@ -11,6 +11,21 @@ import type { ChatMessage } from "@/lib/llm/types"
 // - evolve 负责在线提炼偏好建议（可能写入 knowledge）；
 // - 本模块负责把对话本身沉淀为可召回的记忆条目。
 
+export type AimMemoryStatus =
+  | "candidate"
+  | "active"
+  | "superseded"
+  | "rejected"
+  | "archived"
+
+export const MEMORY_STATUSES: readonly AimMemoryStatus[] = [
+  "candidate",
+  "active",
+  "superseded",
+  "rejected",
+  "archived",
+] as const
+
 export type AimMemoryKind = "conversation_summary" | "preference" | "decision" | "fact"
 
 export const MEMORY_KINDS: readonly AimMemoryKind[] = [
@@ -176,14 +191,8 @@ interface PersistContext {
 }
 
 /**
- * 把记忆草稿幂等写入 AimMemory。
+ * 把记忆草稿幂等写入 AimMemory（默认 candidate，不进生产召回）。
  * 去重策略：同 projectId+agentId+kind+content 已存在则跳过（不重复写）。
- */
-/**
- * @description persistaimmemories
- * @param drafts - drafts
- * @param ctx - 上下文
- * @returns Promise<number>
  */
 export async function persistAimMemories(
   drafts: AimMemoryDraft[],
@@ -200,7 +209,7 @@ export async function persistAimMemories(
           agentId: ctx.agentId,
           kind: draft.kind,
           content: draft.content,
-          status: "active",
+          status: { in: ["candidate", "active"] },
         },
         select: { id: true },
       })
@@ -215,7 +224,9 @@ export async function persistAimMemories(
           entityIds: [],
           sourceGenerationId: ctx.sourceGenerationId ?? null,
           relevance: 1.0,
-          status: "active",
+          status: "candidate",
+          creationBasis: "conversation_extraction",
+          sourceRef: ctx.sourceGenerationId ?? null,
         },
       })
       written += 1
@@ -224,6 +235,44 @@ export async function persistAimMemories(
     }
   }
   return written
+}
+
+/**
+ * 人工批准候选记忆进入生产召回。
+ */
+export async function approveAimMemoryCandidate(input: {
+  id: string
+  userId: string
+  reviewerId: string
+}): Promise<boolean> {
+  const result = await prisma.aimMemory.updateMany({
+    where: { id: input.id, userId: input.userId, status: "candidate" },
+    data: {
+      status: "active",
+      reviewerId: input.reviewerId,
+      reviewedAt: new Date(),
+    },
+  })
+  return result.count > 0
+}
+
+/**
+ * 拒绝候选记忆。
+ */
+export async function rejectAimMemoryCandidate(input: {
+  id: string
+  userId: string
+  reviewerId: string
+}): Promise<boolean> {
+  const result = await prisma.aimMemory.updateMany({
+    where: { id: input.id, userId: input.userId, status: "candidate" },
+    data: {
+      status: "rejected",
+      reviewerId: input.reviewerId,
+      reviewedAt: new Date(),
+    },
+  })
+  return result.count > 0
 }
 
 /**
@@ -279,17 +328,20 @@ export async function retrieveAimMemory(input: {
 }): Promise<AimMemoryRow[]> {
   const { userId, projectId, agentId } = input
   const topK = input.topK ?? 6
+  const now = new Date()
 
   try {
     const rows = await prisma.aimMemory.findMany({
       where: {
         userId,
         projectId: projectId ?? null,
+        // 仅召回已批准且未过期；candidate / rejected / superseded 不得进入生产上下文
         status: "active",
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
         ...(agentId ? { agentId } : {}),
       },
-      orderBy: { createdAt: "desc" },
-      take: topK * 3, // 多取一些再按 kind 重排
+      orderBy: [{ relevance: "desc" }, { createdAt: "desc" }],
+      take: topK * 3,
       select: { id: true, kind: true, content: true, agentId: true, createdAt: true, relevance: true },
     })
     return sortAimMemoryRows(rows, topK)

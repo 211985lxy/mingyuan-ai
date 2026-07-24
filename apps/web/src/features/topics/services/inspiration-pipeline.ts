@@ -8,7 +8,7 @@ import {
   syncVideoCopyExtraction,
 } from "@/lib/video-copy-extractions"
 import { isVideoExtractionFallbackEnabled } from "@/lib/video-extraction-fallback"
-import { isCaptureOnly, isGenerationSuppressed, isExecutionMode } from "@/lib/execution-mode"
+import { isCaptureOnly, isFormalTopicWriteSuppressed, isExecutionMode } from "@/lib/execution-mode"
 import type { ExecutionMode } from "@/lib/execution-mode"
 import { generateTopicCards } from "@/lib/topic-generation"
 import {
@@ -19,6 +19,10 @@ import {
   buildTopicProjectSource,
   loadTopicChatContext,
 } from "@/lib/topics/chat-context"
+import {
+  formatContentTopicVerificationNote,
+  runContentTopicVerification,
+} from "@/lib/aim/content-topic/run-verification"
 
 export type InspirationPipelineOutcome = "completed" | "deferred"
 
@@ -155,7 +159,7 @@ export async function processInspirationPipeline(inspirationId: string): Promise
   }
 
   // --- evaluate: run AI generation but do NOT write TopicSelection or reply ---
-  if (isGenerationSuppressed(mode)) {
+  if (isFormalTopicWriteSuppressed(mode)) {
     try {
       const [project, elements, ipProfile] = await loadTopicChatContext({
         userId: inspiration.userId,
@@ -178,14 +182,20 @@ export async function processInspirationPipeline(inspirationId: string): Promise
         // Store generated candidates on the Inspiration for observation,
         // but do NOT write TopicSelection or KnowledgeEntry
         if (genResult.success) {
+          const { verification, processingStageHint } = runContentTopicVerification({
+            projectId: inspiration.projectId,
+            sourceText: topicInput,
+            cards: genResult.cards,
+          })
+          const verificationNote = formatContentTopicVerificationNote(verification)
           await prisma.inspiration.update({
             where: { id: inspiration.id },
             data: {
               aiStatus: "completed",
-              processingStage: "shadow_completed",
+              processingStage: processingStageHint ?? "shadow_completed",
               generatedTopics: genResult.cards as unknown as Prisma.InputJsonValue,
               replyStatus: "suppressed",
-              errorMessage: null,
+              errorMessage: verificationNote,
             },
           })
           return { outcome: "completed" }

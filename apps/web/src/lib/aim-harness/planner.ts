@@ -21,10 +21,13 @@ import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
 
+import { resolveExecutionPolicy } from "./execution-mode"
 import type {
   AimAgentId,
   AimContextPolicy,
   AimEntrypoint,
+  AimExecutionMode,
+  AimExecutionPolicy,
   AimModelPolicy,
   AimModelPolicyOverride,
   AimRunSpec,
@@ -63,6 +66,10 @@ export interface PlanRunInput {
    * 用户已确认本轮意图并映射 runtimeTask：禁止向量/LLM 再次改判。
    */
   intentFrozen?: boolean
+  /** 执行模式；默认 single_shot。bounded_tool_loop 须命中白名单。 */
+  executionMode?: AimExecutionMode
+  /** 完整执行策略覆盖；未传则按 mode 默认冻结。 */
+  executionPolicy?: Partial<AimExecutionPolicy>
 }
 
 function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
@@ -232,6 +239,12 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
 
   const defaults = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false, input.agentModule, input.writerModule)
   const modelPolicy = applyModelPolicyOverride(defaults, input.modelPolicy)
+  const executionPolicy = resolveExecutionPolicy({
+    requested: input.executionMode,
+    policy: input.executionPolicy,
+    agentId: input.agentId,
+    runtimeTask,
+  })
 
   return Object.freeze({
     entrypoint: input.entrypoint,
@@ -246,5 +259,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     actorId: input.actorId,
     projectId: input.projectId,
     methodologyProfileIds: input.methodologyProfileIds,
+    executionMode: executionPolicy.mode,
+    executionPolicy,
   })
 }

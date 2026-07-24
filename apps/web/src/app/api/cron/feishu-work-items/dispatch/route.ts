@@ -134,7 +134,12 @@ export async function GET(request: NextRequest) {
         id: context.runId,
         userId: ownerUserId,
         projectId: context.projectId || undefined,
-        agentId: context.loopId === "sales-diagnosis-v1" ? "business_diagnosis" : undefined,
+        agentId:
+          context.loopId === "sales-diagnosis-v1"
+            ? "business_diagnosis"
+            : context.loopId === "content-growth-v1"
+              ? "content_producer"
+              : undefined,
         action: "generate",
         inputSummary: `${context.loopId || "invalid-loop"}:${context.idempotencyKey}`,
       })
@@ -183,7 +188,9 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     enabled: true,
-    mode: runtimeConfig.shadowMode ? "shadow" : "live",
+    mode: runtimeConfig.operatingMode,
+    shadowMode: runtimeConfig.shadowMode,
+    liveWrite: !runtimeConfig.shadowMode,
     summary: publicDispatchSummary(summary),
   })
 }

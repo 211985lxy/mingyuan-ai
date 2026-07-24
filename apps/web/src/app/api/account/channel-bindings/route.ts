@@ -14,7 +14,7 @@ const createSchema = z.object({
   projectId: z.string().trim().min(1).max(80),
   triggerMode: z.enum(["mention_or_keyword", "all"]).default("mention_or_keyword"),
   triggerKeywords: z.array(z.string().trim().min(1).max(40)).max(10).default(["收选题"]),
-  executionMode: z.enum(["capture_only", "evaluate", "live"]).default("live"),
+  executionMode: z.enum(["capture_only", "evaluate", "live"]).default("capture_only"),
   /** 路由目标：topic（选题采集，默认）| aim（AIM 智能体对话） */
   routeTarget: z.enum(["topic", "aim"]).default("topic"),
   /** routeTarget=aim 时的默认智能体；为空则要求消息带 /命令 */

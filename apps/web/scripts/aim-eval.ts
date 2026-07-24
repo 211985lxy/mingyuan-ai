@@ -20,6 +20,7 @@ import { writeFileSync, mkdirSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { ALL_FIXTURES } from "../__tests__/eval/fixtures"
+import { assertRealModelProvidersConfigured } from "../src/lib/llm/config"
 import {
   createFrozenContextAdapter,
   runEvalSuite,
@@ -58,6 +59,10 @@ async function main() {
         ? { sampleSize: 15, repetitions: 2, skipRubric: false }
         : { sampleSize: ALL_FIXTURES.length, repetitions: 3, skipRubric: false }
   const executor = opts.mode === "deterministic" ? undefined : createRealEvalExecutor()
+
+  if (opts.mode !== "deterministic") {
+    assertRealModelProvidersConfigured(`eval:${opts.mode}`)
+  }
 
   process.stderr.write(`[aim-eval] mode=${opts.mode} adapter=${adapter.name}\n`)
 

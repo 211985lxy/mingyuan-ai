@@ -283,23 +283,25 @@ describe("aim-harness fallback policy", () => {
 
   it("caps the provider fallback chain", async () => {
     const calls: string[] = []
+    // 使用可重试但无退避的网络错误，避免 server 类 503 的 sleep 拖慢/拖垮门禁
     const failing = (name: string): LLMProvider => ({
       name,
       defaultModel: `${name}-model`,
       isAvailable: () => true,
       async complete() {
         calls.push(name)
-        throw new Error("status 503")
+        throw new Error("ECONNRESET")
       },
     })
 
-    await expect(new LLMClient([
-      failing("provider-1"),
-      failing("provider-2"),
-      fakeProvider("provider-3"),
-    ]).complete({ messages: [{ role: "user", content: "test" }] })).rejects.toThrow("503")
+    await expect(
+      new LLMClient(
+        [failing("provider-1"), failing("provider-2"), fakeProvider("provider-3")],
+        { maxAttempts: 2 },
+      ).complete({ messages: [{ role: "user", content: "test" }] }),
+    ).rejects.toThrow(/ECONNRESET/)
     expect(calls).toEqual(["provider-1", "provider-2"])
-  })
+  }, 5_000)
 
   it("maxProviderAttempts=1 时临时失败也不尝试第二个 provider", async () => {
     const calls: string[] = []

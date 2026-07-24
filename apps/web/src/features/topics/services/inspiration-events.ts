@@ -173,7 +173,7 @@ export async function resolveChannelBinding(input: { platform: string; externalC
   })
   if (binding?.status === "active") return binding
   if (input.platform === "feishu" && env.FEISHU_TOPIC_CHAT_ID === input.externalChatId && env.FEISHU_TOPIC_CHAT_USER_ID && env.FEISHU_TOPIC_CHAT_PROJECT_ID) {
-    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "live" as const, externalAccountId: "" as const, triggerMode: "mention_or_keyword" as const, triggerKeywords: ["收选题"], routeTarget: "topic" as const, defaultAgentId: null }
+    return { userId: env.FEISHU_TOPIC_CHAT_USER_ID, projectId: env.FEISHU_TOPIC_CHAT_PROJECT_ID, status: "active" as const, executionMode: "capture_only" as const, externalAccountId: "" as const, triggerMode: "mention_or_keyword" as const, triggerKeywords: ["收选题"], routeTarget: "topic" as const, defaultAgentId: null }
   }
   return null
 }

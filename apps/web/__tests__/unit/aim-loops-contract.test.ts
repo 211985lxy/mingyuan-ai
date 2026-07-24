@@ -119,13 +119,22 @@ describe("sales-diagnosis-v1 完整契约", () => {
 })
 
 describe("注册表 fail-closed", () => {
-  it("只注册销售诊断 v1", () => {
-    expect(listRegisteredLoops().map((spec) => spec.id)).toEqual(["sales-diagnosis-v1"])
+  it("注册销售诊断与内容增长 v1", () => {
+    expect(listRegisteredLoops().map((spec) => spec.id).sort()).toEqual([
+      "content-growth-v1",
+      "sales-diagnosis-v1",
+    ])
     expect(BUSINESS_LOOP_IDS).toContain("content-growth-v1")
   })
 
-  it("已知但尚未注册的 Loop 返回 null", () => {
-    expect(findRegisteredLoop("content-growth-v1")).toBeNull()
+  it("内容增长 Loop 可读取且默认影子、禁止外发", () => {
+    const spec = getRegisteredLoop("content-growth-v1")
+    expect(spec.workflow).toBe("内容增长")
+    expect(spec.trigger).toBe("inspiration_captured")
+    expect(spec.supervisionPolicy.defaultMode).toBe("shadow")
+    expect(spec.supervisionPolicy.allowExternalSideEffects).toBe(false)
+    expect(spec.verificationPolicy).toBe("content-topic-evidence-v1")
+    expect(findRegisteredLoop("content-growth-v1")?.id).toBe("content-growth-v1")
   })
 
   it("非法 Loop ID 不会被 find 静默吞掉", () => {
@@ -135,6 +144,9 @@ describe("注册表 fail-closed", () => {
   it("未授权工具被拒绝", () => {
     expect(() => assertLoopToolAuthorized("sales-diagnosis-v1", "aim_harness")).not.toThrow()
     expect(reasonOf(() => assertLoopToolAuthorized("sales-diagnosis-v1", "send_customer_message"))).toBe(
+      "unauthorized_tool",
+    )
+    expect(reasonOf(() => assertLoopToolAuthorized("content-growth-v1", "send_customer_message"))).toBe(
       "unauthorized_tool",
     )
   })

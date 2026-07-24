@@ -87,8 +87,64 @@ jobs:
       - name: Deterministic harness
         run: pnpm --dir apps/web run test:harness
 
+  # 缺口升级 WP-A1：main 发布必须过真实模型 daily 门禁；密钥缺失时失败（禁止静默跳过）
+  real-model-eval:
+    name: Real-model daily eval gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm --dir apps/web exec prisma generate
+      - name: Require at least one model secret
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          APIMART_API_KEY: ${{ secrets.APIMART_API_KEY }}
+          THEROUTER_API_KEY: ${{ secrets.THEROUTER_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          JIEKOU_API_KEY: ${{ secrets.JIEKOU_API_KEY }}
+          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          LIHUO_API_KEY: ${{ secrets.LIHUO_API_KEY }}
+          ZENMUX_API_KEY: ${{ secrets.ZENMUX_API_KEY }}
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY}${APIMART_API_KEY}${THEROUTER_API_KEY}${OPENROUTER_API_KEY}${JIEKOU_API_KEY}${GLM_API_KEY}${LIHUO_API_KEY}${ZENMUX_API_KEY}" ]; then
+            echo "::error::真实模型评估门禁需要至少一个 LLM API Key secret。禁止静默跳过。"
+            exit 1
+          fi
+      - name: Daily eval (real model)
+        env:
+          THEROUTER_API_KEY: ${{ secrets.THEROUTER_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          JIEKOU_API_KEY: ${{ secrets.JIEKOU_API_KEY }}
+          GLM_API_KEY: ${{ secrets.GLM_API_KEY }}
+          LIHUO_API_KEY: ${{ secrets.LIHUO_API_KEY }}
+          APIMART_API_KEY: ${{ secrets.APIMART_API_KEY }}
+          ZENMUX_API_KEY: ${{ secrets.ZENMUX_API_KEY }}
+          DATABASE_URL: mysql://eval:eval@127.0.0.1:3306/aim_eval
+        run: |
+          pnpm --dir apps/web run eval:daily > daily-summary.md 2> eval.log
+          STATUS=$?
+          cat daily-summary.md >> "$GITHUB_STEP_SUMMARY"
+          tail -n 40 eval.log >> "$GITHUB_STEP_SUMMARY"
+          exit $STATUS
+      - name: Upload daily eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aim-eval-daily-release-gate
+          path: apps/web/aim-eval-report/
+
   build-and-push:
-    needs: quality
+    needs: [quality, real-model-eval]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

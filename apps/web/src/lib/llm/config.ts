@@ -117,3 +117,22 @@ export function getProviderConfigs(): LLMProviderConfig[] {
 
   return configs
 }
+
+/** 真实模型评估（daily / full / model-swap）所需：至少一个已配置 Provider。 */
+export function listConfiguredProviderNames(): string[] {
+  return getProviderConfigs().map((config) => config.name)
+}
+
+/**
+ * @description 断言已配置真实模型密钥；缺失时抛错（评估门禁不得静默跳过）
+ * @param purpose - 用途说明（写入错误信息）
+ */
+export function assertRealModelProvidersConfigured(purpose: string): void {
+  const names = listConfiguredProviderNames()
+  if (names.length === 0) {
+    throw new Error(
+      `[aim-eval] ${purpose} 需要至少一个 LLM Provider 密钥（如 DEEPSEEK_API_KEY / APIMART_API_KEY / THEROUTER_API_KEY），` +
+        "当前未配置。禁止静默跳过真实模型评估。",
+    )
+  }
+}

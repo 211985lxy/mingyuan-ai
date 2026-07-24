@@ -75,6 +75,8 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     methodologyProfileIds: request.methodologyProfileIds,
     stableRouting: request.stableRouting,
     intentFrozen: request.intentFrozen,
+    executionMode: request.executionMode,
+    executionPolicy: request.executionPolicy,
   }
 }
 

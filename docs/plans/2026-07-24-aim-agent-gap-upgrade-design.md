@@ -1,9 +1,10 @@
 # AIM Agent 能力缺口升级设计计划
 
-> 状态：设计稿（待业务负责人确认后拆实施工作包）  
+> 状态：设计稿（§8 已关闭）  
 > 日期：2026-07-24  
+> **执行正本**：[`2026-07-24-aim-14w-upgrade-execution-plan.md`](./2026-07-24-aim-14w-upgrade-execution-plan.md)  
 > 依据：[`ai-agent-book`](https://github.com/bojieli/ai-agent-book) 核心观点 × 当前策略差距分析  
-> 相关正本：`AGENTS.md` · `docs/architecture/adr-001-aim-harness-execution-kernel.md` · `docs/plans/aim-ai-native-company-zcode-execution-plan.md` · `docs/adr/001-feishu-asset-landing.md`
+> 相关：`AGENTS.md` · `docs/architecture/adr-001-aim-harness-execution-kernel.md` · `docs/plans/aim-ai-native-company-zcode-execution-plan.md` · `docs/adr/001-feishu-asset-landing.md`
 
 ---
 
@@ -338,34 +339,32 @@ flowchart TB
 
 ---
 
-## 8. 需要业务负责人拍板的事项
+## 8. 拍板事项（已关闭）
 
-确认前不进入大规模实施：
+> **正本**：[`2026-07-24-aim-14w-upgrade-execution-plan.md`](./2026-07-24-aim-14w-upgrade-execution-plan.md)  
+> 本设计稿保留问题陈述与架构意图；**排期、契约字段名、灰度语义与工作包清单以正本为准**。
 
-1. **P0 顺序**：先评估门禁（A）还是先销售 Loop live（B）？建议 **A 与 B1 并行，B2 在 A1 绿之后**。  
-2. **ToolLoop 首批路径**：是否同意「销售补证 + 选题核验」两条？有无更高优先级路径？  
-3. **eval:daily 成本上限**：每月可接受的模型评估预算？  
-4. **Skill 真源**：纯 Markdown 仓库 vs 命名方法论 DB profile（ADR-002）以谁为发布正本？  
-5. **群聊选题管道（B3）** 是否纳入本计划同一季度，还是独立路线？
+| # | 议题 | 结论 |
+|---|---|---|
+| 1 | P0 顺序 | 评估门禁先行；**内容增长为主战场**；销售为第二试点 |
+| 2 | ToolLoop 路径 | 内容选题核验 + 销售诊断补证 |
+| 3 | eval:daily 成本 | 先按现有 daily（15×2） |
+| 4 | Skill 真源 | 仓库文档 + 已发布方法论 profile；自动产物仅候选 |
+| 5 | 群聊选题管道 | 纳入本季度（正本阶段 2） |
 
 ---
 
-## 9. 建议的实施拆分（确认后开线程）
+## 9. 实施拆分
 
-每个条目一个独立分支/worktree，禁止混提：
+见正本「五、工作包与分支」。本设计稿原 A/B/C/D/E 映射：
 
-1. `feat/eval-daily-gate` — WP-A1  
-2. `feat/eval-model-swap` — WP-A2  
-3. `feat/execution-mode-spec` — WP-A3  
-4. `feat/work-item-field-contract` — WP-B1  
-5. `feat/sales-loop-supervised-auto` — WP-B2（含灰度报告）  
-6. `feat/bounded-tool-loop-kernel` — WP-C1+C2  
-7. `feat/tool-loop-sales-content` — WP-C3  
-8. `feat/trace-to-eval-candidates` — WP-D1  
-9. `feat/skill-context-loading` — WP-D2  
-10. `feat/memory-eval-suite` — WP-D3  
-11. （可选）`feat/inspiration-pipeline-prod` — WP-B3  
-12. （可选）`feat/tool-registry` — WP-E1  
+| 设计阶段 | 正本阶段 | 业务侧重调整 |
+|---|---|---|
+| A 评估 | 阶段 1 | 不变；契约用 `executionPolicy` |
+| B 经营/内容 | 阶段 2 | **内容增长升为 P0**；销售 live 不阻塞内容 |
+| C ToolLoop | 阶段 3 | maxSteps=6 / 整环 60s |
+| D 外化学习 | 阶段 4 | 不变 |
+| E 工具治理 | 阶段 5 | 不变 |
 
 ---
 
@@ -373,16 +372,17 @@ flowchart TB
 
 | 既有文档 | 关系 |
 |---|---|
-| `aim-ai-native-company-zcode-execution-plan.md` | 经营控制面与 Loop 正本；本计划 **不替代**，只补评估、ToolLoop、外化学习与生产化缺口 |
-| `aim-context-engineering-plan.md` | 历史上下文预算已大部分落地；本计划在其基础上加 Skill 加载与 ToolLoop 观察回写上下文 |
-| ADR-001 Harness / 飞书资产 ADR | 继续遵守；ToolLoop 是 Harness 内模式，不是新内核 |
-| 差距分析 Canvas | 本计划是其「可落地升级路线图」的工程展开 |
+| `2026-07-24-aim-14w-upgrade-execution-plan.md` | **执行正本**；关闭 §8 |
+| `aim-ai-native-company-zcode-execution-plan.md` | 经营控制面与 Loop 正本；本计划 **不替代** |
+| `aim-context-engineering-plan.md` | 上下文预算已大部分落地；本计划加 Skill 与 ToolLoop 观察回写 |
+| ADR-001 Harness / 飞书资产 ADR | 继续遵守；ToolLoop 是 Harness 内模式 |
+| 差距分析 Canvas | 本设计是其工程展开；排期以 14 周正本为准 |
 
 ---
 
-## 11. 下一步（本设计确认后）
+## 11. 下一步
 
-1. 业务负责人回复 §8 五项拍板。  
-2. 开 WP-A1 + WP-B1 两个实施线程（可并行）。  
-3. 每个工作包开工声明：目标、允许/禁止修改范围、完成标准。  
-4. 合并顺序：A1 → A2 → A3 → B1 → B2 → C* → D*；B3 按拍板插入。
+1. ~~业务负责人回复 §8~~（已关闭）。  
+2. 收敛阶段 1（评估门禁 + executionPolicy + 基线）并合并。  
+3. 新开阶段 2：`feat/content-growth-loop-register`。  
+4. 每个工作包开工声明：目标、允许/禁止修改范围、完成标准。

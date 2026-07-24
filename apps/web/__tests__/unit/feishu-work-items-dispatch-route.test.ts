@@ -41,6 +41,7 @@ const {
   readLoopRuntimeConfig: vi.fn(() => ({
     enabled: true,
     shadowMode: false,
+    operatingMode: "supervised_auto" as const,
     pilotProjectIds: new Set(["proj_1"]),
   })),
   findProject: vi.fn(async () => ({ userId: "user_owner_1" })),
@@ -154,6 +155,7 @@ describe("鉴权与 fail-closed", () => {
     readLoopRuntimeConfig.mockReturnValueOnce({
       enabled: false,
       shadowMode: true,
+      operatingMode: "shadow",
       pilotProjectIds: new Set(),
     })
     const { status, body } = await call()
@@ -295,6 +297,7 @@ describe("无人值守调度执行", () => {
     readLoopRuntimeConfig.mockReturnValueOnce({
       enabled: true,
       shadowMode: true,
+      operatingMode: "shadow",
       pilotProjectIds: new Set(["proj_1"]),
     })
     runMeetingInsightWorkflow.mockResolvedValueOnce({

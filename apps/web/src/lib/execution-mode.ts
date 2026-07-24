@@ -79,18 +79,24 @@ export function isReplySuppressed(mode: ExecutionMode | null | undefined): boole
 }
 
 /**
- * Whether the given effective mode suppresses AI generation and TopicSelection writes.
- * Only live runs the full generation pipeline.
- * Null/undefined (backward compat for records without snapshot) is treated as live.
+ * Whether formal TopicSelection writes and outbound replies are suppressed.
+ * capture_only / evaluate：不写正式选题、不回执；仅 live 放开。
+ * evaluate 仍会生成候选供观察（见 inspiration-pipeline）。
  */
-/**
- * @description 判断是否generationsuppressed
- * @param mode - 模式
- * @returns boolean
- */
-export function isGenerationSuppressed(mode: ExecutionMode | null | undefined): boolean {
+export function isFormalTopicWriteSuppressed(mode: ExecutionMode | null | undefined): boolean {
   if (!mode) return false
   return mode !== "live"
+}
+
+/**
+ * @deprecated 历史命名易误解：evaluate 仍会生成候选。请改用 isFormalTopicWriteSuppressed。
+ */
+export function isGenerationSuppressed(mode: ExecutionMode | null | undefined): boolean {
+  return isFormalTopicWriteSuppressed(mode)
+}
+
+export function isLiveMode(mode: ExecutionMode | null | undefined): boolean {
+  return mode === "live"
 }
 
 /**

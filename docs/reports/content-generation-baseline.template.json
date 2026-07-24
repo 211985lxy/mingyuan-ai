@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "capturedAt": "2026-07-24T06:38:10.908Z",
+  "source": "template",
+  "windowLabel": "待补齐：近 14 天内容生成运营窗口",
+  "metrics": {
+    "acceptanceRate": null,
+    "rewriteRate": null,
+    "evidenceCompletenessRate": null,
+    "severeFabricationRate": null,
+    "avgLatencyMs": null,
+    "avgCostCny": null,
+    "sampleSize": null
+  },
+  "notes": [
+    "正式灰度前须用真实接受/重写数据覆盖本模板。",
+    "严重虚构率必须为 0 才能宣称生产闭环。",
+    "新版本相对基线质量下降不得超过 5 个百分点。"
+  ]
+}

@@ -27,6 +27,32 @@ type AgentRoutingPolicy = {
   maxProviderAttempts: number
 }
 
+/** model-swap 评估画像：仅评估脚本通过环境变量设置，生产路径不得设置。 */
+export type AimEvalModelSwapProfile = "strong" | "weak"
+
+export const AIM_EVAL_MODEL_SWAP_ENV = "AIM_EVAL_MODEL_SWAP_PROFILE"
+
+/**
+ * @description 读取评估用的 model-swap 画像（未设置则不影响生产路由）
+ */
+export function readEvalModelSwapProfile(): AimEvalModelSwapProfile | null {
+  const raw = process.env[AIM_EVAL_MODEL_SWAP_ENV]?.trim()
+  if (raw === "strong" || raw === "weak") return raw
+  return null
+}
+
+/**
+ * @description 按 swap 画像过滤路由：strong 仅 advanced；weak 仅 basic/standard
+ */
+export function applyEvalModelSwapFilter(routes: AgentModelRoute[]): AgentModelRoute[] {
+  const profile = readEvalModelSwapProfile()
+  if (!profile) return routes
+  if (profile === "strong") {
+    return routes.filter((route) => route.capability === "advanced")
+  }
+  return routes.filter((route) => route.capability === "basic" || route.capability === "standard")
+}
+
 const CAPABILITY_RANK: Record<ModelCapability, number> = {
   basic: 1,
   standard: 2,
@@ -161,11 +187,12 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
   const configMap = new Map(allConfigs.map((c) => [c.name, c]))
 
   const providers: LLMProvider[] = []
+  const swapFiltered = applyEvalModelSwapFilter(routes)
   const eligibleRoutes = policy
-    ? routes.filter((route) =>
+    ? swapFiltered.filter((route) =>
         CAPABILITY_RANK[route.capability] >= CAPABILITY_RANK[policy.minimumCapability]
       )
-    : routes
+    : swapFiltered
 
   for (const route of eligibleRoutes) {
     const config = configMap.get(route.name)

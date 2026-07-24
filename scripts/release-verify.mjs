@@ -1,6 +1,9 @@
 import { spawnSync } from "node:child_process"
 
 const allowMissingServices = process.argv.includes("--allow-missing-services")
+const skipDailyEval = process.argv.includes("--skip-daily-eval")
+const signedOffBy = process.env.AIM_RELEASE_SKIP_DAILY_EVAL_SIGNED_OFF_BY?.trim() || ""
+
 const steps = [
   ["Frozen dependency install", ["install", "--frozen-lockfile"]],
   ["Prisma schema validation", ["--dir", "apps/web", "exec", "prisma", "validate"]],
@@ -26,11 +29,28 @@ const databaseSteps = [
   ["Migration status", ["--dir", "apps/web", "run", "schema:migration-status"]],
   ["Deterministic database E2E", ["--dir", "apps/web", "run", "test:e2e"]],
 ]
+
+const dailyEvalStep = ["Real-model daily eval gate", ["--dir", "apps/web", "run", "eval:daily"]]
+
 const hasDatabaseServices = Boolean(process.env.TEST_DATABASE_URL && process.env.DATABASE_URL)
 
 if (!hasDatabaseServices && !allowMissingServices) {
   console.error("release:verify requires both TEST_DATABASE_URL and DATABASE_URL")
   process.exit(1)
+}
+
+if (skipDailyEval) {
+  if (!signedOffBy) {
+    console.error(
+      "release:verify --skip-daily-eval requires AIM_RELEASE_SKIP_DAILY_EVAL_SIGNED_OFF_BY " +
+        "(业务负责人书面签核姓名/工号)。禁止无签核跳过真实模型门禁。",
+    )
+    process.exit(1)
+  }
+  console.warn(
+    `WARN: skipping real-model daily eval by written sign-off from ${signedOffBy}. ` +
+      "This is NOT release evidence.",
+  )
 }
 
 for (const [name, args] of hasDatabaseServices ? [...steps, ...databaseSteps] : steps) {
@@ -42,6 +62,24 @@ for (const [name, args] of hasDatabaseServices ? [...steps, ...databaseSteps] : 
   const result = spawnSync("pnpm", args, { stdio: "inherit", env })
   if (result.status !== 0) {
     console.error(`release verification failed: ${name}`)
+    process.exit(result.status ?? 1)
+  }
+  console.log(`<== ${name} passed in ${Math.ceil((Date.now() - startedAt) / 1000)}s`)
+}
+
+if (!skipDailyEval) {
+  const [name, args] = dailyEvalStep
+  console.log(`\n==> ${name}`)
+  const startedAt = Date.now()
+  const result = spawnSync("pnpm", args, {
+    stdio: "inherit",
+    env: process.env,
+  })
+  if (result.status !== 0) {
+    console.error(
+      "release verification failed: Real-model daily eval gate " +
+        "(缺少密钥、报告门槛不达标或评估失败时必须失败；仅书面签核可 --skip-daily-eval)",
+    )
     process.exit(result.status ?? 1)
   }
   console.log(`<== ${name} passed in ${Math.ceil((Date.now() - startedAt) / 1000)}s`)
