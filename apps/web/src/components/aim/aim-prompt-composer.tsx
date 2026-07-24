@@ -141,7 +141,7 @@ export function AimPromptComposer({
   }, [skillsOpen, modeOpen])
 
   return (
-    <div ref={rootRef} className="mx-auto w-full max-w-3xl">
+    <div ref={rootRef} className="mx-auto w-full max-w-6xl xl:max-w-7xl">
       <div
         className={cn(
           "relative overflow-visible rounded-[18px] bg-card/95 backdrop-blur-md",
@@ -158,10 +158,10 @@ export function AimPromptComposer({
             event.preventDefault()
             if (canSubmit) onGenerate()
           }}
-          rows={2}
+          rows={1}
           placeholder={placeholder}
           disabled={busy}
-          className="max-h-52 min-h-[88px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-base leading-7 tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
+          className="max-h-36 min-h-[44px] w-full resize-none bg-transparent px-3 pb-1 pt-2.5 text-sm leading-6 tracking-[-0.01em] outline-none placeholder:text-muted-foreground disabled:opacity-60"
         />
 
         {imageAttachments.length > 0 && (
@@ -266,7 +266,7 @@ export function AimPromptComposer({
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5 pt-0.5">
+        <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-0">
           <div className="flex min-w-0 items-center gap-0.5">
             {showContentMode && onContentModeChange ? (
               <button
@@ -277,7 +277,7 @@ export function AimPromptComposer({
                   setSkillsOpen(false)
                 }}
                 className={cn(
-                  "inline-flex h-9 max-w-[10.5rem] items-center gap-1 rounded-full px-3 text-sm transition-colors",
+                  "inline-flex h-7 max-w-[10.5rem] items-center gap-1 rounded-full px-2.5 text-xs transition-colors",
                   modeOpen || contentMode
                     ? "bg-foreground/[0.06] font-medium text-foreground"
                     : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
@@ -296,7 +296,7 @@ export function AimPromptComposer({
                 size="sm"
                 variant="ghost"
                 className={cn(
-                  "h-9 gap-1 rounded-full px-3 text-sm",
+                  "h-7 gap-1 rounded-full px-2.5 text-xs",
                   isPlanMode ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")}
@@ -323,7 +323,7 @@ export function AimPromptComposer({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-9 w-9 rounded-full p-0 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
               title="添加图片"
@@ -337,7 +337,7 @@ export function AimPromptComposer({
                 size="sm"
                 variant="ghost"
                 className={cn(
-                  "h-9 gap-1 rounded-full px-3 text-sm",
+                  "h-7 gap-1 rounded-full px-2.5 text-xs",
                   skillsOpen ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => {
@@ -367,7 +367,7 @@ export function AimPromptComposer({
               type="button"
               size="sm"
               variant="ghost"
-              className="h-9 w-9 rounded-full p-0 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 rounded-full p-0 text-muted-foreground hover:text-foreground"
               onClick={isRecording ? onStopRecording : onStartRecording}
               disabled={busy && !isRecording}
               title="语音输入"
@@ -380,7 +380,7 @@ export function AimPromptComposer({
                 type="button"
                 size="sm"
                 variant="ghost"
-                className="h-9 gap-1 rounded-full px-3 text-sm text-red-600"
+                className="h-7 gap-1 rounded-full px-2.5 text-xs text-red-600"
                 onClick={onStop}
                 title="停止"
               >

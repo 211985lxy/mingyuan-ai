@@ -56,7 +56,7 @@ export function AimWorkbenchHeader({
       type="button"
       size="sm"
       variant="ghost"
-      className="h-9 shrink-0 gap-1 px-2.5 md:h-9"
+      className="h-8 shrink-0 gap-1 px-2 md:h-8"
       onClick={onReset}
       aria-label="新任务：清空旧稿并开始新任务"
       title="清空旧稿并开始新任务"
@@ -71,7 +71,7 @@ export function AimWorkbenchHeader({
       type="button"
       size="sm"
       variant="outline"
-      className="h-9 shrink-0 px-2.5 md:h-9"
+      className="h-8 shrink-0 px-2 md:h-8"
       onClick={onEvolve}
       disabled={!canEvolve}
       aria-label={isEvolving ? "偏好沉淀：提炼中" : "偏好沉淀：从当前对话提炼客户偏好并更新全局写作风格档案"}
@@ -86,7 +86,7 @@ export function AimWorkbenchHeader({
       value={projectEnabled ? selectedProjectId : "quick"}
       onChange={(event) => onProjectScopeChange(event.target.value)}
       aria-label="选择客户全案或快速出稿模式"
-      className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto sm:flex-none md:h-9"
+      className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 sm:w-auto sm:flex-none md:h-8"
     >
       {projectEnabled && !selectedProjectId ? <option value="" disabled>项目不可用</option> : null}
       <option value="quick">快速出稿</option>
@@ -95,7 +95,7 @@ export function AimWorkbenchHeader({
   )
 
   return (
-    <header className="flex flex-col gap-2.5 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-3">
+    <header className="flex flex-col gap-1.5 border-b border-border/50 px-3 py-1.5 md:flex-row md:items-center md:justify-between md:gap-2 md:px-4">
       {/* 移动端第一行：当前阶段 + 新任务；桌面端：智能体标题 + 完整步骤条 */}
       <div className="flex min-w-0 items-center gap-2.5 md:flex-1 md:flex-wrap">
         <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
@@ -123,10 +123,10 @@ export function AimWorkbenchHeader({
         </div>
         <div className="shrink-0 md:hidden">{newTaskButton}</div>
 
-        <span className="hidden h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary md:flex">
-          <AgentIcon className="h-5 w-5" />
+        <span className="hidden h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary md:flex">
+          <AgentIcon className="h-4 w-4" />
         </span>
-        <p className="hidden shrink-0 truncate text-base font-semibold text-foreground md:block">{agentTitle}</p>
+        <p className="hidden shrink-0 truncate text-sm font-semibold text-foreground md:block">{agentTitle}</p>
         {showStageProgress && (
           <nav className="hidden min-w-0 flex-col gap-1 md:flex" aria-label="AIM 工作流">
             <ol className="flex min-w-0 items-center gap-1 overflow-x-auto">
@@ -140,7 +140,7 @@ export function AimWorkbenchHeader({
                       onClick={() => onStageChange(stage.id)}
                       aria-current={isCurrent ? "step" : undefined}
                       className={cn(
-                        "flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors",
+                        "flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors",
                         isCurrent && "bg-primary/10 text-primary",
                         isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                         !isCurrent && !isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -166,7 +166,7 @@ export function AimWorkbenchHeader({
               })}
             </ol>
             {activeDescription && (
-              <p className="truncate pl-7 text-xs text-muted-foreground">{activeDescription}</p>
+              <p className="hidden truncate pl-7 text-[11px] text-muted-foreground xl:block">{activeDescription}</p>
             )}
           </nav>
         )}
@@ -199,26 +199,26 @@ export function AimProjectNotices({ projectsCount, selectedProjectId, projectEna
   return (
     <>
       {!projectEnabled ? (
-        <div className="border-b bg-muted/30 px-4 py-2 text-sm text-muted-foreground">
+        <div className="border-b bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
           快速出稿不会读取客户全案资料，生成后可手动保存到全案。
         </div>
       ) : projectsCount === 0 ? (
-        <div className="border-b bg-muted/30 px-4 py-2 text-sm text-muted-foreground">
+        <div className="border-b bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
           还没有 IP 营销全案，<Link href="/projects" className="text-primary underline-offset-2 hover:underline">先创建一个</Link>，生成内容可自动归属。
         </div>
       ) : null}
       {projectAccessError ? (
-        <div className="border-b bg-destructive/10 px-4 py-2 text-sm text-destructive">
+        <div className="border-b bg-destructive/10 px-4 py-1.5 text-xs text-destructive">
           {projectAccessError}
         </div>
       ) : projectEnabled && projectsCount > 0 && !selectedProjectId ? (
-        <div className="border-b bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+        <div className="border-b bg-amber-500/10 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-300">
           正在加载你的 IP 营销全案，请稍后再生成内容。
         </div>
       ) : null}
       {personaProgress != null ? (
         <div className="border-b bg-primary/5 px-4 py-2.5">
-          <div className="mx-auto flex max-w-3xl items-center gap-2">
+          <div className="mx-auto flex w-full max-w-6xl items-center gap-2 xl:max-w-7xl">
             <span className="shrink-0 text-sm font-medium text-primary">来时路信息收集</span>
             <Progress value={personaProgress} className="h-1.5 flex-1" />
             <span className="shrink-0 text-sm tabular-nums text-muted-foreground">{personaProgress}%</span>
@@ -242,7 +242,7 @@ export function AimEvolutionSuggestions({ suggestions, onDismiss, onSave }: {
   if (suggestions.length === 0) return null
   return (
     <div className="border-b bg-muted/30 px-4 py-3">
-      <div className="mx-auto max-w-3xl space-y-2">
+      <div className="mx-auto w-full max-w-6xl space-y-2 xl:max-w-7xl">
         <p className="text-sm font-medium text-muted-foreground">发现可沉淀的客户偏好</p>
         {suggestions.map((suggestion) => (
           <div key={`${suggestion.title}-${suggestion.content}`} className="rounded-md border bg-background p-3.5">

@@ -30,18 +30,18 @@ export function AiResultPanel({
 }: AiResultPanelProps) {
   if (flat) {
     return (
-      <div className={`mt-4 border-t border-border/50 pt-4 w-full ${className ?? ""}`}>
-        <div className="flex flex-row items-center justify-between gap-3 mb-3">
-          <div className="min-w-0 flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-base font-semibold text-foreground">
+      <div className={`mt-4 border-t border-border/50 pt-2 w-full ${className ?? ""}`}>
+        <div className="mb-2 flex flex-row items-center justify-between gap-2">
+          <div className="min-w-0 flex items-center gap-1.5">
+            <div className="flex items-center gap-1 text-sm font-semibold text-foreground">
               {icon}
               <span className="truncate">{title}</span>
             </div>
-            {meta ? <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">{meta}</div> : null}
+            {meta ? <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{meta}</div> : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{actions}</div> : null}
+          {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div> : null}
         </div>
-        <div className={contentClassName ?? "py-1"}>{children}</div>
+        <div className={contentClassName ?? "py-0"}>{children}</div>
       </div>
     )
   }

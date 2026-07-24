@@ -211,7 +211,7 @@ export default function AimPage() {
 
             {/* 输入区：悬浮卡片，对标 Claude composer */}
             {!w.planSession.isPlanMode && (
-              <footer className="px-3 pb-4 pt-1 sm:px-5 sm:pb-5">{composer}</footer>
+              <footer className="px-3 pb-2 pt-1 sm:px-5 sm:pb-3">{composer}</footer>
             )}
           </>
         )}

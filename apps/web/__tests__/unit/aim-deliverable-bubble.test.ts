@@ -39,10 +39,11 @@ describe("AimDeliverableBubble", () => {
 
     expect(html).toContain("AI 交付物")
     expect(html).toContain("当前版本")
+    expect(html).toContain("这是当前正文")
+    expect(html).toContain("交付依据与衍生工具")
     expect(html).toContain("当前需求 + 知识库 1 条")
     expect(html).toContain("思考依据")
     expect(html).toContain("来自客户访谈")
-    expect(html).toContain("这是当前正文")
     expect(html).toContain("生成发布包")
     expect(html).toContain("编辑")
     expect(html).not.toContain("高级编辑")

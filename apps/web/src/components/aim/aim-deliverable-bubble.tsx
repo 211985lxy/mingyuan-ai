@@ -26,6 +26,7 @@ import { AimInlineDocumentCard } from "@/components/aim/aim-inline-document-card
 import type { TextSelectionRange } from "@/lib/aim-editor"
 import { CanonicalContentPanel } from "@/components/aim/canonical-content-panel"
 import { ContentPackagePanel } from "@/components/aim/content-package-panel"
+import { KnowledgeCitationPanel } from "@/components/aim/knowledge-citation-panel"
 import { PublishPackActions } from "@/components/aim/publish-pack-actions"
 import type { TaskSpec } from "@/lib/task-spec"
 import {
@@ -111,20 +112,54 @@ export function DeliveryContractStrip({ contract }: { contract: AimDeliveryContr
     { label: "状态", value: contract.status.label, detail: contract.status.detail, icon: ShieldCheck, className: toneClass },
     { label: "下一步", value: contract.next.label, detail: contract.next.detail, icon: ArrowRight, className: "text-foreground" },
   ]
-  return <div className="mb-4 border-y border-border/70 bg-muted/20">
-    <div className="grid grid-cols-2 lg:grid-cols-4">{items.map(({ label, value, detail, icon: Icon, className }, index) =>
-      <div key={label} className={`min-w-0 px-3 py-3 ${index % 2 === 1 ? "border-l border-border/60" : ""} ${index > 1 ? "border-t border-border/60 lg:border-t-0" : ""} ${index === 2 ? "lg:border-l" : ""}`} title={detail}>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5 shrink-0" /><span>{label}</span></div>
-        <p className={`mt-1 truncate text-sm font-medium ${className}`}>{value}</p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</p>
-      </div>)}</div>
-    {contract.expanded ? <div className="border-t border-border/40 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
-      {contract.taskSpec?.mode === "discovery_exploration" ? <p className="text-amber-600 dark:text-amber-400">当前信息不足，无法给出确定方案；请先补充关键资料，再生成正式方案。</p> : null}
-      {contract.assumptions?.length ? <p className="mt-1"><span className="font-medium text-foreground">本次假设：</span>{contract.assumptions.map((item) => `${item.statement}（影响${item.impact}）`).join("；")}</p> : null}
-      {contract.unknowns?.length ? <p className="mt-1"><span className="font-medium text-foreground">待确认：</span>{contract.unknowns.join("；")}</p> : null}
-      {contract.knownFacts?.length ? <p className="mt-1"><span className="font-medium text-foreground">已知事实：</span>{contract.knownFacts.map((item) => item.statement).join("；")}</p> : null}
-    </div> : null}
-  </div>
+  const hasExpanded =
+    contract.expanded &&
+    (contract.taskSpec?.mode === "discovery_exploration" ||
+      Boolean(contract.assumptions?.length) ||
+      Boolean(contract.unknowns?.length) ||
+      Boolean(contract.knownFacts?.length))
+
+  return (
+    <div className="border-b border-border/60 pb-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        {items.map(({ label, value, detail, icon: Icon, className }) => (
+          <span key={label} className="inline-flex min-w-0 max-w-full items-center gap-1" title={detail}>
+            <Icon className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="text-muted-foreground">{label}</span>
+            <span className={`truncate font-medium ${className}`}>{value}</span>
+            <span className="hidden truncate text-muted-foreground sm:inline">{detail}</span>
+          </span>
+        ))}
+      </div>
+      {hasExpanded ? (
+        <div className="mt-1.5 space-y-0.5 text-xs leading-relaxed text-muted-foreground">
+          {contract.taskSpec?.mode === "discovery_exploration" ? (
+            <p className="text-amber-600 dark:text-amber-400">
+              当前信息不足，无法给出确定方案；请先补充关键资料，再生成正式方案。
+            </p>
+          ) : null}
+          {contract.assumptions?.length ? (
+            <p>
+              <span className="font-medium text-foreground">本次假设：</span>
+              {contract.assumptions.map((item) => `${item.statement}（影响${item.impact}）`).join("；")}
+            </p>
+          ) : null}
+          {contract.unknowns?.length ? (
+            <p>
+              <span className="font-medium text-foreground">待确认：</span>
+              {contract.unknowns.join("；")}
+            </p>
+          ) : null}
+          {contract.knownFacts?.length ? (
+            <p>
+              <span className="font-medium text-foreground">已知事实：</span>
+              {contract.knownFacts.map((item) => item.statement).join("；")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onInlineEditKeyChange, onInlineContentSaved, onInlineSelectionRewrite, referenceText, persona, topicTitle, projectId }: {
@@ -191,8 +226,8 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
   projectId?: string
 }) {
   return <Tabs value={activeFormat} onValueChange={(value) => onTabChange(value as ContentFormat)} className="w-full">
-    <TabsList className="mb-3 flex h-auto flex-wrap justify-start gap-1.5 rounded-none bg-transparent p-0">
-      {results.map((item) => <TabsTrigger key={item.format} value={item.format} className="rounded-md px-3 py-2 text-sm text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none">{AIM_FORMAT_LABELS[item.format]}</TabsTrigger>)}
+    <TabsList className="mb-2 flex h-auto flex-wrap justify-start gap-1 rounded-none bg-transparent p-0">
+      {results.map((item) => <TabsTrigger key={item.format} value={item.format} className="rounded-md px-2.5 py-1 text-xs text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none">{AIM_FORMAT_LABELS[item.format]}</TabsTrigger>)}
     </TabsList>
     {results.map((item) => <DeliverableResult key={item.format} item={item} generationId={generationId} messageKey={messageKey} inlineEditKey={inlineEditKey} onInlineEditKeyChange={onInlineEditKeyChange} onInlineContentSaved={onInlineContentSaved} onInlineSelectionRewrite={onInlineSelectionRewrite} referenceText={referenceText} persona={persona} topicTitle={topicTitle} projectId={projectId} />)}
   </Tabs>
@@ -359,30 +394,14 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         <p className="text-xs text-muted-foreground">正在重出一版…</p>
       </div>
     ) : null}
-    <AiResultPanel title="AI 交付物" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-xs">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>} flat>
-      {deliverables.id && deliverables.taskSpec ? (
-        <CanonicalContentPanel
-          generationId={deliverables.id}
-          taskSpec={deliverables.taskSpec}
-          knowledgeUsed={deliverables.knowledgeUsed}
-          onUpdated={({ taskSpec }) => {
-            props.onCanonicalUpdated?.({ generationId: deliverables.id, taskSpec })
-          }}
-        />
-      ) : null}
-      <ContentPackagePanel
-        deliverables={deliverables}
-        isBusy={actionsBusy}
-        onGeneratePackage={(formats) => props.onRepurpose(formats)}
-      />
-      <PublishPackActions
-        deliverables={deliverables}
-        projectId={deliverables.projectId}
-        publishPlatform={deliverables.publishPlatform}
-        publishUrl={deliverables.publishUrl}
-        reviewNote={deliverables.reviewNote}
-      />
-      <DeliveryContractStrip contract={contract} />
+    <AiResultPanel
+      title="AI 交付物"
+      icon={<Sparkles className="h-3.5 w-3.5 text-primary" />}
+      meta={<Badge variant={props.isCurrentVersion ? "secondary" : "outline"} className="text-[10px]">{props.isCurrentVersion ? "当前版本" : "历史版本"}</Badge>}
+      flat
+      contentClassName="py-0"
+    >
+      {/* 文案优先：正文置顶，元信息默认折叠，把垂直空间还给内容 */}
       <DeliverableTabs
         results={deliverables.results}
         activeFormat={activeFormat}
@@ -398,7 +417,40 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         topicTitle={props.topicTitle}
         projectId={props.projectId}
       />
-      <DeliverableActions {...props} isBusy={actionsBusy} activeResult={activeResult} />
+      <div className="mt-2 space-y-2 border-t border-border/50 pt-2">
+        <DeliverableActions {...props} isBusy={actionsBusy} activeResult={activeResult} />
+        <PublishPackActions
+          deliverables={deliverables}
+          projectId={deliverables.projectId}
+          publishPlatform={deliverables.publishPlatform}
+          publishUrl={deliverables.publishUrl}
+          reviewNote={deliverables.reviewNote}
+        />
+      </div>
+      <details className="mt-2 rounded-md border border-border/60 bg-muted/15 open:bg-muted/20">
+        <summary className="cursor-pointer select-none px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+          交付依据与衍生工具
+        </summary>
+        <div className="space-y-2 border-t border-border/50 px-2.5 py-2">
+          <DeliveryContractStrip contract={contract} />
+          <KnowledgeCitationPanel knowledgeUsed={deliverables.knowledgeUsed} compact />
+          {deliverables.id && deliverables.taskSpec ? (
+            <CanonicalContentPanel
+              generationId={deliverables.id}
+              taskSpec={deliverables.taskSpec}
+              knowledgeUsed={deliverables.knowledgeUsed}
+              onUpdated={({ taskSpec }) => {
+                props.onCanonicalUpdated?.({ generationId: deliverables.id, taskSpec })
+              }}
+            />
+          ) : null}
+          <ContentPackagePanel
+            deliverables={deliverables}
+            isBusy={actionsBusy}
+            onGeneratePackage={(formats) => props.onRepurpose(formats)}
+          />
+        </div>
+      </details>
     </AiResultPanel>
   </div>
 }

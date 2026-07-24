@@ -72,11 +72,11 @@ export function ContentPackagePanel({
   }
 
   return (
-    <div className="mb-3 rounded-xl border border-border/80 bg-secondary/20 p-3">
+    <div className="mb-2 rounded-lg border border-border/80 bg-secondary/20 p-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-foreground">多平台内容包</p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs font-semibold text-foreground">多平台内容包</p>
+          <p className="text-[10px] text-muted-foreground">
             {packageSpec
               ? `已完成 ${completedCount} · 失败 ${failed.length} · 请求 ${packageSpec.requestedFormats.length}`
               : "一次选择多个平台，真实生成并保存；失败可单独重试"}

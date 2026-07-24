@@ -68,11 +68,11 @@ export function AimMethodologySelector({
   const selected = profiles.find((p) => p.id === selectedId)
 
   return (
-    <div className="mx-auto mb-2 flex w-full max-w-3xl flex-wrap items-center gap-2">
-      <span className="text-xs text-muted-foreground">参考方法论</span>
+    <div className="mx-auto mb-1.5 flex w-full max-w-6xl flex-wrap items-center gap-1.5 px-1 xl:max-w-7xl">
+      <span className="text-[11px] text-muted-foreground">参考方法论</span>
       <button
         type="button"
-        className={`rounded-md border px-2.5 py-1 text-xs ${!selectedId ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
+        className={`rounded-md border px-2 py-0.5 text-[11px] ${!selectedId ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
         onClick={() => onChange([])}
       >
         不指定
@@ -82,7 +82,7 @@ export function AimMethodologySelector({
           key={profile.id}
           type="button"
           title={profile.description ?? profile.originatorName ?? undefined}
-          className={`rounded-md border px-2.5 py-1 text-xs ${selectedId === profile.id ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
+          className={`rounded-md border px-2 py-0.5 text-[11px] ${selectedId === profile.id ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
           onClick={() => onChange(selectedId === profile.id ? [] : [profile.id])}
         >
           {profile.name}
@@ -90,7 +90,7 @@ export function AimMethodologySelector({
         </button>
       ))}
       {selected && (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-[11px] text-muted-foreground">
           借鉴方法与框架，不模仿作者语言风格
         </span>
       )}

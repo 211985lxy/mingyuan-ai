@@ -148,7 +148,7 @@ interface AimMessageStreamProps {
 }
 
 export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps>(function AimMessageStream(props, ref) {
-  return <div ref={ref} className="flex-1 overflow-y-auto px-3 py-5 sm:px-5">
-    {props.messages.length === 0 ? <EmptyMessageState agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
+  return <div ref={ref} className="flex-1 overflow-y-auto px-3 py-3 sm:px-5">
+    {props.messages.length === 0 ? <EmptyMessageState agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 xl:max-w-7xl">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
   </div>
 })
