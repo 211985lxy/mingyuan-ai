@@ -78,7 +78,7 @@ const aimExpertAgentIds: AimAgentId[] = [
   "persona",
 ]
 
-const RECENT_THREAD_LIMIT = 20
+const RECENT_THREAD_LIMIT = 50
 
 function isNavActive(pathname: string, searchParams: URLSearchParams, href: string) {
   const url = new URL(href, "http://local")
@@ -257,16 +257,18 @@ export function AppSidebar() {
 
   const isAim = pathname === "/aim"
   const agentParam = searchParams.get("agent")
+  const historyAgentId = isValidAimAgent(agentParam) ? agentParam : DEFAULT_AIM_AGENT
+  const historyAgent = getAimAgent(historyAgentId)
 
   const history = useAimWorkspaceStore((s) => s.history)
   const fetchHistory = useAimWorkspaceStore((s) => s.fetchHistory)
   const deleteHistory = useAimWorkspaceStore((s) => s.deleteHistory)
   const requestLoad = useAimWorkspaceStore((s) => s.requestLoad)
 
-  // 「最近任务」为全局最近记录（不按智能体过滤），按更新时间倒序展示
+  // 「最近任务」按当前 AIM 专家划分；切换智能体时强制刷新
   useEffect(() => {
-    fetchHistory().catch(() => {})
-  }, [fetchHistory])
+    fetchHistory({ agentId: historyAgentId, force: true }).catch(() => {})
+  }, [fetchHistory, historyAgentId])
 
   const closeMobile = () => setOpenMobile(false)
 
@@ -281,15 +283,18 @@ export function AppSidebar() {
   }
 
   const recentThreads = useMemo(() => {
-    const ranked = [...history].sort(
-      (a, b) => {
+    const ranked = [...history]
+      .filter((item) => {
+        const itemAgent = item.agentId === "ip_video" ? "content_producer" : item.agentId
+        return !itemAgent || itemAgent === historyAgentId
+      })
+      .sort((a, b) => {
         const aTime = new Date(a.updatedAt || a.createdAt).getTime()
         const bTime = new Date(b.updatedAt || b.createdAt).getTime()
         return bTime - aTime
-      },
-    )
+      })
     return ranked.slice(0, RECENT_THREAD_LIMIT)
-  }, [history])
+  }, [history, historyAgentId])
 
   return (
     <Sidebar className="border-r border-border/40 bg-sidebar text-sidebar-foreground">
@@ -375,12 +380,14 @@ export function AppSidebar() {
 
         <SidebarGroup className="mt-3 flex min-h-0 flex-1 flex-col p-0">
           <SidebarGroupLabel className="mb-1.5 h-7 shrink-0 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
-            最近任务
+            最近任务 · {historyAgent.displayTitle ?? historyAgent.title}
           </SidebarGroupLabel>
           <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto">
             <div className="space-y-0.5 pb-1">
               {recentThreads.length === 0 ? (
-                <p className="px-2.5 py-2 text-sm text-muted-foreground">暂无任务，点上方新建</p>
+                <p className="px-2.5 py-2 text-sm text-muted-foreground">
+                  暂无「{historyAgent.displayTitle ?? historyAgent.title}」任务
+                </p>
               ) : (
                 recentThreads.map((item) => {
                   const title = formatHistoryTitle(item)
