@@ -87,6 +87,14 @@
 - 相关单测：`aim-turn-intent`、`aim-workbench-helpers`、`aim-context-compressor`、`aim-prompt-optimization`。
 - 交付门闩：`typecheck` → harness → `arch:size`；上线用 `bash scripts/deploy-ecs-standalone.sh`，以服务器内网 healthz 的 `releaseSha` 为准。
 
+## 8.2 AIM 上下文工程（提示词铁律）
+
+运行时提示词 = **铁律 always-on** + **按意图渐进加载** + **GoalVerifier 后验**，不要把发布包/高风险/对标长规则每次全量塞进 chat。
+
+- 审计清单：`docs/plans/2026-07-25-aim-context-engineering-iron-laws.md`
+- 修意图串台 / 建议优先：`.cursor/skills/aim-intent-context/SKILL.md`
+- 方案背景：`docs/plans/aim-context-engineering-plan.md`（规划不代表已实现）
+
 ## 9. 提交、发布与停止条件
 
 `mingyuan` 正常发布流程：相关改动完成 → 本地验证 → Conventional Commit → 从明确提交部署 → 线上验证。Prisma 变更必须显式检查 Schema 和迁移状态，不依赖人工记忆。

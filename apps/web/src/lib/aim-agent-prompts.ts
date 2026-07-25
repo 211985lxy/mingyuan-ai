@@ -5,7 +5,18 @@ import {
   LIGHT_EDIT_OUTPUT_BOUNDARY,
 } from "@/lib/aim-intent-boundaries"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
+import {
+  CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE,
+  METHODOLOGY_INJECTION_PREFACE,
+} from "@/lib/methodology/methodology-injection-preface"
+import {
+  resolveContentProducerProgressiveFlags,
+  type ContentProducerProgressiveFlags,
+} from "@/lib/aim/progressive-prompt-flags"
 import type { ContentFormat } from "./aim-generator"
+
+export type { ContentProducerProgressiveFlags }
+export { resolveContentProducerProgressiveFlags }
 
 export interface ContentProducerChatPromptParams {
   conversationBlock?: string
@@ -20,6 +31,14 @@ export interface ContentProducerChatPromptParams {
   knowledgeStrategy?: ResolvedKnowledgeStrategy
   /** IP 方法论动态选卡计划（目标模糊时可追问） */
   methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
+  /** 本轮用户原文，用于推断发布包等渐进块 */
+  rawInput?: string
+  contentAction?: string | null
+  hasBenchmarkText?: boolean
+  includePublishPackage?: boolean
+  includeHighRisk?: boolean
+  includeBenchmark?: boolean
+  includeOperatingLogicFull?: boolean
 }
 function buildChatContextBlock(params: Pick<ContentProducerChatPromptParams, "conversationBlock" | "knowledgeBlock">) {
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
@@ -130,6 +149,36 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     params.methodologyPlan?.businessGoal === "unclear" && (params.methodologyPlan.confidence ?? 0) < 0.6
       ? `\n目标确认（仅当目标仍模糊时，最多追问 1 题 + 下列选项，不要开放追问）：\n这条内容更想达成哪个目标？\nA. 获客线索（留资/私信/预约诊断）\nB. 成交转化（报名/购买）\nC. 人设信任（来时路/专业可信）\nD. 品牌曝光（起号/流量/品宣）\n`
       : ""
+
+  const inferred = resolveContentProducerProgressiveFlags({
+    runtimeTask: params.runtimeTask,
+    knowledgeStrategy: params.knowledgeStrategy,
+    rawInput: params.rawInput,
+    contentAction: params.contentAction,
+    hasBenchmarkText: params.hasBenchmarkText,
+    forGenerate: false,
+  })
+  const flags: ContentProducerProgressiveFlags = {
+    includePublishPackage: params.includePublishPackage ?? inferred.includePublishPackage,
+    includeHighRisk: params.includeHighRisk ?? inferred.includeHighRisk,
+    includeBenchmark: params.includeBenchmark ?? inferred.includeBenchmark,
+    includeOperatingLogicFull: params.includeOperatingLogicFull ?? false,
+  }
+
+  const progressiveBlocks = [
+    flags.includeHighRisk ? AIM_HIGH_RISK_LOOP_RULE : "",
+    flags.includeBenchmark
+      ? `若涉及对标改写，遵守：\n${BENCHMARK_REWRITE_GUARDRAIL}`
+      : "",
+    flags.includePublishPackage
+      ? `若整理发布信息，遵守：\n${PUBLISH_PACKAGE_CHAT_RULE}`
+      : "",
+  ].filter(Boolean)
+
+  const methodologySection = params.methodologyBlock
+    ? `${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}${METHODOLOGY_INJECTION_PREFACE}\n${params.methodologyBlock}`
+    : params.selectedMethodologyBlock || ""
+
   return `你是一个身经百战的「太极营销创意总监」，正与企业老板（用户）面对面进行爆款营销文案创意碰撞与思路对齐。
 
 北极星目标：${AIM_NORTH_STAR_GOAL}
@@ -140,36 +189,70 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
 当前对话上下文：
 ${contextBlock}
 ${params.workflowContext ? `\n工作流任务单：\n${params.workflowContext}\n` : ""}
-${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}公共 IP 操盘方法论（强参考·仅已选卡片）：
-必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过或用通用模板替代。不得把方法论原文整段抄进回复；方法论案例不得覆盖客户真实资料；成稿正文禁止方法论说明书腔。
-边界：公共方法论只决定“怎么写”，不能提供或推断“客户是谁、做什么、说过什么”；客户事实、观点归属、产品、案例和口吻只能来自当前用户输入、当前项目知识库与客户 IP 专属档案。
-${params.methodologyBlock}
+${methodologySection}
 ${params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${params.ipWikiBlock}` : ""}
 ${lightEditBlock}${goalClarify}
-${AIM_HIGH_RISK_LOOP_RULE}
-
+${progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : ""}
 你的对话原则：
-1. 当用户明显缺失会影响成稿的关键信息（如目标受众、品牌调性、核心卖点、使用场景）时，主动追问 1-3 个最核心的问题；问法必须简洁、友好、具体。若仅缺内容目标，优先用上方「目标确认」单题选项，不要另开开放题。
-2. 追问时尽量给出示例或选项来降低回答门槛，例如："这篇文案主要面向 B 端企业客户，还是 C 端消费者？"
-3. 如果信息基本完整、只缺少不影响主方向的个别细节，可以基于上下文做合理假设并直接交付可用版本，同时在结果中简短标注待用户确认的假设项。
-4. 禁止输出"您好，请问有什么可以帮您？"这类追问式开场白。只有在信息确实不足时才针对性追问，不重复询问用户已经提供的信息。
-5. "我以前带过一个人"、"我之前有个学员/客户"这类第一人称案例可在讲痛点、方法或结果时适时调用，但必须来自用户输入、当前对话或知识库中可追溯的真实经历。如果该案例是成稿的关键信任证据但细节缺失，只追问一个具体案例问题；如果不是必需，改用通用场景表达，绝不虚构个人经历。
-6. 若用户在问结构说明/拆解/分析，或问「怎么优化 / 有没有问题 / 哪里薄弱 / 优化建议」，先给问题清单与最小改法（可举例改开头一两句），禁止直接另写一整篇成稿；仅当用户明确说「重写/改写/出一版/生成」时，再交付成稿。
-7. 绝对不要说 AI 味的官腔、客套话（如"很高兴能与您碰撞"、"这是一个非常好的切入点"等）。
-8. 先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。
-9. 如果用户需要的是完整定位或商业诊断，给一句简短建议引导去定位策划官或商业诊断官；内容生产必需的受众、卖点、场景等信息，仍可按上述原则适度追问。
-10. 如果输入是热点选题，只能说"热点/选题/事件/来源"，不要说"对标文案/对标原文/原视频"。
-11. IP操盘方法论是强参考：只执行已注入卡片；知识库和历史稿件只辅助事实与表达。三者都不得盖过用户当前这一轮的明确要求。问优化建议时，可用方法论做诊断标准，但不要把方法论说明书打进回复，也不要因此另生成一篇口播。
-12. 如果涉及对标文案改写，必须遵守：
-${BENCHMARK_REWRITE_GUARDRAIL}
-13. 如果用户要求把成稿整理成发布文案/发布话题/发布包，必须遵守：
-${PUBLISH_PACKAGE_CHAT_RULE}
-14. ${knowledgeRule}
-15. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}
-16. ${AIM_SESSION_PRIORITY_RULES}
-17. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
+1. 缺关键信息（受众/卖点/场景）时追问 1-3 个具体问题；目标仍模糊时优先用上方「目标确认」单题。信息基本够则可假设交付并标注待确认项。禁止客套开场白。
+2. 分析/优化建议问句：先给问题清单与最小改法（可举例改开头一两句），禁止另写整篇或用「替换稿」顶替建议；仅当用户明确说「重写/改写/出一版/生成/直接改」时再交付成稿。
+3. 第一人称学员/客户案例必须可追溯；缺依据标「未提供/待补充」，绝不虚构。
+4. 像该 IP 真人说话：先保住人的位置与手迹，再清 AI 腔、宣传腔、整齐排比和万能结尾；禁止官腔客套。
+5. ${knowledgeRule}
+6. ${AIM_SESSION_PRIORITY_RULES}；方法论只决定怎么写，不得盖过本轮明确要求。
+7. ${flags.includeOperatingLogicFull ? CONTENT_PRODUCER_OPERATING_LOGIC_RULE : CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE}
+8. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 请直接根据上文与用户的历史对话，产出下一轮内容。`
+}
+
+export interface ContentProducerPromptFootprint {
+  alwaysOnChars: number
+  progressiveChars: number
+  total: number
+  flags: ContentProducerProgressiveFlags
+}
+
+/**
+ * 测量内容创作官 chat 提示中 always-on vs progressive 字符占比（不含动态上下文块）。
+ */
+export function measureContentProducerPromptFootprint(opts?: {
+  flags?: Partial<ContentProducerProgressiveFlags>
+  runtimeTask?: AimRuntimeTask
+  knowledgeStrategy?: ResolvedKnowledgeStrategy
+}): ContentProducerPromptFootprint {
+  const flags: ContentProducerProgressiveFlags = {
+    includePublishPackage: false,
+    includeHighRisk: false,
+    includeBenchmark: false,
+    includeOperatingLogicFull: false,
+    ...opts?.flags,
+  }
+  const alwaysOnPrompt = buildContentProducerChatPrompt({
+    knowledgeBlock: "",
+    methodologyBlock: "",
+    ipWikiBlock: "",
+    runtimeTask: opts?.runtimeTask,
+    knowledgeStrategy: opts?.knowledgeStrategy,
+    includePublishPackage: false,
+    includeHighRisk: false,
+    includeBenchmark: false,
+    includeOperatingLogicFull: false,
+  })
+  const withFlags = buildContentProducerChatPrompt({
+    knowledgeBlock: "",
+    methodologyBlock: "",
+    ipWikiBlock: "",
+    runtimeTask: opts?.runtimeTask,
+    knowledgeStrategy: opts?.knowledgeStrategy,
+    ...flags,
+  })
+  return {
+    alwaysOnChars: alwaysOnPrompt.length,
+    progressiveChars: Math.max(0, withFlags.length - alwaysOnPrompt.length),
+    total: withFlags.length,
+    flags,
+  }
 }
 
 // ─── 格式指令常量 ──────────────────────────────────────────
@@ -192,6 +275,9 @@ ${PLAIN_LANGUAGE_RULE_LINE}
 - 用口语化表达，短句为主，保留必要停顿和语气词，禁止书面语
 - 一段话就是一个完整口播段落，可以直接录制
 - 排版：自然成段；段与段之间最多空一行；禁止每句后空一行，禁止连续多个空行把版面撑疏
+- 口播不是公众号长文：单线推进，一段只扛一个信息点；禁止写成综合长文或观点清单
+- 主冲突/核心判断必须在前 15 秒内出现；开头禁止连环堆 4 个以上痛点或并列问题，先给判断再展开
+- 产品/业务露出要承接前文判断，禁止突然硬切卖点或功能清单
 ${BUZZWORD_BAN_LINE}
 必含要素：具体冲突/利益开头、一个可对号入座的客户场景、一个鲜明判断、一个可追溯证据或方法、一个匹配任务的轻承接。
 禁用开场：今天给大家分享、很多人不知道、在这个时代、作为一名。

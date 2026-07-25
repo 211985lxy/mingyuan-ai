@@ -192,6 +192,67 @@ function verifyBrand(text: string, format?: ContentFormat): GoalVerifyIssue[] {
   return verifyTraffic(text, format).map((issue) => ({ ...issue, goal: "brand" as const }))
 }
 
+const ORAL_FORMATS = new Set<ContentFormat>(["video_script", "koubo_script"])
+
+/** 口播开场约 15 秒可读窗口（中文口语密度粗估）。 */
+const ORAL_OPENING_WINDOW_CHARS = 90
+
+/**
+ * 口播工艺：开头主判断、禁连环痛点、空行密度（与 normalizeScriptBodySpacing 互补）。
+ */
+export function verifyOralScriptCraft(
+  text: string,
+  format?: ContentFormat,
+  goal: MethodologyBusinessGoal = "traffic",
+): GoalVerifyIssue[] {
+  if (format && !ORAL_FORMATS.has(format)) return []
+  const body = String(text || "").replace(/\r\n/g, "\n").trim()
+  if (!body) return []
+  const issues: GoalVerifyIssue[] = []
+  const opening = body.slice(0, Math.min(ORAL_OPENING_WINDOW_CHARS, body.length))
+
+  const hasEarlyJudgment = hasAny(opening, [
+    /其实|不是|别再|真正|关键|核心|先记住|一句话|结论是|判断是|停一下|先别/,
+    /为什么.{0,8}(?:不行|失效|贵|难)/,
+  ])
+  if (!hasEarlyJudgment && opening.length >= 40) {
+    issues.push({
+      goal,
+      format,
+      reason: "口播开头缺少早期主判断",
+      mustFix: "前 15 秒内先给出核心判断/反差结论，再展开痛点或案例",
+    })
+  }
+
+  const painQuestionHits = (opening.match(/[？?]/g) || []).length
+  const stackedPain = hasAny(opening, [
+    /(?:是不是|有没有|会不会).{0,12}(?:是不是|有没有|会不会).{0,12}(?:是不是|有没有|会不会)/,
+  ]) || painQuestionHits >= 4
+  if (stackedPain) {
+    issues.push({
+      goal,
+      format,
+      reason: "开头连环堆痛点/并列提问",
+      mustFix: "开头最多 1-2 个痛点或问题，先给判断再展开，不要清单式开场",
+    })
+  }
+
+  const paras = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  if (paras.length >= 6) {
+    const shortParas = paras.filter((p) => !p.includes("\n") && [...p].length <= 28).length
+    if (shortParas / paras.length >= 0.7) {
+      issues.push({
+        goal,
+        format,
+        reason: "口播空行过密（一句一段）",
+        mustFix: "合并短句为自然段落；段与段之间最多空一行，按信息点分段",
+      })
+    }
+  }
+
+  return issues
+}
+
 /**
  * 按 plan.businessGoal 检查各格式正文。
  */
@@ -234,6 +295,8 @@ export function verifyMethodologyGoal(
       default:
         break
     }
+
+    issues.push(...verifyOralScriptCraft(body, draft.format, plan.businessGoal))
   }
 
   // 结构模块软检查：只看业务目标卡的模块，避免路由卡叠加导致误杀

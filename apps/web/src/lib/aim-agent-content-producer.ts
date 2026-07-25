@@ -42,6 +42,8 @@ export class ContentProducerHandler implements AimAgentHandler {
       runtimeTask: params.runtimeTask,
       knowledgeStrategy: params.knowledgeStrategy,
       methodologyPlan: params.methodologyPlan ?? params.taskSpec?.methodologyPlan,
+      rawInput: latestUser,
+      hasBenchmarkText: /对标原文|对标文案/.test(latestUser),
     })
   }
 

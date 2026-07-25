@@ -6,6 +6,8 @@ import {
   CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
   buildContentProducerKnowledgeRule,
 } from "@/lib/aim-agent-prompts"
+import { METHODOLOGY_INJECTION_PREFACE } from "@/lib/methodology/methodology-injection-preface"
+import { resolveContentProducerProgressiveFlags } from "@/lib/aim/progressive-prompt-flags"
 import {
   AIM_INTERNAL_INTENT_GATE,
   AIM_NORTH_STAR_GOAL,
@@ -315,6 +317,13 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     ? NEWSROOM_SAMPLE_CITATION_RULE
     : ""
   const fewshot = buildPromptFewshotBlock(context.runtimeTask, context.targetFormats)
+  const progressive = resolveContentProducerProgressiveFlags({
+    runtimeTask: context.runtimeTask,
+    knowledgeStrategy: context.knowledgeStrategy,
+    rawInput: rawInputText,
+    hasBenchmarkText: /对标原文|对标文案/.test(rawInputText),
+    forGenerate: true,
+  })
 
   // 上下文按优先级：TaskSpec 由 user prompt 注入；IP Wiki / 知识为事实素材；
   // IP 操盘方法论为强参考（结构/钩子/判断标准必须执行）；爆款库仍为弱参考。
@@ -323,7 +332,7 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     context.knowledgeBlock ? `当前客户项目知识库（高相关事实条目）：\n${context.knowledgeBlock}` : "",
     context.selectedMethodologyBlock ? `公共指定方法论（强参考，只决定怎么写）：\n${context.selectedMethodologyBlock}` : "",
     context.methodologyBlock
-      ? `公共 IP 操盘方法论（强参考·仅已选卡片，只决定怎么写）：\n必须按下列已注入卡片的结构、钩子、判断标准与写作规范执行；禁止调用未注入卡片的句式库；除非用户本轮明确要求覆盖，否则不得跳过、稀释或用通用模板替代。\n公共方法论不能提供或推断客户身份、业务、观点归属、产品与案例；这些事实只能来自当前输入、当前项目知识库和客户 IP 专属档案。不得把方法论原文整段抄进成稿；方法论中的人物/业务案例不得覆盖当前项目真实资料；成稿正文禁止方法论说明书腔。\n${context.methodologyBlock}`
+      ? `${METHODOLOGY_INJECTION_PREFACE}\n${context.methodologyBlock}`
       : "",
     context.businessDiagnosisBlock ? `商业诊断方法（弱参考）：\n${context.businessDiagnosisBlock}` : "",
     context.eventStorytellingBlock ? `事件叙事方法：\n${context.eventStorytellingBlock}` : "",
@@ -345,26 +354,28 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     AIM_SESSION_PRIORITY_RULES,
   ].join("\n")
 
+  const qualityRedlines = [
+    "选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > IP操盘方法论（强参考：结构/钩子/判断） > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者；方法论不得被通用模板绕过。",
+    "如果输入是热点选题而不是对标文案，成稿与分析里都不要出现「对标文案」「对标原文」「原视频」这类说法。",
+    "开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。",
+    "正文每一段都要推进信息，不要堆形容词，不要写营销黑话。",
+    "先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。像该 IP 真人说话；跟最近成稿密度对齐。",
+    "文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。",
+    "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。",
+    "没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。",
+    `所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。`,
+    progressive.includeBenchmark ? `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}` : "",
+    creationTraceRule,
+    newsroomRule,
+  ].filter(Boolean)
+
   return composeLayeredAimPrompt({
     roleBlock: agentPrompt,
     runtimeTask: context.runtimeTask,
     taskConstraintExtra,
     contextBlocks,
     formatBlock: "请严格按照下方每种格式的要求生成对应内容。每种格式用 ===FORMAT:格式名=== 作为分隔标记。格式细则见用户消息。",
-    qualityRedlines: [
-      "选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > IP操盘方法论（强参考：结构/钩子/判断） > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者；方法论不得被通用模板绕过。",
-      "如果输入是热点选题而不是对标文案，成稿与分析里都不要出现「对标文案」「对标原文」「原视频」这类说法。",
-      "开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。",
-      "正文每一段都要推进信息，不要堆形容词，不要写营销黑话。",
-      "先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。",
-      "文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。",
-      "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。",
-      "没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。",
-      `所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。`,
-      `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}`,
-      creationTraceRule,
-      newsroomRule,
-    ].filter(Boolean),
+    qualityRedlines,
   })
 }
 
@@ -390,14 +401,21 @@ export function buildUserPrompt(context: AimGenerateContext, formatBlocks: strin
     ? LIGHT_EDIT_USER_INSTRUCTION
     : `请根据以上内容与任务单，按知识规则生成以下格式的营销内容：\n${knowledgeHint}`
 
-  // 冲突2：light_edit 跳过选题锁定和 GUARDRAIL（局部优化不需要对标改写硬规则）
+  // 冲突2：light_edit 跳过选题锁定；对标 guardrail 仅 rewrite / 有对标原文时注入
+  const includeBenchmarkGuardrail = !isLightEdit && resolveContentProducerProgressiveFlags({
+    runtimeTask: context.runtimeTask,
+    knowledgeStrategy: context.knowledgeStrategy,
+    rawInput: context.rawInput,
+    hasBenchmarkText: /对标原文|对标文案/.test(context.rawInput || ""),
+    forGenerate: true,
+  }).includeBenchmark
   const topicLockBlock = isLightEdit
     ? ""
     : `选题锁定要求：
 - 如果用户输入里有热点标题、对标标题、对标原文、爆款拆解或明确选题，必须先锁定其核心选题。
 - 企业知识库和IP特色只能作为案例、身份、表达口吻和承接方式融入，不允许把主题改写成知识库里另一个更熟悉的话题。
 - 成稿必须让用户一眼看出：这仍然是在讲热点/原选题，只是换成了本IP的表达和承接。
-- ${BENCHMARK_REWRITE_GUARDRAIL}`
+${includeBenchmarkGuardrail ? `- ${BENCHMARK_REWRITE_GUARDRAIL}` : ""}`
 
   const rawInputBlock = passagePolish
     ? `【待润色原文与要求】（只在此基础上润色，保持相近篇幅，禁止另起长口播/长文）\n"${context.rawInput}"`
