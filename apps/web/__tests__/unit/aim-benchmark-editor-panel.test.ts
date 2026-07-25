@@ -74,15 +74,22 @@ describe("AIM workbench display helpers", () => {
   })
 
   it("collapses excessive blank lines in script bodies", () => {
-    expect(normalizeScriptBodySpacing("第一段\n\n\n\n第二段\n\n\n第三段")).toBe(
-      "第一段\n\n第二段\n\n第三段",
-    )
+    const p1 = "这是一段刻意写得很长的第一段正文，用来确认长段落之间仍保留空行分隔，不会被短句合并逻辑误伤。"
+    const p2 = "这是一段刻意写得很长的第二段正文，用来确认长段落之间仍保留空行分隔，不会被短句合并逻辑误伤。"
+    const p3 = "这是一段刻意写得很长的第三段正文，用来确认长段落之间仍保留空行分隔，不会被短句合并逻辑误伤。"
+    expect(normalizeScriptBodySpacing(`${p1}\n\n\n\n${p2}\n\n\n${p3}`)).toBe(`${p1}\n\n${p2}\n\n${p3}`)
     expect(
-      splitAimMethodNote("甲\n\n\n乙\n[[AIM_METHOD_NOTE]]note[[/AIM_METHOD_NOTE]]"),
+      splitAimMethodNote(`${p1}\n\n\n${p2}\n[[AIM_METHOD_NOTE]]note[[/AIM_METHOD_NOTE]]`),
     ).toEqual({
       methodNote: "note",
-      result: "甲\n\n乙",
+      result: `${p1}\n\n${p2}`,
     })
+  })
+
+  it("merges consecutive short script paragraphs into soft line breaks", () => {
+    expect(
+      normalizeScriptBodySpacing("说实话，这两头都容易踩坑。\n\n我们直接开始。\n\n第一层，单点级。"),
+    ).toBe("说实话，这两头都容易踩坑。\n我们直接开始。\n第一层，单点级。")
   })
 
   it("keeps unknown workflow states compatible with draft", () => {

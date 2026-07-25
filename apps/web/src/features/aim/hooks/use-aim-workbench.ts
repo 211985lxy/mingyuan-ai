@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useRef, useCallback, useEffect } from "react"
+import { useState, useMemo, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 
 import { transcribeAudio, type ContentFormat } from "@/lib/api/client"
@@ -23,7 +23,10 @@ import { useAimDraftAutosave, useAimMessageAutoScroll, useAimSourceHydration } f
 import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVideoCopyPrefill } from "@/hooks/use-aim-route-sync"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
-import { aimDraftProjectScope, clearAimDraft, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { aimDraftProjectScope, loadAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { runAimWorkbenchNewTaskReset, clearAimWorkbenchEphemeralState } from "@/features/aim/hooks/run-aim-workbench-new-task-reset"
+import { useAimPendingNewCopy } from "@/features/aim/hooks/use-aim-pending-new-copy"
+import { useAimEphemeralIsolation } from "@/features/aim/hooks/use-aim-ephemeral-isolation"
 import {
   extractPersonaProgress as extractProgress,
   findLatestAimVideoDeliverableMessageId,
@@ -44,14 +47,7 @@ import { useAimTurnIntentGate } from "@/features/aim/hooks/use-aim-turn-intent-g
 import { useAimSourceEditorState } from "@/features/aim/hooks/use-aim-source-editor-state"
 
 /**
- * Master hook — consolidates all AIM workbench state, refs, and hook
- * orchestration so the page component is a thin assembly layer (params →
- * hook → JSX).  Return type is inferred from concrete hook outputs; do NOT
- * add an explicit interface (it would diverge from actual hook signatures).
- */
-/**
- * @description React Hook：aimworkbench
- * @returns 无返回值
+ * AIM 工作台总编排：params → hooks → 页面薄装配层。
  */
 export function useAimWorkbench() {
   const router = useRouter()
@@ -199,8 +195,14 @@ export function useAimWorkbench() {
     setSourceVideoCopyExtractionId, setSourceOriginalText, setSourceAnalysisText,
     setSourceTopicTitle, setSourceTopicRationale, setEditorText, setEditorFormat,
     setEditorSourceMessageId, setEditorPanelWidth, setEditorPanelOpen,
+    setSelectedMethodologyProfileIds,
   })
   const currentProjectScope = aimDraftProjectScope(projectEnabled, selectedProjectId)
+
+  const { clearAgentSwitchEphemeral, isolateTaskSessionExtras } = useAimEphemeralIsolation({
+    clearSelections, clearImages, setWorkflowBrief, setWorkflowBriefForm,
+    setWorkflowBriefDialogOpen, setContentAction, searchParams, router,
+  })
 
   // ---- Effects ----
   useAimDraftAutosave({
@@ -215,9 +217,18 @@ export function useAimWorkbench() {
     setSourceOriginalText, setSourceAnalysisText,
   })
 
-  useAimAgentDraftSwitch({ agentParam, activeAgentId, selectedProjectId, projectScope: currentProjectScope, lastAgentParamRef, setters: routeSetters })
-  useAimTopicPrefill({ topicTitle: topicTitleParam, topicRationale: topicRationaleParam, projectId: projectIdParam, idea: ideaParam, router, searchParams, setters: routeSetters })
-  useAimVideoCopyPrefill({ extractionId: videoCopyExtractionIdParam, router, searchParams, setters: routeSetters })
+  useAimAgentDraftSwitch({
+    agentParam, activeAgentId, selectedProjectId, projectScope: currentProjectScope,
+    lastAgentParamRef, setters: routeSetters, clearEphemeral: clearAgentSwitchEphemeral,
+  })
+  useAimTopicPrefill({
+    topicTitle: topicTitleParam, topicRationale: topicRationaleParam, projectId: projectIdParam,
+    idea: ideaParam, router, searchParams, setters: routeSetters, clearEphemeral: clearAgentSwitchEphemeral,
+  })
+  useAimVideoCopyPrefill({
+    extractionId: videoCopyExtractionIdParam, router, searchParams, setters: routeSetters,
+    clearEphemeral: clearAgentSwitchEphemeral,
+  })
 
   // ---- openEditorFromResult (needed by generation + history load) ----
   // 默认同步编辑上下文，不自动打开右侧面板（内联编辑优先）
@@ -246,6 +257,7 @@ export function useAimWorkbench() {
     sourceTopicTitle, sourceTopicRationale, selectedMethodologyProfileIds,
     topicSelectionId: topicSelectionIdParam, selectedTopicIndex: selectedTopicIndexParam,
     requestAbortRef, pendingScrollMessageIdRef, clearCurrentTaskContext,
+    onIsolateTaskSession: isolateTaskSessionExtras,
     openEditorFromResult: syncEditorFromResultProxy, refreshHistory, refreshProjectWorkflow,
   })
 
@@ -266,14 +278,16 @@ export function useAimWorkbench() {
   const clearTurnIntentRef = useRef<(() => void) | null>(null)
 
   function resetConversation() {
-    requestAbortRef.current?.abort()
-    setMessages([])
-    setInput("")
-    clearCurrentTaskContext()
-    clearAimDraft(selectedAgentId, currentProjectScope)
-    planOrchestration.planSession.resetPlan()
-    planOrchestration.setComposerMode("direct")
-    clearTurnIntentRef.current?.()
+    runAimWorkbenchNewTaskReset({
+      abort: () => requestAbortRef.current?.abort(),
+      setMessages: () => setMessages([]),
+      setInput, clearCurrentTaskContext, clearSelections, clearImages,
+      setWorkflowBrief, setWorkflowBriefForm, setWorkflowBriefDialogOpen, setContentAction,
+      setSelectedMethodologyProfileIds, setEditorPanelOpen, selectedAgentId, currentProjectScope,
+      resetPlan: () => planOrchestration.planSession.resetPlan(),
+      setComposerMode: planOrchestration.setComposerMode,
+      clearTurnIntent: clearTurnIntentRef.current, searchParams, router,
+    })
   }
 
   const restoreScopeDraft = (nextDraft: AimDraft | null) => {
@@ -281,14 +295,14 @@ export function useAimWorkbench() {
     setMessages(nextDraft?.messages || [])
     setInput(nextDraft?.input || "")
     restoreFromDraft(nextDraft)
+    setSelectedMethodologyProfileIds(nextDraft?.selectedMethodologyProfileIds ?? [])
   }
 
   const afterScopeChange = () => {
-    clearSelections()
-    setWorkflowBrief(null)
-    setContentAction(null)
-    clearImages()
-    // 切换项目时废弃旧计划，防止跨客户上下文混用
+    clearAimWorkbenchEphemeralState({
+      clearSelections, clearImages, setWorkflowBrief, setWorkflowBriefForm,
+      setWorkflowBriefDialogOpen, setContentAction,
+    })
     planOrchestration.planSession.abandonPlan()
     planOrchestration.setComposerMode("direct")
     clearTurnIntentRef.current?.()
@@ -320,7 +334,8 @@ export function useAimWorkbench() {
   const { sendText } = useAimChatActions({
     messages, setMessages, setInput, setIsThinking,
     selectedAgentId, selectedProjectId, projectEnabled, agentModule,
-    requestAbortRef, clearCurrentTaskContext, clearImages, runWorkbenchCommand,
+    requestAbortRef, clearCurrentTaskContext, clearImages,
+    onIsolateTaskSession: isolateTaskSessionExtras, runWorkbenchCommand,
   })
 
   const {
@@ -363,23 +378,10 @@ export function useAimWorkbench() {
     generateWithInput,
   })
 
-  // 侧栏「新建文案」：清空当前会话，进入内容创作官空稿态（与顶栏「新任务」一致，并固定到 content_producer）
-  useEffect(() => {
-    if (!pendingNewCopy) return
-    clearAimDraft(selectedAgentId, currentProjectScope)
-    clearAimDraft("content_producer", currentProjectScope)
-    resetConversation()
-    setContentAction(null)
-    clearImages()
-    setEditorPanelOpen(false)
-    setSelectedAgentId("content_producer")
-    lastAgentParamRef.current = "content_producer"
-    const nextParams = new URLSearchParams()
-    nextParams.set("agent", "content_producer")
-    router.replace(`/aim?${nextParams.toString()}`)
-    clearNewCopyRequest()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to pendingNewCopy signal
-  }, [pendingNewCopy])
+  useAimPendingNewCopy({
+    pendingNewCopy, selectedAgentId, currentProjectScope, searchParams, router,
+    lastAgentParamRef, resetConversation, setSelectedAgentId, clearNewCopyRequest,
+  })
 
   // ---- Send actions ----
   const { handleUseSkill, handleGenerate, retryFailedMessage } = useAimSendActions({

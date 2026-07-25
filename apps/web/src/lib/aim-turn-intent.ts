@@ -145,7 +145,17 @@ const STRONG_WRITE_WORDS = [
 
 /** 结构拆解 / 优化建议问句：应走对话，禁止擅自出整篇成稿 */
 const COPY_ANALYSIS_PATTERN =
-  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|点评一下|点评这|点评下|评价一下|评一下这|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用|怎么优化|如何优化|该怎么(?:改|优化)|有没有问题|哪里有问题|问题在哪|哪里不对|哪里需要改|怎么改更好|优化建议|帮我看看这篇|检查一下(?:这篇|这版|逻辑)|文案逻辑|逻辑(?:有问题|对不对|通不通)|哪里薄弱|痛点是不是太散/
+  /结构是什么|什么结构|文案结构|讲讲结构|怎么拆|拆解|分析一下|分析这|分析下|点评一下|点评这|点评下|评价一下|评一下这|这篇.{0,8}结构|这版.{0,8}结构|这个文案结构|结构图解|段落作用|怎么优化|如何优化|该怎么(?:改|优化)|有没有问题|又没有问题|有没有毛病|哪里有问题|问题在哪|哪里不对|哪里需要改|怎么改更好|优化建议|帮我看看这篇|检查一下(?:这篇|这版|逻辑)|文案逻辑|逻辑(?:有问题|对不对|通不通)|哪里薄弱|痛点是不是太散|优化这篇|优化这条|优化一下这篇|优化一下这条|帮我优化|看看这篇|这篇有什么问题|有什么问题|哪里不行|先别重写|告诉我怎么改|该怎么改|问题多不多/
+
+/** 显式要求「直接改出修改稿」时才走润色交付，避免「优化这篇」被当成再生成一篇 */
+const POLISH_EXECUTE_WORDS = [
+  "直接改", "直接优化", "改好这篇", "改好这条", "改顺", "别扩写", "不要扩写",
+  "保持篇幅", "输出修改稿", "给我修改稿", "润色并输出", "改短一点", "改长一点",
+] as const
+
+const PASSAGE_SCOPED_WORDS = [
+  "这段话", "这段文字", "这段表述", "这段", "这句话", "这一句",
+] as const
 
 const PASSAGE_POLISH_WORDS = [
   "优化", "润色", "顺一下", "顺一点", "改顺", "自然点", "更自然", "口语化",
@@ -160,18 +170,33 @@ const PASSAGE_REF_WORDS = [
 const BARE_POLISH_PATTERN = /^(?:帮我)?(?:润色|优化|顺一下|改改|改一下)(?:一下|下|下吧)?[。.!！？?]*$/
 
 export function looksLikeCopyAnalysisQuestion(text: string): boolean {
+  // 点名开头/标题等局部部位时，优先走部位轻改，不要当成「整篇怎么优化」建议问句
+  if (includesAny(text, [...LOCAL_EDIT_PART_WORDS])) return false
   return COPY_ANALYSIS_PATTERN.test(text) && !includesAny(text, [...STRONG_WRITE_WORDS])
 }
 
-/** 优化/润色已粘贴或点名的这段/这篇：走轻改，禁止扩成全新长稿。
+/** 优化/润色已粘贴或点名的这段：走轻改，禁止扩成全新长稿。
+ * 整篇级「优化这篇」默认给建议（chat）；点名「这段话」或带「直接改」等执行词才润色出稿。
  * 若已点名开头/标题等局部部位，交给部位轻改规则，不走段落润色。
  */
 export function looksLikePassagePolish(text: string): boolean {
   if (includesAny(text, [...LOCAL_EDIT_PART_WORDS])) return false
+  if (looksLikeCopyAnalysisQuestion(text)) return false
   if (includesAny(text, [...STRONG_WRITE_WORDS])) return false
-  if (!includesAny(text, [...PASSAGE_POLISH_WORDS])) return false
-  if (includesAny(text, [...PASSAGE_REF_WORDS])) return true
-  return BARE_POLISH_PATTERN.test(text.trim())
+
+  const passageScoped = includesAny(text, [...PASSAGE_SCOPED_WORDS])
+  const executePolish = includesAny(text, [...POLISH_EXECUTE_WORDS])
+  const hasPolishVerb = includesAny(text, [...PASSAGE_POLISH_WORDS])
+  const hasPassageRef = includesAny(text, [...PASSAGE_REF_WORDS])
+
+  // 显式「直接改好/输出修改稿」：即使没有「优化/润色」也算润色出稿
+  if (executePolish && hasPassageRef) return true
+  if (executePolish && passageScoped) return true
+  if (BARE_POLISH_PATTERN.test(text.trim())) return true
+  if (!hasPolishVerb) return false
+  // 「优化这篇/这条」无执行词 → 不当润色出稿（由 analysis 或默认 chat 处理）
+  if (!passageScoped) return false
+  return true
 }
 
 /**

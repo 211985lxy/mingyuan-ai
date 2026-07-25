@@ -235,9 +235,28 @@ describe("意图确认辅助", () => {
     expect(intent.action).toBe("chat")
   })
 
-  it("命令式「优化这篇文案」仍可走 local_edit 润色", () => {
+  it("「优化这篇文案」默认走建议对话，不直接出新稿", () => {
     const intent = resolveAimTurnIntent({
       rawInput: "优化这篇文案",
+    })
+    expect(intent.action).toBe("chat")
+    expect(intent.avoid.some((a) => a.includes("新稿") || a.includes("整篇"))).toBe(true)
+  })
+
+  it("「这篇有什么问题」→ chat", () => {
+    expect(resolveAimTurnIntent({ rawInput: "这篇有什么问题" }).action).toBe("chat")
+  })
+
+  it("「直接改好这篇文案」才走 local_edit 润色", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "直接改好这篇文案输出修改稿",
+    })
+    expect(intent.action).toBe("local_edit")
+  })
+
+  it("「优化这段话别扩写」仍走 local_edit", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "优化这段话别扩写",
     })
     expect(intent.action).toBe("local_edit")
   })

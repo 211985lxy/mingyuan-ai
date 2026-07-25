@@ -211,6 +211,11 @@ export interface AimEditorContext {
   draftLabel?: string
 }
 
+/** 对话追问/优化建议：只要诊断，不要强制「替换稿」整篇。 */
+function isAdviceEditorAction(action: string): boolean {
+  return /对话追问|优化建议|诊断|怎么优化|有没有问题|结构说明|结构拆解|拆解|先别重写/.test(action)
+}
+
 /**
  * @description 格式化编辑器上下文为提示词文本
  * @param context - 编辑器上下文（动作、选区、草稿等）
@@ -221,6 +226,25 @@ export function formatEditorContextForPrompt(context?: AimEditorContext) {
   const isPlan = context.documentType === "plan"
   const referenceLabel = context.referenceLabel || (isPlan ? "参考材料" : "对标")
   const draftLabel = context.draftLabel || (isPlan ? "我的策划案" : "我的")
+  const isAdvice = !isPlan && isAdviceEditorAction(context.action)
+
+  if (isAdvice) {
+    return [
+      "=== 文案诊断上下文（当前成稿仅供诊断参考，不要复述整篇原文） ===",
+      `用户动作：${context.action}`,
+      context.draftSelection ? `${draftLabel}选区：\n${context.draftSelection}` : null,
+      context.draftText ? `${draftLabel}当前稿：\n${context.draftText}` : null,
+      "诊断原则：像资深操盘手审稿，不另写一整篇口播/种草文。",
+      "诊断原则：先抓主冲突是否够早、信息是否过载、像不像口播、产品露出是否生硬、CTA 是否单一。",
+      "诊断原则：可用方法论做判断标准，但不要输出方法论说明书或卡片名称堆砌。",
+      "回复要求：",
+      "1. 先列 3-6 个具体问题（按严重程度），每条说明「为什么是问题」。",
+      "2. 给最小改法；必要时只举例改开头/转折一两句，并标注「示例」。",
+      "3. 禁止输出完整新成稿；禁止用「替换稿」整篇代替建议；用户未明确说重写/改写/出一版时不要交新稿。",
+      "回复格式固定为：\n主要问题：\n1. ...\n\n最小改法：\n- ...\n\n可选示例（仅局部）：\n...",
+    ].filter(Boolean).join("\n\n")
+  }
+
   return [
     isPlan
       ? "=== 策划案修改上下文（仅供本轮回复参考，不要复述整段原文） ==="

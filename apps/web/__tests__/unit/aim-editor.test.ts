@@ -66,6 +66,20 @@ describe("aim editor helpers", () => {
     expect(prompt).toContain("确实需要整段重写时要说明原因")
   })
 
+  it("formats advice follow-ups as diagnosis without replacement draft", () => {
+    const prompt = formatEditorContextForPrompt({
+      action: "优化建议（诊断当前成稿，禁止另写整篇）",
+      draftText: "第一段原文。",
+    })
+
+    expect(prompt).toContain("文案诊断上下文")
+    expect(prompt).toContain("主要问题")
+    expect(prompt).toContain("最小改法")
+    expect(prompt).toContain("禁止输出完整新成稿")
+    expect(prompt).not.toContain("回复格式固定为：\n修改思路")
+    expect(prompt).not.toMatch(/替换稿：\n/)
+  })
+
   it("formats planning editor context as strategy plan edits", () => {
     const prompt = formatEditorContextForPrompt({
       action: "用户追问",

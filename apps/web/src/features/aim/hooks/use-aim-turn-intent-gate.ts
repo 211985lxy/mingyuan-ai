@@ -31,11 +31,16 @@ function resolveChatEditorContext(input: {
   editorText: string
   messages: AimWorkbenchMessage[]
   labels: Pick<EditorPanelLabels, "documentType" | "referenceTitle" | "draftTitle">
+  intent: AimTurnIntent
 }): AimEditorContext | undefined {
   const draftText = input.editorText.trim() || findLatestAimDeliverableText(input.messages)
   if (!draftText) return undefined
+  const adviceAction = input.intent.summary.includes("优化建议")
+    || input.intent.avoid.some((item) => item.includes("整篇") || item.includes("新稿"))
   return buildAimEditorContext({
-    action: "对话追问（引用当前成稿）",
+    action: adviceAction
+      ? "优化建议（诊断当前成稿，禁止另写整篇）"
+      : "对话追问（引用当前成稿）",
     referenceSelection: "",
     draftSelection: "",
     editorText: draftText,
@@ -63,6 +68,7 @@ function dispatchByIntent(input: {
           editorText: input.editorText,
           messages: input.messages,
           labels: input.editorLabels,
+          intent: input.intent,
         })
     void input.sendText(input.text, editorContext ? { editorContext } : undefined)
     return

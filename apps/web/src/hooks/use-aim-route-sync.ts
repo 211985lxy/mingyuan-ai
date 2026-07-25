@@ -50,6 +50,7 @@ export interface AimRouteStateSetters {
   setEditorSourceMessageId: Setter<string | undefined>
   setEditorPanelWidth: Setter<number>
   setEditorPanelOpen: Setter<boolean>
+  setSelectedMethodologyProfileIds?: Setter<string[]>
 }
 
 /**
@@ -64,8 +65,10 @@ export function useAimAgentDraftSwitch(input: {
   projectScope: string
   lastAgentParamRef: MutableRefObject<string | null>
   setters: AimRouteStateSetters
+  /** 切智能体时清流程 brief / 图片等非草稿字段，避免跨 agent 串台。 */
+  clearEphemeral?: () => void
 }) {
-  const { agentParam, activeAgentId, selectedProjectId, projectScope, lastAgentParamRef, setters } = input
+  const { agentParam, activeAgentId, selectedProjectId, projectScope, lastAgentParamRef, setters, clearEphemeral } = input
   useEffect(() => {
     if (lastAgentParamRef.current === agentParam) return
     lastAgentParamRef.current = agentParam
@@ -86,8 +89,10 @@ export function useAimAgentDraftSwitch(input: {
       setters.setEditorSourceMessageId(draft?.editorSourceMessageId)
       setters.setEditorPanelWidth(draft?.editorPanelWidth ?? EDITOR_PANEL_DEFAULT_WIDTH)
       setters.setEditorPanelOpen(draft?.editorPanelOpen ?? true)
+      setters.setSelectedMethodologyProfileIds?.(draft?.selectedMethodologyProfileIds ?? [])
+      clearEphemeral?.()
     })
-  }, [activeAgentId, agentParam, lastAgentParamRef, projectScope, selectedProjectId, setters])
+  }, [activeAgentId, agentParam, clearEphemeral, lastAgentParamRef, projectScope, selectedProjectId, setters])
 }
 
 /**
@@ -103,8 +108,9 @@ export function useAimTopicPrefill(input: {
   router: Router
   searchParams: SearchParams
   setters: AimRouteStateSetters
+  clearEphemeral?: () => void
 }) {
-  const { topicTitle, topicRationale, projectId, idea, router, searchParams, setters } = input
+  const { topicTitle, topicRationale, projectId, idea, router, searchParams, setters, clearEphemeral } = input
   useEffect(() => {
     if (!topicTitle && !topicRationale && !projectId && !idea) return
     const prefill = [topicTitle ? `选题：${topicTitle}` : null, topicRationale ? `选题依据：${topicRationale}` : null, idea ? `创作灵感：${idea}` : null]
@@ -124,11 +130,13 @@ export function useAimTopicPrefill(input: {
       setters.setEditorText("")
       setters.setEditorFormat(undefined)
       setters.setEditorSourceMessageId(undefined)
+      setters.setSelectedMethodologyProfileIds?.([])
+      clearEphemeral?.()
     })
     const params = new URLSearchParams(searchParams.toString())
     for (const key of ["topicTitle", "topicRationale", "idea"]) params.delete(key)
     router.replace(params.toString() ? `/aim?${params.toString()}` : "/aim")
-  }, [idea, projectId, router, searchParams, setters, topicRationale, topicTitle])
+  }, [clearEphemeral, idea, projectId, router, searchParams, setters, topicRationale, topicTitle])
 }
 
 /**
@@ -141,8 +149,9 @@ export function useAimVideoCopyPrefill(input: {
   router: Router
   searchParams: SearchParams
   setters: AimRouteStateSetters
+  clearEphemeral?: () => void
 }) {
-  const { extractionId, router, searchParams, setters } = input
+  const { extractionId, router, searchParams, setters, clearEphemeral } = input
   useEffect(() => {
     if (!extractionId) return
     let active = true
@@ -173,6 +182,8 @@ export function useAimVideoCopyPrefill(input: {
           setters.setEditorFormat(undefined)
           setters.setEditorSourceMessageId(undefined)
           setters.setEditorPanelOpen(true)
+          setters.setSelectedMethodologyProfileIds?.([])
+          clearEphemeral?.()
         })
         toast.success("已带入对标文案")
       })
@@ -186,7 +197,7 @@ export function useAimVideoCopyPrefill(input: {
     return () => {
       active = false
     }
-  }, [extractionId, router, searchParams, setters])
+  }, [clearEphemeral, extractionId, router, searchParams, setters])
 }
 
 /**

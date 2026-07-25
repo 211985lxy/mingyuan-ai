@@ -35,6 +35,8 @@ interface AimChatActionInput {
   requestAbortRef: MutableRefObject<AbortController | null>
   clearCurrentTaskContext: () => void
   clearImages: () => void
+  /** 软隔离新任务：清流程 brief / URL 任务态等。 */
+  onIsolateTaskSession?: () => void
   runWorkbenchCommand: (command: AimWorkbenchCommand) => boolean | void
   agentModule?: CopyStudioModule
 }
@@ -99,7 +101,10 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   input.requestAbortRef.current = controller
   const turn = prepareAimChatTurn({ messages: input.messages, text, images, retryMessageId: options.retryMessageId, startsNewTask, editorApplyRange: options.editorApplyRange })
   const traceId = crypto.randomUUID()
-  if (startsNewTask) input.clearCurrentTaskContext()
+  if (startsNewTask) {
+    input.clearCurrentTaskContext()
+    input.onIsolateTaskSession?.()
+  }
   input.setMessages(turn.pendingMessages)
   input.setMessages((messages) => messages.map((message) => message.id === turn.assistantId
     ? { ...message, traceId, traceType: "chat" as const }

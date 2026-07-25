@@ -27,6 +27,7 @@ export type AimRouteSetters = {
   setEditorSourceMessageId: Setter<string | undefined>
   setEditorPanelWidth: Setter<number>
   setEditorPanelOpen: Setter<boolean>
+  setSelectedMethodologyProfileIds?: Setter<string[]>
 }
 
 /** Build stable route setters object for route-sync hooks. */
@@ -53,11 +54,12 @@ export function useRouteSetters(setters: AimRouteSetters): AimRouteSetters {
     setEditorSourceMessageId: setters.setEditorSourceMessageId,
     setEditorPanelWidth: setters.setEditorPanelWidth,
     setEditorPanelOpen: setters.setEditorPanelOpen,
+    setSelectedMethodologyProfileIds: setters.setSelectedMethodologyProfileIds,
   }), [
     setters.setEditorFormat, setters.setEditorPanelOpen, setters.setEditorPanelWidth,
     setters.setEditorSourceMessageId, setters.setEditorText, setters.setInput,
     setters.setMessages, setters.setSelectedAgentId, setters.setAgentModule, setters.setSelectedProjectId,
-    setters.setProjectEnabled,
+    setters.setProjectEnabled, setters.setSelectedMethodologyProfileIds,
     setters.setSourceAnalysisText, setters.setSourceOriginalText,
     setters.setSourceTopicRationale, setters.setSourceTopicTitle,
     setters.setSourceVideoCopyExtractionId,

@@ -49,12 +49,39 @@ export function splitAimMethodNote(content: string) {
 }
 
 /**
- * 压缩成稿多余空行：连续空行最多保留 1 个，避免口播一句一段被撑得很疏。
+ * 压缩成稿多余空行：连续空行最多保留 1 个；连续短句段落合并为软换行，
+ * 避免口播「一句一段」把版面撑疏。真段落（空行分隔）仍保留，供朗读/竹简按空行分组。
  */
 export function normalizeScriptBodySpacing(text: string): string {
-  return String(text || "")
+  const collapsed = String(text || "")
     .replace(/\r\n/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
+  return compactShortScriptParagraphs(collapsed)
+}
+
+const SHORT_SCRIPT_PARAGRAPH_CHARS = 40
+
+function compactShortScriptParagraphs(text: string): string {
+  const parts = text.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean)
+  if (parts.length < 2) return text
+
+  const isShortLine = (line: string) => [...line].length <= SHORT_SCRIPT_PARAGRAPH_CHARS
+  const isShortPara = (part: string) => !part.includes("\n") && isShortLine(part)
+  const lastLineShort = (part: string) => {
+    const lines = part.split("\n")
+    return isShortLine(lines[lines.length - 1] || "")
+  }
+
+  const out: string[] = []
+  for (const part of parts) {
+    const prev = out[out.length - 1]
+    if (prev && isShortPara(part) && lastLineShort(prev)) {
+      out[out.length - 1] = `${prev}\n${part}`
+    } else {
+      out.push(part)
+    }
+  }
+  return out.join("\n\n")
 }

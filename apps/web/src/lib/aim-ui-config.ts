@@ -22,6 +22,12 @@ export interface AimAgentMeta {
   description: string
   icon: ComponentType<{ className?: string }>
   defaultFormats: ContentFormat[]
+  /**
+   * 对用户隐藏的智能体：不进入侧边栏/选择器/对外 agent 列表。
+   * 后端路由与合约仍保留该 id 为合法值（历史消息、外部 API 调用、渠道回落
+   * 仍可命中），仅 UI 入口不再暴露。归一化由 LEGACY_AGENT_ID_ALIASES 兜底。
+   */
+  hidden?: boolean
 }
 
 export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
@@ -53,6 +59,9 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     description: "听用户要求，直接交稿；统一创作官内置自由模式",
     icon: PenLine,
     defaultFormats: ["raw_copy"],
+    // 已并入「内容文案创作」的自由模式（content_producer + agentModule=free），
+    // 不再作为独立入口暴露。保留 id 以兼容历史消息/外部调用/渠道回落。
+    hidden: true,
   },
   {
     id: "deep_copywriter",

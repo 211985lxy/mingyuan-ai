@@ -37,7 +37,7 @@ export function hasExplicitNewTaskIntent(text: string): boolean {
 }
 
 const CURRENT_TASK_REFERENCE_PATTERN = /(继续|接着|基于|根据|上面|刚才|这篇|这版|当前|原稿|原文|改一下|修改|优化|润色|仿写|重写)/
-const SELF_CONTAINED_WRITING_PATTERN = /(写|生成|创作|策划|输出|做).{0,12}(文案|口播|文章|脚本|内容|选题)|(文案|口播|文章|脚本|内容|选题).{0,12}(写|生成|创作|策划|输出|做)/
+const SELF_CONTAINED_WRITING_PATTERN = /(写|生成|创作|策划|输出|做|出).{0,12}(文案|口播|文章|脚本|内容|选题|一篇|一个)|(文案|口播|文章|脚本|内容|选题).{0,12}(写|生成|创作|策划|输出|做)|(来|整|做|出)一篇/
 
 /**
  * @description 判断是否应隔离当前写作指令（避免旧任务上下文污染）

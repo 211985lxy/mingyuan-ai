@@ -22,6 +22,10 @@ import {
   findLatestAimDeliverableId,
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
+import {
+  resolveAimWorkflowBriefForRequest,
+  shouldKeepAimFollowUpContext,
+} from "@/lib/aim/task-session-reset"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { AimTurnIntent } from "@/lib/aim-turn-intent"
 import { repurposeDeliverable } from "@/hooks/aim-repurpose-content-package"
@@ -69,6 +73,8 @@ export interface AimGenerationActionInput {
   requestAbortRef: MutableRefObject<AbortController | null>
   pendingScrollMessageIdRef: MutableRefObject<string | null>
   clearCurrentTaskContext: () => void
+  /** 软隔离新任务：清流程 brief / URL 任务态等（不含方法论偏好）。 */
+  onIsolateTaskSession?: () => void
   openEditorFromResult: (messageId: string, format: ContentFormat, content: string) => void
   refreshHistory: (options?: { projectId?: string; agentId?: string; force?: boolean }) => Promise<void>
   refreshProjectWorkflow: () => Promise<void>
@@ -122,7 +128,10 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
     : options.retryMessageId
       ? input.messages.filter((message) => message.id !== options.retryMessageId)
       : input.messages
-  if (options.startsNewTask) input.clearCurrentTaskContext()
+  if (options.startsNewTask) {
+    input.clearCurrentTaskContext()
+    input.onIsolateTaskSession?.()
+  }
   input.setMessages((messages) => [
     ...(options.startsNewTask ? [] : options.retryMessageId ? messages.filter((message) => message.id !== options.retryMessageId) : messages),
     ...(currentInput && !options.retryMessageId ? [{ id: nextAimWorkbenchId(), role: "user" as const, content: currentInput }] : []),
@@ -145,8 +154,16 @@ function buildGenerationRequest(
   baseMessages: AimWorkbenchMessage[],
   options: GenerateOptions,
 ) {
-  const keepContext = !options.startsNewTask
-  const existingGenerationId = resolveFollowUpGenerationId(options.startsNewTask, baseMessages)
+  const keepContext = shouldKeepAimFollowUpContext(options.startsNewTask, baseMessages.length)
+  const existingGenerationId = resolveFollowUpGenerationId(
+    options.startsNewTask || baseMessages.length === 0,
+    baseMessages,
+  )
+  const workflowBrief = resolveAimWorkflowBriefForRequest({
+    keepContext,
+    currentBrief: input.workflowBrief,
+    override: options.workflowBriefOverride,
+  })
   return {
     agentId: input.selectedAgentId,
     agentModule: input.agentModule,
@@ -160,15 +177,16 @@ function buildGenerationRequest(
     topicSelectionId: keepContext ? input.topicSelectionId || undefined : undefined,
     selectedTopicIndex: keepContext && Number.isFinite(input.selectedTopicIndex) ? input.selectedTopicIndex : undefined,
     existingGenerationId,
-    taskType: input.contentAction
+    taskType: keepContext && input.contentAction
       ? AIM_CONTENT_ACTIONS.find((item) => item.id === input.contentAction)?.taskType || "write_script"
       : "write_script",
     useMarketViralVideos: input.selectedAgentId === "business_diagnosis",
-    workflow: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief) ? {
+    workflow: workflowBrief ? {
       stage: "content" as const,
-      sourceGenerationId: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief)!.sourceGenerationId,
-      confirmed: (options.workflowBriefOverride !== undefined ? options.workflowBriefOverride : input.workflowBrief)!.confirmed,
+      sourceGenerationId: workflowBrief.sourceGenerationId,
+      confirmed: workflowBrief.confirmed,
     } : undefined,
+    // 方法论是当前控件偏好，不是上一任务正文；空会话/新任务仍可带上用户已选卡片。
     methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
     confirmedTurnIntent: options.confirmedTurnIntent,
   }

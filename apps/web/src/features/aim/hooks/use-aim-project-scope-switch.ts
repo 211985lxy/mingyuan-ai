@@ -3,6 +3,7 @@
 import { useCallback } from "react"
 
 import { loadAimDraft, saveAimDraft, type AimDraft } from "@/lib/aim/draft-storage"
+import { stripAimTaskScopedSearchParams } from "@/lib/aim/task-session-reset"
 
 type Router = { replace: (href: string) => void }
 type SearchParams = { toString: () => string }
@@ -36,7 +37,7 @@ export function useAimProjectScopeSwitch(input: {
     afterScopeChange()
 
     const nextParams = new URLSearchParams(searchParams.toString())
-    nextParams.delete("generationId")
+    stripAimTaskScopedSearchParams(nextParams)
     if (scope === "quick") {
       nextParams.set("mode", "quick")
       nextParams.delete("projectId")
