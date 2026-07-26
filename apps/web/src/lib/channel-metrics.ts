@@ -9,6 +9,12 @@
  */
 
 import { redis } from "@/lib/redis"
+import { prisma } from "@/lib/prisma"
+import {
+  countShadowSamples,
+  emptyShadowSampleCount,
+  type ShadowSampleCountResult,
+} from "@/lib/inspiration-shadow-samples"
 
 const KEY_PREFIX = "aim:metrics"
 
@@ -67,9 +73,55 @@ export async function recordChannelMetric(input: {
   }
 }
 
+const EMPTY_REDIS_TOTAL: ChannelMetricsSummary["total"] = {
+  received: 0,
+  duplicate: 0,
+  rate_limited: 0,
+  ingress_rejected: 0,
+  pipeline_started: 0,
+  pipeline_completed: 0,
+  pipeline_failed: 0,
+  reply_sent: 0,
+  reply_dead_letter: 0,
+}
+
+/**
+ * 从 Inspiration 正式表统计影子样本（不用 Redis 事件数代替）。
+ * platform 与 Inspiration.source 对齐（飞书主战役传 feishu）。
+ */
+export async function loadShadowSamplesFromInspiration(input: {
+  platform?: string
+  since: Date
+  until?: Date
+}): Promise<ShadowSampleCountResult> {
+  const until = input.until ?? new Date()
+  try {
+    const rows = await prisma.inspiration.findMany({
+      where: {
+        createdAt: { gte: input.since, lte: until },
+        ...(input.platform ? { source: input.platform } : {}),
+      },
+      select: {
+        id: true,
+        source: true,
+        sourceUrl: true,
+        externalMessageId: true,
+        dedupeKey: true,
+        executionModeSnapshot: true,
+        topicSelectionId: true,
+        replyStatus: true,
+        createdAt: true,
+      },
+    })
+    return countShadowSamples(rows)
+  } catch {
+    return emptyShadowSampleCount()
+  }
+}
+
 /**
  * Retrieve metrics summary for a given time range.
- * Returns per-platform daily counters.
+ * Returns per-platform daily counters + Inspiration-backed shadowSamples.
  */
 /**
  * @description 获取channelmetrics
@@ -82,6 +134,12 @@ export async function getChannelMetrics(input: {
   until?: Date
 }): Promise<ChannelMetricsSummary> {
   const until = input.until ?? new Date()
+  const shadowSamples = await loadShadowSamplesFromInspiration({
+    platform: input.platform,
+    since: input.since,
+    until,
+  })
+
   const days: Array<{ date: string; keys: string[] }> = []
 
   for (let d = new Date(input.since); d <= until; d.setDate(d.getDate() + 1)) {
@@ -110,7 +168,14 @@ export async function getChannelMetrics(input: {
   }
 
   if (allKeys.length === 0) {
-    return { days: [], total: { received: 0, duplicate: 0, rate_limited: 0, ingress_rejected: 0, pipeline_started: 0, pipeline_completed: 0, pipeline_failed: 0, reply_sent: 0, reply_dead_letter: 0 }, duplicateRate: 0, pipelineSuccessRate: 0, replySuccessRate: 0 }
+    return {
+      days: [],
+      total: { ...EMPTY_REDIS_TOTAL },
+      duplicateRate: 0,
+      pipelineSuccessRate: 0,
+      replySuccessRate: 0,
+      shadowSamples,
+    }
   }
 
   try {
@@ -152,9 +217,17 @@ export async function getChannelMetrics(input: {
       duplicateRate: received > 0 ? duplicates / received : 0,
       pipelineSuccessRate: pipelineTotal > 0 ? pipelineCompleted / pipelineTotal : 0,
       replySuccessRate: replyTotal > 0 ? replySent / replyTotal : 0,
+      shadowSamples,
     }
   } catch {
-    return { days: [], total: { received: 0, duplicate: 0, rate_limited: 0, ingress_rejected: 0, pipeline_started: 0, pipeline_completed: 0, pipeline_failed: 0, reply_sent: 0, reply_dead_letter: 0 }, duplicateRate: 0, pipelineSuccessRate: 0, replySuccessRate: 0 }
+    return {
+      days: [],
+      total: { ...EMPTY_REDIS_TOTAL },
+      duplicateRate: 0,
+      pipelineSuccessRate: 0,
+      replySuccessRate: 0,
+      shadowSamples,
+    }
   }
 }
 
@@ -174,4 +247,6 @@ export interface ChannelMetricsSummary {
   duplicateRate: number
   pipelineSuccessRate: number
   replySuccessRate: number
+  /** Inspiration 正式表影子样本统计（只读，不含客户原文） */
+  shadowSamples: ShadowSampleCountResult
 }

@@ -19,9 +19,11 @@
 
 ### 影子样本是什么
 - 真实群消息触发管道后写入的 `Inspiration` 行。
-- 执行档为 `capture_only`（只记录/提取）或 `evaluate`（可出候选但不回群、不写正式选题）。
+- **仅**显式 `executionModeSnapshot` ∈ `capture_only` | `evaluate` 计入放量门槛；缺失或非法快照不计。
+- 带 `topicSelectionId` 的影子行不计，记正式写入违规；`replyStatus` ≠ `suppressed` 不计，记外发违规。
 - `live` 不算影子。手工 `source=text` 且无渠道痕迹的不算。
-- 代码：`lib/inspiration-shadow-samples.ts` + 晋升门禁 `content-rollout-gate.ts`（满 30 条）。
+- 计数入口：`GET /api/admin/channel-metrics?platform=feishu&days=…` 的只读字段 `shadowSamples`（数据来自 Inspiration 表，非 Redis）。
+- 代码：`lib/inspiration-shadow-samples.ts` + `lib/channel-metrics.ts` + 晋升门禁 `content-rollout-gate.ts`（满 30 条）。
 
 ## Channels
 - [ ] 飞书：必须跑通

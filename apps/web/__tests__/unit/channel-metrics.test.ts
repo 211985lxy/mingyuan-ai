@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
+import { CONTENT_ROLLOUT_MIN_SHADOW_SAMPLES } from "@/lib/aim-harness/content-rollout-gate"
 
 // Mock redis module
 const mockPipeline = {
@@ -6,6 +7,8 @@ const mockPipeline = {
   expire: vi.fn().mockReturnThis(),
   exec: vi.fn().mockResolvedValue([1, 1]),
 }
+const mockFindMany = vi.fn().mockResolvedValue([])
+
 vi.mock("@/lib/redis", () => ({
   redis: {
     pipeline: () => mockPipeline,
@@ -13,10 +16,19 @@ vi.mock("@/lib/redis", () => ({
   },
 }))
 
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    inspiration: {
+      findMany: (...args: unknown[]) => mockFindMany(...args),
+    },
+  },
+}))
+
 describe("recordChannelMetric", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockPipeline.exec.mockResolvedValue([1, 1])
+    mockFindMany.mockResolvedValue([])
   })
 
   it("increments counters via Redis pipeline (global + account + channel)", async () => {
@@ -52,6 +64,7 @@ describe("recordChannelMetric", () => {
 describe("getChannelMetrics", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFindMany.mockResolvedValue([])
   })
 
   it("returns zero summary when Redis mget returns empty", async () => {
@@ -70,6 +83,14 @@ describe("getChannelMetrics", () => {
     expect(summary.replySuccessRate).toBe(0)
     // 7 days ago to today (inclusive) = 8 days
     expect(summary.days).toHaveLength(8)
+    expect(summary.shadowSamples).toEqual({
+      total: 0,
+      byMode: { capture_only: 0, evaluate: 0 },
+      remainingToGate: CONTENT_ROLLOUT_MIN_SHADOW_SAMPLES,
+      invalidCount: 0,
+      formalWriteViolationCount: 0,
+      replyViolationCount: 0,
+    })
   })
 
   it("aggregates values from Redis mget", async () => {
@@ -104,5 +125,77 @@ describe("getChannelMetrics", () => {
     })
 
     expect(summary.total.received).toBe(0)
+    expect(summary.shadowSamples.total).toBe(0)
+  })
+
+  it("loads shadowSamples from Inspiration with platform and window filters", async () => {
+    mockFindMany.mockResolvedValue([
+      {
+        id: "a",
+        source: "feishu",
+        sourceUrl: null,
+        externalMessageId: "om_a",
+        dedupeKey: null,
+        executionModeSnapshot: "capture_only",
+        topicSelectionId: null,
+        replyStatus: "suppressed",
+        createdAt: new Date(),
+      },
+      {
+        id: "b",
+        source: "feishu",
+        sourceUrl: null,
+        externalMessageId: "om_b",
+        dedupeKey: null,
+        executionModeSnapshot: "evaluate",
+        topicSelectionId: null,
+        replyStatus: "suppressed",
+        createdAt: new Date(),
+      },
+      {
+        id: "c",
+        source: "feishu",
+        sourceUrl: null,
+        externalMessageId: "om_c",
+        dedupeKey: null,
+        executionModeSnapshot: null,
+        topicSelectionId: null,
+        replyStatus: "suppressed",
+        createdAt: new Date(),
+      },
+    ])
+
+    const { getChannelMetrics } = await import("@/lib/channel-metrics")
+    const since = new Date("2026-07-01T00:00:00.000Z")
+    const until = new Date("2026-07-10T00:00:00.000Z")
+    const summary = await getChannelMetrics({
+      platform: "feishu",
+      since,
+      until,
+    })
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          source: "feishu",
+          createdAt: { gte: since, lte: until },
+        }),
+      }),
+    )
+    expect(summary.shadowSamples.total).toBe(2)
+    expect(summary.shadowSamples.byMode).toEqual({ capture_only: 1, evaluate: 1 })
+    expect(summary.shadowSamples.invalidCount).toBe(1)
+    expect(summary.shadowSamples.remainingToGate).toBe(CONTENT_ROLLOUT_MIN_SHADOW_SAMPLES - 2)
+  })
+
+  it("returns zero shadowSamples when Inspiration query throws", async () => {
+    mockFindMany.mockRejectedValue(new Error("db down"))
+    const { getChannelMetrics } = await import("@/lib/channel-metrics")
+    const summary = await getChannelMetrics({
+      platform: "feishu",
+      since: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    })
+    expect(summary.shadowSamples.total).toBe(0)
+    expect(summary.shadowSamples.remainingToGate).toBe(CONTENT_ROLLOUT_MIN_SHADOW_SAMPLES)
   })
 })
