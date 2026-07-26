@@ -27,6 +27,7 @@ describe("agent router timeout overrides", () => {
     process.env.JIEKOU_API_KEY = "test-jiekou"
     process.env.THEROUTER_API_KEY = "test-therouter"
     process.env.GLM_API_KEY = "test-glm"
+    process.env.ZENMUX_API_KEY = "test-zenmux"
     process.env.LLM_TIMEOUT_MS = "60000"
     vi.resetModules()
   })
@@ -49,10 +50,24 @@ describe("agent router timeout overrides", () => {
     expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
   })
 
-  it("keeps other agents on the default provider timeout", async () => {
-    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+  it("routes content_producer to Claude Opus 5 first, keeping DeepSeek as fallback", async () => {
+    const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
-    getAgentLLM("content_producer")
+    const llm = getAgentLLM("content_producer")
+    expect(llm.providerNames[0]).toBe("zenmux")
+    expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-opus-5")
+    expect(llm.providerNames).toContain("deepseek")
+    expect(llm.providerNames).toContain("apimart")
+
+    const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
+    expect(zenmux?.timeout).toBe(120000)
+  })
+
+  it("keeps non-Claude-primary agents on the default provider timeout", async () => {
+    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+    ctorArgs.length = 0
+
+    getAgentLLM("content_review")
 
     expect(ctorArgs.length).toBeGreaterThan(0)
     expect(ctorArgs.every((config) => config.timeout === 60000)).toBe(true)

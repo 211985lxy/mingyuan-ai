@@ -8,8 +8,9 @@ import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio
  * 智能体模型路由策略
  *
  * 核心思路：关键创作优先质量，日常生产优先稳定低成本
- * - 深度文案 / 商业选题 → ZenMux Claude 优先，离火 GPT-5.6 兜底
- * - 内容生产 / 质检 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
+ * - 深度文案 → ZenMux Claude Sonnet 优先，离火 GPT-5.6 兜底
+ * - 内容创作（content_producer）→ ZenMux Claude Opus 5，OpenRouter / Sonnet / DeepSeek 兜底
+ * - 发布质检 / 人设等 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
  * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / qianfan / openai
  * model 为可选，覆盖 provider 的默认模型（同一 provider 下不同智能体可用不同模型）
@@ -83,16 +84,18 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "glm", timeoutMs: 20000, capability: "standard" },
   ],
 
-  // ── DeepSeek 组（日常分发，走官方直连，无中转差价）──
-  // DeepSeek 官方直连价格最低，不走中转站加价；直连不可用时才回退到中转站
+  // ── 内容创作：Claude Opus 5 优先（仅 content_producer / 创作台 social）──
   content_producer: [
-    { name: "deepseek", capability: "standard" },
+    { name: "zenmux", model: "anthropic/claude-opus-5", timeoutMs: 120000, capability: "advanced" },
+    { name: "openrouter", model: "anthropic/claude-opus-5", timeoutMs: 120000, capability: "advanced" },
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
     { name: "apimart", capability: "advanced" },
-    { name: "zenmux", capability: "standard" },
-    { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
+    { name: "deepseek", capability: "standard" },
     { name: "jiekou", capability: "basic" },
     { name: "glm", capability: "standard" },
   ],
+
+  // ── DeepSeek 组（质检 / 人设等日常分发，走官方直连）──
   free_copywriter: [
     // 自由创作首选文心一言：中文语感、本土表达、创意生成最强，国内端点低延迟
     { name: "qianfan", model: "ernie-5.1", capability: "advanced" },
