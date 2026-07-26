@@ -91,8 +91,10 @@ export default function LoginPage() {
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle className="text-xl">登录</CardTitle>
-        <CardDescription>欢迎回来，请登录您的账号</CardDescription>
+        <CardTitle className="text-xl">登录明远 AIM</CardTitle>
+        <CardDescription>
+          欢迎回来。登录后进入企业智能体工作台；官网转化仍以微信预约诊断为主。
+        </CardDescription>
       </CardHeader>
 
       <CardContent>

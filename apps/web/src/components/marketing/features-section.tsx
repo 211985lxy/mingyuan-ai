@@ -1,69 +1,86 @@
 "use client"
 
-import { useTranslations } from "next-intl"
-import {
-  BriefcaseBusiness,
-  Mic2,
-  PencilLine,
-  MessageCircleQuestion,
-  Compass,
-  Layers,
-} from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import Link from "next/link"
+import { MARKETING_PRODUCT_NAME } from "@/lib/marketing-brand"
 
-interface Feature {
-  titleKey: string
-  descKey: string
-  tagKey: string
-  Icon: LucideIcon
-}
-
-const features: Feature[] = [
-  { titleKey: "feature1Title", descKey: "feature1Desc", tagKey: "feature1Tag", Icon: BriefcaseBusiness },
-  { titleKey: "feature2Title", descKey: "feature2Desc", tagKey: "feature2Tag", Icon: Mic2 },
-  { titleKey: "feature3Title", descKey: "feature3Desc", tagKey: "feature3Tag", Icon: PencilLine },
-  { titleKey: "feature4Title", descKey: "feature4Desc", tagKey: "feature4Tag", Icon: MessageCircleQuestion },
-  { titleKey: "feature5Title", descKey: "feature5Desc", tagKey: "feature5Tag", Icon: Compass },
-  { titleKey: "feature6Title", descKey: "feature6Desc", tagKey: "feature6Tag", Icon: Layers },
+const capabilities = [
+  {
+    index: "①",
+    title: "学习老板",
+    desc: "沉淀定位、表达、案例与判断，让输出更像本人、更贴业务。",
+  },
+  {
+    index: "②",
+    title: "持续做内容",
+    desc: "覆盖选题研究、脚本生产、矩阵协同，降低内容中断风险。",
+  },
+  {
+    index: "③",
+    title: "支持稳定运营",
+    desc: "把审核、复盘和资产回流嵌进日常工作，而不是一次性生成。",
+  },
+  {
+    index: "④",
+    title: "按真实结果优化",
+    desc: "用线索质量、转化与内容表现反哺提示词、选题与素材库。",
+  },
 ]
 
 /**
- * @description featuressection
- * @returns 无返回值
+ * @description Product spotlight — distill-style featured block.
  */
 export function FeaturesSection() {
-  const t = useTranslations("Features")
-
   return (
-    <section id="features" className="bg-[#FAF8F3] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-12 text-center sm:mb-16">
-          <h2 className="mb-4 text-2xl font-bold text-[#25211D] sm:text-3xl lg:text-4xl">
-            {t("heading")}
-          </h2>
-          <p className="mx-auto max-w-3xl text-lg text-[#5F5A52]">
-            {t("subheading")}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ titleKey, descKey, tagKey, Icon }) => (
-            <div
-              key={titleKey}
-              className="group jade-emboss flex flex-col gap-4 rounded-xl border border-[#E8DED1] bg-white p-6 sm:p-7"
-            >
-              <div className="flex items-center gap-3">
-                <div className="seal-icon h-10 w-10">
-                  <Icon className="h-5 w-5" />
-                </div>
-                <Badge variant="secondary" className="text-xs font-medium">
-                  {t(tagKey)}
-                </Badge>
+    <section id="product" className="px-0 py-16 sm:py-20 lg:py-24">
+      <div className="marketing-wrap">
+        <div className="overflow-hidden rounded-2xl border border-[#E8DED1] bg-[#25211D] text-[#F5F3EF]">
+          <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="p-8 sm:p-10 lg:p-12">
+              <p className="marketing-section-label mb-3 text-[#B88C33]">
+                ★ 核心产品
+              </p>
+              <h2 className="marketing-serif text-3xl font-bold leading-tight sm:text-4xl">
+                {MARKETING_PRODUCT_NAME}
+                <span className="mt-2 block text-lg font-medium text-white/55 sm:text-xl">
+                  Mingyuan AIM · Enterprise Agent Workspace
+                </span>
+              </h2>
+              <p className="mt-5 max-w-xl text-base leading-8 text-white/70">
+                把好老板的判断变成组织可调用资产：学习老板、持续做内容、支持稳定运营，并根据真实结果优化。
+              </p>
+              <div className="mt-8 flex flex-wrap gap-4">
+                <Link
+                  href="/ip-agent"
+                  className="inline-flex text-sm font-semibold text-[#B88C33] hover:underline"
+                >
+                  了解 IP 智能体 →
+                </Link>
+                <Link
+                  href="/login"
+                  className="inline-flex text-sm font-semibold text-white/70 hover:text-white"
+                >
+                  登录工作台 →
+                </Link>
               </div>
-              <h3 className="text-lg font-semibold text-[#25211D]">{t(titleKey)}</h3>
-              <p className="text-sm leading-relaxed text-[#6F675E]">{t(descKey)}</p>
             </div>
-          ))}
+            <div className="border-t border-white/10 bg-black/20 p-8 sm:p-10 lg:border-l lg:border-t-0 lg:p-12">
+              <ol className="space-y-6">
+                {capabilities.map((item) => (
+                  <li key={item.title} className="flex gap-4">
+                    <span className="marketing-serif text-xl text-[#B88C33]">
+                      {item.index}
+                    </span>
+                    <div>
+                      <h3 className="font-semibold text-white">{item.title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-white/55">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
         </div>
       </div>
     </section>

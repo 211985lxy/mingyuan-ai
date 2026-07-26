@@ -15,15 +15,14 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useBranding } from "@/components/providers/branding-provider"
 import { ApiError, registerUser } from "@/lib/api/client"
 import { useAuthStore } from "@/lib/store"
 import { getSubscriptionStatus } from "@/lib/subscription"
+import { MARKETING_PRODUCT_NAME } from "@/lib/marketing-brand"
 
 export default function RegisterPage() {
   const router = useRouter()
   const setSession = useAuthStore((s) => s.setSession)
-  const branding = useBranding()
 
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
@@ -102,8 +101,11 @@ export default function RegisterPage() {
   return (
     <Card>
       <CardHeader className="text-center">
-        <CardTitle className="text-xl">注册</CardTitle>
-        <CardDescription>创建您的 {branding.name} 账号</CardDescription>
+        <CardTitle className="text-xl">注册明远 AIM</CardTitle>
+        <CardDescription>
+          创建 {MARKETING_PRODUCT_NAME}{" "}
+          账号。若需企业诊断，请先从官网添加微信预约。
+        </CardDescription>
       </CardHeader>
 
       <CardContent>

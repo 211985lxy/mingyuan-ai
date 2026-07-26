@@ -1,57 +1,64 @@
 "use client"
 
-import { useTranslations } from "next-intl"
-import { ArchiveX, FileQuestion, MessageSquareWarning, PenLine } from "lucide-react"
+import {
+  Brain,
+  ClipboardList,
+  RefreshCcw,
+  UserRound,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { MarketingSectionHeader } from "./section-header"
 
-interface Pain {
-  titleKey: string
-  descKey: string
-  statKey: string
-  statLabelKey: string
-  Icon: LucideIcon
-}
-
-const pains: Pain[] = [
-  { titleKey: "pain1Title", descKey: "pain1Desc", statKey: "pain1Stat", statLabelKey: "pain1StatLabel", Icon: ArchiveX },
-  { titleKey: "pain2Title", descKey: "pain2Desc", statKey: "pain2Stat", statLabelKey: "pain2StatLabel", Icon: MessageSquareWarning },
-  { titleKey: "pain3Title", descKey: "pain3Desc", statKey: "pain3Stat", statLabelKey: "pain3StatLabel", Icon: PenLine },
-  { titleKey: "pain4Title", descKey: "pain4Desc", statKey: "pain4Stat", statLabelKey: "pain4StatLabel", Icon: FileQuestion },
+const problems: { title: string; desc: string; Icon: LucideIcon }[] = [
+  {
+    title: "经验依赖老板",
+    desc: "判断、表达和成交方法在老板脑子里，团队难以稳定复制。",
+    Icon: UserRound,
+  },
+  {
+    title: "内容容易中断",
+    desc: "缺人、缺素材、缺节奏时，获客内容生产就会停摆。",
+    Icon: ClipboardList,
+  },
+  {
+    title: "专业交付难复制",
+    desc: "方法论和案例散落各处，新人上手慢，交付质量波动大。",
+    Icon: Brain,
+  },
+  {
+    title: "AI 未进入工作流程",
+    desc: "工具很多，但没有进入选题、生产、审核和复盘的真实链路。",
+    Icon: RefreshCcw,
+  },
 ]
 
 /**
- * @description painpointssection
- * @returns 无返回值
+ * @description Enterprise problem grid.
  */
 export function PainPointsSection() {
-  const t = useTranslations("PainPoints")
-
   return (
-    <section className="bg-[#FAF8F3] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
-      <div className="mx-auto max-w-7xl">
-        <div className="text-center mb-12 sm:mb-16">
-          <h2 className="mb-4 text-2xl font-bold text-[#25211D] sm:text-3xl lg:text-4xl">
-            {t("heading")}
-          </h2>
-          <p className="mx-auto max-w-3xl text-lg text-[#5F5A52]">
-            {t("subheading")}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {pains.map(({ titleKey, descKey, statKey, statLabelKey, Icon }) => (
-            <div
-              key={titleKey}
-              className="jade-emboss group relative flex flex-col rounded-xl border border-[#E8DED1] bg-white p-6 hover:border-[#D14A33]/30"
-            >
-              <div className="seal-icon mb-4 h-11 w-11">
-                <Icon className="h-5 w-5" />
+    <section id="problems" className="px-0 py-16 sm:py-20 lg:py-24">
+      <div className="marketing-wrap">
+        <MarketingSectionHeader
+          label="企业问题"
+          title="真正卡住的，不是缺一个 AI 工具"
+          description="而是经验、内容、交付和流程没有形成可调用、可迭代的资产。"
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {problems.map(({ title, desc, Icon }, index) => (
+            <div key={title} className="marketing-solution-card">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="seal-icon h-10 w-10">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span className="font-mono text-xs text-[#B88C33]">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
               </div>
-              <h3 className="mb-2 text-lg font-semibold text-[#25211D]">{t(titleKey)}</h3>
-              <p className="mb-4 flex-1 text-sm leading-relaxed text-[#6F675E]">{t(descKey)}</p>
-              <div className="border-t border-[#EFE7DC] pt-4">
-                <span className="text-xl font-bold text-[#D14A33]">{t(statKey)}</span>
-                <span className="mt-0.5 block text-xs text-[#8A8175]">{t(statLabelKey)}</span>
-              </div>
+              <h3 className="mb-2 text-base font-semibold text-[#25211D]">
+                {title}
+              </h3>
+              <p className="text-sm leading-relaxed text-[#6F675E]">{desc}</p>
             </div>
           ))}
         </div>

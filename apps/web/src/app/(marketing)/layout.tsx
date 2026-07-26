@@ -1,22 +1,20 @@
-import { getLocale } from "next-intl/server"
 import { MarketingNavbar } from "@/components/marketing/marketing-navbar"
 import { MarketingFooter } from "@/components/marketing/marketing-footer"
+import { MarketingCtaProvider } from "@/components/marketing/wechat-cta"
 
-export default async function MarketingLayout({
+export default function MarketingLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const locale = await getLocale()
-
   return (
-    <div
-      className="marketing-page flex flex-col min-h-screen"
-      lang={locale === "zh" ? "zh-CN" : "en"}
-    >
-      <MarketingNavbar />
-      <main className="flex-1">{children}</main>
-      <MarketingFooter />
+    <div className="marketing-page flex min-h-screen flex-col" lang="zh-CN">
+      <div className="marketing-atmosphere" aria-hidden />
+      <MarketingCtaProvider>
+        <MarketingNavbar />
+        <div className="relative z-[1] flex-1">{children}</div>
+        <MarketingFooter />
+      </MarketingCtaProvider>
     </div>
   )
 }

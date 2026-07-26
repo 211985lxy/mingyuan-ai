@@ -1,79 +1,56 @@
 "use client"
 
-import { useTranslations } from "next-intl"
-import { CheckCircle, Sparkles } from "lucide-react"
+import { MarketingSectionHeader } from "./section-header"
 
-interface Diff {
-  titleKey: string
-  descKey: string
-  highlight?: boolean
-}
-
-const diffs: Diff[] = [
-  { titleKey: "diff0Title", descKey: "diff0Desc", highlight: true },
-  { titleKey: "diff1Title", descKey: "diff1Desc" },
-  { titleKey: "diff2Title", descKey: "diff2Desc" },
-  { titleKey: "diff3Title", descKey: "diff3Desc" },
-  { titleKey: "diff4Title", descKey: "diff4Desc" },
-  { titleKey: "diff5Title", descKey: "diff5Desc" },
-  { titleKey: "diff6Title", descKey: "diff6Desc" },
+const rows = [
+  {
+    other: "通用 AI 工具",
+    ours: "围绕商业目标与企业经验组织调用，而不是只给一个对话框",
+  },
+  {
+    other: "培训机构",
+    ours: "不只讲课，还把方法装进真实工作流程与可迭代资产",
+  },
+  {
+    other: "软件开发公司",
+    ours: "先对齐业务闭环，再联合交付，避免只交付一套空壳系统",
+  },
+  {
+    other: "传统代运营",
+    ours: "目标是沉淀企业自有智能体资产，而不是长期外包内容产能",
+  },
 ]
 
 /**
- * @description differentiatorssection
- * @returns 无返回值
+ * @description Differentiation comparison table.
  */
 export function DifferentiatorsSection() {
-  const t = useTranslations("Differentiators")
-
   return (
-    <section className="bg-white px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-12 text-center sm:mb-16">
-          <h2 className="mb-4 text-2xl font-bold text-[#25211D] sm:text-3xl lg:text-4xl">
-            {t("heading")}
-          </h2>
-          <p className="mx-auto max-w-3xl text-lg text-[#5F5A52]">
-            {t("subheading")}
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {diffs.map(({ titleKey, descKey, highlight }) =>
-            highlight ? (
-              // 首卡：高亮「档案只配一次」卖点，跨列强调
-              <div
-                key={titleKey}
-                className="dao-shimmer jade-emboss flex items-start gap-4 rounded-xl bg-fire-earth-gradient p-6 text-white sm:col-span-2 lg:col-span-1"
-              >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="mb-1 text-lg font-bold">{t(titleKey)}</h3>
-                  <p className="text-sm leading-relaxed text-white/90">
-                    {t(descKey)}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div
-                key={titleKey}
-                className="jade-emboss flex items-start gap-4 rounded-xl border border-[#E8DED1] bg-[#FAF8F3] p-6"
-              >
-                <div className="seal-icon mt-0.5 h-8 w-8">
-                  <CheckCircle className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="mb-1 text-base font-semibold text-[#25211D]">
-                    {t(titleKey)}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-[#6F675E]">
-                    {t(descKey)}
-                  </p>
-                </div>
-              </div>
-            )
-          )}
+    <section id="difference" className="px-0 py-16 sm:py-20 lg:py-24">
+      <div className="marketing-wrap">
+        <MarketingSectionHeader
+          label="差异化"
+          title="同时处理目标、经验、流程与联合交付"
+          description="明动远见不是单点卖工具、卖课或卖外包，而是共建企业专有智能体资产。"
+        />
+        <div className="overflow-hidden rounded-2xl border border-[#E8DED1] bg-[#FEFDFB]">
+          <div className="hidden grid-cols-[200px_1fr] border-b border-[#EFE7DC] bg-[#F6EEDA]/60 md:grid">
+            <div className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[#8A8175]">
+              常见选择
+            </div>
+            <div className="px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[#8A8175]">
+              明动远见怎么做
+            </div>
+          </div>
+          {rows.map((row) => (
+            <div
+              key={row.other}
+              className="grid grid-cols-1 gap-2 border-t border-[#EFE7DC] px-5 py-5 first:border-t-0 md:grid-cols-[200px_1fr] md:gap-6"
+            >
+              <div className="text-sm font-semibold text-[#D14A33]">{row.other}</div>
+              <div className="text-sm leading-relaxed text-[#5F5A52]">{row.ours}</div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

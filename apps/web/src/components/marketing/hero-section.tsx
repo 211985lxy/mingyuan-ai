@@ -1,186 +1,68 @@
 "use client"
 
 import Link from "next/link"
-import { useTranslations } from "next-intl"
-import { useBranding } from "@/components/providers/branding-provider"
+import { ArrowRight } from "lucide-react"
 import {
-  ArrowRight,
-  BookOpen,
-  Brain,
-  BriefcaseBusiness,
-  Check,
-  MessageSquareText,
-  Play,
-  Quote,
-  Sparkles,
-  Wand2,
-} from "lucide-react"
+  MARKETING_COMPANY_NAME,
+  MARKETING_PRIMARY_CTA,
+  MARKETING_PRODUCT_NAME,
+} from "@/lib/marketing-brand"
+import { WechatCtaButton } from "./wechat-cta"
 
-const inputs = [
-  { labelKey: "businessDocs", Icon: BookOpen },
-  { labelKey: "founderKnowhow", Icon: Quote },
-  { labelKey: "projectCases", Icon: BriefcaseBusiness },
-  { labelKey: "customerQa", Icon: MessageSquareText },
+const proofStrip = [
+  { value: "4000+", label: "单月精准线索（项目方提供）" },
+  { value: "20+", label: "账号矩阵协同" },
+  { value: "近千万", label: "内部实践单条播放" },
 ]
 
-const outputs = [
-  "heroOutput1",
-  "heroOutput2",
-  "heroOutput3",
-  "heroOutput4",
-] as const
-
 /**
- * @description herosection
- * @returns 无返回值
+ * @description Editorial hero inspired by evidence-first studio sites.
  */
 export function HeroSection() {
-  const t = useTranslations("Hero")
-  const tP = useTranslations("Platforms")
-  const branding = useBranding()
-  const profileOnce = t("profileOnce")
-
   return (
-    <section className="relative overflow-hidden bg-[#FAF8F3] px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
-      {/* 背景晕染：火土东方光晕 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background:
-            "radial-gradient(60% 55% at 85% 0%, oklch(0.575 0.205 28.0 / 0.10), transparent 70%), radial-gradient(45% 45% at 0% 20%, oklch(0.745 0.185 38.0 / 0.10), transparent 70%)",
-        }}
-      />
-
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[1fr_520px]">
-        {/* 左：文案与行动 */}
-        <div>
-          {/* 徽章 */}
-          <div className="badge-gold mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium">
-            <Sparkles className="h-4 w-4" />
-            {t("badge")}
-          </div>
-
-          {/* 眉题 */}
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B88C33]">
-            {t("eyebrow")}
-          </p>
-
-          {/* 主标题：高对比、大号、群响式压迫感 */}
-          <h1 className="max-w-3xl break-words text-4xl font-bold leading-[1.08] tracking-tight text-[#25211D] sm:text-5xl lg:text-6xl">
-            {t("title")}
-            <br />
-            <span className="block break-all text-[#D14A33]">
-              {t("titleHighlight")}
-            </span>
+    <section className="relative overflow-hidden px-0 pb-10 pt-14 sm:pb-14 sm:pt-20 lg:pt-24">
+      <div className="marketing-wrap">
+        <div className="hero-head max-w-4xl">
+          <p className="marketing-section-label mb-4">最近在做</p>
+          <h1 className="marketing-hero-title text-[#25211D]">
+            <em>{MARKETING_COMPANY_NAME}</em> 在做什么
           </h1>
-
-          {/* 副标题 */}
-          <p className="mt-6 max-w-2xl text-base leading-8 text-[#5F5A52] sm:text-lg">
-            {t("subtitle", { name: branding.name })}
+          <p className="mt-5 max-w-2xl text-base leading-8 text-[#5F5A52] sm:text-lg">
+            判断不靠口号。看我们如何让 AI 学会老板的经验，进入真实工作，并帮助企业持续获得客户——比任何介绍都准。
           </p>
-
-          {profileOnce ? (
-            <div className="mt-6 inline-flex items-center gap-2 rounded-lg border border-[#D14A33]/15 bg-white/70 px-3.5 py-2 text-sm font-medium text-[#25211D] shadow-sm backdrop-blur">
-              <span className="seal-icon h-5! w-5!">
-                <Check className="h-3.5 w-3.5" />
-              </span>
-              {profileOnce}
-            </div>
-          ) : null}
-
-          {/* CTAs */}
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-            <Link
-              href="/register"
-              className="jade-emboss inline-flex w-full cursor-pointer items-center justify-center rounded-lg bg-[#D14A33] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-[#D14A33]/25 transition-colors duration-200 hover:bg-[#B83F2B] sm:w-auto"
-            >
-              {t("cta")}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
-            <Link
-              href="/login"
-              className="jade-emboss inline-flex w-full cursor-pointer items-center justify-center rounded-lg border border-[#D14A33]/25 bg-white px-8 py-4 text-base font-semibold text-[#25211D] transition-colors duration-200 hover:bg-[#FFF8F4] sm:w-auto"
-            >
-              <Play className="mr-2 h-5 w-5 text-[#D14A33]" />
-              {t("ctaSecondary")}
-            </Link>
-          </div>
-
-          {/* 信任条：三项并列 */}
-          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium text-[#8A8175]">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="text-base font-bold text-[#D14A33]">3,000+</span>
-              {t("trustBusiness")}
-            </span>
-            <span className="hidden h-4 w-px bg-[#E8DED1] sm:inline-block" />
-            <span className="inline-flex items-center gap-1.5">
-              <span className="text-base font-bold text-[#D14A33]">7</span>
-              {t("trustLoop")}
-            </span>
-            <span className="hidden h-4 w-px bg-[#E8DED1] sm:inline-block" />
-            <span>{t("trustBrowser")}</span>
-          </div>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-[#8A8175]">
+            核心产品 {MARKETING_PRODUCT_NAME}
+            ：把经验变成可调用、可迭代的智能体资产。
+          </p>
         </div>
 
-        {/* 右：产品可视化卡片（带动效） */}
-        <div className="dao-shimmer relative rounded-2xl border border-[#E8DED1] bg-white p-5 shadow-2xl shadow-[#8C4A2F]/15 lg:p-6">
-          {/* 卡片头 */}
-          <div className="flex items-center justify-between border-b border-[#EFE7DC] pb-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#B88C33]">
-                {t("panelLabel")}
+        <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:items-center">
+          <WechatCtaButton className="jade-emboss inline-flex w-full cursor-pointer items-center justify-center rounded-lg bg-[#D14A33] px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#D14A33]/25 transition-colors duration-200 hover:bg-[#B83F2B] sm:w-auto">
+            {MARKETING_PRIMARY_CTA}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </WechatCtaButton>
+          <Link
+            href="/#product"
+            className="inline-flex w-full cursor-pointer items-center justify-center rounded-lg border border-[#E8DED1] bg-white/80 px-7 py-3.5 text-sm font-semibold text-[#25211D] backdrop-blur transition-colors duration-200 hover:border-[#D14A33]/30 hover:bg-[#FFF8F4] sm:w-auto"
+          >
+            看 {MARKETING_PRODUCT_NAME} 怎么跑 →
+          </Link>
+        </div>
+
+        <div className="mt-12 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {proofStrip.map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl border border-[#E8DED1] bg-white/75 px-5 py-4 backdrop-blur"
+            >
+              <p className="marketing-serif text-2xl font-bold tracking-tight text-[#D14A33]">
+                {item.value}
               </p>
-              <p className="mt-1 text-lg font-bold text-[#25211D]">
-                {t("panelTitle")}
+              <p className="mt-1 text-xs leading-relaxed text-[#8A8175]">
+                {item.label}
               </p>
             </div>
-            <div className="fire-pulse-ring flex h-12 w-12 items-center justify-center rounded-xl bg-[#D14A33]/10">
-              <Brain className="h-6 w-6 text-[#D14A33]" />
-            </div>
-          </div>
-
-          {/* 输入资产 */}
-          <div className="grid gap-3 py-5 sm:grid-cols-2">
-            {inputs.map(({ labelKey, Icon }) => (
-              <div
-                key={labelKey}
-                className="rounded-lg border border-[#EFE7DC] bg-[#FAF8F3] p-4 transition-colors duration-200 hover:border-[#D14A33]/30"
-              >
-                <Icon className="mb-3 h-5 w-5 text-[#B88C33]" />
-                <p className="text-sm font-semibold text-[#25211D]">{tP(labelKey)}</p>
-                <p className="mt-1 text-xs text-[#777066]">{t("panelInputs")}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* AI 转化箭头条 */}
-          <div className="mb-4 flex items-center justify-center gap-2 text-xs font-semibold text-[#B88C33]">
-            <Wand2 className="h-4 w-4" />
-            <span>{t("panelStatus")}</span>
-            <span className="gold-flow-progress h-1 w-16 overflow-hidden rounded-full" />
-          </div>
-
-          {/* 输出 */}
-          <div className="rounded-xl bg-[#25211D] p-5 text-white">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="text-sm font-semibold">{t("panelOutputs")}</p>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/70">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                {t("panelStatus")}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {outputs.map((item) => (
-                <div
-                  key={item}
-                  className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white/90 transition-colors duration-200 hover:bg-white/15"
-                >
-                  {t(item)}
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </section>

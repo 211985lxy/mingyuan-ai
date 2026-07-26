@@ -150,7 +150,160 @@
 
 /* Marketing page — CJK typography and CSS isolation */
 .marketing-page {
+  position: relative;
   font-family: var(--font-sans), system-ui, sans-serif;
+  background: #faf8f3;
+  color: #25211d;
+}
+
+.marketing-page .marketing-serif {
+  font-family:
+    "Songti SC",
+    "Noto Serif SC",
+    "Source Han Serif SC",
+    "STSong",
+    "SimSun",
+    serif;
+}
+
+/* Soft atmosphere wash (yibi-like depth, brand warm sand) */
+.marketing-atmosphere {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(55% 40% at 88% -5%, oklch(0.575 0.205 28 / 0.09), transparent 70%),
+    radial-gradient(40% 35% at 8% 15%, oklch(0.745 0.185 38 / 0.08), transparent 65%),
+    radial-gradient(50% 50% at 50% 100%, oklch(0.945 0.025 76 / 0.55), transparent 70%);
+}
+
+.marketing-wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .marketing-wrap {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .marketing-wrap {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.marketing-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b88c33;
+}
+
+.marketing-h-section {
+  font-family:
+    "Songti SC",
+    "Noto Serif SC",
+    "Source Han Serif SC",
+    "STSong",
+    "SimSun",
+    serif;
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.marketing-hero-title {
+  font-family:
+    "Songti SC",
+    "Noto Serif SC",
+    "Source Han Serif SC",
+    "STSong",
+    "SimSun",
+    serif;
+  font-size: clamp(2.25rem, 6vw, 4rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+}
+
+.marketing-hero-title em {
+  font-style: normal;
+  color: #d14a33;
+}
+
+.marketing-solution-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid #e8ded1;
+  border-radius: 1rem;
+  background: #fefdfb;
+  padding: 1.5rem;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.marketing-solution-card:hover {
+  border-color: oklch(0.575 0.205 28 / 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px oklch(0.24 0.035 68 / 0.06);
+}
+
+.marketing-solution-card.is-core {
+  border-color: oklch(0.575 0.205 28 / 0.4);
+  background: linear-gradient(165deg, #fff8f4 0%, #fefdfb 55%);
+}
+
+.marketing-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid #efe7dc;
+  background: #faf8f3;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  color: #5f5a52;
+}
+
+.marketing-metric strong {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #d14a33;
+}
+
+.marketing-cta-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: #d14a33;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 4px 14px oklch(0.575 0.205 28 / 0.22);
+  transition: background-color 0.2s ease;
+}
+
+.marketing-cta-mini:hover {
+  background: #b83f2b;
 }
 
 /* Offset anchor targets so they land below the sticky navbar */
@@ -170,6 +323,12 @@
 .marketing-page[lang="zh-CN"] li {
   line-height: 1.75;
   letter-spacing: 0.02em;
+}
+
+.marketing-page .marketing-hero-title,
+.marketing-page .marketing-h-section {
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
 /* ============================================================
