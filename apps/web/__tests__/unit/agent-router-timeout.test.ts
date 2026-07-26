@@ -50,17 +50,24 @@ describe("agent router timeout overrides", () => {
     expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
   })
 
-  it("routes content_producer to DeepSeek first for stable production chat", async () => {
+  it("routes content_producer to ZenMux Claude first with DeepSeek fallback", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     const llm = getAgentLLM("content_producer")
-    expect(llm.providerNames[0]).toBe("deepseek")
-    expect(getAgentRecommendedModel("content_producer")).toBe("deepseek-v4-flash")
+    expect(llm.providerNames[0]).toBe("zenmux")
+    expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-sonnet-4.6")
+    expect(llm.providerNames).toContain("deepseek")
     expect(llm.providerNames).toContain("apimart")
-    expect(llm.providerNames).toContain("zenmux")
 
-    const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
-    expect(deepseek).toBeTruthy()
+    const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
+    expect(zenmux?.timeout).toBe(120000)
+    expect(zenmux?.fetchOptions).toMatchObject({ dispatcher: expect.any(Object) })
+  })
+
+  it("attaches proxy dispatcher to ZenMux when APIMART_PROXY_URL is set", async () => {
+    const { getProviderConfigs } = await import("@/lib/llm/config")
+    const zenmux = getProviderConfigs().find((config) => config.name === "zenmux")
+    expect(zenmux?.proxyURL).toBe("http://127.0.0.1:10808")
   })
 
   it("keeps non-Claude-primary agents on the default provider timeout", async () => {
@@ -126,5 +133,17 @@ describe("agent router timeout overrides", () => {
 
     expect(llm.providerNames).toContain("deepseek")
     expect(llm.providerNames).not.toContain("jiekou")
+  })
+
+  it("lists deduped routed model targets for the probe script", async () => {
+    const { listRoutedModelTargets } = await import("@/lib/llm/agent-router")
+    const targets = listRoutedModelTargets()
+    expect(targets.length).toBeGreaterThan(5)
+    const keys = new Set(targets.map((t) => `${t.provider}::${t.model ?? ""}`))
+    expect(keys.size).toBe(targets.length)
+    expect(
+      targets.some((t) => t.provider === "zenmux" && t.model === "anthropic/claude-sonnet-4.6"),
+    ).toBe(true)
+    expect(targets.some((t) => t.provider === "deepseek")).toBe(true)
   })
 })

@@ -207,6 +207,7 @@ export const env = createEnv({
     ZENMUX_API_KEY: z.string().optional(),
     ZENMUX_BASE_URL: z.string().optional(),
     ZENMUX_MODEL: z.string().optional(),
+    ZENMUX_PROXY_URL: z.string().optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.string().optional(),
@@ -417,6 +418,7 @@ export const env = createEnv({
     ZENMUX_API_KEY: process.env.ZENMUX_API_KEY,
     ZENMUX_BASE_URL: process.env.ZENMUX_BASE_URL,
     ZENMUX_MODEL: process.env.ZENMUX_MODEL,
+    ZENMUX_PROXY_URL: process.env.ZENMUX_PROXY_URL,
   },
   emptyStringAsUndefined: true,
 })

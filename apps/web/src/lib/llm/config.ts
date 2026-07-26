@@ -19,12 +19,14 @@ export function getProviderConfigs(): LLMProviderConfig[] {
   }
 
   // High-quality gateway: ZenMux — OpenAI-compatible unified model API
+  // ECS 直连 zenmux.ai 常超时；生产应设 ZENMUX_PROXY_URL（可与 APIMART_PROXY_URL 同代理）。
   if (process.env.ZENMUX_API_KEY) {
     configs.push({
       name: "zenmux",
       apiKey: process.env.ZENMUX_API_KEY,
       baseURL: process.env.ZENMUX_BASE_URL || "https://zenmux.ai/api/v1",
       defaultModel: process.env.ZENMUX_MODEL || "qwen/qwen3-max",
+      proxyURL: process.env.ZENMUX_PROXY_URL || env.APIMART_PROXY_URL,
     })
   }
 
