@@ -54,7 +54,7 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     })
     for (const agent of [
       "content_producer",
-      "deep_copywriter",
+      "work_editor",
       "business_diagnosis",
       "free_copywriter",
       "business_system_diagnosis",
@@ -214,25 +214,25 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
 
     expect(evaluateEvalGate(report([
       result("a", "content_producer", 80),
-      result("b", "deep_copywriter", 80),
+      result("b", "work_editor", 80),
       result("c", "business_diagnosis", 80),
     ]), "daily").passed).toBe(true)
 
     expect(evaluateEvalGate(report([
       result("a", "content_producer", null),
-      result("b", "deep_copywriter", 90),
+      result("b", "work_editor", 90),
       result("c", "business_diagnosis", 90),
     ]), "daily").reasons).toContain("rubric judge coverage is incomplete")
 
     expect(evaluateEvalGate(report([
       result("a", "content_producer", 90, true),
-      result("b", "deep_copywriter", 90),
+      result("b", "work_editor", 90),
       result("c", "business_diagnosis", 90),
     ]), "full").reasons).toContain("fabricated facts detected")
 
     expect(evaluateEvalGate(report([
       result("a", "content_producer", 90),
-      result("b", "deep_copywriter", 60),
+      result("b", "work_editor", 60),
       result("c", "business_diagnosis", 90),
     ]), "full").passed).toBe(false)
   })

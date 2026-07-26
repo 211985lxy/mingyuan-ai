@@ -299,8 +299,8 @@ describe("AIM high-risk loop prompt coverage", () => {
     completeMock.mockResolvedValue({ content: "ok", model: "test", usage: { totalTokens: 0 } })
   })
 
-  it("keeps deep_copywriter listening to the current ask while adding loop rules only for formal deliverables", async () => {
-    const handler = getAgentHandler("deep_copywriter")
+  it("keeps work_editor listening to the current ask while adding loop rules only for formal deliverables", async () => {
+    const handler = getAgentHandler("work_editor")
     await handler.chat(buildChatParams())
 
     const systemPrompt = capturedSystemPrompt()
@@ -310,8 +310,8 @@ describe("AIM high-risk loop prompt coverage", () => {
     expect(systemPrompt).toContain("正式交付内容结尾追加一个简短“验证结果”区块")
   })
 
-  it("lets deep_copywriter generate bypass the framework when the current request explicitly asks for direct drafting", async () => {
-    const handler = getAgentHandler("deep_copywriter")
+  it("lets work_editor generate bypass the framework when the current request explicitly asks for direct drafting", async () => {
+    const handler = getAgentHandler("work_editor")
     await handler.generate(buildGenerateContext({
       rawInput: [
         "【本轮对话】",
@@ -492,7 +492,7 @@ describe("定位策划官 天命IP资产化操盘全案路由 (F)", () => {
     const action = guide.nextActions.find((a) => a.id === "to_business_diagnosis")
 
     expect(action).toBeDefined()
-    expect(action?.label).toBe("带入灵感选题策划")
+    expect(action?.label).toBe("带入选题策划")
     expect(action?.targetAgentId).toBe("business_diagnosis")
     expect(action?.prompt).toContain("天命IP资产化操盘全案")
     expect(action?.prompt).toContain("12 个客户结果段")

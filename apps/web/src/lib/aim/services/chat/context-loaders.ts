@@ -82,7 +82,7 @@ export async function retrieveChatContextBlocks(input: {
     shouldUseKnowledgeContext
     && projectId
     && projectId !== "<no-project>"
-    && (agentId === "content_producer" || agentId === "deep_copywriter" || agentId === "free_copywriter"),
+    && (agentId === "content_producer" || agentId === "work_editor" || agentId === "free_copywriter"),
   )
 
   const painIntent = shouldResolvePainIntent

@@ -16,7 +16,7 @@ import type { CopyStudioModule } from "@/lib/copy-studio"
 export type AimAgentId =
   | "content_producer"
   | "free_copywriter"
-  | "deep_copywriter"
+  | "work_editor"
   | "business_system_diagnosis"
   | "business_diagnosis"
   | "content_review"
@@ -32,7 +32,7 @@ export type AimEntrypoint = "chat" | "generate" | "agent_api" | "inspiration"
 export const AIM_AGENT_IDS: ReadonlySet<AimAgentId> = new Set<AimAgentId>([
   "content_producer",
   "free_copywriter",
-  "deep_copywriter",
+  "work_editor",
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",
@@ -43,12 +43,14 @@ export const AIM_AGENT_IDS: ReadonlySet<AimAgentId> = new Set<AimAgentId>([
 export const DEFAULT_AIM_AGENT: AimAgentId = "content_producer"
 
 /**
- * 旧 id 归一化映射。内容生产官曾用 "ip_video" 作为公开 id（URL、外部 API、
- * 旧 AimGeneration 记录），现已统一为 "content_producer"。保留旧 id 的归一化，
- * 使旧书签链接、旧外部调用、旧数据库行都能正确路由，不报 404。
+ * 旧 id 归一化映射。
+ * - 内容生产官曾用 "ip_video"，现统一为 "content_producer"
+ * - 作品编辑曾用 "deep_copywriter"，现统一为 "work_editor"
+ * 保留旧 id 的归一化，使旧书签链接、旧外部调用、旧数据库行都能正确路由，不报 404。
  */
 export const LEGACY_AGENT_ID_ALIASES: Record<string, AimAgentId> = {
   ip_video: "content_producer",
+  deep_copywriter: "work_editor",
 }
 
 /**

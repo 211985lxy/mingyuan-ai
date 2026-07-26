@@ -50,6 +50,14 @@ describe("aim history detail route", () => {
     expect(await response.json()).toEqual({ id: "generation-1", agentId: "content_producer" })
   })
 
+  it("normalizes legacy deep_copywriter agent id to work_editor", async () => {
+    mocks.generationFindFirst.mockResolvedValueOnce({ id: "generation-2", agentId: "deep_copywriter" })
+
+    const response = await GET(new NextRequest("http://localhost/api/aim/history/generation-2"), params)
+
+    expect(await response.json()).toEqual({ id: "generation-2", agentId: "work_editor" })
+  })
+
   it("attaches a quick generation to an authorized active project", async () => {
     mocks.generationFindFirst.mockResolvedValueOnce({
       id: "generation-1", projectId: null, topicSelectionId: null,

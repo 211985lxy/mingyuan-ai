@@ -108,7 +108,7 @@ describe("GET /api/admin/aim/runs (list)", () => {
 
   it("lists harness-instrumented runs (runId not null)", async () => {
     traceStore.set("run_1", { id: "t1", runId: "run_1", agentId: "content_producer", qualityStatus: "pass" })
-    traceStore.set("run_2", { id: "t2", runId: "run_2", agentId: "deep_copywriter", degraded: true, qualityStatus: "warn" })
+    traceStore.set("run_2", { id: "t2", runId: "run_2", agentId: "work_editor", degraded: true, qualityStatus: "warn" })
 
     const res = await listRuns(runRequest("http://localhost/api/admin/aim/runs?limit=10"), segment())
     const body = await res.json()

@@ -32,7 +32,7 @@ const MAX_HISTORY_MESSAGES = 10
 const AGENT_DEFAULT_FORMAT: Partial<Record<AimAgentId, ContentFormat>> = {
   content_producer: "video_script",
   free_copywriter: "raw_copy",
-  deep_copywriter: "raw_copy",
+  work_editor: "raw_copy",
   business_system_diagnosis: "raw_copy",
   business_diagnosis: "raw_copy",
   content_review: "raw_copy",

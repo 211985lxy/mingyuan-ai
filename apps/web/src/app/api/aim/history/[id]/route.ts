@@ -29,7 +29,12 @@ export async function GET(
     }
     return NextResponse.json({
       ...record,
-      agentId: record.agentId === "ip_video" ? "content_producer" : record.agentId,
+      agentId:
+        record.agentId === "ip_video"
+          ? "content_producer"
+          : record.agentId === "deep_copywriter"
+            ? "work_editor"
+            : record.agentId,
     })
   } catch (error) {
     return authErrorResponse(error) ?? NextResponse.json(

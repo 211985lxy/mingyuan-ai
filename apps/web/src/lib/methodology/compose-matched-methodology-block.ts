@@ -15,7 +15,7 @@ import {
 
 const DYNAMIC_CARD_AGENTS = new Set([
   "content_producer",
-  "deep_copywriter",
+  "work_editor",
   "free_copywriter",
 ])
 

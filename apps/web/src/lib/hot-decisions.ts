@@ -108,7 +108,7 @@ export function decideAiHotItems(items: AiHotItem[]): HotDecisionItem[] {
     sourceTierLabel: "AI HOT 已精选",
     sourceConfidence: "已精选",
     reason: "这条来自 AI HOT 精选池，已完成基础信源过滤，适合直接判断内容角度。",
-    recommendedAction: "适合交给深度文案官，提炼成观点型内容。",
+    recommendedAction: "适合交给作品编辑，提炼成观点型内容。",
     isPreselected: true,
     clusterSize: 1,
     relatedTitles: [],
@@ -328,7 +328,7 @@ function buildReason(verdict: HotDecisionVerdict, businessScore: number, titleSc
 
 function actionFor(verdict: HotDecisionVerdict) {
   if (verdict === "worth") return "适合马上进入 AIM 创作。"
-  if (verdict === "watch") return "适合交给深度文案官打磨观点。"
+  if (verdict === "watch") return "适合交给作品编辑打磨观点。"
   if (verdict === "caution") return "先加入选题库观察，不建议直接发布。"
   return "不建议追。"
 }

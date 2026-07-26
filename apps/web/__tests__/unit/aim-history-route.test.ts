@@ -55,6 +55,34 @@ describe("aim history route", () => {
     ])
   })
 
+  it("loads legacy deep_copywriter rows for work_editor and normalizes the response id", async () => {
+    findMany.mockResolvedValueOnce([
+      {
+        id: "gen-dc",
+        agentId: "deep_copywriter",
+        rawInput: "旧作品编辑记录",
+        createdAt: new Date("2026-07-08T08:00:00.000Z"),
+      },
+    ])
+
+    const res = await GET(new NextRequest("http://localhost:3000/api/aim/history?agentId=work_editor"))
+    const body = await res.json()
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        userId: "user-1",
+        agentId: { in: ["work_editor", "deep_copywriter"] },
+      }),
+    }))
+    expect(body).toEqual([
+      expect.objectContaining({
+        id: "gen-dc",
+        agentId: "work_editor",
+        rawInput: "旧作品编辑记录",
+      }),
+    ])
+  })
+
   it("returns a real pending total without changing the legacy response by default", async () => {
     findMany.mockResolvedValueOnce([{ id: "gen-2", agentId: "content_producer" }])
     count.mockResolvedValueOnce(12)

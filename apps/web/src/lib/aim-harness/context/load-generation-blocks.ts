@@ -50,7 +50,7 @@ export async function loadGenerationContextBlocks(input: {
     spec.projectId
     && generationIntent.useKnowledge
     && !params.contextOverride
-    && (agentId === "content_producer" || agentId === "deep_copywriter" || agentId === "free_copywriter"),
+    && (agentId === "content_producer" || agentId === "work_editor" || agentId === "free_copywriter"),
   )
 
   const painIntent = shouldResolvePainIntent
@@ -121,7 +121,7 @@ export async function loadGenerationContextBlocks(input: {
             ? buildBusinessDiagnosisMethodologyBlock()
             : Promise.resolve(""),
           generationIntent.useMethodology && spec.projectId ? buildIpWikiBlock({ projectId: spec.projectId }) : Promise.resolve(""),
-          generationIntent.useMethodology && (agentId === "content_producer" || agentId === "deep_copywriter") && useEventStorytelling
+          generationIntent.useMethodology && (agentId === "content_producer" || agentId === "work_editor") && useEventStorytelling
             ? buildEventStorytellingMethodologyBlock()
             : Promise.resolve(""),
         ]),

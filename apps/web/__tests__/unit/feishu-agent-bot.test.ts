@@ -7,11 +7,11 @@ vi.mock("@/env", () => ({
     FEISHU_BOT_CONTENT_PRODUCER_VERIFY_TOKEN: "token_cp",
     FEISHU_BOT_CONTENT_PRODUCER_ENCRYPT_KEY: "encrypt_cp",
     FEISHU_BOT_CONTENT_PRODUCER_SUPERVISOR_CHAT_ID: "oc_cp",
-    FEISHU_BOT_DEEP_COPYWRITER_APP_ID: "cli_dc",
-    FEISHU_BOT_DEEP_COPYWRITER_APP_SECRET: "secret_dc",
-    FEISHU_BOT_DEEP_COPYWRITER_VERIFY_TOKEN: "token_dc",
-    FEISHU_BOT_DEEP_COPYWRITER_ENCRYPT_KEY: "encrypt_dc",
-    FEISHU_BOT_DEEP_COPYWRITER_SUPERVISOR_CHAT_ID: "oc_dc",
+    FEISHU_BOT_WORK_EDITOR_APP_ID: "cli_dc",
+    FEISHU_BOT_WORK_EDITOR_APP_SECRET: "secret_dc",
+    FEISHU_BOT_WORK_EDITOR_VERIFY_TOKEN: "token_dc",
+    FEISHU_BOT_WORK_EDITOR_ENCRYPT_KEY: "encrypt_dc",
+    FEISHU_BOT_WORK_EDITOR_SUPERVISOR_CHAT_ID: "oc_dc",
     FEISHU_BOT_BIZ_DIAGNOSIS_APP_ID: "cli_bd",
     FEISHU_BOT_BIZ_DIAGNOSIS_APP_SECRET: "secret_bd",
     FEISHU_BOT_BIZ_DIAGNOSIS_VERIFY_TOKEN: "token_bd",
@@ -45,7 +45,7 @@ import { isAgentAllowedForBot, resolveBotByVerificationToken, loadAgentBotRegist
 
 const mockContentProducer: FeishuAgentBotConfig = {
   botId: "content_producer",
-  displayName: "内容创作官",
+  displayName: "内容创作",
   appId: "cli_cp",
   appSecret: "secret_cp",
   verificationToken: "token_cp",
@@ -57,7 +57,7 @@ const mockContentProducer: FeishuAgentBotConfig = {
 
 const mockBizDiagnosis: FeishuAgentBotConfig = {
   botId: "business_system_diagnosis",
-  displayName: "商业诊断官",
+  displayName: "商业诊断",
   appId: "cli_bd",
   appSecret: "secret_bd",
   verificationToken: "token_bd",
@@ -103,15 +103,15 @@ describe("resolveAgentBotIntent", () => {
     const result = resolveAgentBotIntent("/商业诊断 帮我分析一下", mockContentProducer)
     expect(result.status).toBe("cross_bot_redirect")
     if (result.status === "cross_bot_redirect") {
-      expect(result.message).toContain("商业诊断官")
+      expect(result.message).toContain("商业诊断")
     }
   })
 
-  it("诊断官收到内容创作命令时引导到内容创作官", () => {
+  it("诊断官收到内容创作命令时引导到内容创作", () => {
     const result = resolveAgentBotIntent("/内容创作 写一条口播", mockBizDiagnosis)
     expect(result.status).toBe("cross_bot_redirect")
     if (result.status === "cross_bot_redirect") {
-      expect(result.message).toContain("内容创作官")
+      expect(result.message).toContain("内容创作")
     }
   })
 
@@ -127,7 +127,7 @@ describe("resolveAgentBotIntent", () => {
 describe("buildBotHelpText", () => {
   it("包含 bot 名称", () => {
     const text = buildBotHelpText(mockContentProducer)
-    expect(text).toContain("内容创作官")
+    expect(text).toContain("内容创作")
   })
 
   it("提示直接发消息", () => {
@@ -139,12 +139,12 @@ describe("buildBotHelpText", () => {
 // ─── feishu-agent-persona ─────────────────────────────────────
 
 describe("getAgentBotAckReply", () => {
-  it("内容创作官有个性化 ACK", () => {
+  it("内容创作有个性化 ACK", () => {
     const ack = getAgentBotAckReply("content_producer")
     expect(ack).toContain("创作")
   })
 
-  it("商业诊断官有个性化 ACK", () => {
+  it("商业诊断有个性化 ACK", () => {
     const ack = getAgentBotAckReply("business_system_diagnosis")
     expect(ack).toContain("诊断")
   })
@@ -157,12 +157,12 @@ describe("getAgentBotAckReply", () => {
 
 describe("getBotRoleConstraint", () => {
   it("每个 bot 都有角色约束", () => {
-    expect(getBotRoleConstraint("content_producer")).toContain("内容创作官")
-    expect(getBotRoleConstraint("deep_copywriter")).toContain("作品编辑")
-    expect(getBotRoleConstraint("business_system_diagnosis")).toContain("商业诊断官")
-    expect(getBotRoleConstraint("business_diagnosis")).toContain("灵感选题官")
+    expect(getBotRoleConstraint("content_producer")).toContain("内容创作")
+    expect(getBotRoleConstraint("work_editor")).toContain("作品编辑")
+    expect(getBotRoleConstraint("business_system_diagnosis")).toContain("商业诊断")
+    expect(getBotRoleConstraint("business_diagnosis")).toContain("选题策划")
     expect(getBotRoleConstraint("content_review")).toContain("发布质检")
-    expect(getBotRoleConstraint("persona")).toContain("人设故事官")
+    expect(getBotRoleConstraint("persona")).toContain("人设故事")
   })
 })
 
@@ -191,7 +191,7 @@ describe("buildWorkItemCard", () => {
       resultLink: "https://example.com/result/123",
     })
     const card = JSON.parse(json)
-    expect(card.header.title.content).toContain("内容创作官")
+    expect(card.header.title.content).toContain("内容创作")
     expect(card.header.title.content).toContain("待人工审核")
     expect(card.header.template).toBe("orange")
 
@@ -242,7 +242,7 @@ describe("registry", () => {
     const bot = resolveBotByVerificationToken("token_cp")
     expect(bot).not.toBeNull()
     expect(bot!.botId).toBe("content_producer")
-    expect(bot!.displayName).toBe("内容创作官")
+    expect(bot!.displayName).toBe("内容创作")
   })
 
   it("isAgentAllowedForBot 一对一模式仅允许自己", () => {

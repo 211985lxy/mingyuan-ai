@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { AimGenerateContext } from "@/lib/aim-agent-handlers"
-import { DeepCopywriterHandler } from "@/lib/aim-agent-deep-copywriter"
+import { WorkEditorHandler } from "@/lib/aim-agent-work-editor"
 
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("@/lib/aim-harness/persistence", () => ({
   saveAimGenerationRecord: mocks.save,
 }))
 
-describe("deep copywriter boundaries", () => {
+describe("work editor boundaries", () => {
   beforeEach(() => {
     mocks.execute.mockReset().mockResolvedValue({
       completion: { content: "完整长文正文" },
@@ -37,7 +37,7 @@ describe("deep copywriter boundaries", () => {
       ipWikiBlock: "",
     } as unknown as AimGenerateContext
 
-    const result = await new DeepCopywriterHandler().generate(context)
+    const result = await new WorkEditorHandler().generate(context)
     const [, systemPrompt, , , safeTargets] = mocks.execute.mock.calls[0]
 
     expect(result.results.map((item) => item.format)).toEqual(["raw_copy"])

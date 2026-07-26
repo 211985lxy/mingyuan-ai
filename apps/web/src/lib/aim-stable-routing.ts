@@ -42,7 +42,7 @@ export interface StableRoutingResult {
 const WRITING_AGENTS = new Set([
   "content_producer",
   "free_copywriter",
-  "deep_copywriter",
+  "work_editor",
 ])
 
 const RUNTIME_TASKS = new Set<AimRuntimeTask>([

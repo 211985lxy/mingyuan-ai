@@ -22,7 +22,7 @@ describe("AIM knowledge cleanup tags", () => {
   }
 
   it("prioritizes IP knowledge for deep copywriting", () => {
-    const ranked = rankKnowledgeEntriesForAgent("deep_copywriter", [projectEntry, ipEntry])
+    const ranked = rankKnowledgeEntriesForAgent("work_editor", [projectEntry, ipEntry])
     expect(ranked[0].id).toBe("ip-1")
   })
 
@@ -47,7 +47,7 @@ describe("AIM knowledge cleanup tags", () => {
 
 describe("AIM evolved preferences retrieval", () => {
   it("keeps user_insight visible for deep copywriter ranking", () => {
-    const ranked = rankKnowledgeEntriesForAgent("deep_copywriter", [
+    const ranked = rankKnowledgeEntriesForAgent("work_editor", [
       { id: "product", category: "product_usp", title: "产品", content: "产品卖点", score: 0.8, tags: [] },
       { id: "preference", category: "user_insight", title: "偏好", content: "用户喜欢短句", score: 0.8, tags: ["kb_scope:project"] },
     ])
@@ -125,7 +125,7 @@ describe("AIM knowledge strategy integration", () => {
   })
 
   it("categoryBoost from conversion strategy elevates product_usp above others", () => {
-    // Use deep_copywriter agent (hot_topic NOT in its priority → ×0.85)
+    // Use work_editor agent (hot_topic NOT in its priority → ×0.85)
     // Without boost: hot_topic (0.6 × 0.85 = 0.51) vs product_usp (0.6 × 0.85 = 0.51) → tie
     // With boost:    product_usp (0.6 × 0.85 × 1.3 = 0.663) > hot_topic (0.6 × 0.85 = 0.51)
     const boost = KNOWLEDGE_STRATEGY_PROFILES.conversion.categoryBoost
@@ -146,7 +146,7 @@ describe("AIM knowledge strategy integration", () => {
       tags: [],
     }
     const ranked = rankKnowledgeEntriesForAgent(
-      "deep_copywriter",
+      "work_editor",
       [tiedEntry, prodEntry],
       boost,
     )

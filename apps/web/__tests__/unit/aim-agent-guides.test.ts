@@ -40,10 +40,12 @@ describe("aim agent guides", () => {
   })
 
   it("uses task-based workflow names on the visible agent list", () => {
-    expect(getAimAgent("business_diagnosis").title).toBe("灵感选题策划")
-    expect(getAimAgent("content_producer").title).toBe("内容文案创作")
+    expect(getAimAgent("business_system_diagnosis").title).toBe("商业诊断")
+    expect(getAimAgent("business_diagnosis").title).toBe("选题策划")
+    expect(getAimAgent("content_producer").title).toBe("内容创作")
+    expect(getAimAgent("work_editor").title).toBe("作品编辑")
     expect(getAimAgent("content_review").title).toBe("发布质检")
-    expect(getAimAgent("business_system_diagnosis").title).toBe("商业模式诊断")
+    expect(getAimAgent("persona").title).toBe("人设故事")
   })
 
   it("keeps content pillars under topic planning instead of separate agents", () => {

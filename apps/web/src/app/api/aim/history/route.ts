@@ -17,10 +17,15 @@ export async function GET(request: NextRequest) {
       aimHistoryQuerySchema,
     )
 
-    // content_producer 查询时同时包含旧 ip_video 记录
-    const resolvedAgentFilter = agentId === "content_producer"
-      ? { agentId: { in: ["content_producer", "ip_video"] as string[] } }
-      : agentId ? { agentId } : {}
+    // content_producer / work_editor 查询时同时包含旧别名记录
+    const resolvedAgentFilter =
+      agentId === "content_producer"
+        ? { agentId: { in: ["content_producer", "ip_video"] as string[] } }
+        : agentId === "work_editor"
+          ? { agentId: { in: ["work_editor", "deep_copywriter"] as string[] } }
+          : agentId
+            ? { agentId }
+            : {}
 
     const where = {
       userId: user.id,
@@ -43,10 +48,15 @@ export async function GET(request: NextRequest) {
       includeTotal === "true" ? prisma.aimGeneration.count({ where }) : Promise.resolve(0),
     ])
 
-    // 归一化：旧 ip_video 记录的 agentId 统一为 content_producer
+    // 归一化：旧别名记录的 agentId 统一为当前规范 id
     const normalized = records.map((record) => ({
       ...record,
-      agentId: record.agentId === "ip_video" ? "content_producer" : record.agentId,
+      agentId:
+        record.agentId === "ip_video"
+          ? "content_producer"
+          : record.agentId === "deep_copywriter"
+            ? "work_editor"
+            : record.agentId,
     }))
 
     return NextResponse.json(includeTotal === "true" ? { items: normalized, total } : normalized)

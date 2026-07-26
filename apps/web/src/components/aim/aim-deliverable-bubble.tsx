@@ -341,7 +341,7 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const formats = new Set(deliverables.results.map((item) => item.format))
   const hasPublishScript = formats.has("video_script") || formats.has("koubo_script")
   const qualityFail = deliverables.qualityStatus === "fail"
-  const canRunPublishCheck = ["content_producer", "free_copywriter", "deep_copywriter", "content_review"].includes(agentId)
+  const canRunPublishCheck = ["content_producer", "free_copywriter", "work_editor", "content_review"].includes(agentId)
   const primaryActions = nextActions.filter((action) => action.id === "publish_package" || action.id === "publish_check")
   const secondaryActions = nextActions.filter((action) => action.id !== "publish_package" && action.id !== "publish_check")
   const hasPublishCheckAction = nextActions.some((action) => action.id === "publish_check")

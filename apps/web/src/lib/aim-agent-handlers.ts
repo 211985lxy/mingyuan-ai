@@ -32,7 +32,7 @@ import {
   withCopyStudioExecution,
 } from "@/lib/task-spec"
 import { FreeCopywriterHandler } from "@/lib/aim-agent-free-copywriter"
-import { DeepCopywriterHandler } from "@/lib/aim-agent-deep-copywriter"
+import { WorkEditorHandler } from "@/lib/aim-agent-work-editor"
 import { BusinessSystemDiagnosisHandler } from "@/lib/aim-agent-business-system-diagnosis"
 import { BusinessDiagnosisHandler } from "@/lib/aim-agent-business-diagnosis"
 import { ContentReviewHandler } from "@/lib/aim-agent-content-review"
@@ -78,7 +78,7 @@ export {
 const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
   content_producer: new ContentProducerHandler(),
   free_copywriter: new FreeCopywriterHandler(),
-  deep_copywriter: new DeepCopywriterHandler(),
+  work_editor: new WorkEditorHandler(),
   business_system_diagnosis: new BusinessSystemDiagnosisHandler(),
   business_diagnosis: new BusinessDiagnosisHandler(),
   content_review: new ContentReviewHandler(),

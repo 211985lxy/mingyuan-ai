@@ -58,7 +58,7 @@ describe("AIM runtime task routing", () => {
 
   it("prefers the current generate input over older edit history", () => {
     const task = resolveAimRuntimeTask({
-      agentId: "deep_copywriter",
+      agentId: "work_editor",
       input: [
         "【本轮对话】",
         "用户：把这篇开头改一下",

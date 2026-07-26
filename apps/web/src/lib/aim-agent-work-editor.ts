@@ -27,10 +27,10 @@ function buildChatContextBlock(params: { knowledgeBlock: string; conversationBlo
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
 }
 
-export class DeepCopywriterHandler implements AimAgentHandler {
-  agentId = "deep_copywriter" as const
+export class WorkEditorHandler implements AimAgentHandler {
+  agentId = "work_editor" as const
 
-  /** 深度文案官在 generate 模式下只允许产出纯长文 */
+  /** 作品编辑在 generate 模式下只允许产出纯长文 */
   private static readonly ALLOWED_GENERATE_FORMATS = new Set<ContentFormat>(["raw_copy"])
 
   private buildChatPrompt(params: AimChatParams): string {
@@ -44,7 +44,7 @@ export class DeepCopywriterHandler implements AimAgentHandler {
       runtimeTask: params.runtimeTask,
     })
     const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
-    return `你是一个深度文案官，负责把想法、视频原文、老板口述或对标文案，打磨成一篇高质量的完整长篇文案。
+    return `你是「作品编辑」，负责把想法、视频原文、老板口述或对标文案，打磨成一篇高质量的完整长篇文案；也做文字二改/润色、公众号排版与小红书图文改写。
 
 北极星目标：${AIM_NORTH_STAR_GOAL}
 
@@ -93,13 +93,13 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
     // ── 输出边界：强制只允许全文类格式 ──
     const allowed = context.targetFormats.filter((f) =>
-      DeepCopywriterHandler.ALLOWED_GENERATE_FORMATS.has(f)
+      WorkEditorHandler.ALLOWED_GENERATE_FORMATS.has(f)
     )
     // 如果所有请求格式都不在允许范围内，默认产出 raw_copy
     const safeTargets = allowed.length > 0 ? allowed : ["raw_copy" as ContentFormat]
     const directDraftRequested = hasExplicitDirectDraftIntent(context.rawInput)
 
-    const agentPrompt = `你是一个深度文案官，专门把想法、视频原文、老板口述或对标文案先搭出文案框架，再打磨成高质量长篇文案正文。
+    const agentPrompt = `你是「作品编辑」，专门把想法、视频原文、老板口述或对标文案先搭出文案框架，再打磨成高质量长篇文案正文。
 
 【核心输出规则 — 严格遵循】
 - ${
@@ -167,7 +167,6 @@ ${workflowContext ? `工作流上下文：
 ${workflowContext}
 
 ` : ""}
-
 ${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n\n` : ""}请根据上下文判断：如果还没有明确文案框架，先输出文案框架；如果已经确认框架，直接输出正文。除正文前的 [[AIM_METHOD_NOTE]] 外，正文最后一句写完就停止，不要包含解释性文字、拆分方向、私域话术或确认尾句。`
 
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(

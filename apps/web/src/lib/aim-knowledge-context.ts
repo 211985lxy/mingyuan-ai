@@ -46,7 +46,7 @@ const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
     "hot_topic",
     "benchmark_reference",
   ],
-  deep_copywriter: [
+  work_editor: [
     "customer_pain",
     "boss_experience",
     "product_usp",
@@ -217,7 +217,7 @@ export function rankKnowledgeEntriesForAgent<T extends { category: string; score
   const prioritySet = new Set(
     AGENT_PRIORITY_CATEGORIES[agentId] ?? DEFAULT_PRIORITY_CATEGORIES
   )
-  const wantsIp = agentId === "deep_copywriter" || agentId === "business_diagnosis"
+  const wantsIp = agentId === "work_editor" || agentId === "business_diagnosis"
   const wantsProject = agentId === "content_producer" || agentId === "business_system_diagnosis" || agentId === "content_review"
 
   return entries

@@ -33,7 +33,7 @@ export interface AimCompressionProfile {
 // ─── 智能体压缩策略配置 ──────────────────────────────────
 
 const COMPRESSION_PROFILES: Record<string, AimCompressionProfile> = {
-  deep_copywriter: {
+  work_editor: {
     recentRounds: 6,
     focus: [
       "用户的真实观点和态度",

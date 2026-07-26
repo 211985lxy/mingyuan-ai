@@ -8,7 +8,7 @@ import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio
  * 智能体模型路由策略
  *
  * 核心思路：关键创作优先质量，日常生产优先稳定低成本
- * - 深度文案 → ZenMux Claude Sonnet 优先，离火 GPT-5.6 兜底
+ * - 作品编辑 → ZenMux Claude Sonnet 优先，离火 GPT-5.6 兜底
  * - 内容创作（content_producer）→ ZenMux Claude（经代理）优先，DeepSeek / APIMart 兜底
  * - 发布质检 / 人设等 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
@@ -62,7 +62,7 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 
 const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
-  deep_copywriter: [
+  work_editor: [
     // 旗舰链：Claude → GPT-5.6 → ERNIE 5.1（深度长文走非流式调用，放宽到 120s）
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 120000, capability: "advanced" },
@@ -177,7 +177,7 @@ export function listRoutedModelTargets(): RoutedModelTarget[] {
 // 统一创作台模块复用现有生产链，避免在合并阶段改变主线的生产首选顺序。
 const COPY_STUDIO_ROUTE_ALIASES: Record<string, string> = {
   [COPY_STUDIO_ROUTE_KEYS.social]: "content_producer",
-  [COPY_STUDIO_ROUTE_KEYS.longform]: "deep_copywriter",
+  [COPY_STUDIO_ROUTE_KEYS.longform]: "work_editor",
   [COPY_STUDIO_ROUTE_KEYS.free]: "free_copywriter",
   [COPY_STUDIO_ROUTE_KEYS.moments]: "moments_copywriter",
 }
