@@ -46,7 +46,7 @@ describe("AIM knowledge cleanup tags", () => {
 })
 
 describe("AIM evolved preferences retrieval", () => {
-  it("keeps user_insight visible for deep copywriter ranking", () => {
+  it("keeps user_insight visible for work_editor ranking", () => {
     const ranked = rankKnowledgeEntriesForAgent("work_editor", [
       { id: "product", category: "product_usp", title: "产品", content: "产品卖点", score: 0.8, tags: [] },
       { id: "preference", category: "user_insight", title: "偏好", content: "用户喜欢短句", score: 0.8, tags: ["kb_scope:project"] },

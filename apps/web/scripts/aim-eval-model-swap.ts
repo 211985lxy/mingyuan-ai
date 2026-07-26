@@ -33,7 +33,7 @@ import { classifyModelSwapBottleneck } from "../src/lib/aim-harness/eval-model-s
 const PREFERRED_FIXTURE_IDS = [
   "cp_new_video_01",
   "cp_info_insufficient_19",
-  "dc_new_wechat_01",
+  "we_polish_01",
   "bd_new_position_01",
   "pq_new_xhs_01",
   "bsd_new_01",

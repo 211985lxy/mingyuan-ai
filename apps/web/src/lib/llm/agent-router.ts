@@ -63,7 +63,7 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
-    // 旗舰链：Claude → GPT-5.6 → ERNIE 5.1（深度长文走非流式调用，放宽到 120s）
+    // 旗舰链：Claude → GPT-5.6 → ERNIE 5.1（作品编辑润色/排版；长文创作已归 content_producer）
     { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 120000, capability: "advanced" },
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 90000, capability: "advanced" },
@@ -177,7 +177,8 @@ export function listRoutedModelTargets(): RoutedModelTarget[] {
 // 统一创作台模块复用现有生产链，避免在合并阶段改变主线的生产首选顺序。
 const COPY_STUDIO_ROUTE_ALIASES: Record<string, string> = {
   [COPY_STUDIO_ROUTE_KEYS.social]: "content_producer",
-  [COPY_STUDIO_ROUTE_KEYS.longform]: "work_editor",
+  // 深度长文已并入内容创作；作品编辑只做二改/排版，不吃 longform 路由
+  [COPY_STUDIO_ROUTE_KEYS.longform]: "content_producer",
   [COPY_STUDIO_ROUTE_KEYS.free]: "free_copywriter",
   [COPY_STUDIO_ROUTE_KEYS.moments]: "moments_copywriter",
 }

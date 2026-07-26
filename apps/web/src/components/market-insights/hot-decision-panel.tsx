@@ -210,9 +210,9 @@ function HotDecisionCard({ item }: { item: ApiHotDecisionItem }) {
               <Sparkles className="h-3.5 w-3.5" />
               AIM 创作
             </Button>
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/aim?mode=quick&agent=work_editor&idea=${encodeURIComponent(item.title)}`} />}>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/aim?mode=quick&agent=content_producer&agentModule=longform&idea=${encodeURIComponent(item.title)}`} />}>
               <Wand2 className="h-3.5 w-3.5" />
-              作品编辑
+              深度长文
             </Button>
             <Button variant="outline" size="sm" nativeButton={false} render={<Link href={`/topic-planning?${topicPoolParams.toString()}`} />}>
               加入选题池

@@ -53,7 +53,7 @@ export interface AgentLogicProfile {
 const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
   content_producer: ["user_insight", "product_usp", "project_case", "private_domain_material", "hot_topic", "benchmark_reference"],
   free_copywriter: ["user_insight", "product_usp", "project_case", "benchmark_reference"],
-  work_editor: ["boss_experience", "product_usp", "user_insight", "benchmark_reference", "positioning_material"],
+  work_editor: ["benchmark_reference", "boss_experience", "product_usp", "user_insight"],
   business_diagnosis: ["user_insight", "positioning_material", "boss_experience", "product_usp", "customer_pain"],
   business_system_diagnosis: ["product_usp", "customer_pain", "project_case", "customer_qa", "user_insight"],
   content_review: ["project_case", "benchmark_reference", "user_insight", "hot_topic"],

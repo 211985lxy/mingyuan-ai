@@ -169,22 +169,24 @@ function buildModelPolicy(
     needsAdvancedReasoning ||
     agentId === "persona"
 
-  // ── 温度差异化：自由创作高创意，深度创作低温度保准确，朋友圈口语化略高 ──
+  // ── 温度差异化：自由创作高创意，深度长文略低温保结构，朋友圈口语化略高 ──
   const temperature = isChat
     ? 0.7
     : studioModule === "free" ? 0.92
     : studioModule === "moments" ? 0.88
     : studioModule === "social" ? 0.85
-    : agentId === "work_editor" ? 0.72
+    : studioModule === "longform" ? 0.72
+    : agentId === "work_editor" ? 0.75
     : 0.8
 
-  // ── maxTokens 差异化：长文 12k，社交短文 4k，自由创作 6k，朋友圈多版本 6k ──
+  // ── maxTokens：深度长文 12k；作品编辑（润色/排版）8k；社交短文 4k ──
   const maxTokens = isChat
     ? undefined
-    : studioModule === "longform" || agentId === "work_editor" ? 12288
+    : studioModule === "longform" ? 12288
     : studioModule === "social" ? 4096
     : studioModule === "free" ? 6144
     : studioModule === "moments" ? 6144
+    : agentId === "work_editor" ? 8192
     : 8192
 
   return {

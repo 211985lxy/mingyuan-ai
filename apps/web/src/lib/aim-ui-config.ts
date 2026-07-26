@@ -67,7 +67,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     id: "work_editor",
     // id 保留 work_editor（旧 deep_copywriter 经别名归一）；对外只叫「作品编辑」
     title: "作品编辑",
-    description: "小红书图文、公众号成版、渠道排版",
+    description: "文字二改、公众号排版、小红书图文",
     icon: Edit3,
     defaultFormats: ["raw_copy"],
   },

@@ -14,10 +14,15 @@ function durationToSeconds(value: string | null) {
 }
 
 /**
- * @description 判断视频文案拆解是否应打开作品编辑（时长≥10分钟或转录文本≥1200字）
+ * @description 长视频/长转录更适合走内容创作的深度长文能力（时长≥10分钟或转录≥1200字）
  * @param record - 视频拆解记录（包含时长和转录文本）
- * @returns 应打开作品编辑返回 true，否则返回 false
+ * @returns 应打开内容创作·深度长文返回 true
  */
-export function shouldOpenWorkEditor(record: Pick<ApiVideoCopyExtraction, "videoDuration" | "transcript">) {
+export function shouldOpenContentProducerLongform(
+  record: Pick<ApiVideoCopyExtraction, "videoDuration" | "transcript">,
+) {
   return durationToSeconds(record.videoDuration) >= 600 || (record.transcript?.length ?? 0) >= 1200
 }
+
+/** @deprecated 使用 shouldOpenContentProducerLongform；旧名易误解为作品编辑 */
+export const shouldOpenWorkEditor = shouldOpenContentProducerLongform

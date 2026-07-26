@@ -47,12 +47,10 @@ const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
     "benchmark_reference",
   ],
   work_editor: [
-    "customer_pain",
+    "benchmark_reference",
     "boss_experience",
     "product_usp",
     "user_insight",
-    "benchmark_reference",
-    "positioning_material",
   ],
   business_system_diagnosis: [
     "product_usp",

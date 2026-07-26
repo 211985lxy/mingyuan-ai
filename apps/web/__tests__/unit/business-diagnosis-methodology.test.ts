@@ -299,34 +299,37 @@ describe("AIM high-risk loop prompt coverage", () => {
     completeMock.mockResolvedValue({ content: "ok", model: "test", usage: { totalTokens: 0 } })
   })
 
-  it("keeps work_editor listening to the current ask while adding loop rules only for formal deliverables", async () => {
+  it("keeps work_editor on polish/layout duties while still attaching high-risk loop rules", async () => {
     const handler = getAgentHandler("work_editor")
     await handler.chat(buildChatParams())
 
     const systemPrompt = capturedSystemPrompt()
-    expect(systemPrompt).toContain("如果用户明确要完整成稿")
-    expect(systemPrompt).toContain("不要强制先问、先做框架或先做观点确认")
+    expect(systemPrompt).toContain("只做三件事")
+    expect(systemPrompt).toContain("文字二改/润色")
+    expect(systemPrompt).toContain("公众号排版")
+    expect(systemPrompt).toContain("小红书图文")
+    expect(systemPrompt).toContain("内容创作")
     expect(systemPrompt).toContain("框架阶段或追问阶段，不要追加“验证结果”区块")
     expect(systemPrompt).toContain("正式交付内容结尾追加一个简短“验证结果”区块")
   })
 
-  it("lets work_editor generate bypass the framework when the current request explicitly asks for direct drafting", async () => {
+  it("keeps work_editor generate focused on editing, not deep-longform drafting", async () => {
     const handler = getAgentHandler("work_editor")
     await handler.generate(buildGenerateContext({
       rawInput: [
-        "【本轮对话】",
-        "用户：把目标人群改成李立星的目标人群",
-        "助手：已输出框架调整建议",
-        "用户：不用再分析了 直接生成文案",
+        "【成稿】",
+        "我们始终坚信，只有把客户价值做到极致，才能赢得市场的尊重。",
         "",
-        "【本次生成输入】",
-        "不用再分析了，直接生成文案",
+        "请对上面成稿做文字二改/润色，去 AI 味。",
       ].join("\n"),
     }))
 
     const systemPrompt = capturedSystemPrompt()
-    expect(systemPrompt).toContain("当前这轮用户已经明确要求直接交稿")
-    expect(systemPrompt).toContain("不要继续停在框架、观点确认或追问")
+    expect(systemPrompt).toContain("禁止从零写深度长文")
+    expect(systemPrompt).toContain("内容创作")
+    expect(systemPrompt).toContain("润色 / 公众号排版 / 小红书图文")
+    expect(systemPrompt).not.toContain("先输出文案框架")
+    expect(systemPrompt).not.toContain("一篇完整深度长文")
   })
 
   it("adds loop rules to business_system_diagnosis without breaking the eight-section report", async () => {

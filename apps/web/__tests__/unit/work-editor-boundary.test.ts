@@ -21,16 +21,16 @@ vi.mock("@/lib/aim-harness/persistence", () => ({
 describe("work editor boundaries", () => {
   beforeEach(() => {
     mocks.execute.mockReset().mockResolvedValue({
-      completion: { content: "完整长文正文" },
-      parsed: { raw_copy: "完整长文正文" },
+      completion: { content: "润色后的成稿" },
+      parsed: { raw_copy: "润色后的成稿" },
     })
     mocks.save.mockReset().mockResolvedValue({ id: "generation-1", knowledgeUsed: [] })
   })
 
-  it("forces one long-form draft and passes the no-tail rule to the model", async () => {
+  it("keeps polish/layout focus and rejects deep-longform framing", async () => {
     const context = {
       targetFormats: ["video_script", "raw_copy"],
-      rawInput: "直接写一篇完整长文",
+      rawInput: "请对下面成稿做文字二改/润色，去 AI 味。\n\n原文：……",
       knowledgeBlock: "",
       methodologyBlock: "",
       eventStorytellingBlock: "",
@@ -42,10 +42,12 @@ describe("work editor boundaries", () => {
 
     expect(result.results.map((item) => item.format)).toEqual(["raw_copy"])
     expect(safeTargets).toEqual(["raw_copy"])
-    expect(systemPrompt).toContain('"可拆分方向"模块')
-    expect(systemPrompt).toContain("私域话术")
-    expect(systemPrompt).toContain("正文最后一句写完就停止")
-    expect(systemPrompt).toContain("确认尾句")
-    expect(systemPrompt).toContain("透明创作说明")
+    expect(systemPrompt).toContain("文字二改/润色")
+    expect(systemPrompt).toContain("公众号排版")
+    expect(systemPrompt).toContain("小红书图文")
+    expect(systemPrompt).toContain("禁止从零写深度长文")
+    expect(systemPrompt).toContain("内容创作")
+    expect(systemPrompt).not.toContain("先输出文案框架")
+    expect(systemPrompt).not.toContain("一篇完整深度长文")
   })
 })

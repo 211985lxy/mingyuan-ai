@@ -29,7 +29,7 @@ import {
   buildExplicitWordCountPriorityRule,
   hasWordCountPreservationIntent,
 } from "@/lib/aim-benchmark-length"
-import { shouldOpenWorkEditor } from "@/lib/video-copy-routing"
+import { shouldOpenContentProducerLongform } from "@/lib/video-copy-routing"
 import { FORMAT_INSTRUCTIONS } from "@/lib/aim-agent-prompts"
 
 describe("AIM content production positioning", () => {
@@ -39,11 +39,19 @@ describe("AIM content production positioning", () => {
     expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("一个可信证据")
     expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("一个承接动作")
     expect(CONTENT_PRODUCER_OPERATING_LOGIC_RULE).toContain("不要输出运营分析")
+    // chat 默认只挂短句；完整运营逻辑需显式打开 includeOperatingLogicFull
     expect(buildContentProducerChatPrompt({
       conversationBlock: "",
       knowledgeBlock: "",
       methodologyBlock: "",
       ipWikiBlock: "",
+    })).toContain("内部按「目标客户 / 真实问题 / 证据 / 承接」组织")
+    expect(buildContentProducerChatPrompt({
+      conversationBlock: "",
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      ipWikiBlock: "",
+      includeOperatingLogicFull: true,
     })).toContain(CONTENT_PRODUCER_OPERATING_LOGIC_RULE)
   })
 
@@ -55,12 +63,11 @@ describe("AIM content production positioning", () => {
       ipWikiBlock: "",
     })
 
-    expect(prompt).toContain("主动追问 1-3 个最核心的问题")
-    expect(prompt).toContain("给出示例或选项来降低回答门槛")
-    expect(prompt).toContain("标注待用户确认的假设项")
-    expect(prompt).toContain("禁止输出\"您好，请问有什么可以帮您？\"")
-    expect(prompt).toContain("可追溯的真实经历")
-    expect(prompt).toContain("绝不虚构个人经历")
+    expect(prompt).toContain("追问 1-3 个具体问题")
+    expect(prompt).toContain("可假设交付并标注待确认项")
+    expect(prompt).toContain("禁止客套开场白")
+    expect(prompt).toContain("可追溯")
+    expect(prompt).toContain("绝不虚构")
     expect(prompt).not.toContain("不在内容生产官里追问")
   })
 
@@ -234,13 +241,16 @@ describe("AIM content production positioning", () => {
     expect(freeCopywriter?.defaultFormats).toEqual(["raw_copy"])
   })
 
-  it("positions the deep copywriter as the work editor", () => {
+  it("positions work_editor as polish and layout, not deep longform writing", () => {
     const workEditor = AIM_AGENT_OPTIONS.find((agent) => agent.id === "work_editor")
+    const contentProducer = AIM_AGENT_OPTIONS.find((agent) => agent.id === "content_producer")
 
     expect(workEditor?.title).toBe("作品编辑")
     expect(workEditor?.displayTitle).toBeUndefined()
-    expect(workEditor?.description).toContain("小红书")
+    expect(workEditor?.description).toMatch(/二改|排版|小红书/)
+    expect(workEditor?.description).not.toMatch(/深度长文|从零/)
     expect(workEditor?.defaultFormats).toEqual(["raw_copy"])
+    expect(contentProducer?.description).toMatch(/深度长文|长文/)
   })
 
   it("positions content_review as the publish quality agent", () => {
@@ -298,12 +308,12 @@ describe("AIM content production positioning", () => {
     expect(buildBenchmarkLengthRule("")).toBeNull()
   })
 
-  it("switches long benchmark rewrites to deep copywriter earlier", () => {
-    expect(shouldOpenWorkEditor({
+  it("switches long benchmark transcripts to content producer longform earlier", () => {
+    expect(shouldOpenContentProducerLongform({
       videoDuration: null,
       transcript: "测".repeat(1579),
     })).toBe(true)
-    expect(shouldOpenWorkEditor({
+    expect(shouldOpenContentProducerLongform({
       videoDuration: null,
       transcript: "测".repeat(900),
     })).toBe(false)

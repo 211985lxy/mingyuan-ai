@@ -2,7 +2,7 @@
  * Registry of all versioned eval fixtures (92 cases).
  *
  *   content_producer  : 45  (24 + 21 prompt_quality)
- *   work_editor   : 15
+ *   work_editor       : 15  (润色/排版/图文/局部改/追改；深度长文新写已归 content_producer)
  *   business_diagnosis: 15
  *   free_copywriter   : 5   (4 + 1 prompt_quality)
  *   remaining 3 agents: 12

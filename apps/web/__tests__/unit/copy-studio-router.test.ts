@@ -15,16 +15,18 @@ describe("copy studio module contract", () => {
     expect(resolveCopyStudioRouteKey("social")).toBe(COPY_STUDIO_ROUTE_KEYS.social)
     expect(resolveCopyStudioRouteKey("moments")).toBe(COPY_STUDIO_ROUTE_KEYS.moments)
     expect(resolveAgentRouteKey("content_producer", "social")).toBe(COPY_STUDIO_ROUTE_KEYS.social)
-    expect(resolveAgentRouteKey("work_editor", "longform")).toBe(COPY_STUDIO_ROUTE_KEYS.longform)
+    expect(resolveAgentRouteKey("content_producer", "longform")).toBe(COPY_STUDIO_ROUTE_KEYS.longform)
     expect(resolveAgentRouteKey("content_producer", "moments")).toBe(COPY_STUDIO_ROUTE_KEYS.moments)
     expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.social)).toBe(getAgentRecommendedModel("content_producer"))
-    expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.longform)).toBe(getAgentRecommendedModel("work_editor"))
+    // 深度长文归内容创作（alias → content_producer），不再走作品编辑
+    expect(getAgentRecommendedModel(COPY_STUDIO_ROUTE_KEYS.longform)).toBe(getAgentRecommendedModel("content_producer"))
   })
 
   it("scopes workbench modes to the content producer while preserving API compatibility", () => {
     expect(normalizeWorkbenchCopyStudioModule("content_producer", "social")).toBe("social")
     expect(normalizeWorkbenchCopyStudioModule("business_diagnosis", "social")).toBeUndefined()
     expect(normalizeRequestedCopyStudioModule(undefined, "longform")).toBe("longform")
+    expect(supportsCopyStudioModule("content_producer")).toBe(true)
     expect(supportsCopyStudioModule("work_editor")).toBe(true)
     expect(supportsCopyStudioModule("business_diagnosis")).toBe(false)
   })
