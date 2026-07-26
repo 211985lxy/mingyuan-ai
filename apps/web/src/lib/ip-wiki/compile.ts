@@ -67,7 +67,7 @@ export function buildCompilePrompt(input: CompileWikiInput): string {
     .map((p) => `- [${p.pageType}] ${p.title}`)
     .join("\n")
 
-  return `你是一个 IP 定位维基的编译器。你的任务是把一份「IP 定位方案」编译成一组结构化维基页，供下游内容生产官和深度文案官在生成内容时直接读取，作为该 IP 的工作上下文。
+  return `你是一个 IP 定位维基的编译器。你的任务是把一份「IP 定位方案」编译成一组结构化维基页，供下游内容生产官和作品编辑在生成内容时直接读取，作为该 IP 的工作上下文。
 
 这是「提前编译」而不是「即时检索」：你要把定位方案里散落的信息，提炼、归并、交叉引用成凝练的全局维基页，让下游 agent 不必每次重新推导。
 

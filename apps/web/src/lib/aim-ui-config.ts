@@ -31,41 +31,41 @@ export interface AimAgentMeta {
 }
 
 export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
+  // 侧栏展示名统一四字；顺序对齐工作流：诊断 → 选题 → 创作 → 编辑 → 质检 → 人设
   {
     id: "business_system_diagnosis",
-    title: "商业模式诊断",
+    title: "商业诊断",
     description: "商业模式、流量转化、核心矛盾",
     icon: Activity,
     defaultFormats: ["raw_copy"],
   },
   {
     id: "business_diagnosis",
-    title: "灵感选题策划",
+    title: "选题策划",
     description: "账号对标、内容主线、高潜选题",
     icon: ShieldCheck,
     defaultFormats: ["raw_copy"],
   },
   {
     id: "content_producer",
-    title: "内容文案创作",
-    displayTitle: "内容创作官",
+    title: "内容创作",
     description: "社媒速产、深度长文、自由交付、朋友圈文案",
     icon: Video,
     defaultFormats: ["video_script"],
   },
   {
     id: "free_copywriter",
-    title: "交货文案创作",
-    description: "听用户要求，直接交稿；统一创作官内置自由模式",
+    title: "交货文案",
+    description: "听用户要求，直接交稿；统一创作内置自由模式",
     icon: PenLine,
     defaultFormats: ["raw_copy"],
-    // 已并入「内容文案创作」的自由模式（content_producer + agentModule=free），
+    // 已并入「内容创作」的自由模式（content_producer + agentModule=free），
     // 不再作为独立入口暴露。保留 id 以兼容历史消息/外部调用/渠道回落。
     hidden: true,
   },
   {
-    id: "deep_copywriter",
-    // id 保留 deep_copywriter；对外只叫「作品编辑」——小红书图文 / 公众号成版
+    id: "work_editor",
+    // id 保留 work_editor（旧 deep_copywriter 经别名归一）；对外只叫「作品编辑」
     title: "作品编辑",
     description: "小红书图文、公众号成版、渠道排版",
     icon: Edit3,
@@ -81,7 +81,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   },
   {
     id: "persona",
-    title: "人设故事梳理",
+    title: "人设故事",
     description: "来时路、人设故事、置顶脚本",
     icon: Compass,
     defaultFormats: ["video_script"],

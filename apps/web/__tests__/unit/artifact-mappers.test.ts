@@ -22,7 +22,7 @@ describe("artifact-mappers", () => {
     it("所有 6 个智能体映射器已注册", () => {
       const agentIds = [
         "content_producer",
-        "deep_copywriter",
+        "work_editor",
         "content_review",
         "business_system_diagnosis",
         "content_growth",
@@ -54,10 +54,10 @@ describe("artifact-mappers", () => {
     })
   })
 
-  describe("deep_copywriter", () => {
+  describe("work_editor", () => {
     it("映射为编辑稿 Doc", () => {
       const specs = mapGenerationToArtifacts(makeInput({
-        agentId: "deep_copywriter",
+        agentId: "work_editor",
         taskSpec: { articleTitle: "深度分析" },
       }))
 
@@ -68,7 +68,7 @@ describe("artifact-mappers", () => {
 
     it("有配图时生成 Drive 资产", () => {
       const specs = mapGenerationToArtifacts(makeInput({
-        agentId: "deep_copywriter",
+        agentId: "work_editor",
         taskSpec: { articleTitle: "稿件", imagePaths: ["/tmp/img1.png", "/tmp/img2.png"] },
       }))
 

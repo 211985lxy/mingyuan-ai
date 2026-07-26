@@ -42,7 +42,7 @@ const COPY_EDITOR_LABELS: EditorPanelLabels = {
  * @returns 编辑器面板标签配置对象
  */
 export function getAimEditorPanelLabels(agentId: AimAgentId, editorFormat?: ContentFormat): EditorPanelLabels {
-  if ((editorFormat && COPY_FORMATS.has(editorFormat)) || agentId === "content_producer" || agentId === "free_copywriter" || agentId === "deep_copywriter") {
+  if ((editorFormat && COPY_FORMATS.has(editorFormat)) || agentId === "content_producer" || agentId === "free_copywriter" || agentId === "work_editor") {
     return COPY_EDITOR_LABELS
   }
 

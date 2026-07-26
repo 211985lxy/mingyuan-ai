@@ -167,7 +167,7 @@ export default function AdminMethodologyPage() {
         <CardContent>
           <FlowDiagram profiles={PROFILES} edges={FLOW_EDGES} />
           <p className="mt-3 text-xs text-muted-foreground">
-            箭头表示智能体之间的产出可带入下一个智能体（来自各智能体的「下一步」配置）。完整调用链：商业模式诊断 → 灵感选题策划 → 内容文案创作/作品编辑 → 发布质检。
+            箭头表示智能体之间的产出可带入下一个智能体（来自各智能体的「下一步」配置）。完整调用链：商业诊断 → 选题策划 → 内容创作 / 作品编辑 → 发布质检。
           </p>
         </CardContent>
       </Card>
@@ -266,7 +266,7 @@ function FlowDiagram({
     "business_diagnosis",
     "persona",
     "content_producer",
-    "deep_copywriter",
+    "work_editor",
     "content_review",
   ]
   const ordered = orderedIds

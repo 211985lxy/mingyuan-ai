@@ -14,7 +14,7 @@ import type { CopyStudioModule } from "@/lib/copy-studio"
  * 定位官确定的 topicType 直接成为文案产出时知识调用的钥匙。
  *
  * 执行层放在共享的 buildAimGeneration（中央执行），
- * 这样 content_producer / deep_copywriter 等所有产出智能体都受益。
+ * 这样 content_producer / work_editor 等所有产出智能体都受益。
  */
 export type ResolvedKnowledgeStrategy =
   | "light_edit" // 轻改润色：少调/几乎不调知识

@@ -23,7 +23,7 @@ import { ALL_FIXTURES, EXPECTED_AGENT_COUNTS } from "../eval/fixtures"
 const SEVEN_AGENT_IDS: readonly AimAgentId[] = [
   "content_producer",
   "free_copywriter",
-  "deep_copywriter",
+  "work_editor",
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",

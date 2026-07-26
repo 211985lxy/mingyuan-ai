@@ -110,7 +110,7 @@ describe("sales loop operating mode", () => {
 describe("skills + eval candidates + inspiration readiness", () => {
   it("按 agent 选择 Skill", () => {
     const skills = selectAimSkills({
-      agentId: "deep_copywriter",
+      agentId: "work_editor",
       runtimeTask: "new_copy",
     })
     expect(skills.some((skill) => skill.id === "ip-copywriting")).toBe(true)

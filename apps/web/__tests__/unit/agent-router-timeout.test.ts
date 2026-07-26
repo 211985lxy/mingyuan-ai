@@ -85,7 +85,7 @@ describe("agent router timeout overrides", () => {
     const textAgents = [
       "content_producer",
       "free_copywriter",
-      "deep_copywriter",
+      "work_editor",
       "business_diagnosis",
       "business_system_diagnosis",
       "content_review",
@@ -102,7 +102,7 @@ describe("agent router timeout overrides", () => {
     const textAgents = [
       "content_producer",
       "free_copywriter",
-      "deep_copywriter",
+      "work_editor",
       "business_diagnosis",
       "business_system_diagnosis",
       "content_review",
@@ -126,7 +126,7 @@ describe("agent router timeout overrides", () => {
   it("filters routes below the policy minimum capability", async () => {
     const { getAgentLLM } = await import("@/lib/llm/agent-router")
 
-    const llm = getAgentLLM("deep_copywriter", {
+    const llm = getAgentLLM("work_editor", {
       minimumCapability: "standard",
       maxProviderAttempts: 3,
     })

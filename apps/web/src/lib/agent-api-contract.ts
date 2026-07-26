@@ -9,7 +9,7 @@ export const AGENT_AIM_AGENT_IDS: AimAgentId[] = [
   "business_diagnosis",
   "content_producer",
   "free_copywriter",
-  "deep_copywriter",
+  "work_editor",
   "content_review",
 ]
 

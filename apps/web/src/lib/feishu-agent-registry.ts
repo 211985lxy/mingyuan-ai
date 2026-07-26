@@ -61,18 +61,18 @@ function buildBotConfig(
 
 /** 6 个 bot 的静态元信息（displayName + workflowId） */
 const BOT_META: Record<string, { displayName: string; workflowId: string }> = {
-  content_producer: { displayName: "内容创作官", workflowId: "content_growth" },
-  deep_copywriter: { displayName: "作品编辑", workflowId: "content_growth" },
-  business_system_diagnosis: { displayName: "商业诊断官", workflowId: "sales_diagnosis" },
-  business_diagnosis: { displayName: "灵感选题官", workflowId: "sales_diagnosis" },
+  content_producer: { displayName: "内容创作", workflowId: "content_growth" },
+  work_editor: { displayName: "作品编辑", workflowId: "content_growth" },
+  business_system_diagnosis: { displayName: "商业诊断", workflowId: "sales_diagnosis" },
+  business_diagnosis: { displayName: "选题策划", workflowId: "sales_diagnosis" },
   content_review: { displayName: "发布质检", workflowId: "content_growth" },
-  persona: { displayName: "人设故事官", workflowId: "content_growth" },
+  persona: { displayName: "人设故事", workflowId: "content_growth" },
 }
 
 /** 环境变量前缀映射 */
 const BOT_ENV_PREFIX: Record<string, string> = {
   content_producer: "FEISHU_BOT_CONTENT_PRODUCER",
-  deep_copywriter: "FEISHU_BOT_DEEP_COPYWRITER",
+  work_editor: "FEISHU_BOT_WORK_EDITOR",
   business_system_diagnosis: "FEISHU_BOT_BIZ_DIAGNOSIS",
   business_diagnosis: "FEISHU_BOT_TOPIC_PLANNER",
   content_review: "FEISHU_BOT_CONTENT_REVIEW",
@@ -81,7 +81,7 @@ const BOT_ENV_PREFIX: Record<string, string> = {
 
 const ALL_AGENT_IDS: AimAgentId[] = [
   "content_producer",
-  "deep_copywriter",
+  "work_editor",
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",

@@ -243,7 +243,7 @@ export function IpWikiDialog({
             IP 定位维基
           </DialogTitle>
           <DialogDescription>
-            把定位方案编译成结构化维基页，作为该 IP 生成内容时的全局定位底盘。审核确认后才写入，下游内容生产官 / 深度文案官会自动读取。
+            把定位方案编译成结构化维基页，作为该 IP 生成内容时的全局定位底盘。审核确认后才写入，下游内容生产官 / 作品编辑会自动读取。
           </DialogDescription>
         </DialogHeader>
 

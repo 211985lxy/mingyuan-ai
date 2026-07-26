@@ -251,10 +251,10 @@ const REVIEW_SKILLS: AimWorkbenchSkill[] = [
   { id: "publish_decision", label: "发布前判断", description: "把这条为什么要发先说清楚。", prompt: "请基于当前文案做发布前判断。固定输出：1. 这条内容现在能不能发；2. 真正会吸引谁；3. 这条最该验证什么；4. 哪一句最容易留下来；5. 如果不建议发，最小修改方向是什么。不要整篇重写。", agentId: "content_review", group: "综合判断" },
 ]
 
-const DEEP_COPYWRITER_SKILLS: AimWorkbenchSkill[] = [
-  { id: "text_polish", label: "文字二改/润色", description: "对现有成稿去 AI 味、调语气、保真。", prompt: "请对当前文案做文字二改/润色：保留核心意思和事实，明显去 AI 味，调整成更自然的真人表达，纠正错别字和病句，不改变作者立场和关键数据。", agentId: "deep_copywriter", group: "作品编辑" },
-  { id: "wechat_layout", label: "公众号排版", description: "把成稿整理成公众号可读结构。", prompt: "请把当前素材整理成适合公众号发布的结构：优化段落长度、补充小标题、梳理开篇钩子和结尾引导，输出可直接用于公众号的正文，配图位置用【配图：说明】标注。", agentId: "deep_copywriter", group: "作品编辑" },
-  { id: "xiaohongshu_edit", label: "小红书图文", description: "改写成小红书图文笔记结构。", prompt: "请把当前内容改写成小红书图文笔记：输出小红书标题 5 个、封面主标题/副标题、正文、2-5 个话题标签、8 页图文结构与逐页配图脚本；每页只讲一个信息点，手机端一眼读懂。", agentId: "deep_copywriter", group: "作品编辑" },
+const WORK_EDITOR_SKILLS: AimWorkbenchSkill[] = [
+  { id: "text_polish", label: "文字二改/润色", description: "对现有成稿去 AI 味、调语气、保真。", prompt: "请对当前文案做文字二改/润色：保留核心意思和事实，明显去 AI 味，调整成更自然的真人表达，纠正错别字和病句，不改变作者立场和关键数据。", agentId: "work_editor", group: "作品编辑" },
+  { id: "wechat_layout", label: "公众号排版", description: "把成稿整理成公众号可读结构。", prompt: "请把当前素材整理成适合公众号发布的结构：优化段落长度、补充小标题、梳理开篇钩子和结尾引导，输出可直接用于公众号的正文，配图位置用【配图：说明】标注。", agentId: "work_editor", group: "作品编辑" },
+  { id: "xiaohongshu_edit", label: "小红书图文", description: "改写成小红书图文笔记结构。", prompt: "请把当前内容改写成小红书图文笔记：输出小红书标题 5 个、封面主标题/副标题、正文、2-5 个话题标签、8 页图文结构与逐页配图脚本；每页只讲一个信息点，手机端一眼读懂。", agentId: "work_editor", group: "作品编辑" },
 ]
 
 const BUSINESS_SYSTEM_SKILLS: AimWorkbenchSkill[] = [
@@ -291,11 +291,11 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     nextActions: [
       { id: "publish_package", label: "生成发布计划", prompt: PUBLISH_PLAN_PROMPT },
       { id: "publish_check", label: "发布前自查", prompt: "请对下面成稿做抖音发布前自查，只给风险、最小改法和复检建议。" },
-      { id: "to_deep_copywriter", label: "带入作品编辑", targetAgentId: "deep_copywriter", prompt: "请把下面成稿做作品编辑：文字二改/润色、公众号排版或小红书图文改写。" },
+      { id: "to_work_editor", label: "带入作品编辑", targetAgentId: "work_editor", prompt: "请把下面成稿做作品编辑：文字二改/润色、公众号排版或小红书图文改写。" },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
   },
-  deep_copywriter: {
+  work_editor: {
     intro: "这里是作品编辑。把成稿或素材给我，我做文字二改/润色、公众号排版、小红书图文改写，让作品更适合发布。",
     placeholder: "粘贴成稿或素材，告诉我做文字润色、公众号排版还是小红书图文改写…",
     defaultInstruction: "只做作品编辑：文字二改/润色、公众号排版、小红书图文改写。先判断用户当前要做哪一类编辑，再直接输出对应成品，不强制先出框架或追问。润色时保留作者立场、关键事实和真实数据，明显去 AI 味；公众号排版时优化段落和小标题，配图位置用【配图：说明】标注；小红书图文按标题、封面、正文、话题、逐页脚本输出。不输出拆分方向、私域话术、其他平台分发内容或“你看是否符合”这类确认尾句。热点只能自然融合，禁止硬蹭或编造。",
@@ -308,9 +308,9 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     scenarios: ["文字二改/润色", "公众号排版", "小红书图文改写"],
     inputTemplate: BASIC_INPUT_TEMPLATE,
     outputAssets: ["润色成稿", "公众号排版正文", "小红书图文笔记"],
-    skills: DEEP_COPYWRITER_SKILLS,
+    skills: WORK_EDITOR_SKILLS,
     nextActions: [
-      { id: "to_content_producer", label: "带入内容文案创作", targetAgentId: "content_producer", prompt: "请把下面作品改写成短视频口播、小红书图文笔记、朋友圈文案、Vlog 分镜脚本和后续 12 条发布选题。" },
+      { id: "to_content_producer", label: "带入内容创作", targetAgentId: "content_producer", prompt: "请把下面作品改写成短视频口播、小红书图文笔记、朋友圈文案、Vlog 分镜脚本和后续 12 条发布选题。" },
       { id: "publish_package", label: "生成发布计划", prompt: PUBLISH_PLAN_PROMPT },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
@@ -353,7 +353,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     outputAssets: ["热点类选题", "人设类选题", "问题解答类选题", "观点类选题", "高潜选题", "S级优先选题", "A级连续栏目选题", "发布前判断"],
     skills: TOPIC_PLANNING_SKILLS,
     nextActions: [
-      { id: "to_content_producer", label: "带入内容文案创作", targetAgentId: "content_producer", prompt: "请基于下面灵感选题策划，先选择一个高潜选题，生成短视频口播，并给出小红书图文、朋友圈文案和后续 12 条发布选题。" },
+      { id: "to_content_producer", label: "带入内容创作", targetAgentId: "content_producer", prompt: "请基于下面灵感选题策划，先选择一个高潜选题，生成短视频口播，并给出小红书图文、朋友圈文案和后续 12 条发布选题。" },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
   },
@@ -373,7 +373,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     outputAssets: ["商业诊断报告", "核心矛盾", "调整路径", "本周动作", "内容数据复盘"],
     skills: BUSINESS_SYSTEM_SKILLS,
     nextActions: [
-      { id: "to_business_diagnosis", label: "带入灵感选题策划", targetAgentId: "business_diagnosis", prompt: "请基于下面商业诊断结果和客户知识库，生成一份《天命IP资产化操盘全案》。走天命IP资产化操盘全案路由，按 12 个客户结果段输出：项目总判断、天命底盘、IP主定位、目标客户、核心问题、IP价值、产品设计、内容系统、流量闭环、私域成交、交付资产化、行动处方。方法论只做后台推理，不要把定位公式、方法论名称、模块解释或占位模板原样呈现给用户。天命底盘没有命理资料时写「未提供/待补充」，不编造。每段都要结合客户事实，能指导后续选题、文案、产品承接、私域成交和交付资产化。" },
+      { id: "to_business_diagnosis", label: "带入选题策划", targetAgentId: "business_diagnosis", prompt: "请基于下面商业诊断结果和客户知识库，生成一份《天命IP资产化操盘全案》。走天命IP资产化操盘全案路由，按 12 个客户结果段输出：项目总判断、天命底盘、IP主定位、目标客户、核心问题、IP价值、产品设计、内容系统、流量闭环、私域成交、交付资产化、行动处方。方法论只做后台推理，不要把定位公式、方法论名称、模块解释或占位模板原样呈现给用户。天命底盘没有命理资料时写「未提供/待补充」，不编造。每段都要结合客户事实，能指导后续选题、文案、产品承接、私域成交和交付资产化。" },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
   },
@@ -414,7 +414,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     outputAssets: ["来时路总结", "人设故事", "置顶视频脚本"],
     skills: PERSONA_SKILLS,
     nextActions: [
-      { id: "to_content_producer", label: "带入内容文案创作", targetAgentId: "content_producer", prompt: "请基于下面人设故事，生成一条置顶视频口播文案，并给出小红书图文笔记、朋友圈文案和后续 12 条人设故事选题。" },
+      { id: "to_content_producer", label: "带入内容创作", targetAgentId: "content_producer", prompt: "请基于下面人设故事，生成一条置顶视频口播文案，并给出小红书图文笔记、朋友圈文案和后续 12 条人设故事选题。" },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
   },

@@ -120,7 +120,7 @@ describe("aim-conversation-intent", () => {
 
   it("生成链路带历史对话时，优先理解本次生成输入", () => {
     const result = resolveAimConversationIntentWithRules({
-      agentId: "deep_copywriter",
+      agentId: "work_editor",
       messages: [{
         role: "user",
         content: [

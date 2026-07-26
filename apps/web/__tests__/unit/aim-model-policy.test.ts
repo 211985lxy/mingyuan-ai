@@ -20,7 +20,7 @@ describe("AIM model capability policy", () => {
   it("caps streaming fallback at two attempts", () => {
     const spec = planAimRun({
       entrypoint: "chat",
-      agentId: "deep_copywriter",
+      agentId: "work_editor",
       rawInput: "继续优化",
       targetFormats: [],
       messages: [{ role: "user", content: "继续优化" }],

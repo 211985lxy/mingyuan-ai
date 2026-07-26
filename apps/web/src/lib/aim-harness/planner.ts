@@ -162,7 +162,7 @@ function buildModelPolicy(
   const studioModule = agentModule ?? writerModule
   const needsAdvancedReasoning =
     agentId === "content_producer" ||
-    agentId === "deep_copywriter" ||
+    agentId === "work_editor" ||
     agentId === "business_diagnosis" ||
     agentId === "business_system_diagnosis"
   const requiresStandardFloor =
@@ -175,13 +175,13 @@ function buildModelPolicy(
     : studioModule === "free" ? 0.92
     : studioModule === "moments" ? 0.88
     : studioModule === "social" ? 0.85
-    : agentId === "deep_copywriter" ? 0.72
+    : agentId === "work_editor" ? 0.72
     : 0.8
 
   // ── maxTokens 差异化：长文 12k，社交短文 4k，自由创作 6k，朋友圈多版本 6k ──
   const maxTokens = isChat
     ? undefined
-    : studioModule === "longform" || agentId === "deep_copywriter" ? 12288
+    : studioModule === "longform" || agentId === "work_editor" ? 12288
     : studioModule === "social" ? 4096
     : studioModule === "free" ? 6144
     : studioModule === "moments" ? 6144

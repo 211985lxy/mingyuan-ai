@@ -53,7 +53,7 @@ export interface AgentLogicProfile {
 const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
   content_producer: ["user_insight", "product_usp", "project_case", "private_domain_material", "hot_topic", "benchmark_reference"],
   free_copywriter: ["user_insight", "product_usp", "project_case", "benchmark_reference"],
-  deep_copywriter: ["boss_experience", "product_usp", "user_insight", "benchmark_reference", "positioning_material"],
+  work_editor: ["boss_experience", "product_usp", "user_insight", "benchmark_reference", "positioning_material"],
   business_diagnosis: ["user_insight", "positioning_material", "boss_experience", "product_usp", "customer_pain"],
   business_system_diagnosis: ["product_usp", "customer_pain", "project_case", "customer_qa", "user_insight"],
   content_review: ["project_case", "benchmark_reference", "user_insight", "hot_topic"],
@@ -68,7 +68,7 @@ const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
 const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
   content_producer: ["deepseek", "apimart", "zenmux", "openrouter", "jiekou", "glm"],
   free_copywriter: ["qianfan", "deepseek", "glm", "apimart", "zenmux", "jiekou"],
-  deep_copywriter: ["zenmux", "lihuo", "qianfan", "apimart", "deepseek", "glm"],
+  work_editor: ["zenmux", "lihuo", "qianfan", "apimart", "deepseek", "glm"],
   business_diagnosis: ["apimart", "zenmux", "openrouter", "openrouter", "lihuo", "deepseek", "jiekou", "therouter", "glm"],
   business_system_diagnosis: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
   content_review: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
@@ -85,7 +85,7 @@ const AGENT_METHODOLOGIES: Record<AimAgentId, Array<{ key: MethodologyKey; label
     { key: "event_storytelling", label: "事件内容化方法论", note: "仅现场/事件复盘类内容时按需注入" },
   ],
   free_copywriter: [],
-  deep_copywriter: [
+  work_editor: [
     { key: "ip_copywriting", label: "IP 操盘方法论" },
     { key: "event_storytelling", label: "事件内容化方法论", note: "仅现场/事件复盘类内容时按需注入" },
   ],
@@ -102,7 +102,7 @@ const AGENT_METHODOLOGIES: Record<AimAgentId, Array<{ key: MethodologyKey; label
 const AGENT_OTHER_CONTEXT: Record<AimAgentId, string[]> = {
   content_producer: ["爆款结构库（开头/结构/结尾，来自内容模板）", "写作风格档案", "AIM 长期记忆", "IP Wiki", "编辑器上下文"],
   free_copywriter: ["写作风格档案", "AIM 长期记忆", "IP Wiki", "编辑器上下文"],
-  deep_copywriter: ["爆款结构库", "写作风格档案", "AIM 长期记忆", "IP Wiki"],
+  work_editor: ["爆款结构库", "写作风格档案", "AIM 长期记忆", "IP Wiki"],
   business_diagnosis: ["竞品观察（watchAccount）", "写作风格档案", "AIM 长期记忆", "IP Wiki", "对标视频拆解"],
   business_system_diagnosis: ["写作风格档案", "AIM 长期记忆", "IP Wiki"],
   content_review: ["写作风格档案", "AIM 长期记忆"],

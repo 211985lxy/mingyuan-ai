@@ -160,7 +160,7 @@ async function main() {
         methodologyType: "content_creation",
         scope: "global",
         description: "徐沪生《做号：个人IP创作手册》内容创作方法论蒸馏（专业个人IP、账号即杂志、内容漏斗、选题与脚本规则）。",
-        // deep_copywriter 已隐藏并入 content_producer，故不再单列
+        // work_editor 已隐藏并入 content_producer，故不再单列
         applicableAgents: ["content_producer"],
         applicableTasks: ["new_copy", "rewrite_copy", "positioning_topic"],
         priority: 100,

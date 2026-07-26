@@ -25,7 +25,7 @@ const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
     aliases: ["内容创作", "内容文案", "内容文案创作", "内容创作官", "写文案", "口播", "短视频", "社媒", "种草"],
   },
   {
-    agentId: "deep_copywriter",
+    agentId: "work_editor",
     aliases: ["作品编辑", "作品编辑官", "润色", "二改", "排版", "公众号排版", "小红书"],
   },
   {
@@ -34,7 +34,7 @@ const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
   },
   {
     agentId: "business_diagnosis",
-    aliases: ["选题", "灵感选题", "选题策划", "选题策划", "对标"],
+    aliases: ["选题", "灵感选题", "选题策划", "灵感选题策划", "对标"],
   },
   {
     agentId: "business_system_diagnosis",
@@ -153,6 +153,6 @@ export function buildAimChannelHelpText(): string {
     "在群里 @我 并用 /命令 指定智能体，例如：",
     ...lines.map((l) => `  ${l} 你的需求`),
     "",
-    "可用智能体：内容创作、作品编辑、自由文案、灵感选题、商业诊断、发布质检、人设故事。",
+    "可用智能体：商业诊断、选题策划、内容创作、作品编辑、发布质检、人设故事。",
   ].join("\n")
 }

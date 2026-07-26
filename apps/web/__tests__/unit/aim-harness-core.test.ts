@@ -82,7 +82,7 @@ describe("aim-harness planner", () => {
   it("resolves hot_topic when a hotTopic is present (priority over topicType)", () => {
     const spec = planAimRun({
       entrypoint: "generate",
-      agentId: "deep_copywriter",
+      agentId: "work_editor",
       rawInput: "结合当下热点写一篇流量型文案",
       targetFormats: ["wechat_article"],
       taskType: "write_script",
@@ -233,7 +233,7 @@ describe("aim-harness planner", () => {
   it("显式 hotTopic 触发 market viral 加载", () => {
     const spec = planAimRun({
       entrypoint: "generate",
-      agentId: "deep_copywriter",
+      agentId: "work_editor",
       rawInput: "结合热点",
       targetFormats: ["wechat_article"],
       hotTopic: "搭子文化",

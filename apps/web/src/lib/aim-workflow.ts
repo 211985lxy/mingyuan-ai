@@ -36,7 +36,7 @@ const STAGE_BY_AGENT: Partial<Record<AimAgentId, AimWorkflowStage>> = {
   persona: "direction",
   content_producer: "content",
   free_copywriter: "content",
-  deep_copywriter: "content",
+  work_editor: "content",
   content_review: "publish",
 }
 

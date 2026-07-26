@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma"
  * 三份方法论对应 mingyuan/docs/*-methodology-core.md：
  *  - ip_copywriting（IP 操盘，5 个智能体共用）
  *  - business_diagnosis（商业诊断，仅 business_system_diagnosis）
- *  - event_storytelling（事件方法论，仅 content_producer/deep_copywriter 特定场景）
+ *  - event_storytelling（事件方法论，仅 content_producer/work_editor 特定场景）
  *
  * 后台编辑写 DB，并 bump 版本号使内存缓存失效 → 编辑即时生效，无需重启。
  */

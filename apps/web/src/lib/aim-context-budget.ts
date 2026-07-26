@@ -106,14 +106,14 @@ const TRUNCATION_MARKER = "\n（该上下文已按预算截断）"
 /**
  * agent 级预算修正：在 runtimeTask 基准上叠加 agent 维度的总量与块上限调整。
  * - free_copywriter：知识依赖低，压缩知识块、放大对话块
- * - deep_copywriter：知识依赖最高，放大知识块与事件叙事块
+ * - work_editor：知识依赖最高，放大知识块与事件叙事块
  */
 const AGENT_BUDGET_OVERRIDES: Partial<Record<string, { totalChars?: number; blockCaps?: Partial<Record<AimContextBlockKey, number>> }>> = {
   free_copywriter: {
     totalChars: 6_000,
     blockCaps: { knowledgeBlock: 1_500, conversationBlock: 2_500, methodologyBlock: 800 },
   },
-  deep_copywriter: {
+  work_editor: {
     totalChars: 16_000,
     blockCaps: { knowledgeBlock: 6_000, eventStorytellingBlock: 2_500, ipWikiBlock: 3_500 },
   },

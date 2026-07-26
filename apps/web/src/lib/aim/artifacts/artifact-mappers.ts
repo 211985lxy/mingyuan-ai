@@ -11,7 +11,7 @@
  *
  * 按优先级：
  * 1. content_producer → 文案 Doc + 内容日历 Base
- * 2. deep_copywriter → 编辑稿 Doc + 配图 Drive
+ * 2. work_editor → 编辑稿 Doc + 配图 Drive
  * 3. content_review → 质检报告 Doc + Base
  * 4. business_system_diagnosis → 诊断报告 Doc + Base + Sheets
  * 5. content_growth → 选题池/日历/复盘 Base
@@ -155,10 +155,10 @@ registerArtifactMapper({
   },
 })
 
-// ─── 2. deep_copywriter 映射器 ──────────────────────────────────────────────
+// ─── 2. work_editor 映射器 ──────────────────────────────────────────────
 
 registerArtifactMapper({
-  agentId: "deep_copywriter",
+  agentId: "work_editor",
   map(input) {
     const specs: AimArtifactSpec[] = []
     const title = String(input.taskSpec.articleTitle ?? "深度稿件")

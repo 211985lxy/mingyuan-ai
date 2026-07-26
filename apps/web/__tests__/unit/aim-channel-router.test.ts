@@ -57,7 +57,7 @@ describe("resolveAimChannelIntent", () => {
   })
 
   it("支持每个智能体的别名", () => {
-    expect(resolveAimChannelIntent("/润色 这段").agentId).toBe("deep_copywriter")
+    expect(resolveAimChannelIntent("/润色 这段").agentId).toBe("work_editor")
     expect(resolveAimChannelIntent("/商业诊断 流量上不来").agentId).toBe("business_system_diagnosis")
     expect(resolveAimChannelIntent("/选题 给我几个题").agentId).toBe("business_diagnosis")
     expect(resolveAimChannelIntent("/质检 看看能不能发").agentId).toBe("content_review")
@@ -104,7 +104,7 @@ describe("help text", () => {
     expect(agentIds).toEqual(
       expect.arrayContaining([
         "content_producer",
-        "deep_copywriter",
+        "work_editor",
         "free_copywriter",
         "business_diagnosis",
         "business_system_diagnosis",

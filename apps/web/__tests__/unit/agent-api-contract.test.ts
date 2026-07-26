@@ -20,7 +20,7 @@ describe("Agent API contract", () => {
       "business_diagnosis",
       "content_producer",
       "free_copywriter",
-      "deep_copywriter",
+      "work_editor",
       "content_review",
     ])
     // 旧别名 ip_video 不应再出现在公开契约里

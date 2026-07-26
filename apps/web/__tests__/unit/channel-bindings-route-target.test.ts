@@ -72,12 +72,12 @@ describe("channel-bindings routeTarget / defaultAgentId", () => {
       externalChatId: "oc_2",
       projectId: "proj-1",
       routeTarget: "aim",
-      defaultAgentId: "deep_copywriter",
+      defaultAgentId: "work_editor",
     }))
     expect(res.status).toBe(201)
     const createArg = mocks.upsert.mock.calls[0][0].create
     expect(createArg.routeTarget).toBe("aim")
-    expect(createArg.defaultAgentId).toBe("deep_copywriter")
+    expect(createArg.defaultAgentId).toBe("work_editor")
   })
 
   it("routeTarget=aim 时 defaultAgentId 可为空（要求消息带 /命令）", async () => {

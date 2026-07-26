@@ -143,7 +143,7 @@ describe("aim-remote contracts", () => {
         rawInput: "x", targetFormats: ["video_script"] as never,
       })
       const b = computeRequestHash({
-        idempotencyKey: "k", projectId: "p", agentId: "deep_copywriter" as never,
+        idempotencyKey: "k", projectId: "p", agentId: "work_editor" as never,
         rawInput: "x", targetFormats: ["video_script"] as never,
       })
       expect(a).not.toBe(b)

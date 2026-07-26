@@ -114,7 +114,7 @@ export function useAimAgentConfig(input: {
         primaryActionLabel: "生成口播文案",
       }
     }
-    if (selectedAgentId === "deep_copywriter") return { ...baseAgent, title: baseAgent.displayTitle ?? baseAgent.title }
+    if (selectedAgentId === "work_editor") return { ...baseAgent, title: baseAgent.displayTitle ?? baseAgent.title }
     return baseAgent
   }, [modeParam, selectedAgentId, sourceTopicTitle, sourceVideoCopyExtractionId])
 }

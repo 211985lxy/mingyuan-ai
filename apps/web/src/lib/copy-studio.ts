@@ -17,7 +17,7 @@ export const COPY_STUDIO_MODULE_LABELS: Record<CopyStudioModule, string> = {
   moments: "朋友圈文案",
 }
 
-export const COPY_STUDIO_TITLE = "内容创作官"
+export const COPY_STUDIO_TITLE = "内容创作"
 
 /** 当前阶段的作品编辑入口；视频剪辑暂不进入本轮实现。 */
 export const WORK_EDITOR_MODULES = ["text", "wechat", "xiaohongshu"] as const
@@ -68,7 +68,7 @@ export function copyStudioModuleFromRouteKey(routeKey: unknown): CopyStudioModul
 }
 
 const COPY_STUDIO_COMPATIBLE_AGENT_IDS = new Set([
-  "content_producer", "deep_copywriter", "free_copywriter", "ip_video",
+  "content_producer", "work_editor", "free_copywriter", "ip_video", "deep_copywriter",
 ])
 
 /** Normalize the additive API aliases before request validation and routing. */

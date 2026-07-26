@@ -150,7 +150,7 @@ function collectConversationRuleSignals(input: {
   return {
     latestUser,
     hasPriorUserTurn: normalized.filter((message) => message.role === "user").length > 1,
-    isWritingAgent: ["content_producer", "free_copywriter", "deep_copywriter"].includes(input.agentId),
+    isWritingAgent: ["content_producer", "free_copywriter", "work_editor"].includes(input.agentId),
     wantsEarliestReference,
     wantsReference,
     isCorrection,

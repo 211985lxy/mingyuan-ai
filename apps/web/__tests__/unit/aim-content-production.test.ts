@@ -29,7 +29,7 @@ import {
   buildExplicitWordCountPriorityRule,
   hasWordCountPreservationIntent,
 } from "@/lib/aim-benchmark-length"
-import { shouldOpenDeepCopywriter } from "@/lib/video-copy-routing"
+import { shouldOpenWorkEditor } from "@/lib/video-copy-routing"
 import { FORMAT_INSTRUCTIONS } from "@/lib/aim-agent-prompts"
 
 describe("AIM content production positioning", () => {
@@ -220,27 +220,27 @@ describe("AIM content production positioning", () => {
   it("keeps the required standalone content agents", () => {
     const titles = AIM_AGENT_OPTIONS.map((agent) => agent.title)
 
-    expect(titles).toContain("内容文案创作")
-    expect(titles).toContain("交货文案创作")
-    expect(titles).toContain("灵感选题策划")
-    expect(titles).toContain("商业模式诊断")
+    expect(titles).toContain("内容创作")
+    expect(titles).toContain("交货文案")
+    expect(titles).toContain("选题策划")
+    expect(titles).toContain("商业诊断")
   })
 
   it("adds a delivery copywriter that follows user requirements first", () => {
     const freeCopywriter = AIM_AGENT_OPTIONS.find((agent) => agent.id === "free_copywriter")
 
-    expect(freeCopywriter?.title).toBe("交货文案创作")
+    expect(freeCopywriter?.title).toBe("交货文案")
     expect(freeCopywriter?.description).toContain("听用户要求")
     expect(freeCopywriter?.defaultFormats).toEqual(["raw_copy"])
   })
 
   it("positions the deep copywriter as the work editor", () => {
-    const deepCopywriter = AIM_AGENT_OPTIONS.find((agent) => agent.id === "deep_copywriter")
+    const workEditor = AIM_AGENT_OPTIONS.find((agent) => agent.id === "work_editor")
 
-    expect(deepCopywriter?.title).toBe("作品编辑")
-    expect(deepCopywriter?.displayTitle).toBeUndefined()
-    expect(deepCopywriter?.description).toContain("小红书")
-    expect(deepCopywriter?.defaultFormats).toEqual(["raw_copy"])
+    expect(workEditor?.title).toBe("作品编辑")
+    expect(workEditor?.displayTitle).toBeUndefined()
+    expect(workEditor?.description).toContain("小红书")
+    expect(workEditor?.defaultFormats).toEqual(["raw_copy"])
   })
 
   it("positions content_review as the publish quality agent", () => {
@@ -299,11 +299,11 @@ describe("AIM content production positioning", () => {
   })
 
   it("switches long benchmark rewrites to deep copywriter earlier", () => {
-    expect(shouldOpenDeepCopywriter({
+    expect(shouldOpenWorkEditor({
       videoDuration: null,
       transcript: "测".repeat(1579),
     })).toBe(true)
-    expect(shouldOpenDeepCopywriter({
+    expect(shouldOpenWorkEditor({
       videoDuration: null,
       transcript: "测".repeat(900),
     })).toBe(false)

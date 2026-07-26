@@ -68,12 +68,12 @@ const quickNav: NavItem[] = [
   { title: "工作总览", href: "/home", icon: LayoutDashboard },
 ]
 
-/** AIM 专家：6 个用户可见智能体，始终展开，不提供折叠/更多入口 */
+/** AIM 专家：按工作流排序，始终展开，不提供折叠/更多入口 */
 const aimExpertAgentIds: AimAgentId[] = [
-  "content_producer",
-  "deep_copywriter",
-  "business_diagnosis",
   "business_system_diagnosis",
+  "business_diagnosis",
+  "content_producer",
+  "work_editor",
   "content_review",
   "persona",
 ]
