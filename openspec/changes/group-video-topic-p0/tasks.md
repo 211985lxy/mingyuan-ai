@@ -10,12 +10,18 @@
 - [ ] 全链路幂等、可重试、项目隔离、错误可追踪
 
 ## Acceptance evidence
-- [ ] ≥30 条真实影子样本
+- [ ] ≥30 条真实影子样本（见下定义；用 `executionModeSnapshot` ∈ capture_only|evaluate 计数）
 - [ ] 连续 5 个工作日无 P0/P1
 - [ ] 严重虚构 = 0；重复消息抑制率 100%
 - [ ] 覆盖：长链/短链/无效链接/超长视频/Provider 失败与降级
 - [ ] 飞书测试群正式运行 3 天（回执与结果正确）
 - [ ] 线上可回读发布版本、开关状态、健康状态
+
+### 影子样本是什么
+- 真实群消息触发管道后写入的 `Inspiration` 行。
+- 执行档为 `capture_only`（只记录/提取）或 `evaluate`（可出候选但不回群、不写正式选题）。
+- `live` 不算影子。手工 `source=text` 且无渠道痕迹的不算。
+- 代码：`lib/inspiration-shadow-samples.ts` + 晋升门禁 `content-rollout-gate.ts`（满 30 条）。
 
 ## Channels
 - [ ] 飞书：必须跑通

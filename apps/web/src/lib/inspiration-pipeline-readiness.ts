@@ -106,6 +106,7 @@ export function assessInspirationPipelineReadiness(
   if (!cron) nextActions.push("配置 CRON_SECRET")
   if (level === "shadow") {
     nextActions.push("验收后设 INSPIRATION_PIPELINE_EXECUTION_MODE_OVERRIDE=evaluate，再改为 live")
+    nextActions.push("影子样本：真实群消息入库但默认不写正式选题、不回群；满 30 条再谈晋升")
   }
   if (level === "live") {
     nextActions.push("确认 ChannelBinding 与视频 fallback 开关后做真实群样本验收")
@@ -113,3 +114,11 @@ export function assessInspirationPipelineReadiness(
 
   return { level, ok, checks, nextActions }
 }
+
+/** 人话解释：影子样本是什么（给 UI / 运维文案复用）。 */
+export const SHADOW_SAMPLE_PLAIN_LANGUAGE = [
+  "影子样本 = 真实群聊里进来的视频/链接消息，在非 live 模式下跑完管道后留下的入库记录。",
+  "capture_only：只记录和提取；evaluate：可生成候选观察。",
+  "两种都不写正式选题、默认不回群；用来安全攒证据，满 30 条才考虑升档。",
+].join(" ")
+
