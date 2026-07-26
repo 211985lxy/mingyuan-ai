@@ -119,11 +119,18 @@
 
 ## 10. Worktree 与分支生命周期
 
+正本约束（90 天收敛计划）：**同时最多 3 个 worktree**——① 生产主目录 ② 当前 P0（如群聊选题）③ 一个收敛/功能包。超出必须先清再开。
+
 - 每个 worktree 创建时必须关联一个明确的工作包目标，完成后 **24 小时内** 必须执行 `git worktree remove` 清理。
-- 禁止在 `.worktrees/` 下留存超过 3 个同时存在的 worktree；超出时必须先清理旧的再创建新的。
+- 禁止在 `.worktrees/` 或 `~/Desktop/AIM-worktrees/` 下留存超过 3 个同时存在的 worktree；超出时必须先清理旧的再创建新的。
+- **只使用当前正本仓**（`明动aim智能体/mingyuan`）。禁止再从 `02-业务-明动aim智能体` 等旧桌面路径开 worktree。
+- 部署/上线用临时 checkout：用完当日必须 `worktree remove`；禁止长期留下 `deploy-*` 目录。
+- 未合入 main 的分支：先打 `archive/<name>-YYYYMMDD` tag，再删 worktree；不要 silently drop tip。
+- 已合入 main 的分支：`git branch -d` 删除本地分支，避免僵尸分支名。
 - 工作包合并或放弃后，对应分支和 worktree 必须同步清理，不留僵尸。
-- Agent 线程结束时必须执行收尾清单：`git status` 确认干净 → `git worktree list` 确认无残留 → 报告磁盘占用。
+- Agent 线程结束时必须执行收尾清单：`git status` 确认干净 → `git worktree list` 确认无残留（≤3）→ 报告磁盘占用。
 - 定期（每周）运行 `git worktree prune` 清理失效引用。
+- 共享 stash 只保留有明确标签的条目（如 `FREEZE:` / `wip-<wp>-`）；过期 deploy stash 应在确认无用后清理。
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
