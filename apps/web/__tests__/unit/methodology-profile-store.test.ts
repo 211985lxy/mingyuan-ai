@@ -31,13 +31,16 @@ vi.mock("@/lib/prisma", () => ({
 
 const {
   buildMethodologyProfileBlock,
-  createMethodologyProfileVersion,
   getMethodologyProfileVersion,
   MethodologyProfileError,
-  publishMethodologyProfileVersion,
   resolveMethodologyPolicy,
-  updateMethodologyProfileMeta,
 } = await import("@/lib/methodology-profile-store")
+
+const {
+  createMethodologyProfileVersion,
+  publishMethodologyProfileVersion,
+  updateMethodologyProfileMeta,
+} = await import("@/lib/methodology-profile-admin")
 
 const PUBLISHED_AT = new Date("2026-07-26T00:00:00.000Z")
 

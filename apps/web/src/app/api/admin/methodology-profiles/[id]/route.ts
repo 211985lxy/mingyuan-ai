@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { withAdminAuth } from "@/lib/admin-auth"
 import {
-  MethodologyProfileError,
   createMethodologyProfileVersion,
   getMethodologyProfileAdminDetail,
   publishMethodologyProfileVersion,
   updateMethodologyProfileMeta,
-} from "@/lib/methodology-profile-store"
+} from "@/lib/methodology-profile-admin"
+import { MethodologyProfileError } from "@/lib/methodology-profile-store"
 
 function errorResponse(error: unknown) {
   if (error instanceof MethodologyProfileError) {
