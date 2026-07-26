@@ -2,6 +2,47 @@ import { env } from "@/env"
 import type { LLMProviderConfig } from "./types"
 
 /**
+ * 解析 LLM 出站代理：去掉引号/空白；无效值视为未配置。
+ */
+export function resolveLlmProxyUrl(
+  ...candidates: Array<string | undefined | null>
+): string | undefined {
+  for (const raw of candidates) {
+    if (raw == null) continue
+    const trimmed = raw.trim().replace(/^["']|["']$/g, "")
+    if (!trimmed) continue
+    if (!/^https?:\/\//i.test(trimmed)) {
+      console.error(`[llm] ignore invalid proxy URL (must be http/https): ${trimmed.slice(0, 64)}`)
+      continue
+    }
+    return trimmed
+  }
+  return undefined
+}
+
+/**
+ * ZenMux：生产默认禁止无代理直连（ECS → zenmux.ai 会挂死超时）。
+ * 设 ZENMUX_ALLOW_DIRECT=true 才允许裸连（仅排障）。
+ */
+export function shouldRegisterZenMux(input: {
+  apiKey?: string
+  proxyURL?: string
+  nodeEnv?: string
+  allowDirect?: string
+}): { ok: boolean; reason?: string } {
+  if (!input.apiKey?.trim()) return { ok: false, reason: "missing_api_key" }
+  const allowDirect = input.allowDirect?.trim().toLowerCase() === "true"
+  const isProd = (input.nodeEnv || process.env.NODE_ENV) === "production"
+  if (isProd && !allowDirect && !input.proxyURL) {
+    return {
+      ok: false,
+      reason: "production_requires_proxy",
+    }
+  }
+  return { ok: true }
+}
+
+/**
  * @description 获取providerconfigs
  * @returns LLMProviderConfig[]
  */
@@ -19,15 +60,35 @@ export function getProviderConfigs(): LLMProviderConfig[] {
   }
 
   // High-quality gateway: ZenMux — OpenAI-compatible unified model API
-  // ECS 直连 zenmux.ai 常超时；生产应设 ZENMUX_PROXY_URL（可与 APIMART_PROXY_URL 同代理）。
+  // ECS 直连 zenmux.ai 常超时；生产必须 ZENMUX_PROXY_URL 或复用 APIMART_PROXY_URL。
   if (process.env.ZENMUX_API_KEY) {
-    configs.push({
-      name: "zenmux",
+    const proxyURL = resolveLlmProxyUrl(
+      process.env.ZENMUX_PROXY_URL,
+      env.APIMART_PROXY_URL,
+    )
+    const gate = shouldRegisterZenMux({
       apiKey: process.env.ZENMUX_API_KEY,
-      baseURL: process.env.ZENMUX_BASE_URL || "https://zenmux.ai/api/v1",
-      defaultModel: process.env.ZENMUX_MODEL || "qwen/qwen3-max",
-      proxyURL: process.env.ZENMUX_PROXY_URL || env.APIMART_PROXY_URL,
+      proxyURL,
+      nodeEnv: process.env.NODE_ENV,
+      allowDirect: process.env.ZENMUX_ALLOW_DIRECT,
     })
+    if (!gate.ok) {
+      console.error(
+        `[llm] ZenMux skipped (${gate.reason}): set ZENMUX_PROXY_URL or APIMART_PROXY_URL ` +
+          "(ECS cannot reach zenmux.ai directly). Falling back to other providers.",
+      )
+    } else {
+      if (!proxyURL) {
+        console.warn("[llm] ZenMux registered without proxy (ZENMUX_ALLOW_DIRECT=true)")
+      }
+      configs.push({
+        name: "zenmux",
+        apiKey: process.env.ZENMUX_API_KEY,
+        baseURL: process.env.ZENMUX_BASE_URL || "https://zenmux.ai/api/v1",
+        defaultModel: process.env.ZENMUX_MODEL || "qwen/qwen3-max",
+        proxyURL,
+      })
+    }
   }
 
   // Alternative: JieKou AI — OpenAI-compatible API（接口AI中转站）
@@ -57,7 +118,7 @@ export function getProviderConfigs(): LLMProviderConfig[] {
       apiKey: env.APIMART_API_KEY,
       baseURL: env.APIMART_BASE_URL || "https://api.apimart.ai/v1",
       defaultModel: env.APIMART_MODEL || "gpt-5",
-      proxyURL: env.APIMART_PROXY_URL,
+      proxyURL: resolveLlmProxyUrl(env.APIMART_PROXY_URL),
     })
   }
 
