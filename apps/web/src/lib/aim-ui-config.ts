@@ -65,16 +65,17 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   },
   {
     id: "deep_copywriter",
+    // id 保留 deep_copywriter；对外只叫「作品编辑」——小红书图文 / 公众号成版
     title: "作品编辑",
-    displayTitle: "作品编辑官",
-    description: "文字二改、公众号排版、小红书图文",
+    description: "小红书图文、公众号成版、渠道排版",
     icon: Edit3,
     defaultFormats: ["raw_copy"],
   },
   {
     id: "content_review",
-    title: "发布前质检",
-    description: "标题、钩子、结构、风险表达",
+    // id 保留 content_review；对外叫「发布质检」——查问题、标句子、局部改稿
+    title: "发布质检",
+    description: "标题、钩子、结构、人设一致、风险表达",
     icon: ShieldCheck,
     defaultFormats: ["raw_copy"],
   },

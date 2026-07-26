@@ -238,14 +238,15 @@ describe("AIM content production positioning", () => {
     const deepCopywriter = AIM_AGENT_OPTIONS.find((agent) => agent.id === "deep_copywriter")
 
     expect(deepCopywriter?.title).toBe("作品编辑")
-    expect(deepCopywriter?.displayTitle).toBe("作品编辑官")
+    expect(deepCopywriter?.displayTitle).toBeUndefined()
+    expect(deepCopywriter?.description).toContain("小红书")
     expect(deepCopywriter?.defaultFormats).toEqual(["raw_copy"])
   })
 
   it("positions content_review as the publish quality agent", () => {
     const reviewAgent = AIM_AGENT_OPTIONS.find((agent) => agent.id === "content_review")
 
-    expect(reviewAgent?.title).toBe("发布前质检")
+    expect(reviewAgent?.title).toBe("发布质检")
     expect(reviewAgent?.description).toContain("标题")
     expect(reviewAgent?.description).toContain("风险表达")
     expect(reviewAgent?.defaultFormats).toEqual(["raw_copy"])

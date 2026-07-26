@@ -42,7 +42,7 @@ const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
   },
   {
     agentId: "content_review",
-    aliases: ["质检", "发布前质检", "检查", "自查", "风险"],
+    aliases: ["质检", "发布质检", "发布前质检", "检查", "自查", "风险"],
   },
   {
     agentId: "persona",
@@ -153,6 +153,6 @@ export function buildAimChannelHelpText(): string {
     "在群里 @我 并用 /命令 指定智能体，例如：",
     ...lines.map((l) => `  ${l} 你的需求`),
     "",
-    "可用智能体：内容创作、作品编辑、自由文案、灵感选题、商业诊断、发布前质检、人设故事。",
+    "可用智能体：内容创作、作品编辑、自由文案、灵感选题、商业诊断、发布质检、人设故事。",
   ].join("\n")
 }

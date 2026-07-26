@@ -69,7 +69,7 @@ const mockBizDiagnosis: FeishuAgentBotConfig = {
 
 const mockContentReview: FeishuAgentBotConfig = {
   botId: "content_review",
-  displayName: "发布质检官",
+  displayName: "发布质检",
   appId: "cli_cr",
   appSecret: "secret_cr",
   verificationToken: "token_cr",
@@ -149,7 +149,7 @@ describe("getAgentBotAckReply", () => {
     expect(ack).toContain("诊断")
   })
 
-  it("发布质检官有个性化 ACK", () => {
+  it("发布质检有个性化 ACK", () => {
     const ack = getAgentBotAckReply("content_review")
     expect(ack).toContain("质检")
   })
@@ -158,10 +158,10 @@ describe("getAgentBotAckReply", () => {
 describe("getBotRoleConstraint", () => {
   it("每个 bot 都有角色约束", () => {
     expect(getBotRoleConstraint("content_producer")).toContain("内容创作官")
-    expect(getBotRoleConstraint("deep_copywriter")).toContain("作品编辑官")
+    expect(getBotRoleConstraint("deep_copywriter")).toContain("作品编辑")
     expect(getBotRoleConstraint("business_system_diagnosis")).toContain("商业诊断官")
     expect(getBotRoleConstraint("business_diagnosis")).toContain("灵感选题官")
-    expect(getBotRoleConstraint("content_review")).toContain("发布质检官")
+    expect(getBotRoleConstraint("content_review")).toContain("发布质检")
     expect(getBotRoleConstraint("persona")).toContain("人设故事官")
   })
 })

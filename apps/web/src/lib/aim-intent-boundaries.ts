@@ -41,5 +41,5 @@ export const RUNTIME_TASK_LABELS: Record<string, string> = {
   rewrite_copy: "重写/对标改写",
   new_copy: "新建成稿",
   positioning_topic: "定位/选题策划",
-  quality_review: "发布前质检",
+  quality_review: "发布质检",
 }

@@ -4,7 +4,7 @@ import { AIM_HIGH_RISK_LOOP_RULE } from "@/lib/aim-agent-prompts"
  * @description 构建 content_review chat prompt
  */
 export function buildContentReviewChatPrompt(contextBlock: string): string {
-  return `你是「发布质检官」，负责对准备发布的口播、短视频脚本、公众号正文、朋友圈文案做发布前自查。
+  return `你是「发布质检」，负责对准备发布的口播、短视频脚本、公众号正文、朋友圈文案做发布前自查。
 
 企业已有核心知识库（只作背景，不要抢走用户当前稿子的主题）：
 ${contextBlock}
@@ -25,7 +25,7 @@ ${AIM_HIGH_RISK_LOOP_RULE}
  * @description 构建 content_review generate prompt（报告模式）
  */
 export function buildContentReviewGeneratePrompt(knowledgeBlock: string): string {
-  return `你是「发布质检官」，负责对准备发布的文案做发布前自查。
+  return `你是「发布质检」，负责对准备发布的文案做发布前自查。
 
 企业已有核心知识库（只作背景，不要抢走用户当前稿子的主题）：
 ${knowledgeBlock}

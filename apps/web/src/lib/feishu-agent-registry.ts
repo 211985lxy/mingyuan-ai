@@ -62,10 +62,10 @@ function buildBotConfig(
 /** 6 个 bot 的静态元信息（displayName + workflowId） */
 const BOT_META: Record<string, { displayName: string; workflowId: string }> = {
   content_producer: { displayName: "内容创作官", workflowId: "content_growth" },
-  deep_copywriter: { displayName: "作品编辑官", workflowId: "content_growth" },
+  deep_copywriter: { displayName: "作品编辑", workflowId: "content_growth" },
   business_system_diagnosis: { displayName: "商业诊断官", workflowId: "sales_diagnosis" },
   business_diagnosis: { displayName: "灵感选题官", workflowId: "sales_diagnosis" },
-  content_review: { displayName: "发布质检官", workflowId: "content_growth" },
+  content_review: { displayName: "发布质检", workflowId: "content_growth" },
   persona: { displayName: "人设故事官", workflowId: "content_growth" },
 }
 

@@ -42,7 +42,7 @@ describe("aim agent guides", () => {
   it("uses task-based workflow names on the visible agent list", () => {
     expect(getAimAgent("business_diagnosis").title).toBe("灵感选题策划")
     expect(getAimAgent("content_producer").title).toBe("内容文案创作")
-    expect(getAimAgent("content_review").title).toBe("发布前质检")
+    expect(getAimAgent("content_review").title).toBe("发布质检")
     expect(getAimAgent("business_system_diagnosis").title).toBe("商业模式诊断")
   })
 

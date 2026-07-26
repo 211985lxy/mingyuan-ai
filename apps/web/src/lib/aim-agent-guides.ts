@@ -378,9 +378,9 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     ],
   },
   content_review: {
-    intro: "这里是发布前质检。把准备发布的文案贴给我，我会检查标题、开头钩子、内容结构、人设一致性、平台适配、转化路径和风险表达。",
+    intro: "这里是发布质检。把准备发布的文案贴给我，我会检查标题、开头钩子、内容结构、人设一致性、平台适配、转化路径和风险表达。",
     placeholder: "贴一版准备发布的口播、脚本或正文，我帮你做发布前自查…",
-    defaultInstruction: "按发布前质检结构输出：总体结论、标题质检、开头钩子质检、内容结构质检、人设一致性质检、平台适配质检、转化路径质检、风险表达质检、最小修改建议、复检清单。只给最小改法，不要整篇重写。",
+    defaultInstruction: "按发布质检结构输出：总体结论、标题质检、开头钩子质检、内容结构质检、人设一致性质检、平台适配质检、转化路径质检、风险表达质检、最小修改建议、复检清单。只给最小改法，不要整篇重写。",
     quickPrompts: [
       "帮我检查这版口播能不能直接发，哪些地方必须改。",
       "帮我做抖音发布前自查，只给最小修改建议。",
@@ -389,7 +389,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     primaryActionLabel: "生成质检报告",
     scenarios: ["文案准备发布", "担心违规或限流", "只想要最小修改建议"],
     inputTemplate: [{ label: "待质检文案", placeholder: "粘贴完整口播、脚本或正文" }],
-    outputAssets: ["发布前质检报告", "标题/钩子/结构检查", "平台风险", "最小改法", "复检清单", "发布前判断"],
+    outputAssets: ["发布质检报告", "标题/钩子/结构检查", "平台风险", "最小改法", "复检清单", "发布前判断"],
     skills: REVIEW_SKILLS,
     nextActions: [
       { id: "recheck", label: "复检修改稿", prompt: "请对下面修改稿做复检，只指出仍需修改的位置和原因。" },
