@@ -14,7 +14,7 @@ export function getProviderConfigs(): LLMProviderConfig[] {
       name: "deepseek",
       apiKey: env.DEEPSEEK_API_KEY,
       baseURL: env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
-      defaultModel: env.DEEPSEEK_MODEL || "deepseek-chat",
+      defaultModel: env.DEEPSEEK_MODEL || "deepseek-v4-flash",
     })
   }
 

@@ -79,9 +79,9 @@ export class LLMClient {
 
     const maxAttempts = normalizeInteger(
       this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
-      2,
-      1,
       3,
+      1,
+      5,
     )
     const maxOutputTokens = normalizeInteger(env.LLM_MAX_OUTPUT_TOKENS, 8192, 256, 16_384)
     const boundedOptions = {
@@ -154,9 +154,9 @@ export class LLMClient {
 
     const maxAttempts = normalizeInteger(
       this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
-      2,
-      1,
       3,
+      1,
+      5,
     )
     const maxOutputTokens = normalizeInteger(env.LLM_MAX_OUTPUT_TOKENS, 8192, 256, 16_384)
     const boundedOptions = {

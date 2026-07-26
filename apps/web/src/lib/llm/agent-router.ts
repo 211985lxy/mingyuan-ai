@@ -9,7 +9,7 @@ import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio
  *
  * 核心思路：关键创作优先质量，日常生产优先稳定低成本
  * - 深度文案 → ZenMux Claude Sonnet 优先，离火 GPT-5.6 兜底
- * - 内容创作（content_producer）→ ZenMux Claude Opus 5，OpenRouter / Sonnet / DeepSeek 兜底
+ * - 内容创作（content_producer）→ DeepSeek / APIMart 稳定优先，Claude Sonnet/Opus 兜底
  * - 发布质检 / 人设等 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
  * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / qianfan / openai
@@ -84,13 +84,15 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "glm", timeoutMs: 20000, capability: "standard" },
   ],
 
-  // ── 内容创作：Claude Opus 5 优先（仅 content_producer / 创作台 social）──
+  // ── 内容创作：稳定优先（DeepSeek/APIMart），Claude 作增强兜底 ──
+  // 生产约束：LLM_MAX_PROVIDER_ATTEMPTS 默认仅 2~3 次；ZenMux/OpenRouter Opus
+  // 若排在前两位，连通性或区域 403 会直接打满额度，表现为「AI 服务响应超时」(nginx 502)。
   content_producer: [
+    { name: "deepseek", model: "deepseek-v4-flash", capability: "standard" },
+    { name: "apimart", timeoutMs: 60000, capability: "advanced" },
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
     { name: "zenmux", model: "anthropic/claude-opus-5", timeoutMs: 120000, capability: "advanced" },
     { name: "openrouter", model: "anthropic/claude-opus-5", timeoutMs: 120000, capability: "advanced" },
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
-    { name: "apimart", capability: "advanced" },
-    { name: "deepseek", capability: "standard" },
     { name: "jiekou", capability: "basic" },
     { name: "glm", capability: "standard" },
   ],

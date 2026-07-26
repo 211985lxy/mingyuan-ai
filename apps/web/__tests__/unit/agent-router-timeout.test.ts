@@ -50,17 +50,17 @@ describe("agent router timeout overrides", () => {
     expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
   })
 
-  it("routes content_producer to Claude Opus 5 first, keeping DeepSeek as fallback", async () => {
+  it("routes content_producer to DeepSeek first for stable production chat", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     const llm = getAgentLLM("content_producer")
-    expect(llm.providerNames[0]).toBe("zenmux")
-    expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-opus-5")
-    expect(llm.providerNames).toContain("deepseek")
+    expect(llm.providerNames[0]).toBe("deepseek")
+    expect(getAgentRecommendedModel("content_producer")).toBe("deepseek-v4-flash")
     expect(llm.providerNames).toContain("apimart")
+    expect(llm.providerNames).toContain("zenmux")
 
-    const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(zenmux?.timeout).toBe(120000)
+    const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
+    expect(deepseek).toBeTruthy()
   })
 
   it("keeps non-Claude-primary agents on the default provider timeout", async () => {
