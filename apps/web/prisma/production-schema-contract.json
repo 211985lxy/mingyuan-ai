@@ -243,6 +243,43 @@
         "fallbackJobId",
         "transcript"
       ]
+    },
+    {
+      "name": "MethodologyProfile",
+      "columns": [
+        "id",
+        "userId",
+        "name",
+        "slug",
+        "originatorName",
+        "aliases",
+        "methodologyType",
+        "scope",
+        "description",
+        "applicableAgents",
+        "applicableTasks",
+        "applicableChannels",
+        "priority",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "name": "MethodologyProfileVersion",
+      "columns": [
+        "id",
+        "profileId",
+        "version",
+        "contentMarkdown",
+        "compiledPrompt",
+        "sourceRefs",
+        "checksum",
+        "status",
+        "rightsNote",
+        "createdAt",
+        "publishedAt"
+      ]
     }
   ]
 }

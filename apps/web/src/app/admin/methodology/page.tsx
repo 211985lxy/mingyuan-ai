@@ -137,9 +137,12 @@ export default function AdminMethodologyPage() {
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        title="IP 操盘方法论"
-        description="查看智能体使用的知识、方法论和调用流程，并维护可复用的方法论内容。"
+        title="系统方法论"
+        description="内置 3 份系统方法论（改完下次生成立刻生效）。徐沪生这类可点选的命名方法论在另一页。"
         actions={<>
+          <Link href="/admin/methodology-profiles">
+            <Button variant="outline" size="sm">命名方法论</Button>
+          </Link>
           <Button variant="outline" size="sm" onClick={fetchMethodologies}>
             <RotateCw className="mr-1.5 h-4 w-4" />
             刷新

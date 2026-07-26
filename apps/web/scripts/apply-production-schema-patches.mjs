@@ -174,6 +174,47 @@ export const PRODUCTION_SCHEMA_PATCHES = [
   // 渠道绑定默认灰度从 capture_only 起（不改既有行的取值，只改列默认）
   `ALTER TABLE \`ChannelBinding\`
     MODIFY COLUMN \`executionMode\` VARCHAR(20) NOT NULL DEFAULT 'capture_only'`,
+  // ── 命名方法论（ADR-002） ──
+  `CREATE TABLE IF NOT EXISTS \`MethodologyProfile\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`userId\` VARCHAR(191) NULL,
+    \`name\` VARCHAR(191) NOT NULL,
+    \`slug\` VARCHAR(191) NOT NULL,
+    \`originatorName\` VARCHAR(191) NULL,
+    \`aliases\` JSON NOT NULL,
+    \`methodologyType\` VARCHAR(191) NOT NULL,
+    \`scope\` VARCHAR(191) NOT NULL,
+    \`description\` TEXT NULL,
+    \`applicableAgents\` JSON NOT NULL,
+    \`applicableTasks\` JSON NOT NULL,
+    \`applicableChannels\` JSON NOT NULL,
+    \`priority\` INTEGER NOT NULL DEFAULT 100,
+    \`status\` VARCHAR(191) NOT NULL DEFAULT 'active',
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+    UNIQUE INDEX \`MethodologyProfile_slug_key\`(\`slug\`),
+    INDEX \`MethodologyProfile_status_idx\`(\`status\`),
+    INDEX \`MethodologyProfile_userId_status_idx\`(\`userId\`, \`status\`),
+    PRIMARY KEY (\`id\`),
+    CONSTRAINT \`MethodologyProfile_userId_fkey\` FOREIGN KEY (\`userId\`) REFERENCES \`User\`(\`id\`) ON DELETE SET NULL ON UPDATE CASCADE
+  ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS \`MethodologyProfileVersion\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`profileId\` VARCHAR(191) NOT NULL,
+    \`version\` INTEGER NOT NULL,
+    \`contentMarkdown\` LONGTEXT NOT NULL,
+    \`compiledPrompt\` LONGTEXT NOT NULL,
+    \`sourceRefs\` JSON NOT NULL,
+    \`checksum\` VARCHAR(64) NOT NULL,
+    \`status\` VARCHAR(191) NOT NULL DEFAULT 'published',
+    \`rightsNote\` TEXT NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`publishedAt\` DATETIME(3) NULL,
+    UNIQUE INDEX \`MethodologyProfileVersion_profileId_version_key\`(\`profileId\`, \`version\`),
+    INDEX \`MethodologyProfileVersion_profileId_status_idx\`(\`profileId\`, \`status\`),
+    PRIMARY KEY (\`id\`),
+    CONSTRAINT \`MethodologyProfileVersion_profileId_fkey\` FOREIGN KEY (\`profileId\`) REFERENCES \`MethodologyProfile\`(\`id\`) ON DELETE CASCADE ON UPDATE CASCADE
+  ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 ]
 
 function runMysql(connection, query) {

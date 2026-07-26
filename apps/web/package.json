@@ -22,6 +22,7 @@
     "eval:deterministic": "DATABASE_URL='mysql://eval:eval@127.0.0.1:3306/aim_eval' tsx --tsconfig tsconfig.json scripts/aim-eval.ts --deterministic",
     "eval:daily": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --daily",
     "eval:full": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --full",
+    "seed:methodology": "DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' tsx scripts/seed-methodology-profile.ts",
     "eval:model-swap": "tsx --tsconfig tsconfig.json scripts/aim-eval-model-swap.ts",
     "eval:content-baseline": "tsx --tsconfig tsconfig.json scripts/aim-content-baseline.ts",
     "eval:memory": "tsx --tsconfig tsconfig.json scripts/aim-memory-eval.ts",

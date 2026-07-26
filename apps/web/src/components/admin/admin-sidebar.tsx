@@ -79,7 +79,8 @@ const navGroups: NavGroup[] = [
     labelEn: "AI Agents",
     items: [
       { title: "智能体", titleEn: "Agents", href: "/admin/agents", icon: Bot },
-      { title: "方法论", titleEn: "Methodology", href: "/admin/methodology", icon: Compass },
+      { title: "系统方法论", titleEn: "System Methodology", href: "/admin/methodology", icon: Compass },
+      { title: "命名方法论", titleEn: "Named Methodology", href: "/admin/methodology-profiles", icon: BookOpen },
       { title: "检索测试", titleEn: "Retrieval Test", href: "/admin/retrieval-test", icon: FlaskConical },
     ],
   },
