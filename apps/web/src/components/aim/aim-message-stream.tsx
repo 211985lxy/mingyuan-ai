@@ -1,8 +1,9 @@
 "use client"
 
-import { forwardRef, useState } from "react"
+import { forwardRef, useCallback, useState, type Ref } from "react"
 import { ArrowRight } from "lucide-react"
 import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
+import { AimMessageJumpRail } from "@/components/aim/aim-message-jump-rail"
 import { AimQualityReport } from "@/components/aim/aim-quality-report"
 import { ThinkingProcessPanel } from "@/components/aim/thinking-process-panel"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
@@ -153,8 +154,46 @@ interface AimMessageStreamProps {
   actions: MessageActions
 }
 
+function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
+  if (!ref) return
+  if (typeof ref === "function") ref(value)
+  else ref.current = value
+}
+
 export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps>(function AimMessageStream(props, ref) {
-  return <div ref={ref} className="flex-1 overflow-y-auto px-3 py-3 sm:px-5">
-    {props.messages.length === 0 ? <EmptyMessageState agentIntro={props.agentIntro} workflowStage={props.workflowStage} selectedAgentId={props.selectedAgentId} onBeginContentAction={props.onBeginContentAction} /> : <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 xl:max-w-7xl">{props.messages.map((message) => <AimMessageCard key={message.id} message={message} busy={props.busy} selectedAgentId={props.selectedAgentId} selectedProjectId={props.selectedProjectId} latestDeliverableMessageId={props.latestDeliverableMessageId} actions={props.actions} />)}</div>}
-  </div>
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
+  const setScrollRef = useCallback((node: HTMLDivElement | null) => {
+    setScrollEl(node)
+    assignRef(ref, node)
+  }, [ref])
+
+  return (
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={setScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
+        {props.messages.length === 0 ? (
+          <EmptyMessageState
+            agentIntro={props.agentIntro}
+            workflowStage={props.workflowStage}
+            selectedAgentId={props.selectedAgentId}
+            onBeginContentAction={props.onBeginContentAction}
+          />
+        ) : (
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 xl:max-w-7xl">
+            {props.messages.map((message) => (
+              <AimMessageCard
+                key={message.id}
+                message={message}
+                busy={props.busy}
+                selectedAgentId={props.selectedAgentId}
+                selectedProjectId={props.selectedProjectId}
+                latestDeliverableMessageId={props.latestDeliverableMessageId}
+                actions={props.actions}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      <AimMessageJumpRail messages={props.messages} scrollEl={scrollEl} />
+    </div>
+  )
 })
