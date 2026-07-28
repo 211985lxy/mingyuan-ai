@@ -9,7 +9,6 @@ import {
   type CompetitorWatchVideo,
 } from "@/components/competitor/competitor-video-sections"
 import { CompetitorAddAccountPanel } from "@/components/competitor/competitor-add-account-panel"
-import { CompetitorDiscoveryPanel } from "@/components/competitor/competitor-discovery-panel"
 import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-web-research-panel"
 import type { WatchAccount } from "@/lib/api/client"
 import type { ApiCompetitorReport } from "@/types/api"
@@ -129,23 +128,7 @@ describe("competitor account pool components", () => {
     expect(html).toContain("生成内容资产包")
   })
 
-  it("keeps monitor, add-account and web-research entries visible", () => {
-    const discoveryHtml = renderToStaticMarkup(createElement(CompetitorDiscoveryPanel, {
-      activeAccount: account,
-      accounts: [account],
-      discovering: false,
-      discoveryAttempted: false,
-      peerAccounts: [],
-      leaderAccounts: [],
-      ignoredUrls: new Set<string>(),
-      adding: false,
-      refreshingId: null,
-      onActivate: () => {},
-      onRefresh: async () => {},
-      onDiscover: async () => {},
-      onAdd: async () => {},
-      onIgnore: () => {},
-    }))
+  it("keeps add-account and web-research entries visible", () => {
     const addHtml = renderToStaticMarkup(createElement(CompetitorAddAccountPanel, {
       value: "",
       adding: false,
@@ -162,13 +145,11 @@ describe("competitor account pool components", () => {
       onResearch: async () => {},
     }))
 
-    expect(discoveryHtml).toContain("监控对标")
-    expect(discoveryHtml).toContain("刷新作品池")
-    expect(discoveryHtml).toContain("扩展同赛道")
     expect(addHtml).toContain("添加监控账号")
     expect(addHtml).toContain("搜昵称")
     expect(addHtml).toContain("搜视频号")
     expect(addHtml).toContain("视频号昵称")
+    expect(addHtml).not.toContain("扩展同赛道")
     expect(researchHtml).toContain("全网补证")
     expect(researchHtml).toContain("这里不替你直接下结论")
   })

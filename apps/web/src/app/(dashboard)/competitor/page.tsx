@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { CompetitorAddAccountPanel } from "@/components/competitor/competitor-add-account-panel"
-import { CompetitorDiscoveryPanel } from "@/components/competitor/competitor-discovery-panel"
 import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-web-research-panel"
 import { CompetitorTopicAnalysisPanel } from "@/components/competitor/competitor-topic-analysis-panel"
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
@@ -30,7 +29,6 @@ import { CompetitorWorkbenchLinks } from "@/features/competitor/components/compe
 import { useCompetitorVideoExtractions } from "@/features/competitor/hooks/use-competitor-video-extractions"
 import { useCompetitorWebResearch } from "@/features/competitor/hooks/use-competitor-web-research"
 import { useCompetitorReports } from "@/features/competitor/hooks/use-competitor-reports"
-import { useCompetitorDiscovery } from "@/features/competitor/hooks/use-competitor-discovery"
 import { useCompetitorWatchAccounts } from "@/features/competitor/hooks/use-competitor-watch-accounts"
 
 // ─── Main Page ─────────────────────────────────────────
@@ -40,7 +38,7 @@ export default function CompetitorWatchPage() {
 
   const [analyzingUrl, setAnalyzingUrl] = useState<string | null>(null)
   const {
-    accounts, activeAccountId, addAccount, addDiscoveredAccount, addUrl, adding,
+    accounts, activeAccountId, addAccount, addUrl, adding,
     deletingId, loading, refreshAccount, refreshAll, refreshing, refreshingId,
     removeAccount, setActiveAccountId, setAddUrl,
   } = useCompetitorWatchAccounts()
@@ -54,7 +52,6 @@ export default function CompetitorWatchPage() {
   } = useCompetitorWebResearch()
   const activeAccount = resolveActiveAccount(accounts, activeAccountId)
   const { loadReports, reports, reportsLoading } = useCompetitorReports(activeAccount?.targetUrl)
-  const { discover, discovering, discoveryAttempted, ignoredDiscoveryUrls, ignore, leaderAccounts, peerAccounts } = useCompetitorDiscovery()
 
   async function handleAnalyze(url: string) {
     setAnalyzingUrl(url)
@@ -110,23 +107,6 @@ export default function CompetitorWatchPage() {
 
         <TabsContent value="accounts" className="mt-0 space-y-6">
           <CompetitorAddAccountPanel value={addUrl} adding={adding} accountCount={accounts.length} onChange={setAddUrl} onAdd={addAccount} />
-
-          <CompetitorDiscoveryPanel
-            activeAccount={activeAccount}
-            accounts={accounts}
-            discovering={discovering}
-            discoveryAttempted={discoveryAttempted}
-            peerAccounts={peerAccounts}
-            leaderAccounts={leaderAccounts}
-            ignoredUrls={ignoredDiscoveryUrls}
-            adding={adding}
-            refreshingId={refreshingId}
-            onActivate={setActiveAccountId}
-            onRefresh={refreshAccount}
-            onDiscover={discover}
-            onAdd={addDiscoveredAccount}
-            onIgnore={ignore}
-          />
 
           <MonitoredAccountGrid
             accounts={sortedAccounts}
