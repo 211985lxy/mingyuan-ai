@@ -44,6 +44,26 @@
       ]
     },
     {
+      "name": "CustomerOutcomeProjection",
+      "columns": [
+        "id",
+        "projectId",
+        "externalOutcomeId",
+        "externalDealId",
+        "metricCode",
+        "baseline",
+        "target",
+        "actual",
+        "unit",
+        "observedFrom",
+        "observedTo",
+        "evidenceRef",
+        "reviewStatus",
+        "reviewerRef",
+        "reviewedAt"
+      ]
+    },
+    {
       "name": "AimRunSnapshot",
       "columns": [
         "id",

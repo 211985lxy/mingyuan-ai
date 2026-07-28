@@ -82,17 +82,18 @@ model ClientProject {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user              User               @relation(fields: [userId], references: [id])
-  aimGenerations    AimGeneration[]
-  knowledgeEntries  KnowledgeEntry[]
-  knowledgeEntities KnowledgeEntity[]
-  assetCandidates   AssetCandidate[]
-  aimMemories       AimMemory[]
-  ipWikiPages       IpWikiPage[]
-  benchmarkProfiles BenchmarkProfile[]
-  inspirations      Inspiration[]
-  channelBindings   ChannelBinding[]
+  user                   User                        @relation(fields: [userId], references: [id])
+  aimGenerations         AimGeneration[]
+  knowledgeEntries       KnowledgeEntry[]
+  knowledgeEntities      KnowledgeEntity[]
+  assetCandidates        AssetCandidate[]
+  aimMemories            AimMemory[]
+  ipWikiPages            IpWikiPage[]
+  benchmarkProfiles      BenchmarkProfile[]
+  inspirations           Inspiration[]
+  channelBindings        ChannelBinding[]
   opportunityCollections OpportunityCollection[]
+  customerOutcomes       CustomerOutcomeProjection[]
 
   @@index([userId, status])
   @@index([userId, createdAt])

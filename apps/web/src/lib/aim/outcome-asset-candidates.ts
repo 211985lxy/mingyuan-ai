@@ -1,8 +1,17 @@
 /**
- * 经营结果 → 资产候选（阶段 4 WP4.4 / WP-0 语义修复）
+ * 经营结果 → 资产候选（阶段 4 WP4.4 / WP-0 语义修复 / WP-4）
  * 只生成 pending 候选，不直接写入正式知识库。
  * 决策只看 verdictCode；userVerdict 仅作备注展示。
+ *
+ * 成交/预约 → 仅「转化案例候选」。
+ * 成功案例候选见 customer-outcome.ts（须已审核客户结果投影）。
  */
+
+export {
+  buildSuccessCaseCandidateFromCustomerOutcome,
+  canMarkDeliverySuccess,
+  canPromoteSuccessCase,
+} from "@/lib/aim/customer-outcome"
 
 import type { AssetCandidateDraft } from "@/lib/aim/asset-candidates"
 import {

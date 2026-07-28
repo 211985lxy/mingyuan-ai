@@ -28,3 +28,35 @@ model OutcomeAttribution {
   @@index([generationId])
   @@index([attributionMethod])
 }
+
+/**
+ * 客户结果投影（WP-4）：正本在飞书，AIM 只存查询投影。
+ * 无 baseline/actual/证据/审核人不得标记交付成功；已审核后才可出成功案例候选。
+ */
+model CustomerOutcomeProjection {
+  id                String    @id @default(cuid())
+  projectId         String
+  externalOutcomeId String    @db.VarChar(80)
+  externalDealId    String?   @db.VarChar(80)
+  metricCode        String    @db.VarChar(80)
+  baseline          Decimal?  @db.Decimal(14, 2)
+  target            Decimal?  @db.Decimal(14, 2)
+  actual            Decimal?  @db.Decimal(14, 2)
+  unit              String?   @db.VarChar(40)
+  observedFrom      DateTime
+  observedTo        DateTime
+  evidenceRef       String    @db.VarChar(500)
+  /** pending | approved | rejected */
+  reviewStatus      String    @db.VarChar(20)
+  reviewerRef       String?   @db.VarChar(120)
+  reviewedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  project ClientProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([externalOutcomeId])
+  @@index([projectId, reviewStatus])
+  @@index([externalDealId])
+  @@index([metricCode])
+}

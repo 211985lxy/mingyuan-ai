@@ -90,6 +90,15 @@ describe("Prisma migrations", () => {
     expect(migrationSql).toContain("UNIQUE INDEX `OutcomeAttribution_externalLeadId_key`")
   })
 
+  it("creates CustomerOutcomeProjection for reviewed customer results (WP-4)", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("model CustomerOutcomeProjection")
+    expect(migrationSql).toContain("CREATE TABLE IF NOT EXISTS `CustomerOutcomeProjection`")
+    expect(migrationSql).toContain("UNIQUE INDEX `CustomerOutcomeProjection_externalOutcomeId_key`")
+  })
+
   it("owns phase 14 schema changes in Prisma migrations only", () => {
     const migrationSql = readFileSync(
       path.join(
