@@ -1,5 +1,5 @@
 import { redfoxPost } from "@/lib/redfox/client"
-import { tikhubGet } from "@/lib/tikhub/client"
+import { tikhubPost } from "@/lib/tikhub/client"
 import { logger } from "@/lib/logger"
 import type { OpportunityItem } from "../contracts/types"
 import type { SearchAdapter, PlatformSearchInput, PlatformSearchOutput } from "./adapter-interface"
@@ -39,9 +39,9 @@ interface RedFoxSearchResult {
   hasMore?: boolean
 }
 
-// ─── TikHub Wire Types ─────────────────────────────────────
+// ─── TikHub Wire Types（Search V2）──────────────────────────
 
-interface TikHubVideoItem {
+interface TikHubAwemeInfo {
   aweme_id?: string
   desc?: string
   share_url?: string
@@ -57,8 +57,16 @@ interface TikHubVideoItem {
   author?: { uid?: string; nickname?: string; follower_count?: number }
 }
 
-interface TikHubSearchResult {
-  data?: TikHubVideoItem[]
+interface TikHubSearchV2Item {
+  type?: number
+  data?: {
+    type?: number
+    aweme_info?: TikHubAwemeInfo
+  }
+}
+
+interface TikHubSearchV2Data {
+  business_data?: TikHubSearchV2Item[]
   cursor?: number
   has_more?: number
 }
@@ -73,20 +81,22 @@ function redfoxSortType(sortOrder?: string): string {
   }
 }
 
+/** TikHub V2: 0=综合 1=最多点赞 2=最新发布 */
 function tikhubSortType(sortOrder?: string): string {
   switch (sortOrder) {
-    case "latest": return "1"
-    case "popular": return "2"
+    case "popular": return "1"
+    case "latest": return "2"
     default: return "0"
   }
 }
 
-function tikhubPublishTime(timeRange?: string): string | undefined {
+/** TikHub V2: 0=不限 1=最近一天 7=最近一周 180=最近半年 */
+function tikhubPublishTime(timeRange?: string): string {
   switch (timeRange) {
     case "24h": return "1"
     case "7d": return "7"
-    case "30d": return "30"
-    default: return undefined
+    case "30d": return "180"
+    default: return "0"
   }
 }
 
@@ -162,25 +172,31 @@ export class DouyinSearchAdapter implements SearchAdapter {
     }
   }
 
-  // ─── TikHub: /api/v1/douyin/web/search_video ───
+  // ─── TikHub: POST /api/v1/douyin/search/fetch_video_search_v2 ───
 
   private async searchViaTikHub(input: PlatformSearchInput): Promise<OpportunityItem[]> {
-    const data = await tikhubGet<TikHubSearchResult>(
-      "/api/v1/douyin/web/search_video",
+    const data = await tikhubPost<TikHubSearchV2Data>(
+      "/api/v1/douyin/search/fetch_video_search_v2",
       {
         keyword: input.keyword,
-        offset: 0,
-        count: input.count,
+        cursor: 0,
         sort_type: tikhubSortType(input.filters?.sortOrder),
         publish_time: tikhubPublishTime(input.filters?.timeRange),
+        filter_duration: "0",
+        content_type: "1",
+        search_id: "",
+        backtrace: "",
       },
     )
 
-    const list = data.data ?? []
+    const list = (data.business_data ?? [])
+      .map((row) => row.data?.aweme_info)
+      .filter((info): info is TikHubAwemeInfo => Boolean(info?.aweme_id))
+
     return list.slice(0, input.count).map((item) => this.normalizeTikHub(item))
   }
 
-  private normalizeTikHub(item: TikHubVideoItem): OpportunityItem {
+  private normalizeTikHub(item: TikHubAwemeInfo): OpportunityItem {
     const sourceId = item.aweme_id ?? ""
     const stats = item.statistics ?? {}
 

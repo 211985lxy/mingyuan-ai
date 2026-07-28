@@ -1,44 +1,14 @@
 import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
-import { tikhubGet } from "@/lib/tikhub/client"
 import { LLMClient } from "@/lib/llm"
+import { searchWechatChannelsVideos, type WechatChannelsSearchVideo } from "@/lib/tikhub/search-wechat-channels-videos"
 import { z } from "zod"
 
 const bodySchema = z.object({
   keyword: z.string().trim().min(1).max(200),
   count: z.number().int().min(5).max(50).default(20),
 }).strict()
-
-// ─── Wire Types ───
-
-interface SearchVideoItem {
-  object_id?: string
-  video_id?: string
-  description?: string
-  title?: string
-  cover_url?: string
-  thumb_url?: string
-  create_time?: number
-  publish_time?: number
-  duration?: number
-  play_count?: number
-  read_count?: number
-  like_count?: number
-  recommend_count?: number
-  comment_count?: number
-  share_count?: number
-  forward_count?: number
-  collect_count?: number
-  fav_count?: number
-  nickname?: string
-  finder_username?: string
-}
-
-interface SearchVideoResult {
-  list?: SearchVideoItem[]
-  video_list?: SearchVideoItem[]
-}
 
 const TOPIC_ANALYSIS_PROMPT = `你是视频号选题分析专家。基于搜索结果数据，输出JSON格式的选题热度分析报告。
 
@@ -53,14 +23,14 @@ const TOPIC_ANALYSIS_PROMPT = `你是视频号选题分析专家。基于搜索�
 export const POST = withUserAuth(async (request, { user: _user }) => {
   const body = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 })
 
-  // Step 1: 搜索视频号视频
-  let items: SearchVideoItem[]
+  let items: WechatChannelsSearchVideo[]
   try {
-    const data = await tikhubGet<SearchVideoResult>(
-      '/api/v1/wechat/search/v2/search_channels_video',
-      { keyword: body.keyword, count: body.count },
-    )
-    items = data.list ?? data.video_list ?? []
+    const data = await searchWechatChannelsVideos({
+      keyword: body.keyword,
+      count: body.count,
+      sortType: "popular",
+    })
+    items = data.list
   } catch (err) {
     const message = err instanceof Error ? err.message : '搜索视频号视频失败'
     return NextResponse.json({ error: message }, { status: 502 })
@@ -75,19 +45,17 @@ export const POST = withUserAuth(async (request, { user: _user }) => {
     })
   }
 
-  // Step 2: 构建数据摘要
   const videoSummaries = items.map((item, i) => ({
     idx: i + 1,
-    title: (item.description ?? item.title ?? '').slice(0, 60),
-    author: item.nickname ?? '',
-    views: item.play_count ?? item.read_count ?? 0,
-    likes: item.like_count ?? item.recommend_count ?? 0,
-    comments: item.comment_count ?? 0,
-    shares: item.share_count ?? item.forward_count ?? 0,
-    duration: item.duration ?? 0,
+    title: (item.description || item.title).slice(0, 60),
+    author: item.nickname,
+    views: item.play_count,
+    likes: item.like_count,
+    comments: item.comment_count,
+    shares: item.share_count,
+    duration: item.duration,
   }))
 
-  // Step 3: AI 分析
   try {
     const llm = LLMClient.shared()
     const response = await llm.complete({
@@ -118,7 +86,6 @@ export const POST = withUserAuth(async (request, { user: _user }) => {
       analysis: analysisResult,
     })
   } catch (err) {
-    // AI 分析失败时仍返回搜索结果
     return NextResponse.json({
       keyword: body.keyword,
       videosFound: items.length,

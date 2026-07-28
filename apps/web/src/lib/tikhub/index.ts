@@ -1,4 +1,4 @@
-export { tikhubGet, TikHubError } from './client'
+export { tikhubGet, tikhubPost, TikHubError } from './client'
 export type {
   TikHubResponse,
   NormalizedAccount,
