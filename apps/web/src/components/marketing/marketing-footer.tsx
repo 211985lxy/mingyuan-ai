@@ -17,6 +17,7 @@ const footerColumns = [
       { label: "首页", href: "/" },
       { label: "IP 智能体", href: "/ip-agent" },
       { label: "客户案例", href: "/cases" },
+      { label: "关于我们", href: "/about" },
     ],
   },
   {

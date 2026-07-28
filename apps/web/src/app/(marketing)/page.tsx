@@ -5,6 +5,7 @@ import { HowItWorksSection } from "@/components/marketing/how-it-works-section"
 import { BusinessStructureSection } from "@/components/marketing/business-structure-section"
 import { FeaturesSection } from "@/components/marketing/features-section"
 import { CaseEvidenceSection } from "@/components/marketing/case-evidence-section"
+import { TeamSection } from "@/components/marketing/team-section"
 import { DifferentiatorsSection } from "@/components/marketing/differentiators-section"
 import { CooperationPathSection } from "@/components/marketing/cooperation-path-section"
 import { CTASection } from "@/components/marketing/cta-section"
@@ -114,6 +115,7 @@ export default function MarketingPage() {
       <BusinessStructureSection />
       <FeaturesSection />
       <CaseEvidenceSection />
+      <TeamSection />
       <DifferentiatorsSection />
       <CooperationPathSection />
       <CTASection />

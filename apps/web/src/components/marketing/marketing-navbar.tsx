@@ -17,7 +17,7 @@ import { WechatCtaButton } from "./wechat-cta"
 const navLinks = [
   { label: "产品", href: "/ip-agent" },
   { label: "案例", href: "/cases" },
-  { label: "关于", href: "/vision/#team" },
+  { label: "关于", href: "/about" },
 ]
 
 const serviceLinks = [
