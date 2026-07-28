@@ -60,3 +60,44 @@ model CustomerOutcomeProjection {
   @@index([externalDealId])
   @@index([metricCode])
 }
+
+/** 周度经营复盘周期（WP-5） */
+model ReviewCycle {
+  id              String    @id @default(cuid())
+  periodStart     DateTime
+  periodEnd       DateTime
+  status          String    @default("draft") @db.VarChar(20) // draft | signed
+  metricsSnapshot Json
+  systemOwnerId   String    @db.VarChar(191)
+  /** 筛选维度快照：projectId / workflowId / ownerId / channel */
+  filterSnapshot  Json?
+  signedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  actions ReviewAction[]
+
+  @@index([periodStart, periodEnd])
+  @@index([status])
+  @@index([systemOwnerId])
+}
+
+/** 周复盘行动项台账（WP-5） */
+model ReviewAction {
+  id            String    @id @default(cuid())
+  reviewCycleId String
+  title         String    @db.VarChar(200)
+  ownerId       String    @db.VarChar(191)
+  dueAt         DateTime
+  status        String    @default("open") @db.VarChar(20) // open | done | cancelled
+  evidenceRef   String?   @db.VarChar(500)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  reviewCycle ReviewCycle @relation(fields: [reviewCycleId], references: [id], onDelete: Cascade)
+
+  @@index([reviewCycleId, status])
+  @@index([ownerId, status])
+  @@index([dueAt])
+}
+

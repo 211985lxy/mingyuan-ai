@@ -1,0 +1,169 @@
+/**
+ * 周度经营复盘与行动台账（WP-5）纯域层。
+ *
+ * - ReviewCycle 必须有 metricsSnapshot + systemOwner；签字后不可改指标。
+ * - ReviewAction 必须有 title / owner / dueAt；周复盘签字前至少一条行动项。
+ * - 岗位评价接入需连续 ≥4 周已签字周期；本模块只提供门闩，不写评价逻辑。
+ */
+
+export const REVIEW_CYCLE_STATUSES = ["draft", "signed"] as const
+export type ReviewCycleStatus = (typeof REVIEW_CYCLE_STATUSES)[number]
+
+export const REVIEW_ACTION_STATUSES = ["open", "done", "cancelled"] as const
+export type ReviewActionStatus = (typeof REVIEW_ACTION_STATUSES)[number]
+
+export interface ReviewCycleFilters {
+  projectId?: string
+  workflowId?: string
+  ownerId?: string
+  channel?: "web" | "feishu" | "api"
+}
+
+/** 周报固定展示指标快照（可扩展字段，序列化进 metricsSnapshot） */
+export interface ReviewMetricsSnapshot {
+  publishedCount: number
+  qualifiedLeadCount: number
+  appointmentCount: number
+  dealCount: number
+  revenue: number
+  customerOutcomeCount: number
+  timeSavedMinutes: number | null
+  firstPassAcceptanceRate: number | null
+  rewriteRate: number | null
+  rejectionRate: number | null
+  directCostPerSuccess: number | null
+  fullyLoadedCost: number | null
+  p0FailureCount: number
+  p1FailureCount: number
+  humanTakeoverCount: number
+  highCostAnomalyCount: number
+  pendingKnowledgeCandidates: number
+  pendingCaseCandidates: number
+  pendingMemoryCandidates: number
+  pendingEvalCandidates: number
+  pendingMethodologyCandidates: number
+  previousActionCloseRate: number | null
+  day7BackfillRate: number | null
+}
+
+export interface ReviewCycleDraft {
+  periodStart: Date
+  periodEnd: Date
+  systemOwnerId: string
+  metricsSnapshot: ReviewMetricsSnapshot
+  filterSnapshot?: ReviewCycleFilters
+}
+
+export interface ReviewActionDraft {
+  title: string
+  ownerId: string
+  dueAt: Date
+  evidenceRef?: string
+}
+
+export interface ReviewActionLike {
+  status: string
+}
+
+export interface ReviewCycleLike {
+  status: string
+  signedAt?: Date | string | null
+  periodStart: Date | string
+  periodEnd: Date | string
+  actions?: ReviewActionLike[]
+}
+
+const STATUS_SET = new Set<string>(REVIEW_CYCLE_STATUSES)
+const ACTION_STATUS_SET = new Set<string>(REVIEW_ACTION_STATUSES)
+
+export function isReviewCycleStatus(value: unknown): value is ReviewCycleStatus {
+  return typeof value === "string" && STATUS_SET.has(value)
+}
+
+export function isReviewActionStatus(value: unknown): value is ReviewActionStatus {
+  return typeof value === "string" && ACTION_STATUS_SET.has(value)
+}
+
+export function assertValidReviewPeriod(periodStart: Date, periodEnd: Date): void {
+  if (!(periodStart instanceof Date) || Number.isNaN(periodStart.getTime())) {
+    throw new Error("periodStart 无效")
+  }
+  if (!(periodEnd instanceof Date) || Number.isNaN(periodEnd.getTime())) {
+    throw new Error("periodEnd 无效")
+  }
+  if (periodEnd.getTime() <= periodStart.getTime()) {
+    throw new Error("periodEnd 必须晚于 periodStart")
+  }
+}
+
+export function validateReviewCycleDraft(draft: ReviewCycleDraft): ReviewCycleDraft {
+  assertValidReviewPeriod(draft.periodStart, draft.periodEnd)
+  if (!draft.systemOwnerId.trim()) throw new Error("systemOwnerId 必填")
+  if (!draft.metricsSnapshot || typeof draft.metricsSnapshot !== "object") {
+    throw new Error("metricsSnapshot 必填")
+  }
+  return {
+    periodStart: draft.periodStart,
+    periodEnd: draft.periodEnd,
+    systemOwnerId: draft.systemOwnerId.trim(),
+    metricsSnapshot: draft.metricsSnapshot,
+    filterSnapshot: draft.filterSnapshot,
+  }
+}
+
+export function validateReviewActionDraft(draft: ReviewActionDraft): ReviewActionDraft {
+  const title = draft.title.trim()
+  if (!title) throw new Error("行动项 title 必填")
+  if (title.length > 200) throw new Error("行动项 title 过长")
+  if (!draft.ownerId.trim()) throw new Error("行动项 ownerId 必填")
+  if (!(draft.dueAt instanceof Date) || Number.isNaN(draft.dueAt.getTime())) {
+    throw new Error("行动项 dueAt 无效")
+  }
+  return {
+    title,
+    ownerId: draft.ownerId.trim(),
+    dueAt: draft.dueAt,
+    evidenceRef: draft.evidenceRef?.trim() || undefined,
+  }
+}
+
+/**
+ * 签字前置条件：草稿态 + 至少一条行动项 + 有系统 Owner。
+ * 签字后状态变为 signed，指标快照视为冻结。
+ */
+export function canSignReviewCycle(input: {
+  status: string
+  systemOwnerId: string
+  actionCount: number
+}): { ok: true } | { ok: false; reason: string } {
+  if (input.status !== "draft") return { ok: false, reason: "只有 draft 周期可签字" }
+  if (!input.systemOwnerId.trim()) return { ok: false, reason: "缺少 systemOwnerId" }
+  if (input.actionCount < 1) return { ok: false, reason: "周复盘必须形成至少一条行动项" }
+  return { ok: true }
+}
+
+/** 上周行动项关闭率 = done / (open+done+cancelled 中非 cancelled 的分母用 open+done) */
+export function computeActionCloseRate(actions: ReviewActionLike[]): number | null {
+  const relevant = actions.filter((a) => a.status === "open" || a.status === "done")
+  if (relevant.length === 0) return null
+  const done = relevant.filter((a) => a.status === "done").length
+  return done / relevant.length
+}
+
+/**
+ * 连续已签字周数是否达到岗位评价接入门槛（默认 4 周）。
+ * 只数 signed；draft 不计入。
+ */
+export function canAttachToPerformanceReview(
+  cycles: ReviewCycleLike[],
+  requiredSignedWeeks = 4,
+): boolean {
+  const signed = cycles.filter((c) => c.status === "signed")
+  return signed.length >= requiredSignedWeeks
+}
+
+/** 比率：filled/due；due=0 → null（不当 0） */
+export function computeRate(filled: number, due: number): number | null {
+  if (!Number.isFinite(filled) || !Number.isFinite(due) || due <= 0) return null
+  return Math.max(0, filled) / due
+}
