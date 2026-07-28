@@ -23,8 +23,8 @@ describe("AIM chat payload budget", () => {
     const latest = "按当前拆解重新生成，保留这个结尾"
     const body = {
       messages: [
-        { role: "user" as const, content: "旧需求".repeat(8_000) },
-        { role: "assistant" as const, content: "旧成稿".repeat(8_000) },
+        { role: "user" as const, content: "旧需求".repeat(16_000) },
+        { role: "assistant" as const, content: "旧成稿".repeat(16_000) },
         { role: "user" as const, content: latest },
       ],
       agentId: "content_producer",
@@ -66,7 +66,7 @@ describe("AIM chat payload budget", () => {
         role: "user",
         content: [{
           type: "image_url",
-          image_url: { url: `https://example.com/${"x".repeat(80_000)}` },
+          image_url: { url: `https://example.com/${"x".repeat(160_000)}` },
         }],
       }],
       agentId: "content_producer",

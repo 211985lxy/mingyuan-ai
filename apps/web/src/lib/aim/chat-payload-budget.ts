@@ -1,6 +1,6 @@
 import type { AimChatBody } from "@/features/aim/contracts/api"
 
-export const AIM_CHAT_REQUEST_BUDGET_BYTES = 56 * 1024
+export const AIM_CHAT_REQUEST_BUDGET_BYTES = 120 * 1024
 
 type AimChatRequestBody = AimChatBody & {
   traceId?: string
@@ -57,7 +57,7 @@ function trimLatestMessage(body: AimChatRequestBody) {
   if (!latest) return body
 
   const overhead = jsonBytes({ ...body, messages: [{ ...latest, content: "" }] })
-  const available = Math.max(0, AIM_CHAT_REQUEST_BUDGET_BYTES - overhead)
+  const available = Math.max(0, AIM_CHAT_REQUEST_BUDGET_BYTES - overhead - 512)
   if (typeof latest.content === "string") {
     messages[messages.length - 1] = {
       ...latest,
@@ -75,7 +75,7 @@ function trimLatestMessage(body: AimChatRequestBody) {
 }
 
 /**
- * Keep chat requests below the server's 64 KiB parser limit.
+ * Keep chat requests below the server's 128 KiB parser limit.
  * Recent turns win over old turns; only oversized requests are changed.
  */
 export function fitAimChatRequestBody(body: AimChatRequestBody): AimChatRequestBody {

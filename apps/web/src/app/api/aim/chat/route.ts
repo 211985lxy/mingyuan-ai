@@ -25,6 +25,7 @@ import { ownsActiveProject } from "@/lib/resource-ownership"
 
 /** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
 export const maxDuration = 180
+const AIM_CHAT_MAX_REQUEST_BYTES = 128 * 1024
 
 /**
  * @description 处理 POST 请求
@@ -38,7 +39,9 @@ export async function POST(request: NextRequest) {
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_chat")
     if (quotaResponse) return quotaResponse
 
-    const parsed = parseAimChatBody(await parseJsonRecord(request))
+    const parsed = parseAimChatBody(await parseJsonRecord(request, {
+      maxBytes: AIM_CHAT_MAX_REQUEST_BYTES,
+    }))
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
