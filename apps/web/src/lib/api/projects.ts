@@ -177,6 +177,8 @@ export interface ContentOutcome {
   shares?: number | null
   audienceFeedback?: string | null
   userVerdict?: string | null
+  /** excellent|effective|neutral|ineffective|failed；缺省读取为 unknown */
+  verdictCode?: string | null
 }
 
 export interface ContentOutcomeInput {
@@ -195,7 +197,10 @@ export interface ContentOutcomeInput {
   saves?: number | null
   shares?: number | null
   audienceFeedback?: string
+  /** 自由文本备注 */
   userVerdict?: string
+  verdictNote?: string
+  verdictCode?: "excellent" | "effective" | "neutral" | "ineffective" | "failed"
 }
 
 /**

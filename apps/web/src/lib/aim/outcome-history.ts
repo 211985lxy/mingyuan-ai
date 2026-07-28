@@ -12,6 +12,7 @@
  */
 
 import type { PrismaClient } from "@/generated/prisma/client"
+import { isPositiveOutcomeVerdict, resolveOutcomeVerdictCode } from "@/lib/aim/outcome-verdict"
 
 // ── 常量 ─────────────────────────────────────────────────
 
@@ -45,8 +46,10 @@ export interface TopPerformer {
   engagementRate: number
   /** 转化率（仅 views>0 时有效）。 */
   conversionRate: number | null
-  /** 用户判断。 */
+  /** 用户备注。 */
   userVerdict: string | null
+  /** 结构化判断码；缺省 unknown */
+  verdictCode: string | null
 }
 
 export interface OutcomeHistoryStore {
@@ -74,6 +77,7 @@ interface OutcomeWithGenerationRow {
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictCode: string | null
   generation: {
     id: string
     rawCopy: string | null
@@ -159,7 +163,9 @@ export async function getTopPerformingScripts(input: {
   for (const row of rows) {
     if (!row.generation) continue
     const rate = computeEngagementRate(row)
-    if (rate < MIN_ENGAGEMENT_RATE && !row.userVerdict) continue
+    const code = resolveOutcomeVerdictCode(row.verdictCode)
+    // 旧自由文本不得当作正向信号；无码且低互动则跳过
+    if (rate < MIN_ENGAGEMENT_RATE && !isPositiveOutcomeVerdict(code)) continue
 
     const copy = row.generation.videoScript || row.generation.rawCopy
     if (!copy || copy.trim().length === 0) continue
@@ -180,13 +186,16 @@ export async function getTopPerformingScripts(input: {
       engagementRate: rate,
       conversionRate: computeConversionRate(row),
       userVerdict: row.userVerdict,
+      verdictCode: code === "unknown" ? null : code,
     })
   }
 
-  // 排序：有 userVerdict 优先 → 互动率 → 转化率
+  // 排序：正向判断码优先 → 互动率 → 转化率（旧自由文本不提权）
   candidates.sort((a, b) => {
-    if (a.userVerdict && !b.userVerdict) return -1
-    if (!a.userVerdict && b.userVerdict) return 1
+    const aPositive = isPositiveOutcomeVerdict(resolveOutcomeVerdictCode(a.verdictCode))
+    const bPositive = isPositiveOutcomeVerdict(resolveOutcomeVerdictCode(b.verdictCode))
+    if (aPositive && !bPositive) return -1
+    if (!aPositive && bPositive) return 1
     if (b.engagementRate !== a.engagementRate) return b.engagementRate - a.engagementRate
     if (a.conversionRate != null && b.conversionRate != null) {
       return b.conversionRate - a.conversionRate

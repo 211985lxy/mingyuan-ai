@@ -350,9 +350,12 @@ model ContentOutcome {
   saves    Int?
   shares   Int?
 
-  // 第三组：用户反馈（自由文本）
+  // 第三组：用户反馈（自由文本备注 + 结构化判断码）
   audienceFeedback String? @db.Text
+  /** 自由文本备注（原 userVerdict）；不得参与字符串包含判断 */
   userVerdict      String? @db.Text
+  /** excellent|effective|neutral|ineffective|failed；缺省读取为 unknown */
+  verdictCode      String? @db.VarChar(20)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

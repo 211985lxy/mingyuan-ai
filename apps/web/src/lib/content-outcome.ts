@@ -1,4 +1,8 @@
 import { Prisma } from "@/generated/prisma/client"
+import {
+  parseOutcomeVerdictCode,
+  type OutcomeVerdictCode,
+} from "@/lib/aim/outcome-verdict"
 
 type NullableInt = number | null
 type NullableDecimal = Prisma.Decimal | null
@@ -19,7 +23,9 @@ export interface SanitizedOutcome {
   saves: NullableInt
   shares: NullableInt
   audienceFeedback: string | null
+  /** 自由文本备注，不参与优秀/失败判定 */
   userVerdict: string | null
+  verdictCode: OutcomeVerdictCode | null
 }
 
 function toNullableInt(value: unknown): NullableInt {
@@ -60,7 +66,12 @@ export function sanitizeOutcomeBody(body: Record<string, unknown>): SanitizedOut
     saves: toNullableInt(body.saves),
     shares: toNullableInt(body.shares),
     audienceFeedback: typeof body.audienceFeedback === "string" ? body.audienceFeedback.slice(0, 5000) : null,
-    userVerdict: typeof body.userVerdict === "string" ? body.userVerdict.slice(0, 1000) : null,
+    userVerdict: typeof body.userVerdict === "string"
+      ? body.userVerdict.slice(0, 1000)
+      : typeof body.verdictNote === "string"
+        ? body.verdictNote.slice(0, 1000)
+        : null,
+    verdictCode: parseOutcomeVerdictCode(body.verdictCode),
   }
 }
 
@@ -74,7 +85,7 @@ const PATCHABLE_FIELDS = [
   "platform", "publishedAt",
   "qualifiedCommentCount", "dmCount", "qualifiedLeadCount", "appointmentCount",
   "dealCount", "revenue", "views", "likes", "comments", "saves", "shares",
-  "audienceFeedback", "userVerdict",
+  "audienceFeedback", "userVerdict", "verdictCode",
 ] as const
 
 /**
@@ -97,6 +108,10 @@ export function buildOutcomeUpdate(
     if (presentKeys.has(field)) {
       update[field] = sanitized[field]
     }
+  }
+  // verdictNote 是 userVerdict 的别名写入键
+  if (presentKeys.has("verdictNote") && !presentKeys.has("userVerdict")) {
+    update.userVerdict = sanitized.userVerdict
   }
   return update as Partial<SanitizedOutcome>
 }

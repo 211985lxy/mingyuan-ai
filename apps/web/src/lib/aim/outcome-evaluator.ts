@@ -12,6 +12,7 @@
 
 import type { PrismaClient } from "@/generated/prisma/client"
 import { buildAssetCandidatesFromOutcome } from "@/lib/aim/outcome-asset-candidates"
+import { isNegativeOutcomeVerdict, isPositiveOutcomeVerdict, resolveOutcomeVerdictCode } from "@/lib/aim/outcome-verdict"
 
 // ── 阈值常量（单源） ──────────────────────────────────────
 
@@ -47,8 +48,10 @@ export interface ExcellentOutcome {
   appointmentCount: number | null
   dealCount: number | null
   revenue: number | null
-  /** 用户判断。 */
+  /** 用户备注（自由文本）。 */
   userVerdict: string | null
+  /** 结构化判断码；缺省为 unknown。 */
+  verdictCode: string | null
   /** 计算出的优秀原因。 */
   reason: "user_excellent" | "engagement" | "conversion"
   /** 互动率（仅 views>0 时有效）。 */
@@ -109,6 +112,7 @@ interface OutcomeRow {
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictCode: string | null
   collectWindowDay: number
   collectedAt: Date
 }
@@ -169,15 +173,17 @@ export function computeConversionRate(outcome: {
 /**
  * 判断一条 ContentOutcome 是否「优秀」。
  * 判定优先级：
- *   1. userVerdict 非空 → user_excellent
+ *   1. verdictCode 为 excellent/effective → user_excellent（自由文本备注不参与）
  *   2. 互动率 ≥ 5% → engagement
  *   3. 转化率 ≥ 0.1% → conversion
+ * 历史无码记录视为 unknown，不得因非空备注自动升级为优秀。
  */
 function evaluateExcellent(row: OutcomeRow): { excellent: boolean; reason: ExcellentOutcome["reason"] | null; engagementRate: number | null; conversionRate: number | null } {
   const engagementRate = computeEngagementRate(row)
   const conversionRate = computeConversionRate(row)
+  const code = resolveOutcomeVerdictCode(row.verdictCode)
 
-  if (row.userVerdict && row.userVerdict.trim().length > 0) {
+  if (isPositiveOutcomeVerdict(code)) {
     return { excellent: true, reason: "user_excellent", engagementRate, conversionRate }
   }
   if (engagementRate != null && engagementRate >= ENGAGEMENT_RATE_THRESHOLD) {
@@ -249,6 +255,7 @@ export async function evaluateOutcomes(input: {
       dealCount: row.dealCount,
       revenue: row.revenue != null ? Number(row.revenue) : null,
       userVerdict: row.userVerdict,
+      verdictCode: row.verdictCode,
       reason: eval_.reason,
       engagementRate: eval_.engagementRate,
       conversionRate: eval_.conversionRate,
@@ -256,17 +263,47 @@ export async function evaluateOutcomes(input: {
   }
   result.excellent = excellentOutcomes.length
 
-  if (excellentOutcomes.length === 0) return result
+  const negativeOutcomes: ExcellentOutcome[] = []
+  for (const row of outcomes) {
+    const code = resolveOutcomeVerdictCode(row.verdictCode)
+    if (!isNegativeOutcomeVerdict(code)) continue
+    if (excellentOutcomes.some((item) => item.outcomeId === row.id)) continue
+    negativeOutcomes.push({
+      outcomeId: row.id,
+      generationId: row.generationId,
+      userId: row.userId,
+      projectId: row.projectId,
+      platform: row.platform,
+      copy: null,
+      views: row.views,
+      likes: row.likes,
+      comments: row.comments,
+      saves: row.saves,
+      shares: row.shares,
+      qualifiedLeadCount: row.qualifiedLeadCount,
+      appointmentCount: row.appointmentCount,
+      dealCount: row.dealCount,
+      revenue: row.revenue != null ? Number(row.revenue) : null,
+      userVerdict: row.userVerdict,
+      verdictCode: row.verdictCode,
+      reason: "user_excellent",
+      engagementRate: computeEngagementRate(row),
+      conversionRate: computeConversionRate(row),
+    })
+  }
 
-  const generationIds = [...new Set(excellentOutcomes.map((o) => o.generationId))]
-    const generations = await input.store.aimGeneration.findMany({
+  const candidateSources = [...excellentOutcomes, ...negativeOutcomes]
+  if (candidateSources.length === 0) return result
+
+  const generationIds = [...new Set(candidateSources.map((o) => o.generationId))]
+  const generations = await input.store.aimGeneration.findMany({
     where: { id: { in: generationIds } },
     select: { id: true, rawCopy: true, videoScript: true, topicTitle: true },
     take: EVALUATE_BATCH_SIZE,
   })
   const genMap = new Map(generations.map((g) => [g.id, g]))
 
-  for (const outcome of excellentOutcomes) {
+  for (const outcome of candidateSources) {
     if (!outcome.projectId) {
       result.errors.push(`skip outcome without projectId: ${outcome.outcomeId}`)
       result.skipped++
@@ -292,6 +329,7 @@ export async function evaluateOutcomes(input: {
       dealCount: outcome.dealCount,
       revenue: outcome.revenue,
       userVerdict: outcome.userVerdict,
+      verdictCode: outcome.verdictCode,
       reason: outcome.reason,
     })
 

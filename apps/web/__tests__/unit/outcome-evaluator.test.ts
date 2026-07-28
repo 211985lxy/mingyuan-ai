@@ -58,6 +58,7 @@ function makeOutcomeRow(overrides: Partial<{
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictCode: string | null
   collectWindowDay: number
   collectedAt: Date
 }> = {}) {
@@ -77,6 +78,7 @@ function makeOutcomeRow(overrides: Partial<{
     dealCount: null as number | null,
     revenue: null as unknown,
     userVerdict: null as string | null,
+    verdictCode: null as string | null,
     collectWindowDay: 7,
     collectedAt: new Date("2026-07-18"),
     ...overrides,
@@ -116,6 +118,7 @@ describe("evaluateOutcomes", () => {
         [makeOutcomeRow({
           id: "o1",
           projectId: "proj_1",
+          verdictCode: "excellent",
           userVerdict: "这条视频效果很好，评论区很多人问价格",
           views: 500,
           likes: 30,
@@ -128,11 +131,50 @@ describe("evaluateOutcomes", () => {
     expect(result.writtenBack).toBeGreaterThanOrEqual(1)
   })
 
+  it("旧自由文本无 verdictCode → 不得仅凭备注判优秀", async () => {
+    const result = await evaluateOutcomes({
+      userId: "user_1",
+      store: makeStore(
+        [makeOutcomeRow({
+          id: "o_legacy",
+          projectId: "proj_1",
+          userVerdict: "看起来不错",
+          views: null,
+          likes: null,
+        })],
+        [{ id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "选题" }],
+      ),
+    })
+    expect(result.excellent).toBe(0)
+    expect(result.writtenBack).toBe(0)
+  })
+
+  it("无效码只写方法论修订候选，不计入优秀", async () => {
+    const store = makeStore(
+      [makeOutcomeRow({
+        id: "o_bad",
+        projectId: "proj_1",
+        verdictCode: "ineffective",
+        userVerdict: "无效",
+        views: null,
+      })],
+      [{ id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "警示" }],
+    )
+    const result = await evaluateOutcomes({ userId: "user_1", store })
+    expect(result.excellent).toBe(0)
+    expect(result.writtenBack).toBe(1)
+    expect(store.assetCandidate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "methodology_revision" }),
+      }),
+    )
+  })
+
   it("无 projectId → 跳过候选", async () => {
     const result = await evaluateOutcomes({
       userId: "user_1",
       store: makeStore(
-        [makeOutcomeRow({ id: "o_noproj", projectId: null, userVerdict: "优秀", views: 100, likes: 10 })],
+        [makeOutcomeRow({ id: "o_noproj", projectId: null, verdictCode: "excellent", userVerdict: "优秀", views: 100, likes: 10 })],
         [{ id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "选题" }],
       ),
     })
@@ -147,6 +189,7 @@ describe("evaluateOutcomes", () => {
       [makeOutcomeRow({
         id: "o_cand",
         projectId: "proj_1",
+        verdictCode: "effective",
         userVerdict: "有效",
         views: 200,
         likes: 20,
@@ -165,7 +208,7 @@ describe("evaluateOutcomes", () => {
     const result = await evaluateOutcomes({
       userId: "user_1",
       store: makeStore(
-        [makeOutcomeRow({ id: "o5", projectId: "proj_1", userVerdict: "好", generationId: "missing_gen" })],
+        [makeOutcomeRow({ id: "o5", projectId: "proj_1", verdictCode: "excellent", userVerdict: "好", generationId: "missing_gen" })],
         [],
       ),
     })
@@ -179,7 +222,7 @@ describe("evaluateOutcomes", () => {
       userId: "user_1",
       store: makeStore(
         [
-          makeOutcomeRow({ id: "o_a", projectId: "proj_1", userVerdict: "好", views: 100, likes: 5, qualifiedLeadCount: 1 }),
+          makeOutcomeRow({ id: "o_a", projectId: "proj_1", verdictCode: "excellent", userVerdict: "好", views: 100, likes: 5, qualifiedLeadCount: 1 }),
           makeOutcomeRow({ id: "o_b", projectId: "proj_1", views: 200, likes: 20, comments: 5, saves: 3, shares: 2, dealCount: 1 }),
           makeOutcomeRow({ id: "o_c", projectId: "proj_1", views: 1000, likes: 5 }),
           makeOutcomeRow({ id: "o_d", projectId: "proj_1", userVerdict: null, views: null, likes: null }),
