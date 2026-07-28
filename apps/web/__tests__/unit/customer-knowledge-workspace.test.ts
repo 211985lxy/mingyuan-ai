@@ -29,7 +29,15 @@ describe("customer knowledge workspace wiring", () => {
       join(ROOT, "features/knowledge/components/customer-knowledge-entry-dialog.tsx"),
       "utf8",
     )
-    const combined = `${page}\n${workspace}\n${dialog}`
+    const dataHook = readFileSync(
+      join(ROOT, "features/knowledge/hooks/use-customer-knowledge-data.ts"),
+      "utf8",
+    )
+    const mutationHelpers = readFileSync(
+      join(ROOT, "features/knowledge/hooks/customer-knowledge-mutation-helpers.ts"),
+      "utf8",
+    )
+    const combined = `${page}\n${workspace}\n${dialog}\n${dataHook}\n${mutationHelpers}`
     expect(combined).toContain("listKnowledge")
     expect(combined).toContain("createKnowledge")
     expect(combined).toContain("updateKnowledge")
