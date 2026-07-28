@@ -73,7 +73,7 @@ function DeliveryModelSection() {
           <div>
             <p className="marketing-section-label">HOW WE WORK</p>
             <h2 className="marketing-h-section mt-4 text-[#25211D]">
-              团队价值不在人数，而在关键判断是否有人负责
+              从商业判断到技术落地，每个环节都由专业的人负责
             </h2>
           </div>
           <p className="max-w-2xl text-base leading-8 text-[#5F5A52]">
@@ -162,10 +162,6 @@ function PartnersSection() {
           <h2 className="marketing-h-section mt-4 text-[#25211D]">
             需要工程能力时，由合适的人进入
           </h2>
-          <p className="mt-5 text-sm leading-7 text-[#6F675E]">
-            技术伙伴不是杭州宇米教育科技有限公司的全职成员。
-            双方根据项目范围组成联合交付小组，由明动远见统一管理客户关系、任务边界和验收。
-          </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {technologyPartners.map((partner) => (
