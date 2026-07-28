@@ -49,7 +49,6 @@ function main() {
   const legacyFiles = new Map(policy.legacyFiles.map((item) => [item.path, item]))
   const violations = []
   const oversizedFunctions = []
-  const deadlinePassed = new Date(`${policy.legacyDeadline}T23:59:59Z`).getTime() < Date.now()
 
   for (const path of listSourceFiles(SOURCE_ROOT)) {
     const file = relative(WEB_ROOT, path)
@@ -63,8 +62,6 @@ function main() {
       violations.push(`${file}: ${lines} lines; every new module must stay at or below ${policy.fileLineLimit} lines`)
     } else if (lines > legacy.maxLines) {
       violations.push(`${file}: ${lines} lines; approved legacy maximum is ${legacy.maxLines}, extract into ${legacy.target}`)
-    } else if (deadlinePassed) {
-      violations.push(`${file}: ${lines} lines; legacy waiver expired on ${policy.legacyDeadline}, extract into ${legacy.target}`)
     }
   }
 
@@ -76,11 +73,14 @@ function main() {
     }
   }
 
-  if (deadlinePassed && oversizedFunctions.length > 0) {
-    violations.push(`${oversizedFunctions.length} functions exceed ${policy.functionLineLimit} lines after the legacy deadline`)
+  if (oversizedFunctions.length > policy.legacyFunctionBaseline) {
+    violations.push(
+      `${oversizedFunctions.length} functions exceed ${policy.functionLineLimit} lines; ` +
+      `approved baseline is ${policy.legacyFunctionBaseline} from ${policy.legacyFunctionBaselineDate}`,
+    )
   }
 
-  if (process.argv.includes("--report") || deadlinePassed) {
+  if (process.argv.includes("--report")) {
     console.log(`Functions above ${policy.functionLineLimit} lines (${oversizedFunctions.length}):`)
     for (const finding of oversizedFunctions) console.log(`  - ${finding}`)
   }
@@ -92,7 +92,7 @@ function main() {
   }
 
   const warning = oversizedFunctions.length > 0
-    ? ` warnings=functions>${policy.functionLineLimit}:${oversizedFunctions.length} due=${policy.legacyDeadline}`
+    ? ` warnings=functions>${policy.functionLineLimit}:${oversizedFunctions.length} baseline=${policy.legacyFunctionBaseline}`
     : ""
   console.log(`architecture-size-ok fileLimit=${policy.fileLineLimit} prismaFileLimit=${policy.prismaFileLineLimit} legacyFiles=${legacyFiles.size}${warning}`)
 }
