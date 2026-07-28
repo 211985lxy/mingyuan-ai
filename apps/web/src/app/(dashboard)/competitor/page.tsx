@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { CompetitorAddAccountPanel } from "@/components/competitor/competitor-add-account-panel"
-import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-web-research-panel"
 import { CompetitorTopicAnalysisPanel } from "@/components/competitor/competitor-topic-analysis-panel"
 import { MonitoredAccountGrid } from "@/components/competitor/monitored-account-grid"
 import { RecentReportsCard } from "@/components/competitor/recent-reports-card"
@@ -27,7 +26,6 @@ import {
 } from "@/features/competitor/viral-video-pool"
 import { CompetitorWorkbenchLinks } from "@/features/competitor/components/competitor-workbench-links"
 import { useCompetitorVideoExtractions } from "@/features/competitor/hooks/use-competitor-video-extractions"
-import { useCompetitorWebResearch } from "@/features/competitor/hooks/use-competitor-web-research"
 import { useCompetitorReports } from "@/features/competitor/hooks/use-competitor-reports"
 import { useCompetitorWatchAccounts } from "@/features/competitor/hooks/use-competitor-watch-accounts"
 
@@ -43,13 +41,6 @@ export default function CompetitorWatchPage() {
     removeAccount, setActiveAccountId, setAddUrl,
   } = useCompetitorWatchAccounts()
   const { extractingVideoId, videoExtractions, extractVideo } = useCompetitorVideoExtractions()
-  const {
-    researchLoading,
-    researchQuery,
-    researchResult,
-    research,
-    setResearchQuery,
-  } = useCompetitorWebResearch()
   const activeAccount = resolveActiveAccount(accounts, activeAccountId)
   const { loadReports, reports, reportsLoading } = useCompetitorReports(activeAccount?.targetUrl)
 
@@ -106,6 +97,8 @@ export default function CompetitorWatchPage() {
         </TabsList>
 
         <TabsContent value="accounts" className="mt-0 space-y-6">
+          <CompetitorTopicAnalysisPanel />
+
           <CompetitorAddAccountPanel value={addUrl} adding={adding} accountCount={accounts.length} onChange={setAddUrl} onAdd={addAccount} />
 
           <MonitoredAccountGrid
@@ -120,17 +113,6 @@ export default function CompetitorWatchPage() {
             onRefresh={(id) => void refreshAccount(id)}
             onDelete={(id) => void removeAccount(id)}
           />
-
-          <CompetitorWebResearchPanel
-            activeAccount={activeAccount}
-            query={researchQuery}
-            loading={researchLoading}
-            result={researchResult}
-            onQueryChange={setResearchQuery}
-            onResearch={research}
-          />
-
-          <CompetitorTopicAnalysisPanel />
         </TabsContent>
 
         <TabsContent value="videos" className="mt-0 space-y-6">

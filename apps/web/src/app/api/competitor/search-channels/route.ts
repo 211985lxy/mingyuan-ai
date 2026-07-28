@@ -14,7 +14,7 @@ const CACHE_TTL = 30 * 60 // 30 minutes
 export const POST = withUserAuth(async (request, { user: _user }) => {
   const body = await parseJsonBody(request, searchChannelsVideoBodySchema, { maxBytes: 4 * 1024 })
 
-  const cacheKey = `wx_channels:search_video:v2:${body.keyword}:${body.sortType || 'default'}:${body.cursor || '0'}`
+  const cacheKey = `wx_channels:search_video:v3:${body.keyword}:${body.sortType || 'default'}:${body.cursor || '0'}`
 
   try {
     const cached = await redis.get(cacheKey)
@@ -33,6 +33,8 @@ export const POST = withUserAuth(async (request, { user: _user }) => {
       videoId: item.object_id || item.video_id,
       title: item.description || item.title,
       coverUrl: item.cover_url,
+      videoUrl: item.work_url || item.share_url || "",
+      exportId: item.export_id || "",
       createTime: item.create_time,
       duration: item.duration,
       views: item.play_count,

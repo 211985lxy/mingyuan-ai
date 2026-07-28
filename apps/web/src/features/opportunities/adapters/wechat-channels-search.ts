@@ -48,9 +48,11 @@ export class WechatChannelsSearchAdapter implements SearchAdapter {
     description: string
     title: string
     cover_url: string
+    work_url?: string
+    share_url?: string
     create_time: number
     duration: number
-    play_count: number
+    play_count: number | null
     like_count: number
     comment_count: number
     share_count: number
@@ -60,11 +62,15 @@ export class WechatChannelsSearchAdapter implements SearchAdapter {
   }): OpportunityItem {
     const sourceId = item.object_id || item.video_id
     const title = item.description || item.title
+    const sourceUrl =
+      item.work_url ||
+      item.share_url ||
+      (sourceId ? `https://channels.weixin.qq.com/video/${sourceId}` : "")
 
     return {
       platform: "wechat_channels",
       sourceId,
-      sourceUrl: `https://channels.weixin.qq.com/video/${sourceId}`,
+      sourceUrl,
       title,
       coverUrl: item.cover_url || undefined,
       author: {
@@ -76,7 +82,7 @@ export class WechatChannelsSearchAdapter implements SearchAdapter {
         : undefined,
       durationSeconds: item.duration ? Math.round(item.duration / 1000) : undefined,
       metrics: {
-        views: item.play_count,
+        views: item.play_count ?? undefined,
         likes: item.like_count,
         comments: item.comment_count,
         shares: item.share_count,

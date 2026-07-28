@@ -150,6 +150,37 @@ describe("searchWechatChannelsVideos provider order", () => {
       title: "红狐视频号",
       nickname: "号主",
       play_count: 12,
+      work_url: "",
+    })
+  })
+
+  it("keeps RedFox workUrl and leaves missing playCount as null", async () => {
+    redfoxPost.mockResolvedValue({
+      list: [
+        {
+          exportId: "export/UzFfAgtgekIEAQAAAAAAxExampleId01",
+          title: "有链接的视频",
+          workUrl: "https://channels.weixin.qq.com/s/abc123",
+          accountName: "号主",
+          likeCount: 900,
+        },
+      ],
+    })
+
+    const { searchWechatChannelsVideos } = await import(
+      "@/lib/tikhub/search-wechat-channels-videos"
+    )
+    const result = await searchWechatChannelsVideos({
+      keyword: "供暖",
+      sortType: "popular",
+      count: 3,
+    })
+
+    expect(result.list[0]).toMatchObject({
+      title: "有链接的视频",
+      work_url: "https://channels.weixin.qq.com/s/abc123",
+      play_count: null,
+      like_count: 900,
     })
   })
 
@@ -194,6 +225,49 @@ describe("searchWechatChannelsVideos provider order", () => {
       title: "视频号标题",
       nickname: "号主",
       play_count: 88,
+      work_url: "",
     })
+  })
+
+  it("builds channels URL from long TikHub exportId when no share link", async () => {
+    redfoxPost.mockRejectedValue(new Error("资源不存在"))
+    const exportId = "export/UzFfAgtgekIEAQAAAAAAxLongEnoughId"
+    tikhubPost.mockResolvedValue({
+      items: [
+        {
+          title: "长 ID 视频",
+          exportId,
+          likeNum: "1.2万",
+          jumpInfo: { nickName: "号主" },
+        },
+      ],
+    })
+
+    const { searchWechatChannelsVideos } = await import(
+      "@/lib/tikhub/search-wechat-channels-videos"
+    )
+    const result = await searchWechatChannelsVideos({ keyword: "老板IP", count: 1 })
+
+    expect(result.list[0]).toMatchObject({
+      work_url: `https://channels.weixin.qq.com/video/${exportId}`,
+      like_count: 12_000,
+      play_count: null,
+    })
+  })
+})
+
+describe("resolveChannelsVideoUrl", () => {
+  it("prefers real share/work urls over constructed ids", async () => {
+    const { resolveChannelsVideoUrl, isLikelyChannelsVideoId } = await import(
+      "@/lib/tikhub/search-wechat-channels-videos"
+    )
+    expect(
+      resolveChannelsVideoUrl({
+        workUrl: "https://channels.weixin.qq.com/s/real",
+        exportId: "export/UzFfAgtgekIEAQAAAAAAxLongEnoughId",
+      }),
+    ).toBe("https://channels.weixin.qq.com/s/real")
+    expect(isLikelyChannelsVideoId("sph1")).toBe(false)
+    expect(isLikelyChannelsVideoId("export/UzFfAgtgekIEAQAAAAAAxLongEnoughId")).toBe(true)
   })
 })

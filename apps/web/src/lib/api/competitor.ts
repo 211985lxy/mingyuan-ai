@@ -382,9 +382,13 @@ export interface SearchChannelsVideoResult {
   videoId: string
   title: string
   coverUrl: string
+  /** 可打开的原视频链接；没有可靠来源时为空串 */
+  videoUrl?: string
+  exportId?: string
   createTime: number
   duration: number
-  views: number
+  /** 播放量；上游未提供时为 null */
+  views: number | null
   likes: number
   comments: number
   shares: number

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Loader2, TrendingUp, Search, Sparkles } from "lucide-react"
+import { ExternalLink, Loader2, TrendingUp, Search, Sparkles } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -66,6 +66,15 @@ export function CompetitorTopicAnalysisPanel() {
     }
   }
 
+  async function copyVideoId(videoId: string) {
+    try {
+      await navigator.clipboard.writeText(videoId)
+      toast.success("已复制视频 ID")
+    } catch {
+      toast.error("复制失败，请手动选中 ID")
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -100,20 +109,56 @@ export function CompetitorTopicAnalysisPanel() {
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">找到 {videos.length} 条相关视频（按热度排序）</p>
             <div className="max-h-80 space-y-2 overflow-y-auto">
-              {videos.map((video, idx) => (
-                <div key={video.videoId ?? idx} className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{idx + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm font-medium">{video.title || "无标题"}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      {video.author?.nickname ? <span>@{video.author.nickname}</span> : null}
-                      {video.views != null ? <span>播放 {formatNum(video.views)}</span> : null}
-                      {video.likes != null ? <span>点赞 {formatNum(video.likes)}</span> : null}
-                      {video.comments != null ? <span>评论 {formatNum(video.comments)}</span> : null}
+              {videos.map((video, idx) => {
+                const openUrl = video.videoUrl?.trim() || ""
+                const copyId = video.exportId || video.videoId
+                return (
+                  <div key={video.videoId ?? idx} className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/30">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{idx + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      {openUrl ? (
+                        <a
+                          href={openUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="line-clamp-2 text-sm font-medium text-primary hover:underline"
+                        >
+                          {video.title || "无标题"}
+                        </a>
+                      ) : (
+                        <p className="line-clamp-2 text-sm font-medium text-foreground/80">{video.title || "无标题"}</p>
+                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {video.author?.nickname ? <span>@{video.author.nickname}</span> : null}
+                        {video.views != null ? <span>播放 {formatNum(video.views)}</span> : null}
+                        {video.likes != null ? <span>点赞 {formatNum(video.likes)}</span> : null}
+                        {video.comments != null ? <span>评论 {formatNum(video.comments)}</span> : null}
+                        {openUrl ? (
+                          <a
+                            href={openUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            打开原视频
+                          </a>
+                        ) : copyId ? (
+                          <button
+                            type="button"
+                            onClick={() => void copyVideoId(copyId)}
+                            className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                          >
+                            无可用链接 · 复制 ID
+                          </button>
+                        ) : (
+                          <span>无可用链接</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

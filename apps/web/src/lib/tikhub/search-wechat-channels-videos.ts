@@ -21,9 +21,13 @@ export interface WechatChannelsSearchVideo {
   description: string
   title: string
   cover_url: string
+  /** 可打开的原视频/分享链接；没有可靠来源时为空串 */
+  work_url: string
+  share_url: string
   create_time: number
   duration: number
-  play_count: number
+  /** 播放量；上游没给时为 null，避免当成真实的 0 */
+  play_count: number | null
   like_count: number
   comment_count: number
   share_count: number
@@ -87,29 +91,82 @@ function redfoxSortType(sortType?: WechatChannelsVideoSort): string {
   return "_0"
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 视频号 exportId 通常较长或以 export/ 开头。
+ * 短占位 ID 不拼链接，避免点开就是死链。
+ */
+export function isLikelyChannelsVideoId(id: string): boolean {
+  const trimmed = id.trim()
+  if (trimmed.length < 16) return false
+  if (trimmed.startsWith("export/")) return true
+  return /^[A-Za-z0-9_/=+-]{16,}$/.test(trimmed)
+}
+
+/** 优先用上游真实链接，没有再尝试用合法 ID 拼 channels 页 */
+export function resolveChannelsVideoUrl(input: {
+  workUrl?: string | null
+  shareUrl?: string | null
+  exportId?: string | null
+  objectId?: string | null
+}): string {
+  for (const candidate of [input.workUrl, input.shareUrl]) {
+    const url = candidate?.trim() ?? ""
+    if (url && isHttpUrl(url)) return url
+  }
+  const id = (input.exportId || input.objectId || "").trim()
+  if (!isLikelyChannelsVideoId(id)) return ""
+  return `https://channels.weixin.qq.com/video/${id}`
+}
+
+function optionalCount(value: unknown): number | null {
+  if (value == null || value === "") return null
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  return parseDisplayCount(value)
+}
+
 function mapRedFoxItem(item: RedFoxSphArticle): WechatChannelsSearchVideo {
   const id = String(
     item.objectId ?? item.exportId ?? item.workId ?? item.videoId ?? "",
   )
+  const exportId = String(item.exportId ?? id)
   const title = item.title ?? item.description ?? item.content ?? item.desc ?? ""
   const publish = item.publishTime == null ? 0 : Number(item.publishTime)
   const createTime =
     publish > 1e12 ? Math.round(publish / 1000) : Number.isFinite(publish) ? publish : 0
+  const workUrl = item.workUrl?.trim() ?? ""
+  const shareUrl = item.shareUrl?.trim() ?? ""
+  const resolved = resolveChannelsVideoUrl({
+    workUrl,
+    shareUrl,
+    exportId,
+    objectId: id,
+  })
 
   return {
     object_id: id,
     video_id: id,
-    export_id: String(item.exportId ?? id),
+    export_id: exportId,
     description: title,
     title,
     cover_url: item.coverUrl ?? "",
+    work_url: resolved,
+    share_url: shareUrl,
     create_time: createTime,
     duration: item.duration
       ? item.duration > 10_000
         ? Math.round(item.duration / 1000)
         : Math.round(item.duration)
       : 0,
-    play_count: item.playCount ?? 0,
+    play_count: optionalCount(item.playCount),
     like_count: item.likeCount ?? 0,
     comment_count: item.commentCount ?? 0,
     share_count: item.shareCount ?? 0,
@@ -149,6 +206,10 @@ interface FetchSearchItem {
   docId?: string | number
   exportId?: string
   export_id?: string
+  workUrl?: string
+  shareUrl?: string
+  url?: string
+  link?: string
   image?: string
   coverUrl?: string
   cover_url?: string
@@ -182,6 +243,8 @@ interface FetchSearchItem {
     headImgUrl?: string
     head_img_url?: string
     avatar?: string
+    url?: string
+    jumpUrl?: string
     extInfo?: string | { feedNonceId?: string | number; encryptedObjectId?: string }
   }
 }
@@ -260,6 +323,14 @@ function mapTikHubItem(item: FetchSearchItem): WechatChannelsSearchVideo {
   const title = stripHighlight(item.title ?? item.desc ?? "")
   const jump = item.jumpInfo
   const source = item.source
+  const workUrl = (item.workUrl ?? item.url ?? item.link ?? jump?.url ?? jump?.jumpUrl ?? "").trim()
+  const shareUrl = (item.shareUrl ?? "").trim()
+  const resolved = resolveChannelsVideoUrl({
+    workUrl,
+    shareUrl,
+    exportId,
+    objectId: id,
+  })
 
   return {
     object_id: id,
@@ -268,9 +339,11 @@ function mapTikHubItem(item: FetchSearchItem): WechatChannelsSearchVideo {
     description: title,
     title,
     cover_url: item.image ?? item.cover_url ?? item.coverUrl ?? item.thumb_url ?? item.thumbUrl ?? "",
+    work_url: resolved,
+    share_url: shareUrl,
     create_time: item.pubTime ?? item.create_time ?? item.createTime ?? item.publish_time ?? item.publishTime ?? 0,
     duration: parseDurationSeconds(item.duration),
-    play_count: parseDisplayCount(item.play_count ?? item.playCount ?? item.read_count ?? item.readCount),
+    play_count: optionalCount(item.play_count ?? item.playCount ?? item.read_count ?? item.readCount),
     like_count: parseDisplayCount(item.likeNum ?? item.like_count ?? item.likeCount),
     comment_count: parseDisplayCount(item.comment_count ?? item.commentCount),
     share_count: parseDisplayCount(item.share_count ?? item.shareCount),
