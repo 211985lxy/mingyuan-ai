@@ -5,6 +5,10 @@ import type { SearchAdapter, PlatformSearchInput, PlatformSearchOutput } from ".
 
 const log = logger.child({ component: "WechatChannelsSearchAdapter" })
 
+/**
+ * 视频号内容机会搜索。
+ * 实际优先级在 searchWechatChannelsVideos：RedFox → TikHub。
+ */
 export class WechatChannelsSearchAdapter implements SearchAdapter {
   readonly platform = "wechat_channels" as const
 
@@ -28,7 +32,13 @@ export class WechatChannelsSearchAdapter implements SearchAdapter {
     } catch (err) {
       const message = err instanceof Error ? err.message : "视频号搜索失败"
       log.error({ err, keyword: input.keyword }, "视频号搜索失败")
-      return { platform: this.platform, status: "error", items: [], error: message, durationMs: Date.now() - start }
+      return {
+        platform: this.platform,
+        status: "error",
+        items: [],
+        error: message,
+        durationMs: Date.now() - start,
+      }
     }
   }
 

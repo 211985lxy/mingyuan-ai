@@ -17,15 +17,48 @@ vi.mock("@/lib/logger", () => ({
   logger: { child: () => ({ warn: vi.fn(), error: vi.fn(), info: vi.fn() }) },
 }))
 
-describe("DouyinSearchAdapter TikHub V2", () => {
+describe("DouyinSearchAdapter provider order", () => {
   beforeEach(() => {
     vi.resetModules()
     tikhubPost.mockReset()
     redfoxPost.mockReset()
-    redfoxPost.mockRejectedValue(new Error("redfox down"))
   })
 
-  it("calls fetch_video_search_v2 and maps aweme_info", async () => {
+  it("uses RedFox first and skips TikHub on success", async () => {
+    redfoxPost.mockResolvedValue({
+      list: [
+        {
+          workId: "rf1",
+          title: "红狐抖音结果",
+          accountName: "号主",
+          playCount: 99,
+        },
+      ],
+    })
+
+    const { DouyinSearchAdapter } = await import(
+      "@/features/opportunities/adapters/douyin-search"
+    )
+    const result = await new DouyinSearchAdapter().search({
+      keyword: "徐沪生",
+      count: 5,
+    })
+
+    expect(redfoxPost).toHaveBeenCalledWith(
+      "/story/api/dyData/searchArticle",
+      expect.objectContaining({ keyword: "徐沪生" }),
+    )
+    expect(tikhubPost).not.toHaveBeenCalled()
+    expect(result.status).toBe("ok")
+    expect(result.items[0]).toMatchObject({
+      sourceId: "rf1",
+      title: "红狐抖音结果",
+      author: { name: "号主" },
+    })
+  })
+
+  it("falls back to TikHub V2 only after RedFox fails", async () => {
+    redfoxPost.mockRejectedValue(new Error("redfox down"))
     tikhubPost.mockResolvedValue({
       business_data: [
         {
@@ -56,6 +89,7 @@ describe("DouyinSearchAdapter TikHub V2", () => {
       filters: { sortOrder: "popular" },
     })
 
+    expect(redfoxPost).toHaveBeenCalled()
     expect(tikhubPost).toHaveBeenCalledWith(
       "/api/v1/douyin/search/fetch_video_search_v2",
       expect.objectContaining({
@@ -75,13 +109,52 @@ describe("DouyinSearchAdapter TikHub V2", () => {
   })
 })
 
-describe("searchWechatChannelsVideos", () => {
+describe("searchWechatChannelsVideos provider order", () => {
   beforeEach(() => {
     vi.resetModules()
     tikhubPost.mockReset()
+    redfoxPost.mockReset()
   })
 
-  it("uses wechat_search fetch_search instead of retired channels path", async () => {
+  it("uses RedFox sphData first and skips TikHub on success", async () => {
+    redfoxPost.mockResolvedValue({
+      list: [
+        {
+          workId: "sph1",
+          title: "红狐视频号",
+          accountName: "号主",
+          playCount: 12,
+        },
+      ],
+    })
+
+    const { searchWechatChannelsVideos } = await import(
+      "@/lib/tikhub/search-wechat-channels-videos"
+    )
+    const result = await searchWechatChannelsVideos({
+      keyword: "徐沪生",
+      sortType: "popular",
+      count: 3,
+    })
+
+    expect(redfoxPost).toHaveBeenCalledWith(
+      "/story/api/sphData/searchArticle",
+      expect.objectContaining({
+        keyword: "徐沪生",
+        sortType: "_2",
+      }),
+    )
+    expect(tikhubPost).not.toHaveBeenCalled()
+    expect(result.list[0]).toMatchObject({
+      object_id: "sph1",
+      title: "红狐视频号",
+      nickname: "号主",
+      play_count: 12,
+    })
+  })
+
+  it("falls back to TikHub fetch_search only after RedFox fails", async () => {
+    redfoxPost.mockRejectedValue(new Error("资源不存在"))
     tikhubPost.mockResolvedValue({
       items: [
         {
@@ -106,6 +179,7 @@ describe("searchWechatChannelsVideos", () => {
       count: 3,
     })
 
+    expect(redfoxPost).toHaveBeenCalled()
     expect(tikhubPost).toHaveBeenCalledWith(
       "/api/v1/wechat_search/v2/fetch_search",
       expect.objectContaining({
