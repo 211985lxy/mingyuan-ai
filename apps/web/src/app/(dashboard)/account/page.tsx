@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bot, CalendarDays, Copy, KeyRound, Link2, LogIn, LogOut, Video } from "lucide-react"
+import { Bot, BookOpen, CalendarDays, Copy, KeyRound, Link2, LogIn, LogOut, Video } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -118,6 +118,19 @@ export default function AccountPage() {
               <span className="font-medium">{formatExpiryLabel()}</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="account-knowledge-entry">
+        <CardHeader>
+          <CardTitle>我的知识库</CardTitle>
+          <CardDescription>管理会被 AIM 用于内容创作的个人与项目资料</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => router.push("/knowledge")}>
+            <BookOpen className="mr-1.5 h-4 w-4" />
+            进入我的知识库
+          </Button>
         </CardContent>
       </Card>
 

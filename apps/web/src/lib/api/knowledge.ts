@@ -244,6 +244,7 @@ export async function updateKnowledge(
     content: string
     category: string
     tags: string[]
+    projectId: string | null
   }>
 ): Promise<KnowledgeEntry> {
   return request<KnowledgeEntry>(`/api/knowledge/${id}`, {
@@ -253,12 +254,15 @@ export async function updateKnowledge(
 }
 
 /**
- * @description 删除knowledge
- * @param id - 唯一标识符
- * @returns Promise<void>
+ * @description 归档 knowledge（后端 DELETE 实为 status=archived，非物理删除）
  */
-export async function deleteKnowledge(id: string): Promise<void> {
+export async function archiveKnowledge(id: string): Promise<void> {
   await request(`/api/knowledge/${id}`, { method: "DELETE" })
+}
+
+/** @deprecated 使用 archiveKnowledge；语义上是归档不是硬删 */
+export async function deleteKnowledge(id: string): Promise<void> {
+  await archiveKnowledge(id)
 }
 
 // ─── AIM 生成 ────────────────────────────────────────────

@@ -53,6 +53,22 @@ export async function PUT(
       return NextResponse.json({ error: "不存在" }, { status: 404 })
     }
 
+    let nextProjectId: string | null | undefined
+    if (body.projectId !== undefined) {
+      if (body.projectId === null || body.projectId === "") {
+        nextProjectId = null
+      } else {
+        const project = await prisma.clientProject.findFirst({
+          where: { id: body.projectId, userId: user.id, status: "active" },
+          select: { id: true },
+        })
+        if (!project) {
+          return NextResponse.json({ error: "不存在" }, { status: 404 })
+        }
+        nextProjectId = project.id
+      }
+    }
+
     const updated = await prisma.knowledgeEntry.update({
       where: { id, userId: user.id },
       data: {
@@ -60,6 +76,7 @@ export async function PUT(
         ...(body.content !== undefined ? { content: body.content } : {}),
         ...(body.category !== undefined ? { category: body.category } : {}),
         ...(body.tags !== undefined ? { tags: Array.isArray(body.tags) ? body.tags : [] } : {}),
+        ...(nextProjectId !== undefined ? { projectId: nextProjectId } : {}),
       },
     })
 

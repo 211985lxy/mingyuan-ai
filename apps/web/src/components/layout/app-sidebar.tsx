@@ -21,6 +21,7 @@ import {
   Monitor,
   Check,
   Users,
+  BookOpen,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -65,6 +66,7 @@ const quickNav: NavItem[] = [
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "对标账号", href: "/opportunities", icon: Users },
   { title: "客户项目", href: "/projects", icon: BriefcaseBusiness },
+  { title: "我的知识库", href: "/knowledge", icon: BookOpen },
   { title: "工作总览", href: "/home", icon: LayoutDashboard },
 ]
 

@@ -20,6 +20,8 @@ export const knowledgeUpdateBodySchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   content: z.string().trim().min(1).max(50_000).optional(),
   tags: tags.optional(),
+  /** 允许改归属项目；null 表示改为全局资料 */
+  projectId: id.optional().nullable(),
 }).strict().refine((value) => Object.keys(value).length > 0, "至少提供一个更新字段")
 
 export const obsidianSyncEntrySchema = z.object({
