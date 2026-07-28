@@ -3,6 +3,7 @@ import {
   buildFeishuTextReply,
   parseFeishuMessageEvent,
   parseFeishuSdkMessageEvent,
+  shouldPrioritizeInspirationCapture,
   verifyFeishuEventToken,
 } from "@/lib/integrations/feishu-topic-chat"
 
@@ -86,5 +87,13 @@ describe("feishu topic chat integration", () => {
     expect(text).toContain("建议先拍：贵在哪里")
     expect(text).toContain("开头：客户问你为什么贵，千万别先解释成本。")
     expect(text).toContain("还能拍：报价的底气、别只比价格")
+  })
+
+  it("routes explicit AIM capture messages to inspiration before the legacy video pipeline", () => {
+    expect(shouldPrioritizeInspirationCapture("aim", true)).toBe(true)
+  })
+
+  it("keeps ordinary AIM video messages on the legacy video pipeline", () => {
+    expect(shouldPrioritizeInspirationCapture("aim", false)).toBe(false)
   })
 })

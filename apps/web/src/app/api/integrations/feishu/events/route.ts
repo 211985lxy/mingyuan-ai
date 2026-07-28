@@ -4,7 +4,7 @@ import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { env } from "@/env"
 import { parseJsonRecord } from "@/lib/api-contract"
-import { parseFeishuSdkMessageEvent, verifyFeishuEventToken, getFeishuTenantAccessToken, replyFeishuTextMessage } from "@/lib/integrations/feishu-topic-chat"
+import { parseFeishuSdkMessageEvent, verifyFeishuEventToken, getFeishuTenantAccessToken, replyFeishuTextMessage, shouldPrioritizeInspirationCapture } from "@/lib/integrations/feishu-topic-chat"
 import { ingestInspirationEvent, isExplicitInspirationCaptureMessage, resolveChannelBinding, resolveBindingExecutionMode } from "@/features/topics/services/inspiration-events"
 import { INSPIRATION_ACCEPTED_REPLY } from "@/features/topics/services/inspiration-reply"
 import { isReplySuppressed } from "@/lib/execution-mode"
@@ -101,8 +101,10 @@ export async function POST(request: Request) {
       const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: event.chatId })
       if (!binding) return { ok: true, ignored: true, reason: "channel_unbound" }
 
-      // ─── 视频链接分流：含视频链接的消息 → 内容处理流水线 ───
-      if (env.CONTENT_PIPELINE_ENABLED !== "false") {
+      const captureFromAimChat = shouldPrioritizeInspirationCapture(binding.routeTarget,
+        isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords))
+      // ─── 视频链接分流：显式收选题优先进入影子采集，其余视频走原内容流水线 ───
+      if (env.CONTENT_PIPELINE_ENABLED !== "false" && !captureFromAimChat) {
         const detection = detectVideoLinks(event.text)
         if (detection.hasLinks) {
           const firstLink = detection.links[0]
@@ -137,8 +139,6 @@ export async function POST(request: Request) {
       }
 
       // AIM 群保留日常对话；只有明确的"收集关键词 + 视频链接"绕到灵感入库。
-      const captureFromAimChat = binding.routeTarget === "aim"
-        && isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords)
       if (binding.routeTarget === "aim" && !captureFromAimChat) {
         const ingested = await ingestAimChannelMessage({
           platform: "feishu",
