@@ -1,13 +1,10 @@
 import { prisma } from "@/lib/prisma"
+import {
+  STYLE_PROFILE_CATEGORY,
+  STYLE_PROFILE_MAIN_TITLE,
+} from "@/lib/style-profile-constants"
 
-/**
- * 写作风格档案的统一 category 常量。
- * category 是 schema 里的 String（非 enum），新增无需 prisma migration，只靠代码常量收敛引用。
- */
-export const STYLE_PROFILE_CATEGORY = "writing_style_profile"
-
-/** 主档案的固定 title，作为 upsert / 合并的 anchor */
-export const STYLE_PROFILE_MAIN_TITLE = "IP 写作风格主档案"
+export { STYLE_PROFILE_CATEGORY, STYLE_PROFILE_MAIN_TITLE } from "@/lib/style-profile-constants"
 
 const MAX_ENTRY_CHARS = 1800
 const MAX_BLOCK_CHARS = 2200

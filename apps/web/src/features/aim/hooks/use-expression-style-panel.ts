@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { archiveKnowledge, listKnowledge, type KnowledgeEntry } from "@/lib/api/knowledge"
-import { STYLE_PROFILE_CATEGORY, STYLE_PROFILE_MAIN_TITLE } from "@/lib/style-profile"
+import { STYLE_PROFILE_CATEGORY, STYLE_PROFILE_MAIN_TITLE } from "@/lib/style-profile-constants"
 
 export type StyleSampleDraft = { id: string; content: string; label: "core" | "normal" }
 
