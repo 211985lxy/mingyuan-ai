@@ -7,6 +7,7 @@ import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type { AimChatBody } from "@/features/aim/contracts/api"
 import type { CopyStudioModule } from "@/lib/copy-studio"
+import { serializeAimChatRequestBody } from "@/lib/aim/chat-payload-budget"
 import type {
   ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiScript, ApiUser,
@@ -108,7 +109,7 @@ export async function chatAim(
   const { signal, ...bodyOptions } = options ?? {}
   return request<{ content: string; toolResult?: unknown }>("/api/aim/chat", {
     method: "POST",
-    body: JSON.stringify({ messages, ...bodyOptions }),
+    body: serializeAimChatRequestBody({ messages, ...bodyOptions }),
     timeout: 30000,
     signal,
   })
@@ -143,7 +144,7 @@ export async function chatAimStream(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ messages, ...bodyOptions, stream: true, traceId }),
+      body: serializeAimChatRequestBody({ messages, ...bodyOptions, stream: true, traceId }),
     })
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
