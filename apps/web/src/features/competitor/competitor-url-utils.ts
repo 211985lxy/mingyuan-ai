@@ -15,6 +15,18 @@ export function isSupportedCompetitorUrl(url: string): boolean {
   return SUPPORTED_DOMAINS.some((domain) => url.includes(domain))
 }
 
+/**
+ * 用 TikHub 搜到的 finder_username 拼一条可入库的视频号主页链接。
+ * 视频号常无法复制主页链接；搜昵称拿到标识后走这条路径添加对标。
+ */
+export function buildWechatChannelsProfileUrl(finderUsername: string): string {
+  const id = finderUsername.trim()
+  if (!id) {
+    throw new Error("缺少视频号账号标识")
+  }
+  return `https://channels.weixin.qq.com/web/pages/profile/${encodeURIComponent(id)}`
+}
+
 export type UrlValidationError = string
 
 /** Validate a competitor URL and return the pure URL or an error message. */
@@ -26,7 +38,7 @@ export type UrlValidationError = string
 export function validateCompetitorUrl(raw: string): { ok: true; url: string } | { ok: false; error: string } {
   const trimmed = raw.trim()
   if (!isSupportedCompetitorUrl(trimmed)) {
-    return { ok: false, error: "暂不支持该平台，目前支持抖音和视频号主页链接" }
+    return { ok: false, error: "暂不支持该平台，目前支持抖音主页链接；视频号可搜昵称添加，不必复制链接" }
   }
   const typeError = checkUrlType(trimmed)
   if (typeError) {

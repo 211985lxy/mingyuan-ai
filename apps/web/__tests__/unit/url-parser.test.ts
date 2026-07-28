@@ -49,6 +49,20 @@ describe('detectPlatform', () => {
   it('is case-insensitive', () => {
     expect(detectPlatform('https://WWW.DOUYIN.COM/user/abc')).toBe('douyin')
   })
+
+  it('returns wechat_channels for channels.weixin.qq.com profile URL', () => {
+    expect(
+      detectPlatform(
+        'https://channels.weixin.qq.com/web/pages/profile/v2_abc@finder',
+      ),
+    ).toBe('wechat_channels')
+  })
+
+  it('returns wechat_channels for finder.video.qq.com URL', () => {
+    expect(detectPlatform('https://finder.video.qq.com/mfinder/v2_abc@finder')).toBe(
+      'wechat_channels',
+    )
+  })
 })
 
 describe('extractUserId', () => {
@@ -78,6 +92,22 @@ describe('extractUserId', () => {
   it('returns null for empty string', () => {
     expect(extractUserId('')).toBeNull()
   })
+
+  it('extracts finder_username from wechat channels profile URL', () => {
+    expect(
+      extractUserId(
+        'https://channels.weixin.qq.com/web/pages/profile/v2_abc123@finder',
+      ),
+    ).toBe('v2_abc123@finder')
+  })
+
+  it('decodes encoded finder_username from wechat channels profile URL', () => {
+    expect(
+      extractUserId(
+        'https://channels.weixin.qq.com/web/pages/profile/v2_abc123%40finder',
+      ),
+    ).toBe('v2_abc123@finder')
+  })
 })
 
 describe('parseUrl', () => {
@@ -93,6 +123,15 @@ describe('parseUrl', () => {
     expect(result).not.toBeNull()
     expect(result?.platform).toBe('xiaohongshu')
     expect(result?.rawUserId).toBe('abc123')
+  })
+
+  it('returns ParsedUrl for a wechat channels profile URL', () => {
+    const result = parseUrl(
+      'https://channels.weixin.qq.com/web/pages/profile/v2_abc123@finder',
+    )
+    expect(result).not.toBeNull()
+    expect(result?.platform).toBe('wechat_channels')
+    expect(result?.rawUserId).toBe('v2_abc123@finder')
   })
 
   it('returns null for unsupported URL', () => {

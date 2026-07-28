@@ -97,6 +97,10 @@ export function detectPlatform(url: string): Platform | null {
       return 'xiaohongshu'
     }
 
+    if (lower.includes('channels.weixin.qq.com') || lower.includes('finder.video.qq.com')) {
+      return 'wechat_channels'
+    }
+
     return null
   } catch {
     return null
@@ -136,6 +140,18 @@ export function extractUserId(url: string): string | null {
       // Douyin: /user/<userId>
       const userId = segments[userIdx + 1]
       return userId ?? null
+    }
+
+    // WeChat Channels: /web/pages/profile/<finder_username>
+    const pagesIdx = segments.indexOf('pages')
+    if (pagesIdx !== -1 && segments[pagesIdx + 1] === 'profile' && segments[pagesIdx + 2]) {
+      return decodeURIComponent(segments[pagesIdx + 2])
+    }
+
+    // WeChat Channels: /mfinder/<finder_username>
+    const finderIdx = segments.indexOf('mfinder')
+    if (finderIdx !== -1 && segments[finderIdx + 1]) {
+      return decodeURIComponent(segments[finderIdx + 1])
     }
 
     return null

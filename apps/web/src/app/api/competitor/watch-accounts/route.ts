@@ -22,7 +22,7 @@ export const POST = withUserAuth(async (request, { user }) => {
 
   const rawUrl = typeof body.url === "string" ? body.url.trim() : ""
   if (!rawUrl) {
-    return NextResponse.json({ error: "请输入抖音/视频号主页链接" }, { status: 400 })
+    return NextResponse.json({ error: "请输入抖音主页链接；视频号可搜昵称添加" }, { status: 400 })
   }
 
   const urlTypeError = checkUrlType(rawUrl)

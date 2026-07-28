@@ -112,7 +112,7 @@ export function CompetitorDiscoveryPanel(props: DiscoveryPanelProps) {
         </>
       ) : (
         <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
-          先在下方粘贴抖音/视频号主页链接添加账号，再回来刷新作品池或扩展同赛道。
+          先在下方添加账号：抖音粘贴主页链接，视频号可搜昵称，再回来刷新作品池或扩展同赛道。
         </p>
       )}
     </AiResultPanel>

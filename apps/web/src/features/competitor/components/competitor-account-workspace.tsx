@@ -70,7 +70,7 @@ export function CompetitorAccountWorkspace({
     return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 3 }).map((_, index) => <Card key={index}><CardContent className="p-4"><div className="flex items-center gap-3"><Skeleton className="h-10 w-10 rounded-full" /><div className="flex-1"><Skeleton className="h-4 w-28" /><Skeleton className="mt-1 h-3 w-20" /></div></div></CardContent></Card>)}</div>
   }
   if (accounts.length === 0) {
-    return <Card><CardContent className="flex flex-col items-center py-16 text-center"><User className="mb-4 h-12 w-12 text-muted-foreground" /><h2 className="text-lg font-semibold">还没有监控账号</h2><p className="mt-1 text-sm text-muted-foreground">在上方输入抖音/视频号优质账号主页链接开始监控</p></CardContent></Card>
+    return <Card><CardContent className="flex flex-col items-center py-16 text-center"><User className="mb-4 h-12 w-12 text-muted-foreground" /><h2 className="text-lg font-semibold">还没有监控账号</h2><p className="mt-1 text-sm text-muted-foreground">抖音可贴主页链接；视频号可搜昵称添加，不必复制链接</p></CardContent></Card>
   }
 
   return (
