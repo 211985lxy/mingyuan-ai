@@ -13,9 +13,22 @@ BACKGROUND_TASK_SERVICE="${BACKGROUND_TASK_SERVICE:-mingyuan-background-tasks.se
 BACKGROUND_TASK_TIMER="${BACKGROUND_TASK_TIMER:-mingyuan-background-tasks.timer}"
 HEALTH_URL="${HEALTH_URL:-https://mingyuan-ai.cn/api/healthz}"
 
-SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST")
-RSYNC=(rsync -az --delete -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new")
-RSYNC_DEREF=(rsync -azL --delete -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new")
+SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "$SSH_USER@$SSH_HOST")
+RSYNC=(rsync -az --partial --delete -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10")
+RSYNC_DEREF=(rsync -azL --partial --delete -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10")
+
+retry_transfer() {
+  local attempt=1
+  until "$@"; do
+    if [ "$attempt" -ge 3 ]; then
+      echo "Transfer failed after $attempt attempts." >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    echo "Transfer interrupted; resuming attempt $attempt/3 in 3s..." >&2
+    sleep 3
+  done
+}
 
 cd "$ROOT_DIR"
 
@@ -49,15 +62,15 @@ node -e "const { createRequire } = require('node:module'); const { resolve } = r
 
 "${SSH[@]}" "rm -rf '$REMOTE_INCOMING_DIR' && mkdir -p '$REMOTE_INCOMING_DIR/apps/web/.next/static' '$REMOTE_INCOMING_DIR/apps/web/public' '$REMOTE_INCOMING_DIR/apps/web/messages' '$REMOTE_INCOMING_DIR/ops'"
 
-"${RSYNC_DEREF[@]}" apps/web/.next/standalone/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/"
-"${RSYNC[@]}" apps/web/.next/static/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/apps/web/.next/static/"
-"${RSYNC[@]}" apps/web/public/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/apps/web/public/"
-"${RSYNC[@]}" apps/web/messages/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/apps/web/messages/"
-"${RSYNC[@]}" apps/web/scripts/verify-production-schema.mjs "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
-"${RSYNC[@]}" apps/web/scripts/apply-production-schema-patches.mjs "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
-"${RSYNC[@]}" apps/web/prisma/production-schema-contract.json "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
-"${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.service "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_SERVICE"
-"${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.timer "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_TIMER"
+retry_transfer "${RSYNC_DEREF[@]}" apps/web/.next/standalone/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/"
+retry_transfer "${RSYNC[@]}" apps/web/.next/static/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/apps/web/.next/static/"
+retry_transfer "${RSYNC[@]}" apps/web/public/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/apps/web/public/"
+retry_transfer "${RSYNC[@]}" apps/web/messages/ "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/apps/web/messages/"
+retry_transfer "${RSYNC[@]}" apps/web/scripts/verify-production-schema.mjs "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
+retry_transfer "${RSYNC[@]}" apps/web/scripts/apply-production-schema-patches.mjs "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
+retry_transfer "${RSYNC[@]}" apps/web/prisma/production-schema-contract.json "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
+retry_transfer "${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.service "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_SERVICE"
+retry_transfer "${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.timer "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_TIMER"
 
 "${SSH[@]}" "cd '$REMOTE_INCOMING_DIR/apps/web' && /usr/bin/node -e \"const { createRequire } = require('node:module'); const { resolve } = require('node:path'); const appRequire = createRequire(resolve('server.js')); ['next','styled-jsx/package.json','@next/env','react','react-dom','pino'].forEach((id)=>appRequire.resolve(id)); console.log('remote-standalone-deps-ok')\""
 "${SSH[@]}" "set -a; . /etc/mingyuan/mingyuan.env; set +a; /usr/bin/node '$REMOTE_INCOMING_DIR/ops/apply-production-schema-patches.mjs'"
