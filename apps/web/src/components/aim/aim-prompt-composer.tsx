@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ChevronDown,
+  ChevronUp,
   ImagePlus,
   ListChecks,
   Loader2,
@@ -13,6 +14,7 @@ import {
   Square,
   X,
 } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +24,15 @@ import {
   COPY_STUDIO_MODULE_LABELS,
   type CopyStudioModule,
 } from "@/lib/copy-studio"
+import {
+  canSubmitWithPasteAttachment,
+  createPastedCopyAttachment,
+  formatCharCount,
+  inferPasteUsageFromInstruction,
+  isLongCopyPaste,
+  type PastedCopyAttachment,
+  type PasteUsage,
+} from "@/lib/aim/paste-copy-attachment"
 import { cn } from "@/lib/utils"
 
 export type AimComposerMode = "direct" | "plan"
@@ -53,6 +64,13 @@ interface AimPromptComposerProps {
   contentMode?: CopyStudioModule | undefined
   onContentModeChange?: (value: CopyStudioModule | undefined) => void
   showContentMode?: boolean
+  /** 长文粘贴附件 */
+  pastedCopy?: PastedCopyAttachment | null
+  onPastedCopyChange?: (next: PastedCopyAttachment | null) => void
+  onStyleSampleRequest?: (attachment: PastedCopyAttachment) => void
+  /** 工具栏「我的风格 · 已启用」 */
+  styleEnabled?: boolean
+  onOpenStyleAssets?: () => void
 }
 
 /**
@@ -85,11 +103,21 @@ export function AimPromptComposer({
   contentMode,
   onContentModeChange,
   showContentMode = false,
+  pastedCopy = null,
+  onPastedCopyChange,
+  onStyleSampleRequest,
+  styleEnabled = false,
+  onOpenStyleAssets,
 }: AimPromptComposerProps) {
   const isPlanMode = composerMode === "plan"
-  const canSend = !busy && !isRecording && (value.trim().length > 0 || imageAttachments.length > 0)
-  const canPlan = !busy && !isRecording && value.trim().length > 0
-  const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate
+  const pasteReady = canSubmitWithPasteAttachment({
+    text: value,
+    attachment: pastedCopy,
+    hasImages: imageAttachments.length > 0,
+  })
+  const canSend = !busy && !isRecording && pasteReady
+  const canPlan = !busy && !isRecording && value.trim().length > 0 && (!pastedCopy || Boolean(pastedCopy.usage))
+  const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate && (!pastedCopy || Boolean(pastedCopy.usage && pastedCopy.usage !== "style_sample"))
   const canStop = busy && !isRecording && Boolean(onStop)
   const rootRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -97,11 +125,11 @@ export function AimPromptComposer({
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
   const [skillQuery, setSkillQuery] = useState("")
+  const [copyExpanded, setCopyExpanded] = useState(false)
 
   const contentModeLabel =
     contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[contentMode]
 
-  // 对标 ChatGPT：随行数自动增高，超出上限后内部滚动
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -150,6 +178,53 @@ export function AimPromptComposer({
     }
   }, [skillsOpen, modeOpen])
 
+  const applyUsage = useCallback((usage: PasteUsage) => {
+    if (!pastedCopy || !onPastedCopyChange) return
+    const next = { ...pastedCopy, usage }
+    onPastedCopyChange(next)
+    if (usage === "style_sample") onStyleSampleRequest?.(next)
+  }, [onPastedCopyChange, onStyleSampleRequest, pastedCopy])
+
+  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!onPastedCopyChange) return
+    const pasted = event.clipboardData.getData("text/plain")
+    if (!isLongCopyPaste(pasted)) return
+
+    event.preventDefault()
+    const instruction = value.trim()
+    const inferred = inferPasteUsageFromInstruction(instruction)
+    const next = createPastedCopyAttachment(pasted, inferred)
+
+    if (pastedCopy) {
+      const replace = window.confirm("已有一篇文案附件。确定替换？取消则追加到现有附件。")
+      if (replace) {
+        onPastedCopyChange(next)
+      } else {
+        const merged = createPastedCopyAttachment(
+          `${pastedCopy.content.trim()}\n\n${pasted.trim()}`,
+          pastedCopy.usage ?? inferred,
+        )
+        onPastedCopyChange(merged)
+      }
+    } else {
+      onPastedCopyChange(next)
+    }
+    setCopyExpanded(false)
+    if (inferred === "style_sample") {
+      toast.message("已识别为风格样本，将打开风格预览")
+      onStyleSampleRequest?.(next)
+    }
+  }, [onPastedCopyChange, onStyleSampleRequest, pastedCopy, value])
+
+  // 输入变化时，若已有附件且尚未选用途，尝试从指令自动推断
+  useEffect(() => {
+    if (!pastedCopy || pastedCopy.usage || !onPastedCopyChange) return
+    const inferred = inferPasteUsageFromInstruction(value)
+    if (!inferred) return
+    onPastedCopyChange({ ...pastedCopy, usage: inferred })
+    if (inferred === "style_sample") onStyleSampleRequest?.({ ...pastedCopy, usage: inferred })
+  }, [value, pastedCopy, onPastedCopyChange, onStyleSampleRequest])
+
   return (
     <div ref={rootRef} className="mx-auto w-full max-w-6xl xl:max-w-7xl">
       <div
@@ -160,10 +235,68 @@ export function AimPromptComposer({
           "transition-shadow",
         )}
       >
+        {pastedCopy ? (
+          <div className="mx-3 mt-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">
+                  文案附件 · {formatCharCount(pastedCopy.charCount)}字
+                  {pastedCopy.usage === "edit" ? " · 待修改" : null}
+                  {pastedCopy.usage === "benchmark" ? " · 对标参考" : null}
+                  {pastedCopy.usage === "style_sample" ? " · 风格样本" : null}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setCopyExpanded((v) => !v)}
+              >
+                {copyExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {copyExpanded ? "收起" : "展开"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0"
+                onClick={() => onPastedCopyChange?.(null)}
+                disabled={busy}
+                title="移除文案附件"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {copyExpanded ? (
+              <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">
+                {pastedCopy.content}
+              </pre>
+            ) : null}
+            {!pastedCopy.usage ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  检测到一篇文案 · {formatCharCount(pastedCopy.charCount)}字
+                </span>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyUsage("edit")}>
+                  修改这篇
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyUsage("benchmark")}>
+                  作为对标参考
+                </Button>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => applyUsage("style_sample")}>
+                  沉淀为我的风格
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return
             event.preventDefault()
@@ -360,6 +493,17 @@ export function AimPromptComposer({
                 技能
                 <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
+            ) : null}
+
+            {styleEnabled ? (
+              <button
+                type="button"
+                onClick={onOpenStyleAssets}
+                className="ml-1 inline-flex h-7 items-center rounded-full px-2 text-[11px] text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+                title="查看我的表达风格"
+              >
+                我的风格 · 已启用
+              </button>
             ) : null}
 
             {(isTranscribing || isRecording || isPlanMode) && (

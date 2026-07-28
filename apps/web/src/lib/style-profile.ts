@@ -25,44 +25,28 @@ function formatDate(value: Date): string {
   return `${y}-${m}-${d}`
 }
 
-/**
- * 读取用户的【全局写作风格档案】文本块，供脚本生成 / AIM 智能体 / 润色注入。
- *
- * 关键设计：**不走 retrieveRelevantKnowledge**——
- * 那条链路硬过滤 projectId（aim/chat 还会传 "<no-project>" 字面量），
- * 用户级（projectId=null）的风格档案永远检索不到。
- * 这里直接按 userId + category + projectId:null 全量取——风格档案本就是一条主档案，
- * 条目极少，不需要 embedding 语义筛选。
- *
- * 返回空串表示用户尚未沉淀风格档案，调用方应跳过注入（行为与改动前一致）。
- */
-/**
- * 读取写作风格档案文本块。
- * 项目内优先读取项目风格档案，无项目时回退用户全局。
- */
-/**
- * @description 获取styleprofileblock
- * @param userId - 用户 ID
- * @param projectId? - projectId?
- * @returns Promise<string>
- */
-export async function getStyleProfileBlock(userId: string, projectId?: string | null): Promise<string> {
-  const effectiveProjectId = projectId ?? null
-  const entries = await prisma.knowledgeEntry.findMany({
+type StyleEntryRow = { title: string; content: string; updatedAt: Date }
+
+async function loadStyleEntries(
+  userId: string,
+  projectId: string | null,
+): Promise<StyleEntryRow[]> {
+  return prisma.knowledgeEntry.findMany({
     where: {
       userId,
       category: STYLE_PROFILE_CATEGORY,
-      projectId: effectiveProjectId,
+      projectId,
       status: "active",
     },
     orderBy: [{ updatedAt: "desc" }],
     take: MAX_ENTRIES,
     select: { title: true, content: true, updatedAt: true },
   })
+}
 
+function formatStyleBlock(entries: StyleEntryRow[], headerLine: string): string {
   if (entries.length === 0) return ""
 
-  const headerLine = `\n\n=== 写作风格档案（IP 全局风格） ===`
   const parts: string[] = [headerLine]
   let used = headerLine.length
 
@@ -80,4 +64,62 @@ export async function getStyleProfileBlock(userId: string, projectId?: string | 
   }
 
   return parts.join("")
+}
+
+/**
+ * 读取写作风格档案文本块，供脚本生成 / AIM / 润色注入。
+ *
+ * 不走 retrieveRelevantKnowledge（会过滤掉 projectId=null 的全局档案）。
+ * 优先级：当前项目档案 → 同用户全局档案 → 空串（跳过注入）。
+ * 禁止跨项目、跨用户召回。
+ */
+export async function getStyleProfileBlock(userId: string, projectId?: string | null): Promise<string> {
+  const effectiveProjectId = projectId ?? null
+
+  if (effectiveProjectId) {
+    const projectEntries = await loadStyleEntries(userId, effectiveProjectId)
+    if (projectEntries.length > 0) {
+      return formatStyleBlock(projectEntries, "\n\n=== 写作风格档案（项目风格） ===")
+    }
+    const globalEntries = await loadStyleEntries(userId, null)
+    return formatStyleBlock(
+      globalEntries,
+      "\n\n=== 写作风格档案（IP 全局风格，项目无档案回退） ===",
+    )
+  }
+
+  const globalEntries = await loadStyleEntries(userId, null)
+  return formatStyleBlock(globalEntries, "\n\n=== 写作风格档案（IP 全局风格） ===")
+}
+
+/**
+ * 是否存在可用的风格档案（项目优先，无则看全局）。
+ * 供创作台「我的风格 · 已启用」状态条使用。
+ */
+export async function hasActiveStyleProfile(
+  userId: string,
+  projectId?: string | null,
+): Promise<{ enabled: boolean; scope: "project" | "global" | "none" }> {
+  const effectiveProjectId = projectId ?? null
+  if (effectiveProjectId) {
+    const projectCount = await prisma.knowledgeEntry.count({
+      where: {
+        userId,
+        category: STYLE_PROFILE_CATEGORY,
+        projectId: effectiveProjectId,
+        status: "active",
+      },
+    })
+    if (projectCount > 0) return { enabled: true, scope: "project" }
+  }
+  const globalCount = await prisma.knowledgeEntry.count({
+    where: {
+      userId,
+      category: STYLE_PROFILE_CATEGORY,
+      projectId: null,
+      status: "active",
+    },
+  })
+  if (globalCount > 0) return { enabled: true, scope: "global" }
+  return { enabled: false, scope: "none" }
 }

@@ -13,26 +13,10 @@ interface AimEvolutionActionInput {
 }
 
 async function rememberPreference(input: AimEvolutionActionInput, command: string) {
-  const messages = [
-    ...input.messages.map((message) => ({ role: message.role, content: message.content })),
-    { role: "user" as const, content: command },
-  ].filter((message) => message.content.trim()).slice(-8)
-  if (messages.length === 0) {
-    toast.error("没有可沉淀的偏好内容")
-    return
-  }
-  try {
-    const result = await evolveStyleConversation({ messages })
-    if (result.profile) {
-      toast.success(result.created ? "已建立全局写作风格档案" : "全局写作风格档案已更新")
-    } else if (result.reason === "no_style") {
-      toast.info("这句话还没有形成稳定偏好")
-    } else {
-      toast.info(result.reason || "这句话没有形成稳定偏好")
-    }
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : "偏好沉淀失败")
-  }
+  // 不再直写库：引导用户走「粘贴 → 风格预览 → 确认」路径
+  void input
+  void command
+  toast.message("请把历史文案粘贴到输入框，选择「沉淀为我的风格」，确认后再写入档案")
 }
 
 async function evolveConversation(input: AimEvolutionActionInput, setSuggestions: (items: AimEvolutionSuggestion[]) => void) {

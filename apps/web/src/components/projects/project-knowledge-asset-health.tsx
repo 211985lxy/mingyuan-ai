@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { KnowledgeAssetHealthPanel } from "@/components/admin/knowledge-asset-health-panel"
+import { ExpressionStylePanel } from "@/components/projects/expression-style-panel"
 import {
   createKnowledge,
   fetchKnowledgeAssetHealth,
@@ -34,9 +35,10 @@ interface ProjectKnowledgeAssetHealthProps {
 }
 
 /**
- * @description 用户端项目知识资产健康度：展示五盒 + 用现有 createKnowledge 补录
+ * 用户端项目内容资产：五盒健康度 +「我的表达风格」管理。
  */
 export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAssetHealthProps) {
+  const [focusStyle, setFocusStyle] = useState(false)
   const [health, setHealth] = useState<KnowledgeAssetHealthResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(false)
@@ -48,6 +50,15 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
     content: "",
     prompts: [] as string[],
   })
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const focus = params.get("focus") === "style"
+    const focusedProject = params.get("projectId")
+    const shouldFocus = focus && (!focusedProject || focusedProject === projectId)
+    setFocusStyle(shouldFocus)
+    if (shouldFocus) setExpanded(true)
+  }, [projectId])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -98,6 +109,10 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
     category: KnowledgeCategory
     prompts: string[]
   }) {
+    if (input.category === "writing_style_profile") {
+      setExpanded(true)
+      return
+    }
     const prompts =
       input.prompts.length > 0
         ? input.prompts
@@ -115,7 +130,7 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
     return (
       <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Loader2 className="size-3.5 animate-spin" />
-        正在检查知识资产…
+        正在检查内容资产…
       </div>
     )
   }
@@ -133,7 +148,7 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
           onClick={() => setExpanded((value) => !value)}
           className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary"
         >
-          知识资产健康度
+          内容资产
           {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
         </button>
         <span className="text-xs text-muted-foreground">
@@ -159,13 +174,17 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
       </div>
 
       {expanded ? (
-        <KnowledgeAssetHealthPanel
-          health={health}
-          onSelectBox={() => {
-            /* 用户端无条目列表，点击盒子不筛选 */
-          }}
-          onSupplement={openSupplement}
-        />
+        <>
+          <KnowledgeAssetHealthPanel
+            health={health}
+            title="内容资产"
+            onSelectBox={() => {
+              /* 用户端无条目列表，点击盒子不筛选 */
+            }}
+            onSupplement={openSupplement}
+          />
+          <ExpressionStylePanel projectId={projectId} autoExpandFeed={focusStyle} />
+        </>
       ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -16,11 +16,8 @@ const baseHeaderProps = {
     notes: null, createdAt: "2026-07-17T00:00:00.000Z", updatedAt: "2026-07-17T00:00:00.000Z",
   }],
   selectedProjectId: "project-1",
-  canEvolve: true,
-  isEvolving: false,
   onStageChange: vi.fn(),
   onProjectScopeChange: vi.fn(),
-  onEvolve: vi.fn(),
   onReset: vi.fn(),
 }
 

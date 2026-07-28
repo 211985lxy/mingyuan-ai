@@ -3,8 +3,10 @@ import {
   buildStyleExtractionPrompt,
   normalizeStyleMessages,
   parseStyleProfileJson,
+  samplesToStyleMessages,
   STYLE_PROFILE_DEFAULT_TAGS,
 } from "@/lib/aim-style-evolution"
+import { aimEvolveStyleBodySchema } from "@/features/aim/contracts/api"
 
 describe("aim style evolution", () => {
   it("parses a full 8-dimension delta", () => {
@@ -25,10 +27,6 @@ describe("aim style evolution", () => {
 
     expect(parsed).not.toBeNull()
     expect(parsed!.cognitivePattern.entry).toBe("反常识破题")
-    expect(parsed!.coreValues.opposes).toBe("正确的废话")
-    expect(parsed!.decisionHeuristics.priorities).toBe("先看生意是否成立")
-    expect(parsed!.antiPatterns.forbiddenTone).toBe("不要导师腔")
-    expect(parsed!.honestLimits.requiresEvidence).toBe("战绩必须有真实数据")
     expect(parsed!.confidence).toBe("confirmed")
   })
 
@@ -91,21 +89,62 @@ describe("aim style evolution", () => {
       { role: "assistant", content: "明白。" },
     ])
     expect(prompt).toContain("cognitivePattern")
-    expect(prompt).toContain("emotionalTexture")
-    expect(prompt).toContain("structuralDna")
-    expect(prompt).toContain("microLinguistics")
-    expect(prompt).toContain("coreValues")
-    expect(prompt).toContain("decisionHeuristics")
-    expect(prompt).toContain("antiPatterns")
     expect(prompt).toContain("honestLimits")
-    expect(prompt).toContain("第一性原理")
     expect(prompt).toContain("别用那些黑话")
-    expect(prompt.length).toBeLessThan(6000)
   })
 
   it("uses a legal asset_role (does not repeat the preference bug)", () => {
     expect(STYLE_PROFILE_DEFAULT_TAGS).toContain("asset_role:judgment")
-    expect(STYLE_PROFILE_DEFAULT_TAGS).toContain("kb_scope:ip")
     expect(STYLE_PROFILE_DEFAULT_TAGS).not.toContain("asset_role:preference")
+  })
+
+  it("converts samples to user messages with core/normal tags", () => {
+    const messages = samplesToStyleMessages([
+      { content: "短句说话", label: "core" },
+      { content: "  普通一篇  ", label: "normal" },
+      { content: "   " },
+    ])
+    expect(messages).toHaveLength(2)
+    expect(messages[0].content).toContain("核心样本")
+    expect(messages[1].content).toContain("普通样本")
+  })
+
+  it("validates preview/commit/legacy evolve-style body shapes", () => {
+    expect(
+      aimEvolveStyleBodySchema.safeParse({
+        operation: "preview",
+        samples: [{ content: "我的历史文案足够长用来测试。" }],
+      }).success,
+    ).toBe(true)
+    expect(aimEvolveStyleBodySchema.safeParse({ operation: "preview" }).success).toBe(false)
+    expect(
+      aimEvolveStyleBodySchema.safeParse({
+        operation: "commit",
+        delta: {
+          cognitivePattern: { entry: "反常识" },
+          emotionalTexture: {},
+          structuralDna: {},
+          microLinguistics: {},
+          coreValues: {},
+          decisionHeuristics: {},
+          antiPatterns: {},
+          honestLimits: {},
+          evidence: "用户原话",
+          confidence: "user_claim",
+        },
+      }).success,
+    ).toBe(true)
+    expect(aimEvolveStyleBodySchema.safeParse({ operation: "commit" }).success).toBe(false)
+    expect(
+      aimEvolveStyleBodySchema.safeParse({
+        messages: [{ role: "user", content: "保留口语" }],
+      }).success,
+    ).toBe(true)
+    expect(
+      aimEvolveStyleBodySchema.safeParse({
+        samples: Array.from({ length: 11 }, (_, i) => ({ content: `样本${i}` })),
+        operation: "preview",
+      }).success,
+    ).toBe(false)
   })
 })

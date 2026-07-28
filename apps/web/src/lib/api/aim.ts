@@ -290,18 +290,17 @@ export async function evolveAimConversation(input: {
 }
 
 export interface StyleProfileEvolveResult {
-  delta: { evidence: string; confidence: string } | null
+  delta: (Partial<import("@/lib/aim-style-evolution").StyleProfileDelta> & {
+    evidence?: string
+    confidence?: string
+  }) | null
   profile: { id: string; title: string } | null
   created?: boolean
   reason?: string
+  preview?: boolean
 }
 
-/** 渐进沉淀：从当前对话提炼并更新写作风格档案 */
-/**
- * @description evolvestyleconversation
- * @param input - 输入数据
- * @returns Promise<StyleProfileEvolveResult>
- */
+/** 渐进沉淀：从当前对话提炼并更新写作风格档案（旧路径，兼容） */
 export async function evolveStyleConversation(input: {
   messages: Array<{ role: "user" | "assistant"; content: string }>
   projectId?: string
@@ -312,6 +311,56 @@ export async function evolveStyleConversation(input: {
     body: JSON.stringify({ messages: input.messages, projectId: input.projectId }),
     signal: input.signal,
     timeout: 60000,
+  })
+}
+
+/** 风格预览：只分析不写库 */
+export async function previewStyleProfile(input: {
+  samples?: Array<{ content: string; label?: "core" | "normal" }>
+  messages?: Array<{ role: "user" | "assistant"; content: string }>
+  projectId?: string
+  signal?: AbortSignal
+}): Promise<StyleProfileEvolveResult> {
+  return request<StyleProfileEvolveResult>("/api/aim/evolve-style", {
+    method: "POST",
+    body: JSON.stringify({
+      operation: "preview",
+      samples: input.samples,
+      messages: input.messages,
+      projectId: input.projectId,
+    }),
+    signal: input.signal,
+    timeout: 60000,
+  })
+}
+
+/** 风格确认写入：合并已确认候选到主档案 */
+export async function commitStyleProfile(input: {
+  delta: import("@/lib/aim-style-evolution").StyleProfileDelta
+  projectId?: string
+  signal?: AbortSignal
+}): Promise<StyleProfileEvolveResult> {
+  return request<StyleProfileEvolveResult>("/api/aim/evolve-style", {
+    method: "POST",
+    body: JSON.stringify({
+      operation: "commit",
+      delta: input.delta,
+      projectId: input.projectId,
+    }),
+    signal: input.signal,
+    timeout: 60000,
+  })
+}
+
+/** 创作台风格状态：项目优先，无则全局 */
+export async function fetchStyleStatus(input?: {
+  projectId?: string
+  signal?: AbortSignal
+}): Promise<{ enabled: boolean; scope: "project" | "global" | "none" }> {
+  const qs = input?.projectId ? `?projectId=${encodeURIComponent(input.projectId)}` : ""
+  return request(`/api/aim/style-status${qs}`, {
+    method: "GET",
+    signal: input?.signal,
   })
 }
 

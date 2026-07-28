@@ -33,7 +33,7 @@ export const CATEGORY_LABELS: Record<string, string> = {
   hot_topic: "热点素材",
   positioning_material: "定位素材",
   private_domain_material: "私域素材",
-  writing_style_profile: "写作风格档案",
+  writing_style_profile: "我的表达风格",
 }
 
 export const SOURCE_TYPES = [

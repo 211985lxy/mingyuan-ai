@@ -1,12 +1,15 @@
 "use client"
 
-import { useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimContextUsage } from "@/components/aim/aim-context-usage"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
+import { AimStylePreviewDialog } from "@/components/aim/aim-style-preview-dialog"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
@@ -19,11 +22,21 @@ import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { buildAimChatMessages } from "@/lib/aim/chat-request"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextTokens } from "@/lib/aim-context-usage"
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
+import {
+  assemblePasteUsageInput,
+  PASTE_COMPOSER_PLACEHOLDER,
+  type PastedCopyAttachment,
+} from "@/lib/aim/paste-copy-attachment"
+import { fetchStyleStatus } from "@/lib/api/aim"
 
 export default function AimPage() {
   const w = useAimWorkbench()
-  // 空状态（未选定 agent/阶段、无消息、无待处理意图）：正文用结果导向 Hero + composer 组成
-  // 同一居中区域；顶部不展示完整四阶段步骤条，避免与正文快捷入口重复。
+  const router = useRouter()
+  const [pastedCopy, setPastedCopy] = useState<PastedCopyAttachment | null>(null)
+  const [stylePreviewOpen, setStylePreviewOpen] = useState(false)
+  const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
+  const [styleEnabled, setStyleEnabled] = useState(false)
+
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
   const contextUsage = useMemo(() => {
     const thread = w.messages.map((message) => ({
@@ -34,34 +47,84 @@ export default function AimPage() {
     if (w.input.trim()) {
       thread.push({ role: "user", content: w.input, images: undefined })
     }
+    if (pastedCopy?.content) {
+      thread.push({ role: "user", content: pastedCopy.content, images: undefined })
+    }
     const messages = buildAimChatMessages(thread)
     return {
       usedTokens: estimateContextTokens({ messages }),
       maxTokens: AIM_CONTEXT_CAPACITY_TOKENS,
     }
-  }, [
-    w.input,
-    w.messages,
-  ])
+  }, [w.input, w.messages, pastedCopy])
+
+  const refreshStyleStatus = useCallback(async () => {
+    try {
+      const status = await fetchStyleStatus({
+        projectId: w.projectEnabled ? w.selectedProjectId || undefined : undefined,
+      })
+      setStyleEnabled(status.enabled)
+    } catch {
+      setStyleEnabled(false)
+    }
+  }, [w.projectEnabled, w.selectedProjectId])
+
+  useEffect(() => {
+    void refreshStyleStatus()
+  }, [refreshStyleStatus])
+
+  const openStylePreview = useCallback((attachment: PastedCopyAttachment) => {
+    setStyleSamples([{ content: attachment.content, label: "core" }])
+    setStylePreviewOpen(true)
+  }, [])
+
+  const handleComposerGenerate = useCallback(() => {
+    if (pastedCopy?.usage === "style_sample") {
+      openStylePreview(pastedCopy)
+      return
+    }
+    if (pastedCopy && !pastedCopy.usage) {
+      toast.message("请先选择这篇文案的用途")
+      return
+    }
+    if (pastedCopy?.usage) {
+      const assembled = assemblePasteUsageInput({
+        instruction: w.input,
+        attachment: pastedCopy,
+      })
+      if (assembled) {
+        setPastedCopy(null)
+        w.setInput("")
+        void w.generateWithInput(assembled)
+        return
+      }
+    }
+    w.handleGenerate()
+  }, [openStylePreview, pastedCopy, w])
+
+  const composerPlaceholder =
+    w.composerMode === "plan"
+      ? "用一句话描述你想做什么内容…"
+      : PASTE_COMPOSER_PLACEHOLDER
+
+  const canGenerateBase =
+    (w.input.trim().length > 0 || w.imageAttachments.length > 0 || Boolean(pastedCopy)) &&
+    (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
+    !w.isUploadingImage
 
   const composer = (
     <>
       <AimResearchHint agentId={w.selectedAgentId} />
       <AimPromptComposer
         value={w.input}
-        placeholder={w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : w.agent.placeholder}
+        placeholder={composerPlaceholder}
         busy={w.busy}
         isRecording={w.isRecording}
         isTranscribing={w.isTranscribing}
         isGenerating={w.isGenerating || w.isUploadingImage}
-        canGenerate={
-          (w.input.trim().length > 0 || w.imageAttachments.length > 0) &&
-          (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
-          !w.isUploadingImage
-        }
+        canGenerate={canGenerateBase}
         primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
         onChange={w.setInput}
-        onGenerate={w.handleGenerate}
+        onGenerate={handleComposerGenerate}
         onStop={w.handleStop}
         onStartRecording={w.startRecording}
         onStopRecording={w.stopRecording}
@@ -78,6 +141,17 @@ export default function AimPage() {
         showContentMode={w.selectedAgentId === "content_producer"}
         contentMode={w.agentModule}
         onContentModeChange={w.setAgentModule}
+        pastedCopy={pastedCopy}
+        onPastedCopyChange={setPastedCopy}
+        onStyleSampleRequest={openStylePreview}
+        styleEnabled={styleEnabled}
+        onOpenStyleAssets={() => {
+          if (w.projectEnabled && w.selectedProjectId) {
+            router.push(`/projects?focus=style&projectId=${encodeURIComponent(w.selectedProjectId)}`)
+          } else {
+            router.push("/projects?focus=style")
+          }
+        }}
       />
       <AimContextUsage
         usedTokens={contextUsage.usedTokens}
@@ -88,7 +162,6 @@ export default function AimPage() {
 
   return (
     <div className="-mx-3 -my-3 flex h-[calc(100dvh-2.25rem)] min-h-115 overflow-hidden md:-mx-4 md:-my-4">
-      {/* 对话区（智能体列表与最近内容已移至全局侧边栏） */}
       <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-2 md:px-4">
         <AimWorkbenchHeader
           workflowStage={w.currentWorkflowStage}
@@ -97,12 +170,9 @@ export default function AimPage() {
           projectEnabled={w.projectEnabled}
           projects={w.projects}
           selectedProjectId={w.selectedProjectId}
-          canEvolve={!w.isThinking && !w.isGenerating && !w.isEvolving && w.messages.length >= 2}
-          isEvolving={w.isEvolving}
           showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
           onProjectScopeChange={w.changeProjectScope}
-          onEvolve={() => void w.handleEvolveConversation()}
           onReset={w.resetConversation}
           projectTasks={
             w.selectedProjectId
@@ -131,7 +201,6 @@ export default function AimPage() {
           onSave={(s) => void w.handleSaveEvolutionSuggestion(s)}
         />
 
-        {/* 计划模式：问题卡片 / 任务单卡片（覆盖在对话区上方） */}
         {w.planSession.session?.status === "asking" && !w.planSession.currentQuestion && (
           <div className="px-3 py-2 sm:px-5">
             <AimPlanStatusCard
@@ -236,13 +305,23 @@ export default function AimPage() {
               }}
             />
 
-            {/* 输入区：悬浮卡片，对标 Claude composer */}
             {!w.planSession.isPlanMode && (
               <footer className="px-3 pb-2 pt-1 sm:px-5 sm:pb-3">{composer}</footer>
             )}
           </>
         )}
       </section>
+
+      <AimStylePreviewDialog
+        open={stylePreviewOpen}
+        samples={styleSamples}
+        projectId={w.projectEnabled ? w.selectedProjectId || null : null}
+        onOpenChange={setStylePreviewOpen}
+        onCommitted={() => {
+          setPastedCopy(null)
+          void refreshStyleStatus()
+        }}
+      />
 
       {w.wikiDialog.open && w.wikiDialog.context && (
         <IpWikiDialog

@@ -470,7 +470,7 @@ export function useAimWorkbench() {
     changeProjectScope,
     projectAttach,
     resetConversation, retryFailed, handleGenerate: handleGenerateOrPlan, handleStop, handleRepurpose, handleQuality,
-    sendText, handleUseSkill, openEditorFromResult, openProjectWorkflowTask,
+    sendText, generateWithInput, handleUseSkill, openEditorFromResult, openProjectWorkflowTask,
     inlineEditKey, setInlineEditKey, handleInlineContentSaved, handleInlineSelectionRewrite,
     // 计划模式
     composerMode: planOrchestration.composerMode,

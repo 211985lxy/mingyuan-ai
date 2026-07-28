@@ -395,6 +395,35 @@ export async function extractStyleProfileDelta(input: {
   return parseStyleProfileJson(completion.content)
 }
 
+export type StyleSampleInput = {
+  content: string
+  label?: "core" | "normal"
+}
+
+/** 将纯文本风格样本转成提取器可消费的用户发言消息。 */
+export function samplesToStyleMessages(samples: StyleSampleInput[]): StyleProfileMessage[] {
+  const messages: StyleProfileMessage[] = []
+  samples.forEach((sample, index) => {
+    const content = sample.content.trim()
+    if (!content) return
+    const tag = sample.label === "core" ? "·核心样本" : sample.label === "normal" ? "·普通样本" : ""
+    messages.push({
+      role: "user",
+      content: `[风格样本${index + 1}${tag}]\n${content}`,
+    })
+  })
+  return messages
+}
+
+/** 从 1—10 篇历史文案样本提取风格候选（不写库）。 */
+export async function extractStyleProfileFromSamples(input: {
+  samples: StyleSampleInput[]
+}): Promise<StyleProfileDelta | null> {
+  const messages = samplesToStyleMessages(input.samples)
+  if (messages.length === 0) return null
+  return extractStyleProfileDelta({ messages })
+}
+
 // ─── 入口：upsert 主档案 ──────────────────────────────────
 
 export interface UpsertStyleProfileResult {
@@ -424,7 +453,7 @@ export async function upsertMainStyleProfile(input: {
       userId,
       category: STYLE_PROFILE_CATEGORY,
       title: STYLE_PROFILE_MAIN_TITLE,
-      ...(effectiveProjectId ? { projectId: effectiveProjectId } : {}),
+      projectId: effectiveProjectId,
       status: "active",
     },
     select: { id: true, content: true },

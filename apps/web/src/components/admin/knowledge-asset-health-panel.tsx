@@ -31,6 +31,8 @@ function statusBadgeTone(status: AssetBoxHealth["status"]): string {
 
 export interface KnowledgeAssetHealthPanelProps {
   health: KnowledgeAssetHealthResult
+  /** 用户端可改名为「内容资产」 */
+  title?: string
   /** 点击盒子：筛选该类条目 */
   onSelectBox: (box: AssetBoxHealth) => void
   /** 点击待补充/待确认：引导现有录入入口 */
@@ -46,6 +48,7 @@ export interface KnowledgeAssetHealthPanelProps {
  */
 export function KnowledgeAssetHealthPanel({
   health,
+  title = "知识资产健康度",
   onSelectBox,
   onSupplement,
 }: KnowledgeAssetHealthPanelProps) {
@@ -53,7 +56,7 @@ export function KnowledgeAssetHealthPanel({
     <section className="mb-4 rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">知识资产健康度</h2>
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             看清创作前还缺什么资料。状态只有「已具备 / 待补充 / 待确认」，不做分数。
           </p>

@@ -18,13 +18,10 @@ interface AimWorkbenchHeaderProps {
   projectEnabled: boolean
   projects: ClientProject[]
   selectedProjectId: string
-  canEvolve: boolean
-  isEvolving: boolean
   /** 空状态（未开始任务）时不展示完整四阶段步骤条，避免与正文快捷入口重复 */
   showStageProgress: boolean
   onStageChange: (stage: AimWorkflowStage) => void
   onProjectScopeChange: (scope: string) => void
-  onEvolve: () => void
   onReset: () => void
   /** 有选中项目时，把「待推进」并进顶栏同一行 */
   projectTasks?: {
@@ -44,12 +41,9 @@ export function AimWorkbenchHeader({
   projectEnabled,
   projects,
   selectedProjectId,
-  canEvolve,
-  isEvolving,
   showStageProgress,
   onStageChange,
   onProjectScopeChange,
-  onEvolve,
   onReset,
   projectTasks,
 }: AimWorkbenchHeaderProps) {
@@ -140,18 +134,6 @@ export function AimWorkbenchHeader({
         />
       ) : null}
 
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        className="h-7 w-7 shrink-0 p-0"
-        onClick={onEvolve}
-        disabled={!canEvolve}
-        aria-label={isEvolving ? "偏好沉淀：提炼中" : "偏好沉淀：从当前对话提炼客户偏好并更新全局写作风格档案"}
-        title="从当前对话提炼客户偏好 + 更新全局写作风格档案"
-      >
-        <Sparkles className="h-3.5 w-3.5" />
-      </Button>
       <Button
         type="button"
         size="sm"
