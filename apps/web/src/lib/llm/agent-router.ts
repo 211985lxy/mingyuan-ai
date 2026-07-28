@@ -10,6 +10,7 @@ import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio
  * 核心思路：关键创作优先质量，日常生产优先稳定低成本
  * - 作品编辑 → ZenMux Claude Sonnet 优先，离火 GPT-5.6 兜底
  * - 内容创作（content_producer）→ ZenMux Claude（经代理）优先，DeepSeek / APIMart 兜底
+ * - 商业诊断（business_system_diagnosis）→ ZenMux Claude Sonnet 优先，DeepSeek / APIMart 兜底
  * - 发布质检 / 人设等 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
  * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / qianfan / openai
@@ -105,9 +106,10 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "jiekou", capability: "basic" },
   ],
   business_system_diagnosis: [
+    // 商业诊断优先 Claude：长链路结构化诊断更稳，DeepSeek / APIMart 兜底
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
     { name: "deepseek", capability: "standard" },
     { name: "apimart", capability: "advanced" },
-    { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", capability: "advanced" },
     { name: "openrouter", model: "z-ai/glm-5.2", capability: "advanced" },
     { name: "jiekou", capability: "basic" },

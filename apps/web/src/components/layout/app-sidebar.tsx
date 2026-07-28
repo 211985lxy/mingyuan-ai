@@ -10,7 +10,6 @@ import {
   Settings,
   BriefcaseBusiness,
   Target,
-  Search,
   FileText,
   Plus,
   MoreHorizontal,
@@ -21,6 +20,7 @@ import {
   Moon,
   Monitor,
   Check,
+  Users,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -63,7 +63,7 @@ interface NavItem {
 const quickNav: NavItem[] = [
   { title: "AIM 推进工作流", href: "/aim", icon: Target },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
-  { title: "内容机会", href: "/opportunities", icon: Search },
+  { title: "对标账号", href: "/opportunities", icon: Users },
   { title: "客户项目", href: "/projects", icon: BriefcaseBusiness },
   { title: "工作总览", href: "/home", icon: LayoutDashboard },
 ]

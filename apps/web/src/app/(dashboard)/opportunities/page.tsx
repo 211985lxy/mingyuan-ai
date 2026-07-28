@@ -11,12 +11,14 @@ import { OpportunityBenchmarksPanel } from "@/features/opportunities/components/
 import { OpportunityCollectionsPanel } from "@/features/opportunities/components/opportunity-collections-panel"
 
 const VALID_TABS = new Set(["search", "daily", "benchmarks", "collections"])
+/** 侧栏「对标账号」入口默认落在对标账号 Tab，不再先进主动搜索 */
+const DEFAULT_TAB = "benchmarks"
 
 export default function OpportunitiesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const rawTab = searchParams.get("tab") || "search"
-  const tab = VALID_TABS.has(rawTab) ? rawTab : "search"
+  const rawTab = searchParams.get("tab") || DEFAULT_TAB
+  const tab = VALID_TABS.has(rawTab) ? rawTab : DEFAULT_TAB
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-10">
@@ -31,12 +33,16 @@ export default function OpportunitiesPage() {
       <Tabs
         value={tab}
         onValueChange={(value) => {
-          const next = value === "search" ? "/opportunities" : `/opportunities?tab=${value}`
+          const next = value === DEFAULT_TAB ? "/opportunities" : `/opportunities?tab=${value}`
           router.replace(next)
         }}
         className="space-y-4"
       >
         <TabsList>
+          <TabsTrigger value="benchmarks" className="gap-1.5">
+            <BarChart2 className="h-3.5 w-3.5" />
+            对标账号
+          </TabsTrigger>
           <TabsTrigger value="search" className="gap-1.5">
             <Search className="h-3.5 w-3.5" />
             主动搜索
@@ -44,10 +50,6 @@ export default function OpportunitiesPage() {
           <TabsTrigger value="daily" className="gap-1.5">
             <Bell className="h-3.5 w-3.5" />
             今日机会
-          </TabsTrigger>
-          <TabsTrigger value="benchmarks" className="gap-1.5">
-            <BarChart2 className="h-3.5 w-3.5" />
-            对标账号
           </TabsTrigger>
           <TabsTrigger value="collections" className="gap-1.5">
             <Bookmark className="h-3.5 w-3.5" />
