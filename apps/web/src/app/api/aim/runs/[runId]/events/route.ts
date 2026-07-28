@@ -3,17 +3,21 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { aimRunEventBodySchema } from "@/features/aim/contracts/api"
-import type { Prisma } from "@/generated/prisma/client"
+import {
+  buildAimRunEventMetadata,
+  findDuplicateEventByRequestId,
+  toPrismaJson,
+  validateFinalDispositionEvent,
+} from "@/lib/aim/aim-run-event-write"
 
-// 事件类型：既有 copied/revised/accepted + 协作认知层反馈事件（补充指令 §五）
-// 全部 ≤ 24 字符，适配 AimRunEvent.event @db.VarChar(24)
 const EVENTS = new Set([
   "copied", "revised", "accepted",
   "edited", "published", "retrospected",
   "partially_satisfied", "rewrite_requested", "rejected",
+  "abandoned", "final_disposition",
+  "accepted_first_pass", "accepted_after_edit",
 ])
 
-// 反馈原因（可选；非法值忽略，不报错）
 const VALID_REASONS = new Set([
   "fact_inaccurate", "tone_mismatch", "structure_mismatch", "too_generic",
   "conversion_weak", "missing_evidence", "other",
@@ -22,10 +26,7 @@ const VALID_REASONS = new Set([
 type RouteContext = { params: Promise<{ runId: string }> }
 
 /**
- * @description 处理 POST 请求
- * @param request - 请求对象
- * @param context - 上下文
- * @returns 无返回值
+ * @description 处理 POST 请求：记录 AIM 运行事件（含终态处置）
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   try {
@@ -42,27 +43,50 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const ownedRun = await prisma.aimExecutionTrace.findFirst({
       where: { runId, userId: user.id },
-      select: { id: true },
+      select: { id: true, durationMs: true, costCny: true },
     })
     if (!ownedRun) {
       return NextResponse.json({ error: "执行记录不存在" }, { status: 404 })
     }
 
-    const metadata = body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
-      ? body.metadata
+    const reason = typeof body.reason === "string" && VALID_REASONS.has(body.reason)
+      ? body.reason
       : undefined
-    // 可选 reason：仅当属于合法集合时才写入 metadata，避免污染
-    const reason = typeof body.reason === "string" && VALID_REASONS.has(body.reason) ? body.reason : undefined
-    await prisma.aimRunEvent.create({
+    const metadata = buildAimRunEventMetadata({
+      bodyMetadata: body.metadata as Record<string, unknown> | undefined,
+      reason,
+      runId,
+      trace: ownedRun,
+    })
+
+    const dispositionError = validateFinalDispositionEvent(body.event, metadata)
+    if (dispositionError) {
+      return NextResponse.json({ error: dispositionError }, { status: 400 })
+    }
+
+    if (typeof metadata.requestId === "string" && metadata.requestId.trim()) {
+      const recent = await prisma.aimRunEvent.findMany({
+        where: { runId, userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: { id: true, metadata: true },
+      })
+      const duplicate = findDuplicateEventByRequestId(recent, metadata.requestId.trim())
+      if (duplicate) {
+        return NextResponse.json({ ok: true, deduped: true, id: duplicate.id }, { status: 200 })
+      }
+    }
+
+    const created = await prisma.aimRunEvent.create({
       data: {
         runId,
         userId: user.id,
         event: body.event,
-        metadata: (metadata ?? (reason ? { reason } : undefined)) as Prisma.InputJsonValue | undefined,
+        metadata: toPrismaJson(metadata),
       },
     })
 
-    return NextResponse.json({ ok: true }, { status: 201 })
+    return NextResponse.json({ ok: true, id: created.id }, { status: 201 })
   } catch (error) {
     return authErrorResponse(error) ?? apiRequestErrorResponse(request, error) ?? NextResponse.json(
       { error: "运行事件记录失败" },

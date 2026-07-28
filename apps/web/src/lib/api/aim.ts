@@ -251,7 +251,7 @@ export async function requestAimPlan(
  */
 export async function recordAimRunEvent(
   runId: string,
-  event: "copied" | "revised" | "accepted",
+  event: string,
   metadata?: Record<string, unknown>,
 ): Promise<void> {
   await request(`/api/aim/runs/${encodeURIComponent(runId)}/events`, {

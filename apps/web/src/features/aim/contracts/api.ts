@@ -126,14 +126,106 @@ export const aimEvolveBodySchema = z.object({
   messages: z.array(chatMessageSchema).min(1).max(50),
 }).strict()
 
+const styleDimField = z.string().max(500).optional()
+
+/** 写作风格八维增量（preview 返回 / commit 提交） */
+export const styleProfileDeltaSchema = z.object({
+  cognitivePattern: z.object({
+    entry: styleDimField,
+    reasoning: styleDimField,
+    attitude: styleDimField,
+  }).strict(),
+  emotionalTexture: z.object({
+    tone: styleDimField,
+    humor: styleDimField,
+  }).strict(),
+  structuralDna: z.object({
+    hook: styleDimField,
+    twist: styleDimField,
+    ending: styleDimField,
+  }).strict(),
+  microLinguistics: z.object({
+    sentence: styleDimField,
+    catchphrase: styleDimField,
+    metaphor: styleDimField,
+  }).strict(),
+  coreValues: z.object({
+    beliefs: styleDimField,
+    supports: styleDimField,
+    opposes: styleDimField,
+  }).strict(),
+  decisionHeuristics: z.object({
+    priorities: styleDimField,
+    tradeoffs: styleDimField,
+  }).strict(),
+  antiPatterns: z.object({
+    avoids: styleDimField,
+    forbiddenTone: styleDimField,
+  }).strict(),
+  honestLimits: z.object({
+    uncertainty: styleDimField,
+    requiresEvidence: styleDimField,
+  }).strict(),
+  evidence: z.string().min(1).max(2_000),
+  confidence: z.enum(["confirmed", "user_claim", "pending_verify"]),
+}).strict()
+
+export const styleSampleSchema = z.object({
+  content: z.string().trim().min(1).max(50_000),
+  /** 核心/普通样本标签，仅写入证据语境，不做权重计算 */
+  label: z.enum(["core", "normal"]).optional(),
+}).strict()
+
+/**
+ * 写作风格沉淀：
+ * - 无 operation：旧路径，messages → 提取 + 写库
+ * - preview：samples 或 messages → 只返回候选，不写库
+ * - commit：已确认 delta → 合并写库
+ */
 export const aimEvolveStyleBodySchema = z.object({
   projectId: optionalId,
-  messages: z.array(chatMessageSchema).min(1).max(50),
-}).strict()
+  operation: z.enum(["preview", "commit"]).optional(),
+  messages: z.array(chatMessageSchema).min(1).max(50).optional(),
+  samples: z.array(styleSampleSchema).min(1).max(10).optional(),
+  delta: styleProfileDeltaSchema.optional(),
+}).strict().superRefine((body, ctx) => {
+  if (body.operation === "commit") {
+    if (!body.delta) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "确认写入需要已预览确认的风格候选（delta）",
+        path: ["delta"],
+      })
+    }
+    return
+  }
+  if (body.operation === "preview") {
+    const hasSamples = (body.samples?.length ?? 0) > 0
+    const hasMessages = (body.messages?.length ?? 0) > 0
+    if (!hasSamples && !hasMessages) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "风格预览需要 1—10 篇样本，或提供对话消息",
+        path: ["samples"],
+      })
+    }
+    return
+  }
+  // 旧调用：必须带 messages
+  if (!body.messages || body.messages.length < 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "风格沉淀需要对话消息",
+      path: ["messages"],
+    })
+  }
+})
 
 export type AimChatBody = z.infer<typeof aimChatBodySchema>
 export type AimGenerateBody = z.infer<typeof aimGenerateBodySchema>
 export type AimWorkflowBriefBody = z.infer<typeof aimWorkflowBriefBodySchema>
+export type AimEvolveStyleBody = z.infer<typeof aimEvolveStyleBodySchema>
+export type StyleProfileDeltaBody = z.infer<typeof styleProfileDeltaSchema>
 
 export const aimHistoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(100_000).default(1),
@@ -155,6 +247,10 @@ export const aimRunEventBodySchema = z.object({
     "partially_satisfied",
     "rewrite_requested",
     "rejected",
+    "abandoned",
+    "final_disposition",
+    "accepted_first_pass",
+    "accepted_after_edit",
   ]),
   reason: z.enum([
     "fact_inaccurate",
