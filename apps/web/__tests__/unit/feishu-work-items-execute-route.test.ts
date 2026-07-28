@@ -114,13 +114,23 @@ describe("输入校验（400）", () => {
     expect(status).toBe(400)
   })
 
-  it("complete 缺 aimResultId / fail 缺 errorMessage → 400", async () => {
-    expect((await call({ recordId: "rec_1", action: "complete" })).status).toBe(400)
+  it("fail 缺 errorMessage → 400", async () => {
     expect((await call({ recordId: "rec_1", action: "fail" })).status).toBe(400)
+  })
+
+  it("集成密钥 complete → 403 fail closed（WP-2）", async () => {
+    const { status, body } = await call({
+      recordId: "rec_1",
+      action: "complete",
+      aimResultId: "gen_1",
+    })
+    expect(status).toBe(403)
+    expect(String(body.error)).toMatch(/approvalId|submit_review|集成密钥/)
+    expect(completeWorkItem).not.toHaveBeenCalled()
   })
 })
 
-describe("四种 action 分发到 WP-3 服务", () => {
+describe("三种允许 action 分发到 WP-3 服务", () => {
   it("start → startWorkItem", async () => {
     startWorkItem.mockResolvedValueOnce({ ok: true, status: "处理中", idempotent: false, recordId: "rec_1" })
     await call({ recordId: "rec_1", action: "start" })
@@ -138,14 +148,6 @@ describe("四种 action 分发到 WP-3 服务", () => {
     expect(submitWorkItemForReview).toHaveBeenCalledWith(
       expect.any(Object), "rec_1",
       expect.objectContaining({ aimResultId: "gen_1", resultLink: "https://aim/1" }),
-    )
-  })
-
-  it("complete → completeWorkItem", async () => {
-    completeWorkItem.mockResolvedValueOnce({ ok: true, status: "已完成", idempotent: false, recordId: "rec_1" })
-    await call({ recordId: "rec_1", action: "complete", aimResultId: "gen_1", resultSummary: "x" })
-    expect(completeWorkItem).toHaveBeenCalledWith(
-      expect.any(Object), "rec_1", expect.objectContaining({ aimResultId: "gen_1" }),
     )
   })
 

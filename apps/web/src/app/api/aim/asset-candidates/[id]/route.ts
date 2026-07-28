@@ -2,19 +2,20 @@ import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { reviewAssetCandidate } from "@/lib/aim/asset-candidate-store"
+import {
+  assertValidApprovalForHighRisk,
+} from "@/lib/aim/workflow-governance"
+import {
+  createPrismaApprovalDecisionStore,
+} from "@/lib/aim/approval-decision-prisma"
+import { loadApprovalForSubject } from "@/lib/aim/approval-decision-store"
 
 export const dynamic = "force-dynamic"
 
 /**
- * 人工审核资产候选（90 天计划 3.1）。
- * 请求体：{ "action": "approve" | "reject", "promote"?: boolean, "crossProjectAllowed"?: boolean }
- * approve + promote=true 时升级为正式知识；未审核通过前不会升级。
- */
-/**
- * @description 处理 PATCH 请求
- * @param request - 请求对象
- * @param options - 配置选项
- * @returns 无返回值
+ * 人工审核资产候选（90 天计划 3.1 / WP-2）。
+ * 请求体：{ "action": "approve" | "reject", "promote"?: boolean, "approvalId"?: string, "crossProjectAllowed"?: boolean }
+ * approve + promote=true 时必须引用有效 approvalId。
  */
 export async function PATCH(
   request: NextRequest,
@@ -35,11 +36,27 @@ export async function PATCH(
       return NextResponse.json({ error: "action 必须是 approve 或 reject" }, { status: 400 })
     }
 
+    const promote = body.promote === true
+    if (promote) {
+      const approvalId = typeof body.approvalId === "string" ? body.approvalId : null
+      const store = createPrismaApprovalDecisionStore()
+      const approval = await loadApprovalForSubject(store, approvalId, "asset", id)
+      const gate = assertValidApprovalForHighRisk({
+        action: "promote",
+        approval,
+        subjectType: "asset",
+        subjectId: id,
+      })
+      if (!gate.ok) {
+        return NextResponse.json({ error: gate.error }, { status: 403 })
+      }
+    }
+
     const result = await reviewAssetCandidate({
       userId: user.id,
       candidateId: id,
       action: body.action,
-      promote: body.promote === true,
+      promote,
       crossProjectAllowed:
         typeof body.crossProjectAllowed === "boolean" ? body.crossProjectAllowed : undefined,
     })

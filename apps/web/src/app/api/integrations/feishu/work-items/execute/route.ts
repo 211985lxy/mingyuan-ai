@@ -1,24 +1,11 @@
 /**
- * 单条经营事项执行入口（WP-4）。
+ * 单条经营事项执行入口（WP-4 + WP-2 责任链）。
  *
- * docs/plans/aim-ai-native-company-zcode-execution-plan.md §14：
- * 受保护的单记录状态执行入口，把 WP-3 执行服务绑定到飞书单记录读写能力。
- * 本包只做状态控制，不调用 AIM Harness 生成内容。
+ * 鉴权：Authorization: Bearer <AIM_WORK_ITEM_API_SECRET>
+ * api-inventory: auth=signed_integration
  *
- * 鉴权：Authorization: Bearer <AIM_WORK_ITEM_API_SECRET>，timingSafeEqual 防时序攻击。
- *       密钥未配置 → 503（fail-closed）；密钥错误/缺失 Bearer → 401。
- *       实现见 lib/aim/work-item-api-auth.ts（checkWorkItemApiSecret）。
- *       api-inventory: auth=signed_integration
- *
- * 请求体：{ recordId, action, aimResultId?, resultSummary?, resultLink?, errorMessage? }
- *   action ∈ start | submit_review | complete | fail
- *
- * 响应：
- *   200 成功（含幂等命中，idempotent:true）
- *   400 输入不合法（坏 JSON / 缺 recordId / 非法 action / 缺结果或错误必填项）
- *   401 未授权
- *   503 服务密钥或飞书配置缺失（fail-closed，不伪造）
- *   409 业务冲突（执行服务 ok:false：非法跳转、记录缺失、状态未知、缺结果ID），错误原样透传
+ * WP-2：集成密钥只能 start / submit_review / fail；
+ * complete 须由飞书卡片或带有效 approvalId 的人工通道完成，不得用集成密钥直通。
  */
 import { NextRequest, NextResponse } from "next/server"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
@@ -28,12 +15,12 @@ import {
   readWorkItemStoreConfig,
 } from "@/lib/aim/work-item-store"
 import {
-  completeWorkItem,
   failWorkItem,
   startWorkItem,
   submitWorkItemForReview,
   type WorkItemExecutionResult,
 } from "@/lib/aim/services/work-item-execution"
+import { assertIntegrationKeyActionAllowed } from "@/lib/aim/workflow-governance"
 
 export const dynamic = "force-dynamic"
 
@@ -46,6 +33,7 @@ interface WorkItemRequestBody {
   resultSummary?: string
   resultLink?: string
   errorMessage?: string
+  approvalId?: string
 }
 
 function badRequest(message: string) {
@@ -56,10 +44,12 @@ function conflict(result: Extract<WorkItemExecutionResult, { ok: false }>) {
   return NextResponse.json({ ok: false, error: result.error }, { status: 409 })
 }
 
+function forbidden(message: string) {
+  return NextResponse.json({ ok: false, error: message }, { status: 403 })
+}
+
 /**
- * @description 处理 POST 请求
- * @param request - 请求对象
- * @returns 无返回值
+ * @description 集成密钥经营事项执行；高风险 complete 被 fail closed
  */
 export async function POST(request: NextRequest) {
   const auth = checkWorkItemApiSecret(request)
@@ -87,12 +77,12 @@ export async function POST(request: NextRequest) {
     return badRequest("缺少或非法的 action；必须为 start / submit_review / complete / fail 之一。")
   }
 
-  // 各 action 必填输入校验；空值不进入服务，避免执行层伪造结果。
+  // WP-2：集成密钥不得 complete/publish/promote
+  const gate = assertIntegrationKeyActionAllowed(action)
+  if (!gate.ok) return forbidden(gate.error)
+
   if (action === "submit_review" && !(body.aimResultId ?? "").trim()) {
     return badRequest("submit_review 需要 aimResultId，禁止无结果提交审核。")
-  }
-  if (action === "complete" && !(body.aimResultId ?? "").trim()) {
-    return badRequest("complete 需要 aimResultId，禁止无结果完成。")
   }
   if (action === "fail" && !(body.errorMessage ?? "").trim()) {
     return badRequest("fail 需要 errorMessage，禁止空错误。")
@@ -119,12 +109,6 @@ export async function POST(request: NextRequest) {
         aimResultId: body.aimResultId!.trim(),
         resultSummary: body.resultSummary ?? "",
         resultLink: body.resultLink ?? "",
-      })
-      break
-    case "complete":
-      result = await completeWorkItem(store, recordId, {
-        aimResultId: body.aimResultId!.trim(),
-        resultSummary: body.resultSummary ?? "",
       })
       break
     case "fail":

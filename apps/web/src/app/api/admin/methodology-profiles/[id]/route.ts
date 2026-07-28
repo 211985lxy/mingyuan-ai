@@ -8,12 +8,31 @@ import {
   updateMethodologyProfileMeta,
 } from "@/lib/methodology-profile-admin"
 import { MethodologyProfileError } from "@/lib/methodology-profile-store"
+import { assertValidApprovalForHighRisk } from "@/lib/aim/workflow-governance"
+import { createPrismaApprovalDecisionStore } from "@/lib/aim/approval-decision-prisma"
+import { loadApprovalForSubject } from "@/lib/aim/approval-decision-store"
 
 function errorResponse(error: unknown) {
   if (error instanceof MethodologyProfileError) {
     return NextResponse.json({ error: error.message }, { status: 400 })
   }
   throw error
+}
+
+async function requirePublishApproval(approvalId: unknown, subjectId: string) {
+  const store = createPrismaApprovalDecisionStore()
+  const approval = await loadApprovalForSubject(
+    store,
+    typeof approvalId === "string" ? approvalId : null,
+    "methodology",
+    subjectId,
+  )
+  return assertValidApprovalForHighRisk({
+    action: "publish",
+    approval,
+    subjectType: "methodology",
+    subjectId,
+  })
 }
 
 /** GET /api/admin/methodology-profiles/[id] —— 详情 + 全部版本。 */
@@ -75,19 +94,26 @@ export const POST = withAdminAuth(async (request: NextRequest, { params }) => {
     if (body.action === "publish_version") {
       const versionId = typeof body.versionId === "string" ? body.versionId : ""
       if (!versionId) return NextResponse.json({ error: "缺少 versionId" }, { status: 400 })
+      const gate = await requirePublishApproval(body.approvalId, versionId)
+      if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: 403 })
       const published = await publishMethodologyProfileVersion(versionId)
-      return NextResponse.json({ data: published })
+      return NextResponse.json({ data: published, approvalId: gate.approvalId })
     }
 
     const compiledPrompt = typeof body.compiledPrompt === "string" ? body.compiledPrompt : ""
     if (!compiledPrompt.trim()) {
       return NextResponse.json({ error: "compiledPrompt 不能为空" }, { status: 400 })
     }
+    const status = body.status === "draft" ? "draft" : "published"
+    if (status === "published") {
+      const gate = await requirePublishApproval(body.approvalId, id)
+      if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: 403 })
+    }
     const created = await createMethodologyProfileVersion({
       profileId: id,
       compiledPrompt,
       contentMarkdown: typeof body.contentMarkdown === "string" ? body.contentMarkdown : undefined,
-      status: body.status === "draft" ? "draft" : "published",
+      status,
     })
     return NextResponse.json({ data: created })
   } catch (error) {

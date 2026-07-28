@@ -5,6 +5,8 @@
 // 飞书卡片回调格式：POST body 包含 action.value = { action, recordId, workflowId }
 // 鉴权：通过 bot 的 verification token 校验（与事件订阅共用）。
 // api-inventory: auth=signed_integration
+//
+// WP-2：审批必须写入真实 open_id/user_id；禁止硬编码审批结果 ID。
 
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
@@ -18,6 +20,15 @@ import {
   startWorkItem,
   type WorkItemExecutionResult,
 } from "@/lib/aim/services/work-item-execution"
+import {
+  assertReviewerMatchesAssignment,
+  assertWorkflowGovernanceReady,
+} from "@/lib/aim/workflow-governance"
+import { recordApprovalDecision } from "@/lib/aim/approval-decision-store"
+import {
+  createPrismaApprovalDecisionStore,
+  listActiveGovernanceAssignments,
+} from "@/lib/aim/approval-decision-prisma"
 
 export const dynamic = "force-dynamic"
 
@@ -25,6 +36,7 @@ interface CardActionValue {
   action?: string
   recordId?: string
   workflowId?: string
+  aimResultId?: string
 }
 
 interface CardCallbackBody {
@@ -41,9 +53,7 @@ interface CardCallbackBody {
 }
 
 /**
- * @description 处理飞书卡片按钮回调
- * @param request - 请求对象
- * @returns 飞书卡片回调响应
+ * @description 处理飞书卡片按钮回调；签字写入真实操作人身份
  */
 export async function POST(request: Request) {
   let body: CardCallbackBody & { challenge?: string; type?: string }
@@ -53,22 +63,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid card callback payload" }, { status: 400 })
   }
 
-  // 飞书 URL 验证（配置回调地址时平台发送 challenge）
   if (body.type === "url_verification" && body.challenge) {
     return NextResponse.json({ challenge: body.challenge })
   }
 
-  // 校验 token（识别 bot 身份）
   const token = body.token || ""
   const bot = resolveBotByVerificationToken(token)
   if (!bot) {
     return NextResponse.json({ error: "Unknown agent bot" }, { status: 404 })
   }
 
-  // 解析按钮动作
   const actionValue = body.action?.value
   const action = actionValue?.action?.trim() || ""
   const recordId = actionValue?.recordId?.trim() || ""
+  const workflowId = actionValue?.workflowId?.trim() || "default"
+  const openId = typeof body.open_id === "string" ? body.open_id.trim() : ""
+  const userId = typeof body.user_id === "string" ? body.user_id.trim() : ""
 
   if (!recordId) {
     return NextResponse.json({ toast: { type: "error", content: "缺少记录ID" } }, { status: 200 })
@@ -78,7 +88,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ toast: { type: "error", content: "未知操作" } }, { status: 200 })
   }
 
-  // 执行状态跳转（复用现有状态机）
+  if (!openId && !userId) {
+    return NextResponse.json(
+      { toast: { type: "error", content: "缺少审批人 open_id/user_id，拒绝匿名签字" } },
+      { status: 200 },
+    )
+  }
+
   let config
   try {
     config = readWorkItemStoreConfig()
@@ -87,18 +103,81 @@ export async function POST(request: Request) {
   }
   const store = createLarkWorkItemStore(config)
 
+  // 读取真实 AIM 结果 ID，禁止硬编码 card-approve
+  let aimResultId = actionValue?.aimResultId?.trim() || ""
+  if (!aimResultId) {
+    try {
+      const record = await store.get(recordId)
+      const fields = record?.fields ?? {}
+      const raw =
+        fields["AIM结果ID"]
+        ?? fields["aimResultId"]
+        ?? fields["AIM生成ID"]
+      aimResultId = typeof raw === "string" ? raw.trim() : ""
+    } catch {
+      aimResultId = ""
+    }
+  }
+
+  const assignments = await listActiveGovernanceAssignments(workflowId)
+  const ready = assertWorkflowGovernanceReady(assignments, { workflowId })
+  if (!ready.ok) {
+    return NextResponse.json({ toast: { type: "error", content: ready.error } }, { status: 200 })
+  }
+
+  const match = assertReviewerMatchesAssignment(assignments, {
+    workflowId,
+    reviewerUserId: userId || null,
+    externalReviewerId: openId || null,
+  })
+  if (!match.ok) {
+    return NextResponse.json({ toast: { type: "error", content: match.error } }, { status: 200 })
+  }
+
+  const messageId = body.open_message_id?.trim() || "unknown_msg"
+  const requestId = `feishu_card:${messageId}:${action}:${recordId}`
+  const approvalStore = createPrismaApprovalDecisionStore()
+  const { record: approval, idempotent } = await recordApprovalDecision(approvalStore, {
+    subjectType: "work_item",
+    subjectId: recordId,
+    decision: action === "approve" ? "approve" : "reject",
+    reviewerUserId: userId || null,
+    externalReviewerId: openId || null,
+    roleSnapshot: match.role,
+    reason: action === "approve" ? "飞书卡片审核通过" : "飞书卡片打回修改",
+    source: "feishu_card",
+    requestId,
+  })
+
+  // 重放卡片：已有签字则不重复推进状态机
+  if (idempotent) {
+    return NextResponse.json(
+      {
+        toast: {
+          type: "info",
+          content: action === "approve" ? "已通过（幂等）" : "已打回（幂等）",
+        },
+        approvalId: approval.id,
+        idempotent: true,
+      },
+      { status: 200 },
+    )
+  }
+
   let result: WorkItemExecutionResult
   try {
     if (action === "approve") {
-      // 通过 → 完成（需要 aimResultId，从记录中读取）
-      // 注意：complete 需要 aimResultId，这里简化为直接调用
-      // 实际场景中 aimResultId 应该在记录中已经存在
+      if (!aimResultId) {
+        return NextResponse.json(
+          { toast: { type: "error", content: "记录缺少 AIM结果ID，禁止无结果完成" } },
+          { status: 200 },
+        )
+      }
       result = await completeWorkItem(store, recordId, {
-        aimResultId: "card-approve",
-        resultSummary: "飞书卡片审核通过",
+        aimResultId,
+        resultSummary: `飞书卡片审核通过；approvalId=${approval.id}`,
       })
     } else {
-      // 打回 → 重新开始（待处理 → 处理中）
       result = await startWorkItem(store, recordId)
     }
   } catch (error) {
@@ -111,5 +190,8 @@ export async function POST(request: Request) {
   }
 
   const successMsg = action === "approve" ? "已通过审核" : "已打回重新处理"
-  return NextResponse.json({ toast: { type: "success", content: successMsg } }, { status: 200 })
+  return NextResponse.json(
+    { toast: { type: "success", content: successMsg }, approvalId: approval.id },
+    { status: 200 },
+  )
 }

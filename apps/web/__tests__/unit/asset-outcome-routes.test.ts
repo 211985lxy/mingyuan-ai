@@ -11,6 +11,7 @@ const {
   reviewAssetCandidate,
   listAssetCandidates,
   findDueOutcomeReminders,
+  loadApprovalForSubject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
@@ -18,6 +19,7 @@ const {
   reviewAssetCandidate: vi.fn(),
   listAssetCandidates: vi.fn(async () => []),
   findDueOutcomeReminders: vi.fn(),
+  loadApprovalForSubject: vi.fn(async () => null),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
@@ -27,6 +29,13 @@ vi.mock("@/lib/aim/asset-candidate-store", () => ({
   listAssetCandidates,
 }))
 vi.mock("@/lib/aim/outcome-reminders", () => ({ findDueOutcomeReminders }))
+vi.mock("@/lib/aim/approval-decision-prisma", () => ({
+  createPrismaApprovalDecisionStore: () => ({}),
+}))
+vi.mock("@/lib/aim/approval-decision-store", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/aim/approval-decision-store")>()
+  return { ...actual, loadApprovalForSubject }
+})
 
 import { POST as generatePOST } from "@/app/api/aim/meeting-insights/[id]/asset-candidates/route"
 import { GET as listGET } from "@/app/api/aim/asset-candidates/route"
@@ -128,7 +137,30 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
     expect(res.status).toBe(400)
   })
 
-  it("合法审核透传 action/promote/crossProjectAllowed", async () => {
+  it("promote 缺 approvalId → 403", async () => {
+    loadApprovalForSubject.mockResolvedValueOnce(null)
+    const res = await reviewPATCH(
+      new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
+        method: "PATCH",
+        body: JSON.stringify({ action: "approve", promote: true }),
+      }),
+      candCtx,
+    )
+    expect(res.status).toBe(403)
+    expect(reviewAssetCandidate).not.toHaveBeenCalled()
+  })
+
+  it("合法审核透传 action/promote/crossProjectAllowed（含 approvalId）", async () => {
+    loadApprovalForSubject.mockResolvedValueOnce({
+      id: "apd_1",
+      subjectType: "asset",
+      subjectId: "cand_1",
+      decision: "approve",
+      roleSnapshot: "reviewer",
+      reason: "ok",
+      source: "web",
+      requestId: "req_promote_1",
+    })
     reviewAssetCandidate.mockResolvedValueOnce({
       ok: true,
       record: { id: "cand_1", reviewStatus: "approved", promotedEntryId: "entry_1" },
@@ -136,7 +168,12 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
     const res = await reviewPATCH(
       new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
         method: "PATCH",
-        body: JSON.stringify({ action: "approve", promote: true, crossProjectAllowed: true }),
+        body: JSON.stringify({
+          action: "approve",
+          promote: true,
+          approvalId: "apd_1",
+          crossProjectAllowed: true,
+        }),
       }),
       candCtx,
     )
