@@ -3,6 +3,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { failAimTrace, type AimTraceRecorder } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
+import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
 import {
   executePreparedAimGeneration,
   prepareAimGenerateRequest,
@@ -25,7 +26,11 @@ export async function POST(request: NextRequest) {
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_generate")
     if (quotaResponse) return quotaResponse
 
-    const prepared = await prepareAimGenerateRequest(user.id, await parseJsonRecord(request))
+    // 对话历史会塞进 rawInput；默认 64 KiB 过严，与 chat 一样显式抬高。
+    const prepared = await prepareAimGenerateRequest(
+      user.id,
+      await parseJsonRecord(request, { maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES }),
+    )
     trace = prepared.trace
     if (!prepared.ok) return NextResponse.json({ error: prepared.validationError }, { status: prepared.status ?? 400 })
 

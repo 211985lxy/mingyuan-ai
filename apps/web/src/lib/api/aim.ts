@@ -9,6 +9,7 @@ import type {
   AimGenerateBody,
   AimWorkflowBriefBody,
 } from "@/features/aim/contracts/api"
+import { serializeAimGenerateRequestBody } from "@/lib/aim/generate-payload-budget"
 import type {
   ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiScript, ApiUser,
@@ -154,7 +155,7 @@ export interface AimGeneration {
 export async function generateAimContent(data: AimGenerateRequest, signal?: AbortSignal): Promise<AimGenerateResponse> {
   return request<AimGenerateResponse>("/api/aim/generate", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: serializeAimGenerateRequestBody(data),
     timeout: 180000,
     signal,
   })
