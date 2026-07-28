@@ -41,4 +41,3 @@ describe("aim-context-usage", () => {
     expect(formatContextCapacityLabel(37_000, AIM_CONTEXT_CAPACITY_TOKENS)).toBe("3.7万 / 20万 (18.5%)")
   })
 })
-

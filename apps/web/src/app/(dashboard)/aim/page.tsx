@@ -1,7 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
+
 import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
+import { AimContextUsage } from "@/components/aim/aim-context-usage"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
@@ -13,12 +16,33 @@ import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
+import { buildAimChatMessages } from "@/lib/aim/chat-request"
+import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextTokens } from "@/lib/aim-context-usage"
+import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 
 export default function AimPage() {
   const w = useAimWorkbench()
   // 空状态（未选定 agent/阶段、无消息、无待处理意图）：正文用结果导向 Hero + composer 组成
   // 同一居中区域；顶部不展示完整四阶段步骤条，避免与正文快捷入口重复。
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
+  const contextUsage = useMemo(() => {
+    const thread = w.messages.map((message) => ({
+      role: message.role,
+      content: formatAimMessageContentForModel(message),
+      images: message.images,
+    }))
+    if (w.input.trim()) {
+      thread.push({ role: "user", content: w.input, images: undefined })
+    }
+    const messages = buildAimChatMessages(thread)
+    return {
+      usedTokens: estimateContextTokens({ messages }),
+      maxTokens: AIM_CONTEXT_CAPACITY_TOKENS,
+    }
+  }, [
+    w.input,
+    w.messages,
+  ])
 
   const composer = (
     <>
@@ -54,6 +78,10 @@ export default function AimPage() {
         showContentMode={w.selectedAgentId === "content_producer"}
         contentMode={w.agentModule}
         onContentModeChange={w.setAgentModule}
+      />
+      <AimContextUsage
+        usedTokens={contextUsage.usedTokens}
+        maxTokens={contextUsage.maxTokens}
       />
     </>
   )
