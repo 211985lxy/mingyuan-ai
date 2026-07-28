@@ -101,3 +101,31 @@ model ReviewAction {
   @@index([dueAt])
 }
 
+/**
+ * 统一学习候选（WP-6）
+ * 约束：候选不得自动写正式 fixture / 方法论 / Skill；晋升必须人工批准。
+ */
+model LearningCandidate {
+  id           String   @id @default(cuid())
+  sourceType   String   @db.VarChar(40) // trace | run_event | content_outcome
+  sourceId     String   @db.VarChar(191)
+  projectId    String?
+  generationId String?
+  targetType   String   @db.VarChar(40) // eval_fixture | methodology_revision | skill_draft
+  failureCode  String?  @db.VarChar(80)
+  payload      Json
+  reviewStatus String   @default("pending") @db.VarChar(20) // pending | approved | rejected | promoted
+  reviewerId   String?
+  promotedRef  String?  @db.VarChar(191)
+  /** 幂等键：同一 source+target 不重复建候选 */
+  requestId    String   @unique @db.VarChar(191)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([reviewStatus, createdAt])
+  @@index([sourceType, sourceId])
+  @@index([targetType, reviewStatus])
+  @@index([projectId])
+  @@index([generationId])
+}
+
