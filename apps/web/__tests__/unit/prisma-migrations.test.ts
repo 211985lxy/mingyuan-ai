@@ -81,6 +81,15 @@ describe("Prisma migrations", () => {
     expect(migrationSql).toContain("FOREIGN KEY (`userId`) REFERENCES `User`(`id`)")
   })
 
+  it("creates OutcomeAttribution for per-event business attribution (WP-3)", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("model OutcomeAttribution")
+    expect(migrationSql).toContain("CREATE TABLE IF NOT EXISTS `OutcomeAttribution`")
+    expect(migrationSql).toContain("UNIQUE INDEX `OutcomeAttribution_externalLeadId_key`")
+  })
+
   it("owns phase 14 schema changes in Prisma migrations only", () => {
     const migrationSql = readFileSync(
       path.join(

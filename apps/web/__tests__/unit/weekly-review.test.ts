@@ -83,6 +83,40 @@ describe("computeWeeklyReview", () => {
     expect(review.revenue).toBe(9800)
   })
 
+  it("同一内容的 7/14/30 累计快照不直接相加，取周期末最成熟窗口", async () => {
+    const outcomes = [
+      outcome("g1", { collectWindowDay: 7, qualifiedLeadCount: 3, appointmentCount: 1, dealCount: 0, revenue: 0 }),
+      outcome("g1", {
+        collectWindowDay: 14,
+        qualifiedLeadCount: 5,
+        appointmentCount: 2,
+        dealCount: 1,
+        revenue: 5000,
+        collectedAt: new Date("2026-07-09T00:00:00.000Z"),
+      }),
+      outcome("g1", {
+        collectWindowDay: 30,
+        qualifiedLeadCount: 8,
+        appointmentCount: 2,
+        dealCount: 1,
+        revenue: 9800,
+        collectedAt: new Date("2026-07-10T00:00:00.000Z"),
+      }),
+      outcome("g2", { collectWindowDay: 7, qualifiedLeadCount: 2 }),
+    ]
+    const review = await computeWeeklyReview({
+      userId: USER,
+      start: START,
+      end: END,
+      store: makeStore([], outcomes),
+    })
+    // g1 只取 day30（8），不得 3+5+8；g2 取 day7（2）→ 合计 10
+    expect(review.qualifiedLeadCount).toBe(10)
+    expect(review.appointmentCount).toBe(2)
+    expect(review.dealCount).toBe(1)
+    expect(review.revenue).toBe(9800)
+  })
+
   it("知识资产复用：按 knowledgeUsed 去重，≥2 次调用计入「重复调用」", async () => {
     const gens: FakeGen[] = [
       { id: "g1", workflowStatus: "published", publishedAt: new Date("2026-07-07T10:00:00Z"), createdAt: new Date("2026-07-07T09:00:00Z"), knowledgeUsed: [{ id: "k1" }, { id: "k2" }] },

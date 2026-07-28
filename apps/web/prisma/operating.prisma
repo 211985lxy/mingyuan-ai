@@ -1,0 +1,30 @@
+// Operating-system projections (WP-3 / WP-4)
+// ContentOutcome remains the content-window snapshot; these models hold per-event business facts.
+
+/** 逐笔经营归因（WP-3）：内容 → 线索/预约/成交/回款；不建 CRM 实体 */
+model OutcomeAttribution {
+  id                    String   @id @default(cuid())
+  userId                String
+  generationId          String
+  externalLeadId        String   @db.VarChar(80)
+  externalAppointmentId String?  @db.VarChar(80)
+  externalDealId        String?  @db.VarChar(80)
+  externalPaymentId     String?  @db.VarChar(80)
+  /** explicit | first_touch | unknown */
+  attributionMethod     String   @db.VarChar(20)
+  /** high | medium | low */
+  attributionConfidence String   @db.VarChar(10)
+  occurredAt            DateTime
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id])
+  generation AimGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([externalLeadId])
+  @@unique([externalDealId])
+  @@unique([externalPaymentId])
+  @@index([userId, occurredAt])
+  @@index([generationId])
+  @@index([attributionMethod])
+}

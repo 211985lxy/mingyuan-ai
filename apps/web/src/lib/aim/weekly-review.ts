@@ -10,6 +10,7 @@
  *
  * 另附第 7 天回填率（due/filled）：衡量「发布后第 7 天经营结果回填」纪律。
  * 原则：null 不当 0；周期外数据不计入；显式填 0 是有效数据。
+ * 7/14/30 是累计快照：同一 generation 多窗口禁止直接相加，取周期末最成熟窗口。
  */
 
 export interface WeeklyReviewMetrics {
@@ -90,6 +91,32 @@ function sumNullable(rows: OutcomeRow[], pick: (row: OutcomeRow) => number | nul
   return sum
 }
 
+/**
+ * 7/14/30 为累计快照：同一 generation 只保留周期内最成熟窗口
+ *（collectWindowDay 最大；并列取 collectedAt 最新），禁止三窗直接相加。
+ */
+export function pickPeriodEndSnapshots(rows: OutcomeRow[]): OutcomeRow[] {
+  const best = new Map<string, OutcomeRow>()
+  for (const row of rows) {
+    const prev = best.get(row.generationId)
+    if (!prev) {
+      best.set(row.generationId, row)
+      continue
+    }
+    if (row.collectWindowDay > prev.collectWindowDay) {
+      best.set(row.generationId, row)
+      continue
+    }
+    if (
+      row.collectWindowDay === prev.collectWindowDay &&
+      row.collectedAt.getTime() > prev.collectedAt.getTime()
+    ) {
+      best.set(row.generationId, row)
+    }
+  }
+  return [...best.values()]
+}
+
 function extractKnowledgeIds(knowledgeUsed: unknown): string[] {
   if (!Array.isArray(knowledgeUsed)) return []
   const ids: string[] = []
@@ -126,8 +153,10 @@ export async function computeWeeklyReview(input: {
     (g) => g.workflowStatus === "published" && inRange(g.publishedAt, start, end),
   ).length
 
-  // 2/3/4. 周期内收集到的经营结果（null 不当 0）
-  const periodOutcomes = outcomes.filter((o) => inRange(o.collectedAt, start, end))
+  // 2/3/4. 周期内经营结果：按 generation 取周期末累计快照，禁止 7+14+30 相加
+  const periodOutcomes = pickPeriodEndSnapshots(
+    outcomes.filter((o) => inRange(o.collectedAt, start, end)),
+  )
   const qualifiedLeadCount = sumNullable(periodOutcomes, (o) => o.qualifiedLeadCount)
   const appointmentCount = sumNullable(periodOutcomes, (o) => o.appointmentCount)
   const dealCount = sumNullable(periodOutcomes, (o) => o.dealCount)

@@ -29,6 +29,21 @@
       ]
     },
     {
+      "name": "OutcomeAttribution",
+      "columns": [
+        "id",
+        "userId",
+        "generationId",
+        "externalLeadId",
+        "externalAppointmentId",
+        "externalDealId",
+        "externalPaymentId",
+        "attributionMethod",
+        "attributionConfidence",
+        "occurredAt"
+      ]
+    },
+    {
       "name": "AimRunSnapshot",
       "columns": [
         "id",
