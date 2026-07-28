@@ -1,14 +1,17 @@
 "use client"
 
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, RefreshCw, Search } from "lucide-react"
 
 import { DiscoveredAccountCard } from "@/components/competitor/discovered-account-card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
 import type { SimilarAccount, WatchAccount } from "@/lib/api/client"
 import { formatCompetitorAccountName, formatCompetitorRelativeTime } from "@/lib/competitor/display"
 import { extractPureUrl } from "@/lib/tikhub/url-parser"
+import { cn } from "@/lib/utils"
 
 interface DiscoveryPanelProps {
   activeAccount?: WatchAccount
@@ -73,6 +76,108 @@ function DiscoveredGroup({ title, description, items, props }: {
   )
 }
 
+/** 可输入筛选的账号框：替代原生 select，支持打字定位已监控账号。 */
+function AccountPickerInput({
+  accounts,
+  activeAccount,
+  disabled,
+  onActivate,
+}: {
+  accounts: WatchAccount[]
+  activeAccount: WatchAccount
+  disabled?: boolean
+  onActivate: (id: string) => void
+}) {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState(formatCompetitorAccountName(activeAccount))
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", onPointerDown)
+    return () => document.removeEventListener("mousedown", onPointerDown)
+  }, [open])
+
+  const filtered = useMemo(() => {
+    const keyword = query.trim().toLowerCase()
+    if (!keyword) return accounts
+    return accounts.filter((account) => formatCompetitorAccountName(account).toLowerCase().includes(keyword))
+  }, [accounts, query])
+
+  const pick = (account: WatchAccount) => {
+    onActivate(account.id)
+    setQuery(formatCompetitorAccountName(account))
+    setOpen(false)
+  }
+
+  return (
+    <div ref={rootRef} className="relative min-w-0 flex-1">
+      <Input
+        value={query}
+        disabled={disabled}
+        placeholder="输入账号名筛选，或从列表选择"
+        aria-label="选择监控账号"
+        aria-expanded={open}
+        aria-autocomplete="list"
+        role="combobox"
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          setQuery(event.target.value)
+          setOpen(true)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setQuery(formatCompetitorAccountName(activeAccount))
+            setOpen(false)
+            return
+          }
+          if (event.key === "Enter") {
+            event.preventDefault()
+            const first = filtered[0]
+            if (first) pick(first)
+          }
+        }}
+        className="h-9"
+      />
+      {open ? (
+        <ul
+          role="listbox"
+          className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {filtered.length === 0 ? (
+            <li className="px-2.5 py-2 text-sm text-muted-foreground">没有匹配的监控账号</li>
+          ) : (
+            filtered.map((account) => {
+              const label = formatCompetitorAccountName(account)
+              const active = account.id === activeAccount.id
+              return (
+                <li key={account.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={cn(
+                      "flex w-full rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+                      active ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted",
+                    )}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => pick(account)}
+                  >
+                    {label}
+                  </button>
+                </li>
+              )
+            })
+          )}
+        </ul>
+      ) : null}
+    </div>
+  )
+}
+
 /**
  * @description competitordiscoverypanel
  * @param props - 组件属性
@@ -85,9 +190,13 @@ export function CompetitorDiscoveryPanel(props: DiscoveryPanelProps) {
       {account ? (
         <>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <select value={account.id} onChange={(event) => props.onActivate(event.target.value)} disabled={props.discovering} className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50">
-              {props.accounts.map((item) => <option key={item.id} value={item.id}>{formatCompetitorAccountName(item)}</option>)}
-            </select>
+            <AccountPickerInput
+              key={account.id}
+              accounts={props.accounts}
+              activeAccount={account}
+              disabled={props.discovering}
+              onActivate={props.onActivate}
+            />
             <Button variant="outline" onClick={() => void props.onRefresh(account.id)} disabled={Boolean(props.refreshingId) || account.refreshStatus === "refreshing"}>
               {props.refreshingId === account.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}刷新作品池
             </Button>
@@ -107,7 +216,11 @@ export function CompetitorDiscoveryPanel(props: DiscoveryPanelProps) {
             </div>
           )}
         </>
-      ) : <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">先在下方添加一个抖音主页链接，再刷新作品池。这里不支持直接输入账号名称。</p>}
+      ) : (
+        <p className="rounded-lg bg-muted/40 px-3 py-4 text-sm text-muted-foreground">
+          先在下方粘贴抖音/视频号主页链接添加账号，再回来刷新作品池或扩展同赛道。
+        </p>
+      )}
     </AiResultPanel>
   )
 }

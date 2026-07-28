@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Compass, FileText, Film, RefreshCw, Users } from "lucide-react"
+import { FileText, Film, RefreshCw, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -106,10 +106,11 @@ export default function CompetitorWatchPage() {
           <TabsTrigger value="accounts"><Users className="h-4 w-4" />监控账号</TabsTrigger>
           <TabsTrigger value="videos"><Film className="h-4 w-4" />作品池</TabsTrigger>
           <TabsTrigger value="reports"><FileText className="h-4 w-4" />分析报告</TabsTrigger>
-          <TabsTrigger value="discovery"><Compass className="h-4 w-4" />线索发现</TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts" className="mt-0 space-y-6">
+          <CompetitorAddAccountPanel value={addUrl} adding={adding} accountCount={accounts.length} onChange={setAddUrl} onAdd={addAccount} />
+
           <CompetitorDiscoveryPanel
             activeAccount={activeAccount}
             accounts={accounts}
@@ -127,8 +128,6 @@ export default function CompetitorWatchPage() {
             onIgnore={ignore}
           />
 
-          <CompetitorAddAccountPanel value={addUrl} adding={adding} accountCount={accounts.length} onChange={setAddUrl} onAdd={addAccount} />
-
           <MonitoredAccountGrid
             accounts={sortedAccounts}
             loading={loading}
@@ -141,6 +140,17 @@ export default function CompetitorWatchPage() {
             onRefresh={(id) => void refreshAccount(id)}
             onDelete={(id) => void removeAccount(id)}
           />
+
+          <CompetitorWebResearchPanel
+            activeAccount={activeAccount}
+            query={researchQuery}
+            loading={researchLoading}
+            result={researchResult}
+            onQueryChange={setResearchQuery}
+            onResearch={research}
+          />
+
+          <CompetitorTopicAnalysisPanel />
         </TabsContent>
 
         <TabsContent value="videos" className="mt-0 space-y-6">
@@ -179,18 +189,6 @@ export default function CompetitorWatchPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="discovery" className="mt-0 space-y-6">
-          <CompetitorWebResearchPanel
-            activeAccount={activeAccount}
-            query={researchQuery}
-            loading={researchLoading}
-            result={researchResult}
-            onQueryChange={setResearchQuery}
-            onResearch={research}
-          />
-
-          <CompetitorTopicAnalysisPanel />
-        </TabsContent>
       </Tabs>
     </div>
   )
