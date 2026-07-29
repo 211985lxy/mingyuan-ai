@@ -17,6 +17,7 @@ import {
 } from "@/lib/inspiration-shadow-samples"
 
 const KEY_PREFIX = "aim:metrics"
+const SHADOW_SAMPLE_QUERY_LIMIT = 10_000
 
 type MetricName =
   | "received"
@@ -112,7 +113,9 @@ export async function loadShadowSamplesFromInspiration(input: {
         replyStatus: true,
         createdAt: true,
       },
+      take: SHADOW_SAMPLE_QUERY_LIMIT + 1,
     })
+    if (rows.length > SHADOW_SAMPLE_QUERY_LIMIT) return emptyShadowSampleCount()
     return countShadowSamples(rows)
   } catch {
     return emptyShadowSampleCount()

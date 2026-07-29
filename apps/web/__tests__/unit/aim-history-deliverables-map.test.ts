@@ -49,7 +49,12 @@ describe("mapAimGenerationToDeliverables", () => {
     expect(deliverables.workflowStatus).toBe("pending_review")
     expect(deliverables.projectId).toBe("proj_1")
     expect(deliverables.reviewNote).toBe("先过审")
-    expect(deliverables.knowledgeUsed).toEqual([{ id: "k1", title: "案例", category: "case_study" }])
+    expect(deliverables.knowledgeUsed).toEqual([{
+      id: "k1",
+      title: "案例",
+      category: "case_study",
+      categoryLabel: "case_study",
+    }])
     expect(deliverables.results.map((item) => item.format)).toEqual(
       expect.arrayContaining(["video_script", "xiaohongshu_post"]),
     )

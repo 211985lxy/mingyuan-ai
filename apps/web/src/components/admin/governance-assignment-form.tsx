@@ -44,6 +44,41 @@ function FieldSelect(props: {
   )
 }
 
+function IdentityFields(props: {
+  draft: GovernanceAssignmentInput
+  onChange: (next: GovernanceAssignmentInput) => void
+}) {
+  const { draft, onChange } = props
+  return (
+    <>
+      <div>
+        <Label>内部用户 ID</Label>
+        <Input
+          value={draft.userId ?? ""}
+          onChange={(e) => onChange({ ...draft, userId: e.target.value })}
+          placeholder="可选"
+        />
+      </div>
+      <div>
+        <Label>飞书 open_id</Label>
+        <Input
+          value={draft.externalOpenId ?? ""}
+          onChange={(e) => onChange({ ...draft, externalOpenId: e.target.value })}
+          placeholder="ou_xxx"
+        />
+      </div>
+      <div>
+        <Label>飞书 user_id</Label>
+        <Input
+          value={draft.externalUserId ?? ""}
+          onChange={(e) => onChange({ ...draft, externalUserId: e.target.value })}
+          placeholder="on_xxx"
+        />
+      </div>
+    </>
+  )
+}
+
 export function GovernanceAssignmentForm(props: {
   draft: GovernanceAssignmentInput
   saving: boolean
@@ -94,30 +129,7 @@ export function GovernanceAssignmentForm(props: {
               { value: "system_owner", label: "系统 Owner" },
             ]}
           />
-          <div>
-            <Label>内部用户 ID</Label>
-            <Input
-              value={draft.userId ?? ""}
-              onChange={(e) => onChange({ ...draft, userId: e.target.value })}
-              placeholder="可选"
-            />
-          </div>
-          <div>
-            <Label>飞书 open_id</Label>
-            <Input
-              value={draft.externalOpenId ?? ""}
-              onChange={(e) => onChange({ ...draft, externalOpenId: e.target.value })}
-              placeholder="ou_xxx"
-            />
-          </div>
-          <div>
-            <Label>飞书 user_id</Label>
-            <Input
-              value={draft.externalUserId ?? ""}
-              onChange={(e) => onChange({ ...draft, externalUserId: e.target.value })}
-              placeholder="on_xxx"
-            />
-          </div>
+          <IdentityFields draft={draft} onChange={onChange} />
           <Button type="submit" disabled={saving} className="w-full">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             新增
