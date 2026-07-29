@@ -11,6 +11,7 @@ const {
   buildRawInputWithVideoCopyContext,
   buildRawInputWithTrendingContext,
   buildRawInputWithCommentInsightContext,
+  buildRawInputWithOpportunityBrief,
   ownsActiveProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
@@ -29,6 +30,7 @@ const {
   buildRawInputWithVideoCopyContext: vi.fn(async (_userId, rawInput) => rawInput),
   buildRawInputWithTrendingContext: vi.fn(async (rawInput) => rawInput),
   buildRawInputWithCommentInsightContext: vi.fn(async (_userId, rawInput) => rawInput),
+  buildRawInputWithOpportunityBrief: vi.fn((rawInput) => rawInput),
   ownsActiveProject: vi.fn(async () => true),
 }))
 
@@ -66,6 +68,7 @@ vi.mock("@/lib/aim-generate-context", () => ({
   buildRawInputWithVideoCopyContext,
   buildRawInputWithTrendingContext,
   buildRawInputWithCommentInsightContext,
+  buildRawInputWithOpportunityBrief,
 }))
 
 // Route 契约测试只验证入口对接与响应序列化；运行时内核、
@@ -124,6 +127,31 @@ describe("POST /api/aim/generate", () => {
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
     ownsActiveProject.mockResolvedValue(true)
+  })
+
+  it("accepts generate bodies larger than the default 64 KiB parser limit", async () => {
+    generateAimContent.mockResolvedValue({
+      id: "gen-large",
+      results: [{ format: "video_script", content: "口播", wordCount: 2 }],
+      knowledgeUsed: [],
+    })
+
+    // 约 80 KiB：超过默认 65536，但低于 AIM 生成显式上限 256 KiB
+    const rawInput = "中".repeat(40_000)
+    expect(Buffer.byteLength(JSON.stringify({ rawInput }), "utf8")).toBeGreaterThan(65_536)
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      rawInput,
+      targetFormats: ["video_script"],
+      projectId: "project-1",
+    }))
+    const body = await res.json()
+
+    expect(res.status).not.toBe(413)
+    expect(body.code).not.toBe("PAYLOAD_TOO_LARGE")
+    expect(res.status).toBe(200)
+    expect(generateAimContent).toHaveBeenCalled()
   })
 
   it("rejects a project that is not owned before generation starts", async () => {

@@ -11,6 +11,7 @@ import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { createAimTrace } from "@/lib/aim-observability"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
+import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
 import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 import {
   buildAgentGenerateResponse,
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     context = await authenticateAgentRequest(request)
     assertAgentScope(context, AGENT_SCOPE.draftsSubmit)
-    const body = await parseJsonRecord(request)
+    const body = await parseJsonRecord(request, { maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES })
 
     const prepared = prepareAgentGenerateBody(body)
     if (!prepared.ok) throw new Error(prepared.validationError)
