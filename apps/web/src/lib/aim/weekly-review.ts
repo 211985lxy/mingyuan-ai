@@ -32,6 +32,9 @@ export interface WeeklyReviewMetrics {
   day7Backfill: { due: number; filled: number }
 }
 
+/** 周报对 7/14/30 累计快照使用周期末差值，禁止直接相加。 */
+export const WEEKLY_OUTCOME_WINDOW_POLICY = "cumulative_snapshot_delta_v1"
+
 interface GenerationRow {
   id: string
   workflowStatus: string

@@ -236,7 +236,8 @@ export const PATCH = withAdminAuth(async (
       action: `learning_candidate.${body.action}`,
       targetType: "learning_candidate",
       targetId: id,
-      metadata: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue,
+      metadata: { approvalId: typeof body.approvalId === "string" ? body.approvalId : null,
+        result: JSON.parse(JSON.stringify(result)) } as Prisma.InputJsonValue,
     })
     return NextResponse.json({ result }, {
       headers: { "x-request-id": requestId },

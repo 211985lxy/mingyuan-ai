@@ -31,6 +31,7 @@ function trace(
   overrides: Partial<{
     id: string
     durationMs: number | null
+    aimGenerationId: string | null
     createdAt: Date
     updatedAt: Date
   }> = {},
@@ -39,6 +40,7 @@ function trace(
     id: overrides.id ?? `trace-${runId ?? "missing"}`,
     runId,
     durationMs: overrides.durationMs === undefined ? 1000 : overrides.durationMs,
+    aimGenerationId: overrides.aimGenerationId ?? null,
     costCny,
     createdAt: overrides.createdAt ?? new Date("2026-07-01T00:00:00Z"),
     updatedAt: overrides.updatedAt ?? new Date("2026-07-01T00:01:00Z"),
@@ -140,6 +142,7 @@ describe("aggregateRunOutcomeMetrics", () => {
         trace("run_duplicate", 2, {
           id: "trace-old",
           durationMs: null,
+          aimGenerationId: "stale_generation",
           updatedAt: new Date("2026-07-01T00:01:00Z"),
         }),
         trace("run_duplicate", 7, {
@@ -154,6 +157,7 @@ describe("aggregateRunOutcomeMetrics", () => {
     expect(metrics.aiDirectCostCny).toBe(7)
     expect(metrics.coverage.duration).toBe(1)
     expect(metrics.coverage.cost).toBe(1)
+    expect(metrics.coverage.generationLink).toBe(0)
   })
 
   it("筛选只匹配 latest structured outcome 且不引入 event-only run", () => {
@@ -176,5 +180,20 @@ describe("aggregateRunOutcomeMetrics", () => {
     expect(metrics.runCount).toBe(0)
     expect(metrics.acceptedCount).toBe(0)
     expect(metrics.aiDirectCostCny).toBe(0)
+  })
+
+  it("关联 ID 覆盖率按周期 trace universe 计算", () => {
+    const metrics = aggregateRunOutcomeMetrics({
+      events: [
+        outcome("run_1", "accepted_first_pass"),
+        outcome("run_2", "accepted_first_pass"),
+      ],
+      traces: [
+        trace("run_1", 1, { aimGenerationId: "generation_1" }),
+        trace("run_2", 1),
+      ],
+      humanHourlyCostCny: 0,
+    })
+    expect(metrics.coverage.generationLink).toBe(0.5)
   })
 })

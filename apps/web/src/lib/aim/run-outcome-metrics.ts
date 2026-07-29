@@ -22,6 +22,7 @@ export interface OutcomeMetricTrace {
   runId: string | null
   durationMs: number | null
   costCny: unknown
+  aimGenerationId?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -54,6 +55,7 @@ export interface RunOutcomeMetrics {
     duration: number
     cost: number
     finalDisposition: number
+    generationLink: number
   }
 }
 
@@ -199,6 +201,9 @@ export function aggregateRunOutcomeMetrics(input: {
     : input.traces
   const traceCount = coverageTraces.length
   const withRunIdCount = coverageTraces.filter((item) => Boolean(item.runId)).length
+  const withGenerationLinkCount = [...includedTraces.values()]
+    .filter((item) => Boolean(item.aimGenerationId))
+    .length
   const finalDispositionCount = [...includedRuns]
     .filter((runId) => reduceFinalDisposition(eventsByRun.get(runId) ?? []) !== "unknown")
     .length
@@ -225,6 +230,7 @@ export function aggregateRunOutcomeMetrics(input: {
       duration: rate(trace.durationCovered, includedRuns.size) ?? 0,
       cost: rate(trace.costCovered, includedRuns.size) ?? 0,
       finalDisposition: rate(finalDispositionCount, includedRuns.size) ?? 0,
+      generationLink: rate(withGenerationLinkCount, includedRuns.size) ?? 0,
     },
   }
 }

@@ -292,5 +292,9 @@ export async function loadReviewMetricsSnapshot(input: {
       weekly.day7Backfill.filled,
       weekly.day7Backfill.due,
     ),
+    runIdCoverage: run.metrics.coverage.runId,
+    costCoverage: run.metrics.coverage.cost,
+    finalDispositionCoverage: run.metrics.coverage.finalDisposition,
+    generationLinkCoverage: run.metrics.coverage.generationLink,
   }
 }

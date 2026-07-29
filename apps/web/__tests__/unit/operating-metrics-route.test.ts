@@ -31,6 +31,7 @@ describe("operating metrics route", () => {
       runId: "run_1",
       durationMs: 100,
       costCny: 1,
+      aimGenerationId: "generation_1",
       createdAt: new Date("2026-07-01T00:00:00Z"),
       updatedAt: new Date("2026-07-02T00:00:00Z"),
     }])
@@ -47,7 +48,7 @@ describe("operating metrics route", () => {
     const response = await GET(new NextRequest(
       "http://localhost/api/admin/aim/operating-metrics"
       + "?start=2026-07-01T00:00:00Z&end=2026-07-08T00:00:00Z",
-    ))
+    ), {} as never)
     expect(response.status).toBe(200)
     expect(traceFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
@@ -64,7 +65,10 @@ describe("operating metrics route", () => {
     }))
     expect(eventFindMany.mock.calls[0]?.[0]?.where).not.toHaveProperty("createdAt")
     expect(aggregateRunOutcomeMetrics).toHaveBeenCalledWith(expect.objectContaining({
-      traces: expect.arrayContaining([expect.objectContaining({ runId: "run_1" })]),
+      traces: expect.arrayContaining([expect.objectContaining({
+        runId: "run_1",
+        aimGenerationId: "generation_1",
+      })]),
       events: expect.arrayContaining([expect.objectContaining({ id: "event-1" })]),
     }))
   })
@@ -81,7 +85,7 @@ describe("operating metrics route", () => {
     const response = await GET(new NextRequest(
       "http://localhost/api/admin/aim/operating-metrics"
       + "?start=2026-07-01T00:00:00Z&end=2026-07-08T00:00:00Z",
-    ))
+    ), {} as never)
     expect(response.status).toBe(200)
     expect(eventFindMany).not.toHaveBeenCalled()
     expect(aggregateRunOutcomeMetrics).toHaveBeenCalledWith(expect.objectContaining({

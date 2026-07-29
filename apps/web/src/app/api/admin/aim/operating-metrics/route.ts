@@ -35,6 +35,7 @@ async function loadMetricRunUniverse(start: Date, end: Date) {
       runId: true,
       durationMs: true,
       costCny: true,
+      aimGenerationId: true,
       createdAt: true,
       updatedAt: true,
     },

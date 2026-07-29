@@ -46,6 +46,11 @@ export interface ReviewMetricsSnapshot {
   pendingMethodologyCandidates: number
   previousActionCloseRate: number | null
   day7BackfillRate: number | null
+  /** 资格闸门证据；旧快照缺失时保持 unknown，不推测回填。 */
+  runIdCoverage?: number | null
+  costCoverage?: number | null
+  finalDispositionCoverage?: number | null
+  generationLinkCoverage?: number | null
 }
 
 export interface ReviewCycleDraft {
@@ -84,6 +89,10 @@ const RATE_KEYS = [
   "rejectionRate",
   "previousActionCloseRate",
   "day7BackfillRate",
+  "runIdCoverage",
+  "costCoverage",
+  "finalDispositionCoverage",
+  "generationLinkCoverage",
 ] as const
 const NULLABLE_NUMBER_KEYS = [
   "timeSavedMinutes",

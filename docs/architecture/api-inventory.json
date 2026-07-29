@@ -270,6 +270,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/operating-qualification",
+      "file": "src/app/api/admin/aim/operating-qualification/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/aim/outcome-attributions",
       "file": "src/app/api/admin/aim/outcome-attributions/route.ts",
       "methods": [
