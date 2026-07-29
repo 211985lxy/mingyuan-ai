@@ -92,7 +92,7 @@ const LATE_DECISION_STAGES = new Set(["方案比较", "决策中", "已成交"])
  * - decisionStage ∈ 决策后期时，goals → deal_trigger（已成交 high，否则 medium）
  * - followUps → follow_up_script（medium）
  * - topicCandidates → content_topic（medium）
- * - 已成交且有交付任务 → 恰好一条 case_candidate（low）
+ * - 已成交且有交付任务 → 恰好一条「转化案例候选」（low），不得称成功案例
  * - diagnosisQuestions → methodology_revision（low）
  */
 /**
@@ -139,8 +139,8 @@ export function buildAssetCandidatesFromInsight(insight: MeetingInsight): AssetC
     const text = `客户「${insight.customer || "未指明"}」已成交，目标：${goals}；交付任务：${tasks}。`
     drafts.push({
       kind: "case_candidate",
-      title: truncateTitle(`${ASSET_CANDIDATE_KIND_LABELS.case_candidate}｜${insight.customer || "未指明客户"}`),
-      content: `${text}\n\n${sourceLine(insight)}`,
+      title: truncateTitle(`转化案例候选｜${insight.customer || "未指明客户"}`),
+      content: `${text}\n\n说明：本条仅证明成交与进入交付，不代表客户结果成功。\n\n${sourceLine(insight)}`,
       evidence: text,
       confidence: "low",
       crossProjectAllowed: false,

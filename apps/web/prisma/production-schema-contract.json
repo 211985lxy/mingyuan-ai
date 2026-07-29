@@ -124,6 +124,8 @@
         "projectId",
         "externalOutcomeId",
         "externalDealId",
+        "externalRecordId",
+        "externalTableId",
         "metricCode",
         "baseline",
         "target",
@@ -262,7 +264,8 @@
         "kind",
         "reviewStatus",
         "crossProjectAllowed",
-        "promotedEntryId"
+        "promotedEntryId",
+        "customerOutcomeProjectionId"
       ]
     },
     {

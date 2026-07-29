@@ -102,6 +102,9 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model CustomerOutcomeProjection")
     expect(migrationSql).toContain("CREATE TABLE IF NOT EXISTS `CustomerOutcomeProjection`")
     expect(migrationSql).toContain("UNIQUE INDEX `CustomerOutcomeProjection_externalOutcomeId_key`")
+    expect(schema).toContain("customerOutcomeProjectionId")
+    expect(migrationSql).toContain("CustomerOutcomeProjection_externalRecordId_key")
+    expect(migrationSql).toContain("AssetCandidate_customerOutcomeProjectionId_fkey")
   })
 
   it("adds verdictCode and verdictNote with MySQL-safe additive migrations", () => {

@@ -51,7 +51,11 @@ export function canMarkDeliverySuccess(row: CustomerOutcomeProjectionLike): bool
  * @description 是否已审核通过且证据齐全，可晋升成功案例候选
  */
 export function canPromoteSuccessCase(row: CustomerOutcomeProjectionLike): boolean {
-  return row.reviewStatus === "approved" && canMarkDeliverySuccess(row)
+  return (
+    row.reviewStatus === "approved"
+    && canMarkDeliverySuccess(row)
+    && Boolean(row.reviewedAt)
+  )
 }
 
 /**

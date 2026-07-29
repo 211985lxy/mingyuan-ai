@@ -60,6 +60,8 @@ model CustomerOutcomeProjection {
   projectId         String
   externalOutcomeId String    @db.VarChar(80)
   externalDealId    String?   @db.VarChar(80)
+  externalRecordId  String?   @unique @db.VarChar(80)
+  externalTableId   String?   @db.VarChar(80)
   metricCode        String    @db.VarChar(80)
   baseline          Decimal?  @db.Decimal(14, 2)
   target            Decimal?  @db.Decimal(14, 2)
@@ -76,6 +78,7 @@ model CustomerOutcomeProjection {
   updatedAt         DateTime  @updatedAt
 
   project ClientProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  caseCandidate AssetCandidate?
 
   @@unique([externalOutcomeId])
   @@index([projectId, reviewStatus])

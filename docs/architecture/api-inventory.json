@@ -189,6 +189,20 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/customer-outcomes",
+      "file": "src/app/api/admin/aim/customer-outcomes/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/aim/efficiency-baselines",
       "file": "src/app/api/admin/aim/efficiency-baselines/route.ts",
       "methods": [

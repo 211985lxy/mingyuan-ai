@@ -154,7 +154,25 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
     expect(reviewAssetCandidate).not.toHaveBeenCalled()
   })
 
-  it("合法审核透传 action/promote/crossProjectAllowed（含 approvalId）", async () => {
+  it("跨项目复用缺独立 system_owner 签字时拒绝", async () => {
+    const res = await reviewPATCH(
+      new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "approve",
+          promote: true,
+          workflowId: "content-growth-v1",
+          approvalId: "apd_1",
+          crossProjectAllowed: true,
+        }),
+      }),
+      candCtx,
+    )
+    expect(res.status).toBe(403)
+    expect(reviewAssetCandidate).not.toHaveBeenCalled()
+  })
+
+  it("合法审核透传 action/promote/crossProjectAllowed（两次独立签字）", async () => {
     reviewAssetCandidate.mockResolvedValueOnce({
       ok: true,
       record: { id: "cand_1", reviewStatus: "approved", promotedEntryId: "entry_1" },
@@ -167,6 +185,7 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
           promote: true,
           workflowId: "content-growth-v1",
           approvalId: "apd_1",
+          crossProjectApprovalId: "apd_system_1",
           crossProjectAllowed: true,
         }),
       }),
@@ -187,6 +206,12 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
         subjectId: "cand_1",
         workflowId: "content-growth-v1",
         projectId: "proj_1",
+      }),
+    )
+    expect(validateHighRiskApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approvalId: "apd_system_1",
+        expectedRoles: ["system_owner"],
       }),
     )
   })

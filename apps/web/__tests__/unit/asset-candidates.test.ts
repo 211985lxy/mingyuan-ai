@@ -106,6 +106,8 @@ describe("buildAssetCandidatesFromInsight", () => {
     expect(drafts).toHaveLength(1)
     expect(drafts[0].confidence).toBe("low")
     expect(drafts[0].content).toContain("葛老板")
+    expect(drafts[0].title).toContain("转化案例候选")
+    expect(drafts[0].title).not.toContain("成功案例")
   })
 
   it("未成交不生成 case_candidate（禁止虚构案例）", () => {
