@@ -19,7 +19,7 @@ model GovernanceAssignment {
   @@index([externalOpenId])
 }
 
-/** 审批签字记录；requestId 幂等 */
+/** 审批签字记录；requestId 幂等；effect* 支撑失败可重试、重放不重复完成 */
 model ApprovalDecision {
   id                 String   @id @default(cuid())
   subjectType        String   @db.VarChar(40) // work_item | generation | asset | memory | methodology | workflow_change
@@ -32,10 +32,18 @@ model ApprovalDecision {
   source             String   @db.VarChar(20) // web | feishu_card | api
   requestId          String   @unique @db.VarChar(120)
   decidedAt          DateTime @default(now())
+  /** 工作流范围；历史行可为 null（unknown） */
+  workflowId         String?  @db.VarChar(120)
+  /** 项目范围；历史行可为 null（unknown） */
+  projectId          String?  @db.VarChar(191)
+  /** none | pending | applied | failed —— 侧效（完成/打回）可恢复状态 */
+  effectStatus       String   @default("none") @db.VarChar(20)
+  effectError        String?  @db.Text
   createdAt          DateTime @default(now())
 
   @@index([subjectType, subjectId])
   @@index([reviewerUserId])
   @@index([externalReviewerId])
   @@index([decidedAt])
+  @@index([workflowId, effectStatus])
 }
