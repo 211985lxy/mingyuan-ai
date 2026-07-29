@@ -46,6 +46,11 @@ describe("verifyFeishuEventSignature", () => {
     }
 
     expect(verifyFeishuEventSignature({ ...input, signature: "" })).toBe(false)
+    expect(verifyFeishuEventSignature({
+      ...input,
+      signature: "",
+      allowMissingSignature: true,
+    })).toBe(true)
     expect(verifyFeishuEventSignature({ ...input, signature: "invalid" })).toBe(false)
   })
 })

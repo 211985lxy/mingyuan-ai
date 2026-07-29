@@ -6,8 +6,9 @@ export function verifyFeishuEventSignature(input: {
   encryptKey: string
   bodyCandidates: string[]
   signature: string
+  allowMissingSignature?: boolean
 }): boolean {
-  if (!input.signature) return false
+  if (!input.signature) return input.allowMissingSignature === true
 
   const actualBuffer = Buffer.from(input.signature)
   return input.bodyCandidates.some((body) => {

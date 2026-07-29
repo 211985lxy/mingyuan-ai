@@ -63,6 +63,7 @@ function verifyEncryptedPayload(
   request: Request,
   encryptKey: string,
   rawBody: string,
+  allowMissingSignature = false,
 ) {
   if (!payload.encrypt || !encryptKey) return true
   const headers = requestHeaders(request)
@@ -72,6 +73,7 @@ function verifyEncryptedPayload(
     encryptKey,
     bodyCandidates: [JSON.stringify(payload), rawBody],
     signature: headers["x-lark-signature"] || "",
+    allowMissingSignature,
   })
 }
 
@@ -126,7 +128,7 @@ export async function POST(request: Request) {
   try {
     const challenge = challengePayload(payload, encryptKey)
     if (challenge) {
-      if (payload.encrypt && !verifyEncryptedPayload(payload, request, encryptKey, rawBody)) {
+      if (payload.encrypt && !verifyEncryptedPayload(payload, request, encryptKey, rawBody, true)) {
         return NextResponse.json({ error: "Invalid Feishu signature" }, { status: 401 })
       }
       if (payload.encrypt) {
