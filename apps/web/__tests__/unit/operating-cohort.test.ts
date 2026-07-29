@@ -56,11 +56,21 @@ describe("operating-cohort", () => {
     ).toBe("insufficient_sample")
 
     expect(
-      resolveTrendVerdict({ sampleSize: 12, currentRate: 0.6, previousRate: 0.4 }).verdict,
+      resolveTrendVerdict({
+        sampleSize: 12,
+        currentRate: 0.6,
+        previousRate: 0.4,
+        previousSampleSize: 12,
+      }).verdict,
     ).toBe("up")
 
     expect(
-      resolveTrendVerdict({ sampleSize: 12, currentRate: 0.3, previousRate: 0.5 }).verdict,
+      resolveTrendVerdict({
+        sampleSize: 12,
+        currentRate: 0.3,
+        previousRate: 0.5,
+        previousSampleSize: 12,
+      }).verdict,
     ).toBe("down")
 
     const records = Array.from({ length: 12 }, (_, i) =>
@@ -73,7 +83,12 @@ describe("operating-cohort", () => {
       }),
     )
     const stats = aggregateCohortStats(records, {
-      previousLeadToAppointmentRateBySegment: { 高客单: 0.5 },
+      previousLeadToAppointmentByGroup: {
+        "deal_size_band::高客单": {
+          leadToAppointmentRate: 0.5,
+          sampleSize: 12,
+        },
+      },
     })
     expect(stats[0].trendVerdict).toBe("up")
   })
@@ -102,5 +117,32 @@ describe("operating-cohort", () => {
     const stats = aggregateCohortStats(records)
     expect(stats[0].leadToAppointmentRate).toBeNull()
     expect(stats[0].appointmentToDealRate).toBeNull()
+  })
+
+  it("对照期样本不足时同样禁止趋势判断", () => {
+    expect(resolveTrendVerdict({
+      sampleSize: 12,
+      currentRate: 0.6,
+      previousRate: 0.4,
+      previousSampleSize: 3,
+    }).verdict).toBe("insufficient_sample")
+  })
+
+  it("成功任务成本按任务数加权，不平均各线索均值", () => {
+    const records = [
+      row({
+        externalRecordId: "ext_cost_1",
+        segmentKey: "咨询",
+        successTaskCount: 1,
+        successTaskTotalCostCny: 10,
+      }),
+      row({
+        externalRecordId: "ext_cost_2",
+        segmentKey: "咨询",
+        successTaskCount: 3,
+        successTaskTotalCostCny: 30,
+      }),
+    ]
+    expect(aggregateCohortStats(records)[0].avgSuccessTaskCostCny).toBe(10)
   })
 })
