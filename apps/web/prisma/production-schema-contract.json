@@ -25,7 +25,50 @@
         "collectedAt",
         "qualifiedLeadCount",
         "views",
-        "userVerdict"
+        "userVerdict",
+        "verdictNote",
+        "verdictCode"
+      ]
+    },
+    {
+      "name": "TaskEfficiencyBaseline",
+      "columns": [
+        "id",
+        "workflowId",
+        "taskType",
+        "medianManualMinutes",
+        "sampleSize",
+        "validFrom",
+        "approvedBy"
+      ]
+    },
+    {
+      "name": "GovernanceAssignment",
+      "columns": [
+        "id",
+        "scopeType",
+        "scopeId",
+        "role",
+        "userId",
+        "externalOpenId",
+        "status",
+        "effectiveAt"
+      ]
+    },
+    {
+      "name": "ApprovalDecision",
+      "columns": [
+        "id",
+        "subjectType",
+        "subjectId",
+        "decision",
+        "reviewerUserId",
+        "externalReviewerId",
+        "roleSnapshot",
+        "reason",
+        "source",
+        "requestId",
+        "decidedAt"
       ]
     },
     {
@@ -61,6 +104,48 @@
         "reviewStatus",
         "reviewerRef",
         "reviewedAt"
+      ]
+    },
+    {
+      "name": "ReviewCycle",
+      "columns": [
+        "id",
+        "periodStart",
+        "periodEnd",
+        "status",
+        "metricsSnapshot",
+        "systemOwnerId",
+        "filterSnapshot",
+        "signedAt"
+      ]
+    },
+    {
+      "name": "ReviewAction",
+      "columns": [
+        "id",
+        "reviewCycleId",
+        "title",
+        "ownerId",
+        "dueAt",
+        "status",
+        "evidenceRef"
+      ]
+    },
+    {
+      "name": "LearningCandidate",
+      "columns": [
+        "id",
+        "sourceType",
+        "sourceId",
+        "projectId",
+        "generationId",
+        "targetType",
+        "failureCode",
+        "payload",
+        "reviewStatus",
+        "reviewerId",
+        "promotedRef",
+        "requestId"
       ]
     },
     {

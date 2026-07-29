@@ -18,6 +18,7 @@ import {
 } from "@/lib/api/client"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
+import { parseOutcomeVerdictCode } from "@/lib/aim/outcome-verdict"
 import { getAimWorkflowStatusLabel } from "@/lib/aim/workbench-display"
 import { patchDeliverableWorkflowFields } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
@@ -100,6 +101,8 @@ function buildRetroOutcome(form: OutcomeForm, window: OutcomeWindow, platform: s
     comments: parseAimOutcomeNumber(form, "comments"),
     shares: parseAimOutcomeNumber(form, "shares"),
     audienceFeedback: form.audienceFeedback?.trim() || undefined,
+    verdictCode: parseOutcomeVerdictCode(form.verdictCode) ?? undefined,
+    verdictNote: form.verdictNote?.trim() || undefined,
   }
 }
 

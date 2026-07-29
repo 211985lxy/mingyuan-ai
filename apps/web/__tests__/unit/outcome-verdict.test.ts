@@ -34,17 +34,18 @@ describe("outcome-verdict", () => {
 })
 
 describe("sanitizeOutcomeBody verdictCode", () => {
-  it("写入 verdictCode，并把 verdictNote 映射到 userVerdict", () => {
+  it("分别写入 verdictCode 和 verdictNote，不污染历史 userVerdict", () => {
     const sanitized = sanitizeOutcomeBody({
       collectWindowDay: 7,
       verdictCode: "ineffective",
       verdictNote: "这条完全没反馈",
     })
     expect(sanitized.verdictCode).toBe("ineffective")
-    expect(sanitized.userVerdict).toBe("这条完全没反馈")
+    expect(sanitized.verdictNote).toBe("这条完全没反馈")
+    expect(sanitized.userVerdict).toBeNull()
   })
 
-  it("非法 verdictCode 存 null（读取侧 unknown）", () => {
+  it("旧客户端 userVerdict 兼容写入 verdictNote，但不推测 verdictCode", () => {
     const sanitized = sanitizeOutcomeBody({
       collectWindowDay: 14,
       verdictCode: "看起来不错",
@@ -52,6 +53,7 @@ describe("sanitizeOutcomeBody verdictCode", () => {
     })
     expect(sanitized.verdictCode).toBeNull()
     expect(sanitized.userVerdict).toBe("看起来不错")
+    expect(sanitized.verdictNote).toBe("看起来不错")
   })
 })
 
@@ -88,6 +90,20 @@ describe("buildAssetCandidatesFromOutcome verdict semantics", () => {
       userVerdict: "无效，没人看",
     })
     expect(drafts.map((d) => d.kind)).toEqual(["methodology_revision"])
+  })
+
+  it("负向码即使已有线索、预约和成交也只生成方法论修订候选", () => {
+    const drafts = buildAssetCandidatesFromOutcome({
+      ...base,
+      qualifiedLeadCount: 2,
+      appointmentCount: 1,
+      dealCount: 1,
+      revenue: 1000,
+      verdictCode: "failed",
+      verdictNote: "最终交付失败",
+    })
+    expect(drafts.map((d) => d.kind)).toEqual(["methodology_revision"])
+    expect(drafts[0]?.content).toContain("最终交付失败")
   })
 
   it("neutral 不生成成功或失败候选", () => {

@@ -369,8 +369,10 @@ model ContentOutcome {
 
   // 第三组：用户反馈（自由文本备注 + 结构化判断码）
   audienceFeedback String? @db.Text
-  /** 自由文本备注（原 userVerdict）；不得参与字符串包含判断 */
+  /** 历史自由文本字段，仅兼容旧记录；不得参与字符串包含判断 */
   userVerdict      String? @db.Text
+  /** 新版自由文本备注；不得参与结果分类 */
+  verdictNote      String? @db.Text
   /** excellent|effective|neutral|ineffective|failed；缺省读取为 unknown */
   verdictCode      String? @db.VarChar(20)
 

@@ -176,7 +176,9 @@ export interface ContentOutcome {
   saves?: number | null
   shares?: number | null
   audienceFeedback?: string | null
+  /** @deprecated 历史自由文本字段 */
   userVerdict?: string | null
+  verdictNote?: string | null
   /** excellent|effective|neutral|ineffective|failed；缺省读取为 unknown */
   verdictCode?: string | null
 }
@@ -197,8 +199,9 @@ export interface ContentOutcomeInput {
   saves?: number | null
   shares?: number | null
   audienceFeedback?: string
-  /** 自由文本备注 */
+  /** @deprecated 旧客户端兼容；服务端会同步写入 verdictNote */
   userVerdict?: string
+  /** 自由文本备注 */
   verdictNote?: string
   verdictCode?: "excellent" | "effective" | "neutral" | "ineffective" | "failed"
 }

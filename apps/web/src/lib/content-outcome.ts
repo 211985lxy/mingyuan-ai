@@ -23,8 +23,10 @@ export interface SanitizedOutcome {
   saves: NullableInt
   shares: NullableInt
   audienceFeedback: string | null
-  /** 自由文本备注，不参与优秀/失败判定 */
+  /** 历史自由文本字段，仅兼容旧客户端 */
   userVerdict: string | null
+  /** 自由文本备注，不参与优秀/失败判定 */
+  verdictNote: string | null
   verdictCode: OutcomeVerdictCode | null
 }
 
@@ -66,10 +68,12 @@ export function sanitizeOutcomeBody(body: Record<string, unknown>): SanitizedOut
     saves: toNullableInt(body.saves),
     shares: toNullableInt(body.shares),
     audienceFeedback: typeof body.audienceFeedback === "string" ? body.audienceFeedback.slice(0, 5000) : null,
-    userVerdict: typeof body.userVerdict === "string"
-      ? body.userVerdict.slice(0, 1000)
-      : typeof body.verdictNote === "string"
-        ? body.verdictNote.slice(0, 1000)
+    userVerdict:
+      typeof body.userVerdict === "string" ? body.userVerdict.slice(0, 1000) : null,
+    verdictNote: typeof body.verdictNote === "string"
+      ? body.verdictNote.slice(0, 1000)
+      : typeof body.userVerdict === "string"
+        ? body.userVerdict.slice(0, 1000)
         : null,
     verdictCode: parseOutcomeVerdictCode(body.verdictCode),
   }
@@ -85,7 +89,7 @@ const PATCHABLE_FIELDS = [
   "platform", "publishedAt",
   "qualifiedCommentCount", "dmCount", "qualifiedLeadCount", "appointmentCount",
   "dealCount", "revenue", "views", "likes", "comments", "saves", "shares",
-  "audienceFeedback", "userVerdict", "verdictCode",
+  "audienceFeedback", "userVerdict", "verdictNote", "verdictCode",
 ] as const
 
 /**
@@ -109,9 +113,9 @@ export function buildOutcomeUpdate(
       update[field] = sanitized[field]
     }
   }
-  // verdictNote 是 userVerdict 的别名写入键
-  if (presentKeys.has("verdictNote") && !presentKeys.has("userVerdict")) {
-    update.userVerdict = sanitized.userVerdict
+  // 旧客户端仍传 userVerdict 时，同时写入新版备注；不推测 verdictCode。
+  if (presentKeys.has("userVerdict") && !presentKeys.has("verdictNote")) {
+    update.verdictNote = sanitized.verdictNote
   }
   return update as Partial<SanitizedOutcome>
 }

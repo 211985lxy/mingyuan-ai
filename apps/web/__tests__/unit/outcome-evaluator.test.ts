@@ -66,6 +66,7 @@ function makeOutcomeRow(overrides: Partial<{
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictNote: string | null
   verdictCode: string | null
   collectWindowDay: number
   collectedAt: Date
@@ -86,6 +87,7 @@ function makeOutcomeRow(overrides: Partial<{
     dealCount: null as number | null,
     revenue: null as unknown,
     userVerdict: null as string | null,
+    verdictNote: null as string | null,
     verdictCode: null as string | null,
     collectWindowDay: 7,
     collectedAt: new Date("2026-07-18"),
@@ -171,6 +173,34 @@ describe("evaluateOutcomes", () => {
     const result = await evaluateOutcomes({ userId: "user_1", store })
     expect(result.excellent).toBe(0)
     expect(result.writtenBack).toBe(1)
+    expect(store.assetCandidate.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "methodology_revision" }),
+      }),
+    )
+  })
+
+  it("无效码优先于高互动和成交信号，只写方法论修订候选", async () => {
+    const store = makeStore(
+      [makeOutcomeRow({
+        id: "o_bad_metrics",
+        projectId: "proj_1",
+        verdictCode: "ineffective",
+        verdictNote: "有流量但客户不匹配",
+        views: 100,
+        likes: 50,
+        saves: 20,
+        qualifiedLeadCount: 3,
+        appointmentCount: 2,
+        dealCount: 1,
+      })],
+      [{ id: "gen_1", rawCopy: "文案", videoScript: null, topicTitle: "警示" }],
+    )
+    const result = await evaluateOutcomes({ userId: "user_1", store })
+    expect(result.excellent).toBe(0)
+    expect(result.writtenBack).toBe(1)
+    expect(result.skipped).toBe(0)
+    expect(store.assetCandidate.create).toHaveBeenCalledTimes(1)
     expect(store.assetCandidate.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ kind: "methodology_revision" }),

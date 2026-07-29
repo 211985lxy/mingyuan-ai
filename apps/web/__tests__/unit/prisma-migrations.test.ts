@@ -99,6 +99,32 @@ describe("Prisma migrations", () => {
     expect(migrationSql).toContain("UNIQUE INDEX `CustomerOutcomeProjection_externalOutcomeId_key`")
   })
 
+  it("adds verdictCode and verdictNote with MySQL-safe additive migrations", () => {
+    const schema = readPrismaSchema()
+    const verdictCodeMigration = readFileSync(
+      path.join(
+        appRoot,
+        "prisma/migrations/20260728120000_add_content_outcome_verdict_code/migration.sql",
+      ),
+      "utf8",
+    )
+    const verdictNoteMigration = readFileSync(
+      path.join(
+        appRoot,
+        "prisma/migrations/20260729130000_add_content_outcome_verdict_note/migration.sql",
+      ),
+      "utf8",
+    )
+
+    expect(schema).toMatch(/verdictCode\s+String\?/)
+    expect(schema).toMatch(/verdictNote\s+String\?/)
+    expect(verdictCodeMigration).toContain("ALTER TABLE ContentOutcome")
+    expect(verdictCodeMigration).not.toContain('"ContentOutcome"')
+    expect(verdictNoteMigration).toContain("ADD COLUMN IF NOT EXISTS `verdictCode`")
+    expect(verdictNoteMigration).toContain("ADD COLUMN IF NOT EXISTS `verdictNote`")
+    expect(verdictNoteMigration).not.toMatch(/\bUPDATE\b/i)
+  })
+
   it("owns phase 14 schema changes in Prisma migrations only", () => {
     const migrationSql = readFileSync(
       path.join(

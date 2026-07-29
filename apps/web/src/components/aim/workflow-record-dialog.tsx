@@ -57,6 +57,21 @@ function OutcomeFields({ form, window, onChange, onWindowChange }: {
       <summary className="cursor-pointer text-xs font-medium text-muted-foreground">更多数据</summary>
       <div className="mt-3 space-y-3">
         <OutcomeInputs fields={MORE_OUTCOME_FIELDS} form={form} onChange={onChange} />
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[11px] text-muted-foreground">结果判断</span>
+          <select value={form.verdictCode ?? ""} onChange={(event) => onChange({ ...form, verdictCode: event.target.value })} className="h-8 rounded border border-border/60 bg-background px-2 text-sm">
+            <option value="">未判断</option>
+            <option value="excellent">优秀</option>
+            <option value="effective">有效</option>
+            <option value="neutral">中性</option>
+            <option value="ineffective">无效</option>
+            <option value="failed">失败</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-0.5">
+          <span className="text-[11px] text-muted-foreground">判断备注</span>
+          <Textarea value={form.verdictNote ?? ""} onChange={(event) => onChange({ ...form, verdictNote: event.target.value })} placeholder="记录为什么有效或无效；备注不会自动改变判断码。" className="min-h-[60px]" />
+        </label>
         <label className="flex flex-col gap-0.5"><span className="text-[11px] text-muted-foreground">用户反馈（哪类人在问 / 是否目标客户原话 / 是否带来错误人群）</span><Textarea value={form.audienceFeedback ?? ""} onChange={(event) => onChange({ ...form, audienceFeedback: event.target.value })} placeholder="把评论区/私信里真实出现的话记下来。" className="min-h-[60px]" /></label>
       </div>
     </details>

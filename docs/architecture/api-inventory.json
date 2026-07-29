@@ -402,6 +402,20 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/governance-assignments",
+      "file": "src/app/api/admin/governance-assignments/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/hot-sources",
       "file": "src/app/api/admin/hot-sources/route.ts",
       "methods": [
@@ -450,6 +464,19 @@
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/asset-health",
+      "file": "src/app/api/admin/knowledge/asset-health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false
@@ -530,6 +557,34 @@
       ],
       "auth": "admin_session",
       "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/methodology-profiles/[id]",
+      "file": "src/app/api/admin/methodology-profiles/[id]/route.ts",
+      "methods": [
+        "GET",
+        "PATCH",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/methodology-profiles",
+      "file": "src/app/api/admin/methodology-profiles/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "none",
       "query": "none",
       "externalService": false,
       "cost": "low",
@@ -1011,6 +1066,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/export-office",
+      "file": "src/app/api/aim/export-office/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/generate",
       "file": "src/app/api/aim/generate/route.ts",
       "methods": [
@@ -1021,6 +1089,32 @@
       "query": "none",
       "externalService": false,
       "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/history/[id]/canonical",
+      "file": "src/app/api/aim/history/[id]/canonical/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/history/[id]/distribution-claim",
+      "file": "src/app/api/aim/history/[id]/distribution-claim/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -1061,6 +1155,19 @@
       "auth": "user_session",
       "input": "none",
       "query": "zod",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/intent-resolve",
+      "file": "src/app/api/aim/intent-resolve/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
       "externalService": false,
       "cost": "low",
       "idempotency": false
@@ -1132,6 +1239,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/memories/[id]",
+      "file": "src/app/api/aim/memories/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/outcomes/reminders",
       "file": "src/app/api/aim/outcomes/reminders/route.ts",
       "methods": [
@@ -1180,7 +1300,7 @@
       "input": "zod_json",
       "query": "none",
       "externalService": false,
-      "cost": "high",
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -1192,6 +1312,19 @@
       "auth": "public",
       "input": "none",
       "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/style-status",
+      "file": "src/app/api/aim/style-status/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false
@@ -1218,8 +1351,8 @@
       "auth": "user_session",
       "input": "multipart",
       "query": "none",
-      "externalService": true,
-      "cost": "high",
+      "externalService": false,
+      "cost": "medium",
       "idempotency": false
     },
     {
@@ -1730,8 +1863,21 @@
       "input": "none",
       "query": "none",
       "externalService": false,
-      "cost": "medium",
+      "cost": "high",
       "idempotency": false
+    },
+    {
+      "route": "/api/content-opportunities/collections/[id]/newsroom",
+      "file": "src/app/api/content-opportunities/collections/[id]/newsroom/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
     },
     {
       "route": "/api/content-opportunities/collections/[id]",
@@ -2100,7 +2246,7 @@
       "query": "none",
       "externalService": true,
       "cost": "low",
-      "idempotency": false
+      "idempotency": true
     },
     {
       "route": "/api/integrations/feishu/events",
@@ -2126,7 +2272,7 @@
       "query": "none",
       "externalService": true,
       "cost": "low",
-      "idempotency": true
+      "idempotency": false
     },
     {
       "route": "/api/integrations/feishu/work-items/meeting-insight",
@@ -2174,11 +2320,25 @@
       "file": "src/app/api/knowledge/[id]/route.ts",
       "methods": [
         "DELETE",
+        "GET",
         "PUT"
       ],
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/knowledge/asset-health",
+      "file": "src/app/api/knowledge/asset-health/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false
