@@ -11,7 +11,7 @@ import { OpportunityBenchmarksPanel } from "@/features/opportunities/components/
 import { OpportunityCollectionsPanel } from "@/features/opportunities/components/opportunity-collections-panel"
 
 const VALID_TABS = new Set(["search", "daily", "benchmarks", "collections"])
-/** 侧栏「对标账号」入口默认落在对标账号 Tab，不再先进主动搜索 */
+/** 侧栏「市场洞察」入口默认落在对标账号 Tab，不再先进主动搜索 */
 const DEFAULT_TAB = "benchmarks"
 
 export default function OpportunitiesPage() {
