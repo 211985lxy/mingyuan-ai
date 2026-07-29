@@ -9,6 +9,7 @@ import {
   type CompetitorWatchVideo,
 } from "@/components/competitor/competitor-video-sections"
 import { CompetitorAddAccountPanel } from "@/components/competitor/competitor-add-account-panel"
+import { CompetitorTopicAnalysisPanel } from "@/components/competitor/competitor-topic-analysis-panel"
 import { CompetitorWebResearchPanel } from "@/components/competitor/competitor-web-research-panel"
 import type { WatchAccount } from "@/lib/api/client"
 import type { ApiCompetitorReport } from "@/types/api"
@@ -146,11 +147,20 @@ describe("competitor account pool components", () => {
     }))
 
     expect(addHtml).toContain("添加监控账号")
-    expect(addHtml).toContain("搜视频号")
+    expect(addHtml).toContain("搜索账号")
     expect(addHtml).toContain("输入账号昵称，或粘贴抖音 / 视频号主页链接")
     expect(addHtml.match(/<input/g)).toHaveLength(1)
     expect(addHtml).not.toContain("扩展同赛道")
     expect(researchHtml).toContain("全网补证")
     expect(researchHtml).toContain("这里不替你直接下结论")
+  })
+
+  it("explains topic analysis and keeps it separate from account search", () => {
+    const html = renderToStaticMarkup(createElement(CompetitorTopicAnalysisPanel))
+
+    expect(html).toContain("查看相关热门作品、竞争热度和可切入的内容角度")
+    expect(html).toContain("只输入选题关键词")
+    expect(html).toContain("搜索作品")
+    expect(html).toContain("生成分析")
   })
 })

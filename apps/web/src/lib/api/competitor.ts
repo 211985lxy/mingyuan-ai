@@ -396,14 +396,26 @@ export interface SearchChannelsVideoResult {
   author: { nickname: string; finderUsername: string; avatar: string }
 }
 
-export interface SearchChannelsUserResult {
-  finderUsername: string
+export interface SearchCompetitorAccountResult {
+  platform: "douyin" | "wechat_channels"
+  platformUserId: string
+  targetUrl: string
   nickname: string
   avatar: string
   signature: string
   followerCount: number
   videoCount: number
   isVerified: boolean
+}
+
+export async function searchCompetitorAccounts(
+  keyword: string,
+): Promise<{ accounts: SearchCompetitorAccountResult[]; partial: boolean }> {
+  return request("/api/competitor/search-accounts", {
+    method: "POST",
+    body: JSON.stringify({ keyword }),
+    timeout: 30000,
+  })
 }
 
 /**
@@ -419,23 +431,6 @@ export async function searchChannelsVideos(
   return request("/api/competitor/search-channels", {
     method: "POST",
     body: JSON.stringify({ keyword, ...options }),
-    timeout: 30000,
-  })
-}
-
-/**
- * @description 搜索视频号账号
- * @param keyword - 关键词
- * @param cursor - 分页游标
- * @returns Promise<{ users: SearchChannelsUserResult[]; cursor: string; hasMore: boolean }>
- */
-export async function searchChannelsUsers(
-  keyword: string,
-  cursor?: string,
-): Promise<{ users: SearchChannelsUserResult[]; cursor: string; hasMore: boolean }> {
-  return request("/api/competitor/search-channels-user", {
-    method: "POST",
-    body: JSON.stringify({ keyword, cursor }),
     timeout: 30000,
   })
 }

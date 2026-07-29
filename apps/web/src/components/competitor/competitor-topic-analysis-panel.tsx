@@ -8,7 +8,28 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { isCompetitorAccountLinkInput } from "@/features/competitor/competitor-url-utils"
 import { analyzeChannelsTopic, searchChannelsVideos, type SearchChannelsVideoResult } from "@/lib/api/competitor"
+
+interface TopicAnalysis {
+  heat_score?: number
+  heat_level?: string
+  summary?: string
+  analysis?: {
+    content_format_distribution?: Array<{ format?: string; percentage?: number }>
+    engagement_overview?: {
+      avg_views?: number
+      avg_likes?: number
+      avg_comments?: number
+      avg_shares?: number
+      top_video_views?: number
+    }
+    trend_signals?: string[]
+    differentiation_opportunities?: string[]
+    recommended_angles?: string[]
+    risk_notes?: string[]
+  }
+}
 
 interface TopicAnalysisResult {
   keyword: string
@@ -29,12 +50,22 @@ export function CompetitorTopicAnalysisPanel() {
   const [analysisResult, setAnalysisResult] = useState<TopicAnalysisResult | null>(null)
   const [searched, setSearched] = useState(false)
 
-  async function handleSearch() {
+  function getTopicKeyword(): string | null {
     const kw = keyword.trim()
     if (!kw) {
       toast.error("请输入选题关键词")
-      return
+      return null
     }
+    if (isCompetitorAccountLinkInput(kw)) {
+      toast.error("这里分析选题关键词；账号昵称或主页链接请填到下方“添加监控账号”")
+      return null
+    }
+    return kw
+  }
+
+  async function handleSearch() {
+    const kw = getTopicKeyword()
+    if (!kw) return
     setSearching(true)
     setSearched(true)
     setVideos([])
@@ -53,7 +84,7 @@ export function CompetitorTopicAnalysisPanel() {
   }
 
   async function handleAnalyze() {
-    const kw = keyword.trim()
+    const kw = getTopicKeyword()
     if (!kw) return
     setAnalyzing(true)
     try {
@@ -83,11 +114,14 @@ export function CompetitorTopicAnalysisPanel() {
           视频号选题分析
           <Badge variant="secondary" className="ml-1 text-xs">视频号</Badge>
         </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          输入一个选题关键词，查看相关热门作品、竞争热度和可切入的内容角度。
+        </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
           <Input
-            placeholder="输入选题关键词，如：供暖节能、老板IP、AI创业"
+            placeholder="只输入选题关键词，如：供暖节能、老板IP、AI创业"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void handleSearch()}
@@ -96,11 +130,11 @@ export function CompetitorTopicAnalysisPanel() {
           />
           <Button onClick={() => void handleSearch()} disabled={searching || analyzing || !keyword.trim()}>
             {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {searching ? "搜索中..." : "搜索"}
+            {searching ? "搜索中..." : "搜索作品"}
           </Button>
           <Button variant="outline" onClick={() => void handleAnalyze()} disabled={analyzing || searching || !keyword.trim()}>
             {analyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {analyzing ? "AI 分析中..." : "AI 选题分析"}
+            {analyzing ? "分析中..." : "生成分析"}
           </Button>
         </div>
 
@@ -173,17 +207,104 @@ export function CompetitorTopicAnalysisPanel() {
             </div>
             {analysisResult.analysisError ? (
               <p className="text-xs text-amber-600">{analysisResult.analysisError}</p>
-            ) : (
-              <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap text-xs leading-5 text-foreground/80">
-                {typeof analysisResult.analysis === 'string'
-                  ? analysisResult.analysis
-                  : JSON.stringify(analysisResult.analysis, null, 2)}
-              </pre>
-            )}
+            ) : <TopicAnalysisReport value={analysisResult.analysis} />}
           </div>
         )}
       </CardContent>
     </Card>
+  )
+}
+
+function TopicAnalysisReport({ value }: { value: unknown }) {
+  const report = normalizeTopicAnalysis(value)
+  if (!report) {
+    return <p className="text-sm text-muted-foreground">暂未生成有效分析，请稍后重试。</p>
+  }
+
+  const sections = [
+    { title: "建议切入角度", items: report.analysis?.recommended_angles ?? [] },
+    { title: "差异化机会", items: report.analysis?.differentiation_opportunities ?? [] },
+    { title: "趋势信号", items: report.analysis?.trend_signals ?? [] },
+  ].filter((section) => section.items.length > 0)
+  const engagement = report.analysis?.engagement_overview
+
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        {typeof report.heat_score === "number" ? (
+          <Badge>热度 {report.heat_score}/100</Badge>
+        ) : null}
+        {report.heat_level ? <Badge variant="secondary">{report.heat_level}</Badge> : null}
+      </div>
+
+      {report.summary ? (
+        <p className="rounded-md bg-muted/40 px-3 py-2 leading-6">{report.summary}</p>
+      ) : null}
+
+      {(report.analysis?.content_format_distribution ?? []).length > 0 ? (
+        <div>
+          <p className="mb-2 font-medium">内容形式分布</p>
+          <div className="flex flex-wrap gap-2">
+            {report.analysis?.content_format_distribution?.map((item, index) => (
+              <Badge key={`${item.format ?? "形式"}-${index}`} variant="outline">
+                {item.format || "其他"} {typeof item.percentage === "number" ? `${item.percentage}%` : ""}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {engagement ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <Metric label="平均播放" value={engagement.avg_views} />
+          <Metric label="平均点赞" value={engagement.avg_likes} />
+          <Metric label="平均评论" value={engagement.avg_comments} />
+          <Metric label="平均分享" value={engagement.avg_shares} />
+          <Metric label="最高播放" value={engagement.top_video_views} />
+        </div>
+      ) : null}
+
+      {sections.length > 0 ? (
+        <div className="grid gap-3 md:grid-cols-3">
+          {sections.map((section) => (
+            <div key={section.title} className="rounded-md border bg-background/60 p-3">
+              <p className="mb-2 font-medium">{section.title}</p>
+              <ul className="space-y-1.5 text-xs leading-5 text-muted-foreground">
+                {section.items.map((item, index) => <li key={`${item}-${index}`}>• {item}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {(report.analysis?.risk_notes ?? []).length > 0 ? (
+        <div className="rounded-md bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          <span className="font-medium">注意：</span>
+          {report.analysis?.risk_notes?.join("；")}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function normalizeTopicAnalysis(value: unknown): TopicAnalysis | null {
+  if (!value) return null
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value) as TopicAnalysis
+    } catch {
+      return { summary: value }
+    }
+  }
+  return typeof value === "object" ? value as TopicAnalysis : null
+}
+
+function Metric({ label, value }: { label: string; value?: number }) {
+  return (
+    <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium">{typeof value === "number" ? formatNum(value) : "—"}</p>
+    </div>
   )
 }
 

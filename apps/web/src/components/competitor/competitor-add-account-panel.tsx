@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react"
 
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
-import { WechatChannelsUserSearch } from "@/components/competitor/wechat-channels-user-search"
+import { CompetitorAccountSearch } from "@/components/competitor/competitor-account-search"
 
 interface AddAccountPanelProps {
   value: string
@@ -28,7 +28,7 @@ export function CompetitorAddAccountPanel({ value, adding, accountCount, onChang
       meta={<span>输入账号昵称或主页链接，系统会自动识别并添加</span>}
       flat
     >
-      <WechatChannelsUserSearch
+      <CompetitorAccountSearch
         value={value}
         accountCount={accountCount}
         disabled={full}

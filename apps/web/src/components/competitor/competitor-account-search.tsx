@@ -2,13 +2,14 @@
 
 import { Loader2, Plus, Search } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { isCompetitorAccountLinkInput } from "@/features/competitor/competitor-url-utils"
-import { useWechatChannelsUserSearch } from "@/features/competitor/hooks/use-wechat-channels-user-search"
-import type { SearchChannelsUserResult } from "@/lib/api/client"
+import { useCompetitorAccountSearch } from "@/features/competitor/hooks/use-competitor-account-search"
+import type { SearchCompetitorAccountResult } from "@/lib/api/client"
 
-interface WechatChannelsUserSearchProps {
+interface CompetitorAccountSearchProps {
   value: string
   accountCount: number
   disabled?: boolean
@@ -17,22 +18,22 @@ interface WechatChannelsUserSearchProps {
   onAdd: (url?: string, successMessage?: string) => Promise<void>
 }
 
-export function WechatChannelsUserSearch({
+export function CompetitorAccountSearch({
   value,
   accountCount,
   disabled = false,
   adding,
   onChange,
   onAdd,
-}: WechatChannelsUserSearchProps) {
+}: CompetitorAccountSearchProps) {
   const {
     searching,
     results,
     searched,
     addingFinder,
     handleSearch,
-    handleAddChannelsUser,
-  } = useWechatChannelsUserSearch({ keyword: value, disabled, adding, onAdd })
+    handleAddSearchResult,
+  } = useCompetitorAccountSearch({ keyword: value, disabled, adding, onAdd })
   const linkInput = isCompetitorAccountLinkInput(value)
   const busy = adding || searching
 
@@ -72,54 +73,54 @@ export function WechatChannelsUserSearch({
               ? "添加中..."
               : linkInput
                 ? `添加 (${accountCount}/10)`
-                : "搜视频号"}
+                : "搜索账号"}
         </Button>
       </div>
 
       {!linkInput && searched && !searching && results.length === 0 ? (
         <p className="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-          没搜到可添加的账号。可换更完整的昵称再试。
+          抖音和视频号都没搜到匹配账号，可换更完整的昵称或账号 ID 再试。
         </p>
       ) : null}
 
       {!linkInput && results.length > 0 ? (
-        <ChannelsUserResultList
+        <AccountSearchResultList
           results={results}
           adding={adding}
           addingFinder={addingFinder}
           disabled={disabled}
-          onAdd={handleAddChannelsUser}
+          onAdd={handleAddSearchResult}
         />
       ) : null}
     </div>
   )
 }
 
-function ChannelsUserResultList({
+function AccountSearchResultList({
   results,
   adding,
   addingFinder,
   disabled,
   onAdd,
 }: {
-  results: SearchChannelsUserResult[]
+  results: SearchCompetitorAccountResult[]
   adding: boolean
   addingFinder: string | null
   disabled: boolean
-  onAdd: (user: SearchChannelsUserResult) => void
+  onAdd: (account: SearchCompetitorAccountResult) => void
 }) {
   return (
     <ul className="space-y-2">
-      {results.slice(0, 8).map((user) => {
-        const busy = addingFinder === user.finderUsername
+      {results.slice(0, 12).map((account) => {
+        const busy = addingFinder === account.platformUserId
         return (
           <li
-            key={user.finderUsername}
+            key={`${account.platform}:${account.platformUserId}`}
             className="flex items-center gap-3 rounded-lg border border-border/70 px-3 py-2"
           >
-            {user.avatar ? (
+            {account.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+              <img src={account.avatar} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
             ) : (
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs text-muted-foreground">
                 号
@@ -127,21 +128,24 @@ function ChannelsUserResultList({
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
-                {user.nickname || "未命名视频号"}
-                {user.isVerified ? (
+                {account.nickname || "未命名账号"}
+                <Badge variant="secondary" className="ml-2 align-middle text-[10px]">
+                  {account.platform === "douyin" ? "抖音" : "视频号"}
+                </Badge>
+                {account.isVerified ? (
                   <span className="ml-1 text-xs font-normal text-muted-foreground">已认证</span>
                 ) : null}
               </p>
               <p className="truncate text-xs text-muted-foreground">
-                {user.signature || "暂无简介"}
-                {user.followerCount > 0 ? ` · ${formatCount(user.followerCount)} 粉丝` : ""}
+                {account.signature || "暂无简介"}
+                {account.followerCount > 0 ? ` · ${formatCount(account.followerCount)} 粉丝` : ""}
               </p>
             </div>
             <Button
               size="sm"
               className="shrink-0"
               disabled={adding || disabled || Boolean(addingFinder)}
-              onClick={() => onAdd(user)}
+              onClick={() => onAdd(account)}
             >
               {busy ? "添加中..." : "加入监控"}
             </Button>
