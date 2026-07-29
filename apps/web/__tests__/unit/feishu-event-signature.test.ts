@@ -16,7 +16,7 @@ describe("verifyFeishuEventSignature", () => {
       timestamp,
       nonce,
       encryptKey,
-      rawBody,
+      bodyCandidates: [rawBody],
       signature,
     })).toBe(true)
 
@@ -24,9 +24,17 @@ describe("verifyFeishuEventSignature", () => {
       timestamp,
       nonce,
       encryptKey,
-      rawBody: JSON.stringify(JSON.parse(rawBody)),
+      bodyCandidates: [JSON.stringify(JSON.parse(rawBody))],
       signature,
     })).toBe(false)
+
+    expect(verifyFeishuEventSignature({
+      timestamp,
+      nonce,
+      encryptKey,
+      bodyCandidates: [JSON.stringify(JSON.parse(rawBody)), rawBody],
+      signature,
+    })).toBe(true)
   })
 
   it("rejects a missing or malformed signature", () => {
@@ -34,7 +42,7 @@ describe("verifyFeishuEventSignature", () => {
       timestamp: "1785312000",
       nonce: "nonce",
       encryptKey: "encrypt-key",
-      rawBody: '{"encrypt":"ciphertext"}',
+      bodyCandidates: ['{"encrypt":"ciphertext"}'],
     }
 
     expect(verifyFeishuEventSignature({ ...input, signature: "" })).toBe(false)

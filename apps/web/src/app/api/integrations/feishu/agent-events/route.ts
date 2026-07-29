@@ -70,7 +70,7 @@ function verifyEncryptedPayload(
     timestamp: headers["x-lark-request-timestamp"] || "",
     nonce: headers["x-lark-request-nonce"] || "",
     encryptKey,
-    rawBody,
+    bodyCandidates: [JSON.stringify(payload), rawBody],
     signature: headers["x-lark-signature"] || "",
   })
 }
