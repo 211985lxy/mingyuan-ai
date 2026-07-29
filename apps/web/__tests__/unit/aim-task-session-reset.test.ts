@@ -30,7 +30,10 @@ describe("aim task session reset", () => {
 
   it("drops stale workflow brief unless keepContext or explicit override", () => {
     const stale = { sourceGenerationId: "old-gen", confirmed: { angle: "旧选题" } }
-    const fresh = { sourceGenerationId: undefined, confirmed: { angle: "新计划" } }
+    const fresh: {
+      sourceGenerationId?: string
+      confirmed: { angle: string }
+    } = { sourceGenerationId: undefined, confirmed: { angle: "新计划" } }
 
     expect(resolveAimWorkflowBriefForRequest({
       keepContext: false,

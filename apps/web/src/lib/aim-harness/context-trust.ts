@@ -20,6 +20,8 @@ export function resolveDefaultTrustLevel(
     case "ip_wiki":
     case "methodology":
     case "memory":
+    case "skill":
+    case "system":
       return "system_trusted"
     case "request":
     case "history":

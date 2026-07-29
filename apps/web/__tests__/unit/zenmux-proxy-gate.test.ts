@@ -5,6 +5,7 @@ describe("ZenMux proxy gate", () => {
 
   afterEach(() => {
     process.env = { ...originalEnv }
+    vi.unstubAllEnvs()
     vi.resetModules()
     vi.restoreAllMocks()
   })
@@ -40,7 +41,7 @@ describe("ZenMux proxy gate", () => {
   })
 
   it("skips registering ZenMux without proxy under NODE_ENV=production", async () => {
-    process.env.NODE_ENV = "production"
+    vi.stubEnv("NODE_ENV", "production")
     process.env.ZENMUX_API_KEY = "sk-zenmux"
     delete process.env.ZENMUX_PROXY_URL
     delete process.env.APIMART_PROXY_URL

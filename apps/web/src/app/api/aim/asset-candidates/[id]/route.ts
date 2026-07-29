@@ -3,14 +3,108 @@ import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { reviewAssetCandidate } from "@/lib/aim/asset-candidate-store"
 import {
-  assertValidApprovalForHighRisk,
-} from "@/lib/aim/workflow-governance"
-import {
-  createPrismaApprovalDecisionStore,
-} from "@/lib/aim/approval-decision-prisma"
-import { loadApprovalForSubject } from "@/lib/aim/approval-decision-store"
+  validateHighRiskApproval,
+} from "@/lib/aim/approval-validation"
+import { prisma } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
+
+async function validateCrossProjectApproval(input: {
+  id: string
+  projectId: string
+  workflowId: string
+  approvalId: string | null
+  body: Record<string, unknown>
+}): Promise<NextResponse | null> {
+  const crossProjectApprovalId =
+    typeof input.body.crossProjectApprovalId === "string"
+      ? input.body.crossProjectApprovalId
+      : null
+  if (!crossProjectApprovalId) {
+    return NextResponse.json({
+      error: "跨项目复用需独立的 system_owner approvalId",
+    }, { status: 403 })
+  }
+  if (input.approvalId && crossProjectApprovalId === input.approvalId) {
+    return NextResponse.json({
+      error: "跨项目复用批准必须与主批准不同",
+    }, { status: 403 })
+  }
+  const crossProjectGate = await validateHighRiskApproval({
+    action: "promote",
+    approvalId: crossProjectApprovalId,
+    subjectType: "asset",
+    subjectId: input.id,
+    workflowId: input.workflowId,
+    projectId: input.projectId,
+    expectedRoles: ["system_owner"],
+  })
+  return crossProjectGate.ok
+    ? null
+    : NextResponse.json({ error: crossProjectGate.error }, { status: 403 })
+}
+
+/**
+ * promote 或开启跨项目复用时的审批校验。
+ * 无论 promote 是否为 true，只要把 crossProjectAllowed 从 false 开到 true，
+ * 都必须有独立 system_owner approval。
+ */
+async function validatePromotion(
+  id: string,
+  userId: string,
+  body: Record<string, unknown>,
+): Promise<NextResponse | null> {
+  const promote = body.promote === true
+  const enablingCrossProject = body.crossProjectAllowed === true
+  if (!promote && !enablingCrossProject) return null
+  if (promote && body.action !== "approve") {
+    return NextResponse.json({ error: "仅 approve 可执行 promote" }, { status: 400 })
+  }
+  if (enablingCrossProject && body.action !== "approve") {
+    return NextResponse.json({ error: "仅 approve 可开启跨项目复用" }, { status: 400 })
+  }
+  const workflowId =
+    typeof body.workflowId === "string" ? body.workflowId.trim() : ""
+  if (!workflowId) {
+    return NextResponse.json({
+      error: promote ? "promote 缺少 workflowId" : "开启跨项目复用缺少 workflowId",
+    }, { status: 400 })
+  }
+  const candidate = await prisma.assetCandidate.findFirst({
+    where: { id, userId },
+    select: { projectId: true, crossProjectAllowed: true },
+  })
+  if (!candidate) {
+    return NextResponse.json({ error: "候选不存在或无权操作" }, { status: 404 })
+  }
+
+  const approvalId = typeof body.approvalId === "string" ? body.approvalId : null
+  if (promote) {
+    const gate = await validateHighRiskApproval({
+      action: "promote",
+      approvalId,
+      subjectType: "asset",
+      subjectId: id,
+      workflowId,
+      projectId: candidate.projectId,
+      expectedRoles: ["reviewer", "business_owner", "backup_owner", "system_owner"],
+    })
+    if (!gate.ok) {
+      return NextResponse.json({ error: gate.error }, { status: 403 })
+    }
+  }
+
+  const needsCrossProjectApproval =
+    enablingCrossProject && !candidate.crossProjectAllowed
+  if (!needsCrossProjectApproval) return null
+  return validateCrossProjectApproval({
+    id,
+    projectId: candidate.projectId,
+    workflowId,
+    approvalId: promote ? approvalId : null,
+    body,
+  })
+}
 
 /**
  * 人工审核资产候选（90 天计划 3.1 / WP-2）。
@@ -37,20 +131,8 @@ export async function PATCH(
     }
 
     const promote = body.promote === true
-    if (promote) {
-      const approvalId = typeof body.approvalId === "string" ? body.approvalId : null
-      const store = createPrismaApprovalDecisionStore()
-      const approval = await loadApprovalForSubject(store, approvalId, "asset", id)
-      const gate = assertValidApprovalForHighRisk({
-        action: "promote",
-        approval,
-        subjectType: "asset",
-        subjectId: id,
-      })
-      if (!gate.ok) {
-        return NextResponse.json({ error: gate.error }, { status: 403 })
-      }
-    }
+    const promotionError = await validatePromotion(id, user.id, body)
+    if (promotionError) return promotionError
 
     const result = await reviewAssetCandidate({
       userId: user.id,

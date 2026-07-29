@@ -48,6 +48,7 @@ export interface TopPerformer {
   conversionRate: number | null
   /** 用户备注。 */
   userVerdict: string | null
+  verdictNote?: string | null
   /** 结构化判断码；缺省 unknown */
   verdictCode: string | null
 }
@@ -77,6 +78,7 @@ interface OutcomeWithGenerationRow {
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictNote?: string | null
   verdictCode: string | null
   generation: {
     id: string
@@ -133,7 +135,7 @@ function computeConversionRate(outcome: {
  * 查询用户历史表现最佳的文案。
  *
  * 排序规则：
- *   1. 有 userVerdict 的优先
+ *   1. 有正向 verdictCode 的优先
  *   2. 互动率降序
  *   3. 转化率降序
  *
@@ -197,6 +199,7 @@ export async function getTopPerformingScripts(input: {
       engagementRate: rate,
       conversionRate: computeConversionRate(row),
       userVerdict: row.userVerdict,
+      verdictNote: row.verdictNote,
       verdictCode: code === "unknown" ? null : code,
     })
   }
@@ -250,7 +253,8 @@ export function buildTopPerformerSection(performers: TopPerformer[]): string {
 
     lines.push(`--- 参考 ${i + 1}：${p.topicTitle || "（无标题）"} ---`)
     lines.push(`效果：${metrics.join(" | ")}`)
-    if (p.userVerdict) lines.push(`用户评价：${p.userVerdict}`)
+    const note = p.verdictNote?.trim() || p.userVerdict?.trim()
+    if (note) lines.push(`用户评价：${note}`)
     lines.push("文案：")
     lines.push(p.copyExcerpt)
     lines.push("")

@@ -19,6 +19,7 @@ function makeRow(overrides: Partial<{
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictNote: string | null
   verdictCode: string | null
   generation: {
     id: string
@@ -41,6 +42,7 @@ function makeRow(overrides: Partial<{
     dealCount: null,
     revenue: null,
     userVerdict: null,
+    verdictNote: null,
     verdictCode: null,
     generation: {
       id: "gen1",
@@ -84,12 +86,19 @@ describe("getTopPerformingScripts", () => {
     expect(result[0].engagementRate).toBeCloseTo(0.02, 4)
   })
 
-  it("有 userVerdict 但互动率低 → 仍返回", async () => {
+  it("旧 userVerdict 但互动率低 → 不得自动升级为最佳表现", async () => {
     const store = makeStore([
-      makeRow({ views: 100, likes: 0, userVerdict: "用户说很好" }),
+      makeRow({
+        views: 100,
+        likes: 0,
+        comments: 0,
+        saves: 0,
+        shares: 0,
+        userVerdict: "用户说很好",
+      }),
     ])
     const result = await getTopPerformingScripts({ userId: "u1", store })
-    expect(result).toHaveLength(1)
+    expect(result).toHaveLength(0)
   })
 
   it("按互动率降序排列", async () => {
@@ -181,6 +190,8 @@ describe("buildTopPerformerSection", () => {
         engagementRate: 0.06,
         conversionRate: 0.005,
         userVerdict: null,
+        verdictNote: null,
+        verdictCode: null,
       },
     ]
     const section = buildTopPerformerSection(performers)

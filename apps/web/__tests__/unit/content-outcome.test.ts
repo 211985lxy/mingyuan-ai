@@ -20,6 +20,16 @@ describe("sanitizeOutcomeBody", () => {
   it("显式 0 保留为 0（用户确实填了 0）", () => {
     expect(sanitizeOutcomeBody({ collectWindowDay: 7, dmCount: 0 }).dmCount).toBe(0)
   })
+  it("新版备注与历史 userVerdict 分列保存", () => {
+    const out = sanitizeOutcomeBody({
+      collectWindowDay: 7,
+      verdictCode: "neutral",
+      verdictNote: "数据一般",
+    })
+    expect(out.verdictNote).toBe("数据一般")
+    expect(out.userVerdict).toBeNull()
+    expect(out.verdictCode).toBe("neutral")
+  })
 })
 
 describe("buildOutcomeUpdate (PATCH 语义)", () => {
@@ -42,5 +52,15 @@ describe("buildOutcomeUpdate (PATCH 语义)", () => {
     const sanitized = sanitizeOutcomeBody({ collectWindowDay: 7, views: "" })
     const update = buildOutcomeUpdate(sanitized, new Set(["collectWindowDay", "views"]))
     expect(update).toHaveProperty("views", null)
+  })
+  it("旧客户端 userVerdict 同步到 verdictNote，但不修改 verdictCode", () => {
+    const sanitized = sanitizeOutcomeBody({ collectWindowDay: 7, userVerdict: "旧备注" })
+    const update = buildOutcomeUpdate(
+      sanitized,
+      new Set(["collectWindowDay", "userVerdict"]),
+    )
+    expect(update).toHaveProperty("userVerdict", "旧备注")
+    expect(update).toHaveProperty("verdictNote", "旧备注")
+    expect(update).not.toHaveProperty("verdictCode")
   })
 })

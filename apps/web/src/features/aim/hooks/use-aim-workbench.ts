@@ -135,7 +135,7 @@ export function useAimWorkbench() {
     outcomeForm, setOutcomeForm,
     outcomeWindow, setOutcomeWindow,
     retroRuleForm, setRetroRuleForm,
-    handleMarkStatus, openRecordDialog, submitRecordDialog,
+    handleMarkStatus, handleFinalDisposition, openRecordDialog, submitRecordDialog,
   } = useAimWorkflowRecords({
     messages,
     setMessages,
@@ -345,6 +345,7 @@ export function useAimWorkbench() {
     handleInlineContentSaved,
     handleInlineSelectionRewrite,
   } = useAimInlineEditorBridge({
+    messages,
     setMessages,
     setEditorText,
     setEditorFormat,
@@ -359,6 +360,7 @@ export function useAimWorkbench() {
     setEditorPanelOpen(true)
   }, [setEditorPanelOpen, syncEditorFromResult])
 
+  // eslint-disable-next-line react-hooks/refs -- ref trampoline must see this render's callback.
   openEditorFromResultRef.current = syncEditorFromResult
 
   // ---- openProjectWorkflowTask ----
@@ -413,6 +415,7 @@ export function useAimWorkbench() {
     sendText,
     generateWithInput,
   })
+  // eslint-disable-next-line react-hooks/refs -- reset handlers read this ref outside render.
   clearTurnIntentRef.current = clearPendingTurnIntent
 
   /** 统一的生成入口：显式计划指令/开关优先，其余请求走直接模式意图门闩。 */
@@ -459,7 +462,7 @@ export function useAimWorkbench() {
     isEvolving, evolutionSuggestions,
     recordDialog, closeRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm,
     retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow,
-    retroRuleForm, setRetroRuleForm, handleMarkStatus, openRecordDialog, submitRecordDialog,
+    retroRuleForm, setRetroRuleForm, handleMarkStatus, handleFinalDisposition, openRecordDialog, submitRecordDialog,
     wikiDialog,
     isImitating, isSavingEditor, imitateStyleId, setImitateStyleId, handleImitate, saveEditorToDeliverable, applyEditorReplacement, applyRestoredContent,
     scrollRef,

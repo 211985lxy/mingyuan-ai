@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  AttributionConflictError,
   normalizeAttributionMethod,
   resolveAttributionMethod,
   upsertOutcomeAttribution,
@@ -13,6 +14,8 @@ function makeStore(seed: OutcomeAttributionRecord[] = []): OutcomeAttributionSto
   const rows = [...seed]
   return {
     rows,
+    findByExternalRecordId: async (externalRecordId) =>
+      rows.find((row) => row.externalRecordId === externalRecordId) ?? null,
     findByExternalLeadId: async (externalLeadId) =>
       rows.find((row) => row.externalLeadId === externalLeadId) ?? null,
     findByExternalDealId: async (externalDealId) =>
@@ -28,12 +31,22 @@ function makeStore(seed: OutcomeAttributionRecord[] = []): OutcomeAttributionSto
         externalAppointmentId: data.externalAppointmentId,
         externalDealId: data.externalDealId,
         externalPaymentId: data.externalPaymentId,
+        externalRecordId: data.externalRecordId,
+        externalTableId: data.externalTableId,
+        externalSourceContentId: data.externalSourceContentId,
+        externalAttributionConfirmer: data.externalAttributionConfirmer,
         attributionMethod: data.attributionMethod,
         attributionConfidence: data.attributionConfidence,
         occurredAt: data.occurredAt,
       }
       rows.push(record)
       return record
+    },
+    update: async (id, data) => {
+      const index = rows.findIndex((row) => row.id === id)
+      if (index < 0) throw new Error("missing")
+      rows[index] = { ...rows[index], ...data }
+      return rows[index]
     },
   }
 }
@@ -83,6 +96,24 @@ describe("resolveAttributionMethod", () => {
     expect(normalizeAttributionMethod("multi_touch")).toBe("unknown")
     expect(normalizeAttributionMethod("explicit")).toBe("explicit")
   })
+
+  it("飞书声明归因必须带确认人，否则降为 unknown", () => {
+    expect(
+      resolveAttributionMethod({
+        candidateGenerationId: "g1",
+        externalLeadId: "lead_1",
+        declaredMethod: "明确归因",
+      }),
+    ).toEqual({ method: "unknown", confidence: "low" })
+    expect(
+      resolveAttributionMethod({
+        candidateGenerationId: "g1",
+        externalLeadId: "lead_1",
+        declaredMethod: "明确归因",
+        confirmedBy: "ou_owner",
+      }),
+    ).toEqual({ method: "explicit", confidence: "high" })
+  })
 })
 
 describe("upsertOutcomeAttribution 幂等", () => {
@@ -98,7 +129,7 @@ describe("upsertOutcomeAttribution 幂等", () => {
     const store = makeStore()
     const first = await upsertOutcomeAttribution(base, store)
     const second = await upsertOutcomeAttribution(
-      { ...base, generationId: "g_other", explicitLink: false },
+      { ...base, explicitLink: false },
       store,
     )
     expect(first.created).toBe(true)
@@ -117,9 +148,7 @@ describe("upsertOutcomeAttribution 幂等", () => {
     const second = await upsertOutcomeAttribution(
       {
         ...base,
-        externalLeadId: "lead_2",
         externalDealId: "deal_1",
-        generationId: "g9",
       },
       store,
     )
@@ -138,12 +167,52 @@ describe("upsertOutcomeAttribution 幂等", () => {
     const second = await upsertOutcomeAttribution(
       {
         ...base,
-        externalLeadId: "lead_9",
         externalPaymentId: "pay_1",
       },
       store,
     )
     expect(second.created).toBe(false)
     expect(second.record.id).toBe(first.record.id)
+  })
+
+  it("同一线索后续补预约/成交/回款时更新原投影", async () => {
+    const store = makeStore()
+    await upsertOutcomeAttribution(base, store)
+    const second = await upsertOutcomeAttribution(
+      {
+        ...base,
+        externalAppointmentId: "appointment_1",
+        externalDealId: "deal_1",
+        externalPaymentId: "pay_1",
+        declaredMethod: "explicit",
+        externalAttributionConfirmer: "admin_1",
+        explicitLink: false,
+      },
+      store,
+    )
+    expect(second.created).toBe(false)
+    expect(second.record.externalAppointmentId).toBe("appointment_1")
+    expect(second.record.externalDealId).toBe("deal_1")
+    expect(second.record.externalPaymentId).toBe("pay_1")
+    expect(second.record.attributionMethod).toBe("explicit")
+    expect(store.rows).toHaveLength(1)
+  })
+
+  it("同一外部线索不得静默改绑到其它 generation", async () => {
+    const store = makeStore()
+    await upsertOutcomeAttribution(base, store)
+    await expect(
+      upsertOutcomeAttribution({ ...base, generationId: "g_other" }, store),
+    ).rejects.toBeInstanceOf(AttributionConflictError)
+  })
+
+  it("同一飞书 recordId 不得带入另一条线索", async () => {
+    const store = makeStore()
+    await upsertOutcomeAttribution({ ...base, externalRecordId: "rec_1" }, store)
+    await expect(upsertOutcomeAttribution({
+      ...base,
+      externalLeadId: "lead_other",
+      externalRecordId: "rec_1",
+    }, store)).rejects.toBeInstanceOf(AttributionConflictError)
   })
 })

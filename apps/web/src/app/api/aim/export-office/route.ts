@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       typeof body.title === "string" && body.title.trim()
         ? body.title.trim().slice(0, 120)
         : "AIM 交付物"
-    let sections: OfficeExportSection[] = sectionsFromBody ?? []
+    const sections: OfficeExportSection[] = sectionsFromBody ?? []
 
     const generationId = typeof body.generationId === "string" ? body.generationId.trim() : ""
     if (sections.length === 0 && generationId) {

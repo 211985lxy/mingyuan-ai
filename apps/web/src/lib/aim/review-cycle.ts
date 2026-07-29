@@ -26,6 +26,9 @@ export interface ReviewMetricsSnapshot {
   appointmentCount: number
   dealCount: number
   revenue: number
+  paymentCount: number
+  /** 无真实回款金额来源时保持 null，禁止用成交额冒充 */
+  paymentAmountCny: number | null
   customerOutcomeCount: number
   timeSavedMinutes: number | null
   firstPassAcceptanceRate: number | null
@@ -44,9 +47,15 @@ export interface ReviewMetricsSnapshot {
   pendingMethodologyCandidates: number
   previousActionCloseRate: number | null
   day7BackfillRate: number | null
+  /** 资格闸门证据；旧快照缺失时保持 unknown，不推测回填。 */
+  runIdCoverage?: number | null
+  costCoverage?: number | null
+  finalDispositionCoverage?: number | null
+  generationLinkCoverage?: number | null
 }
 
 export interface ReviewCycleDraft {
+  requestId: string
   periodStart: Date
   periodEnd: Date
   systemOwnerId: string
@@ -75,6 +84,59 @@ export interface ReviewCycleLike {
 
 const STATUS_SET = new Set<string>(REVIEW_CYCLE_STATUSES)
 const ACTION_STATUS_SET = new Set<string>(REVIEW_ACTION_STATUSES)
+const RATE_KEYS = [
+  "firstPassAcceptanceRate",
+  "rewriteRate",
+  "rejectionRate",
+  "previousActionCloseRate",
+  "day7BackfillRate",
+  "runIdCoverage",
+  "costCoverage",
+  "finalDispositionCoverage",
+  "generationLinkCoverage",
+] as const
+const NULLABLE_NUMBER_KEYS = [
+  "timeSavedMinutes",
+  "directCostPerSuccess",
+  "fullyLoadedCost",
+  "paymentAmountCny",
+  ...RATE_KEYS,
+] as const
+const REQUIRED_NUMBER_KEYS = [
+  "publishedCount",
+  "qualifiedLeadCount",
+  "appointmentCount",
+  "dealCount",
+  "revenue",
+  "paymentCount",
+  "customerOutcomeCount",
+  "p0FailureCount",
+  "p1FailureCount",
+  "humanTakeoverCount",
+  "highCostAnomalyCount",
+  "pendingKnowledgeCandidates",
+  "pendingCaseCandidates",
+  "pendingMemoryCandidates",
+  "pendingEvalCandidates",
+  "pendingMethodologyCandidates",
+] as const
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const FILTER_KEYS = ["projectId", "workflowId", "ownerId", "channel"] as const
+
+/** 移除 undefined / 空字符串字段，得到规范化筛选快照。 */
+export function normalizeReviewCycleFilters(
+  filters: ReviewCycleFilters | undefined | null,
+): ReviewCycleFilters {
+  if (!filters || typeof filters !== "object") return {}
+  const normalized: ReviewCycleFilters = {}
+  for (const key of FILTER_KEYS) {
+    const value = filters[key]
+    if (typeof value === "string" && value.trim()) {
+      normalized[key] = value.trim() as never
+    }
+  }
+  return normalized
+}
 
 export function isReviewCycleStatus(value: unknown): value is ReviewCycleStatus {
   return typeof value === "string" && STATUS_SET.has(value)
@@ -94,20 +156,42 @@ export function assertValidReviewPeriod(periodStart: Date, periodEnd: Date): voi
   if (periodEnd.getTime() <= periodStart.getTime()) {
     throw new Error("periodEnd 必须晚于 periodStart")
   }
+  if (periodEnd.getTime() - periodStart.getTime() !== WEEK_MS) {
+    throw new Error("周复盘周期必须正好 7 天")
+  }
 }
 
 export function validateReviewCycleDraft(draft: ReviewCycleDraft): ReviewCycleDraft {
   assertValidReviewPeriod(draft.periodStart, draft.periodEnd)
+  if (!draft.requestId.trim()) throw new Error("requestId 必填")
   if (!draft.systemOwnerId.trim()) throw new Error("systemOwnerId 必填")
   if (!draft.metricsSnapshot || typeof draft.metricsSnapshot !== "object") {
     throw new Error("metricsSnapshot 必填")
   }
+  for (const key of REQUIRED_NUMBER_KEYS) {
+    if (!Number.isFinite(draft.metricsSnapshot[key])) {
+      throw new Error(`metricsSnapshot.${key} 必须是有限数字`)
+    }
+  }
+  for (const key of NULLABLE_NUMBER_KEYS) {
+    const value = draft.metricsSnapshot[key]
+    if (value != null && !Number.isFinite(value)) {
+      throw new Error(`metricsSnapshot.${key} 必须是有限数字或 null`)
+    }
+  }
+  for (const key of RATE_KEYS) {
+    const value = draft.metricsSnapshot[key]
+    if (value != null && (value < 0 || value > 1)) {
+      throw new Error(`metricsSnapshot.${key} 必须在 0..1`)
+    }
+  }
   return {
+    requestId: draft.requestId.trim(),
     periodStart: draft.periodStart,
     periodEnd: draft.periodEnd,
     systemOwnerId: draft.systemOwnerId.trim(),
     metricsSnapshot: draft.metricsSnapshot,
-    filterSnapshot: draft.filterSnapshot,
+    filterSnapshot: normalizeReviewCycleFilters(draft.filterSnapshot),
   }
 }
 
@@ -158,8 +242,29 @@ export function canAttachToPerformanceReview(
   cycles: ReviewCycleLike[],
   requiredSignedWeeks = 4,
 ): boolean {
-  const signed = cycles.filter((c) => c.status === "signed")
-  return signed.length >= requiredSignedWeeks
+  if (!Number.isInteger(requiredSignedWeeks) || requiredSignedWeeks < 1) return false
+  const signed = cycles
+    .filter((cycle) => cycle.status === "signed" && cycle.signedAt)
+    .map((cycle) => ({
+      start: new Date(cycle.periodStart).getTime(),
+      end: new Date(cycle.periodEnd).getTime(),
+    }))
+    .filter((cycle) =>
+      Number.isFinite(cycle.start)
+      && Number.isFinite(cycle.end)
+      && cycle.end - cycle.start === WEEK_MS)
+    .sort((left, right) => left.start - right.start)
+  let consecutive = 0
+  let previousStart: number | null = null
+  for (const cycle of signed) {
+    consecutive =
+      previousStart != null && cycle.start - previousStart === WEEK_MS
+        ? consecutive + 1
+        : 1
+    if (consecutive >= requiredSignedWeeks) return true
+    previousStart = cycle.start
+  }
+  return false
 }
 
 /** 比率：filled/due；due=0 → null（不当 0） */

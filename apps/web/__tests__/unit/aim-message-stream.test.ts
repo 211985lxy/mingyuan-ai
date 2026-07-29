@@ -11,9 +11,12 @@ const actions = {
   onRepurpose: vi.fn(() => vi.fn()),
   onQuality: vi.fn(() => vi.fn()),
   onMarkStatus: vi.fn(() => vi.fn()),
+  onFinalDisposition: vi.fn(() => vi.fn()),
   onNextAction: vi.fn(),
   onOpenRecord: vi.fn(),
   onCompileToWiki: vi.fn(),
+  onInlineContentSaved: vi.fn(),
+  onInlineSelectionRewrite: vi.fn(),
 }
 
 describe("AIM message stream", () => {

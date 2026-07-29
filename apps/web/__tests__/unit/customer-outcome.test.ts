@@ -65,6 +65,7 @@ describe("buildSuccessCaseCandidateFromCustomerOutcome", () => {
     expect(buildSuccessCaseCandidateFromCustomerOutcome(row({ actual: null }))).toBeNull()
     expect(buildSuccessCaseCandidateFromCustomerOutcome(row({ reviewStatus: "rejected" }))).toBeNull()
     expect(buildSuccessCaseCandidateFromCustomerOutcome(row({ reviewerRef: "" }))).toBeNull()
+    expect(buildSuccessCaseCandidateFromCustomerOutcome(row({ reviewedAt: null }))).toBeNull()
   })
 })
 

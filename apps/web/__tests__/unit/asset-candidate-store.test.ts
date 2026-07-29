@@ -29,6 +29,7 @@ interface FakeRow {
   reviewStatus: string
   crossProjectAllowed: boolean
   promotedEntryId: string | null
+  promotedAt: Date | null
 }
 
 function makeTaskSpec() {
@@ -89,8 +90,23 @@ function makeStore() {
         ),
       findFirst: async (args: { where: { id: string; userId: string } }) =>
         rows.find((r) => r.id === args.where.id && r.userId === args.where.userId) ?? null,
-      create: async (args: { data: Omit<FakeRow, "id"> }) => {
-        const row = { ...args.data, id: `cand_${++seq}` }
+      create: async (args: { data: Record<string, unknown> }) => {
+        const row: FakeRow = {
+          id: `cand_${++seq}`,
+          userId: String(args.data.userId),
+          projectId: String(args.data.projectId),
+          generationId: String(args.data.generationId),
+          feishuRecordId: (args.data.feishuRecordId as string | null) ?? null,
+          kind: String(args.data.kind),
+          title: String(args.data.title),
+          content: String(args.data.content),
+          evidence: (args.data.evidence as string | null) ?? null,
+          confidence: String(args.data.confidence ?? "medium"),
+          reviewStatus: String(args.data.reviewStatus ?? "pending"),
+          crossProjectAllowed: Boolean(args.data.crossProjectAllowed),
+          promotedEntryId: (args.data.promotedEntryId as string | null) ?? null,
+          promotedAt: (args.data.promotedAt as Date | null) ?? null,
+        }
         rows.push(row)
         return row
       },
@@ -105,6 +121,12 @@ function makeStore() {
       create: async (args: { data: Record<string, unknown> }) => {
         knowledgeEntries.push(args.data)
         return { id: `entry_${knowledgeEntries.length}` }
+      },
+      update: async (args: { where: { id: string }; data: Record<string, unknown> }) => {
+        const entry = knowledgeEntries.find((_, index) =>
+          `entry_${index + 1}` === args.where.id)
+        if (entry) Object.assign(entry, args.data)
+        return { id: args.where.id }
       },
     },
   }
@@ -256,7 +278,7 @@ describe("reviewAssetCandidate", () => {
     expect(ctx.rows[0].reviewStatus).toBe("approved")
   })
 
-  it("crossProjectAllowed=true 且 promote：知识写入全局（projectId=null）", async () => {
+  it("crossProjectAllowed=true 且 promote：知识写入全局（projectId=null）并记录 promotedAt", async () => {
     const candidate = ctx.rows.find((r) => r.kind === "objection")!
     await reviewAssetCandidate({
       userId: USER,
@@ -267,7 +289,62 @@ describe("reviewAssetCandidate", () => {
       store: ctx.store,
     })
     expect(ctx.knowledgeEntries[0].projectId).toBeNull()
-    expect(ctx.rows.find((r) => r.id === candidate.id)!.crossProjectAllowed).toBe(true)
+    const updated = ctx.rows.find((r) => r.id === candidate.id)!
+    expect(updated.crossProjectAllowed).toBe(true)
+    expect(updated.promotedAt).toBeInstanceOf(Date)
+  })
+
+  it("已晋升候选切换跨项目范围时同步 KnowledgeEntry.projectId", async () => {
+    const candidate = ctx.rows.find((r) => r.kind === "pain_point")!
+    await reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      promote: true,
+      store: ctx.store,
+    })
+    expect(ctx.knowledgeEntries[0].projectId).toBe("proj_1")
+    await reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      crossProjectAllowed: true,
+      store: ctx.store,
+    })
+    expect(ctx.knowledgeEntries[0].projectId).toBeNull()
+    await reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      crossProjectAllowed: false,
+      store: ctx.store,
+    })
+    expect(ctx.knowledgeEntries[0].projectId).toBe("proj_1")
+  })
+
+  it("knowledgeEntry.update 为必填：缺少 update 时范围同步会失败而不是静默跳过", async () => {
+    const candidate = ctx.rows.find((r) => r.kind === "pain_point")!
+    await reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      promote: true,
+      store: ctx.store,
+    })
+    const broken = {
+      ...ctx.store,
+      knowledgeEntry: {
+        create: ctx.store.knowledgeEntry.create,
+        // 故意不提供 update，验证 port 契约必填
+      },
+    } as unknown as AssetCandidateStorePort
+    await expect(reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      crossProjectAllowed: true,
+      store: broken,
+    })).rejects.toThrow()
   })
 
   it("reject：标记拒绝且不升级", async () => {

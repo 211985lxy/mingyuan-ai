@@ -1,7 +1,7 @@
 /**
  * 经营结果 → 资产候选（阶段 4 WP4.4 / WP-0 语义修复 / WP-4）
  * 只生成 pending 候选，不直接写入正式知识库。
- * 决策只看 verdictCode；userVerdict 仅作备注展示。
+ * 决策只看 verdictCode；verdictNote / userVerdict 仅作备注展示。
  *
  * 成交/预约 → 仅「转化案例候选」。
  * 成功案例候选见 customer-outcome.ts（须已审核客户结果投影）。
@@ -32,8 +32,9 @@ export interface OutcomeAssetSource {
   appointmentCount: number | null
   dealCount: number | null
   revenue: number | null
-  /** @deprecated 仅展示备注，不得参与字符串包含判断 */
+  /** @deprecated 历史备注，仅展示，不得参与字符串包含判断 */
   userVerdict: string | null
+  verdictNote?: string | null
   verdictCode?: string | null
   reason: string
 }
@@ -47,6 +48,27 @@ export function buildAssetCandidatesFromOutcome(source: OutcomeAssetSource): Ass
   const titleBase = source.topicTitle?.trim() || `内容 ${source.generationId.slice(0, 8)}`
   const code = resolveOutcomeVerdictCode(source.verdictCode)
   const evidence = buildEvidence(source, code)
+  const note = source.verdictNote?.trim() || source.userVerdict?.trim() || ""
+
+  // 负向人工判断优先于客观信号：无效/失败只允许生成方法论修订候选。
+  if (isNegativeOutcomeVerdict(code)) {
+    return [{
+      kind: "methodology_revision",
+      title: `无效内容警示：${titleBase}`,
+      content: [
+        `平台：${platform}`,
+        `判断码：${code}`,
+        note ? `用户备注：${note}` : "",
+        `原因：${source.reason}`,
+        "请人工确认后，再决定是否沉淀为禁区或方法论修订。",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      evidence,
+      confidence: "low",
+      crossProjectAllowed: false,
+    }]
+  }
 
   // 成交/预约 → 转化案例候选（不是成功案例；成功案例须已审核客户结果，见 WP-4）
   if ((source.dealCount ?? 0) > 0 || (source.appointmentCount ?? 0) > 0) {
@@ -84,30 +106,11 @@ export function buildAssetCandidatesFromOutcome(source: OutcomeAssetSource): Ass
     })
   }
 
-  // 无效/失败 → 仅方法论修订；neutral / unknown 不生成成功或失败候选
-  if (isNegativeOutcomeVerdict(code)) {
-    drafts.push({
-      kind: "methodology_revision",
-      title: `无效内容警示：${titleBase}`,
-      content: [
-        `平台：${platform}`,
-        `判断码：${code}`,
-        source.userVerdict ? `用户备注：${source.userVerdict}` : "",
-        `原因：${source.reason}`,
-        "请人工确认后，再决定是否沉淀为禁区或方法论修订。",
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      evidence,
-      confidence: "low",
-      crossProjectAllowed: false,
-    })
-  }
-
   return drafts
 }
 
 function buildEvidence(source: OutcomeAssetSource, code: OutcomeVerdictCodeOrUnknown): string {
+  const note = source.verdictNote?.trim() || source.userVerdict?.trim() || ""
   return [
     `outcomeId=${source.outcomeId}`,
     `generationId=${source.generationId}`,
@@ -117,7 +120,7 @@ function buildEvidence(source: OutcomeAssetSource, code: OutcomeVerdictCodeOrUnk
     source.appointmentCount != null ? `预约=${source.appointmentCount}` : "",
     source.dealCount != null ? `成交=${source.dealCount}` : "",
     source.revenue != null ? `收入=${source.revenue}` : "",
-    source.userVerdict ? `用户备注=${source.userVerdict}` : "",
+    note ? `用户备注=${note}` : "",
     `判定原因=${source.reason}`,
   ]
     .filter(Boolean)

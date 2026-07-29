@@ -263,3 +263,5 @@ export const aimRunEventBodySchema = z.object({
   ]).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 }).strict()
+
+export type AimRunEventBody = z.infer<typeof aimRunEventBodySchema>

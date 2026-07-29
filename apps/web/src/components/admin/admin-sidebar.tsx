@@ -19,6 +19,7 @@ import {
   KeyRound,
   Receipt,
   Settings,
+  ShieldCheck,
   ScrollText,
   LogOut,
 } from "lucide-react"
@@ -98,6 +99,7 @@ const navGroups: NavGroup[] = [
     labelEn: "System",
     items: [
       { title: "系统设置", titleEn: "Settings", href: "/admin/settings", icon: Settings },
+      { title: "治理责任", titleEn: "Governance", href: "/admin/governance", icon: ShieldCheck },
       { title: "操作日志", titleEn: "Audit Log", href: "/admin/logs", icon: ScrollText },
     ],
   },

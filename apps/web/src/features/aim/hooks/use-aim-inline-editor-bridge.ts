@@ -1,12 +1,19 @@
 "use client"
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react"
+import { toast } from "sonner"
 import type { ContentFormat } from "@/lib/api/client"
+import { isValidAimAgent } from "@/lib/aim-ui-config"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import { buildAimEditorContext } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { AimEditorContext } from "@/lib/aim-editor"
+import {
+  reportWebFinalDisposition,
+  reportWebRunEdited,
+  resolveRunWorkflowId,
+} from "@/lib/aim/run-outcome-client"
 
 type SendText = (
   text: string,
@@ -16,7 +23,40 @@ type SendText = (
   },
 ) => Promise<unknown> | unknown
 
+function findRunTelemetry(messages: AimWorkbenchMessage[], messageId: string) {
+  const message = messages.find((item) => item.id === messageId)
+  if (!message?.runId || !isValidAimAgent(message.agentId)) return null
+  return {
+    runId: message.runId,
+    workflowId: resolveRunWorkflowId(message.agentId),
+    taskType: message.contentAction ?? "generation",
+  }
+}
+
+async function reportInlineEditTelemetry(
+  telemetry: ReturnType<typeof findRunTelemetry>,
+) {
+  if (!telemetry) return
+  try {
+    await reportWebRunEdited(telemetry)
+  } catch {
+    toast.error("内容已保存，但编辑遥测记录失败，请稍后重试")
+  }
+}
+
+async function reportInlineRewriteTelemetry(
+  telemetry: ReturnType<typeof findRunTelemetry>,
+) {
+  if (!telemetry) return
+  try {
+    await reportWebFinalDisposition({ ...telemetry, finalDisposition: "rewrite_requested" })
+  } catch {
+    toast.error("重写将继续，但经营结果记录失败，请稍后重试")
+  }
+}
+
 export function useAimInlineEditorBridge(input: {
+  messages: AimWorkbenchMessage[]
   setMessages: Dispatch<SetStateAction<AimWorkbenchMessage[]>>
   setEditorText: Dispatch<SetStateAction<string>>
   setEditorFormat: Dispatch<SetStateAction<ContentFormat | undefined>>
@@ -26,6 +66,7 @@ export function useAimInlineEditorBridge(input: {
   sendText: SendText
 }) {
   const {
+    messages,
     setMessages,
     setEditorText,
     setEditorFormat,
@@ -43,7 +84,8 @@ export function useAimInlineEditorBridge(input: {
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
   }, [setDraftSelection, setEditorFormat, setEditorSourceMessageId, setEditorText])
 
-  const handleInlineContentSaved = useCallback((messageId: string, format: ContentFormat, content: string) => {
+  const handleInlineContentSaved = useCallback(async (messageId: string, format: ContentFormat, content: string) => {
+    const telemetry = findRunTelemetry(messages, messageId)
     setMessages((messages) => messages.map((message) =>
       message.id === messageId && message.deliverables
         ? {
@@ -58,17 +100,20 @@ export function useAimInlineEditorBridge(input: {
           }
         : message))
     syncEditorFromResult(messageId, format, content)
-  }, [setMessages, syncEditorFromResult])
+    await reportInlineEditTelemetry(telemetry)
+  }, [messages, setMessages, syncEditorFromResult])
 
-  const handleInlineSelectionRewrite = useCallback((messageId: string, payload: {
+  const handleInlineSelectionRewrite = useCallback(async (messageId: string, payload: {
     format: ContentFormat
     prompt: string
     selectionText: string
     range: { start: number; end: number }
     draftContent: string
   }) => {
+    const telemetry = findRunTelemetry(messages, messageId)
     syncEditorFromResult(messageId, payload.format, payload.draftContent)
     setDraftSelection({ text: payload.selectionText, range: payload.range })
+    await reportInlineRewriteTelemetry(telemetry)
     void sendText(payload.prompt, {
       editorContext: buildAimEditorContext({
         action: "内联选区改写",
@@ -79,7 +124,7 @@ export function useAimInlineEditorBridge(input: {
       }),
       editorApplyRange: payload.range,
     })
-  }, [editorPanelLabels, sendText, setDraftSelection, syncEditorFromResult])
+  }, [editorPanelLabels, messages, sendText, setDraftSelection, syncEditorFromResult])
 
   return {
     inlineEditKey,

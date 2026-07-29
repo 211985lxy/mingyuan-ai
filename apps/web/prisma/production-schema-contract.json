@@ -16,6 +16,25 @@
       ]
     },
     {
+      "name": "AimRunEvent",
+      "columns": [
+        "id",
+        "runId",
+        "userId",
+        "event",
+        "workflowId",
+        "taskType",
+        "finalDisposition",
+        "humanActiveMinutes",
+        "manualBaselineMinutes",
+        "reasonCode",
+        "channel",
+        "requestId",
+        "metadata",
+        "createdAt"
+      ]
+    },
+    {
       "name": "ContentOutcome",
       "columns": [
         "id",
@@ -25,7 +44,58 @@
         "collectedAt",
         "qualifiedLeadCount",
         "views",
-        "userVerdict"
+        "userVerdict",
+        "verdictNote",
+        "verdictCode"
+      ]
+    },
+    {
+      "name": "TaskEfficiencyBaseline",
+      "columns": [
+        "id",
+        "workflowId",
+        "taskType",
+        "medianManualMinutes",
+        "sampleSize",
+        "validFrom",
+        "approvedBy"
+      ]
+    },
+    {
+      "name": "GovernanceAssignment",
+      "columns": [
+        "id",
+        "scopeType",
+        "scopeId",
+        "role",
+        "userId",
+        "externalOpenId",
+        "externalUserId",
+        "status",
+        "effectiveAt"
+      ]
+    },
+    {
+      "name": "ApprovalDecision",
+      "columns": [
+        "id",
+        "subjectType",
+        "subjectId",
+        "decision",
+        "reviewerUserId",
+        "externalReviewerId",
+        "externalReviewerUserId",
+        "roleSnapshot",
+        "reason",
+        "source",
+        "requestId",
+        "decidedAt",
+        "workflowId",
+        "projectId",
+        "effectStatus",
+        "effectError",
+        "effectClaimToken",
+        "effectClaimedAt"
       ]
     },
     {
@@ -38,6 +108,10 @@
         "externalAppointmentId",
         "externalDealId",
         "externalPaymentId",
+        "externalRecordId",
+        "externalTableId",
+        "externalSourceContentId",
+        "externalAttributionConfirmer",
         "attributionMethod",
         "attributionConfidence",
         "occurredAt"
@@ -50,6 +124,8 @@
         "projectId",
         "externalOutcomeId",
         "externalDealId",
+        "externalRecordId",
+        "externalTableId",
         "metricCode",
         "baseline",
         "target",
@@ -61,6 +137,67 @@
         "reviewStatus",
         "reviewerRef",
         "reviewedAt"
+      ]
+    },
+    {
+      "name": "ReviewCycle",
+      "columns": [
+        "id",
+        "requestId",
+        "periodStart",
+        "periodEnd",
+        "status",
+        "metricsSnapshot",
+        "systemOwnerId",
+        "filterSnapshot",
+        "signedAt",
+        "signedApprovalId"
+      ]
+    },
+    {
+      "name": "ReviewAction",
+      "columns": [
+        "id",
+        "reviewCycleId",
+        "title",
+        "ownerId",
+        "dueAt",
+        "status",
+        "evidenceRef"
+      ]
+    },
+    {
+      "name": "LearningCandidate",
+      "columns": [
+        "id",
+        "sourceType",
+        "sourceId",
+        "projectId",
+        "generationId",
+        "targetType",
+        "failureCode",
+        "payload",
+        "reviewStatus",
+        "reviewerId",
+        "promotedRef",
+        "requestId"
+      ]
+    },
+    {
+      "name": "EvalFixtureVersion",
+      "columns": [
+        "id",
+        "fixtureKey",
+        "version",
+        "sourceCandidateId",
+        "payload",
+        "status",
+        "deterministicPassedAt",
+        "dailyPassedAt",
+        "qualificationMetrics",
+        "qualificationEvidenceRef",
+        "activationApprovalId",
+        "activatedAt"
       ]
     },
     {
@@ -88,17 +225,6 @@
         "outputTokens",
         "cachedTokens",
         "costCny"
-      ]
-    },
-    {
-      "name": "AimRunEvent",
-      "columns": [
-        "id",
-        "runId",
-        "userId",
-        "event",
-        "metadata",
-        "createdAt"
       ]
     },
     {
@@ -157,7 +283,9 @@
         "kind",
         "reviewStatus",
         "crossProjectAllowed",
-        "promotedEntryId"
+        "promotedEntryId",
+        "promotedAt",
+        "customerOutcomeProjectionId"
       ]
     },
     {

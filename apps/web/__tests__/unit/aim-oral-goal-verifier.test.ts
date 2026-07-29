@@ -5,7 +5,7 @@ import type { CopyMethodologyPlan } from "@/lib/methodology/resolve-copy-methodo
 
 const trafficPlan: CopyMethodologyPlan = {
   businessGoal: "traffic",
-  contentRoute: "traffic",
+  contentRoute: "point_of_view",
   cardIds: [],
   structureModules: [],
   confidence: 0.9,

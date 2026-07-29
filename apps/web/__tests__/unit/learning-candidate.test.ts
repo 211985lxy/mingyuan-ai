@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 import {
   assertCandidateCannotWriteFormalKnowledge,
   buildLearningRequestId,
+  evaluateLearningQualification,
+  isActivationApprovalAfterQualification,
   shouldAutoCreateFromCostOrLatency,
   shouldAutoCreateFromDisposition,
   shouldAutoCreateFromFailureCode,
@@ -99,5 +101,59 @@ describe("learning-candidate", () => {
         promotedRef: "fixture_v2",
       }),
     ).not.toThrow()
+    expect(() =>
+      assertCandidateCannotWriteFormalKnowledge({
+        reviewStatus: "promoted",
+      }),
+    ).toThrow(/缺少正式资产引用/)
+  })
+
+  it("灰度资格要求失败率改善且全局基线不退化", () => {
+    const metrics = {
+      targetFailureRateBefore: 0.5,
+      targetFailureRateAfter: 0.4,
+      acceptanceRateBefore: 0.8,
+      acceptanceRateAfter: 0.75,
+      evidenceCompletenessRateBefore: 0.9,
+      evidenceCompletenessRateAfter: 0.85,
+      severeHallucinationRate: 0,
+    }
+    expect(evaluateLearningQualification({
+      deterministicPassed: true,
+      dailyPassed: true,
+      evidenceRef: "report:eval-1",
+      metrics,
+    }).ok).toBe(true)
+    expect(evaluateLearningQualification({
+      deterministicPassed: true,
+      dailyPassed: true,
+      evidenceRef: "report:eval-2",
+      metrics: { ...metrics, severeHallucinationRate: 0.01 },
+    })).toMatchObject({ ok: false })
+    expect(evaluateLearningQualification({
+      deterministicPassed: true,
+      dailyPassed: true,
+      evidenceRef: "report:eval-3",
+      metrics: { ...metrics, targetFailureRateAfter: 0.41 },
+    })).toMatchObject({ ok: false })
+  })
+
+  it("Eval 激活签字必须晚于 deterministic 和 daily 资格证据", () => {
+    const deterministicPassedAt = new Date("2026-07-29T01:00:00Z")
+    const dailyPassedAt = new Date("2026-07-29T02:00:00Z")
+    expect(isActivationApprovalAfterQualification({
+      deterministicPassedAt,
+      dailyPassedAt,
+      approvalDecidedAt: new Date("2026-07-29T03:00:00Z"),
+    })).toBe(true)
+    expect(isActivationApprovalAfterQualification({
+      deterministicPassedAt,
+      dailyPassedAt,
+      approvalDecidedAt: new Date("2026-07-29T01:30:00Z"),
+    })).toBe(false)
+    expect(isActivationApprovalAfterQualification({
+      deterministicPassedAt,
+      approvalDecidedAt: new Date("2026-07-29T03:00:00Z"),
+    })).toBe(false)
   })
 })

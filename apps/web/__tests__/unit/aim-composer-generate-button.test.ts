@@ -11,9 +11,12 @@ const chatSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-chat-acti
 describe("AIM composer generate button", () => {
   it("requires current input instead of enabling from old messages", () => {
     const canGenerateBlock = source.match(/canGenerate=\{\s*([\s\S]*?)\s*\}\s*primaryActionLabel=/)?.[1] ?? ""
+    const canGenerateDefinition =
+      source.match(/const canGenerateBase =([\s\S]*?)\n\n  const composer/)?.[1] ?? ""
 
-    expect(canGenerateBlock).toContain("input.trim().length > 0")
-    expect(canGenerateBlock).not.toContain("messages.some")
+    expect(canGenerateBlock).toContain("canGenerateBase")
+    expect(canGenerateDefinition).toContain("w.input.trim().length > 0")
+    expect(canGenerateDefinition).not.toContain("messages.some")
   })
 
   it("shows the user input and generation status before the generation request finishes", () => {

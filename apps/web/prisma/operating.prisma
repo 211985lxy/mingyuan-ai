@@ -1,6 +1,23 @@
 // Operating-system projections (WP-3 / WP-4)
 // ContentOutcome remains the content-window snapshot; these models hold per-event business facts.
 
+/** 版本化人工效率基线（WP-1）；用于节省时间计算 */
+model TaskEfficiencyBaseline {
+  id                  String   @id @default(cuid())
+  workflowId          String   @db.VarChar(80)
+  taskType            String   @db.VarChar(80)
+  medianManualMinutes Float
+  sampleSize          Int
+  validFrom           DateTime
+  approvedBy          String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([workflowId, taskType, validFrom])
+  @@index([workflowId, taskType])
+  @@index([validFrom])
+}
+
 /** 逐笔经营归因（WP-3）：内容 → 线索/预约/成交/回款；不建 CRM 实体 */
 model OutcomeAttribution {
   id                    String   @id @default(cuid())
@@ -10,6 +27,10 @@ model OutcomeAttribution {
   externalAppointmentId String?  @db.VarChar(80)
   externalDealId        String?  @db.VarChar(80)
   externalPaymentId     String?  @db.VarChar(80)
+  externalRecordId      String?  @db.VarChar(80)
+  externalTableId       String?  @db.VarChar(80)
+  externalSourceContentId String? @db.VarChar(80)
+  externalAttributionConfirmer String? @db.VarChar(120)
   /** explicit | first_touch | unknown */
   attributionMethod     String   @db.VarChar(20)
   /** high | medium | low */
@@ -24,6 +45,7 @@ model OutcomeAttribution {
   @@unique([externalLeadId])
   @@unique([externalDealId])
   @@unique([externalPaymentId])
+  @@unique([externalRecordId])
   @@index([userId, occurredAt])
   @@index([generationId])
   @@index([attributionMethod])
@@ -38,6 +60,8 @@ model CustomerOutcomeProjection {
   projectId         String
   externalOutcomeId String    @db.VarChar(80)
   externalDealId    String?   @db.VarChar(80)
+  externalRecordId  String?   @unique @db.VarChar(80)
+  externalTableId   String?   @db.VarChar(80)
   metricCode        String    @db.VarChar(80)
   baseline          Decimal?  @db.Decimal(14, 2)
   target            Decimal?  @db.Decimal(14, 2)
@@ -54,6 +78,7 @@ model CustomerOutcomeProjection {
   updatedAt         DateTime  @updatedAt
 
   project ClientProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  caseCandidate AssetCandidate?
 
   @@unique([externalOutcomeId])
   @@index([projectId, reviewStatus])
@@ -64,6 +89,7 @@ model CustomerOutcomeProjection {
 /** 周度经营复盘周期（WP-5） */
 model ReviewCycle {
   id              String    @id @default(cuid())
+  requestId       String?   @unique @db.VarChar(191)
   periodStart     DateTime
   periodEnd       DateTime
   status          String    @default("draft") @db.VarChar(20) // draft | signed
@@ -72,6 +98,7 @@ model ReviewCycle {
   /** 筛选维度快照：projectId / workflowId / ownerId / channel */
   filterSnapshot  Json?
   signedAt        DateTime?
+  signedApprovalId String?  @unique @db.VarChar(191)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -122,6 +149,8 @@ model LearningCandidate {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  evalFixtureVersion EvalFixtureVersion?
+
   @@index([reviewStatus, createdAt])
   @@index([sourceType, sourceId])
   @@index([targetType, reviewStatus])
@@ -129,3 +158,25 @@ model LearningCandidate {
   @@index([generationId])
 }
 
+/** 经人工批准的版本化 Eval fixture；draft 不进入正式评估集。 */
+model EvalFixtureVersion {
+  id                   String    @id @default(cuid())
+  fixtureKey           String    @db.VarChar(120)
+  version              Int
+  sourceCandidateId    String    @unique
+  payload              Json
+  status               String    @default("draft") @db.VarChar(20) // draft | qualified | active | rejected
+  deterministicPassedAt DateTime?
+  dailyPassedAt        DateTime?
+  qualificationMetrics Json?
+  qualificationEvidenceRef String? @db.VarChar(500)
+  activationApprovalId String?   @unique @db.VarChar(191)
+  activatedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  sourceCandidate LearningCandidate @relation(fields: [sourceCandidateId], references: [id], onDelete: Restrict)
+
+  @@unique([fixtureKey, version])
+  @@index([status, createdAt])
+}

@@ -26,7 +26,7 @@ const taskSpec = {
     failedFormats: [],
     knowledgeUsed: [],
   },
-} as TaskSpec
+} as unknown as TaskSpec
 
 describe("formatPublishPackText", () => {
   it("includes mother content, platform summaries, review note and publish link slots", () => {

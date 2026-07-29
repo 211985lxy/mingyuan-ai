@@ -10,13 +10,20 @@
  * --out (default ./aim-eval-report) as report.json + report.md for the CI
  * artifact / job summary.
  *
+ * qualify_eval 用的已签名资格制品（仅 --daily）：
+ *   需同时设置独立密钥 AIM_DAILY_EVAL_ARTIFACT_SECRET（≥32 字符，勿复用用户 API key）
+ *   以及 --qualification-metrics=<json> --evidence-ref=<string>
+ *   成功时另写 qualification-artifact.json；secret 缺失则只写普通报告，不可用于 qualify。
+ *
  * Usage:
  *   pnpm --dir apps/web exec tsx scripts/aim-eval.ts --deterministic
  *   pnpm --dir apps/web exec tsx scripts/aim-eval.ts --daily
+ *   pnpm --dir apps/web exec tsx scripts/aim-eval.ts --daily \
+ *     --qualification-metrics=./metrics.json --evidence-ref=report://daily/1
  *   pnpm --dir apps/web exec tsx scripts/aim-eval.ts --full --out ./aim-eval-report
  */
 
-import { writeFileSync, mkdirSync } from "node:fs"
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { ALL_FIXTURES } from "../__tests__/eval/fixtures"
@@ -28,10 +35,17 @@ import {
   evaluateEvalGate,
 } from "../src/lib/aim-harness/eval-runner"
 import { createRealEvalExecutor } from "../src/lib/aim-harness/eval-real-executor"
+import {
+  signDailyEvalArtifact,
+  type DailyEvalArtifactBody,
+} from "../src/lib/aim/daily-eval-artifact"
+import type { LearningQualificationMetrics } from "../src/lib/aim/learning-candidate"
 
 interface CliOptions {
   mode: "deterministic" | "daily" | "full"
   out: string
+  qualificationMetricsPath?: string
+  evidenceRef?: string
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -41,6 +55,12 @@ function parseArgs(argv: string[]): CliOptions {
     else if (arg === "--daily") opts.mode = "daily"
     else if (arg === "--full") opts.mode = "full"
     else if (arg.startsWith("--out=")) opts.out = arg.slice("--out=".length)
+    else if (arg.startsWith("--qualification-metrics=")) {
+      opts.qualificationMetricsPath =
+        arg.slice("--qualification-metrics=".length)
+    } else if (arg.startsWith("--evidence-ref=")) {
+      opts.evidenceRef = arg.slice("--evidence-ref=".length)
+    }
     else if (arg === "--out") {
       // next arg
     }
@@ -91,6 +111,50 @@ async function main() {
   if (!gate.passed) {
     process.stderr.write(`[aim-eval] FAILED: ${gate.reasons.join("; ")}\n`)
     process.exit(1)
+  }
+
+  if (opts.mode === "daily") {
+    const secret = process.env.AIM_DAILY_EVAL_ARTIFACT_SECRET
+    const wantsArtifact = Boolean(
+      secret || opts.qualificationMetricsPath || opts.evidenceRef,
+    )
+    if (!wantsArtifact) {
+      process.stderr.write(
+        "[aim-eval] 未配置 AIM_DAILY_EVAL_ARTIFACT_SECRET / 资格参数，"
+        + "仅写入普通报告（不可用于 qualify_eval）\n",
+      )
+    } else if (
+      !secret
+      || !opts.qualificationMetricsPath
+      || !opts.evidenceRef
+    ) {
+      throw new Error(
+        "生成资格制品需同时提供 AIM_DAILY_EVAL_ARTIFACT_SECRET（≥32 字符）、"
+        + "--qualification-metrics 和 --evidence-ref；缺一不可，拒绝写出半成品",
+      )
+    } else {
+      const metrics = JSON.parse(
+        readFileSync(resolve(opts.qualificationMetricsPath), "utf8"),
+      ) as LearningQualificationMetrics
+      const body: DailyEvalArtifactBody = {
+        schemaVersion: 1,
+        mode: "daily",
+        generatedAt: report.generatedAt,
+        contractPassRate: report.contractPassRate,
+        rubricPassRate: report.rubricPassRate ?? 0,
+        repetitions: report.repetitions,
+        results: report.results,
+        qualificationMetrics: metrics,
+        evidenceRef: opts.evidenceRef,
+      }
+      writeFileSync(
+        resolve(outDir, "qualification-artifact.json"),
+        JSON.stringify(signDailyEvalArtifact({ body, secret }), null, 2),
+      )
+      process.stderr.write(
+        "[aim-eval] signed qualification artifact written\n",
+      )
+    }
   }
 }
 

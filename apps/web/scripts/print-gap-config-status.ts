@@ -52,6 +52,8 @@ function main() {
     ["负责人", "AIM_WORK_ITEM_OWNER_USER_ID", present(env.AIM_WORK_ITEM_OWNER_USER_ID) ? "已填" : "缺"],
     ["飞书表Token", "LARK_BASE_TOKEN", present(env.LARK_BASE_TOKEN) ? "已填" : "缺"],
     ["经营事项表", "LARK_WORK_ITEM_TABLE_ID", present(env.LARK_WORK_ITEM_TABLE_ID) ? "已填" : "缺"],
+    ["经营归因表", "LARK_BUSINESS_ATTRIBUTION_TABLE_ID", present(env.LARK_BUSINESS_ATTRIBUTION_TABLE_ID) ? "已填" : "缺"],
+    ["客户结果表", "LARK_CUSTOMER_OUTCOME_TABLE_ID", present(env.LARK_CUSTOMER_OUTCOME_TABLE_ID) ? "已填" : "缺"],
     ["先查再写", "AIM_BOUNDED_TOOL_LOOP_ENABLED", flag(env.AIM_BOUNDED_TOOL_LOOP_ENABLED)],
     ["Skill手册", "AIM_SKILL_LOADING_ENABLED", flag(env.AIM_SKILL_LOADING_ENABLED || "true(默认)")],
     ["群聊管道", "INSPIRATION_PIPELINE_ENABLED", flag(env.INSPIRATION_PIPELINE_ENABLED)],

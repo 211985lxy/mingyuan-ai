@@ -432,3 +432,69 @@ export interface AdminHotSourceInput {
   enabled: boolean
   note?: string
 }
+
+// ─── Governance assignments ──────────────────────────────
+
+export interface GovernanceAssignmentItem {
+  id: string
+  scopeType: string
+  scopeId: string
+  role: string
+  userId: string | null
+  externalOpenId: string | null
+  externalUserId: string | null
+  status: string
+  effectiveAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GovernanceAssignmentInput {
+  scopeType: "system" | "workflow"
+  scopeId: string
+  role: "business_owner" | "system_owner" | "reviewer" | "backup_owner"
+  userId?: string
+  externalOpenId?: string
+  externalUserId?: string
+  status?: "active" | "inactive"
+  effectiveAt?: string
+}
+
+export async function getGovernanceAssignments(params?: {
+  scopeType?: string
+  scopeId?: string
+  status?: string
+  limit?: number
+  offset?: number
+}) {
+  const qs = new URLSearchParams()
+  if (params?.scopeType) qs.set("scopeType", params.scopeType)
+  if (params?.scopeId) qs.set("scopeId", params.scopeId)
+  if (params?.status) qs.set("status", params.status)
+  if (params?.limit) qs.set("limit", String(params.limit))
+  if (params?.offset) qs.set("offset", String(params.offset))
+  const suffix = qs.toString() ? `?${qs}` : ""
+  return request<{
+    items: GovernanceAssignmentItem[]
+    total: number
+    limit: number
+    offset: number
+  }>(`/api/admin/governance-assignments${suffix}`)
+}
+
+export async function createGovernanceAssignment(input: GovernanceAssignmentInput) {
+  return request<{ item: GovernanceAssignmentItem }>("/api/admin/governance-assignments", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+}
+
+export async function setGovernanceAssignmentStatus(
+  id: string,
+  status: "active" | "inactive",
+) {
+  return request<{ item: GovernanceAssignmentItem }>("/api/admin/governance-assignments", {
+    method: "PATCH",
+    body: JSON.stringify({ id, status }),
+  })
+}

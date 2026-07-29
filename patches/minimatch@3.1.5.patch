@@ -1,0 +1,7 @@
+diff --git a/minimatch.js b/minimatch.js
+index 2e4a058..3294694 100644
+--- a/minimatch.js
++++ b/minimatch.js
+@@ -10,1 +10,2 @@
+ var expand = require('brace-expansion')
++expand = typeof expand === 'function' ? expand : expand.expand

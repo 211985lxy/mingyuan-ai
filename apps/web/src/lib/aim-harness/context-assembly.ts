@@ -212,6 +212,7 @@ export async function prepareAimContext(
     ipWikiBlock: budgeted.blocks.ipWikiBlock,
     viralStructureBlock: budgeted.blocks.viralStructureBlock,
     selectedMethodologyBlock: budgeted.blocks.selectedMethodologyBlock,
+    skills,
     taskSpec: taskSpecWithPlan,
   })
 

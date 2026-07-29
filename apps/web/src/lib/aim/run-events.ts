@@ -27,10 +27,31 @@ export function reportAimRunEvent(
   void recordAimRunEvent(runId, event, metadata).catch(() => undefined)
 }
 
+/** Critical WP-1 telemetry: retry once with the same requestId and surface final failure. */
+export async function reportRequiredAimRunEvent(
+  runId: string,
+  event: LegacyRunEvent,
+  metadata: Record<string, unknown>,
+) {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await recordAimRunEvent(runId, event, metadata)
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 150))
+      }
+    }
+  }
+  throw lastError
+}
+
 /** 上报最终处置（WP-1）；写入 final_disposition 事件 */
-export function reportFinalDisposition(
-  runId: string | null | undefined,
+export async function reportFinalDisposition(
+  runId: string,
   outcome: RunOutcomeMetadata,
 ) {
-  reportAimRunEvent(runId, "final_disposition", { ...outcome })
+  await reportRequiredAimRunEvent(runId, "final_disposition", { ...outcome })
 }

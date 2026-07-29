@@ -16,15 +16,20 @@ model AssetCandidate {
   reviewStatus        String   @default("pending") @db.VarChar(20) // pending | approved | rejected
   crossProjectAllowed Boolean  @default(false) // 跨项目复用需人工批准
   promotedEntryId     String? // 升级后的 KnowledgeEntry.id
+  /** 首次晋升写入；历史缺失保持 null，不回填推测 */
+  promotedAt          DateTime?
+  customerOutcomeProjectionId String? @unique
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   user    User          @relation(fields: [userId], references: [id])
   project ClientProject @relation(fields: [projectId], references: [id])
+  customerOutcomeProjection CustomerOutcomeProjection? @relation(fields: [customerOutcomeProjectionId], references: [id], onDelete: SetNull)
 
   @@index([userId, reviewStatus])
   @@index([userId, projectId, kind])
   @@index([generationId])
+  @@index([promotedAt])
 }
 
 model KnowledgeEntry {

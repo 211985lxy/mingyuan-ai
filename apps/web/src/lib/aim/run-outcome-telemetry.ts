@@ -24,24 +24,17 @@ export interface RunOutcomeMetadata {
   reasonCode?: string
   channel: RunOutcomeChannel
   /** 幂等键；重复上报同一 requestId 不重复落库 */
-  requestId?: string
+  requestId: string
 }
 
 export interface AimRunEventLike {
+  id?: string
   event: string
   metadata?: unknown
   createdAt: Date | string
 }
 
 const DISPOSITION_SET = new Set<string>(FINAL_DISPOSITIONS)
-
-/** 旧事件映射到终态（兼容已有 accepted/revised/rejected） */
-const LEGACY_TO_DISPOSITION: Record<string, FinalDisposition> = {
-  accepted: "accepted_first_pass",
-  rejected: "rejected",
-  rewrite_requested: "rewrite_requested",
-  abandoned: "abandoned",
-}
 
 export function isFinalDisposition(value: unknown): value is FinalDisposition {
   return typeof value === "string" && DISPOSITION_SET.has(value)
@@ -51,22 +44,55 @@ export function parseRunOutcomeMetadata(raw: unknown): RunOutcomeMetadata | null
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null
   const obj = raw as Record<string, unknown>
   if (!isFinalDisposition(obj.finalDisposition)) return null
-  if (typeof obj.workflowId !== "string" || !obj.workflowId.trim()) return null
-  if (typeof obj.taskType !== "string" || !obj.taskType.trim()) return null
-  if (typeof obj.humanActiveMinutes !== "number" || !Number.isFinite(obj.humanActiveMinutes)) return null
+  if (
+    typeof obj.workflowId !== "string"
+    || !obj.workflowId.trim()
+    || obj.workflowId.trim().length > 80
+  ) return null
+  if (
+    typeof obj.taskType !== "string"
+    || !obj.taskType.trim()
+    || obj.taskType.trim().length > 80
+  ) return null
+  if (
+    typeof obj.humanActiveMinutes !== "number"
+    || !Number.isFinite(obj.humanActiveMinutes)
+    || obj.humanActiveMinutes < 0
+  ) return null
   if (obj.channel !== "web" && obj.channel !== "feishu" && obj.channel !== "api") return null
+  if (
+    typeof obj.requestId !== "string"
+    || !obj.requestId.trim()
+    || obj.requestId.trim().length > 191
+  ) return null
+  if (
+    obj.manualBaselineMinutes != null
+    && (
+      typeof obj.manualBaselineMinutes !== "number"
+      || !Number.isFinite(obj.manualBaselineMinutes)
+      || obj.manualBaselineMinutes < 0
+    )
+  ) return null
+  if (
+    obj.reasonCode != null
+    && (
+      typeof obj.reasonCode !== "string"
+      || !obj.reasonCode.trim()
+      || obj.reasonCode.trim().length > 64
+    )
+  ) return null
   return {
     workflowId: obj.workflowId.trim(),
     taskType: obj.taskType.trim(),
     finalDisposition: obj.finalDisposition,
-    humanActiveMinutes: Math.max(0, obj.humanActiveMinutes),
+    humanActiveMinutes: obj.humanActiveMinutes,
     manualBaselineMinutes:
       typeof obj.manualBaselineMinutes === "number" && Number.isFinite(obj.manualBaselineMinutes)
-        ? Math.max(0, obj.manualBaselineMinutes)
+        ? obj.manualBaselineMinutes
         : undefined,
-    reasonCode: typeof obj.reasonCode === "string" ? obj.reasonCode : undefined,
+    reasonCode: typeof obj.reasonCode === "string" ? obj.reasonCode.trim() : undefined,
     channel: obj.channel,
-    requestId: typeof obj.requestId === "string" ? obj.requestId : undefined,
+    requestId: obj.requestId.trim(),
   }
 }
 
@@ -78,7 +104,9 @@ export function reduceFinalDisposition(
   events: AimRunEventLike[],
 ): FinalDisposition | "unknown" {
   const sorted = [...events].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    (a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      || (a.id ?? "").localeCompare(b.id ?? ""),
   )
 
   let sawEdit = false
@@ -98,29 +126,8 @@ export function reduceFinalDisposition(
       continue
     }
 
-    if (item.event === "final_disposition") {
-      const disposition = (item.metadata as Record<string, unknown> | null)?.finalDisposition
-      if (isFinalDisposition(disposition)) {
-        latest = disposition === "accepted_first_pass" && sawEdit
-          ? "accepted_after_edit"
-          : disposition
-      }
-      continue
-    }
-
-    if (isFinalDisposition(item.event)) {
-      latest = item.event === "accepted_first_pass" && sawEdit
-        ? "accepted_after_edit"
-        : item.event
-      continue
-    }
-
-    const legacy = LEGACY_TO_DISPOSITION[item.event]
-    if (legacy) {
-      latest = legacy === "accepted_first_pass" && sawEdit
-        ? "accepted_after_edit"
-        : legacy
-    }
+    // 旧自由事件没有结构化上下文与人工投入时间，统一保持 unknown。
+    // 特别是历史 accepted 不得被推断为 accepted_first_pass。
   }
 
   return latest

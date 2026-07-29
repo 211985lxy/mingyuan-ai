@@ -215,6 +215,8 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     PRIMARY KEY (\`id\`),
     CONSTRAINT \`MethodologyProfileVersion_profileId_fkey\` FOREIGN KEY (\`profileId\`) REFERENCES \`MethodologyProfile\`(\`id\`) ON DELETE CASCADE ON UPDATE CASCADE
   ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  `ALTER TABLE \`AssetCandidate\`
+    ADD COLUMN IF NOT EXISTS \`promotedAt\` DATETIME(3) NULL`,
 ]
 
 function runMysql(connection, query) {

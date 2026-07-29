@@ -41,9 +41,20 @@ export interface LearningCandidateLike {
   reviewerId?: string | null
 }
 
+export interface LearningQualificationMetrics {
+  targetFailureRateBefore: number
+  targetFailureRateAfter: number
+  acceptanceRateBefore: number
+  acceptanceRateAfter: number
+  evidenceCompletenessRateBefore: number
+  evidenceCompletenessRateAfter: number
+  severeHallucinationRate: number
+}
+
 const SOURCE_SET = new Set<string>(LEARNING_SOURCE_TYPES)
 const TARGET_SET = new Set<string>(LEARNING_TARGET_TYPES)
 const STATUS_SET = new Set<string>(LEARNING_REVIEW_STATUSES)
+const RATE_EPSILON = 1e-9
 
 /** 自动进入候选的终态：拒绝与重写 */
 export const AUTO_CANDIDATE_DISPOSITIONS = ["rejected", "rewrite_requested"] as const
@@ -189,6 +200,58 @@ export function transitionLearningReview(input: {
   }
 }
 
+function validRate(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 1
+}
+
+/** 灰度发布门禁：目标失败下降≥20%，接受率/证据完整率下降≤5pp，严重虚构=0。 */
+export function evaluateLearningQualification(input: {
+  deterministicPassed: boolean
+  dailyPassed: boolean
+  evidenceRef: string
+  metrics: LearningQualificationMetrics
+}): { ok: true } | { ok: false; reasons: string[] } {
+  const reasons: string[] = []
+  const values = Object.values(input.metrics)
+  if (!values.every(validRate)) reasons.push("所有灰度指标必须在 0..1")
+  if (!input.deterministicPassed) reasons.push("deterministic Eval 未通过")
+  if (!input.dailyPassed) reasons.push("daily Eval 未通过")
+  if (!input.evidenceRef.trim()) reasons.push("缺少灰度证据引用")
+  if (
+    input.metrics.targetFailureRateBefore <= 0
+    || input.metrics.targetFailureRateAfter
+      > input.metrics.targetFailureRateBefore * 0.8 + RATE_EPSILON
+  ) reasons.push("目标失败率下降不足 20%")
+  if (
+    input.metrics.acceptanceRateBefore
+    - input.metrics.acceptanceRateAfter > 0.05 + RATE_EPSILON
+  ) reasons.push("接受率下降超过 5 个百分点")
+  if (
+    input.metrics.evidenceCompletenessRateBefore
+    - input.metrics.evidenceCompletenessRateAfter > 0.05 + RATE_EPSILON
+  ) reasons.push("证据完整率下降超过 5 个百分点")
+  if (input.metrics.severeHallucinationRate !== 0) {
+    reasons.push("严重虚构率必须为 0")
+  }
+  return reasons.length ? { ok: false, reasons } : { ok: true }
+}
+
+export function isActivationApprovalAfterQualification(input: {
+  approvalDecidedAt?: Date | null
+  deterministicPassedAt?: Date | null
+  dailyPassedAt?: Date | null
+}): boolean {
+  if (
+    !input.approvalDecidedAt
+    || !input.deterministicPassedAt
+    || !input.dailyPassedAt
+  ) return false
+  return input.approvalDecidedAt.getTime() >= Math.max(
+    input.deterministicPassedAt.getTime(),
+    input.dailyPassedAt.getTime(),
+  )
+}
+
 /**
  * 守卫：候选记录本身永远不是正式知识写入。
  * promoted 仅表示「已人工批准并指向正式资产引用」，调用方仍需走独立写入 API。
@@ -202,6 +265,9 @@ export function assertCandidateCannotWriteFormalKnowledge(
   if (candidate.reviewStatus === "approved" && !candidate.promotedRef) {
     // approved 仍未晋升：禁止当正式写入
     throw new Error("已批准但未晋升的学习候选不得直接写入正式资产")
+  }
+  if (candidate.reviewStatus === "promoted" && !candidate.promotedRef) {
+    throw new Error("promoted 学习候选缺少正式资产引用")
   }
   // promoted：允许调用方按 promotedRef 引用；本守卫不自动写库
 }

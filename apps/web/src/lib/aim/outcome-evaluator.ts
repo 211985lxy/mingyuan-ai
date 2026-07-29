@@ -50,6 +50,7 @@ export interface ExcellentOutcome {
   revenue: number | null
   /** 用户备注（自由文本）。 */
   userVerdict: string | null
+  verdictNote: string | null
   /** 结构化判断码；缺省为 unknown。 */
   verdictCode: string | null
   /** 计算出的优秀原因。 */
@@ -112,6 +113,7 @@ interface OutcomeRow {
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictNote: string | null
   verdictCode: string | null
   collectWindowDay: number
   collectedAt: Date
@@ -198,6 +200,9 @@ function evaluateExcellent(row: OutcomeRow): { excellent: boolean; reason: Excel
   if (isPositiveOutcomeVerdict(code)) {
     return { excellent: true, reason: "user_excellent", engagementRate, conversionRate }
   }
+  if (isNegativeOutcomeVerdict(code)) {
+    return { excellent: false, reason: null, engagementRate, conversionRate }
+  }
   if (engagementRate != null && engagementRate >= ENGAGEMENT_RATE_THRESHOLD) {
     return { excellent: true, reason: "engagement", engagementRate, conversionRate }
   }
@@ -247,7 +252,9 @@ export async function evaluateOutcomes(input: {
   for (const row of outcomes) {
     const eval_ = evaluateExcellent(row)
     if (!eval_.excellent || !eval_.reason) {
-      result.skipped++
+      if (!isNegativeOutcomeVerdict(resolveOutcomeVerdictCode(row.verdictCode))) {
+        result.skipped++
+      }
       continue
     }
     excellentOutcomes.push({
@@ -267,6 +274,7 @@ export async function evaluateOutcomes(input: {
       dealCount: row.dealCount,
       revenue: row.revenue != null ? Number(row.revenue) : null,
       userVerdict: row.userVerdict,
+      verdictNote: row.verdictNote,
       verdictCode: row.verdictCode,
       reason: eval_.reason,
       engagementRate: eval_.engagementRate,
@@ -297,6 +305,7 @@ export async function evaluateOutcomes(input: {
       dealCount: row.dealCount,
       revenue: row.revenue != null ? Number(row.revenue) : null,
       userVerdict: row.userVerdict,
+      verdictNote: row.verdictNote,
       verdictCode: row.verdictCode,
       reason: "user_excellent",
       engagementRate: computeEngagementRate(row),
@@ -341,6 +350,7 @@ export async function evaluateOutcomes(input: {
       dealCount: outcome.dealCount,
       revenue: outcome.revenue,
       userVerdict: outcome.userVerdict,
+      verdictNote: outcome.verdictNote,
       verdictCode: outcome.verdictCode,
       reason: outcome.reason,
     })

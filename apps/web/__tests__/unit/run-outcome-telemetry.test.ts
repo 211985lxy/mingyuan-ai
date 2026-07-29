@@ -30,17 +30,28 @@ describe("run-outcome-telemetry", () => {
     })).toBeNull()
   })
 
-  it("reducer：append-only 取最新终态；先改后接受 → accepted_after_edit", () => {
+  it("reducer：旧自由终态保持 unknown；结构化终态取最新值", () => {
     expect(reduceFinalDisposition([])).toBe("unknown")
 
     expect(reduceFinalDisposition([
       { event: "copied", createdAt: "2026-07-01T00:00:00Z" },
       { event: "accepted", createdAt: "2026-07-01T00:01:00Z" },
-    ])).toBe("accepted_first_pass")
+    ])).toBe("unknown")
 
     expect(reduceFinalDisposition([
       { event: "revised", createdAt: "2026-07-01T00:00:00Z" },
-      { event: "accepted", createdAt: "2026-07-01T00:01:00Z" },
+      {
+        event: "final_disposition",
+        createdAt: "2026-07-01T00:01:00Z",
+        metadata: {
+          workflowId: "w",
+          taskType: "t",
+          finalDisposition: "accepted_first_pass",
+          humanActiveMinutes: 2,
+          channel: "web",
+          requestId: "req_accept",
+        },
+      },
     ])).toBe("accepted_after_edit")
 
     expect(reduceFinalDisposition([
@@ -54,6 +65,7 @@ describe("run-outcome-telemetry", () => {
           finalDisposition: "rejected",
           humanActiveMinutes: 5,
           channel: "web",
+          requestId: "req_reject",
         },
       },
     ])).toBe("rejected")
@@ -65,6 +77,25 @@ describe("run-outcome-telemetry", () => {
     ])
     expect(code).toBe("unknown")
     expect(isAcceptedDisposition(code)).toBe(false)
+  })
+
+  it("拒绝负人工时间、空 requestId，不静默修正输入", () => {
+    expect(parseRunOutcomeMetadata({
+      workflowId: "w",
+      taskType: "t",
+      finalDisposition: "rejected",
+      humanActiveMinutes: -1,
+      channel: "web",
+      requestId: "req",
+    })).toBeNull()
+    expect(parseRunOutcomeMetadata({
+      workflowId: "w",
+      taskType: "t",
+      finalDisposition: "rejected",
+      humanActiveMinutes: 1,
+      channel: "web",
+      requestId: " ",
+    })).toBeNull()
   })
 
   it("节省时间允许为负；比率与成本公式", () => {

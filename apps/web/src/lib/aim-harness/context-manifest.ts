@@ -4,26 +4,67 @@
 
 import type { AimRunSpec, AimContextSource } from "./types"
 import type { MethodologyPolicy } from "@/lib/methodology-profile-store"
+import type { LoadedAimSkill } from "./skill-loader"
 import { sha256 } from "./hashing"
 import { resolveDefaultTrustLevel, withDefaultTrustLevel } from "./context-trust"
+
+/**
+ * 从最终 budgeted methodology block 提取实际存在的 Skill 片段。
+ * 预算裁剪后未注入的 skill 不记录；部分截断则对截断后准确文本哈希。
+ */
+export function extractSkillsFromBudgetedBlock(
+  budgetedMethodologyBlock: string,
+  skills: LoadedAimSkill[],
+): Array<{ id: string; text: string }> {
+  if (!budgetedMethodologyBlock || !skills.length) return []
+  const injected: Array<{ id: string; text: string }> = []
+  for (const skill of skills) {
+    const header = `【Skill:${skill.title}】`
+    const start = budgetedMethodologyBlock.indexOf(header)
+    if (start < 0) continue
+    const afterHeader = start + header.length
+    const next = budgetedMethodologyBlock.indexOf("【Skill:", afterHeader)
+    let end = next >= 0 ? next : budgetedMethodologyBlock.length
+    if (next >= 0 && budgetedMethodologyBlock.slice(Math.max(0, next - 2), next) === "\n\n") {
+      end = next - 2
+    }
+    const text = budgetedMethodologyBlock.slice(start, end)
+    if (!text.startsWith(header)) continue
+    injected.push({ id: skill.id, text })
+  }
+  return injected
+}
+
+/** @deprecated 仅兼容旧测试；正式路径请用 extractSkillsFromBudgetedBlock */
+export function resolveInjectedSkillSegments(
+  skills: LoadedAimSkill[],
+): Array<{ id: string; text: string }> {
+  const block = skills
+    .map((skill) => `【Skill:${skill.title}】\n${skill.content}`)
+    .join("\n\n")
+    .slice(0, 6000)
+  return extractSkillsFromBudgetedBlock(block, skills)
+}
 
 export function buildContextManifest(input: {
   spec: AimRunSpec
   knowledgeEntries: Array<{ id: string }>
   includedChars: number
   methodologyPolicy: MethodologyPolicy
+  /** 最终注入 prompt 的 methodology 块（已预算裁剪，可能含 Skill） */
   methodologyBlock: string
   businessDiagnosisBlock: string
   eventStorytellingBlock: string
   ipWikiBlock: string
   viralStructureBlock: string
   selectedMethodologyBlock: string
+  /** 加载过的 skills；仅当预算后 methodologyBlock 仍含其片段才记入 manifest */
+  skills?: LoadedAimSkill[]
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
 }): AimContextSource[] {
   const { spec, knowledgeEntries, includedChars } = input
   const sources: AimContextSource[] = []
 
-  // 知识条目
   for (const entry of knowledgeEntries) {
     sources.push(withDefaultTrustLevel({
       kind: "knowledge",
@@ -32,7 +73,6 @@ export function buildContextManifest(input: {
     }))
   }
 
-  // ── 方法论来源（系统 + 命名）──
   pushBlockSource(sources, "methodology", "agent_methodology:ip_copywriting", input.methodologyBlock)
   pushBlockSource(sources, "methodology", "agent_methodology:business_diagnosis", input.businessDiagnosisBlock)
   pushBlockSource(sources, "methodology", "agent_methodology:event_storytelling", input.eventStorytellingBlock)
@@ -48,6 +88,19 @@ export function buildContextManifest(input: {
 
   pushBlockSource(sources, "ip_wiki", "ip_wiki:block", input.ipWikiBlock)
   pushBlockSource(sources, "market_viral", "viral_structure", input.viralStructureBlock)
+
+  for (const skill of extractSkillsFromBudgetedBlock(
+    input.methodologyBlock,
+    input.skills ?? [],
+  )) {
+    sources.push(withDefaultTrustLevel({
+      kind: "skill",
+      id: `skill:${skill.id}`,
+      charCount: skill.text.length,
+      contentHash: sha256(skill.text),
+      trustLevel: "system_trusted",
+    }))
+  }
 
   if (input.taskSpec) {
     const briefJson = JSON.stringify(input.taskSpec)
@@ -68,7 +121,6 @@ export function buildContextManifest(input: {
   return sources
 }
 
-/** 非空 block 才记进 manifest（内容 hash 作为变更追踪依据）。 */
 function pushBlockSource(
   sources: AimContextSource[],
   kind: AimContextSource["kind"],

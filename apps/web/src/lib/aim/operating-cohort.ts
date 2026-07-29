@@ -39,6 +39,8 @@ export interface CohortRecord {
   deliveryCycleDays?: number | null
   /** 成功任务平均成本 */
   successTaskCostCny?: number | null
+  successTaskCount?: number
+  successTaskTotalCostCny?: number
   /** 案例是否批准 */
   caseApproved?: boolean | null
   /** 计算窗口 */
@@ -71,6 +73,11 @@ export interface CohortSegmentStats extends CohortMetricRates {
   trendNote: string
 }
 
+export interface PreviousCohortMetric {
+  leadToAppointmentRate: number | null
+  sampleSize: number
+}
+
 const DIMENSION_SET = new Set<string>(COHORT_DIMENSIONS)
 
 export function isCohortDimension(value: unknown): value is CohortDimension {
@@ -99,6 +106,8 @@ export function computeRatesFromTotals(input: {
   dealCycleDays: Array<number | null | undefined>
   deliveryCycleDays: Array<number | null | undefined>
   successTaskCosts: Array<number | null | undefined>
+  successTaskCount?: number
+  successTaskTotalCostCny?: number
   caseApprovedFlags: Array<boolean | null | undefined>
 }): CohortMetricRates {
   const caseFlags = input.caseApprovedFlags.filter((v): v is boolean => typeof v === "boolean")
@@ -109,7 +118,10 @@ export function computeRatesFromTotals(input: {
     paymentToOutcomeRate: safeRate(input.customerOutcomeSuccessCount, input.paymentCount),
     avgDealCycleDays: avgNullable(input.dealCycleDays),
     avgDeliveryCycleDays: avgNullable(input.deliveryCycleDays),
-    avgSuccessTaskCostCny: avgNullable(input.successTaskCosts),
+    avgSuccessTaskCostCny:
+      input.successTaskCount && input.successTaskCount > 0
+        ? (input.successTaskTotalCostCny ?? 0) / input.successTaskCount
+        : avgNullable(input.successTaskCosts),
     caseApprovalRate:
       caseFlags.length === 0
         ? null
@@ -125,6 +137,7 @@ export function resolveTrendVerdict(input: {
   sampleSize: number
   currentRate: number | null
   previousRate?: number | null
+  previousSampleSize?: number
   minSample?: number
   epsilon?: number
 }): { verdict: CohortTrendVerdict; note: string } {
@@ -133,6 +146,15 @@ export function resolveTrendVerdict(input: {
     return {
       verdict: "insufficient_sample",
       note: `样本 ${input.sampleSize} < ${minSample}，只展示数据，不输出趋势判断`,
+    }
+  }
+  if (
+    input.previousRate !== undefined
+    && (input.previousSampleSize ?? 0) < minSample
+  ) {
+    return {
+      verdict: "insufficient_sample",
+      note: `对照期样本 ${input.previousSampleSize ?? 0} < ${minSample}，只展示数据，不输出趋势判断`,
     }
   }
   if (input.currentRate == null) {
@@ -148,13 +170,50 @@ export function resolveTrendVerdict(input: {
   return { verdict: "flat", note: "较对照期持平" }
 }
 
+function computeGroupRates(rows: CohortRecord[]): CohortMetricRates {
+  const count = (value: number) =>
+    Number.isFinite(value) ? Math.max(0, value) : 0
+  const leadCount = rows.reduce((sum, row) => sum + count(row.leadCount), 0)
+  const appointmentCount = rows.reduce(
+    (sum, row) => sum + count(row.appointmentCount),
+    0,
+  )
+  const dealCount = rows.reduce((sum, row) => sum + count(row.dealCount), 0)
+  const paymentCount = rows.reduce((sum, row) => sum + count(row.paymentCount), 0)
+  const customerOutcomeSuccessCount = rows.reduce(
+    (sum, row) => sum + count(row.customerOutcomeSuccessCount),
+    0,
+  )
+  const successTaskCount = rows.reduce(
+    (sum, row) => sum + count(row.successTaskCount ?? 0),
+    0,
+  )
+  const successTaskTotalCostCny = rows.reduce(
+    (sum, row) => sum + count(row.successTaskTotalCostCny ?? 0),
+    0,
+  )
+  return computeRatesFromTotals({
+    leadCount,
+    appointmentCount,
+    dealCount,
+    paymentCount,
+    customerOutcomeSuccessCount,
+    dealCycleDays: rows.map((row) => row.dealCycleDays),
+    deliveryCycleDays: rows.map((row) => row.deliveryCycleDays),
+    successTaskCosts: rows.map((row) => row.successTaskCostCny),
+    successTaskCount,
+    successTaskTotalCostCny,
+    caseApprovedFlags: rows.map((row) => row.caseApproved),
+  })
+}
+
 /** 按维度+分群键聚合描述统计 */
 export function aggregateCohortStats(
   records: CohortRecord[],
   options?: {
     minSample?: number
-    /** segmentKey → 对照期主转化率（线索→预约），可选 */
-    previousLeadToAppointmentRateBySegment?: Record<string, number | null>
+    /** dimension::segmentKey → 对照期主转化率与样本量，可选 */
+    previousLeadToAppointmentByGroup?: Record<string, PreviousCohortMetric>
   },
 ): CohortSegmentStats[] {
   const minSample = options?.minSample ?? MIN_TREND_SAMPLE
@@ -163,6 +222,9 @@ export function aggregateCohortStats(
   for (const row of records) {
     if (!isCohortDimension(row.dimension)) continue
     if (!row.externalRecordId.trim() || !row.segmentKey.trim()) continue
+    const startMs = new Date(row.windowStart).getTime()
+    const endMs = new Date(row.windowEnd).getTime()
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) continue
     const key = `${row.dimension}::${row.segmentKey}`
     const list = groups.get(key) ?? []
     list.push(row)
@@ -172,25 +234,7 @@ export function aggregateCohortStats(
   const results: CohortSegmentStats[] = []
   for (const [, rows] of groups) {
     const first = rows[0]
-    const leadCount = rows.reduce((s, r) => s + Math.max(0, r.leadCount), 0)
-    const appointmentCount = rows.reduce((s, r) => s + Math.max(0, r.appointmentCount), 0)
-    const dealCount = rows.reduce((s, r) => s + Math.max(0, r.dealCount), 0)
-    const paymentCount = rows.reduce((s, r) => s + Math.max(0, r.paymentCount), 0)
-    const customerOutcomeSuccessCount = rows.reduce(
-      (s, r) => s + Math.max(0, r.customerOutcomeSuccessCount),
-      0,
-    )
-    const rates = computeRatesFromTotals({
-      leadCount,
-      appointmentCount,
-      dealCount,
-      paymentCount,
-      customerOutcomeSuccessCount,
-      dealCycleDays: rows.map((r) => r.dealCycleDays),
-      deliveryCycleDays: rows.map((r) => r.deliveryCycleDays),
-      successTaskCosts: rows.map((r) => r.successTaskCostCny),
-      caseApprovedFlags: rows.map((r) => r.caseApproved),
-    })
+    const rates = computeGroupRates(rows)
 
     const windowStart = rows
       .map((r) => new Date(r.windowStart).getTime())
@@ -199,12 +243,13 @@ export function aggregateCohortStats(
       .map((r) => new Date(r.windowEnd).getTime())
       .reduce((a, b) => Math.max(a, b), Number.NEGATIVE_INFINITY)
 
-    const prev =
-      options?.previousLeadToAppointmentRateBySegment?.[first.segmentKey] ?? null
+    const groupKey = `${first.dimension}::${first.segmentKey}`
+    const previous = options?.previousLeadToAppointmentByGroup?.[groupKey]
     const trend = resolveTrendVerdict({
       sampleSize: rows.length,
       currentRate: rates.leadToAppointmentRate,
-      previousRate: prev,
+      previousRate: previous?.leadToAppointmentRate,
+      previousSampleSize: previous?.sampleSize,
       minSample,
     })
 

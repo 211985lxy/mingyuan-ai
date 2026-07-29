@@ -14,10 +14,11 @@ import { computeRequestHash } from "@/lib/aim-remote/invocation-service"
 
 describe("aim-remote contracts", () => {
   describe("AGENT_SCOPE constants", () => {
-    it("defines all 10 expected scopes", () => {
-      expect(AGENT_SCOPES).toHaveLength(10)
+    it("defines all expected scopes", () => {
+      expect(AGENT_SCOPES).toHaveLength(11)
       expect(AGENT_SCOPE.capabilitiesRead).toBe("capabilities.read")
       expect(AGENT_SCOPE.draftsSubmit).toBe("drafts.submit")
+      expect(AGENT_SCOPE.outcomesWrite).toBe("outcomes.write")
       expect(AGENT_SCOPE.repliesClaim).toBe("replies.claim")
       expect(AGENT_SCOPE.inspirationIngest).toBe("inspiration.ingest")
       expect(AGENT_SCOPE.knowledgeConfirm).toBe("knowledge.confirm")

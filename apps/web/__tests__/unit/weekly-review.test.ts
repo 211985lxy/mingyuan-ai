@@ -117,6 +117,37 @@ describe("computeWeeklyReview", () => {
     expect(review.revenue).toBe(9800)
   })
 
+  it("跨周累计快照按期末减期初计算，不重复计算上周结果", async () => {
+    const outcomes = [
+      outcome("g1", {
+        collectWindowDay: 7,
+        qualifiedLeadCount: 3,
+        appointmentCount: 1,
+        dealCount: 0,
+        revenue: 0,
+        collectedAt: new Date("2026-07-05T00:00:00.000Z"),
+      }),
+      outcome("g1", {
+        collectWindowDay: 14,
+        qualifiedLeadCount: 5,
+        appointmentCount: 2,
+        dealCount: 1,
+        revenue: 5000,
+        collectedAt: new Date("2026-07-09T00:00:00.000Z"),
+      }),
+    ]
+    const review = await computeWeeklyReview({
+      userId: USER,
+      start: START,
+      end: END,
+      store: makeStore([], outcomes),
+    })
+    expect(review.qualifiedLeadCount).toBe(2)
+    expect(review.appointmentCount).toBe(1)
+    expect(review.dealCount).toBe(1)
+    expect(review.revenue).toBe(5000)
+  })
+
   it("知识资产复用：按 knowledgeUsed 去重，≥2 次调用计入「重复调用」", async () => {
     const gens: FakeGen[] = [
       { id: "g1", workflowStatus: "published", publishedAt: new Date("2026-07-07T10:00:00Z"), createdAt: new Date("2026-07-07T09:00:00Z"), knowledgeUsed: [{ id: "k1" }, { id: "k2" }] },

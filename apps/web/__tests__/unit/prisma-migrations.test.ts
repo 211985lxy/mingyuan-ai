@@ -79,6 +79,9 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model AimRunEvent")
     expect(migrationSql).toContain("CREATE TABLE `AimRunEvent`")
     expect(migrationSql).toContain("FOREIGN KEY (`userId`) REFERENCES `User`(`id`)")
+    expect(schema).toContain("finalDisposition")
+    expect(migrationSql).toContain("AimRunEvent_userId_runId_requestId_key")
+    expect(migrationSql).not.toMatch(/UPDATE\s+`?AimRunEvent`?/i)
   })
 
   it("creates OutcomeAttribution for per-event business attribution (WP-3)", () => {
@@ -88,6 +91,8 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model OutcomeAttribution")
     expect(migrationSql).toContain("CREATE TABLE IF NOT EXISTS `OutcomeAttribution`")
     expect(migrationSql).toContain("UNIQUE INDEX `OutcomeAttribution_externalLeadId_key`")
+    expect(schema).toContain("externalAttributionConfirmer")
+    expect(migrationSql).toContain("OutcomeAttribution_externalRecordId_key")
   })
 
   it("creates CustomerOutcomeProjection for reviewed customer results (WP-4)", () => {
@@ -97,6 +102,55 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model CustomerOutcomeProjection")
     expect(migrationSql).toContain("CREATE TABLE IF NOT EXISTS `CustomerOutcomeProjection`")
     expect(migrationSql).toContain("UNIQUE INDEX `CustomerOutcomeProjection_externalOutcomeId_key`")
+    expect(schema).toContain("customerOutcomeProjectionId")
+    expect(migrationSql).toContain("CustomerOutcomeProjection_externalRecordId_key")
+    expect(migrationSql).toContain("AssetCandidate_customerOutcomeProjectionId_fkey")
+  })
+
+  it("hardens ReviewCycle with idempotent request and traceable signing (WP-5)", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("model ReviewCycle")
+    expect(schema).toContain("signedApprovalId")
+    expect(migrationSql).toContain("ReviewCycle_requestId_key")
+    expect(migrationSql).toContain("ReviewCycle_signedApprovalId_key")
+  })
+
+  it("adds versioned Eval fixtures without writing static fixtures (WP-6)", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("model LearningCandidate")
+    expect(schema).toContain("model EvalFixtureVersion")
+    expect(migrationSql).toContain("EvalFixtureVersion_sourceCandidateId_key")
+    expect(migrationSql).toContain("EvalFixtureVersion_fixtureKey_version_key")
+  })
+
+  it("adds verdictCode and verdictNote with MySQL-safe additive migrations", () => {
+    const schema = readPrismaSchema()
+    const verdictCodeMigration = readFileSync(
+      path.join(
+        appRoot,
+        "prisma/migrations/20260728120000_add_content_outcome_verdict_code/migration.sql",
+      ),
+      "utf8",
+    )
+    const verdictNoteMigration = readFileSync(
+      path.join(
+        appRoot,
+        "prisma/migrations/20260729130000_add_content_outcome_verdict_note/migration.sql",
+      ),
+      "utf8",
+    )
+
+    expect(schema).toMatch(/verdictCode\s+String\?/)
+    expect(schema).toMatch(/verdictNote\s+String\?/)
+    expect(verdictCodeMigration).toContain("ALTER TABLE ContentOutcome")
+    expect(verdictCodeMigration).not.toContain('"ContentOutcome"')
+    expect(verdictNoteMigration).toContain("ADD COLUMN IF NOT EXISTS `verdictCode`")
+    expect(verdictNoteMigration).toContain("ADD COLUMN IF NOT EXISTS `verdictNote`")
+    expect(verdictNoteMigration).not.toMatch(/\bUPDATE\b/i)
   })
 
   it("owns phase 14 schema changes in Prisma migrations only", () => {

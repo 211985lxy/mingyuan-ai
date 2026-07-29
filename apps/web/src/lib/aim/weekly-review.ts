@@ -32,6 +32,9 @@ export interface WeeklyReviewMetrics {
   day7Backfill: { due: number; filled: number }
 }
 
+/** 周报对 7/14/30 累计快照使用周期末差值，禁止直接相加。 */
+export const WEEKLY_OUTCOME_WINDOW_POLICY = "cumulative_snapshot_delta_v1"
+
 interface GenerationRow {
   id: string
   workflowStatus: string
@@ -82,13 +85,31 @@ function hasAnyBusinessMetric(row: OutcomeRow): boolean {
   ].some((value) => value != null && value !== "")
 }
 
-function sumNullable(rows: OutcomeRow[], pick: (row: OutcomeRow) => number | null): number {
-  let sum = 0
-  for (const row of rows) {
-    const value = pick(row)
-    if (value != null && Number.isFinite(value)) sum += value
+function sumPeriodSnapshotDeltas(
+  rows: OutcomeRow[],
+  start: Date,
+  end: Date,
+  pick: (row: OutcomeRow) => number | null,
+): number {
+  const endSnapshots = pickPeriodEndSnapshots(
+    rows.filter((row) => row.collectedAt.getTime() < end.getTime()),
+  )
+  const startSnapshots = new Map(
+    pickPeriodEndSnapshots(
+      rows.filter((row) => row.collectedAt.getTime() < start.getTime()),
+    ).map((row) => [row.generationId, row]),
+  )
+  let total = 0
+  for (const endRow of endSnapshots) {
+    const endValue = pick(endRow)
+    if (endValue == null || !Number.isFinite(endValue)) continue
+    const startRow = startSnapshots.get(endRow.generationId)
+    const startValue = startRow ? pick(startRow) : null
+    total += startValue != null && Number.isFinite(startValue)
+      ? endValue - startValue
+      : endValue
   }
-  return sum
+  return total
 }
 
 /**
@@ -128,6 +149,30 @@ function extractKnowledgeIds(knowledgeUsed: unknown): string[] {
   return ids
 }
 
+async function loadWeeklyReviewRows(input: {
+  userId?: string
+  projectId?: string
+  generationIds?: string[]
+  store: WeeklyReviewStorePort
+}) {
+  const where = {
+    ...(input.userId ? { userId: input.userId } : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.generationIds ? { id: { in: input.generationIds } } : {}),
+  }
+  const outcomeWhere = {
+    ...(input.userId ? { userId: input.userId } : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.generationIds
+      ? { generationId: { in: input.generationIds } }
+      : {}),
+  }
+  return Promise.all([
+    input.store.aimGeneration.findMany({ where, take: 1000 }),
+    input.store.contentOutcome.findMany({ where: outcomeWhere, take: 5000 }),
+  ])
+}
+
 /**
  * 计算 [start, end) 周期的经营复盘指标。
  */
@@ -137,30 +182,32 @@ function extractKnowledgeIds(knowledgeUsed: unknown): string[] {
  * @returns Promise<WeeklyReviewMetrics>
  */
 export async function computeWeeklyReview(input: {
-  userId: string
+  userId?: string
+  projectId?: string
+  generationIds?: string[]
   start: Date
   end: Date
   store: WeeklyReviewStorePort
 }): Promise<WeeklyReviewMetrics> {
-  const { userId, start, end, store } = input
-  const [generations, outcomes] = await Promise.all([
-    store.aimGeneration.findMany({ where: { userId }, take: 1000 }),
-    store.contentOutcome.findMany({ where: { userId }, take: 5000 }),
-  ])
+  const { start, end } = input
+  const [generations, outcomes] = await loadWeeklyReviewRows(input)
 
   // 1. 发布内容数
   const publishedCount = generations.filter(
     (g) => g.workflowStatus === "published" && inRange(g.publishedAt, start, end),
   ).length
 
-  // 2/3/4. 周期内经营结果：按 generation 取周期末累计快照，禁止 7+14+30 相加
-  const periodOutcomes = pickPeriodEndSnapshots(
-    outcomes.filter((o) => inRange(o.collectedAt, start, end)),
+  // 2/3/4. 周期经营结果：周期末累计快照减周期初快照，避免跨周重复计数
+  const qualifiedLeadCount = sumPeriodSnapshotDeltas(
+    outcomes, start, end, (o) => o.qualifiedLeadCount,
   )
-  const qualifiedLeadCount = sumNullable(periodOutcomes, (o) => o.qualifiedLeadCount)
-  const appointmentCount = sumNullable(periodOutcomes, (o) => o.appointmentCount)
-  const dealCount = sumNullable(periodOutcomes, (o) => o.dealCount)
-  const revenue = sumNullable(periodOutcomes, (o) => {
+  const appointmentCount = sumPeriodSnapshotDeltas(
+    outcomes, start, end, (o) => o.appointmentCount,
+  )
+  const dealCount = sumPeriodSnapshotDeltas(
+    outcomes, start, end, (o) => o.dealCount,
+  )
+  const revenue = sumPeriodSnapshotDeltas(outcomes, start, end, (o) => {
     if (o.revenue == null) return null
     const value = Number(o.revenue)
     return Number.isFinite(value) ? value : null

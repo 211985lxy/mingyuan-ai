@@ -176,6 +176,7 @@ describe("getChannelMetrics", () => {
 
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        take: 10_001,
         where: expect.objectContaining({
           source: "feishu",
           createdAt: { gte: since, lte: until },
@@ -190,6 +191,27 @@ describe("getChannelMetrics", () => {
 
   it("returns zero shadowSamples when Inspiration query throws", async () => {
     mockFindMany.mockRejectedValue(new Error("db down"))
+    const { getChannelMetrics } = await import("@/lib/channel-metrics")
+    const summary = await getChannelMetrics({
+      platform: "feishu",
+      since: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    })
+    expect(summary.shadowSamples.total).toBe(0)
+    expect(summary.shadowSamples.remainingToGate).toBe(CONTENT_ROLLOUT_MIN_SHADOW_SAMPLES)
+  })
+
+  it("查询达到边界时不输出截断后的错误影子样本统计", async () => {
+    mockFindMany.mockResolvedValue(Array.from({ length: 10_001 }, (_, index) => ({
+      id: `sample_${index}`,
+      source: "feishu",
+      sourceUrl: null,
+      externalMessageId: `message_${index}`,
+      dedupeKey: null,
+      executionModeSnapshot: "capture_only",
+      topicSelectionId: null,
+      replyStatus: "suppressed",
+      createdAt: new Date(),
+    })))
     const { getChannelMetrics } = await import("@/lib/channel-metrics")
     const summary = await getChannelMetrics({
       platform: "feishu",

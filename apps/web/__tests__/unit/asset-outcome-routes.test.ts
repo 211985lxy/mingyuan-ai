@@ -11,7 +11,8 @@ const {
   reviewAssetCandidate,
   listAssetCandidates,
   findDueOutcomeReminders,
-  loadApprovalForSubject,
+  validateHighRiskApproval,
+  prisma,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
@@ -19,7 +20,12 @@ const {
   reviewAssetCandidate: vi.fn(),
   listAssetCandidates: vi.fn(async () => []),
   findDueOutcomeReminders: vi.fn(),
-  loadApprovalForSubject: vi.fn(async () => null),
+  validateHighRiskApproval: vi.fn(),
+  prisma: {
+    assetCandidate: {
+      findFirst: vi.fn(),
+    },
+  },
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
@@ -29,13 +35,8 @@ vi.mock("@/lib/aim/asset-candidate-store", () => ({
   listAssetCandidates,
 }))
 vi.mock("@/lib/aim/outcome-reminders", () => ({ findDueOutcomeReminders }))
-vi.mock("@/lib/aim/approval-decision-prisma", () => ({
-  createPrismaApprovalDecisionStore: () => ({}),
-}))
-vi.mock("@/lib/aim/approval-decision-store", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/aim/approval-decision-store")>()
-  return { ...actual, loadApprovalForSubject }
-})
+vi.mock("@/lib/aim/approval-validation", () => ({ validateHighRiskApproval }))
+vi.mock("@/lib/prisma", () => ({ prisma }))
 
 import { POST as generatePOST } from "@/app/api/aim/meeting-insights/[id]/asset-candidates/route"
 import { GET as listGET } from "@/app/api/aim/asset-candidates/route"
@@ -124,7 +125,14 @@ describe("GET /api/aim/asset-candidates", () => {
 })
 
 describe("PATCH /api/aim/asset-candidates/[id]", () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    prisma.assetCandidate.findFirst.mockResolvedValue({
+      projectId: "proj_1",
+      crossProjectAllowed: false,
+    })
+    validateHighRiskApproval.mockResolvedValue({ ok: true, approvalId: "apd_1" })
+  })
 
   it("非法 action → 400", async () => {
     const res = await reviewPATCH(
@@ -137,8 +145,7 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
     expect(res.status).toBe(400)
   })
 
-  it("promote 缺 approvalId → 403", async () => {
-    loadApprovalForSubject.mockResolvedValueOnce(null)
+  it("promote 缺 workflowId → 400", async () => {
     const res = await reviewPATCH(
       new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
         method: "PATCH",
@@ -146,21 +153,55 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
       }),
       candCtx,
     )
+    expect(res.status).toBe(400)
+    expect(reviewAssetCandidate).not.toHaveBeenCalled()
+  })
+
+  it("跨项目复用缺独立 system_owner 签字时拒绝", async () => {
+    const res = await reviewPATCH(
+      new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "approve",
+          promote: true,
+          workflowId: "content-growth-v1",
+          approvalId: "apd_1",
+          crossProjectAllowed: true,
+        }),
+      }),
+      candCtx,
+    )
     expect(res.status).toBe(403)
     expect(reviewAssetCandidate).not.toHaveBeenCalled()
   })
 
-  it("合法审核透传 action/promote/crossProjectAllowed（含 approvalId）", async () => {
-    loadApprovalForSubject.mockResolvedValueOnce({
-      id: "apd_1",
-      subjectType: "asset",
-      subjectId: "cand_1",
-      decision: "approve",
-      roleSnapshot: "reviewer",
-      reason: "ok",
-      source: "web",
-      requestId: "req_promote_1",
+  it("不 promote 但开启跨项目复用仍需独立 system_owner 批准", async () => {
+    reviewAssetCandidate.mockResolvedValueOnce({
+      ok: true,
+      record: { id: "cand_1", reviewStatus: "approved", crossProjectAllowed: true },
     })
+    const res = await reviewPATCH(
+      new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "approve",
+          workflowId: "content-growth-v1",
+          crossProjectAllowed: true,
+          crossProjectApprovalId: "apd_system_1",
+        }),
+      }),
+      candCtx,
+    )
+    expect(res.status).toBe(200)
+    expect(validateHighRiskApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approvalId: "apd_system_1",
+        expectedRoles: ["system_owner"],
+      }),
+    )
+  })
+
+  it("合法审核透传 action/promote/crossProjectAllowed（两次独立签字）", async () => {
     reviewAssetCandidate.mockResolvedValueOnce({
       ok: true,
       record: { id: "cand_1", reviewStatus: "approved", promotedEntryId: "entry_1" },
@@ -171,7 +212,9 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
         body: JSON.stringify({
           action: "approve",
           promote: true,
+          workflowId: "content-growth-v1",
           approvalId: "apd_1",
+          crossProjectApprovalId: "apd_system_1",
           crossProjectAllowed: true,
         }),
       }),
@@ -185,6 +228,19 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
         action: "approve",
         promote: true,
         crossProjectAllowed: true,
+      }),
+    )
+    expect(validateHighRiskApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subjectId: "cand_1",
+        workflowId: "content-growth-v1",
+        projectId: "proj_1",
+      }),
+    )
+    expect(validateHighRiskApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approvalId: "apd_system_1",
+        expectedRoles: ["system_owner"],
       }),
     )
   })
