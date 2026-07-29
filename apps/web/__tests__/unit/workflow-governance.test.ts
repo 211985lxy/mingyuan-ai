@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it, vi } from "vitest"
 import {
   assertDualSignForChange,

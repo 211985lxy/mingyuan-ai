@@ -37,7 +37,7 @@ describe("efficiency baseline admin route", () => {
         validFrom: "2026-07-01T00:00:00Z",
         approvedBy: "spoofed",
       }),
-    }))
+    }), {} as never)
     expect(response.status).toBe(201)
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({ approvedBy: "admin-real" }),
@@ -54,9 +54,12 @@ describe("efficiency baseline admin route", () => {
         medianManualMinutes: 30,
         sampleSize: 0,
       }),
-    }))
+    }), {} as never)
     expect(bad.status).toBe(400)
-    await GET(new NextRequest("http://localhost/api/admin/aim/efficiency-baselines"))
+    await GET(
+      new NextRequest("http://localhost/api/admin/aim/efficiency-baselines"),
+      {} as never,
+    )
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 500 }))
   })
 })

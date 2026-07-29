@@ -37,7 +37,7 @@ describe("resolveCopyMethodologyPlan", () => {
       rawInput: "写一条关于团队管理的口播",
       taskSpec: {
         goal: "写口播",
-        mode: "execute",
+        mode: "direct_delivery",
         riskLevel: "medium",
         knownFacts: [],
         unknowns: [],

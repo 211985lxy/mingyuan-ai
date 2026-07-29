@@ -1,4 +1,4 @@
-import { createElement } from "react"
+import { createElement, type ComponentType } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import { FileText } from "lucide-react"
 import { describe, expect, it, vi } from "vitest"
@@ -47,8 +47,11 @@ describe("AIM workbench chrome", () => {
   })
 
   it("renders the landing hero with result-oriented quick entries and the composer", () => {
+    const LandingHeroForTest = AimLandingHero as unknown as ComponentType<{
+      onBeginContentAction: () => void
+    }>
     const html = renderToStaticMarkup(createElement(
-      AimLandingHero,
+      LandingHeroForTest,
       { onBeginContentAction: vi.fn() },
       createElement("div", null, "COMPOSER_MARKER"),
     ))

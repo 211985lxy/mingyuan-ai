@@ -360,6 +360,7 @@ export function useAimWorkbench() {
     setEditorPanelOpen(true)
   }, [setEditorPanelOpen, syncEditorFromResult])
 
+  // eslint-disable-next-line react-hooks/refs -- ref trampoline must see this render's callback.
   openEditorFromResultRef.current = syncEditorFromResult
 
   // ---- openProjectWorkflowTask ----
@@ -414,6 +415,7 @@ export function useAimWorkbench() {
     sendText,
     generateWithInput,
   })
+  // eslint-disable-next-line react-hooks/refs -- reset handlers read this ref outside render.
   clearTurnIntentRef.current = clearPendingTurnIntent
 
   /** 统一的生成入口：显式计划指令/开关优先，其余请求走直接模式意图门闩。 */

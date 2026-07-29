@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 const mocks = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  authErrorResponse: vi.fn(() => null),
+  authErrorResponse: vi.fn<(error: unknown) => NextResponse | null>(() => null),
   findMany: vi.fn(),
   findFirst: vi.fn(),
   create: vi.fn(),
@@ -48,7 +48,10 @@ vi.mock("@/lib/internal-beta-limits", () => ({
 import { GET as listKnowledge, POST as createKnowledge } from "@/app/api/knowledge/route"
 import { GET as getKnowledge, PUT as updateKnowledge, DELETE as archiveKnowledge } from "@/app/api/knowledge/[id]/route"
 
-function jsonRequest(url: string, init?: RequestInit) {
+function jsonRequest(
+  url: string,
+  init?: ConstructorParameters<typeof NextRequest>[1],
+) {
   return new NextRequest(url, init)
 }
 

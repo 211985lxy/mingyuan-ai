@@ -297,7 +297,7 @@ export function resolveCopyMethodologyPlan(
     assumptions.push(...taskGoal.sourceBits)
   }
 
-  let contentRoute: MethodologyContentRoute =
+  const contentRoute: MethodologyContentRoute =
     routeFromText ||
     (businessGoal !== "unclear"
       ? GOAL_TO_DEFAULT_ROUTE[businessGoal]

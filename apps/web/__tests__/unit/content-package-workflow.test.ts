@@ -17,7 +17,7 @@ function taskSpec(partial: {
       failedFormats: partial.failed ?? [],
       knowledgeUsed: [],
     },
-  } as TaskSpec
+  } as unknown as TaskSpec
 }
 
 describe("suggestWorkflowAfterContentPackageComplete", () => {

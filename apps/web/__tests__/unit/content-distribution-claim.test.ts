@@ -30,7 +30,7 @@ const taskSpec = {
     failedFormats: [],
     knowledgeUsed: [],
   },
-} as TaskSpec
+} as unknown as TaskSpec
 
 describe("buildContentDistributionClaimDraft", () => {
   it("builds a copyable Feishu claim draft for content growth workflow", () => {

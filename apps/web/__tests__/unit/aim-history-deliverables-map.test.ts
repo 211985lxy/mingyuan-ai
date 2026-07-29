@@ -38,7 +38,7 @@ function generation(partial: Partial<AimGeneration> = {}): AimGeneration {
           xiaohongshu_post: "小红书图文正文".padEnd(40, "！"),
         },
       },
-    } as AimGeneration["taskSpec"],
+    } as unknown as AimGeneration["taskSpec"],
     ...partial,
   }
 }
