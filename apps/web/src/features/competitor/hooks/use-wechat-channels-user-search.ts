@@ -11,12 +11,12 @@ import {
 } from "@/lib/api/client"
 
 export function useWechatChannelsUserSearch(options: {
+  keyword: string
   disabled?: boolean
   adding: boolean
-  onAdd: (url: string, successMessage?: string) => Promise<void>
+  onAdd: (url?: string, successMessage?: string) => Promise<void>
 }) {
-  const { disabled = false, adding, onAdd } = options
-  const [keyword, setKeyword] = useState("")
+  const { keyword, disabled = false, adding, onAdd } = options
   const [searching, setSearching] = useState(false)
   const [results, setResults] = useState<SearchChannelsUserResult[]>([])
   const [searched, setSearched] = useState(false)
@@ -64,8 +64,6 @@ export function useWechatChannelsUserSearch(options: {
   }
 
   return {
-    keyword,
-    setKeyword,
     searching,
     results,
     searched,

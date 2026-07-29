@@ -1,65 +1,88 @@
 "use client"
 
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Plus, Search } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { isCompetitorAccountLinkInput } from "@/features/competitor/competitor-url-utils"
 import { useWechatChannelsUserSearch } from "@/features/competitor/hooks/use-wechat-channels-user-search"
 import type { SearchChannelsUserResult } from "@/lib/api/client"
 
 interface WechatChannelsUserSearchProps {
+  value: string
+  accountCount: number
   disabled?: boolean
   adding: boolean
-  onAdd: (url: string, successMessage?: string) => Promise<void>
+  onChange: (value: string) => void
+  onAdd: (url?: string, successMessage?: string) => Promise<void>
 }
 
 export function WechatChannelsUserSearch({
+  value,
+  accountCount,
   disabled = false,
   adding,
+  onChange,
   onAdd,
 }: WechatChannelsUserSearchProps) {
   const {
-    keyword,
-    setKeyword,
     searching,
     results,
     searched,
     addingFinder,
     handleSearch,
     handleAddChannelsUser,
-  } = useWechatChannelsUserSearch({ disabled, adding, onAdd })
+  } = useWechatChannelsUserSearch({ keyword: value, disabled, adding, onAdd })
+  const linkInput = isCompetitorAccountLinkInput(value)
+  const busy = adding || searching
+
+  function handleSubmit() {
+    if (linkInput) {
+      void onAdd()
+      return
+    }
+    void handleSearch()
+  }
 
   return (
-    <div className="mt-4 space-y-3 border-t border-border/60 pt-4">
-      <p className="text-xs text-muted-foreground">
-        视频号：输入昵称或关键词搜索，点「加入监控」即可，不必复制主页链接。
-      </p>
+    <div className="space-y-3">
       <div className="flex gap-3">
         <Input
-          placeholder="视频号昵称 / 关键词，如：人民日报"
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && void handleSearch()}
-          disabled={searching || disabled}
+          placeholder="输入账号昵称，或粘贴抖音 / 视频号主页链接"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => event.key === "Enter" && handleSubmit()}
+          disabled={busy || disabled}
           className="flex-1"
         />
         <Button
-          variant="outline"
-          onClick={() => void handleSearch()}
-          disabled={searching || !keyword.trim() || disabled}
+          onClick={handleSubmit}
+          disabled={busy || !value.trim() || disabled}
         >
-          {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          {searching ? "搜索中..." : "搜视频号"}
+          {searching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : linkInput ? (
+            <Plus className="h-4 w-4" />
+          ) : (
+            <Search className="h-4 w-4" />
+          )}
+          {searching
+            ? "搜索中..."
+            : adding
+              ? "添加中..."
+              : linkInput
+                ? `添加 (${accountCount}/10)`
+                : "搜视频号"}
         </Button>
       </div>
 
-      {searched && !searching && results.length === 0 ? (
+      {!linkInput && searched && !searching && results.length === 0 ? (
         <p className="rounded-lg bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
           没搜到可添加的账号。可换更完整的昵称再试。
         </p>
       ) : null}
 
-      {results.length > 0 ? (
+      {!linkInput && results.length > 0 ? (
         <ChannelsUserResultList
           results={results}
           adding={adding}

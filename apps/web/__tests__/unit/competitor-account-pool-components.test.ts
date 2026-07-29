@@ -146,9 +146,9 @@ describe("competitor account pool components", () => {
     }))
 
     expect(addHtml).toContain("添加监控账号")
-    expect(addHtml).toContain("搜昵称")
     expect(addHtml).toContain("搜视频号")
-    expect(addHtml).toContain("视频号昵称")
+    expect(addHtml).toContain("输入账号昵称，或粘贴抖音 / 视频号主页链接")
+    expect(addHtml.match(/<input/g)).toHaveLength(1)
     expect(addHtml).not.toContain("扩展同赛道")
     expect(researchHtml).toContain("全网补证")
     expect(researchHtml).toContain("这里不替你直接下结论")
