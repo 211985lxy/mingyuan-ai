@@ -22,6 +22,7 @@ import {
   type WorkItemExecutionResult,
   type WorkItemRecordStore,
 } from "@/lib/aim/services/work-item-execution"
+import { randomUUID } from "node:crypto"
 
 export type CardApprovalAction = "approve" | "reject"
 
@@ -32,7 +33,7 @@ export interface ProcessCardApprovalInput {
   recordId: string
   action: CardApprovalAction
   openId: string
-  userId: string
+  externalUserId: string
   messageId: string
   aimResultId: string
   workItemStore: WorkItemRecordStore
@@ -45,6 +46,7 @@ export type ProcessCardApprovalResult =
       ok: true
       approval: ApprovalDecisionRecord
       idempotent: boolean
+      processing?: boolean
       workItem?: WorkItemExecutionResult & { ok: true }
       toast: string
     }
@@ -63,10 +65,20 @@ async function applyApproveEffect(
     return { ok: false, error: "记录缺少 AIM结果ID，禁止无结果完成", approval }
   }
 
-  await input.approvalStore.updateEffect(approval.id, {
-    effectStatus: "pending",
-    effectError: null,
-  })
+  const claimToken = randomUUID()
+  const claim = await input.approvalStore.claimEffect(approval.id, claimToken)
+  if (!claim.claimed) {
+    return {
+      ok: true,
+      approval: claim.record,
+      idempotent: true,
+      processing: claim.record.effectStatus === "pending",
+      toast:
+        claim.record.effectStatus === "applied"
+          ? "已通过（幂等）"
+          : "审批正在处理中，请勿重复操作",
+    }
+  }
 
   let result: WorkItemExecutionResult
   try {
@@ -76,7 +88,7 @@ async function applyApproveEffect(
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "完成事项失败"
-    const failed = await input.approvalStore.updateEffect(approval.id, {
+    const failed = await input.approvalStore.settleEffect(approval.id, claimToken, {
       effectStatus: "failed",
       effectError: message,
     })
@@ -84,14 +96,14 @@ async function applyApproveEffect(
   }
 
   if (!result.ok) {
-    const failed = await input.approvalStore.updateEffect(approval.id, {
+    const failed = await input.approvalStore.settleEffect(approval.id, claimToken, {
       effectStatus: "failed",
       effectError: result.error,
     })
     return { ok: false, error: result.error, approval: failed, recoverable: true }
   }
 
-  const updated = await input.approvalStore.updateEffect(approval.id, {
+  const updated = await input.approvalStore.settleEffect(approval.id, claimToken, {
     effectStatus: "applied",
     effectError: null,
   })
@@ -108,17 +120,27 @@ async function applyRejectEffect(
   input: ProcessCardApprovalInput,
   approval: ApprovalDecisionRecord,
 ): Promise<ProcessCardApprovalResult> {
-  await input.approvalStore.updateEffect(approval.id, {
-    effectStatus: "pending",
-    effectError: null,
-  })
+  const claimToken = randomUUID()
+  const claim = await input.approvalStore.claimEffect(approval.id, claimToken)
+  if (!claim.claimed) {
+    return {
+      ok: true,
+      approval: claim.record,
+      idempotent: true,
+      processing: claim.record.effectStatus === "pending",
+      toast:
+        claim.record.effectStatus === "applied"
+          ? "已打回（幂等）"
+          : "审批正在处理中，请勿重复操作",
+    }
+  }
 
   let result: WorkItemExecutionResult
   try {
     result = await startWorkItem(input.workItemStore, input.recordId)
   } catch (error) {
     const message = error instanceof Error ? error.message : "打回失败"
-    const failed = await input.approvalStore.updateEffect(approval.id, {
+    const failed = await input.approvalStore.settleEffect(approval.id, claimToken, {
       effectStatus: "failed",
       effectError: message,
     })
@@ -126,14 +148,14 @@ async function applyRejectEffect(
   }
 
   if (!result.ok) {
-    const failed = await input.approvalStore.updateEffect(approval.id, {
+    const failed = await input.approvalStore.settleEffect(approval.id, claimToken, {
       effectStatus: "failed",
       effectError: result.error,
     })
     return { ok: false, error: result.error, approval: failed, recoverable: true }
   }
 
-  const updated = await input.approvalStore.updateEffect(approval.id, {
+  const updated = await input.approvalStore.settleEffect(approval.id, claimToken, {
     effectStatus: "applied",
     effectError: null,
   })
@@ -159,8 +181,8 @@ export async function processFeishuCardApproval(
 
   const match = assertReviewerMatchesAssignment(input.assignments, {
     workflowId: input.workflowId,
-    reviewerUserId: input.userId || null,
     externalReviewerId: input.openId || null,
+    externalReviewerUserId: input.externalUserId || null,
   })
   if (!match.ok) return { ok: false, error: match.error }
 
@@ -171,8 +193,8 @@ export async function processFeishuCardApproval(
       subjectType: "work_item",
       subjectId: input.recordId,
       decision: input.action === "approve" ? "approve" : "reject",
-      reviewerUserId: input.userId || null,
       externalReviewerId: input.openId || null,
+      externalReviewerUserId: input.externalUserId || null,
       roleSnapshot: match.role,
       reason: input.action === "approve" ? "飞书卡片审核通过" : "飞书卡片打回修改",
       source: "feishu_card",

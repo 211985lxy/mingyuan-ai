@@ -4,10 +4,7 @@
  */
 
 export const GOVERNANCE_ROLES = [
-  "business_owner",
-  "system_owner",
-  "reviewer",
-  "backup_owner",
+  "business_owner", "system_owner", "reviewer", "backup_owner",
 ] as const
 
 export type GovernanceRole = (typeof GOVERNANCE_ROLES)[number]
@@ -16,12 +13,7 @@ export const GOVERNANCE_SCOPE_TYPES = ["system", "workflow"] as const
 export type GovernanceScopeType = (typeof GOVERNANCE_SCOPE_TYPES)[number]
 
 export const APPROVAL_SUBJECT_TYPES = [
-  "work_item",
-  "generation",
-  "asset",
-  "memory",
-  "methodology",
-  "workflow_change",
+  "work_item", "generation", "asset", "memory", "methodology", "workflow_change",
 ] as const
 export type ApprovalSubjectType = (typeof APPROVAL_SUBJECT_TYPES)[number]
 
@@ -53,6 +45,7 @@ export interface GovernanceAssignmentLike {
   role: string
   userId?: string | null
   externalOpenId?: string | null
+  externalUserId?: string | null
   status: string
   effectiveAt: Date | string
 }
@@ -63,6 +56,7 @@ export interface ApprovalDecisionInput {
   decision: ApprovalDecisionCode
   reviewerUserId?: string | null
   externalReviewerId?: string | null
+  externalReviewerUserId?: string | null
   roleSnapshot: string
   reason: string
   source: ApprovalSource
@@ -72,6 +66,8 @@ export interface ApprovalDecisionInput {
   projectId?: string | null
   effectStatus?: ApprovalEffectStatus
   effectError?: string | null
+  effectClaimToken?: string | null
+  effectClaimedAt?: Date | string | null
 }
 
 export interface ApprovalDecisionRecord extends ApprovalDecisionInput {
@@ -133,7 +129,11 @@ function isActive(row: GovernanceAssignmentLike, at: Date): boolean {
 }
 
 function hasIdentity(row: GovernanceAssignmentLike): boolean {
-  return Boolean(row.userId?.trim() || row.externalOpenId?.trim())
+  return Boolean(
+    row.userId?.trim()
+    || row.externalOpenId?.trim()
+    || row.externalUserId?.trim(),
+  )
 }
 
 /**
@@ -191,12 +191,15 @@ export function assertReviewerMatchesAssignment(
     workflowId: string
     reviewerUserId?: string | null
     externalReviewerId?: string | null
+    externalReviewerUserId?: string | null
+    requiredRole?: GovernanceRole
     at?: Date
   },
 ): ReviewerMatchResult {
   const userId = input.reviewerUserId?.trim() || ""
   const openId = input.externalReviewerId?.trim() || ""
-  if (!userId && !openId) {
+  const externalUserId = input.externalReviewerUserId?.trim() || ""
+  if (!userId && !openId && !externalUserId) {
     return { ok: false, code: "anonymous", error: "审批人身份缺失，拒绝匿名签字。" }
   }
 
@@ -208,16 +211,14 @@ export function assertReviewerMatchesAssignment(
     return { ok: false, code: "reviewer_mismatch", error: ready.error }
   }
 
-  const allowedRoles: GovernanceRole[] = [
-    "reviewer",
-    "business_owner",
-    "backup_owner",
-    "system_owner",
-  ]
+  const allowedRoles: GovernanceRole[] = input.requiredRole
+    ? [input.requiredRole]
+    : ["reviewer", "business_owner", "backup_owner", "system_owner"]
   const hit = ready.assignments.find((row) => {
     if (!isGovernanceRole(row.role) || !allowedRoles.includes(row.role)) return false
     if (userId && row.userId === userId) return true
     if (openId && row.externalOpenId === openId) return true
+    if (externalUserId && row.externalUserId === externalUserId) return true
     return false
   })
 
@@ -235,19 +236,62 @@ export function assertReviewerMatchesAssignment(
  * 工作流或方法论变更需业务 Owner 与系统 Owner 双签。
  */
 export function assertDualSignForChange(
-  approvals: Array<{ decision: string; roleSnapshot: string; subjectId: string }>,
-  subjectId: string,
+  approvals: ApprovalDecisionRecord[],
+  input: {
+    subjectType: ApprovalSubjectType
+    subjectId: string
+    workflowId: string
+    projectId: string | null
+    assignments: GovernanceAssignmentLike[]
+    at?: Date
+    maxAgeMs?: number
+  },
 ): DualSignResult {
-  const approved = approvals.filter(
-    (row) => row.subjectId === subjectId && row.decision === "approve",
+  const at = input.at ?? new Date()
+  const maxAgeMs = input.maxAgeMs ?? APPROVAL_MAX_AGE_MS
+  const scoped = approvals.filter(
+    (row) =>
+      row.subjectType === input.subjectType
+      && row.subjectId === input.subjectId
+      && row.workflowId === input.workflowId
+      && row.projectId === input.projectId
+      && !isApprovalExpired(row, at, maxAgeMs),
+  ).sort(
+    (left, right) =>
+      new Date(right.decidedAt ?? 0).getTime()
+      - new Date(left.decidedAt ?? 0).getTime(),
   )
-  const hasBusiness = approved.some((row) => row.roleSnapshot === "business_owner")
-  const hasSystem = approved.some((row) => row.roleSnapshot === "system_owner")
-  if (!hasBusiness || !hasSystem) {
+
+  const latestBySignerRole = new Map<string, ApprovalDecisionRecord>()
+  for (const row of scoped) {
+    const identityKey = reviewerIdentityParts(row).sort().join("|")
+    if (!identityKey) continue
+    const key = `${row.roleSnapshot}:${identityKey}`
+    if (!latestBySignerRole.has(key)) latestBySignerRole.set(key, row)
+  }
+
+  const current = [...latestBySignerRole.values()].filter(
+    (row) =>
+      row.decision === "approve"
+      && approvalStillMatchesAssignment(row, input.assignments, input.workflowId, at),
+  )
+  const business = current.find((row) => row.roleSnapshot === "business_owner")
+  const system = current.find((row) => row.roleSnapshot === "system_owner")
+  if (
+    !business
+    || !system
+    || sameReviewerIdentity(
+      business,
+      system,
+      input.assignments,
+      input.workflowId,
+      at,
+    )
+  ) {
     return {
       ok: false,
       code: "dual_sign_required",
-      error: "工作流/方法论变更需业务 Owner 与系统 Owner 双签。",
+      error: "工作流/方法论变更需当前有效且身份不同的业务 Owner 与系统 Owner 双签。",
     }
   }
   return { ok: true }
@@ -269,6 +313,8 @@ export function parseApprovalDecisionInput(raw: unknown): ApprovalDecisionInput 
     decision: obj.decision,
     reviewerUserId: typeof obj.reviewerUserId === "string" ? obj.reviewerUserId : null,
     externalReviewerId: typeof obj.externalReviewerId === "string" ? obj.externalReviewerId : null,
+    externalReviewerUserId:
+      typeof obj.externalReviewerUserId === "string" ? obj.externalReviewerUserId : null,
     roleSnapshot: obj.roleSnapshot.trim(),
     reason: obj.reason.trim(),
     source: obj.source,
@@ -299,11 +345,85 @@ function isApprovalExpired(
   at: Date,
   maxAgeMs: number,
 ): boolean {
-  // 历史行可能没有 decidedAt（unknown）：不按过期拒绝，由调用方补齐新签字
-  if (!approval.decidedAt) return false
+  if (!approval.decidedAt) return true
   const decidedAt = new Date(approval.decidedAt).getTime()
-  if (!Number.isFinite(decidedAt)) return false
+  if (!Number.isFinite(decidedAt)) return true
   return at.getTime() - decidedAt > maxAgeMs
+}
+
+function reviewerIdentityParts(
+  row: Pick<
+    ApprovalDecisionRecord,
+    "reviewerUserId" | "externalReviewerId" | "externalReviewerUserId"
+  >,
+): string[] {
+  return [
+    row.reviewerUserId ? `internal:${row.reviewerUserId}` : "",
+    row.externalReviewerId ? `open:${row.externalReviewerId}` : "",
+    row.externalReviewerUserId ? `external_user:${row.externalReviewerUserId}` : "",
+  ].filter(Boolean)
+}
+
+function sameReviewerIdentity(
+  left: ApprovalDecisionRecord,
+  right: ApprovalDecisionRecord,
+  assignments: GovernanceAssignmentLike[],
+  workflowId: string,
+  at: Date,
+): boolean {
+  const assignmentIdentityParts = (
+    approval: ApprovalDecisionRecord,
+  ): string[] => assignments
+    .filter((row) => assignmentMatchesApproval(row, approval, workflowId, at))
+    .flatMap((row) => [
+      row.userId ? `internal:${row.userId}` : "",
+      row.externalOpenId ? `open:${row.externalOpenId}` : "",
+      row.externalUserId ? `external_user:${row.externalUserId}` : "",
+    ])
+    .filter(Boolean)
+  const leftIds = new Set([
+    ...reviewerIdentityParts(left),
+    ...assignmentIdentityParts(left),
+  ])
+  return [
+    ...reviewerIdentityParts(right),
+    ...assignmentIdentityParts(right),
+  ].some((value) => leftIds.has(value))
+}
+
+function assignmentMatchesApproval(
+  row: GovernanceAssignmentLike,
+  approval: ApprovalDecisionRecord,
+  workflowId: string,
+  at: Date = new Date(),
+): boolean {
+  if (!isGovernanceRole(approval.roleSnapshot)) return false
+  const expectedScope =
+    approval.roleSnapshot === "system_owner"
+      ? { scopeType: "system" }
+      : { scopeType: "workflow", scopeId: workflowId }
+  if (!isActive(row, at) || row.role !== approval.roleSnapshot) return false
+  if (row.scopeType !== expectedScope.scopeType) return false
+  if (expectedScope.scopeId && row.scopeId !== expectedScope.scopeId) return false
+  if (approval.reviewerUserId && row.userId === approval.reviewerUserId) return true
+  if (
+    approval.externalReviewerId
+    && row.externalOpenId === approval.externalReviewerId
+  ) return true
+  return Boolean(
+    approval.externalReviewerUserId
+    && row.externalUserId === approval.externalReviewerUserId,
+  )
+}
+
+export function approvalStillMatchesAssignment(
+  approval: ApprovalDecisionRecord,
+  assignments: GovernanceAssignmentLike[],
+  workflowId: string,
+  at: Date = new Date(),
+): boolean {
+  return assignments.some((row) =>
+    assignmentMatchesApproval(row, approval, workflowId, at))
 }
 
 /**
@@ -336,18 +456,10 @@ export function assertValidApprovalForHighRisk(input: {
   if (approval.subjectType !== input.subjectType || approval.subjectId !== input.subjectId) {
     return { ok: false, error: "approvalId 与事项不匹配，拒绝执行。" }
   }
-  if (
-    input.workflowId
-    && approval.workflowId
-    && approval.workflowId !== input.workflowId
-  ) {
+  if (input.workflowId !== undefined && approval.workflowId !== input.workflowId) {
     return { ok: false, error: "approvalId 与工作流不匹配，拒绝跨工作流执行。" }
   }
-  if (
-    input.projectId
-    && approval.projectId
-    && approval.projectId !== input.projectId
-  ) {
+  if (input.projectId !== undefined && approval.projectId !== input.projectId) {
     return { ok: false, error: "approvalId 与项目不匹配，拒绝跨项目执行。" }
   }
   if (

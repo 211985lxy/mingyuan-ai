@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -61,6 +63,8 @@ export default function AdminMethodologyPage() {
   const [editingContent, setEditingContent] = React.useState("")
   const [editingTitle, setEditingTitle] = React.useState("")
   const [saving, setSaving] = React.useState(false)
+  const [workflowId, setWorkflowId] = React.useState("content-growth-v1")
+  const [approvalId, setApprovalId] = React.useState("")
 
   const fetchMethodologies = React.useCallback(async () => {
     setLoading(true)
@@ -95,7 +99,12 @@ export default function AdminMethodologyPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ key: editingKey, content: editingContent }),
+        body: JSON.stringify({
+          key: editingKey,
+          content: editingContent,
+          workflowId,
+          approvalId,
+        }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "保存失败" }))
@@ -119,7 +128,7 @@ export default function AdminMethodologyPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action: "reset" }),
+        body: JSON.stringify({ action: "reset", workflowId, approvalId }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "重置失败" }))
@@ -191,6 +200,27 @@ export default function AdminMethodologyPage() {
           <BookOpen className="h-5 w-5 text-primary" />
           方法论库（可编辑整理）
         </h2>
+        <Card className="mb-4">
+          <CardContent className="grid gap-3 py-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="methodology-workflow-id">工作流 ID</Label>
+              <Input
+                id="methodology-workflow-id"
+                value={workflowId}
+                onChange={(event) => setWorkflowId(event.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="methodology-approval-id">双签中的任一 approvalId</Label>
+              <Input
+                id="methodology-approval-id"
+                value={approvalId}
+                onChange={(event) => setApprovalId(event.target.value)}
+                placeholder="先在治理责任页完成两次签字"
+              />
+            </div>
+          </CardContent>
+        </Card>
         {loading ? (
           <div className="grid gap-4 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (

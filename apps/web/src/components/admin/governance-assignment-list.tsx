@@ -33,7 +33,8 @@ export function GovernanceAssignmentList(props: {
               </div>
               <p className="font-mono text-xs text-muted-foreground">{item.scopeId}</p>
               <p className="text-xs text-muted-foreground">
-                userId={item.userId || "—"} · open_id={item.externalOpenId || "—"}
+                userId={item.userId || "—"} · open_id={item.externalOpenId || "—"} ·
+                user_id={item.externalUserId || "—"}
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => props.onToggle(item)}>

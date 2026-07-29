@@ -110,6 +110,14 @@ export function GovernanceAssignmentForm(props: {
               placeholder="ou_xxx"
             />
           </div>
+          <div>
+            <Label>飞书 user_id</Label>
+            <Input
+              value={draft.externalUserId ?? ""}
+              onChange={(e) => onChange({ ...draft, externalUserId: e.target.value })}
+              placeholder="on_xxx"
+            />
+          </div>
           <Button type="submit" disabled={saving} className="w-full">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             新增

@@ -24,7 +24,7 @@ describeDb("governance + approval DB integration", () => {
       create: {
         email: "governance-wp2@test.com",
         name: "WP2 Tester",
-        passwordHash: "x",
+        password: "x",
         role: "admin",
       },
       update: {},
@@ -102,6 +102,7 @@ describeDb("governance + approval DB integration", () => {
       subjectId: "rec_wp2_it",
       decision: "approve" as const,
       externalReviewerId: "ou_wp2_reviewer",
+      externalReviewerUserId: "on_wp2_reviewer",
       roleSnapshot: "reviewer",
       reason: "集成测试通过",
       source: "feishu_card" as const,
@@ -128,6 +129,24 @@ describeDb("governance + approval DB integration", () => {
     })
     expect(applied.effectStatus).toBe("applied")
     expect(applied.effectError).toBeNull()
+
+    await store.updateEffect(first.record.id, {
+      effectStatus: "none",
+      effectError: null,
+    })
+    const claims = await Promise.all([
+      store.claimEffect(first.record.id, "claim_a"),
+      store.claimEffect(first.record.id, "claim_b"),
+    ])
+    expect(claims.filter((claim) => claim.claimed)).toHaveLength(1)
+    const winner = claims.find((claim) => claim.claimed)
+    expect(winner).toBeTruthy()
+    const settled = await store.settleEffect(
+      first.record.id,
+      winner?.record.effectClaimToken ?? "",
+      { effectStatus: "applied" },
+    )
+    expect(settled.effectStatus).toBe("applied")
 
     const count = await prisma.approvalDecision.count({
       where: { requestId: input.requestId },

@@ -12,6 +12,7 @@ import {
 import { AdminPageShell } from "@/components/admin/admin-page-shell"
 import { GovernanceAssignmentForm } from "@/components/admin/governance-assignment-form"
 import { GovernanceAssignmentList } from "@/components/admin/governance-assignment-list"
+import { ApprovalDecisionForm } from "@/components/admin/approval-decision-form"
 import { useGovernanceAssignments } from "@/hooks/use-governance-assignments"
 
 export default function AdminGovernancePage() {
@@ -52,12 +53,15 @@ export default function AdminGovernancePage() {
     >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <GovernanceAssignmentList items={g.items} total={g.total} onToggle={g.onToggle} />
-        <GovernanceAssignmentForm
-          draft={g.draft}
-          saving={g.saving}
-          onChange={g.setDraft}
-          onSubmit={g.onCreate}
-        />
+        <div className="space-y-4">
+          <GovernanceAssignmentForm
+            draft={g.draft}
+            saving={g.saving}
+            onChange={g.setDraft}
+            onSubmit={g.onCreate}
+          />
+          <ApprovalDecisionForm />
+        </div>
       </div>
     </AdminPageShell>
   )

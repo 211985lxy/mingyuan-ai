@@ -92,12 +92,16 @@ export async function POST(request: Request) {
   const actionValue = body.action?.value
   const action = actionValue?.action?.trim() || ""
   const recordId = actionValue?.recordId?.trim() || ""
-  const workflowId = actionValue?.workflowId?.trim() || "default"
+  const workflowId = actionValue?.workflowId?.trim() || ""
   const projectId = actionValue?.projectId?.trim() || null
   const openId = typeof body.open_id === "string" ? body.open_id.trim() : ""
   const userId = typeof body.user_id === "string" ? body.user_id.trim() : ""
+  const messageId =
+    typeof body.open_message_id === "string" ? body.open_message_id.trim() : ""
 
   if (!recordId) return toastError("缺少记录ID")
+  if (!workflowId) return toastError("缺少工作流ID")
+  if (!messageId) return toastError("缺少 open_message_id，拒绝创建共享幂等键")
   if (action !== "approve" && action !== "reject") return toastError("未知操作")
   if (!openId && !userId) return toastError("缺少审批人 open_id/user_id，拒绝匿名签字")
 
@@ -117,8 +121,8 @@ export async function POST(request: Request) {
     recordId,
     action,
     openId,
-    userId,
-    messageId: body.open_message_id?.trim() || "unknown_msg",
+    externalUserId: userId,
+    messageId,
     aimResultId,
     workItemStore,
     approvalStore: createPrismaApprovalDecisionStore(),
@@ -134,7 +138,7 @@ export async function POST(request: Request) {
   return NextResponse.json(
     {
       toast: {
-        type: result.idempotent ? "info" : "success",
+        type: result.idempotent || result.processing ? "info" : "success",
         content: result.toast,
       },
       approvalId: result.approval.id,

@@ -9,6 +9,7 @@ import {
   type MethodologyKey,
 } from "@/lib/agent-methodology-store"
 import { recordAdminAudit } from "@/lib/admin-audit"
+import { validateHighRiskApproval } from "@/lib/aim/approval-validation"
 
 const VALID_KEYS = new Set<MethodologyKey>(
   Object.keys(METHODOLOGY_META) as MethodologyKey[]
@@ -37,12 +38,27 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin, params }
 
   const body = await parseJsonBody(
     request,
-    z.object({ action: z.literal("reset") }).strict(),
-    { maxBytes: 1024 },
+    z.object({
+      action: z.literal("reset"),
+      workflowId: z.string().trim().min(1).max(120),
+      approvalId: z.string().trim().min(1).max(191),
+    }).strict(),
+    { maxBytes: 2048 },
   )
   if (body?.action !== "reset") {
     return NextResponse.json({ error: "仅支持 action=reset" }, { status: 400 })
   }
+  const gate = await validateHighRiskApproval({
+    action: "publish",
+    approvalId: body.approvalId,
+    subjectType: "methodology",
+    subjectId: `builtin:${key}`,
+    workflowId: body.workflowId,
+    projectId: null,
+    expectedRoles: ["business_owner", "system_owner"],
+    dualSign: true,
+  })
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: 403 })
 
   await resetMethodologyToText(key)
   const item = await getMethodologyForAdmin(key)
@@ -52,6 +68,10 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin, params }
     action: "methodology.reset",
     targetType: "methodology",
     targetId: key,
+    metadata: { approvalId: gate.approvalId, workflowId: body.workflowId },
   })
-  return NextResponse.json({ data: item }, { headers: { "x-request-id": requestId } })
+  return NextResponse.json(
+    { data: item, approvalId: gate.approvalId },
+    { headers: { "x-request-id": requestId } },
+  )
 })

@@ -5,6 +5,8 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { request } from "@/lib/api/core"
 import { ASSET_CANDIDATE_KIND_LABELS } from "@/lib/aim/asset-candidates"
 
@@ -30,6 +32,8 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const [workflowId, setWorkflowId] = useState("content-growth-v1")
+  const [approvalId, setApprovalId] = useState("")
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -54,7 +58,12 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
     try {
       await request(`/api/aim/asset-candidates/${encodeURIComponent(id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ action, promote }),
+        body: JSON.stringify({
+          action,
+          promote,
+          workflowId: promote ? workflowId : undefined,
+          approvalId: promote ? approvalId : undefined,
+        }),
       })
       toast.success(action === "approve" ? (promote ? "已批准并写入知识库" : "已批准") : "已拒绝")
       await reload()
@@ -97,7 +106,29 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
       </div>
 
       {expanded ? (
-        <ul className="mt-3 space-y-3">
+        <>
+          <div className="mt-3 grid gap-2 rounded-lg border border-border/70 bg-card p-2.5 sm:grid-cols-2">
+            <div className="grid gap-1">
+              <Label htmlFor="asset-workflow-id" className="text-xs">工作流 ID</Label>
+              <Input
+                id="asset-workflow-id"
+                value={workflowId}
+                onChange={(event) => setWorkflowId(event.target.value)}
+                className="h-8 text-xs"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="asset-approval-id" className="text-xs">approvalId</Label>
+              <Input
+                id="asset-approval-id"
+                value={approvalId}
+                onChange={(event) => setApprovalId(event.target.value)}
+                placeholder="治理责任页签字后粘贴"
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+          <ul className="mt-3 space-y-3">
           {items.map((item) => (
             <li key={item.id} className="rounded-lg border border-border/70 bg-card p-2.5">
               <p className="text-xs font-medium text-foreground">
@@ -142,7 +173,8 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
               </div>
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       ) : null}
     </div>
   )
