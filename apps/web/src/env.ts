@@ -128,6 +128,7 @@ export const env = createEnv({
     LARK_CONTENT_TABLE_ID: z.string().optional(),
     LARK_COMPETITOR_TABLE_ID: z.string().optional(),
     LARK_DELIVERY_TABLE_ID: z.string().optional(),
+    LARK_BUSINESS_ATTRIBUTION_TABLE_ID: z.string().optional(),
     LARK_ASSET_DEFAULT_EDITOR_OPEN_ID: z.string().optional(),
     MEETING_INSIGHT_MODEL: z.string().optional(),
     LIHUO_API_KEY: z.string().optional(),
@@ -337,6 +338,8 @@ export const env = createEnv({
     LARK_CONTENT_TABLE_ID: process.env.LARK_CONTENT_TABLE_ID,
     LARK_COMPETITOR_TABLE_ID: process.env.LARK_COMPETITOR_TABLE_ID,
     LARK_DELIVERY_TABLE_ID: process.env.LARK_DELIVERY_TABLE_ID,
+    LARK_BUSINESS_ATTRIBUTION_TABLE_ID:
+      process.env.LARK_BUSINESS_ATTRIBUTION_TABLE_ID,
     LARK_ASSET_DEFAULT_EDITOR_OPEN_ID: process.env.LARK_ASSET_DEFAULT_EDITOR_OPEN_ID,
     MEETING_INSIGHT_MODEL: process.env.MEETING_INSIGHT_MODEL,
     LIHUO_API_KEY: process.env.LIHUO_API_KEY,

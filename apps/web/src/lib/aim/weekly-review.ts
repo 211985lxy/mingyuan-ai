@@ -82,13 +82,31 @@ function hasAnyBusinessMetric(row: OutcomeRow): boolean {
   ].some((value) => value != null && value !== "")
 }
 
-function sumNullable(rows: OutcomeRow[], pick: (row: OutcomeRow) => number | null): number {
-  let sum = 0
-  for (const row of rows) {
-    const value = pick(row)
-    if (value != null && Number.isFinite(value)) sum += value
+function sumPeriodSnapshotDeltas(
+  rows: OutcomeRow[],
+  start: Date,
+  end: Date,
+  pick: (row: OutcomeRow) => number | null,
+): number {
+  const endSnapshots = pickPeriodEndSnapshots(
+    rows.filter((row) => row.collectedAt.getTime() < end.getTime()),
+  )
+  const startSnapshots = new Map(
+    pickPeriodEndSnapshots(
+      rows.filter((row) => row.collectedAt.getTime() < start.getTime()),
+    ).map((row) => [row.generationId, row]),
+  )
+  let total = 0
+  for (const endRow of endSnapshots) {
+    const endValue = pick(endRow)
+    if (endValue == null || !Number.isFinite(endValue)) continue
+    const startRow = startSnapshots.get(endRow.generationId)
+    const startValue = startRow ? pick(startRow) : null
+    total += startValue != null && Number.isFinite(startValue)
+      ? endValue - startValue
+      : endValue
   }
-  return sum
+  return total
 }
 
 /**
@@ -153,14 +171,17 @@ export async function computeWeeklyReview(input: {
     (g) => g.workflowStatus === "published" && inRange(g.publishedAt, start, end),
   ).length
 
-  // 2/3/4. 周期内经营结果：按 generation 取周期末累计快照，禁止 7+14+30 相加
-  const periodOutcomes = pickPeriodEndSnapshots(
-    outcomes.filter((o) => inRange(o.collectedAt, start, end)),
+  // 2/3/4. 周期经营结果：周期末累计快照减周期初快照，避免跨周重复计数
+  const qualifiedLeadCount = sumPeriodSnapshotDeltas(
+    outcomes, start, end, (o) => o.qualifiedLeadCount,
   )
-  const qualifiedLeadCount = sumNullable(periodOutcomes, (o) => o.qualifiedLeadCount)
-  const appointmentCount = sumNullable(periodOutcomes, (o) => o.appointmentCount)
-  const dealCount = sumNullable(periodOutcomes, (o) => o.dealCount)
-  const revenue = sumNullable(periodOutcomes, (o) => {
+  const appointmentCount = sumPeriodSnapshotDeltas(
+    outcomes, start, end, (o) => o.appointmentCount,
+  )
+  const dealCount = sumPeriodSnapshotDeltas(
+    outcomes, start, end, (o) => o.dealCount,
+  )
+  const revenue = sumPeriodSnapshotDeltas(outcomes, start, end, (o) => {
     if (o.revenue == null) return null
     const value = Number(o.revenue)
     return Number.isFinite(value) ? value : null

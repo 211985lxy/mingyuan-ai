@@ -91,6 +91,8 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model OutcomeAttribution")
     expect(migrationSql).toContain("CREATE TABLE IF NOT EXISTS `OutcomeAttribution`")
     expect(migrationSql).toContain("UNIQUE INDEX `OutcomeAttribution_externalLeadId_key`")
+    expect(schema).toContain("externalAttributionConfirmer")
+    expect(migrationSql).toContain("OutcomeAttribution_externalRecordId_key")
   })
 
   it("creates CustomerOutcomeProjection for reviewed customer results (WP-4)", () => {

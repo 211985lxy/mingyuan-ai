@@ -216,6 +216,20 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/outcome-attributions",
+      "file": "src/app/api/admin/aim/outcome-attributions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/aim/runs/[runId]",
       "file": "src/app/api/admin/aim/runs/[runId]/route.ts",
       "methods": [

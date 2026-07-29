@@ -27,6 +27,10 @@ model OutcomeAttribution {
   externalAppointmentId String?  @db.VarChar(80)
   externalDealId        String?  @db.VarChar(80)
   externalPaymentId     String?  @db.VarChar(80)
+  externalRecordId      String?  @db.VarChar(80)
+  externalTableId       String?  @db.VarChar(80)
+  externalSourceContentId String? @db.VarChar(80)
+  externalAttributionConfirmer String? @db.VarChar(120)
   /** explicit | first_touch | unknown */
   attributionMethod     String   @db.VarChar(20)
   /** high | medium | low */
@@ -41,6 +45,7 @@ model OutcomeAttribution {
   @@unique([externalLeadId])
   @@unique([externalDealId])
   @@unique([externalPaymentId])
+  @@unique([externalRecordId])
   @@index([userId, occurredAt])
   @@index([generationId])
   @@index([attributionMethod])

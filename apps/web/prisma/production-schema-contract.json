@@ -108,6 +108,10 @@
         "externalAppointmentId",
         "externalDealId",
         "externalPaymentId",
+        "externalRecordId",
+        "externalTableId",
+        "externalSourceContentId",
+        "externalAttributionConfirmer",
         "attributionMethod",
         "attributionConfidence",
         "occurredAt"
