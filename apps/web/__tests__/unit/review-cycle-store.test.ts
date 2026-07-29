@@ -17,7 +17,7 @@ const SNAPSHOT = {
   dealCount: 1,
   revenue: 10000,
   paymentCount: 1,
-  paymentAmountCny: 10000,
+  paymentAmountCny: null,
   customerOutcomeCount: 1,
   timeSavedMinutes: 40,
   firstPassAcceptanceRate: 0.5,
@@ -177,14 +177,22 @@ describe("review cycle persistence", () => {
     const action = created.record.actions[0]!
     await updateReviewActionStatus({
       actionId: action.id,
+      reviewCycleId: created.record.id,
       status: "done",
       evidenceRef: "feishu:doc/action",
       store: context.store,
     })
     await expect(updateReviewActionStatus({
       actionId: action.id,
+      reviewCycleId: created.record.id,
       status: "open",
       store: context.store,
     })).rejects.toThrow(/不得再次变更|不能回退/)
+    await expect(updateReviewActionStatus({
+      actionId: action.id,
+      reviewCycleId: "other_cycle",
+      status: "cancelled",
+      store: context.store,
+    })).rejects.toThrow(/不属于该周复盘/)
   })
 })

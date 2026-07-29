@@ -8,6 +8,8 @@ const {
   assertWorkflowGovernanceReady,
   decideLearningCandidate,
   promoteLearningCandidateToEvalDraft,
+  qualifyEvalFixtureVersion,
+  activateEvalFixtureVersion,
   recordAdminAudit,
   prisma,
 } = vi.hoisted(() => ({
@@ -17,6 +19,8 @@ const {
   assertWorkflowGovernanceReady: vi.fn(),
   decideLearningCandidate: vi.fn(),
   promoteLearningCandidateToEvalDraft: vi.fn(),
+  qualifyEvalFixtureVersion: vi.fn(),
+  activateEvalFixtureVersion: vi.fn(),
   recordAdminAudit: vi.fn(async () => "audit_1"),
   prisma: {
     learningCandidate: { findUnique: vi.fn() },
@@ -38,12 +42,12 @@ vi.mock("@/lib/aim/workflow-governance", () => ({
   assertWorkflowGovernanceReady,
 }))
 vi.mock("@/lib/aim/learning-candidate-store", () => ({
-  activateEvalFixtureVersion: vi.fn(),
+  activateEvalFixtureVersion,
   annotateLearningCandidate: vi.fn(),
   decideLearningCandidate,
   markLearningCandidatePromoted: vi.fn(),
   promoteLearningCandidateToEvalDraft,
-  qualifyEvalFixtureVersion: vi.fn(),
+  qualifyEvalFixtureVersion,
 }))
 vi.mock("@/lib/methodology-profile-admin", () => ({
   createMethodologyProfileVersion: vi.fn(),
@@ -131,5 +135,50 @@ describe("learning candidate admin route", () => {
     }), context as never)
     expect(response.status).toBe(403)
     expect(decideLearningCandidate).not.toHaveBeenCalled()
+  })
+
+  it("qualify_eval/activate_eval 必须把 URL candidateId 绑定到 version", async () => {
+    qualifyEvalFixtureVersion.mockResolvedValueOnce({ id: "version_1" })
+    activateEvalFixtureVersion.mockResolvedValueOnce({
+      record: { id: "version_1" },
+      idempotent: false,
+    })
+    const qualify = await PATCH(patch({
+      action: "qualify_eval",
+      approvalId: "approval_1",
+      workflowId: "growth",
+      versionId: "version_other",
+      dailyPassed: true,
+      evidenceRef: "report://1",
+      metrics: {
+        targetFailureRateBefore: 0.5,
+        targetFailureRateAfter: 0.3,
+        acceptanceRateBefore: 0.8,
+        acceptanceRateAfter: 0.8,
+        evidenceCompletenessRateBefore: 0.9,
+        evidenceCompletenessRateAfter: 0.9,
+        severeHallucinationRate: 0,
+      },
+    }), context as never)
+    expect(qualify.status).toBe(200)
+    expect(qualifyEvalFixtureVersion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        versionId: "version_other",
+        candidateId: "candidate_1",
+      }),
+    )
+
+    const activate = await PATCH(patch({
+      action: "activate_eval",
+      approvalId: "approval_1",
+      workflowId: "growth",
+      versionId: "version_other",
+    }), context as never)
+    expect(activate.status).toBe(200)
+    expect(activateEvalFixtureVersion).toHaveBeenCalledWith({
+      versionId: "version_other",
+      candidateId: "candidate_1",
+      approvalId: "approval_1",
+    })
   })
 })

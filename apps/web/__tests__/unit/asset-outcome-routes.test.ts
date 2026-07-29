@@ -127,7 +127,10 @@ describe("GET /api/aim/asset-candidates", () => {
 describe("PATCH /api/aim/asset-candidates/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    prisma.assetCandidate.findFirst.mockResolvedValue({ projectId: "proj_1" })
+    prisma.assetCandidate.findFirst.mockResolvedValue({
+      projectId: "proj_1",
+      crossProjectAllowed: false,
+    })
     validateHighRiskApproval.mockResolvedValue({ ok: true, approvalId: "apd_1" })
   })
 
@@ -170,6 +173,32 @@ describe("PATCH /api/aim/asset-candidates/[id]", () => {
     )
     expect(res.status).toBe(403)
     expect(reviewAssetCandidate).not.toHaveBeenCalled()
+  })
+
+  it("不 promote 但开启跨项目复用仍需独立 system_owner 批准", async () => {
+    reviewAssetCandidate.mockResolvedValueOnce({
+      ok: true,
+      record: { id: "cand_1", reviewStatus: "approved", crossProjectAllowed: true },
+    })
+    const res = await reviewPATCH(
+      new NextRequest("http://localhost/api/aim/asset-candidates/cand_1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          action: "approve",
+          workflowId: "content-growth-v1",
+          crossProjectAllowed: true,
+          crossProjectApprovalId: "apd_system_1",
+        }),
+      }),
+      candCtx,
+    )
+    expect(res.status).toBe(200)
+    expect(validateHighRiskApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        approvalId: "apd_system_1",
+        expectedRoles: ["system_owner"],
+      }),
+    )
   })
 
   it("合法审核透传 action/promote/crossProjectAllowed（两次独立签字）", async () => {

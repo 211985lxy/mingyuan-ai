@@ -76,16 +76,23 @@ async function loadRunMetrics(input: {
   const runIds = traces.flatMap((trace) => trace.runId ? [trace.runId] : [])
   const events = runIds.length
     ? await prisma.aimRunEvent.findMany({
-      where: { runId: { in: runIds } },
+      where: {
+        runId: { in: runIds },
+        createdAt: { gte: input.start, lt: input.end },
+      },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: EVENT_LIMIT + 1,
       select: { id: true, runId: true, event: true, metadata: true, createdAt: true },
     })
     : []
   if (events.length > EVENT_LIMIT) throw new Error("终态事件超过 100000，请缩短周期")
+  // 禁止窗口外泄漏：只保留 [start, end) 内事件
+  const windowedEvents = events.filter((event) =>
+    event.createdAt.getTime() >= input.start.getTime()
+    && event.createdAt.getTime() < input.end.getTime())
   const metrics = aggregateRunOutcomeMetrics({
     traces,
-    events,
+    events: windowedEvents,
     humanHourlyCostCny: input.humanHourlyCostCny,
     filters: {
       workflowId: input.filters.workflowId,
@@ -97,7 +104,7 @@ async function loadRunMetrics(input: {
       ? [...new Set(traces.flatMap((row) =>
         row.aimGenerationId ? [row.aimGenerationId] : []))]
       : undefined
-  return { traces, events, metrics, generationIds }
+  return { traces, events: windowedEvents, metrics, generationIds }
 }
 
 async function loadCandidateCounts(filters: ReviewCycleFilters) {
@@ -270,7 +277,7 @@ export async function loadReviewMetricsSnapshot(input: {
     dealCount: weekly.dealCount,
     revenue: weekly.revenue,
     paymentCount: counts.paymentCount,
-    paymentAmountCny: weekly.revenue,
+    paymentAmountCny: null,
     customerOutcomeCount: counts.customerOutcomeCount,
     timeSavedMinutes: run.metrics.timeSavedMinutes,
     firstPassAcceptanceRate: run.metrics.firstPassAcceptanceRate,

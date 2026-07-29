@@ -4,8 +4,38 @@
 
 import type { AimRunSpec, AimContextSource } from "./types"
 import type { MethodologyPolicy } from "@/lib/methodology-profile-store"
+import type { LoadedAimSkill } from "./skill-loader"
 import { sha256 } from "./hashing"
 import { resolveDefaultTrustLevel, withDefaultTrustLevel } from "./context-trust"
+
+/** 与 buildAimSkillBlock 一致：总块上限；manifest 必须对实际注入/截断文本哈希。 */
+const SKILL_BLOCK_MAX_CHARS = 6000
+
+/**
+ * 计算实际注入 prompt 的逐条 Skill 文本（含标题包装与总长截断）。
+ */
+export function resolveInjectedSkillSegments(
+  skills: LoadedAimSkill[],
+): Array<{ id: string; text: string }> {
+  const segments = skills.map((skill) => ({
+    id: skill.id,
+    text: `【Skill:${skill.title}】\n${skill.content}`,
+  }))
+  const joined: string[] = []
+  let used = 0
+  const injected: Array<{ id: string; text: string }> = []
+  for (const segment of segments) {
+    const separator = joined.length ? 2 : 0 // "\n\n"
+    const remaining = SKILL_BLOCK_MAX_CHARS - used - separator
+    if (remaining <= 0) break
+    const text = segment.text.slice(0, remaining)
+    if (!text) break
+    joined.push(text)
+    used += separator + text.length
+    injected.push({ id: segment.id, text })
+  }
+  return injected
+}
 
 export function buildContextManifest(input: {
   spec: AimRunSpec
@@ -18,6 +48,8 @@ export function buildContextManifest(input: {
   ipWikiBlock: string
   viralStructureBlock: string
   selectedMethodologyBlock: string
+  /** 实际加载并注入 prompt 的 skills（已截断后的正文） */
+  skills?: LoadedAimSkill[]
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
 }): AimContextSource[] {
   const { spec, knowledgeEntries, includedChars } = input
@@ -48,6 +80,16 @@ export function buildContextManifest(input: {
 
   pushBlockSource(sources, "ip_wiki", "ip_wiki:block", input.ipWikiBlock)
   pushBlockSource(sources, "market_viral", "viral_structure", input.viralStructureBlock)
+
+  for (const skill of resolveInjectedSkillSegments(input.skills ?? [])) {
+    sources.push(withDefaultTrustLevel({
+      kind: "skill",
+      id: `skill:${skill.id}`,
+      charCount: skill.text.length,
+      contentHash: sha256(skill.text),
+      trustLevel: "system_trusted",
+    }))
+  }
 
   if (input.taskSpec) {
     const briefJson = JSON.stringify(input.taskSpec)

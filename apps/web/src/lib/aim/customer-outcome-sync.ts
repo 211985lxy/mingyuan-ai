@@ -154,16 +154,19 @@ export async function loadCustomerOutcomeSource(input: {
     cliPath: input.config.cliPath,
     runner: input.runner,
   })
-  return {
-    fields,
-    records: extractItems(payload).map((row) => ({
-      recordId: scalar(row.record_id ?? row.recordId) ?? "",
-      fields:
-        row.fields && typeof row.fields === "object"
-          ? row.fields as Record<string, unknown>
-          : {},
-    })),
+  const records = extractItems(payload).map((row) => ({
+    recordId: scalar(row.record_id ?? row.recordId) ?? "",
+    fields:
+      row.fields && typeof row.fields === "object"
+        ? row.fields as Record<string, unknown>
+        : {},
+  }))
+  if (records.length >= RECORD_LIMIT) {
+    throw new Error(
+      `飞书客户结果记录达到 limit=${RECORD_LIMIT} 边界，拒绝同步不完整数据`,
+    )
   }
+  return { fields, records }
 }
 
 function toProjectionInput(

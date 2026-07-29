@@ -112,6 +112,7 @@ export async function addReviewAction(input: {
 
 export async function updateReviewActionStatus(input: {
   actionId: string
+  reviewCycleId: string
   status: string
   evidenceRef?: string | null
   store?: ReviewCycleStorePort
@@ -123,6 +124,9 @@ export async function updateReviewActionStatus(input: {
     include: { reviewCycle: { select: { status: true } } },
   })
   if (!action) throw new Error("行动项不存在")
+  if (action.reviewCycleId !== input.reviewCycleId) {
+    throw new Error("行动项不属于该周复盘周期")
+  }
   if (action.status === input.status) return action
   if (action.status !== "open") throw new Error("已关闭行动项不得再次变更状态")
   if (input.status === "open") throw new Error("行动项不能回退为 open")

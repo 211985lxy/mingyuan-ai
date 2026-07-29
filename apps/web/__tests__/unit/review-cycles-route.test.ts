@@ -33,7 +33,7 @@ const SERVER_SNAPSHOT = {
   dealCount: 1,
   revenue: 100,
   paymentCount: 1,
-  paymentAmountCny: 100,
+  paymentAmountCny: null,
   customerOutcomeCount: 0,
   timeSavedMinutes: 10,
   firstPassAcceptanceRate: 1,

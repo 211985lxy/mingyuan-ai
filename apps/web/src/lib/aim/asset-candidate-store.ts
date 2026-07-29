@@ -32,6 +32,7 @@ export interface AssetCandidateRecord {
   reviewStatus: string
   crossProjectAllowed: boolean
   promotedEntryId: string | null
+  promotedAt?: Date | null
   customerOutcomeProjectionId?: string | null
 }
 
@@ -67,6 +68,10 @@ export interface AssetCandidateStorePort {
   }
   knowledgeEntry: {
     create(args: { data: Record<string, unknown> }): Promise<{ id: string }>
+    update?(args: {
+      where: { id: string }
+      data: Record<string, unknown>
+    }): Promise<{ id: string }>
   }
 }
 
@@ -223,10 +228,125 @@ export type ReviewAssetCandidateResult =
  * - reject：拒绝；已 approved 的候选不能拒绝，已 rejected 的候选不能批准。
  * - 重复同向操作幂等（no-op 返回当前记录）。
  */
+async function syncKnowledgeProjectScope(input: {
+  store: AssetCandidateStorePort
+  promotedEntryId: string | null
+  crossProjectAllowed: boolean
+  projectId: string
+}) {
+  if (!input.promotedEntryId || !input.store.knowledgeEntry.update) return
+  await input.store.knowledgeEntry.update({
+    where: { id: input.promotedEntryId },
+    data: { projectId: input.crossProjectAllowed ? null : input.projectId },
+  })
+}
+
+async function promoteKnowledgeEntry(input: {
+  store: AssetCandidateStorePort
+  userId: string
+  record: AssetCandidateRecord
+  crossProjectAllowed: boolean
+}) {
+  const isCustomerOutcomeCase = Boolean(input.record.customerOutcomeProjectionId)
+  return input.store.knowledgeEntry.create({
+    data: {
+      userId: input.userId,
+      projectId: input.crossProjectAllowed ? null : input.record.projectId,
+      category: PROMOTE_CATEGORY[input.record.kind] ?? "customer_qa",
+      title: input.record.title.slice(0, 200),
+      content: input.record.evidence
+        ? `${input.record.content}\n\n原文证据：${input.record.evidence}`
+        : input.record.content,
+      tags: isCustomerOutcomeCase
+        ? ["customer_outcome", input.record.kind, "confidence:confirmed"]
+        : ["meeting_candidate", input.record.kind],
+      sourceType: isCustomerOutcomeCase ? "customer_outcome" : "meeting_insight",
+    },
+  })
+}
+
+async function rejectAssetCandidate(
+  store: AssetCandidateStorePort,
+  record: AssetCandidateRecord,
+): Promise<ReviewAssetCandidateResult> {
+  if (record.reviewStatus === "approved") {
+    return { ok: false, status: 409, error: "已批准的候选不能拒绝。" }
+  }
+  if (record.reviewStatus === "rejected") return { ok: true, record }
+  return {
+    ok: true,
+    record: await store.assetCandidate.update({
+      where: { id: record.id },
+      data: { reviewStatus: "rejected" },
+    }),
+  }
+}
+
+async function approveAssetCandidate(input: {
+  store: AssetCandidateStorePort
+  userId: string
+  record: AssetCandidateRecord
+  promote?: boolean
+  crossProjectAllowed?: boolean
+}): Promise<ReviewAssetCandidateResult> {
+  const { store, record } = input
+  if (record.reviewStatus === "rejected") {
+    return { ok: false, status: 409, error: "已拒绝的候选不能重新批准。" }
+  }
+  const crossProjectAllowed = input.crossProjectAllowed ?? record.crossProjectAllowed
+  const needsPromotion = input.promote === true && !record.promotedEntryId
+  const scopeChanged = crossProjectAllowed !== record.crossProjectAllowed
+
+  if (record.reviewStatus === "approved" && !needsPromotion) {
+    if (!scopeChanged) return { ok: true, record }
+    await syncKnowledgeProjectScope({
+      store,
+      promotedEntryId: record.promotedEntryId,
+      crossProjectAllowed,
+      projectId: record.projectId,
+    })
+    return {
+      ok: true,
+      record: await store.assetCandidate.update({
+        where: { id: record.id },
+        data: { crossProjectAllowed },
+      }),
+    }
+  }
+
+  let promotedEntryId = record.promotedEntryId
+  let promotedAt = record.promotedAt ?? null
+  if (needsPromotion) {
+    const entry = await promoteKnowledgeEntry({
+      store, userId: input.userId, record, crossProjectAllowed,
+    })
+    promotedEntryId = entry.id
+    promotedAt = new Date()
+  } else if (scopeChanged) {
+    await syncKnowledgeProjectScope({
+      store,
+      promotedEntryId: record.promotedEntryId,
+      crossProjectAllowed,
+      projectId: record.projectId,
+    })
+  }
+
+  return {
+    ok: true,
+    record: await store.assetCandidate.update({
+      where: { id: record.id },
+      data: {
+        reviewStatus: "approved",
+        promotedEntryId,
+        crossProjectAllowed,
+        ...(promotedAt && !record.promotedAt ? { promotedAt } : {}),
+      },
+    }),
+  }
+}
+
 /**
  * @description 审查assetcandidate
- * @param input - 输入数据
- * @returns Promise<ReviewAssetCandidateResult>
  */
 export async function reviewAssetCandidate(input: {
   userId: string
@@ -241,70 +361,14 @@ export async function reviewAssetCandidate(input: {
     where: { id: input.candidateId, userId: input.userId },
   })
   if (!record) return { ok: false, status: 404, error: "not found" }
-
-  if (input.action === "reject") {
-    if (record.reviewStatus === "approved") {
-      return { ok: false, status: 409, error: "已批准的候选不能拒绝。" }
-    }
-    if (record.reviewStatus === "rejected") return { ok: true, record }
-    return {
-      ok: true,
-      record: await store.assetCandidate.update({
-        where: { id: record.id },
-        data: { reviewStatus: "rejected" },
-      }),
-    }
-  }
-
-  // approve
-  if (record.reviewStatus === "rejected") {
-    return { ok: false, status: 409, error: "已拒绝的候选不能重新批准。" }
-  }
-
-  const crossProjectAllowed = input.crossProjectAllowed ?? record.crossProjectAllowed
-  const needsPromotion = input.promote === true && !record.promotedEntryId
-
-  if (record.reviewStatus === "approved" && !needsPromotion) {
-    if (crossProjectAllowed === record.crossProjectAllowed) return { ok: true, record }
-    return {
-      ok: true,
-      record: await store.assetCandidate.update({
-        where: { id: record.id },
-        data: { crossProjectAllowed },
-      }),
-    }
-  }
-
-  let promotedEntryId = record.promotedEntryId
-  if (needsPromotion) {
-    const isCustomerOutcomeCase = Boolean(record.customerOutcomeProjectionId)
-    const entry = await store.knowledgeEntry.create({
-      data: {
-        userId: input.userId,
-        projectId: crossProjectAllowed ? null : record.projectId,
-        category: PROMOTE_CATEGORY[record.kind] ?? "customer_qa",
-        title: record.title.slice(0, 200),
-        content: record.evidence
-          ? `${record.content}\n\n原文证据：${record.evidence}`
-          : record.content,
-        tags: isCustomerOutcomeCase
-          ? ["customer_outcome", record.kind, "confidence:confirmed"]
-          : ["meeting_candidate", record.kind],
-        sourceType: isCustomerOutcomeCase
-          ? "customer_outcome"
-          : "meeting_insight",
-      },
-    })
-    promotedEntryId = entry.id
-  }
-
-  return {
-    ok: true,
-    record: await store.assetCandidate.update({
-      where: { id: record.id },
-      data: { reviewStatus: "approved", promotedEntryId, crossProjectAllowed },
-    }),
-  }
+  if (input.action === "reject") return rejectAssetCandidate(store, record)
+  return approveAssetCandidate({
+    store,
+    userId: input.userId,
+    record,
+    promote: input.promote,
+    crossProjectAllowed: input.crossProjectAllowed,
+  })
 }
 
 /** 列出用户的资产候选（支持项目 / 审核状态 / 类型过滤）。 */

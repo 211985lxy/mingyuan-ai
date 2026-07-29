@@ -11,7 +11,7 @@ function metadata(disposition: string) {
     humanActiveMinutes: 10,
     manualBaselineMinutes: 30,
     channel: "web",
-    requestId: `request_${disposition}`,
+    requestId: `request_${disposition}_${Math.random().toString(36).slice(2, 6)}`,
   }
 }
 
@@ -72,8 +72,11 @@ describe("learning candidate capture", () => {
     })
     expect(drafts.map((draft) => draft.requestId)).toEqual(expect.arrayContaining([
       "lc:trace:trace_quality:eval_fixture",
+      "lc:trace:trace_quality:methodology_revision",
       "lc:trace:trace_cost:eval_fixture",
+      "lc:trace:trace_cost:methodology_revision",
       "lc:run_event:event_rejected:eval_fixture",
+      "lc:run_event:event_rejected:methodology_revision",
       "lc:content_outcome:outcome_failed:methodology_revision",
     ]))
     expect(drafts.some((draft) => draft.sourceId === "outcome_neutral")).toBe(false)
@@ -101,32 +104,41 @@ describe("learning candidate capture", () => {
     )
   })
 
-  it("没有同期 Trace 的重写事件仍进入候选，并选择最新结构化终态", () => {
+  it("逐条 rewrite/reject 建候选，后续 accepted_after_edit 不能吞掉早先重写", () => {
     const drafts = buildLearningCandidateDrafts({
       traces: [],
       events: [
         {
-          id: "event_old",
-          runId: "run_event_only",
-          event: "final_disposition",
-          metadata: metadata("rejected"),
-          createdAt: new Date("2026-07-29T01:00:00Z"),
-        },
-        {
-          id: "event_new",
+          id: "event_rewrite",
           runId: "run_event_only",
           event: "final_disposition",
           metadata: metadata("rewrite_requested"),
+          createdAt: new Date("2026-07-29T01:00:00Z"),
+        },
+        {
+          id: "event_reject",
+          runId: "run_event_only",
+          event: "final_disposition",
+          metadata: metadata("rejected"),
           createdAt: new Date("2026-07-29T02:00:00Z"),
+        },
+        {
+          id: "event_accepted",
+          runId: "run_event_only",
+          event: "final_disposition",
+          metadata: metadata("accepted_after_edit"),
+          createdAt: new Date("2026-07-29T03:00:00Z"),
         },
       ],
       outcomes: [],
     })
-    expect(drafts).toEqual([
-      expect.objectContaining({
-        sourceId: "event_new",
-        failureCode: "rewrite_requested",
-      }),
-    ])
+    const ids = drafts.map((draft) => draft.requestId).sort()
+    expect(ids).toEqual([
+      "lc:run_event:event_reject:eval_fixture",
+      "lc:run_event:event_reject:methodology_revision",
+      "lc:run_event:event_rewrite:eval_fixture",
+      "lc:run_event:event_rewrite:methodology_revision",
+    ].sort())
+    expect(drafts.some((draft) => draft.sourceId === "event_accepted")).toBe(false)
   })
 })

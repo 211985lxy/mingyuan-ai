@@ -18,7 +18,7 @@ const SNAPSHOT = {
   dealCount: 1,
   revenue: 9800,
   paymentCount: 1,
-  paymentAmountCny: 9800,
+  paymentAmountCny: null,
   customerOutcomeCount: 0,
   timeSavedMinutes: 40,
   firstPassAcceptanceRate: 0.5,
@@ -51,14 +51,25 @@ describe("review-cycle", () => {
       }),
     ).toThrow(/periodEnd/)
 
+    expect(() =>
+      validateReviewCycleDraft({
+        requestId: "review_1",
+        periodStart: START,
+        periodEnd: new Date("2026-07-10T00:00:00.000Z"),
+        systemOwnerId: "sys_1",
+        metricsSnapshot: SNAPSHOT,
+      }),
+    ).toThrow(/正好 7 天/)
+
     const draft = validateReviewCycleDraft({
       requestId: "review_1",
       periodStart: START,
       periodEnd: END,
       systemOwnerId: "  sys_1  ",
-      metricsSnapshot: SNAPSHOT,
+      metricsSnapshot: { ...SNAPSHOT, paymentAmountCny: null },
     })
     expect(draft.systemOwnerId).toBe("sys_1")
+    expect(draft.metricsSnapshot.paymentAmountCny).toBeNull()
 
     expect(() =>
       validateReviewActionDraft({ title: "  ", ownerId: "u1", dueAt: END }),

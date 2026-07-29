@@ -152,10 +152,13 @@ export async function loadBusinessAttributionSource(input: {
     cliPath: input.config.cliPath,
     runner: input.runner,
   })
-  return {
-    fields,
-    records: extractItems(payload).map(parseSourceRecord),
+  const records = extractItems(payload).map(parseSourceRecord)
+  if (records.length >= RECORD_LIMIT) {
+    throw new Error(
+      `飞书经营归因记录达到 limit=${RECORD_LIMIT} 边界，拒绝同步不完整数据`,
+    )
   }
+  return { fields, records }
 }
 
 function toUpsertInput(

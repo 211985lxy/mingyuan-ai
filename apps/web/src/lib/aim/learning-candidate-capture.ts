@@ -76,6 +76,12 @@ function groupEventsByRun(events: LearningEventInput[]) {
   return grouped
 }
 
+function dualTargets(failure: boolean): Array<"eval_fixture" | "methodology_revision"> {
+  return failure
+    ? ["eval_fixture", "methodology_revision"]
+    : ["eval_fixture"]
+}
+
 function buildTraceDrafts(
   traces: LearningTraceInput[],
   eventsByRun: Map<string, LearningEventInput[]>,
@@ -104,57 +110,63 @@ function buildTraceDrafts(
           : highCost
             ? "cost_or_latency_anomaly"
             : undefined
-    add({
-      sourceType: "trace",
-      sourceId: trace.id,
-      projectId: trace.projectId ?? undefined,
-      generationId: trace.aimGenerationId ?? undefined,
-      targetType: "eval_fixture",
-      failureCode,
-      payload: {
-        runId: trace.runId,
-        status: trace.status,
-        qualityStatus: trace.qualityStatus,
-        durationMs: trace.durationMs,
-        costCny: finite(trace.costCny),
-        errorMessage: trace.errorMessage?.slice(0, 1000) || null,
-        disposition,
-        captureReason: failed
-          ? "failure"
-          : highCost
-            ? "cost_or_latency"
-            : "success_sample_10pct",
-      },
-      requestId: buildLearningRequestId("trace", trace.id, "eval_fixture"),
-    })
+    const captureReason = failed
+      ? "failure"
+      : highCost
+        ? "cost_or_latency"
+        : "success_sample_10pct"
+    for (const targetType of dualTargets(failed || highCost)) {
+      add({
+        sourceType: "trace",
+        sourceId: trace.id,
+        projectId: trace.projectId ?? undefined,
+        generationId: trace.aimGenerationId ?? undefined,
+        targetType,
+        failureCode,
+        payload: {
+          runId: trace.runId,
+          status: trace.status,
+          qualityStatus: trace.qualityStatus,
+          durationMs: trace.durationMs,
+          costCny: finite(trace.costCny),
+          errorMessage: trace.errorMessage?.slice(0, 1000) || null,
+          disposition,
+          captureReason,
+        },
+        requestId: buildLearningRequestId("trace", trace.id, targetType),
+      })
+    }
   }
 }
 
+/**
+ * 逐条 structured rewrite_requested/rejected 建候选；
+ * 后续 accepted_after_edit 不能吞掉早先重写/拒绝。
+ */
 function buildEventDrafts(
   eventsByRun: Map<string, LearningEventInput[]>,
   add: CandidateSink,
 ) {
   for (const [runId, events] of eventsByRun) {
-    const disposition = reduceFinalDisposition(events)
-    if (!shouldAutoCreateFromDisposition(disposition)) continue
-    const terminal = [...events]
-      .sort((a, b) =>
-        b.createdAt.getTime() - a.createdAt.getTime()
-        || b.id.localeCompare(a.id))
-      .find((event) => parseRunOutcomeMetadata(event.metadata))
-    if (!terminal) continue
-    add({
-      sourceType: "run_event",
-      sourceId: terminal.id,
-      targetType: "eval_fixture",
-      failureCode: disposition,
-      payload: {
-        runId,
-        disposition,
-        metadata: parseRunOutcomeMetadata(terminal.metadata),
-      },
-      requestId: buildLearningRequestId("run_event", terminal.id, "eval_fixture"),
-    })
+    for (const event of events) {
+      const metadata = parseRunOutcomeMetadata(event.metadata)
+      if (!metadata) continue
+      if (!shouldAutoCreateFromDisposition(metadata.finalDisposition)) continue
+      for (const targetType of dualTargets(true)) {
+        add({
+          sourceType: "run_event",
+          sourceId: event.id,
+          targetType,
+          failureCode: metadata.finalDisposition,
+          payload: {
+            runId,
+            disposition: metadata.finalDisposition,
+            metadata,
+          },
+          requestId: buildLearningRequestId("run_event", event.id, targetType),
+        })
+      }
+    }
   }
 }
 
@@ -204,6 +216,33 @@ export function buildLearningCandidateDrafts(input: {
   return drafts
 }
 
+async function persistLearningDrafts(drafts: LearningCandidateDraft[]) {
+  let created = 0
+  for (const draft of drafts) {
+    try {
+      await prisma.learningCandidate.create({
+        data: {
+          ...draft,
+          projectId: draft.projectId ?? null,
+          generationId: draft.generationId ?? null,
+          failureCode: draft.failureCode ?? null,
+          reviewStatus: "pending",
+          payload: JSON.parse(JSON.stringify(draft.payload)) as Prisma.InputJsonValue,
+        },
+      })
+      created += 1
+    } catch (error) {
+      if (
+        !error
+        || typeof error !== "object"
+        || !("code" in error)
+        || (error as { code?: unknown }).code !== "P2002"
+      ) throw error
+    }
+  }
+  return { inspected: drafts.length, created, existing: drafts.length - created }
+}
+
 export async function captureLearningCandidates(input: {
   start: Date
   end: Date
@@ -240,8 +279,8 @@ export async function captureLearningCandidates(input: {
       select: { id: true, runId: true, event: true, metadata: true, createdAt: true },
     }),
     prisma.contentOutcome.findMany({
-      where: { collectedAt: { gte: input.start, lt: input.end } },
-      orderBy: [{ collectedAt: "asc" }, { id: "asc" }],
+      where: { updatedAt: { gte: input.start, lt: input.end } },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
       take: OUTCOME_LIMIT + 1,
       select: {
         id: true,
@@ -255,29 +294,11 @@ export async function captureLearningCandidates(input: {
   ])
   if (events.length > EVENT_LIMIT) throw new Error("运行事件超过 100000，请缩短周期")
   if (outcomes.length > OUTCOME_LIMIT) throw new Error("经营结果超过 10000，请缩短周期")
-  const drafts = buildLearningCandidateDrafts({ traces, events, outcomes })
-  let created = 0
-  for (const draft of drafts) {
-    try {
-      await prisma.learningCandidate.create({
-        data: {
-          ...draft,
-          projectId: draft.projectId ?? null,
-          generationId: draft.generationId ?? null,
-          failureCode: draft.failureCode ?? null,
-          reviewStatus: "pending",
-          payload: JSON.parse(JSON.stringify(draft.payload)) as Prisma.InputJsonValue,
-        },
-      })
-      created += 1
-    } catch (error) {
-      if (
-        !error
-        || typeof error !== "object"
-        || !("code" in error)
-        || (error as { code?: unknown }).code !== "P2002"
-      ) throw error
-    }
-  }
-  return { inspected: drafts.length, created, existing: drafts.length - created }
+  return persistLearningDrafts(buildLearningCandidateDrafts({
+    traces,
+    events: events.filter((event) =>
+      event.createdAt.getTime() >= input.start.getTime()
+      && event.createdAt.getTime() < input.end.getTime()),
+    outcomes,
+  }))
 }

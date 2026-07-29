@@ -139,4 +139,34 @@ describe("customer outcome Feishu projection sync", () => {
     expect(result.skipped).toBe(1)
     expect(result.errors[0]?.code).toBe("approved_without_evidence")
   })
+
+  it("命中 limit=500 边界时 fail closed", async () => {
+    const runner = vi.fn(async (_file: string, args: string[]) => {
+      if (args.includes("+field-list")) {
+        return { stdout: fieldPayload(CUSTOMER_OUTCOME_FIELD_NAMES), stderr: "" }
+      }
+      if (args.includes("+record-list")) {
+        return {
+          stdout: JSON.stringify({
+            data: {
+              items: Array.from({ length: 500 }, (_, index) => ({
+                record_id: `rec_${index}`,
+                fields: {},
+              })),
+            },
+          }),
+          stderr: "",
+        }
+      }
+      throw new Error("unexpected")
+    })
+    await expect(loadCustomerOutcomeSource({
+      config: {
+        baseToken: "base_1",
+        tableId: "table_1",
+        cliPath: "/mock/lark",
+      },
+      runner,
+    })).rejects.toThrow(/limit=500/)
+  })
 })

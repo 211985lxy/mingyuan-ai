@@ -148,6 +148,7 @@ export async function promoteLearningCandidateToEvalDraft(input: {
 
 export async function qualifyEvalFixtureVersion(input: {
   versionId: string
+  candidateId: string
   dailyPassed: boolean
   evidenceRef: string
   metrics: LearningQualificationMetrics
@@ -156,6 +157,9 @@ export async function qualifyEvalFixtureVersion(input: {
     where: { id: input.versionId },
   })
   if (!version) throw new Error("Eval fixture 版本不存在")
+  if (version.sourceCandidateId !== input.candidateId) {
+    throw new Error("Eval 版本不属于该学习候选，拒绝跨候选操作")
+  }
   if (version.status !== "draft") throw new Error("只有 draft fixture 可执行灰度资格检查")
   const fixture = parseFixture(version.payload)
   if (!fixture) throw new Error("Eval fixture payload 非法")
@@ -185,6 +189,7 @@ export async function qualifyEvalFixtureVersion(input: {
 
 export async function activateEvalFixtureVersion(input: {
   versionId: string
+  candidateId: string
   approvalId: string
 }) {
   const [version, approval] = await Promise.all([
@@ -192,6 +197,9 @@ export async function activateEvalFixtureVersion(input: {
     prisma.approvalDecision.findUnique({ where: { id: input.approvalId } }),
   ])
   if (!version) throw new Error("Eval fixture 版本不存在")
+  if (version.sourceCandidateId !== input.candidateId) {
+    throw new Error("Eval 版本不属于该学习候选，拒绝跨候选操作")
+  }
   if (
     version.status === "active"
     && version.activationApprovalId === input.approvalId

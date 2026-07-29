@@ -6,6 +6,10 @@ import {
   type QualificationWeek,
 } from "@/lib/aim/operating-qualification"
 import { loadGovernedActions } from "@/lib/aim/operating-qualification-actions"
+import {
+  loadAnnotatedLearningSamples,
+  loadReusedCustomerOutcomeCases,
+} from "@/lib/aim/operating-qualification-reuse"
 import { WEEKLY_OUTCOME_WINDOW_POLICY } from "@/lib/aim/weekly-review"
 import { prisma } from "@/lib/prisma"
 
@@ -40,11 +44,13 @@ async function loadQualificationCycles(): Promise<QualificationWeek[]> {
       periodEnd: true,
       signedAt: true,
       signedApprovalId: true,
+      filterSnapshot: true,
       metricsSnapshot: true,
     },
   })
   return rows.map((row) => ({
     ...row,
+    filterSnapshot: row.filterSnapshot,
     runIdCoverage: rate(row.metricsSnapshot, "runIdCoverage"),
     costCoverage: rate(row.metricsSnapshot, "costCoverage"),
     finalDispositionCoverage: rate(
@@ -182,26 +188,29 @@ export async function loadOperatingQualificationEvidence(
   evaluatedAt = new Date(),
 ): Promise<OperatingQualificationEvidence> {
   const cycles = await loadQualificationCycles()
-  const weeks = selectLatestConsecutiveWeeks(cycles)
-  const [assignments, actions, sample] = await Promise.all([
-    prisma.governanceAssignment.findMany({
-      where: { status: "active" },
-      take: 200,
-      select: {
-        id: true,
-        scopeType: true,
-        scopeId: true,
-        role: true,
-        status: true,
-        effectiveAt: true,
-        userId: true,
-        externalOpenId: true,
-        externalUserId: true,
-      },
-    }),
-    loadGovernedActions(weeks),
-    loadOperatingSample(),
-  ])
+  const weeks = selectLatestConsecutiveWeeks(cycles, evaluatedAt)
+  const [assignments, actions, sample, reusedCases, annotatedSamples] =
+    await Promise.all([
+      prisma.governanceAssignment.findMany({
+        where: { status: "active" },
+        take: 200,
+        select: {
+          id: true,
+          scopeType: true,
+          scopeId: true,
+          role: true,
+          status: true,
+          effectiveAt: true,
+          userId: true,
+          externalOpenId: true,
+          externalUserId: true,
+        },
+      }),
+      loadGovernedActions(weeks),
+      loadOperatingSample(),
+      loadReusedCustomerOutcomeCases(),
+      loadAnnotatedLearningSamples(),
+    ])
   const approvedFormalRefs = new Set(actions.formalWrites
     .filter((row) => row.approvalBacked)
     .map((row) => `${row.type}:${row.id}`))
@@ -225,6 +234,10 @@ export async function loadOperatingQualificationEvidence(
     outcomeWindowPolicy: WEEKLY_OUTCOME_WINDOW_POLICY,
     qualifiedLearningLoopCount: learningLoopRefs.length,
     learningLoopRefs,
+    reusedCustomerOutcomeCaseCount: reusedCases.count,
+    reusedCustomerOutcomeCaseRefs: reusedCases.refs,
+    annotatedLearningSampleCount: annotatedSamples.count,
+    annotatedLearningSampleRefs: annotatedSamples.refs,
   }
 }
 

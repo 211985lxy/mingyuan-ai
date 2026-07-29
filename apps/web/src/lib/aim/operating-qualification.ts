@@ -12,6 +12,8 @@ export const OPERATING_QUALIFICATION_THRESHOLDS = {
   approvedCustomerOutcomes: 3,
   fullAttributionChains: 1,
   learningLoops: 1,
+  reusedCustomerOutcomeCases: 1,
+  annotatedLearningSamples: 20,
 } as const
 
 export interface QualificationWeek {
@@ -21,6 +23,8 @@ export interface QualificationWeek {
   periodEnd: Date
   signedAt: Date | null
   signedApprovalId: string | null
+  /** 公司级周周期要求为空；含项目/工作流等筛选时不得计入资格 */
+  filterSnapshot?: unknown
   runIdCoverage: number | null
   costCoverage: number | null
   finalDispositionCoverage: number | null
@@ -58,6 +62,12 @@ export interface OperatingQualificationEvidence {
   fullAttributionChainCount: number
   qualifiedLearningLoopCount: number
   learningLoopRefs: string[]
+  /** 客户结果支持、已晋升 project_case、且晋升后被 AimGeneration 实际引用 */
+  reusedCustomerOutcomeCaseCount: number
+  reusedCustomerOutcomeCaseRefs: string[]
+  /** 人工 reviewerId + payload.annotation 的学习样本数 */
+  annotatedLearningSampleCount: number
+  annotatedLearningSampleRefs: string[]
 }
 
 export interface QualificationCriterion {
@@ -88,19 +98,38 @@ function criterion(
   return { id, label, passed, actual, threshold, evidenceRefs }
 }
 
-function validSignedWeek(cycle: QualificationWeek): boolean {
-  return cycle.status === "signed"
-    && cycle.signedAt != null
-    && cycle.periodEnd.getTime() - cycle.periodStart.getTime() === WEEK_MS
+/** 公司级：filterSnapshot 为空或不含有效筛选键。 */
+export function isCompanyWideFilterSnapshot(snapshot: unknown): boolean {
+  if (snapshot == null) return true
+  if (typeof snapshot !== "object" || Array.isArray(snapshot)) return false
+  return Object.values(snapshot as Record<string, unknown>)
+    .every((value) => value == null || value === "")
+}
+
+/**
+ * 资格周周期防伪：signed + 恰好 7 天 + 公司级空筛选
+ * + periodEnd<=evaluatedAt + signedAt>=periodEnd（排除未来/提前签字）。
+ */
+export function validSignedWeek(
+  cycle: QualificationWeek,
+  evaluatedAt: Date,
+): boolean {
+  if (cycle.status !== "signed" || cycle.signedAt == null) return false
+  if (cycle.periodEnd.getTime() - cycle.periodStart.getTime() !== WEEK_MS) return false
+  if (!isCompanyWideFilterSnapshot(cycle.filterSnapshot)) return false
+  if (cycle.periodEnd.getTime() > evaluatedAt.getTime()) return false
+  if (cycle.signedAt.getTime() < cycle.periodEnd.getTime()) return false
+  return true
 }
 
 /** 选择时间上最新的一段连续四周；重复周期只保留最后签字的一条。 */
 export function selectLatestConsecutiveWeeks(
   cycles: QualificationWeek[],
+  evaluatedAt: Date,
   required = OPERATING_QUALIFICATION_THRESHOLDS.signedWeeks,
 ): QualificationWeek[] {
   const unique = new Map<number, QualificationWeek>()
-  for (const cycle of cycles.filter(validSignedWeek)) {
+  for (const cycle of cycles.filter((row) => validSignedWeek(row, evaluatedAt))) {
     const key = cycle.periodStart.getTime()
     const current = unique.get(key)
     if (!current || (cycle.signedAt?.getTime() ?? 0) > (current.signedAt?.getTime() ?? 0)) {
@@ -306,6 +335,15 @@ function operatingResultCriteria(
       "≥1 条内容→线索→预约→成交→回款链",
       ["outcome_attribution:full_chain"],
     ),
+    criterion(
+      "reused_customer_outcome_case",
+      "真实客户结果案例被后续任务引用",
+      evidence.reusedCustomerOutcomeCaseCount
+        >= OPERATING_QUALIFICATION_THRESHOLDS.reusedCustomerOutcomeCases,
+      evidence.reusedCustomerOutcomeCaseCount,
+      "≥1 条客户结果支持的已晋升 project_case 被 AimGeneration.knowledgeUsed 引用",
+      evidence.reusedCustomerOutcomeCaseRefs,
+    ),
   ]
 }
 
@@ -322,6 +360,15 @@ function learningGovernanceCriteria(
       "≥1 条同源失败：active Eval 达标 + 方法论版本 published",
       evidence.learningLoopRefs,
     ),
+    criterion(
+      "annotated_learning_samples",
+      "人工标注学习样本达到门槛",
+      evidence.annotatedLearningSampleCount
+        >= OPERATING_QUALIFICATION_THRESHOLDS.annotatedLearningSamples,
+      evidence.annotatedLearningSampleCount,
+      "≥20 条含人工 reviewerId 与 payload.annotation 的学习样本",
+      evidence.annotatedLearningSampleRefs,
+    ),
     governedActionsCriterion(
       evidence.formalWrites,
       "governed_formal_writes",
@@ -334,7 +381,7 @@ function learningGovernanceCriteria(
 export function evaluateOperatingQualification(
   evidence: OperatingQualificationEvidence,
 ): OperatingQualificationResult {
-  const weeks = selectLatestConsecutiveWeeks(evidence.cycles)
+  const weeks = selectLatestConsecutiveWeeks(evidence.cycles, evidence.evaluatedAt)
   const periodStart = weeks.at(0)?.periodStart ?? null
   const periodEnd = weeks.at(-1)?.periodEnd ?? null
   const criteria = [

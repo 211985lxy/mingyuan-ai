@@ -27,7 +27,8 @@ export interface ReviewMetricsSnapshot {
   dealCount: number
   revenue: number
   paymentCount: number
-  paymentAmountCny: number
+  /** 无真实回款金额来源时保持 null，禁止用成交额冒充 */
+  paymentAmountCny: number | null
   customerOutcomeCount: number
   timeSavedMinutes: number | null
   firstPassAcceptanceRate: number | null
@@ -98,6 +99,7 @@ const NULLABLE_NUMBER_KEYS = [
   "timeSavedMinutes",
   "directCostPerSuccess",
   "fullyLoadedCost",
+  "paymentAmountCny",
   ...RATE_KEYS,
 ] as const
 const REQUIRED_NUMBER_KEYS = [
@@ -107,7 +109,6 @@ const REQUIRED_NUMBER_KEYS = [
   "dealCount",
   "revenue",
   "paymentCount",
-  "paymentAmountCny",
   "customerOutcomeCount",
   "p0FailureCount",
   "p1FailureCount",
@@ -119,6 +120,7 @@ const REQUIRED_NUMBER_KEYS = [
   "pendingEvalCandidates",
   "pendingMethodologyCandidates",
 ] as const
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 export function isReviewCycleStatus(value: unknown): value is ReviewCycleStatus {
   return typeof value === "string" && STATUS_SET.has(value)
@@ -137,6 +139,9 @@ export function assertValidReviewPeriod(periodStart: Date, periodEnd: Date): voi
   }
   if (periodEnd.getTime() <= periodStart.getTime()) {
     throw new Error("periodEnd 必须晚于 periodStart")
+  }
+  if (periodEnd.getTime() - periodStart.getTime() !== WEEK_MS) {
+    throw new Error("周复盘周期必须正好 7 天")
   }
 }
 
@@ -222,7 +227,6 @@ export function canAttachToPerformanceReview(
   requiredSignedWeeks = 4,
 ): boolean {
   if (!Number.isInteger(requiredSignedWeeks) || requiredSignedWeeks < 1) return false
-  const weekMs = 7 * 24 * 60 * 60 * 1000
   const signed = cycles
     .filter((cycle) => cycle.status === "signed" && cycle.signedAt)
     .map((cycle) => ({
@@ -232,13 +236,13 @@ export function canAttachToPerformanceReview(
     .filter((cycle) =>
       Number.isFinite(cycle.start)
       && Number.isFinite(cycle.end)
-      && cycle.end - cycle.start === weekMs)
+      && cycle.end - cycle.start === WEEK_MS)
     .sort((left, right) => left.start - right.start)
   let consecutive = 0
   let previousStart: number | null = null
   for (const cycle of signed) {
     consecutive =
-      previousStart != null && cycle.start - previousStart === weekMs
+      previousStart != null && cycle.start - previousStart === WEEK_MS
         ? consecutive + 1
         : 1
     if (consecutive >= requiredSignedWeeks) return true

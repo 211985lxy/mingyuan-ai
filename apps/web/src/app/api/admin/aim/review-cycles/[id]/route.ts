@@ -93,6 +93,7 @@ export const PATCH = withAdminAuth(async (
     } else if (body.action === "update_action") {
       result = await updateReviewActionStatus({
         actionId: typeof body.actionId === "string" ? body.actionId : "",
+        reviewCycleId: id,
         status: typeof body.status === "string" ? body.status : "",
         evidenceRef: typeof body.evidenceRef === "string" ? body.evidenceRef : undefined,
       })

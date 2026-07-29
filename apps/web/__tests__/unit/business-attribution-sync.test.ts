@@ -161,4 +161,35 @@ describe("business attribution Feishu read-only sync", () => {
     })).rejects.toThrow("缺少 归因确认人")
     expect(runner).toHaveBeenCalledTimes(1)
   })
+
+  it("命中 limit=500 边界时 fail closed，不静默同步不完整数据", async () => {
+    const runner = vi.fn(async (_file: string, args: string[]) => {
+      if (args.includes("+field-list")) {
+        return { stdout: fieldPayload(BUSINESS_ATTRIBUTION_FIELD_NAMES), stderr: "" }
+      }
+      if (args.includes("+record-list")) {
+        return {
+          stdout: JSON.stringify({
+            data: {
+              items: Array.from({ length: 500 }, (_, index) => ({
+                record_id: `rec_${index}`,
+                created_time: "1785283200000",
+                fields: { AIM生成ID: `gen_${index}`, 线索记录ID: `lead_${index}` },
+              })),
+            },
+          }),
+          stderr: "",
+        }
+      }
+      throw new Error("unexpected command")
+    })
+    await expect(loadBusinessAttributionSource({
+      config: {
+        baseToken: "base_test",
+        tableId: "table_test",
+        cliPath: "/mock/lark",
+      },
+      runner,
+    })).rejects.toThrow(/limit=500/)
+  })
 })
