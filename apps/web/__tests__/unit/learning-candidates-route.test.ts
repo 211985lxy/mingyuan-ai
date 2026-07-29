@@ -148,18 +148,19 @@ describe("learning candidate admin route", () => {
     expect(annotateLearningCandidate).not.toHaveBeenCalled()
   })
 
-  it("qualify_eval/activate_eval 必须把 URL candidateId 绑定到 version，并传 dailyEvalArtifact", async () => {
+  it("qualify_eval 只传签名制品，不接受独立 metrics/evidenceRef", async () => {
     qualifyEvalFixtureVersion.mockResolvedValueOnce({ id: "version_1" })
     activateEvalFixtureVersion.mockResolvedValueOnce({
       record: { id: "version_1" },
       idempotent: false,
     })
     const artifact = {
+      schemaVersion: 1,
       mode: "daily",
-      generatedAt: "2026-07-01T00:00:00.000Z",
-      contractPassRate: 1,
-      rubricPassRate: 0.9,
-      results: [{ fixtureId: "fixture_1", contractPassed: true, rubricPassed: true }],
+      generatedAt: "2026-07-28T12:00:00.000Z",
+      signature: "ab".repeat(32),
+      qualificationMetrics: { targetFailureRateAfter: 0.3 },
+      evidenceRef: "report://daily/1",
     }
     const qualify = await PATCH(patch({
       action: "qualify_eval",
@@ -167,28 +168,19 @@ describe("learning candidate admin route", () => {
       workflowId: "growth",
       versionId: "version_other",
       dailyEvalArtifact: artifact,
-      evidenceRef: "report://1",
-      metrics: {
-        targetFailureRateBefore: 0.5,
-        targetFailureRateAfter: 0.3,
-        acceptanceRateBefore: 0.8,
-        acceptanceRateAfter: 0.8,
-        evidenceCompletenessRateBefore: 0.9,
-        evidenceCompletenessRateAfter: 0.9,
-        severeHallucinationRate: 0,
-      },
+      evidenceRef: "report://tampered",
+      metrics: { targetFailureRateAfter: 0.01 },
+      dailyPassed: true,
     }), context as never)
     expect(qualify.status).toBe(200)
-    expect(qualifyEvalFixtureVersion).toHaveBeenCalledWith(
-      expect.objectContaining({
-        versionId: "version_other",
-        candidateId: "candidate_1",
-        dailyEvalArtifact: artifact,
-      }),
-    )
-    expect(qualifyEvalFixtureVersion).not.toHaveBeenCalledWith(
-      expect.objectContaining({ dailyPassed: expect.anything() }),
-    )
+    expect(qualifyEvalFixtureVersion).toHaveBeenCalledWith({
+      versionId: "version_other",
+      candidateId: "candidate_1",
+      dailyEvalArtifact: artifact,
+    })
+    expect(qualifyEvalFixtureVersion.mock.calls[0]?.[0]).not.toHaveProperty("metrics")
+    expect(qualifyEvalFixtureVersion.mock.calls[0]?.[0]).not.toHaveProperty("evidenceRef")
+    expect(qualifyEvalFixtureVersion.mock.calls[0]?.[0]).not.toHaveProperty("dailyPassed")
 
     const activate = await PATCH(patch({
       action: "activate_eval",

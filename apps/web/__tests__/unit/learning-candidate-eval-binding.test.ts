@@ -1,4 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import {
+  signDailyEvalArtifact,
+  type DailyEvalArtifactBody,
+} from "@/lib/aim/daily-eval-artifact"
+
+const SECRET = "aim-daily-eval-artifact-secret-test-0001"
 
 const { runEvalCase, createFrozenContextAdapter, prisma } = vi.hoisted(() => ({
   runEvalCase: vi.fn(),
@@ -46,21 +52,39 @@ const METRICS = {
   severeHallucinationRate: 0,
 }
 
-const DAILY_ARTIFACT = {
-  mode: "daily",
-  generatedAt: "2026-07-01T00:00:00.000Z",
-  contractPassRate: 1,
-  rubricPassRate: 0.9,
-  results: [{
-    fixtureId: "fixture_1",
-    contractPassed: true,
-    rubricPassed: true,
-  }],
+function artifactBody(
+  overrides: Partial<DailyEvalArtifactBody> = {},
+): DailyEvalArtifactBody {
+  return {
+    schemaVersion: 1,
+    mode: "daily",
+    generatedAt: "2026-07-28T12:00:00.000Z",
+    contractPassRate: 1,
+    rubricPassRate: 0.9,
+    repetitions: 1,
+    results: [{
+      fixtureId: "fixture_1",
+      contractPassed: true,
+      rubricScore: 88,
+      fabricatedFact: false,
+    }],
+    qualificationMetrics: METRICS,
+    evidenceRef: "report://daily/1",
+    ...overrides,
+  }
 }
 
 describe("eval fixture candidate binding", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.AIM_DAILY_EVAL_ARTIFACT_SECRET = SECRET
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-07-29T00:00:00.000Z"))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    delete process.env.AIM_DAILY_EVAL_ARTIFACT_SECRET
   })
 
   it("qualify_eval 拒绝操作不属于 URL 候选的 version", async () => {
@@ -74,14 +98,15 @@ describe("eval fixture candidate binding", () => {
     await expect(qualifyEvalFixtureVersion({
       versionId: "version_b",
       candidateId: "candidate_a",
-      dailyEvalArtifact: DAILY_ARTIFACT,
-      evidenceRef: "report://1",
-      metrics: METRICS,
+      dailyEvalArtifact: signDailyEvalArtifact({
+        body: artifactBody(),
+        secret: SECRET,
+      }),
     })).rejects.toThrow(/不属于该学习候选/)
     expect(runEvalCase).not.toHaveBeenCalled()
   })
 
-  it("qualify_eval 不得信任 dailyPassed boolean，缺少制品则 fail-closed", async () => {
+  it("qualify_eval 拒绝伪造结构化 JSON / 未签名制品", async () => {
     prisma.evalFixtureVersion.findUnique.mockResolvedValue({
       id: "version_a",
       sourceCandidateId: "candidate_a",
@@ -92,15 +117,13 @@ describe("eval fixture candidate binding", () => {
     await expect(qualifyEvalFixtureVersion({
       versionId: "version_a",
       candidateId: "candidate_a",
-      dailyEvalArtifact: true,
-      evidenceRef: "report://1",
-      metrics: METRICS,
-    })).rejects.toThrow(/daily Eval/)
+      dailyEvalArtifact: artifactBody(),
+    })).rejects.toThrow(/签名/)
     expect(runEvalCase).not.toHaveBeenCalled()
     expect(prisma.evalFixtureVersion.update).not.toHaveBeenCalled()
   })
 
-  it("qualify_eval 用制品 generatedAt 写入 dailyPassedAt", async () => {
+  it("qualify_eval 只信任签名制品内的 metrics/evidenceRef", async () => {
     prisma.evalFixtureVersion.findUnique.mockResolvedValue({
       id: "version_a",
       sourceCandidateId: "candidate_a",
@@ -110,17 +133,23 @@ describe("eval fixture candidate binding", () => {
     })
     runEvalCase.mockResolvedValue({ contractPassed: true })
     prisma.evalFixtureVersion.update.mockResolvedValue({ id: "version_a" })
+    const artifact = signDailyEvalArtifact({
+      body: artifactBody(),
+      secret: SECRET,
+    })
     await qualifyEvalFixtureVersion({
       versionId: "version_a",
       candidateId: "candidate_a",
-      dailyEvalArtifact: DAILY_ARTIFACT,
-      evidenceRef: "report://1",
-      metrics: METRICS,
+      dailyEvalArtifact: artifact,
     })
     expect(prisma.evalFixtureVersion.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          dailyPassedAt: new Date(DAILY_ARTIFACT.generatedAt),
+          dailyPassedAt: new Date(artifact.generatedAt),
+          qualificationEvidenceRef: "report://daily/1",
+          qualificationMetrics: expect.objectContaining({
+            targetFailureRateAfter: 0.3,
+          }),
         }),
       }),
     )

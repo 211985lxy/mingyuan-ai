@@ -100,15 +100,22 @@ function parseMetrics(value: unknown): LearningQualificationMetrics | null {
 function dailyReportPassed(row: JsonRecord): string | null {
   if (
     typeof row.contractPassRate !== "number"
+    || !Number.isFinite(row.contractPassRate)
     || row.contractPassRate < 0.999
     || row.contractPassRate > 1
   ) return "daily Eval 契约通过率必须为 100%"
   if (
     typeof row.rubricPassRate !== "number"
+    || !Number.isFinite(row.rubricPassRate)
     || row.rubricPassRate < DAILY_RUBRIC_MIN
     || row.rubricPassRate > 1
   ) return "daily Eval rubric 通过率必须 ≥ 80%"
-  if (!Number.isInteger(row.repetitions) || row.repetitions < 1) {
+  const repetitions = row.repetitions
+  if (
+    typeof repetitions !== "number"
+    || !Number.isInteger(repetitions)
+    || repetitions < 1
+  ) {
     return "daily Eval repetitions 无效"
   }
   if (!Array.isArray(row.results) || row.results.length === 0) {
@@ -117,13 +124,15 @@ function dailyReportPassed(row: JsonRecord): string | null {
   const results = row.results.map(object)
   if (results.some((result) =>
     !result
+    || typeof result.fixtureId !== "string"
+    || result.fixtureId.trim().length === 0
     || result.contractPassed !== true
     || typeof result.rubricScore !== "number"
     || !Number.isFinite(result.rubricScore)
     || result.fabricatedFact === true)) {
     return "daily Eval 结果存在契约失败、缺失评分或虚构"
   }
-  if (row.repetitions > 1) {
+  if (repetitions > 1) {
     const fixtureIds = new Set(results.flatMap((result) =>
       typeof result?.fixtureId === "string" ? [result.fixtureId] : []))
     for (const fixtureId of fixtureIds) {

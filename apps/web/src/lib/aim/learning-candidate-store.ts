@@ -8,7 +8,6 @@ import {
   evaluateLearningQualification,
   isActivationApprovalAfterQualification,
   transitionLearningReview,
-  type LearningQualificationMetrics,
 } from "@/lib/aim/learning-candidate"
 import { verifyDailyEvalArtifact } from "@/lib/aim/daily-eval-artifact"
 import { prisma } from "@/lib/prisma"
