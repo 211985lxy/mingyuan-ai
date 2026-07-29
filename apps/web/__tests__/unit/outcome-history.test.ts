@@ -19,6 +19,7 @@ function makeRow(overrides: Partial<{
   dealCount: number | null
   revenue: unknown
   userVerdict: string | null
+  verdictCode: string | null
   generation: {
     id: string
     rawCopy: string | null
@@ -40,6 +41,7 @@ function makeRow(overrides: Partial<{
     dealCount: null,
     revenue: null,
     userVerdict: null,
+    verdictCode: null,
     generation: {
       id: "gen1",
       rawCopy: "这是文案原文",
@@ -100,13 +102,27 @@ describe("getTopPerformingScripts", () => {
     expect(result[1].generationId).toBe("g1")
   })
 
-  it("有 userVerdict 的优先排前", async () => {
+  it("收藏加权：相同点赞下收藏更多的视频互动率更高、排更前", async () => {
     const store = makeStore([
-      makeRow({ id: "no_verdict", generationId: "g1", views: 1000, likes: 100, userVerdict: null, generation: { id: "g1", rawCopy: "A", videoScript: null, topicTitle: "T1" } }),
-      makeRow({ id: "with_verdict", generationId: "g2", views: 1000, likes: 50, userVerdict: "好", generation: { id: "g2", rawCopy: "B", videoScript: null, topicTitle: "T2" } }),
+      // 仅点赞：100 → 互动率 100×1/1000 = 0.1
+      makeRow({ id: "likes_only", generationId: "g_likes", views: 1000, likes: 100, comments: 0, saves: 0, shares: 0, generation: { id: "g_likes", rawCopy: "纯点赞", videoScript: null, topicTitle: "TL" } }),
+      // 点赞少但收藏多：30 收藏 → 30×5/1000 = 0.15 > 0.1
+      makeRow({ id: "saves_heavy", generationId: "g_saves", views: 1000, likes: 0, comments: 0, saves: 30, shares: 0, generation: { id: "g_saves", rawCopy: "高收藏", videoScript: null, topicTitle: "TS" } }),
     ])
     const result = await getTopPerformingScripts({ userId: "u1", store })
-    expect(result[0].generationId).toBe("g2") // 有 userVerdict 优先
+    expect(result[0].generationId).toBe("g_saves") // 收藏权重高，反超纯点赞
+    expect(result[0].engagementRate).toBeCloseTo(0.15, 4)
+  })
+
+  it("有正向 verdictCode 的优先排前（即使互动率更低）", async () => {
+    const store = makeStore([
+      // 无码、纯靠互动率：likes=100
+      makeRow({ id: "no_code", generationId: "g1", views: 1000, likes: 100, verdictCode: null, generation: { id: "g1", rawCopy: "A", videoScript: null, topicTitle: "T1" } }),
+      // 有正向码 excellent，但点赞更少 → 应因 verdictCode 正向而排前
+      makeRow({ id: "with_code", generationId: "g2", views: 1000, likes: 50, verdictCode: "excellent", generation: { id: "g2", rawCopy: "B", videoScript: null, topicTitle: "T2" } }),
+    ])
+    const result = await getTopPerformingScripts({ userId: "u1", store })
+    expect(result[0].generationId).toBe("g2") // 有正向 verdictCode 优先
   })
 
   it("文案截断 500 字", async () => {

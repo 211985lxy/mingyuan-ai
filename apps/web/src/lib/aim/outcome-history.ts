@@ -89,7 +89,18 @@ interface OutcomeWithGenerationRow {
 // ── 核心逻辑 ──────────────────────────────────────────────
 
 /**
- * 互动率 = (likes + comments + saves + shares) / max(views, 1)
+ * 互动行为权重（与 outcome-evaluator 保持统一口径）。
+ * 对应平台新权重排序：收藏 > 复访/铁粉互动 > 点赞。
+ */
+const ENGAGEMENT_WEIGHTS = {
+  saves: 5,     // 收藏：第一权重（可持续停留）
+  shares: 3,    // 分享：强传播信号
+  comments: 2,  // 评论：铁粉/粉丝互动
+  likes: 1,     // 点赞：权重最低
+} as const
+
+/**
+ * 互动率 = (saves×5 + shares×3 + comments×2 + likes×1) / max(views, 1)
  */
 function computeEngagementRate(outcome: {
   views: number | null
@@ -100,10 +111,10 @@ function computeEngagementRate(outcome: {
 }): number {
   if (!outcome.views || outcome.views <= 0) return 0
   const interactions =
-    (outcome.likes ?? 0) +
-    (outcome.comments ?? 0) +
-    (outcome.saves ?? 0) +
-    (outcome.shares ?? 0)
+    (outcome.saves ?? 0) * ENGAGEMENT_WEIGHTS.saves +
+    (outcome.shares ?? 0) * ENGAGEMENT_WEIGHTS.shares +
+    (outcome.comments ?? 0) * ENGAGEMENT_WEIGHTS.comments +
+    (outcome.likes ?? 0) * ENGAGEMENT_WEIGHTS.likes
   return interactions / outcome.views
 }
 
@@ -228,8 +239,10 @@ export function buildTopPerformerSection(performers: TopPerformer[]): string {
     const p = performers[i]
     const metrics: string[] = []
     if (p.views != null) metrics.push(`播放 ${p.views}`)
-    if (p.likes != null) metrics.push(`点赞 ${p.likes}`)
+    if (p.saves != null) metrics.push(`收藏 ${p.saves}`)
+    if (p.shares != null) metrics.push(`分享 ${p.shares}`)
     if (p.comments != null) metrics.push(`评论 ${p.comments}`)
+    if (p.likes != null) metrics.push(`点赞 ${p.likes}`)
     if (p.qualifiedLeadCount != null) metrics.push(`线索 ${p.qualifiedLeadCount}`)
     if (p.dealCount != null) metrics.push(`成交 ${p.dealCount}`)
     metrics.push(`互动率 ${(p.engagementRate * 100).toFixed(1)}%`)

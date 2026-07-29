@@ -16,7 +16,7 @@ import { isNegativeOutcomeVerdict, isPositiveOutcomeVerdict, resolveOutcomeVerdi
 
 // ── 阈值常量（单源） ──────────────────────────────────────
 
-/** 互动率 = (likes + comments + saves + shares) / max(views, 1)，超过此值视为优秀。 */
+/** 互动率 = (saves×5 + shares×3 + comments×2 + likes×1) / max(views, 1)，超过此值视为优秀。 */
 const ENGAGEMENT_RATE_THRESHOLD = 0.05 // 5%
 
 /** 转化率 = qualifiedLeadCount / max(views, 1)，超过此值视为优秀。 */
@@ -127,8 +127,20 @@ interface GenerationRow {
 // ── 核心逻辑 ──────────────────────────────────────────────
 
 /**
- * 计算互动率。
- * 互动率 = (likes + comments + saves + shares) / max(views, 1)
+ * 互动行为权重（统一口径）。
+ * 对应抖音等平台新权重排序：收藏 > 复访/铁粉互动 > 点赞。
+ * 复访率暂无独立数据源（需平台侧采集），此处以「评论」近似铁粉/粉丝互动。
+ */
+const ENGAGEMENT_WEIGHTS = {
+  saves: 5,     // 收藏：第一权重（可持续停留）
+  shares: 3,    // 分享：强传播信号
+  comments: 2,  // 评论：铁粉/粉丝互动
+  likes: 1,     // 点赞：权重最低
+} as const
+
+/**
+ * 计算互动率（收藏加权）。
+ * 互动率 = (saves×5 + shares×3 + comments×2 + likes×1) / max(views, 1)
  * 仅当 views > 0 时有意义；views=null 或 0 时返回 null。
  */
 /**
@@ -145,10 +157,10 @@ export function computeEngagementRate(outcome: {
 }): number | null {
   if (!outcome.views || outcome.views <= 0) return null
   const interactions =
-    (outcome.likes ?? 0) +
-    (outcome.comments ?? 0) +
-    (outcome.saves ?? 0) +
-    (outcome.shares ?? 0)
+    (outcome.saves ?? 0) * ENGAGEMENT_WEIGHTS.saves +
+    (outcome.shares ?? 0) * ENGAGEMENT_WEIGHTS.shares +
+    (outcome.comments ?? 0) * ENGAGEMENT_WEIGHTS.comments +
+    (outcome.likes ?? 0) * ENGAGEMENT_WEIGHTS.likes
   return interactions / outcome.views
 }
 

@@ -15,9 +15,17 @@ describe("computeEngagementRate", () => {
     expect(computeEngagementRate({ views: 0, likes: 10, comments: 5, saves: 3, shares: 2 })).toBeNull()
   })
 
-  it("正常计算互动率", () => {
+  it("正常计算互动率（收藏加权：saves×5 + shares×3 + comments×2 + likes×1）", () => {
     const rate = computeEngagementRate({ views: 100, likes: 10, comments: 5, saves: 3, shares: 2 })
-    expect(rate).toBeCloseTo(0.2, 4)
+    // (3×5 + 2×3 + 5×2 + 10×1) / 100 = (15+6+10+10) / 100 = 0.41
+    expect(rate).toBeCloseTo(0.41, 4)
+  })
+
+  it("收藏权重高于点赞（同样数量收藏价值是点赞的 5 倍）", () => {
+    const bySaves = computeEngagementRate({ views: 100, likes: 0, comments: 0, saves: 10, shares: 0 })
+    const byLikes = computeEngagementRate({ views: 100, likes: 10, comments: 0, saves: 0, shares: 0 })
+    expect(bySaves).toBeCloseTo(0.5, 4) // 10×5/100
+    expect(byLikes).toBeCloseTo(0.1, 4) // 10×1/100
   })
 
   it("null 互动字段当 0 处理", () => {

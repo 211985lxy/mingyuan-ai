@@ -23,7 +23,7 @@ export const OPENING_TYPES = [
   {
     code: "curiosity_open",
     name: "好奇类开场",
-    description: "用体验提问、假设推演或反常结果激发观众好奇心，让「想知道答案」成为完播驱动力",
+    description: "用体验提问、假设推演或反常结果激发观众好奇心，让「想知道答案」成为回看与收藏的驱动力",
     formulas: [
       "{话题}是一种什么体验？",
       "如何不{代价}也能{结果}？",
@@ -139,7 +139,7 @@ export const COPY_STRUCTURES = [
   {
     code: "suspense_reveal",
     name: "悬念递延法",
-    description: "先抛结果或疑问，把答案延后几个节拍揭开，提升完播和后段留存",
+    description: "先抛结果或疑问，把答案延后几个节拍揭开，提升复访与后段留存",
     beats: [
       { label: "悬念抛出", instruction: "用一个有信息缺口的句子开场，让观众产生「想知道答案」的冲动" },
       { label: "背景铺垫", instruction: "简要交代背景或问题的严重性，加强观众继续看的动力" },

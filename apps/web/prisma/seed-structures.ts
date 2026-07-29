@@ -23,7 +23,7 @@ export const VIDEO_STRUCTURES = [
     name: "suspense-reveal",
     displayName: "悬念递延法",
     subtitle: "先给结果后解释",
-    description: "先抛结果或疑问，把答案延后几个节拍揭开，提升完播和后段留存。",
+    description: "先抛结果或疑问，把答案延后几个节拍揭开，提升复访与后段留存（让用户想回看、想收藏）。",
     useCase: "适合讲结果、讲原因、讲揭晓过程",
     blueprint: {
       openingPattern: "suspense_open",
