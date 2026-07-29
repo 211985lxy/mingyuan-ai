@@ -5,15 +5,14 @@
 // 与旧 /api/integrations/feishu/events 并存，互不干扰。
 // api-inventory: auth=signed_integration
 
-import { createHash } from "node:crypto"
 import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { env } from "@/env"
-import { parseJsonRecord } from "@/lib/api-contract"
 import { parseFeishuSdkMessageEvent, verifyFeishuEventToken } from "@/lib/integrations/feishu-topic-chat"
 import { resolveBotByVerificationToken, loadAgentBotRegistry, type FeishuAgentBotConfig } from "@/lib/feishu-agent-registry"
 import { resolveAgentBotIntent } from "@/lib/feishu-agent-bot-router"
 import { replyAsBot } from "@/lib/feishu-bot-identity"
+import { verifyFeishuEventSignature } from "@/lib/feishu-event-signature"
 import { ingestAimChannelMessage } from "@/features/aim-channels/aim-channel-ingest"
 import { resolveChannelBinding } from "@/features/topics/services/inspiration-events"
 import { getAgentBotAckReply } from "@/lib/feishu-agent-persona"
@@ -59,16 +58,21 @@ function challengePayload(payload: Record<string, unknown>, encryptKey: string) 
   return challenge.isChallenge ? challenge.challenge : null
 }
 
-function verifyEncryptedPayload(payload: Record<string, unknown>, request: Request, encryptKey: string) {
+function verifyEncryptedPayload(
+  payload: Record<string, unknown>,
+  request: Request,
+  encryptKey: string,
+  rawBody: string,
+) {
   if (!payload.encrypt || !encryptKey) return true
   const headers = requestHeaders(request)
-  const timestamp = headers["x-lark-request-timestamp"] || ""
-  const nonce = headers["x-lark-request-nonce"] || ""
-  const signature = headers["x-lark-signature"] || ""
-  const expected = createHash("sha256")
-    .update(timestamp + nonce + encryptKey + JSON.stringify(payload))
-    .digest("hex")
-  return Boolean(signature) && signature === expected
+  return verifyFeishuEventSignature({
+    timestamp: headers["x-lark-request-timestamp"] || "",
+    nonce: headers["x-lark-request-nonce"] || "",
+    encryptKey,
+    rawBody,
+    signature: headers["x-lark-signature"] || "",
+  })
 }
 
 /**
@@ -94,8 +98,15 @@ async function resolveMessageContext(chatId: string): Promise<{ userId: string; 
 
 export async function POST(request: Request) {
   let payload: Record<string, unknown>
+  let rawBody: string
   try {
-    payload = await parseJsonRecord(request)
+    rawBody = await request.text()
+    if (Buffer.byteLength(rawBody, "utf8") > 64 * 1024) {
+      return NextResponse.json({ error: "Feishu event payload too large" }, { status: 413 })
+    }
+    const parsed: unknown = JSON.parse(rawBody)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid payload")
+    payload = parsed as Record<string, unknown>
   } catch {
     return NextResponse.json({ error: "Invalid Feishu event payload" }, { status: 400 })
   }
@@ -115,7 +126,7 @@ export async function POST(request: Request) {
   try {
     const challenge = challengePayload(payload, encryptKey)
     if (challenge) {
-      if (payload.encrypt && !verifyEncryptedPayload(payload, request, encryptKey)) {
+      if (payload.encrypt && !verifyEncryptedPayload(payload, request, encryptKey, rawBody)) {
         return NextResponse.json({ error: "Invalid Feishu signature" }, { status: 401 })
       }
       if (payload.encrypt) {
@@ -133,7 +144,7 @@ export async function POST(request: Request) {
   }
 
   // 签名验证（加密事件）
-  if (payload.encrypt && !verifyEncryptedPayload(payload, request, encryptKey)) {
+  if (payload.encrypt && !verifyEncryptedPayload(payload, request, encryptKey, rawBody)) {
     return NextResponse.json({ error: "Invalid Feishu signature" }, { status: 401 })
   }
 
