@@ -20,6 +20,7 @@ export const env = createEnv({
     ALIYUN_VIAPI_ACCESS_KEY_SECRET: z.string().optional(),
     AIM_LOOP_NOTIFICATIONS_ENABLED: z.string().optional(),
     AIM_BUSINESS_LOOPS_ENABLED: z.string().optional(),
+    AIM_DAILY_EVAL_ARTIFACT_SECRET: z.string().min(32).optional(),
     AIM_LOOP_PILOT_PROJECT_IDS: z.string().optional(),
     AIM_LOOP_SHADOW_MODE: z.string().optional(),
     AIM_LOOP_OPERATING_MODE: z.string().optional(),
@@ -234,6 +235,8 @@ export const env = createEnv({
     ALIYUN_VIAPI_ACCESS_KEY_SECRET: process.env.ALIYUN_VIAPI_ACCESS_KEY_SECRET,
     AIM_LOOP_NOTIFICATIONS_ENABLED: process.env.AIM_LOOP_NOTIFICATIONS_ENABLED,
     AIM_BUSINESS_LOOPS_ENABLED: process.env.AIM_BUSINESS_LOOPS_ENABLED,
+    AIM_DAILY_EVAL_ARTIFACT_SECRET:
+      process.env.AIM_DAILY_EVAL_ARTIFACT_SECRET,
     AIM_LOOP_PILOT_PROJECT_IDS: process.env.AIM_LOOP_PILOT_PROJECT_IDS,
     AIM_LOOP_SHADOW_MODE: process.env.AIM_LOOP_SHADOW_MODE,
     AIM_LOOP_OPERATING_MODE: process.env.AIM_LOOP_OPERATING_MODE,
