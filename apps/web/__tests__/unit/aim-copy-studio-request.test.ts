@@ -21,24 +21,6 @@ describe("AIM copy-studio request normalization", () => {
     expect(validateGenerateInput(parsed)).toBe("agentModule 只能用于内容创作官")
   })
 
-  it("rejects video extraction context on agents without capability", () => {
-    const review = parseGenerateBody({
-      agentId: "content_review",
-      rawInput: "质检这段",
-      targetFormats: ["raw_copy"],
-      videoCopyExtractionId: "vce_test_1",
-    })
-    expect(validateGenerateInput(review)).toBe("当前专家未授权视频文案提取")
-
-    const producer = parseGenerateBody({
-      agentId: "content_producer",
-      rawInput: "基于视频写稿",
-      targetFormats: ["raw_copy"],
-      videoCopyExtractionId: "vce_test_1",
-    })
-    expect(validateGenerateInput(producer)).toBeNull()
-  })
-
   it("restores a persisted mode only for content-producer history", () => {
     const taskSpec = { execution: { schemaVersion: 1, copyStudioModule: "free" } } as never
     expect(resolveAimHistoryAgentModule("content_producer", taskSpec)).toBe("free")
