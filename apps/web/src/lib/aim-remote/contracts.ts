@@ -31,6 +31,7 @@ export const AGENT_SCOPE = {
   capabilitiesRead: "capabilities.read",
   projectsRead: "projects.read",
   draftsSubmit: "drafts.submit",
+  outcomesWrite: "outcomes.write",
   invocationsRead: "invocations.read",
   inspirationIngest: "inspiration.ingest",
   inspirationStatusRead: "inspiration.status.read",
@@ -50,6 +51,7 @@ export const CODEX_DEFAULT_SCOPES: AgentScope[] = [
   AGENT_SCOPE.capabilitiesRead,
   AGENT_SCOPE.projectsRead,
   AGENT_SCOPE.draftsSubmit,
+  AGENT_SCOPE.outcomesWrite,
   AGENT_SCOPE.invocationsRead,
 ]
 

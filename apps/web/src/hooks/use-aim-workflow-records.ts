@@ -16,8 +16,12 @@ import {
   type AimDecisionSnapshot,
   type AimRetroSnapshot,
 } from "@/lib/api/client"
-import type { AimAgentId } from "@/lib/aim-ui-config"
-import { reportAimRunEvent } from "@/lib/aim/run-events"
+import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
+import {
+  reportWebFinalDisposition,
+  resolveRunWorkflowId,
+} from "@/lib/aim/run-outcome-client"
+import type { FinalDisposition } from "@/lib/aim/run-outcome-telemetry"
 import { parseOutcomeVerdictCode } from "@/lib/aim/outcome-verdict"
 import { getAimWorkflowStatusLabel } from "@/lib/aim/workbench-display"
 import { patchDeliverableWorkflowFields } from "@/lib/aim/workbench-helpers"
@@ -59,7 +63,6 @@ async function saveDecisionRecord(generationId: string, form: AimDecisionSnapsho
 async function savePublishRecord(
   generationId: string,
   form: PublishRecordForm,
-  messages: AimWorkbenchMessage[],
   setMessages?: Dispatch<SetStateAction<AimWorkbenchMessage[]>>,
 ) {
   const publishPlatform = form.publishPlatform.trim() || "抖音"
@@ -81,8 +84,6 @@ async function savePublishRecord(
     publishPlatform,
     publishUrl,
   }))
-  const message = messages.find((item) => item.deliverables?.id === generationId)
-  reportAimRunEvent(message?.runId, "accepted", { workflowStatus: "published" })
   toast.success("已登记发布")
 }
 
@@ -183,6 +184,55 @@ interface UseAimWorkflowRecordsInput {
   onPublished?: (generationId: string) => void
 }
 
+function useRecordDialogHandlers(input: {
+  workflow: UseAimWorkflowRecordsInput
+  forms: RecordForms
+  recordDialog: WorkflowRecordDialogState | null
+  setRecordDialog: Dispatch<SetStateAction<WorkflowRecordDialogState | null>>
+  refreshRecords: () => void
+  reportMessageOutcome: (
+    message: AimWorkbenchMessage | undefined,
+    finalDisposition: FinalDisposition,
+  ) => void
+}) {
+  const openRecordDialog = useCallback((messageId: string, mode: WorkflowRecordMode) => {
+    const deliverable = input.workflow.messages.find((message) => message.id === messageId)?.deliverables
+    if (!deliverable?.id || deliverable.id.startsWith("polish-")) return toast.error("只有已保存的内容才能记录")
+    resetFormForMode(mode, deliverable.taskSpec, input.forms)
+    input.setRecordDialog({ mode, generationId: deliverable.id })
+  }, [input])
+  const submitRecordDialog = useCallback(async () => {
+    const dialog = input.recordDialog
+    if (!dialog) return
+    try {
+      if (dialog.mode === "decision") {
+        await saveDecisionRecord(dialog.generationId, input.forms.decisionForm)
+      } else if (dialog.mode === "publish") {
+        await savePublishRecord(dialog.generationId, input.forms.publishForm, input.workflow.setMessages)
+        input.reportMessageOutcome(
+          input.workflow.messages.find((message) => message.deliverables?.id === dialog.generationId),
+          "accepted_first_pass",
+        )
+        input.workflow.onPublished?.(dialog.generationId)
+      } else {
+        await saveRetroRecord({
+          generationId: dialog.generationId,
+          retroForm: input.forms.retroForm,
+          ruleForm: input.forms.retroRuleForm,
+          outcomeForm: input.forms.outcomeForm,
+          outcomeWindow: input.forms.outcomeWindow,
+          publishForm: input.forms.publishForm,
+        })
+      }
+      input.setRecordDialog(null)
+      input.refreshRecords()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "保存失败")
+    }
+  }, [input])
+  return { openRecordDialog, submitRecordDialog }
+}
+
 /**
  * @description React Hook：aimworkflowrecords
  * @param input - 输入数据
@@ -195,6 +245,19 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     void input.refreshHistory({ force: true, agentId: input.selectedAgentId })
     if (input.selectedProjectId) void input.refreshProjectWorkflow()
   }, [input])
+  const reportMessageOutcome = useCallback((
+    message: AimWorkbenchMessage | undefined,
+    finalDisposition: FinalDisposition,
+  ) => {
+    reportWebFinalDisposition({
+      runId: message?.runId,
+      workflowId: resolveRunWorkflowId(
+        isValidAimAgent(message?.agentId) ? message.agentId : input.selectedAgentId,
+      ),
+      taskType: message?.contentAction ?? "generation",
+      finalDisposition,
+    })
+  }, [input.selectedAgentId])
   const handleMarkStatus = useCallback((messageId: string) => async (status: string) => {
     const message = input.messages.find((item) => item.id === messageId)
     const deliverable = message?.deliverables
@@ -204,40 +267,39 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
       input.setMessages?.((current) => patchDeliverableWorkflowFields(current, deliverable.id, {
         workflowStatus: status,
       }))
-      if (ACCEPTED_WORKFLOW_STATUSES.has(status)) reportAimRunEvent(message?.runId, "accepted", { workflowStatus: status })
+      if (ACCEPTED_WORKFLOW_STATUSES.has(status)) {
+        reportMessageOutcome(message, "accepted_first_pass")
+      }
       refreshRecords()
       toast.success(`已标记为：${getAimWorkflowStatusLabel(status)}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "状态更新失败")
     }
-  }, [input, refreshRecords])
-  const openRecordDialog = useCallback((messageId: string, mode: WorkflowRecordMode) => {
-    const deliverable = input.messages.find((message) => message.id === messageId)?.deliverables
-    if (!deliverable?.id || deliverable.id.startsWith("polish-")) return toast.error("只有已保存的内容才能记录")
-    resetFormForMode(mode, deliverable.taskSpec, forms)
-    setRecordDialog({ mode, generationId: deliverable.id })
-  }, [forms, input.messages])
-  const submitRecordDialog = useCallback(async () => {
-    if (!recordDialog) return
-    try {
-      if (recordDialog.mode === "decision") await saveDecisionRecord(recordDialog.generationId, forms.decisionForm)
-      else if (recordDialog.mode === "publish") {
-        await savePublishRecord(recordDialog.generationId, forms.publishForm, input.messages, input.setMessages)
-        input.onPublished?.(recordDialog.generationId)
-      }
-      else await saveRetroRecord({
-        generationId: recordDialog.generationId,
-        retroForm: forms.retroForm,
-        ruleForm: forms.retroRuleForm,
-        outcomeForm: forms.outcomeForm,
-        outcomeWindow: forms.outcomeWindow,
-        publishForm: forms.publishForm,
-      })
-      setRecordDialog(null)
-      refreshRecords()
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "保存失败")
-    }
-  }, [forms, input, recordDialog, refreshRecords])
-  return { recordDialog, closeRecordDialog: () => setRecordDialog(null), ...forms, handleMarkStatus, openRecordDialog, submitRecordDialog }
+  }, [input, refreshRecords, reportMessageOutcome])
+  const handleFinalDisposition = useCallback(
+    (messageId: string) => (finalDisposition: FinalDisposition) => {
+      reportMessageOutcome(
+        input.messages.find((message) => message.id === messageId),
+        finalDisposition,
+      )
+    },
+    [input.messages, reportMessageOutcome],
+  )
+  const { openRecordDialog, submitRecordDialog } = useRecordDialogHandlers({
+    workflow: input,
+    forms,
+    recordDialog,
+    setRecordDialog,
+    refreshRecords,
+    reportMessageOutcome,
+  })
+  return {
+    recordDialog,
+    closeRecordDialog: () => setRecordDialog(null),
+    ...forms,
+    handleMarkStatus,
+    handleFinalDisposition,
+    openRecordDialog,
+    submitRecordDialog,
+  }
 }

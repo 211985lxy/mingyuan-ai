@@ -17,6 +17,8 @@ import { splitAimMethodNote } from "@/lib/aim/workbench-display"
 import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
 import type { ContentFormat } from "@/lib/api/client"
 import type { WorkflowRecordMode } from "@/components/aim/workflow-record-dialog"
+import type { FinalDisposition } from "@/lib/aim/run-outcome-telemetry"
+import { AimRunOutcomeActions } from "@/components/aim/aim-run-outcome-select-items"
 
 function ChoiceStepper({ groups, busy, onSubmit }: { groups: AimChoiceGroup[]; busy: boolean; onSubmit: (text: string) => void }) {
   const [step, setStep] = useState(0)
@@ -64,6 +66,7 @@ interface MessageActions {
   onRepurpose: (messageId: string) => (formats: ContentFormat | ContentFormat[]) => void
   onQuality: (messageId: string) => () => void
   onMarkStatus: (messageId: string) => (status: string) => void
+  onFinalDisposition: (messageId: string) => (disposition: FinalDisposition) => void
   onNextAction: (action: AimNextAction, content: string, generationId: string) => void
   onOpenRecord: (messageId: string, mode: WorkflowRecordMode) => void
   onCompileToWiki: (context: IpWikiDialogContext) => void
@@ -102,7 +105,7 @@ function MessageDeliverable({ message, selectedAgentId, selectedProjectId, lates
     sourceGenerationId: deliverables.id,
     positioningText: rawCopy,
   } : null
-  return <div className="mt-2 w-full"><AimDeliverableBubble messageId={message.id} deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} regenerating={Boolean(message.regenerating)} onInlineEditKeyChange={actions.onInlineEditKeyChange} inlineEditKey={actions.inlineEditKey} onInlineContentSaved={(format, content) => actions.onInlineContentSaved(message.id, format, content)} onInlineSelectionRewrite={(input) => actions.onInlineSelectionRewrite(message.id, input)} referenceText={actions.referenceText} persona={actions.persona} topicTitle={actions.topicTitle} projectId={actions.projectId} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} onCanonicalUpdated={({ taskSpec }) => actions.onCanonicalUpdated?.(message.id, taskSpec)} /></div>
+  return <div className="mt-2 w-full"><AimDeliverableBubble messageId={message.id} deliverables={deliverables} runId={message.runId} isCurrentVersion={message.id === latestDeliverableMessageId} agentId={messageAgentId} workflowStage={message.workflowStage} contentAction={message.contentAction} nextActions={getAimAgentGuide(messageAgentId).nextActions} onRepurpose={actions.onRepurpose(message.id)} onQuality={actions.onQuality(message.id)} onMarkStatus={actions.onMarkStatus(message.id)} onNextAction={actions.onNextAction} isBusy={busy} regenerating={Boolean(message.regenerating)} onInlineEditKeyChange={actions.onInlineEditKeyChange} inlineEditKey={actions.inlineEditKey} onInlineContentSaved={(format, content) => actions.onInlineContentSaved(message.id, format, content)} onInlineSelectionRewrite={(input) => actions.onInlineSelectionRewrite(message.id, input)} referenceText={actions.referenceText} persona={actions.persona} topicTitle={actions.topicTitle} projectId={actions.projectId} onOpenDecision={() => actions.onOpenRecord(message.id, "decision")} onOpenPublish={() => actions.onOpenRecord(message.id, "publish")} onOpenRetro={() => actions.onOpenRecord(message.id, "retro")} onAttachProject={actions.onAttachProject} onCompileToWiki={wikiContext ? () => actions.onCompileToWiki(wikiContext) : undefined} onCanonicalUpdated={({ taskSpec }) => actions.onCanonicalUpdated?.(message.id, taskSpec)} />{message.runId ? <AimRunOutcomeActions onSelect={actions.onFinalDisposition(message.id)} /> : null}</div>
 }
 
 function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, latestDeliverableMessageId, actions }: {

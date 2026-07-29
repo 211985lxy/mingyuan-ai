@@ -189,6 +189,33 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/efficiency-baselines",
+      "file": "src/app/api/admin/aim/efficiency-baselines/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/aim/operating-metrics",
+      "file": "src/app/api/admin/aim/operating-metrics/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/aim/runs/[runId]",
       "file": "src/app/api/admin/aim/runs/[runId]/route.ts",
       "methods": [
@@ -828,6 +855,19 @@
       "query": "none",
       "externalService": false,
       "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/agent/v1/aim/runs/[runId]/outcome",
+      "file": "src/app/api/agent/v1/aim/runs/[runId]/outcome/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "agent_key",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -2260,6 +2300,19 @@
       "externalService": true,
       "cost": "high",
       "idempotency": true
+    },
+    {
+      "route": "/api/integrations/feishu/run-outcomes",
+      "file": "src/app/api/integrations/feishu/run-outcomes/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
     },
     {
       "route": "/api/integrations/feishu/work-items/execute",

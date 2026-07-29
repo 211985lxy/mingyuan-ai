@@ -135,7 +135,7 @@ export function useAimWorkbench() {
     outcomeForm, setOutcomeForm,
     outcomeWindow, setOutcomeWindow,
     retroRuleForm, setRetroRuleForm,
-    handleMarkStatus, openRecordDialog, submitRecordDialog,
+    handleMarkStatus, handleFinalDisposition, openRecordDialog, submitRecordDialog,
   } = useAimWorkflowRecords({
     messages,
     setMessages,
@@ -345,6 +345,7 @@ export function useAimWorkbench() {
     handleInlineContentSaved,
     handleInlineSelectionRewrite,
   } = useAimInlineEditorBridge({
+    messages,
     setMessages,
     setEditorText,
     setEditorFormat,
@@ -459,7 +460,7 @@ export function useAimWorkbench() {
     isEvolving, evolutionSuggestions,
     recordDialog, closeRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm,
     retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow,
-    retroRuleForm, setRetroRuleForm, handleMarkStatus, openRecordDialog, submitRecordDialog,
+    retroRuleForm, setRetroRuleForm, handleMarkStatus, handleFinalDisposition, openRecordDialog, submitRecordDialog,
     wikiDialog,
     isImitating, isSavingEditor, imitateStyleId, setImitateStyleId, handleImitate, saveEditorToDeliverable, applyEditorReplacement, applyRestoredContent,
     scrollRef,

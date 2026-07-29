@@ -300,34 +300,29 @@ model AimRunSnapshot {
 }
 
 model AimRunEvent {
-  id        String   @id @default(cuid())
-  runId     String   @db.VarChar(40)
-  userId    String
-  event     String   @db.VarChar(24) // copied | revised | accepted | final_disposition | …
-  metadata  Json?
-  createdAt DateTime @default(now())
+  id                    String   @id @default(cuid())
+  runId                 String   @db.VarChar(40)
+  userId                String
+  event                 String   @db.VarChar(24) // copied | revised | accepted | final_disposition | …
+  workflowId            String?  @db.VarChar(80)
+  taskType               String?  @db.VarChar(80)
+  finalDisposition      String?  @db.VarChar(32)
+  humanActiveMinutes    Float?
+  manualBaselineMinutes Float?
+  reasonCode            String?  @db.VarChar(64)
+  channel               String?  @db.VarChar(16)
+  requestId             String?  @db.VarChar(191)
+  metadata              Json?
+  createdAt             DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
+  @@unique([userId, runId, requestId])
   @@index([runId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@index([event, createdAt(sort: Desc)])
-}
-
-/** 版本化人工效率基线（WP-1）；用于节省时间计算 */
-model TaskEfficiencyBaseline {
-  id                  String   @id @default(cuid())
-  workflowId          String   @db.VarChar(80)
-  taskType            String   @db.VarChar(80)
-  medianManualMinutes Float
-  sampleSize          Int
-  validFrom           DateTime
-  approvedBy          String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@index([workflowId, taskType])
-  @@index([validFrom])
+  @@index([workflowId, taskType, createdAt(sort: Desc)])
+  @@index([channel, createdAt(sort: Desc)])
 }
 
 model AgentMethodology {

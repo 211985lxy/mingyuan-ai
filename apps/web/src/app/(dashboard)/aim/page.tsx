@@ -281,6 +281,7 @@ export default function AimPage() {
                 onRepurpose: w.handleRepurpose,
                 onQuality: w.handleQuality,
                 onMarkStatus: w.handleMarkStatus,
+                onFinalDisposition: w.handleFinalDisposition,
                 onNextAction: w.handleAimNextAction,
                 onOpenRecord: w.openRecordDialog,
                 onCompileToWiki: (ctx) => w.setWikiDialog({ open: true, context: ctx }),

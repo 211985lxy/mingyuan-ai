@@ -2,11 +2,17 @@
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react"
 import type { ContentFormat } from "@/lib/api/client"
+import { isValidAimAgent } from "@/lib/aim-ui-config"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
 import { buildAimEditorContext } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { AimEditorContext } from "@/lib/aim-editor"
+import {
+  reportWebFinalDisposition,
+  reportWebRunEdited,
+  resolveRunWorkflowId,
+} from "@/lib/aim/run-outcome-client"
 
 type SendText = (
   text: string,
@@ -16,7 +22,18 @@ type SendText = (
   },
 ) => Promise<unknown> | unknown
 
+function findRunTelemetry(messages: AimWorkbenchMessage[], messageId: string) {
+  const message = messages.find((item) => item.id === messageId)
+  if (!message?.runId || !isValidAimAgent(message.agentId)) return null
+  return {
+    runId: message.runId,
+    workflowId: resolveRunWorkflowId(message.agentId),
+    taskType: message.contentAction ?? "generation",
+  }
+}
+
 export function useAimInlineEditorBridge(input: {
+  messages: AimWorkbenchMessage[]
   setMessages: Dispatch<SetStateAction<AimWorkbenchMessage[]>>
   setEditorText: Dispatch<SetStateAction<string>>
   setEditorFormat: Dispatch<SetStateAction<ContentFormat | undefined>>
@@ -26,6 +43,7 @@ export function useAimInlineEditorBridge(input: {
   sendText: SendText
 }) {
   const {
+    messages,
     setMessages,
     setEditorText,
     setEditorFormat,
@@ -44,6 +62,8 @@ export function useAimInlineEditorBridge(input: {
   }, [setDraftSelection, setEditorFormat, setEditorSourceMessageId, setEditorText])
 
   const handleInlineContentSaved = useCallback((messageId: string, format: ContentFormat, content: string) => {
+    const telemetry = findRunTelemetry(messages, messageId)
+    if (telemetry) reportWebRunEdited(telemetry)
     setMessages((messages) => messages.map((message) =>
       message.id === messageId && message.deliverables
         ? {
@@ -58,7 +78,7 @@ export function useAimInlineEditorBridge(input: {
           }
         : message))
     syncEditorFromResult(messageId, format, content)
-  }, [setMessages, syncEditorFromResult])
+  }, [messages, setMessages, syncEditorFromResult])
 
   const handleInlineSelectionRewrite = useCallback((messageId: string, payload: {
     format: ContentFormat
@@ -67,6 +87,8 @@ export function useAimInlineEditorBridge(input: {
     range: { start: number; end: number }
     draftContent: string
   }) => {
+    const telemetry = findRunTelemetry(messages, messageId)
+    if (telemetry) reportWebFinalDisposition({ ...telemetry, finalDisposition: "rewrite_requested" })
     syncEditorFromResult(messageId, payload.format, payload.draftContent)
     setDraftSelection({ text: payload.selectionText, range: payload.range })
     void sendText(payload.prompt, {
@@ -79,7 +101,7 @@ export function useAimInlineEditorBridge(input: {
       }),
       editorApplyRange: payload.range,
     })
-  }, [editorPanelLabels, sendText, setDraftSelection, syncEditorFromResult])
+  }, [editorPanelLabels, messages, sendText, setDraftSelection, syncEditorFromResult])
 
   return {
     inlineEditKey,

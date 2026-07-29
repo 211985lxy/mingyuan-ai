@@ -1,6 +1,23 @@
 // Operating-system projections (WP-3 / WP-4)
 // ContentOutcome remains the content-window snapshot; these models hold per-event business facts.
 
+/** 版本化人工效率基线（WP-1）；用于节省时间计算 */
+model TaskEfficiencyBaseline {
+  id                  String   @id @default(cuid())
+  workflowId          String   @db.VarChar(80)
+  taskType            String   @db.VarChar(80)
+  medianManualMinutes Float
+  sampleSize          Int
+  validFrom           DateTime
+  approvedBy          String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([workflowId, taskType, validFrom])
+  @@index([workflowId, taskType])
+  @@index([validFrom])
+}
+
 /** 逐笔经营归因（WP-3）：内容 → 线索/预约/成交/回款；不建 CRM 实体 */
 model OutcomeAttribution {
   id                    String   @id @default(cuid())
@@ -128,4 +145,3 @@ model LearningCandidate {
   @@index([projectId])
   @@index([generationId])
 }
-

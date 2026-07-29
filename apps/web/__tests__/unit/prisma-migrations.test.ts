@@ -79,6 +79,9 @@ describe("Prisma migrations", () => {
     expect(schema).toContain("model AimRunEvent")
     expect(migrationSql).toContain("CREATE TABLE `AimRunEvent`")
     expect(migrationSql).toContain("FOREIGN KEY (`userId`) REFERENCES `User`(`id`)")
+    expect(schema).toContain("finalDisposition")
+    expect(migrationSql).toContain("AimRunEvent_userId_runId_requestId_key")
+    expect(migrationSql).not.toMatch(/UPDATE\s+`?AimRunEvent`?/i)
   })
 
   it("creates OutcomeAttribution for per-event business attribution (WP-3)", () => {

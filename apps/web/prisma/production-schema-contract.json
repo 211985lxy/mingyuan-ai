@@ -16,6 +16,25 @@
       ]
     },
     {
+      "name": "AimRunEvent",
+      "columns": [
+        "id",
+        "runId",
+        "userId",
+        "event",
+        "workflowId",
+        "taskType",
+        "finalDisposition",
+        "humanActiveMinutes",
+        "manualBaselineMinutes",
+        "reasonCode",
+        "channel",
+        "requestId",
+        "metadata",
+        "createdAt"
+      ]
+    },
+    {
       "name": "ContentOutcome",
       "columns": [
         "id",
@@ -173,17 +192,6 @@
         "outputTokens",
         "cachedTokens",
         "costCny"
-      ]
-    },
-    {
-      "name": "AimRunEvent",
-      "columns": [
-        "id",
-        "runId",
-        "userId",
-        "event",
-        "metadata",
-        "createdAt"
       ]
     },
     {

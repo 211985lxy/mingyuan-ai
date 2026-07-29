@@ -28,6 +28,7 @@ import {
 } from "@/lib/aim/task-session-reset"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import type { AimTurnIntent } from "@/lib/aim-turn-intent"
+import { startRunOutcomeActivity } from "@/lib/aim/run-outcome-client"
 import { repurposeDeliverable } from "@/hooks/aim-repurpose-content-package"
 
 type MessageSetter = Dispatch<SetStateAction<AimWorkbenchMessage[]>>
@@ -198,6 +199,7 @@ function applyGenerationResponse(
   currentInput: string,
   response: AimGenerateResponse,
 ) {
+  startRunOutcomeActivity(response.runId)
   const originalText = extractBenchmarkOriginalText(currentInput)
   const analysisText = extractBenchmarkAnalysisText(currentInput)
   if (originalText) input.setSourceOriginalText(originalText)
