@@ -89,6 +89,7 @@ model CustomerOutcomeProjection {
 /** 周度经营复盘周期（WP-5） */
 model ReviewCycle {
   id              String    @id @default(cuid())
+  requestId       String?   @unique @db.VarChar(191)
   periodStart     DateTime
   periodEnd       DateTime
   status          String    @default("draft") @db.VarChar(20) // draft | signed
@@ -97,6 +98,7 @@ model ReviewCycle {
   /** 筛选维度快照：projectId / workflowId / ownerId / channel */
   filterSnapshot  Json?
   signedAt        DateTime?
+  signedApprovalId String?  @unique @db.VarChar(191)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

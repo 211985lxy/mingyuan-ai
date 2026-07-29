@@ -244,6 +244,33 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/review-cycles/[id]",
+      "file": "src/app/api/admin/aim/review-cycles/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/aim/review-cycles",
+      "file": "src/app/api/admin/aim/review-cycles/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/aim/runs/[runId]",
       "file": "src/app/api/admin/aim/runs/[runId]/route.ts",
       "methods": [

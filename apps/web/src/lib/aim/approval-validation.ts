@@ -65,6 +65,25 @@ export async function resolveApprovalSubjectScope(
   if (subjectType === "workflow_change") {
     return subjectId === workflowId ? { projectId: null } : null
   }
+  if (subjectType === "review_cycle") {
+    const cycle = await prisma.reviewCycle.findUnique({
+      where: { id: subjectId },
+      select: { filterSnapshot: true },
+    })
+    if (!cycle) return null
+    const filters =
+      cycle.filterSnapshot
+      && typeof cycle.filterSnapshot === "object"
+      && !Array.isArray(cycle.filterSnapshot)
+        ? cycle.filterSnapshot as Record<string, unknown>
+        : {}
+    return {
+      projectId:
+        typeof filters.projectId === "string"
+          ? filters.projectId
+          : null,
+    }
+  }
   return null
 }
 

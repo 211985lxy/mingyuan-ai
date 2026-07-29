@@ -146,6 +146,30 @@ function extractKnowledgeIds(knowledgeUsed: unknown): string[] {
   return ids
 }
 
+async function loadWeeklyReviewRows(input: {
+  userId?: string
+  projectId?: string
+  generationIds?: string[]
+  store: WeeklyReviewStorePort
+}) {
+  const where = {
+    ...(input.userId ? { userId: input.userId } : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.generationIds ? { id: { in: input.generationIds } } : {}),
+  }
+  const outcomeWhere = {
+    ...(input.userId ? { userId: input.userId } : {}),
+    ...(input.projectId ? { projectId: input.projectId } : {}),
+    ...(input.generationIds
+      ? { generationId: { in: input.generationIds } }
+      : {}),
+  }
+  return Promise.all([
+    input.store.aimGeneration.findMany({ where, take: 1000 }),
+    input.store.contentOutcome.findMany({ where: outcomeWhere, take: 5000 }),
+  ])
+}
+
 /**
  * 计算 [start, end) 周期的经营复盘指标。
  */
@@ -155,16 +179,15 @@ function extractKnowledgeIds(knowledgeUsed: unknown): string[] {
  * @returns Promise<WeeklyReviewMetrics>
  */
 export async function computeWeeklyReview(input: {
-  userId: string
+  userId?: string
+  projectId?: string
+  generationIds?: string[]
   start: Date
   end: Date
   store: WeeklyReviewStorePort
 }): Promise<WeeklyReviewMetrics> {
-  const { userId, start, end, store } = input
-  const [generations, outcomes] = await Promise.all([
-    store.aimGeneration.findMany({ where: { userId }, take: 1000 }),
-    store.contentOutcome.findMany({ where: { userId }, take: 5000 }),
-  ])
+  const { start, end } = input
+  const [generations, outcomes] = await loadWeeklyReviewRows(input)
 
   // 1. 发布内容数
   const publishedCount = generations.filter(

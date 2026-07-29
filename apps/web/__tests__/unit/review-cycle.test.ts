@@ -17,6 +17,8 @@ const SNAPSHOT = {
   appointmentCount: 2,
   dealCount: 1,
   revenue: 9800,
+  paymentCount: 1,
+  paymentAmountCny: 9800,
   customerOutcomeCount: 0,
   timeSavedMinutes: 40,
   firstPassAcceptanceRate: 0.5,
@@ -41,6 +43,7 @@ describe("review-cycle", () => {
   it("校验周期与行动项草稿", () => {
     expect(() =>
       validateReviewCycleDraft({
+        requestId: "review_1",
         periodStart: END,
         periodEnd: START,
         systemOwnerId: "sys_1",
@@ -49,6 +52,7 @@ describe("review-cycle", () => {
     ).toThrow(/periodEnd/)
 
     const draft = validateReviewCycleDraft({
+      requestId: "review_1",
       periodStart: START,
       periodEnd: END,
       systemOwnerId: "  sys_1  ",
@@ -75,19 +79,34 @@ describe("review-cycle", () => {
 
     expect(
       canAttachToPerformanceReview([
-        { status: "signed", periodStart: START, periodEnd: END },
-        { status: "signed", periodStart: START, periodEnd: END },
-        { status: "signed", periodStart: START, periodEnd: END },
+        { status: "signed", signedAt: END, periodStart: START, periodEnd: END },
+        { status: "signed", signedAt: END, periodStart: START, periodEnd: END },
+        { status: "signed", signedAt: END, periodStart: START, periodEnd: END },
         { status: "draft", periodStart: START, periodEnd: END },
       ]),
     ).toBe(false)
 
     expect(
       canAttachToPerformanceReview([
-        { status: "signed", periodStart: START, periodEnd: END },
-        { status: "signed", periodStart: START, periodEnd: END },
-        { status: "signed", periodStart: START, periodEnd: END },
-        { status: "signed", periodStart: START, periodEnd: END },
+        {
+          status: "signed",
+          signedAt: END,
+          periodStart: new Date("2026-06-15T00:00:00Z"),
+          periodEnd: new Date("2026-06-22T00:00:00Z"),
+        },
+        {
+          status: "signed",
+          signedAt: END,
+          periodStart: new Date("2026-06-22T00:00:00Z"),
+          periodEnd: new Date("2026-06-29T00:00:00Z"),
+        },
+        {
+          status: "signed",
+          signedAt: END,
+          periodStart: new Date("2026-06-29T00:00:00Z"),
+          periodEnd: new Date("2026-07-06T00:00:00Z"),
+        },
+        { status: "signed", signedAt: END, periodStart: START, periodEnd: END },
       ]),
     ).toBe(true)
   })

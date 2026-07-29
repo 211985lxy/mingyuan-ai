@@ -107,6 +107,16 @@ describe("Prisma migrations", () => {
     expect(migrationSql).toContain("AssetCandidate_customerOutcomeProjectionId_fkey")
   })
 
+  it("hardens ReviewCycle with idempotent request and traceable signing (WP-5)", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("model ReviewCycle")
+    expect(schema).toContain("signedApprovalId")
+    expect(migrationSql).toContain("ReviewCycle_requestId_key")
+    expect(migrationSql).toContain("ReviewCycle_signedApprovalId_key")
+  })
+
   it("adds verdictCode and verdictNote with MySQL-safe additive migrations", () => {
     const schema = readPrismaSchema()
     const verdictCodeMigration = readFileSync(

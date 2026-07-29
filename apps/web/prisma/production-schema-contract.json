@@ -143,13 +143,15 @@
       "name": "ReviewCycle",
       "columns": [
         "id",
+        "requestId",
         "periodStart",
         "periodEnd",
         "status",
         "metricsSnapshot",
         "systemOwnerId",
         "filterSnapshot",
-        "signedAt"
+        "signedAt",
+        "signedApprovalId"
       ]
     },
     {
