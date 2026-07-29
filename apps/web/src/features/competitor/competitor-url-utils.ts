@@ -29,6 +29,11 @@ export function buildWechatChannelsProfileUrl(finderUsername: string): string {
 
 export type UrlValidationError = string
 
+/** Distinguish pasted links (including share text containing a link) from account names. */
+export function isCompetitorAccountLinkInput(raw: string): boolean {
+  return /https?:\/\/|(?:^|\s)(?:www\.)?[\w-]+\.[a-z]{2,}(?:[/?#]|\s|$)/i.test(raw.trim())
+}
+
 /** Validate a competitor URL and return the pure URL or an error message. */
 /**
  * @description 验证competitorurl

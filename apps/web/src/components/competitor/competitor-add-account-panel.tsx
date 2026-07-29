@@ -2,10 +2,8 @@
 
 import { Plus } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { AiResultPanel } from "@/components/workbench/ai-result-panel"
-import { WechatChannelsUserSearch } from "@/components/competitor/wechat-channels-user-search"
+import { CompetitorAccountSearch } from "@/components/competitor/competitor-account-search"
 
 interface AddAccountPanelProps {
   value: string
@@ -27,24 +25,17 @@ export function CompetitorAddAccountPanel({ value, adding, accountCount, onChang
     <AiResultPanel
       title="添加监控账号"
       icon={<Plus className="h-4 w-4 text-primary" />}
-      meta={<span>抖音可粘贴主页链接；视频号常无法复制链接，可直接搜昵称添加</span>}
+      meta={<span>输入账号昵称或主页链接，系统会自动识别并添加</span>}
       flat
     >
-      <div className="flex gap-3">
-        <Input
-          placeholder="抖音主页链接，或已有视频号主页链接"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && void onAdd()}
-          disabled={adding || full}
-          className="flex-1"
-        />
-        <Button onClick={() => void onAdd()} disabled={adding || !value.trim() || full}>
-          {adding ? "添加中..." : `添加 (${accountCount}/10)`}
-        </Button>
-      </div>
-
-      <WechatChannelsUserSearch disabled={full} adding={adding} onAdd={onAdd} />
+      <CompetitorAccountSearch
+        value={value}
+        accountCount={accountCount}
+        disabled={full}
+        adding={adding}
+        onChange={onChange}
+        onAdd={onAdd}
+      />
 
       {full ? <p className="mt-2 text-xs text-amber-600">已达到 10 个账号上限</p> : null}
     </AiResultPanel>

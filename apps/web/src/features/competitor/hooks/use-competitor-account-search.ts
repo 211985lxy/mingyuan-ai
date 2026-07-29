@@ -3,22 +3,22 @@
 import { useState } from "react"
 import { toast } from "sonner"
 
-import { buildWechatChannelsProfileUrl } from "@/features/competitor/competitor-url-utils"
 import {
   ApiError,
-  searchChannelsUsers,
-  type SearchChannelsUserResult,
+  resolveDouyinAccountUrl,
+  searchCompetitorAccounts,
+  type SearchCompetitorAccountResult,
 } from "@/lib/api/client"
 
-export function useWechatChannelsUserSearch(options: {
+export function useCompetitorAccountSearch(options: {
+  keyword: string
   disabled?: boolean
   adding: boolean
-  onAdd: (url: string, successMessage?: string) => Promise<void>
+  onAdd: (url?: string, successMessage?: string) => Promise<void>
 }) {
-  const { disabled = false, adding, onAdd } = options
-  const [keyword, setKeyword] = useState("")
+  const { keyword, disabled = false, adding, onAdd } = options
   const [searching, setSearching] = useState(false)
-  const [results, setResults] = useState<SearchChannelsUserResult[]>([])
+  const [results, setResults] = useState<SearchCompetitorAccountResult[]>([])
   const [searched, setSearched] = useState(false)
   const [addingFinder, setAddingFinder] = useState<string | null>(null)
 
@@ -28,32 +28,36 @@ export function useWechatChannelsUserSearch(options: {
     setSearching(true)
     setSearched(true)
     try {
-      const data = await searchChannelsUsers(q)
-      setResults(data.users.filter((user) => user.finderUsername.trim()))
+      const data = await searchCompetitorAccounts(q)
+      setResults(data.accounts.filter((account) => account.platformUserId.trim()))
+      if (data.partial) {
+        toast.warning("部分平台搜索暂时不可用，已展示可用结果")
+      }
     } catch (error) {
       setResults([])
       const message =
         error instanceof ApiError && error.details
           ? String((error.details as Record<string, unknown>).error || "")
           : ""
-      toast.error(message || (error instanceof Error ? error.message : "搜索视频号失败"))
+      toast.error(message || (error instanceof Error ? error.message : "搜索账号失败"))
     } finally {
       setSearching(false)
     }
   }
 
-  async function handleAddChannelsUser(user: SearchChannelsUserResult) {
+  async function handleAddSearchResult(account: SearchCompetitorAccountResult) {
     if (adding || disabled || addingFinder) return
-    const finder = user.finderUsername.trim()
-    if (!finder) {
+    const accountId = account.platformUserId.trim()
+    if (!accountId) {
       toast.error("该结果缺少账号标识，请换一个")
       return
     }
-    setAddingFinder(finder)
+    setAddingFinder(accountId)
     try {
-      const profileUrl = buildWechatChannelsProfileUrl(finder)
-      const label = user.nickname.trim() || "视频号"
-      await onAdd(profileUrl, `已添加「${label}」`)
+      const label = account.nickname.trim() || "账号"
+      const targetUrl = account.targetUrl.trim()
+        || (await resolveDouyinAccountUrl(accountId)).targetUrl
+      await onAdd(targetUrl, `已添加「${label}」`)
     } catch (error) {
       if (error instanceof Error && error.message) {
         toast.error(error.message)
@@ -64,13 +68,11 @@ export function useWechatChannelsUserSearch(options: {
   }
 
   return {
-    keyword,
-    setKeyword,
     searching,
     results,
     searched,
     addingFinder,
     handleSearch,
-    handleAddChannelsUser,
+    handleAddSearchResult,
   }
 }
