@@ -7,6 +7,7 @@
 // api-inventory: auth=signed_integration
 //
 // WP-2：审批必须写入真实 open_id/user_id；禁止硬编码审批结果 ID。
+// 失败可重试；重放不重复完成（见 approval-completion）。
 
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
@@ -15,16 +16,7 @@ import {
   createLarkWorkItemStore,
   readWorkItemStoreConfig,
 } from "@/lib/aim/work-item-store"
-import {
-  completeWorkItem,
-  startWorkItem,
-  type WorkItemExecutionResult,
-} from "@/lib/aim/services/work-item-execution"
-import {
-  assertReviewerMatchesAssignment,
-  assertWorkflowGovernanceReady,
-} from "@/lib/aim/workflow-governance"
-import { recordApprovalDecision } from "@/lib/aim/approval-decision-store"
+import { processFeishuCardApproval } from "@/lib/aim/approval-completion"
 import {
   createPrismaApprovalDecisionStore,
   listActiveGovernanceAssignments,
@@ -36,6 +28,7 @@ interface CardActionValue {
   action?: string
   recordId?: string
   workflowId?: string
+  projectId?: string
   aimResultId?: string
 }
 
@@ -52,13 +45,37 @@ interface CardCallbackBody {
   }
 }
 
+function toastError(content: string, extra?: Record<string, unknown>) {
+  return NextResponse.json({ toast: { type: "error", content }, ...extra }, { status: 200 })
+}
+
+async function resolveAimResultId(
+  actionValue: CardActionValue | undefined,
+  getRecord: (recordId: string) => Promise<{ fields: Record<string, unknown> } | null>,
+  recordId: string,
+): Promise<string> {
+  const fromAction = actionValue?.aimResultId?.trim() || ""
+  if (fromAction) return fromAction
+  try {
+    const record = await getRecord(recordId)
+    const fields = record?.fields ?? {}
+    const raw = fields["AIM结果ID"] ?? fields["aimResultId"] ?? fields["AIM生成ID"]
+    return typeof raw === "string" ? raw.trim() : ""
+  } catch {
+    return ""
+  }
+}
+
 /**
  * @description 处理飞书卡片按钮回调；签字写入真实操作人身份
  */
 export async function POST(request: Request) {
   let body: CardCallbackBody & { challenge?: string; type?: string }
   try {
-    body = (await parseJsonRecord(request)) as CardCallbackBody & { challenge?: string; type?: string }
+    body = (await parseJsonRecord(request)) as CardCallbackBody & {
+      challenge?: string
+      type?: string
+    }
   } catch {
     return NextResponse.json({ error: "Invalid card callback payload" }, { status: 400 })
   }
@@ -67,8 +84,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ challenge: body.challenge })
   }
 
-  const token = body.token || ""
-  const bot = resolveBotByVerificationToken(token)
+  const bot = resolveBotByVerificationToken(body.token || "")
   if (!bot) {
     return NextResponse.json({ error: "Unknown agent bot" }, { status: 404 })
   }
@@ -77,121 +93,53 @@ export async function POST(request: Request) {
   const action = actionValue?.action?.trim() || ""
   const recordId = actionValue?.recordId?.trim() || ""
   const workflowId = actionValue?.workflowId?.trim() || "default"
+  const projectId = actionValue?.projectId?.trim() || null
   const openId = typeof body.open_id === "string" ? body.open_id.trim() : ""
   const userId = typeof body.user_id === "string" ? body.user_id.trim() : ""
 
-  if (!recordId) {
-    return NextResponse.json({ toast: { type: "error", content: "缺少记录ID" } }, { status: 200 })
-  }
-
-  if (action !== "approve" && action !== "reject") {
-    return NextResponse.json({ toast: { type: "error", content: "未知操作" } }, { status: 200 })
-  }
-
-  if (!openId && !userId) {
-    return NextResponse.json(
-      { toast: { type: "error", content: "缺少审批人 open_id/user_id，拒绝匿名签字" } },
-      { status: 200 },
-    )
-  }
+  if (!recordId) return toastError("缺少记录ID")
+  if (action !== "approve" && action !== "reject") return toastError("未知操作")
+  if (!openId && !userId) return toastError("缺少审批人 open_id/user_id，拒绝匿名签字")
 
   let config
   try {
     config = readWorkItemStoreConfig()
   } catch {
-    return NextResponse.json({ toast: { type: "error", content: "飞书配置缺失" } }, { status: 200 })
+    return toastError("飞书配置缺失")
   }
-  const store = createLarkWorkItemStore(config)
-
-  // 读取真实 AIM 结果 ID，禁止硬编码 card-approve
-  let aimResultId = actionValue?.aimResultId?.trim() || ""
-  if (!aimResultId) {
-    try {
-      const record = await store.get(recordId)
-      const fields = record?.fields ?? {}
-      const raw =
-        fields["AIM结果ID"]
-        ?? fields["aimResultId"]
-        ?? fields["AIM生成ID"]
-      aimResultId = typeof raw === "string" ? raw.trim() : ""
-    } catch {
-      aimResultId = ""
-    }
-  }
-
+  const workItemStore = createLarkWorkItemStore(config)
+  const aimResultId = await resolveAimResultId(actionValue, (id) => workItemStore.get(id), recordId)
   const assignments = await listActiveGovernanceAssignments(workflowId)
-  const ready = assertWorkflowGovernanceReady(assignments, { workflowId })
-  if (!ready.ok) {
-    return NextResponse.json({ toast: { type: "error", content: ready.error } }, { status: 200 })
-  }
-
-  const match = assertReviewerMatchesAssignment(assignments, {
+  const result = await processFeishuCardApproval({
+    assignments,
     workflowId,
-    reviewerUserId: userId || null,
-    externalReviewerId: openId || null,
+    projectId,
+    recordId,
+    action,
+    openId,
+    userId,
+    messageId: body.open_message_id?.trim() || "unknown_msg",
+    aimResultId,
+    workItemStore,
+    approvalStore: createPrismaApprovalDecisionStore(),
   })
-  if (!match.ok) {
-    return NextResponse.json({ toast: { type: "error", content: match.error } }, { status: 200 })
-  }
-
-  const messageId = body.open_message_id?.trim() || "unknown_msg"
-  const requestId = `feishu_card:${messageId}:${action}:${recordId}`
-  const approvalStore = createPrismaApprovalDecisionStore()
-  const { record: approval, idempotent } = await recordApprovalDecision(approvalStore, {
-    subjectType: "work_item",
-    subjectId: recordId,
-    decision: action === "approve" ? "approve" : "reject",
-    reviewerUserId: userId || null,
-    externalReviewerId: openId || null,
-    roleSnapshot: match.role,
-    reason: action === "approve" ? "飞书卡片审核通过" : "飞书卡片打回修改",
-    source: "feishu_card",
-    requestId,
-  })
-
-  // 重放卡片：已有签字则不重复推进状态机
-  if (idempotent) {
-    return NextResponse.json(
-      {
-        toast: {
-          type: "info",
-          content: action === "approve" ? "已通过（幂等）" : "已打回（幂等）",
-        },
-        approvalId: approval.id,
-        idempotent: true,
-      },
-      { status: 200 },
-    )
-  }
-
-  let result: WorkItemExecutionResult
-  try {
-    if (action === "approve") {
-      if (!aimResultId) {
-        return NextResponse.json(
-          { toast: { type: "error", content: "记录缺少 AIM结果ID，禁止无结果完成" } },
-          { status: 200 },
-        )
-      }
-      result = await completeWorkItem(store, recordId, {
-        aimResultId,
-        resultSummary: `飞书卡片审核通过；approvalId=${approval.id}`,
-      })
-    } else {
-      result = await startWorkItem(store, recordId)
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "操作失败"
-    return NextResponse.json({ toast: { type: "error", content: message } }, { status: 200 })
-  }
 
   if (!result.ok) {
-    return NextResponse.json({ toast: { type: "error", content: result.error } }, { status: 200 })
+    return toastError(result.error, {
+      approvalId: result.approval?.id,
+      recoverable: result.recoverable === true,
+    })
   }
 
-  const successMsg = action === "approve" ? "已通过审核" : "已打回重新处理"
   return NextResponse.json(
-    { toast: { type: "success", content: successMsg }, approvalId: approval.id },
+    {
+      toast: {
+        type: result.idempotent ? "info" : "success",
+        content: result.toast,
+      },
+      approvalId: result.approval.id,
+      idempotent: result.idempotent,
+    },
     { status: 200 },
   )
 }

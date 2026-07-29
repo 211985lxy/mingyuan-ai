@@ -87,7 +87,11 @@
         "reason",
         "source",
         "requestId",
-        "decidedAt"
+        "decidedAt",
+        "workflowId",
+        "projectId",
+        "effectStatus",
+        "effectError"
       ]
     },
     {

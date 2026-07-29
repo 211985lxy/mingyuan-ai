@@ -1,6 +1,6 @@
 /**
  * 工作流责任与审批签字（WP-2）
- * 缺 Owner 配置 fail closed；双签；审批人匹配；requestId 幂等。
+ * 缺 Owner 配置 fail closed；双签；审批人匹配；requestId 幂等；过期/拒绝 fail closed。
  */
 
 export const GOVERNANCE_ROLES = [
@@ -35,6 +35,18 @@ export type ApprovalSource = (typeof APPROVAL_SOURCES)[number]
 export const HIGH_RISK_ACTIONS = ["complete", "publish", "promote"] as const
 export type HighRiskAction = (typeof HIGH_RISK_ACTIONS)[number]
 
+/** 集成密钥允许的动作 */
+export const INTEGRATION_KEY_ALLOWED_ACTIONS = ["start", "submit_review", "fail"] as const
+
+/** 需业务 Owner + 系统 Owner 双签的 subject */
+export const DUAL_SIGN_SUBJECT_TYPES = ["methodology", "workflow_change"] as const
+
+/** 审批签字默认最长有效期（7 天）；超时视为过期 */
+export const APPROVAL_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+export const APPROVAL_EFFECT_STATUSES = ["none", "pending", "applied", "failed"] as const
+export type ApprovalEffectStatus = (typeof APPROVAL_EFFECT_STATUSES)[number]
+
 export interface GovernanceAssignmentLike {
   scopeType: string
   scopeId: string
@@ -56,10 +68,15 @@ export interface ApprovalDecisionInput {
   source: ApprovalSource
   requestId: string
   decidedAt?: Date
+  workflowId?: string | null
+  projectId?: string | null
+  effectStatus?: ApprovalEffectStatus
+  effectError?: string | null
 }
 
 export interface ApprovalDecisionRecord extends ApprovalDecisionInput {
   id: string
+  effectStatus: ApprovalEffectStatus
 }
 
 export type GovernanceCheckResult =
@@ -79,6 +96,8 @@ const SUBJECT_SET = new Set<string>(APPROVAL_SUBJECT_TYPES)
 const DECISION_SET = new Set<string>(APPROVAL_DECISIONS)
 const SOURCE_SET = new Set<string>(APPROVAL_SOURCES)
 const HIGH_RISK_SET = new Set<string>(HIGH_RISK_ACTIONS)
+const DUAL_SIGN_SET = new Set<string>(DUAL_SIGN_SUBJECT_TYPES)
+const EFFECT_SET = new Set<string>(APPROVAL_EFFECT_STATUSES)
 
 export function isGovernanceRole(value: unknown): value is GovernanceRole {
   return typeof value === "string" && ROLE_SET.has(value)
@@ -98,6 +117,14 @@ export function isApprovalSource(value: unknown): value is ApprovalSource {
 
 export function isHighRiskAction(value: unknown): value is HighRiskAction {
   return typeof value === "string" && HIGH_RISK_SET.has(value)
+}
+
+export function requiresDualSign(subjectType: string): boolean {
+  return DUAL_SIGN_SET.has(subjectType)
+}
+
+export function isApprovalEffectStatus(value: unknown): value is ApprovalEffectStatus {
+  return typeof value === "string" && EFFECT_SET.has(value)
 }
 
 function isActive(row: GovernanceAssignmentLike, at: Date): boolean {
@@ -247,11 +274,13 @@ export function parseApprovalDecisionInput(raw: unknown): ApprovalDecisionInput 
     source: obj.source,
     requestId: obj.requestId.trim(),
     decidedAt: obj.decidedAt instanceof Date ? obj.decidedAt : undefined,
+    workflowId: typeof obj.workflowId === "string" ? obj.workflowId.trim() : null,
+    projectId: typeof obj.projectId === "string" ? obj.projectId.trim() : null,
   }
 }
 
 /**
- * 集成密钥只能提交待审，不得直接 complete/publish/promote。
+ * 集成密钥只能 start / submit_review / fail，不得直接 complete/publish/promote。
  */
 export function assertIntegrationKeyActionAllowed(action: string): {
   ok: true
@@ -265,14 +294,31 @@ export function assertIntegrationKeyActionAllowed(action: string): {
   return { ok: true }
 }
 
+function isApprovalExpired(
+  approval: ApprovalDecisionRecord,
+  at: Date,
+  maxAgeMs: number,
+): boolean {
+  // 历史行可能没有 decidedAt（unknown）：不按过期拒绝，由调用方补齐新签字
+  if (!approval.decidedAt) return false
+  const decidedAt = new Date(approval.decidedAt).getTime()
+  if (!Number.isFinite(decidedAt)) return false
+  return at.getTime() - decidedAt > maxAgeMs
+}
+
 /**
- * complete/publish/promote 必须引用有效 approve 签字。
+ * complete/publish/promote 必须引用有效 approve 签字，且 subject/workflow/project/角色匹配。
  */
 export function assertValidApprovalForHighRisk(input: {
   action: string
   approval: ApprovalDecisionRecord | null | undefined
   subjectType: ApprovalSubjectType
   subjectId: string
+  workflowId?: string | null
+  projectId?: string | null
+  expectedRoles?: GovernanceRole[]
+  at?: Date
+  maxAgeMs?: number
 }): { ok: true; approvalId: string } | { ok: false; error: string } {
   if (!isHighRiskAction(input.action)) {
     return { ok: true, approvalId: input.approval?.id ?? "" }
@@ -281,11 +327,40 @@ export function assertValidApprovalForHighRisk(input: {
   if (!approval) {
     return { ok: false, error: `${input.action} 必须引用有效 approvalId。` }
   }
+  if (approval.decision === "reject" || approval.decision === "request_changes") {
+    return { ok: false, error: `approvalId=${approval.id} 已拒绝/要求修改，拒绝执行。` }
+  }
   if (approval.decision !== "approve") {
     return { ok: false, error: `approvalId=${approval.id} 不是 approve 决定，拒绝执行。` }
   }
   if (approval.subjectType !== input.subjectType || approval.subjectId !== input.subjectId) {
     return { ok: false, error: "approvalId 与事项不匹配，拒绝执行。" }
+  }
+  if (
+    input.workflowId
+    && approval.workflowId
+    && approval.workflowId !== input.workflowId
+  ) {
+    return { ok: false, error: "approvalId 与工作流不匹配，拒绝跨工作流执行。" }
+  }
+  if (
+    input.projectId
+    && approval.projectId
+    && approval.projectId !== input.projectId
+  ) {
+    return { ok: false, error: "approvalId 与项目不匹配，拒绝跨项目执行。" }
+  }
+  if (
+    input.expectedRoles
+    && input.expectedRoles.length > 0
+    && !input.expectedRoles.includes(approval.roleSnapshot as GovernanceRole)
+  ) {
+    return { ok: false, error: "approvalId 角色与动作要求不匹配，拒绝执行。" }
+  }
+  const at = input.at ?? new Date()
+  const maxAgeMs = input.maxAgeMs ?? APPROVAL_MAX_AGE_MS
+  if (isApprovalExpired(approval, at, maxAgeMs)) {
+    return { ok: false, error: `approvalId=${approval.id} 已过期，拒绝执行。` }
   }
   return { ok: true, approvalId: approval.id }
 }
@@ -302,6 +377,7 @@ export function resolveIdempotentApproval(
     record: {
       ...draft,
       decidedAt: draft.decidedAt ?? new Date(),
+      effectStatus: draft.effectStatus ?? "none",
     },
     idempotent: false,
   }

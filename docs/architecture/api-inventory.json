@@ -433,6 +433,7 @@
       "file": "src/app/api/admin/governance-assignments/route.ts",
       "methods": [
         "GET",
+        "PATCH",
         "POST"
       ],
       "auth": "admin_session",

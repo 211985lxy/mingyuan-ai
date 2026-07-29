@@ -8,9 +8,15 @@ import {
   updateMethodologyProfileMeta,
 } from "@/lib/methodology-profile-admin"
 import { MethodologyProfileError } from "@/lib/methodology-profile-store"
-import { assertValidApprovalForHighRisk } from "@/lib/aim/workflow-governance"
+import {
+  assertDualSignForChange,
+  assertValidApprovalForHighRisk,
+} from "@/lib/aim/workflow-governance"
 import { createPrismaApprovalDecisionStore } from "@/lib/aim/approval-decision-prisma"
-import { loadApprovalForSubject } from "@/lib/aim/approval-decision-store"
+import {
+  loadApprovalForSubject,
+  loadApprovalsForSubject,
+} from "@/lib/aim/approval-decision-store"
 
 function errorResponse(error: unknown) {
   if (error instanceof MethodologyProfileError) {
@@ -19,6 +25,7 @@ function errorResponse(error: unknown) {
   throw error
 }
 
+/** 方法论发布：有效 approvalId + business_owner/system_owner 双签 */
 async function requirePublishApproval(approvalId: unknown, subjectId: string) {
   const store = createPrismaApprovalDecisionStore()
   const approval = await loadApprovalForSubject(
@@ -27,12 +34,18 @@ async function requirePublishApproval(approvalId: unknown, subjectId: string) {
     "methodology",
     subjectId,
   )
-  return assertValidApprovalForHighRisk({
+  const gate = assertValidApprovalForHighRisk({
     action: "publish",
     approval,
     subjectType: "methodology",
     subjectId,
   })
+  if (!gate.ok) return gate
+
+  const all = await loadApprovalsForSubject(store, "methodology", subjectId)
+  const dual = assertDualSignForChange(all, subjectId)
+  if (!dual.ok) return { ok: false as const, error: dual.error }
+  return gate
 }
 
 /** GET /api/admin/methodology-profiles/[id] —— 详情 + 全部版本。 */
