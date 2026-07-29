@@ -117,6 +117,16 @@ describe("Prisma migrations", () => {
     expect(migrationSql).toContain("ReviewCycle_signedApprovalId_key")
   })
 
+  it("adds versioned Eval fixtures without writing static fixtures (WP-6)", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("model LearningCandidate")
+    expect(schema).toContain("model EvalFixtureVersion")
+    expect(migrationSql).toContain("EvalFixtureVersion_sourceCandidateId_key")
+    expect(migrationSql).toContain("EvalFixtureVersion_fixtureKey_version_key")
+  })
+
   it("adds verdictCode and verdictNote with MySQL-safe additive migrations", () => {
     const schema = readPrismaSchema()
     const verdictCodeMigration = readFileSync(

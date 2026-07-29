@@ -84,6 +84,12 @@ export async function resolveApprovalSubjectScope(
           : null,
     }
   }
+  if (subjectType === "learning_candidate") {
+    return prisma.learningCandidate.findUnique({
+      where: { id: subjectId },
+      select: { projectId: true },
+    })
+  }
   return null
 }
 

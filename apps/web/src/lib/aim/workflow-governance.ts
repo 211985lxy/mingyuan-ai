@@ -15,6 +15,7 @@ export type GovernanceScopeType = (typeof GOVERNANCE_SCOPE_TYPES)[number]
 export const APPROVAL_SUBJECT_TYPES = [
   "work_item", "generation", "asset", "memory", "methodology", "workflow_change",
   "review_cycle",
+  "learning_candidate",
 ] as const
 export type ApprovalSubjectType = (typeof APPROVAL_SUBJECT_TYPES)[number]
 

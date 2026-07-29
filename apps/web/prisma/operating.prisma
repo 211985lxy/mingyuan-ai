@@ -149,9 +149,34 @@ model LearningCandidate {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  evalFixtureVersion EvalFixtureVersion?
+
   @@index([reviewStatus, createdAt])
   @@index([sourceType, sourceId])
   @@index([targetType, reviewStatus])
   @@index([projectId])
   @@index([generationId])
+}
+
+/** 经人工批准的版本化 Eval fixture；draft 不进入正式评估集。 */
+model EvalFixtureVersion {
+  id                   String    @id @default(cuid())
+  fixtureKey           String    @db.VarChar(120)
+  version              Int
+  sourceCandidateId    String    @unique
+  payload              Json
+  status               String    @default("draft") @db.VarChar(20) // draft | qualified | active | rejected
+  deterministicPassedAt DateTime?
+  dailyPassedAt        DateTime?
+  qualificationMetrics Json?
+  qualificationEvidenceRef String? @db.VarChar(500)
+  activationApprovalId String?   @unique @db.VarChar(191)
+  activatedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  sourceCandidate LearningCandidate @relation(fields: [sourceCandidateId], references: [id], onDelete: Restrict)
+
+  @@unique([fixtureKey, version])
+  @@index([status, createdAt])
 }

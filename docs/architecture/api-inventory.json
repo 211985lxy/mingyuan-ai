@@ -217,6 +217,33 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/learning-candidates/[id]",
+      "file": "src/app/api/admin/aim/learning-candidates/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/aim/learning-candidates",
+      "file": "src/app/api/admin/aim/learning-candidates/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/aim/operating-metrics",
       "file": "src/app/api/admin/aim/operating-metrics/route.ts",
       "methods": [

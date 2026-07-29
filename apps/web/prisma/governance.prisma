@@ -28,7 +28,7 @@ model GovernanceAssignment {
  */
 model ApprovalDecision {
   id                     String    @id @default(cuid())
-  subjectType            String    @db.VarChar(40) // work_item | generation | asset | memory | methodology | workflow_change | review_cycle
+  subjectType            String    @db.VarChar(40) // work_item | generation | asset | memory | methodology | workflow_change | review_cycle | learning_candidate
   subjectId              String    @db.VarChar(191)
   decision               String    @db.VarChar(20) // approve | reject | request_changes
   reviewerUserId         String?

@@ -184,6 +184,23 @@
       ]
     },
     {
+      "name": "EvalFixtureVersion",
+      "columns": [
+        "id",
+        "fixtureKey",
+        "version",
+        "sourceCandidateId",
+        "payload",
+        "status",
+        "deterministicPassedAt",
+        "dailyPassedAt",
+        "qualificationMetrics",
+        "qualificationEvidenceRef",
+        "activationApprovalId",
+        "activatedAt"
+      ]
+    },
+    {
       "name": "AimRunSnapshot",
       "columns": [
         "id",
