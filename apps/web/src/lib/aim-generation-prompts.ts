@@ -1,6 +1,5 @@
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import { AIM_OUTPUT_MAX_CHARS, buildExplicitWordCountPriorityRule } from "@/lib/aim-benchmark-length"
-import { isBenchmarkCopyTooSimilar } from "@/lib/aim-benchmark-quality"
 import {
   BENCHMARK_REWRITE_GUARDRAIL,
   CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
@@ -31,33 +30,17 @@ import {
   buildGoalRewritePromptAppendix,
   verifyMethodologyGoal,
 } from "@/lib/methodology/goal-verifier"
+import {
+  buildGenerationSafetyRetryPrompt,
+  inspectGenerationSafety,
+} from "@/lib/aim-generation-guardrails"
 
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
-
-const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)/
-
-/**
- * @description 查找不支持第一人称案例声明的格式
- * @param context - AIM 生成上下文
- * @param parsed - 解析后的多格式内容
- * @param targetFormats - 目标格式列表
- * @returns 包含无依据第一人称声明的格式数组
- */
-export function findUnsupportedFirstPersonClaimFormats(
-  context: AimGenerateContext,
-  parsed: Partial<Record<ContentFormat, string>>,
-  targetFormats: ContentFormat[],
-): ContentFormat[] {
-  const evidence = [
-    context.rawInput,
-    context.knowledgeBlock,
-    context.ipWikiBlock,
-    context.eventStorytellingBlock,
-  ].filter(Boolean).join("\n")
-  if (FIRST_PERSON_EVIDENCE_PATTERN.test(evidence)) return []
-
-  return targetFormats.filter((format) => FIRST_PERSON_EVIDENCE_PATTERN.test(parsed[format] || ""))
-}
+export {
+  findLightEditScopeViolationFormats,
+  findUnsupportedFirstPersonClaimFormats,
+  isGenericContentRequestWithoutFacts,
+} from "@/lib/aim-generation-guardrails"
 
 function renderKnownFacts(facts: TaskSpec["knownFacts"] | undefined, limit?: number): string | null {
   if (!facts?.length) return null
@@ -234,17 +217,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
-    // light_edit 的目的是保留原文、只做局部优化，跳过抄袭检测以避免误判
-    const copiedFormats = isLightEdit
-      ? []
-      : targetFormats.filter((format) =>
-          isBenchmarkCopyTooSimilar(context.rawInput, parsed[format] || "")
-        )
-    const unsupportedClaimFormats = findUnsupportedFirstPersonClaimFormats(
-      context,
-      parsed,
-      targetFormats,
-    )
+    const safety = inspectGenerationSafety(context, parsed, targetFormats)
 
     const goalVerify = !isLightEdit && methodologyPlan
       ? verifyMethodologyGoal(
@@ -253,40 +226,43 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         )
       : { ok: true, issues: [], summary: "" }
 
-    if (copiedFormats.length === 0 && unsupportedClaimFormats.length === 0 && goalVerify.ok) {
+    if (
+      safety.copiedFormats.length === 0
+      && safety.unsupportedClaimFormats.length === 0
+      && safety.lightEditScopeViolationFormats.length === 0
+      && goalVerify.ok
+    ) {
       return { completion, parsed, goalVerify }
     }
     if (attempt === 2) {
-      if (copiedFormats.length || unsupportedClaimFormats.length) {
-        throw new Error("生成结果连续出现无依据的案例或过度近似原文，已停止交付")
+      if (
+        safety.copiedFormats.length
+        || safety.unsupportedClaimFormats.length
+        || safety.lightEditScopeViolationFormats.length
+      ) {
+        throw new Error(
+          "生成结果连续出现无依据案例、过度近似原文或轻改信息丢失，已停止交付",
+        )
       }
       // 目标质检末次仍失败：交付最后一版，由 METHOD_NOTE 记录；不硬抛
       return { completion, parsed, goalVerify }
     }
 
-    const previousOutput = targetFormats
-      .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
-      .join("\n\n")
-    const retryReasons = [
-      copiedFormats.length
-        ? `上一版 ${copiedFormats.join("、")} 与对标原文过于相似，判定为“几乎没改”。`
-        : "",
-      unsupportedClaimFormats.length
-        ? `上一版 ${unsupportedClaimFormats.join("、")} 出现了上下文无依据的“我的学员/客户/朋友/亲历”，判定为事实风险。`
-        : "",
-    ].filter(Boolean).join("\n")
-
-    if (copiedFormats.length || unsupportedClaimFormats.length) {
-      activePrompt = `${userPrompt}
-
-【自动质检结果】
-${retryReasons}
-请重写全部请求格式：保留原选题、结构节奏和目标字数；禁止声称“真事”、“我们公司的人”或“我观察/带过很多人”。无依据的人物案例改为普遍现象、可验证方法或明确写出“假设”的举例。
-除专有名词和固定产品名外，不要连续沿用原文 12 个字以上；不要只替换少量词。
-
-上一版输出：
-${previousOutput}`
+    if (
+      safety.copiedFormats.length
+      || safety.unsupportedClaimFormats.length
+      || safety.lightEditScopeViolationFormats.length
+    ) {
+      activePrompt = buildGenerationSafetyRetryPrompt(
+        userPrompt,
+        parsed,
+        targetFormats,
+        safety,
+      )
     } else if (methodologyPlan && !goalVerify.ok) {
+      const previousOutput = targetFormats
+        .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
+        .join("\n\n")
       activePrompt = `${userPrompt}
 ${buildGoalRewritePromptAppendix(methodologyPlan, goalVerify, previousOutput)}`
     }

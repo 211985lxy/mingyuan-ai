@@ -8,6 +8,7 @@ import {
   buildWorkflowContext,
   ensureContentCreationTrace,
   executeGenerateLLMWithBenchmarkRetry,
+  isGenericContentRequestWithoutFacts,
 } from "@/lib/aim-generation-prompts"
 import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
 import { buildContentPackageConstraintBlock } from "@/lib/content-package-spec"
@@ -56,6 +57,37 @@ export class ContentProducerHandler implements AimAgentHandler {
   }
 
   async generate(context: AimGenerateContext): Promise<AimGenerateResponse> {
+    if (isGenericContentRequestWithoutFacts(context)) {
+      const warning =
+        "信息不足：请补充这条内容的主题、目标受众，以及产品/观点/真实案例中的至少一项；在资料补齐前我不会编造脚本。"
+      const completion = {
+        content: warning,
+        model: "aim-deterministic-safety-gate",
+        provider: "aim",
+        usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      }
+      const traced = Object.fromEntries(
+        context.targetFormats.map((format) => [
+          format,
+          ensureContentCreationTrace(warning, context),
+        ]),
+      ) as Record<(typeof context.targetFormats)[number], string>
+      const record = await saveAimGenerationRecord(context, completion, traced)
+      return {
+        id: record.id,
+        results: context.targetFormats.map((format) => ({
+          format,
+          content: traced[format],
+          wordCount: traced[format].length,
+        })),
+        knowledgeUsed: record.knowledgeUsed as any[],
+        taskSpec: (record as {
+          taskSpec?: import("@/lib/task-spec").TaskSpec
+        }).taskSpec,
+        workflowStatus: "draft",
+        projectId: context.projectId ?? null,
+      }
+    }
     const agentPrompt = `你是企业营销内容专家（内容创作官）。${AIM_NORTH_STAR_GOAL}根据用户提供的信息与客户档案，生成高质量、可拍摄可发布的营销内容。`
     const formatBlocks = context.targetFormats
       .map((format) => FORMAT_INSTRUCTIONS[format])

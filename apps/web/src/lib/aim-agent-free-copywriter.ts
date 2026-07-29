@@ -1,9 +1,10 @@
-import { executeChatLLM, executeChatLLMStream, executeGenerateLLM } from "@/lib/aim-agent-model"
+import { executeChatLLM, executeChatLLMStream } from "@/lib/aim-agent-model"
 import { saveAimGenerationRecord } from "@/lib/aim-harness/persistence"
 import {
   CONTENT_CREATION_TRACE_RULE,
   buildCompactWorkflowContext,
   ensureContentCreationTrace,
+  executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
 import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
 import type { ContentFormat } from "./aim-generator"
@@ -102,8 +103,17 @@ ${includeCreationTrace ? `\n${CONTENT_CREATION_TRACE_RULE}` : ""}`
     const userPrompt = `请直接按用户要求写一版文案：
 "${context.rawInput}"
 ${compactTask ? `\n${compactTask}` : ""}`
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
-    const content = ensureContentCreationTrace(completion.content, context)
+    const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
+      this.agentId,
+      systemPrompt,
+      userPrompt,
+      context,
+      [format],
+    )
+    const content = ensureContentCreationTrace(
+      parsed[format] || completion.content,
+      context,
+    )
     const record = await saveAimGenerationRecord(context, completion, { [format]: content } as Record<ContentFormat, string | undefined>)
 
     return {

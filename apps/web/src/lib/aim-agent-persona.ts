@@ -1,7 +1,10 @@
-import { executeChatLLM, executeChatLLMStream, executeGenerateLLM } from "@/lib/aim-agent-model"
+import { executeChatLLM, executeChatLLMStream } from "@/lib/aim-agent-model"
 import { saveAimGenerationRecord } from "@/lib/aim-harness/persistence"
 import { AIM_HIGH_RISK_LOOP_RULE } from "@/lib/aim-agent-prompts"
-import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
+import {
+  buildWorkflowContext,
+  executeGenerateLLMWithBenchmarkRetry,
+} from "@/lib/aim-generation-prompts"
 import type { ContentFormat } from "./aim-generator"
 import type {
   AimAgentHandler,
@@ -116,10 +119,17 @@ ${AIM_HIGH_RISK_LOOP_RULE}`
 
 ${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}请直接输出「来时路总结 + 置顶视频脚本」，不要包含任何解释性文字。`
 
-    const completion = await executeGenerateLLM(this.agentId, systemPrompt, userPrompt, context.modelPolicy)
-    const rawText = completion.content.trim()
+    const targetFormat = "video_script" as ContentFormat
+    const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
+      this.agentId,
+      systemPrompt,
+      userPrompt,
+      context,
+      [targetFormat],
+    )
+    const rawText = (parsed[targetFormat] || completion.content).trim()
 
-    const parsed: Record<ContentFormat, string | undefined> = {
+    const resultByFormat: Record<ContentFormat, string | undefined> = {
       video_script: rawText,
       wechat_article: undefined,
       moments_post: undefined,
@@ -130,7 +140,7 @@ ${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}请直�
       xiaohongshu_post: undefined,
     }
 
-    const record = await saveAimGenerationRecord(context, completion, parsed)
+    const record = await saveAimGenerationRecord(context, completion, resultByFormat)
 
     return {
       id: record.id,
