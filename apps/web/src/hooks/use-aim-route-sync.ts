@@ -200,6 +200,59 @@ export function useAimVideoCopyPrefill(input: {
   }, [clearEphemeral, extractionId, router, searchParams, setters])
 }
 
+async function resolveHistoryLoadItem(input: {
+  loadTargetId: string | null
+  generationIdParam: string | null
+  history: AimGeneration[]
+}): Promise<AimGeneration | undefined> {
+  const { loadTargetId, generationIdParam, history } = input
+  if (loadTargetId) {
+    const local = history.find((record) => record.id === loadTargetId)
+    if (local) return local
+  }
+  const targetId = loadTargetId || generationIdParam
+  if (!targetId) return undefined
+  try {
+    return await getAimHistory(targetId)
+  } catch {
+    return undefined
+  }
+}
+
+function buildHistoryLoadMessages(item: AimGeneration, assistantId: string) {
+  const deliverables = mapAimGenerationToDeliverables(item)
+  const contents = deliverables.results
+  const newsroom = item.taskSpec && typeof item.taskSpec === "object" && !Array.isArray(item.taskSpec)
+    ? (item.taskSpec as { newsroom?: { stage?: string; sourceCount?: number; editorDiffSummary?: string } }).newsroom
+    : undefined
+  const stageHint = newsroom?.stage
+    ? `编辑室阶段：${newsroom.stage}${newsroom.sourceCount != null ? ` · 样本 ${newsroom.sourceCount}` : ""}`
+    : ""
+  const messages: AimWorkbenchMessage[] = [
+    { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
+  ]
+  if (contents.length) {
+    messages.push({
+      id: assistantId,
+      role: "assistant",
+      content: [
+        `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
+        stageHint,
+      ].filter(Boolean).join("\n"),
+      agentId: item.agentId ?? undefined,
+      deliverables,
+      editorDiffSummary: newsroom?.editorDiffSummary || null,
+    })
+  } else {
+    messages.push({
+      id: nextAimWorkbenchId(),
+      role: "assistant",
+      content: ["已加载历史素材，可直接让我改写。", stageHint].filter(Boolean).join("\n"),
+    })
+  }
+  return { messages, contents, deliverables }
+}
+
 /**
  * @description React Hook：aimhistoryload
  * @param input - 输入数据
@@ -217,7 +270,10 @@ export function useAimHistoryLoad(input: {
   openEditorFromResult: (messageId: string, format: ContentFormat, content: string) => void
   setters: AimRouteStateSetters
 }) {
-  const { loadTargetId, generationIdParam, history, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters } = input
+  const {
+    loadTargetId, generationIdParam, history, selectedAgentId, router, searchParams,
+    lastAgentParamRef, clearLoadTarget, openEditorFromResult, setters,
+  } = input
   const loadedDeepLinkRef = useRef<string | null>(null)
   useEffect(() => {
     const isDeepLink = !loadTargetId && !!generationIdParam
@@ -225,29 +281,16 @@ export function useAimHistoryLoad(input: {
     if (isDeepLink && loadedDeepLinkRef.current === generationIdParam) return
     let active = true
     const load = async () => {
-      const targetId = loadTargetId || generationIdParam
-      let item: AimGeneration | undefined
-      if (loadTargetId) {
-        item = history.find((record) => record.id === loadTargetId)
-      }
-      // 本地列表被切专家清空/刷新时，必须回源按 id 拉取，否则会静默打不开
-      if (!item && targetId) {
-        try {
-          item = await getAimHistory(targetId)
-        } catch {
-          item = undefined
-        }
-      }
+      const item = await resolveHistoryLoadItem({ loadTargetId, generationIdParam, history })
       if (!active) return
       if (!item) {
         toast.error("历史记录加载失败，请稍后重试")
         clearLoadTarget()
         return
       }
-      const deliverables = mapAimGenerationToDeliverables(item)
-      const contents = deliverables.results
       const assistantId = nextAimWorkbenchId()
       const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : selectedAgentId
+      const { messages, contents } = buildHistoryLoadMessages(item, assistantId)
       startTransition(() => {
         setters.setSelectedAgentId(itemAgentId)
         setters.setAgentModule(resolveAimHistoryAgentModule(itemAgentId, item.taskSpec))
@@ -257,32 +300,7 @@ export function useAimHistoryLoad(input: {
         setters.setSourceTopicRationale("")
         setters.setSourceOriginalText(extractBenchmarkOriginalText(item.rawInput))
         setters.setSourceAnalysisText(extractBenchmarkAnalysisText(item.rawInput))
-        const newsroom = item.taskSpec && typeof item.taskSpec === "object" && !Array.isArray(item.taskSpec)
-          ? (item.taskSpec as { newsroom?: { stage?: string; sourceCount?: number; editorDiffSummary?: string } }).newsroom
-          : undefined
-        const stageHint = newsroom?.stage
-          ? `编辑室阶段：${newsroom.stage}${newsroom.sourceCount != null ? ` · 样本 ${newsroom.sourceCount}` : ""}`
-          : ""
-        setters.setMessages([
-          { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
-          ...(contents.length
-            ? [{
-                id: assistantId,
-                role: "assistant" as const,
-                content: [
-                  `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
-                  stageHint,
-                ].filter(Boolean).join("\n"),
-                agentId: item.agentId ?? undefined,
-                deliverables,
-                editorDiffSummary: newsroom?.editorDiffSummary || null,
-              }]
-            : [{
-                id: nextAimWorkbenchId(),
-                role: "assistant" as const,
-                content: ["已加载历史素材，可直接让我改写。", stageHint].filter(Boolean).join("\n"),
-              }]),
-        ])
+        setters.setMessages(messages)
         if (contents[0]) openEditorFromResult(assistantId, contents[0].format, contents[0].content)
       })
       if (itemAgentId !== selectedAgentId) {
