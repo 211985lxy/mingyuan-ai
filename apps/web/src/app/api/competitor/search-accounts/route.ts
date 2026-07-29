@@ -3,14 +3,14 @@ import { NextResponse } from "next/server"
 import { parseJsonBody } from "@/lib/api-contract"
 import { searchChannelsUserBodySchema } from "@/features/competitor/contracts/api"
 import { buildWechatChannelsProfileUrl } from "@/features/competitor/competitor-url-utils"
-import { searchDouyinUsers } from "@/lib/tikhub/search-douyin-users"
+import { searchRedFoxDouyinUsers } from "@/lib/redfox/douyin-users"
 import { searchWechatChannelsUsers } from "@/lib/tikhub/search-wechat-channels-users"
 import { withUserAuth } from "@/lib/user-auth"
 
 export const POST = withUserAuth(async (request) => {
   const body = await parseJsonBody(request, searchChannelsUserBodySchema, { maxBytes: 4 * 1024 })
   const [douyin, channels] = await Promise.allSettled([
-    searchDouyinUsers(body.keyword),
+    searchRedFoxDouyinUsers(body.keyword),
     searchWechatChannelsUsers({ keyword: body.keyword }),
   ])
 
@@ -21,14 +21,14 @@ export const POST = withUserAuth(async (request) => {
   const douyinAccounts = douyin.status === "fulfilled"
     ? douyin.value.slice(0, 8).map((item) => ({
           platform: "douyin" as const,
-          platformUserId: item.secUserId,
-          targetUrl: `https://www.douyin.com/user/${item.secUserId}`,
+          platformUserId: item.accountId,
+          targetUrl: "",
           nickname: item.nickname,
           avatar: item.avatarUrl,
-          signature: item.category,
+          signature: item.signature,
           followerCount: item.followerCount,
           videoCount: item.videoCount,
-          isVerified: false,
+          isVerified: item.isVerified,
         }))
     : []
   const channelsAccounts = channels.status === "fulfilled"

@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import {
   ApiError,
+  resolveDouyinAccountUrl,
   searchCompetitorAccounts,
   type SearchCompetitorAccountResult,
 } from "@/lib/api/client"
@@ -28,7 +29,7 @@ export function useCompetitorAccountSearch(options: {
     setSearched(true)
     try {
       const data = await searchCompetitorAccounts(q)
-      setResults(data.accounts.filter((account) => account.targetUrl.trim()))
+      setResults(data.accounts.filter((account) => account.platformUserId.trim()))
       if (data.partial) {
         toast.warning("部分平台搜索暂时不可用，已展示可用结果")
       }
@@ -47,14 +48,16 @@ export function useCompetitorAccountSearch(options: {
   async function handleAddSearchResult(account: SearchCompetitorAccountResult) {
     if (adding || disabled || addingFinder) return
     const accountId = account.platformUserId.trim()
-    if (!accountId || !account.targetUrl.trim()) {
+    if (!accountId) {
       toast.error("该结果缺少账号标识，请换一个")
       return
     }
     setAddingFinder(accountId)
     try {
       const label = account.nickname.trim() || "账号"
-      await onAdd(account.targetUrl, `已添加「${label}」`)
+      const targetUrl = account.targetUrl.trim()
+        || (await resolveDouyinAccountUrl(accountId)).targetUrl
+      await onAdd(targetUrl, `已添加「${label}」`)
     } catch (error) {
       if (error instanceof Error && error.message) {
         toast.error(error.message)

@@ -418,6 +418,14 @@ export async function searchCompetitorAccounts(
   })
 }
 
+export async function resolveDouyinAccountUrl(accountId: string): Promise<{ targetUrl: string }> {
+  return request("/api/competitor/search-accounts/douyin-url", {
+    method: "POST",
+    body: JSON.stringify({ accountId }),
+    timeout: 30000,
+  })
+}
+
 /**
  * @description 搜索视频号视频（选题热度分析）
  * @param keyword - 关键词
