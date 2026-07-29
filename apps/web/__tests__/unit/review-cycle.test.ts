@@ -4,9 +4,11 @@ import {
   canSignReviewCycle,
   computeActionCloseRate,
   computeRate,
+  normalizeReviewCycleFilters,
   validateReviewActionDraft,
   validateReviewCycleDraft,
 } from "@/lib/aim/review-cycle"
+import { isCompanyWideFilterSnapshot } from "@/lib/aim/operating-qualification"
 
 const START = new Date("2026-07-06T00:00:00.000Z")
 const END = new Date("2026-07-13T00:00:00.000Z")
@@ -70,6 +72,24 @@ describe("review-cycle", () => {
     })
     expect(draft.systemOwnerId).toBe("sys_1")
     expect(draft.metricsSnapshot.paymentAmountCny).toBeNull()
+    expect(draft.filterSnapshot).toEqual({})
+
+    const filtered = validateReviewCycleDraft({
+      requestId: "review_2",
+      periodStart: START,
+      periodEnd: END,
+      systemOwnerId: "sys_1",
+      metricsSnapshot: SNAPSHOT,
+      filterSnapshot: { projectId: "  ", workflowId: "growth", ownerId: undefined },
+    })
+    expect(filtered.filterSnapshot).toEqual({ workflowId: "growth" })
+    expect(normalizeReviewCycleFilters({ projectId: "", channel: "web" }))
+      .toEqual({ channel: "web" })
+
+    expect(isCompanyWideFilterSnapshot(null)).toBe(true)
+    expect(isCompanyWideFilterSnapshot({})).toBe(true)
+    expect(isCompanyWideFilterSnapshot({ projectId: "" })).toBe(false)
+    expect(isCompanyWideFilterSnapshot({ projectId: "p1" })).toBe(false)
 
     expect(() =>
       validateReviewActionDraft({ title: "  ", ownerId: "u1", dueAt: END }),

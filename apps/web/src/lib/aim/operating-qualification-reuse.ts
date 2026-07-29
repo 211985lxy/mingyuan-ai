@@ -23,15 +23,68 @@ function knowledgeIds(value: unknown): string[] {
   })
 }
 
+/** 非空人工标注：必须是对象且至少有一个自有键。 */
+export function hasNonEmptyAnnotation(payload: unknown): boolean {
+  const annotation = object(payload)?.annotation
+  if (!annotation || typeof annotation !== "object" || Array.isArray(annotation)) {
+    return false
+  }
+  return Object.keys(annotation).length > 0
+}
+
+export function isApprovedCustomerOutcomeEvidence(row: {
+  reviewStatus: string
+  baseline: unknown
+  actual: unknown
+  reviewerRef: string | null
+  reviewedAt: Date | null
+  evidenceRef: string
+}): boolean {
+  return row.reviewStatus === "approved"
+    && row.baseline != null
+    && row.actual != null
+    && Boolean(row.reviewerRef?.trim())
+    && row.reviewedAt != null
+    && Boolean(row.evidenceRef?.trim())
+}
+
+export interface ReusedCaseStorePort {
+  assetCandidate: {
+    findMany(args: Record<string, unknown>): Promise<Array<{
+      id: string
+      promotedEntryId: string | null
+      promotedAt: Date | null
+      customerOutcomeProjectionId: string | null
+      customerOutcomeProjection: {
+        reviewStatus: string
+        baseline: unknown
+        actual: unknown
+        reviewerRef: string | null
+        reviewedAt: Date | null
+        evidenceRef: string
+      } | null
+    }>>
+  }
+  knowledgeEntry: {
+    findMany(args: Record<string, unknown>): Promise<Array<{ id: string }>>
+  }
+  aimGeneration: {
+    findMany(args: Record<string, unknown>): Promise<Array<{
+      id: string
+      createdAt: Date
+      knowledgeUsed: unknown
+    }>>
+  }
+}
+
 /**
  * 客户结果支持的已批准候选，已晋升为 KnowledgeEntry.project_case，
- * 且 promotedAt 之后有 AimGeneration.knowledgeUsed 实际引用该 entry。
+ * 且 promotedAt 之后（严格 >）有 AimGeneration.knowledgeUsed 实际引用该 entry。
  */
-export async function loadReusedCustomerOutcomeCases(): Promise<{
-  count: number
-  refs: string[]
-}> {
-  const candidates = await prisma.assetCandidate.findMany({
+export async function loadReusedCustomerOutcomeCases(
+  store: ReusedCaseStorePort = prisma as unknown as ReusedCaseStorePort,
+): Promise<{ count: number; refs: string[] }> {
+  const candidates = await store.assetCandidate.findMany({
     where: {
       reviewStatus: "approved",
       kind: "case_candidate",
@@ -44,6 +97,17 @@ export async function loadReusedCustomerOutcomeCases(): Promise<{
       id: true,
       promotedEntryId: true,
       promotedAt: true,
+      customerOutcomeProjectionId: true,
+      customerOutcomeProjection: {
+        select: {
+          reviewStatus: true,
+          baseline: true,
+          actual: true,
+          reviewerRef: true,
+          reviewedAt: true,
+          evidenceRef: true,
+        },
+      },
     },
   })
   if (candidates.length > CASE_LIMIT) {
@@ -51,8 +115,15 @@ export async function loadReusedCustomerOutcomeCases(): Promise<{
   }
   if (!candidates.length) return { count: 0, refs: [] }
 
-  const entryIds = [...new Set(candidates.map((row) => row.promotedEntryId!))]
-  const entries = await prisma.knowledgeEntry.findMany({
+  const withOutcome = candidates.filter((row) =>
+    row.promotedEntryId
+    && row.promotedAt
+    && row.customerOutcomeProjection
+    && isApprovedCustomerOutcomeEvidence(row.customerOutcomeProjection))
+  if (!withOutcome.length) return { count: 0, refs: [] }
+
+  const entryIds = [...new Set(withOutcome.map((row) => row.promotedEntryId!))]
+  const entries = await store.knowledgeEntry.findMany({
     where: { id: { in: entryIds }, category: "project_case" },
     take: CASE_LIMIT + 1,
     select: { id: true },
@@ -61,16 +132,16 @@ export async function loadReusedCustomerOutcomeCases(): Promise<{
     throw new Error("项目案例知识条目超过查询边界，拒绝给出不完整结论")
   }
   const projectCaseIds = new Set(entries.map((row) => row.id))
-  const eligible = candidates.filter((row) =>
-    row.promotedEntryId && projectCaseIds.has(row.promotedEntryId))
+  const eligible = withOutcome.filter((row) =>
+    projectCaseIds.has(row.promotedEntryId!))
   if (!eligible.length) return { count: 0, refs: [] }
 
   const earliest = eligible.reduce(
     (min, row) => Math.min(min, row.promotedAt!.getTime()),
     Number.POSITIVE_INFINITY,
   )
-  const generations = await prisma.aimGeneration.findMany({
-    where: { createdAt: { gte: new Date(earliest) } },
+  const generations = await store.aimGeneration.findMany({
+    where: { createdAt: { gt: new Date(earliest) } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take: GENERATION_LIMIT + 1,
     select: { id: true, createdAt: true, knowledgeUsed: true },
@@ -84,19 +155,28 @@ export async function loadReusedCustomerOutcomeCases(): Promise<{
     const entryId = candidate.promotedEntryId!
     const promotedAt = candidate.promotedAt!
     const hit = generations.find((generation) =>
-      generation.createdAt.getTime() >= promotedAt.getTime()
+      generation.createdAt.getTime() > promotedAt.getTime()
       && knowledgeIds(generation.knowledgeUsed).includes(entryId))
     if (hit) refs.push(`asset_candidate:${candidate.id}`)
   }
   return { count: refs.length, refs }
 }
 
-/** 人工 reviewerId 且 payload.annotation 存在的学习样本。 */
-export async function loadAnnotatedLearningSamples(): Promise<{
-  count: number
-  refs: string[]
-}> {
-  const rows = await prisma.learningCandidate.findMany({
+export interface AnnotatedSampleStorePort {
+  learningCandidate: {
+    findMany(args: Record<string, unknown>): Promise<Array<{
+      id: string
+      reviewerId: string | null
+      payload: unknown
+    }>>
+  }
+}
+
+/** 人工 reviewerId 且 payload.annotation 非空对象的学习样本。 */
+export async function loadAnnotatedLearningSamples(
+  store: AnnotatedSampleStorePort = prisma as unknown as AnnotatedSampleStorePort,
+): Promise<{ count: number; refs: string[] }> {
+  const rows = await store.learningCandidate.findMany({
     where: { reviewerId: { not: null } },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     take: SAMPLE_LIMIT + 1,
@@ -107,8 +187,7 @@ export async function loadAnnotatedLearningSamples(): Promise<{
   }
   const refs = rows.flatMap((row) => {
     if (!row.reviewerId?.trim()) return []
-    const annotation = object(row.payload)?.annotation
-    return annotation && typeof annotation === "object" && !Array.isArray(annotation)
+    return hasNonEmptyAnnotation(row.payload)
       ? [`learning_candidate:${row.id}`]
       : []
   })

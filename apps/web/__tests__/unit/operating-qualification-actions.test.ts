@@ -114,6 +114,46 @@ describe("qualification governed actions", () => {
     expect(result.formalWrites[0]?.approvalBacked).toBe(false)
   })
 
+  it("正式资产晋升按 promotedAt 周窗口计入，不用 later updatedAt", async () => {
+    prisma.adminAuditLog.findMany.mockResolvedValueOnce([])
+    prisma.methodologyProfileVersion.findMany.mockResolvedValueOnce([])
+    prisma.assetCandidate.findMany.mockResolvedValueOnce([
+      { id: "asset_in_window", promotedAt: new Date("2026-06-03T00:00:00.000Z") },
+    ])
+    prisma.approvalDecision.findMany.mockResolvedValueOnce([
+      approvals()[0],
+      {
+        id: "approval_asset",
+        subjectType: "asset",
+        subjectId: "asset_in_window",
+        decision: "approve",
+        roleSnapshot: "reviewer",
+        workflowId: "content-growth-v1",
+        reviewerUserId: "reviewer_1",
+        externalReviewerId: null,
+        externalReviewerUserId: null,
+        decidedAt: new Date("2026-06-02T00:00:00.000Z"),
+      },
+    ])
+    const result = await loadGovernedActions([week])
+    expect(prisma.assetCandidate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          promotedAt: { gte: START, lt: END },
+        }),
+        select: { id: true, promotedAt: true },
+      }),
+    )
+    expect(result.formalWrites).toContainEqual(
+      expect.objectContaining({
+        id: "asset_in_window",
+        type: "formal_asset.promote",
+        occurredAt: new Date("2026-06-03T00:00:00.000Z"),
+        approvalBacked: true,
+      }),
+    )
+  })
+
   it("学习候选拒绝接受可追溯 reject 签字", async () => {
     prisma.adminAuditLog.findMany.mockResolvedValueOnce([{
       id: "audit_reject",

@@ -10,6 +10,7 @@ import {
   transitionLearningReview,
   type LearningQualificationMetrics,
 } from "@/lib/aim/learning-candidate"
+import { verifyDailyEvalArtifact } from "@/lib/aim/daily-eval-artifact"
 import { prisma } from "@/lib/prisma"
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -51,6 +52,9 @@ export async function annotateLearningCandidate(input: {
   annotation: Record<string, unknown>
   reviewerId: string
 }) {
+  if (!Object.keys(input.annotation).length) {
+    throw new Error("annotation 不能为空对象")
+  }
   const candidate = await prisma.learningCandidate.findUnique({
     where: { id: input.candidateId },
   })
@@ -149,9 +153,7 @@ export async function promoteLearningCandidateToEvalDraft(input: {
 export async function qualifyEvalFixtureVersion(input: {
   versionId: string
   candidateId: string
-  dailyPassed: boolean
-  evidenceRef: string
-  metrics: LearningQualificationMetrics
+  dailyEvalArtifact: unknown
 }) {
   const version = await prisma.evalFixtureVersion.findUnique({
     where: { id: input.versionId },
@@ -163,6 +165,10 @@ export async function qualifyEvalFixtureVersion(input: {
   if (version.status !== "draft") throw new Error("只有 draft fixture 可执行灰度资格检查")
   const fixture = parseFixture(version.payload)
   if (!fixture) throw new Error("Eval fixture payload 非法")
+  const daily = verifyDailyEvalArtifact({
+    artifact: input.dailyEvalArtifact,
+  })
+  if (!daily.ok) throw new Error(daily.reason)
   const deterministic = await runEvalCase(
     fixture,
     createFrozenContextAdapter(),
@@ -170,9 +176,9 @@ export async function qualifyEvalFixtureVersion(input: {
   )
   const gate = evaluateLearningQualification({
     deterministicPassed: deterministic.contractPassed,
-    dailyPassed: input.dailyPassed,
-    evidenceRef: input.evidenceRef,
-    metrics: input.metrics,
+    dailyPassed: true,
+    evidenceRef: daily.evidenceRef,
+    metrics: daily.metrics,
   })
   if (!gate.ok) throw new Error(gate.reasons.join("；"))
   return prisma.evalFixtureVersion.update({
@@ -180,9 +186,9 @@ export async function qualifyEvalFixtureVersion(input: {
     data: {
       status: "qualified",
       deterministicPassedAt: new Date(),
-      dailyPassedAt: new Date(),
-      qualificationMetrics: json(input.metrics),
-      qualificationEvidenceRef: input.evidenceRef.trim(),
+      dailyPassedAt: daily.passedAt,
+      qualificationMetrics: json(daily.metrics),
+      qualificationEvidenceRef: daily.evidenceRef,
     },
   })
 }

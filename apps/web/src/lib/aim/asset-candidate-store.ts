@@ -68,7 +68,7 @@ export interface AssetCandidateStorePort {
   }
   knowledgeEntry: {
     create(args: { data: Record<string, unknown> }): Promise<{ id: string }>
-    update?(args: {
+    update(args: {
       where: { id: string }
       data: Record<string, unknown>
     }): Promise<{ id: string }>
@@ -234,7 +234,7 @@ async function syncKnowledgeProjectScope(input: {
   crossProjectAllowed: boolean
   projectId: string
 }) {
-  if (!input.promotedEntryId || !input.store.knowledgeEntry.update) return
+  if (!input.promotedEntryId) return
   await input.store.knowledgeEntry.update({
     where: { id: input.promotedEntryId },
     data: { projectId: input.crossProjectAllowed ? null : input.projectId },

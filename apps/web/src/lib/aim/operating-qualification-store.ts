@@ -162,8 +162,12 @@ async function loadOperatingSample() {
         reviewStatus: "approved",
         baseline: { not: null },
         actual: { not: null },
-        reviewerRef: { not: null },
+        reviewedAt: { not: null },
         evidenceRef: { not: "" },
+        AND: [
+          { reviewerRef: { not: null } },
+          { reviewerRef: { not: "" } },
+        ],
       },
     }),
     prisma.outcomeAttribution.count({

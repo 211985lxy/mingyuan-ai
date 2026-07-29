@@ -29,6 +29,7 @@ model AssetCandidate {
   @@index([userId, reviewStatus])
   @@index([userId, projectId, kind])
   @@index([generationId])
+  @@index([promotedAt])
 }
 
 model KnowledgeEntry {

@@ -77,6 +77,7 @@ describe("learning candidate capture", () => {
       "lc:trace:trace_cost:methodology_revision",
       "lc:run_event:event_rejected:eval_fixture",
       "lc:run_event:event_rejected:methodology_revision",
+      "lc:content_outcome:outcome_failed:eval_fixture",
       "lc:content_outcome:outcome_failed:methodology_revision",
     ]))
     expect(drafts.some((draft) => draft.sourceId === "outcome_neutral")).toBe(false)

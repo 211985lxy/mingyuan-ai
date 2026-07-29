@@ -154,14 +154,10 @@ export async function executeLearningApprovedAction(input: {
     return promoteMethodologyCandidate(input.candidateId, input.reviewerId)
   }
   if (input.action === "qualify_eval") {
-    const metrics = object(input.body.metrics)
-    if (!metrics) throw new Error("metrics 必须是对象")
     return qualifyEvalFixtureVersion({
       versionId: typeof input.body.versionId === "string" ? input.body.versionId : "",
       candidateId: input.candidateId,
-      dailyPassed: input.body.dailyPassed === true,
-      evidenceRef: typeof input.body.evidenceRef === "string" ? input.body.evidenceRef : "",
-      metrics: metrics as never,
+      dailyEvalArtifact: input.body.dailyEvalArtifact,
     })
   }
   return activateEvalFixtureVersion({

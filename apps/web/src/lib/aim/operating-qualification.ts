@@ -98,12 +98,11 @@ function criterion(
   return { id, label, passed, actual, threshold, evidenceRefs }
 }
 
-/** 公司级：filterSnapshot 为空或不含有效筛选键。 */
+/** 公司级：仅 null 或无 key 的空对象；未知/空值 key 也不算公司级。 */
 export function isCompanyWideFilterSnapshot(snapshot: unknown): boolean {
   if (snapshot == null) return true
   if (typeof snapshot !== "object" || Array.isArray(snapshot)) return false
-  return Object.values(snapshot as Record<string, unknown>)
-    .every((value) => value == null || value === "")
+  return Object.keys(snapshot as Record<string, unknown>).length === 0
 }
 
 /**

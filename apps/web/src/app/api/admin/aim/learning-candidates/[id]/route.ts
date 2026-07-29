@@ -42,8 +42,8 @@ export const PATCH = withAdminAuth(async (
     let result: unknown
     if (body.action === "annotate") {
       const annotation = object(body.annotation)
-      if (!annotation) {
-        return NextResponse.json({ error: "annotation 必须是对象" }, { status: 400 })
+      if (!annotation || Object.keys(annotation).length === 0) {
+        return NextResponse.json({ error: "annotation 必须是非空对象" }, { status: 400 })
       }
       result = await annotateLearningCandidate({
         candidateId: id,

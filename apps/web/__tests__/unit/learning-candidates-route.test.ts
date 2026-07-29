@@ -10,6 +10,7 @@ const {
   promoteLearningCandidateToEvalDraft,
   qualifyEvalFixtureVersion,
   activateEvalFixtureVersion,
+  annotateLearningCandidate,
   recordAdminAudit,
   prisma,
 } = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ const {
   promoteLearningCandidateToEvalDraft: vi.fn(),
   qualifyEvalFixtureVersion: vi.fn(),
   activateEvalFixtureVersion: vi.fn(),
+  annotateLearningCandidate: vi.fn(),
   recordAdminAudit: vi.fn(async () => "audit_1"),
   prisma: {
     learningCandidate: { findUnique: vi.fn() },
@@ -43,7 +45,7 @@ vi.mock("@/lib/aim/workflow-governance", () => ({
 }))
 vi.mock("@/lib/aim/learning-candidate-store", () => ({
   activateEvalFixtureVersion,
-  annotateLearningCandidate: vi.fn(),
+  annotateLearningCandidate,
   decideLearningCandidate,
   markLearningCandidatePromoted: vi.fn(),
   promoteLearningCandidateToEvalDraft,
@@ -137,18 +139,34 @@ describe("learning candidate admin route", () => {
     expect(decideLearningCandidate).not.toHaveBeenCalled()
   })
 
-  it("qualify_eval/activate_eval 必须把 URL candidateId 绑定到 version", async () => {
+  it("annotate 拒绝空对象 annotation={}", async () => {
+    const response = await PATCH(patch({
+      action: "annotate",
+      annotation: {},
+    }), context as never)
+    expect(response.status).toBe(400)
+    expect(annotateLearningCandidate).not.toHaveBeenCalled()
+  })
+
+  it("qualify_eval/activate_eval 必须把 URL candidateId 绑定到 version，并传 dailyEvalArtifact", async () => {
     qualifyEvalFixtureVersion.mockResolvedValueOnce({ id: "version_1" })
     activateEvalFixtureVersion.mockResolvedValueOnce({
       record: { id: "version_1" },
       idempotent: false,
     })
+    const artifact = {
+      mode: "daily",
+      generatedAt: "2026-07-01T00:00:00.000Z",
+      contractPassRate: 1,
+      rubricPassRate: 0.9,
+      results: [{ fixtureId: "fixture_1", contractPassed: true, rubricPassed: true }],
+    }
     const qualify = await PATCH(patch({
       action: "qualify_eval",
       approvalId: "approval_1",
       workflowId: "growth",
       versionId: "version_other",
-      dailyPassed: true,
+      dailyEvalArtifact: artifact,
       evidenceRef: "report://1",
       metrics: {
         targetFailureRateBefore: 0.5,
@@ -165,7 +183,11 @@ describe("learning candidate admin route", () => {
       expect.objectContaining({
         versionId: "version_other",
         candidateId: "candidate_1",
+        dailyEvalArtifact: artifact,
       }),
+    )
+    expect(qualifyEvalFixtureVersion).not.toHaveBeenCalledWith(
+      expect.objectContaining({ dailyPassed: expect.anything() }),
     )
 
     const activate = await PATCH(patch({

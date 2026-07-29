@@ -149,6 +149,7 @@ describe("operating qualification", () => {
     const selected = selectLatestConsecutiveWeeks([
       week(0),
       week(1, { filterSnapshot: { projectId: "proj_1" } }),
+      week(1, { id: "cycle_empty_key", filterSnapshot: { projectId: "" } }),
       week(2, { signedAt: new Date(START.getTime() + 2 * WEEK_MS - 1) }),
       week(3),
       week(10, {

@@ -121,6 +121,22 @@ const REQUIRED_NUMBER_KEYS = [
   "pendingMethodologyCandidates",
 ] as const
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const FILTER_KEYS = ["projectId", "workflowId", "ownerId", "channel"] as const
+
+/** 移除 undefined / 空字符串字段，得到规范化筛选快照。 */
+export function normalizeReviewCycleFilters(
+  filters: ReviewCycleFilters | undefined | null,
+): ReviewCycleFilters {
+  if (!filters || typeof filters !== "object") return {}
+  const normalized: ReviewCycleFilters = {}
+  for (const key of FILTER_KEYS) {
+    const value = filters[key]
+    if (typeof value === "string" && value.trim()) {
+      normalized[key] = value.trim() as never
+    }
+  }
+  return normalized
+}
 
 export function isReviewCycleStatus(value: unknown): value is ReviewCycleStatus {
   return typeof value === "string" && STATUS_SET.has(value)
@@ -175,7 +191,7 @@ export function validateReviewCycleDraft(draft: ReviewCycleDraft): ReviewCycleDr
     periodEnd: draft.periodEnd,
     systemOwnerId: draft.systemOwnerId.trim(),
     metricsSnapshot: draft.metricsSnapshot,
-    filterSnapshot: draft.filterSnapshot,
+    filterSnapshot: normalizeReviewCycleFilters(draft.filterSnapshot),
   }
 }
 

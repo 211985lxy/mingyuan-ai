@@ -34,7 +34,7 @@ interface ActionRows {
     metadata: unknown
     createdAt: Date
   }>
-  assets: Array<{ id: string; updatedAt: Date }>
+  assets: Array<{ id: string; promotedAt: Date | null }>
   memories: Array<{ id: string; reviewedAt: Date | null }>
   evals: Array<{
     id: string
@@ -65,10 +65,10 @@ async function loadActionRows(start: Date, end: Date): Promise<ActionRows> {
     prisma.assetCandidate.findMany({
       where: {
         promotedEntryId: { not: null },
-        updatedAt: { gte: start, lt: end },
+        promotedAt: { gte: start, lt: end },
       },
       take: ROW_LIMIT + 1,
-      select: { id: true, updatedAt: true },
+      select: { id: true, promotedAt: true },
     }),
     prisma.aimMemory.findMany({
       where: {
@@ -232,10 +232,10 @@ function buildCandidateFormalWrites(
   const assets = rows.assets.map((row) => ({
     id: row.id,
     type: "formal_asset.promote",
-    occurredAt: row.updatedAt,
+    occurredAt: row.promotedAt ?? new Date(0),
     approvalBacked: validQualificationApproval(
       bySubject.get(`asset:${row.id}`),
-      row.updatedAt,
+      row.promotedAt ?? new Date(0),
       { type: "asset", id: row.id },
     ),
   }))

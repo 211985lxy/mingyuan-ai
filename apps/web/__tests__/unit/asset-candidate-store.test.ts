@@ -322,6 +322,31 @@ describe("reviewAssetCandidate", () => {
     expect(ctx.knowledgeEntries[0].projectId).toBe("proj_1")
   })
 
+  it("knowledgeEntry.update 为必填：缺少 update 时范围同步会失败而不是静默跳过", async () => {
+    const candidate = ctx.rows.find((r) => r.kind === "pain_point")!
+    await reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      promote: true,
+      store: ctx.store,
+    })
+    const broken = {
+      ...ctx.store,
+      knowledgeEntry: {
+        create: ctx.store.knowledgeEntry.create,
+        // 故意不提供 update，验证 port 契约必填
+      },
+    } as unknown as AssetCandidateStorePort
+    await expect(reviewAssetCandidate({
+      userId: USER,
+      candidateId: candidate.id,
+      action: "approve",
+      crossProjectAllowed: true,
+      store: broken,
+    })).rejects.toThrow()
+  })
+
   it("reject：标记拒绝且不升级", async () => {
     const candidate = ctx.rows[0]
     const result = await reviewAssetCandidate({

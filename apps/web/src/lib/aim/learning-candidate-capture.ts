@@ -176,27 +176,24 @@ function buildOutcomeDrafts(
 ) {
   for (const outcome of outcomes) {
     if (!shouldCreateFromVerdictCode(outcome.verdictCode)) continue
-    const targetType =
+    const failed =
       outcome.verdictCode === "failed" || outcome.verdictCode === "ineffective"
-        ? "methodology_revision"
-        : "eval_fixture"
-    add({
-      sourceType: "content_outcome",
-      sourceId: outcome.id,
-      projectId: outcome.projectId ?? undefined,
-      generationId: outcome.generationId,
-      targetType,
-      failureCode:
-        targetType === "methodology_revision"
-          ? `outcome_${outcome.verdictCode}`
-          : undefined,
-      payload: {
-        verdictCode: outcome.verdictCode,
-        verdictNote: outcome.verdictNote,
-        collectWindowDay: outcome.collectWindowDay,
-      },
-      requestId: buildLearningRequestId("content_outcome", outcome.id, targetType),
-    })
+    for (const targetType of dualTargets(failed)) {
+      add({
+        sourceType: "content_outcome",
+        sourceId: outcome.id,
+        projectId: outcome.projectId ?? undefined,
+        generationId: outcome.generationId,
+        targetType,
+        failureCode: failed ? `outcome_${outcome.verdictCode}` : undefined,
+        payload: {
+          verdictCode: outcome.verdictCode,
+          verdictNote: outcome.verdictNote,
+          collectWindowDay: outcome.collectWindowDay,
+        },
+        requestId: buildLearningRequestId("content_outcome", outcome.id, targetType),
+      })
+    }
   }
 }
 
