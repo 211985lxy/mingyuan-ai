@@ -39,7 +39,8 @@ export function AimPastedCopyAttachmentBar({
   autoUsageLabel,
 }: AimPastedCopyAttachmentProps) {
   const [expanded, setExpanded] = useState(false)
-  const showChooser = !attachment.usage && allowedUsages.length > 1
+  // 单用途（质检/编辑）也要能点选，避免 usage 未自动带上时发送键死锁
+  const showChooser = !attachment.usage && allowedUsages.length > 0
   const usageLabel = getUsageLabel(attachment.usage, autoUsageLabel)
 
   return (
@@ -86,6 +87,11 @@ export function AimPastedCopyAttachmentBar({
           {allowedUsages.includes("edit") ? (
             <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("edit")}>
               修改这篇
+            </Button>
+          ) : null}
+          {allowedUsages.includes("review") ? (
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("review")}>
+              质检这篇
             </Button>
           ) : null}
           {allowedUsages.includes("benchmark") ? (

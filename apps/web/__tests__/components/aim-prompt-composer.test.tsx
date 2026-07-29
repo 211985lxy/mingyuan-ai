@@ -109,4 +109,29 @@ describe("AimPromptComposer", () => {
     expect(screen.queryByRole("button", { name: "作为对标参考" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "沉淀为我的风格" })).not.toBeInTheDocument()
   })
+
+  it("发布质检附件未带 usage 时仍可直接发送，并露出质检按钮兜底", async () => {
+    const user = userEvent.setup()
+    const onGenerate = vi.fn()
+    render(
+      <AimPromptComposer
+        {...baseProps({
+          value: "",
+          onGenerate,
+          pastedCopy: {
+            content: "待质检文案内容足够长".repeat(20),
+            charCount: 200,
+          },
+          onPastedCopyChange: vi.fn(),
+          capabilities: getAimAgentCapabilities("content_review"),
+        })}
+      />,
+    )
+
+    expect(screen.getByRole("button", { name: "质检这篇" })).toBeInTheDocument()
+    const textarea = screen.getByPlaceholderText("说说你的需求")
+    await user.click(textarea)
+    await user.keyboard("{Enter}")
+    expect(onGenerate).toHaveBeenCalledTimes(1)
+  })
 })

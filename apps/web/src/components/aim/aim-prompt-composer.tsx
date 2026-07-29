@@ -23,7 +23,10 @@ import {
   COPY_STUDIO_MODULE_LABELS,
   type CopyStudioModule,
 } from "@/lib/copy-studio"
-import type { PastedCopyAttachment } from "@/lib/aim/paste-copy-attachment"
+import {
+  canSubmitWithPasteAttachment,
+  type PastedCopyAttachment,
+} from "@/lib/aim/paste-copy-attachment"
 import {
   getAimAgentCapabilities,
   type AimAgentCapabilities,
@@ -82,7 +85,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
 
   const capabilities = capabilitiesProp ?? getAimAgentCapabilities("content_producer")
   const isPlanMode = composerMode === "plan"
-  const { pasteReady, applyUsage, handlePaste, allowedUsages, pasteEnabled } = useAimPasteCopyAttachment({
+  const { applyUsage, handlePaste, allowedUsages, pasteEnabled } = useAimPasteCopyAttachment({
     value,
     pastedCopy,
     onPastedCopyChange: capabilities.pasteMode === "plain" ? undefined : onPastedCopyChange,
@@ -90,9 +93,18 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
     imageCount: imageAttachments.length,
     capabilities,
   })
-  const canSend = !busy && !isRecording && pasteReady
-  const canPlan = !busy && !isRecording && value.trim().length > 0 && (!pastedCopy || Boolean(pastedCopy.usage))
-  const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate && (!pastedCopy || Boolean(pastedCopy.usage && pastedCopy.usage !== "style_sample"))
+  const effectivePasteUsage = pastedCopy?.usage
+    ?? (allowedUsages.length === 1 ? allowedUsages[0] : undefined)
+  const pasteReadyForSend = canSubmitWithPasteAttachment({
+    text: value,
+    attachment: pastedCopy
+      ? { ...pastedCopy, usage: effectivePasteUsage }
+      : null,
+    hasImages: imageAttachments.length > 0,
+  })
+  const canSend = !busy && !isRecording && pasteReadyForSend
+  const canPlan = !busy && !isRecording && value.trim().length > 0 && (!pastedCopy || Boolean(effectivePasteUsage))
+  const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate && (!pastedCopy || Boolean(effectivePasteUsage && effectivePasteUsage !== "style_sample"))
   const canStop = busy && !isRecording && Boolean(onStop)
   const showContentModeControl = showContentMode && capabilities.contentModeSelector
   const autoUsageLabel =

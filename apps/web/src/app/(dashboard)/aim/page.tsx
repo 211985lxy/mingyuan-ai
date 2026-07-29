@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
@@ -61,8 +61,15 @@ export default function AimPage() {
     onCompleted: openCompletedVideoCopy,
   })
 
-  // 切专家 / 切项目：清理任务级临时态（附件、风格预览），不依赖页面重挂载
+  // 切专家 / 切项目：清理任务级临时态。首屏与「空项目→补齐项目」不算切换，避免刚粘贴的质检附件被冲掉。
+  const scopeRef = useRef({ agentId: w.selectedAgentId, projectId: w.selectedProjectId })
   useEffect(() => {
+    const prev = scopeRef.current
+    const agentChanged = prev.agentId !== w.selectedAgentId
+    const projectChanged = prev.projectId !== w.selectedProjectId
+    scopeRef.current = { agentId: w.selectedAgentId, projectId: w.selectedProjectId }
+    if (!agentChanged && !projectChanged) return
+    if (!agentChanged && !prev.projectId && w.selectedProjectId) return
     setPastedCopy(null)
     setStylePreviewOpen(false)
     setStyleSamples([])
@@ -116,26 +123,36 @@ export default function AimPage() {
         return
       }
     }
-    if (pastedCopy?.usage === "style_sample") {
+    // 质检/编辑只有一种用途时，允许未点选也能直接发，避免发送键假死
+    const effectiveUsage = pastedCopy?.usage
+      ?? (capabilities.pasteMode === "review"
+        ? "review" as const
+        : capabilities.pasteMode === "edit"
+          ? "edit" as const
+          : undefined)
+    const activePaste = pastedCopy && effectiveUsage
+      ? { ...pastedCopy, usage: effectiveUsage }
+      : pastedCopy
+    if (activePaste?.usage === "style_sample") {
       if (!capabilities.styleSample) {
         toast.message("当前专家不支持风格沉淀")
         return
       }
-      openStylePreview(pastedCopy)
+      openStylePreview(activePaste)
       return
     }
-    if (pastedCopy?.usage === "benchmark" && !capabilities.benchmarkReference) {
+    if (activePaste?.usage === "benchmark" && !capabilities.benchmarkReference) {
       toast.message("当前专家不支持对标参考")
       return
     }
-    if (pastedCopy && !pastedCopy.usage) {
+    if (pastedCopy && !effectiveUsage) {
       toast.message("请先选择这篇文案的用途")
       return
     }
-    if (pastedCopy?.usage) {
+    if (activePaste?.usage) {
       const assembled = assemblePasteUsageInput({
         instruction: w.input,
-        attachment: pastedCopy,
+        attachment: activePaste,
       })
       if (assembled) {
         setPastedCopy(null)
