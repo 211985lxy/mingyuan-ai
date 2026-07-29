@@ -18,9 +18,15 @@ import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
 import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
+import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { buildAimChatMessages } from "@/lib/aim/chat-request"
+import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextTokens } from "@/lib/aim-context-usage"
+import {
+  buildContentProducerVideoCopyHref,
+  resolveContentProducerVideoUrl,
+} from "@/lib/aim/video-copy-input"
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 import {
   assemblePasteUsageInput,
@@ -32,10 +38,35 @@ import { fetchStyleStatus } from "@/lib/api/aim"
 export default function AimPage() {
   const w = useAimWorkbench()
   const router = useRouter()
+  const capabilities = useMemo(
+    () => getAimAgentCapabilities(w.selectedAgentId),
+    [w.selectedAgentId],
+  )
   const [pastedCopy, setPastedCopy] = useState<PastedCopyAttachment | null>(null)
   const [stylePreviewOpen, setStylePreviewOpen] = useState(false)
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
   const [styleEnabled, setStyleEnabled] = useState(false)
+  const openCompletedVideoCopy = useCallback((record: { id: string }) => {
+    router.replace(buildContentProducerVideoCopyHref({
+      recordId: record.id,
+      projectId: w.projectEnabled ? w.selectedProjectId || undefined : undefined,
+    }))
+  }, [router, w.projectEnabled, w.selectedProjectId])
+  const {
+    isProcessingVideo,
+    processVideoUrl,
+    cancelVideoProcessing,
+  } = useAimVideoCopyInput({
+    enabled: capabilities.videoCopyExtraction,
+    onCompleted: openCompletedVideoCopy,
+  })
+
+  // 切专家 / 切项目：清理任务级临时态（附件、风格预览），不依赖页面重挂载
+  useEffect(() => {
+    setPastedCopy(null)
+    setStylePreviewOpen(false)
+    setStyleSamples([])
+  }, [w.selectedAgentId, w.selectedProjectId])
 
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
   const contextUsage = useMemo(() => {
@@ -78,8 +109,23 @@ export default function AimPage() {
   }, [])
 
   const handleComposerGenerate = useCallback(() => {
+    if (capabilities.videoCopyExtraction) {
+      const videoUrl = resolveContentProducerVideoUrl(w.selectedAgentId, w.input)
+      if (videoUrl) {
+        void processVideoUrl(videoUrl)
+        return
+      }
+    }
     if (pastedCopy?.usage === "style_sample") {
+      if (!capabilities.styleSample) {
+        toast.message("当前专家不支持风格沉淀")
+        return
+      }
       openStylePreview(pastedCopy)
+      return
+    }
+    if (pastedCopy?.usage === "benchmark" && !capabilities.benchmarkReference) {
+      toast.message("当前专家不支持对标参考")
       return
     }
     if (pastedCopy && !pastedCopy.usage) {
@@ -99,7 +145,7 @@ export default function AimPage() {
       }
     }
     w.handleGenerate()
-  }, [openStylePreview, pastedCopy, w])
+  }, [capabilities, openStylePreview, pastedCopy, processVideoUrl, w])
 
   const composerPlaceholder =
     w.composerMode === "plan"
@@ -117,15 +163,15 @@ export default function AimPage() {
       <AimPromptComposer
         value={w.input}
         placeholder={composerPlaceholder}
-        busy={w.busy}
+        busy={w.busy || isProcessingVideo}
         isRecording={w.isRecording}
         isTranscribing={w.isTranscribing}
-        isGenerating={w.isGenerating || w.isUploadingImage}
+        isGenerating={w.isGenerating || w.isUploadingImage || isProcessingVideo}
         canGenerate={canGenerateBase}
         primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
         onChange={w.setInput}
         onGenerate={handleComposerGenerate}
-        onStop={w.handleStop}
+        onStop={isProcessingVideo ? cancelVideoProcessing : w.handleStop}
         onStartRecording={w.startRecording}
         onStopRecording={w.stopRecording}
         showSkills={Boolean(w.params.agentParam)}
@@ -138,13 +184,14 @@ export default function AimPage() {
         onComposerModeChange={w.setComposerMode}
         canUsePlanMode={w.canUsePlanMode}
         isPlanSessionActive={w.planSession.isPlanMode}
-        showContentMode={w.selectedAgentId === "content_producer"}
+        showContentMode={capabilities.contentModeSelector}
         contentMode={w.agentModule}
         onContentModeChange={w.setAgentModule}
         pastedCopy={pastedCopy}
-        onPastedCopyChange={setPastedCopy}
-        onStyleSampleRequest={openStylePreview}
-        styleEnabled={styleEnabled}
+        onPastedCopyChange={capabilities.pasteMode === "plain" ? undefined : setPastedCopy}
+        onStyleSampleRequest={capabilities.styleSample ? openStylePreview : undefined}
+        styleEnabled={styleEnabled && capabilities.styleSample}
+        capabilities={capabilities}
         onOpenStyleAssets={() => {
           if (w.projectEnabled && w.selectedProjectId) {
             router.push(`/projects?focus=style&projectId=${encodeURIComponent(w.selectedProjectId)}`)

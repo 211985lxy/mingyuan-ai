@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { getAimAgentGuide, type AimNextAction } from "@/lib/aim-agent-guides"
 import { extractReplacementDraft } from "@/lib/aim-editor"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
+import { agentAllowsContentModeSelector } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
 import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-groups"
 import { splitAimMethodNote } from "@/lib/aim/workbench-display"
@@ -139,7 +140,7 @@ function EmptyMessageState({ agentIntro, workflowStage, selectedAgentId, onBegin
   selectedAgentId: AimAgentId
   onBeginContentAction: (action: AimContentAction) => void
 }) {
-  return <div className="mx-auto flex w-full max-w-3xl flex-col py-6"><div className="max-w-2xl text-left"><p className="line-clamp-3 text-base leading-7 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && selectedAgentId === "content_producer" ? <div className="mt-4 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-9 rounded-md text-sm" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div></div>
+  return <div className="mx-auto flex w-full max-w-3xl flex-col py-6"><div className="max-w-2xl text-left"><p className="line-clamp-3 text-base leading-7 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && agentAllowsContentModeSelector(selectedAgentId) ? <div className="mt-4 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-9 rounded-md text-sm" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div></div>
 }
 
 interface AimMessageStreamProps {

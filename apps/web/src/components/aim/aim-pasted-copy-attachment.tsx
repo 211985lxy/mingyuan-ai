@@ -15,6 +15,18 @@ interface AimPastedCopyAttachmentProps {
   busy: boolean
   onRemove: () => void
   onSelectUsage: (usage: PasteUsage) => void
+  /** 能力矩阵允许的用途；不传则保持旧行为（三项全显示） */
+  allowedUsages?: PasteUsage[]
+  /** edit/review 自动用途时的标签文案 */
+  autoUsageLabel?: string
+}
+
+function getUsageLabel(usage: PasteUsage | undefined, autoUsageLabel?: string) {
+  if (usage === "edit") return autoUsageLabel ?? " · 待修改"
+  if (usage === "review") return autoUsageLabel ?? " · 待质检"
+  if (usage === "benchmark") return " · 对标参考"
+  if (usage === "style_sample") return " · 风格样本"
+  return null
 }
 
 /** 创作台长文附件条：展开、移除、用途确认 */
@@ -23,8 +35,12 @@ export function AimPastedCopyAttachmentBar({
   busy,
   onRemove,
   onSelectUsage,
+  allowedUsages = ["edit", "review", "benchmark", "style_sample"],
+  autoUsageLabel,
 }: AimPastedCopyAttachmentProps) {
   const [expanded, setExpanded] = useState(false)
+  const showChooser = !attachment.usage && allowedUsages.length > 1
+  const usageLabel = getUsageLabel(attachment.usage, autoUsageLabel)
 
   return (
     <div className="mx-3 mt-3 rounded-xl border border-border/70 bg-muted/30 px-3 py-2">
@@ -32,9 +48,7 @@ export function AimPastedCopyAttachmentBar({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">
             文案附件 · {formatCharCount(attachment.charCount)}字
-            {attachment.usage === "edit" ? " · 待修改" : null}
-            {attachment.usage === "benchmark" ? " · 对标参考" : null}
-            {attachment.usage === "style_sample" ? " · 风格样本" : null}
+            {usageLabel}
           </p>
         </div>
         <Button
@@ -64,20 +78,26 @@ export function AimPastedCopyAttachmentBar({
           {attachment.content}
         </pre>
       ) : null}
-      {!attachment.usage ? (
+      {showChooser ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">
             检测到一篇文案 · {formatCharCount(attachment.charCount)}字
           </span>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("edit")}>
-            修改这篇
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("benchmark")}>
-            作为对标参考
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("style_sample")}>
-            沉淀为我的风格
-          </Button>
+          {allowedUsages.includes("edit") ? (
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("edit")}>
+              修改这篇
+            </Button>
+          ) : null}
+          {allowedUsages.includes("benchmark") ? (
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("benchmark")}>
+              作为对标参考
+            </Button>
+          ) : null}
+          {allowedUsages.includes("style_sample") ? (
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => onSelectUsage("style_sample")}>
+              沉淀为我的风格
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

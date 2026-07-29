@@ -3,6 +3,7 @@ import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule, type Copy
 import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
 import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
 import { normalizeConfirmedTurnIntent, type AimTurnIntent } from "@/lib/aim-turn-intent"
+import { agentAllowsContentModeSelector } from "@/lib/aim/agent-capabilities"
 
 const VALID_FORMATS = new Set([
   "video_script",
@@ -157,6 +158,9 @@ export function validateGenerateInput(parsed: {
   agentModule?: CopyStudioModule
 }): string | null {
   if (parsed.agentModule && !supportsCopyStudioModule(parsed.agentId)) return "agentModule 只能用于内容创作官"
+  if (parsed.agentModule && !agentAllowsContentModeSelector(parsed.agentId)) {
+    return "当前专家未授权创作模式选择"
+  }
   if (!parsed.rawInput) return "请输入内容"
   if (parsed.targetFormats.length === 0) return "请选择至少一种生成格式"
   return null

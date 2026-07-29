@@ -9,6 +9,7 @@ import userEvent from "@testing-library/user-event"
 
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 
 function baseProps(overrides: Partial<React.ComponentProps<typeof AimPromptComposer>> = {}) {
   return {
@@ -85,5 +86,27 @@ describe("AimPromptComposer", () => {
 
     await user.click(screen.getByRole("button", { name: /计划/ }))
     expect(onComposerModeChange).toHaveBeenCalledWith("plan")
+  })
+
+  it("发布质检长文只显示待质检，不暴露创作用途", () => {
+    render(
+      <AimPromptComposer
+        {...baseProps({
+          value: "",
+          pastedCopy: {
+            content: "待质检文案",
+            charCount: 5,
+            usage: "review",
+          },
+          onPastedCopyChange: vi.fn(),
+          capabilities: getAimAgentCapabilities("content_review"),
+        })}
+      />,
+    )
+
+    expect(screen.getByText(/待质检/)).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "修改这篇" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "作为对标参考" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "沉淀为我的风格" })).not.toBeInTheDocument()
   })
 })

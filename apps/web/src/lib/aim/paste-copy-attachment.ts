@@ -2,12 +2,44 @@
  * 内容创作台：长文粘贴识别与用途装配（仅客户端状态，不进 Agent 契约）。
  */
 
-export type PasteUsage = "edit" | "benchmark" | "style_sample"
+import type { AimAgentCapabilities, AimPasteMode } from "@/lib/aim/agent-capabilities"
+
+export type PasteUsage = "edit" | "review" | "benchmark" | "style_sample"
 
 export interface PastedCopyAttachment {
   content: string
   charCount: number
   usage?: PasteUsage
+}
+
+/** 按能力矩阵决定长文粘贴可选用途；plain 返回空（不接管粘贴）。 */
+export function getAllowedPasteUsages(capabilities: AimAgentCapabilities): PasteUsage[] {
+  if (capabilities.pasteMode === "plain") return []
+  if (capabilities.pasteMode === "edit") return ["edit"]
+  if (capabilities.pasteMode === "review") return ["review"]
+  const usages: PasteUsage[] = ["edit"]
+  if (capabilities.benchmarkReference) usages.push("benchmark")
+  if (capabilities.styleSample) usages.push("style_sample")
+  return usages
+}
+
+/**
+ * edit/review 模式：长文粘贴自动带用途，可直接发送。
+ * creative：保留推断；若无推断则等用户点选。
+ * plain：不应调用（调用方应跳过接管）。
+ */
+export function resolveInitialPasteUsage(input: {
+  pasteMode: AimPasteMode
+  instruction?: string
+  allowedUsages: PasteUsage[]
+}): PasteUsage | undefined {
+  const { pasteMode, instruction = "", allowedUsages } = input
+  if (pasteMode === "plain" || allowedUsages.length === 0) return undefined
+  if (pasteMode === "edit") return allowedUsages.includes("edit") ? "edit" : allowedUsages[0]
+  if (pasteMode === "review") return allowedUsages.includes("review") ? "review" : allowedUsages[0]
+  const inferred = inferPasteUsageFromInstruction(instruction)
+  if (inferred && allowedUsages.includes(inferred)) return inferred
+  return undefined
 }
 
 /** 正文不少于 300 字，或至少 6 行非空文本 → 长文附件 */
@@ -74,6 +106,11 @@ export function assemblePasteUsageInput(input: {
   if (usage === "edit") {
     const lead = instruction.trim() || "请优化修改下面这篇文案，直接给出可发布终稿。"
     return `${lead}\n\n【待修改原文】\n${body}`
+  }
+
+  if (usage === "review") {
+    const lead = instruction.trim() || "请对下面文案做发布质检，只指出风险和最小修改建议，不要整篇重写。"
+    return `${lead}\n\n【待质检原文】\n${body}`
   }
 
   if (usage === "benchmark") {

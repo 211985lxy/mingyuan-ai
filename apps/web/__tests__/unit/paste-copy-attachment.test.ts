@@ -32,11 +32,18 @@ describe("paste-copy-attachment", () => {
     expect(canSubmitWithPasteAttachment({ text: "", attachment: { ...attachment, usage: "style_sample" } })).toBe(false)
   })
 
-  it("装配修改与对标输入", () => {
+  it("装配修改、质检与对标输入", () => {
     const attachment = createPastedCopyAttachment("原稿正文", "edit")
     const editInput = assemblePasteUsageInput({ instruction: "优化一下", attachment })
     expect(editInput).toContain("【待修改原文】")
     expect(editInput).toContain("原稿正文")
+
+    const review = assemblePasteUsageInput({
+      instruction: "",
+      attachment: { ...attachment, usage: "review" },
+    })
+    expect(review).toContain("【待质检原文】")
+    expect(review).toContain("不要整篇重写")
 
     const bench = assemblePasteUsageInput({
       instruction: "按结构仿写",

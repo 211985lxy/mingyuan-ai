@@ -24,6 +24,10 @@ import {
   type CopyStudioModule,
 } from "@/lib/copy-studio"
 import type { PastedCopyAttachment } from "@/lib/aim/paste-copy-attachment"
+import {
+  getAimAgentCapabilities,
+  type AimAgentCapabilities,
+} from "@/lib/aim/agent-capabilities"
 import { cn } from "@/lib/utils"
 
 export type AimComposerMode = "direct" | "plan"
@@ -60,6 +64,8 @@ export interface AimPromptComposerProps {
   onStyleSampleRequest?: (attachment: PastedCopyAttachment) => void
   styleEnabled?: boolean
   onOpenStyleAssets?: () => void
+  /** 专家能力矩阵；不传则按「内容创作」全开兼容旧调用 */
+  capabilities?: AimAgentCapabilities
 }
 
 /** 悬浮输入卡片：文本 / 图片 / 长文附件 / 发送 */
@@ -71,16 +77,30 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
     composerMode = "direct", onComposerModeChange, canUsePlanMode = false, isPlanSessionActive = false,
     contentMode, onContentModeChange, showContentMode = false,
     pastedCopy = null, onPastedCopyChange, onStyleSampleRequest, styleEnabled = false, onOpenStyleAssets,
+    capabilities: capabilitiesProp,
   } = props
 
+  const capabilities = capabilitiesProp ?? getAimAgentCapabilities("content_producer")
   const isPlanMode = composerMode === "plan"
-  const { pasteReady, applyUsage, handlePaste } = useAimPasteCopyAttachment({
-    value, pastedCopy, onPastedCopyChange, onStyleSampleRequest, imageCount: imageAttachments.length,
+  const { pasteReady, applyUsage, handlePaste, allowedUsages, pasteEnabled } = useAimPasteCopyAttachment({
+    value,
+    pastedCopy,
+    onPastedCopyChange: capabilities.pasteMode === "plain" ? undefined : onPastedCopyChange,
+    onStyleSampleRequest: capabilities.styleSample ? onStyleSampleRequest : undefined,
+    imageCount: imageAttachments.length,
+    capabilities,
   })
   const canSend = !busy && !isRecording && pasteReady
   const canPlan = !busy && !isRecording && value.trim().length > 0 && (!pastedCopy || Boolean(pastedCopy.usage))
   const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate && (!pastedCopy || Boolean(pastedCopy.usage && pastedCopy.usage !== "style_sample"))
   const canStop = busy && !isRecording && Boolean(onStop)
+  const showContentModeControl = showContentMode && capabilities.contentModeSelector
+  const autoUsageLabel =
+    capabilities.pasteMode === "review"
+      ? " · 待质检"
+      : capabilities.pasteMode === "edit"
+        ? " · 待编辑"
+        : undefined
   const rootRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -143,12 +163,14 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
           "transition-shadow",
         )}
       >
-        {pastedCopy ? (
+        {pastedCopy && pasteEnabled ? (
           <AimPastedCopyAttachmentBar
             attachment={pastedCopy}
             busy={busy}
             onRemove={() => onPastedCopyChange?.(null)}
             onSelectUsage={applyUsage}
+            allowedUsages={allowedUsages}
+            autoUsageLabel={autoUsageLabel}
           />
         ) : null}
 
@@ -156,7 +178,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
           ref={textareaRef}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          onPaste={handlePaste}
+          onPaste={pasteEnabled ? handlePaste : undefined}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return
             event.preventDefault()
@@ -187,7 +209,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
           </div>
         )}
 
-        {showContentMode && onContentModeChange && modeOpen ? (
+        {showContentModeControl && onContentModeChange && modeOpen ? (
           <div className="absolute bottom-14 left-3 z-20 w-52 overflow-hidden rounded-xl bg-popover p-1 text-popover-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.14)]">
             {([{ id: undefined as CopyStudioModule | undefined, label: "智能选择", hint: "按内容自动路由" },
               ...COPY_STUDIO_MODULES.map((module) => ({ id: module as CopyStudioModule | undefined, label: COPY_STUDIO_MODULE_LABELS[module], hint: "" })),
@@ -232,7 +254,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
 
         <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-0">
           <div className="flex min-w-0 items-center gap-0.5">
-            {showContentMode && onContentModeChange ? (
+            {showContentModeControl && onContentModeChange ? (
               <button type="button" disabled={busy} onClick={() => { setModeOpen((open) => !open); setSkillsOpen(false) }} className={cn("inline-flex h-7 max-w-[10.5rem] items-center gap-1 rounded-full px-2.5 text-xs transition-colors", modeOpen || contentMode ? "bg-foreground/[0.06] font-medium text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")} title="创作模式">
                 <Sparkles className="h-4 w-4 shrink-0 opacity-70" /><span className="truncate">{contentModeLabel}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
               </button>
@@ -249,7 +271,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
                 技能<ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>
             ) : null}
-            {styleEnabled ? (
+            {styleEnabled && capabilities.styleSample ? (
               <button type="button" onClick={onOpenStyleAssets} className="ml-1 inline-flex h-7 items-center rounded-full px-2 text-[11px] text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground" title="查看我的表达风格">我的风格 · 已启用</button>
             ) : null}
             {(isTranscribing || isRecording || isPlanMode) ? (

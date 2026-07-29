@@ -241,6 +241,50 @@ function checkR6(files: string[]) {
   }
 }
 
+/**
+ * R7：AIM 页面/composer 不得继续新增零散专家 ID 能力判断。
+ * 能力边界唯一源：src/lib/aim/agent-capabilities.ts
+ */
+const R7_SCOPED_FILES = [
+  "src/app/(dashboard)/aim/page.tsx",
+  "src/components/aim/aim-prompt-composer.tsx",
+  "src/components/aim/aim-pasted-copy-attachment.tsx",
+  "src/features/aim/hooks/use-aim-paste-copy-attachment.ts",
+  "src/features/aim/hooks/use-aim-video-copy-input.ts",
+  "src/lib/aim/video-copy-input.ts",
+]
+
+const R7_FORBIDDEN = [
+  /selectedAgentId\s*===\s*["']content_producer["']/,
+  /\[["']content_producer["']\s*,/,
+  /agentId\s*===\s*["']content_producer["']/,
+  /agentId\s*!==\s*["']content_producer["']/,
+]
+
+function checkR7() {
+  for (const relPath of R7_SCOPED_FILES) {
+    const full = join(WEB_ROOT, relPath)
+    let text = ""
+    try {
+      text = read(full)
+    } catch {
+      continue
+    }
+    // 能力矩阵文件自身、以及通过 getAimAgentCapabilities 的调用是允许的；
+    // video-copy-input 只允许读 agentAllowsVideoCopyExtraction，禁止硬编码 id 比较。
+    for (const pattern of R7_FORBIDDEN) {
+      if (pattern.test(text)) {
+        findings.push({
+          rule: "R7",
+          severity: "error",
+          file: relPath,
+          detail: `检测到零散专家 ID 能力判断（${pattern}）；请改用 getAimAgentCapabilities / agentAllows*`,
+        })
+      }
+    }
+  }
+}
+
 // ── 主流程 ──────────────────────────────────────────────────────────────────
 function main() {
   const files = listTsFiles(SRC_ROOT)
@@ -250,6 +294,7 @@ function main() {
   checkR4(files)
   checkR5()
   checkR6(files)
+  checkR7()
 
   const errors = findings.filter((f) => f.severity === "error")
   const todos = findings.filter((f) => f.severity === "todo")

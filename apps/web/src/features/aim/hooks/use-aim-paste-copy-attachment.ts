@@ -1,16 +1,30 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import { toast } from "sonner"
 
+import type { AimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import {
   canSubmitWithPasteAttachment,
   createPastedCopyAttachment,
+  getAllowedPasteUsages,
   inferPasteUsageFromInstruction,
   isLongCopyPaste,
+  resolveInitialPasteUsage,
   type PastedCopyAttachment,
   type PasteUsage,
 } from "@/lib/aim/paste-copy-attachment"
+
+function guardUsage(
+  usage: PasteUsage,
+  capabilities: AimAgentCapabilities,
+  allowedUsages: PasteUsage[],
+): string | null {
+  if (!allowedUsages.includes(usage)) return "当前专家不支持该文案用途"
+  if (usage === "style_sample" && !capabilities.styleSample) return "当前专家不支持风格沉淀"
+  if (usage === "benchmark" && !capabilities.benchmarkReference) return "当前专家不支持对标参考"
+  return null
+}
 
 export function useAimPasteCopyAttachment(input: {
   value: string
@@ -18,58 +32,65 @@ export function useAimPasteCopyAttachment(input: {
   onPastedCopyChange?: (next: PastedCopyAttachment | null) => void
   onStyleSampleRequest?: (attachment: PastedCopyAttachment) => void
   imageCount: number
+  capabilities: AimAgentCapabilities
 }) {
-  const { value, pastedCopy, onPastedCopyChange, onStyleSampleRequest, imageCount } = input
-
+  const {
+    value, pastedCopy, onPastedCopyChange, onStyleSampleRequest, imageCount, capabilities,
+  } = input
+  const pasteMode = capabilities.pasteMode
+  const allowedUsages = useMemo(
+    () => getAllowedPasteUsages(capabilities),
+    [capabilities],
+  )
+  const pasteEnabled = pasteMode !== "plain" && Boolean(onPastedCopyChange)
   const pasteReady = canSubmitWithPasteAttachment({
-    text: value,
-    attachment: pastedCopy,
-    hasImages: imageCount > 0,
+    text: value, attachment: pastedCopy, hasImages: imageCount > 0,
   })
 
   const applyUsage = useCallback((usage: PasteUsage) => {
     if (!pastedCopy || !onPastedCopyChange) return
+    const blocked = guardUsage(usage, capabilities, allowedUsages)
+    if (blocked) { toast.message(blocked); return }
     const next = { ...pastedCopy, usage }
     onPastedCopyChange(next)
     if (usage === "style_sample") onStyleSampleRequest?.(next)
-  }, [onPastedCopyChange, onStyleSampleRequest, pastedCopy])
+  }, [allowedUsages, capabilities, onPastedCopyChange, onStyleSampleRequest, pastedCopy])
 
   const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    if (!onPastedCopyChange) return
+    if (!pasteEnabled || !onPastedCopyChange) return
     const pasted = event.clipboardData.getData("text/plain")
     if (!isLongCopyPaste(pasted)) return
-
     event.preventDefault()
-    const instruction = value.trim()
-    const inferred = inferPasteUsageFromInstruction(instruction)
-    const next = createPastedCopyAttachment(pasted, inferred)
-
+    const usage = resolveInitialPasteUsage({ pasteMode, instruction: value.trim(), allowedUsages })
+    const next = createPastedCopyAttachment(pasted, usage)
     if (pastedCopy) {
       const replace = window.confirm("已有一篇文案附件。确定替换？取消则追加到现有附件。")
-      if (replace) {
-        onPastedCopyChange(next)
-      } else {
-        onPastedCopyChange(createPastedCopyAttachment(
-          `${pastedCopy.content.trim()}\n\n${pasted.trim()}`,
-          pastedCopy.usage ?? inferred,
-        ))
-      }
+      onPastedCopyChange(replace
+        ? next
+        : createPastedCopyAttachment(`${pastedCopy.content.trim()}\n\n${pasted.trim()}`, pastedCopy.usage ?? usage))
     } else {
       onPastedCopyChange(next)
     }
-    if (inferred === "style_sample") {
+    if (usage === "style_sample" && capabilities.styleSample) {
       toast.message("已识别为风格样本，将打开风格预览")
       onStyleSampleRequest?.(next)
     }
-  }, [onPastedCopyChange, onStyleSampleRequest, pastedCopy, value])
+  }, [allowedUsages, capabilities.styleSample, onPastedCopyChange, onStyleSampleRequest, pasteEnabled, pasteMode, pastedCopy, value])
 
   useEffect(() => {
-    if (!pastedCopy || pastedCopy.usage || !onPastedCopyChange) return
+    if (!pasteEnabled || !pastedCopy || pastedCopy.usage || !onPastedCopyChange) return
+    if (pasteMode === "edit" || pasteMode === "review") {
+      const auto = resolveInitialPasteUsage({ pasteMode, allowedUsages })
+      if (auto) onPastedCopyChange({ ...pastedCopy, usage: auto })
+      return
+    }
     const inferred = inferPasteUsageFromInstruction(value)
-    if (!inferred) return
+    if (!inferred || !allowedUsages.includes(inferred)) return
     onPastedCopyChange({ ...pastedCopy, usage: inferred })
-    if (inferred === "style_sample") onStyleSampleRequest?.({ ...pastedCopy, usage: inferred })
-  }, [value, pastedCopy, onPastedCopyChange, onStyleSampleRequest])
+    if (inferred === "style_sample" && capabilities.styleSample) {
+      onStyleSampleRequest?.({ ...pastedCopy, usage: inferred })
+    }
+  }, [allowedUsages, capabilities.styleSample, onPastedCopyChange, onStyleSampleRequest, pasteEnabled, pasteMode, pastedCopy, value])
 
-  return { pasteReady, applyUsage, handlePaste }
+  return { pasteReady, applyUsage, handlePaste, allowedUsages, pasteEnabled }
 }
