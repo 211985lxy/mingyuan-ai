@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useState, type Dispatch, type SetStateAction } from "react"
+import { toast } from "sonner"
 import type { ContentFormat } from "@/lib/api/client"
 import { isValidAimAgent } from "@/lib/aim-ui-config"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
@@ -29,6 +30,28 @@ function findRunTelemetry(messages: AimWorkbenchMessage[], messageId: string) {
     runId: message.runId,
     workflowId: resolveRunWorkflowId(message.agentId),
     taskType: message.contentAction ?? "generation",
+  }
+}
+
+async function reportInlineEditTelemetry(
+  telemetry: ReturnType<typeof findRunTelemetry>,
+) {
+  if (!telemetry) return
+  try {
+    await reportWebRunEdited(telemetry)
+  } catch {
+    toast.error("内容已保存，但编辑遥测记录失败，请稍后重试")
+  }
+}
+
+async function reportInlineRewriteTelemetry(
+  telemetry: ReturnType<typeof findRunTelemetry>,
+) {
+  if (!telemetry) return
+  try {
+    await reportWebFinalDisposition({ ...telemetry, finalDisposition: "rewrite_requested" })
+  } catch {
+    toast.error("重写将继续，但经营结果记录失败，请稍后重试")
   }
 }
 
@@ -61,9 +84,8 @@ export function useAimInlineEditorBridge(input: {
     setDraftSelection({ text: "", range: { start: 0, end: 0 } })
   }, [setDraftSelection, setEditorFormat, setEditorSourceMessageId, setEditorText])
 
-  const handleInlineContentSaved = useCallback((messageId: string, format: ContentFormat, content: string) => {
+  const handleInlineContentSaved = useCallback(async (messageId: string, format: ContentFormat, content: string) => {
     const telemetry = findRunTelemetry(messages, messageId)
-    if (telemetry) reportWebRunEdited(telemetry)
     setMessages((messages) => messages.map((message) =>
       message.id === messageId && message.deliverables
         ? {
@@ -78,9 +100,10 @@ export function useAimInlineEditorBridge(input: {
           }
         : message))
     syncEditorFromResult(messageId, format, content)
+    await reportInlineEditTelemetry(telemetry)
   }, [messages, setMessages, syncEditorFromResult])
 
-  const handleInlineSelectionRewrite = useCallback((messageId: string, payload: {
+  const handleInlineSelectionRewrite = useCallback(async (messageId: string, payload: {
     format: ContentFormat
     prompt: string
     selectionText: string
@@ -88,9 +111,9 @@ export function useAimInlineEditorBridge(input: {
     draftContent: string
   }) => {
     const telemetry = findRunTelemetry(messages, messageId)
-    if (telemetry) reportWebFinalDisposition({ ...telemetry, finalDisposition: "rewrite_requested" })
     syncEditorFromResult(messageId, payload.format, payload.draftContent)
     setDraftSelection({ text: payload.selectionText, range: payload.range })
+    await reportInlineRewriteTelemetry(telemetry)
     void sendText(payload.prompt, {
       editorContext: buildAimEditorContext({
         action: "内联选区改写",

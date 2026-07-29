@@ -2,8 +2,8 @@
 
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import {
-  reportAimRunEvent,
   reportFinalDisposition,
+  reportRequiredAimRunEvent,
 } from "@/lib/aim/run-events"
 import type { FinalDisposition } from "@/lib/aim/run-outcome-telemetry"
 
@@ -45,43 +45,45 @@ export function resolveRunWorkflowId(agentId: AimAgentId): string {
     : "content-growth-v1"
 }
 
-export function reportWebRunEdited(input: {
+export async function reportWebRunEdited(input: {
   runId: string | null | undefined
   workflowId: string
   taskType: string
 }) {
-  if (!input.runId) return
+  if (!input.runId) throw new Error("缺少执行编号，编辑遥测未记录")
   const session = touch(input.runId)
   session.edited = true
-  reportAimRunEvent(input.runId, "edited", {
+  const editRequestId = requestId("web_edit", input.runId)
+  await reportRequiredAimRunEvent(input.runId, "edited", {
     workflowId: input.workflowId,
     taskType: input.taskType,
     channel: "web",
     humanActiveMinutes: session.activeMs / 60_000,
-    requestId: requestId("web_edit", input.runId),
+    requestId: editRequestId,
   })
 }
 
-export function reportWebFinalDisposition(input: {
+export async function reportWebFinalDisposition(input: {
   runId: string | null | undefined
   workflowId: string
   taskType: string
   finalDisposition: FinalDisposition
   reasonCode?: string
 }) {
-  if (!input.runId) return
+  if (!input.runId) throw new Error("缺少执行编号，经营结果未记录")
   const session = touch(input.runId)
   const finalDisposition =
     input.finalDisposition === "accepted_first_pass" && session.edited
       ? "accepted_after_edit"
       : input.finalDisposition
-  reportFinalDisposition(input.runId, {
+  const outcomeRequestId = requestId("web_outcome", input.runId)
+  await reportFinalDisposition(input.runId, {
     workflowId: input.workflowId,
     taskType: input.taskType,
     finalDisposition,
     humanActiveMinutes: session.activeMs / 60_000,
     reasonCode: input.reasonCode,
     channel: "web",
-    requestId: requestId("web_outcome", input.runId),
+    requestId: outcomeRequestId,
   })
 }

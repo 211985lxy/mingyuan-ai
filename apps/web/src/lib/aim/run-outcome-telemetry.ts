@@ -28,6 +28,7 @@ export interface RunOutcomeMetadata {
 }
 
 export interface AimRunEventLike {
+  id?: string
   event: string
   metadata?: unknown
   createdAt: Date | string
@@ -103,7 +104,9 @@ export function reduceFinalDisposition(
   events: AimRunEventLike[],
 ): FinalDisposition | "unknown" {
   const sorted = [...events].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    (a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      || (a.id ?? "").localeCompare(b.id ?? ""),
   )
 
   let sawEdit = false

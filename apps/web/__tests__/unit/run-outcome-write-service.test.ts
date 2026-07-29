@@ -15,7 +15,10 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 
-import { writeFinalRunOutcome } from "@/lib/aim/run-outcome-write-service"
+import {
+  findRunOutcomeOwner,
+  writeFinalRunOutcome,
+} from "@/lib/aim/run-outcome-write-service"
 
 const outcome = {
   workflowId: "content-growth-v1",
@@ -47,6 +50,10 @@ describe("writeFinalRunOutcome", () => {
       outcome,
     })
     expect(result).toEqual({ ok: true, id: "event-1", deduped: false })
+    expect(traceFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { runId: "run_1", userId: "user-1" },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    }))
     expect(eventCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         runId: "run_1",
@@ -100,5 +107,18 @@ describe("writeFinalRunOutcome", () => {
       outcome,
     })).resolves.toMatchObject({ ok: false, code: "RUN_NOT_FOUND" })
     expect(eventCreate).not.toHaveBeenCalled()
+  })
+
+  it("selects the run owner deterministically when duplicate traces exist", async () => {
+    traceFindFirst.mockResolvedValueOnce({ userId: "user-1", projectId: "project-1" })
+    await expect(findRunOutcomeOwner("run_1")).resolves.toEqual({
+      userId: "user-1",
+      projectId: "project-1",
+    })
+    expect(traceFindFirst).toHaveBeenCalledWith({
+      where: { runId: "run_1", userId: { not: null } },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+      select: { userId: true, projectId: true },
+    })
   })
 })

@@ -24,6 +24,7 @@ export async function writeFinalRunOutcome(input: {
 }): Promise<RunOutcomeWriteResult> {
   const trace = await prisma.aimExecutionTrace.findFirst({
     where: { runId: input.runId, userId: input.userId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     select: {
       id: true,
       durationMs: true,
@@ -90,6 +91,7 @@ export async function writeFinalRunOutcome(input: {
 export async function findRunOutcomeOwner(runId: string) {
   return prisma.aimExecutionTrace.findFirst({
     where: { runId, userId: { not: null } },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     select: { userId: true, projectId: true },
   })
 }

@@ -84,7 +84,6 @@ async function savePublishRecord(
     publishPlatform,
     publishUrl,
   }))
-  toast.success("已登记发布")
 }
 
 function buildRetroOutcome(form: OutcomeForm, window: OutcomeWindow, platform: string) {
@@ -193,7 +192,7 @@ function useRecordDialogHandlers(input: {
   reportMessageOutcome: (
     message: AimWorkbenchMessage | undefined,
     finalDisposition: FinalDisposition,
-  ) => void
+  ) => Promise<void>
 }) {
   const openRecordDialog = useCallback((messageId: string, mode: WorkflowRecordMode) => {
     const deliverable = input.workflow.messages.find((message) => message.id === messageId)?.deliverables
@@ -209,10 +208,16 @@ function useRecordDialogHandlers(input: {
         await saveDecisionRecord(dialog.generationId, input.forms.decisionForm)
       } else if (dialog.mode === "publish") {
         await savePublishRecord(dialog.generationId, input.forms.publishForm, input.workflow.setMessages)
-        input.reportMessageOutcome(
-          input.workflow.messages.find((message) => message.deliverables?.id === dialog.generationId),
-          "accepted_first_pass",
-        )
+        try {
+          await input.reportMessageOutcome(
+            input.workflow.messages.find((message) => message.deliverables?.id === dialog.generationId),
+            "accepted_first_pass",
+          )
+        } catch {
+          toast.error("已登记发布，但经营结果记录失败，请重试")
+          return
+        }
+        toast.success("已登记发布")
         input.workflow.onPublished?.(dialog.generationId)
       } else {
         await saveRetroRecord({
@@ -245,11 +250,11 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     void input.refreshHistory({ force: true, agentId: input.selectedAgentId })
     if (input.selectedProjectId) void input.refreshProjectWorkflow()
   }, [input])
-  const reportMessageOutcome = useCallback((
+  const reportMessageOutcome = useCallback(async (
     message: AimWorkbenchMessage | undefined,
     finalDisposition: FinalDisposition,
   ) => {
-    reportWebFinalDisposition({
+    await reportWebFinalDisposition({
       runId: message?.runId,
       workflowId: resolveRunWorkflowId(
         isValidAimAgent(message?.agentId) ? message.agentId : input.selectedAgentId,
@@ -268,7 +273,13 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
         workflowStatus: status,
       }))
       if (ACCEPTED_WORKFLOW_STATUSES.has(status)) {
-        reportMessageOutcome(message, "accepted_first_pass")
+        try {
+          await reportMessageOutcome(message, "accepted_first_pass")
+        } catch {
+          refreshRecords()
+          toast.error("状态已更新，但经营结果记录失败，请重试")
+          return
+        }
       }
       refreshRecords()
       toast.success(`已标记为：${getAimWorkflowStatusLabel(status)}`)
@@ -277,11 +288,16 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     }
   }, [input, refreshRecords, reportMessageOutcome])
   const handleFinalDisposition = useCallback(
-    (messageId: string) => (finalDisposition: FinalDisposition) => {
-      reportMessageOutcome(
-        input.messages.find((message) => message.id === messageId),
-        finalDisposition,
-      )
+    (messageId: string) => async (finalDisposition: FinalDisposition) => {
+      try {
+        await reportMessageOutcome(
+          input.messages.find((message) => message.id === messageId),
+          finalDisposition,
+        )
+        toast.success("经营结果已记录")
+      } catch {
+        toast.error("经营结果记录失败，请重试")
+      }
     },
     [input.messages, reportMessageOutcome],
   )

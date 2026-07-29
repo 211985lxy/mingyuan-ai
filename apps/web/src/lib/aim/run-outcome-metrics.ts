@@ -10,6 +10,7 @@ import {
 } from "@/lib/aim/run-outcome-telemetry"
 
 export interface OutcomeMetricEvent {
+  id: string
   runId: string
   event: string
   metadata: unknown
@@ -17,10 +18,12 @@ export interface OutcomeMetricEvent {
 }
 
 export interface OutcomeMetricTrace {
+  id: string
   runId: string | null
   durationMs: number | null
   costCny: unknown
   createdAt: Date
+  updatedAt: Date
 }
 
 export interface RunOutcomeMetricFilters {
@@ -71,20 +74,18 @@ function matchesFilters(
   filters: RunOutcomeMetricFilters,
 ): boolean {
   if (!filters.workflowId && !filters.taskType && !filters.channel) return true
-  return events.some((event) => {
-    const metadata = parseRunOutcomeMetadata(event.metadata)
-    if (!metadata) return false
-    return (
-      (!filters.workflowId || metadata.workflowId === filters.workflowId)
-      && (!filters.taskType || metadata.taskType === filters.taskType)
-      && (!filters.channel || metadata.channel === filters.channel)
-    )
-  })
+  const metadata = latestMetadata(events)
+  return Boolean(metadata
+    && (!filters.workflowId || metadata.workflowId === filters.workflowId)
+    && (!filters.taskType || metadata.taskType === filters.taskType)
+    && (!filters.channel || metadata.channel === filters.channel))
 }
 
 function latestMetadata(events: OutcomeMetricEvent[]) {
   return [...events]
-    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .sort((left, right) =>
+      right.createdAt.getTime() - left.createdAt.getTime()
+      || right.id.localeCompare(left.id))
     .map((event) => parseRunOutcomeMetadata(event.metadata))
     .find((metadata) => metadata != null) ?? null
 }
@@ -102,7 +103,6 @@ function groupEventsByRun(events: OutcomeMetricEvent[]) {
 function summarizeOutcomeEvents(
   eventsByRun: Map<string, OutcomeMetricEvent[]>,
   includedRuns: Set<string>,
-  hasFilters: boolean,
 ) {
   const counts = {
     reviewedCount: 0,
@@ -114,8 +114,8 @@ function summarizeOutcomeEvents(
     timeSavedMinutes: 0,
     humanMinutes: 0,
   }
-  for (const [runId, events] of eventsByRun) {
-    if ((includedRuns.size > 0 && !includedRuns.has(runId)) || (includedRuns.size === 0 && hasFilters)) continue
+  for (const runId of includedRuns) {
+    const events = eventsByRun.get(runId) ?? []
     const disposition = reduceFinalDisposition(events)
     const metadata = latestMetadata(events)
     if (disposition === "unknown") counts.unknownCount += 1
@@ -140,11 +140,23 @@ function summarizeOutcomeEvents(
   return counts
 }
 
-function summarizeTraceCosts(traces: OutcomeMetricTrace[]) {
+function compareTrace(left: OutcomeMetricTrace, right: OutcomeMetricTrace) {
+  return left.updatedAt.getTime() - right.updatedAt.getTime()
+    || left.createdAt.getTime() - right.createdAt.getTime()
+    || left.id.localeCompare(right.id)
+}
+
+function canonicalizeTraces(traces: OutcomeMetricTrace[]) {
   const unique = new Map<string, OutcomeMetricTrace>()
   for (const trace of traces) {
-    if (trace.runId && !unique.has(trace.runId)) unique.set(trace.runId, trace)
+    if (!trace.runId) continue
+    const current = unique.get(trace.runId)
+    if (!current || compareTrace(trace, current) > 0) unique.set(trace.runId, trace)
   }
+  return unique
+}
+
+function summarizeTraceCosts(unique: Map<string, OutcomeMetricTrace>) {
   let aiDirectCostCny = 0
   let durationCovered = 0
   let costCovered = 0
@@ -156,7 +168,7 @@ function summarizeTraceCosts(traces: OutcomeMetricTrace[]) {
       aiDirectCostCny += cost
     }
   }
-  return { unique, aiDirectCostCny, durationCovered, costCovered }
+  return { aiDirectCostCny, durationCovered, costCovered }
 }
 
 /**
@@ -168,35 +180,28 @@ export function aggregateRunOutcomeMetrics(input: {
   humanHourlyCostCny: number
   filters?: RunOutcomeMetricFilters
 }): RunOutcomeMetrics {
+  const eventsByRun = groupEventsByRun(input.events)
+  const canonicalTraces = canonicalizeTraces(input.traces)
+  const includedRuns = new Set(
+    [...canonicalTraces.keys()].filter((runId) =>
+      matchesFilters(eventsByRun.get(runId) ?? [], input.filters ?? {})),
+  )
+  const includedTraces = new Map(
+    [...canonicalTraces.entries()].filter(([runId]) => includedRuns.has(runId)),
+  )
+  const outcome = summarizeOutcomeEvents(eventsByRun, includedRuns)
+  const trace = summarizeTraceCosts(includedTraces)
   const hasFilters = Boolean(
     input.filters?.workflowId || input.filters?.taskType || input.filters?.channel,
   )
-  const eventsByRun = groupEventsByRun(input.events)
-  const filteredRuns = new Set(
-    [...eventsByRun.entries()]
-      .filter(([, events]) => matchesFilters(events, input.filters ?? {}))
-      .map(([runId]) => runId),
-  )
-  const traces = input.traces.filter((trace) =>
-    trace.runId != null
-      ? (
-        filteredRuns.size === 0
-        && hasFilters
-          ? false
-          : filteredRuns.size === 0 || filteredRuns.has(trace.runId)
-      )
-      : !hasFilters,
-  )
-  const outcome = summarizeOutcomeEvents(eventsByRun, filteredRuns, hasFilters)
-  const trace = summarizeTraceCosts(traces)
-  const traceCount = traces.length
-  const withRunIdCount = traces.filter((trace) => Boolean(trace.runId)).length
-  const finalDispositionCount = [...eventsByRun.entries()]
-    .filter(([runId, events]) =>
-      trace.unique.has(runId)
-      && (!hasFilters || filteredRuns.has(runId))
-      && reduceFinalDisposition(events) !== "unknown"
-    ).length
+  const coverageTraces = hasFilters
+    ? input.traces.filter((item) => item.runId != null && includedRuns.has(item.runId))
+    : input.traces
+  const traceCount = coverageTraces.length
+  const withRunIdCount = coverageTraces.filter((item) => Boolean(item.runId)).length
+  const finalDispositionCount = [...includedRuns]
+    .filter((runId) => reduceFinalDisposition(eventsByRun.get(runId) ?? []) !== "unknown")
+    .length
   const fullyLoadedCostCny = computeFullyLoadedCost(
     trace.aiDirectCostCny,
     outcome.humanMinutes,
@@ -205,12 +210,8 @@ export function aggregateRunOutcomeMetrics(input: {
   const { humanMinutes: _humanMinutes, ...publicOutcome } = outcome
 
   return {
-    runCount: trace.unique.size,
+    runCount: includedRuns.size,
     ...publicOutcome,
-    unknownCount: Math.max(
-      publicOutcome.unknownCount,
-      trace.unique.size - finalDispositionCount,
-    ),
     acceptanceRate: rate(outcome.acceptedCount, outcome.reviewedCount),
     firstPassAcceptanceRate: rate(outcome.firstPassAcceptedCount, outcome.reviewedCount),
     rewriteRate: rate(outcome.rewriteCount, outcome.reviewedCount),
@@ -221,9 +222,9 @@ export function aggregateRunOutcomeMetrics(input: {
     fullyLoadedCostPerSuccessfulTaskCny: rate(fullyLoadedCostCny, outcome.acceptedCount),
     coverage: {
       runId: rate(withRunIdCount, traceCount) ?? 0,
-      duration: rate(trace.durationCovered, trace.unique.size) ?? 0,
-      cost: rate(trace.costCovered, trace.unique.size) ?? 0,
-      finalDisposition: rate(finalDispositionCount, trace.unique.size) ?? 0,
+      duration: rate(trace.durationCovered, includedRuns.size) ?? 0,
+      cost: rate(trace.costCovered, includedRuns.size) ?? 0,
+      finalDisposition: rate(finalDispositionCount, includedRuns.size) ?? 0,
     },
   }
 }
