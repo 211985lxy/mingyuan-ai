@@ -288,8 +288,13 @@ export function AppSidebar() {
   const recentThreads = useMemo(() => {
     const ranked = [...history]
       .filter((item) => {
-        const itemAgent = item.agentId === "ip_video" ? "content_producer" : item.agentId
-        return !itemAgent || itemAgent === historyAgentId
+        const itemAgent = item.agentId === "ip_video"
+          ? "content_producer"
+          : item.agentId === "deep_copywriter"
+            ? "work_editor"
+            : item.agentId
+        // 无 agentId 的旧记录不跨专家串台展示
+        return Boolean(itemAgent) && itemAgent === historyAgentId
       })
       .sort((a, b) => {
         const aTime = new Date(a.updatedAt || a.createdAt).getTime()
@@ -407,7 +412,8 @@ export function AppSidebar() {
                       <button
                         type="button"
                         onClick={() => {
-                          const agentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
+                          // 缺 agentId 时留在当前专家，避免误跳内容创作后列表被清空导致打不开
+                          const agentId = isValidAimAgent(item.agentId) ? item.agentId : historyAgentId
                           requestLoad(item.id)
                           if (!isAim || agentParam !== agentId) {
                             router.push(`/aim?agent=${agentId}`)

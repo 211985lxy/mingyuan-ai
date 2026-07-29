@@ -9,7 +9,7 @@ import { loadAimDraft } from "@/lib/aim/draft-storage"
 import { normalizeWorkbenchCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 import { getTaskSpecCopyStudioModule } from "@/lib/task-spec"
 import { EDITOR_PANEL_DEFAULT_WIDTH } from "@/lib/aim-editor"
-import { DEFAULT_AIM_AGENT, isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
+import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import {
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
@@ -225,14 +225,29 @@ export function useAimHistoryLoad(input: {
     if (isDeepLink && loadedDeepLinkRef.current === generationIdParam) return
     let active = true
     const load = async () => {
-      const item = loadTargetId
-        ? history.find((record) => record.id === loadTargetId)
-        : generationIdParam ? await getAimHistory(generationIdParam) : undefined
-      if (!active || !item) return
+      const targetId = loadTargetId || generationIdParam
+      let item: AimGeneration | undefined
+      if (loadTargetId) {
+        item = history.find((record) => record.id === loadTargetId)
+      }
+      // 本地列表被切专家清空/刷新时，必须回源按 id 拉取，否则会静默打不开
+      if (!item && targetId) {
+        try {
+          item = await getAimHistory(targetId)
+        } catch {
+          item = undefined
+        }
+      }
+      if (!active) return
+      if (!item) {
+        toast.error("历史记录加载失败，请稍后重试")
+        clearLoadTarget()
+        return
+      }
       const deliverables = mapAimGenerationToDeliverables(item)
       const contents = deliverables.results
       const assistantId = nextAimWorkbenchId()
-      const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : DEFAULT_AIM_AGENT
+      const itemAgentId = isValidAimAgent(item.agentId) ? item.agentId : selectedAgentId
       startTransition(() => {
         setters.setSelectedAgentId(itemAgentId)
         setters.setAgentModule(resolveAimHistoryAgentModule(itemAgentId, item.taskSpec))
@@ -273,6 +288,7 @@ export function useAimHistoryLoad(input: {
       if (itemAgentId !== selectedAgentId) {
         const params = new URLSearchParams(searchParams.toString())
         params.set("agent", itemAgentId)
+        params.delete("generationId")
         lastAgentParamRef.current = itemAgentId
         router.replace(`/aim?${params.toString()}`)
       }
@@ -281,7 +297,9 @@ export function useAimHistoryLoad(input: {
       clearLoadTarget()
     }
     void load().catch((error) => {
-      if (active) toast.error(error instanceof Error ? error.message : "历史记录加载失败")
+      if (!active) return
+      toast.error(error instanceof Error ? error.message : "历史记录加载失败")
+      clearLoadTarget()
     })
     return () => { active = false }
   }, [clearLoadTarget, generationIdParam, history, lastAgentParamRef, loadTargetId, openEditorFromResult, router, searchParams, selectedAgentId, setters])
