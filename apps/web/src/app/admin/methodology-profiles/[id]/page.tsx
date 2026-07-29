@@ -58,6 +58,8 @@ export default function AdminMethodologyProfileDetailPage() {
   const [agentsText, setAgentsText] = React.useState("")
   const [status, setStatus] = React.useState<"active" | "archived">("active")
   const [compiledPrompt, setCompiledPrompt] = React.useState("")
+  const [workflowId, setWorkflowId] = React.useState("content-growth-v1")
+  const [approvalId, setApprovalId] = React.useState("")
 
   const load = React.useCallback(async () => {
     if (!id) return
@@ -103,6 +105,8 @@ export default function AdminMethodologyProfileDetailPage() {
           description: description || null,
           applicableAgents: agentsText.split(/[,，、]/).map((s) => s.trim()).filter(Boolean),
           status,
+          workflowId,
+          approvalId,
         }),
       })
       const json = await res.json()
@@ -123,7 +127,12 @@ export default function AdminMethodologyProfileDetailPage() {
       const res = await fetch(`/api/admin/methodology-profiles/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ compiledPrompt, status: as }),
+        body: JSON.stringify({
+          compiledPrompt,
+          status: as,
+          workflowId,
+          approvalId: as === "published" ? approvalId : undefined,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "保存失败")
@@ -143,7 +152,12 @@ export default function AdminMethodologyProfileDetailPage() {
       const res = await fetch(`/api/admin/methodology-profiles/${id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "publish_version", versionId }),
+        body: JSON.stringify({
+          action: "publish_version",
+          versionId,
+          workflowId,
+          approvalId,
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || "发布失败")
@@ -190,6 +204,34 @@ export default function AdminMethodologyProfileDetailPage() {
           </Link>
         }
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">正式变更审批</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label htmlFor="governance-workflow-id">工作流 ID</Label>
+            <Input
+              id="governance-workflow-id"
+              value={workflowId}
+              onChange={(event) => setWorkflowId(event.target.value)}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="governance-approval-id">双签中的任一 approvalId</Label>
+            <Input
+              id="governance-approval-id"
+              value={approvalId}
+              onChange={(event) => setApprovalId(event.target.value)}
+              placeholder="先在治理责任页完成两次签字"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground md:col-span-2">
+            元信息、发布新版本和发布草稿均需当前业务 Owner 与系统 Owner 双签；草稿保存不进入运行时。
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

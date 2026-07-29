@@ -215,6 +215,20 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/approval-decisions",
+      "file": "src/app/api/admin/approval-decisions/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/admin/audit-logs",
       "file": "src/app/api/admin/audit-logs/route.ts",
       "methods": [

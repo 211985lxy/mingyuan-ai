@@ -17,6 +17,7 @@ export const EMPTY_GOVERNANCE_DRAFT: GovernanceAssignmentInput = {
   role: "business_owner",
   userId: "",
   externalOpenId: "",
+  externalUserId: "",
   status: "active",
 }
 
@@ -62,6 +63,7 @@ export function useGovernanceAssignments() {
         ...draft,
         userId: draft.userId?.trim() || undefined,
         externalOpenId: draft.externalOpenId?.trim() || undefined,
+        externalUserId: draft.externalUserId?.trim() || undefined,
       })
       toast.success("已新增责任配置")
       setDraft(EMPTY_GOVERNANCE_DRAFT)

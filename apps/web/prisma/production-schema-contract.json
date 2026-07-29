@@ -51,6 +51,7 @@
         "role",
         "userId",
         "externalOpenId",
+        "externalUserId",
         "status",
         "effectiveAt"
       ]
@@ -64,6 +65,7 @@
         "decision",
         "reviewerUserId",
         "externalReviewerId",
+        "externalReviewerUserId",
         "roleSnapshot",
         "reason",
         "source",
@@ -72,7 +74,9 @@
         "workflowId",
         "projectId",
         "effectStatus",
-        "effectError"
+        "effectError",
+        "effectClaimToken",
+        "effectClaimedAt"
       ]
     },
     {

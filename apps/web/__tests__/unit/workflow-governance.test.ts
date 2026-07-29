@@ -25,6 +25,7 @@ function assignment(
     scopeId: "content-growth-v1",
     userId: `user_${overrides.role}`,
     externalOpenId: `ou_${overrides.role}`,
+    externalUserId: `on_${overrides.role}`,
     status: "active",
     effectiveAt: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
@@ -77,6 +78,41 @@ function memoryStore(): ApprovalDecisionStorePort & {
         ...existing,
         effectStatus: patch.effectStatus,
         effectError: patch.effectError ?? null,
+      }
+      rows.set(id, next)
+      return next
+    },
+    claimEffect: async (id, claimToken) => {
+      const existing = rows.get(id)
+      if (!existing) throw new Error("missing")
+      if (existing.effectStatus !== "none" && existing.effectStatus !== "failed") {
+        return { claimed: false, record: existing }
+      }
+      const next = {
+        ...existing,
+        effectStatus: "pending" as const,
+        effectError: null,
+        effectClaimToken: claimToken,
+        effectClaimedAt: new Date(),
+      }
+      rows.set(id, next)
+      return { claimed: true, record: next }
+    },
+    settleEffect: async (id, claimToken, patch) => {
+      const existing = rows.get(id)
+      if (
+        !existing
+        || existing.effectStatus !== "pending"
+        || existing.effectClaimToken !== claimToken
+      ) {
+        throw new Error("claim mismatch")
+      }
+      const next = {
+        ...existing,
+        effectStatus: patch.effectStatus,
+        effectError: patch.effectError ?? null,
+        effectClaimToken: null,
+        effectClaimedAt: null,
       }
       rows.set(id, next)
       return next
@@ -158,13 +194,46 @@ describe("workflow-governance reviewer match 反例", () => {
     })
     expect(result).toEqual({ ok: true, role: "reviewer" })
   })
+
+  it("飞书 user_id 只匹配 externalUserId，不冒充内部 userId", () => {
+    const result = assertReviewerMatchesAssignment(READY, {
+      workflowId: "content-growth-v1",
+      externalReviewerUserId: "on_reviewer",
+    })
+    expect(result).toEqual({ ok: true, role: "reviewer" })
+    const internalAttempt = assertReviewerMatchesAssignment(READY, {
+      workflowId: "content-growth-v1",
+      reviewerUserId: "on_reviewer",
+    })
+    expect(internalAttempt.ok).toBe(false)
+  })
 })
 
 describe("workflow-governance dual sign & high risk", () => {
   it("少一签 → 双签失败", () => {
     const result = assertDualSignForChange(
-      [{ decision: "approve", roleSnapshot: "business_owner", subjectId: "wf_1" }],
-      "wf_1",
+      [{
+        id: "apd_business",
+        subjectType: "workflow_change",
+        subjectId: "content-growth-v1",
+        decision: "approve",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "ok",
+        source: "web",
+        requestId: "r_business",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      }],
+      {
+        subjectType: "workflow_change",
+        subjectId: "content-growth-v1",
+        workflowId: "content-growth-v1",
+        projectId: null,
+        assignments: READY,
+      },
     )
     expect(result.ok).toBe(false)
   })
@@ -172,12 +241,296 @@ describe("workflow-governance dual sign & high risk", () => {
   it("业务+系统双签 → 通过", () => {
     const result = assertDualSignForChange(
       [
-        { decision: "approve", roleSnapshot: "business_owner", subjectId: "wf_1" },
-        { decision: "approve", roleSnapshot: "system_owner", subjectId: "wf_1" },
+        {
+          id: "apd_business",
+          subjectType: "workflow_change",
+          subjectId: "content-growth-v1",
+          decision: "approve",
+          reviewerUserId: "user_business_owner",
+          roleSnapshot: "business_owner",
+          reason: "ok",
+          source: "web",
+          requestId: "r_business",
+          decidedAt: new Date(),
+          workflowId: "content-growth-v1",
+          projectId: null,
+          effectStatus: "none",
+        },
+        {
+          id: "apd_system",
+          subjectType: "workflow_change",
+          subjectId: "content-growth-v1",
+          decision: "approve",
+          reviewerUserId: "user_system_owner",
+          roleSnapshot: "system_owner",
+          reason: "ok",
+          source: "web",
+          requestId: "r_system",
+          decidedAt: new Date(),
+          workflowId: "content-growth-v1",
+          projectId: null,
+          effectStatus: "none",
+        },
       ],
-      "wf_1",
+      {
+        subjectType: "workflow_change",
+        subjectId: "content-growth-v1",
+        workflowId: "content-growth-v1",
+        projectId: null,
+        assignments: READY,
+      },
     )
     expect(result.ok).toBe(true)
+  })
+
+  it("仅配置飞书身份的业务与系统 Owner 也能完成双签", () => {
+    const externalAssignments = READY.map((row) => ({
+      ...row,
+      userId: null,
+    }))
+    const approvals: ApprovalDecisionRecord[] = [
+      {
+        id: "apd_business_external",
+        subjectType: "workflow_change",
+        subjectId: "content-growth-v1",
+        decision: "approve",
+        externalReviewerId: "ou_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "ok",
+        source: "feishu_card",
+        requestId: "r_business_external",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+      {
+        id: "apd_system_external",
+        subjectType: "workflow_change",
+        subjectId: "content-growth-v1",
+        decision: "approve",
+        externalReviewerUserId: "on_system_owner",
+        roleSnapshot: "system_owner",
+        reason: "ok",
+        source: "feishu_card",
+        requestId: "r_system_external",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+    ]
+    const result = assertDualSignForChange(approvals, {
+      subjectType: "workflow_change",
+      subjectId: "content-growth-v1",
+      workflowId: "content-growth-v1",
+      projectId: null,
+      assignments: externalAssignments,
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it("同一人的 Web 与飞书映射不能绕过双签身份隔离", () => {
+    const linkedAssignments = READY.map((row) =>
+      row.role === "system_owner"
+        ? {
+            ...row,
+            userId: "user_business_owner",
+            externalOpenId: "ou_business_owner",
+          }
+        : row,
+    )
+    const approvals: ApprovalDecisionRecord[] = [
+      {
+        id: "apd_business_web",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "ok",
+        source: "web",
+        requestId: "r_business_web",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+      {
+        id: "apd_system_feishu",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        externalReviewerId: "ou_business_owner",
+        roleSnapshot: "system_owner",
+        reason: "ok",
+        source: "feishu_card",
+        requestId: "r_system_feishu",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+    ]
+    const result = assertDualSignForChange(approvals, {
+      subjectType: "methodology",
+      subjectId: "method_1",
+      workflowId: "content-growth-v1",
+      projectId: null,
+      assignments: linkedAssignments,
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it("同一内部身份不能同时充当业务与系统双签", () => {
+    const sharedIdentityAssignments = READY.map((row) =>
+      row.role === "system_owner"
+        ? { ...row, userId: "user_business_owner" }
+        : row,
+    )
+    const approvals: ApprovalDecisionRecord[] = [
+      {
+        id: "apd_business",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "ok",
+        source: "web",
+        requestId: "r_business_same",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+      {
+        id: "apd_system",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "system_owner",
+        reason: "ok",
+        source: "web",
+        requestId: "r_system_same",
+        decidedAt: new Date(),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+    ]
+    const result = assertDualSignForChange(approvals, {
+      subjectType: "methodology",
+      subjectId: "method_1",
+      workflowId: "content-growth-v1",
+      projectId: null,
+      assignments: sharedIdentityAssignments,
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it("过期或已停用角色快照不能凑双签", () => {
+    const approvals: ApprovalDecisionRecord[] = [
+      {
+        id: "apd_business_old",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "old",
+        source: "web",
+        requestId: "r_business_old",
+        decidedAt: new Date("2026-01-01"),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+      {
+        id: "apd_system_current",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_system_owner",
+        roleSnapshot: "system_owner",
+        reason: "ok",
+        source: "web",
+        requestId: "r_system_current",
+        decidedAt: new Date("2026-07-29"),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+    ]
+    const result = assertDualSignForChange(approvals, {
+      subjectType: "methodology",
+      subjectId: "method_1",
+      workflowId: "content-growth-v1",
+      projectId: null,
+      assignments: READY,
+      at: new Date("2026-07-29T12:00:00Z"),
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it("同一签字人后续 reject 会覆盖旧 approve，不能凑双签", () => {
+    const approvals: ApprovalDecisionRecord[] = [
+      {
+        id: "apd_business_old",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "initial",
+        source: "web",
+        requestId: "r_business_initial",
+        decidedAt: new Date("2026-07-29T08:00:00Z"),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+      {
+        id: "apd_business_reject",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "reject",
+        reviewerUserId: "user_business_owner",
+        roleSnapshot: "business_owner",
+        reason: "retracted",
+        source: "web",
+        requestId: "r_business_reject",
+        decidedAt: new Date("2026-07-29T09:00:00Z"),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+      {
+        id: "apd_system",
+        subjectType: "methodology",
+        subjectId: "method_1",
+        decision: "approve",
+        reviewerUserId: "user_system_owner",
+        roleSnapshot: "system_owner",
+        reason: "ok",
+        source: "web",
+        requestId: "r_system_after",
+        decidedAt: new Date("2026-07-29T09:00:00Z"),
+        workflowId: "content-growth-v1",
+        projectId: null,
+        effectStatus: "none",
+      },
+    ]
+    const result = assertDualSignForChange(approvals, {
+      subjectType: "methodology",
+      subjectId: "method_1",
+      workflowId: "content-growth-v1",
+      projectId: null,
+      assignments: READY,
+      at: new Date("2026-07-29T10:00:00Z"),
+    })
+    expect(result.ok).toBe(false)
   })
 
   it("集成密钥不得 complete/publish/promote", () => {
@@ -265,6 +618,32 @@ describe("workflow-governance dual sign & high risk", () => {
     })
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toMatch(/项目/)
+  })
+
+  it("调用方给出 scope 时，unknown scope approval 必须拒绝", () => {
+    const result = assertValidApprovalForHighRisk({
+      action: "promote",
+      approval: {
+        id: "apd_unknown",
+        subjectType: "asset",
+        subjectId: "asset_1",
+        decision: "approve",
+        reviewerUserId: "user_reviewer",
+        roleSnapshot: "reviewer",
+        reason: "ok",
+        source: "web",
+        requestId: "req_unknown",
+        workflowId: null,
+        projectId: null,
+        effectStatus: "none",
+        decidedAt: new Date(),
+      },
+      subjectType: "asset",
+      subjectId: "asset_1",
+      workflowId: "content-growth-v1",
+      projectId: "proj_1",
+    })
+    expect(result.ok).toBe(false)
   })
 
   it("角色错配 → 拒绝", () => {
@@ -371,6 +750,49 @@ describe("approval requestId idempotency & concurrency", () => {
 })
 
 describe("approval-completion 可恢复状态机", () => {
+  it("Promise.all 并发回调只有 claim 获胜者执行完成副作用", async () => {
+    const approvalStore = memoryStore()
+    let updateCalls = 0
+    const workItemStore: WorkItemRecordStore = {
+      get: async () => ({
+        recordId: "rec_concurrent",
+        fields: {
+          状态: "待人工审核",
+          AIM结果ID: "gen_concurrent",
+          结果摘要: "",
+        },
+      }),
+      update: async () => {
+        updateCalls += 1
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        return { ok: true as const }
+      },
+    }
+    const input = {
+      assignments: READY,
+      workflowId: "content-growth-v1",
+      projectId: "proj_1",
+      recordId: "rec_concurrent",
+      action: "approve" as const,
+      openId: "ou_reviewer",
+      externalUserId: "on_reviewer",
+      messageId: "msg_concurrent",
+      aimResultId: "gen_concurrent",
+      workItemStore,
+      approvalStore,
+      idFactory: () => "apd_concurrent",
+    }
+
+    const results = await Promise.all([
+      processFeishuCardApproval(input),
+      processFeishuCardApproval(input),
+    ])
+
+    expect(results.every((result) => result.ok)).toBe(true)
+    expect(updateCalls).toBe(1)
+    expect(results.some((result) => result.ok && result.processing)).toBe(true)
+  })
+
   it("完成失败可重试，重放不重复完成", async () => {
     const approvalStore = memoryStore()
     let completeCalls = 0
@@ -398,7 +820,7 @@ describe("approval-completion 可恢复状态机", () => {
       recordId: "rec_1",
       action: "approve" as const,
       openId: "ou_reviewer",
-      userId: "",
+      externalUserId: "",
       messageId: "msg_retry",
       aimResultId: "gen_1",
       workItemStore,
@@ -495,7 +917,7 @@ describe("approval-completion 反例：越权回调", () => {
       recordId: "rec_1",
       action: "approve",
       openId: "ou_attacker",
-      userId: "",
+      externalUserId: "",
       messageId: "msg_bad",
       aimResultId: "gen_1",
       workItemStore,

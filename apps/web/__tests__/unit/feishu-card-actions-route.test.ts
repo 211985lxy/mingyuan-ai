@@ -58,12 +58,32 @@ describe("feishu card-actions route", () => {
     const res = await POST(
       post({
         token: "tok",
+        open_message_id: "om_anonymous",
         action: { value: { action: "approve", recordId: "rec_1", workflowId: "content-growth-v1" } },
       }),
     )
     const body = await res.json()
     expect(body.toast.type).toBe("error")
     expect(body.toast.content).toMatch(/open_id|匿名/)
+    expect(processFeishuCardApproval).not.toHaveBeenCalled()
+  })
+
+  it("缺 open_message_id 拒绝，不生成 unknown_msg 幂等键", async () => {
+    const res = await POST(
+      post({
+        token: "tok",
+        open_id: "ou_reviewer",
+        action: {
+          value: {
+            action: "approve",
+            recordId: "rec_1",
+            workflowId: "content-growth-v1",
+          },
+        },
+      }),
+    )
+    const body = await res.json()
+    expect(body.toast.content).toMatch(/open_message_id/)
     expect(processFeishuCardApproval).not.toHaveBeenCalled()
   })
 
@@ -78,6 +98,7 @@ describe("feishu card-actions route", () => {
       post({
         token: "tok",
         open_id: "ou_reviewer",
+        user_id: "on_reviewer",
         open_message_id: "om_1",
         action: {
           value: {
@@ -95,6 +116,7 @@ describe("feishu card-actions route", () => {
     expect(processFeishuCardApproval).toHaveBeenCalledWith(
       expect.objectContaining({
         openId: "ou_reviewer",
+        externalUserId: "on_reviewer",
         recordId: "rec_1",
         action: "approve",
         aimResultId: "gen_1",
@@ -113,7 +135,14 @@ describe("feishu card-actions route", () => {
       post({
         token: "tok",
         open_id: "ou_reviewer",
-        action: { value: { action: "approve", recordId: "rec_1" } },
+        open_message_id: "om_retry",
+        action: {
+          value: {
+            action: "approve",
+            recordId: "rec_1",
+            workflowId: "content-growth-v1",
+          },
+        },
       }),
     )
     const body = await res.json()

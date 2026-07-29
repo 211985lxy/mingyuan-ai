@@ -1,6 +1,8 @@
 // AIM 经营治理：工作流责任与审批签字（WP-2）
 
-/** 业务 Owner / 系统 Owner / 审核人 / 备份 Owner 配置；缺配置 fail closed */
+/**
+ * 业务 Owner / 系统 Owner / 审核人 / 备份 Owner 配置；缺配置 fail closed
+ */
 model GovernanceAssignment {
   id             String   @id @default(cuid())
   scopeType      String   @db.VarChar(20) // system | workflow
@@ -8,6 +10,7 @@ model GovernanceAssignment {
   role           String   @db.VarChar(40) // business_owner | system_owner | reviewer | backup_owner
   userId         String?
   externalOpenId String?  @db.VarChar(120)
+  externalUserId String?  @db.VarChar(120)
   status         String   @default("active") @db.VarChar(20) // active | inactive
   effectiveAt    DateTime @default(now())
   createdAt      DateTime @default(now())
@@ -17,33 +20,46 @@ model GovernanceAssignment {
   @@index([role, status])
   @@index([userId])
   @@index([externalOpenId])
+  @@index([externalUserId])
 }
 
-/** 审批签字记录；requestId 幂等；effect* 支撑失败可重试、重放不重复完成 */
+/**
+ * 审批签字记录；requestId 幂等；effect* 支撑失败可重试、重放不重复完成
+ */
 model ApprovalDecision {
-  id                 String   @id @default(cuid())
-  subjectType        String   @db.VarChar(40) // work_item | generation | asset | memory | methodology | workflow_change
-  subjectId          String   @db.VarChar(191)
-  decision           String   @db.VarChar(20) // approve | reject | request_changes
-  reviewerUserId     String?
-  externalReviewerId String?  @db.VarChar(120)
-  roleSnapshot       String   @db.VarChar(80)
-  reason             String   @db.Text
-  source             String   @db.VarChar(20) // web | feishu_card | api
-  requestId          String   @unique @db.VarChar(120)
-  decidedAt          DateTime @default(now())
-  /** 工作流范围；历史行可为 null（unknown） */
-  workflowId         String?  @db.VarChar(120)
-  /** 项目范围；历史行可为 null（unknown） */
-  projectId          String?  @db.VarChar(191)
-  /** none | pending | applied | failed —— 侧效（完成/打回）可恢复状态 */
-  effectStatus       String   @default("none") @db.VarChar(20)
-  effectError        String?  @db.Text
-  createdAt          DateTime @default(now())
+  id                     String    @id @default(cuid())
+  subjectType            String    @db.VarChar(40) // work_item | generation | asset | memory | methodology | workflow_change
+  subjectId              String    @db.VarChar(191)
+  decision               String    @db.VarChar(20) // approve | reject | request_changes
+  reviewerUserId         String?
+  externalReviewerId     String?   @db.VarChar(120)
+  externalReviewerUserId String?   @db.VarChar(120)
+  roleSnapshot           String    @db.VarChar(80)
+  reason                 String    @db.Text
+  source                 String    @db.VarChar(20) // web | feishu_card | api
+  requestId              String    @unique @db.VarChar(120)
+  decidedAt              DateTime  @default(now())
+  /**
+   * 工作流范围；历史行可为 null（unknown）
+   */
+  workflowId             String?   @db.VarChar(120)
+  /**
+   * 项目范围；历史行可为 null（unknown）
+   */
+  projectId              String?   @db.VarChar(191)
+  /**
+   * none | pending | applied | failed —— 侧效（完成/打回）可恢复状态
+   */
+  effectStatus           String    @default("none") @db.VarChar(20)
+  effectError            String?   @db.Text
+  effectClaimToken       String?   @db.VarChar(191)
+  effectClaimedAt        DateTime?
+  createdAt              DateTime  @default(now())
 
   @@index([subjectType, subjectId])
   @@index([reviewerUserId])
   @@index([externalReviewerId])
+  @@index([externalReviewerUserId])
   @@index([decidedAt])
   @@index([workflowId, effectStatus])
 }

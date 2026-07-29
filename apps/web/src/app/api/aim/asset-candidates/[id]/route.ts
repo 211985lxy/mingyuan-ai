@@ -3,12 +3,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { reviewAssetCandidate } from "@/lib/aim/asset-candidate-store"
 import {
-  assertValidApprovalForHighRisk,
-} from "@/lib/aim/workflow-governance"
-import {
-  createPrismaApprovalDecisionStore,
-} from "@/lib/aim/approval-decision-prisma"
-import { loadApprovalForSubject } from "@/lib/aim/approval-decision-store"
+  validateHighRiskApproval,
+} from "@/lib/aim/approval-validation"
+import { prisma } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
 
@@ -38,14 +35,30 @@ export async function PATCH(
 
     const promote = body.promote === true
     if (promote) {
+      if (body.action !== "approve") {
+        return NextResponse.json({ error: "仅 approve 可执行 promote" }, { status: 400 })
+      }
+      const workflowId =
+        typeof body.workflowId === "string" ? body.workflowId.trim() : ""
+      if (!workflowId) {
+        return NextResponse.json({ error: "promote 缺少 workflowId" }, { status: 400 })
+      }
+      const candidate = await prisma.assetCandidate.findFirst({
+        where: { id, userId: user.id },
+        select: { projectId: true },
+      })
+      if (!candidate) {
+        return NextResponse.json({ error: "候选不存在或无权操作" }, { status: 404 })
+      }
       const approvalId = typeof body.approvalId === "string" ? body.approvalId : null
-      const store = createPrismaApprovalDecisionStore()
-      const approval = await loadApprovalForSubject(store, approvalId, "asset", id)
-      const gate = assertValidApprovalForHighRisk({
+      const gate = await validateHighRiskApproval({
         action: "promote",
-        approval,
+        approvalId,
         subjectType: "asset",
         subjectId: id,
+        workflowId,
+        projectId: candidate.projectId,
+        expectedRoles: ["reviewer", "business_owner", "backup_owner", "system_owner"],
       })
       if (!gate.ok) {
         return NextResponse.json({ error: gate.error }, { status: 403 })

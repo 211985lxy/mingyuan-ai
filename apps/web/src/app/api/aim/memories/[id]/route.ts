@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { approveAimMemoryCandidate, rejectAimMemoryCandidate } from "@/lib/aim-memory"
-import { assertValidApprovalForHighRisk } from "@/lib/aim/workflow-governance"
-import { createPrismaApprovalDecisionStore } from "@/lib/aim/approval-decision-prisma"
-import { loadApprovalForSubject } from "@/lib/aim/approval-decision-store"
+import { validateHighRiskApproval } from "@/lib/aim/approval-validation"
+import { prisma } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
 
@@ -33,14 +32,27 @@ export async function PATCH(
     }
 
     if (body.action === "approve") {
-      const store = createPrismaApprovalDecisionStore()
+      const workflowId =
+        typeof body.workflowId === "string" ? body.workflowId.trim() : ""
+      if (!workflowId) {
+        return NextResponse.json({ error: "promote 缺少 workflowId" }, { status: 400 })
+      }
+      const memory = await prisma.aimMemory.findFirst({
+        where: { id, userId: user.id },
+        select: { projectId: true },
+      })
+      if (!memory) {
+        return NextResponse.json({ error: "候选不存在或无权操作" }, { status: 404 })
+      }
       const approvalId = typeof body.approvalId === "string" ? body.approvalId : null
-      const approval = await loadApprovalForSubject(store, approvalId, "memory", id)
-      const gate = assertValidApprovalForHighRisk({
+      const gate = await validateHighRiskApproval({
         action: "promote",
-        approval,
+        approvalId,
         subjectType: "memory",
         subjectId: id,
+        workflowId,
+        projectId: memory.projectId,
+        expectedRoles: ["reviewer", "business_owner", "backup_owner", "system_owner"],
       })
       if (!gate.ok) {
         return NextResponse.json({ error: gate.error }, { status: 403 })

@@ -442,6 +442,7 @@ export interface GovernanceAssignmentItem {
   role: string
   userId: string | null
   externalOpenId: string | null
+  externalUserId: string | null
   status: string
   effectiveAt: string
   createdAt: string
@@ -454,7 +455,9 @@ export interface GovernanceAssignmentInput {
   role: "business_owner" | "system_owner" | "reviewer" | "backup_owner"
   userId?: string
   externalOpenId?: string
+  externalUserId?: string
   status?: "active" | "inactive"
+  effectiveAt?: string
 }
 
 export async function getGovernanceAssignments(params?: {

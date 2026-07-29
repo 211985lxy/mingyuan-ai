@@ -10,6 +10,7 @@ const {
     findMany: vi.fn(),
     count: vi.fn(),
     create: vi.fn(),
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
   }
@@ -32,6 +33,7 @@ function asAdminCtx() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  prisma.governanceAssignment.findFirst.mockResolvedValue(null)
 })
 
 describe("governance-assignments API", () => {
@@ -99,5 +101,61 @@ describe("governance-assignments API", () => {
     expect(recordAdminAudit).toHaveBeenCalledWith(
       expect.objectContaining({ action: "governance_assignment.deactivate" }),
     )
+  })
+
+  it.each([
+    {
+      name: "非法 effectiveAt",
+      body: {
+        scopeType: "workflow",
+        scopeId: "content-growth-v1",
+        role: "reviewer",
+        userId: "user_1",
+        effectiveAt: "not-a-date",
+      },
+    },
+    {
+      name: "system scope 配置业务 Owner",
+      body: {
+        scopeType: "system",
+        scopeId: "global",
+        role: "business_owner",
+        userId: "user_1",
+      },
+    },
+    {
+      name: "超长 scopeId",
+      body: {
+        scopeType: "workflow",
+        scopeId: "x".repeat(121),
+        role: "reviewer",
+        userId: "user_1",
+      },
+    },
+  ])("$name 返回 400", async ({ body }) => {
+    const req = new NextRequest("http://localhost/api/admin/governance-assignments", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+    })
+    const res = await POST(req, asAdminCtx() as never)
+    expect(res.status).toBe(400)
+    expect(prisma.governanceAssignment.create).not.toHaveBeenCalled()
+  })
+
+  it("重复 active scope/role 返回 409", async () => {
+    prisma.governanceAssignment.findFirst.mockResolvedValueOnce({ id: "ga_existing" })
+    const req = new NextRequest("http://localhost/api/admin/governance-assignments", {
+      method: "POST",
+      body: JSON.stringify({
+        scopeType: "workflow",
+        scopeId: "content-growth-v1",
+        role: "reviewer",
+        externalUserId: "on_reviewer",
+      }),
+      headers: { "content-type": "application/json" },
+    })
+    const res = await POST(req, asAdminCtx() as never)
+    expect(res.status).toBe(409)
   })
 })
