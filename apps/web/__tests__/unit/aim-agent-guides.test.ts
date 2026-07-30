@@ -126,8 +126,9 @@ describe("aim agent guides", () => {
     expect(traffic.prompt).not.toContain("通用故事")
 
     expect(lead.prompt).toContain("线索获客")
-    expect(lead.prompt).toContain("评论、私信或预约")
-    expect(lead.prompt).not.toContain("流量漏斗")
+    expect(lead.prompt).toContain("评论 / 私信 / 预约")
+    expect(lead.prompt).toContain("信任前置")
+    expect(lead.prompt).toContain("适合谁")
 
     expect(story.prompt).toContain("通用故事")
     expect(story.prompt).toContain("不强行推产品")
@@ -242,7 +243,7 @@ describe("aim agent guides", () => {
     const traffic = skills.find((s) => s.id === "traffic_funnel")
     expect(traffic?.prompt).toContain("强钩子")
     const lead = skills.find((s) => s.id === "lead_acquisition")
-    expect(lead?.prompt).toContain("评论、私信或预约")
+    expect(lead?.prompt).toContain("评论 / 私信 / 预约")
     const story = skills.find((s) => s.id === "general_story")
     expect(story?.prompt).toContain("不强行推产品")
   })

@@ -13,18 +13,36 @@ describe("aim agent skills", () => {
     expect(t.label).toBe("流量漏斗")
     expect(l.label).toBe("线索获客")
     expect(g.label).toBe("通用故事")
+  })
 
-    // 每条技能的 prompt 都只提自己的目的，不再出现"先判断 A/B/C"
-    expect(t.prompt).toContain("流量漏斗")
-    expect(t.prompt).not.toContain("线索获客")
-    expect(t.prompt).not.toContain("通用故事")
+  it("三条技能各有独立的写作手法，不混同", () => {
+    const [t, l, g] = CONTENT_PRODUCER_SKILLS
 
-    expect(l.prompt).toContain("线索获客")
-    expect(l.prompt).not.toContain("流量漏斗")
-    expect(l.prompt).not.toContain("通用故事")
+    // 流量漏斗：核心是停留/收藏/复看
+    expect(t.prompt).toContain("收藏")
+    expect(t.prompt).toContain("复看")
+    expect(t.prompt).toContain("可收藏性")
+    expect(t.prompt).toContain("句锚")
 
-    expect(g.prompt).toContain("通用故事")
-    expect(g.prompt).not.toContain("线索获客")
+    // 线索获客：核心是精准筛选 + CTA 承接
+    expect(l.prompt).toContain("适合谁")
+    expect(l.prompt).toContain("不适合谁")
+    expect(l.prompt).toContain("信任前置")
+    expect(l.prompt).toContain("CTA")
+
+    // 通用故事：核心是真实细节 + 信任资产
+    expect(g.prompt).toContain("细节颗粒度")
+    expect(g.prompt).toContain("顿悟时刻")
+    expect(g.prompt).toContain("人设一致性")
+    expect(g.prompt).toContain("不强行推产品")
+  })
+
+  it("三条技能互相有对比说明，帮助模型区分目的", () => {
+    const [, l, g] = CONTENT_PRODUCER_SKILLS
+    // 线索获客 prompt 里有跟流量漏斗的对比
+    expect(l.prompt).toContain("跟流量漏斗的区别")
+    // 通用故事 prompt 里有跟另外两类的对比
+    expect(g.prompt).toContain("跟另外两类的区别")
   })
 
   it("通用故事保留：人设故事/来时路/置顶视频 的特殊处理分支", () => {

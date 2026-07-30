@@ -1,0 +1,24 @@
+# pre-commit: 提交前轻量检查（只跑 typecheck，约 4 秒）
+# 设计原则：快、不打扰——只在改了 .ts/.tsx 时跑；改文档/md 时直接放行。
+# 想跳过本次检查（紧急情况）：git commit --no-verify
+
+# 1. 只看暂存（已 git add）的文件里，有没有 .ts/.tsx
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+if [ -z "$STAGED_TS" ]; then
+  # 没改代码（只改了文档/配置），直接放行
+  exit 0
+fi
+
+# 2. 跑 typecheck（只在 apps/web，约 4 秒）
+echo "── pre-commit: 检测到 TS 改动，跑 typecheck（约 4s，--no-verify 可跳过）──"
+if [ -f apps/web/package.json ]; then
+  (cd apps/web && pnpm typecheck)
+  if [ $? -ne 0 ]; then
+    echo ""
+    echo "✗ typecheck 失败。请修完再提交。"
+    echo "  想紧急跳过：git commit --no-verify（不推荐，会让坏代码进仓）"
+    exit 1
+  fi
+fi
+
+echo "✓ typecheck 通过"
