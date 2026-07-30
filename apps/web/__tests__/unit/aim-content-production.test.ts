@@ -399,16 +399,16 @@ describe("AIM content production positioning", () => {
     expect(sop).toContain("结构重构、观点重构、表达重构")
   })
 
-  it("prefills benchmark recreation with short intent only (SOP stays server-side)", () => {
-    expect(BENCHMARK_RECREATION_PREFILL.short).toContain("创作成适合我自己的口播文案")
+  it("treats video-copy handoff as enter content producer, not a create prompt", () => {
+    expect(BENCHMARK_RECREATION_PREFILL.handoff).toBe("")
+    expect(BENCHMARK_RECREATION_PREFILL.short).toContain("写出口播文案")
     expect(BENCHMARK_RECREATION_PREFILL.short).not.toContain("先按拆解好的爆款结构逻辑走")
     expect(BENCHMARK_RECREATION_PREFILL.long).toContain("完整长篇文案")
-    expect(BENCHMARK_RECREATION_PREFILL.long).not.toContain("先按拆解好的爆款结构逻辑走")
   })
 
-  it("builds visible prefill without dumping creation SOP into the composer", () => {
+  it("builds handoff prefill with materials only (no create instruction)", () => {
     const prefill = buildBenchmarkMaterialPrefill({
-      intent: "short",
+      intent: "handoff",
       videoTitle: "测试标题",
       transcript: "对标正文内容",
       analysis: "拆解摘要",
@@ -417,6 +417,7 @@ describe("AIM content production positioning", () => {
     expect(prefill).toContain("对标标题：测试标题")
     expect(prefill).toContain("对标原文：")
     expect(prefill).toContain("已有拆解：")
+    expect(prefill).not.toContain("请基于")
     expect(prefill).not.toContain("创作原则")
     expect(prefill).not.toContain("爆款选题再创作 SOP")
     expect(prefill).not.toContain("至少 30%")

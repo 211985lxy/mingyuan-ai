@@ -7,8 +7,10 @@ export const BENCHMARK_RECREATION_SOP_RULES = [
 ]
 
 export const BENCHMARK_RECREATION_PREFILL = {
-  short: "请基于下面这条对标文案和已有拆解，创作成适合我自己的口播文案。",
-  long: "请基于下面这条长对标文案和已有拆解，创作一篇适合我自己的完整长篇文案。",
+  /** 从爆款拆解带入：只进文案创作台，不预写创作指令 */
+  handoff: "",
+  short: "请基于下面这条对标文案和已有拆解，写出口播文案。",
+  long: "请基于下面这条长对标文案和已有拆解，写一篇完整长篇文案。",
   rewrite: "请按对标原文重新生成一版文案，直接输出最终稿。",
 }
 
@@ -26,7 +28,7 @@ export function buildBenchmarkRecreationSopBlock() {
 }
 
 /**
- * @description 构建对标再创作时用户可见输入：只带意图 + 材料，不塞创作原则/SOP
+ * @description 构建进入文案创作时用户可见输入：只带材料（可选短意图），不塞创作原则/SOP
  */
 export function buildBenchmarkMaterialPrefill(input: {
   intent?: keyof typeof BENCHMARK_RECREATION_PREFILL
@@ -35,10 +37,10 @@ export function buildBenchmarkMaterialPrefill(input: {
   analysis?: string | null
   currentDraft?: string | null
 }) {
-  const intent = BENCHMARK_RECREATION_PREFILL[input.intent || "short"]
+  const intent = BENCHMARK_RECREATION_PREFILL[input.intent || "handoff"].trim()
   return [
-    intent,
-    "",
+    intent || null,
+    intent ? "" : null,
     input.videoTitle?.trim() ? `对标标题：${input.videoTitle.trim()}` : null,
     input.transcript?.trim() ? `对标原文：\n${input.transcript.trim()}` : null,
     input.analysis?.trim() ? `\n已有拆解：\n${input.analysis.trim()}` : null,

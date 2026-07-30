@@ -352,9 +352,9 @@ const topComments = analysis?.topComments ?? []
 
       {record?.status === "completed" && record.transcript ? (
         <AiResultPanel
-          title="再创作成我的文案"
+          title="进入文案创作"
           icon={<Wand2 className="h-4 w-4 text-primary" />}
-          meta={<span>带入原文案和拆解结果，再创作规则已内置</span>}
+          meta={<span>带入原文案和拆解结果</span>}
           flat
           actions={
             <Link
@@ -362,12 +362,12 @@ const topComments = analysis?.topComments ?? []
               className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               <Wand2 className="h-4 w-4" />
-              再创作内容资产包
+              进入文案创作
             </Link>
           }
         >
           <p className="text-sm leading-6 text-muted-foreground">
-            再创作会在内容文案创作里进行：只带入本参考文案和拆解结果，爆款再创作规则在后台自动生效。
+            打开内容文案创作，并带入本参考文案和拆解；再创作规则在后台自动生效，你在文案创作里继续写就行。
           </p>
         </AiResultPanel>
       ) : null}

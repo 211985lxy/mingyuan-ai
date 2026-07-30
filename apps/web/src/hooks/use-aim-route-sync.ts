@@ -184,9 +184,9 @@ export function useAimVideoCopyPrefill(input: {
       .then((record) => {
         if (!active) return
         const analysis = formatAnalysisResultForPrompt(record.analysisResult) || ""
-        // 创作原则/SOP 已由服务端 buildRawInputWithVideoCopyContext 内置，输入框只带材料
+        // 只带材料进入文案创作；创作原则/SOP 由服务端内置
         const prefill = buildBenchmarkMaterialPrefill({
-          intent: "short",
+          intent: "handoff",
           videoTitle: record.videoTitle,
           transcript: record.transcript,
           analysis: record.analysisResult ? analysis : null,
@@ -208,7 +208,7 @@ export function useAimVideoCopyPrefill(input: {
           setters.setSelectedMethodologyProfileIds?.([])
           clearEphemeral?.()
         })
-        toast.success("已带入对标文案")
+        toast.success("已带入对标文案，进入文案创作")
       })
       .catch(() => toast.error("对标文案加载失败"))
       .finally(() => {
