@@ -28,7 +28,6 @@ import { runAimWorkbenchNewTaskReset, clearAimWorkbenchEphemeralState } from "@/
 import { useAimPendingNewCopy } from "@/features/aim/hooks/use-aim-pending-new-copy"
 import { useAimEphemeralIsolation } from "@/features/aim/hooks/use-aim-ephemeral-isolation"
 import {
-  extractPersonaProgress as extractProgress,
   findLatestAimVideoDeliverableMessageId,
 } from "@/lib/aim/workbench-helpers"
 import type { AimAgentId } from "@/lib/aim-ui-config"
@@ -60,9 +59,10 @@ export function useAimWorkbench() {
     ideaParam, workflowStageParam, generationIdParam } = params
 
   // ---- Draft-based initialization ----
-  const explicitInitialScope = modeParam === "quick" ? "quick" : projectIdParam || undefined
+  // Always default to the customer's project. Legacy mode=quick deep links no longer force empty scope.
+  const explicitInitialScope = projectIdParam || undefined
   const [initialDraft] = useState<AimDraft | null>(() => loadAimDraft(activeAgentId, explicitInitialScope))
-  const initialQuickMode = modeParam === "quick" || (!projectIdParam && initialDraft?.selectedProjectId === "")
+  const initialQuickMode = false
   const [selectedAgentId, setSelectedAgentId] = useState<AimAgentId>(() => agentParam ? activeAgentId : initialDraft?.selectedAgentId || activeAgentId)
   const { agentModule, setAgentModule } = useAimCopyStudioMode({ selectedAgentId, initialModule: initialDraft?.agentModule })
   // ADR-002：本次选中的命名方法论 profile id（MVP 最多 1 个；从 draft 恢复）
@@ -243,12 +243,7 @@ export function useAimWorkbench() {
   useAimHistoryLoad({ loadTargetId, generationIdParam, history: storeHistory, selectedAgentId, router, searchParams, lastAgentParamRef, clearLoadTarget, openEditorFromResult: syncEditorFromResultProxy, setters: routeSetters })
   useAimMessageAutoScroll({ scrollRef, pendingMessageIdRef: pendingScrollMessageIdRef, messages, isThinking, isGenerating })
 
-  // ---- Persona progress ----
-  const personaProgress = useMemo(() => {
-    if (agent.id !== "persona") return null
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
-    return lastAssistant ? extractProgress(lastAssistant.content) : null
-  }, [messages, agent.id])
+  // 人设故事已并入内容创作「通用故事」，不再单独追踪来时路进度
 
   // ---- Generation actions ----
   const { generateWithInput, stopGeneration: handleStop, repurposeDeliverable: handleRepurpose, checkDeliverableQuality: handleQuality } = useAimGenerationActions({
@@ -462,7 +457,6 @@ export function useAimWorkbench() {
     currentWorkflowStage, showWorkflowLanding,
     workflowBrief, workflowBriefForm, workflowBriefDialogOpen, isBuildingWorkflowBrief, contentAction,
     projects, selectedProjectId, projectEnabled, projectAccessError, projectWorkflowRecords, isLoadingProjectWorkflow,
-    personaProgress,
     isEvolving, evolutionSuggestions,
     recordDialog, closeRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm,
     retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow,

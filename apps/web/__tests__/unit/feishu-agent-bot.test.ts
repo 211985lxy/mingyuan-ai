@@ -162,7 +162,7 @@ describe("getBotRoleConstraint", () => {
     expect(getBotRoleConstraint("business_system_diagnosis")).toContain("商业诊断")
     expect(getBotRoleConstraint("business_diagnosis")).toContain("选题策划")
     expect(getBotRoleConstraint("content_review")).toContain("发布质检")
-    expect(getBotRoleConstraint("persona")).toContain("人设故事")
+    expect(getBotRoleConstraint("content_producer")).toContain("通用故事")
   })
 })
 
@@ -233,9 +233,9 @@ describe("buildWorkItemCard", () => {
 // ─── feishu-agent-registry ─────────────────────────────────────
 
 describe("registry", () => {
-  it("loadAgentBotRegistry 返回 6 个 bot", () => {
+  it("loadAgentBotRegistry 返回 5 个 bot", () => {
     const registry = loadAgentBotRegistry()
-    expect(registry.length).toBe(6)
+    expect(registry.length).toBe(5)
   })
 
   it("resolveBotByVerificationToken 正确识别 bot", () => {

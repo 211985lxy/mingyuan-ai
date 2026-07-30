@@ -294,7 +294,6 @@ function FlowDiagram({
   const orderedIds = [
     "business_system_diagnosis",
     "business_diagnosis",
-    "persona",
     "content_producer",
     "work_editor",
     "content_review",

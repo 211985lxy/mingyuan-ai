@@ -103,7 +103,6 @@ describe("agent router timeout overrides", () => {
       "business_diagnosis",
       "business_system_diagnosis",
       "content_review",
-      "persona",
     ]
 
     for (const agentId of textAgents) {
@@ -120,7 +119,6 @@ describe("agent router timeout overrides", () => {
       "business_diagnosis",
       "business_system_diagnosis",
       "content_review",
-      "persona",
     ]
 
     for (const agentId of textAgents) {

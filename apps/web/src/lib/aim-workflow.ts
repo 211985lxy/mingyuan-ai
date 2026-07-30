@@ -27,13 +27,11 @@ export const AIM_CONTENT_ACTIONS: Array<{
   { id: "new_copy", title: "新写一版", prompt: "请基于当前项目资料，新写一版可直接发布的内容。", taskType: "write_script" },
   { id: "edit_current", title: "修改当前稿", prompt: "请只修改我指定的部分，未指定段落必须保持原意和结构。", taskType: "polish_copy" },
   { id: "rewrite_reference", title: "按对标重写", prompt: "请按我提供的对标内容重写，保留结构价值，不复用原句。", taskType: "write_script" },
-  { id: "repurpose", title: "拆成多平台", prompt: "请把当前内容拆成适合不同平台发布的版本。", taskType: "repurpose" },
 ]
 
 const STAGE_BY_AGENT: Partial<Record<AimAgentId, AimWorkflowStage>> = {
   business_diagnosis: "direction",
   business_system_diagnosis: "direction",
-  persona: "direction",
   content_producer: "content",
   free_copywriter: "content",
   work_editor: "publish",

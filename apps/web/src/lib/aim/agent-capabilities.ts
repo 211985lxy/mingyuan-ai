@@ -49,7 +49,8 @@ export const AIM_AGENT_CAPABILITIES = {
     videoCopyExtraction: true,
     benchmarkReference: true,
     styleSample: true,
-    contentModeSelector: true,
+    // 创作模式（社媒/长文/朋友圈）与「内容目的」三技能抢戏，默认关闭
+    contentModeSelector: false,
     publishCheck: true,
   },
   // 已并入内容创作自由模式；保留历史调用能力边界
@@ -80,14 +81,6 @@ export const AIM_AGENT_CAPABILITIES = {
   // 粘贴平台导出文档进数；不产出可发布稿件，不开发布前自查
   content_retro: {
     pasteMode: "analytics",
-    videoCopyExtraction: false,
-    benchmarkReference: false,
-    styleSample: false,
-    contentModeSelector: false,
-    publishCheck: false,
-  },
-  persona: {
-    pasteMode: "plain",
     videoCopyExtraction: false,
     benchmarkReference: false,
     styleSample: false,

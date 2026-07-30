@@ -22,7 +22,7 @@ export interface AimChannelIntent {
 export const COMMAND_ALIASES: readonly Readonly<{ agentId: AimAgentId; aliases: readonly string[] }>[] = Object.freeze([
   {
     agentId: "content_producer",
-    aliases: ["内容创作", "内容文案", "内容文案创作", "内容创作官", "写文案", "口播", "短视频", "社媒", "种草"],
+    aliases: ["内容创作", "内容文案", "内容文案创作", "内容创作官", "写文案", "口播", "短视频", "社媒", "种草", "人设", "人设故事", "人设故事官", "人设梳理官", "人设故事梳理", "人设梳理", "来时路", "置顶视频"],
   },
   {
     agentId: "work_editor",
@@ -47,10 +47,6 @@ export const COMMAND_ALIASES: readonly Readonly<{ agentId: AimAgentId; aliases: 
   {
     agentId: "content_retro",
     aliases: ["复盘", "数据复盘", "内容复盘"],
-  },
-  {
-    agentId: "persona",
-    aliases: ["人设", "人设故事", "人设故事官", "人设梳理官", "人设故事梳理", "人设梳理", "来时路", "置顶视频"],
   },
 ].map(({ agentId, aliases }) => Object.freeze({ agentId: agentId as AimAgentId, aliases: Object.freeze([...aliases]) })))
 
@@ -157,6 +153,6 @@ export function buildAimChannelHelpText(): string {
     "在群里 @我 并用 /命令 指定智能体，例如：",
     ...lines.map((l) => `  ${l} 你的需求`),
     "",
-    "可用智能体：商业诊断、选题策划、内容创作、作品编辑、发布质检、人设故事。",
+    "可用智能体：商业诊断、选题策划、内容创作、作品编辑、发布质检。",
   ].join("\n")
 }

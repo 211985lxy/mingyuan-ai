@@ -21,6 +21,7 @@ import {
   buildProducerSystemPrompt,
   buildWorkflowContext,
   ensureContentCreationTrace,
+  findIncompleteGenerationFormats,
 } from "@/lib/aim-generation-prompts"
 import {
   AIM_OUTPUT_MAX_CHARS,
@@ -77,6 +78,38 @@ describe("AIM content production positioning", () => {
     expect(FORMAT_INSTRUCTIONS.video_script).toContain("根据内容完整性决定篇幅")
     expect(FORMAT_INSTRUCTIONS.video_script).not.toContain("200-500")
     expect(FORMAT_INSTRUCTIONS.koubo_script).toBe(FORMAT_INSTRUCTIONS.video_script)
+  })
+
+  it("rejects a spoken script that ends halfway through a sentence", () => {
+    expect(findIncompleteGenerationFormats({
+      parsed: {
+        video_script: "AI工具开始被退订了。你以为换成工具就能增长，但不少公司这么干完之后，获客",
+      },
+      targetFormats: ["video_script"],
+      rawInput: "帮我写一条完整口播文案",
+      finishReason: "stop",
+    })).toEqual(["video_script"])
+  })
+
+  it("accepts a deliberately short but complete spoken script", () => {
+    expect(findIncompleteGenerationFormats({
+      parsed: { video_script: "别急着换工具，先把获客路径想清楚。" },
+      targetFormats: ["video_script"],
+      rawInput: "写一句不超过30字的短口播",
+      finishReason: "stop",
+    })).toEqual([])
+  })
+
+  it("rejects every format when the model reports token truncation", () => {
+    expect(findIncompleteGenerationFormats({
+      parsed: {
+        video_script: "这是完整句子。",
+        moments_post: "朋友圈正文。",
+      },
+      targetFormats: ["video_script", "moments_post"],
+      rawInput: "生成内容",
+      finishReason: "length",
+    })).toEqual(["video_script", "moments_post"])
   })
 
   it("learns shared style from five to ten samples without stitching or copying them", () => {
@@ -251,7 +284,7 @@ describe("AIM content production positioning", () => {
     expect(workEditor?.description).toMatch(/二改|排版|小红书/)
     expect(workEditor?.description).not.toMatch(/深度长文|从零/)
     expect(workEditor?.defaultFormats).toEqual(["raw_copy"])
-    expect(contentProducer?.description).toMatch(/深度长文|长文/)
+    expect(contentProducer?.description).toMatch(/流量漏斗|线索获客|通用故事/)
   })
 
   it("positions content_review as the publish quality agent", () => {

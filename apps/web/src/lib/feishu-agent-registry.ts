@@ -76,7 +76,6 @@ export const FEISHU_AGENT_BOT_META = freezeBotMeta({
   business_system_diagnosis: { displayName: "商业诊断", workflowId: "sales_diagnosis" },
   business_diagnosis: { displayName: "选题策划", workflowId: "sales_diagnosis" },
   content_review: { displayName: "发布质检", workflowId: "content_growth" },
-  persona: { displayName: "人设故事", workflowId: "content_growth" },
 })
 
 /** 环境变量前缀映射 */
@@ -86,7 +85,6 @@ export const FEISHU_AGENT_BOT_ENV_PREFIX: Readonly<Record<string, string>> = Obj
   business_system_diagnosis: "FEISHU_BOT_BIZ_DIAGNOSIS",
   business_diagnosis: "FEISHU_BOT_TOPIC_PLANNER",
   content_review: "FEISHU_BOT_CONTENT_REVIEW",
-  persona: "FEISHU_BOT_PERSONA",
 })
 
 export const FEISHU_AGENT_BOT_IDS: readonly AimAgentId[] = Object.freeze([
@@ -95,7 +93,6 @@ export const FEISHU_AGENT_BOT_IDS: readonly AimAgentId[] = Object.freeze([
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",
-  "persona",
 ])
 
 /**

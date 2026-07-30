@@ -60,20 +60,6 @@ export function getAimEditorPanelLabels(agentId: AimAgentId, editorFormat?: Cont
     }
   }
 
-  if (agentId === "persona") {
-    return {
-      title: "人设策划案编辑",
-      collapsedTitle: "展开人设策划案编辑",
-      referenceTitle: "人物材料",
-      referencePlaceholder: "暂无人物材料",
-      draftTitle: "我的人设策划案",
-      draftPlaceholder: "AI 生成的人设策划案会出现在这里，也可以直接粘贴/编辑。",
-      currentLabel: "当前人设策划案",
-      selectActionLabel: "修改选中策划案",
-      documentType: "plan",
-    }
-  }
-
   return {
     title: "策划案编辑",
     collapsedTitle: "展开策划案编辑",

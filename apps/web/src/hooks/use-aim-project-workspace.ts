@@ -74,7 +74,7 @@ export function useAimProjectWorkspace(input: { initialProjectId: string; quickM
           const next = selectAuthorizedProjectId(requested, items)
           if (requested && !next) {
             invalidProjectIdRef.current = requested
-            setProjectAccessError("这个客户全案已失效或你无权访问，请重新选择")
+            setProjectAccessError("这个客户全案已失效或你无权访问，请联系管理员开通权限。")
             return ""
           }
           invalidProjectIdRef.current = null
@@ -91,7 +91,7 @@ export function useAimProjectWorkspace(input: { initialProjectId: string; quickM
       if (!active) return
       setSelectedProjectId("")
       setProjectEnabled(!quickMode)
-      setProjectAccessError(quickMode ? null : "客户全案读取失败，请切换到快速出稿或稍后重试")
+      setProjectAccessError(quickMode ? null : "客户全案读取失败，请稍后重试。")
     })
     return () => {
       active = false

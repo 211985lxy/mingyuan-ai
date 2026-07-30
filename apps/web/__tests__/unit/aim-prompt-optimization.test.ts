@@ -82,7 +82,7 @@ describe("format inference + routing", () => {
   })
 
   it("channel aliases cover 人设梳理官 and 自由撰稿人", () => {
-    expect(resolveAimChannelIntent("/人设梳理官 开始").agentId).toBe("persona")
+    expect(resolveAimChannelIntent("/人设梳理官 开始").agentId).toBe("content_producer")
     expect(resolveAimChannelIntent("/自由撰稿人 写一段").agentId).toBe("free_copywriter")
   })
 })

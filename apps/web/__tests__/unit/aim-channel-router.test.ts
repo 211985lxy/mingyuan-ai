@@ -62,7 +62,7 @@ describe("resolveAimChannelIntent", () => {
     expect(resolveAimChannelIntent("/商业诊断 流量上不来").agentId).toBe("business_system_diagnosis")
     expect(resolveAimChannelIntent("/选题 给我几个题").agentId).toBe("business_diagnosis")
     expect(resolveAimChannelIntent("/质检 看看能不能发").agentId).toBe("content_review")
-    expect(resolveAimChannelIntent("/人设 讲讲来时路").agentId).toBe("persona")
+    expect(resolveAimChannelIntent("/人设 讲讲来时路").agentId).toBe("content_producer")
     expect(resolveAimChannelIntent("/自由 按我说的写").agentId).toBe("free_copywriter")
   })
 
@@ -106,6 +106,7 @@ describe("help text", () => {
 
     expect(new Set(agentIds)).toEqual(new Set(AIM_AGENT_IDS))
     expect(commands).toHaveLength(AIM_AGENT_IDS.size)
+    expect(agentIds).not.toContain("persona")
   })
 
   it("帮助文案包含示例与全部智能体", () => {
@@ -113,6 +114,6 @@ describe("help text", () => {
     expect(help).toContain("/命令")
     expect(help).toContain("内容创作")
     expect(help).toContain("作品编辑")
-    expect(help).toContain("人设故事")
+    expect(help).not.toContain("人设故事")
   })
 })

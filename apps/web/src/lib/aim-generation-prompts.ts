@@ -195,6 +195,31 @@ export function composeLayeredAimPrompt(input: LayeredAimPromptInput): string {
   return sections.filter(Boolean).join("\n\n")
 }
 
+const METHOD_NOTE_BLOCK = /\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/
+const COMPLETE_SENTENCE_END = /[。！？!?…」』）)\]”’"'](?:[*_`#\s]*)$/u
+const SHORT_OUTPUT_REQUEST = /(一句话?|标题|口号|金句|不超过\s*\d+\s*字|\d+\s*字以内|(?:10|15|20)\s*秒)/
+const SPOKEN_SCRIPT_FORMATS = new Set<ContentFormat>(["video_script", "koubo_script"])
+
+/**
+ * 拦住明显被截断的成稿：模型报告长度耗尽、正文为空，或正常口播只有残句。
+ */
+export function findIncompleteGenerationFormats(input: {
+  parsed: Partial<Record<ContentFormat, string | undefined>>
+  targetFormats: ContentFormat[]
+  rawInput: string
+  finishReason?: string | null
+}): ContentFormat[] {
+  if (input.finishReason === "length") return [...input.targetFormats]
+  const allowsShort = SHORT_OUTPUT_REQUEST.test(input.rawInput)
+
+  return input.targetFormats.filter((format) => {
+    const body = (input.parsed[format] || "").replace(METHOD_NOTE_BLOCK, "").trim()
+    if (!body) return true
+    if (!SPOKEN_SCRIPT_FORMATS.has(format) || allowsShort) return false
+    return body.length < 80 || (body.length < 300 && !COMPLETE_SENTENCE_END.test(body))
+  })
+}
+
 /**
  * @description 执行 LLM 生成并带对标抄袭检测重试
  * @param agentId - 智能体 ID
@@ -218,6 +243,12 @@ export async function executeGenerateLLMWithBenchmarkRetry(
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
+    const incompleteFormats = isLightEdit ? [] : findIncompleteGenerationFormats({
+      parsed,
+      targetFormats,
+      rawInput: context.rawInput || "",
+      finishReason: completion.finishReason,
+    })
 
     const goalVerify = !isLightEdit && methodologyPlan
       ? verifyMethodologyGoal(
@@ -230,11 +261,15 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       safety.copiedFormats.length === 0
       && safety.unsupportedClaimFormats.length === 0
       && safety.lightEditScopeViolationFormats.length === 0
+      && incompleteFormats.length === 0
       && goalVerify.ok
     ) {
       return { completion, parsed, goalVerify }
     }
     if (attempt === 2) {
+      if (incompleteFormats.length) {
+        throw new Error("生成结果连续被截断或正文过短，已停止交付，请重试本次请求")
+      }
       if (
         safety.copiedFormats.length
         || safety.unsupportedClaimFormats.length
@@ -248,7 +283,15 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       return { completion, parsed, goalVerify }
     }
 
-    if (
+    if (incompleteFormats.length) {
+      activePrompt = `${userPrompt}
+
+【完整性重试】
+上一版在正文中途结束或篇幅不足，不能交付。请重新完整输出 ${incompleteFormats.join("、")}：
+- 减少内部推理，优先保证正文完整。
+- 口播必须有完整开头、展开和收束，禁止停在半句话。
+- 每种格式都必须以完整句子结束，并保留 ===FORMAT:格式名=== 标记。`
+    } else if (
       safety.copiedFormats.length
       || safety.unsupportedClaimFormats.length
       || safety.lightEditScopeViolationFormats.length

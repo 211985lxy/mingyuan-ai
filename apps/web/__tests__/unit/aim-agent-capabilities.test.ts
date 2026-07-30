@@ -23,14 +23,14 @@ describe("AIM agent capability matrix", () => {
     expect(getAimAgentCapabilities("not_a_real_agent").videoCopyExtraction).toBe(false)
   })
 
-  it("lets content_producer use video / benchmark / style / content mode", () => {
+  it("lets content_producer use video / benchmark / style, without content-mode switcher", () => {
     const caps = getAimAgentCapabilities("content_producer")
     expect(caps).toMatchObject({
       pasteMode: "creative",
       videoCopyExtraction: true,
       benchmarkReference: true,
       styleSample: true,
-      contentModeSelector: true,
+      contentModeSelector: false,
     })
   })
 

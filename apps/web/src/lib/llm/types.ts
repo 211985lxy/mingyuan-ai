@@ -23,6 +23,8 @@ export interface CompletionResult {
   content: string
   model: string
   provider: string
+  /** 模型停止原因；length 表示输出预算耗尽，正文可能被截断。 */
+  finishReason?: string | null
   usage?: {
     promptTokens: number
     completionTokens: number

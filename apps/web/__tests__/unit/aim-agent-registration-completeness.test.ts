@@ -58,9 +58,6 @@ const REGISTRATION_TABLES: RegistrationTable[] = [
     file: "src/lib/aim-knowledge-context.ts",
     table: "AGENT_PRIORITY_CATEGORIES",
     actualIds: Object.keys(AGENT_PRIORITY_CATEGORIES),
-    exemptions: {
-      persona: "人设故事没有专属知识排序，使用默认的定位、老板经历、痛点和案例优先级。",
-    },
   },
   {
     file: "src/lib/aim-context-compressor.ts",
@@ -68,24 +65,17 @@ const REGISTRATION_TABLES: RegistrationTable[] = [
     actualIds: Object.keys(COMPRESSION_PROFILES),
     exemptions: {
       free_copywriter: "自由文案没有固定交付物，使用通用摘要重点，避免把创作限制成预设模板。",
-      persona: "人设故事依赖追问过程，使用通用摘要重点，避免预先丢掉用户故事线索。",
     },
   },
   {
     file: "src/lib/agent-api-contract.ts",
     table: "AGENT_AIM_AGENT_IDS",
     actualIds: AGENT_AIM_AGENT_IDS,
-    exemptions: {
-      persona: "人设故事需要在控制台里持续追问和确认，不开放给只负责单次草稿交付的对外 Agent API。",
-    },
   },
   {
     file: "src/app/api/account/agent-keys/route.ts",
     table: "AGENT_AGENT_ALLOWLIST",
     actualIds: AGENT_AGENT_ALLOWLIST,
-    exemptions: {
-      persona: "API Key 只允许调用对外 Agent API 已开放的智能体；人设故事不在该 API 的单次草稿范围内。",
-    },
   },
   {
     file: "src/lib/feishu-agent-registry.ts",

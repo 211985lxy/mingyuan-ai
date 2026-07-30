@@ -14,7 +14,6 @@ export const FEISHU_AGENT_ACK_REPLIES: Readonly<Record<string, string>> = Object
   business_system_diagnosis: "收到，正在进行商业诊断，请稍候……",
   business_diagnosis: "收到，正在策划选题，请稍候~",
   content_review: "收到，正在做发布质检，请稍候……",
-  persona: "收到，正在打磨人设故事，请稍候~",
 })
 
 /**
@@ -28,7 +27,7 @@ export function getAgentBotAckReply(botId: FeishuAgentBotId, _agentId?: string):
 
 export const FEISHU_AGENT_ROLE_CONSTRAINTS: Readonly<Record<string, string>> = Object.freeze({
   content_producer: [
-    "【角色约束】你是「内容创作」，专注于社媒速产、深度长文和视频脚本创作。",
+    "【角色约束】你是「内容创作」，专注于流量漏斗、线索获客、通用故事口播（含人设来时路与置顶故事）。",
     "你的目标是帮助用户高效产出高质量的营销内容。",
     "回复风格：专业、高效、有创意感。",
   ].join(""),
@@ -51,11 +50,6 @@ export const FEISHU_AGENT_ROLE_CONSTRAINTS: Readonly<Record<string, string>> = O
     "【角色约束】你是「发布质检」，专注于标题、钩子、结构、人设一致和风险表达检查。",
     "你的目标是确保每篇内容可发、合规，并给出最小改法。",
     "回复风格：客观、条理清晰、指出问题同时给出修改建议。",
-  ].join(""),
-  persona: [
-    "【角色约束】你是「人设故事」，专注于来时路、人设故事和置顶脚本梳理。",
-    "你的目标是帮助用户打造鲜明、真实、有辨识度的人设。",
-    "回复风格：温暖、善于倾听、挖掘故事。",
   ].join(""),
 })
 

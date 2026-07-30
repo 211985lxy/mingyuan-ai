@@ -241,10 +241,7 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
     return "light_edit"
   }
 
-  // persona 智能体默认走定位策划（新任务场景，非轻改/重写）
-  if (input.agentId === "persona") {
-    return "positioning_topic"
-  }
+  // 轻改已处理完毕
 
   if (asksForRewrite) {
     return "rewrite_copy"

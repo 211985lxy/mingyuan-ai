@@ -20,7 +20,7 @@ const actions = {
 }
 
 describe("AIM message stream", () => {
-  it("renders content quick actions when the content stage conversation is empty", () => {
+  it("renders intro only when the conversation is empty", () => {
     const html = renderToStaticMarkup(createElement(AimMessageStream, {
       messages: [],
       busy: false,
@@ -28,13 +28,12 @@ describe("AIM message stream", () => {
       workflowStage: "content",
       selectedAgentId: "content_producer",
       selectedProjectId: "",
-      onBeginContentAction: vi.fn(),
       actions,
     }))
 
     expect(html).toContain("内容工作台")
-    expect(html).toContain("新写一版")
-    expect(html).toContain("修改当前稿")
+    expect(html).not.toContain("新写一版")
+    expect(html).not.toContain("修改当前稿")
   })
 
   it("keeps method notes, assistant output and choices visible", () => {
@@ -46,7 +45,6 @@ describe("AIM message stream", () => {
       workflowStage: "content",
       selectedAgentId: "content_producer",
       selectedProjectId: "project-1",
-      onBeginContentAction: vi.fn(),
       actions,
     }))
 

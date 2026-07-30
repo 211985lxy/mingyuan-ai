@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button"
 import { getAimAgentGuide, type AimNextAction } from "@/lib/aim-agent-guides"
 import { extractReplacementDraft } from "@/lib/aim-editor"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
-import { agentAllowsContentModeSelector } from "@/lib/aim/agent-capabilities"
-import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
+import type { AimWorkflowStage } from "@/lib/aim-workflow"
 import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-groups"
 import { splitAimMethodNote } from "@/lib/aim/workbench-display"
 import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
@@ -137,13 +136,16 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
   </div>
 }
 
-function EmptyMessageState({ agentIntro, workflowStage, selectedAgentId, onBeginContentAction }: {
+function EmptyMessageState({ agentIntro }: {
   agentIntro: string
-  workflowStage: AimWorkflowStage
-  selectedAgentId: AimAgentId
-  onBeginContentAction: (action: AimContentAction) => void
 }) {
-  return <div className="mx-auto flex w-full max-w-3xl flex-col py-6"><div className="max-w-2xl text-left"><p className="line-clamp-3 text-base leading-7 text-muted-foreground">{agentIntro}</p>{workflowStage === "content" && agentAllowsContentModeSelector(selectedAgentId) ? <div className="mt-4 flex flex-wrap gap-2">{AIM_CONTENT_ACTIONS.map((action) => <Button key={action.id} size="sm" variant="outline" className="h-9 rounded-md text-sm" onClick={() => onBeginContentAction(action.id)}>{action.title}</Button>)}</div> : null}</div></div>
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col py-6">
+      <div className="max-w-2xl text-left">
+        <p className="line-clamp-3 text-base leading-7 text-muted-foreground">{agentIntro}</p>
+      </div>
+    </div>
+  )
 }
 
 interface AimMessageStreamProps {
@@ -154,7 +156,6 @@ interface AimMessageStreamProps {
   selectedAgentId: AimAgentId
   selectedProjectId: string
   latestDeliverableMessageId?: string
-  onBeginContentAction: (action: AimContentAction) => void
   actions: MessageActions
 }
 
@@ -175,12 +176,7 @@ export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={setScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
         {props.messages.length === 0 ? (
-          <EmptyMessageState
-            agentIntro={props.agentIntro}
-            workflowStage={props.workflowStage}
-            selectedAgentId={props.selectedAgentId}
-            onBeginContentAction={props.onBeginContentAction}
-          />
+          <EmptyMessageState agentIntro={props.agentIntro} />
         ) : (
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 xl:max-w-7xl">
             {props.messages.map((message) => (

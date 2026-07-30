@@ -29,7 +29,6 @@ const DECLARED_AGENT_IDS: readonly AimAgentId[] = [
   "business_diagnosis",
   "content_review",
   "content_retro",
-  "persona",
 ]
 
 describe("AimAgentId 唯一事实源", () => {
@@ -79,6 +78,7 @@ describe("AimAgentId 唯一事实源", () => {
     // 完全未知的外部 id 原样返回（归一化阶段不做合法性断言）。
     expect(normalizeAimAgentId("totally_unknown_agent")).toBe("totally_unknown_agent")
     // 空值回退默认。
+    expect(normalizeAimAgentId("persona")).toBe("content_producer")
     expect(normalizeAimAgentId(null)).toBe(DEFAULT_AIM_AGENT)
     expect(normalizeAimAgentId(undefined)).toBe(DEFAULT_AIM_AGENT)
     expect(normalizeAimAgentId("")).toBe(DEFAULT_AIM_AGENT)

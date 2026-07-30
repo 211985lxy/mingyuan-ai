@@ -97,6 +97,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       content: choice.message.content,
       model: response.model,
       provider: this.name,
+      finishReason: choice.finish_reason,
       usage: response.usage
         ? {
             promptTokens: response.usage.prompt_tokens,

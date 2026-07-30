@@ -13,7 +13,7 @@ describe("inline-editor-session helpers", () => {
 
   it("builds selection rewrite prompts with replacement instructions", () => {
     const prompt = buildInlineSelectionPrompt("polish", "今天天气真好")
-    expect(prompt).toContain("润色")
+    expect(prompt).toContain("更顺")
     expect(prompt).toContain("替换稿")
     expect(prompt).toContain("今天天气真好")
   })

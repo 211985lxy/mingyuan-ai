@@ -77,7 +77,6 @@ const aimExpertAgentIds: AimAgentId[] = [
   "content_producer",
   "work_editor",
   "content_retro",
-  "persona",
 ]
 
 const RECENT_THREAD_LIMIT = 50

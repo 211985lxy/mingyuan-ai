@@ -37,7 +37,6 @@ import { BusinessSystemDiagnosisHandler } from "@/lib/aim-agent-business-system-
 import { BusinessDiagnosisHandler } from "@/lib/aim-agent-business-diagnosis"
 import { ContentReviewHandler } from "@/lib/aim-agent-content-review"
 import { ContentRetroHandler } from "@/lib/aim-agent-content-retro"
-import { PersonaHandler } from "@/lib/aim-agent-persona"
 import type {
   AimAgentHandler,
   AimChatParams,
@@ -69,6 +68,7 @@ export {
   buildContentReviewChatPrompt,
   buildContentReviewGeneratePrompt,
 } from "@/lib/aim-agent-content-review-prompts"
+/** 人设故事智能体已并入内容创作；保留检测函数供旧测例与前采整理入口复用。 */
 export { detectPersonaMode } from "@/lib/aim-agent-persona"
 export {
   benchmarkCopyReuseRatio,
@@ -84,7 +84,6 @@ const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
   business_diagnosis: new BusinessDiagnosisHandler(),
   content_review: new ContentReviewHandler(),
   content_retro: new ContentRetroHandler(),
-  persona: new PersonaHandler(),
 }
 
 const VALID_AGENT_IDS = AIM_AGENT_IDS as ReadonlySet<string>

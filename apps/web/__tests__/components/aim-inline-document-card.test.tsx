@@ -4,7 +4,7 @@
  * 覆盖：进入编辑 → 修改正文 → 保存成功回调；空正文保存被拦截。
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { AimInlineDocumentCard } from "@/components/aim/aim-inline-document-card"
@@ -40,6 +40,17 @@ describe("AimInlineDocumentCard 编辑/保存", () => {
     vi.unstubAllGlobals()
   })
 
+  it("查看态只显示正文、编辑和复制", () => {
+    render(<AimInlineDocumentCard {...baseProps()} />)
+
+    expect(screen.getByTestId("view")).toHaveTextContent("原始文案内容")
+    expect(screen.getByRole("button", { name: "编辑" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "复制" })).toBeInTheDocument()
+    expect(screen.queryByText(/原始文案 ·/)).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "对标仿写" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "版本" })).not.toBeInTheDocument()
+  })
+
   it("进入编辑 → 修改正文 → 保存成功后回调并退出编辑态", async () => {
     const user = userEvent.setup()
     const props = baseProps()
@@ -61,7 +72,9 @@ describe("AimInlineDocumentCard 编辑/保存", () => {
     await user.click(screen.getByRole("button", { name: /保存/ }))
 
     // 保存成功：用服务端返回的正文回调父组件，并释放编辑占用
-    expect(props.onContentSaved).toHaveBeenCalledWith("保存后的文案")
+    await waitFor(() => {
+      expect(props.onContentSaved).toHaveBeenCalledWith("保存后的文案")
+    })
     expect(props.onReleaseEditOwnership).toHaveBeenCalledTimes(1)
     // 退出编辑态，回到查看态
     expect(screen.queryByPlaceholderText("在这里编辑文案")).not.toBeInTheDocument()

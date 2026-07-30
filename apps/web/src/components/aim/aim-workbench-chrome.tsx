@@ -2,41 +2,34 @@
 
 import Link from "next/link"
 import type { ComponentType, ReactNode } from "react"
-import { Check, Edit3, FileSearch, Plus, Repeat2, Sparkles } from "lucide-react"
+import { Check, FileSearch, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import type { AimEvolutionSuggestion, ClientProject } from "@/lib/api/client"
-import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
+import type { AimEvolutionSuggestion } from "@/lib/api/client"
+import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import { AIM_WORKFLOW_STAGES, type AimWorkflowStage } from "@/lib/aim-workflow"
 
 interface AimWorkbenchHeaderProps {
   workflowStage: AimWorkflowStage
   agentTitle: string
   AgentIcon: ComponentType<{ className?: string }>
-  projectEnabled: boolean
-  projects: ClientProject[]
-  selectedProjectId: string
   /** 空状态（未开始任务）时不展示完整四阶段步骤条，避免与正文快捷入口重复 */
   showStageProgress: boolean
-  onStageChange: (stage: AimWorkflowStage) => void
-  onProjectScopeChange: (scope: string) => void
+  /** @deprecated 阶段条改为只读进度，不再用于切换专家 */
+  onStageChange?: (stage: AimWorkflowStage) => void
   onReset: () => void
 }
 
 /**
- * 紧凑单行头：阶段/项目/动作同一行，不展示阶段说明，把高度还给正文。
+ * 紧凑单行头：阶段只读进度 + 当前专家名 + 新任务。
+ * 客户全案由工作台默认选中，不再提供「快速出稿」切换框。
  */
 export function AimWorkbenchHeader({
   workflowStage,
   agentTitle,
   AgentIcon,
-  projectEnabled,
-  projects,
-  selectedProjectId,
   showStageProgress,
-  onStageChange,
-  onProjectScopeChange,
   onReset,
 }: AimWorkbenchHeaderProps) {
   const currentIndex = AIM_WORKFLOW_STAGES.findIndex((stage) => stage.id === workflowStage)
@@ -49,35 +42,24 @@ export function AimWorkbenchHeader({
 
       {showStageProgress ? (
         <>
-          <select
-            value={workflowStage}
-            onChange={(event) => {
-              if (isAimWorkflowStage(event.target.value)) onStageChange(event.target.value)
-            }}
-            aria-label="当前工作流阶段"
-            className="h-7 max-w-[7.5rem] shrink-0 rounded-md border border-input bg-transparent px-1.5 text-xs font-medium text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 md:hidden"
-          >
-            {AIM_WORKFLOW_STAGES.map((stage) => (
-              <option key={stage.id} value={stage.id}>{stage.title}</option>
-            ))}
-          </select>
-          <nav className="hidden min-w-0 items-center md:flex" aria-label="AIM 工作流">
+          <p className="shrink-0 text-xs font-medium text-foreground md:hidden">
+            {AIM_WORKFLOW_STAGES.find((stage) => stage.id === workflowStage)?.title ?? agentTitle}
+          </p>
+          <nav className="hidden min-w-0 flex-1 items-center md:flex" aria-label="AIM 工作流进度">
             <ol className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
               {AIM_WORKFLOW_STAGES.map((stage, index) => {
                 const isCurrent = stage.id === workflowStage
                 const isDone = index < currentIndex
                 return (
                   <li key={stage.id} className="flex shrink-0 items-center">
-                    <button
-                      type="button"
-                      onClick={() => onStageChange(stage.id)}
-                      aria-current={isCurrent ? "step" : undefined}
+                    <span
                       title={stage.description}
+                      aria-current={isCurrent ? "step" : undefined}
                       className={cn(
-                        "flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium transition-colors",
+                        "flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium",
                         isCurrent && "bg-primary/10 text-primary",
-                        isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                        !isCurrent && !isDone && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                        isDone && "text-muted-foreground",
+                        !isCurrent && !isDone && "text-muted-foreground/70",
                       )}
                     >
                       <span
@@ -91,7 +73,7 @@ export function AimWorkbenchHeader({
                         {isDone ? <Check className="h-2.5 w-2.5" /> : index + 1}
                       </span>
                       {stage.title}
-                    </button>
+                    </span>
                     {index < AIM_WORKFLOW_STAGES.length - 1 && (
                       <span className="mx-0.5 h-px w-2.5 shrink-0 bg-border" aria-hidden />
                     )}
@@ -100,57 +82,32 @@ export function AimWorkbenchHeader({
               })}
             </ol>
           </nav>
+          <span className="min-w-0 flex-1 md:hidden" aria-hidden />
         </>
       ) : (
-        <p className="min-w-0 shrink-0 truncate text-xs font-semibold text-foreground">{agentTitle}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{agentTitle}</p>
       )}
 
-      <select
-        value={projectEnabled ? selectedProjectId : "quick"}
-        onChange={(event) => onProjectScopeChange(event.target.value)}
-        aria-label="选择客户全案或快速出稿模式"
-        className="h-7 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-      >
-        {projectEnabled && !selectedProjectId ? <option value="" disabled>项目不可用</option> : null}
-        <option value="quick">快速出稿</option>
-        {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-      </select>
-
-      <Button
-        type="button"
-        size="sm"
-        variant="ghost"
-        className="h-7 shrink-0 gap-0.5 px-1.5"
-        onClick={onReset}
-        aria-label="新任务：清空旧稿并开始新任务"
-        title="清空旧稿并开始新任务"
-      >
+      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 rounded-md px-2 text-xs" onClick={onReset}>
         <Plus className="h-3.5 w-3.5" />
-        <span className="text-xs">新任务</span>
+        新任务
       </Button>
     </header>
   )
 }
 
 /**
- * @description aimprojectnotices
- * @param options - 配置选项
- * @returns 无返回值
+ * @description AIM 项目提示条（无项目 / 加载中 / 权限错误）
  */
-export function AimProjectNotices({ projectsCount, selectedProjectId, projectEnabled, projectAccessError, personaProgress }: {
+export function AimProjectNotices({ projectsCount, selectedProjectId, projectEnabled, projectAccessError }: {
   projectsCount: number
   selectedProjectId: string
   projectEnabled: boolean
   projectAccessError?: string | null
-  personaProgress: number | null
 }) {
   return (
     <>
-      {!projectEnabled ? (
-        <div className="border-b bg-muted/30 px-3 py-1 text-[11px] text-muted-foreground">
-          快速出稿不会读取客户全案资料，生成后可手动保存到全案。
-        </div>
-      ) : projectsCount === 0 ? (
+      {projectEnabled && projectsCount === 0 ? (
         <div className="border-b bg-muted/30 px-3 py-1 text-[11px] text-muted-foreground">
           还没有 IP 营销全案，<Link href="/projects" className="text-primary underline-offset-2 hover:underline">先创建一个</Link>，生成内容可自动归属。
         </div>
@@ -164,23 +121,12 @@ export function AimProjectNotices({ projectsCount, selectedProjectId, projectEna
           正在加载你的 IP 营销全案，请稍后再生成内容。
         </div>
       ) : null}
-      {personaProgress != null ? (
-        <div className="border-b bg-primary/5 px-3 py-1">
-          <div className="mx-auto flex w-full max-w-6xl items-center gap-2 xl:max-w-7xl">
-            <span className="shrink-0 text-[11px] font-medium text-primary">来时路信息收集</span>
-            <Progress value={personaProgress} className="h-1 flex-1" />
-            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{personaProgress}%</span>
-          </div>
-        </div>
-      ) : null}
     </>
   )
 }
 
 /**
- * @description aimevolutionsuggestions
- * @param options - 配置选项
- * @returns 无返回值
+ * @description 对话演化偏好建议条
  */
 export function AimEvolutionSuggestions({ suggestions, onDismiss, onSave }: {
   suggestions: AimEvolutionSuggestion[]
@@ -207,28 +153,16 @@ export function AimEvolutionSuggestions({ suggestions, onDismiss, onSave }: {
   )
 }
 
-interface AimLandingAction {
-  label: string
-  icon: ComponentType<{ className?: string }>
-}
-
-const AIM_LANDING_CONTENT_ACTIONS: Record<"new_copy" | "edit_current" | "rewrite_reference", AimLandingAction> = {
-  new_copy: { label: "从想法出一稿", icon: Sparkles },
-  edit_current: { label: "修改现有文案", icon: Edit3 },
-  rewrite_reference: { label: "按对标重写", icon: Repeat2 },
-}
-
 /**
- * @description AIM 空状态：结果导向标题 + 4 个快捷入口 + composer 组成同一居中区域，
- * 用户开始任务后此区域即被替换为正常工作台布局（composer 沉底）。
- * @param options - 配置选项
- * @returns 无返回值
+ * AIM 空状态：三目的入口 + 爆款拆解主入口 + composer。
  */
 export function AimLandingHero({
-  onBeginContentAction,
+  purposes,
+  onSelectPurpose,
   children,
 }: {
-  onBeginContentAction: (action: AimContentAction) => void
+  purposes: AimWorkbenchSkill[]
+  onSelectPurpose: (skill: AimWorkbenchSkill) => void
   children: ReactNode
 }) {
   return (
@@ -238,19 +172,16 @@ export function AimLandingHero({
           今天想得到什么结果？
         </h1>
         <div className="grid w-full grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {(Object.entries(AIM_LANDING_CONTENT_ACTIONS) as Array<[AimContentAction, AimLandingAction]>).map(
-            ([id, action]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => onBeginContentAction(id)}
-                className="flex h-12 items-center gap-2 rounded-xl border bg-background px-3.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-              >
-                <action.icon className="h-4 w-4 shrink-0 opacity-70" />
-                <span className="truncate">{action.label}</span>
-              </button>
-            ),
-          )}
+          {purposes.map((skill) => (
+            <button
+              key={skill.id}
+              type="button"
+              onClick={() => onSelectPurpose(skill)}
+              className="flex h-12 items-center gap-2 rounded-xl border bg-background px-3.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            >
+              <span className="truncate">{skill.label}</span>
+            </button>
+          ))}
           <Link
             href="/video-copy"
             className="flex h-12 items-center gap-2 rounded-xl border bg-background px-3.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"

@@ -31,9 +31,9 @@ describe("inferRiskLevel", () => {
     expect(inferRiskLevel({ ...baseInput, taskType: "polish_copy", agentId: "content_producer" })).toBe("low")
     expect(inferRiskLevel({ ...baseInput, taskType: "repurpose", agentId: "free_copywriter" })).toBe("low")
   })
-  it("business_diagnosis/persona 为高风险", () => {
+  it("business_diagnosis 为高风险，内容创作为中风险", () => {
     expect(inferRiskLevel({ ...baseInput, agentId: "business_diagnosis" })).toBe("high")
-    expect(inferRiskLevel({ ...baseInput, agentId: "persona" })).toBe("high")
+    expect(inferRiskLevel({ ...baseInput, agentId: "content_producer" })).toBe("medium")
   })
   it("含高风险关键词(商业诊断/IP定位/成交路径)为高风险", () => {
     expect(inferRiskLevel({ ...baseInput, agentId: "content_producer", rawInput: "帮我做商业诊断" })).toBe("high")

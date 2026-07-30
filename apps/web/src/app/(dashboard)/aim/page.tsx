@@ -21,9 +21,9 @@ import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confir
 import { AimRetroListPanel } from "@/components/aim/aim-retro-list-panel"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
-import { buildAimChatMessages } from "@/lib/aim/chat-request"
+import { getAimAgentGuide } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
-import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextTokens } from "@/lib/aim-context-usage"
+import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import {
   buildContentProducerVideoCopyHref,
   resolveContentProducerVideoUrl,
@@ -79,21 +79,18 @@ export default function AimPage() {
 
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
   const contextUsage = useMemo(() => {
-    const thread = w.messages.map((message) => ({
-      role: message.role,
-      content: formatAimMessageContentForModel(message),
-      images: message.images,
-    }))
-    if (w.input.trim()) {
-      thread.push({ role: "user", content: w.input, images: undefined })
-    }
-    if (pastedCopy?.content) {
-      thread.push({ role: "user", content: pastedCopy.content, images: undefined })
-    }
-    const messages = buildAimChatMessages(thread)
+    const breakdown = estimateContextUsageBreakdown({
+      conversation: w.messages.map((message) => ({
+        content: formatAimMessageContentForModel(message),
+        imageCount: message.images?.length ?? 0,
+      })),
+      currentInput: w.input,
+      pastedCopy: pastedCopy?.content,
+    })
     return {
-      usedTokens: estimateContextTokens({ messages }),
+      usedTokens: breakdown.usedTokens,
       maxTokens: AIM_CONTEXT_CAPACITY_TOKENS,
+      segments: breakdown.segments,
     }
   }, [w.input, w.messages, pastedCopy])
 
@@ -235,6 +232,7 @@ export default function AimPage() {
       <AimContextUsage
         usedTokens={contextUsage.usedTokens}
         maxTokens={contextUsage.maxTokens}
+        segments={contextUsage.segments}
       />
     </>
   )
@@ -246,12 +244,8 @@ export default function AimPage() {
           workflowStage={w.currentWorkflowStage}
           agentTitle={w.agent.title}
           AgentIcon={w.agent.icon}
-          projectEnabled={w.projectEnabled}
-          projects={w.projects}
-          selectedProjectId={w.selectedProjectId}
           showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
-          onProjectScopeChange={w.changeProjectScope}
           onReset={w.resetConversation}
         />
 
@@ -260,7 +254,6 @@ export default function AimPage() {
           selectedProjectId={w.selectedProjectId}
           projectEnabled={w.projectEnabled}
           projectAccessError={w.projectAccessError}
-          personaProgress={w.personaProgress}
         />
 
         <AimEvolutionSuggestions
@@ -329,7 +322,15 @@ export default function AimPage() {
         )}
 
         {isLanding ? (
-          <AimLandingHero onBeginContentAction={w.beginContentAction}>{composer}</AimLandingHero>
+          <AimLandingHero
+            purposes={getAimAgentGuide("content_producer").skills}
+            onSelectPurpose={(skill) => {
+              if (w.selectedAgentId !== "content_producer") w.beginWorkflowStage("content")
+              w.handleUseSkill(skill)
+            }}
+          >
+            {composer}
+          </AimLandingHero>
         ) : (
           <>
             <AimMessageStream
@@ -341,7 +342,6 @@ export default function AimPage() {
               selectedAgentId={w.selectedAgentId}
               selectedProjectId={w.selectedProjectId}
               latestDeliverableMessageId={w.latestDeliverableMessageId}
-              onBeginContentAction={w.beginContentAction}
               actions={{
                 onSubmitChoice: (text) => void w.sendText(text),
                 onRetry: w.retryFailed,

@@ -24,9 +24,9 @@ const baseSpec = buildTaskSpecSkeleton({
 })
 
 describe("AIM workflow", () => {
-  it("exposes exactly four user-facing stages and four content actions", () => {
+  it("exposes exactly four user-facing stages and three content actions", () => {
     expect(AIM_WORKFLOW_STAGES.map((item) => item.id)).toEqual(["direction", "content", "publish", "results"])
-    expect(AIM_CONTENT_ACTIONS.map((item) => item.id)).toEqual(["new_copy", "edit_current", "rewrite_reference", "repurpose"])
+    expect(AIM_CONTENT_ACTIONS.map((item) => item.id)).toEqual(["new_copy", "edit_current", "rewrite_reference"])
   })
 
   it("keeps legacy agents inside their workflow stage", () => {

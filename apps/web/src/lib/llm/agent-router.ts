@@ -11,7 +11,7 @@ import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio
  * - 作品编辑 → ZenMux Claude Sonnet 优先，离火 GPT-5.6 兜底
  * - 内容创作（content_producer）→ ZenMux Claude（经代理）优先，DeepSeek / APIMart 兜底
  * - 商业诊断（business_system_diagnosis）→ ZenMux Claude Sonnet 优先，DeepSeek / APIMart 兜底
- * - 发布质检 / 人设等 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
+ * - 发布质检等 → DeepSeek 直连优先，ZenMux / OpenRouter 兜底
  *
  * provider 名与 config.ts 一致：deepseek / zenmux / jiekou / openrouter / apimart / therouter / glm / lihuo / qianfan / openai
  * model 为可选，覆盖 provider 的默认模型（同一 provider 下不同智能体可用不同模型）
@@ -143,15 +143,6 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "zenmux", capability: "standard" },
     { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
-    { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
-  ],
-  persona: [
-    { name: "deepseek", capability: "standard" },
-    { name: "apimart", capability: "advanced" },
-    { name: "zenmux", capability: "standard" },
-    { name: "openrouter", model: "moonshotai/kimi-k2.6", capability: "standard" },
-    { name: "openrouter", model: "qwen/qwen3.7-plus", capability: "standard" },
     { name: "jiekou", capability: "basic" },
     { name: "glm", capability: "standard" },
   ],

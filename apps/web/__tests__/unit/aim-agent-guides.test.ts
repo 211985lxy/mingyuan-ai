@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest"
 
 import { AIM_AGENT_OPTIONS, getAimAgent } from "@/lib/aim-ui-config"
 import {
-  AIM_COPY_VARIANTS,
   buildAimNextActionPrompt,
   getAimAgentGuide,
 } from "@/lib/aim-agent-guides"
@@ -31,12 +30,10 @@ describe("aim agent guides", () => {
     expect(actionText).toContain("保存")
   })
 
-  it("offers the three visible content-production variants", () => {
-    const labels = AIM_COPY_VARIANTS.map((variant) => variant.label)
+  it("does not expose structural copyVariants beside purpose skills", () => {
     const guide = getAimAgentGuide("content_producer")
-
-    expect(labels).toEqual(expect.arrayContaining(["独白流", "结论先行", "问答型"]))
-    expect(guide.copyVariants?.map((variant) => variant.label)).toEqual(labels)
+    expect((guide as { copyVariants?: unknown }).copyVariants).toBeUndefined()
+    expect(guide.skills.map((s) => s.label)).toEqual(["流量漏斗", "线索获客", "通用故事"])
   })
 
   it("uses task-based workflow names on the visible agent list", () => {
@@ -45,7 +42,7 @@ describe("aim agent guides", () => {
     expect(getAimAgent("content_producer").title).toBe("内容创作")
     expect(getAimAgent("work_editor").title).toBe("作品编辑")
     expect(getAimAgent("content_review").title).toBe("发布质检")
-    expect(getAimAgent("persona").title).toBe("人设故事")
+    expect(getAimAgent("persona").title).toBe("内容创作") // legacy alias
   })
 
   it("keeps content pillars under topic planning instead of separate agents", () => {
@@ -59,19 +56,24 @@ describe("aim agent guides", () => {
     expect(guideText).toContain("问题解答类")
   })
 
-  it("surfaces high-frequency creation tasks under content writing", () => {
+  it("preloads content producer around three content purposes", () => {
+    const guide = getAimAgentGuide("content_producer")
     const guideText = [
-      getAimAgentGuide("content_producer").defaultInstruction,
-      ...getAimAgentGuide("content_producer").quickPrompts,
-      ...getAimAgentGuide("content_producer").outputAssets,
+      guide.intro,
+      guide.defaultInstruction,
+      ...guide.quickPrompts,
+      ...guide.scenarios,
+      ...guide.outputAssets,
     ].join("\n")
 
-    expect(guideText).toContain("改写")
-    expect(guideText).toContain("对标再创作")
-    expect(guideText).toContain("追热点")
-    expect(guideText).toContain("获客文案")
-    expect(guideText).toContain("公众号文章/深度长文")
-    expect(guideText).toContain("Vlog 分镜脚本")
+    expect(guideText).toContain("流量漏斗")
+    expect(guideText).toContain("线索获客")
+    expect(guideText).toContain("通用故事")
+    expect(guide.quickPrompts).toHaveLength(3)
+    expect(guide.scenarios).toEqual(["流量漏斗口播", "线索获客口播", "通用故事口播"])
+    expect(guide.defaultInstruction).toContain("未说明时默认按流量漏斗处理")
+    expect(guide.defaultInstruction).not.toContain("对标再创作")
+    expect(guide.quickPrompts.join("\n")).not.toContain("多平台")
   })
 
   it("keeps content producer knowledge use lightweight by default", () => {
@@ -105,92 +107,58 @@ describe("aim agent guides", () => {
     expect(aliased).toBe(canonical)
   })
 
-  it("defines the high-frequency content producer skills", () => {
-    const labels = getAimAgentGuide("content_producer").skills.map((skill) => skill.label)
+  it("keeps content producer skills to three content purposes", () => {
+    const skills = getAimAgentGuide("content_producer").skills
+    const labels = skills.map((skill) => skill.label)
 
-    expect(labels).toEqual(expect.arrayContaining([
-      "改开头钩子",
-      "重写这版文案",
-      "按爆款逻辑重写",
-      "借热点写观点",
-      "口播脚本",
-      "生成小红书图文",
-      "生成获客成交文案",
-      "内容裂变",
-    ]))
+    expect(labels).toEqual(["流量漏斗", "线索获客", "通用故事"])
+    expect(skills.every((skill) => skill.group === "内容目的")).toBe(true)
+    expect(skills.find((skill) => skill.id === "traffic_funnel")?.prompt).toContain("流量漏斗")
+    expect(skills.find((skill) => skill.id === "lead_acquisition")?.prompt).toContain("线索获客")
+    expect(skills.find((skill) => skill.id === "general_story")?.prompt).toContain("通用故事")
+    expect(skills.every((skill) => skill.prompt.includes("完整口播正文"))).toBe(true)
   })
 
-  it("adds a unified oral script skill with type-based routing", () => {
-    const guide = getAimAgentGuide("content_producer")
-    const skill = guide.skills.find((item) => item.id === "oral_script")
-    const guideText = [guide.defaultInstruction, ...guide.quickPrompts].join("\n")
+  it("keeps topic planning skills to four actions", () => {
+    const guide = getAimAgentGuide("business_diagnosis")
+    const labels = guide.skills.map((skill) => skill.label)
 
-    expect(skill?.label).toBe("口播脚本")
-    expect(skill?.prompt).toContain("类型 A")
-    expect(skill?.prompt).toContain("类型 B")
-    expect(skill?.prompt).toContain("类型 C")
-    expect(skill?.prompt).toContain("类型 D")
-    expect(skill?.prompt).toContain("适配度")
-    expect(skill?.prompt).toContain("不得照抄原句")
-    expect(skill?.prompt).toContain("3-5 条")
-    expect(skill?.prompt).toContain("前 3 秒钩子")
-    expect(skill?.prompt).toContain("镜头表现建议")
-    expect(skill?.prompt).toContain("结尾行动引导")
-    expect(guideText).toContain("热点口播")
-    expect(guideText).toContain("参考同行文案")
+    expect(labels).toEqual(["对标选题池", "按目的出题", "筛高潜", "会议提炼"])
+    expect(guide.skills.every((skill) => skill.group === "选题动作")).toBe(true)
+    expect(guide.scenarios).toEqual(["对标选题池", "按目的出题", "筛高潜", "会议提炼"])
+    expect(guide.quickPrompts).toHaveLength(4)
+    expect(guide.defaultInstruction).toContain("优先按目的出题")
   })
 
-  it("keeps oral script and xiaohongshu skills tied to their methodology", () => {
-    const guide = getAimAgentGuide("content_producer")
-    const oralScript = guide.skills.find((item) => item.id === "oral_script")
-    const xhs = guide.skills.find((item) => item.id === "xiaohongshu_image_text")
+  it("keeps review skills to full check and publish decision", () => {
+    const guide = getAimAgentGuide("content_review")
+    const labels = guide.skills.map((skill) => skill.label)
 
-    expect(oralScript?.prompt).toContain("事件内容化五步法")
-    expect(oralScript?.prompt).toContain("真实事件 -> 关键矛盾 -> 核心观点 -> 用户价值 -> 内容表达")
-    expect(xhs?.prompt).toContain("小红书图文视觉导演结构")
-    expect(xhs?.prompt).toContain("8 页图文结构")
-    expect(xhs?.prompt).toContain("品牌/IP/账号相关标签")
-  })
-
-  it("defines topic planning and review skills", () => {
-    const planningLabels = getAimAgentGuide("business_diagnosis").skills.map((skill) => skill.label)
-    expect(planningLabels.slice(0, 4)).toEqual([
-      "选择对标账号 / 对标内容",
-      "按目的生成选题",
-      "按主线生成选题池",
-      "筛选高潜选题",
-    ])
-    expect(planningLabels).toContain("判断这条值不值得做")
-
-    const reviewLabels = getAimAgentGuide("content_review").skills.map((skill) => skill.label)
-    expect(reviewLabels).toEqual(expect.arrayContaining([
-      "标题质检",
-      "开头钩子质检",
-      "内容结构质检",
-      "人设一致性质检",
-      "平台适配质检",
-      "转化路径质检",
-      "风险表达质检",
-      "发布前判断",
-    ]))
+    expect(labels).toEqual(["发布前全检", "发布前判断"])
+    expect(guide.skills.every((skill) => skill.group === "质检动作")).toBe(true)
+    expect(guide.scenarios).toEqual(["发布前全检", "发布前判断"])
+    expect(guide.quickPrompts).toHaveLength(2)
+    expect(guide.defaultInstruction).toContain("未说明时默认做发布前全检")
+    expect(guide.skills.find((s) => s.id === "full_publish_review")?.prompt).toContain("复检清单")
   })
 
   it("keeps topic goals decided before copywriting", () => {
     const purposeSkill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "purpose_topics")
 
+    expect(purposeSkill?.label).toBe("按目的出题")
     expect(purposeSkill?.prompt).toContain("曝光/获客/信任/成交")
     expect(purposeSkill?.prompt).toContain("不要直接写文案")
     expect(purposeSkill?.prompt).toContain("为什么不是另外三个目的")
   })
 
-  it("adds a benchmark-asset flywheel skill for topic planning", () => {
-    const skill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "benchmark_asset_flywheel")
+  it("keeps benchmark topic pool as graded asset package", () => {
+    const skill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "benchmark_topic_pool")
     const guideText = [
       ...getAimAgentGuide("business_diagnosis").quickPrompts,
       ...getAimAgentGuide("business_diagnosis").outputAssets,
     ].join("\n")
 
-    expect(skill?.label).toBe("对标资产生成选题池")
+    expect(skill?.label).toBe("对标选题池")
     expect(skill?.prompt).toContain("30 条可直接开拍的候选选题")
     expect(skill?.prompt).toContain("5 条 S 级优先选题")
     expect(skill?.prompt).toContain("10 条 A 级连续栏目选题")
@@ -198,11 +166,12 @@ describe("aim agent guides", () => {
     expect(guideText).toContain("A级连续栏目选题")
   })
 
-  it("keeps meeting-minutes topic skill grounded and non-generic", () => {
-    const skill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "meeting_minutes_topics")
+  it("keeps meeting topic skill grounded and able to add execution materials", () => {
+    const skill = getAimAgentGuide("business_diagnosis").skills.find((item) => item.id === "meeting_topics")
 
     expect(skill?.prompt).toContain("单核心选题")
     expect(skill?.prompt).toContain("完整资产包")
+    expect(skill?.prompt).toContain("选题 + 执行物料")
     expect(skill?.prompt).toContain("关键信息抽取表")
     expect(skill?.prompt).toContain("至少 12 条")
     expect(skill?.prompt).toContain("不要结尾反问")
@@ -217,50 +186,55 @@ describe("aim agent guides", () => {
     }
   })
 
-  it("keeps single-content retro out of business diagnosis (moved to a future retro agent)", () => {
+  it("keeps single-content retro on content_retro, not business diagnosis", () => {
+    const guide = getAimAgentGuide("business_system_diagnosis")
     const businessSystemText = [
-      getAimAgentGuide("business_system_diagnosis").intro,
-      ...getAimAgentGuide("business_system_diagnosis").quickPrompts,
-      ...getAimAgentGuide("business_system_diagnosis").outputAssets,
-      ...getAimAgentGuide("business_system_diagnosis").skills.map((skill) => `${skill.label} ${skill.prompt}`),
+      guide.intro,
+      ...guide.quickPrompts,
+      ...guide.outputAssets,
+      ...guide.skills.map((skill) => `${skill.label} ${skill.prompt}`),
     ].join("\n")
 
-    expect(businessSystemText).not.toContain("数据复盘")
+    expect(guide.skills.map((s) => s.label)).toEqual(["生意诊断"])
+    expect(guide.skills.map((s) => s.label)).not.toContain("内容复盘")
     expect(businessSystemText).not.toContain("飞轮")
     expect(businessSystemText).not.toContain("闭环")
+
+    const retro = getAimAgentGuide("content_retro")
+    expect(retro.intro).toContain("数据复盘")
+    expect(retro.skills.length).toBeGreaterThan(0)
+    expect(retro.skills.map((s) => s.label).join("\n")).toContain("复盘这条内容")
   })
 
-  it("separates content fission from publish plan scheduling", () => {
-    const fission = getAimAgentGuide("content_producer").skills.find((s) => s.id === "content_fission")
+  it("keeps publish plan scheduling on nextActions, not skills", () => {
+    const skills = getAimAgentGuide("content_producer").skills
     const publishAction = getAimAgentGuide("content_producer").nextActions.find((a) => a.id === "publish_package")
 
-    // 裂变技能不输出排产表
-    expect(fission?.prompt).toContain("不要输出排产表")
-    expect(fission?.prompt).toContain("生成发布计划")
-    // 发布计划 nextAction 承担排产职责
+    expect(skills.find((s) => s.id === "content_fission")).toBeUndefined()
     expect(publishAction?.prompt).toContain("12 条内容排产表")
-    // 发布计划不再做平台裂变（与 content_fission 职责分离）
     expect(publishAction?.prompt).not.toContain("裂变为短视频")
   })
 
-  it("disambiguates hot topic opinion from oral script", () => {
-    const hotTopic = getAimAgentGuide("content_producer").skills.find((s) => s.id === "hot_topic_copy")
-    const oralScript = getAimAgentGuide("content_producer").skills.find((s) => s.id === "oral_script")
+  it("separates traffic, lead and story purposes without rewrite clutter", () => {
+    const skills = getAimAgentGuide("content_producer").skills
+    const labels = skills.map((skill) => skill.label)
 
-    // 热点观点明确声明不是口播
-    expect(hotTopic?.label).toBe("借热点写观点")
-    expect(hotTopic?.prompt).toContain("不是口播脚本")
-    expect(hotTopic?.group).toBe("改写优化")
-    // 口播脚本保持独立分组
-    expect(oralScript?.group).toBe("热点口播")
+    expect(labels).not.toContain("改开头钩子")
+    expect(labels).not.toContain("重写这版文案")
+    expect(labels).not.toContain("借热点写观点")
+    expect(skills.find((s) => s.id === "traffic_funnel")?.prompt).toContain("传播优先于成交")
+    expect(skills.find((s) => s.id === "lead_acquisition")?.prompt).toContain("评论、私信或预约")
+    expect(skills.find((s) => s.id === "general_story")?.prompt).toContain("不强行推产品成交")
   })
 
-  it("requires persona progress check before generating pinned video", () => {
-    const skill = getAimAgentGuide("persona").skills.find((s) => s.id === "pinned_story_video")
+  it("routes persona/story work through content producer general_story skill", () => {
+    const skill = getAimAgentGuide("content_producer").skills.find((s) => s.id === "general_story")
 
-    expect(skill?.prompt).toContain("6 维尚未收齐")
-    expect(skill?.prompt).toContain("进度未到 100%")
-    expect(skill?.prompt).toContain("追问最关键的一个缺口")
+    expect(skill?.label).toBe("通用故事")
+    expect(skill?.prompt).toContain("来时路")
+    expect(skill?.prompt).toContain("置顶视频")
+    expect(skill?.prompt).toContain("不强行推产品成交")
+    expect(getAimAgentGuide("persona")).toBe(getAimAgentGuide("content_producer"))
   })
 
   it("assigns a group to every skill for UI rendering", () => {
@@ -274,17 +248,17 @@ describe("aim agent guides", () => {
   it("folds publish review skills into work_editor while keeping their engine id", () => {
     const skills = getAimAgentGuide("work_editor").skills
     const editSkill = skills.find((skill) => skill.id === "text_polish")
-    const titleReview = skills.find((skill) => skill.id === "title_review")
+    const fullReview = skills.find((skill) => skill.id === "full_publish_review")
     const publishDecision = skills.find((skill) => skill.id === "publish_decision")
 
     expect(editSkill).toBeTruthy()
-    expect(titleReview).toBeTruthy()
+    expect(fullReview).toBeTruthy()
     expect(publishDecision).toBeTruthy()
     // 质检技能挂在作品编辑的技能列表里，但执行引擎仍归 content_review
-    expect(titleReview?.agentId).toBe("content_review")
+    expect(fullReview?.agentId).toBe("content_review")
     expect(publishDecision?.agentId).toBe("content_review")
-    expect(titleReview?.group).toBe("单项质检")
-    expect(publishDecision?.group).toBe("综合判断")
+    expect(fullReview?.group).toBe("质检动作")
+    expect(publishDecision?.group).toBe("质检动作")
   })
 
   it("keeps content_review hidden from the visible agent list but still resolvable by guide", () => {

@@ -59,7 +59,6 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
       "free_copywriter",
       "business_system_diagnosis",
       "content_review",
-      "persona",
     ] as const) {
       expect(report.perAgent[agent]).toBeDefined()
       expect(report.perAgent[agent].contractPassRate).toBe(1)

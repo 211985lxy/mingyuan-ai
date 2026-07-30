@@ -241,16 +241,14 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
           </div>
         ) : null}
 
-        {showSkills && skillsOpen ? (
+        {showSkills && skills.length > 4 && skillsOpen ? (
           <div className="absolute bottom-14 left-3 z-20 w-[min(420px,calc(100vw-2rem))] rounded-xl bg-popover p-2 text-popover-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.14)]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input value={skillQuery} onChange={(event) => setSkillQuery(event.target.value)} placeholder="搜索技能" className="h-8 border-0 bg-muted/50 pl-8 text-xs shadow-none" autoFocus />
             </div>
             <div className="mt-2 max-h-72 overflow-y-auto">
-              {skills.length === 0 ? (
-                <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">当前智能体暂无内置技能</p>
-              ) : filteredSkills.map(({ group, items }) => (
+              {filteredSkills.map(({ group, items }) => (
                 <div key={group || "_default"}>
                   {group ? <p className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-[10px] font-medium tracking-wide text-muted-foreground/80">{group}</p> : null}
                   {items.map((skill) => (
@@ -261,8 +259,25 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
                   ))}
                 </div>
               ))}
-              {skills.length > 0 && filteredSkills.length === 0 ? <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">没有找到匹配技能</p> : null}
+              {filteredSkills.length === 0 ? <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">没有找到匹配技能</p> : null}
             </div>
+          </div>
+        ) : null}
+
+        {showSkills && skills.length > 0 && skills.length <= 4 ? (
+          <div className="flex flex-wrap gap-1.5 px-3 pb-1">
+            {skills.map((skill) => (
+              <button
+                key={skill.id}
+                type="button"
+                disabled={busy}
+                title={skill.description}
+                onClick={() => onUseSkill?.(skill)}
+                className="inline-flex h-7 items-center rounded-full border border-border/70 bg-background px-2.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:opacity-50"
+              >
+                {skill.label}
+              </button>
+            ))}
           </div>
         ) : null}
 
@@ -273,14 +288,14 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
                 <Sparkles className="h-4 w-4 shrink-0 opacity-70" /><span className="truncate">{contentModeLabel}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
               </button>
             ) : null}
-            {!isPlanSessionActive && onComposerModeChange ? (
-              <Button type="button" size="sm" variant="ghost" className={cn("h-7 gap-1 rounded-full px-2.5 text-xs", isPlanMode ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground")} onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")} disabled={busy || (!canUsePlanMode && !isPlanMode)} title={!canUsePlanMode && !isPlanMode ? "请先选择 IP 营销全案" : isPlanMode ? "切回直接模式" : "开启计划模式"}>
-                <ListChecks className="h-4 w-4" />计划
+            {(isPlanMode || isPlanSessionActive) && onComposerModeChange ? (
+              <Button type="button" size="sm" variant="ghost" className={cn("h-7 gap-1 rounded-full px-2.5 text-xs", isPlanMode ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground")} onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")} disabled={busy} title="退出计划模式">
+                <ListChecks className="h-4 w-4" />计划中
               </Button>
             ) : null}
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { if (event.target.files?.length) onAddImages?.(event.target.files); event.target.value = "" }} />
             <Button type="button" size="sm" variant="ghost" className="h-7 w-7 rounded-full p-0 text-muted-foreground hover:text-foreground" onClick={() => fileInputRef.current?.click()} disabled={busy} title="添加图片"><ImagePlus className="h-4 w-4" /></Button>
-            {showSkills ? (
+            {showSkills && skills.length > 4 ? (
               <Button type="button" size="sm" variant="ghost" className={cn("h-7 gap-1 rounded-full px-2.5 text-xs", skillsOpen ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground")} onClick={() => { setSkillsOpen((open) => !open); setModeOpen(false) }} disabled={busy}>
                 技能<ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </Button>

@@ -166,8 +166,7 @@ function buildModelPolicy(
     agentId === "business_diagnosis" ||
     agentId === "business_system_diagnosis"
   const requiresStandardFloor =
-    needsAdvancedReasoning ||
-    agentId === "persona"
+    needsAdvancedReasoning
 
   // ── 温度差异化：自由创作高创意，深度长文略低温保结构，朋友圈口语化略高 ──
   const temperature = isChat

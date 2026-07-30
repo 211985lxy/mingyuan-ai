@@ -67,8 +67,7 @@ export async function assessAimGeneration(input: {
       (item) => item.content.trim() && MAIN_DRAFT_FORMATS.has(item.format),
     )
     const skipLlm =
-      input.agentId === "persona"
-      || input.agentId === "free_copywriter"
+      input.agentId === "free_copywriter"
       || input.taskType === "polish_copy"
       || input.taskType === "quality_check"
 

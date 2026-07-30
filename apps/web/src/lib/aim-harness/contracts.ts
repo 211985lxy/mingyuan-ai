@@ -12,7 +12,7 @@
 
 import type { CopyStudioModule } from "@/lib/copy-studio"
 
-/** AIM 七个内容智能体的规范 id（唯一事实源） */
+/** AIM 内容智能体的规范 id（唯一事实源） */
 export type AimAgentId =
   | "content_producer"
   | "free_copywriter"
@@ -21,7 +21,6 @@ export type AimAgentId =
   | "business_diagnosis"
   | "content_review"
   | "content_retro"
-  | "persona"
 
 /** 四个服务端入口（镜像 AimRunSpec.entrypoint） */
 export type AimEntrypoint = "chat" | "generate" | "agent_api" | "inspiration"
@@ -38,7 +37,6 @@ export const AIM_AGENT_IDS: ReadonlySet<AimAgentId> = new Set<AimAgentId>([
   "business_diagnosis",
   "content_review",
   "content_retro",
-  "persona",
 ])
 
 /** 默认智能体（回退值） */
@@ -48,11 +46,13 @@ export const DEFAULT_AIM_AGENT: AimAgentId = "content_producer"
  * 旧 id 归一化映射。
  * - 内容生产官曾用 "ip_video"，现统一为 "content_producer"
  * - 作品编辑曾用 "deep_copywriter"，现统一为 "work_editor"
+ * - 人设故事曾用 "persona"，现并入内容创作「通用故事」路由
  * 保留旧 id 的归一化，使旧书签链接、旧外部调用、旧数据库行都能正确路由，不报 404。
  */
 export const LEGACY_AGENT_ID_ALIASES: Record<string, AimAgentId> = {
   ip_video: "content_producer",
   deep_copywriter: "work_editor",
+  persona: "content_producer",
 }
 
 /**

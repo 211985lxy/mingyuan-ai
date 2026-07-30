@@ -54,38 +54,41 @@ describe("AimPromptComposer", () => {
     expect(props.onGenerate).not.toHaveBeenCalled()
   })
 
-  it("技能下拉：打开 → 选择技能 → onUseSkill 被调且面板关闭", async () => {
+  it("技能少时直接展示芯片，点击即填入", async () => {
     const user = userEvent.setup()
     const onUseSkill = vi.fn()
     const skills: AimWorkbenchSkill[] = [
-      { id: "s1", label: "写小红书", description: "生成小红书图文", prompt: "p1", group: "创作" },
+      { id: "s1", label: "流量漏斗", description: "完播优先", prompt: "p1", group: "内容目的" },
     ]
     render(<AimPromptComposer {...baseProps({ showSkills: true, skills, onUseSkill })} />)
 
-    // 初始未展开
-    expect(screen.queryByText("写小红书")).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole("button", { name: /技能/ }))
-    // 展开后可见技能项
-    await user.click(screen.getByText("写小红书"))
+    expect(screen.queryByRole("button", { name: /技能/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "流量漏斗" }))
 
     expect(onUseSkill).toHaveBeenCalledTimes(1)
     expect(onUseSkill.mock.calls[0][0].id).toBe("s1")
-    // 选择后面板关闭
-    expect(screen.queryByText("写小红书")).not.toBeInTheDocument()
   })
 
-  it("计划模式切换：direct 下点击「计划」回调 plan", async () => {
+  it("计划模式：已在 plan 时显示退出入口", async () => {
     const user = userEvent.setup()
     const onComposerModeChange = vi.fn()
     render(
       <AimPromptComposer
-        {...baseProps({ onComposerModeChange, canUsePlanMode: true, composerMode: "direct" })}
+        {...baseProps({ onComposerModeChange, canUsePlanMode: true, composerMode: "plan" })}
       />,
     )
 
-    await user.click(screen.getByRole("button", { name: /计划/ }))
-    expect(onComposerModeChange).toHaveBeenCalledWith("plan")
+    await user.click(screen.getByRole("button", { name: /计划中/ }))
+    expect(onComposerModeChange).toHaveBeenCalledWith("direct")
+  })
+
+  it("直接模式下不展示计划入口，避免和内容目的抢位", () => {
+    render(
+      <AimPromptComposer
+        {...baseProps({ onComposerModeChange: vi.fn(), canUsePlanMode: true, composerMode: "direct" })}
+      />,
+    )
+    expect(screen.queryByRole("button", { name: /计划/ })).not.toBeInTheDocument()
   })
 
   it("发布质检长文只显示待质检，不暴露创作用途", () => {

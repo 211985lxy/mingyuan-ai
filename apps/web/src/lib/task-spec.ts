@@ -123,7 +123,7 @@ export const RISK_KEYWORDS_HIGH = [
 ]
 
 const LOW_TASK_TYPES: AimTaskType[] = ["polish_copy", "repurpose"]
-const HIGH_AGENTS = new Set(["business_diagnosis", "business_system_diagnosis", "persona"])
+const HIGH_AGENTS = new Set(["business_diagnosis", "business_system_diagnosis"])
 const LOW_AGENTS = new Set(["free_copywriter"])
 
 /**

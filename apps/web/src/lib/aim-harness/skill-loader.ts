@@ -33,7 +33,7 @@ export const AIM_SKILL_CATALOG: readonly AimSkillRef[] = [
     id: "business-diagnosis",
     title: "商业定位诊断方法论",
     relativePath: "docs/methodologies/business-diagnosis-methodology-core.md",
-    agentIds: ["business_diagnosis", "business_system_diagnosis", "persona"],
+    agentIds: ["business_diagnosis", "business_system_diagnosis"],
     runtimeTasks: ["positioning_topic", "new_copy"],
     maxChars: 2500,
   },

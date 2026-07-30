@@ -1,5 +1,5 @@
 import type { ComponentType } from "react"
-import { Activity, Compass, LineChart, PenLine, ShieldCheck, Video, Edit3 } from "lucide-react"
+import { Activity, LineChart, PenLine, ShieldCheck, Video, Edit3 } from "lucide-react"
 import type { ContentFormat } from "@/lib/api/client"
 // 身份契约唯一源：aim-harness/contracts.ts。
 // AimAgentId 类型 + 运行时校验/归一化逻辑（DEFAULT_AIM_AGENT /
@@ -31,7 +31,7 @@ export interface AimAgentMeta {
 }
 
 export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
-  // 侧栏展示名统一四字；顺序对齐工作流：诊断 → 选题 → 创作 → 编辑 → 复盘 → 人设
+  // 侧栏展示名统一四字；顺序对齐工作流：诊断 → 选题 → 创作 → 编辑 → 复盘
   {
     id: "business_system_diagnosis",
     title: "商业诊断",
@@ -49,7 +49,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   {
     id: "content_producer",
     title: "内容创作",
-    description: "社媒速产、深度长文、自由交付、朋友圈文案",
+    description: "流量漏斗、线索获客、通用故事口播",
     icon: Video,
     defaultFormats: ["video_script"],
   },
@@ -73,7 +73,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   },
   {
     id: "content_review",
-    // id 保留 content_review；对外叫「发布质检」——查问题、标句子、局部改稿
+    // id 保留 content_review；对外只叫「发布质检」——查问题、标句子、局部改稿
     title: "发布质检",
     description: "标题、钩子、结构、人设一致、风险表达",
     icon: ShieldCheck,
@@ -88,13 +88,6 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     description: "已发布内容的数据表现、有效规律、下一步动作",
     icon: LineChart,
     defaultFormats: ["raw_copy"],
-  },
-  {
-    id: "persona",
-    title: "人设故事",
-    description: "来时路、人设故事、置顶脚本",
-    icon: Compass,
-    defaultFormats: ["video_script"],
   },
 ]
 
