@@ -4,7 +4,7 @@ import { startTransition, useEffect, useRef, type Dispatch, type MutableRefObjec
 import { toast } from "sonner"
 
 import { getAimHistory, getVideoCopyExtraction, type AimGeneration, type ContentFormat } from "@/lib/api/client"
-import { BENCHMARK_RECREATION_PREFILL, buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
+import { buildBenchmarkMaterialPrefill } from "@/lib/aim-benchmark-length"
 import { loadAimDraft } from "@/lib/aim/draft-storage"
 import { normalizeWorkbenchCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 import { getTaskSpecCopyStudioModule } from "@/lib/task-spec"
@@ -184,15 +184,13 @@ export function useAimVideoCopyPrefill(input: {
       .then((record) => {
         if (!active) return
         const analysis = formatAnalysisResultForPrompt(record.analysisResult) || ""
-        const lengthRule = buildBenchmarkLengthRule(record.transcript)
-        const prefill = [
-          BENCHMARK_RECREATION_PREFILL.short, "", "创作原则：", buildBenchmarkRecreationSopBlock(),
-          "1. 开头机制可以借，但第一句话必须重写成我的身份和业务场景里的话。",
-          "2. 结构节奏可以保留，但表达至少 30% 可感知重写：案例、转折、句式和行动引导不能贴原文。",
-          "3. 除专有名词外，不要连续沿用原文 12 个字以上，最终稿要像我的内容，不像原文换皮。",
-          lengthRule ? `4. ${lengthRule}` : null, "", record.videoTitle ? `对标标题：${record.videoTitle}` : null,
-          "对标原文：", record.transcript || "", record.analysisResult ? "\n已有拆解：" : null, analysis,
-        ].filter(Boolean).join("\n")
+        // 创作原则/SOP 已由服务端 buildRawInputWithVideoCopyContext 内置，输入框只带材料
+        const prefill = buildBenchmarkMaterialPrefill({
+          intent: "short",
+          videoTitle: record.videoTitle,
+          transcript: record.transcript,
+          analysis: record.analysisResult ? analysis : null,
+        })
         startTransition(() => {
           setters.setSelectedAgentId("content_producer")
           setters.setAgentModule(undefined)

@@ -7,14 +7,15 @@ export const BENCHMARK_RECREATION_SOP_RULES = [
 ]
 
 export const BENCHMARK_RECREATION_PREFILL = {
-  short: "请基于下面这条对标文案和已有拆解，先按拆解好的爆款结构逻辑走，再创作成适合我自己的口播文案。",
-  long: "请基于下面这条长对标文案和已有拆解，先按拆解好的爆款结构逻辑走，再创作一篇适合我自己的完整长篇文案。",
+  short: "请基于下面这条对标文案和已有拆解，创作成适合我自己的口播文案。",
+  long: "请基于下面这条长对标文案和已有拆解，创作一篇适合我自己的完整长篇文案。",
+  rewrite: "请按对标原文重新生成一版文案，直接输出最终稿。",
 }
 
 export const AIM_OUTPUT_MAX_CHARS = 5000
 
 /**
- * @description 构建爆款选题再创作 SOP 规则文本块
+ * @description 构建爆款选题再创作 SOP 规则文本块（仅供服务端/系统提示注入，不塞进用户输入框）
  * @returns SOP 规则的多行文本
  */
 export function buildBenchmarkRecreationSopBlock() {
@@ -22,6 +23,27 @@ export function buildBenchmarkRecreationSopBlock() {
     "爆款选题再创作 SOP：",
     ...BENCHMARK_RECREATION_SOP_RULES.map((rule, index) => `${index + 1}. ${rule}`),
   ].join("\n")
+}
+
+/**
+ * @description 构建对标再创作时用户可见输入：只带意图 + 材料，不塞创作原则/SOP
+ */
+export function buildBenchmarkMaterialPrefill(input: {
+  intent?: keyof typeof BENCHMARK_RECREATION_PREFILL
+  videoTitle?: string | null
+  transcript?: string | null
+  analysis?: string | null
+  currentDraft?: string | null
+}) {
+  const intent = BENCHMARK_RECREATION_PREFILL[input.intent || "short"]
+  return [
+    intent,
+    "",
+    input.videoTitle?.trim() ? `对标标题：${input.videoTitle.trim()}` : null,
+    input.transcript?.trim() ? `对标原文：\n${input.transcript.trim()}` : null,
+    input.analysis?.trim() ? `\n已有拆解：\n${input.analysis.trim()}` : null,
+    input.currentDraft?.trim() ? `\n我当前不满意的稿子：\n${input.currentDraft.trim()}` : null,
+  ].filter(Boolean).join("\n")
 }
 
 /**

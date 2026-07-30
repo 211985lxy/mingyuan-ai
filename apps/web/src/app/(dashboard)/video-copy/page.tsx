@@ -354,7 +354,7 @@ const topComments = analysis?.topComments ?? []
         <AiResultPanel
           title="再创作成我的文案"
           icon={<Wand2 className="h-4 w-4 text-primary" />}
-          meta={<span>带入原文案、拆解结果和爆款选题再创作原则</span>}
+          meta={<span>带入原文案和拆解结果，再创作规则已内置</span>}
           flat
           actions={
             <Link
@@ -367,7 +367,7 @@ const topComments = analysis?.topComments ?? []
           }
         >
           <p className="text-sm leading-6 text-muted-foreground">
-            再创作会在内容文案创作里进行，基于本参考文案、拆解结果和爆款选题再创作原则，生成全套内容资产包。
+            再创作会在内容文案创作里进行：只带入本参考文案和拆解结果，爆款再创作规则在后台自动生效。
           </p>
         </AiResultPanel>
       ) : null}

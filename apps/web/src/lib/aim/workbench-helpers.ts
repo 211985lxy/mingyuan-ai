@@ -1,5 +1,5 @@
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
-import { buildBenchmarkLengthRule, buildBenchmarkRecreationSopBlock } from "@/lib/aim-benchmark-length"
+import { buildBenchmarkMaterialPrefill } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { normalizeKnowledgeUsed } from "@/lib/aim-knowledge-cite"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
@@ -240,19 +240,13 @@ export function buildAimBenchmarkRewriteInput(input: {
   const original = findAimBenchmarkOriginal(input.messages, input.sourceOriginalText)
   if (!original) return null
   const currentDraft = input.editorText.trim() || findLatestAimDeliverableText(input.messages)
-  const lengthRule = buildBenchmarkLengthRule(original)
-  return [
-    "请按对标原文重新生成一版文案，直接输出最终稿。",
-    "硬性要求：",
-    buildBenchmarkRecreationSopBlock(),
-    "1. 目标字数必须和对标原文基本一致，允许 95%-105% 波动。",
-    "2. 整体至少 30% 可感知重写，不能只是替换少数字。",
-    "3. 除专有名词外，不要连续沿用原文 12 个字以上。",
-    lengthRule ? `4. ${lengthRule}` : null,
-    input.sourceAnalysisText.trim() ? `已有拆解：\n${input.sourceAnalysisText.trim()}` : null,
-    `对标原文：\n${original}`,
-    currentDraft ? `我当前不满意的稿子：\n${currentDraft}` : null,
-  ].filter(Boolean).join("\n\n")
+  // SOP/字数硬规则走系统侧提示，用户输入只保留材料
+  return buildBenchmarkMaterialPrefill({
+    intent: "rewrite",
+    transcript: original,
+    analysis: input.sourceAnalysisText,
+    currentDraft,
+  })
 }
 
 /**
