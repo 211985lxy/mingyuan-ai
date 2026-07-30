@@ -65,7 +65,7 @@ const quickNav: NavItem[] = [
   { title: "AIM 推进工作流", href: "/aim", icon: Target },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "市场洞察", href: "/opportunities", icon: Users },
-  { title: "客户项目", href: "/projects", icon: BriefcaseBusiness },
+  { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
   { title: "工作总览", href: "/home", icon: LayoutDashboard },
 ]

@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -15,8 +15,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { KnowledgeAssetHealthPanel } from "@/components/admin/knowledge-asset-health-panel"
-import { ExpressionStylePanel } from "@/components/projects/expression-style-panel"
 import {
   createKnowledge,
   fetchKnowledgeAssetHealth,
@@ -25,23 +23,33 @@ import { CATEGORY_LABELS, type KnowledgeCategory } from "@/lib/knowledge-categor
 import {
   HEALTH_STATUS_LABELS,
   getSupplementPrompts,
-  type AssetBoxId,
+  type AssetBoxHealth,
   type KnowledgeAssetHealthResult,
+  type KnowledgeAssetHealthStatus,
 } from "@/lib/knowledge-asset-health"
 import { buildDefaultKnowledgeTags } from "@/lib/knowledge-tags"
+import { cn } from "@/lib/utils"
 
 interface ProjectKnowledgeAssetHealthProps {
   projectId: string
 }
 
+function statusChipClass(status: KnowledgeAssetHealthStatus): string {
+  if (status === "ready") {
+    return "border-border/80 bg-secondary/50 text-muted-foreground"
+  }
+  if (status === "pending_confirm") {
+    return "border-amber-700/25 bg-amber-50 text-amber-950 dark:border-primary/30 dark:bg-secondary dark:text-foreground"
+  }
+  return "border-primary/35 bg-primary/[0.08] text-foreground"
+}
+
 /**
- * 用户端项目内容资产：五盒健康度 +「我的表达风格」管理。
+ * 用户端项目内容资产：一行五盒状态，点缺口可补录。
  */
 export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAssetHealthProps) {
-  const [focusStyle, setFocusStyle] = useState(false)
   const [health, setHealth] = useState<KnowledgeAssetHealthResult | null>(null)
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -50,15 +58,6 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
     content: "",
     prompts: [] as string[],
   })
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const focus = params.get("focus") === "style"
-    const focusedProject = params.get("projectId")
-    const shouldFocus = focus && (!focusedProject || focusedProject === projectId)
-    setFocusStyle(shouldFocus)
-    if (shouldFocus) setExpanded(true)
-  }, [projectId])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -104,88 +103,63 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
     }
   }
 
-  function openSupplement(input: {
-    boxId: AssetBoxId
-    category: KnowledgeCategory
-    prompts: string[]
-  }) {
-    if (input.category === "writing_style_profile") {
-      setExpanded(true)
+  function openSupplement(box: AssetBoxHealth) {
+    const category =
+      box.suggestedCategory ??
+      box.missingCategories[0] ??
+      box.categories[0]
+    if (!category) {
+      toast.message("这一盒暂时没有可补录的类目")
       return
     }
-    const prompts =
-      input.prompts.length > 0
-        ? input.prompts
-        : getSupplementPrompts(input.boxId, input.category)
     setForm({
-      category: input.category,
+      category,
       title: "",
       content: "",
-      prompts,
+      prompts: getSupplementPrompts(box.id, category),
     })
     setDialogOpen(true)
   }
 
   if (loading) {
     return (
-      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="size-3.5 animate-spin" />
-        正在检查内容资产…
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" />
+        检查资产…
       </div>
     )
   }
 
   if (!health) return null
 
-  const missingCount = health.boxes.filter((box) => box.status !== "ready").length
-  const firstGap = health.boxes.find((box) => box.status !== "ready")
-
   return (
-    <div className="mt-3 space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary"
-        >
-          内容资产
-          {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-        </button>
-        <span className="text-xs text-muted-foreground">
-          {missingCount === 0
-            ? "五盒已齐"
-            : `${missingCount} 项${firstGap ? HEALTH_STATUS_LABELS[firstGap.status] : "待处理"}`}
-        </span>
-        {firstGap?.suggestedCategory ? (
-          <button
-            type="button"
-            className="text-xs font-medium text-primary hover:underline"
-            onClick={() =>
-              openSupplement({
-                boxId: firstGap.id,
-                category: firstGap.suggestedCategory!,
-                prompts: [],
-              })
-            }
-          >
-            去补资料
-          </button>
-        ) : null}
+    <>
+      <div className="flex flex-wrap gap-1">
+        {health.boxes.map((box) => {
+          const interactive = box.status !== "ready"
+          return (
+            <button
+              key={box.id}
+              type="button"
+              disabled={!interactive}
+              title={`${box.label} · ${HEALTH_STATUS_LABELS[box.status]}${interactive ? "（点击补录）" : ""}`}
+              onClick={() => {
+                if (interactive) openSupplement(box)
+              }}
+              className={cn(
+                "inline-flex h-6 max-w-full items-center gap-1 rounded-md border px-1.5 text-[11px] leading-none",
+                statusChipClass(box.status),
+                interactive
+                  ? "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/10"
+                  : "cursor-default opacity-90",
+              )}
+            >
+              <span className="truncate font-medium">{box.label}</span>
+              <span className="shrink-0 opacity-70">{HEALTH_STATUS_LABELS[box.status]}</span>
+            </button>
+          )
+        })}
       </div>
-
-      {expanded ? (
-        <>
-          <KnowledgeAssetHealthPanel
-            health={health}
-            title="内容资产"
-            onSelectBox={() => {
-              /* 用户端无条目列表，点击盒子不筛选 */
-            }}
-            onSupplement={openSupplement}
-          />
-          <ExpressionStylePanel projectId={projectId} autoExpandFeed={focusStyle} />
-        </>
-      ) : null}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -235,6 +209,6 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
