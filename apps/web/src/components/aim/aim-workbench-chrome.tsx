@@ -1,14 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import type { ComponentType, ReactNode } from "react"
-import { Check, FileSearch, Plus } from "lucide-react"
+import { useEffect, useState, type ComponentType, type ReactNode } from "react"
+import { ArrowRight, Check, Plus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { AimEvolutionSuggestion } from "@/lib/api/client"
+import type { AimEvolutionSuggestion, AimGeneration } from "@/lib/api/client"
+import { listPendingAimHistory } from "@/lib/api/client"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { AIM_WORKFLOW_STAGES, type AimWorkflowStage } from "@/lib/aim-workflow"
+import { getContentTitle } from "@/lib/home-history-summary"
+import { buildAimGenerationHref } from "@/features/aim/workflow/tasks"
 
 interface AimWorkbenchHeaderProps {
   workflowStage: AimWorkflowStage
@@ -23,7 +26,6 @@ interface AimWorkbenchHeaderProps {
 
 /**
  * 紧凑单行头：阶段只读进度 + 当前专家名 + 新任务。
- * 客户全案由工作台默认选中，不再提供「快速出稿」切换框。
  */
 export function AimWorkbenchHeader({
   workflowStage,
@@ -116,7 +118,7 @@ export function AimProjectNotices({ projectsCount, selectedProjectId, projectEna
     <>
       {projectEnabled && projectsCount === 0 ? (
         <div className="border-b bg-muted/30 px-3 py-1 text-[11px] text-muted-foreground">
-          还没有 IP 营销全案，<Link href="/projects" className="text-primary underline-offset-2 hover:underline">先创建一个</Link>，生成内容可自动归属。
+          还没有项目，<Link href="/projects" className="text-primary underline-offset-2 hover:underline">先创建一个</Link>，生成内容可自动归属。
         </div>
       ) : null}
       {projectAccessError ? (
@@ -125,7 +127,7 @@ export function AimProjectNotices({ projectsCount, selectedProjectId, projectEna
         </div>
       ) : projectEnabled && projectsCount > 0 && !selectedProjectId ? (
         <div className="border-b bg-amber-500/10 px-3 py-1 text-[11px] text-amber-700 dark:text-amber-300">
-          正在加载你的 IP 营销全案，请稍后再生成内容。
+          正在加载你的项目，请稍后再生成内容。
         </div>
       ) : null}
     </>
@@ -160,8 +162,43 @@ export function AimEvolutionSuggestions({ suggestions, onDismiss, onSave }: {
   )
 }
 
+function AimContinueLast() {
+  const [item, setItem] = useState<AimGeneration | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listPendingAimHistory(1)
+      .then((data) => {
+        if (!cancelled) setItem(data.items[0] ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setItem(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (!item) return null
+
+  return (
+    <Link
+      href={buildAimGenerationHref(item)}
+      className="group flex w-full items-center gap-3 border-b border-border/60 pb-4 text-left transition-colors hover:border-primary/40"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-muted-foreground">继续上次</p>
+        <p className="mt-0.5 truncate text-sm font-medium text-foreground group-hover:text-primary">
+          {getContentTitle(item)}
+        </p>
+      </div>
+      <ArrowRight className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+    </Link>
+  )
+}
+
 /**
- * AIM 空状态：三目的入口 + 爆款拆解主入口 + composer。
+ * 创作台空状态：继续上次 + 目的入口 + 输入框。
  */
 export function AimLandingHero({
   purposes,
@@ -173,31 +210,30 @@ export function AimLandingHero({
   children: ReactNode
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
-      <div className="flex w-full max-w-3xl flex-col items-center gap-7">
+    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-10">
+      <div className="flex w-full max-w-2xl flex-col items-center gap-8">
+        <AimContinueLast />
         <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           今天想得到什么结果？
         </h1>
-        <div className="grid w-full grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
           {purposes.map((skill) => (
             <button
               key={skill.id}
               type="button"
               onClick={() => onSelectPurpose(skill)}
-              className="flex h-12 items-center gap-2 rounded-xl border bg-background px-3.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+              className="flex h-11 items-center justify-center rounded-lg border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
             >
               <span className="truncate">{skill.label}</span>
             </button>
           ))}
-          <Link
-            href="/video-copy"
-            className="flex h-12 items-center gap-2 rounded-xl border bg-background px-3.5 text-left text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-          >
-            <FileSearch className="h-4 w-4 shrink-0 opacity-70" />
-            <span className="truncate">爆款拆解</span>
-          </Link>
         </div>
         <div className="w-full">{children}</div>
+        <p className="text-center text-xs text-muted-foreground">
+          <Link href="/projects" className="underline-offset-2 hover:text-foreground hover:underline">
+            我的项目
+          </Link>
+        </p>
       </div>
     </div>
   )

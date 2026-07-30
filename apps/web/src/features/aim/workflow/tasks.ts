@@ -78,3 +78,15 @@ export function groupAimWorkflowTasks(records: AimGeneration[]) {
     results: tasks.filter((task) => task.stage === "results"),
   } satisfies Record<AimWorkflowStage, AimWorkflowTask[]>
 }
+
+/**
+ * 待办条目跳进创作台的链接（带 generation + 阶段 + 项目）。
+ */
+export function buildAimGenerationHref(item: AimGeneration) {
+  const stage = deriveAimWorkflowTasks([item])[0]?.stage || "content"
+  const params = new URLSearchParams({ generationId: item.id, stage })
+  if (item.projectId) params.set("projectId", item.projectId)
+  else params.set("mode", "quick")
+  return `/aim?${params.toString()}`
+}
+

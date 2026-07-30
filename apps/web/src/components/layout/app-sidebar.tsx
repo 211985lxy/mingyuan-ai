@@ -6,10 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { BrandLogo } from "@/components/branding/brand-logo"
 import { useBranding } from "@/components/providers/branding-provider"
 import {
-  LayoutDashboard,
   Settings,
   BriefcaseBusiness,
-  Target,
+  PenLine,
   FileText,
   Plus,
   MoreHorizontal,
@@ -60,14 +59,13 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
 }
 
-/** 一级导航：固定 5 项，「爆款拆解」保留高频一级入口 */
+/** 一级导航：创作台统一开工；爆款拆解保留高频入口 */
 const quickNav: NavItem[] = [
-  { title: "AIM 推进工作流", href: "/aim", icon: Target },
+  { title: "创作台", href: "/aim", icon: PenLine },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
-  { title: "工作总览", href: "/home", icon: LayoutDashboard },
 ]
 
 /** AIM 专家：按工作流排序，始终展开，不提供折叠/更多入口 */
@@ -89,7 +87,7 @@ function isNavActive(pathname: string, searchParams: URLSearchParams, href: stri
   if (path === "/aim") {
     const expectedAgent = url.searchParams.get("agent")
     const actualAgent = searchParams.get("agent")
-    // 「推进工作流」= 无 agent；「文案创作」等 = 精确匹配 agent
+    // 「创作台」= 无 agent；「文案创作」等 = 精确匹配 agent
     if (expectedAgent) return actualAgent === expectedAgent
     return !actualAgent
   }
@@ -307,7 +305,7 @@ export function AppSidebar() {
     <Sidebar className="border-r border-border/40 bg-sidebar text-sidebar-foreground">
       <SidebarHeader className="gap-2 px-3 pb-2 pt-3">
         <Link
-          href="/home"
+          href="/aim"
           onClick={closeMobile}
           className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-1 text-foreground hover:bg-foreground/[0.03]"
         >
