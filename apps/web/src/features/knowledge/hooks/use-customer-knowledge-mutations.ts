@@ -21,6 +21,7 @@ export function useCustomerKnowledgeMutations(input: {
   const [form, setForm] = useState<CustomerKnowledgeForm>(EMPTY_CUSTOMER_KNOWLEDGE_FORM)
   const [saving, setSaving] = useState(false)
   const [archivingId, setArchivingId] = useState<string | null>(null)
+  const [memoryImportOpen, setMemoryImportOpen] = useState(false)
 
   function openCreate() {
     setDialogMode("create")
@@ -30,6 +31,10 @@ export function useCustomerKnowledgeMutations(input: {
       projectId: input.projectFilter !== "all" ? input.projectFilter : "none",
     })
     setDialogOpen(true)
+  }
+
+  function openMemoryImport() {
+    setMemoryImportOpen(true)
   }
 
   function openEdit(entry: KnowledgeEntry) {
@@ -77,7 +82,10 @@ export function useCustomerKnowledgeMutations(input: {
     setForm,
     saving,
     archivingId,
+    memoryImportOpen,
+    setMemoryImportOpen,
     openCreate,
+    openMemoryImport,
     openEdit,
     handleSave,
     handleArchive,

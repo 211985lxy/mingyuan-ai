@@ -1,14 +1,17 @@
 "use client"
 
-import { Plus } from "lucide-react"
+import { BrainCircuit, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CustomerKnowledgeEntryDialog } from "@/features/knowledge/components/customer-knowledge-entry-dialog"
 import { CustomerKnowledgeFilters } from "@/features/knowledge/components/customer-knowledge-filters"
 import { CustomerKnowledgeListPanel } from "@/features/knowledge/components/customer-knowledge-list-panel"
+import { ExternalAiMemoryImportDialog } from "@/features/knowledge/components/external-ai-memory-import-dialog"
 import { useCustomerKnowledgeWorkspace } from "@/features/knowledge/hooks/use-customer-knowledge-workspace"
 
 export function CustomerKnowledgeWorkspace() {
   const ws = useCustomerKnowledgeWorkspace()
+  const memoryDefaultProjectId =
+    ws.projectFilter !== "all" && ws.projectFilter !== "none" ? ws.projectFilter : undefined
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -19,10 +22,16 @@ export function CustomerKnowledgeWorkspace() {
             管理你自己的业务资料。AIM 写稿时会按项目调用这里的内容。
           </p>
         </div>
-        <Button onClick={ws.openCreate}>
-          <Plus className="mr-1.5 h-4 w-4" />
-          新增知识
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={ws.openMemoryImport}>
+            <BrainCircuit className="mr-1.5 h-4 w-4" />
+            粘贴外部记忆
+          </Button>
+          <Button onClick={ws.openCreate}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            新增知识
+          </Button>
+        </div>
       </div>
 
       <CustomerKnowledgeFilters
@@ -57,6 +66,14 @@ export function CustomerKnowledgeWorkspace() {
         onOpenChange={ws.setDialogOpen}
         onFormChange={ws.setForm}
         onSave={() => void ws.handleSave()}
+      />
+
+      <ExternalAiMemoryImportDialog
+        open={ws.memoryImportOpen}
+        projects={ws.projects}
+        defaultProjectId={memoryDefaultProjectId}
+        onOpenChange={ws.setMemoryImportOpen}
+        onImported={() => void ws.load()}
       />
     </div>
   )
