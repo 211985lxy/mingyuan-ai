@@ -33,7 +33,7 @@ describe("aim agent guides", () => {
   it("does not expose structural copyVariants beside purpose skills", () => {
     const guide = getAimAgentGuide("content_producer")
     expect((guide as { copyVariants?: unknown }).copyVariants).toBeUndefined()
-    expect(guide.skills.map((s) => s.label)).toEqual(["流量漏斗", "线索获客", "通用故事"])
+    expect(guide.skills.map((s) => s.label)).toEqual(["漏斗获客与故事口播"])
   })
 
   it("uses task-based workflow names on the visible agent list", () => {
@@ -107,16 +107,17 @@ describe("aim agent guides", () => {
     expect(aliased).toBe(canonical)
   })
 
-  it("keeps content producer skills to three content purposes", () => {
+  it("merges content producer purpose skills into one oral skill", () => {
     const skills = getAimAgentGuide("content_producer").skills
     const labels = skills.map((skill) => skill.label)
 
-    expect(labels).toEqual(["流量漏斗", "线索获客", "通用故事"])
+    expect(labels).toEqual(["漏斗获客与故事口播"])
     expect(skills.every((skill) => skill.group === "内容目的")).toBe(true)
-    expect(skills.find((skill) => skill.id === "traffic_funnel")?.prompt).toContain("流量漏斗")
-    expect(skills.find((skill) => skill.id === "lead_acquisition")?.prompt).toContain("线索获客")
-    expect(skills.find((skill) => skill.id === "general_story")?.prompt).toContain("通用故事")
-    expect(skills.every((skill) => skill.prompt.includes("完整口播正文"))).toBe(true)
+    const purpose = skills.find((skill) => skill.id === "funnel_lead_story_oral")
+    expect(purpose?.prompt).toContain("流量漏斗")
+    expect(purpose?.prompt).toContain("线索获客")
+    expect(purpose?.prompt).toContain("通用故事")
+    expect(purpose?.prompt).toContain("完整口播正文")
   })
 
   it("keeps topic planning skills to four actions", () => {
@@ -222,15 +223,16 @@ describe("aim agent guides", () => {
     expect(labels).not.toContain("改开头钩子")
     expect(labels).not.toContain("重写这版文案")
     expect(labels).not.toContain("借热点写观点")
-    expect(skills.find((s) => s.id === "traffic_funnel")?.prompt).toContain("传播优先于成交")
-    expect(skills.find((s) => s.id === "lead_acquisition")?.prompt).toContain("评论、私信或预约")
-    expect(skills.find((s) => s.id === "general_story")?.prompt).toContain("不强行推产品成交")
+    const purpose = skills.find((s) => s.id === "funnel_lead_story_oral")
+    expect(purpose?.prompt).toContain("传播优先于成交")
+    expect(purpose?.prompt).toContain("评论、私信或预约")
+    expect(purpose?.prompt).toContain("不强行推产品成交")
   })
 
-  it("routes persona/story work through content producer general_story skill", () => {
-    const skill = getAimAgentGuide("content_producer").skills.find((s) => s.id === "general_story")
+  it("routes persona/story work through merged content producer purpose skill", () => {
+    const skill = getAimAgentGuide("content_producer").skills.find((s) => s.id === "funnel_lead_story_oral")
 
-    expect(skill?.label).toBe("通用故事")
+    expect(skill?.label).toBe("漏斗获客与故事口播")
     expect(skill?.prompt).toContain("来时路")
     expect(skill?.prompt).toContain("置顶视频")
     expect(skill?.prompt).toContain("不强行推产品成交")

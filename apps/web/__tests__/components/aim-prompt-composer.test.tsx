@@ -54,41 +54,36 @@ describe("AimPromptComposer", () => {
     expect(props.onGenerate).not.toHaveBeenCalled()
   })
 
-  it("技能少时直接展示芯片，点击即填入", async () => {
+  it("+ 菜单技能：打开 → 选择技能 → onUseSkill 被调且面板关闭", async () => {
     const user = userEvent.setup()
     const onUseSkill = vi.fn()
     const skills: AimWorkbenchSkill[] = [
-      { id: "s1", label: "流量漏斗", description: "完播优先", prompt: "p1", group: "内容目的" },
+      { id: "s1", label: "写小红书", description: "生成小红书图文", prompt: "p1", group: "创作" },
     ]
     render(<AimPromptComposer {...baseProps({ showSkills: true, skills, onUseSkill })} />)
 
-    expect(screen.queryByRole("button", { name: /技能/ })).not.toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "流量漏斗" }))
+    expect(screen.queryByText("写小红书")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: /添加图片、技能、模式/ }))
+    await user.click(screen.getByText("写小红书"))
 
     expect(onUseSkill).toHaveBeenCalledTimes(1)
     expect(onUseSkill.mock.calls[0][0].id).toBe("s1")
+    expect(screen.queryByText("写小红书")).not.toBeInTheDocument()
   })
 
-  it("计划模式：已在 plan 时显示退出入口", async () => {
+  it("计划模式切换：+ 菜单里开启计划模式", async () => {
     const user = userEvent.setup()
     const onComposerModeChange = vi.fn()
     render(
       <AimPromptComposer
-        {...baseProps({ onComposerModeChange, canUsePlanMode: true, composerMode: "plan" })}
+        {...baseProps({ onComposerModeChange, canUsePlanMode: true, composerMode: "direct" })}
       />,
     )
 
-    await user.click(screen.getByRole("button", { name: /计划中/ }))
-    expect(onComposerModeChange).toHaveBeenCalledWith("direct")
-  })
-
-  it("直接模式下不展示计划入口，避免和内容目的抢位", () => {
-    render(
-      <AimPromptComposer
-        {...baseProps({ onComposerModeChange: vi.fn(), canUsePlanMode: true, composerMode: "direct" })}
-      />,
-    )
-    expect(screen.queryByRole("button", { name: /计划/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /添加图片、技能、模式/ }))
+    await user.click(screen.getByText("计划模式"))
+    expect(onComposerModeChange).toHaveBeenCalledWith("plan")
   })
 
   it("发布质检长文只显示待质检，不暴露创作用途", () => {

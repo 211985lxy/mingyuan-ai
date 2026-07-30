@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  ChevronDown,
   ImagePlus,
   ListChecks,
   Loader2,
   Mic,
+  Plus,
   Search,
   Send,
   Sparkles,
@@ -71,6 +71,9 @@ export interface AimPromptComposerProps {
   capabilities?: AimAgentCapabilities
 }
 
+const POPOVER_SHADOW =
+  "shadow-[0_0_0_1px_rgba(239,231,220,0.95),0_12px_32px_-8px_rgba(37,33,29,0.12)]"
+
 /** 悬浮输入卡片：文本 / 图片 / 长文附件 / 发送 */
 export function AimPromptComposer(props: AimPromptComposerProps) {
   const {
@@ -107,6 +110,8 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
   const canSubmit = (isPlanMode ? canPlan : canSend) && canGenerate && (!pastedCopy || Boolean(effectivePasteUsage && effectivePasteUsage !== "style_sample"))
   const canStop = busy && !isRecording && Boolean(onStop)
   const showContentModeControl = showContentMode && capabilities.contentModeSelector
+  const showPlanModeControl = !isPlanSessionActive && Boolean(onComposerModeChange)
+  const showAddMenu = Boolean(onAddImages) || showPlanModeControl || showContentModeControl || showSkills
   const autoUsageLabel =
     capabilities.pasteMode === "review"
       ? " · 待质检"
@@ -118,8 +123,8 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [skillsOpen, setSkillsOpen] = useState(false)
-  const [modeOpen, setModeOpen] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [contentModeExpanded, setContentModeExpanded] = useState(false)
   const [skillQuery, setSkillQuery] = useState("")
   const contentModeLabel = contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[contentMode]
 
@@ -145,19 +150,21 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
     return groups
   }, [skillQuery, skills])
 
+  const closeAddMenu = () => {
+    setAddMenuOpen(false)
+    setContentModeExpanded(false)
+    setSkillQuery("")
+  }
+
   useEffect(() => {
-    if (!skillsOpen && !modeOpen) return
+    if (!addMenuOpen) return
     function closeOnOutside(event: PointerEvent) {
       if (rootRef.current?.contains(event.target as Node)) return
-      setSkillsOpen(false)
-      setModeOpen(false)
-      setSkillQuery("")
+      closeAddMenu()
     }
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return
-      setSkillsOpen(false)
-      setModeOpen(false)
-      setSkillQuery("")
+      closeAddMenu()
     }
     document.addEventListener("pointerdown", closeOnOutside)
     document.addEventListener("keydown", closeOnEscape)
@@ -165,7 +172,16 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
       document.removeEventListener("pointerdown", closeOnOutside)
       document.removeEventListener("keydown", closeOnEscape)
     }
-  }, [skillsOpen, modeOpen])
+  }, [addMenuOpen])
+
+  const contentModeOptions = useMemo(() => ([
+    { id: undefined as CopyStudioModule | undefined, label: "智能选择", hint: "按内容自动路由" },
+    ...COPY_STUDIO_MODULES.map((module) => ({
+      id: module as CopyStudioModule | undefined,
+      label: COPY_STUDIO_MODULE_LABELS[module],
+      hint: "",
+    })),
+  ]), [])
 
   return (
     <div ref={rootRef} className="mx-auto w-full max-w-6xl xl:max-w-7xl">
@@ -223,98 +239,228 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
           </div>
         )}
 
-        {showContentModeControl && onContentModeChange && modeOpen ? (
-          <div className="absolute bottom-14 left-3 z-20 w-52 overflow-hidden rounded-xl bg-popover p-1 text-popover-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.14)]">
-            {([{ id: undefined as CopyStudioModule | undefined, label: "智能选择", hint: "按内容自动路由" },
-              ...COPY_STUDIO_MODULES.map((module) => ({ id: module as CopyStudioModule | undefined, label: COPY_STUDIO_MODULE_LABELS[module], hint: "" })),
-            ]).map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                className={cn("flex w-full flex-col rounded-lg px-2.5 py-2 text-left transition-colors", contentMode === option.id ? "bg-foreground/[0.06]" : "hover:bg-foreground/[0.04]")}
-                onClick={() => { onContentModeChange(option.id); setModeOpen(false) }}
-              >
-                <span className={cn("text-sm", contentMode === option.id ? "font-medium text-foreground" : "text-foreground/85")}>{option.label}</span>
-                {option.hint ? <span className="text-xs text-muted-foreground">{option.hint}</span> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        {addMenuOpen ? (
+          <div
+            className={cn(
+              "absolute bottom-[calc(100%+0.35rem)] left-2 z-20 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-xl bg-popover text-popover-foreground",
+              POPOVER_SHADOW,
+            )}
+          >
+            <p className="border-b border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+              添加图片、技能、模式…
+            </p>
+            <div className="max-h-[min(420px,60vh)] overflow-y-auto p-1.5">
+              {onAddImages ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70 disabled:opacity-50"
+                  onClick={() => { fileInputRef.current?.click(); closeAddMenu() }}
+                >
+                  <ImagePlus className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="font-medium text-foreground">图片</span>
+                </button>
+              ) : null}
 
-        {showSkills && skills.length > 4 && skillsOpen ? (
-          <div className="absolute bottom-14 left-3 z-20 w-[min(420px,calc(100vw-2rem))] rounded-xl bg-popover p-2 text-popover-foreground shadow-[0_0_0_1px_rgba(15,23,42,0.06),0_12px_32px_rgba(15,23,42,0.14)]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input value={skillQuery} onChange={(event) => setSkillQuery(event.target.value)} placeholder="搜索技能" className="h-8 border-0 bg-muted/50 pl-8 text-xs shadow-none" autoFocus />
-            </div>
-            <div className="mt-2 max-h-72 overflow-y-auto">
-              {filteredSkills.map(({ group, items }) => (
-                <div key={group || "_default"}>
-                  {group ? <p className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-[10px] font-medium tracking-wide text-muted-foreground/80">{group}</p> : null}
-                  {items.map((skill) => (
-                    <button key={skill.id} type="button" className="w-full rounded-lg px-2.5 py-2 text-left hover:bg-muted" onClick={() => { onUseSkill?.(skill); setSkillsOpen(false); setSkillQuery("") }}>
-                      <span className="block text-sm font-medium leading-5">{skill.label}</span>
-                      <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{skill.description}</span>
-                    </button>
-                  ))}
+              {showPlanModeControl && onComposerModeChange ? (
+                <button
+                  type="button"
+                  disabled={busy || (!canUsePlanMode && !isPlanMode)}
+                  title={!canUsePlanMode && !isPlanMode ? "请先选择 IP 营销全案" : isPlanMode ? "切回直接模式" : "开启计划模式"}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70 disabled:opacity-50",
+                    isPlanMode && "bg-primary/5",
+                  )}
+                  onClick={() => {
+                    onComposerModeChange(isPlanMode ? "direct" : "plan")
+                    closeAddMenu()
+                  }}
+                >
+                  <ListChecks className={cn("h-4 w-4 shrink-0", isPlanMode ? "text-primary" : "text-muted-foreground")} />
+                  <div className="min-w-0">
+                    <span className="font-medium text-foreground">计划模式</span>
+                    {isPlanMode ? <span className="ml-1.5 text-xs text-primary">已开启</span> : null}
+                  </div>
+                </button>
+              ) : null}
+
+              {showContentModeControl && onContentModeChange ? (
+                <div className="py-0.5">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted/70 disabled:opacity-50"
+                    onClick={() => setContentModeExpanded((open) => !open)}
+                  >
+                    <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-foreground">创作模式</span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">{contentModeLabel}</span>
+                    </div>
+                  </button>
+                  {contentModeExpanded ? (
+                    <div className="ml-2 mt-0.5 border-l border-border/60 pl-2">
+                      {contentModeOptions.map((option) => (
+                        <button
+                          key={option.label}
+                          type="button"
+                          className={cn(
+                            "flex w-full flex-col rounded-lg px-2 py-1.5 text-left transition-colors",
+                            contentMode === option.id ? "bg-primary/8 text-foreground" : "hover:bg-muted/60",
+                          )}
+                          onClick={() => {
+                            onContentModeChange(option.id)
+                            closeAddMenu()
+                          }}
+                        >
+                          <span className={cn("text-sm", contentMode === option.id ? "font-medium" : "text-foreground/90")}>
+                            {option.label}
+                          </span>
+                          {option.hint ? <span className="text-xs text-muted-foreground">{option.hint}</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
-              ))}
-              {filteredSkills.length === 0 ? <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">没有找到匹配技能</p> : null}
-            </div>
-          </div>
-        ) : null}
+              ) : null}
 
-        {showSkills && skills.length > 0 && skills.length <= 4 ? (
-          <div className="flex flex-wrap gap-1.5 px-3 pb-1">
-            {skills.map((skill) => (
-              <button
-                key={skill.id}
-                type="button"
-                disabled={busy}
-                title={skill.description}
-                onClick={() => onUseSkill?.(skill)}
-                className="inline-flex h-7 items-center rounded-full border border-border/70 bg-background px-2.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:opacity-50"
-              >
-                {skill.label}
-              </button>
-            ))}
+              {showSkills && skills.length > 0 ? (
+                <>
+                  {(onAddImages || showPlanModeControl || showContentModeControl) ? (
+                    <div className="my-1.5 h-px bg-border/70" role="separator" />
+                  ) : null}
+                  <div className="px-1 pb-1">
+                    <p className="px-2 py-1 text-[10px] font-medium tracking-wide text-muted-foreground/80">技能</p>
+                    {skills.length > 6 ? (
+                      <div className="relative mb-1.5 px-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={skillQuery}
+                          onChange={(event) => setSkillQuery(event.target.value)}
+                          placeholder="搜索技能"
+                          className="h-8 border-0 bg-muted/50 pl-8 text-xs shadow-none"
+                          autoFocus
+                        />
+                      </div>
+                    ) : null}
+                    <div className="max-h-56 overflow-y-auto">
+                      {skills.length === 0 ? (
+                        <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">当前智能体暂无内置技能</p>
+                      ) : filteredSkills.map(({ group, items }) => (
+                        <div key={group || "_default"}>
+                          {group ? (
+                            <p className="sticky top-0 z-10 bg-popover px-2.5 pb-0.5 pt-1.5 text-[10px] font-medium tracking-wide text-muted-foreground/80">
+                              {group}
+                            </p>
+                          ) : null}
+                          {items.map((skill) => (
+                            <button
+                              key={skill.id}
+                              type="button"
+                              className="w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/70"
+                              onClick={() => {
+                                onUseSkill?.(skill)
+                                closeAddMenu()
+                              }}
+                            >
+                              <span className="block text-sm font-medium leading-5">{skill.label}</span>
+                              <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{skill.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ))}
+                      {skills.length > 0 && filteredSkills.every(({ items }) => items.length === 0) ? (
+                        <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">没有找到匹配技能</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
         <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-0">
-          <div className="flex min-w-0 items-center gap-0.5">
-            {showContentModeControl && onContentModeChange ? (
-              <button type="button" disabled={busy} onClick={() => { setModeOpen((open) => !open); setSkillsOpen(false) }} className={cn("inline-flex h-7 max-w-[10.5rem] items-center gap-1 rounded-full px-2.5 text-xs transition-colors", modeOpen || contentMode ? "bg-foreground/[0.06] font-medium text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")} title="创作模式">
-                <Sparkles className="h-4 w-4 shrink-0 opacity-70" /><span className="truncate">{contentModeLabel}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
-              </button>
-            ) : null}
-            {(isPlanMode || isPlanSessionActive) && onComposerModeChange ? (
-              <Button type="button" size="sm" variant="ghost" className={cn("h-7 gap-1 rounded-full px-2.5 text-xs", isPlanMode ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground")} onClick={() => onComposerModeChange(isPlanMode ? "direct" : "plan")} disabled={busy} title="退出计划模式">
-                <ListChecks className="h-4 w-4" />计划中
-              </Button>
-            ) : null}
-            <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(event) => { if (event.target.files?.length) onAddImages?.(event.target.files); event.target.value = "" }} />
-            <Button type="button" size="sm" variant="ghost" className="h-7 w-7 rounded-full p-0 text-muted-foreground hover:text-foreground" onClick={() => fileInputRef.current?.click()} disabled={busy} title="添加图片"><ImagePlus className="h-4 w-4" /></Button>
-            {showSkills && skills.length > 4 ? (
-              <Button type="button" size="sm" variant="ghost" className={cn("h-7 gap-1 rounded-full px-2.5 text-xs", skillsOpen ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:text-foreground")} onClick={() => { setSkillsOpen((open) => !open); setModeOpen(false) }} disabled={busy}>
-                技能<ChevronDown className="h-3.5 w-3.5 opacity-50" />
+          <div className="flex min-w-0 items-center gap-1">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                if (event.target.files?.length) onAddImages?.(event.target.files)
+                event.target.value = ""
+              }}
+            />
+            {showAddMenu ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-expanded={addMenuOpen}
+                aria-haspopup="menu"
+                className={cn(
+                  "h-8 w-8 rounded-full p-0 transition-colors",
+                  addMenuOpen
+                    ? "bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+                )}
+                onClick={() => setAddMenuOpen((open) => !open)}
+                disabled={busy}
+                title="添加图片、技能、模式…"
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             ) : null}
             {styleEnabled && capabilities.styleSample ? (
-              <button type="button" onClick={onOpenStyleAssets} className="ml-1 inline-flex h-7 items-center rounded-full px-2 text-[11px] text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground" title="查看我的表达风格">我的风格 · 已启用</button>
+              <button
+                type="button"
+                onClick={onOpenStyleAssets}
+                className="inline-flex h-7 max-w-[9rem] items-center truncate rounded-full px-2 text-[11px] text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
+                title="查看我的表达风格"
+              >
+                我的风格 · 已启用
+              </button>
             ) : null}
             {(isTranscribing || isRecording || isPlanMode) ? (
-              <span className="ml-1 truncate text-xs text-muted-foreground">{isTranscribing ? "语音转写中…" : isRecording ? "录音中" : "计划模式"}</span>
+              <span className="truncate text-xs text-muted-foreground">
+                {isTranscribing ? "语音转写中…" : isRecording ? "录音中" : "计划模式"}
+              </span>
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <Button type="button" size="sm" variant="ghost" className="h-7 w-7 rounded-full p-0 text-muted-foreground hover:text-foreground" onClick={isRecording ? onStopRecording : onStartRecording} disabled={busy && !isRecording} title="语音输入">
-              {isRecording ? <span className="text-xs text-red-500">停</span> : <Mic className="h-4 w-4" />}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:text-foreground"
+              onClick={isRecording ? onStopRecording : onStartRecording}
+              disabled={busy && !isRecording}
+              title={isRecording ? "停止录音" : "语音输入"}
+            >
+              {isRecording ? <Square className="h-3.5 w-3.5 text-red-500" /> : <Mic className="h-4 w-4" />}
             </Button>
             {canStop ? (
-              <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 rounded-full px-2.5 text-xs text-red-600" onClick={onStop} title="停止"><Square className="h-3.5 w-3.5" />停止</Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 rounded-full p-0 text-red-600 hover:bg-red-500/10 hover:text-red-600"
+                onClick={onStop}
+                title="停止生成"
+              >
+                <Square className="h-3.5 w-3.5" />
+              </Button>
             ) : null}
-            <Button type="button" size="sm" onClick={onGenerate} disabled={!canSubmit} className={cn("h-9 rounded-full shadow-none", isPlanMode ? "gap-1.5 px-4" : "w-9 p-0")} title={isPlanMode ? "开始规划" : primaryActionLabel}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={onGenerate}
+              disabled={!canSubmit}
+              className={cn("h-9 rounded-full shadow-none", isPlanMode ? "gap-1.5 px-4" : "w-9 p-0")}
+              title={isPlanMode ? "开始规划" : primaryActionLabel}
+            >
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : isPlanMode ? <ListChecks className="h-4 w-4" /> : <Send className="h-4 w-4" />}
               {isPlanMode ? <span className="text-sm">规划</span> : null}
             </Button>
