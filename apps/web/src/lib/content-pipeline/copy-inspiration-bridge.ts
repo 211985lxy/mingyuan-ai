@@ -1,4 +1,3 @@
-// @ts-nocheck — LLMClient.chat 接口待对齐，临时跳过
 /**
  * 5e 文案灵感生成桥接模块
  *

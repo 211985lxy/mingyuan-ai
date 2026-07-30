@@ -1,11 +1,10 @@
-// @ts-nocheck — extractPureVideoUrl 导出待修复，临时跳过
 /**
  * 视频链接检测器 — 从飞书/公众号消息文本中提取视频链接。
  *
  * 支持平台：抖音、视频号（微信）、B站、快手、小红书、YouTube
  */
 
-import { detectVideoPlatform, extractPureVideoUrl } from "@/lib/video-text-extractor"
+import { detectVideoPlatform } from "@/lib/video-text-extractor"
 
 // ─── 链接正则 ──────────────────────────────────────────────────────
 
