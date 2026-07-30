@@ -31,7 +31,12 @@ export function ExternalAiMemoryImportFields(props: {
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>绑定项目</Label>
-        <Select value={props.projectId || undefined} onValueChange={props.onProjectIdChange}>
+        <Select
+          value={props.projectId || undefined}
+          onValueChange={(value) => {
+            if (value) props.onProjectIdChange(value)
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="选择项目" />
           </SelectTrigger>
