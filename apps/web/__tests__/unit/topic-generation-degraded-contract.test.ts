@@ -17,12 +17,6 @@ vi.mock("@/lib/llm/agent-router", () => ({
   getAgentLLM: () => ({ complete: mocks.complete }),
 }))
 
-// 把 TopicCardsSchema 校验相关的副作用模块保留默认行为，仅隔离 LLM。
-vi.mock("@/lib/topic-generation/prompts", () => ({
-  buildTopicSystemPrompt: () => "system",
-  buildTopicUserPrompt: () => "user",
-}))
-
 import { generateTopicCards } from "@/lib/topic-generation"
 
 const baseInput = {
