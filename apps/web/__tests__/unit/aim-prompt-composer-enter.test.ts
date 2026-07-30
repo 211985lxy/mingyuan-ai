@@ -2,22 +2,29 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-const source = readFileSync(join(process.cwd(), "src/components/aim/aim-prompt-composer.tsx"), "utf8")
+const composerSource = readFileSync(
+  join(process.cwd(), "src/components/aim/aim-prompt-composer.tsx"),
+  "utf8",
+)
+const shellSource = readFileSync(
+  join(process.cwd(), "src/components/aim/aim-prompt-composer-shell.tsx"),
+  "utf8",
+)
 
 describe("AIM prompt composer Enter behavior", () => {
   it("uses Codex-style Enter submit and Shift+Enter newline", () => {
-    expect(source).toContain("onKeyDown")
-    expect(source).toContain("event.shiftKey")
+    // 回车提交逻辑在 aim-prompt-composer-shell.tsx（UI 重构时从主文件迁出）。
+    expect(shellSource).toContain("onKeyDown")
+    expect(shellSource).toContain("event.shiftKey")
     // 行为断言：Enter（非 Shift、非输入法组合）才触发生成。
-    // 旧版断言的「Enter 发送 · Shift+Enter 换行」提示文案已随 UI 重构移除，
-    // 改为断言真实提交逻辑，避免对装饰性文案的脆弱依赖。
-    expect(source).toContain("if (canSubmit) onGenerate()")
-    expect(source).toContain("event.nativeEvent.isComposing")
+    expect(shellSource).toContain("if (canSubmit) onGenerate()")
+    expect(shellSource).toContain("event.nativeEvent.isComposing")
   })
 
   it("closes the skill menu on outside click and Escape", () => {
-    expect(source).toContain('document.addEventListener("pointerdown", closeOnOutside)')
-    expect(source).toContain('document.addEventListener("keydown", closeOnEscape)')
-    expect(source).toContain('event.key !== "Escape"')
+    // 菜单关闭逻辑仍在 aim-prompt-composer.tsx。
+    expect(composerSource).toContain('document.addEventListener("pointerdown", closeOnOutside)')
+    expect(composerSource).toContain('document.addEventListener("keydown", closeOnEscape)')
+    expect(composerSource).toContain('event.key !== "Escape"')
   })
 })
