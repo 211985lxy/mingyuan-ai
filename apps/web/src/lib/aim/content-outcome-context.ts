@@ -117,14 +117,17 @@ export async function loadPublishOutcomeContext(input: {
   })
   if (!generation) return { hasData: false, block: EMPTY_BLOCK }
 
+  const rawSnapshots = Array.isArray(generation.retroSnapshots)
+    ? (generation.retroSnapshots as unknown[])
+    : []
+  const retroSnapshots = rawSnapshots.filter(
+    (snapshot): snapshot is RetroSnapshotLike =>
+      typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot),
+  )
+
   return formatPublishOutcomeBlock({
     outcomes: generation.contentOutcomes,
-    retroSnapshots: Array.isArray(generation.retroSnapshots)
-      ? generation.retroSnapshots.filter(
-          (snapshot): snapshot is RetroSnapshotLike =>
-            typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot),
-        )
-      : [],
+    retroSnapshots,
   })
 }
 
