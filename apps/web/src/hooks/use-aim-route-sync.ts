@@ -96,6 +96,19 @@ export function useAimAgentDraftSwitch(input: {
 }
 
 /**
+ * 选题/灵感预填才清会话。仅带 projectId 的工作台 URL 不得清空消息，
+ * 否则「新写一篇」剥 stage 等参数、或 searchParams 引用变化时会把进行中的对话抹掉，
+ * 页面中间变空白，而生成中的转圈还在。
+ */
+export function shouldApplyAimTopicPrefill(input: {
+  topicTitle: string | null
+  topicRationale: string | null
+  idea: string | null
+}): boolean {
+  return Boolean(input.topicTitle?.trim() || input.topicRationale?.trim() || input.idea?.trim())
+}
+
+/**
  * @description React Hook：aimtopicprefill
  * @param input - 输入数据
  * @returns 无返回值
@@ -111,8 +124,13 @@ export function useAimTopicPrefill(input: {
   clearEphemeral?: () => void
 }) {
   const { topicTitle, topicRationale, projectId, idea, router, searchParams, setters, clearEphemeral } = input
+  const consumedPrefillKeyRef = useRef<string | null>(null)
+  const search = searchParams.toString()
   useEffect(() => {
-    if (!topicTitle && !topicRationale && !projectId && !idea) return
+    if (!shouldApplyAimTopicPrefill({ topicTitle, topicRationale, idea })) return
+    const consumeKey = [topicTitle ?? "", topicRationale ?? "", idea ?? "", projectId ?? ""].join("\0")
+    if (consumedPrefillKeyRef.current === consumeKey) return
+    consumedPrefillKeyRef.current = consumeKey
     const prefill = [topicTitle ? `选题：${topicTitle}` : null, topicRationale ? `选题依据：${topicRationale}` : null, idea ? `创作灵感：${idea}` : null]
       .filter(Boolean).join("\n")
     startTransition(() => {
@@ -133,10 +151,17 @@ export function useAimTopicPrefill(input: {
       setters.setSelectedMethodologyProfileIds?.([])
       clearEphemeral?.()
     })
-    const params = new URLSearchParams(searchParams.toString())
-    for (const key of ["topicTitle", "topicRationale", "idea"]) params.delete(key)
-    router.replace(params.toString() ? `/aim?${params.toString()}` : "/aim")
-  }, [clearEphemeral, idea, projectId, router, searchParams, setters, topicRationale, topicTitle])
+    const params = new URLSearchParams(search)
+    let stripped = false
+    for (const key of ["topicTitle", "topicRationale", "idea"]) {
+      if (!params.has(key)) continue
+      params.delete(key)
+      stripped = true
+    }
+    if (stripped) {
+      router.replace(params.toString() ? `/aim?${params.toString()}` : "/aim")
+    }
+  }, [clearEphemeral, idea, projectId, router, search, setters, topicRationale, topicTitle])
 }
 
 /**
