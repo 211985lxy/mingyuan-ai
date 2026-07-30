@@ -163,7 +163,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     outputAssets: ["生意诊断报告", "核心矛盾", "内容主线", "本周动作"],
     skills: BUSINESS_SYSTEM_SKILLS,
     nextActions: [
-      { id: "to_business_diagnosis", label: "带入选题策划", targetAgentId: "business_diagnosis", prompt: "请基于下面商业诊断结果和客户知识库，生成一份《天命IP资产化操盘全案》。走天命IP资产化操盘全案路由，按 12 个客户结果段输出：项目总判断、天命底盘、IP主定位、目标客户、核心问题、IP价值、产品设计、内容系统、流量闭环、私域成交、交付资产化、行动处方。方法论只做后台推理，不要把定位公式、方法论名称、模块解释或占位模板原样呈现给用户。天命底盘没有命理资料时写「未提供/待补充」，不编造。每段都要结合客户事实，能指导后续选题、文案、产品承接、私域成交和交付资产化。" },
+      { id: "to_business_diagnosis", label: "生成天命全案", targetAgentId: "business_diagnosis", prompt: "请基于下面商业诊断结果和客户知识库，生成一份《天命IP资产化操盘全案》。走天命IP资产化操盘全案路由，按 12 个客户结果段输出：项目总判断、天命底盘、IP主定位、目标客户、核心问题、IP价值、产品设计、内容系统、流量闭环、私域成交、交付资产化、行动处方。方法论只做后台推理，不要把定位公式、方法论名称、模块解释或占位模板原样呈现给用户。天命底盘没有命理资料时写「未提供/待补充」，不编造。每段都要结合客户事实，能指导后续选题、文案、产品承接、私域成交和交付资产化。" },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
   },
