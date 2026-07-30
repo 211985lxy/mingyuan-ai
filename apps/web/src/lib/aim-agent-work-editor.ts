@@ -43,7 +43,13 @@ export class WorkEditorHandler implements AimAgentHandler {
       rawInput: latestUser,
       runtimeTask: params.runtimeTask,
     })
-    const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
+
+    const isLightEdit = params.runtimeTask === "light_edit"
+    const lightEditBlock = isLightEdit ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
+    // 互斥约束：light_edit（局部润色）不注入「高风险任务验证规则 / 验证结果区块」。
+    // 该规则自身声明「局部润色、单句改写不要追加验证结果区块」；若在 light_edit 下注入，
+    // 模型会同时收到「保留原文、只改局部」与「追加验证结果区块」两个相反指令。
+    const highRiskBlock = isLightEdit ? "" : `\n${AIM_HIGH_RISK_LOOP_RULE}`
     return `你是「作品编辑」，只做三件事：文字二改/润色、公众号排版、小红书图文改写。
 默认输入是已有成稿或素材。不要从零写深度长文或公众号新稿；用户要新写长文时，明确提示去「内容创作」。
 
@@ -55,8 +61,7 @@ ${workflowContext ? `\n工作流任务单：\n${workflowContext}\n` : ""}
 IP操盘方法论（编辑时的强参考，不得整段抄进回复）：
 ${params.methodologyBlock}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
-${lightEditBlock}
-${AIM_HIGH_RISK_LOOP_RULE}
+${lightEditBlock}${highRiskBlock}
 
 你的对话原则：
 1. 先判断用户当前要做哪一类：文字二改/润色、公众号排版，还是小红书图文改写；直接输出对应成品，不强制先出框架、不追问一堆问题。

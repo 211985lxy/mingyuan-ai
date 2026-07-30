@@ -38,6 +38,19 @@ export function resolveContentProducerProgressiveFlags(input: {
     || contentAction.includes("publish")
     || contentAction === "publish_package"
 
+  // 互斥硬约束：light_edit 的语义是「保留原文、只改局部」，与「整篇至少 30% 重写」
+  // 「正式交付验证区块」是互斥指令。无论原文是否含「对标/改写」字样，light_edit
+  // 都绝不能注入这两条长规则块，否则模型会同时收到「保留原文」与「整篇重写」
+  // 两个相反要求（历史踩过的坑，见契约测试 aim-prompt-contract.test.ts）。
+  if (input.runtimeTask === "light_edit") {
+    return {
+      includePublishPackage,
+      includeHighRisk: false,
+      includeBenchmark: false,
+      includeOperatingLogicFull: Boolean(input.forGenerate),
+    }
+  }
+
   const includeBenchmark =
     Boolean(input.hasBenchmarkText)
     || input.runtimeTask === "rewrite_copy"
