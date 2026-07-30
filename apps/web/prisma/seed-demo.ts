@@ -95,7 +95,7 @@ async function main() {
   for (const entry of knowledgeEntries) {
     await prisma.knowledgeEntry.upsert({
       where: { id: entry.id },
-      update: { content: entry.content },
+      update: { content: entry.content, tags: entry.tags, valueGrade: entry.valueGrade },
       create: entry,
     })
   }
@@ -183,7 +183,7 @@ interface KnowledgeSeed {
 }
 
 function buildKnowledgeEntries(userId: string, projectId: string): KnowledgeSeed[] {
-  const base = { userId, projectId, tags: JSON.stringify([]) }
+  const base = { userId, projectId, tags: [] as string[] }
   return [
     // ── 盒1 who_am_i: boss_experience + positioning_material + writing_style_profile
     {
@@ -235,6 +235,7 @@ function buildKnowledgeEntries(userId: string, projectId: string): KnowledgeSeed
       title: "标杆案例：某 SaaS 公司 60 天内容获客",
       content:
         "客户背景：一家做 HR SaaS 的公司，过去靠电销获客，单条线索成本 800 元。合作后用我们的内容闭环，60 天内公众号 + 视频号产出 40 条内容，带来 127 条合格线索，成交 9 单，单条线索成本降到 210 元，内容团队从 3 人减到 1 人。关键动作：每条内容都绑定一个真实客户场景，质检卡掉 AI 味，发布后强制 7 天结果回填。",
+      tags: ["confidence:confirmed"],
       valueGrade: "A",
       sortOrder: 5,
     },
