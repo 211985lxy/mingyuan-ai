@@ -29,6 +29,7 @@ export interface FeishuAgentBotConfig {
 
 /**
  * 从环境变量构建 bot 配置。凭证不完整时返回 null（fail-closed）。
+ * delegatedAgentIds：该 bot 显式委托代收的 agent（无独立飞书应用，由本 bot 接收并以其身份回复）。
  */
 function buildBotConfig(
   botId: FeishuAgentBotId,
@@ -39,6 +40,7 @@ function buildBotConfig(
   envVerifyToken: string | undefined,
   envEncryptKey: string | undefined,
   envSupervisorChatId: string | undefined,
+  delegatedAgentIds: readonly AimAgentId[] = [],
 ): FeishuAgentBotConfig | null {
   const appId = envAppId?.trim() || ""
   const appSecret = envAppSecret?.trim() || ""
@@ -54,7 +56,8 @@ function buildBotConfig(
     encryptKey: envEncryptKey?.trim() || undefined,
     workflowId,
     defaultAgentId: botId,
-    allowedAgentIds: [botId],
+    // 自身 + 委托代收的 agent；用于 router 判定"本 bot 可处理该 agent 意图且保留其引擎"
+    allowedAgentIds: [botId, ...delegatedAgentIds],
     supervisorChatId: envSupervisorChatId?.trim() || undefined,
   }
 }
@@ -69,13 +72,13 @@ function freezeBotMeta(
   )
 }
 
-/** 6 个 bot 的静态元信息（displayName + workflowId） */
+/** 5 个 bot 的静态元信息（displayName + workflowId） */
 export const FEISHU_AGENT_BOT_META = freezeBotMeta({
-  content_producer: { displayName: "内容创作", workflowId: "content_growth" },
-  work_editor: { displayName: "作品编辑", workflowId: "content_growth" },
-  business_system_diagnosis: { displayName: "商业诊断", workflowId: "sales_diagnosis" },
-  business_diagnosis: { displayName: "选题策划", workflowId: "sales_diagnosis" },
-  content_review: { displayName: "发布质检", workflowId: "content_growth" },
+  content_producer: { displayName: "内容创作官", workflowId: "content_growth" },
+  work_editor: { displayName: "作品编辑官", workflowId: "content_growth" },
+  business_system_diagnosis: { displayName: "商业诊断官", workflowId: "sales_diagnosis" },
+  business_diagnosis: { displayName: "选题策划官", workflowId: "sales_diagnosis" },
+  content_retro: { displayName: "数据复盘官", workflowId: "content_growth" },
 })
 
 /** 环境变量前缀映射 */
@@ -84,7 +87,15 @@ export const FEISHU_AGENT_BOT_ENV_PREFIX: Readonly<Record<string, string>> = Obj
   work_editor: "FEISHU_BOT_WORK_EDITOR",
   business_system_diagnosis: "FEISHU_BOT_BIZ_DIAGNOSIS",
   business_diagnosis: "FEISHU_BOT_TOPIC_PLANNER",
-  content_review: "FEISHU_BOT_CONTENT_REVIEW",
+  content_retro: "FEISHU_BOT_DATA_RETRO",
+})
+
+/**
+ * 委托代收映射：键 = 承接 bot 的 botId，值 = 该 bot 代收的 agent 列表
+ * （这些 agent 已无独立飞书应用，由本 bot 接收并以本 bot 身份回复，底层仍走各自引擎）。
+ */
+export const FEISHU_AGENT_BOT_DELEGATIONS: Readonly<Record<string, readonly AimAgentId[]>> = Object.freeze({
+  work_editor: Object.freeze<AimAgentId[]>(["content_review"]),
 })
 
 export const FEISHU_AGENT_BOT_IDS: readonly AimAgentId[] = Object.freeze([
@@ -92,7 +103,7 @@ export const FEISHU_AGENT_BOT_IDS: readonly AimAgentId[] = Object.freeze([
   "work_editor",
   "business_system_diagnosis",
   "business_diagnosis",
-  "content_review",
+  "content_retro",
 ])
 
 /**
@@ -114,6 +125,7 @@ export function loadAgentBotRegistry(): FeishuAgentBotConfig[] {
       envRecord[`${prefix}_VERIFY_TOKEN`],
       envRecord[`${prefix}_ENCRYPT_KEY`],
       envRecord[`${prefix}_SUPERVISOR_CHAT_ID`],
+      FEISHU_AGENT_BOT_DELEGATIONS[agentId],
     )
     if (bot) bots.push(bot)
   }

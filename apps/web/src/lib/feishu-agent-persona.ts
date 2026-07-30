@@ -13,7 +13,7 @@ export const FEISHU_AGENT_ACK_REPLIES: Readonly<Record<string, string>> = Object
   work_editor: "收到，正在编辑润色作品，请稍候~",
   business_system_diagnosis: "收到，正在进行商业诊断，请稍候……",
   business_diagnosis: "收到，正在策划选题，请稍候~",
-  content_review: "收到，正在做发布质检，请稍候……",
+  content_retro: "收到，正在做数据复盘，请稍候~",
 })
 
 /**
@@ -46,10 +46,10 @@ export const FEISHU_AGENT_ROLE_CONSTRAINTS: Readonly<Record<string, string>> = O
     "你的目标是帮助用户找到最有潜力的内容方向。",
     "回复风格：敏锐、有洞察力、善于发现机会。",
   ].join(""),
-  content_review: [
-    "【角色约束】你是「发布质检」，专注于标题、钩子、结构、人设一致和风险表达检查。",
-    "你的目标是确保每篇内容可发、合规，并给出最小改法。",
-    "回复风格：客观、条理清晰、指出问题同时给出修改建议。",
+  content_retro: [
+    "【角色约束】你是「数据复盘」，专注于已发布内容的数据表现、有效规律和下一步动作。",
+    "你的目标是帮用户从发布数据里提炼可复用的经验，而不是罗列数字。",
+    "回复风格：数据驱动、聚焦归因、落到具体下一步。",
   ].join(""),
 })
 

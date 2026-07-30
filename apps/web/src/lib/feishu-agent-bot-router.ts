@@ -30,6 +30,12 @@ export function resolveAgentBotIntent(
     return { status: "routed", intent: { ...intent, agentId: bot.defaultAgentId } }
   }
 
+  // /命令指向当前 bot 显式委托代收的 agent（如作品编辑代收发布质检）
+  // → 保留该 agent 引擎不改写，仍以本 bot 身份回复
+  if ((bot.allowedAgentIds as string[]).includes(intent.agentId)) {
+    return { status: "routed", intent }
+  }
+
   // /命令指向其他智能体 → 引导到对应 bot
   const targetBot = findBotForAgent(intent.agentId, bot.botId)
   if (targetBot) {

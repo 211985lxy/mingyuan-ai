@@ -83,7 +83,7 @@ const REGISTRATION_TABLES: RegistrationTable[] = [
     actualIds: FEISHU_AGENT_BOT_IDS,
     exemptions: {
       free_copywriter: "自由文案没有独立飞书机器人和凭证前缀，保持在现有机器人内通过命令调用。",
-      content_retro: "数据复盘尚未配置独立飞书应用及环境变量；注册空凭证机器人会让入口看似可用却无法验签。",
+      content_review: "发布质检已并入作品编辑机器人（work_editor 委托代收），不再有独立飞书应用；质检引擎 content_review 作为 agentId 保留。",
     },
   },
   {
@@ -95,7 +95,7 @@ const REGISTRATION_TABLES: RegistrationTable[] = [
     ])],
     exemptions: {
       free_copywriter: "自由文案没有独立飞书机器人，所以不需要独立确认话术和角色约束。",
-      content_retro: "数据复盘没有独立飞书机器人，不能只补话术而没有可验签的机器人配置。",
+      content_review: "发布质检已并入作品编辑机器人，质检时复用作品编辑人设，无需独立质检人设。",
     },
   },
 ]

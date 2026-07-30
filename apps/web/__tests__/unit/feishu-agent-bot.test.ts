@@ -22,16 +22,11 @@ vi.mock("@/env", () => ({
     FEISHU_BOT_TOPIC_PLANNER_VERIFY_TOKEN: "token_tp",
     FEISHU_BOT_TOPIC_PLANNER_ENCRYPT_KEY: "encrypt_tp",
     FEISHU_BOT_TOPIC_PLANNER_SUPERVISOR_CHAT_ID: "oc_tp",
-    FEISHU_BOT_CONTENT_REVIEW_APP_ID: "cli_cr",
-    FEISHU_BOT_CONTENT_REVIEW_APP_SECRET: "secret_cr",
-    FEISHU_BOT_CONTENT_REVIEW_VERIFY_TOKEN: "token_cr",
-    FEISHU_BOT_CONTENT_REVIEW_ENCRYPT_KEY: "encrypt_cr",
-    FEISHU_BOT_CONTENT_REVIEW_SUPERVISOR_CHAT_ID: "oc_cr",
-    FEISHU_BOT_PERSONA_APP_ID: "cli_ps",
-    FEISHU_BOT_PERSONA_APP_SECRET: "secret_ps",
-    FEISHU_BOT_PERSONA_VERIFY_TOKEN: "token_ps",
-    FEISHU_BOT_PERSONA_ENCRYPT_KEY: "encrypt_ps",
-    FEISHU_BOT_PERSONA_SUPERVISOR_CHAT_ID: "oc_ps",
+    FEISHU_BOT_DATA_RETRO_APP_ID: "cli_dr",
+    FEISHU_BOT_DATA_RETRO_APP_SECRET: "secret_dr",
+    FEISHU_BOT_DATA_RETRO_VERIFY_TOKEN: "token_dr",
+    FEISHU_BOT_DATA_RETRO_ENCRYPT_KEY: "encrypt_dr",
+    FEISHU_BOT_DATA_RETRO_SUPERVISOR_CHAT_ID: "oc_dr",
     FEISHU_ENCRYPT_KEY: "encrypt_default",
   },
 }))
@@ -45,7 +40,7 @@ import { isAgentAllowedForBot, resolveBotByVerificationToken, loadAgentBotRegist
 
 const mockContentProducer: FeishuAgentBotConfig = {
   botId: "content_producer",
-  displayName: "内容创作",
+  displayName: "内容创作官",
   appId: "cli_cp",
   appSecret: "secret_cp",
   verificationToken: "token_cp",
@@ -57,7 +52,7 @@ const mockContentProducer: FeishuAgentBotConfig = {
 
 const mockBizDiagnosis: FeishuAgentBotConfig = {
   botId: "business_system_diagnosis",
-  displayName: "商业诊断",
+  displayName: "商业诊断官",
   appId: "cli_bd",
   appSecret: "secret_bd",
   verificationToken: "token_bd",
@@ -67,16 +62,29 @@ const mockBizDiagnosis: FeishuAgentBotConfig = {
   supervisorChatId: "oc_bd",
 }
 
-const mockContentReview: FeishuAgentBotConfig = {
-  botId: "content_review",
-  displayName: "发布质检",
-  appId: "cli_cr",
-  appSecret: "secret_cr",
-  verificationToken: "token_cr",
+// 作品编辑：显式委托代收发布质检（content_review 无独立飞书应用）
+const mockWorkEditor: FeishuAgentBotConfig = {
+  botId: "work_editor",
+  displayName: "作品编辑官",
+  appId: "cli_dc",
+  appSecret: "secret_dc",
+  verificationToken: "token_dc",
   workflowId: "content_growth",
-  defaultAgentId: "content_review",
-  allowedAgentIds: ["content_review"],
-  supervisorChatId: "oc_cr",
+  defaultAgentId: "work_editor",
+  allowedAgentIds: ["work_editor", "content_review"],
+  supervisorChatId: "oc_dc",
+}
+
+const mockContentRetro: FeishuAgentBotConfig = {
+  botId: "content_retro",
+  displayName: "数据复盘官",
+  appId: "cli_dr",
+  appSecret: "secret_dr",
+  verificationToken: "token_dr",
+  workflowId: "content_growth",
+  defaultAgentId: "content_retro",
+  allowedAgentIds: ["content_retro"],
+  supervisorChatId: "oc_dr",
 }
 
 // ─── feishu-agent-bot-router ─────────────────────────────────────
@@ -122,6 +130,15 @@ describe("resolveAgentBotIntent", () => {
       expect(result.intent.agentId).toBe("business_system_diagnosis")
     }
   })
+
+  it("作品编辑收到 /质检 命令时保留质检引擎不改写", () => {
+    const result = resolveAgentBotIntent("/质检 检查这条文案", mockWorkEditor)
+    expect(result.status).toBe("routed")
+    if (result.status === "routed") {
+      // 关键：仍走 content_review 质检引擎，不被改写成 work_editor
+      expect(result.intent.agentId).toBe("content_review")
+    }
+  })
 })
 
 describe("buildBotHelpText", () => {
@@ -149,9 +166,9 @@ describe("getAgentBotAckReply", () => {
     expect(ack).toContain("诊断")
   })
 
-  it("发布质检有个性化 ACK", () => {
-    const ack = getAgentBotAckReply("content_review")
-    expect(ack).toContain("质检")
+  it("数据复盘有个性化 ACK", () => {
+    const ack = getAgentBotAckReply("content_retro")
+    expect(ack).toContain("复盘")
   })
 })
 
@@ -161,7 +178,7 @@ describe("getBotRoleConstraint", () => {
     expect(getBotRoleConstraint("work_editor")).toContain("作品编辑")
     expect(getBotRoleConstraint("business_system_diagnosis")).toContain("商业诊断")
     expect(getBotRoleConstraint("business_diagnosis")).toContain("选题策划")
-    expect(getBotRoleConstraint("content_review")).toContain("发布质检")
+    expect(getBotRoleConstraint("content_retro")).toContain("数据复盘")
     expect(getBotRoleConstraint("content_producer")).toContain("通用故事")
   })
 })
@@ -217,7 +234,7 @@ describe("buildWorkItemCard", () => {
   })
 
   it("failed 卡片包含错误信息", () => {
-    const json = buildWorkItemCard(mockContentReview, {
+    const json = buildWorkItemCard(mockContentRetro, {
       itemName: "失败的文案",
       recordId: "rec_789",
       workflowId: "content_growth",
@@ -242,11 +259,23 @@ describe("registry", () => {
     const bot = resolveBotByVerificationToken("token_cp")
     expect(bot).not.toBeNull()
     expect(bot!.botId).toBe("content_producer")
-    expect(bot!.displayName).toBe("内容创作")
+    expect(bot!.displayName).toBe("内容创作官")
+  })
+
+  it("作品编辑 bot 委托代收发布质检（content_review 无独立飞书应用）", () => {
+    const bot = resolveBotByVerificationToken("token_dc")
+    expect(bot).not.toBeNull()
+    expect(bot!.botId).toBe("work_editor")
+    expect(bot!.allowedAgentIds).toContain("content_review")
   })
 
   it("isAgentAllowedForBot 一对一模式仅允许自己", () => {
     expect(isAgentAllowedForBot(mockContentProducer, "content_producer")).toBe(true)
     expect(isAgentAllowedForBot(mockContentProducer, "business_system_diagnosis")).toBe(false)
+  })
+
+  it("isAgentAllowedForBot 委托代收模式下允许被委托的 agent", () => {
+    expect(isAgentAllowedForBot(mockWorkEditor, "work_editor")).toBe(true)
+    expect(isAgentAllowedForBot(mockWorkEditor, "content_review")).toBe(true)
   })
 })
