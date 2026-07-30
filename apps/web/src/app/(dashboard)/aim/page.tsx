@@ -13,7 +13,7 @@ import { AimStylePreviewDialog } from "@/components/aim/aim-style-preview-dialog
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
-import { AimMethodologySelector, AimResearchHint } from "@/components/aim/aim-workbench-controls"
+import { AimResearchHint } from "@/components/aim/aim-workbench-controls"
 import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
 import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
@@ -247,8 +247,6 @@ export default function AimPage() {
           projectAccessError={w.projectAccessError}
           personaProgress={w.personaProgress}
         />
-
-        <AimMethodologySelector value={w.selectedMethodologyProfileIds} onChange={w.setSelectedMethodologyProfileIds} />
 
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}
