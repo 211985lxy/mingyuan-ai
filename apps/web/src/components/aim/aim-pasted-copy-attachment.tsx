@@ -24,6 +24,7 @@ interface AimPastedCopyAttachmentProps {
 function getUsageLabel(usage: PasteUsage | undefined, autoUsageLabel?: string) {
   if (usage === "edit") return autoUsageLabel ?? " · 待修改"
   if (usage === "review") return autoUsageLabel ?? " · 待质检"
+  if (usage === "analytics") return autoUsageLabel ?? " · 发布数据"
   if (usage === "benchmark") return " · 对标参考"
   if (usage === "style_sample") return " · 风格样本"
   return null

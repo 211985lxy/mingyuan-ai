@@ -112,7 +112,9 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
       ? " · 待质检"
       : capabilities.pasteMode === "edit"
         ? " · 待编辑"
-        : undefined
+        : capabilities.pasteMode === "analytics"
+          ? " · 发布数据"
+          : undefined
   const rootRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)

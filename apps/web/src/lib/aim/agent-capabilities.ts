@@ -11,8 +11,8 @@ import {
   type AimAgentId,
 } from "@/lib/aim-harness/contracts"
 
-/** 长文粘贴行为：plain=不当附件；creative=可选用途；edit/review=自动用途并可发送 */
-export type AimPasteMode = "plain" | "creative" | "edit" | "review"
+/** 长文粘贴行为：plain=不当附件；creative=可选用途；edit/review/analytics=自动用途并可发送 */
+export type AimPasteMode = "plain" | "creative" | "edit" | "review" | "analytics"
 
 export interface AimAgentCapabilities {
   pasteMode: AimPasteMode
@@ -77,9 +77,9 @@ export const AIM_AGENT_CAPABILITIES = {
     contentModeSelector: false,
     publishCheck: true,
   },
-  // 复盘只读已发布数据，不产出可发布稿件，因此不开放发布前自查
+  // 粘贴平台导出文档进数；不产出可发布稿件，不开发布前自查
   content_retro: {
-    pasteMode: "plain",
+    pasteMode: "analytics",
     videoCopyExtraction: false,
     benchmarkReference: false,
     styleSample: false,

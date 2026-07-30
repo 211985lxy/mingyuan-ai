@@ -18,6 +18,7 @@ import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
 import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
+import { AimRetroListPanel } from "@/components/aim/aim-retro-list-panel"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { buildAimChatMessages } from "@/lib/aim/chat-request"
@@ -33,6 +34,7 @@ import {
   PASTE_COMPOSER_PLACEHOLDER,
   type PastedCopyAttachment,
 } from "@/lib/aim/paste-copy-attachment"
+import { runAnalyticsPasteSend } from "@/lib/aim/run-analytics-paste-send"
 import { fetchStyleStatus } from "@/lib/api/aim"
 
 export default function AimPage() {
@@ -123,13 +125,15 @@ export default function AimPage() {
         return
       }
     }
-    // 质检/编辑只有一种用途时，允许未点选也能直接发，避免发送键假死
+    // 质检/编辑/复盘数据只有一种用途时，允许未点选也能直接发，避免发送键假死
     const effectiveUsage = pastedCopy?.usage
       ?? (capabilities.pasteMode === "review"
         ? "review" as const
         : capabilities.pasteMode === "edit"
           ? "edit" as const
-          : undefined)
+          : capabilities.pasteMode === "analytics"
+            ? "analytics" as const
+            : undefined)
     const activePaste = pastedCopy && effectiveUsage
       ? { ...pastedCopy, usage: effectiveUsage }
       : pastedCopy
@@ -147,6 +151,17 @@ export default function AimPage() {
     }
     if (pastedCopy && !effectiveUsage) {
       toast.message("请先选择这篇文案的用途")
+      return
+    }
+    if (activePaste?.usage === "analytics") {
+      void runAnalyticsPasteSend({
+        attachment: activePaste,
+        instruction: w.input,
+        targetGenerationId: w.resolveRetroTargetGenerationId(),
+        setPastedCopy,
+        setInput: w.setInput,
+        sendText: w.sendText,
+      })
       return
     }
     if (activePaste?.usage) {
@@ -358,6 +373,23 @@ export default function AimPage() {
                 },
               }}
             />
+
+            {!w.planSession.isPlanMode && w.selectedAgentId === "content_retro" ? (
+              <div className="px-3 pb-1 sm:px-5">
+                <AimRetroListPanel
+                  projectId={w.projectEnabled ? w.selectedProjectId || undefined : undefined}
+                  selectedId={w.retroTargetGenerationId}
+                  onSelect={(id) => {
+                    w.setRetroTargetGenerationId(id)
+                    toast.success("已选中复盘目标，可粘贴发布数据或点开始复盘")
+                  }}
+                  onStartRetro={(id) => {
+                    w.setRetroTargetGenerationId(id)
+                    void w.sendText("请基于这条内容已登记的发布数据做内容数据复盘。", { resultId: id })
+                  }}
+                />
+              </div>
+            ) : null}
 
             {!w.planSession.isPlanMode && (
               <footer className="px-3 pb-2 pt-1 sm:px-5 sm:pb-3">{composer}</footer>

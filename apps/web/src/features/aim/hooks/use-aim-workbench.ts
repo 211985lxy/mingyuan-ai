@@ -45,6 +45,7 @@ import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-s
 import { useAimPlanOrchestration } from "@/features/aim/hooks/use-aim-plan-orchestration"
 import { useAimTurnIntentGate } from "@/features/aim/hooks/use-aim-turn-intent-gate"
 import { useAimSourceEditorState } from "@/features/aim/hooks/use-aim-source-editor-state"
+import { useAimRetroTarget } from "@/features/aim/hooks/use-aim-retro-target"
 
 /**
  * AIM 工作台总编排：params → hooks → 页面薄装配层。
@@ -72,6 +73,7 @@ export function useAimWorkbench() {
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
   const sourceEditor = useAimSourceEditorState(initialDraft)
+  const retroTarget = useAimRetroTarget(messages)
   const {
     sourceVideoCopyExtractionId, setSourceVideoCopyExtractionId,
     sourceOriginalText, setSourceOriginalText,
@@ -489,11 +491,8 @@ export function useAimWorkbench() {
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),
-    latestGenerationId,
-    editorGenerationId,
-    agentModule,
-    setAgentModule,
-    selectedMethodologyProfileIds,
-    setSelectedMethodologyProfileIds,
+    latestGenerationId, editorGenerationId, agentModule, setAgentModule,
+    selectedMethodologyProfileIds, setSelectedMethodologyProfileIds,
+    ...retroTarget,
   }
 }

@@ -16,6 +16,8 @@ import {
   reportAimChatRevision,
 } from "@/lib/aim/workbench-helpers"
 import type { AimImageAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import { persistContentRetroAfterChat } from "@/lib/aim/persist-content-retro"
+import { toast } from "sonner"
 
 export interface SendAimTextOptions {
   editorContext?: AimEditorContext
@@ -24,6 +26,8 @@ export interface SendAimTextOptions {
   retryMessageId?: string
   /** 本轮委托执行引擎；与会话 agentId 平级，缺省则不委托 */
   executionAgentId?: string
+  /** 复盘目标内容 AimGeneration id；缺省时回落到会话最新交付物 */
+  resultId?: string
 }
 
 interface AimChatActionInput {
@@ -66,11 +70,12 @@ async function executeChatRequest(
     setAssistantMessage(input, assistantId, "当前没有可同步到飞书的 AIM 生成结果。")
     return
   }
-  // 复盘要读这条内容的真实发布数据，目标只取当前会话里的交付物；
-  // 会话里没有交付物时留空，让服务端走「未登记」而不是猜一条内容。
+  // 复盘要读这条内容的真实发布数据：显式指定优先，否则取当前会话交付物；
+  // 都没有时留空，让服务端走「未登记」而不是猜一条内容。
   const retroTargetId = (options.executionAgentId ?? input.selectedAgentId) === "content_retro"
-    ? findLatestAimDeliverableId(input.messages)
+    ? (options.resultId?.trim() || findLatestAimDeliverableId(input.messages) || undefined)
     : undefined
+  let latestContent = ""
   const { hasContent } = await runAimChatRequest({
     messages: buildAimChatMessages(thread.map((message) => ({
       role: message.role,
@@ -87,12 +92,35 @@ async function executeChatRequest(
     signal: controller.signal,
     traceId,
     ...(options.executionAgentId ? { executionAgentId: options.executionAgentId } : {}),
-    onContent: (content) => setAssistantMessage(input, assistantId, content),
+    onContent: (content) => {
+      latestContent = content
+      setAssistantMessage(input, assistantId, content)
+    },
   })
   if (!hasContent) {
     input.setMessages((messages) => messages.map((message) => message.id === assistantId
       ? { ...message, content: "没有收到模型回复。", failure: { kind: "chat", retryText: text } }
       : message))
+    return
+  }
+
+  const isRetroTurn = (options.executionAgentId ?? input.selectedAgentId) === "content_retro"
+  if (isRetroTurn && latestContent.trim() && retroTargetId) {
+    try {
+      const persisted = await persistContentRetroAfterChat({
+        projectId: input.projectEnabled ? input.selectedProjectId : null,
+        generationId: retroTargetId,
+        retroBody: latestContent,
+        source: /【发布数据原文】/.test(text) ? "paste" : "chat",
+      })
+      if (persisted.savedKnowledge) {
+        toast.success("复盘结论已沉淀到知识库")
+      } else if (persisted.warning) {
+        toast.message(persisted.warning)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "复盘沉淀失败")
+    }
   }
 }
 

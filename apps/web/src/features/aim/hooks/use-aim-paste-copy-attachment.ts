@@ -9,6 +9,7 @@ import {
   createPastedCopyAttachment,
   getAllowedPasteUsages,
   inferPasteUsageFromInstruction,
+  isAnalyticsPasteCandidate,
   isLongCopyPaste,
   resolveInitialPasteUsage,
   type PastedCopyAttachment,
@@ -59,12 +60,19 @@ export function useAimPasteCopyAttachment(input: {
   const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (!pasteEnabled || !onPastedCopyChange) return
     const pasted = event.clipboardData.getData("text/plain")
-    if (!isLongCopyPaste(pasted)) return
+    const shouldCapture = pasteMode === "analytics"
+      ? isAnalyticsPasteCandidate(pasted)
+      : isLongCopyPaste(pasted)
+    if (!shouldCapture) return
     event.preventDefault()
     const usage = resolveInitialPasteUsage({ pasteMode, instruction: value.trim(), allowedUsages })
     const next = createPastedCopyAttachment(pasted, usage)
     if (pastedCopy) {
-      const replace = window.confirm("已有一篇文案附件。确定替换？取消则追加到现有附件。")
+      const replace = window.confirm(
+        pasteMode === "analytics"
+          ? "已有一份发布数据附件。确定替换？取消则追加到现有附件。"
+          : "已有一篇文案附件。确定替换？取消则追加到现有附件。",
+      )
       onPastedCopyChange(replace
         ? next
         : createPastedCopyAttachment(`${pastedCopy.content.trim()}\n\n${pasted.trim()}`, pastedCopy.usage ?? usage))
@@ -79,7 +87,7 @@ export function useAimPasteCopyAttachment(input: {
 
   useEffect(() => {
     if (!pasteEnabled || !pastedCopy || pastedCopy.usage || !onPastedCopyChange) return
-    if (pasteMode === "edit" || pasteMode === "review") {
+    if (pasteMode === "edit" || pasteMode === "review" || pasteMode === "analytics") {
       const auto = resolveInitialPasteUsage({ pasteMode, allowedUsages })
       if (auto) onPastedCopyChange({ ...pastedCopy, usage: auto })
       return

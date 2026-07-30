@@ -232,3 +232,45 @@ export async function getContentOutcome(
 ): Promise<{ outcomes: ContentOutcome[]; topicSelectionId?: string | null; projectId?: string | null }> {
   return request(`/api/aim/history/${encodeURIComponent(generationId)}/outcome`, { method: "GET" })
 }
+
+export interface AimRetroListItem {
+  id: string
+  title: string
+  workflowStatus: string
+  platform: string | null
+  publishedAt: string | null
+  updatedAt: string
+  outcomeWindows: number[]
+  hasOutcome: boolean
+  hasRetro: boolean
+  latestRetroSummary: string | null
+  outcomes: Array<{
+    collectWindowDay: number
+    platform: string | null
+    views: number | null
+    likes: number | null
+    comments: number | null
+    dmCount: number | null
+    qualifiedLeadCount: number | null
+    dealCount: number | null
+    verdictCode: string | null
+  }>
+  latestRetro: {
+    summary?: string
+    actualData?: string
+    verdict?: string
+    nextRule?: string
+    createdAt?: string
+  } | null
+}
+
+export async function listAimRetroItems(input?: {
+  projectId?: string
+  limit?: number
+}): Promise<{ items: AimRetroListItem[] }> {
+  const params = new URLSearchParams()
+  if (input?.projectId) params.set("projectId", input.projectId)
+  if (input?.limit) params.set("limit", String(input.limit))
+  const qs = params.toString()
+  return request(`/api/aim/retro-list${qs ? `?${qs}` : ""}`)
+}

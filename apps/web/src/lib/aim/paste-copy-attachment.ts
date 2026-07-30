@@ -4,7 +4,7 @@
 
 import type { AimAgentCapabilities, AimPasteMode } from "@/lib/aim/agent-capabilities"
 
-export type PasteUsage = "edit" | "review" | "benchmark" | "style_sample"
+export type PasteUsage = "edit" | "review" | "benchmark" | "style_sample" | "analytics"
 
 export interface PastedCopyAttachment {
   content: string
@@ -17,6 +17,7 @@ export function getAllowedPasteUsages(capabilities: AimAgentCapabilities): Paste
   if (capabilities.pasteMode === "plain") return []
   if (capabilities.pasteMode === "edit") return ["edit"]
   if (capabilities.pasteMode === "review") return ["review"]
+  if (capabilities.pasteMode === "analytics") return ["analytics"]
   const usages: PasteUsage[] = ["edit"]
   if (capabilities.benchmarkReference) usages.push("benchmark")
   if (capabilities.styleSample) usages.push("style_sample")
@@ -24,7 +25,7 @@ export function getAllowedPasteUsages(capabilities: AimAgentCapabilities): Paste
 }
 
 /**
- * edit/review 模式：长文粘贴自动带用途，可直接发送。
+ * edit/review/analytics 模式：长文粘贴自动带用途，可直接发送。
  * creative：保留推断；若无推断则等用户点选。
  * plain：不应调用（调用方应跳过接管）。
  */
@@ -37,9 +38,22 @@ export function resolveInitialPasteUsage(input: {
   if (pasteMode === "plain" || allowedUsages.length === 0) return undefined
   if (pasteMode === "edit") return allowedUsages.includes("edit") ? "edit" : allowedUsages[0]
   if (pasteMode === "review") return allowedUsages.includes("review") ? "review" : allowedUsages[0]
+  if (pasteMode === "analytics") {
+    return allowedUsages.includes("analytics") ? "analytics" : allowedUsages[0]
+  }
   const inferred = inferPasteUsageFromInstruction(instruction)
   if (inferred && allowedUsages.includes(inferred)) return inferred
   return undefined
+}
+
+/** 复盘：短导出文档也要接管（不必满 300 字）。 */
+export function isAnalyticsPasteCandidate(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (isLongCopyPaste(trimmed)) return true
+  return /播放|点赞|评论|收藏|分享|转发|私信|线索|成交|营收/.test(trimmed)
+    && /\d/.test(trimmed)
+    && trimmed.length >= 12
 }
 
 /** 正文不少于 300 字，或至少 6 行非空文本 → 长文附件 */
@@ -116,6 +130,11 @@ export function assemblePasteUsageInput(input: {
   if (usage === "benchmark") {
     const lead = instruction.trim() || "请按对标原文重新生成一版文案，直接输出最终稿。"
     return `${lead}\n\n对标原文：\n${body}`
+  }
+
+  if (usage === "analytics") {
+    const lead = instruction.trim() || "请基于下面这份已登记的发布数据做内容数据复盘。"
+    return `${lead}\n\n【发布数据原文】\n${body}`
   }
 
   return null

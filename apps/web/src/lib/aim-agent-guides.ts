@@ -230,7 +230,7 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     skills: CONTENT_RETRO_SKILLS,
     nextActions: [
       { id: "to_business_diagnosis", label: "带入选题策划", targetAgentId: "business_diagnosis", prompt: "请基于下面这份内容数据复盘里已经验证有效的规律，生成下一批选题：优先复用被数据证明有效的选题类型和角度，避开已被验证无效的方向。" },
-      { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
+      { id: "save_knowledge", label: "沉淀到知识库", prompt: "保存为 AIM 档案素材。" },
     ],
   },
   persona: {

@@ -16,6 +16,12 @@ import type { AimAgentId } from "@/lib/aim-ui-config"
 import { buildAimNextActionPrompt, type AimNextAction } from "@/lib/aim-agent-guides"
 import type { AimWorkflowBriefState } from "@/hooks/use-aim-generation-actions"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import {
+  buildRetroKnowledgeContent,
+  buildRetroKnowledgeTags,
+  resolveAimKnowledgeCategory,
+  resolveAimKnowledgeSourceType,
+} from "@/lib/aim/retro-knowledge"
 
 type StringSetter = Dispatch<SetStateAction<string>>
 
@@ -58,18 +64,34 @@ function beginContentAction(input: AimWorkflowActionInput, action: AimContentAct
   if (input.selectedAgentId !== "content_producer") beginWorkflowStage(input, "content")
 }
 
-async function saveNextActionKnowledge(input: AimWorkflowActionInput, action: AimNextAction, content: string) {
+async function saveNextActionKnowledge(
+  input: AimWorkflowActionInput,
+  action: AimNextAction,
+  content: string,
+  generationId?: string,
+) {
   if (!input.selectedProjectId) return toast.error("请先选择 IP 营销全案")
+  const category = resolveAimKnowledgeCategory(input.selectedAgentId)
+  const isRetro = input.selectedAgentId === "content_retro"
+  const body = isRetro && generationId
+    ? buildRetroKnowledgeContent({
+      generationId,
+      retroBody: content,
+    })
+    : content
+  const tags = isRetro
+    ? [...buildRetroKnowledgeTags({ generationId, source: "manual" }), action.id]
+    : ["aim_delivery", action.id]
   try {
     await createKnowledge({
       projectId: input.selectedProjectId,
-      category: "positioning_material",
-      title: `AIM交付物 · ${input.agentTitle}`,
-      content,
-      tags: ["aim_delivery", action.id],
-      sourceType: "manual",
+      category,
+      title: isRetro ? `内容数据复盘 · ${generationId?.slice(0, 8) || input.agentTitle}` : `AIM交付物 · ${input.agentTitle}`,
+      content: body,
+      tags,
+      sourceType: resolveAimKnowledgeSourceType(input.selectedAgentId),
     })
-    toast.success("已保存为档案素材")
+    toast.success(isRetro ? "复盘结论已沉淀到知识库" : "已保存为档案素材")
   } catch (error) {
     toast.error(error instanceof Error ? error.message : "保存失败")
   }
@@ -115,7 +137,7 @@ function switchToTargetAgent(input: AimWorkflowActionInput, targetAgentId: AimAg
 async function handleAimNextAction(input: AimWorkflowActionInput, action: AimNextAction, content: string, generationId: string) {
   const cleanContent = content.trim()
   if (!cleanContent) return
-  if (action.id === "save_knowledge") return void await saveNextActionKnowledge(input, action, cleanContent)
+  if (action.id === "save_knowledge") return void await saveNextActionKnowledge(input, action, cleanContent, generationId)
   if (action.targetAgentId && action.targetAgentId !== input.selectedAgentId) {
     if (action.targetAgentId === "content_producer" && getWorkflowStageForAgent(input.selectedAgentId) === "direction") {
       await openWorkflowBrief(input, action, cleanContent, generationId)
