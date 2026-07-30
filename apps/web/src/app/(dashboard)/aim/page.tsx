@@ -238,15 +238,6 @@ export default function AimPage() {
           onStageChange={w.beginWorkflowStage}
           onProjectScopeChange={w.changeProjectScope}
           onReset={w.resetConversation}
-          projectTasks={
-            w.selectedProjectId
-              ? {
-                  records: w.projectWorkflowRecords,
-                  loading: w.isLoadingProjectWorkflow,
-                  onOpenTask: (id) => void w.openProjectWorkflowTask(id),
-                }
-              : undefined
-          }
         />
 
         <AimProjectNotices

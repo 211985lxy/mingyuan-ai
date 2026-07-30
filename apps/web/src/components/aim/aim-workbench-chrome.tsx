@@ -7,9 +7,8 @@ import { Check, Edit3, FileSearch, Plus, Repeat2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import type { AimEvolutionSuggestion, AimGeneration, ClientProject } from "@/lib/api/client"
+import type { AimEvolutionSuggestion, ClientProject } from "@/lib/api/client"
 import { AIM_WORKFLOW_STAGES, isAimWorkflowStage, type AimContentAction, type AimWorkflowStage } from "@/lib/aim-workflow"
-import { AimProjectTaskPanel } from "@/features/aim/components/project-task-panel"
 
 interface AimWorkbenchHeaderProps {
   workflowStage: AimWorkflowStage
@@ -23,12 +22,6 @@ interface AimWorkbenchHeaderProps {
   onStageChange: (stage: AimWorkflowStage) => void
   onProjectScopeChange: (scope: string) => void
   onReset: () => void
-  /** 有选中项目时，把「待推进」并进顶栏同一行 */
-  projectTasks?: {
-    records: AimGeneration[]
-    loading?: boolean
-    onOpenTask: (id: string) => void
-  }
 }
 
 /**
@@ -45,7 +38,6 @@ export function AimWorkbenchHeader({
   onStageChange,
   onProjectScopeChange,
   onReset,
-  projectTasks,
 }: AimWorkbenchHeaderProps) {
   const currentIndex = AIM_WORKFLOW_STAGES.findIndex((stage) => stage.id === workflowStage)
 
@@ -123,16 +115,6 @@ export function AimWorkbenchHeader({
         <option value="quick">快速出稿</option>
         {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
       </select>
-
-      {selectedProjectId && projectTasks ? (
-        <AimProjectTaskPanel
-          inline
-          records={projectTasks.records}
-          loading={projectTasks.loading}
-          onOpenTask={projectTasks.onOpenTask}
-          onStartStage={onStageChange}
-        />
-      ) : null}
 
       <Button
         type="button"
