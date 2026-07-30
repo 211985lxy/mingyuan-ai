@@ -49,4 +49,32 @@ describe("production schema patches", () => {
     expect(outboxUpgradePatch).toContain("ADD COLUMN IF NOT EXISTS `availableAt`")
     expect(outboxUpgradePatch).toContain("ADD INDEX IF NOT EXISTS `ChannelReplyOutbox_status_availableAt_idx`")
   })
+
+  it("repairs operating-system tables and telemetry columns idempotently", () => {
+    const runEventPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("ALTER TABLE `AimRunEvent`") && patch.includes("workflowId"),
+    )
+    const contentOutcomePatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("ALTER TABLE `ContentOutcome`"),
+    )
+    const baselinePatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("CREATE TABLE IF NOT EXISTS `TaskEfficiencyBaseline`"),
+    )
+    const reviewCyclePatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("CREATE TABLE IF NOT EXISTS `ReviewCycle`"),
+    )
+    const learningPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("CREATE TABLE IF NOT EXISTS `LearningCandidate`"),
+    )
+    const evalPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("CREATE TABLE IF NOT EXISTS `EvalFixtureVersion`"),
+    )
+
+    expect(runEventPatch).toContain("ADD COLUMN IF NOT EXISTS `finalDisposition`")
+    expect(contentOutcomePatch).toContain("ADD COLUMN IF NOT EXISTS `verdictNote`")
+    expect(baselinePatch).toContain("TaskEfficiencyBaseline_workflowId_taskType_validFrom_key")
+    expect(reviewCyclePatch).toContain("signedApprovalId")
+    expect(learningPatch).toContain("LearningCandidate_requestId_key")
+    expect(evalPatch).toContain("EvalFixtureVersion_sourceCandidateId_fkey")
+  })
 })
