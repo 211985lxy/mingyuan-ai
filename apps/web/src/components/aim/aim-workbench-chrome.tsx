@@ -36,27 +36,30 @@ export function AimWorkbenchHeader({
 
   return (
     <header className="relative z-30 flex shrink-0 items-center gap-1.5 border-b border-border/50 px-2 py-1 md:gap-2 md:px-3">
-      <span className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary sm:flex" title={agentTitle}>
-        <AgentIcon className="h-3.5 w-3.5" />
+      <span
+        className="hidden size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary sm:inline-flex"
+        title={agentTitle}
+      >
+        <AgentIcon className="size-3.5" />
       </span>
 
       {showStageProgress ? (
         <>
-          <p className="shrink-0 text-xs font-medium text-foreground md:hidden">
+          <p className="shrink-0 text-xs font-medium leading-none text-foreground md:hidden">
             {AIM_WORKFLOW_STAGES.find((stage) => stage.id === workflowStage)?.title ?? agentTitle}
           </p>
           <nav className="hidden min-w-0 flex-1 items-center md:flex" aria-label="AIM 工作流进度">
-            <ol className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
+            <ol className="flex min-w-0 items-center">
               {AIM_WORKFLOW_STAGES.map((stage, index) => {
                 const isCurrent = stage.id === workflowStage
                 const isDone = index < currentIndex
                 return (
-                  <li key={stage.id} className="flex shrink-0 items-center">
+                  <li key={stage.id} className="flex items-center">
                     <span
                       title={stage.description}
                       aria-current={isCurrent ? "step" : undefined}
                       className={cn(
-                        "flex h-6 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium",
+                        "inline-flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium leading-none",
                         isCurrent && "bg-primary/10 text-primary",
                         isDone && "text-muted-foreground",
                         !isCurrent && !isDone && "text-muted-foreground/70",
@@ -64,19 +67,23 @@ export function AimWorkbenchHeader({
                     >
                       <span
                         className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]",
+                          "inline-flex size-4 shrink-0 items-center justify-center rounded-full leading-none",
                           isCurrent && "bg-primary text-primary-foreground",
                           isDone && "bg-muted-foreground/20 text-muted-foreground",
-                          !isCurrent && !isDone && "border border-muted-foreground/30 text-transparent",
+                          !isCurrent && !isDone && "border border-muted-foreground/30",
                         )}
                       >
-                        {isDone ? <Check className="h-2.5 w-2.5" /> : index + 1}
+                        {isDone ? (
+                          <Check className="size-2.5" strokeWidth={2.5} aria-hidden />
+                        ) : isCurrent ? (
+                          <span className="text-[10px] leading-none tabular-nums">{index + 1}</span>
+                        ) : null}
                       </span>
-                      {stage.title}
+                      <span className="leading-none">{stage.title}</span>
                     </span>
-                    {index < AIM_WORKFLOW_STAGES.length - 1 && (
-                      <span className="mx-0.5 h-px w-2.5 shrink-0 bg-border" aria-hidden />
-                    )}
+                    {index < AIM_WORKFLOW_STAGES.length - 1 ? (
+                      <span className="mx-1 h-px w-2.5 shrink-0 self-center bg-border" aria-hidden />
+                    ) : null}
                   </li>
                 )
               })}
@@ -85,11 +92,11 @@ export function AimWorkbenchHeader({
           <span className="min-w-0 flex-1 md:hidden" aria-hidden />
         </>
       ) : (
-        <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{agentTitle}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-medium leading-none text-foreground">{agentTitle}</p>
       )}
 
-      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 rounded-md px-2 text-xs" onClick={onReset}>
-        <Plus className="h-3.5 w-3.5" />
+      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 rounded-md px-2 text-xs leading-none" onClick={onReset}>
+        <Plus className="size-3.5" />
         新任务
       </Button>
     </header>
