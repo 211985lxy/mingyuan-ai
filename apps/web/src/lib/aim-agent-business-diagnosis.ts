@@ -15,6 +15,9 @@ function buildChatContextBlock(params: { knowledgeBlock: string; conversationBlo
   return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
 }
 export class BusinessDiagnosisHandler implements AimAgentHandler {
+  // 说明：这个 agentId 历史上叫 business_diagnosis，但实际职责是「选题策划/定位策划官」
+  // （真正的商业诊断是 business_system_diagnosis）。名字保留不变以避免数据库历史记录、
+  // API、前端、别名表的大面积破坏性改动；此处标注以消除名不副实的认知地雷。
   agentId = "business_diagnosis" as const
 
   /** 定位策划官仅产出定位方案 */

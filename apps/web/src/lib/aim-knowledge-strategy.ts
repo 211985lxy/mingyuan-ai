@@ -112,11 +112,23 @@ export const KNOWLEDGE_STRATEGY_PROFILES: Record<ResolvedKnowledgeStrategy, Know
   },
 }
 
-/** topicType（人设型/转化型/流量型）→ 策略档 的映射 */
+/**
+ * topicType → 策略档 的映射。
+ *
+ * 同时覆盖两套历史取值，避免其中一套静默命中 ?? deep 兜底导致选题类型信号丢失：
+ * - 体系 A（结构化选题引擎）：人设型 / 转化型 / 流量型
+ * - 体系 B（定位策划官内容路由）：人设信任型 / 观点立场型 / 问题解决型 / 案例转化型
+ */
 const TOPIC_TYPE_STRATEGY: Record<string, ResolvedKnowledgeStrategy> = {
+  // 体系 A：结构化选题引擎
   人设型: "persona",
   转化型: "conversion",
   流量型: "traffic",
+  // 体系 B：定位策划官内容路由（business_diagnosis 产出）
+  人设信任型: "persona",
+  观点立场型: "persona",
+  问题解决型: "conversion",
+  案例转化型: "conversion",
 }
 
 export interface ResolveKnowledgeStrategyInput {
@@ -321,9 +333,10 @@ export function resolveKnowledgeStrategy(
     return "hot_topic"
   }
 
-  // 4. 内容类型档：复用定位策划官的 topicType
-  if (topicType && VALID_TOPIC_TYPES.includes(topicType as (typeof VALID_TOPIC_TYPES)[number])) {
-    return TOPIC_TYPE_STRATEGY[topicType] ?? "deep"
+  // 4. 内容类型档：复用定位策划官的 topicType（体系A 3类 + 体系B 4类都认）
+  // 校验放宽为"TOPIC_TYPE_STRATEGY 里有的都认"，避免体系B值被挡掉后兜底 deep、信号丢失。
+  if (topicType && topicType in TOPIC_TYPE_STRATEGY) {
+    return TOPIC_TYPE_STRATEGY[topicType]
   }
 
   // 5. 深度创作：默认全量（=改造前行为，保证向后兼容）

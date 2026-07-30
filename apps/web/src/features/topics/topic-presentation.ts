@@ -49,7 +49,10 @@ function getTopicDisplayGroupKey(card: ApiTopicCard) {
 
   if (/人设|身份|老板|经历|故事|信任|认识/.test(text) || card.topicType === "人设型") return "persona"
   if (/热点/.test(text) || card.sourceType === "行业热点") return "hot_topic"
-  if (/观点|判断|认知|趋势|误区|反常识|立场/.test(text) || card.topicType === "流量型") return "point_of_view"
+  if (/观点|判断|认知|趋势|误区|反常识|立场/.test(text)) return "point_of_view"
+  // 流量型（曝光起号）不等于观点类，不再硬塞进 point_of_view；
+  // 按文本关键词判定，不命中则兜底到问题解答类。
+  if (card.topicType === "流量型" && !/观点|判断|认知|趋势|误区|反常识|立场/.test(text)) return "question_answer"
   return "question_answer"
 }
 
