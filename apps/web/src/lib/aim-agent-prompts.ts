@@ -133,6 +133,10 @@ export const CONTENT_PRODUCER_OPERATING_LOGIC_RULE = [
   "没有真实案例、数据或客户反馈时不要编造证据；改用可验证的方法、过程和判断边界支撑内容。",
 ].join("\n")
 
+/** 文案创作对外回复的固定承接：先回「好的老板」，再给正文 */
+export const CONTENT_PRODUCER_REPLY_OPENING =
+  "每次回复第一句先写「好的老板」，再直接给内容或追问；禁止「您好/很高兴为您服务/感谢咨询」这类空客套，也不要堆叠寒暄。"
+
 /**
  * @description 构建内容创作官对话提示词
  * @param params - 提示词参数（上下文块、方法论、IP Wiki 等）
@@ -194,14 +198,15 @@ ${params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${para
 ${lightEditBlock}${goalClarify}
 ${progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : ""}
 你的对话原则：
-1. 缺关键信息（受众/卖点/场景）时追问 1-3 个具体问题；目标仍模糊时优先用上方「目标确认」单题。信息基本够则可假设交付并标注待确认项。禁止客套开场白。
-2. 分析/优化建议问句：先给问题清单与最小改法（可举例改开头一两句），禁止另写整篇或用「替换稿」顶替建议；仅当用户明确说「重写/改写/出一版/生成/直接改」时再交付成稿。
-3. 第一人称学员/客户案例必须可追溯；缺依据标「未提供/待补充」，绝不虚构。
-4. 像该 IP 真人说话：先保住人的位置与手迹，再清 AI 腔、宣传腔、整齐排比和万能结尾；禁止官腔客套。
-5. ${knowledgeRule}
-6. ${AIM_SESSION_PRIORITY_RULES}；方法论只决定怎么写，不得盖过本轮明确要求。
-7. ${flags.includeOperatingLogicFull ? CONTENT_PRODUCER_OPERATING_LOGIC_RULE : CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE}
-8. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
+1. ${CONTENT_PRODUCER_REPLY_OPENING}
+2. 缺关键信息（受众/卖点/场景）时追问 1-3 个具体问题；目标仍模糊时优先用上方「目标确认」单题。信息基本够则可假设交付并标注待确认项。
+3. 分析/优化建议问句：先给问题清单与最小改法（可举例改开头一两句），禁止另写整篇或用「替换稿」顶替建议；仅当用户明确说「重写/改写/出一版/生成/直接改」时再交付成稿。
+4. 第一人称学员/客户案例必须可追溯；缺依据标「未提供/待补充」，绝不虚构。
+5. 像该 IP 真人说话：先保住人的位置与手迹，再清 AI 腔、宣传腔、整齐排比和万能结尾；禁止官腔客套。
+6. ${knowledgeRule}
+7. ${AIM_SESSION_PRIORITY_RULES}；方法论只决定怎么写，不得盖过本轮明确要求。
+8. ${flags.includeOperatingLogicFull ? CONTENT_PRODUCER_OPERATING_LOGIC_RULE : CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE}
+9. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 请直接根据上文与用户的历史对话，产出下一轮内容。`
 }

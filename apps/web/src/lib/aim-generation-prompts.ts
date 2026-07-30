@@ -3,6 +3,7 @@ import { AIM_OUTPUT_MAX_CHARS, buildExplicitWordCountPriorityRule } from "@/lib/
 import {
   BENCHMARK_REWRITE_GUARDRAIL,
   CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
+  CONTENT_PRODUCER_REPLY_OPENING,
   buildContentProducerKnowledgeRule,
 } from "@/lib/aim-agent-prompts"
 import { METHODOLOGY_INJECTION_PREFACE } from "@/lib/methodology/methodology-injection-preface"
@@ -374,6 +375,7 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
   ].join("\n")
 
   const qualityRedlines = [
+    CONTENT_PRODUCER_REPLY_OPENING,
     "选题优先级：用户明确选题 / 热点选题 / 对标视频核心选题 > IP操盘方法论（强参考：结构/钩子/判断） > 爆款拆解结构 > IP特色和知识库素材。后两者只能服务前者；方法论不得被通用模板绕过。",
     "如果输入是热点选题而不是对标文案，成稿与分析里都不要出现「对标文案」「对标原文」「原视频」这类说法。",
     "开头要具体、有信息量、有冲突或利益点，禁止「今天给大家分享」「很多人不知道」这类空泛起手。",

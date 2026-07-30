@@ -7,6 +7,7 @@ import {
   AIM_HIGH_RISK_LOOP_RULE,
   BENCHMARK_REWRITE_GUARDRAIL,
   CONTENT_PRODUCER_OPERATING_LOGIC_RULE,
+  CONTENT_PRODUCER_REPLY_OPENING,
   CONTENT_PRODUCER_SELECTIVE_KNOWLEDGE_RULE,
   PUBLISH_PACKAGE_CHAT_RULE,
   benchmarkCopyReuseRatio,
@@ -68,10 +69,20 @@ describe("AIM content production positioning", () => {
 
     expect(prompt).toContain("追问 1-3 个具体问题")
     expect(prompt).toContain("可假设交付并标注待确认项")
-    expect(prompt).toContain("禁止客套开场白")
+    expect(prompt).toContain("好的老板")
+    expect(prompt).toContain("禁止「您好/很高兴为您服务/感谢咨询」这类空客套")
     expect(prompt).toContain("可追溯")
     expect(prompt).toContain("绝不虚构")
     expect(prompt).not.toContain("不在内容生产官里追问")
+  })
+
+  it("requires content producer replies to open with 好的老板", () => {
+    expect(CONTENT_PRODUCER_REPLY_OPENING).toContain("好的老板")
+    const systemPrompt = buildProducerSystemPrompt("agent", {
+      rawInput: "写一条口播",
+      targetFormats: ["video_script"],
+    } as never)
+    expect(systemPrompt).toContain("好的老板")
   })
 
   it("keeps one canonical spoken-script instruction without a default word range", () => {
