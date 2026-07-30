@@ -4,14 +4,15 @@ import type { ContentFormat } from "@/lib/aim-generator"
 
 export const AGENT_API_VERSION = "0.1.0"
 
-export const AGENT_AIM_AGENT_IDS: AimAgentId[] = [
+export const AGENT_AIM_AGENT_IDS: readonly AimAgentId[] = Object.freeze([
   "business_system_diagnosis",
   "business_diagnosis",
   "content_producer",
   "free_copywriter",
   "work_editor",
   "content_review",
-]
+  "content_retro",
+])
 
 export const AGENT_TARGET_FORMATS: ContentFormat[] = [
   "video_script",
@@ -83,6 +84,8 @@ export function buildAgentCapabilities() {
     version: AGENT_API_VERSION,
     mode: "draft_generation_only",
     authentication: "Authorization: Bearer maim_xxx",
+    // 按 AGENT_AIM_AGENT_ID_SET 白名单过滤，不看 AimAgentMeta.hidden——
+    // hidden 只影响侧栏等 UI 入口，content_review 的外部 API 调用仍合法。
     agents: AIM_AGENT_OPTIONS.filter((agent) => AGENT_AIM_AGENT_ID_SET.has(agent.id)).map(
       (agent) => ({
         id: agent.id,

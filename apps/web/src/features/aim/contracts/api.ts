@@ -57,6 +57,11 @@ const editorContextSchema = z.object({
 export const aimChatBodySchema = z.object({
   messages: z.array(chatMessageSchema).min(1).max(50),
   agentId: z.string().max(80).optional(),
+  /**
+   * 本轮执行引擎（技能跨引擎委托）。会话仍归属 agentId，只有这一轮换 handler /
+   * 模型链 / 知识策略。非法值由服务端回落到 agentId，不换引擎。
+   */
+  executionAgentId: z.string().max(80).optional(),
   projectId: optionalId,
   toolAction: z.enum([
     "import_lark_topics",

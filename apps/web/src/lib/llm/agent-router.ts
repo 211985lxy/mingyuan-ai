@@ -29,6 +29,19 @@ type AgentRoutingPolicy = {
   maxProviderAttempts: number
 }
 
+function freezeAgentRoutes(
+  routes: Record<string, AgentModelRoute[]>
+): Readonly<Record<string, readonly Readonly<AgentModelRoute>[]>> {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(routes).map(([agentId, agentRoutes]) => [
+        agentId,
+        Object.freeze(agentRoutes.map((route) => Object.freeze({ ...route }))),
+      ])
+    )
+  )
+}
+
 /** model-swap 评估画像：仅评估脚本通过环境变量设置，生产路径不得设置。 */
 export type AimEvalModelSwapProfile = "strong" | "weak"
 
@@ -46,9 +59,9 @@ export function readEvalModelSwapProfile(): AimEvalModelSwapProfile | null {
 /**
  * @description 按 swap 画像过滤路由：strong 仅 advanced；weak 仅 basic/standard
  */
-export function applyEvalModelSwapFilter(routes: AgentModelRoute[]): AgentModelRoute[] {
+export function applyEvalModelSwapFilter(routes: readonly AgentModelRoute[]): AgentModelRoute[] {
   const profile = readEvalModelSwapProfile()
-  if (!profile) return routes
+  if (!profile) return [...routes]
   if (profile === "strong") {
     return routes.filter((route) => route.capability === "advanced")
   }
@@ -61,7 +74,7 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
   advanced: 3,
 }
 
-const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
+export const AGENT_ROUTES = freezeAgentRoutes({
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
     // 旗舰链：Claude → GPT-5.6 → ERNIE 5.1（作品编辑润色/排版；长文创作已归 content_producer）
@@ -124,6 +137,15 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "jiekou", capability: "basic" },
     { name: "glm", capability: "standard" },
   ],
+  content_retro: [
+    { name: "deepseek", capability: "standard" },
+    { name: "apimart", capability: "advanced" },
+    { name: "zenmux", capability: "standard" },
+    { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
+    { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
+    { name: "jiekou", capability: "basic" },
+    { name: "glm", capability: "standard" },
+  ],
   persona: [
     { name: "deepseek", capability: "standard" },
     { name: "apimart", capability: "advanced" },
@@ -148,7 +170,7 @@ const AGENT_ROUTES: Record<string, AgentModelRoute[]> = {
     { name: "glm", capability: "standard" },
     { name: "jiekou", capability: "basic" },
   ],
-}
+})
 
 /** 路由表里出现过的 provider + 可选 model（供体检脚本去重探测）。 */
 export type RoutedModelTarget = {

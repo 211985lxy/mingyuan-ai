@@ -160,7 +160,13 @@ export function resolveAimRuntimeTask(input: ResolveAimRuntimeTaskInput): AimRun
   const polishInstruction = extractLatestAimUserIntentText(input.polishInstruction ?? "")
   const text = `${intentInput} ${polishInstruction}`.trim()
 
-  if (input.taskType === "quality_check" || input.agentId === "content_review") {
+  // 复盘与质检同属「分析当前内容、不新写」，共用一档检索与预算画像；
+  // 不归到 new_copy，否则会按创作规格捞知识、留预算。
+  if (
+    input.taskType === "quality_check"
+    || input.agentId === "content_review"
+    || input.agentId === "content_retro"
+  ) {
     return "quality_review"
   }
 

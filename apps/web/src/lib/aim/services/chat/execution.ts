@@ -36,6 +36,8 @@ export function prepareAimChatExecution(input: {
   userId: string
   projectId: string
   agentId: string
+  /** 本轮执行引擎（技能跨引擎委托）。缺省等于 agentId。 */
+  executionAgentId?: string
   shouldStream: boolean
   trace?: AimTraceRecorder
   agentModule?: CopyStudioModule
@@ -43,6 +45,12 @@ export function prepareAimChatExecution(input: {
 }) {
   const { context, userId, projectId, agentId, trace } = input
   const { query, normalizedMessages, runtimeTask, conversationIntent, knowledgeBlock } = context
+  const executionAgentId = input.executionAgentId ?? agentId
+  const delegated = executionAgentId !== agentId
+  // 创作台模块会把 modelPolicy.routeKey 改写成 copy_studio.*，覆盖目标引擎自己的
+  // provider 链；它属于会话智能体的控件状态，委托轮不带过去。
+  const agentModule = delegated ? undefined : input.agentModule
+  const writerModule = delegated ? undefined : input.writerModule
 
   const chatParams = {
     userId,
@@ -54,6 +62,7 @@ export function prepareAimChatExecution(input: {
     trace,
     // ADR-002：命名方法论块透传到 handler（buildAimChatRuntime 会纳入预算）
     selectedMethodologyBlock: context.selectedMethodologyBlock,
+    publishOutcomeBlock: context.publishOutcomeBlock,
   }
 
   const summaryStep = {
@@ -67,21 +76,25 @@ export function prepareAimChatExecution(input: {
       knowledgeEntries: context.knowledgeEntries,
       knowledgeSource: context.knowledgeSource,
       knowledgeChars: knowledgeBlock.length,
+      executionAgentId,
+      delegatedExecution: delegated,
     },
   }
 
   const runRequest = {
     entrypoint: "chat" as const,
     rawInput: query,
-    agentId,
+    // Harness 的 agentId 就是"本轮谁来执行"：planner 据此定 modelPolicy.routeKey，
+    // domain-executor 据此取 handler。会话归属另由 persistMemory / trace 保持。
+    agentId: executionAgentId,
     messages: normalizedMessages,
     trace,
     actorId: userId,
     projectId: projectId || undefined,
     runtimeTask,
     conversationMode: conversationIntent.mode,
-    agentModule: input.agentModule,
-    writerModule: input.writerModule,
+    agentModule,
+    writerModule,
   }
 
   const streamRequest = { ...runRequest, contextManifest: context.contextManifest, stream: true }

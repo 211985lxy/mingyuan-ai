@@ -22,6 +22,7 @@ import {
   prepareAimChatExecution,
 } from "@/lib/aim/services/chat-context"
 import { ownsActiveProject } from "@/lib/resource-ownership"
+import { resolveAimExecutionAgent } from "@/lib/aim/services/aim-execution-agent"
 
 /** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
 export const maxDuration = 180
@@ -51,6 +52,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
     }
 
+    // 技能跨引擎委托：只换本轮执行引擎，trace / 记忆仍挂在会话智能体名下。
+    const execAgent = resolveAimExecutionAgent({
+      sessionAgentId: agentId,
+      requestedExecutionAgentId: parsed.requestedExecutionAgentId,
+    })
+
     trace = await createAimTrace({
       id: traceId || undefined,
       userId: user.id,
@@ -64,7 +71,16 @@ export async function POST(request: NextRequest) {
       label: "路由请求识别",
       status: "success",
       summary: toolAction ? "工具动作" : "普通聊天",
-      metadata: { agentId, projectId: projectId || null, stream: shouldStream, messageCount: messages.length },
+      metadata: {
+        agentId,
+        executionAgentId: execAgent.executionAgentId,
+        delegatedExecution: execAgent.delegated,
+        // 非法引擎字段不静默丢弃：留痕后回落到会话智能体
+        rejectedExecutionAgentId: execAgent.rejectedExecutionAgentId ?? null,
+        projectId: projectId || null,
+        stream: shouldStream,
+        messageCount: messages.length,
+      },
     })
 
     // ── 飞书工具动作（委托给共享模块）──
@@ -77,16 +93,20 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       projectId,
       agentId,
+      executionAgentId: execAgent.executionAgentId,
       messages,
       editorContext,
       trace,
       methodologyProfileIds,
+      // resultId 在飞书导出里就是 AimGeneration id；复盘同语义，缺省不猜
+      targetGenerationId: resultId || undefined,
     })
     const exec = prepareAimChatExecution({
       context,
       userId: user.id,
       projectId,
       agentId,
+      executionAgentId: execAgent.executionAgentId,
       agentModule,
       writerModule,
       shouldStream,

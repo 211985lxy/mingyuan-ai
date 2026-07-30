@@ -24,8 +24,11 @@ export type PendingTurnIntent = {
 
 export type AimSendTextFn = (
   text: string,
-  options?: { editorContext?: AimEditorContext },
+  options?: { editorContext?: AimEditorContext; executionAgentId?: string },
 ) => Promise<unknown>
+
+/** 取出技能按钮挂上的一次性委托意图；无委托时返回空对象，不带 undefined 键 */
+export type ConsumeSkillDelegationFn = (text: string) => { executionAgentId?: string }
 
 function resolveChatEditorContext(input: {
   editorText: string
@@ -48,6 +51,17 @@ function resolveChatEditorContext(input: {
   })
 }
 
+function buildSendOptions(
+  editorContext: AimEditorContext | undefined,
+  delegation: { executionAgentId?: string },
+): { editorContext?: AimEditorContext; executionAgentId?: string } | undefined {
+  const options = {
+    ...(editorContext ? { editorContext } : {}),
+    ...delegation,
+  }
+  return Object.keys(options).length > 0 ? options : undefined
+}
+
 function dispatchByIntent(input: {
   text: string
   intent: AimTurnIntent
@@ -60,8 +74,12 @@ function dispatchByIntent(input: {
     raw: string,
     options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
   ) => Promise<unknown>
+  consumeSkillDelegation?: ConsumeSkillDelegationFn
 }) {
-  if (input.intent.action === "chat") {
+  // 主发送按钮绕开 handleSend，必须在这里取走一次性委托，否则质检技能会静默落到润色引擎
+  const delegation = input.consumeSkillDelegation?.(input.text) ?? {}
+  // generate 故意不支持 executionAgentId；有跨引擎委托时强制走 chat，避免质检变成成稿
+  if (input.intent.action === "chat" || delegation.executionAgentId) {
     const editorContext = input.startsNewTask
       ? undefined
       : resolveChatEditorContext({
@@ -70,7 +88,7 @@ function dispatchByIntent(input: {
           labels: input.editorLabels,
           intent: input.intent,
         })
-    void input.sendText(input.text, editorContext ? { editorContext } : undefined)
+    void input.sendText(input.text, buildSendOptions(editorContext, delegation))
     return
   }
   void input.generateWithInput(input.text, {
@@ -102,11 +120,15 @@ export function useAimTurnIntentGate(input: {
     raw: string,
     options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
   ) => Promise<unknown>
+  /** 技能按钮留下的一次性委托；主发送走门闩时必须由此取走 */
+  consumeSkillDelegation?: ConsumeSkillDelegationFn
+  /** 只看不取：有跨引擎委托时跳过生成确认，直接走 chat */
+  peekSkillDelegation?: ConsumeSkillDelegationFn
 }) {
   const [pendingTurnIntent, setPendingTurnIntent] = useState<PendingTurnIntent | null>(null)
   const [intentResolving, setIntentResolving] = useState(false)
   // 只解构确认/分发真正用到的稳定引用，避免依赖整个 input 大对象导致每次击键都重建回调。
-  const { generateWithInput, sendText } = input
+  const { generateWithInput, sendText, consumeSkillDelegation } = input
 
   const clearPendingTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -126,8 +148,9 @@ export function useAimTurnIntentGate(input: {
       editorLabels: input.editorLabels,
       sendText,
       generateWithInput,
+      consumeSkillDelegation,
     })
-  }, [pendingTurnIntent, generateWithInput, sendText, input.editorText, input.messages, input.editorLabels])
+  }, [pendingTurnIntent, generateWithInput, sendText, consumeSkillDelegation, input.editorText, input.messages, input.editorLabels])
 
   const handleCancelTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -172,7 +195,9 @@ export function useAimTurnIntentGate(input: {
         setIntentResolving(false)
       }
 
-      if (shouldConfirmTurnIntent(intent)) {
+      // 跨引擎技能委托只走 chat，跳过「局部修改」类确认弹层，避免委托意图卡在确认态
+      const skillDelegation = input.peekSkillDelegation?.(currentInput)
+      if (shouldConfirmTurnIntent(intent) && !skillDelegation?.executionAgentId) {
         setPendingTurnIntent({ text: currentInput, intent, startsNewTask, source })
         return
       }
@@ -185,6 +210,7 @@ export function useAimTurnIntentGate(input: {
         editorLabels: input.editorLabels,
         sendText: input.sendText,
         generateWithInput: input.generateWithInput,
+        consumeSkillDelegation: input.consumeSkillDelegation,
       })
     })()
   }, [input, pendingTurnIntent, intentResolving])

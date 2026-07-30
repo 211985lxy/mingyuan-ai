@@ -62,4 +62,58 @@ describe("AIM chat request", () => {
     })
     expect(empty.hasContent).toBe(false)
   })
+
+  it("流式请求带上委托引擎", async () => {
+    vi.mocked(chatAimStream).mockResolvedValue({ content: "质检结果" })
+    await runAimChatRequest({
+      messages: [{ role: "user", content: "标题质检" }],
+      agentId: "work_editor",
+      executionAgentId: "content_review",
+      signal: new AbortController().signal,
+      onContent: vi.fn(),
+    })
+    expect(chatAimStream).toHaveBeenCalledWith(
+      [{ role: "user", content: "标题质检" }],
+      expect.objectContaining({
+        agentId: "work_editor",
+        executionAgentId: "content_review",
+      }),
+    )
+  })
+
+  it("非流式工具请求带上委托引擎", async () => {
+    vi.mocked(chatAim).mockResolvedValue({ content: "同步完成" })
+    await runAimChatRequest({
+      messages: [{ role: "user", content: "同步到飞书" }],
+      agentId: "work_editor",
+      executionAgentId: "content_review",
+      toolAction: "export_lark_generation",
+      resultId: "generation-1",
+      signal: new AbortController().signal,
+      onContent: vi.fn(),
+    })
+    expect(chatAim).toHaveBeenCalledWith(
+      [{ role: "user", content: "同步到飞书" }],
+      expect.objectContaining({
+        agentId: "work_editor",
+        executionAgentId: "content_review",
+        toolAction: "export_lark_generation",
+      }),
+    )
+  })
+
+  it("普通发送不带委托字段，options 与今天一致", async () => {
+    vi.mocked(chatAimStream).mockResolvedValue({ content: "好" })
+    await runAimChatRequest({
+      messages: [{ role: "user", content: "帮我看看" }],
+      agentId: "work_editor",
+      signal: new AbortController().signal,
+      onContent: vi.fn(),
+    })
+    const options = vi.mocked(chatAimStream).mock.calls[0][1]
+    expect(options).not.toHaveProperty("executionAgentId")
+    expect(options).toEqual(expect.objectContaining({
+      agentId: "work_editor",
+    }))
+  })
 })

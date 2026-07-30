@@ -1,5 +1,5 @@
 import type { ComponentType } from "react"
-import { Activity, Compass, PenLine, ShieldCheck, Video, Edit3 } from "lucide-react"
+import { Activity, Compass, LineChart, PenLine, ShieldCheck, Video, Edit3 } from "lucide-react"
 import type { ContentFormat } from "@/lib/api/client"
 // 身份契约唯一源：aim-harness/contracts.ts。
 // AimAgentId 类型 + 运行时校验/归一化逻辑（DEFAULT_AIM_AGENT /
@@ -31,7 +31,7 @@ export interface AimAgentMeta {
 }
 
 export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
-  // 侧栏展示名统一四字；顺序对齐工作流：诊断 → 选题 → 创作 → 编辑 → 质检 → 人设
+  // 侧栏展示名统一四字；顺序对齐工作流：诊断 → 选题 → 创作 → 编辑 → 复盘 → 人设
   {
     id: "business_system_diagnosis",
     title: "商业诊断",
@@ -67,7 +67,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     id: "work_editor",
     // id 保留 work_editor（旧 deep_copywriter 经别名归一）；对外只叫「作品编辑」
     title: "作品编辑",
-    description: "文字二改、公众号排版、小红书图文",
+    description: "二改润色、渠道排版、发布质检",
     icon: Edit3,
     defaultFormats: ["raw_copy"],
   },
@@ -77,6 +77,16 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
     title: "发布质检",
     description: "标题、钩子、结构、人设一致、风险表达",
     icon: ShieldCheck,
+    defaultFormats: ["raw_copy"],
+    // 入口已并入「作品编辑」；id、guide 和底层质检引擎完整保留，
+    // 用于兼容历史会话、飞书 /质检 命令和外部 Agent API 调用。
+    hidden: true,
+  },
+  {
+    id: "content_retro",
+    title: "数据复盘",
+    description: "已发布内容的数据表现、有效规律、下一步动作",
+    icon: LineChart,
     defaultFormats: ["raw_copy"],
   },
   {

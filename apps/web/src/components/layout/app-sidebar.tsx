@@ -76,7 +76,7 @@ const aimExpertAgentIds: AimAgentId[] = [
   "business_diagnosis",
   "content_producer",
   "work_editor",
-  "content_review",
+  "content_retro",
   "persona",
 ]
 

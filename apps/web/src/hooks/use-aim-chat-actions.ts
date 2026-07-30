@@ -22,6 +22,8 @@ export interface SendAimTextOptions {
   editorApplyRange?: TextSelectionRange
   images?: AimImageAttachment[]
   retryMessageId?: string
+  /** 本轮委托执行引擎；与会话 agentId 平级，缺省则不委托 */
+  executionAgentId?: string
 }
 
 interface AimChatActionInput {
@@ -64,6 +66,11 @@ async function executeChatRequest(
     setAssistantMessage(input, assistantId, "当前没有可同步到飞书的 AIM 生成结果。")
     return
   }
+  // 复盘要读这条内容的真实发布数据，目标只取当前会话里的交付物；
+  // 会话里没有交付物时留空，让服务端走「未登记」而不是猜一条内容。
+  const retroTargetId = (options.executionAgentId ?? input.selectedAgentId) === "content_retro"
+    ? findLatestAimDeliverableId(input.messages)
+    : undefined
   const { hasContent } = await runAimChatRequest({
     messages: buildAimChatMessages(thread.map((message) => ({
       role: message.role,
@@ -73,12 +80,13 @@ async function executeChatRequest(
     agentId: input.selectedAgentId,
     projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,
     toolAction,
-    resultId,
+    resultId: resultId ?? retroTargetId,
     editorContext: options.editorContext,
     agentModule: input.agentModule,
     writerModule: input.agentModule,
     signal: controller.signal,
     traceId,
+    ...(options.executionAgentId ? { executionAgentId: options.executionAgentId } : {}),
     onContent: (content) => setAssistantMessage(input, assistantId, content),
   })
   if (!hasContent) {

@@ -19,7 +19,7 @@ export interface AimChannelIntent {
  * 用户在飞书里可以用任意一个别名触发，例如 `/内容创作`、`/写文案`、`/口播`。
  * 别名都是小写、去空格匹配，所以 "内容创作" 和 "内容 创作" 等价。
  */
-const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
+export const COMMAND_ALIASES: readonly Readonly<{ agentId: AimAgentId; aliases: readonly string[] }>[] = Object.freeze([
   {
     agentId: "content_producer",
     aliases: ["内容创作", "内容文案", "内容文案创作", "内容创作官", "写文案", "口播", "短视频", "社媒", "种草"],
@@ -45,10 +45,14 @@ const COMMAND_ALIASES: Array<{ agentId: AimAgentId; aliases: string[] }> = [
     aliases: ["质检", "发布质检", "发布前质检", "检查", "自查", "风险"],
   },
   {
+    agentId: "content_retro",
+    aliases: ["复盘", "数据复盘", "内容复盘"],
+  },
+  {
     agentId: "persona",
     aliases: ["人设", "人设故事", "人设故事官", "人设梳理官", "人设故事梳理", "人设梳理", "来时路", "置顶视频"],
   },
-]
+].map(({ agentId, aliases }) => Object.freeze({ agentId: agentId as AimAgentId, aliases: Object.freeze([...aliases]) })))
 
 /** 预计算：别名（去空格、小写）→ agentId 的扁平查找表 */
 const ALIAS_LOOKUP: Map<string, AimAgentId> = (() => {
@@ -142,7 +146,7 @@ export function resolveAimChannelIntent(
 }
 
 /** 返回所有可用的命令别名，用于给用户展示帮助文案。 */
-export function listAimChannelCommands(): Array<{ agentId: AimAgentId; aliases: string[] }> {
+export function listAimChannelCommands(): Array<{ agentId: AimAgentId; aliases: readonly string[] }> {
   return COMMAND_ALIASES.map(({ agentId, aliases }) => ({ agentId, aliases }))
 }
 

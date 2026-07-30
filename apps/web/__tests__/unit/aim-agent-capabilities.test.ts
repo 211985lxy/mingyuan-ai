@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest"
 
 import {
   AIM_AGENT_CAPABILITIES,
+  agentAllowsPublishCheck,
   getAimAgentCapabilities,
 } from "@/lib/aim/agent-capabilities"
-import { AIM_AGENT_IDS } from "@/lib/aim-harness/contracts"
+import { AIM_AGENT_IDS, type AimAgentId } from "@/lib/aim-harness/contracts"
 import {
   assemblePasteUsageInput,
   createPastedCopyAttachment,
@@ -64,5 +65,40 @@ describe("AIM agent capability matrix", () => {
     expect(resolveContentProducerVideoUrl("content_review", shareText)).toBeNull()
     expect(resolveContentProducerVideoUrl("content_producer", shareText)).toBe("https://v.douyin.com/example/")
     expect(resolveContentProducerVideoUrl("content_producer", "参考资料 https://example.com/article")).toBeNull()
+  })
+
+  it("allows publishCheck only on the four agents that previously had the action", () => {
+    const allowed: AimAgentId[] = [
+      "content_producer",
+      "free_copywriter",
+      "work_editor",
+      "content_review",
+    ]
+    for (const id of allowed) {
+      expect(AIM_AGENT_CAPABILITIES[id].publishCheck).toBe(true)
+      expect(agentAllowsPublishCheck(id)).toBe(true)
+    }
+    for (const id of AIM_AGENT_IDS) {
+      if (allowed.includes(id)) continue
+      expect(AIM_AGENT_CAPABILITIES[id].publishCheck).toBe(false)
+      expect(agentAllowsPublishCheck(id)).toBe(false)
+    }
+  })
+
+  it("denies publishCheck for unknown agent ids via DENY_ALL", () => {
+    expect(getAimAgentCapabilities("not_a_real_agent").publishCheck).toBe(false)
+    expect(agentAllowsPublishCheck("not_a_real_agent")).toBe(false)
+    expect(agentAllowsPublishCheck("totally_fake")).toBe(false)
+  })
+
+  it("resolves legacy aliases to the same publishCheck as canonical ids", () => {
+    expect(agentAllowsPublishCheck("deep_copywriter")).toBe(true)
+    expect(agentAllowsPublishCheck("ip_video")).toBe(true)
+    expect(getAimAgentCapabilities("deep_copywriter").publishCheck).toBe(
+      AIM_AGENT_CAPABILITIES.work_editor.publishCheck,
+    )
+    expect(getAimAgentCapabilities("ip_video").publishCheck).toBe(
+      AIM_AGENT_CAPABILITIES.content_producer.publishCheck,
+    )
   })
 })

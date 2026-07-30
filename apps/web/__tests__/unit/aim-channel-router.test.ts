@@ -5,6 +5,7 @@ import {
   listAimChannelCommands,
   buildAimChannelHelpText,
 } from "@/lib/aim-channel-router"
+import { AIM_AGENT_IDS } from "@/lib/aim-harness/contracts"
 
 describe("extractCommandPrefix", () => {
   it("解析半角斜杠命令", () => {
@@ -98,21 +99,13 @@ describe("resolveAimChannelIntent", () => {
 })
 
 describe("help text", () => {
-  it("列出全部 7 个智能体的命令", () => {
+  // 覆盖面从身份契约推导：新增智能体忘了配渠道命令时这里会红，不靠人工改数字
+  it("每个智能体都有渠道命令，不漏不重", () => {
     const commands = listAimChannelCommands()
     const agentIds = commands.map((c) => c.agentId)
-    expect(agentIds).toEqual(
-      expect.arrayContaining([
-        "content_producer",
-        "work_editor",
-        "free_copywriter",
-        "business_diagnosis",
-        "business_system_diagnosis",
-        "content_review",
-        "persona",
-      ]),
-    )
-    expect(commands).toHaveLength(7)
+
+    expect(new Set(agentIds)).toEqual(new Set(AIM_AGENT_IDS))
+    expect(commands).toHaveLength(AIM_AGENT_IDS.size)
   })
 
   it("帮助文案包含示例与全部智能体", () => {

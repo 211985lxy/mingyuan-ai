@@ -59,34 +59,44 @@ function buildBotConfig(
   }
 }
 
+function freezeBotMeta(
+  meta: Record<string, { displayName: string; workflowId: string }>
+): Readonly<Record<string, Readonly<{ displayName: string; workflowId: string }>>> {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(meta).map(([agentId, config]) => [agentId, Object.freeze({ ...config })])
+    )
+  )
+}
+
 /** 6 个 bot 的静态元信息（displayName + workflowId） */
-const BOT_META: Record<string, { displayName: string; workflowId: string }> = {
+export const FEISHU_AGENT_BOT_META = freezeBotMeta({
   content_producer: { displayName: "内容创作", workflowId: "content_growth" },
   work_editor: { displayName: "作品编辑", workflowId: "content_growth" },
   business_system_diagnosis: { displayName: "商业诊断", workflowId: "sales_diagnosis" },
   business_diagnosis: { displayName: "选题策划", workflowId: "sales_diagnosis" },
   content_review: { displayName: "发布质检", workflowId: "content_growth" },
   persona: { displayName: "人设故事", workflowId: "content_growth" },
-}
+})
 
 /** 环境变量前缀映射 */
-const BOT_ENV_PREFIX: Record<string, string> = {
+export const FEISHU_AGENT_BOT_ENV_PREFIX: Readonly<Record<string, string>> = Object.freeze({
   content_producer: "FEISHU_BOT_CONTENT_PRODUCER",
   work_editor: "FEISHU_BOT_WORK_EDITOR",
   business_system_diagnosis: "FEISHU_BOT_BIZ_DIAGNOSIS",
   business_diagnosis: "FEISHU_BOT_TOPIC_PLANNER",
   content_review: "FEISHU_BOT_CONTENT_REVIEW",
   persona: "FEISHU_BOT_PERSONA",
-}
+})
 
-const ALL_AGENT_IDS: AimAgentId[] = [
+export const FEISHU_AGENT_BOT_IDS: readonly AimAgentId[] = Object.freeze([
   "content_producer",
   "work_editor",
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",
   "persona",
-]
+])
 
 /**
  * 运行时读取所有已配置的 bot。
@@ -96,12 +106,12 @@ export function loadAgentBotRegistry(): FeishuAgentBotConfig[] {
   const bots: FeishuAgentBotConfig[] = []
   const envRecord = env as unknown as Record<string, string | undefined>
 
-  for (const agentId of ALL_AGENT_IDS) {
-    const prefix = BOT_ENV_PREFIX[agentId]
+  for (const agentId of FEISHU_AGENT_BOT_IDS) {
+    const prefix = FEISHU_AGENT_BOT_ENV_PREFIX[agentId]
     const bot = buildBotConfig(
       agentId,
-      BOT_META[agentId].displayName,
-      BOT_META[agentId].workflowId,
+      FEISHU_AGENT_BOT_META[agentId].displayName,
+      FEISHU_AGENT_BOT_META[agentId].workflowId,
       envRecord[`${prefix}_APP_ID`],
       envRecord[`${prefix}_APP_SECRET`],
       envRecord[`${prefix}_VERIFY_TOKEN`],

@@ -36,7 +36,17 @@ export interface AimKnowledgeContextResult {
  * - 其余 → 得分 × 0.85（后移）
  * 保留所有类别，避免信息缺失。
  */
-const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
+function freezePriorityCategories(
+  categories: Record<string, string[]>
+): Readonly<Record<string, readonly string[]>> {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(categories).map(([agentId, priority]) => [agentId, Object.freeze([...priority])])
+    )
+  )
+}
+
+export const AGENT_PRIORITY_CATEGORIES = freezePriorityCategories({
   content_producer: [
     "customer_pain",
     "user_insight",
@@ -72,12 +82,18 @@ const AGENT_PRIORITY_CATEGORIES: Record<string, string[]> = {
     "user_insight",
     "hot_topic",
   ],
+  content_retro: [
+    "project_case",
+    "user_insight",
+    "product_usp",
+    "benchmark_reference",
+  ],
   free_copywriter: [
     // 自由创作知识依赖最低，仅优先最通用的背景类
     "boss_experience",
     "user_insight",
   ],
-}
+})
 
 /** 默认优先级（未匹配到具体 agent 时的兜底） */
 const DEFAULT_PRIORITY_CATEGORIES = [

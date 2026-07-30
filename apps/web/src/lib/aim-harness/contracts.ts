@@ -20,6 +20,7 @@ export type AimAgentId =
   | "business_system_diagnosis"
   | "business_diagnosis"
   | "content_review"
+  | "content_retro"
   | "persona"
 
 /** 四个服务端入口（镜像 AimRunSpec.entrypoint） */
@@ -36,6 +37,7 @@ export const AIM_AGENT_IDS: ReadonlySet<AimAgentId> = new Set<AimAgentId>([
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",
+  "content_retro",
   "persona",
 ])
 

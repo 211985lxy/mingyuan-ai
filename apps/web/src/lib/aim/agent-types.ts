@@ -46,6 +46,8 @@ export interface AimChatParams {
   knowledgeStrategy?: ResolvedKnowledgeStrategy
   modelPolicy?: AimModelPolicy
   trace?: AimTraceRecorder
+  /** 已格式化的单条发布结果文本块；缺失时提示词走「未登记发布数据」分支 */
+  publishOutcomeBlock?: string
 }
 
 export interface AimChatResponse {
@@ -101,6 +103,8 @@ export interface AimGenerateContext {
   confirmedTurnIntent?: import("@/lib/aim-turn-intent").AimTurnIntent
   /** 发布质检官模式 */
   reviewMode?: import("@/features/newsroom/contracts").ContentReviewMode
+  /** 已格式化的单条发布结果文本块；缺失时提示词走「未登记发布数据」分支 */
+  publishOutcomeBlock?: string
 }
 
 export interface AimGenerationContextOverride {

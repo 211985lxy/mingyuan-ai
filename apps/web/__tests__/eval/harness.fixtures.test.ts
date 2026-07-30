@@ -2,7 +2,7 @@
  * Deterministic harness fixture test (no model, no DB).
  *
  * This is the `test:x harness` gate that runs on every PR. It asserts:
- *   - the suite has exactly 92 fixtures with all seven agents represented
+ *   - 样本总数与 EXPECTED_AGENT_COUNTS 声明一致，且每个已注册智能体都有样本
  *   - every fixture's declared routing/knowledge/format contract matches the
  *     real production planner (resolveAimRuntimeTask / resolveKnowledgeStrategy)
  *   - ids are unique and versioned
@@ -22,11 +22,12 @@ import {
 import { gradeFixture, GRADABLE_FORMATS } from "@/lib/aim-harness/eval/graders"
 
 describe("aim harness fixture registry", () => {
-  it("has exactly 92 fixtures", () => {
-    expect(ALL_FIXTURES).toHaveLength(92)
+  it("总数与各智能体声明数量一致", () => {
+    const declaredTotal = Object.values(EXPECTED_AGENT_COUNTS).reduce((sum, n) => sum + n, 0)
+    expect(ALL_FIXTURES).toHaveLength(declaredTotal)
   })
 
-  it("covers all seven agents with the required counts", () => {
+  it("covers every registered agent with the required counts", () => {
     const byAgent = ALL_FIXTURES.reduce<Record<string, number>>((acc, fixture) => {
       acc[fixture.agent] = (acc[fixture.agent] ?? 0) + 1
       return acc

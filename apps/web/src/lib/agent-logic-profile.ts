@@ -57,6 +57,7 @@ const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
   business_diagnosis: ["user_insight", "positioning_material", "boss_experience", "product_usp", "customer_pain"],
   business_system_diagnosis: ["product_usp", "customer_pain", "project_case", "customer_qa", "user_insight"],
   content_review: ["project_case", "benchmark_reference", "user_insight", "hot_topic"],
+  content_retro: ["project_case", "user_insight", "product_usp", "benchmark_reference"],
   // persona 未在 AGENT_PRIORITY_CATEGORIES 中显式配置，走 DEFAULT_PRIORITY_CATEGORIES 兜底
   persona: ["product_usp", "boss_experience", "customer_pain", "project_case"],
 }
@@ -72,6 +73,7 @@ const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
   business_diagnosis: ["apimart", "zenmux", "openrouter", "openrouter", "lihuo", "deepseek", "jiekou", "therouter", "glm"],
   business_system_diagnosis: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
   content_review: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
+  content_retro: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
   persona: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "glm"],
 }
 
@@ -95,6 +97,8 @@ const AGENT_METHODOLOGIES: Record<AimAgentId, Array<{ key: MethodologyKey; label
     { key: "business_diagnosis", label: "商业诊断方法论" },
   ],
   content_review: [{ key: "ip_copywriting", label: "IP 操盘方法论" }],
+  // 复盘只依据真实发布数据判断，handler 不注入方法论
+  content_retro: [],
   persona: [{ key: "ip_copywriting", label: "IP 操盘方法论" }],
 }
 
@@ -106,6 +110,7 @@ const AGENT_OTHER_CONTEXT: Record<AimAgentId, string[]> = {
   business_diagnosis: ["竞品观察（watchAccount）", "写作风格档案", "AIM 长期记忆", "IP Wiki", "对标视频拆解"],
   business_system_diagnosis: ["写作风格档案", "AIM 长期记忆", "IP Wiki"],
   content_review: ["写作风格档案", "AIM 长期记忆"],
+  content_retro: ["已登记发布数据（ContentOutcome）", "AIM 长期记忆"],
   persona: ["写作风格档案", "AIM 长期记忆"],
 }
 

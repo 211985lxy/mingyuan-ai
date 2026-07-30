@@ -217,7 +217,7 @@ describe("aim agent guides", () => {
     }
   })
 
-  it("adds a plain-language retro path instead of a new technical workflow", () => {
+  it("keeps single-content retro out of business diagnosis (moved to a future retro agent)", () => {
     const businessSystemText = [
       getAimAgentGuide("business_system_diagnosis").intro,
       ...getAimAgentGuide("business_system_diagnosis").quickPrompts,
@@ -225,8 +225,7 @@ describe("aim agent guides", () => {
       ...getAimAgentGuide("business_system_diagnosis").skills.map((skill) => `${skill.label} ${skill.prompt}`),
     ].join("\n")
 
-    expect(businessSystemText).toContain("内容数据复盘")
-    expect(businessSystemText).toContain("下次同类内容怎么判断")
+    expect(businessSystemText).not.toContain("数据复盘")
     expect(businessSystemText).not.toContain("飞轮")
     expect(businessSystemText).not.toContain("闭环")
   })
@@ -270,6 +269,30 @@ describe("aim agent guides", () => {
         expect(skill.group, `${agent.id}/${skill.id} missing group`).toBeTruthy()
       }
     }
+  })
+
+  it("folds publish review skills into work_editor while keeping their engine id", () => {
+    const skills = getAimAgentGuide("work_editor").skills
+    const editSkill = skills.find((skill) => skill.id === "text_polish")
+    const titleReview = skills.find((skill) => skill.id === "title_review")
+    const publishDecision = skills.find((skill) => skill.id === "publish_decision")
+
+    expect(editSkill).toBeTruthy()
+    expect(titleReview).toBeTruthy()
+    expect(publishDecision).toBeTruthy()
+    // 质检技能挂在作品编辑的技能列表里，但执行引擎仍归 content_review
+    expect(titleReview?.agentId).toBe("content_review")
+    expect(publishDecision?.agentId).toBe("content_review")
+    expect(titleReview?.group).toBe("单项质检")
+    expect(publishDecision?.group).toBe("综合判断")
+  })
+
+  it("keeps content_review hidden from the visible agent list but still resolvable by guide", () => {
+    const reviewAgent = AIM_AGENT_OPTIONS.find((agent) => agent.id === "content_review")
+
+    expect(reviewAgent?.hidden).toBe(true)
+    expect(getAimAgentGuide("content_review").intro).toContain("发布质检")
+    expect(getAimAgentGuide("content_review").skills.length).toBeGreaterThan(0)
   })
 
   it("ensures all skill prompts reference context to avoid awkward prefix", () => {

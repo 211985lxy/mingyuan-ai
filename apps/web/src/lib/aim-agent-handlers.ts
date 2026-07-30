@@ -36,6 +36,7 @@ import { WorkEditorHandler } from "@/lib/aim-agent-work-editor"
 import { BusinessSystemDiagnosisHandler } from "@/lib/aim-agent-business-system-diagnosis"
 import { BusinessDiagnosisHandler } from "@/lib/aim-agent-business-diagnosis"
 import { ContentReviewHandler } from "@/lib/aim-agent-content-review"
+import { ContentRetroHandler } from "@/lib/aim-agent-content-retro"
 import { PersonaHandler } from "@/lib/aim-agent-persona"
 import type {
   AimAgentHandler,
@@ -82,6 +83,7 @@ const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
   business_system_diagnosis: new BusinessSystemDiagnosisHandler(),
   business_diagnosis: new BusinessDiagnosisHandler(),
   content_review: new ContentReviewHandler(),
+  content_retro: new ContentRetroHandler(),
   persona: new PersonaHandler(),
 }
 

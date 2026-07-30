@@ -29,6 +29,7 @@ import { ContentPackagePanel } from "@/components/aim/content-package-panel"
 import { KnowledgeCitationPanel } from "@/components/aim/knowledge-citation-panel"
 import { PublishPackActions } from "@/components/aim/publish-pack-actions"
 import type { TaskSpec } from "@/lib/task-spec"
+import { agentAllowsPublishCheck } from "@/lib/aim/agent-capabilities"
 import {
   getAllowedWorkflowTransitions,
   normalizeAimWorkflowStatus,
@@ -341,7 +342,7 @@ function DeliverableActions(props: DeliverableActionsProps) {
   const formats = new Set(deliverables.results.map((item) => item.format))
   const hasPublishScript = formats.has("video_script") || formats.has("koubo_script")
   const qualityFail = deliverables.qualityStatus === "fail"
-  const canRunPublishCheck = ["content_producer", "free_copywriter", "work_editor", "content_review"].includes(agentId)
+  const canRunPublishCheck = agentAllowsPublishCheck(agentId)
   const primaryActions = nextActions.filter((action) => action.id === "publish_package" || action.id === "publish_check")
   const secondaryActions = nextActions.filter((action) => action.id !== "publish_package" && action.id !== "publish_check")
   const hasPublishCheckAction = nextActions.some((action) => action.id === "publish_check")

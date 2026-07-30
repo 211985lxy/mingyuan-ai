@@ -63,6 +63,8 @@ export async function runAimChatRequest(input: {
   agentModule?: CopyStudioModule
   writerModule?: CopyStudioModule
   traceId?: string
+  /** 本轮委托执行引擎；缺省不写入请求体，保持普通发送零变化 */
+  executionAgentId?: string
 }): Promise<{ hasContent: boolean }> {
   const options = {
     agentId: input.agentId,
@@ -72,6 +74,7 @@ export async function runAimChatRequest(input: {
     writerModule: input.writerModule,
     signal: input.signal,
     traceId: input.traceId,
+    ...(input.executionAgentId ? { executionAgentId: input.executionAgentId } : {}),
   }
   if (input.toolAction) {
     const { content } = await chatAim(input.messages, {

@@ -14,8 +14,8 @@ export interface AimWorkflowStageConfig {
 export const AIM_WORKFLOW_STAGES: AimWorkflowStageConfig[] = [
   { id: "direction", title: "定方向", description: "想清楚讲什么、讲给谁、为什么值得做", defaultAgentId: "business_diagnosis" },
   { id: "content", title: "做内容", description: "把方向变成可以发布和持续修改的内容", defaultAgentId: "content_producer" },
-  { id: "publish", title: "发作品", description: "编辑、质检、整理发布包，并登记已发布内容", defaultAgentId: "content_review" },
-  { id: "results", title: "看结果", description: "复盘有效内容，把规则沉淀回项目资产", defaultAgentId: "content_producer" },
+  { id: "publish", title: "发作品", description: "编辑、质检、整理发布包，并登记已发布内容", defaultAgentId: "work_editor" },
+  { id: "results", title: "看结果", description: "复盘有效内容，把规则沉淀回项目资产", defaultAgentId: "content_retro" },
 ]
 
 export const AIM_CONTENT_ACTIONS: Array<{
@@ -36,8 +36,9 @@ const STAGE_BY_AGENT: Partial<Record<AimAgentId, AimWorkflowStage>> = {
   persona: "direction",
   content_producer: "content",
   free_copywriter: "content",
-  work_editor: "content",
+  work_editor: "publish",
   content_review: "publish",
+  content_retro: "results",
 }
 
 /**

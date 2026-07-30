@@ -22,9 +22,20 @@ describe("Agent API contract", () => {
       "free_copywriter",
       "work_editor",
       "content_review",
+      "content_retro",
     ])
     // 旧别名 ip_video 不应再出现在公开契约里
     expect(ids).not.toContain("ip_video")
+    // persona 至今未开放对外调用，改动这条前需要产品确认
+    expect(ids).not.toContain("persona")
+  })
+
+  it("keeps content_review callable via the external API even though it is hidden in the sidebar", () => {
+    const capabilities = buildAgentCapabilities()
+    const reviewAgent = capabilities.agents.find((agent) => agent.id === "content_review")
+
+    expect(reviewAgent).toBeTruthy()
+    expect(reviewAgent?.name).toBe("发布质检")
   })
 
   it("accepts only whitelisted target formats", () => {

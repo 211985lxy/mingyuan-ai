@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { AIM_AGENT_OPTIONS } from "@/lib/aim-ui-config"
 import { parseMultiFormatResponse } from "@/lib/aim-generator"
 import { buildKnowledgeBlock } from "@/lib/aim-knowledge-context"
+import { AIM_WORKFLOW_STAGES, getWorkflowStageForAgent } from "@/lib/aim-workflow"
 import {
   AIM_HIGH_RISK_LOOP_RULE,
   BENCHMARK_REWRITE_GUARDRAIL,
@@ -260,6 +261,15 @@ describe("AIM content production positioning", () => {
     expect(reviewAgent?.description).toContain("标题")
     expect(reviewAgent?.description).toContain("风险表达")
     expect(reviewAgent?.defaultFormats).toEqual(["raw_copy"])
+    // 入口已并入作品编辑，UI 不再单独展示
+    expect(reviewAgent?.hidden).toBe(true)
+  })
+
+  it("routes the publish workflow stage to work_editor after review consolidation", () => {
+    const publishStage = AIM_WORKFLOW_STAGES.find((stage) => stage.id === "publish")
+
+    expect(publishStage?.defaultAgentId).toBe("work_editor")
+    expect(getWorkflowStageForAgent("work_editor")).toBe("publish")
   })
 
   it("keeps content_review focused on publish checks", () => {

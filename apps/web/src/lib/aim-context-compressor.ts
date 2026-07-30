@@ -25,14 +25,27 @@ export interface AimCompressionProfile {
   /** 保留的最近消息轮次（含 assistant 回复） */
   recentRounds: number
   /** 摘要中应保留的关键字段描述（给规则引擎用的） */
-  focus: string[]
+  focus: readonly string[]
   /** 压缩摘要上限字符数 */
   maxSummaryChars: number
 }
 
+function freezeCompressionProfiles(
+  profiles: Record<string, AimCompressionProfile>
+): Readonly<Record<string, Readonly<AimCompressionProfile>>> {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(profiles).map(([agentId, profile]) => [
+        agentId,
+        Object.freeze({ ...profile, focus: Object.freeze([...profile.focus]) }),
+      ])
+    )
+  )
+}
+
 // ─── 智能体压缩策略配置 ──────────────────────────────────
 
-const COMPRESSION_PROFILES: Record<string, AimCompressionProfile> = {
+export const COMPRESSION_PROFILES = freezeCompressionProfiles({
   work_editor: {
     recentRounds: 6,
     focus: [
@@ -96,7 +109,18 @@ const COMPRESSION_PROFILES: Record<string, AimCompressionProfile> = {
     ],
     maxSummaryChars: 2000,
   },
-}
+  content_retro: {
+    recentRounds: 5,
+    focus: [
+      "已登记的单条内容发布数据和数据来源",
+      "已确认的命中点、判断偏差和证据",
+      "下一次同类内容的判断规则",
+      "待执行的复盘动作及完成情况",
+      "缺失或尚未核验的数据",
+    ],
+    maxSummaryChars: 1800,
+  },
+})
 
 /** 默认压缩策略（未匹配到具体 agent 时的兜底） */
 const DEFAULT_PROFILE: AimCompressionProfile = {

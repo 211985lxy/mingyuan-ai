@@ -104,6 +104,8 @@ export async function chatAim(
     agentModule?: CopyStudioModule
     writerModule?: CopyStudioModule
     signal?: AbortSignal
+    /** 本轮委托执行引擎；与会话 agentId 平级，缺省不写入请求体 */
+    executionAgentId?: string
   },
 ): Promise<{ content: string; toolResult?: unknown }> {
   const { signal, ...bodyOptions } = options ?? {}
@@ -132,6 +134,8 @@ export async function chatAimStream(
     signal?: AbortSignal
     onDelta: (delta: string, content: string) => void
     traceId?: string
+    /** 本轮委托执行引擎；与会话 agentId 平级，缺省不写入请求体 */
+    executionAgentId?: string
   },
 ): Promise<{ content: string }> {
   const { signal, onDelta, traceId, ...bodyOptions } = options

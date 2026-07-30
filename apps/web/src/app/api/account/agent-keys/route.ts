@@ -12,20 +12,21 @@ import {
   type AgentClientType,
 } from "@/lib/aim-remote/contracts"
 
-const AGENT_AGENT_ALLOWLIST = [
+export const AGENT_AGENT_ALLOWLIST: readonly string[] = Object.freeze([
   "business_system_diagnosis",
   "business_diagnosis",
   "content_producer",
   "free_copywriter",
   "work_editor",
   "content_review",
-]
+  "content_retro",
+])
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(60),
   clientType: z.enum(AGENT_CLIENT_TYPES as unknown as [AgentClientType, ...AgentClientType[]]),
   projects: z.array(z.string().trim().min(1)).min(1).max(20),
-  agents: z.array(z.string().trim().min(1)).max(10).default(AGENT_AGENT_ALLOWLIST),
+  agents: z.array(z.string().trim().min(1)).max(10).default([...AGENT_AGENT_ALLOWLIST]),
   scopes: z.array(z.string()).optional(),
   dailyLimit: z.number().int().min(1).max(1000).default(50),
   minuteLimit: z.number().int().min(1).max(600).default(60),

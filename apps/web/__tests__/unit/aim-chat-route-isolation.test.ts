@@ -116,8 +116,8 @@ describe("aim chat route project isolation (source contract)", () => {
   })
 
   it("项目对话只召回项目记忆，不混入全局记忆", () => {
-    expect(source).toContain("? retrieveAimMemory({ userId, projectId, agentId }).catch(() => [])")
-    expect(source).toContain(": retrieveLayeredAimMemory({ userId, projectId, agentId }).catch(() => [])")
+    expect(source).toContain("? retrieveAimMemory({ userId, projectId, agentId: memoryAgentId }).catch(() => [])")
+    expect(source).toContain(": retrieveLayeredAimMemory({ userId, projectId, agentId: memoryAgentId }).catch(() => [])")
   })
 })
 

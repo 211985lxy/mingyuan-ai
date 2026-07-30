@@ -35,6 +35,7 @@ import {
   buildMethodologyProfileBlock,
   type MethodologyPolicy,
 } from "@/lib/methodology-profile-store"
+import { resolvePublishOutcomeBlock } from "@/lib/aim/content-outcome-context"
 
 export type RetrievedChatContextBlocks = {
   knowledgeBlock: string
@@ -47,6 +48,8 @@ export type RetrievedChatContextBlocks = {
   selectedMethodologyBlock: string
   /** ADR-002：解析后的方法论策略（供 manifest 记录）。 */
   methodologyPolicy: MethodologyPolicy
+  /** 数据复盘专用：已格式化的发布结果块；非复盘或无目标内容时为 undefined。 */
+  publishOutcomeBlock?: string
 }
 
 /**
@@ -63,7 +66,13 @@ export type RetrievedChatContextBlocks = {
 export async function retrieveChatContextBlocks(input: {
   userId: string
   projectId: string
+  /** 本轮执行引擎：决定知识分类优先级、痛点识别与竞品召回的分流 */
   agentId: string
+  /**
+   * 会话归属智能体：长期记忆按会话归属读写，跨引擎委托时不能改成执行引擎，
+   * 否则同一轮对话会读 A 引擎的记忆、写 B 引擎的记忆。
+   */
+  memoryAgentId?: string
   query: string
   editorContext?: AimEditorContext
   conversationIntent: AimConversationIntent
@@ -71,8 +80,14 @@ export async function retrieveChatContextBlocks(input: {
   trace?: AimTraceRecorder
   /** ADR-002：显式选择的命名方法论 profile id。 */
   methodologyProfileIds?: string[]
+  /**
+   * 目标内容的 AimGeneration id（请求体 resultId）。
+   * 仅 content_retro 执行轮用来读发布数据；缺省不查库、不猜最近一条。
+   */
+  targetGenerationId?: string
 }): Promise<RetrievedChatContextBlocks> {
   const { userId, projectId, agentId, query, editorContext, conversationIntent, runtimeTask, trace } = input
+  const memoryAgentId = input.memoryAgentId ?? agentId
 
   const shouldUseKnowledgeContext = conversationIntent.useKnowledge || shouldUseKnowledgeContextForTask(runtimeTask)
   const shouldUseMarketContext =
@@ -165,8 +180,8 @@ export async function retrieveChatContextBlocks(input: {
         "aim_memory",
         "历史记忆召回",
         () => projectId
-          ? retrieveAimMemory({ userId, projectId, agentId }).catch(() => [])
-          : retrieveLayeredAimMemory({ userId, projectId, agentId }).catch(() => []),
+          ? retrieveAimMemory({ userId, projectId, agentId: memoryAgentId }).catch(() => [])
+          : retrieveLayeredAimMemory({ userId, projectId, agentId: memoryAgentId }).catch(() => []),
         (rows) => ({ summary: `召回 ${rows.length} 条记忆`, metadata: { count: rows.length } }),
       )
     : []
@@ -188,6 +203,27 @@ export async function retrieveChatContextBlocks(input: {
   })
   const selectedMethodologyBlock = buildMethodologyProfileBlock(methodologyPolicy)
 
+  // 只在数据复盘执行轮才走发布数据路径；其它引擎零开销，装配结果与今天一致。
+  const publishOutcomeBlock = agentId === "content_retro"
+    ? await runAimTraceStep(
+        trace,
+        "publish_outcome_context",
+        "发布结果数据召回",
+        () => resolvePublishOutcomeBlock({
+          executionAgentId: agentId,
+          userId,
+          generationId: input.targetGenerationId,
+        }),
+        (block) => ({
+          summary: block ? "已注入发布数据" : "未注入发布数据",
+          metadata: {
+            chars: block?.length ?? 0,
+            targetGenerationId: input.targetGenerationId ?? null,
+          },
+        }),
+      )
+    : undefined
+
   return {
     knowledgeBlock,
     knowledgeContext,
@@ -197,5 +233,6 @@ export async function retrieveChatContextBlocks(input: {
     memoryBlock,
     selectedMethodologyBlock,
     methodologyPolicy,
+    publishOutcomeBlock,
   }
 }

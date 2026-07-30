@@ -51,6 +51,8 @@ export function normalizeMemoryMessages(messages: unknown[]): AimMemoryMessage[]
 export type AimChatRequestBody = {
   messages: unknown[]
   agentId: string
+  /** 本轮执行引擎（技能跨引擎委托）；未解析合法性，由 resolveAimExecutionAgent 裁定。 */
+  requestedExecutionAgentId: string
   projectId: string
   toolAction: string
   resultId: string
@@ -96,6 +98,9 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     ok: true,
     messages,
     agentId: typeof record.agentId === "string" ? record.agentId : "",
+    requestedExecutionAgentId: typeof record.executionAgentId === "string"
+      ? (record.executionAgentId as string).trim()
+      : "",
     projectId: typeof record.projectId === "string" ? (record.projectId as string).trim() : "",
     toolAction: typeof record.toolAction === "string" ? record.toolAction : "",
     resultId: typeof record.resultId === "string" ? (record.resultId as string).trim() : "",

@@ -8,6 +8,7 @@ import {
   type AimWorkbenchSkill,
 } from "@/lib/aim-agent-guides"
 import type { AimWorkbenchMessage as ChatMessage } from "@/lib/aim/workbench-types"
+import { isValidAimAgent, normalizeAimAgentId } from "@/lib/aim-harness/contracts"
 
 export interface AimAgentOption extends AimAgentMeta, AimAgentGuide {}
 
@@ -48,4 +49,25 @@ export function buildSkillPrompt(skill: AimWorkbenchSkill, context: {
   return hasCurrentContext && !alreadyRefsContext
     ? `请基于当前内容，${skill.prompt.replace(/^请/, "")}`
     : skill.prompt
+}
+
+/**
+ * 解析技能应该由哪个引擎执行。
+ *
+ * 返回 undefined 表示"不用委托"：请求不带 executionAgentId，服务端行为与今天完全一致。
+ * 非法 / 未知 agent 一律回落到不委托，绝不落到默认智能体造成串台。
+ *
+ * @description 解析技能执行引擎
+ * @param skill - 工作台技能
+ * @param currentAgentId - 当前会话智能体（可缺省；服务端会用请求里的会话 agentId 再判一次）
+ * @returns string | undefined
+ */
+export function resolveSkillExecutionAgentId(
+  skill: Pick<AimWorkbenchSkill, "agentId">,
+  currentAgentId?: string,
+): string | undefined {
+  if (!isValidAimAgent(skill.agentId)) return undefined
+  const executionAgentId = normalizeAimAgentId(skill.agentId)
+  if (currentAgentId && executionAgentId === normalizeAimAgentId(currentAgentId)) return undefined
+  return executionAgentId
 }

@@ -30,6 +30,8 @@ export type AssembledAimChatContext = {
   selectedMethodologyBlock: string
   /** ADR-002：解析后的方法论策略（供 chatParams 透传到 handler）。 */
   methodologyPolicy: import("@/lib/methodology-profile-store").MethodologyPolicy
+  /** 数据复盘专用：已格式化发布结果；非复盘或无目标时为 undefined。 */
+  publishOutcomeBlock?: string
 }
 
 /**
@@ -104,32 +106,24 @@ function buildChatContextManifest(input: {
  * Order, gates, catch fallbacks, and trace steps are preserved byte-for-byte
  * from the original route implementation.
  */
-/**
- * @description 组装aimchatcontext
- * @param input - 输入数据
- * @returns Promise<AssembledAimChatContext>
- */
-export async function assembleAimChatContext(input: {
-  userId: string
-  projectId: string
-  agentId: string
+async function resolveChatIntentAndTask(input: {
+  executionAgentId: string
   messages: unknown[]
-  editorContext?: AimEditorContext
+  query: string
   trace?: AimTraceRecorder
-  /** ADR-002：显式选择的命名方法论 profile id。 */
-  methodologyProfileIds?: string[]
-}): Promise<AssembledAimChatContext> {
-  const { userId, projectId, agentId, messages, editorContext, trace } = input
-  const lastMessage = messages[messages.length - 1] as { content?: unknown } | undefined
-  const query = extractTextContent(lastMessage?.content).slice(0, 500)
-
-  const inferredRuntimeTask = resolveAimRuntimeTask({ agentId, input: query })
-
+}) {
+  const inferredRuntimeTask = resolveAimRuntimeTask({
+    agentId: input.executionAgentId,
+    input: input.query,
+  })
   const conversationIntent = await runAimTraceStep(
-    trace,
+    input.trace,
     "conversation_intent",
     "对话意图识别",
-    () => resolveAimConversationIntent({ agentId, messages: messages as never }),
+    () => resolveAimConversationIntent({
+      agentId: input.executionAgentId,
+      messages: input.messages as never,
+    }),
     (intent) => ({
       summary: `${intent.mode} (${intent.reason})`,
       metadata: {
@@ -141,19 +135,63 @@ export async function assembleAimChatContext(input: {
       },
     }),
   )
-  const runtimeTask = resolveAimChatRuntimeTask(inferredRuntimeTask, conversationIntent.mode)
+  return {
+    conversationIntent,
+    runtimeTask: resolveAimChatRuntimeTask(inferredRuntimeTask, conversationIntent.mode),
+  }
+}
+
+/**
+ * @description 组装aimchatcontext
+ * @param input - 输入数据
+ * @returns Promise<AssembledAimChatContext>
+ */
+export async function assembleAimChatContext(input: {
+  userId: string
+  projectId: string
+  agentId: string
+  /**
+   * 本轮执行引擎（技能跨引擎委托）。缺省等于 agentId。
+   * 运行时任务、对话意图、知识策略与知识分类都按它分流，
+   * 保证委托执行拿到的是目标引擎自己的配置，而不是会话智能体的。
+   */
+  executionAgentId?: string
+  messages: unknown[]
+  editorContext?: AimEditorContext
+  trace?: AimTraceRecorder
+  /** ADR-002：显式选择的命名方法论 profile id。 */
+  methodologyProfileIds?: string[]
+  /**
+   * 目标内容 AimGeneration id（请求体 resultId）。
+   * 仅 content_retro 执行轮用于发布数据召回。
+   */
+  targetGenerationId?: string
+}): Promise<AssembledAimChatContext> {
+  const { userId, projectId, agentId, messages, editorContext, trace } = input
+  const executionAgentId = input.executionAgentId ?? agentId
+  const lastMessage = messages[messages.length - 1] as { content?: unknown } | undefined
+  const query = extractTextContent(lastMessage?.content).slice(0, 500)
+
+  const { conversationIntent, runtimeTask } = await resolveChatIntentAndTask({
+    executionAgentId,
+    messages,
+    query,
+    trace,
+  })
 
   const isolatesCurrentTurn = conversationIntent.mode === "new_task" || conversationIntent.mode === "clarify_task_boundary"
   const blocks = await retrieveChatContextBlocks({
     userId,
     projectId,
-    agentId,
+    agentId: executionAgentId,
+    memoryAgentId: agentId,
     query,
     editorContext: isolatesCurrentTurn ? undefined : editorContext,
     conversationIntent,
     runtimeTask,
     trace,
     methodologyProfileIds: input.methodologyProfileIds,
+    targetGenerationId: input.targetGenerationId,
   })
 
   const allNormalizedMessages = normalizeMemoryMessages(messages)
@@ -174,5 +212,6 @@ export async function assembleAimChatContext(input: {
     knowledgeSource: blocks.knowledgeContext.source,
     selectedMethodologyBlock: blocks.selectedMethodologyBlock,
     methodologyPolicy: blocks.methodologyPolicy,
+    publishOutcomeBlock: blocks.publishOutcomeBlock,
   }
 }

@@ -20,23 +20,25 @@ import { AIM_AGENT_OPTIONS } from "@/lib/aim-ui-config"
 import { getAgentHandler } from "@/lib/aim-agent-handlers"
 import { ALL_FIXTURES, EXPECTED_AGENT_COUNTS } from "../eval/fixtures"
 
-const SEVEN_AGENT_IDS: readonly AimAgentId[] = [
+// 手写清单：与 contracts.ts 的 type 字面量逐一对照，防止只改了 Set 没改 type
+const DECLARED_AGENT_IDS: readonly AimAgentId[] = [
   "content_producer",
   "free_copywriter",
   "work_editor",
   "business_system_diagnosis",
   "business_diagnosis",
   "content_review",
+  "content_retro",
   "persona",
 ]
 
 describe("AimAgentId 唯一事实源", () => {
   it("contracts 是唯一 type 定义源（grep 级保护见 CI 护栏）", () => {
     // 静态保证：AIM_AGENT_IDS 与 type 字面量同源（二者均在 contracts.ts 手写维护）。
-    for (const id of SEVEN_AGENT_IDS) {
+    for (const id of DECLARED_AGENT_IDS) {
       expect(AIM_AGENT_IDS.has(id)).toBe(true)
     }
-    expect(AIM_AGENT_IDS.size).toBe(SEVEN_AGENT_IDS.length)
+    expect(AIM_AGENT_IDS.size).toBe(DECLARED_AGENT_IDS.length)
   })
 
   it("默认智能体是合法 id", () => {

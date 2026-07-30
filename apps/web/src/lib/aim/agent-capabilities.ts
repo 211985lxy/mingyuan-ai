@@ -20,6 +20,8 @@ export interface AimAgentCapabilities {
   benchmarkReference: boolean
   styleSample: boolean
   contentModeSelector: boolean
+  /** 交付物动作条是否允许「发布前自查」 */
+  publishCheck: boolean
 }
 
 /**
@@ -32,6 +34,7 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: false,
     styleSample: false,
     contentModeSelector: false,
+    publishCheck: false,
   },
   business_diagnosis: {
     pasteMode: "plain",
@@ -39,6 +42,7 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: false,
     styleSample: false,
     contentModeSelector: false,
+    publishCheck: false,
   },
   content_producer: {
     pasteMode: "creative",
@@ -46,6 +50,7 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: true,
     styleSample: true,
     contentModeSelector: true,
+    publishCheck: true,
   },
   // 已并入内容创作自由模式；保留历史调用能力边界
   free_copywriter: {
@@ -54,6 +59,7 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: true,
     styleSample: false,
     contentModeSelector: false,
+    publishCheck: true,
   },
   work_editor: {
     pasteMode: "edit",
@@ -61,6 +67,7 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: false,
     styleSample: false,
     contentModeSelector: false,
+    publishCheck: true,
   },
   content_review: {
     pasteMode: "review",
@@ -68,6 +75,16 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: false,
     styleSample: false,
     contentModeSelector: false,
+    publishCheck: true,
+  },
+  // 复盘只读已发布数据，不产出可发布稿件，因此不开放发布前自查
+  content_retro: {
+    pasteMode: "plain",
+    videoCopyExtraction: false,
+    benchmarkReference: false,
+    styleSample: false,
+    contentModeSelector: false,
+    publishCheck: false,
   },
   persona: {
     pasteMode: "plain",
@@ -75,6 +92,7 @@ export const AIM_AGENT_CAPABILITIES = {
     benchmarkReference: false,
     styleSample: false,
     contentModeSelector: false,
+    publishCheck: false,
   },
 } as const satisfies Record<AimAgentId, AimAgentCapabilities>
 
@@ -84,6 +102,7 @@ const DENY_ALL: AimAgentCapabilities = {
   benchmarkReference: false,
   styleSample: false,
   contentModeSelector: false,
+  publishCheck: false,
 }
 
 /** 按专家取能力；非法 id 归一化后仍未知则默认拒绝全部。 */
@@ -101,4 +120,8 @@ export function agentAllowsVideoCopyExtraction(agentId: string | null | undefine
 
 export function agentAllowsContentModeSelector(agentId: string | null | undefined): boolean {
   return getAimAgentCapabilities(agentId).contentModeSelector
+}
+
+export function agentAllowsPublishCheck(agentId: string | null | undefined): boolean {
+  return getAimAgentCapabilities(agentId).publishCheck
 }
