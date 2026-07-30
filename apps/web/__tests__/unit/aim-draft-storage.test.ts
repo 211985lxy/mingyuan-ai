@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { aimDraftStorageKey, clearAimDraft, loadAimDraft, saveAimDraft } from "@/lib/aim/draft-storage"
+import {
+  aimDraftHasActiveTaskContent,
+  aimDraftStorageKey,
+  clearAimDraft,
+  loadAimDraft,
+  saveAimDraft,
+  shouldCarryAimDraftAcrossProjectScope,
+} from "@/lib/aim/draft-storage"
 
 describe("AIM draft storage", () => {
   const values = new Map<string, string>()
@@ -47,6 +54,18 @@ describe("AIM draft storage", () => {
     expect(values.has(aimDraftStorageKey("content_producer", "project-1"))).toBe(false)
   })
 
+  it("keeps a draft that only has video extraction context", () => {
+    saveAimDraft({
+      selectedAgentId: "content_producer",
+      selectedProjectId: "",
+      input: "",
+      messages: [],
+      videoCopyExtractionId: "vce_1",
+      sourceOriginalText: "对标原文",
+    }, "quick")
+    expect(loadAimDraft("content_producer", "quick")?.videoCopyExtractionId).toBe("vce_1")
+  })
+
   it("isolates drafts by project scope", () => {
     saveAimDraft({ selectedAgentId: "content_producer", agentModule: "social", selectedProjectId: "project-1", input: "项目一", messages: [] }, "project-1")
     saveAimDraft({ selectedAgentId: "content_producer", selectedProjectId: "project-2", input: "项目二", messages: [] }, "project-2")
@@ -62,5 +81,25 @@ describe("AIM draft storage", () => {
       selectedAgentId: "business_diagnosis", agentModule: "social", selectedProjectId: "", input: "诊断客户业务", messages: [],
     }))
     expect(loadAimDraft("business_diagnosis", "quick")?.agentModule).toBeUndefined()
+  })
+
+  it("carries active video-copy task into an empty project draft", () => {
+    const current = {
+      input: "对标原文：\n一段爆款文案",
+      messages: [] as [],
+      videoCopyExtractionId: "vce_demo",
+      sourceOriginalText: "一段爆款文案",
+      sourceAnalysisText: "拆解结果",
+    }
+    expect(aimDraftHasActiveTaskContent(current)).toBe(true)
+    expect(shouldCarryAimDraftAcrossProjectScope({ current, next: null })).toBe(true)
+    expect(shouldCarryAimDraftAcrossProjectScope({
+      current,
+      next: { input: "", messages: [], videoCopyExtractionId: undefined },
+    })).toBe(true)
+    expect(shouldCarryAimDraftAcrossProjectScope({
+      current,
+      next: { input: "该客户旧草稿", messages: [], videoCopyExtractionId: undefined },
+    })).toBe(false)
   })
 })

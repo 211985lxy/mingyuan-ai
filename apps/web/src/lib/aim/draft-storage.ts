@@ -41,6 +41,45 @@ export function aimDraftProjectScope(projectEnabled: boolean, projectId: string)
 }
 
 /**
+ * 当前会话是否有进行中的任务内容（输入、消息、对标/拆解素材）。
+ * 用于切客户项目时判断要不要把内容带走，避免空草稿把刚带入的文案冲掉。
+ */
+export function aimDraftHasActiveTaskContent(
+  draft: Pick<
+    AimDraft,
+    | "input"
+    | "messages"
+    | "videoCopyExtractionId"
+    | "sourceOriginalText"
+    | "sourceAnalysisText"
+    | "sourceTopicTitle"
+    | "editorText"
+  > | null | undefined,
+): boolean {
+  if (!draft) return false
+  return Boolean(
+    draft.input?.trim()
+    || draft.messages?.length
+    || draft.videoCopyExtractionId
+    || draft.sourceOriginalText?.trim()
+    || draft.sourceAnalysisText?.trim()
+    || draft.sourceTopicTitle?.trim()
+    || draft.editorText?.trim(),
+  )
+}
+
+/**
+ * 切项目时：当前有活任务、目标项目草稿为空 → 带走当前内容，不要 restore 空草稿。
+ * 目标项目已有草稿 → 仍按原行为切换到目标草稿。
+ */
+export function shouldCarryAimDraftAcrossProjectScope(input: {
+  current: Parameters<typeof aimDraftHasActiveTaskContent>[0]
+  next: Parameters<typeof aimDraftHasActiveTaskContent>[0]
+}): boolean {
+  return aimDraftHasActiveTaskContent(input.current) && !aimDraftHasActiveTaskContent(input.next)
+}
+
+/**
  * @description 生成 AIM 草稿存储键
  * @param agentId - 智能体 ID
  * @param projectScope - 项目作用域
@@ -122,6 +161,7 @@ export function saveAimDraft(draft: AimDraft, projectScope: AimDraftProjectScope
       && !draft.sourceAnalysisText?.trim()
       && !draft.sourceTopicTitle?.trim()
       && !draft.sourceTopicRationale?.trim()
+      && !draft.videoCopyExtractionId
     ) {
       window.sessionStorage.removeItem(storageKey)
       return
