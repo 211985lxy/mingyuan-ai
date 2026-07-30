@@ -36,6 +36,55 @@ function DataError({ message, onRetry }: { message: string; onRetry: () => void 
   )
 }
 
+
+function PendingSection({
+  summary,
+}: {
+  summary: ReturnType<typeof useAimHomeSummary>
+}) {
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold">待推进</h2>
+        {summary.pending.data.total > 6 ? (
+          <Link href="/aim" className="text-xs text-primary hover:underline">全部</Link>
+        ) : null}
+      </div>
+      <div className="mt-2 divide-y border-y">
+        {summary.pending.loading ? (
+          <div className="space-y-3 py-4">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        ) : null}
+        {!summary.pending.loading && !summary.pending.error && summary.pending.data.items.length === 0 ? (
+          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+            <FilePenLine className="h-4 w-4" />还没有待推进，先出一稿。
+          </div>
+        ) : null}
+        {summary.pending.error ? (
+          <div className="py-4">
+            <DataError message={summary.pending.error} onRetry={() => void summary.loadPending()} />
+          </div>
+        ) : null}
+        {summary.pending.data.items.map((item) => (
+          <Link
+            key={item.id}
+            href={taskHref(item)}
+            className="flex items-center justify-between gap-4 py-3 transition-colors hover:bg-muted/25"
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{getContentTitle(item)}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{getContentPreview(item)}</p>
+            </div>
+            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 /** 工作总览：极简——继续上次 / 出稿 / 补资料 / 待推进列表 */
 export default function DashboardPage() {
   const summary = useAimHomeSummary()
@@ -106,45 +155,7 @@ export default function DashboardPage() {
         </Card>
       </section>
 
-      <section>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold">待推进</h2>
-          {summary.pending.data.total > 6 ? (
-            <Link href="/aim" className="text-xs text-primary hover:underline">全部</Link>
-          ) : null}
-        </div>
-        <div className="mt-2 divide-y border-y">
-          {summary.pending.loading ? (
-            <div className="space-y-3 py-4">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : null}
-          {!summary.pending.loading && !summary.pending.error && summary.pending.data.items.length === 0 ? (
-            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <FilePenLine className="h-4 w-4" />还没有待推进，先出一稿。
-            </div>
-          ) : null}
-          {summary.pending.error ? (
-            <div className="py-4">
-              <DataError message={summary.pending.error} onRetry={() => void summary.loadPending()} />
-            </div>
-          ) : null}
-          {summary.pending.data.items.map((item) => (
-            <Link
-              key={item.id}
-              href={taskHref(item)}
-              className="flex items-center justify-between gap-4 py-3 transition-colors hover:bg-muted/25"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{getContentTitle(item)}</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">{getContentPreview(item)}</p>
-              </div>
-              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </Link>
-          ))}
-        </div>
-      </section>
+      <PendingSection summary={summary} />
     </div>
   )
 }
