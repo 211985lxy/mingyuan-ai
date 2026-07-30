@@ -495,7 +495,7 @@ describe("定位策划官 天命IP资产化操盘全案路由 (F)", () => {
     const action = guide.nextActions.find((a) => a.id === "to_business_diagnosis")
 
     expect(action).toBeDefined()
-    expect(action?.label).toBe("带入选题策划")
+    expect(action?.label).toBe("生成天命全案")
     expect(action?.targetAgentId).toBe("business_diagnosis")
     expect(action?.prompt).toContain("天命IP资产化操盘全案")
     expect(action?.prompt).toContain("12 个客户结果段")
