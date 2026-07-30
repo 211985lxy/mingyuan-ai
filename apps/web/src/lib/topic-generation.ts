@@ -105,6 +105,11 @@ export type TopicGenerationResult =
       promptText: string
       model: string
       strategy: DerivationStrategy
+      /**
+       * 是否为降级兜底结果：true 表示 LLM 多次重试失败后用了 fallbackTopicCards 模板占位选题，
+       * 非真实生成。下游（前端/日志/监控）应据此提示用户「选题为占位，建议重试或补料」。
+       */
+      degraded: boolean
     }
   | {
       success: false
@@ -349,6 +354,7 @@ function buildFallbackTopicResult(
     promptText,
     model: `${TOPIC_MODEL || "business_diagnosis-route"}:fallback`,
     strategy,
+    degraded: true,
   }
 }
 
@@ -420,6 +426,7 @@ export async function generateTopicCards(
           promptText: fullPromptText,
           model: result.model,
           strategy,
+          degraded: false,
         }
       }
 
