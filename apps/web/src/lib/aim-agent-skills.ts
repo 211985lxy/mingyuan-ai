@@ -26,12 +26,22 @@ export const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
 
 export const TOPIC_PLANNING_SKILLS: AimWorkbenchSkill[] = [
   {
+    id: "market_benchmark_search",
+    label: "搜对标选题",
+    description: "按关键词搜抖音/视频号爆款，可收藏或转写稿。",
+    prompt: "",
+    agentId: "business_diagnosis",
+    group: "选题动作",
+    workbenchAction: "open_benchmark_search",
+  },
+  {
     id: "benchmark_topic_pool",
     label: "对标选题池",
     description: "选对标、拆结构，转成可拍选题池。",
     prompt: [
       "请基于当前业务、目标客户和对标素材，整理一份《对标选题资产包》。",
       "先说明该看谁、看什么、借鉴哪一层，以及不能照抄的部分；没有对标账号时给出选择标准与待补充项。",
+      "若用户刚搜过市场对标，优先用已提供的真实标题/账号/数据，不要编造播放量。",
       "固定输出：1. 赛道共性判断（只保留 5 条最稳定的爆点结构）；2. 账号池摘要；3. 代表作拆解表（至少 8 条：来源账号、原始标题、内容类型、开头钩子、用户痛点、爆点来源、可迁移角度、格式模板）；4. 30 条可直接开拍的候选选题；5. 5 条 S 级优先选题；6. 10 条 A 级连续栏目选题；7. 每条 S/A 补充：为什么值得拍、先准备什么、拍完导向哪里。",
       "不要照搬对标标题；没有依据的地方写未提供/待补充。不要直接写文案正文。",
     ].join("\n"),

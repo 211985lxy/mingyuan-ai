@@ -6,6 +6,19 @@ import type { SearchAdapter, PlatformSearchInput, PlatformSearchOutput } from ".
 
 const log = logger.child({ component: "DouyinSearchAdapter" })
 
+export function toIsoPublishedAt(value: number | string | undefined): string | undefined {
+  if (value == null || value === "") return undefined
+  if (typeof value === "string" && Number.isNaN(Number(value))) {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString()
+  }
+  const num = Number(value)
+  if (!Number.isFinite(num) || num <= 0) return undefined
+  const ms = num > 1e12 ? num : num * 1000
+  const date = new Date(ms)
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
+}
+
 // ─── RedFox Wire Types ─────────────────────────────────────
 
 interface RedFoxSearchArticle {
@@ -140,7 +153,14 @@ export class DouyinSearchAdapter implements SearchAdapter {
     )
 
     const list = data.list ?? data.articles ?? []
-    return list.slice(0, input.count).map((item) => this.normalizeRedFox(item))
+    return list.slice(0, input.count).flatMap((item) => {
+      try {
+        return [this.normalizeRedFox(item)]
+      } catch (err) {
+        log.warn({ err, sourceId: item.workId ?? item.awemeId }, "跳过无法规范化的 RedFox 抖音结果")
+        return []
+      }
+    })
   }
 
   private normalizeRedFox(item: RedFoxSearchArticle): OpportunityItem {
@@ -159,7 +179,7 @@ export class DouyinSearchAdapter implements SearchAdapter {
         name: item.accountName ?? item.nickname ?? "",
         followerCount: item.followerCount ?? item.fansCount,
       },
-      publishedAt: item.publishTime ? new Date(Number(item.publishTime) * (Number(item.publishTime) > 1e12 ? 1 : 1000)).toISOString() : undefined,
+      publishedAt: toIsoPublishedAt(item.publishTime),
       durationSeconds: item.duration ? Math.round(item.duration / 1000) : undefined,
       metrics: {
         views: item.playCount,

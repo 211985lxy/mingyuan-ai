@@ -19,6 +19,7 @@ import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
 import { AimRetroListPanel } from "@/components/aim/aim-retro-list-panel"
+import { AimBenchmarkTopicSearchPanel } from "@/components/aim/aim-benchmark-topic-search-panel"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { getAimAgentGuide } from "@/lib/aim-agent-guides"
@@ -48,6 +49,7 @@ export default function AimPage() {
   const [stylePreviewOpen, setStylePreviewOpen] = useState(false)
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
   const [styleEnabled, setStyleEnabled] = useState(false)
+  const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(true)
   const openCompletedVideoCopy = useCallback((record: { id: string }) => {
     router.replace(buildContentProducerVideoCopyHref({
       recordId: record.id,
@@ -205,7 +207,14 @@ export default function AimPage() {
         onStopRecording={w.stopRecording}
         showSkills={Boolean(w.params.agentParam)}
         skills={w.agent.skills}
-        onUseSkill={w.handleUseSkill}
+        onUseSkill={(skill) => {
+          if (skill.workbenchAction === "open_benchmark_search") {
+            setBenchmarkSearchOpen(true)
+            toast.success("已打开对标选题搜索")
+            return
+          }
+          w.handleUseSkill(skill)
+        }}
         imageAttachments={w.imageAttachments}
         onAddImages={(files) => void w.addImages(files)}
         onRemoveImage={w.removeImage}
@@ -387,6 +396,16 @@ export default function AimPage() {
                     w.setRetroTargetGenerationId(id)
                     void w.sendText("请基于这条内容已登记的发布数据做内容数据复盘。", { resultId: id })
                   }}
+                />
+              </div>
+            ) : null}
+
+            {!w.planSession.isPlanMode && w.selectedAgentId === "business_diagnosis" ? (
+              <div className="px-3 pb-1 sm:px-5">
+                <AimBenchmarkTopicSearchPanel
+                  projectId={w.projectEnabled ? w.selectedProjectId || null : null}
+                  open={benchmarkSearchOpen}
+                  onOpenChange={setBenchmarkSearchOpen}
                 />
               </div>
             ) : null}

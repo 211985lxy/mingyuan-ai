@@ -120,14 +120,15 @@ describe("aim agent guides", () => {
     expect(purpose?.prompt).toContain("完整口播正文")
   })
 
-  it("keeps topic planning skills to four actions", () => {
+  it("keeps topic planning skills including market search action", () => {
     const guide = getAimAgentGuide("business_diagnosis")
     const labels = guide.skills.map((skill) => skill.label)
 
-    expect(labels).toEqual(["对标选题池", "按目的出题", "筛高潜", "会议提炼"])
+    expect(labels).toEqual(["搜对标选题", "对标选题池", "按目的出题", "筛高潜", "会议提炼"])
     expect(guide.skills.every((skill) => skill.group === "选题动作")).toBe(true)
-    expect(guide.scenarios).toEqual(["对标选题池", "按目的出题", "筛高潜", "会议提炼"])
-    expect(guide.quickPrompts).toHaveLength(4)
+    expect(guide.scenarios).toEqual(["搜对标选题", "对标选题池", "按目的出题", "筛高潜", "会议提炼"])
+    expect(guide.skills.find((skill) => skill.id === "market_benchmark_search")?.workbenchAction)
+      .toBe("open_benchmark_search")
     expect(guide.defaultInstruction).toContain("优先按目的出题")
   })
 
@@ -181,6 +182,7 @@ describe("aim agent guides", () => {
   it("keeps skill prompts actionable and aligned with labels", () => {
     for (const agent of AIM_AGENT_OPTIONS) {
       for (const skill of getAimAgentGuide(agent.id).skills) {
+        if (skill.workbenchAction) continue
         expect(skill.prompt.trim()).toBeTruthy()
         expect(skill.prompt).toContain("请")
       }
@@ -279,6 +281,7 @@ describe("aim agent guides", () => {
     ]
     for (const agent of AIM_AGENT_OPTIONS) {
       for (const skill of getAimAgentGuide(agent.id).skills) {
+        if (skill.workbenchAction) continue
         const hasRef = CONTEXT_REFS.some((ref) => skill.prompt.includes(ref))
         expect(hasRef, `${agent.id}/${skill.id} lacks context ref`).toBe(true)
       }
