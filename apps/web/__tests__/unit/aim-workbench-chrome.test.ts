@@ -39,12 +39,12 @@ describe("AIM workbench chrome", () => {
     expect(html).not.toContain("快速出稿")
   })
 
-  it("renders the landing hero with three content purposes, viral breakdown, and the composer", () => {
+  it("renders the landing hero with three content purposes and the composer", () => {
     const html = renderToStaticMarkup(createElement(
       AimLandingHero,
       {
         purposes: [
-          { id: "traffic_funnel", label: "流量漏斗", description: "完播优先", prompt: "p1" },
+          { id: "traffic_funnel", label: "流量漏斗", description: "停留+收藏+复看优先", prompt: "p1" },
           { id: "lead_acquisition", label: "线索获客", description: "私信预约", prompt: "p2" },
           { id: "general_story", label: "通用故事", description: "人设信任", prompt: "p3" },
         ],
@@ -57,10 +57,13 @@ describe("AIM workbench chrome", () => {
     expect(html).toContain("流量漏斗")
     expect(html).toContain("线索获客")
     expect(html).toContain("通用故事")
-    expect(html).toContain("爆款拆解")
-    expect(html).toContain("/video-copy")
-    expect(html).not.toContain("从想法出一稿")
+    expect(html).toContain("停留+收藏+复看优先")
+    expect(html).toContain("私信预约")
+    expect(html).toContain("人设信任")
     expect(html).toContain("COMPOSER_MARKER")
+    // 三张独立目的卡，不是被合并成的"漏斗获客与故事口播"；也不是旧口径"完播优先"
+    expect(html).not.toContain("漏斗获客与故事口播")
+    expect(html).not.toContain("完播优先")
   })
 
   it("renders project notices without persona progress", () => {
@@ -72,7 +75,7 @@ describe("AIM workbench chrome", () => {
         projectAccessError: null,
       }),
     )
-    expect(html).toContain("还没有 IP 营销全案")
+    expect(html).toContain("还没有项目")
     expect(html).not.toContain("来时路信息收集")
   })
 

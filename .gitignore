@@ -60,3 +60,6 @@ apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/.window-state.json
 # Added by code-review-graph
 .code-review-graph/
+
+# stash 清理备份（本地临时存档，不入版本库）
+.stash-archive/
