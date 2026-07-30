@@ -64,17 +64,17 @@ export async function generateCopyInspiration(
     const userPrompt = buildUserPrompt(input, transcript)
     const systemPrompt = buildSystemPrompt(input)
 
-    const response = await client.chat.completions.create({
+    const result = await client.complete({
       model: "default",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 800,
+      maxTokens: 800,
     })
 
-    const content = response.choices?.[0]?.message?.content || ""
+    const content = result.content || ""
 
     // 解析 JSON
     return parseCopyInspiration(content, input)

@@ -276,11 +276,19 @@ async function extractVideoTranscript(
       const transcript = result.transcript
         ? await polishTranscript(result.transcript)
         : result.transcript
-      return { ...result, transcript }
+      return {
+        status: "completed",
+        platform,
+        originalUrl: url,
+        title: result.title,
+        transcript,
+        providerTaskId: batchId,
+      }
     }
     if (result.status === "failed") {
       throw new Error(result.errorMessage || "视频文案提取失败")
     }
+    // pending / processing → 继续 polling，无需返回中间状态
   }
 
   throw new Error("视频文案提取超时，请稍后重试")
