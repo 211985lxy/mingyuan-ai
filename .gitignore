@@ -24,6 +24,13 @@ yarn-debug.log*
 .env
 .env.local
 .env.*.local
+.demo-env
+demo-demo.env
+docker-compose.demo.yml
+
+# 飞书应用图标（24 个，当前代码引用为 0，属于死资源）
+# 待有页面真正引用后再移除此规则并纳入版本管理
+apps/web/public/branding/feishu-app-icons/
 
 # local credentials
 docs/accounts.local.md

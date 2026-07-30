@@ -23,6 +23,7 @@
     "eval:daily": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --daily",
     "eval:full": "tsx --tsconfig tsconfig.json scripts/aim-eval.ts --full",
     "seed:methodology": "DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' tsx scripts/seed-methodology-profile.ts",
+    "seed:demo": "DOTENV_CONFIG_PATH=.demo-env NODE_OPTIONS='-r dotenv/config' tsx prisma/seed-demo.ts",
     "eval:model-swap": "tsx --tsconfig tsconfig.json scripts/aim-eval-model-swap.ts",
     "eval:content-baseline": "tsx --tsconfig tsconfig.json scripts/aim-content-baseline.ts",
     "eval:memory": "tsx --tsconfig tsconfig.json scripts/aim-memory-eval.ts",
