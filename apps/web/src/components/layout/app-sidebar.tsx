@@ -393,7 +393,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="mb-1.5 h-7 shrink-0 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             最近任务 · {historyAgent.displayTitle ?? historyAgent.title}
           </SidebarGroupLabel>
-          <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto">
+          <SidebarGroupContent className="min-h-0 flex-1 basis-40 overflow-y-auto">
             <div className="space-y-0.5 pb-1">
               {recentThreads.length === 0 ? (
                 <p className="px-2.5 py-2 text-sm text-muted-foreground">
@@ -406,7 +406,7 @@ export function AppSidebar() {
                   return (
                     <div
                       key={item.id}
-                      className="group/item flex h-10 items-center rounded-md text-sm text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground md:h-9"
+                      className="group/item relative flex items-start rounded-md text-sm text-foreground/70 hover:bg-foreground/[0.04] hover:text-foreground"
                     >
                       <button
                         type="button"
@@ -419,17 +419,19 @@ export function AppSidebar() {
                           }
                           closeMobile()
                         }}
-                        className="min-w-0 flex-1 px-2.5 text-left"
+                        className="min-w-0 flex-1 px-2.5 py-1.5 pr-8 text-left"
                         title={title}
                       >
-                        <span className="flex items-center gap-2">
-                          <span className="min-w-0 flex-1 truncate">{title}</span>
-                          {date ? <span className="shrink-0 text-xs text-muted-foreground">{date}</span> : null}
-                        </span>
+                        <span className="line-clamp-2 break-words leading-snug">{title}</span>
+                        {date ? (
+                          <span className="mt-0.5 block text-[11px] leading-none text-muted-foreground">
+                            {date}
+                          </span>
+                        ) : null}
                       </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger
-                          className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 hover:bg-foreground/[0.06] group-hover/item:opacity-100"
+                          className="absolute right-1 top-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-sm opacity-0 hover:bg-foreground/[0.06] group-hover/item:opacity-100"
                           aria-label="更多操作"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
