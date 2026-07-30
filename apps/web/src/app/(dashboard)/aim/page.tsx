@@ -332,7 +332,8 @@ export default function AimPage() {
 
         {isLanding ? (
           <AimLandingHero
-            purposes={getAimAgentGuide("content_producer").skills}
+            purposes={getAimAgentGuide(w.selectedAgentId).skills}
+            intro={w.agent.intro}
             onSelectPurpose={(skill) => {
               if (w.selectedAgentId !== "content_producer") w.beginWorkflowStage("content")
               w.handleUseSkill(skill)

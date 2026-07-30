@@ -37,12 +37,12 @@ export function AimWorkbenchHeader({
   const currentIndex = AIM_WORKFLOW_STAGES.findIndex((stage) => stage.id === workflowStage)
 
   return (
-    <header className="relative z-30 flex shrink-0 items-center gap-1.5 border-b border-border/50 px-2 py-1 md:gap-2 md:px-3">
+    <header className="relative z-30 flex shrink-0 items-center gap-1.5 border-b border-border/60 bg-background/60 px-2 py-1.5 backdrop-blur-sm md:gap-2.5 md:px-4">
       <span
-        className="hidden size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary sm:inline-flex"
+        className="hidden size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-amber-500/10 text-primary ring-1 ring-inset ring-primary/15 sm:inline-flex"
         title={agentTitle}
       >
-        <AgentIcon className="size-3.5" />
+        <AgentIcon className="size-4" />
       </span>
 
       {showStageProgress ? (
@@ -51,40 +51,63 @@ export function AimWorkbenchHeader({
             {AIM_WORKFLOW_STAGES.find((stage) => stage.id === workflowStage)?.title ?? agentTitle}
           </p>
           <nav className="hidden min-w-0 flex-1 items-center md:flex" aria-label="AIM 工作流进度">
-            <ol className="flex min-w-0 items-center">
+            <ol className="flex min-w-0 items-center gap-1">
               {AIM_WORKFLOW_STAGES.map((stage, index) => {
                 const isCurrent = stage.id === workflowStage
                 const isDone = index < currentIndex
+                const isNext = index === currentIndex + 1
                 return (
                   <li key={stage.id} className="flex items-center">
                     <span
                       title={stage.description}
                       aria-current={isCurrent ? "step" : undefined}
                       className={cn(
-                        "inline-flex h-6 items-center gap-1.5 rounded-md px-1.5 text-[11px] font-medium leading-none",
-                        isCurrent && "bg-primary/10 text-primary",
-                        isDone && "text-muted-foreground",
-                        !isCurrent && !isDone && "text-muted-foreground/70",
+                        "relative inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-[12px] font-medium leading-none transition-all duration-200",
+                        isCurrent &&
+                          "bg-gradient-to-r from-primary/15 via-primary/10 to-amber-500/10 text-primary shadow-[0_0_0_1px_rgba(209,74,51,0.18),0_2px_8px_-4px_rgba(209,74,51,0.25)]",
+                        isDone && "text-muted-foreground/85",
+                        !isCurrent && !isDone && "text-muted-foreground/60",
                       )}
                     >
                       <span
                         className={cn(
-                          "inline-flex size-4 shrink-0 items-center justify-center rounded-full leading-none",
-                          isCurrent && "bg-primary text-primary-foreground",
-                          isDone && "bg-muted-foreground/20 text-muted-foreground",
-                          !isCurrent && !isDone && "border border-muted-foreground/30",
+                          "inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold leading-none tabular-nums transition-all",
+                          isCurrent &&
+                            "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground shadow-[0_0_0_2px_var(--background),0_0_0_3px_rgba(209,74,51,0.2)]",
+                          isDone &&
+                            "bg-gradient-to-br from-emerald-500/80 to-emerald-600/80 text-white shadow-[0_0_0_1px_rgba(16,185,129,0.2)]",
+                          !isCurrent && !isDone &&
+                            "border border-dashed border-muted-foreground/35 text-muted-foreground/60 bg-muted/40",
                         )}
                       >
                         {isDone ? (
-                          <Check className="size-2.5" strokeWidth={2.5} aria-hidden />
+                          <Check className="size-3" strokeWidth={3} aria-hidden />
                         ) : isCurrent ? (
-                          <span className="text-[10px] leading-none tabular-nums">{index + 1}</span>
-                        ) : null}
+                          <span className="leading-none">{index + 1}</span>
+                        ) : (
+                          <span className="leading-none opacity-80">{index + 1}</span>
+                        )}
                       </span>
-                      <span className="leading-none">{stage.title}</span>
+                      <span className={cn(
+                        "leading-none",
+                        isCurrent && "font-semibold tracking-tight",
+                        isNext && !isCurrent && "text-muted-foreground/75",
+                      )}>
+                        {stage.title}
+                      </span>
                     </span>
                     {index < AIM_WORKFLOW_STAGES.length - 1 ? (
-                      <span className="mx-1 h-px w-2.5 shrink-0 self-center bg-border" aria-hidden />
+                      <span
+                        className={cn(
+                          "mx-0.5 h-0.5 w-4 shrink-0 self-center rounded-full transition-all duration-300",
+                          index < currentIndex
+                            ? "bg-gradient-to-r from-emerald-500/60 to-primary/30"
+                            : index === currentIndex
+                              ? "bg-gradient-to-r from-primary/40 to-border/60"
+                              : "bg-border/70",
+                        )}
+                        aria-hidden
+                      />
                     ) : null}
                   </li>
                 )
@@ -94,11 +117,17 @@ export function AimWorkbenchHeader({
           <span className="min-w-0 flex-1 md:hidden" aria-hidden />
         </>
       ) : (
-        <p className="min-w-0 flex-1 truncate text-sm font-medium leading-none text-foreground">{agentTitle}</p>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-none tracking-tight text-foreground">{agentTitle}</p>
       )}
 
-      <Button type="button" size="sm" variant="ghost" className="h-7 gap-1 rounded-md px-2 text-xs leading-none" onClick={onReset}>
-        <Plus className="size-3.5" />
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-8 gap-1.5 rounded-lg px-2.5 text-[12px] font-medium leading-none transition-colors hover:bg-primary/8 hover:text-primary"
+        onClick={onReset}
+      >
+        <Plus className="size-4" strokeWidth={2.2} />
         新任务
       </Button>
     </header>
@@ -198,36 +227,87 @@ function AimContinueLast() {
 }
 
 /**
- * 创作台空状态：继续上次 + 目的入口 + 输入框。
+ * 创作台空状态：继续上次 + 专家简介 + 目的入口卡片 + 输入框。
  */
 export function AimLandingHero({
   purposes,
+  intro,
   onSelectPurpose,
   children,
 }: {
   purposes: AimWorkbenchSkill[]
+  intro?: string
   onSelectPurpose: (skill: AimWorkbenchSkill) => void
   children: ReactNode
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-10">
-      <div className="flex w-full max-w-2xl flex-col items-center gap-8">
+    <div className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-10">
+      {/* 品牌氛围层 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(60% 45% at 50% 0%, oklch(0.575 0.205 28 / 0.07), transparent 70%),\n             radial-gradient(45% 40% at 12% 18%, oklch(0.745 0.185 38 / 0.06), transparent 65%),\n             radial-gradient(55% 55% at 88% 35%, oklch(0.945 0.025 76 / 0.35), transparent 70%)",
+        }}
+      />
+      <div className="flex w-full max-w-3xl flex-col items-center gap-8">
         <AimContinueLast />
-        <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          今天想得到什么结果？
-        </h1>
-        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
-          {purposes.map((skill) => (
-            <button
-              key={skill.id}
-              type="button"
-              onClick={() => onSelectPurpose(skill)}
-              className="flex h-11 items-center justify-center rounded-lg border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-            >
-              <span className="truncate">{skill.label}</span>
-            </button>
-          ))}
+
+        <div className="flex w-full flex-col items-center gap-4">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-[11px] font-medium text-primary/90">
+            <span className="size-1.5 rounded-full bg-primary/70" />
+            AI 协作台 · 专家待命
+          </div>
+          <h1 className="text-center text-2xl font-semibold tracking-tight text-foreground sm:text-[28px] sm:leading-tight">
+            今天想得到什么结果？
+          </h1>
+          {intro ? (
+            <p className="mx-auto max-w-xl text-center text-sm leading-7 text-muted-foreground">
+              {intro}
+            </p>
+          ) : null}
         </div>
+
+        {purposes.length > 0 ? (
+          <div className="w-full">
+            <p className="mb-2.5 px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
+              一键开始 · 选择内容目的
+            </p>
+            <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
+              {purposes.map((skill) => (
+                <button
+                  key={skill.id}
+                  type="button"
+                  onClick={() => onSelectPurpose(skill)}
+                  className="group relative flex flex-col items-start gap-2 overflow-hidden rounded-2xl border border-border/80 bg-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-gradient-to-br hover:from-card hover:via-primary/[0.03] hover:to-amber-500/[0.02] hover:shadow-[0_10px_30px_-14px_rgba(209,74,51,0.22)]"
+                >
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-primary/[0.06] opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
+                  />
+                  <div className="flex w-full items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/12 to-amber-500/10 text-primary ring-1 ring-inset ring-primary/15">
+                        <SparklesFilled className="size-4.5" strokeWidth={0} />
+                      </span>
+                      <span className="text-[15px] font-semibold leading-5 tracking-tight text-foreground">
+                        {skill.label}
+                      </span>
+                    </div>
+                    <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </div>
+                  {skill.description ? (
+                    <p className="pl-[46px] text-[13px] leading-5 text-muted-foreground/90">
+                      {skill.description}
+                    </p>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="w-full">{children}</div>
         <p className="text-center text-xs text-muted-foreground">
           <Link href="/projects" className="underline-offset-2 hover:text-foreground hover:underline">
@@ -236,5 +316,26 @@ export function AimLandingHero({
         </p>
       </div>
     </div>
+  )
+}
+
+function SparklesFilled(props: { className?: string; strokeWidth?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={props.className}>
+      <path
+        d="M12 2.25c.5 2.4 2.35 4.25 4.75 4.75-2.4.5-4.25 2.35-4.75 4.75-.5-2.4-2.35-4.25-4.75-4.75 2.4-.5 4.25-2.35 4.75-4.75Z"
+        fill="currentColor"
+      />
+      <path
+        d="M19.25 12.5c.25 1.2 1.18 2.12 2.37 2.37-1.2.25-2.12 1.18-2.37 2.37-.25-1.2-1.18-2.12-2.37-2.37 1.2-.25 2.12-1.18 2.37-2.37Z"
+        fill="currentColor"
+        opacity=".8"
+      />
+      <path
+        d="M5 13.25c.35 1.65 1.6 2.9 3.25 3.25-1.65.35-2.9 1.6-3.25 3.25-.35-1.65-1.6-2.9-3.25-3.25 1.65-.35 2.9-1.6 3.25-3.25Z"
+        fill="currentColor"
+        opacity=".65"
+      />
+    </svg>
   )
 }
