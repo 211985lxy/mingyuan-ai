@@ -6,6 +6,7 @@ import {
   DYNAMIC_POOL_CATEGORIES,
   HEALTH_STATUS_LABELS,
   computeKnowledgeAssetHealth,
+  countReadyAssetBoxes,
   getAssetBoxForCategory,
   getSupplementPrompts,
   mapCategoryToBucket,
@@ -193,5 +194,18 @@ describe("computeKnowledgeAssetHealth", () => {
     ])
     expect(result.boxes.find((box) => box.id === "why_trust_me")?.status).toBe("ready")
     expect(result.boxes.find((box) => box.id === "why_trust_me")?.entryCount).toBe(600)
+  })
+
+  it("countReadyAssetBoxes 统计已具备盒数", () => {
+    expect(countReadyAssetBoxes(null)).toEqual({ ready: 0, total: 5 })
+    const empty = computeKnowledgeAssetHealth([])
+    expect(countReadyAssetBoxes(empty).ready).toBe(0)
+    const partial = computeKnowledgeAssetHealth([
+      entry({ category: "positioning_material" }),
+      entry({ category: "writing_style_profile" }),
+      entry({ category: "product_usp" }),
+    ])
+    expect(countReadyAssetBoxes(partial).ready).toBe(2)
+    expect(countReadyAssetBoxes(partial).total).toBe(5)
   })
 })

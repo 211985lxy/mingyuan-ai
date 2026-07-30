@@ -372,3 +372,16 @@ export function computeKnowledgeAssetHealth(
     },
   }
 }
+
+/** 统计五盒中「已具备」的数量（分母固定为 ASSET_BOX_IDS.length）。 */
+export function countReadyAssetBoxes(health: KnowledgeAssetHealthResult | null | undefined): {
+  ready: number
+  total: number
+} {
+  const total = ASSET_BOX_IDS.length
+  if (!health) return { ready: 0, total }
+  return {
+    ready: health.boxes.filter((box) => box.status === "ready").length,
+    total,
+  }
+}

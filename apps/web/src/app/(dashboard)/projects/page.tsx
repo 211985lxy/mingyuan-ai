@@ -98,16 +98,18 @@ export default function ProjectsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <WorkbenchHero
         title="我的项目"
-        subtitle="先建项目，再沉淀资料、改文案、生产内容。"
-        badge={<Badge variant="secondary">{projects.length} 个项目</Badge>}
+        subtitle="多数人只用一个账户。资料在知识库，写稿在创作台。"
+        badge={<Badge variant="secondary">{projects.length} 个</Badge>}
       />
 
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
         {/* 左：新建 */}
         <section className="min-w-0 space-y-4">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold tracking-tight text-foreground">新建项目</h2>
-            <p className="text-sm text-muted-foreground">只填成交交付必填信息。</p>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">新建（少用）</h2>
+            <p className="text-sm text-muted-foreground">
+              默认不用建。补资料去知识库。
+            </p>
           </div>
 
           <div className="space-y-4">
@@ -210,8 +212,8 @@ export default function ProjectsPage() {
         {/* 右：列表 */}
         <section className="min-w-0 space-y-4">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold tracking-tight text-foreground">进行中的项目</h2>
-            <p className="text-sm text-muted-foreground">选一个进入 AI 内容总监。</p>
+            <h2 className="text-base font-semibold tracking-tight text-foreground">进行中</h2>
+            <p className="text-sm text-muted-foreground">进创作台写；缺口在五盒里补。</p>
           </div>
 
           {loading ? (
@@ -221,7 +223,7 @@ export default function ProjectsPage() {
             </div>
           ) : projects.length === 0 ? (
             <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-border/80 text-sm text-muted-foreground">
-              还没有项目，先在左侧创建一个。
+              还没有项目。也可以先去知识库「添加账户资料」，会自动创建「我的账户」。
             </div>
           ) : (
             <ul className="divide-y divide-border/70 border-y border-border/70">

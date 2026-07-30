@@ -29,7 +29,9 @@ export function CustomerKnowledgeEntryDialog(props: {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{props.mode === "create" ? "新增知识" : "编辑知识"}</DialogTitle>
-          <DialogDescription>这些内容会在 AIM 创作时按项目调用。请写真实可用的业务资料，不要写空话。</DialogDescription>
+          <DialogDescription>
+            这些内容会进入这台智能体的账户知识库，写稿时按账户调用。请写真实可用的业务资料。
+          </DialogDescription>
         </DialogHeader>
         <CustomerKnowledgeEntryFormFields form={props.form} projects={props.projects} onFormChange={props.onFormChange} />
         <div className="flex justify-end gap-2">

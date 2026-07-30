@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -30,8 +30,14 @@ import {
 import { buildDefaultKnowledgeTags } from "@/lib/knowledge-tags"
 import { cn } from "@/lib/utils"
 
-interface ProjectKnowledgeAssetHealthProps {
+export interface ProjectKnowledgeAssetHealthProps {
   projectId: string
+  /** chips=项目列表紧凑行；panel=知识库顶部引导区 */
+  variant?: "chips" | "panel"
+  /** 递增时自动打开第一个缺口补录 */
+  openGapRequest?: number
+  onHealthChange?: (health: KnowledgeAssetHealthResult | null) => void
+  onSaved?: () => void
 }
 
 function statusChipClass(status: KnowledgeAssetHealthStatus): string {
@@ -47,7 +53,13 @@ function statusChipClass(status: KnowledgeAssetHealthStatus): string {
 /**
  * 用户端项目内容资产：一行五盒状态，点缺口可补录。
  */
-export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAssetHealthProps) {
+export function ProjectKnowledgeAssetHealth({
+  projectId,
+  variant = "chips",
+  openGapRequest = 0,
+  onHealthChange,
+  onSaved,
+}: ProjectKnowledgeAssetHealthProps) {
   const [health, setHealth] = useState<KnowledgeAssetHealthResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -58,22 +70,55 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
     content: "",
     prompts: [] as string[],
   })
+  const lastGapRequest = useRef(0)
 
   const reload = useCallback(async () => {
     setLoading(true)
     try {
       const payload = await fetchKnowledgeAssetHealth(projectId)
       setHealth(payload.health)
+      onHealthChange?.(payload.health)
     } catch {
       setHealth(null)
+      onHealthChange?.(null)
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [onHealthChange, projectId])
 
   useEffect(() => {
     void reload()
   }, [reload])
+
+  function openSupplement(box: AssetBoxHealth) {
+    const category =
+      box.suggestedCategory
+      ?? box.missingCategories[0]
+      ?? box.categories[0]
+    if (!category) {
+      toast.message("这一盒暂时没有可补录的类目")
+      return
+    }
+    setForm({
+      category,
+      title: "",
+      content: "",
+      prompts: getSupplementPrompts(box.id, category),
+    })
+    setDialogOpen(true)
+  }
+
+  useEffect(() => {
+    if (!openGapRequest || openGapRequest === lastGapRequest.current) return
+    if (!health || loading) return
+    lastGapRequest.current = openGapRequest
+    const gap = health.boxes.find((box) => box.status !== "ready")
+    if (gap) {
+      openSupplement(gap)
+      return
+    }
+    toast.message("五盒资料已齐，可直接写稿，或继续新增知识。")
+  }, [health, loading, openGapRequest])
 
   async function handleSave() {
     const title = form.title.trim()
@@ -96,29 +141,12 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
       setDialogOpen(false)
       setForm((current) => ({ ...current, title: "", content: "" }))
       await reload()
+      onSaved?.()
     } catch {
       toast.error("写入失败，请稍后重试")
     } finally {
       setSaving(false)
     }
-  }
-
-  function openSupplement(box: AssetBoxHealth) {
-    const category =
-      box.suggestedCategory ??
-      box.missingCategories[0] ??
-      box.categories[0]
-    if (!category) {
-      toast.message("这一盒暂时没有可补录的类目")
-      return
-    }
-    setForm({
-      category,
-      title: "",
-      content: "",
-      prompts: getSupplementPrompts(box.id, category),
-    })
-    setDialogOpen(true)
   }
 
   if (loading) {
@@ -132,34 +160,51 @@ export function ProjectKnowledgeAssetHealth({ projectId }: ProjectKnowledgeAsset
 
   if (!health) return null
 
+  const chips = (
+    <div className={cn("flex flex-wrap gap-1", variant === "panel" && "gap-1.5")}>
+      {health.boxes.map((box) => {
+        const interactive = box.status !== "ready"
+        return (
+          <button
+            key={box.id}
+            type="button"
+            disabled={!interactive}
+            title={`${box.label} · ${HEALTH_STATUS_LABELS[box.status]}${interactive ? "（点击补录）" : ""}`}
+            onClick={() => {
+              if (interactive) openSupplement(box)
+            }}
+            className={cn(
+              "inline-flex h-6 max-w-full items-center gap-1 rounded-md border px-1.5 text-[11px] leading-none",
+              variant === "panel" && "h-7 px-2 text-xs",
+              statusChipClass(box.status),
+              interactive
+                ? "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/10"
+                : "cursor-default opacity-90",
+            )}
+          >
+            <span className="truncate font-medium">{box.label}</span>
+            <span className="shrink-0 opacity-70">{HEALTH_STATUS_LABELS[box.status]}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <>
-      <div className="flex flex-wrap gap-1">
-        {health.boxes.map((box) => {
-          const interactive = box.status !== "ready"
-          return (
-            <button
-              key={box.id}
-              type="button"
-              disabled={!interactive}
-              title={`${box.label} · ${HEALTH_STATUS_LABELS[box.status]}${interactive ? "（点击补录）" : ""}`}
-              onClick={() => {
-                if (interactive) openSupplement(box)
-              }}
-              className={cn(
-                "inline-flex h-6 max-w-full items-center gap-1 rounded-md border px-1.5 text-[11px] leading-none",
-                statusChipClass(box.status),
-                interactive
-                  ? "cursor-pointer transition-colors hover:border-primary/50 hover:bg-primary/10"
-                  : "cursor-default opacity-90",
-              )}
-            >
-              <span className="truncate font-medium">{box.label}</span>
-              <span className="shrink-0 opacity-70">{HEALTH_STATUS_LABELS[box.status]}</span>
-            </button>
-          )
-        })}
-      </div>
+      {variant === "panel" ? (
+        <section className="space-y-2 rounded-lg border border-border/80 bg-muted/20 px-3 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">还缺什么</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              点缺口补一条。齐了就去创作台写。
+            </p>
+          </div>
+          {chips}
+        </section>
+      ) : (
+        chips
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
