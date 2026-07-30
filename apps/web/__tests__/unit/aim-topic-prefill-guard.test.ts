@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { mergeAimGenerationIntoMessages } from "@/hooks/use-aim-generation-actions"
+import { mergeAimGenerationIntoMessages } from "@/lib/aim/merge-aim-generation-messages"
 import { shouldApplyAimTopicPrefill } from "@/hooks/use-aim-route-sync"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
