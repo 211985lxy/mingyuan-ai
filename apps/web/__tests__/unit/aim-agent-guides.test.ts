@@ -121,14 +121,14 @@ describe("aim agent guides", () => {
     const story = skills.find((s) => s.id === "general_story")!
 
     expect(traffic.prompt).toContain("流量漏斗")
-    expect(traffic.prompt).toContain("前 3 秒")
+    expect(traffic.prompt).toContain("可收藏抓手")
     expect(traffic.prompt).not.toContain("线索获客")
     expect(traffic.prompt).not.toContain("通用故事")
 
     expect(lead.prompt).toContain("线索获客")
-    expect(lead.prompt).toContain("评论 / 私信 / 预约")
-    expect(lead.prompt).toContain("信任前置")
-    expect(lead.prompt).toContain("适合谁")
+    expect(lead.prompt).toContain("评论/私信/领清单/预约其一")
+    expect(lead.prompt).toContain("做镜子不做自己")
+    expect(lead.prompt).toContain("谁适合/谁不适合")
 
     expect(story.prompt).toContain("通用故事")
     expect(story.prompt).toContain("不强行推产品")
@@ -241,9 +241,9 @@ describe("aim agent guides", () => {
     expect(labels).not.toContain("重写这版文案")
     expect(labels).not.toContain("借热点写观点")
     const traffic = skills.find((s) => s.id === "traffic_funnel")
-    expect(traffic?.prompt).toContain("强钩子")
+    expect(traffic?.prompt).toContain("断裂感")
     const lead = skills.find((s) => s.id === "lead_acquisition")
-    expect(lead?.prompt).toContain("评论 / 私信 / 预约")
+    expect(lead?.prompt).toContain("评论/私信/领清单/预约其一")
     const story = skills.find((s) => s.id === "general_story")
     expect(story?.prompt).toContain("不强行推产品")
   })
@@ -295,7 +295,7 @@ describe("aim agent guides", () => {
     const CONTEXT_REFS = [
       "当前内容", "当前文案", "当前素材", "当前业务", "当前热点",
       "当前信息", "当前人设", "当前核心", "当前选题", "当前会议",
-      "当前对标", "当前商业模式", "当前来时路", "当前人设故事",
+      "当前对标", "当前商业模式", "当前来时路", "当前人设故事", "当前成稿",
     ]
     for (const agent of AIM_AGENT_OPTIONS) {
       for (const skill of getAimAgentGuide(agent.id).skills) {

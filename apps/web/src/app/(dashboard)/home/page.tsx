@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getContentPreview, getContentTitle } from "@/lib/home-history-summary"
 import { deriveAimWorkflowTasks } from "@/features/aim/workflow/tasks"
 import { useAimHomeSummary } from "@/features/aim/hooks/use-aim-home-summary"
+import { PlatformIntegrationsCard } from "@/features/integrations/components/platform-integrations-card"
 import type { AimGeneration } from "@/lib/api/client"
 
 function taskHref(item: AimGeneration) {
@@ -154,6 +155,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <PlatformIntegrationsCard />
 
       <PendingSection summary={summary} />
     </div>

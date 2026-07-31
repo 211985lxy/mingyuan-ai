@@ -13,7 +13,7 @@ import {
   mergePainIntentIntoKnowledgeContext,
   resolvePainPointIntent,
 } from "@/lib/aim-pain-intent"
-import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
+import { buildIpWikiBlock, loadIpWikiPagesIndexed } from "@/lib/ip-wiki/context"
 import { buildViralStructureBlock } from "@/lib/aim-generator"
 import {
   runAimTraceStep,
@@ -77,7 +77,7 @@ export async function loadGenerationContextBlocks(input: {
 
   const knowledgeQuery = enrichKnowledgeQueryWithPainIntent(spec.rawInput, painIntent)
 
-  const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock] = await runAimTraceStep(
+  const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock, ipWikiPages] = await runAimTraceStep(
     trace,
     "load_generation_context",
     "知识/结构/方法论读取",
@@ -93,6 +93,7 @@ export async function loadGenerationContextBlocks(input: {
           params.contextOverride!.businessDiagnosisBlock ?? "",
           params.contextOverride!.ipWikiBlock ?? "",
           params.contextOverride!.eventStorytellingBlock ?? "",
+          {},
         ] as const)
       : Promise.all([
           // 知识检索始终允许（包括 light_edit），由策略画像 topK 控制预算；
@@ -124,8 +125,9 @@ export async function loadGenerationContextBlocks(input: {
           generationIntent.useMethodology && (agentId === "content_producer" || agentId === "work_editor") && useEventStorytelling
             ? buildEventStorytellingMethodologyBlock()
             : Promise.resolve(""),
+          generationIntent.useMethodology && spec.projectId ? loadIpWikiPagesIndexed({ projectId: spec.projectId }) : Promise.resolve({}),
         ]),
-    ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory]) => ({
+    ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory, ipWikiPagesVal]) => ({
       summary: `命中 ${knowledge.entries.length} 条知识`,
       metadata: {
         knowledgeEntries: knowledge.entries.length,
@@ -137,9 +139,10 @@ export async function loadGenerationContextBlocks(input: {
         eventStorytellingChars: eventStory.length,
         eventStorytellingActive: useEventStorytelling,
         painIds: painIntent?.painIds ?? [],
+        ipWikiPagesCount: Object.keys(ipWikiPagesVal ?? {}).length,
       },
     }),
   )
 
-  return { knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock }
+  return { knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock, ipWikiPages }
 }

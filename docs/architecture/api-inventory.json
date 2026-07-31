@@ -350,6 +350,34 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/aim/skills/[id]",
+      "file": "src/app/api/admin/aim/skills/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/aim/skills",
+      "file": "src/app/api/admin/aim/skills/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/approval-decisions",
       "file": "src/app/api/admin/approval-decisions/route.ts",
       "methods": [
@@ -1441,6 +1469,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/retro-list",
+      "file": "src/app/api/aim/retro-list/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "zod",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/review/weekly",
       "file": "src/app/api/aim/review/weekly/route.ts",
       "methods": [
@@ -1475,6 +1516,19 @@
       "auth": "public",
       "input": "none",
       "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/skills",
+      "file": "src/app/api/aim/skills/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false
@@ -1860,6 +1914,32 @@
       "idempotency": false
     },
     {
+      "route": "/api/competitor/search-accounts/douyin-url",
+      "file": "src/app/api/competitor/search-accounts/douyin-url/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/competitor/search-accounts",
+      "file": "src/app/api/competitor/search-accounts/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/competitor/search-channels-user",
       "file": "src/app/api/competitor/search-channels-user/route.ts",
       "methods": [
@@ -2202,6 +2282,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/data-platform/summary",
+      "file": "src/app/api/data-platform/summary/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/douyin-hot",
       "file": "src/app/api/douyin-hot/route.ts",
       "methods": [
@@ -2386,13 +2479,39 @@
       "idempotency": true
     },
     {
+      "route": "/api/integrations/douyin/auth",
+      "file": "src/app/api/integrations/douyin/auth/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/integrations/douyin/callback",
+      "file": "src/app/api/integrations/douyin/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/integrations/feishu/agent-events",
       "file": "src/app/api/integrations/feishu/agent-events/route.ts",
       "methods": [
         "POST"
       ],
       "auth": "signed_integration",
-      "input": "bounded_json_object",
+      "input": "raw_body",
       "query": "none",
       "externalService": true,
       "cost": "high",

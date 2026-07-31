@@ -105,6 +105,13 @@ export interface AimGenerateContext {
   reviewMode?: import("@/features/newsroom/contracts").ContentReviewMode
   /** 已格式化的单条发布结果文本块；缺失时提示词走「未登记发布数据」分支 */
   publishOutcomeBlock?: string
+  /** IP 操盘案六页核心结构化数据（用于合规校验）；无 projectId 或无维基页时 undefined */
+  ipWikiPages?: Partial<
+    Record<
+      import("@/lib/ip-wiki/types").IpWikiPageType,
+      import("@/lib/ip-wiki/repo").IpWikiPageRow
+    >
+  >
 }
 
 export interface AimGenerationContextOverride {

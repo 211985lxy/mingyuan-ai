@@ -237,6 +237,13 @@ export interface PreparedAimContext {
   contextManifest: AimContextSource[]
   /** 是否已应用上下文预算裁剪 */
   budgetApplied: boolean
+  /** IP 操盘案六页核心结构化数据（合规校验用）；projectId 缺 / 维基未编译时为 undefined 或空对象 */
+  ipWikiPages?: Partial<
+    Record<
+      import("@/lib/ip-wiki/types").IpWikiPageType,
+      import("@/lib/ip-wiki/repo").IpWikiPageRow
+    >
+  >
 }
 
 /**

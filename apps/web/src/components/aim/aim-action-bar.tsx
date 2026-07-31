@@ -1,7 +1,7 @@
 "use client"
 
 import type { RefObject } from "react"
-import { ListChecks, Loader2, Mic, Plus, Send, Square } from "lucide-react"
+import { ListChecks, Loader2, Mic, Plus, Send, Sparkles, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
@@ -24,6 +24,9 @@ export function AimActionBar(props: {
   showAddMenu: boolean
   addMenuOpen: boolean
   onToggleAddMenu: () => void
+  showSkillQuick?: boolean
+  skillQuickOpen?: boolean
+  onToggleSkillQuick?: () => void
   styleEnabled: boolean
   capabilities: AimAgentCapabilities
   onOpenStyleAssets?: () => void
@@ -37,6 +40,7 @@ export function AimActionBar(props: {
   const {
     busy, isRecording, isTranscribing, isPlanMode, isGenerating, canSubmit, canStop,
     primaryActionLabel, showAddMenu, addMenuOpen, onToggleAddMenu,
+    showSkillQuick, skillQuickOpen, onToggleSkillQuick,
     styleEnabled, capabilities, onOpenStyleAssets,
     onStartRecording, onStopRecording, onStop, onGenerate,
     fileInputRef, onAddImages,
@@ -50,6 +54,9 @@ export function AimActionBar(props: {
         showAddMenu={showAddMenu}
         addMenuOpen={addMenuOpen}
         onToggleAddMenu={onToggleAddMenu}
+        showSkillQuick={showSkillQuick}
+        skillQuickOpen={skillQuickOpen}
+        onToggleSkillQuick={onToggleSkillQuick}
         styleEnabled={styleEnabled}
         capabilities={capabilities}
         onOpenStyleAssets={onOpenStyleAssets}
@@ -81,6 +88,9 @@ function ActionBarLeft(props: {
   showAddMenu: boolean
   addMenuOpen: boolean
   onToggleAddMenu: () => void
+  showSkillQuick?: boolean
+  skillQuickOpen?: boolean
+  onToggleSkillQuick?: () => void
   styleEnabled: boolean
   capabilities: AimAgentCapabilities
   onOpenStyleAssets?: () => void
@@ -90,7 +100,8 @@ function ActionBarLeft(props: {
 }) {
   const {
     busy, fileInputRef, onAddImages, showAddMenu, addMenuOpen,
-    onToggleAddMenu, styleEnabled, capabilities, onOpenStyleAssets,
+    onToggleAddMenu, showSkillQuick, skillQuickOpen, onToggleSkillQuick,
+    styleEnabled, capabilities, onOpenStyleAssets,
     isTranscribing, isRecording, isPlanMode,
   } = props
   return (
@@ -118,6 +129,13 @@ function ActionBarLeft(props: {
         >
           <Plus className="h-[18px] w-[18px]" strokeWidth={2.2} />
         </Button>
+      ) : null}
+      {showSkillQuick ? (
+        <SkillQuickButton
+          open={Boolean(skillQuickOpen)}
+          onToggle={onToggleSkillQuick}
+          disabled={busy}
+        />
       ) : null}
       {styleEnabled && capabilities.styleSample ? (
         <button
@@ -310,5 +328,32 @@ function HiddenImageInput(props: {
         event.target.value = ""
       }}
     />
+  )
+}
+
+/** 左下角常驻「技能」速选入口：点击弹出 skill 速选面板，与 + 菜单互斥。 */
+function SkillQuickButton(props: {
+  open: boolean
+  onToggle?: () => void
+  disabled?: boolean
+}) {
+  const { open, onToggle, disabled } = props
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={open}
+      title="选择技能"
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] font-medium transition-all duration-150",
+        open
+          ? "bg-gradient-to-br from-primary/14 to-amber-500/10 text-primary ring-1 ring-inset ring-primary/20"
+          : "border border-border/60 bg-card/40 text-muted-foreground hover:border-primary/25 hover:text-foreground",
+      )}
+    >
+      <Sparkles className="h-[15px] w-[15px]" strokeWidth={2.1} />
+      <span className="leading-none">技能</span>
+    </button>
   )
 }

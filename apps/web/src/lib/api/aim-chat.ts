@@ -118,6 +118,12 @@ export async function chatAim(
 }
 
 /**
+ * 流式对话最长等待：连接或读流卡住时主动中止，避免工作台一直 busy。
+ * 正常长文生成通常远短于此；超时后用户可重试。
+ */
+const AIM_CHAT_STREAM_TIMEOUT_MS = 180_000
+
+/**
  * @description chataimstream
  * @param messages - 消息列表
  * @param options - 配置选项
@@ -136,28 +142,47 @@ export async function chatAimStream(
     traceId?: string
     /** 本轮委托执行引擎；与会话 agentId 平级，缺省不写入请求体 */
     executionAgentId?: string
+    /** 覆盖默认流式超时（毫秒） */
+    timeoutMs?: number
   },
 ): Promise<{ content: string }> {
-  const { signal, onDelta, traceId, ...bodyOptions } = options
+  const { signal, onDelta, traceId, timeoutMs = AIM_CHAT_STREAM_TIMEOUT_MS, ...bodyOptions } = options
+  const timeoutController = new AbortController()
+  const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs)
+  const onExternalAbort = () => timeoutController.abort()
+  if (signal) {
+    if (signal.aborted) timeoutController.abort()
+    else signal.addEventListener("abort", onExternalAbort, { once: true })
+  }
+
   let response: Response
   try {
     response = await fetch("/api/aim/chat", {
       method: "POST",
       credentials: "same-origin",
-      signal,
+      signal: timeoutController.signal,
       headers: {
         "Content-Type": "application/json",
       },
       body: serializeAimChatRequestBody({ messages, ...bodyOptions, stream: true, traceId }),
     })
   } catch (error) {
+    clearTimeout(timeoutId)
+    if (signal) signal.removeEventListener("abort", onExternalAbort)
     if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiError("请求已停止", 499, { code: "ABORTED", originalPath: "/api/aim/chat" })
+      const timedOut = !signal?.aborted
+      throw new ApiError(
+        timedOut ? "回复超时，请重试或缩短输入后再试" : "请求已停止",
+        timedOut ? 408 : 499,
+        { code: timedOut ? "TIMEOUT" : "ABORTED", originalPath: "/api/aim/chat" },
+      )
     }
     throw error
   }
 
   if (!response.ok) {
+    clearTimeout(timeoutId)
+    if (signal) signal.removeEventListener("abort", onExternalAbort)
     const text = await response.text().catch(() => "")
     const payload = text
       ? (() => {
@@ -181,6 +206,8 @@ export async function chatAimStream(
   }
 
   if (!response.body) {
+    clearTimeout(timeoutId)
+    if (signal) signal.removeEventListener("abort", onExternalAbort)
     throw new ApiError("当前浏览器不支持流式输出", 500, { code: "NO_STREAM_BODY" })
   }
 
@@ -204,10 +231,17 @@ export async function chatAimStream(
     }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new ApiError("请求已停止", 499, { code: "ABORTED", originalPath: "/api/aim/chat" })
+      const timedOut = !signal?.aborted
+      throw new ApiError(
+        timedOut ? "回复超时，请重试或缩短输入后再试" : "请求已停止",
+        timedOut ? 408 : 499,
+        { code: timedOut ? "TIMEOUT" : "ABORTED", originalPath: "/api/aim/chat" },
+      )
     }
     throw error
   } finally {
+    clearTimeout(timeoutId)
+    if (signal) signal.removeEventListener("abort", onExternalAbort)
     reader.releaseLock()
   }
 

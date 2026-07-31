@@ -228,3 +228,22 @@ export function formatIpWikiBlock(pages: IpWikiPageRow[]): string {
     sections.join("\n\n"),
   ].join("\n")
 }
+
+/**
+ * 合规校验用：加载 IP 操盘案六页核心结构化数据，按 pageType 做索引。
+ * projectId 缺失时返回空对象（下游判断 ipWikiPages === undefined 或空都跳过）。
+ */
+export async function loadIpWikiPagesIndexed(input: {
+  projectId?: string
+}): Promise<Partial<Record<IpWikiPageType, IpWikiPageRow>>> {
+  if (!input.projectId) return {}
+  const rows = await listIpWikiPages({
+    projectId: input.projectId,
+    pageTypes: IP_WIKI_CORE_PAGE_TYPES,
+  })
+  const index: Partial<Record<IpWikiPageType, IpWikiPageRow>> = {}
+  for (const r of rows) {
+    if (!index[r.pageType]) index[r.pageType] = r
+  }
+  return index
+}

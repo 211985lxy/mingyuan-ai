@@ -151,10 +151,15 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   try {
     await executeChatRequest(input, text, { ...options, editorContext: startsNewTask ? undefined : options.editorContext }, controller, turn.assistantId, turn.thread, traceId)
   } catch (error) {
+    const timedOut = error instanceof ApiError && error.status === 408
     const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-    const content = stopped ? "已停止本次回复。" : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`
+    const content = timedOut
+      ? `对话失败：${error.message}`
+      : stopped
+        ? "已停止本次回复。"
+        : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`
     input.setMessages((messages) => messages.map((message) => message.id === turn.assistantId
-      ? { ...message, content, failure: stopped ? null : { kind: "chat", retryText: text } }
+      ? { ...message, content, failure: stopped && !timedOut ? null : { kind: "chat", retryText: text } }
       : message))
   } finally {
     if (input.requestAbortRef.current === controller) {

@@ -4,6 +4,7 @@ import type { MutableRefObject, ReactNode } from "react"
 
 import { AimActionBar } from "@/components/aim/aim-action-bar"
 import { AimAddMenuPanel } from "@/components/aim/aim-add-menu-panel"
+import { AimSkillQuickPopover } from "@/components/aim/aim-skill-quick-popover"
 import { AimPastedCopyAttachmentBar } from "@/components/aim/aim-pasted-copy-attachment"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
@@ -130,6 +131,10 @@ export function ImageAttachments(props: {
 export interface ComposerPanelsAndBarProps {
   addMenuOpen: boolean
   setAddMenuOpen: (v: boolean | ((p: boolean) => boolean)) => void
+  toggleAddMenu: () => void
+  showSkillQuick: boolean
+  skillQuickOpen: boolean
+  toggleSkillQuick: () => void
   busy: boolean
   isPlanMode: boolean
   canUsePlanMode: boolean
@@ -151,6 +156,8 @@ export interface ComposerPanelsAndBarProps {
   filteredSkills: SkillGroup[]
   onUseSkill?: (skill: AimWorkbenchSkill) => void
   closeAddMenu: () => void
+  onAddSkill?: () => void
+  onEditSkill?: (skill: AimWorkbenchSkill) => void
   fileInputRef: MutableRefObject<HTMLInputElement | null>
   isRecording: boolean
   isTranscribing: boolean
@@ -170,13 +177,14 @@ export interface ComposerPanelsAndBarProps {
 
 export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
   const {
-    addMenuOpen, setAddMenuOpen,
+    addMenuOpen, toggleAddMenu,
+    showSkillQuick, skillQuickOpen, toggleSkillQuick,
     busy, isPlanMode, canUsePlanMode, composerMode,
     onComposerModeChange, showPlanModeControl, onAddImages,
     showContentModeControl, contentMode, contentModeLabel,
     contentModeExpanded, setContentModeExpanded, contentModeOptions,
     onContentModeChange, showSkills, skills, skillQuery, setSkillQuery,
-    filteredSkills, onUseSkill, closeAddMenu, fileInputRef,
+    filteredSkills, onUseSkill, closeAddMenu, onAddSkill, onEditSkill, fileInputRef,
     isRecording, isTranscribing, isGenerating, canSubmit, canStop,
     primaryActionLabel, showAddMenu, styleEnabled, capabilities,
     onOpenStyleAssets, onStartRecording, onStopRecording, onStop, onGenerate,
@@ -209,6 +217,15 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
           fileInputRef={fileInputRef}
         />
       ) : null}
+      {showSkillQuick && skillQuickOpen ? (
+        <AimSkillQuickPopover
+          skills={skills}
+          onUseSkill={onUseSkill}
+          onAddSkill={onAddSkill}
+          onEditSkill={onEditSkill}
+          close={closeAddMenu}
+        />
+      ) : null}
       <AimActionBar
         busy={busy}
         isRecording={isRecording}
@@ -220,7 +237,10 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
         primaryActionLabel={primaryActionLabel}
         showAddMenu={showAddMenu}
         addMenuOpen={addMenuOpen}
-        onToggleAddMenu={() => setAddMenuOpen((open) => !open)}
+        onToggleAddMenu={toggleAddMenu}
+        showSkillQuick={showSkillQuick}
+        skillQuickOpen={skillQuickOpen}
+        onToggleSkillQuick={toggleSkillQuick}
         styleEnabled={styleEnabled}
         capabilities={capabilities}
         onOpenStyleAssets={onOpenStyleAssets}

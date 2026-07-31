@@ -9,6 +9,7 @@ import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimContextUsage } from "@/components/aim/aim-context-usage"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
+import { AimSkillEditDialog } from "@/components/aim/aim-skill-edit-dialog"
 import { AimStylePreviewDialog } from "@/components/aim/aim-style-preview-dialog"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
@@ -22,7 +23,8 @@ import { AimRetroListPanel } from "@/components/aim/aim-retro-list-panel"
 import { AimBenchmarkTopicSearchPanel } from "@/components/aim/aim-benchmark-topic-search-panel"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
-import { getAimAgentGuide } from "@/lib/aim-agent-guides"
+import { useAimWorkbenchSkills } from "@/features/aim/hooks/use-aim-workbench-skills"
+import { getAimAgentGuide, type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import {
@@ -50,6 +52,11 @@ export default function AimPage() {
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
   const [styleEnabled, setStyleEnabled] = useState(false)
   const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(true)
+  const [skillDialogOpen, setSkillDialogOpen] = useState(false)
+  const [editingSkill, setEditingSkill] = useState<AimWorkbenchSkill | null>(null)
+  const skillState = useAimWorkbenchSkills(
+    w.params.agentParam ? w.selectedAgentId : undefined,
+  )
   const openCompletedVideoCopy = useCallback((record: { id: string }) => {
     router.replace(buildContentProducerVideoCopyHref({
       recordId: record.id,
@@ -178,65 +185,44 @@ export default function AimPage() {
     w.handleGenerate()
   }, [capabilities, openStylePreview, pastedCopy, processVideoUrl, w])
 
-  const composerPlaceholder =
-    w.composerMode === "plan"
-      ? "用一句话描述你想做什么内容…"
-      : PASTE_COMPOSER_PLACEHOLDER
-
-  const canGenerateBase =
-    (w.input.trim().length > 0 || w.imageAttachments.length > 0 || Boolean(pastedCopy)) &&
-    (!w.projectEnabled || Boolean(w.selectedProjectId)) &&
-    !w.isUploadingImage
-
+  const composerPlaceholder = w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : PASTE_COMPOSER_PLACEHOLDER
+  const canGenerateBase = (w.input.trim().length > 0 || w.imageAttachments.length > 0 || Boolean(pastedCopy)) && (!w.projectEnabled || Boolean(w.selectedProjectId)) && !w.isUploadingImage
+  const onAddSkill = w.params.agentParam ? () => { setEditingSkill(null); setSkillDialogOpen(true) } : undefined
+  const onEditSkill = w.params.agentParam ? (skill: AimWorkbenchSkill) => { setEditingSkill(skill); setSkillDialogOpen(true) } : undefined
+  const onUseSkill = (skill: AimWorkbenchSkill) => {
+    if (skill.workbenchAction === "open_benchmark_search") { setBenchmarkSearchOpen(true); toast.success("已打开对标选题搜索"); return }
+    w.handleUseSkill(skill)
+  }
+  const onOpenStyleAssets = () => {
+    if (w.projectEnabled && w.selectedProjectId) {
+      router.push(`/projects?focus=style&projectId=${encodeURIComponent(w.selectedProjectId)}`)
+    } else { router.push("/projects?focus=style") }
+  }
   const composer = (
     <>
       <AimResearchHint agentId={w.selectedAgentId} />
       <AimPromptComposer
-        value={w.input}
-        placeholder={composerPlaceholder}
-        busy={w.busy || isProcessingVideo}
-        isRecording={w.isRecording}
-        isTranscribing={w.isTranscribing}
-        isGenerating={w.isGenerating || w.isUploadingImage || isProcessingVideo}
+        value={w.input} placeholder={composerPlaceholder}
+        busy={w.busy || isProcessingVideo} isRecording={w.isRecording}
+        isTranscribing={w.isTranscribing} isGenerating={w.isGenerating || w.isUploadingImage || isProcessingVideo}
         canGenerate={canGenerateBase}
         primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
-        onChange={w.setInput}
-        onGenerate={handleComposerGenerate}
+        onChange={w.setInput} onGenerate={handleComposerGenerate}
         onStop={isProcessingVideo ? cancelVideoProcessing : w.handleStop}
-        onStartRecording={w.startRecording}
-        onStopRecording={w.stopRecording}
-        showSkills={Boolean(w.params.agentParam)}
-        skills={w.agent.skills}
-        onUseSkill={(skill) => {
-          if (skill.workbenchAction === "open_benchmark_search") {
-            setBenchmarkSearchOpen(true)
-            toast.success("已打开对标选题搜索")
-            return
-          }
-          w.handleUseSkill(skill)
-        }}
-        imageAttachments={w.imageAttachments}
-        onAddImages={(files) => void w.addImages(files)}
-        onRemoveImage={w.removeImage}
-        composerMode={w.composerMode}
-        onComposerModeChange={w.setComposerMode}
-        canUsePlanMode={w.canUsePlanMode}
+        onStartRecording={w.startRecording} onStopRecording={w.stopRecording}
+        showSkills={Boolean(w.params.agentParam)} skills={skillState.skills}
+        onAddSkill={onAddSkill} onEditSkill={onEditSkill} onUseSkill={onUseSkill}
+        imageAttachments={w.imageAttachments} onAddImages={(files) => void w.addImages(files)}
+        onRemoveImage={w.removeImage} composerMode={w.composerMode}
+        onComposerModeChange={w.setComposerMode} canUsePlanMode={w.canUsePlanMode}
         isPlanSessionActive={w.planSession.isPlanMode}
         showContentMode={capabilities.contentModeSelector}
-        contentMode={w.agentModule}
-        onContentModeChange={w.setAgentModule}
+        contentMode={w.agentModule} onContentModeChange={w.setAgentModule}
         pastedCopy={pastedCopy}
         onPastedCopyChange={capabilities.pasteMode === "plain" ? undefined : setPastedCopy}
         onStyleSampleRequest={capabilities.styleSample ? openStylePreview : undefined}
         styleEnabled={styleEnabled && capabilities.styleSample}
-        capabilities={capabilities}
-        onOpenStyleAssets={() => {
-          if (w.projectEnabled && w.selectedProjectId) {
-            router.push(`/projects?focus=style&projectId=${encodeURIComponent(w.selectedProjectId)}`)
-          } else {
-            router.push("/projects?focus=style")
-          }
-        }}
+        capabilities={capabilities} onOpenStyleAssets={onOpenStyleAssets}
       />
       <AimContextUsage
         usedTokens={contextUsage.usedTokens}
@@ -417,6 +403,21 @@ export default function AimPage() {
           </>
         )}
       </section>
+
+      <AimSkillEditDialog
+        open={skillDialogOpen}
+        onOpenChange={setSkillDialogOpen}
+        skill={editingSkill}
+        agentId={w.selectedAgentId}
+        onSaved={() => {
+          skillState.refresh()
+          toast.success("技能已保存")
+        }}
+        onDeleted={() => {
+          skillState.refresh()
+          toast.success("技能已删除")
+        }}
+      />
 
       <AimStylePreviewDialog
         open={stylePreviewOpen}

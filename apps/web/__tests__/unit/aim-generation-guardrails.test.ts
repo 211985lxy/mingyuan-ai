@@ -5,6 +5,7 @@ import {
   findUnsupportedFirstPersonClaimFormats,
   isGenericContentRequestWithoutFacts,
 } from "@/lib/aim-generation-prompts"
+import { findDroppedStructureModules } from "@/lib/aim-generation-guardrails"
 import type { AimGenerateContext } from "@/lib/aim-agent-handlers"
 
 function context(overrides: Partial<AimGenerateContext> = {}): AimGenerateContext {
@@ -113,5 +114,70 @@ describe("AIM generation fact guardrails", () => {
       { raw_copy: "AI 到底有没有用，看它能否减少重复劳动。" },
       ["raw_copy"],
     )).toEqual([])
+  })
+})
+
+describe("findDroppedStructureModules — lead 线索获客结构检测（Obsidian 02-线索获客打法）", () => {
+  // 原稿完整覆盖 Obsidian 三段公式 + 精准客户三特征 + 筛人 + CTA
+  // 注意：CTA 用「清单」而非「自检」，避免与方案模块的「自检」标记冲突；
+  // 结尾公式句单独成行，便于测试时单独删除。
+  const leadSource = [
+    "你已经花了十几万推广费，团队也换过两拨，但咨询还是上不来。这就是代价。",
+    "问题在哪？很多人误以为是脚本不够好，其实根源是你没找精准客户。",
+    "怎么做？给你一个小切口自检方法：用一句话说清你帮谁解决什么，做不到就说明定位还不清。",
+    "适合有成熟业务、想用账号获客的老板；只想甩手做IP的不适合。",
+    "评论区扣「清单」领完整资料。",
+    "记住：精准客户=已投入筹码+已感到代价+正处在决策压力中。",
+  ].join("\n")
+
+  it("lead 输出删掉「方案-小切口」模块时，应被检测出来", () => {
+    // 输出保留了精准客户三特征、问题、解法、筛人、CTA、句锚，但删掉了小切口方案那一段
+    const outputMissingSolution = [
+      "你已经花了十几万推广费，团队也换过两拨，咨询还是上不来。这就是代价。",
+      "问题在哪？很多人误以为是脚本不够好，其实根源是没找精准客户。",
+      "适合有成熟业务的老板；只想甩手做IP的不适合。",
+      "评论区扣「清单」领完整资料。",
+      "记住：精准客户=已投入筹码+已感到代价+正处在决策压力中。",
+    ].join("\n")
+    const dropped = findDroppedStructureModules(leadSource, outputMissingSolution, "lead")
+    expect(dropped).toContain("方案-小切口")
+  })
+
+  it("lead 输出删掉「精准客户三特征落地」时，应被检测出来", () => {
+    // 输出删掉了第一行精准客户三特征场景 + 结尾公式句（公式句里也含三特征关键词，必须一起删）
+    const outputMissingPrecision = [
+      "问题在哪？很多人误以为是脚本不够好，其实根源是没找精准客户。",
+      "怎么做？给你一个小切口自检方法：用一句话说清你帮谁解决什么。",
+      "适合有成熟业务的老板；只想甩手做IP的不适合。",
+      "评论区扣「清单」领完整资料。",
+    ].join("\n")
+    const dropped = findDroppedStructureModules(leadSource, outputMissingPrecision, "lead")
+    expect(dropped).toContain("精准客户三特征落地")
+  })
+
+  it("lead 输出保留全部结构模块时，不应误报", () => {
+    // 输出保留了所有结构模块（仅文字润色）
+    const outputFull = [
+      "你之前已经砸了十几万推广费，团队换过两拨，咨询还是上不来——这就是代价。",
+      "问题在哪？很多人误判为脚本不行，其实根源是没锁定精准客户。",
+      "怎么做？给你一个小切口自检：用一句话说清你帮谁解决什么。",
+      "适合有成熟业务、想用账号获客的老板；只想甩手做IP的不适合。",
+      "评论区扣「清单」领完整资料。",
+      "记住：精准客户=已投入筹码+已感到代价+正处在决策压力中。",
+    ].join("\n")
+    const dropped = findDroppedStructureModules(leadSource, outputFull, "lead")
+    // 允许返回数组，但不应包含 lead 关键模块
+    expect(dropped).not.toContain("精准客户三特征落地")
+    expect(dropped).not.toContain("问题-刚需痛点")
+    expect(dropped).not.toContain("解法-错在哪/为什么/怎么做")
+    expect(dropped).not.toContain("方案-小切口")
+    expect(dropped).not.toContain("谁适合/谁不适合")
+  })
+
+  it("traffic 流量型不调用 lead 严格检测（不在 lead 分支）", () => {
+    // 同样的原文，purpose=traffic 时不会进入 checkAll 分支
+    const dropped = findDroppedStructureModules(leadSource, "完全不同的短输出", "traffic")
+    expect(dropped).not.toContain("精准客户三特征落地")
+    expect(dropped).not.toContain("方案-小切口")
   })
 })

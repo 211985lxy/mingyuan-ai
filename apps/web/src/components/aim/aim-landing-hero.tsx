@@ -11,7 +11,7 @@ import { buildAimGenerationHref } from "@/features/aim/workflow/tasks"
 import { getContentTitle } from "@/lib/home-history-summary"
 
 /**
- * 创作台空状态：继续上次 + 专家简介 + 目的入口卡片 + 输入框。
+ * 创作台空状态：继续上次 + 专家简介 + 目的入口列表 + 输入框。
  * 从 aim-workbench-chrome.tsx 拆出以控制单函数行数 ≤80。
  */
 export function AimLandingHero({
@@ -26,12 +26,14 @@ export function AimLandingHero({
   children: ReactNode
 }) {
   return (
-    <div className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-10">
+    <div className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
       <HeroAmbientLayer />
-      <div className="flex w-full max-w-3xl flex-col items-center gap-8">
+      <div className="flex w-full max-w-2xl flex-col items-center gap-5">
         <AimContinueLast />
         <HeroHeadline intro={intro} />
-        {purposes.length > 0 ? <PurposeCards purposes={purposes} onSelect={onSelectPurpose} /> : null}
+        {purposes.length > 0 ? (
+          <PurposeList purposes={purposes} onSelect={onSelectPurpose} />
+        ) : null}
         <div className="w-full">{children}</div>
         <p className="text-center text-xs text-muted-foreground">
           <Link
@@ -81,58 +83,95 @@ function HeroHeadline(props: { intro?: string }) {
   )
 }
 
-function PurposeCards(props: {
+/** 内容目的：默认收成一条入口，点开后是紧凑列表（不再铺三张大卡片）。 */
+function PurposeList(props: {
   purposes: AimWorkbenchSkill[]
   onSelect: (skill: AimWorkbenchSkill) => void
 }) {
   const { purposes, onSelect } = props
+  // 进入空态即展开列表；需要让位给输入框时可收起
+  const [open, setOpen] = useState(true)
+
   return (
     <div className="w-full">
-      <p className="mb-2.5 px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/80">
-        一键开始 · 选择内容目的
-      </p>
-      <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">
-        {purposes.map((skill) => (
-          <PurposeCard key={skill.id} skill={skill} onSelect={() => onSelect(skill)} />
-        ))}
-      </div>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/80 px-3.5 py-2.5 text-left transition-colors hover:border-primary/30 hover:bg-card"
+      >
+        <span className="text-[13px] font-medium text-foreground">
+          一键开始 · 选择内容目的
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          {open ? "收起" : `${purposes.length} 项`}
+          <ChevronGlyph open={open} />
+        </span>
+      </button>
+      {open ? (
+        <ul className="mt-1.5 overflow-hidden rounded-xl border border-border/70 bg-card">
+          {purposes.map((skill, index) => (
+            <li
+              key={skill.id}
+              className={index > 0 ? "border-t border-border/60" : undefined}
+            >
+              <PurposeListRow skill={skill} onSelect={() => {
+                onSelect(skill)
+                setOpen(false)
+              }} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   )
 }
 
-function PurposeCard(props: {
+function PurposeListRow(props: {
   skill: AimWorkbenchSkill
   onSelect: () => void
 }) {
   const { skill, onSelect } = props
   return (
     <button
-      key={skill.id}
       type="button"
       onClick={onSelect}
-      className="group relative flex flex-col items-start gap-2 overflow-hidden rounded-2xl border border-border/80 bg-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-gradient-to-br hover:from-card hover:via-primary/[0.03] hover:to-amber-500/[0.02] hover:shadow-[0_10px_30px_-14px_rgba(209,74,51,0.22)]"
+      className="group flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-primary/[0.04]"
     >
-      <span
-        aria-hidden
-        className="pointer-events-none absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-primary/[0.06] opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100"
-      />
-      <div className="flex w-full items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/12 to-amber-500/10 text-primary ring-1 ring-inset ring-primary/15">
-            <SparklesFilled className="size-4.5" strokeWidth={0} />
+      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <SparklesFilled className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13.5px] font-semibold leading-5 text-foreground">
+          {skill.label}
+        </span>
+        {skill.description ? (
+          <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted-foreground">
+            {skill.description}
           </span>
-          <span className="text-[15px] font-semibold leading-5 tracking-tight text-foreground">
-            {skill.label}
-          </span>
-        </div>
-        <ArrowRight className="size-4 shrink-0 text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary" />
-      </div>
-      {skill.description ? (
-        <p className="pl-[46px] text-[13px] leading-5 text-muted-foreground/90">
-          {skill.description}
-        </p>
-      ) : null}
+        ) : null}
+      </span>
+      <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
     </button>
+  )
+}
+
+function ChevronGlyph(props: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      className={`size-3.5 transition-transform duration-200 ${props.open ? "rotate-180" : ""}`}
+    >
+      <path
+        d="M4 6.25 8 10l4-3.75"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 

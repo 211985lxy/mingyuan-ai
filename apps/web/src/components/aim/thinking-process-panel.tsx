@@ -229,6 +229,36 @@ const TraceStepItem = memo(function TraceStepItem({
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 
+type SseHandlerContext = {
+  hangTimer: number
+  es: EventSource
+  onCompleteRef: React.MutableRefObject<((() => void) | undefined) | null>
+  setIsComplete: (v: boolean) => void
+  setIsFailed: (v: boolean) => void
+  setSteps: React.Dispatch<React.SetStateAction<TraceStep[]>>
+  eventSourceRef: React.RefObject<EventSource | null>
+}
+
+/** 处理 SSE 消息：step / done / error / timeout */
+function handleSseMessage(data: { type: string; status?: string; step?: TraceStep }, ctx: SseHandlerContext) {
+  if (data.type === "connected") return
+  if (data.type === "step") {
+    ctx.setSteps((prev) => {
+      const idx = prev.findIndex((s) => s.key === data.step?.key)
+      if (idx >= 0) { const next = [...prev]; next[idx] = data.step as TraceStep; return next }
+      return [...prev, data.step as TraceStep]
+    })
+    return
+  }
+  // done / error / timeout 共用收口逻辑
+  window.clearTimeout(ctx.hangTimer)
+  ctx.setIsComplete(true)
+  if (data.type === "done") { ctx.setIsFailed(data.status === "failed"); ctx.onCompleteRef.current?.() }
+  if (data.type === "error") ctx.setIsFailed(true)
+  ctx.es.close()
+  ctx.eventSourceRef.current = null
+}
+
 /**
  * 思考过程面板：通过 SSE 实时展示 AIM 智能体的处理步骤。
  *
@@ -263,6 +293,14 @@ export function ThinkingProcessPanel({
     )
     eventSourceRef.current = es
 
+    // SSE 若迟迟收不到 done/error，前端强制收口，避免一直停在「正在思考…」
+    const hangTimer = window.setTimeout(() => {
+      if (cancelled) return
+      setIsComplete(true)
+      es.close()
+      eventSourceRef.current = null
+    }, 90_000)
+
     es.onopen = () => {
       if (!cancelled) setConnected(true)
     }
@@ -270,49 +308,22 @@ export function ThinkingProcessPanel({
     es.onmessage = (event) => {
       if (cancelled) return
       try {
-        const data = JSON.parse(event.data as string)
-
-        switch (data.type) {
-          case "connected":
-            // SSE 连接成功
-            break
-          case "step":
-            setSteps((prev) => {
-              // 按步骤 key 去重更新（同一步骤可能被多次推送用于状态更新）
-              const idx = prev.findIndex((s) => s.key === data.step?.key)
-              if (idx >= 0) {
-                const next = [...prev]
-                next[idx] = data.step as TraceStep
-                return next
-              }
-              return [...prev, data.step as TraceStep]
-            })
-            break
-          case "done":
-            setIsComplete(true)
-            setIsFailed(data.status === "failed")
-            onCompleteRef.current?.()
-            es.close()
-            eventSourceRef.current = null
-            break
-          case "error":
-            setIsComplete(true)
-            setIsFailed(true)
-            es.close()
-            eventSourceRef.current = null
-            break
-          case "timeout":
-            setIsComplete(true)
-            es.close()
-            eventSourceRef.current = null
-            break
-        }
+        handleSseMessage(JSON.parse(event.data as string), {
+          hangTimer,
+          es,
+          onCompleteRef,
+          setIsComplete,
+          setIsFailed,
+          setSteps,
+          eventSourceRef,
+        })
       } catch {
         // 忽略解析错误
       }
     }
 
     es.onerror = () => {
+      window.clearTimeout(hangTimer)
       if (!cancelled) {
         setIsComplete(true)
       }
@@ -322,6 +333,7 @@ export function ThinkingProcessPanel({
 
     return () => {
       cancelled = true
+      window.clearTimeout(hangTimer)
       es.close()
       eventSourceRef.current = null
       setConnected(false)

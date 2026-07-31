@@ -39,7 +39,7 @@ describe("AIM workbench chrome", () => {
     expect(html).not.toContain("快速出稿")
   })
 
-  it("renders the landing hero with three content purposes and the composer", () => {
+  it("renders the landing hero with a purpose list and the composer", () => {
     const html = renderToStaticMarkup(createElement(
       AimLandingHero,
       {
@@ -54,6 +54,8 @@ describe("AIM workbench chrome", () => {
     ))
 
     expect(html).toContain("今天想得到什么结果")
+    expect(html).toContain("一键开始 · 选择内容目的")
+    expect(html).toContain("aria-expanded=\"true\"")
     expect(html).toContain("流量漏斗")
     expect(html).toContain("线索获客")
     expect(html).toContain("通用故事")
@@ -61,9 +63,10 @@ describe("AIM workbench chrome", () => {
     expect(html).toContain("私信预约")
     expect(html).toContain("人设信任")
     expect(html).toContain("COMPOSER_MARKER")
-    // 三张独立目的卡，不是被合并成的"漏斗获客与故事口播"；也不是旧口径"完播优先"
+    // 收束成列表，不再用大卡片网格；也不是旧口径
     expect(html).not.toContain("漏斗获客与故事口播")
     expect(html).not.toContain("完播优先")
+    expect(html).not.toContain("sm:grid-cols-2")
   })
 
   it("renders project notices without persona progress", () => {

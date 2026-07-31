@@ -64,7 +64,12 @@ export interface ResolveMethodologyPolicyInput {
   methodologyProfileIds?: string[]
   /** 用户原始输入文本（用于文本精确命中 name/aliases）。 */
   rawInput?: string
+  /** 生成入口透传：content_producer 默认兜底加载徐沪生 Profile（MVP 硬编码 slug）；其他入口不传则不兜底。 */
+  agentId?: string
 }
+
+/** content_producer 默认兜底方法论的 slug（MVP 写死；后续可迁到 env 或 配置表）。 */
+const CONTENT_PRODUCER_DEFAULT_PROFILE_SLUG = "xuhusheng-content-creation"
 
 const EMPTY_POLICY: MethodologyPolicy = {
   source: "none",
@@ -126,7 +131,28 @@ export async function resolveMethodologyPolicy(
     }
   }
 
-  // 3. 不选择
+  // 3. 不选择：但 content_producer 入口默认兜底「徐沪生创作方法论」
+  if (
+    input.agentId === "content_producer" &&
+    !input.methodologyProfileIds?.length &&
+    CONTENT_PRODUCER_DEFAULT_PROFILE_SLUG
+  ) {
+    const resolved = await resolveBySlug(CONTENT_PRODUCER_DEFAULT_PROFILE_SLUG, userId)
+    if (resolved.length > 0) {
+      return {
+        source: "explicit_text",
+        selections: resolved.map((r) => ({
+          profileId: r.profileId,
+          versionId: r.versionId,
+          version: r.version,
+          mode: "primary" as const,
+          reason: "content_producer_default_profile_slug",
+        })),
+        versionRows: resolved,
+      }
+    }
+  }
+
   return EMPTY_POLICY
 }
 
@@ -189,6 +215,27 @@ async function resolveByText(
     }
   }
   return []
+}
+
+/** 按 slug 命中全局或本人可见的 Profile，取 published 版本。MVP 仅用于 content_producer 默认兜底。 */
+async function resolveBySlug(
+  slug: string,
+  userId?: string,
+): Promise<MethodologyVersionRow[]> {
+  const profile = await prisma.methodologyProfile.findUnique({
+    where: { slug },
+    select: { id: true, userId: true, scope: true, status: true },
+  })
+  if (!profile) return []
+  if (profile.status !== "active") return []
+  // 全局方法论（scope=global 或 userId=null）所有人可见；私有需归属匹配
+  const isVisible =
+    profile.scope === "global" ||
+    profile.userId === null ||
+    (profile.scope === "user" && profile.userId && profile.userId === userId)
+  if (!isVisible) return []
+  const version = await getPublishedVersion(profile.id)
+  return version ? [version] : []
 }
 
 /** 收集精确匹配名称集合（name + aliases，去空白、去重、过滤过短的）。 */

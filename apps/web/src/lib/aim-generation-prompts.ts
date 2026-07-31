@@ -35,6 +35,10 @@ import {
   buildGenerationSafetyRetryPrompt,
   inspectGenerationSafety,
 } from "@/lib/aim-generation-guardrails"
+import {
+  buildIpWikiComplianceRewritePrompt,
+  verifyIpWikiCompliance,
+} from "@/lib/ip-wiki/compliance"
 
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 export {
@@ -240,6 +244,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   let activePrompt = userPrompt
   const isLightEdit = context.runtimeTask === "light_edit"
   const methodologyPlan = context.methodologyPlan ?? context.taskSpec?.methodologyPlan
+  const ipWikiPages = context.ipWikiPages
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
@@ -258,14 +263,20 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         )
       : { ok: true, issues: [], summary: "" }
 
+    const formatContents = targetFormats.map((fmt) => parsed[fmt] || "")
+    const ipCompliance = !isLightEdit && ipWikiPages && Object.keys(ipWikiPages).length > 0
+      ? await verifyIpWikiCompliance(formatContents, ipWikiPages)
+      : { ok: true, issues: [], summary: "" }
+
     if (
       safety.copiedFormats.length === 0
       && safety.unsupportedClaimFormats.length === 0
       && safety.lightEditScopeViolationFormats.length === 0
       && incompleteFormats.length === 0
       && goalVerify.ok
+      && ipCompliance.ok
     ) {
-      return { completion, parsed, goalVerify }
+      return { completion, parsed, goalVerify, ipCompliance }
     }
     if (attempt === 2) {
       if (incompleteFormats.length) {
@@ -280,8 +291,8 @@ export async function executeGenerateLLMWithBenchmarkRetry(
           "生成结果连续出现无依据案例、过度近似原文或轻改信息丢失，已停止交付",
         )
       }
-      // 目标质检末次仍失败：交付最后一版，由 METHOD_NOTE 记录；不硬抛
-      return { completion, parsed, goalVerify }
+      // 目标质检或 IP 合规末次仍失败：交付最后一版，由 METHOD_NOTE 记录；不硬抛
+      return { completion, parsed, goalVerify, ipCompliance }
     }
 
     if (incompleteFormats.length) {
@@ -302,6 +313,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         parsed,
         targetFormats,
         safety,
+        context,
       )
     } else if (methodologyPlan && !goalVerify.ok) {
       const previousOutput = targetFormats
@@ -309,6 +321,15 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         .join("\n\n")
       activePrompt = `${userPrompt}
 ${buildGoalRewritePromptAppendix(methodologyPlan, goalVerify, previousOutput)}`
+    } else if (ipWikiPages && Object.keys(ipWikiPages).length > 0 && !ipCompliance.ok) {
+      const previousOutput = targetFormats
+        .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
+        .join("\n\n")
+      activePrompt = `${userPrompt}
+${buildIpWikiComplianceRewritePrompt(ipCompliance)}
+
+前一版输出：
+${previousOutput}`
     }
   }
 

@@ -405,6 +405,7 @@ export async function buildAimGeneration(
       knowledgeStrategy: prepared.spec.knowledgeStrategy,
       taskSpec,
       methodologyPlan: prepared.methodologyPlan ?? taskSpec?.methodologyPlan,
+      ipWikiPages: prepared.ipWikiPages,
     }),
     (result) => ({
       summary: `生成 ${result.results.length} 个交付物`,

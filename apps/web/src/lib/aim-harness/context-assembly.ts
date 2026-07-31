@@ -111,7 +111,7 @@ export async function prepareAimContext(
   // 3. 并行读取通用背景资产（与 buildAimGeneration:1508 一致，gating 逐字保留）
   const {
     knowledgeCtx, viralStructureBlock, methodologyBlock,
-    businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock,
+    businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock, ipWikiPages,
   } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, trace })
 
   // 3.2 有界工具环：先查再写（仅 executionPolicy.mode=bounded_tool_loop；eval override 跳过）
@@ -154,12 +154,13 @@ export async function prepareAimContext(
   const skills = await loadAimSkills({ agentId, runtimeTask, enabled: skillEnabled })
   const skillBlock = buildAimSkillBlock(skills)
 
-  // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > none。
+  // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > agent 默认兜底（content_producer=徐沪生）> none。
   // 在现有 6 块加载之后单独计算，不触碰字节等价红线；解析结果冻结进 spec.methodologyPolicy。
   const methodologyPolicy = await resolveMethodologyPolicy({
     userId: params.userId,
     methodologyProfileIds: params.methodologyProfileIds ?? spec.methodologyProfileIds,
     rawInput: spec.rawInput,
+    agentId,
   })
   const selectedMethodologyBlock = buildMethodologyProfileBlock(methodologyPolicy)
   // spec 冻结后不可变；把解析出的 policy 合并入副本，使落 AimGeneration.runSpec 的那份含命中版本
@@ -240,6 +241,7 @@ export async function prepareAimContext(
     retrievedSource: knowledgeCtx.source,
     contextManifest,
     budgetApplied: true,
+    ipWikiPages: Object.keys(ipWikiPages ?? {}).length > 0 ? ipWikiPages : undefined,
   }
 }
 

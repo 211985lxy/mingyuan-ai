@@ -45,6 +45,8 @@ export interface AimPromptComposerProps {
   showSkills?: boolean
   skills?: AimWorkbenchSkill[]
   onUseSkill?: (skill: AimWorkbenchSkill) => void
+  onAddSkill?: () => void
+  onEditSkill?: (skill: AimWorkbenchSkill) => void
   imageAttachments?: Array<{ id: string; name: string; previewUrl: string }>
   onAddImages?: (files: FileList) => void
   onRemoveImage?: (id: string) => void
@@ -96,6 +98,7 @@ function useComposerAllState(props: AimPromptComposerProps) {
     composerMode = "direct", pastedCopy = null, onPastedCopyChange, onStyleSampleRequest,
     imageAttachments = [], capabilities: capabilitiesProp, isPlanSessionActive = false,
     onComposerModeChange, showContentMode = false, showSkills = false, onAddImages,
+    onAddSkill, onEditSkill,
   } = props
   const state = useComposerDerivedState({
     value, busy: busy || false, isRecording: isRecording || false,
@@ -105,14 +108,14 @@ function useComposerAllState(props: AimPromptComposerProps) {
     onComposerModeChange, showContentMode, showSkills, onAddImages,
   })
   const { capabilities, isPlanMode, applyUsage, handlePaste, allowedUsages, pasteEnabled,
-    canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, autoUsageLabel } = state
+    canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel } = state
   const local = useComposerLocalState({ value, skills: props.skills || [] })
   const contentModeLabel =
     props.contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[props.contentMode]
   const contentModeOptions = useContentModeOptions()
   return {
     state: { capabilities, isPlanMode, applyUsage, handlePaste, allowedUsages, pasteEnabled,
-      canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, autoUsageLabel },
+      canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel },
     local,
     extra: { contentModeLabel, contentModeOptions },
   }
@@ -140,6 +143,7 @@ interface AimPromptComposerViewProps {
   onRemoveImage?: (id: string) => void
   addMenuOpen: boolean
   setAddMenuOpen: (v: boolean | ((p: boolean) => boolean)) => void
+  toggleAddMenu: () => void
   isPlanMode: boolean
   canUsePlanMode: boolean
   composerMode: AimComposerMode
@@ -160,6 +164,11 @@ interface AimPromptComposerViewProps {
   filteredSkills: Array<{ group: string; items: AimWorkbenchSkill[] }>
   onUseSkill?: (skill: AimWorkbenchSkill) => void
   closeAddMenu: () => void
+  onAddSkill?: () => void
+  onEditSkill?: (skill: AimWorkbenchSkill) => void
+  showSkillQuick: boolean
+  skillQuickOpen: boolean
+  toggleSkillQuick: () => void
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>
   isRecording: boolean
   isTranscribing: boolean
@@ -208,6 +217,12 @@ function AimPromptComposerView(p: AimPromptComposerViewProps) {
       <ComposerPanelsAndBar
         addMenuOpen={p.addMenuOpen}
         setAddMenuOpen={p.setAddMenuOpen}
+        toggleAddMenu={p.toggleAddMenu}
+        showSkillQuick={p.showSkillQuick}
+        skillQuickOpen={p.skillQuickOpen}
+        toggleSkillQuick={p.toggleSkillQuick}
+        onAddSkill={p.onAddSkill}
+        onEditSkill={p.onEditSkill}
         busy={p.busy}
         isPlanMode={p.isPlanMode}
         canUsePlanMode={p.canUsePlanMode}
@@ -309,6 +324,7 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
   const showPlanModeControl = !isPlanSessionActive && Boolean(onComposerModeChange)
   const showAddMenu =
     Boolean(onAddImages) || showPlanModeControl || showContentModeControl || showSkills
+  const showSkillQuick = showSkills
   const autoUsageLabel =
     capabilities.pasteMode === "review"
       ? " · 待质检"
@@ -321,7 +337,7 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
     capabilities, isPlanMode, applyUsage, handlePaste,
     allowedUsages: allowedUsages as PasteUsage[],
     pasteEnabled, effectivePasteUsage, canSubmit, canStop,
-    showContentModeControl, showPlanModeControl, showAddMenu, autoUsageLabel,
+    showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel,
   }
 }
 
@@ -333,6 +349,7 @@ function useComposerLocalState(input: { value: string; skills: AimWorkbenchSkill
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [contentModeExpanded, setContentModeExpanded] = useState(false)
   const [skillQuery, setSkillQuery] = useState("")
+  const [skillQuickOpen, setSkillQuickOpen] = useState(false)
 
   useAutoResizeTextarea(textareaRef, value)
 
@@ -340,13 +357,35 @@ function useComposerLocalState(input: { value: string; skills: AimWorkbenchSkill
     () => buildFilteredSkills(skillQuery, skills),
     [skillQuery, skills],
   )
-  const closeAddMenu = useCloseAddMenu(setAddMenuOpen, setContentModeExpanded, setSkillQuery)
-  useAddMenuCloseOnEscape(rootRef, addMenuOpen, closeAddMenu)
+  const closeAddMenu = useCloseAddMenu(setAddMenuOpen, setContentModeExpanded, setSkillQuery, setSkillQuickOpen)
+  useAddMenuCloseOnEscape(rootRef, addMenuOpen || skillQuickOpen, closeAddMenu)
+
+  const toggleAddMenu = useMemo(
+    () => () => {
+      setAddMenuOpen((open) => {
+        const next = !open
+        if (next) setSkillQuickOpen(false)
+        return next
+      })
+    },
+    [],
+  )
+  const toggleSkillQuick = useMemo(
+    () => () => {
+      setSkillQuickOpen((open) => {
+        const next = !open
+        if (next) setAddMenuOpen(false)
+        return next
+      })
+    },
+    [],
+  )
 
   return {
     rootRef, textareaRef, fileInputRef,
-    addMenuOpen, setAddMenuOpen, contentModeExpanded, setContentModeExpanded,
+    addMenuOpen, setAddMenuOpen, toggleAddMenu, contentModeExpanded, setContentModeExpanded,
     skillQuery, setSkillQuery, filteredSkills, closeAddMenu,
+    skillQuickOpen, toggleSkillQuick,
   }
 }
 
@@ -366,14 +405,16 @@ function useCloseAddMenu(
   setAddMenuOpen: (v: boolean) => void,
   setContentModeExpanded: (v: boolean) => void,
   setSkillQuery: (v: string) => void,
+  setSkillQuickOpen: (v: boolean) => void,
 ) {
   return useMemo(() => {
     return function close() {
       setAddMenuOpen(false)
       setContentModeExpanded(false)
       setSkillQuery("")
+      setSkillQuickOpen(false)
     }
-  }, [setAddMenuOpen, setContentModeExpanded, setSkillQuery])
+  }, [setAddMenuOpen, setContentModeExpanded, setSkillQuery, setSkillQuickOpen])
 }
 
 function useAddMenuCloseOnEscape(

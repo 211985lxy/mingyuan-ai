@@ -1,5 +1,4 @@
 // Aim domain models
-
 model AimGeneration {
   id                 String    @id @default(cuid())
   userId             String
@@ -48,7 +47,6 @@ model AimGeneration {
   @@index([userId, projectId, createdAt(sort: Desc)])
   @@index([userId, workflowStatus])
 }
-
 // 作品编辑版本：只追加不覆盖；恢复通过创建新版本实现。
 model AimContentVersion {
   id              String   @id @default(cuid())
@@ -380,4 +378,23 @@ model ContentOutcome {
   @@unique([userId, generationId, collectWindowDay])
   @@index([userId, collectedAt])
   @@index([generationId])
+}
+
+// 自定义技能：管理员在后台添加的 skill，运行时与内置 skill 合并。
+// id 冲突时自定义覆盖内置（实现"改默认 skill"的效果）。agentId 决定挂在哪个 agent 下。
+model AimCustomSkill {
+  id          String   @id @default(cuid())
+  // 业务 id：与内置 AimWorkbenchSkill.id 对齐，用于覆盖同名内置 skill
+  skillId     String
+  // 归属 agent：content_producer / work_editor 等
+  agentId     String
+  label       String
+  description String   @default("")
+  prompt      String   @db.MediumText
+  group       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([agentId, skillId])
+  @@index([agentId])
 }

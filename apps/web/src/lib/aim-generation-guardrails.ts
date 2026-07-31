@@ -63,6 +63,16 @@ export function isGenericContentRequestWithoutFacts(
   )
 }
 
+/** 从 rawInput 解析内容目的锚点（由 aim-agent-skills.ts 的技能 prompt 注入）。 */
+export type ContentPurpose = "traffic" | "lead" | "story" | "unknown"
+
+function resolveContentPurpose(rawInput: string): ContentPurpose {
+  if (/【内容目的锚点】\s*=\s*流量漏斗/.test(rawInput)) return "traffic"
+  if (/【内容目的锚点】\s*=\s*线索获客/.test(rawInput)) return "lead"
+  if (/【内容目的锚点】\s*=\s*通用故事/.test(rawInput)) return "story"
+  return "unknown"
+}
+
 export function findLightEditScopeViolationFormats(
   context: Pick<
     AimGenerateContext,
@@ -81,14 +91,103 @@ export function findLightEditScopeViolationFormats(
   if (!/润色|文字二改|去\s*AI\s*味|这段|这篇|这段话/.test(instruction)) {
     return []
   }
-  const sourceLength = context.rawInput
-    .replace(/^【成稿】/, "")
-    .trim()
-    .length
-  if (sourceLength < 12) return []
-  const minimumLength = Math.floor(sourceLength * 0.72)
-  return targetFormats.filter((format) =>
-    (parsed[format] || "").trim().length < minimumLength)
+  const sourceText = context.rawInput.replace(/^【成稿】/, "").trim()
+  if (sourceText.length < 12) return []
+  const minimumLength = Math.floor(sourceText.length * 0.72)
+
+  // 内容目的决定结构检测策略：
+  // - 流量型：结构灵活，只检测长度缩短，不锁死结构模块
+  // - 线索型：结构要求高，检测全部6类结构模块
+  // - 通用故事型：检测叙事结构模块（痛点、CTA、谁适合）
+  // - 未知：默认不检测结构模块（宽松策略，避免误报）
+  const purpose = resolveContentPurpose(context.rawInput)
+
+  return targetFormats.filter((format) => {
+    const output = (parsed[format] || "").trim()
+    if (output.length < minimumLength) return true
+    if (purpose === "traffic" || purpose === "unknown") return false
+    const droppedModules = findDroppedStructureModules(sourceText, output, purpose)
+    return droppedModules.length > 0
+  })
+}
+
+/**
+ * 轻改结构骨架检测：识别原文中已有的关键结构模块，检查输出是否把它们删掉了。
+ * 返回被删掉的模块名列表（空数组=没删）。
+ *
+ * 检测范围按内容目的区分：
+ * - lead（线索获客）：检测全部6类（钩子、可收藏抓手、句锚、CTA、谁适合/不适合、痛点场景）
+ * - story（通用故事）：检测叙事相关3类（句锚、CTA、痛点场景）
+ * - traffic / unknown：不调用此函数（上游已跳过）
+ */
+export function findDroppedStructureModules(
+  source: string,
+  output: string,
+  purpose: ContentPurpose = "lead",
+): string[] {
+  const dropped: string[] = []
+  const src = source.toLowerCase()
+  const out = output.toLowerCase()
+
+  // 线索获客按 Obsidian《02-线索获客打法》真实结构严格检测；
+  // 通用故事只检测后3类（句锚/CTA/痛点场景）。
+  const checkAll = purpose === "lead"
+
+  if (checkAll) {
+    // 1. 精准客户三特征落地（至少照出1条：已投入筹码/已感到代价/决策压力）
+    const precisionCustomerMarkers = /(?:已经|之前|此前|去年|前阵子|上周|上个月).{0,20}(?:投入|花|砸|烧|耗|招|换|试过|走过)|花了.{0,8}(?:万|块|费用|预算|冤枉|白花)|已经发过.{0,12}条|已经做了.{0,12}年|团队.{0,8}换过|窗口.{0,8}关闭|机会.{0,8}不等人|决策.{0,8}压力|必须.{0,8}做决定|判断不了|卡在|不知道该不该|不知道怎么选/
+    if (precisionCustomerMarkers.test(src) && !precisionCustomerMarkers.test(out)) {
+      dropped.push("精准客户三特征落地")
+    }
+
+    // 2. 问题（刚需痛点，不是泛泛痛点）
+    const realPainMarkers = /(?:愿意付钱|花过钱|花了钱|投入过|付出过|代价|损失|亏了|白花|浪费|错过|拖下去|继续这样|再不解决|再拖|卡住|卡在|瓶颈|上不去|下不来)/
+    if (realPainMarkers.test(src) && !realPainMarkers.test(out)) {
+      dropped.push("问题-刚需痛点")
+    }
+
+    // 3. 解法三段：错在哪→为什么→怎么做
+    const diagnoseMarkers = /(?:错在|误区|误判|搞错|做错|做反|反了|错杀|漏掉|踩坑|为什么|因为|根源|本质是|底层是|其实是|真相是|怎么做|怎么改|改成|换成|正确做法|对的|应该)/
+    if (diagnoseMarkers.test(src) && !diagnoseMarkers.test(out)) {
+      dropped.push("解法-错在哪/为什么/怎么做")
+    }
+
+    // 4. 方案（小切口，4条件：立刻能用/零门槛/有反馈/只解决局部）
+    const smallSolutionMarkers = /(?:小切口|小方法|小动作|小步骤|一个方法|一个动作|一句话|一个清单|一个标准|一个公式|一个表格|自检|自查|试试|马上能|立刻能|现在就能|零门槛|不用花钱|不用工具|只解决|不替代|不能替代|剩下|其他)/
+    if (smallSolutionMarkers.test(src) && !smallSolutionMarkers.test(out)) {
+      dropped.push("方案-小切口")
+    }
+
+    // 5. 谁适合/谁不适合（线索获客筛人段）
+    const filterMarkers = /(?:适合|不适合|如果你是|你不是|给.*看的|给.*说的|这类人|这种人|这批人|不建议|不服务|不接|不做|甩手|只想.*的人)/
+    if (filterMarkers.test(src) && !filterMarkers.test(out)) {
+      dropped.push("谁适合/谁不适合")
+    }
+  }
+
+  // 以下3类所有目的都检测（线索+故事）
+
+  // 3. 句锚/结尾金句：原文结尾有金句或行动提示，输出必须有
+  const srcTail = src.slice(-200)
+  const outTail = out.slice(-200)
+  const anchorMarkers = /(?:下次你|以后你|遇到.*就用|记住|这一句|这句话|送给你|留给你|这就是|最后说一句|说到底|归根结底|记住一句话)/
+  if (anchorMarkers.test(srcTail) && !anchorMarkers.test(outTail)) {
+    dropped.push("句锚")
+  }
+
+  // 4. CTA / 行动引导
+  const ctaMarkers = /(?:评论|私信|预约|关注|转发|领|领取|资料|报告|咨询|报名|扣|打在评论区|留言|后台|私信我|加我)/
+  if (ctaMarkers.test(src) && !ctaMarkers.test(out)) {
+    dropped.push("CTA")
+  }
+
+  // 6. 痛点场景
+  const painMarkers = /(?:痛点|麻烦|问题|困扰|纠结|踩坑|吃亏|亏了|花了冤枉|白花|浪费|代价|后果|坑|陷阱|误区|盲区)/
+  if (painMarkers.test(src) && !painMarkers.test(out)) {
+    dropped.push("痛点场景")
+  }
+
+  return dropped
 }
 
 export function inspectGenerationSafety(
@@ -121,28 +220,45 @@ export function buildGenerationSafetyRetryPrompt(
   parsed: Partial<Record<ContentFormat, string>>,
   targetFormats: ContentFormat[],
   findings: ReturnType<typeof inspectGenerationSafety>,
+  context?: Pick<AimGenerateContext, "rawInput" | "polishInstruction" | "runtimeTask">,
 ): string {
   const previousOutput = targetFormats
     .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
     .join("\n\n")
   const retryReasons = [
     findings.copiedFormats.length
-      ? `上一版 ${findings.copiedFormats.join("、")} 与对标原文过于相似，判定为“几乎没改”。`
+      ? `上一版 ${findings.copiedFormats.join("、")} 与对标原文过于相似，判定为"几乎没改"。`
       : "",
     findings.unsupportedClaimFormats.length
       ? `上一版 ${findings.unsupportedClaimFormats.join("、")} 出现了上下文无依据的第一人称经历，判定为事实风险。`
       : "",
     findings.lightEditScopeViolationFormats.length
-      ? `上一版 ${findings.lightEditScopeViolationFormats.join("、")} 在整段润色时删掉了原稿信息点或明显缩短篇幅。`
+      ? (() => {
+          const sourceText = context?.rawInput?.replace(/^【成稿】/, "").trim() ?? ""
+          const droppedByFormat = findings.lightEditScopeViolationFormats.map((format) => {
+            const output = (parsed[format] || "").trim()
+            const dropped = sourceText ? findDroppedStructureModules(sourceText, output) : []
+            const lengthIssue = output.length < Math.floor(sourceText.length * 0.72)
+            const parts: string[] = []
+            if (lengthIssue) parts.push("明显缩短篇幅")
+            if (dropped.length > 0) parts.push(`删掉了关键结构模块：${dropped.join("、")}`)
+            return `${format}（${parts.join("；")}）`
+          })
+          return `上一版 ${droppedByFormat.join("、")} 在整段润色时破坏了原稿结构。`
+        })()
       : "",
   ].filter(Boolean).join("\n")
+
+  const structureRestoreHint = findings.lightEditScopeViolationFormats.length > 0
+    ? "\n结构骨架保护：必须恢复原文已有的关键结构模块（钩子、可收藏抓手/清单/步骤、句锚/结尾金句、CTA/行动引导、谁适合/谁不适合、痛点场景）；只改写模块内的文字表达，不允许砍掉模块本身或换成另一种内容目的的写法。"
+    : ""
 
   return `${userPrompt}
 
 【自动质检结果】
 ${retryReasons}
-请重写全部请求格式：保留原选题、原稿全部信息点、结构节奏和目标字数；整段润色必须保持相近篇幅。禁止声称“真事”、“我们公司的人”或“我观察/带过很多人”。无依据的人物案例改为普遍现象、可验证方法或明确写出“假设”的举例。
-除专有名词和固定产品名外，不要连续沿用原文 12 个字以上；不要只替换少量词。
+请重写全部请求格式：保留原选题、原稿全部信息点、结构节奏和目标字数；整段润色必须保持相近篇幅。禁止声称"真事"、"我们公司的人"或"我观察/带过很多人"。无依据的人物案例改为普遍现象、可验证方法或明确写出"假设"的举例。
+除专有名词和固定产品名外，不要连续沿用原文 12 个字以上；不要只替换少量词。${structureRestoreHint}
 
 上一版输出：
 ${previousOutput}`
