@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { AIM_AGENT_OPTIONS, getAimAgent } from "@/lib/aim-ui-config"
+import { AIM_AGENT_OPTIONS, buildAimAgentHref, getAimAgent, listVisibleAimAgents } from "@/lib/aim-ui-config"
 import {
   buildAimNextActionPrompt,
   getAimAgentGuide,
@@ -120,7 +120,9 @@ describe("aim agent guides", () => {
     const lead = skills.find((s) => s.id === "lead_acquisition")!
     const story = skills.find((s) => s.id === "general_story")!
 
+    expect(traffic.description).toBe("结合热点以及经典话题创作。")
     expect(traffic.prompt).toContain("流量漏斗")
+    expect(traffic.prompt).toContain("结合当下热点与经典常青话题")
     expect(traffic.prompt).toContain("可收藏抓手")
     expect(traffic.prompt).not.toContain("线索获客")
     expect(traffic.prompt).not.toContain("通用故事")
@@ -287,6 +289,17 @@ describe("aim agent guides", () => {
     const reviewAgent = AIM_AGENT_OPTIONS.find((agent) => agent.id === "content_review")
 
     expect(reviewAgent?.hidden).toBe(true)
+    expect(listVisibleAimAgents().map((a) => a.id)).toEqual([
+      "business_system_diagnosis",
+      "business_diagnosis",
+      "content_producer",
+      "work_editor",
+      "content_retro",
+    ])
+    expect(buildAimAgentHref("content_producer")).toBe("/aim?agent=content_producer")
+    expect(buildAimAgentHref("work_editor", { stage: "publish" })).toBe(
+      "/aim?agent=work_editor&stage=publish",
+    )
     expect(getAimAgentGuide("content_review").intro).toContain("发布质检")
     expect(getAimAgentGuide("content_review").skills.length).toBeGreaterThan(0)
   })

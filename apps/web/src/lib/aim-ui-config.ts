@@ -106,3 +106,24 @@ export function getAimAgent(id: string | null | undefined): AimAgentMeta {
   if (matched) return matched
   return AIM_AGENT_OPTIONS.find((a) => a.id === DEFAULT_AIM_AGENT)!
 }
+
+/**
+ * 侧栏与创作台总览共用的可见专家列表（按工作流顺序，排除 hidden）。
+ */
+export function listVisibleAimAgents(): AimAgentMeta[] {
+  return AIM_AGENT_OPTIONS.filter((agent) => !agent.hidden)
+}
+
+/**
+ * 组装 AIM 专家工作台链接。
+ */
+export function buildAimAgentHref(
+  agentId: AimAgentId,
+  extras?: { stage?: string; projectId?: string },
+): string {
+  const params = new URLSearchParams()
+  params.set("agent", agentId)
+  if (extras?.stage) params.set("stage", extras.stage)
+  if (extras?.projectId) params.set("projectId", extras.projectId)
+  return `/aim?${params.toString()}`
+}

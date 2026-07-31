@@ -40,5 +40,25 @@ describe("选题策划搜对标技能", () => {
     )
     expect(skill?.workbenchAction).toBe("open_benchmark_search")
     expect(skill?.label).toContain("搜对标")
+    expect(skill?.group).toBe("选题动作")
+  })
+
+  it("只挂在灵感选题策划专家，不常驻其它专家", () => {
+    expect(
+      getAimAgentGuide("business_diagnosis").skills.some((s) => s.id === "market_benchmark_search"),
+    ).toBe(true)
+    expect(
+      getAimAgentGuide("content_producer").skills.some((s) => s.id === "market_benchmark_search"),
+    ).toBe(false)
+    expect(
+      getAimAgentGuide("content_review").skills.some((s) => s.id === "market_benchmark_search"),
+    ).toBe(false)
+  })
+
+  it("引导文案指向从加号菜单触发，而非常驻搜索卡", () => {
+    const intro = getAimAgentGuide("business_diagnosis").intro
+    expect(intro).toContain("「+」")
+    expect(intro).toContain("搜对标选题")
+    expect(intro).not.toContain("可先搜市场上的对标选题")
   })
 })

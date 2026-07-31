@@ -219,7 +219,7 @@ function applyGenerationResponse(
   }))
   const mainResult = response.results[0]
   if (mainResult) input.openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
-  void input.refreshHistory({ force: true, agentId: input.selectedAgentId })
+  void input.refreshHistory({ force: true })
   if (input.selectedProjectId) void input.refreshProjectWorkflow()
   input.setWorkflowBrief(null)
   input.setContentAction(null)

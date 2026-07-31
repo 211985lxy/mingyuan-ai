@@ -21,7 +21,7 @@ export function AimBenchmarkTopicSearchResults(props: {
   if (props.items.length === 0) {
     return (
       <p className="text-[11px] text-muted-foreground">
-        复用市场洞察同一套搜索。搜到后可收藏进研究篮，或一键转成写稿事项。
+        输入关键词后点搜索。搜到后可收藏进研究篮，或一键转成写稿事项。
       </p>
     )
   }

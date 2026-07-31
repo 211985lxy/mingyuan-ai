@@ -9,10 +9,11 @@ import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 const TRAFFIC_FUNNEL_SKILL: AimWorkbenchSkill = {
   id: "traffic_funnel",
   label: "我要搞流量",
-  description: "停留+收藏+复看优先，让用户觉得值得存、值得再看。",
+  description: "结合热点以及经典话题创作。",
   prompt: [
     "【内容目的锚点】= 流量漏斗（曝光/破圈/起号）。",
     "与另外两类区别：追的是传播广度（停下→存→复看），不是看完就成交也不是讲人设故事。",
+    "选题取材：结合当下热点与经典常青话题来创作，热点自然融入，禁止硬蹭或编造。",
     "平台权重：收藏 > 复看/复访 > 铁粉互动 > 点赞；完播率不核心，不为它牺牲厚度。",
     "请基于当前素材写一版可拍摄口播正文；可收藏抓手、中段断裂感、结尾句锚、转发触发点必须写进正文推进。",
   ].join("\n"),

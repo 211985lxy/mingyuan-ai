@@ -11,6 +11,7 @@ describe("aim agent skills", () => {
 
     const [t, l, g] = CONTENT_PRODUCER_SKILLS
     expect(t.label).toBe("我要搞流量")
+    expect(t.description).toBe("结合热点以及经典话题创作。")
     expect(l.label).toBe("我要获客")
     expect(g.label).toBe("我要讲故事")
   })
@@ -18,8 +19,9 @@ describe("aim agent skills", () => {
   it("三条技能各有独立的写作手法，不混同", () => {
     const [t, l, g] = CONTENT_PRODUCER_SKILLS
 
-    // 流量漏斗：核心是停留/收藏/复看，平台权重改了
+    // 流量漏斗：热点+经典话题取材，再落到收藏/复看权重
     expect(t.prompt).toContain("【内容目的锚点】= 流量漏斗")
+    expect(t.prompt).toContain("结合当下热点与经典常青话题")
     expect(t.prompt).toContain("收藏 > 复看/复访 > 铁粉互动 > 点赞")
     expect(t.prompt).toContain("可收藏抓手、中段断裂感、结尾句锚、转发触发点")
 

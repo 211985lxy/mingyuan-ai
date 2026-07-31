@@ -363,7 +363,7 @@ export function useAimWorkbench() {
   // ---- openProjectWorkflowTask ----
   async function openProjectWorkflowTask(id: string) {
     if (!selectedProjectId) return
-    await refreshHistory({ force: true, projectId: selectedProjectId, agentId: selectedAgentId })
+    await refreshHistory({ force: true, projectId: selectedProjectId })
     requestLoad(id)
   }
 
@@ -440,7 +440,7 @@ export function useAimWorkbench() {
       nextParams.set("projectId", projectId)
       nextParams.set("generationId", generationId)
       router.replace(`/aim?${nextParams.toString()}`)
-      void refreshHistory({ force: true, projectId, agentId: selectedAgentId })
+      void refreshHistory({ force: true, projectId })
     },
   })
 

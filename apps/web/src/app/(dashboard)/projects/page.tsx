@@ -105,13 +105,6 @@ export default function ProjectsPage() {
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
         {/* 左：新建 */}
         <section className="min-w-0 space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-base font-semibold tracking-tight text-foreground">新建（少用）</h2>
-            <p className="text-sm text-muted-foreground">
-              默认不用建。补资料去知识库。
-            </p>
-          </div>
-
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="project-name">

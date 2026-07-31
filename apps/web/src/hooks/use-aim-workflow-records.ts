@@ -178,7 +178,7 @@ interface UseAimWorkflowRecordsInput {
   setMessages?: Dispatch<SetStateAction<AimWorkbenchMessage[]>>
   selectedAgentId: AimAgentId
   selectedProjectId: string
-  refreshHistory: (options: { force: boolean; agentId: AimAgentId }) => Promise<void>
+  refreshHistory: (options?: { projectId?: string; agentId?: string; force?: boolean }) => Promise<void>
   refreshProjectWorkflow: () => Promise<void>
   onPublished?: (generationId: string) => void
 }
@@ -247,7 +247,7 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
   const forms = useAimRecordForms()
   const [recordDialog, setRecordDialog] = useState<WorkflowRecordDialogState | null>(null)
   const refreshRecords = useCallback(() => {
-    void input.refreshHistory({ force: true, agentId: input.selectedAgentId })
+    void input.refreshHistory({ force: true })
     if (input.selectedProjectId) void input.refreshProjectWorkflow()
   }, [input])
   const reportMessageOutcome = useCallback(async (

@@ -19,7 +19,6 @@ import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
 import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
-import { AimRetroListPanel } from "@/components/aim/aim-retro-list-panel"
 import { AimBenchmarkTopicSearchPanel } from "@/components/aim/aim-benchmark-topic-search-panel"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
@@ -51,7 +50,7 @@ export default function AimPage() {
   const [stylePreviewOpen, setStylePreviewOpen] = useState(false)
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
   const [styleEnabled, setStyleEnabled] = useState(false)
-  const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(true)
+  const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(false)
   const [skillDialogOpen, setSkillDialogOpen] = useState(false)
   const [editingSkill, setEditingSkill] = useState<AimWorkbenchSkill | null>(null)
   const skillState = useAimWorkbenchSkills(
@@ -84,6 +83,7 @@ export default function AimPage() {
     setPastedCopy(null)
     setStylePreviewOpen(false)
     setStyleSamples([])
+    setBenchmarkSearchOpen(false)
   }, [w.selectedAgentId, w.selectedProjectId])
 
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
@@ -237,7 +237,7 @@ export default function AimPage() {
       <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-2 md:px-4">
         <AimWorkbenchHeader
           workflowStage={w.currentWorkflowStage}
-          agentTitle={w.agent.title}
+          agentTitle={isLanding ? "创作台" : w.agent.title}
           AgentIcon={w.agent.icon}
           showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
@@ -317,11 +317,7 @@ export default function AimPage() {
         )}
 
         {isLanding ? (
-          <AimLandingHero
-            intro={w.agent.intro}
-          >
-            {composer}
-          </AimLandingHero>
+          <AimLandingHero />
         ) : (
           <>
             <AimMessageStream
@@ -365,39 +361,18 @@ export default function AimPage() {
               }}
             />
 
-            {!w.planSession.isPlanMode && w.selectedAgentId === "content_retro" ? (
-              <div className="px-3 pb-1 sm:px-5">
-                <AimRetroListPanel
-                  projectId={w.projectEnabled ? w.selectedProjectId || undefined : undefined}
-                  selectedId={w.retroTargetGenerationId}
-                  onSelect={(id) => {
-                    w.setRetroTargetGenerationId(id)
-                    toast.success("已选中复盘目标，可粘贴发布数据或点开始复盘")
-                  }}
-                  onStartRetro={(id) => {
-                    w.setRetroTargetGenerationId(id)
-                    void w.sendText("请基于这条内容已登记的发布数据做内容数据复盘。", { resultId: id })
-                  }}
-                />
-              </div>
-            ) : null}
-
-            {!w.planSession.isPlanMode && w.selectedAgentId === "business_diagnosis" ? (
-              <div className="px-3 pb-1 sm:px-5">
-                <AimBenchmarkTopicSearchPanel
-                  projectId={w.projectEnabled ? w.selectedProjectId || null : null}
-                  open={benchmarkSearchOpen}
-                  onOpenChange={setBenchmarkSearchOpen}
-                />
-              </div>
-            ) : null}
-
             {!w.planSession.isPlanMode && (
               <footer className="px-3 pb-2 pt-1 sm:px-5 sm:pb-3">{composer}</footer>
             )}
           </>
         )}
       </section>
+
+      <AimBenchmarkTopicSearchPanel
+        projectId={w.projectEnabled ? w.selectedProjectId || null : null}
+        open={benchmarkSearchOpen}
+        onOpenChange={setBenchmarkSearchOpen}
+      />
 
       <AimSkillEditDialog
         open={skillDialogOpen}

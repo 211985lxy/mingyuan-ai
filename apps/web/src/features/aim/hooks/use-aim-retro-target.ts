@@ -5,7 +5,7 @@ import { findLatestAimDeliverableId } from "@/lib/aim/workbench-helpers"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
 /**
- * 数据复盘目标内容：列表点选优先，否则回落到当前会话交付物。
+ * 数据复盘目标内容：优先用显式指定的 generationId，否则回落到当前会话最新交付物。
  */
 export function useAimRetroTarget(messages: AimWorkbenchMessage[]) {
   const [retroTargetGenerationId, setRetroTargetGenerationId] = useState<string | null>(null)

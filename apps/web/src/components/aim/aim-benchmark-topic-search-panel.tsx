@@ -1,40 +1,38 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronDown, Loader2, Search } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { AimBenchmarkTopicSearchResults } from "@/components/aim/aim-benchmark-topic-search-results"
 import { useAimBenchmarkTopicSearch } from "@/features/aim/hooks/use-aim-benchmark-topic-search"
-import { cn } from "@/lib/utils"
 
+/** 对标选题搜索：仅由「+ → 搜对标选题」技能打开，不再常驻工作台。 */
 export function AimBenchmarkTopicSearchPanel(props: {
   projectId?: string | null
-  defaultOpen?: boolean
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }) {
-  const [uncontrolledOpen, setUncontrolledOpen] = useState(Boolean(props.defaultOpen))
-  const open = props.open ?? uncontrolledOpen
-  const setOpen = props.onOpenChange ?? setUncontrolledOpen
   const search = useAimBenchmarkTopicSearch(props.projectId)
 
   return (
-    <div className="mx-auto w-full max-w-3xl rounded-xl border border-border/70 bg-card/60">
-      <button
-        type="button"
-        className="flex h-9 w-full items-center gap-2 px-3 text-left text-xs font-medium text-foreground"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-      >
-        <Search className="size-3.5 shrink-0 text-primary" />
-        <span className="min-w-0 flex-1 truncate">搜市场上的对标选题</span>
-        <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
-      </button>
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className="max-w-3xl gap-3 sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>搜市场上的对标选题</DialogTitle>
+          <DialogDescription>
+            复用市场洞察同一套搜索。搜到后可收藏进研究篮，或一键转成写稿事项。
+          </DialogDescription>
+        </DialogHeader>
 
-      {open ? (
-        <div className="space-y-2 border-t border-border/60 px-3 pb-3 pt-2">
+        <div className="space-y-2">
           <div className="flex gap-2">
             <Input
               value={search.keyword}
@@ -44,6 +42,7 @@ export function AimBenchmarkTopicSearchPanel(props: {
               }}
               placeholder="关键词：赛道 / 痛点 / 对标品类…"
               className="h-8 flex-1 text-xs"
+              autoFocus
             />
             <Button
               type="button"
@@ -65,7 +64,7 @@ export function AimBenchmarkTopicSearchPanel(props: {
             onWrite={(item) => void search.write(item)}
           />
         </div>
-      ) : null}
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

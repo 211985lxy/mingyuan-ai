@@ -20,7 +20,7 @@ describe("prepareAnalyticsIngest", () => {
     expect(result.status).toBe("need_target")
     if (result.status === "need_target") {
       expect(result.parsed.ok).toBe(true)
-      expect(result.message).toContain("选中")
+      expect(result.message).toContain("成稿")
     }
   })
 

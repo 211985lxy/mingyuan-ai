@@ -89,7 +89,7 @@ export async function repurposeDeliverable(
         }
       }),
     )
-    void input.refreshHistory({ force: true, agentId: input.selectedAgentId })
+    void input.refreshHistory({ force: true })
     const failed = response.taskSpec?.contentPackage?.failedFormats ?? []
     if (failed.length > 0) {
       toast.success(

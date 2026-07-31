@@ -48,7 +48,7 @@ export function prepareAnalyticsIngest(input: {
     return {
       status: "need_target",
       parsed,
-      message: "已识别发布数据，请先在复盘列表里选中要挂靠的那条内容，再发送。不会写库、不会编数字。",
+      message: "已识别发布数据，请先在本会话打开要复盘的那条成稿，再粘贴发送。不会写库、不会编数字。",
     }
   }
 

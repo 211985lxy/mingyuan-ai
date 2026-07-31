@@ -6,16 +6,16 @@ import { deleteAimHistory, listAimHistory, type AimGeneration } from "@/lib/api/
 interface FetchHistoryOpts {
   /** 按全案过滤；不传则不按全案过滤 */
   projectId?: string
-  /** 按智能体过滤；不传则取全局最近（侧栏应按智能体传入） */
+  /** 按智能体过滤；侧栏按专家分组时不传，取全局最近再客户端分组 */
   agentId?: string
   /** 强制刷新，跳过节流 */
   force?: boolean
 }
 
 interface AimWorkspaceState {
-  /** 最近生成记录，供侧边栏「最近任务」渲染（按 historyAgentId 过滤） */
+  /** 最近生成记录，供侧边栏按专家分组渲染「最近任务」 */
   history: AimGeneration[]
-  /** 当前 history 对应的智能体；null = 全局未分智能体 */
+  /** 当前 history 对应的智能体过滤；null = 全局最近 */
   historyAgentId: string | null
   isLoading: boolean
   /** 上次成功拉取时间戳，用于节流 */
@@ -60,7 +60,7 @@ export const useAimWorkspaceStore = create<AimWorkspaceState>()((set, get) => ({
     ) {
       return
     }
-    // 切换智能体时先清空，避免短暂展示上一专家的任务
+    // 过滤条件变化时先清空，避免短暂串台
     if (!filterUnchanged) {
       set({ history: [], historyAgentId: nextAgentId, isLoading: true })
     } else {
