@@ -77,13 +77,13 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 export const AGENT_ROUTES = freezeAgentRoutes({
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
-    // 旗舰链：Claude → GPT-5.6 → ERNIE 5.1（作品编辑润色/排版；长文创作已归 content_producer）
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 120000, capability: "advanced" },
-    { name: "lihuo", model: "gpt-5.6", timeoutMs: 120000, capability: "advanced" },
-    { name: "qianfan", model: "ernie-5.1", timeoutMs: 90000, capability: "advanced" },
-    { name: "apimart", timeoutMs: 120000, capability: "advanced" },
-    { name: "deepseek", capability: "standard" },
-    { name: "glm", capability: "standard" },
+    // 先快失败再换路：ZenMux/离火近年常超时或 503，超时预算要短于前端流式总超时
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 25000, capability: "advanced" },
+    { name: "apimart", timeoutMs: 45000, capability: "advanced" },
+    { name: "deepseek", timeoutMs: 30000, capability: "standard" },
+    { name: "qianfan", model: "ernie-5.1", timeoutMs: 45000, capability: "advanced" },
+    { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
+    { name: "glm", timeoutMs: 30000, capability: "standard" },
   ],
   business_diagnosis: [
     // APIMart is the verified healthy advanced route; long diagnosis needs more than the generic 20s fallback budget.
