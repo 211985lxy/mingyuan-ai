@@ -7,6 +7,7 @@ import type { AdminRole } from "@/types/content-template"
 import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
 import { apiRequestErrorResponse } from "@/lib/api-contract"
 import { createRequestLogger, generateRequestId, hashLogIdentifier } from "@/lib/logger"
+import { safeSecretEqual } from "@/lib/aim/work-item-api-auth"
 
 const ADMIN_JWT_SECRET = env.ADMIN_JWT_SECRET
 
@@ -156,5 +157,6 @@ export function validateCronSecret(request: NextRequest): boolean {
   const auth = request.headers.get("authorization")
   const cronSecret = env.CRON_SECRET
   if (!cronSecret) return false
-  return auth === `Bearer ${cronSecret}`
+  // 常量时间比较，防时序侧信道（与飞书验签、work-item 鉴权同一套惯例）。
+  return safeSecretEqual(`Bearer ${cronSecret}`, auth ?? "")
 }
