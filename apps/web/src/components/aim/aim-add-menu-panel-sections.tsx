@@ -19,12 +19,13 @@ import { cn } from "@/lib/utils"
 
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
 
+
 export interface SkillGroup {
   group: string
   items: AimWorkbenchSkill[]
 }
 
-export type AddMenuView = "root" | "skills" | "modes"
+export type AddMenuView = "root" | "skills" | "modes" | "purposes"
 
 function matchesQuery(query: string, ...terms: string[]) {
   if (!query) return true
@@ -259,6 +260,7 @@ export function ContentModeSubList(props: ContentModeSectionProps) {
   )
 }
 
+
 /* ------------------- 技能：根行 + 子列表 ------------------- */
 
 export interface SkillsSectionProps {
@@ -279,14 +281,14 @@ export function SkillsRootRow(props: {
   query: string
 }) {
   const { show, skills, setView, query } = props
-  if (!show) return null
+  if (!show || skills.length === 0) return null
   const q = query.trim().toLowerCase()
   if (!matchesQuery(q, "技能", "skills")) return null
   return (
     <MenuListRow
       icon={<BookOpen className="size-4" strokeWidth={1.75} />}
       label="技能"
-      hint={skills.length > 0 ? `${skills.length} 个内置技能` : "当前暂无内置技能"}
+      hint={`${skills.length} 个内置技能`}
       trailing={<ChevronRight className="size-3.5 text-muted-foreground/70" />}
       onClick={() => setView("skills")}
     />

@@ -24,7 +24,7 @@ import { AimBenchmarkTopicSearchPanel } from "@/components/aim/aim-benchmark-top
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { useAimWorkbenchSkills } from "@/features/aim/hooks/use-aim-workbench-skills"
-import { getAimAgentGuide, type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import { type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import {
@@ -318,12 +318,7 @@ export default function AimPage() {
 
         {isLanding ? (
           <AimLandingHero
-            purposes={getAimAgentGuide(w.selectedAgentId).skills}
             intro={w.agent.intro}
-            onSelectPurpose={(skill) => {
-              if (w.selectedAgentId !== "content_producer") w.beginWorkflowStage("content")
-              w.handleUseSkill(skill)
-            }}
           >
             {composer}
           </AimLandingHero>

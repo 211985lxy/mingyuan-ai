@@ -33,7 +33,7 @@ describe("aim agent guides", () => {
   it("does not expose structural copyVariants beside purpose skills", () => {
     const guide = getAimAgentGuide("content_producer")
     expect((guide as { copyVariants?: unknown }).copyVariants).toBeUndefined()
-    expect(guide.skills.map((s) => s.label)).toEqual(["流量漏斗", "线索获客", "通用故事"])
+    expect(guide.skills.map((s) => s.label)).toEqual(["我要搞流量", "我要获客", "我要讲故事"])
   })
 
   it("uses task-based workflow names on the visible agent list", () => {
@@ -66,11 +66,11 @@ describe("aim agent guides", () => {
       ...guide.outputAssets,
     ].join("\n")
 
-    expect(guideText).toContain("流量漏斗")
-    expect(guideText).toContain("线索获客")
-    expect(guideText).toContain("通用故事")
+    expect(guideText).toContain("我要搞流量")
+    expect(guideText).toContain("我要获客")
+    expect(guideText).toContain("我要讲故事")
     expect(guide.quickPrompts).toHaveLength(3)
-    expect(guide.scenarios).toEqual(["流量漏斗口播", "线索获客口播", "通用故事口播"])
+    expect(guide.scenarios).toEqual(["我要搞流量口播", "我要获客口播", "我要讲故事口播"])
     expect(guide.defaultInstruction).toContain("未说明时默认按流量漏斗处理")
     expect(guide.defaultInstruction).not.toContain("对标再创作")
     expect(guide.quickPrompts.join("\n")).not.toContain("多平台")
@@ -113,7 +113,7 @@ describe("aim agent guides", () => {
     const ids = skills.map((skill) => skill.id)
 
     expect(ids).toEqual(["traffic_funnel", "lead_acquisition", "general_story"])
-    expect(labels).toEqual(["流量漏斗", "线索获客", "通用故事"])
+    expect(labels).toEqual(["我要搞流量", "我要获客", "我要讲故事"])
     expect(skills.every((skill) => skill.group === "内容目的")).toBe(true)
 
     const traffic = skills.find((s) => s.id === "traffic_funnel")!
@@ -251,7 +251,7 @@ describe("aim agent guides", () => {
   it("routes persona/story work through the independent general_story skill (still on content_producer)", () => {
     const story = getAimAgentGuide("content_producer").skills.find((s) => s.id === "general_story")
 
-    expect(story?.label).toBe("通用故事")
+    expect(story?.label).toBe("我要讲故事")
     expect(story?.prompt).toContain("来时路")
     expect(story?.prompt).toContain("置顶视频")
     expect(story?.prompt).toContain("不强行推产品")

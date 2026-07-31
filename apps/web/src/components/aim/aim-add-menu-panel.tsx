@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type RefObject } from "react"
+import { useEffect, useMemo, useState, type RefObject } from "react"
 
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { type CopyStudioModule } from "@/lib/copy-studio"
@@ -19,13 +19,21 @@ import {
   type AddMenuView,
   type SkillGroup,
 } from "@/components/aim/aim-add-menu-panel-sections"
+import {
+  excludeContentPurposeGroups,
+  excludeContentPurposeSkills,
+  isContentPurposeSkill,
+  PurposesRootRow,
+  PurposesSearchHits,
+  PurposesSubList,
+} from "@/components/aim/aim-add-menu-panel-purposes"
 
 const POPOVER_SHADOW =
   "shadow-[0_0_0_1px_rgba(239,231,220,0.95),0_12px_32px_-8px_rgba(37,33,29,0.12)]"
 
 /**
  * 「+」弹出面板：Cursor 风格搜索 + 列表行。
- * 根层是快捷动作 / 创作模式 / 技能入口；点带 › 的项再钻进子列表。
+ * 根层是快捷动作 / 内容目的 / 创作模式 / 技能入口；点带 › 的项再钻进子列表。
  */
 type AimAddMenuProps = {
   busy: boolean
@@ -60,10 +68,20 @@ function useAddMenuViewController(setContentModeExpanded: AimAddMenuProps["setCo
   return { view, setView }
 }
 
+function useSplitSkills(skills: AimWorkbenchSkill[], filteredSkills: SkillGroup[]) {
+  return useMemo(() => {
+    const purposes = skills.filter(isContentPurposeSkill)
+    const workSkills = excludeContentPurposeSkills(skills)
+    const workFilteredSkills = excludeContentPurposeGroups(filteredSkills)
+    return { purposes, workSkills, workFilteredSkills }
+  }, [skills, filteredSkills])
+}
+
 function renderAddMenuBody(
   view: AddMenuView, setView: (v: AddMenuView) => void,
   props: AimAddMenuProps, skillQuery: string, setSkillQuery: (v: string) => void,
   close: () => void, fileInputRef: RefObject<HTMLInputElement | null>,
+  purposes: AimWorkbenchSkill[], workSkills: AimWorkbenchSkill[], workFilteredSkills: SkillGroup[],
 ) {
   return (
     <>
@@ -77,8 +95,9 @@ function renderAddMenuBody(
             canUsePlanMode={props.canUsePlanMode} isPlanMode={props.isPlanMode}
             query={skillQuery} showContentModeControl={props.showContentModeControl}
             onContentModeChange={props.onContentModeChange} contentModeLabel={props.contentModeLabel}
-            setView={setView} showSkills={props.showSkills} skills={props.skills}
-            filteredSkills={props.filteredSkills} onUseSkill={props.onUseSkill}
+            setView={setView} showSkills={props.showSkills} skills={workSkills}
+            purposes={purposes}
+            filteredSkills={workFilteredSkills} onUseSkill={props.onUseSkill}
           />
         ) : null}
         {view === "modes" ? (
@@ -89,10 +108,19 @@ function renderAddMenuBody(
             options={props.contentModeOptions} close={close} query={skillQuery}
           />
         ) : null}
+        {view === "purposes" ? (
+          <PurposesSubList
+            purposes={purposes}
+            onUseSkill={props.onUseSkill}
+            close={close}
+            setView={setView}
+            query={skillQuery}
+          />
+        ) : null}
         {view === "skills" ? (
           <SkillsSubList
-            show={props.showSkills} skills={props.skills}
-            filteredSkills={props.filteredSkills} onUseSkill={props.onUseSkill}
+            show={props.showSkills} skills={workSkills}
+            filteredSkills={workFilteredSkills} onUseSkill={props.onUseSkill}
             close={close} view={view} setView={setView} query={skillQuery}
           />
         ) : null}
@@ -106,14 +134,19 @@ export function AimAddMenuPanel(rawProps: AimAddMenuProps) {
   void rawProps.onAddImagesClick
   void rawProps.contentModeExpanded
   const { view, setView } = useAddMenuViewController(rawProps.setContentModeExpanded, rawProps.skillQuery)
+  const { purposes, workSkills, workFilteredSkills } = useSplitSkills(rawProps.skills, rawProps.filteredSkills)
   return (
     <PopoverShell>
-      {renderAddMenuBody(view, setView, rawProps, rawProps.skillQuery, rawProps.setSkillQuery, rawProps.close, rawProps.fileInputRef)}
+      {renderAddMenuBody(
+        view, setView, rawProps, rawProps.skillQuery, rawProps.setSkillQuery,
+        rawProps.close, rawProps.fileInputRef,
+        purposes, workSkills, workFilteredSkills,
+      )}
     </PopoverShell>
   )
 }
 
-function RootMenu(props: {
+type RootMenuProps = {
   busy: boolean
   onAddImages?: boolean
   fileInputRef: RefObject<HTMLInputElement | null>
@@ -129,66 +162,77 @@ function RootMenu(props: {
   setView: (view: AddMenuView) => void
   showSkills: boolean
   skills: AimWorkbenchSkill[]
+  purposes: AimWorkbenchSkill[]
   filteredSkills: SkillGroup[]
   onUseSkill?: (skill: AimWorkbenchSkill) => void
-}) {
-  const {
-    busy, onAddImages, fileInputRef, close,
-    showPlanModeControl, onComposerModeChange, canUsePlanMode, isPlanMode,
-    query, showContentModeControl, onContentModeChange, contentModeLabel,
-    setView, showSkills, skills, filteredSkills, onUseSkill,
-  } = props
-  const searching = Boolean(query.trim())
+}
 
+function RootBrowseRows(props: RootMenuProps) {
+  return (
+    <>
+      <PurposesRootRow purposes={props.purposes} setView={props.setView} query={props.query} />
+      <ContentModeRootRow
+        show={props.showContentModeControl}
+        onChange={props.onContentModeChange}
+        contentModeLabel={props.contentModeLabel}
+        setView={props.setView}
+        query={props.query}
+      />
+      <SkillsRootRow
+        show={props.showSkills}
+        skills={props.skills}
+        setView={props.setView}
+        query={props.query}
+      />
+    </>
+  )
+}
+
+function RootSearchRows(props: RootMenuProps) {
+  return (
+    <>
+      <PurposesSearchHits
+        query={props.query}
+        purposes={props.purposes}
+        onUseSkill={props.onUseSkill}
+        close={props.close}
+      />
+      <ContentModeRootRow
+        show={props.showContentModeControl}
+        onChange={props.onContentModeChange}
+        contentModeLabel={props.contentModeLabel}
+        setView={props.setView}
+        query={props.query}
+      />
+      <SkillsSearchHits
+        show={props.showSkills}
+        query={props.query}
+        filteredSkills={props.filteredSkills}
+        onUseSkill={props.onUseSkill}
+        close={props.close}
+      />
+    </>
+  )
+}
+
+function RootMenu(props: RootMenuProps) {
+  const searching = Boolean(props.query.trim())
   return (
     <>
       <QuickActionRows
-        busy={busy}
-        onAddImages={onAddImages}
-        fileInputRef={fileInputRef}
-        close={close}
-        showPlanModeControl={showPlanModeControl}
-        onComposerModeChange={onComposerModeChange}
-        canUsePlanMode={canUsePlanMode}
-        isPlanMode={isPlanMode}
-        query={query}
+        busy={props.busy}
+        onAddImages={props.onAddImages}
+        fileInputRef={props.fileInputRef}
+        close={props.close}
+        showPlanModeControl={props.showPlanModeControl}
+        onComposerModeChange={props.onComposerModeChange}
+        canUsePlanMode={props.canUsePlanMode}
+        isPlanMode={props.isPlanMode}
+        query={props.query}
       />
       {!searching ? <MenuDivider /> : null}
       <div className="space-y-0.5">
-        {!searching ? (
-          <>
-            <ContentModeRootRow
-              show={showContentModeControl}
-              onChange={onContentModeChange}
-              contentModeLabel={contentModeLabel}
-              setView={setView}
-              query={query}
-            />
-            <SkillsRootRow
-              show={showSkills}
-              skills={skills}
-              setView={setView}
-              query={query}
-            />
-          </>
-        ) : (
-          <>
-            <ContentModeRootRow
-              show={showContentModeControl}
-              onChange={onContentModeChange}
-              contentModeLabel={contentModeLabel}
-              setView={setView}
-              query={query}
-            />
-            <SkillsSearchHits
-              show={showSkills}
-              query={query}
-              filteredSkills={filteredSkills}
-              onUseSkill={onUseSkill}
-              close={close}
-            />
-          </>
-        )}
+        {searching ? <RootSearchRows {...props} /> : <RootBrowseRows {...props} />}
       </div>
     </>
   )

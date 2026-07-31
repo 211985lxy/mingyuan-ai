@@ -1,6 +1,6 @@
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 
-/** 三条独立内容目的技能：用户在 landing 或 + 菜单里点哪张，就按那个目的直接出稿，
+/** 三条独立内容目的技能：用户在「+」菜单「内容目的」子页里点选，就按那个目的直接出稿，
  *  不再需要模型自己在 prompt 里判断 A/B/C。
  *  ⚠️ 规则单源：三大技能只做「意图锚点 + 差异说明」，真正的写作结构/权重口径/禁忌
  *     一律通过动态选卡系统（ip-copywriting-cards.ts）注入——避免 Skills 与卡片两边规则漂移。
@@ -8,7 +8,7 @@ import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 
 const TRAFFIC_FUNNEL_SKILL: AimWorkbenchSkill = {
   id: "traffic_funnel",
-  label: "流量漏斗",
+  label: "我要搞流量",
   description: "停留+收藏+复看优先，让用户觉得值得存、值得再看。",
   prompt: [
     "【内容目的锚点】= 流量漏斗（曝光/破圈/起号）。",
@@ -22,7 +22,7 @@ const TRAFFIC_FUNNEL_SKILL: AimWorkbenchSkill = {
 
 const LEAD_ACQUISITION_SKILL: AimWorkbenchSkill = {
   id: "lead_acquisition",
-  label: "线索获客",
+  label: "我要获客",
   description: "让对的人觉得你懂他，自然引导评论/私信/预约。",
   prompt: [
     "【内容目的锚点】= 线索获客（筛选精准人群后留资/私信/预约）。",
@@ -36,7 +36,7 @@ const LEAD_ACQUISITION_SKILL: AimWorkbenchSkill = {
 
 const GENERAL_STORY_SKILL: AimWorkbenchSkill = {
   id: "general_story",
-  label: "通用故事",
+  label: "我要讲故事",
   description: "真实经历/人设信任；要人设故事、来时路、置顶视频都走这条。",
   prompt: [
     "【内容目的锚点】= 通用故事（人设/来时路/真实经历/置顶视频/账号信任资产）。",

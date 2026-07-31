@@ -5,14 +5,14 @@ import {
 } from "@/lib/aim-agent-skills"
 
 describe("aim agent skills", () => {
-  it("拆成三条独立技能：流量漏斗、线索获客、通用故事", () => {
+  it("拆成三条独立技能：我要搞流量、我要获客、我要讲故事", () => {
     const ids = CONTENT_PRODUCER_SKILLS.map(s => s.id)
     expect(ids).toEqual(["traffic_funnel", "lead_acquisition", "general_story"])
 
     const [t, l, g] = CONTENT_PRODUCER_SKILLS
-    expect(t.label).toBe("流量漏斗")
-    expect(l.label).toBe("线索获客")
-    expect(g.label).toBe("通用故事")
+    expect(t.label).toBe("我要搞流量")
+    expect(l.label).toBe("我要获客")
+    expect(g.label).toBe("我要讲故事")
   })
 
   it("三条技能各有独立的写作手法，不混同", () => {

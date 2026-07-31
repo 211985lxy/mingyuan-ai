@@ -296,7 +296,7 @@ describe("AIM content production positioning", () => {
     expect(workEditor?.description).toMatch(/二改|排版|小红书/)
     expect(workEditor?.description).not.toMatch(/深度长文|从零/)
     expect(workEditor?.defaultFormats).toEqual(["raw_copy"])
-    expect(contentProducer?.description).toMatch(/流量漏斗|线索获客|通用故事/)
+    expect(contentProducer?.description).toMatch(/我要搞流量|我要获客|我要讲故事/)
   })
 
   it("positions content_review as the publish quality agent", () => {

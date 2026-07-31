@@ -39,31 +39,28 @@ describe("AIM workbench chrome", () => {
     expect(html).not.toContain("快速出稿")
   })
 
-  it("renders the landing hero with a purpose list and the composer", () => {
+  it("renders the landing hero with composer and points to the + menu for purposes", () => {
     const html = renderToStaticMarkup(createElement(
       AimLandingHero,
       {
-        purposes: [
-          { id: "traffic_funnel", label: "流量漏斗", description: "停留+收藏+复看优先", prompt: "p1" },
-          { id: "lead_acquisition", label: "线索获客", description: "私信预约", prompt: "p2" },
-          { id: "general_story", label: "通用故事", description: "人设信任", prompt: "p3" },
-        ],
-        onSelectPurpose: vi.fn(),
+        intro: "专家简介示例",
       },
       createElement("div", null, "COMPOSER_MARKER"),
     ))
 
     expect(html).toContain("今天想得到什么结果")
-    expect(html).toContain("一键开始 · 选择内容目的")
-    expect(html).toContain("aria-expanded=\"true\"")
-    expect(html).toContain("流量漏斗")
-    expect(html).toContain("线索获客")
-    expect(html).toContain("通用故事")
-    expect(html).toContain("停留+收藏+复看优先")
-    expect(html).toContain("私信预约")
-    expect(html).toContain("人设信任")
+    expect(html).toContain("内容目的在左下角")
     expect(html).toContain("COMPOSER_MARKER")
-    // 收束成列表，不再用大卡片网格；也不是旧口径
+    expect(html).toContain("专家简介示例")
+    // 落地页不再铺「一键开始」三选一
+    expect(html).not.toContain("一键开始 · 选择内容目的")
+    expect(html).not.toContain("我要搞流量")
+    expect(html).not.toContain("我要获客")
+    expect(html).not.toContain("我要讲故事")
+    expect(html).not.toContain("流量漏斗")
+    expect(html).not.toContain("线索获客")
+    expect(html).not.toContain("通用故事")
+    expect(html).not.toContain("停留+收藏+复看优先")
     expect(html).not.toContain("漏斗获客与故事口播")
     expect(html).not.toContain("完播优先")
     expect(html).not.toContain("sm:grid-cols-2")

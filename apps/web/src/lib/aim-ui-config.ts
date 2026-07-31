@@ -49,7 +49,7 @@ export const AIM_AGENT_OPTIONS: AimAgentMeta[] = [
   {
     id: "content_producer",
     title: "内容创作",
-    description: "流量漏斗、线索获客、通用故事口播",
+    description: "我要搞流量、我要获客、我要讲故事口播",
     icon: Video,
     defaultFormats: ["video_script"],
   },

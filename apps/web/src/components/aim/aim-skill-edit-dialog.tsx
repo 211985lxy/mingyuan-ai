@@ -91,7 +91,7 @@ function SkillFormFields(props: {
         <Input value={form.skillId} onChange={(e) => patch({ skillId: e.target.value })} placeholder="如 my_custom_skill" disabled={isEdit} />
       </Field>
       <Field label="技能名称" hint="显示在技能卡片上的标题">
-        <Input value={form.label} onChange={(e) => patch({ label: e.target.value })} placeholder="如 流量漏斗" />
+        <Input value={form.label} onChange={(e) => patch({ label: e.target.value })} placeholder="如 我要搞流量" />
       </Field>
       <Field label="一句话描述" hint="显示在标题下方">
         <Input value={form.description} onChange={(e) => patch({ description: e.target.value })} placeholder="这个技能做什么" />
