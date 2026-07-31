@@ -30,7 +30,7 @@ export interface AimWorkbenchSkill {
   /** 技能分组标签（UI 按组渲染，空则不分组） */
   group?: string
   /** 工作台专用动作：不填提示词，改为打开面板等 */
-  workbenchAction?: "open_benchmark_search"
+  workbenchAction?: "open_benchmark_search" | "open_batch_script_studio"
   /** 自定义技能标记：true 表示来自数据库（可编辑/删除），false 或缺省为内置 */
   isCustom?: boolean
 }

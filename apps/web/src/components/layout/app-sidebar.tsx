@@ -52,7 +52,7 @@ interface NavItem {
 
 /** 一级导航：创作台统一开工；爆款拆解保留高频入口 */
 const quickNav: NavItem[] = [
-  { title: "创作台", href: "/aim", icon: PenLine },
+  { title: "创作台", href: "/home", icon: PenLine },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
@@ -154,7 +154,7 @@ export function AppSidebar() {
           className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
         >
           <Plus className="h-3.5 w-3.5" />
-          新建文案
+          新建任务
         </button>
       </SidebarHeader>
 

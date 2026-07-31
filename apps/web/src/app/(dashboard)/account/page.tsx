@@ -21,6 +21,7 @@ import type { ApiAgentApiKeySummary, ApiUser } from "@/types/api"
 import { ChannelBindingsPanel } from "@/components/account/channel-bindings-panel"
 import { InspirationFailuresPanel } from "@/components/account/inspiration-failures-panel"
 import { AgentKeysPanel } from "@/components/account/agent-keys-panel"
+import { PlatformIntegrationsCard } from "@/features/integrations/components/platform-integrations-card"
 
 /* ── Page ────────────────────────────────────────────────── */
 
@@ -225,6 +226,8 @@ export default function AccountPage() {
           )}
         </CardContent>
       </Card>
+
+      <PlatformIntegrationsCard />
 
       <ChannelBindingsPanel />
 

@@ -45,6 +45,25 @@ export const AIM_WORKFLOW_LEGAL_TRANSITIONS: Record<AimWorkflowStatus, AimWorkfl
   archived: [],
 }
 
+/**
+ * 工作流状态 → 进度百分比（0-100），用于「继续上次」卡片进度条。
+ * 终态 published=100；archived 不展示进度（返回 0）；非法/缺省按 draft 处理。
+ */
+export const AIM_WORKFLOW_PROGRESS: Record<AimWorkflowStatus, number> = {
+  draft: 20,
+  pending_review: 35,
+  ready_to_shoot: 50,
+  shooting: 65,
+  editing: 80,
+  ready_to_publish: 92,
+  published: 100,
+  archived: 0,
+}
+
+export function getAimWorkflowProgress(status: string | null | undefined): number {
+  return AIM_WORKFLOW_PROGRESS[normalizeAimWorkflowStatus(status)] ?? 0
+}
+
 export function isAimWorkflowStatus(value: unknown): value is AimWorkflowStatus {
   return typeof value === "string" && (AIM_WORKFLOW_STATUSES as readonly string[]).includes(value)
 }

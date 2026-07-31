@@ -126,7 +126,7 @@ export function OpportunityCollectionsPanel() {
           <Bookmark className="mb-3 h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm font-medium">还没有研究篮</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            在「主动搜索」里选中样本并保存后，可在此分析并交给编辑室
+            在「对标账号 → 选题快速分析」里选中样本并保存后，可在此分析并交给编辑室
           </p>
         </CardContent>
       </Card>

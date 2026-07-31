@@ -31,6 +31,25 @@ export interface AimWorkbenchMessage {
   traceType?: "chat" | "generate" | null
   /** 同线程重新生成中：保留旧交付物可见，避免闪断 */
   regenerating?: boolean
+  /** 批量复刻交付物：由 runBatchReplicateSend 产出，不走标准生成链路。
+   *  在聊天流内以批量卡片形式展示 N 条生成的文案。 */
+  batchDeliverables?: BatchDeliverableResult | null
+}
+
+/** 批量复刻交付物：提取的结构 + 生成的 N 条文案。 */
+export interface BatchDeliverableResult {
+  /** 提取出的结构模板摘要 */
+  structure: {
+    id: string
+    displayName: string
+    description: string | null
+  }
+  /** 生成的文案列表 */
+  scripts: Array<{
+    id: string
+    title: string
+    content: string
+  }>
 }
 
 export interface IpWikiDialogContext {

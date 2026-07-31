@@ -3,6 +3,7 @@
  */
 
 import type { AimAgentCapabilities, AimPasteMode } from "@/lib/aim/agent-capabilities"
+import { splitScripts } from "@/lib/aim/script-structure-extractor-types"
 
 export type PasteUsage = "edit" | "review" | "benchmark" | "style_sample" | "analytics"
 
@@ -149,6 +150,39 @@ export function canSubmitWithPasteAttachment(input: {
   if (attachment && !attachment.usage) return false
   if (attachment?.usage === "style_sample") return false
   return text.trim().length > 0 || Boolean(attachment) || Boolean(hasImages)
+}
+
+// ─── 批量复刻识别 ──────────────────────────────────────────
+
+/** 批量复刻最少文案条数：少于 2 条不视为批量。 */
+export const BATCH_REPLICATE_MIN_SCRIPTS = 2
+/** 批量复刻单条文案最少字数：避免短文本误判。 */
+export const BATCH_REPLICATE_MIN_SCRIPT_CHARS = 50
+
+/** 指令里出现这些关键词时不走批量复刻（让位给 edit/review/analytics）。 */
+const BATCH_REPLICATE_EXCLUDE_PATTERN =
+  /(修改这篇|优化这篇|润色这篇|帮我改|帮我优化|帮我润色|质检|复盘|发布数据|记住.*风格|沉淀.*风格|按我的风格)/
+
+/**
+ * 判断粘贴内容是否为「批量复刻」候选：
+ *  - splitScripts 切出 ≥ 2 条文案
+ *  - 每条文案 ≥ BATCH_REPLICATE_MIN_SCRIPT_CHARS 字
+ *  - 指令不含 edit/review/analytics/style_sample 关键词
+ *
+ * 由 content_producer 的 handleComposerGenerate 前置调用，
+ * 命中后走 runBatchReplicateSend，不进标准意图门闩。
+ */
+export function isBatchReplicateCandidate(input: {
+  content: string
+  instruction?: string
+}): boolean {
+  const { content, instruction = "" } = input
+  const trimmed = content.trim()
+  if (!trimmed) return false
+  if (BATCH_REPLICATE_EXCLUDE_PATTERN.test(instruction.trim())) return false
+  const scripts = splitScripts(trimmed)
+  if (scripts.length < BATCH_REPLICATE_MIN_SCRIPTS) return false
+  return scripts.every((s) => s.length >= BATCH_REPLICATE_MIN_SCRIPT_CHARS)
 }
 
 export const PASTE_COMPOSER_PLACEHOLDER =

@@ -84,7 +84,8 @@ function getLlmApiKey(): string {
 }
 
 function getLlmModel(): string {
-  return process.env.LLM_SUMMARY_MODEL?.trim() || "deepseek-chat"
+  // 2026-07-31 起 deepseek-v4-flash 正式版上线，旧 deepseek-chat 已停用
+  return process.env.LLM_SUMMARY_MODEL?.trim() || "deepseek-v4-flash"
 }
 
 // ─── 核心流水线 ─────────────────────────────────────────────────────

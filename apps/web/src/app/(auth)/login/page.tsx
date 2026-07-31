@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [submitError, setSubmitError] = React.useState<string | null>(null)
 
   function goAfterLogin(expiresAt?: string | null) {
-    router.push(getSubscriptionStatus(expiresAt ?? null) === "active" ? "/aim" : "/activate")
+    router.push(getSubscriptionStatus(expiresAt ?? null) === "active" ? "/home" : "/activate")
   }
 
   function validate(): boolean {

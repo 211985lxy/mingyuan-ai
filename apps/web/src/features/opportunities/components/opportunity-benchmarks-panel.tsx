@@ -1,8 +1,7 @@
 "use client"
 
-import CompetitorPage from "@/app/(dashboard)/competitor/page"
+import { CompetitorWorkbench } from "@/features/competitor/components/competitor-workbench"
 
-/** 对标账号：复用既有竞品监控工作台 */
 export function OpportunityBenchmarksPanel() {
-  return <CompetitorPage />
+  return <CompetitorWorkbench />
 }

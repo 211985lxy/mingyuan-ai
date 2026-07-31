@@ -49,7 +49,7 @@ function MonitoredAccountCard({ account, active, analyzing, refreshing, deleting
   onDelete: () => void
 }) {
   return (
-    <Card className={`group relative overflow-hidden cursor-pointer transition-all border shadow-sm ${active ? "ring-2 ring-primary/60 border-primary bg-primary/[0.01] shadow-xs" : "hover:border-primary/50 hover:shadow-md"}`} onClick={onActivate}>
+    <Card className={`group relative overflow-hidden cursor-pointer transition-all ${active ? "ring-2 ring-primary/50 bg-primary/[0.02]" : "hover:ring-foreground/20"}`} onClick={onActivate}>
       <CardContent className="p-4">
         <AccountIdentity account={account} />
         <a href={account.targetUrl} target="_blank" rel="noopener noreferrer" className="mt-3 flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground" title={account.targetUrl} onClick={(event) => event.stopPropagation()}>

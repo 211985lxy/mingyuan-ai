@@ -37,6 +37,8 @@ export interface ProjectKnowledgeAssetHealthProps {
   /** 递增时自动打开第一个缺口补录 */
   openGapRequest?: number
   onHealthChange?: (health: KnowledgeAssetHealthResult | null) => void
+  /** 五盒全齐时回调（openGapRequest 触发过一次才会调用） */
+  onAllReady?: () => void
   onSaved?: () => void
 }
 
@@ -58,12 +60,14 @@ export function ProjectKnowledgeAssetHealth({
   variant = "chips",
   openGapRequest = 0,
   onHealthChange,
+  onAllReady,
   onSaved,
 }: ProjectKnowledgeAssetHealthProps) {
   const [health, setHealth] = useState<KnowledgeAssetHealthResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [allReady, setAllReady] = useState(false)
   const [form, setForm] = useState({
     category: "positioning_material" as KnowledgeCategory,
     title: "",
@@ -115,10 +119,17 @@ export function ProjectKnowledgeAssetHealth({
     const gap = health.boxes.find((box) => box.status !== "ready")
     if (gap) {
       openSupplement(gap)
+      setAllReady(false)
       return
     }
-    toast.message("五盒资料已齐，可直接写稿，或继续新增知识。")
+    setAllReady(true)
   }, [health, loading, openGapRequest])
+
+  useEffect(() => {
+    if (!allReady) return
+    onAllReady?.()
+    toast.message("五盒资料已齐，可直接写稿，或继续新增知识。")
+  }, [allReady, onAllReady])
 
   async function handleSave() {
     const title = form.title.trim()

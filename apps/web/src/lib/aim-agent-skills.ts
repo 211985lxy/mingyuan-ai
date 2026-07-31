@@ -53,6 +53,33 @@ export const CONTENT_PRODUCER_SKILLS: AimWorkbenchSkill[] = [
   TRAFFIC_FUNNEL_SKILL,
   LEAD_ACQUISITION_SKILL,
   GENERAL_STORY_SKILL,
+  {
+    id: "batch_extract_structure",
+    label: "批量提取结构",
+    description: "粘贴多条文案或上传 .txt/.md，自动提炼可复用结构模板。",
+    prompt: "",
+    agentId: "content_producer",
+    group: "批量文案",
+    workbenchAction: "open_batch_script_studio",
+  },
+  {
+    id: "batch_generate_scripts",
+    label: "批量生成文案",
+    description: "选一个结构模板，结合知识库批量生成新文案。",
+    prompt: "",
+    agentId: "content_producer",
+    group: "批量文案",
+    workbenchAction: "open_batch_script_studio",
+  },
+  {
+    id: "batch_copy_pipeline",
+    label: "一键批量生成",
+    description: "粘贴文案 → 提取结构 → 直接批量生成新文案，一步到位。",
+    prompt: "",
+    agentId: "content_producer",
+    group: "批量文案",
+    workbenchAction: "open_batch_script_studio",
+  },
 ]
 
 export const TOPIC_PLANNING_SKILLS: AimWorkbenchSkill[] = [

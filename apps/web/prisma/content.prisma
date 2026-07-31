@@ -101,16 +101,26 @@ model VideoStructure {
   subtitle    String?
   description String?  @db.Text
   useCase     String?
-  blueprint   Json // Machine-readable: openingPattern, narrativeBeats, evidenceSlots, ctaSlot, durationRange
+  blueprint   Json // Machine-readable: openingPattern, narrativeBeats, evidenceSlots, ctaSlot, durationRange; extracted ones also carry segments[]
   sortOrder   Int      @default(0)
   status      String   @default("published") // draft | published | archived
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // ── Batch Script Structure Extraction ──
+  // origin: "canonical" (seeded) | "extracted" (derived from pasted scripts via LLM)
+  origin             String   @default("canonical") @db.VarChar(16)
+  sourceScriptText   String?  @db.LongText // original scripts joined by \n\n---\n\n
+  sourceScriptsCount Int      @default(1)
+  userId             String?  @db.VarChar(191) // owner of extracted structure; null for canonical
+  projectId          String?  @db.VarChar(191) // optional project scope; null for global
+
   scripts               Script[]
   contentGenerationRuns ContentGenerationRun[]
 
   @@index([status, sortOrder])
+  @@index([origin, status])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model TopicElement {
@@ -369,9 +379,6 @@ model ChannelReplyOutbox {
   externalMessageId String?   @db.VarChar(191)
   replyText         String    @db.Text
   status            String    @default("pending") @db.VarChar(24)
-  // pending → sending → sent
-  //                 → retry_wait → dead_letter
-  //                 → suppressed
   claimToken        String?   @unique @db.VarChar(191)
   claimExpiresAt    DateTime?
   availableAt       DateTime?  // Earliest time this reply is eligible for (re)delivery

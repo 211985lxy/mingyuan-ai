@@ -3,6 +3,7 @@
 import { forwardRef, useCallback, useState, type Ref } from "react"
 import { ArrowRight } from "lucide-react"
 import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
+import { AimBatchDeliverableBubble } from "@/components/aim/aim-batch-deliverable-bubble"
 import { AimMessageJumpRail } from "@/components/aim/aim-message-jump-rail"
 import { AimQualityReport } from "@/components/aim/aim-quality-report"
 import { ThinkingProcessPanel } from "@/components/aim/thinking-process-panel"
@@ -133,6 +134,9 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
       {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-8 px-2.5 text-sm" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
       {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-8 px-2.5 text-sm" onClick={() => actions.onApplyReplacement(message)}>应用到文案选区</Button> : null}
       <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} />
+      {message.role === "assistant" && message.batchDeliverables ? (
+        <AimBatchDeliverableBubble deliverables={message.batchDeliverables} />
+      ) : null}
       <RunDiagnostics message={message} />
       {message.qualityReport ? <AimQualityReport report={message.qualityReport} /> : null}
       {message.editorDiffSummary ? (

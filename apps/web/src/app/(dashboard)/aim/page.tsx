@@ -20,6 +20,8 @@ import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
 import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
 import { AimBenchmarkTopicSearchPanel } from "@/components/aim/aim-benchmark-topic-search-panel"
+import { BatchScriptStudio } from "@/components/aim/batch-script-studio"
+import type { BatchTab } from "@/components/aim/batch-script-studio-sections"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { useAimWorkbenchSkills } from "@/features/aim/hooks/use-aim-workbench-skills"
@@ -33,10 +35,12 @@ import {
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 import {
   assemblePasteUsageInput,
+  isBatchReplicateCandidate,
   PASTE_COMPOSER_PLACEHOLDER,
   type PastedCopyAttachment,
 } from "@/lib/aim/paste-copy-attachment"
 import { runAnalyticsPasteSend } from "@/lib/aim/run-analytics-paste-send"
+import { runBatchReplicateSend } from "@/lib/aim/run-batch-replicate-send"
 import { fetchStyleStatus } from "@/lib/api/aim"
 
 export default function AimPage() {
@@ -51,6 +55,8 @@ export default function AimPage() {
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
   const [styleEnabled, setStyleEnabled] = useState(false)
   const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(false)
+  const [batchStudioOpen, setBatchStudioOpen] = useState(false)
+  const [batchStudioTab, setBatchStudioTab] = useState<BatchTab>("extract")
   const [skillDialogOpen, setSkillDialogOpen] = useState(false)
   const [editingSkill, setEditingSkill] = useState<AimWorkbenchSkill | null>(null)
   const skillState = useAimWorkbenchSkills(
@@ -84,6 +90,7 @@ export default function AimPage() {
     setStylePreviewOpen(false)
     setStyleSamples([])
     setBenchmarkSearchOpen(false)
+    setBatchStudioOpen(false)
   }, [w.selectedAgentId, w.selectedProjectId])
 
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
@@ -130,6 +137,23 @@ export default function AimPage() {
         void processVideoUrl(videoUrl)
         return
       }
+    }
+    // 批量复刻前置分流：粘贴多条对标文案 + 未显式选用途 → 走 pipeline 一键提取+生成
+    if (
+      pastedCopy &&
+      !pastedCopy.usage &&
+      capabilities.pasteMode === "creative" &&
+      isBatchReplicateCandidate({ content: pastedCopy.content, instruction: w.input })
+    ) {
+      void runBatchReplicateSend({
+        attachment: pastedCopy,
+        instruction: w.input,
+        projectId: w.projectEnabled ? w.selectedProjectId : null,
+        setPastedCopy,
+        setInput: w.setInput,
+        setMessages: w.setMessages,
+      })
+      return
     }
     // 质检/编辑/复盘数据只有一种用途时，允许未点选也能直接发，避免发送键假死
     const effectiveUsage = pastedCopy?.usage
@@ -191,6 +215,17 @@ export default function AimPage() {
   const onEditSkill = w.params.agentParam ? (skill: AimWorkbenchSkill) => { setEditingSkill(skill); setSkillDialogOpen(true) } : undefined
   const onUseSkill = (skill: AimWorkbenchSkill) => {
     if (skill.workbenchAction === "open_benchmark_search") { setBenchmarkSearchOpen(true); toast.success("已打开对标选题搜索"); return }
+    if (skill.workbenchAction === "open_batch_script_studio") {
+      const tabMap: Record<string, BatchTab> = {
+        batch_extract_structure: "extract",
+        batch_generate_scripts: "generate",
+        batch_copy_pipeline: "pipeline",
+      }
+      setBatchStudioTab(tabMap[skill.id] ?? "extract")
+      setBatchStudioOpen(true)
+      toast.success("已打开批量文案工作室")
+      return
+    }
     w.handleUseSkill(skill)
   }
   const onOpenStyleAssets = () => {
@@ -372,6 +407,13 @@ export default function AimPage() {
         projectId={w.projectEnabled ? w.selectedProjectId || null : null}
         open={benchmarkSearchOpen}
         onOpenChange={setBenchmarkSearchOpen}
+      />
+
+      <BatchScriptStudio
+        open={batchStudioOpen}
+        onOpenChange={setBatchStudioOpen}
+        initialTab={batchStudioTab}
+        projectId={w.projectEnabled ? w.selectedProjectId || null : null}
       />
 
       <AimSkillEditDialog

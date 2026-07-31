@@ -1521,6 +1521,60 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/script-structures/[id]/generate",
+      "file": "src/app/api/aim/script-structures/[id]/generate/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/script-structures/[id]",
+      "file": "src/app/api/aim/script-structures/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/script-structures/pipeline",
+      "file": "src/app/api/aim/script-structures/pipeline/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/script-structures",
+      "file": "src/app/api/aim/script-structures/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/skills",
       "file": "src/app/api/aim/skills/route.ts",
       "methods": [

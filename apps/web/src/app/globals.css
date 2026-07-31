@@ -597,3 +597,48 @@
   background-color: oklch(0.745 0.185 38.0 / 15%);
   color: oklch(0.745 0.185 38.0);
 }
+
+/* ============================================================
+   Dashboard Home — 创作台总览 brand atmosphere
+   Scoped to /home; reuses brand tokens, no hardcoded palette.
+   ============================================================ */
+
+/* 水墨晕染背景 (Ink Wash) — 火土金三色 radial wash，置于首页内容之下 */
+.dashboard-ink-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 30%, color-mix(in oklch, var(--primary) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 60% at 80% 70%, color-mix(in oklch, oklch(0.745 0.185 38.0) 10%, transparent) 0%, transparent 55%),
+    radial-gradient(circle at 50% 0%, color-mix(in oklch, var(--secondary-foreground) 8%, transparent) 0%, transparent 40%);
+}
+.dark .dashboard-ink-wash {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 30%, color-mix(in oklch, var(--primary) 14%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 60% at 80% 70%, color-mix(in oklch, oklch(0.745 0.185 38.0) 12%, transparent) 0%, transparent 55%),
+    radial-gradient(circle at 50% 0%, color-mix(in oklch, var(--secondary-foreground) 10%, transparent) 0%, transparent 40%);
+}
+
+/* 氛围卡渐变 (Atmosphere Card) — 火土流光，用于资料就绪度提示 */
+.atmosphere-card {
+  background: linear-gradient(135deg, color-mix(in oklch, var(--primary) 6%, transparent) 0%, transparent 50%, color-mix(in oklch, oklch(0.745 0.185 38.0) 6%, transparent) 100%);
+}
+.dark .atmosphere-card {
+  background: linear-gradient(135deg, color-mix(in oklch, var(--primary) 10%, transparent) 0%, transparent 50%, color-mix(in oklch, oklch(0.745 0.185 38.0) 10%, transparent) 100%);
+}
+
+/* 专家卡 hover 描边 (Expert Card hover border) — 与 .jade-emboss 叠用 */
+.expert-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease;
+  pointer-events: none;
+}
+.expert-card:hover::before {
+  border-color: color-mix(in oklch, var(--primary) 30%, transparent);
+}

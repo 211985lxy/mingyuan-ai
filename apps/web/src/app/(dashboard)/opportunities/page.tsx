@@ -1,18 +1,22 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { Search, Bell, BarChart2, Bookmark } from "lucide-react"
+import { Bell, BarChart2, Bookmark } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
-import { OpportunitySearchPanel } from "@/features/opportunities/components/opportunity-search-panel"
 import { OpportunityDailyPanel } from "@/features/opportunities/components/opportunity-daily-panel"
 import { OpportunityBenchmarksPanel } from "@/features/opportunities/components/opportunity-benchmarks-panel"
 import { OpportunityCollectionsPanel } from "@/features/opportunities/components/opportunity-collections-panel"
 
-const VALID_TABS = new Set(["search", "daily", "benchmarks", "collections"])
-/** 侧栏「市场洞察」入口默认落在对标账号 Tab，不再先进主动搜索 */
+const VALID_TABS = new Set(["daily", "benchmarks", "collections"])
 const DEFAULT_TAB = "benchmarks"
+
+const SEGMENTS = [
+  { value: "benchmarks", label: "对标账号", icon: BarChart2 },
+  { value: "daily", label: "今日机会", icon: Bell },
+  { value: "collections", label: "已收藏研究", icon: Bookmark },
+] as const
 
 export default function OpportunitiesPage() {
   const router = useRouter()
@@ -21,55 +25,43 @@ export default function OpportunitiesPage() {
   const tab = VALID_TABS.has(rawTab) ? rawTab : DEFAULT_TAB
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-10">
-      {tab === "search" ? (
-        <WorkbenchHero
-          title="内容机会"
-          subtitle="搜索真实内容 → 筛选爆款样本 → 批量拆解 → 形成选题 → 交给 AIM 创作"
-          badge={<Badge variant="secondary">抖音 + 视频号</Badge>}
-        />
-      ) : null}
+    <div className="mx-auto max-w-6xl pb-10">
+      <WorkbenchHero
+        title="市场洞察"
+        subtitle="监控对标账号、捕捉今日热点、沉淀选题研究"
+        badge={<Badge variant="secondary">抖音 + 视频号</Badge>}
+      />
 
-      <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          const next = value === DEFAULT_TAB ? "/opportunities" : `/opportunities?tab=${value}`
-          router.replace(next)
-        }}
-        className="space-y-4"
-      >
-        <TabsList>
-          <TabsTrigger value="benchmarks" className="gap-1.5">
-            <BarChart2 className="h-3.5 w-3.5" />
-            对标账号
-          </TabsTrigger>
-          <TabsTrigger value="search" className="gap-1.5">
-            <Search className="h-3.5 w-3.5" />
-            主动搜索
-          </TabsTrigger>
-          <TabsTrigger value="daily" className="gap-1.5">
-            <Bell className="h-3.5 w-3.5" />
-            今日机会
-          </TabsTrigger>
-          <TabsTrigger value="collections" className="gap-1.5">
-            <Bookmark className="h-3.5 w-3.5" />
-            已收藏研究
-          </TabsTrigger>
-        </TabsList>
+      {/* 胶囊式分段控件 */}
+      <div className="mb-6 mt-4 inline-flex items-center gap-1 rounded-lg bg-muted p-1">
+        {SEGMENTS.map((seg) => {
+          const active = tab === seg.value
+          const Icon = seg.icon
+          return (
+            <button
+              key={seg.value}
+              onClick={() => {
+                const next = seg.value === DEFAULT_TAB ? "/opportunities" : `/opportunities?tab=${seg.value}`
+                router.replace(next)
+              }}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all",
+                active
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {seg.label}
+            </button>
+          )
+        })}
+      </div>
 
-        <TabsContent value="search">
-          <OpportunitySearchPanel />
-        </TabsContent>
-        <TabsContent value="daily">
-          <OpportunityDailyPanel />
-        </TabsContent>
-        <TabsContent value="benchmarks">
-          <OpportunityBenchmarksPanel />
-        </TabsContent>
-        <TabsContent value="collections">
-          <OpportunityCollectionsPanel />
-        </TabsContent>
-      </Tabs>
+      {/* 内容区 */}
+      {tab === "benchmarks" ? <OpportunityBenchmarksPanel /> : null}
+      {tab === "daily" ? <OpportunityDailyPanel /> : null}
+      {tab === "collections" ? <OpportunityCollectionsPanel /> : null}
     </div>
   )
 }

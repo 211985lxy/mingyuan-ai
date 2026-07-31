@@ -149,7 +149,7 @@ export default function IpAgentPage() {
               href="/login"
               className="inline-flex items-center justify-center rounded-lg border border-[#D14A33]/25 bg-white px-8 py-3 text-sm font-semibold text-[#25211D] hover:bg-[#FFF8F4]"
             >
-              登录 {MARKETING_PRODUCT_NAME}
+              登录智能体
             </Link>
           </div>
         </div>
