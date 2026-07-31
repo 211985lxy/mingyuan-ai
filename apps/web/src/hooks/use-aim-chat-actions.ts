@@ -4,6 +4,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 
 import { ApiError } from "@/lib/api/client"
 import type { AimEditorContext, TextSelectionRange } from "@/lib/aim-editor"
+import { agentAllowsThinkingProcess } from "@/lib/aim/agent-capabilities"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
 import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand, type AimWorkbenchCommand } from "@/lib/aim-workbench-commands"
@@ -58,7 +59,7 @@ async function executeChatRequest(
   controller: AbortController,
   assistantId: string,
   thread: AimWorkbenchMessage[],
-  traceId: string,
+  traceId?: string,
 ) {
   const toolAction = detectAimLarkToolAction(text)
   if (toolAction && input.projectEnabled && !input.selectedProjectId) {
@@ -90,7 +91,7 @@ async function executeChatRequest(
     agentModule: input.agentModule,
     writerModule: input.agentModule,
     signal: controller.signal,
-    traceId,
+    ...(traceId ? { traceId } : {}),
     ...(options.executionAgentId ? { executionAgentId: options.executionAgentId } : {}),
     onContent: (content) => {
       latestContent = content
@@ -136,15 +137,20 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   const controller = new AbortController()
   input.requestAbortRef.current = controller
   const turn = prepareAimChatTurn({ messages: input.messages, text, images, retryMessageId: options.retryMessageId, startsNewTask, editorApplyRange: options.editorApplyRange })
-  const traceId = crypto.randomUUID()
+  // 作品编辑等不展示思考过程的专家：不挂 trace，避免空转 SSE 拖住观感
+  const executionAgent = options.executionAgentId ?? input.selectedAgentId
+  const attachTrace = agentAllowsThinkingProcess(executionAgent)
+  const traceId = attachTrace ? crypto.randomUUID() : undefined
   if (startsNewTask) {
     input.clearCurrentTaskContext()
     input.onIsolateTaskSession?.()
   }
   input.setMessages(turn.pendingMessages)
-  input.setMessages((messages) => messages.map((message) => message.id === turn.assistantId
-    ? { ...message, traceId, traceType: "chat" as const }
-    : message))
+  if (traceId) {
+    input.setMessages((messages) => messages.map((message) => message.id === turn.assistantId
+      ? { ...message, traceId, traceType: "chat" as const }
+      : message))
+  }
   input.setInput("")
   if (images.length) input.clearImages()
   input.setIsThinking(true)

@@ -121,7 +121,7 @@ export async function chatAim(
  * 流式对话最长等待：连接或读流卡住时主动中止，避免工作台一直 busy。
  * 正常长文生成通常远短于此；超时后用户可重试。
  */
-const AIM_CHAT_STREAM_TIMEOUT_MS = 180_000
+const AIM_CHAT_STREAM_TIMEOUT_MS = 90_000
 
 /**
  * @description chataimstream
