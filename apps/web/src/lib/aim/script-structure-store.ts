@@ -198,7 +198,8 @@ export async function deleteExtractedStructure(
 
 /** 把生成文案批量写入 Script 表。
  *  - status = "draft"（待用户挑选）
- *  - structureId 关联到来源结构模板 */
+ *  - structureId 关联到来源结构模板
+ *  - 用事务整体提交：任一条失败则全部回滚，避免半途中断留下孤儿草稿 */
 export async function saveGeneratedScripts(args: {
   scripts: GeneratedScript[]
   userId: string
@@ -206,20 +207,22 @@ export async function saveGeneratedScripts(args: {
   projectId?: string
 }): Promise<Array<{ id: string; title: string; content: string }>> {
   const { scripts, userId, structureId } = args
-  const created: Array<{ id: string; title: string; content: string }> = []
-  for (const script of scripts) {
-    const row = await prisma.script.create({
-      data: {
-        userId,
-        content: script.content,
-        structureId,
-        status: "draft",
-        qualityMetadata: { title: script.title, segmentOrder: script.segmentOrder } as never,
-      },
-    })
-    created.push({ id: row.id, title: script.title, content: script.content })
-  }
-  return created
+  return prisma.$transaction(async (tx) => {
+    const created: Array<{ id: string; title: string; content: string }> = []
+    for (const script of scripts) {
+      const row = await tx.script.create({
+        data: {
+          userId,
+          content: script.content,
+          structureId,
+          status: "draft",
+          qualityMetadata: { title: script.title, segmentOrder: script.segmentOrder } as never,
+        },
+      })
+      created.push({ id: row.id, title: script.title, content: script.content })
+    }
+    return created
+  })
 }
 
 // ─── VideoStructure → ExtractedStructure 反序列化 ─────────

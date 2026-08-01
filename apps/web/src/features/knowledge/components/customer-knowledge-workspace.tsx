@@ -128,7 +128,7 @@ export function CustomerKnowledgeWorkspace() {
           </div>
           <Button onClick={() => void openAccountMaterials()} disabled={busy || ws.ensuringAccount} size="sm">
             {(busy || ws.ensuringAccount) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
-            投喂一条弹药
+            塞一条经验进去
           </Button>
         </div>
 
