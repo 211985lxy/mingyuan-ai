@@ -123,10 +123,19 @@ async function openWorkflowBrief(input: AimWorkflowActionInput, action: AimNextA
   }
 }
 
-function switchToTargetAgent(input: AimWorkflowActionInput, targetAgentId: AimAgentId) {
+function switchToTargetAgent(
+  input: AimWorkflowActionInput,
+  targetAgentId: AimAgentId,
+  options?: { generationId?: string },
+) {
   const params = new URLSearchParams(input.searchParams.toString())
   params.set("agent", targetAgentId)
   params.set("stage", getWorkflowStageForAgent(targetAgentId))
+  // 进入作品编辑时携带原 generationId，让 useAimHistoryLoad 自动加载该成稿正文进编辑器，
+  // 刷新后仍可由 URL 恢复；projectId 已随 searchParams 保留。
+  if (options?.generationId) {
+    params.set("generationId", options.generationId)
+  }
   input.lastAgentParamRef.current = targetAgentId
   input.setSelectedAgentId(targetAgentId)
   input.setMessages([])
@@ -143,7 +152,9 @@ async function handleAimNextAction(input: AimWorkflowActionInput, action: AimNex
       await openWorkflowBrief(input, action, cleanContent, generationId)
       return
     }
-    switchToTargetAgent(input, action.targetAgentId)
+    // 进入作品编辑（to_work_editor）携带原 generationId，使正文自动加载、刷新可恢复。
+    const carryGenerationId = action.targetAgentId === "work_editor" ? generationId : undefined
+    switchToTargetAgent(input, action.targetAgentId, carryGenerationId ? { generationId: carryGenerationId } : undefined)
   }
   input.setInput(buildAimNextActionPrompt(action, cleanContent))
   toast.success("已带入聊天框")

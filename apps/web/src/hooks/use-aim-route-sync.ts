@@ -329,11 +329,12 @@ export function useAimHistoryLoad(input: {
       if (itemAgentId !== selectedAgentId) {
         const params = new URLSearchParams(searchParams.toString())
         params.set("agent", itemAgentId)
-        params.delete("generationId")
+        // 保留 generationId：刷新页面时可由深链再次恢复正文，符合「进入作品编辑后刷新仍可恢复」。
         lastAgentParamRef.current = itemAgentId
         router.replace(`/aim?${params.toString()}`)
       }
-      if (isDeepLink) loadedDeepLinkRef.current = item.id
+      // 记下本次加载的 generationId，防止同值重复加载；刷新后 ref 重置，会按需重新加载（期望行为）。
+      if (isDeepLink) loadedDeepLinkRef.current = generationIdParam
       toast.success("已加载历史记录")
       clearLoadTarget()
     }

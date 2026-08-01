@@ -6,7 +6,7 @@ import {
   buildAimEditorContext,
 } from "@/lib/aim/workbench-helpers"
 import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand } from "@/lib/aim-workbench-commands"
-import { buildSkillPrompt, resolveSkillExecutionAgentId } from "@/features/aim/aim-skill-utils"
+import { planWorkbenchSkillApply } from "@/features/aim/aim-skill-utils"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { AimWorkbenchMessage as ChatMessage, AimImageAttachment } from "@/lib/aim/workbench-types"
@@ -48,19 +48,10 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
   const pendingSkillDelegationRef = useRef<{ prompt: string; executionAgentId: string } | null>(null)
 
   const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
-    const prompt = buildSkillPrompt(skill, {
-      editorText: options.editorText,
-      sourceOriginalText: options.sourceOriginalText,
-      sourceAnalysisText: options.sourceAnalysisText,
-      sourceTopicTitle: options.sourceTopicTitle,
-      messages: options.messages,
-    })
-    const executionAgentId = resolveSkillExecutionAgentId(skill, options.selectedAgentId)
-    pendingSkillDelegationRef.current = executionAgentId ? { prompt, executionAgentId } : null
-    options.setInput((current) => {
-      const text = current.trim()
-      return text ? `${prompt}\n\n---\n${text}\n---` : prompt
-    })
+    // 内容目的（流量/获客/故事）互斥替换；其它技能前置拼接。用户正文原样保留。
+    const { delegation, nextInput } = planWorkbenchSkillApply(options, skill)
+    pendingSkillDelegationRef.current = delegation
+    if (nextInput !== options.input) options.setInput(nextInput)
     toast.success("技能指令已填入")
   }, [options])
 

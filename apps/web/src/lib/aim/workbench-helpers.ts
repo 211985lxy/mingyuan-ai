@@ -2,6 +2,7 @@ import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { buildBenchmarkMaterialPrefill } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { normalizeKnowledgeUsed } from "@/lib/aim-knowledge-cite"
+import { stripAimFormatMarkers } from "@/lib/aim/format-marker-cleanup"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { extractEditorDraftFromAssistantText, type AimEditorContext, type TextSelectionRange } from "@/lib/aim-editor"
@@ -307,7 +308,11 @@ export function getAimHistoryContents(item: AimGeneration) {
     fromArtifacts.push({ format: "koubo_script", content: koubo })
   }
 
-  return [...fromColumns, ...fromArtifacts]
+  // 兼容历史成稿：清除可能已落库的模型格式收尾标记（===END FORMAT=== 等），与生成解析处同源清洗。
+  return [...fromColumns, ...fromArtifacts].map((entry) => ({
+    ...entry,
+    content: stripAimFormatMarkers(entry.content),
+  }))
 }
 
 /**

@@ -9,11 +9,12 @@
 import { describe, expect, it } from "vitest"
 
 import { resolveAimExecutionAgent } from "@/lib/aim/services/aim-execution-agent"
-import { resolveSkillExecutionAgentId } from "@/features/aim/aim-skill-utils"
+import { applyContentPurposeSkill, resolveSkillExecutionAgentId } from "@/features/aim/aim-skill-utils"
 import { getAgentHandler } from "@/lib/aim-agent-handlers"
 import { ContentReviewHandler } from "@/lib/aim-agent-content-review"
 import { WorkEditorHandler } from "@/lib/aim-agent-work-editor"
 import { resolveAimRuntimeTask } from "@/lib/aim-knowledge-strategy"
+import { CONTENT_PRODUCER_SKILLS } from "@/lib/aim-agent-skills"
 
 describe("resolveAimExecutionAgent", () => {
   it("技能声明质检引擎时委托生效，会话归属不变", () => {
@@ -151,5 +152,75 @@ describe("委托目标引擎的配置来源", () => {
       agentId: notDelegated.executionAgentId,
       input: "请基于当前文案做标题质检：指出标题是否准确、有钩子。",
     })).not.toBe("quality_review")
+  })
+})
+
+describe("applyContentPurposeSkill（内容目的互斥替换）", () => {
+  const traffic = CONTENT_PRODUCER_SKILLS.find((s) => s.id === "traffic_funnel")!
+  const lead = CONTENT_PRODUCER_SKILLS.find((s) => s.id === "lead_acquisition")!
+  const story = CONTENT_PRODUCER_SKILLS.find((s) => s.id === "general_story")!
+
+  it("非内容目的技能返回 null，交还原有前置拼接逻辑", () => {
+    const result = applyContentPurposeSkill({
+      skill: { ...traffic, group: "其它" } as never,
+      newPrompt: "P",
+      currentInput: "用户正文",
+    })
+    expect(result).toBeNull()
+  })
+
+  it("空输入框点目的：只放这一个目的，正文不被多包一层", () => {
+    const result = applyContentPurposeSkill({
+      skill: traffic,
+      newPrompt: traffic.prompt,
+      currentInput: "",
+    })
+    expect(result).toBe(traffic.prompt)
+  })
+
+  it("连点第二个目的：替换掉第一个，输入框始终只剩一个目的锚点", () => {
+    // 第一次点流量（无正文）后的输入框形态
+    const afterTraffic = applyContentPurposeSkill({
+      skill: traffic, newPrompt: traffic.prompt, currentInput: "",
+    })!
+    // 再点获客：应剥离流量锚点，只剩获客
+    const afterLead = applyContentPurposeSkill({
+      skill: lead, newPrompt: lead.prompt, currentInput: afterTraffic,
+    })!
+    expect(afterLead).toContain("【内容目的锚点】= 线索获客")
+    expect(afterLead).not.toContain("【内容目的锚点】= 流量漏斗")
+    expect(afterLead).toBe(lead.prompt)
+  })
+
+  it("用户已有正文时点目的：正文原样保留，不覆盖、不丢失", () => {
+    const userText = "我要写一篇关于老板如何用 AI 跑通获客的口播。"
+    const result = applyContentPurposeSkill({
+      skill: story, newPrompt: story.prompt, currentInput: userText,
+    })!
+    expect(result.startsWith(story.prompt)).toBe(true)
+    expect(result).toContain(userText)
+    expect(result).toContain("【内容目的锚点】= 通用故事")
+  })
+
+  it("连点三个目的且带用户正文：最终只剩最后一次点的目的 + 用户正文", () => {
+    const userText = "用户自己写的正文，不能丢。"
+    const s1 = applyContentPurposeSkill({ skill: traffic, newPrompt: traffic.prompt, currentInput: userText })!
+    const s2 = applyContentPurposeSkill({ skill: lead, newPrompt: lead.prompt, currentInput: s1 })!
+    const s3 = applyContentPurposeSkill({ skill: story, newPrompt: story.prompt, currentInput: s2 })!
+    expect(s3).toContain("【内容目的锚点】= 通用故事")
+    expect(s3).not.toContain("流量漏斗")
+    expect(s3).not.toContain("线索获客")
+    expect(s3).toContain(userText)
+    // 只剩一个目的锚点
+    expect((s3.match(/【内容目的锚点】/g) || []).length).toBe(1)
+  })
+
+  it("识别带「请基于当前内容，」前缀的旧目的段（buildSkillPrompt 加的前缀）", () => {
+    const prefixed = `请基于当前内容，${traffic.prompt.replace(/^请/, "")}`
+    const result = applyContentPurposeSkill({
+      skill: lead, newPrompt: lead.prompt, currentInput: prefixed,
+    })!
+    expect(result).not.toContain("流量漏斗")
+    expect(result).toContain("线索获客")
   })
 })
