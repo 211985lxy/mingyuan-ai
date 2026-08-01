@@ -65,6 +65,7 @@ describe("AimPromptComposer", () => {
     expect(screen.queryByText("写小红书")).not.toBeInTheDocument()
 
     await user.click(screen.getByRole("button", { name: /添加图片、技能、模式/ }))
+    await user.click(screen.getByRole("button", { name: /技能 1 个内置技能/ }))
     await user.click(screen.getByText("写小红书"))
 
     expect(onUseSkill).toHaveBeenCalledTimes(1)

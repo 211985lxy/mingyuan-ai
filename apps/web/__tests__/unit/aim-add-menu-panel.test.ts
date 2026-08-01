@@ -44,7 +44,7 @@ const baseProps = {
   setContentModeExpanded: vi.fn(),
   contentModeOptions: [
     { id: undefined, label: "自动", hint: "按任务判断" },
-    { id: "short_video" as const, label: "短视频", hint: "口播" },
+    { id: "social" as const, label: "社媒速产", hint: "口播" },
   ],
   onContentModeChange: vi.fn(),
   showSkills: true,

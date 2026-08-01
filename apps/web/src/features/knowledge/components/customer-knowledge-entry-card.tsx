@@ -57,11 +57,24 @@ export function CustomerKnowledgeEntryCard(props: {
           </div>
         </div>
         <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={props.onEdit}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            aria-label={`编辑知识：${entry.title}`}
+            onClick={props.onEdit}
+          >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           {entry.status !== "archived" ? (
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={props.archiving} onClick={props.onArchive}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              aria-label={`归档知识：${entry.title}`}
+              disabled={props.archiving}
+              onClick={props.onArchive}
+            >
               {props.archiving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
             </Button>
           ) : null}
