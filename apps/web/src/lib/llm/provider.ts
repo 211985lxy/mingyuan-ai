@@ -69,6 +69,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       defaultHeaders: config.defaultHeaders,
       fetchOptions,
       timeout: config.timeoutMs ?? Number(env.LLM_TIMEOUT_MS || 60000),
+      maxRetries: config.maxRetries,
     })
   }
 

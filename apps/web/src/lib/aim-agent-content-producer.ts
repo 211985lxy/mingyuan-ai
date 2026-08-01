@@ -11,6 +11,11 @@ import {
   isGenericContentRequestWithoutFacts,
 } from "@/lib/aim-generation-prompts"
 import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
+import {
+  buildClosedWorldModelInput,
+  hasStrictNumericClaimConstraint,
+} from "@/lib/aim-generation-guardrails"
+import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
 import { buildContentPackageConstraintBlock } from "@/lib/content-package-spec"
 import { getCanonicalFromTaskSpec, isCanonicalConfirmed } from "@/lib/canonical-content-spec"
 import type {
@@ -113,12 +118,17 @@ export class ContentProducerHandler implements AimAgentHandler {
             .join("\n")
         : ""
     const scenarioBlock = buildScenarioPromptBlock(context.contentScenario)
-    const systemPrompt =
-      buildProducerSystemPrompt(agentPrompt, context) +
-      scenarioBlock +
-      (canonicalBlock ? `\n\n${canonicalBlock}` : "") +
-      (packageConstraints ? `\n\n${packageConstraints}` : "")
-    const userPrompt = buildUserPrompt(context, formatBlocks)
+    const closedWorldFastRun = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
+      && hasStrictNumericClaimConstraint(context.rawInput)
+    const systemPrompt = closedWorldFastRun
+      ? `${agentPrompt}\n这是闭集事实任务：只使用用户原始输入里的事实、客户信息和数字，不调用或复述其他背景事实。客户案例段只能逐字引用用户原文里的事实锚点；禁止补充人员、流程、渠道、做法、原因、其他结果或因果解释，禁止计算、换算或概括降幅、比例等衍生数字，禁止用“他们”“该公司”“这家公司”引出任何新信息。结尾只执行用户指定的行动引导，不增加免费、保证、限时或交付承诺。直接输出完整成稿，不解释、不分析、不增加案例细节。`
+      : buildProducerSystemPrompt(agentPrompt, context)
+        + scenarioBlock
+        + (canonicalBlock ? `\n\n${canonicalBlock}` : "")
+        + (packageConstraints ? `\n\n${packageConstraints}` : "")
+    const userPrompt = closedWorldFastRun
+      ? `用户批准的全部事实与要求：\n${buildClosedWorldModelInput(context.rawInput)}\n\n写成自然、完整、可直接拍摄的口播正文。\n输出格式：\n${context.targetFormats.map((format) => `===FORMAT:${format}===`).join("\n")}`
+      : buildUserPrompt(context, formatBlocks)
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
       systemPrompt,

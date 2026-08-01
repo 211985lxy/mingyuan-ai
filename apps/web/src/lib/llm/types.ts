@@ -42,6 +42,7 @@ export interface LLMProviderConfig {
   defaultHeaders?: Record<string, string>
   proxyURL?: string
   timeoutMs?: number
+  maxRetries?: number
   capability?: ModelCapability
 }
 

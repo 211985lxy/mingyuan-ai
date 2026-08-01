@@ -32,6 +32,12 @@ import type {
   AimModelPolicyOverride,
   AimRunSpec,
 } from "./types"
+import {
+  AIM_FAST_SPOKEN_MAX_TOKENS,
+  AIM_FAST_SPOKEN_ROUTE_KEY,
+  AIM_FAST_SPOKEN_TOTAL_BUDGET_MS,
+  isAimFastSpokenRun,
+} from "./fast-spoken-policy"
 
 export interface PlanRunInput {
   entrypoint: AimEntrypoint
@@ -155,11 +161,19 @@ function buildModelPolicy(
   agentId: AimAgentId,
   entrypoint: AimEntrypoint,
   stream: boolean,
+  runtimeTask: AimRuntimeTask,
+  targetFormats: ContentFormat[],
   agentModule?: CopyStudioModule,
   writerModule?: CopyStudioModule,
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
   const studioModule = agentModule ?? writerModule
+  const fastSpoken = isAimFastSpokenRun({
+    agentId,
+    entrypoint,
+    runtimeTask,
+    targetFormats,
+  })
   const needsAdvancedReasoning =
     agentId === "content_producer" ||
     agentId === "work_editor" ||
@@ -181,6 +195,7 @@ function buildModelPolicy(
   // ── maxTokens：深度长文 12k；作品编辑（润色/排版）8k；社交短文 4k ──
   const maxTokens = isChat
     ? undefined
+    : fastSpoken ? AIM_FAST_SPOKEN_MAX_TOKENS
     : studioModule === "longform" ? 12288
     : studioModule === "social" ? 4096
     : studioModule === "free" ? 6144
@@ -190,13 +205,15 @@ function buildModelPolicy(
 
   return {
     agentId,
-    ...(studioModule ? { routeKey: `copy_studio.${studioModule}` } : {}),
+    ...(fastSpoken
+      ? { routeKey: AIM_FAST_SPOKEN_ROUTE_KEY }
+      : studioModule ? { routeKey: `copy_studio.${studioModule}` } : {}),
     stream,
     temperature,
     ...(maxTokens ? { maxTokens } : {}),
-    targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
+    targetCapability: fastSpoken ? "standard" : needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
-    maxProviderAttempts: stream ? 2 : 3,
+    maxProviderAttempts: fastSpoken ? 1 : stream ? 2 : 3,
   }
 }
 
@@ -238,11 +255,32 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
 
   const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
 
-  const defaults = buildModelPolicy(input.agentId, input.entrypoint, input.stream ?? false, input.agentModule, input.writerModule)
+  const fastSpoken = isAimFastSpokenRun({
+    agentId: input.agentId,
+    entrypoint: input.entrypoint,
+    runtimeTask,
+    targetFormats,
+  })
+  const defaults = buildModelPolicy(
+    input.agentId,
+    input.entrypoint,
+    input.stream ?? false,
+    runtimeTask,
+    targetFormats,
+    input.agentModule,
+    input.writerModule,
+  )
   const modelPolicy = applyModelPolicyOverride(defaults, input.modelPolicy)
   const executionPolicy = resolveExecutionPolicy({
-    requested: input.executionMode,
-    policy: input.executionPolicy,
+    requested: fastSpoken ? "single_shot" : input.executionMode,
+    policy: fastSpoken
+      ? {
+          ...input.executionPolicy,
+          mode: "single_shot",
+          timeoutMs: AIM_FAST_SPOKEN_TOTAL_BUDGET_MS,
+          maxAutoRetries: 0,
+        }
+      : input.executionPolicy,
     agentId: input.agentId,
     runtimeTask,
   })
@@ -260,6 +298,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     actorId: input.actorId,
     projectId: input.projectId,
     methodologyProfileIds: input.methodologyProfileIds,
+    runLlmQuality: fastSpoken ? false : undefined,
     executionMode: executionPolicy.mode,
     executionPolicy,
   })

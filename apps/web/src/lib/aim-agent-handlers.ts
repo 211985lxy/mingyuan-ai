@@ -307,11 +307,10 @@ function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
     actorId: params.userId,
     projectId: params.projectId,
     methodologyProfileIds: params.methodologyProfileIds,
+    runtimeTask: params.runtimeTask,
   })
 
-  return params.runSpec ?? (params.runtimeTask
-    ? { ...plannedSpec, runtimeTask: params.runtimeTask }
-    : plannedSpec)
+  return params.runSpec ?? plannedSpec
 }
 
 function resolveGenerationConversationMode(agentId: string, params: AimGenerationInput) {

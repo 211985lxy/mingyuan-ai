@@ -32,13 +32,16 @@ import {
   verifyMethodologyGoal,
 } from "@/lib/methodology/goal-verifier"
 import {
+  buildGroundedNumericClaimRule,
   buildGenerationSafetyRetryPrompt,
   inspectGenerationSafety,
+  materializeApprovedFacts,
 } from "@/lib/aim-generation-guardrails"
 import {
   buildIpWikiComplianceRewritePrompt,
   verifyIpWikiCompliance,
 } from "@/lib/ip-wiki/compliance"
+import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
 
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 export {
@@ -228,10 +231,6 @@ export function findIncompleteGenerationFormats(input: {
 /**
  * @description 执行 LLM 生成并带对标抄袭检测重试
  * @param agentId - 智能体 ID
- * @param systemPrompt - 系统提示词
- * @param userPrompt - 用户提示词
- * @param context - AIM 生成上下文
- * @param targetFormats - 目标格式列表
  * @returns 生成结果（完成响应和解析内容）
  */
 export async function executeGenerateLLMWithBenchmarkRetry(
@@ -241,13 +240,18 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   context: AimGenerateContext,
   targetFormats: ContentFormat[],
 ) {
-  let activePrompt = userPrompt
+  const groundedNumericRule = buildGroundedNumericClaimRule(context.rawInput)
+  let activePrompt = `${userPrompt}${groundedNumericRule}`
   const isLightEdit = context.runtimeTask === "light_edit"
+  const maxAttempts = isAimFastSpokenRoute(context.modelPolicy?.routeKey) ? 1 : 3
   const methodologyPlan = context.methodologyPlan ?? context.taskSpec?.methodologyPlan
   const ipWikiPages = context.ipWikiPages
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
+    for (const format of targetFormats) {
+      parsed[format] = materializeApprovedFacts(parsed[format] || "", context.rawInput)
+    }
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
     const incompleteFormats = isLightEdit ? [] : findIncompleteGenerationFormats({
       parsed,
@@ -270,6 +274,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
 
     if (
       safety.copiedFormats.length === 0
+      && safety.unsupportedNumericClaimFormats.length === 0
       && safety.unsupportedClaimFormats.length === 0
       && safety.lightEditScopeViolationFormats.length === 0
       && incompleteFormats.length === 0
@@ -278,18 +283,17 @@ export async function executeGenerateLLMWithBenchmarkRetry(
     ) {
       return { completion, parsed, goalVerify, ipCompliance }
     }
-    if (attempt === 2) {
+    if (attempt === maxAttempts - 1) {
       if (incompleteFormats.length) {
-        throw new Error("生成结果连续被截断或正文过短，已停止交付，请重试本次请求")
+        throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
       }
       if (
         safety.copiedFormats.length
+        || safety.unsupportedNumericClaimFormats.length
         || safety.unsupportedClaimFormats.length
         || safety.lightEditScopeViolationFormats.length
       ) {
-        throw new Error(
-          "生成结果连续出现无依据案例、过度近似原文或轻改信息丢失，已停止交付",
-        )
+        throw new Error("生成结果出现事实风险、过度近似原文或轻改信息丢失，已停止交付")
       }
       // 目标质检或 IP 合规末次仍失败：交付最后一版，由 METHOD_NOTE 记录；不硬抛
       return { completion, parsed, goalVerify, ipCompliance }
@@ -305,6 +309,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
 - 每种格式都必须以完整句子结束，并保留 ===FORMAT:格式名=== 标记。`
     } else if (
       safety.copiedFormats.length
+      || safety.unsupportedNumericClaimFormats.length
       || safety.unsupportedClaimFormats.length
       || safety.lightEditScopeViolationFormats.length
     ) {

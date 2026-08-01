@@ -224,7 +224,7 @@ async function finalizeRunResult<TOutput>(input: {
       output,
       agentId: spec.agentId,
       taskType: request.taskType,
-      runLlmQuality: request.runLlmQuality,
+      runLlmQuality: spec.runLlmQuality,
     })
     qualityReport = qualityReport ?? quality.qualityReport
     qualityStatus = qualityStatus ?? quality.qualityStatus

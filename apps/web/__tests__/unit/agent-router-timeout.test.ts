@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const ctorArgs: Array<Record<string, unknown>> = []
+const completionArgs: Array<Record<string, unknown>> = []
 
 vi.mock("openai", () => ({
   default: class MockOpenAI {
@@ -10,7 +11,13 @@ vi.mock("openai", () => ({
 
     chat = {
       completions: {
-        create: vi.fn(),
+        create: vi.fn(async (body: Record<string, unknown>) => {
+          completionArgs.push(body)
+          return {
+            choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+            model: String(body.model || "test-model"),
+          }
+        }),
       },
     }
   },
@@ -19,6 +26,7 @@ vi.mock("openai", () => ({
 describe("agent router timeout overrides", () => {
   beforeEach(() => {
     ctorArgs.length = 0
+    completionArgs.length = 0
     process.env.LIHUO_API_KEY = "test-lihuo"
     process.env.APIMART_API_KEY = "test-apimart"
     process.env.APIMART_PROXY_URL = "http://127.0.0.1:10808"
@@ -62,6 +70,26 @@ describe("agent router timeout overrides", () => {
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
     expect(zenmux?.timeout).toBe(120000)
     expect(zenmux?.fetchOptions).toMatchObject({ dispatcher: expect.any(Object) })
+  })
+
+  it("routes the fast spoken policy only to GPT-4o with a 22s timeout", async () => {
+    const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
+    ctorArgs.length = 0
+
+    const routeKey = "content_producer.fast_spoken"
+    const llm = getAgentLLM(routeKey, {
+      minimumCapability: "standard",
+      maxProviderAttempts: 1,
+    })
+
+    expect(llm.providerNames).toEqual(["jiekou"])
+    expect(getAgentRecommendedModel(routeKey)).toBe("gpt-4o")
+    expect(ctorArgs).toHaveLength(1)
+    expect(ctorArgs[0]?.timeout).toBe(22000)
+    expect(ctorArgs[0]?.maxRetries).toBe(0)
+
+    await llm.complete({ messages: [{ role: "user", content: "写一条口播" }] })
+    expect(completionArgs[0]).toMatchObject({ model: "gpt-4o" })
   })
 
   it("routes business_system_diagnosis to ZenMux Claude first with DeepSeek fallback", async () => {

@@ -3,6 +3,10 @@ import { getProviderConfigs } from "./config"
 import { OpenAICompatibleProvider } from "./provider"
 import type { LLMProvider, LLMProviderConfig, ModelCapability } from "./types"
 import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio"
+import {
+  AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS,
+  AIM_FAST_SPOKEN_ROUTE_KEY,
+} from "@/lib/aim-harness/fast-spoken-policy"
 
 /**
  * 智能体模型路由策略
@@ -21,6 +25,7 @@ type AgentModelRoute = {
   name: string
   model?: string
   timeoutMs?: number
+  maxRetries?: number
   capability: ModelCapability
 }
 
@@ -75,6 +80,15 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 }
 
 export const AGENT_ROUTES = freezeAgentRoutes({
+  [AIM_FAST_SPOKEN_ROUTE_KEY]: [
+    {
+      name: "jiekou",
+      model: "gpt-4o",
+      timeoutMs: AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS,
+      maxRetries: 0,
+      capability: "standard",
+    },
+  ],
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
     // 先快失败再换路：ZenMux/离火近年常超时或 503，超时预算要短于前端流式总超时
@@ -246,6 +260,7 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
       ...config,
       ...(route.model ? { defaultModel: route.model } : {}),
       ...(route.timeoutMs ? { timeoutMs: route.timeoutMs } : {}),
+      ...(route.maxRetries !== undefined ? { maxRetries: route.maxRetries } : {}),
       capability: route.capability,
     }
     providers.push(new OpenAICompatibleProvider(mergedConfig))

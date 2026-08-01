@@ -109,7 +109,7 @@ describe("aim-harness planner", () => {
   })
 
   // ── 阶段 2.1：modelPolicy 冻结（与 handler 执行函数逐字一致）──────────────
-  it("freezes modelPolicy for generate entrypoints (temp 0.8, maxTokens 8192)", () => {
+  it("uses the strict fast policy for a single new spoken script", () => {
     const spec = planAimRun({
       entrypoint: "generate",
       agentId: "content_producer",
@@ -117,15 +117,42 @@ describe("aim-harness planner", () => {
       targetFormats: ["video_script"],
       taskType: "write_script",
     })
-    // 必须与 executeGenerateLLM 的 temperature:0.8 / maxTokens:8192 一致
-    // （8192 为推理模型预留 reasoning tokens 余量，见 planner 注释）
     expect(spec.modelPolicy.temperature).toBe(0.8)
-    expect(spec.modelPolicy.maxTokens).toBe(8192)
+    expect(spec.modelPolicy.routeKey).toBe("content_producer.fast_spoken")
+    expect(spec.modelPolicy.maxTokens).toBe(2500)
     expect(spec.modelPolicy.stream).toBe(false)
-    // 内容生产官走 advanced 主链（多平台内容包 / 母内容质量）
-    expect(spec.modelPolicy.targetCapability).toBe("advanced")
+    expect(spec.modelPolicy.targetCapability).toBe("standard")
     expect(spec.modelPolicy.minimumCapability).toBe("standard")
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(1)
+    expect(spec.executionPolicy).toMatchObject({
+      mode: "single_shot",
+      timeoutMs: 28000,
+      maxAutoRetries: 0,
+    })
+    expect(spec.runLlmQuality).toBe(false)
+  })
+
+  it("keeps the quality route for multi-format and non-new-copy generation", () => {
+    const multi = planAimRun({
+      entrypoint: "generate",
+      agentId: "content_producer",
+      rawInput: "同时写口播和朋友圈",
+      targetFormats: ["video_script", "moments_post"],
+      taskType: "write_script",
+    })
+    const edit = planAimRun({
+      entrypoint: "generate",
+      agentId: "content_producer",
+      rawInput: "优化原稿",
+      targetFormats: ["video_script"],
+      runtimeTask: "light_edit",
+    })
+
+    expect(multi.modelPolicy.routeKey).toBeUndefined()
+    expect(multi.modelPolicy.maxTokens).toBe(8192)
+    expect(multi.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(edit.modelPolicy.routeKey).toBeUndefined()
+    expect(edit.modelPolicy.maxProviderAttempts).toBe(3)
   })
 
   it("freezes modelPolicy for chat entrypoints (temp 0.7, no maxTokens)", () => {

@@ -5,6 +5,85 @@ import { isBenchmarkCopyTooSimilar } from "./aim-benchmark-quality"
 const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)/
 const UNSUPPORTED_ANECDOTE_PATTERN = /我(?:上周|上个月|去年|前阵子|最近)[，,\s]*(?:帮|帮助|服务|辅导|带|见过|遇到|认识|接触|观察)(?:了|过)?|我[，,\s]*(?:帮|帮助|服务|辅导|带|见过|遇到|认识|接触|观察)(?:了|过)?(?:一家|一个|一位|有人|不少|很多|客户|公司|企业|老板|朋友|学员)|(?:上周|上个月|去年|前阵子|最近).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:有|遇到|来了)(?:个|一个|一位|一家).{0,12}(?:客户|公司|企业|老板|朋友|学员)|(?:一个|一位|一家).{0,12}(?:客户|公司|企业|老板|朋友|学员).{0,24}(?:做了|发了|赚了|成交|询盘|增长|提升|降低|节省)/
 const HYPOTHETICAL_MARKER_PATTERN = /假设|比如|例如|举例|如果|设想|虚构示例/
+const STRICT_NUMERIC_CLAIM_PATTERN = /不得(?:新增|编造|出现)(?:任何)?其他数字|禁止(?:新增|编造)(?:任何)?数字/
+const NUMERIC_CLAIM_PATTERN = /(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)\s*(?:%|％|分钟|小时|个人|秒|天|周|月|年|个|位|家|人|条|道|步|套|次|元|块|万|亿|倍|成|折)/gu
+const BENIGN_SINGULAR_PHRASES = new Set(["一个", "一个人", "一家", "一人", "一位", "一步", "一套", "一次"])
+const APPROVED_FACTS_MARKER = "[[APPROVED_FACTS]]"
+const APPROVED_FACTS_PATTERN = /必须准确引用(?:两个|[一二两三四五六七八九十]+个)?事实[:：]\s*([\s\S]*?)(?=。?痛点是|。?结尾只|。?禁止|$)/u
+const APPROVED_CTA_PATTERN = /结尾只引导\s*([^。]+)(?=。|$)/u
+
+function extractNumericClaims(text: string): Set<string> {
+  return new Set(Array.from(text.matchAll(NUMERIC_CLAIM_PATTERN), (match) =>
+    match[0].replace(/\s/g, "").replace(/块$/, "元").replace(/个$/, "条")))
+}
+
+export function hasStrictNumericClaimConstraint(rawInput: string): boolean {
+  return STRICT_NUMERIC_CLAIM_PATTERN.test(rawInput)
+}
+
+export function buildClosedWorldModelInput(rawInput: string): string {
+  if (!hasStrictNumericClaimConstraint(rawInput)) return rawInput
+  const match = rawInput.match(APPROVED_FACTS_PATTERN)
+  if (!match?.[1]?.trim()) return rawInput
+  return rawInput.replace(match[0], `客户案例段必须单独输出 ${APPROVED_FACTS_MARKER}`)
+}
+
+export function materializeApprovedFacts(content: string, rawInput: string): string {
+  const facts = rawInput.match(APPROVED_FACTS_PATTERN)?.[1]?.trim()
+  if (!facts) return content
+  if (!content.includes(APPROVED_FACTS_MARKER)) {
+    throw new Error("生成结果未保留批准的事实锚点，已停止交付")
+  }
+  const approvedNumbers = new Set(facts.match(/\d+(?:\.\d+)?/g) ?? [])
+  const approvedCta = rawInput.match(APPROVED_CTA_PATTERN)?.[1]?.trim()
+  const customerElaboration = /(?:他们|该公司|这家公司|这个案例|案例中|与我们|在我们|我们(?:服务|帮助|支持)|我们的服务|量身定制|高质量内容|优质内容|主持人姓名|主播自我介绍|XXX)/
+  const unsupportedServiceClaim = /(?:我们|已经)?帮(?:过)?(?:不少|很多|一些|多家)?企业|解决过类似(?:的)?难题|我们(?:服务|帮助|支持)过/
+  let foundFactsMarker = false
+  const paragraphs = content.split(/\n{2,}/).flatMap((paragraph) => {
+    if (paragraph.includes(APPROVED_FACTS_MARKER)) {
+      foundFactsMarker = true
+      return [APPROVED_FACTS_MARKER]
+    }
+    if (foundFactsMarker && approvedCta) return []
+    const scrubbed = paragraph
+      .split(/(?<=[。！？!?])/u)
+      .filter((sentence) => !unsupportedServiceClaim.test(sentence))
+      .join("")
+      .trim()
+    const repeatsApprovedNumber = (scrubbed.match(/\d+(?:\.\d+)?/g) ?? [])
+      .some((value) => approvedNumbers.has(value))
+    if (!scrubbed || repeatsApprovedNumber || customerElaboration.test(scrubbed)) return []
+    return [scrubbed]
+  })
+  const body = paragraphs.join("\n\n").replace(APPROVED_FACTS_MARKER, facts)
+  return approvedCta ? `${body}\n\n${approvedCta}。` : body
+}
+
+export function buildGroundedNumericClaimRule(rawInput: string): string {
+  if (!hasStrictNumericClaimConstraint(rawInput)) return ""
+  if (APPROVED_FACTS_PATTERN.test(rawInput)) {
+    return `\n\n【事实锚点门禁】客户案例段必须且只能单独输出 ${APPROVED_FACTS_MARKER}，不得在标记前后复述、改写、解释或推断案例信息。其他段落不得新增数字。`
+  }
+  const allowed = [...extractNumericClaims(rawInput)]
+  return `\n\n【数字事实门禁】正文只能使用用户原文已有的数字表达：${allowed.join("、") || "无"}。如输入包含 ${APPROVED_FACTS_MARKER}，必须原样保留该标记且不得在其他位置提及或解释客户案例。不得新增人数、时长、步骤数、比例或结果数字；缺少依据时删掉数字，不得猜测。`
+}
+
+export function findUnsupportedNumericClaimFormats(
+  context: Pick<AimGenerateContext, "rawInput">,
+  parsed: Partial<Record<ContentFormat, string>>,
+  targetFormats: ContentFormat[],
+): ContentFormat[] {
+  if (!hasStrictNumericClaimConstraint(context.rawInput)) return []
+  const allowed = extractNumericClaims(context.rawInput)
+  return targetFormats.filter((format) => {
+    const unsupported = [...extractNumericClaims(parsed[format] || "")]
+      .filter((claim) => !allowed.has(claim) && !BENIGN_SINGULAR_PHRASES.has(claim))
+    if (unsupported.length) {
+      console.warn("[aim-generation] blocked unsupported numeric claims", { format, unsupported })
+    }
+    return unsupported.length > 0
+  })
+}
 
 function containsUnsupportedAnecdote(text: string): boolean {
   return text
@@ -202,6 +281,11 @@ export function inspectGenerationSafety(
       )
   return {
     copiedFormats,
+    unsupportedNumericClaimFormats: findUnsupportedNumericClaimFormats(
+      context,
+      parsed,
+      targetFormats,
+    ),
     unsupportedClaimFormats: findUnsupportedFirstPersonClaimFormats(
       context,
       parsed,
@@ -231,6 +315,9 @@ export function buildGenerationSafetyRetryPrompt(
       : "",
     findings.unsupportedClaimFormats.length
       ? `上一版 ${findings.unsupportedClaimFormats.join("、")} 出现了上下文无依据的第一人称经历，判定为事实风险。`
+      : "",
+    findings.unsupportedNumericClaimFormats.length
+      ? `上一版 ${findings.unsupportedNumericClaimFormats.join("、")} 出现了用户原文没有的数字表达，判定为事实风险。`
       : "",
     findings.lightEditScopeViolationFormats.length
       ? (() => {
