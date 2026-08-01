@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { MoreHorizontal, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -20,6 +20,7 @@ import {
   type AimHistoryListItem,
 } from "@/lib/aim-sidebar-history"
 import type { AimAgentId } from "@/lib/aim-ui-config"
+import { buildAimAgentNavHref } from "@/lib/aim/task-session-reset"
 
 type AimExpertSidebarHistoryProps = {
   agentId: AimAgentId
@@ -29,6 +30,20 @@ type AimExpertSidebarHistoryProps = {
   onCloseMobile: () => void
   onRequestLoad: (id: string) => void
   onDelete: (id: string) => Promise<void>
+}
+
+async function handleDeleteHistory(
+  onDelete: (id: string) => Promise<void>,
+  id: string,
+  title: string,
+) {
+  if (!window.confirm(`删除这条任务？\n${title}`)) return
+  try {
+    await onDelete(id)
+    toast.success("已删除")
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "删除失败")
+  }
 }
 
 /**
@@ -44,16 +59,7 @@ export function AimExpertSidebarHistory({
   onDelete,
 }: AimExpertSidebarHistoryProps) {
   const router = useRouter()
-
-  async function handleDeleteHistory(id: string, title: string) {
-    if (!window.confirm(`删除这条任务？\n${title}`)) return
-    try {
-      await onDelete(id)
-      toast.success("已删除")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "删除失败")
-    }
-  }
+  const searchParams = useSearchParams()
 
   return (
     <SidebarMenuSub className="mx-2 mb-1 border-l border-border/50">
@@ -74,7 +80,10 @@ export function AimExpertSidebarHistory({
                     const navAgent = resolveHistoryNavAgentId(item.agentId, agentId)
                     onRequestLoad(item.id)
                     if (!isAimRoute || currentAgentParam !== navAgent) {
-                      router.push(`/aim?agent=${navAgent}`)
+                      router.push(buildAimAgentNavHref({
+                        currentSearch: searchParams?.toString() ?? "",
+                        agentId: navAgent,
+                      }))
                     }
                     onCloseMobile()
                   }}
@@ -98,7 +107,7 @@ export function AimExpertSidebarHistory({
                   <DropdownMenuContent align="end" className="w-28">
                     <DropdownMenuItem
                       variant="destructive"
-                      onClick={() => void handleDeleteHistory(item.id, title)}
+                      onClick={() => void handleDeleteHistory(onDelete, item.id, title)}
                     >
                       <Trash2 className="h-4 w-4" />
                       删除

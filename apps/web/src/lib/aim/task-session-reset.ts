@@ -51,3 +51,25 @@ export function resolveAimWorkflowBriefForRequest<T>(input: {
   if (!input.keepContext) return null
   return input.currentBrief ?? null
 }
+
+/**
+ * 侧栏切换专家时，基于当前 URL 拼出新 href：保留 projectId / mode（项目态），
+ * 剥离 generationId / 选题 / 对标 / stage 等任务态，避免串户或串旧任务。
+ * 与 switchToTargetAgent / beginWorkflowStage 的健康路径保持同一语义。
+ *
+ * 不传 stage 时清掉旧 stage，让目标专家进入其自然默认工作流阶段。
+ */
+export function buildAimAgentNavHref(input: {
+  currentSearch: string
+  agentId: string
+  stage?: string
+}): string {
+  const params = new URLSearchParams(input.currentSearch)
+  stripAimTaskScopedSearchParams(params)
+  params.set("agent", input.agentId)
+  if (input.stage) {
+    params.set("stage", input.stage)
+  }
+  const query = params.toString()
+  return query ? `/aim?${query}` : `/aim?agent=${input.agentId}`
+}

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { ChevronRight } from "lucide-react"
 import {
   SidebarMenuButton,
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { getAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import type { AimHistoryListItem } from "@/lib/aim-sidebar-history"
 import { AimExpertSidebarHistory } from "@/components/layout/aim-expert-sidebar-history"
+import { buildAimAgentNavHref } from "@/lib/aim/task-session-reset"
 
 type AimExpertSidebarSectionProps = {
   agentId: AimAgentId
@@ -44,6 +46,12 @@ export function AimExpertSidebarSection({
   const agent = getAimAgent(agentId)
   const Icon = agent.icon
   const label = agent.displayTitle ?? agent.title
+  // 切换专家时基于当前 URL 保留 projectId/mode，剥离旧任务态，避免串户或串旧任务。
+  const searchParams = useSearchParams()
+  const href = buildAimAgentNavHref({
+    currentSearch: searchParams?.toString() ?? "",
+    agentId: agent.id,
+  })
 
   return (
     <SidebarMenuItem>
@@ -65,7 +73,7 @@ export function AimExpertSidebarSection({
         <SidebarMenuButton
           render={(
             <Link
-              href={`/aim?agent=${agent.id}`}
+              href={href}
               onClick={onExpandAndNavigate}
             />
           )}

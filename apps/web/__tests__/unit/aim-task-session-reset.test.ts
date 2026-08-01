@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  buildAimAgentNavHref,
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
   stripAimTaskScopedSearchParams,
@@ -56,5 +57,32 @@ describe("aim task session reset", () => {
       currentBrief: stale,
       override: null,
     })).toBeNull()
+  })
+
+  describe("buildAimAgentNavHref", () => {
+    it("keeps projectId/mode and switches agent, dropping task-scoped params", () => {
+      // 复刻演示场景：项目里切到选题策划，必须保住 projectId（否则背景信息降 0%）。
+      const href = buildAimAgentNavHref({
+        currentSearch:
+          "agent=content_producer&projectId=p1&mode=quick&generationId=g1&topicSelectionId=t1&stage=content",
+        agentId: "business_diagnosis",
+      })
+      const params = new URLSearchParams(href.slice(href.indexOf("?") + 1))
+      expect(params.get("agent")).toBe("business_diagnosis")
+      expect(params.get("projectId")).toBe("p1")
+      expect(params.get("mode")).toBe("quick")
+      // 旧任务态被剥离，避免串旧任务
+      expect(params.get("generationId")).toBeNull()
+      expect(params.get("topicSelectionId")).toBeNull()
+      expect(params.get("stage")).toBeNull()
+    })
+
+    it("still works when there is no prior search (no projectId lost, no crash)", () => {
+      const href = buildAimAgentNavHref({
+        currentSearch: "",
+        agentId: "content_producer",
+      })
+      expect(href).toBe("/aim?agent=content_producer")
+    })
   })
 })
