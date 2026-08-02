@@ -13,6 +13,7 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
   const rows = await prisma.aimCustomSkill.findMany({
     where,
     orderBy: [{ agentId: "asc" }, { createdAt: "asc" }],
+    take: 200,
   })
   return NextResponse.json({ data: rows.map(toApiShape) })
 })

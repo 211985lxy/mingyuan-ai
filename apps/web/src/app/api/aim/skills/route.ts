@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   const rows = await prisma.aimCustomSkill.findMany({
     where,
     orderBy: [{ agentId: "asc" }, { createdAt: "asc" }],
+    take: 200,
   })
   return NextResponse.json({
     data: rows.map((row) => ({

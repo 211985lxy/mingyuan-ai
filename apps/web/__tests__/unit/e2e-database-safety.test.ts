@@ -25,7 +25,7 @@ describe("E2E database safety", () => {
 
   it("keeps the immutable baseline migration list valid and duplicate-free", () => {
     expect(new Set(baselineMigrations).size).toBe(baselineMigrations.length)
-    expect(baselineMigrations.at(-1)).toBe("20260714100000_add_admin_audit_log")
+    expect(baselineMigrations.at(-1)).toBe("20260731120000_add_video_structure_extraction_fields")
     expect(baselineMigrations).toContain("20260713130000_add_admin_session_version")
 
     for (const migration of baselineMigrations) {
