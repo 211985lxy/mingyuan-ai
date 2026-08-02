@@ -82,11 +82,11 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 export const AGENT_ROUTES = freezeAgentRoutes({
   [AIM_FAST_SPOKEN_ROUTE_KEY]: [
     {
-      name: "jiekou",
-      model: "gpt-4o",
+      name: "zenmux",
+      model: "anthropic/claude-opus-4.6",
       timeoutMs: AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS,
       maxRetries: 0,
-      capability: "standard",
+      capability: "advanced",
     },
   ],
   // ── 高质量写作 / 选题策划组 ──

@@ -26,7 +26,7 @@ function context(routeKey?: string) {
       stream: false,
       temperature: 0.8,
       maxTokens: routeKey ? 2500 : 8192,
-      targetCapability: routeKey ? "standard" : "advanced",
+      targetCapability: "advanced",
       minimumCapability: "standard",
       maxProviderAttempts: routeKey ? 1 : 3,
     },
@@ -38,7 +38,7 @@ describe("AIM fast spoken generation budget", () => {
     mocks.execute.mockReset()
   })
 
-  it("fails fast after one incomplete model response", async () => {
+  it("stops after two incomplete model responses", async () => {
     mocks.execute.mockResolvedValue({
       content: "===FORMAT:video_script===\n这是一段没有写完的口播",
       finishReason: "stop",
@@ -51,7 +51,7 @@ describe("AIM fast spoken generation budget", () => {
       context(AIM_FAST_SPOKEN_ROUTE_KEY),
       ["video_script"],
     )).rejects.toThrow("已停止交付")
-    expect(mocks.execute).toHaveBeenCalledTimes(1)
+    expect(mocks.execute).toHaveBeenCalledTimes(2)
   })
 
   it("blocks numeric claims that are absent from a strict user brief", async () => {
@@ -71,7 +71,7 @@ describe("AIM fast spoken generation budget", () => {
       strictContext,
       ["video_script"],
     )).rejects.toThrow("事实风险")
-    expect(mocks.execute).toHaveBeenCalledTimes(1)
+    expect(mocks.execute).toHaveBeenCalledTimes(2)
     expect(mocks.execute.mock.calls[0]?.[2]).toContain("正文只能使用用户原文已有的数字表达")
   })
 
@@ -92,6 +92,83 @@ describe("AIM fast spoken generation budget", () => {
       strictContext,
       ["video_script"],
     )).resolves.toBeDefined()
+  })
+
+  it("allows singular content determiners without treating them as fabricated metrics", async () => {
+    mocks.execute.mockResolvedValue({
+      content: `===FORMAT:video_script===\n${"每一条内容都应该承担明确任务，而不是碰运气。".repeat(8)}`,
+      finishReason: "stop",
+    })
+    const strictContext = {
+      ...context(AIM_FAST_SPOKEN_ROUTE_KEY),
+      rawInput: "围绕内容获客写口播，不得编造其他数字",
+    } as never
+
+    await expect(executeGenerateLLMWithBenchmarkRetry(
+      "content_producer",
+      "system",
+      "user",
+      strictContext,
+      ["video_script"],
+    )).resolves.toBeDefined()
+  })
+
+  it("allows creative time and structure numbers outside hard business claims", async () => {
+    mocks.execute.mockResolvedValue({
+      content: `===FORMAT:video_script===\n${"前三秒先说痛点，再用三条方法把观点讲清楚。".repeat(8)}`,
+      finishReason: "stop",
+    })
+    const strictContext = {
+      ...context(AIM_FAST_SPOKEN_ROUTE_KEY),
+      rawInput: "围绕内容获客写口播，不得编造其他数字",
+    } as never
+
+    await expect(executeGenerateLLMWithBenchmarkRetry(
+      "content_producer",
+      "system",
+      "user",
+      strictContext,
+      ["video_script"],
+    )).resolves.toBeDefined()
+  })
+
+  it("allows generic customer counts used as creative scene setting", async () => {
+    mocks.execute.mockResolvedValue({
+      content: `===FORMAT:video_script===\n${"每一个客户看到内容之后，都应该知道下一步该做什么。".repeat(8)}`,
+      finishReason: "stop",
+    })
+    const strictContext = {
+      ...context(AIM_FAST_SPOKEN_ROUTE_KEY),
+      rawInput: "围绕内容获客写口播，不得编造其他数字",
+    } as never
+
+    await expect(executeGenerateLLMWithBenchmarkRetry(
+      "content_producer",
+      "system",
+      "user",
+      strictContext,
+      ["video_script"],
+    )).resolves.toBeDefined()
+  })
+
+  it("still blocks fabricated first-person customer evidence", async () => {
+    mocks.execute.mockResolvedValue({
+      content: `===FORMAT:video_script===\n${"找到我的小企业老板，大多都卡在内容无法稳定获客。".repeat(8)}`,
+      finishReason: "stop",
+    })
+    const strictContext = {
+      ...context(AIM_FAST_SPOKEN_ROUTE_KEY),
+      rawInput: "围绕内容获客写口播，不得编造其他数字",
+    } as never
+
+    await expect(executeGenerateLLMWithBenchmarkRetry(
+      "content_producer",
+      "system",
+      "user",
+      strictContext,
+      ["video_script"],
+    )).rejects.toThrow("事实风险")
+    expect(mocks.execute).toHaveBeenCalledTimes(2)
   })
 
   it("materializes the approved customer facts instead of letting the model expand them", async () => {
@@ -120,11 +197,36 @@ describe("AIM fast spoken generation budget", () => {
     expect(result.parsed.video_script).toMatch(/评论领取诊断清单。$/)
   })
 
+  it("deterministically appends approved facts when the model omits the marker", async () => {
+    mocks.execute.mockResolvedValue({
+      content: `===FORMAT:video_script===\n${"内容做了很多，精准线索却不稳定，问题在于缺少转化路径。".repeat(8)}`,
+      finishReason: "stop",
+    })
+    const strictContext = {
+      ...context(AIM_FAST_SPOKEN_ROUTE_KEY),
+      rawInput: "必须准确引用两个事实：60天产出40条内容、获得127条线索；成本从800元降到210元。目标客户是小企业老板。痛点是线索不稳。结尾只引导评论领取诊断清单。不得编造其他数字",
+    } as never
+
+    const result = await executeGenerateLLMWithBenchmarkRetry(
+      "content_producer",
+      "system",
+      "user",
+      strictContext,
+      ["video_script"],
+    )
+
+    expect(result.parsed.video_script).toContain("60天产出40条内容、获得127条线索")
+    expect(result.parsed.video_script).toContain("成本从800元降到210元")
+    expect(result.parsed.video_script).not.toContain("[[APPROVED_FACTS]]")
+    expect(result.parsed.video_script).toMatch(/评论领取诊断清单。$/)
+  })
+
   it("hides approved facts from the model and exposes only the marker", () => {
-    const rawInput = "必须准确引用两个事实：某公司60天产出40条内容、获得127条线索。痛点是产能不稳。不得编造其他数字"
+    const rawInput = "必须准确引用两个事实：某公司60天产出40条内容、获得127条线索。目标客户是获客不稳的小企业老板。痛点是产能不稳。不得编造其他数字"
 
     expect(buildClosedWorldModelInput(rawInput)).not.toContain("60天产出40条")
     expect(buildClosedWorldModelInput(rawInput)).toContain("[[APPROVED_FACTS]]")
+    expect(buildClosedWorldModelInput(rawInput)).toContain("目标客户是获客不稳的小企业老板")
     expect(buildGroundedNumericClaimRule(rawInput)).not.toContain("60天")
   })
 

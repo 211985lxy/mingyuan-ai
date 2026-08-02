@@ -121,12 +121,12 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.routeKey).toBe("content_producer.fast_spoken")
     expect(spec.modelPolicy.maxTokens).toBe(2500)
     expect(spec.modelPolicy.stream).toBe(false)
-    expect(spec.modelPolicy.targetCapability).toBe("standard")
+    expect(spec.modelPolicy.targetCapability).toBe("advanced")
     expect(spec.modelPolicy.minimumCapability).toBe("standard")
     expect(spec.modelPolicy.maxProviderAttempts).toBe(1)
     expect(spec.executionPolicy).toMatchObject({
       mode: "single_shot",
-      timeoutMs: 28000,
+      timeoutMs: 90000,
       maxAutoRetries: 0,
     })
     expect(spec.runLlmQuality).toBe(false)

@@ -41,7 +41,10 @@ import {
   buildIpWikiComplianceRewritePrompt,
   verifyIpWikiCompliance,
 } from "@/lib/ip-wiki/compliance"
-import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
+import {
+  AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS,
+  isAimFastSpokenRoute,
+} from "@/lib/aim-harness/fast-spoken-policy"
 
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 export {
@@ -243,7 +246,9 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   const groundedNumericRule = buildGroundedNumericClaimRule(context.rawInput)
   let activePrompt = `${userPrompt}${groundedNumericRule}`
   const isLightEdit = context.runtimeTask === "light_edit"
-  const maxAttempts = isAimFastSpokenRoute(context.modelPolicy?.routeKey) ? 1 : 3
+  const maxAttempts = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
+    ? AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS
+    : 3
   const methodologyPlan = context.methodologyPlan ?? context.taskSpec?.methodologyPlan
   const ipWikiPages = context.ipWikiPages
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {

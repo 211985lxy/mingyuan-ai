@@ -4,8 +4,9 @@ import type { AimAgentId, AimEntrypoint } from "./contracts"
 
 export const AIM_FAST_SPOKEN_ROUTE_KEY = "content_producer.fast_spoken"
 export const AIM_FAST_SPOKEN_MAX_TOKENS = 2_500
-export const AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS = 22_000
-export const AIM_FAST_SPOKEN_TOTAL_BUDGET_MS = 28_000
+export const AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS = 2
+export const AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS = 45_000
+export const AIM_FAST_SPOKEN_TOTAL_BUDGET_MS = 90_000
 
 const FAST_SPOKEN_FORMATS = new Set<ContentFormat>(["video_script", "koubo_script"])
 

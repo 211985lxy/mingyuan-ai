@@ -121,13 +121,13 @@ export class ContentProducerHandler implements AimAgentHandler {
     const closedWorldFastRun = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
       && hasStrictNumericClaimConstraint(context.rawInput)
     const systemPrompt = closedWorldFastRun
-      ? `${agentPrompt}\n这是闭集事实任务：只使用用户原始输入里的事实、客户信息和数字，不调用或复述其他背景事实。客户案例段只能逐字引用用户原文里的事实锚点；禁止补充人员、流程、渠道、做法、原因、其他结果或因果解释，禁止计算、换算或概括降幅、比例等衍生数字，禁止用“他们”“该公司”“这家公司”引出任何新信息。结尾只执行用户指定的行动引导，不增加免费、保证、限时或交付承诺。直接输出完整成稿，不解释、不分析、不增加案例细节。`
+      ? `${agentPrompt}\n事实与创意分区：客户案例和任何可核验的经营结果必须严格使用用户批准的事实，案例位置只输出 [[APPROVED_FACTS]]，不得新增真实客户身份或业绩结果。开头钩子、观点、比喻、问题分析、场景、数字钩子和语言节奏可以自由创作。遵守目标平台发布规范，避免绝对化承诺、站外导流以及夸大医疗或收益效果。结尾只执行用户指定的行动引导。只输出连续口播正文，不要标题、分段标签或 Markdown。`
       : buildProducerSystemPrompt(agentPrompt, context)
         + scenarioBlock
         + (canonicalBlock ? `\n\n${canonicalBlock}` : "")
         + (packageConstraints ? `\n\n${packageConstraints}` : "")
     const userPrompt = closedWorldFastRun
-      ? `用户批准的全部事实与要求：\n${buildClosedWorldModelInput(context.rawInput)}\n\n写成自然、完整、可直接拍摄的口播正文。\n输出格式：\n${context.targetFormats.map((format) => `===FORMAT:${format}===`).join("\n")}`
+      ? `用户批准的全部事实与要求：\n${buildClosedWorldModelInput(context.rawInput)}\n\n写成自然、完整、可直接拍摄的口播正文。在事实标记前充分展开开头、目标客户、痛点分析和核心观点，不要只输出事实标记与行动引导；事实标记后不要再扩写案例。\n输出格式：\n${context.targetFormats.map((format) => `===FORMAT:${format}===`).join("\n")}`
       : buildUserPrompt(context, formatBlocks)
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
