@@ -72,24 +72,24 @@ describe("agent router timeout overrides", () => {
     expect(zenmux?.fetchOptions).toMatchObject({ dispatcher: expect.any(Object) })
   })
 
-  it("routes the fast spoken policy only to GPT-4o with a 22s timeout", async () => {
+  it("routes the fast spoken policy only to Claude Opus 4.6 with a 45s timeout", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0
 
     const routeKey = "content_producer.fast_spoken"
     const llm = getAgentLLM(routeKey, {
-      minimumCapability: "standard",
+      minimumCapability: "advanced",
       maxProviderAttempts: 1,
     })
 
-    expect(llm.providerNames).toEqual(["jiekou"])
-    expect(getAgentRecommendedModel(routeKey)).toBe("gpt-4o")
+    expect(llm.providerNames).toEqual(["zenmux"])
+    expect(getAgentRecommendedModel(routeKey)).toBe("anthropic/claude-opus-4.6")
     expect(ctorArgs).toHaveLength(1)
-    expect(ctorArgs[0]?.timeout).toBe(22000)
+    expect(ctorArgs[0]?.timeout).toBe(45000)
     expect(ctorArgs[0]?.maxRetries).toBe(0)
 
     await llm.complete({ messages: [{ role: "user", content: "写一条口播" }] })
-    expect(completionArgs[0]).toMatchObject({ model: "gpt-4o" })
+    expect(completionArgs[0]).toMatchObject({ model: "anthropic/claude-opus-4.6" })
   })
 
   it("routes business_system_diagnosis to ZenMux Claude Opus 4.6 first with DeepSeek fallback", async () => {

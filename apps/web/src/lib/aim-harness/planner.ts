@@ -211,7 +211,7 @@ function buildModelPolicy(
     stream,
     temperature,
     ...(maxTokens ? { maxTokens } : {}),
-    targetCapability: fastSpoken ? "standard" : needsAdvancedReasoning ? "advanced" : "standard",
+    targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
     maxProviderAttempts: fastSpoken ? 1 : stream ? 2 : 3,
   }

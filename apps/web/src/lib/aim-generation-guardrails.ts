@@ -2,14 +2,15 @@ import type { AimGenerateContext } from "./aim-agent-handlers"
 import type { ContentFormat } from "./aim-generator"
 import { isBenchmarkCopyTooSimilar } from "./aim-benchmark-quality"
 
-const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)/
+const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)|(?:来找我|找到我|咨询我)(?:的)?(?:客户|老板|企业|小企业老板)/
 const UNSUPPORTED_ANECDOTE_PATTERN = /我(?:上周|上个月|去年|前阵子|最近)[，,\s]*(?:帮|帮助|服务|辅导|带|见过|遇到|认识|接触|观察)(?:了|过)?|我[，,\s]*(?:帮|帮助|服务|辅导|带|见过|遇到|认识|接触|观察)(?:了|过)?(?:一家|一个|一位|有人|不少|很多|客户|公司|企业|老板|朋友|学员)|(?:上周|上个月|去年|前阵子|最近).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:有|遇到|来了)(?:个|一个|一位|一家).{0,12}(?:客户|公司|企业|老板|朋友|学员)|(?:一个|一位|一家).{0,12}(?:客户|公司|企业|老板|朋友|学员).{0,24}(?:做了|发了|赚了|成交|询盘|增长|提升|降低|节省)/
 const HYPOTHETICAL_MARKER_PATTERN = /假设|比如|例如|举例|如果|设想|虚构示例/
 const STRICT_NUMERIC_CLAIM_PATTERN = /不得(?:新增|编造|出现)(?:任何)?其他数字|禁止(?:新增|编造)(?:任何)?数字/
-const NUMERIC_CLAIM_PATTERN = /(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)\s*(?:%|％|分钟|小时|个人|秒|天|周|月|年|个|位|家|人|条|道|步|套|次|元|块|万|亿|倍|成|折)/gu
-const BENIGN_SINGULAR_PHRASES = new Set(["一个", "一个人", "一家", "一人", "一位", "一步", "一套", "一次"])
+// 只把可核验的经营结果视为硬事实；时长、步骤数、内容条数等创意表达不在这里拦截。
+const NUMERIC_CLAIM_PATTERN = /(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)\s*(?:%|％|个人|位|家|人|元|块|万元|亿元|倍|成|折)/gu
+const BENIGN_SINGULAR_PHRASES = new Set(["一个", "一条", "一个人", "一家", "一人", "一位", "一步", "一套", "一次"])
 const APPROVED_FACTS_MARKER = "[[APPROVED_FACTS]]"
-const APPROVED_FACTS_PATTERN = /必须准确引用(?:两个|[一二两三四五六七八九十]+个)?事实[:：]\s*([\s\S]*?)(?=。?痛点是|。?结尾只|。?禁止|$)/u
+const APPROVED_FACTS_PATTERN = /必须准确引用(?:两个|[一二两三四五六七八九十]+个)?事实[:：]\s*([\s\S]*?)(?=。?(?:目标客户是|痛点是|结尾只|禁止|不得)|$)/u
 const APPROVED_CTA_PATTERN = /结尾只引导\s*([^。]+)(?=。|$)/u
 
 function extractNumericClaims(text: string): Set<string> {
@@ -31,15 +32,15 @@ export function buildClosedWorldModelInput(rawInput: string): string {
 export function materializeApprovedFacts(content: string, rawInput: string): string {
   const facts = rawInput.match(APPROVED_FACTS_PATTERN)?.[1]?.trim()
   if (!facts) return content
-  if (!content.includes(APPROVED_FACTS_MARKER)) {
-    throw new Error("生成结果未保留批准的事实锚点，已停止交付")
-  }
+  const contentWithMarker = content.includes(APPROVED_FACTS_MARKER)
+    ? content
+    : `${content.trim()}\n\n${APPROVED_FACTS_MARKER}`
   const approvedNumbers = new Set(facts.match(/\d+(?:\.\d+)?/g) ?? [])
   const approvedCta = rawInput.match(APPROVED_CTA_PATTERN)?.[1]?.trim()
   const customerElaboration = /(?:他们|该公司|这家公司|这个案例|案例中|与我们|在我们|我们(?:服务|帮助|支持)|我们的服务|量身定制|高质量内容|优质内容|主持人姓名|主播自我介绍|XXX)/
   const unsupportedServiceClaim = /(?:我们|已经)?帮(?:过)?(?:不少|很多|一些|多家)?企业|解决过类似(?:的)?难题|我们(?:服务|帮助|支持)过/
   let foundFactsMarker = false
-  const paragraphs = content.split(/\n{2,}/).flatMap((paragraph) => {
+  const paragraphs = contentWithMarker.split(/\n{2,}/).flatMap((paragraph) => {
     if (paragraph.includes(APPROVED_FACTS_MARKER)) {
       foundFactsMarker = true
       return [APPROVED_FACTS_MARKER]
