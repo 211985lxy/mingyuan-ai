@@ -161,6 +161,9 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(warnedInsufficientInfo([
       { content: "目前没有登记任何发布数据，所以现在没法告诉你效果怎么样。" },
     ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "你还没填发布数据，所以现在没法做真正的复盘，所有硬指标全是空的。" },
+    ])).toBe(true)
   })
 
   it("shows the judge the frozen context used by the real executor", () => {

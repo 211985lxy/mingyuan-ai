@@ -46,7 +46,12 @@ function buildContextManifest(fixture: EvalFixture, context: EvalContext): AimCo
  * @returns boolean
  */
 export function warnedInsufficientInfo(drafts: Array<{ content: string }>): boolean {
-  return drafts.some((draft) => /信息不足|未提供|尚未提供|没有提供|(?:还没(?:有)?|没有)登记|数据(?:没|未)(?:登记|提供)|复盘做不了|做不了(?:结果)?复盘|还不知道效果|待补充|缺少|缺失|不完整|并非完整|没有(?:任何)?真实数字|没有真实数据|都是空的|没法判断|无法判断|不会编数字|不能假装|必须先补数据/.test(draft.content))
+  return drafts.some((draft) => {
+    const directWarning = /信息不足|未提供|尚未提供|没有提供|数据(?:没|未)(?:登记|提供)|复盘做不了|做不了(?:结果)?复盘|还不知道效果|待补充|缺少|缺失|不完整|并非完整|没有(?:任何)?真实数字|没有真实数据|都是空的|没法判断|无法判断|不会编数字|不能假装|必须先补数据/.test(draft.content)
+    const missingData = /(?:还没(?:有)?|没有).{0,8}(?:登记|填|填写|记录|录入).{0,8}(?:数据|指标)|(?:数据|指标).{0,8}(?:全是空|为空|空的|缺失)/.test(draft.content)
+    const refusesUnsupportedReview = /(?:没法|无法|不能|不可).{0,8}(?:复盘|判断)|(?:不会|不能|拒绝).{0,8}(?:编数字|编造|假装)/.test(draft.content)
+    return directWarning || missingData || refusesUnsupportedReview
+  })
 }
 
 const runRealGeneration: RealCaseRunner = async (fixture, context) => {
