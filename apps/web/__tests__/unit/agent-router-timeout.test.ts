@@ -58,12 +58,12 @@ describe("agent router timeout overrides", () => {
     expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
   })
 
-  it("routes content_producer to ZenMux Claude first with DeepSeek fallback", async () => {
+  it("routes content_producer to ZenMux Claude Opus 4.6 first with DeepSeek fallback", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     const llm = getAgentLLM("content_producer")
-    expect(llm.providerNames[0]).toBe("zenmux")
-    expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-sonnet-4.6")
+    expect(llm.providerNames.slice(0, 2)).toEqual(["zenmux", "deepseek"])
+    expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-opus-4.6")
     expect(llm.providerNames).toContain("deepseek")
     expect(llm.providerNames).toContain("apimart")
 
@@ -92,13 +92,13 @@ describe("agent router timeout overrides", () => {
     expect(completionArgs[0]).toMatchObject({ model: "anthropic/claude-opus-4.6" })
   })
 
-  it("routes business_system_diagnosis to ZenMux Claude first with DeepSeek fallback", async () => {
+  it("routes business_system_diagnosis to ZenMux Claude Opus 4.6 first with DeepSeek fallback", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0
 
     const llm = getAgentLLM("business_system_diagnosis")
-    expect(llm.providerNames[0]).toBe("zenmux")
-    expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("anthropic/claude-sonnet-4.6")
+    expect(llm.providerNames.slice(0, 2)).toEqual(["zenmux", "deepseek"])
+    expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("anthropic/claude-opus-4.6")
     expect(llm.providerNames).toContain("deepseek")
     expect(llm.providerNames).toContain("apimart")
 
@@ -201,6 +201,9 @@ describe("agent router timeout overrides", () => {
     expect(keys.size).toBe(targets.length)
     expect(
       targets.some((t) => t.provider === "zenmux" && t.model === "anthropic/claude-sonnet-4.6"),
+    ).toBe(true)
+    expect(
+      targets.some((t) => t.provider === "zenmux" && t.model === "anthropic/claude-opus-4.6"),
     ).toBe(true)
     expect(targets.some((t) => t.provider === "deepseek")).toBe(true)
   })
