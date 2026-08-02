@@ -15,13 +15,12 @@ export function TeamSection() {
         <div className="grid gap-8 border-b border-white/10 pb-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
           <MarketingSectionHeader
             label="TEAM · BUSINESS FIRST"
-            title="不是把项目交给技术，而是让懂业务的人共同定义结果"
-            description="明动远见以商业诊断、IP 操盘与内容产品为核心，再按项目复杂度组织技术实施。客户始终面对一个清晰的项目负责人和一套统一的验收标准。"
+            title="商业、IP 操盘、内容产品与智能体工程共同进入项目"
+            description="先把客户目标、方法与验收标准定义清楚，再让每一种专业能力围绕同一个业务结果协同。"
             tone="dark"
           />
           <div className="border-l border-[#D14A33] pl-5 text-sm leading-7 text-white/60 lg:mb-14">
-            杭州宇米教育科技有限公司作为签约与交付主体，对项目范围、质量和结果负责；
-            联合技术伙伴按确认后的任务进入，不替代我方对客户的责任。
+            明动远见统一负责商业方案、项目推进、交付质量与客户验收，确保业务判断和技术实现始终在同一条线上。
           </div>
         </div>
 
@@ -78,9 +77,7 @@ function TechnologyPartnerStrip() {
     <div className="mt-8 grid gap-6 border border-white/10 bg-black/10 p-6 sm:p-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
       <div>
         <p className="marketing-section-label text-[#B88C33]">EXTENDED DELIVERY</p>
-        <h3 className="marketing-serif mt-2 text-2xl font-bold">
-          联合技术交付，不混淆组织边界
-        </h3>
+        <h3 className="marketing-serif mt-2 text-2xl font-bold">智能体工程与工作流能力</h3>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         {technologyPartners.map((partner) => (

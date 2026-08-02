@@ -6,25 +6,24 @@ import { MarketingSectionHeader } from "./section-header"
 const teasers = [
   {
     code: "CASE · 01",
-    title: "某金融资产领域创始人 IP 项目",
+    title: "企业现金流与财商顾问 IP 项目",
     metrics: [
       { value: "4000+", label: "单月精准线索" },
       { value: "数百万元", label: "月商业转化" },
       { value: "20+", label: "账号矩阵" },
     ],
     notes: [
-      "全程匿名，不出现客户名称、账号与可识别截图",
-      "核心操盘能力是基础，AI 提升生产与矩阵协同效率",
-      "数据由项目方提供",
+      "专业操盘决定方向，IP 智能体提升研究、文案与矩阵协同效率",
+      "内容触达、客户线索与商业承接处在同一条业务链路",
     ],
   },
   {
     code: "CASE · 02",
     title: "明远 AIM 内部实践",
     metrics: [
-      { value: "2.4 万", label: "抖音粉丝" },
-      { value: "近千万", label: "单条播放" },
-      { value: "全链路", label: "诊断到复盘" },
+      { value: "904.46 万", label: "单条播放" },
+      { value: "31.50 万", label: "点赞" },
+      { value: "776 笔", label: "统计期成交" },
     ],
     notes: [
       "覆盖商业诊断、IP 定位、内容研究、脚本生产与运营复盘",
@@ -43,7 +42,7 @@ export function CaseEvidenceSection() {
         <MarketingSectionHeader
           label="案例证据"
           title="真实业务里怎么用"
-          description="首发展示两类实践：外部匿名项目与明远 AIM 内部跑通链路。"
+          description="不只展示做了多少内容，更展示内容如何连接目标客户与真实业务结果。"
         />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {teasers.map((item) => (

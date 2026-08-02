@@ -245,6 +245,10 @@
   color: #d14a33;
 }
 
+.marketing-home-title {
+  font-size: clamp(2.25rem, 4.3vw, 3.25rem);
+}
+
 .marketing-solution-card {
   display: flex;
   flex-direction: column;
