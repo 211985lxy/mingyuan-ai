@@ -30,7 +30,7 @@ function context(routeKey?: string) {
       minimumCapability: "standard",
       maxProviderAttempts: routeKey ? 1 : 3,
     },
-  } as never
+  } as Parameters<typeof executeGenerateLLMWithBenchmarkRetry>[3]
 }
 
 describe("AIM fast spoken generation budget", () => {
