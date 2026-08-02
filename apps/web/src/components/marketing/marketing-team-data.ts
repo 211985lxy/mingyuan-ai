@@ -35,13 +35,13 @@ export const technologyPartners = [
   {
     initials: "舟",
     name: "见舟",
-    role: "联合技术交付伙伴",
+    role: "智能体业务与技术负责人",
     summary: "企业知识库、智能体设计与工作流落地。",
   },
   {
     initials: "J",
     name: "黄玉超 Jade",
-    role: "联合技术方案伙伴",
+    role: "AI 商业项目操盘专家",
     summary: "系统实施、复杂工作流与项目交付协同。",
   },
 ] as const
@@ -62,7 +62,7 @@ export const deliveryLayers = [
   {
     index: "03",
     title: "技术实施",
-    owner: "按项目联合交付",
+    owner: "工程团队负责",
     description: "根据复杂度配置知识库、工作流、系统实施与工程支持。",
   },
   {

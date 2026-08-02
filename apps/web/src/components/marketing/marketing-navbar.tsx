@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Menu } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { MARKETING_COMPANY_NAME } from "@/lib/marketing-brand"
+import { WechatCtaButton } from "./wechat-cta"
 
 const navLinks = [
   { label: "产品", href: "/ip-agent" },
@@ -23,17 +24,24 @@ export function MarketingNavbar() {
 
   return (
     <header className={`sticky top-0 z-50 border-b bg-[#FFFCF6]/90 backdrop-blur-xl transition-shadow ${scrolled ? "shadow-sm" : ""}`}>
-      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
-        <Link href="/" className="text-lg font-bold tracking-tight text-[#25211D]">
-          {MARKETING_COMPANY_NAME}
+      <div className="marketing-wrap flex h-[72px] items-center justify-between">
+        <Link href="/" className="flex items-center gap-3 text-[#25211D]">
+          <span className="grid h-9 w-9 place-items-center rounded-full bg-[#D14A33] font-serif text-sm font-bold text-white">明</span>
+          <span>
+            <strong className="block text-base tracking-[0.08em]">{MARKETING_COMPANY_NAME}</strong>
+            <small className="block text-[8px] tracking-[0.2em] text-[#8A8175]">MINGDONG VISION</small>
+          </span>
         </Link>
         <nav className="hidden items-center gap-6 md:flex">
           {navLinks.map(({ label, href }) => (
             <NavLink key={href} href={href}>{label}</NavLink>
           ))}
-          <Link href="/login" className="rounded-lg bg-[#D14A33] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#B83F2B]">
-            登录智能体
+          <Link href="/login" className="text-sm font-medium text-[#5F5A52] transition-colors hover:text-[#D14A33]">
+            登录明远 AIM
           </Link>
+          <WechatCtaButton className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg bg-[#D14A33] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#B83F2B]">
+            预约企业诊断
+          </WechatCtaButton>
         </nav>
         <MobileNav />
       </div>
@@ -52,7 +60,8 @@ function MobileNav() {
             {navLinks.map(({ label, href }) => (
               <Link key={href} href={href} className="py-2 text-sm text-[#6F675E]">{label}</Link>
             ))}
-            <Link href="/login" className="mt-2 rounded-lg bg-[#D14A33] px-4 py-2.5 text-center text-sm font-bold text-white">登录智能体</Link>
+            <Link href="/login" className="py-2 text-sm text-[#6F675E]">登录明远 AIM</Link>
+            <WechatCtaButton className="mt-2 min-h-11 rounded-lg bg-[#D14A33] px-4 text-center text-sm font-bold text-white">预约企业诊断</WechatCtaButton>
           </div>
         </SheetContent>
       </Sheet>

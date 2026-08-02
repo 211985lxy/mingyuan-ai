@@ -15,7 +15,7 @@ import {
 export const metadata: Metadata = {
   title: `关于我们｜${MARKETING_COMPANY_NAME}`,
   description:
-    "了解明动远见的核心团队、联合技术伙伴与企业专有智能体共建方式。",
+    "了解明动远见的核心团队、智能体工程能力与企业专有智能体共建方式。",
   alternates: {
     canonical: `${MARKETING_SITE_ORIGIN}/about`,
   },
@@ -28,6 +28,7 @@ export default function AboutPage() {
       <DeliveryModelSection />
       <CoreTeamSection />
       <PartnersSection />
+      <WhyUsSection />
       <AboutCta />
     </main>
   )
@@ -158,10 +159,11 @@ function PartnersSection() {
     <section className="px-0 py-16 sm:py-20 lg:py-24">
       <div className="marketing-wrap grid gap-10 lg:grid-cols-[0.75fr_1.25fr]">
         <div>
-          <p className="marketing-section-label">TECH DELIVERY PARTNERS</p>
+          <p className="marketing-section-label">INTELLIGENT SYSTEMS</p>
           <h2 className="marketing-h-section mt-4 text-[#25211D]">
-            需要工程能力时，由合适的人进入
+            让方法稳定进入知识库、智能体和工作流
           </h2>
+          <p className="mt-5 text-sm leading-7 text-[#6F675E]">技术不是单独的一层外壳，而是把业务方法变成可执行、可检查系统的必要能力。</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {technologyPartners.map((partner) => (
@@ -181,6 +183,33 @@ function PartnersSection() {
               <p className="mt-3 text-sm leading-7 text-[#6F675E]">
                 {partner.summary}
               </p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function WhyUsSection() {
+  const reasons = [
+    ["知识密集", "产品价值依赖专业判断、案例和方法，而不是简单标准品。"],
+    ["强信任", "客户会先通过老板与专家的内容判断专业度，再决定是否合作。"],
+    ["高客单", "成交需要持续内容、案例证据和清晰承接，而不是一次流量爆发。"],
+  ]
+
+  return (
+    <section className="border-t border-[#E8DED1] bg-[#211D19] px-0 py-16 text-[#FFF9EF] sm:py-20 lg:py-24">
+      <div className="marketing-wrap grid gap-10 lg:grid-cols-[0.75fr_1.25fr]">
+        <div>
+          <p className="marketing-section-label text-[#D8AA51]">WHO WE SERVE BEST</p>
+          <h2 className="marketing-h-section mt-4">更适合知识密集、强信任、高客单的企业</h2>
+        </div>
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-3">
+          {reasons.map(([title, desc]) => (
+            <article key={title} className="bg-[#211D19] p-6">
+              <h3 className="marketing-serif text-xl font-bold">{title}</h3>
+              <p className="mt-3 text-sm leading-7 text-white/50">{desc}</p>
             </article>
           ))}
         </div>

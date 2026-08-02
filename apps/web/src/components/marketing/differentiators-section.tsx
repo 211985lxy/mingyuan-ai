@@ -13,7 +13,7 @@ const rows = [
   },
   {
     other: "软件开发公司",
-    ours: "先对齐业务闭环，再联合交付，避免只交付一套空壳系统",
+    ours: "先对齐业务闭环，再实施系统，避免只交付一套空壳工具",
   },
   {
     other: "传统代运营",
@@ -30,7 +30,7 @@ export function DifferentiatorsSection() {
       <div className="marketing-wrap">
         <MarketingSectionHeader
           label="差异化"
-          title="同时处理目标、经验、流程与联合交付"
+          title="同时处理目标、经验、流程与项目交付"
           description="明动远见不是单点卖工具、卖课或卖外包，而是共建企业专有智能体资产。"
         />
         <div className="overflow-hidden rounded-2xl border border-[#E8DED1] bg-[#FEFDFB]">
