@@ -27,25 +27,22 @@ import {
   ensureContentCreationTrace,
 } from "./aim-content-creation-trace"
 import { getMaterialAnchorsFromTaskSpec } from "@/features/newsroom/services/build-source-brief"
-import {
-  buildGoalRewritePromptAppendix,
-  verifyMethodologyGoal,
-} from "@/lib/methodology/goal-verifier"
+import { buildGoalRewritePromptAppendix, verifyMethodologyGoal } from "@/lib/methodology/goal-verifier"
 import {
   buildGroundedNumericClaimRule,
   buildGenerationSafetyRetryPrompt,
   inspectGenerationSafety,
   materializeApprovedFacts,
+  scrubUnsupportedAnecdoteSentences,
+  scrubUnsupportedNumericSentences,
 } from "@/lib/aim-generation-guardrails"
+import { buildGenerationNumericEvidence, scrubLeakedLightEditFeedback } from "@/lib/aim-generation-text"
 import {
   buildIpWikiComplianceRewritePrompt,
   verifyIpWikiCompliance,
 } from "@/lib/ip-wiki/compliance"
-import {
-  AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS,
-  isAimFastSpokenRoute,
-} from "@/lib/aim-harness/fast-spoken-policy"
-
+import { AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS, isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
+import { buildSpokenLengthRetryPrompt, cleanSpokenDeliveryArtifacts, findIncompleteGenerationFormats, findOverlongGenerationFormats, fitOverlongSpokenContent, getSpokenLengthGateDiagnostics, isSpokenScriptFormat } from "@/lib/aim-spoken-length"
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 export {
   findLightEditScopeViolationFormats,
@@ -206,31 +203,6 @@ export function composeLayeredAimPrompt(input: LayeredAimPromptInput): string {
   return sections.filter(Boolean).join("\n\n")
 }
 
-const METHOD_NOTE_BLOCK = /\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/
-const COMPLETE_SENTENCE_END = /[。！？!?…」』）)\]”’"'](?:[*_`#\s]*)$/u
-const SHORT_OUTPUT_REQUEST = /(一句话?|标题|口号|金句|不超过\s*\d+\s*字|\d+\s*字以内|(?:10|15|20)\s*秒)/
-const SPOKEN_SCRIPT_FORMATS = new Set<ContentFormat>(["video_script", "koubo_script"])
-
-/**
- * 拦住明显被截断的成稿：模型报告长度耗尽、正文为空，或正常口播只有残句。
- */
-export function findIncompleteGenerationFormats(input: {
-  parsed: Partial<Record<ContentFormat, string | undefined>>
-  targetFormats: ContentFormat[]
-  rawInput: string
-  finishReason?: string | null
-}): ContentFormat[] {
-  if (input.finishReason === "length") return [...input.targetFormats]
-  const allowsShort = SHORT_OUTPUT_REQUEST.test(input.rawInput)
-
-  return input.targetFormats.filter((format) => {
-    const body = (input.parsed[format] || "").replace(METHOD_NOTE_BLOCK, "").trim()
-    if (!body) return true
-    if (!SPOKEN_SCRIPT_FORMATS.has(format) || allowsShort) return false
-    return body.length < 80 || (body.length < 300 && !COMPLETE_SENTENCE_END.test(body))
-  })
-}
-
 /**
  * @description 执行 LLM 生成并带对标抄袭检测重试
  * @param agentId - 智能体 ID
@@ -246,24 +218,52 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   const groundedNumericRule = buildGroundedNumericClaimRule(context.rawInput)
   let activePrompt = `${userPrompt}${groundedNumericRule}`
   const isLightEdit = context.runtimeTask === "light_edit"
-  const maxAttempts = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
-    ? AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS
-    : 3
+  const fastSpokenRoute = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
+  const maxAttempts = fastSpokenRoute ? AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS : 3
   const methodologyPlan = context.methodologyPlan ?? context.taskSpec?.methodologyPlan
   const ipWikiPages = context.ipWikiPages
+  const numericEvidence = buildGenerationNumericEvidence(context)
+  let isLengthRewrite = false
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, context.modelPolicy)
+    const modelPolicy = isLengthRewrite && context.modelPolicy
+      ? { ...context.modelPolicy, temperature: 0.2 }
+      : context.modelPolicy
+    const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, modelPolicy)
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
     for (const format of targetFormats) {
       parsed[format] = materializeApprovedFacts(parsed[format] || "", context.rawInput)
+      if (isLightEdit) parsed[format] = scrubLeakedLightEditFeedback(parsed[format] || "", context.rawInput)
+      parsed[format] = scrubUnsupportedNumericSentences(parsed[format] || "", context.rawInput, numericEvidence, !isLightEdit && !fastSpokenRoute)
+      parsed[format] = scrubUnsupportedAnecdoteSentences(parsed[format] || "", context.rawInput)
+      if (isSpokenScriptFormat(format)) {
+        parsed[format] = fitOverlongSpokenContent(parsed[format] || "", context.rawInput)
+        parsed[format] = cleanSpokenDeliveryArtifacts(parsed[format] || "")
+      }
     }
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
-    const incompleteFormats = isLightEdit ? [] : findIncompleteGenerationFormats({
+    const incompleteFormats = findIncompleteGenerationFormats({
       parsed,
       targetFormats,
       rawInput: context.rawInput || "",
       finishReason: completion.finishReason,
+      enforceSpokenLength: !isLightEdit,
     })
+    const overlongFormats = isLightEdit ? [] : findOverlongGenerationFormats({
+      parsed,
+      targetFormats,
+      rawInput: context.rawInput || "",
+    })
+    if (incompleteFormats.length || overlongFormats.length) {
+      isLengthRewrite = true
+      console.warn("[aim-generation] spoken length gate", getSpokenLengthGateDiagnostics({
+        attempt: attempt + 1,
+        parsed,
+        targetFormats,
+        rawInput: context.rawInput || "",
+        incompleteFormats,
+        overlongFormats,
+      }))
+    }
 
     const goalVerify = !isLightEdit && methodologyPlan
       ? verifyMethodologyGoal(
@@ -283,6 +283,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       && safety.unsupportedClaimFormats.length === 0
       && safety.lightEditScopeViolationFormats.length === 0
       && incompleteFormats.length === 0
+      && overlongFormats.length === 0
       && goalVerify.ok
       && ipCompliance.ok
     ) {
@@ -291,6 +292,9 @@ export async function executeGenerateLLMWithBenchmarkRetry(
     if (attempt === maxAttempts - 1) {
       if (incompleteFormats.length) {
         throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
+      }
+      if (overlongFormats.length) {
+        throw new Error("生成结果超过要求时长，已停止交付，请重试本次请求")
       }
       if (
         safety.copiedFormats.length
@@ -304,20 +308,22 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       return { completion, parsed, goalVerify, ipCompliance }
     }
 
-    if (incompleteFormats.length) {
-      activePrompt = `${userPrompt}
-
-【完整性重试】
-上一版在正文中途结束或篇幅不足，不能交付。请重新完整输出 ${incompleteFormats.join("、")}：
-- 减少内部推理，优先保证正文完整。
-- 口播必须有完整开头、展开和收束，禁止停在半句话。
-- 每种格式都必须以完整句子结束，并保留 ===FORMAT:格式名=== 标记。`
+    if (incompleteFormats.length || overlongFormats.length) {
+      activePrompt = buildSpokenLengthRetryPrompt({
+        userPrompt,
+        rawInput: context.rawInput || "",
+        parsed,
+        targetFormats,
+        incompleteFormats,
+        overlongFormats,
+      })
     } else if (
       safety.copiedFormats.length
       || safety.unsupportedNumericClaimFormats.length
       || safety.unsupportedClaimFormats.length
       || safety.lightEditScopeViolationFormats.length
     ) {
+      isLengthRewrite = false
       activePrompt = buildGenerationSafetyRetryPrompt(
         userPrompt,
         parsed,
@@ -326,12 +332,14 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         context,
       )
     } else if (methodologyPlan && !goalVerify.ok) {
+      isLengthRewrite = false
       const previousOutput = targetFormats
         .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
         .join("\n\n")
       activePrompt = `${userPrompt}
 ${buildGoalRewritePromptAppendix(methodologyPlan, goalVerify, previousOutput)}`
     } else if (ipWikiPages && Object.keys(ipWikiPages).length > 0 && !ipCompliance.ok) {
+      isLengthRewrite = false
       const previousOutput = targetFormats
         .map((format) => `===FORMAT:${format}===\n${parsed[format] || ""}`)
         .join("\n\n")

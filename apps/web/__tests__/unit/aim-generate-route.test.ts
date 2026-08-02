@@ -111,6 +111,7 @@ vi.mock("@/lib/aim-harness/runtime", () => ({
 }))
 
 import { POST } from "@/app/api/aim/generate/route"
+import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
 
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/aim/generate", {
@@ -243,5 +244,22 @@ describe("POST /api/aim/generate", () => {
     expect(buildRawInputWithMarketViralContext).toHaveBeenCalledWith("user-1", expect.any(String), false)
     expect(buildRawInputWithTrendingContext).toHaveBeenCalledWith(expect.any(String), false)
     expect(buildRawInputWithCommentInsightContext).toHaveBeenCalledWith("user-1", expect.any(String), false)
+  })
+})
+
+describe("serializeAimGenerationRun", () => {
+  it("marks the single-model spoken route so the browser skips second-pass proofreading", () => {
+    const response = serializeAimGenerationRun({
+      output: { id: "gen-fast", results: [], knowledgeUsed: [] },
+      metadata: {
+        runId: "run-fast",
+        degraded: false,
+        provider: "jiekou",
+        model: "gpt-4o",
+      },
+      spec: { modelPolicy: { routeKey: "content_producer.fast_spoken" } },
+    } as never)
+
+    expect(response.fastPath).toBe(true)
   })
 })

@@ -233,6 +233,7 @@ async function softProofreadInBackground(
   response: AimGenerateResponse,
   signal: AbortSignal,
 ) {
+  if (response.fastPath) return
   try {
     const corrected = await proofreadAimResponse(response, input.agent.defaultInstruction)
     if (signal.aborted) return

@@ -1,25 +1,89 @@
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import type { ContentFormat } from "./aim-generator"
 import { isBenchmarkCopyTooSimilar } from "./aim-benchmark-quality"
+import { AIM_FACT_PRIORITY_RULE } from "./aim-context-priority"
+import { deliveryBody, withoutMethodNote } from "./aim-generation-text"
 
-const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我有个|我身边有个|我的)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)|(?:来找我|找到我|咨询我)(?:的)?(?:客户|老板|企业|小企业老板)/
-const UNSUPPORTED_ANECDOTE_PATTERN = /我(?:上周|上个月|去年|前阵子|最近)[，,\s]*(?:帮|帮助|服务|辅导|带|见过|遇到|认识|接触|观察)(?:了|过)?|我[，,\s]*(?:帮|帮助|服务|辅导|带|见过|遇到|认识|接触|观察)(?:了|过)?(?:一家|一个|一位|有人|不少|很多|客户|公司|企业|老板|朋友|学员)|(?:上周|上个月|去年|前阵子|最近).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:有|遇到|来了)(?:个|一个|一位|一家).{0,12}(?:客户|公司|企业|老板|朋友|学员)|(?:一个|一位|一家).{0,12}(?:客户|公司|企业|老板|朋友|学员).{0,24}(?:做了|发了|赚了|成交|询盘|增长|提升|降低|节省)/
+const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我(?:有|身边有)(?:个|一个|位|一位|家|一家)?|我(?:的)?)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)|(?:来找我|找到我|咨询我)(?:的)?(?:客户|老板|企业|小企业老板)/
+const UNSUPPORTED_ANECDOTE_PATTERN = /我(?:上周|上个月|去年|前阵子|最近)[，,\s]*(?:帮|帮助|服务|辅导|带|见过|看到|看见|刷到|遇到|认识|接触|观察)(?:了|过)?|我[，,\s]*(?:帮|帮助|服务|辅导|带|见过|看到|看见|刷到|遇到|认识|接触|观察)(?:了|过)?(?:一家|一个|一位|有人|不少|很多|客户|公司|企业|老板|朋友|学员)|(?:上周|上个月|去年|前阵子|最近).{0,6}我(?:看到|看见|刷到|遇到|听说).{0,20}(?:老板|客户|公司|企业|朋友|学员|视频|案例)|(?:上周|上个月|去年|前阵子|最近).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:有|遇到|来了)(?:个|一个|位|一位|家|一家).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:一个|一位|一家|有位|有个).{0,20}(?:客户|公司|企业|老板|朋友|学员).{0,80}(?:做了|发了|赚了|成交|询盘|增长|提升|降低|节省|投了|推广|获客|引流|播放|点赞|效果|数据|营收|收入|利润)/
+const UNSUPPORTED_SELF_EXPERIENCE_PATTERN = /我.{0,16}(?:遇到|见到|见过|看到|看见|刷到|认识|接触|服务|辅导|帮助|帮|聊过|聊|沟通过|交流过)(?:了|过)?(?:几位|几个|一些|不少|很多|一位|一个|一家)?.{0,16}(?:老板|客户|公司|企业|朋友|学员|团队)|我.{0,8}(?:跟|和)(?:几位|几个|一些|不少|很多|一位|一个)?.{0,10}(?:老板|客户|朋友|学员).{0,8}(?:聊过|聊了|沟通过|交流过)/
+const UNSUPPORTED_REVERSE_EXPERIENCE_PATTERN = /(?:老板|客户|朋友|学员|公司|企业).{0,12}(?:来|曾经|之前)?(?:问我|问过我|来问我|找过我|找我|跟我聊过|和我聊过|向我咨询)|(?:问我|问过我|来问我|找过我|找我|跟我聊过|和我聊过).{0,16}(?:老板|客户|朋友|学员|公司|企业)/
+const CONCRETE_CASE_PATTERN = /(?:某家|一家|有家|一个|某个|有个|一位|某位|有位).{0,30}(?:公司|企业|老板|客户|团队).{0,160}(?:咨询|线索|成交|推广|投放|获客|引流|营收|收入|利润|播放|点赞|评论|增长|降低|成本|效果|数据)/
 const HYPOTHETICAL_MARKER_PATTERN = /假设|比如|例如|举例|如果|设想|虚构示例/
 const STRICT_NUMERIC_CLAIM_PATTERN = /不得(?:新增|编造|出现)(?:任何)?其他数字|禁止(?:新增|编造)(?:任何)?数字/
-// 只把可核验的经营结果视为硬事实；时长、步骤数、内容条数等创意表达不在这里拦截。
-const NUMERIC_CLAIM_PATTERN = /(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)\s*(?:%|％|个人|位|家|人|元|块|万元|亿元|倍|成|折)/gu
+const NUMERIC_CLAIM_PATTERN = /(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)\s*(?:%|％|分钟|小时|个人|秒|天|周|月|年|个|位|家|人|条|道|步|套|次|元|块|万|亿|倍|成|折)/gu
+const HIGH_RISK_NUMERIC_CLAIM_PATTERN = /(?:%|％|元|块|万|亿|倍|成|折)$/u
+const STRUCTURAL_NUMERIC_CLAIM_PATTERN = /(?:分钟|小时|秒|天|周|月|年|步|道|套|条)$/u
+const RESULT_METRIC_LEAD_PATTERN = /新增|获得|带来|产生|实现|成交|降低|节省/u
+const RESULT_METRIC_NOUN_PATTERN = /成交|询盘|线索|订单|播放|点赞|评论|销售额|营收|收入|利润|转化率|成本/u
 const BENIGN_SINGULAR_PHRASES = new Set(["一个", "一条", "一个人", "一家", "一人", "一位", "一步", "一套", "一次"])
 const APPROVED_FACTS_MARKER = "[[APPROVED_FACTS]]"
 const APPROVED_FACTS_PATTERN = /必须准确引用(?:两个|[一二两三四五六七八九十]+个)?事实[:：]\s*([\s\S]*?)(?=。?(?:目标客户是|痛点是|结尾只|禁止|不得)|$)/u
 const APPROVED_CTA_PATTERN = /结尾只引导\s*([^。]+)(?=。|$)/u
-
 function extractNumericClaims(text: string): Set<string> {
   return new Set(Array.from(text.matchAll(NUMERIC_CLAIM_PATTERN), (match) =>
     match[0].replace(/\s/g, "").replace(/块$/, "元").replace(/个$/, "条")))
 }
 
+function hasResultMetricContext(sentence: string, claim: string): boolean {
+  const offset = sentence.indexOf(claim)
+  if (offset < 0) return false
+  const before = sentence.slice(Math.max(0, offset - 6), offset)
+  const after = sentence.slice(offset + claim.length, offset + claim.length + 8)
+  return RESULT_METRIC_LEAD_PATTERN.test(before) || RESULT_METRIC_NOUN_PATTERN.test(after)
+}
+
 export function hasStrictNumericClaimConstraint(rawInput: string): boolean {
   return STRICT_NUMERIC_CLAIM_PATTERN.test(rawInput)
+}
+
+function isStrictUnsupportedNumericClaim(
+  sentence: string,
+  claim: string,
+  allowed: Set<string>,
+): boolean {
+  return !allowed.has(claim)
+    && !BENIGN_SINGULAR_PHRASES.has(claim)
+    && (
+      /\d/u.test(claim)
+      || !STRUCTURAL_NUMERIC_CLAIM_PATTERN.test(claim)
+      || hasResultMetricContext(sentence, claim)
+    )
+}
+
+export function scrubUnsupportedNumericSentences(
+  content: string,
+  rawInput: string,
+  evidenceText = rawInput,
+  _scrubNonStrict = true,
+): string {
+  const strict = hasStrictNumericClaimConstraint(rawInput)
+  // 普通营销创作允许使用修辞性数字和创意示例；只有用户明确声明“不得编造数字”
+  // 时才进入事实数字门禁。轻改等更窄边界由 findUnsupportedNumericClaimFormats 处理。
+  if (!strict) return content
+  const allowed = extractNumericClaims(strict ? rawInput : evidenceText)
+  const methodNote = content.match(/\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/u)?.[0]
+  const scrubbedBody = withoutMethodNote(content)
+    .split(/\n{2,}/u)
+    .map((paragraph) => (paragraph.match(/[^。！？!?；;]+[。！？!?；;]?/gu) ?? [paragraph])
+      .filter((sentence) => ![...extractNumericClaims(sentence)]
+        .some((claim) => strict
+          ? isStrictUnsupportedNumericClaim(sentence, claim, allowed)
+          : !allowed.has(claim)
+            && !BENIGN_SINGULAR_PHRASES.has(claim)
+            && (
+              HIGH_RISK_NUMERIC_CLAIM_PATTERN.test(claim)
+              || hasResultMetricContext(sentence, claim)
+            )
+            && (
+              !STRUCTURAL_NUMERIC_CLAIM_PATTERN.test(claim)
+              || hasResultMetricContext(sentence, claim)
+            )))
+      .join("")
+      .trim())
+    .filter(Boolean)
+    .join("\n\n")
+  return [methodNote, scrubbedBody].filter(Boolean).join("\n\n")
 }
 
 export function buildClosedWorldModelInput(rawInput: string): string {
@@ -29,31 +93,43 @@ export function buildClosedWorldModelInput(rawInput: string): string {
   return rawInput.replace(match[0], `客户案例段必须单独输出 ${APPROVED_FACTS_MARKER}`)
 }
 
+export function redactApprovedFactsForRewrite(content: string, rawInput: string): string {
+  const facts = rawInput.match(APPROVED_FACTS_PATTERN)?.[1]?.trim()
+  return facts ? content.replaceAll(facts, APPROVED_FACTS_MARKER) : content
+}
+
 export function materializeApprovedFacts(content: string, rawInput: string): string {
   const facts = rawInput.match(APPROVED_FACTS_PATTERN)?.[1]?.trim()
   if (!facts) return content
-  const contentWithMarker = content.includes(APPROVED_FACTS_MARKER)
+  const sourceContent = content.includes(APPROVED_FACTS_MARKER)
     ? content
-    : `${content.trim()}\n\n${APPROVED_FACTS_MARKER}`
+    : `${content}\n\n${APPROVED_FACTS_MARKER}`
   const approvedNumbers = new Set(facts.match(/\d+(?:\.\d+)?/g) ?? [])
   const approvedCta = rawInput.match(APPROVED_CTA_PATTERN)?.[1]?.trim()
   const customerElaboration = /(?:他们|该公司|这家公司|这个案例|案例中|与我们|在我们|我们(?:服务|帮助|支持)|我们的服务|量身定制|高质量内容|优质内容|主持人姓名|主播自我介绍|XXX)/
   const unsupportedServiceClaim = /(?:我们|已经)?帮(?:过)?(?:不少|很多|一些|多家)?企业|解决过类似(?:的)?难题|我们(?:服务|帮助|支持)过/
+  const modelCtaPattern = /评论|私信|留言|关注|转发|领取|扫码|咨询|预约|报名|加我/u
   let foundFactsMarker = false
-  const paragraphs = contentWithMarker.split(/\n{2,}/).flatMap((paragraph) => {
+  const paragraphs = sourceContent.split(/\n{2,}/).flatMap((paragraph) => {
     if (paragraph.includes(APPROVED_FACTS_MARKER)) {
+      if (foundFactsMarker) return []
       foundFactsMarker = true
       return [APPROVED_FACTS_MARKER]
     }
     if (foundFactsMarker && approvedCta) return []
     const scrubbed = paragraph
       .split(/(?<=[。！？!?])/u)
-      .filter((sentence) => !unsupportedServiceClaim.test(sentence))
+      .filter((sentence) => {
+        const repeatsApprovedNumber = (sentence.match(/\d+(?:\.\d+)?/g) ?? [])
+          .some((value) => approvedNumbers.has(value))
+        return !unsupportedServiceClaim.test(sentence)
+          && !customerElaboration.test(sentence)
+          && !repeatsApprovedNumber
+          && !(approvedCta && modelCtaPattern.test(sentence))
+      })
       .join("")
       .trim()
-    const repeatsApprovedNumber = (scrubbed.match(/\d+(?:\.\d+)?/g) ?? [])
-      .some((value) => approvedNumbers.has(value))
-    if (!scrubbed || repeatsApprovedNumber || customerElaboration.test(scrubbed)) return []
+    if (!scrubbed) return []
     return [scrubbed]
   })
   const body = paragraphs.join("\n\n").replace(APPROVED_FACTS_MARKER, facts)
@@ -74,11 +150,15 @@ export function findUnsupportedNumericClaimFormats(
   parsed: Partial<Record<ContentFormat, string>>,
   targetFormats: ContentFormat[],
 ): ContentFormat[] {
-  if (!hasStrictNumericClaimConstraint(context.rawInput)) return []
+  const strict = hasStrictNumericClaimConstraint(context.rawInput)
+  if (!strict) return []
   const allowed = extractNumericClaims(context.rawInput)
   return targetFormats.filter((format) => {
-    const unsupported = [...extractNumericClaims(parsed[format] || "")]
-      .filter((claim) => !allowed.has(claim) && !BENIGN_SINGULAR_PHRASES.has(claim))
+    const body = withoutMethodNote(parsed[format] || "")
+    const unsupported = body
+      .split(/(?<=[。！？!?；;\n])/)
+      .flatMap((sentence) => [...extractNumericClaims(sentence)]
+        .filter((claim) => isStrictUnsupportedNumericClaim(sentence, claim, allowed)))
     if (unsupported.length) {
       console.warn("[aim-generation] blocked unsupported numeric claims", { format, unsupported })
     }
@@ -87,14 +167,33 @@ export function findUnsupportedNumericClaimFormats(
 }
 
 function containsUnsupportedAnecdote(text: string): boolean {
-  return text
-    .split(/(?<=[。！？!?；;\n])/)
-    .some((sentence) =>
-      !HYPOTHETICAL_MARKER_PATTERN.test(sentence)
-      && (
-        FIRST_PERSON_EVIDENCE_PATTERN.test(sentence)
-        || UNSUPPORTED_ANECDOTE_PATTERN.test(sentence)
-      ))
+  const sentences = text.split(/(?<=[。！？!?；;\n])/)
+  const windows = sentences.map((sentence, index) => `${sentence}${sentences[index + 1] || ""}`)
+  const anecdotePatterns = [FIRST_PERSON_EVIDENCE_PATTERN, UNSUPPORTED_ANECDOTE_PATTERN,
+    UNSUPPORTED_SELF_EXPERIENCE_PATTERN, UNSUPPORTED_REVERSE_EXPERIENCE_PATTERN, CONCRETE_CASE_PATTERN]
+  return windows.some((window) => {
+    const anecdoteIndex = anecdotePatterns.reduce((earliest, pattern) => {
+      const index = window.search(pattern)
+      return index >= 0 && (earliest < 0 || index < earliest) ? index : earliest
+    }, -1)
+    if (anecdoteIndex < 0) return false
+    const hypotheticalIndex = window.search(HYPOTHETICAL_MARKER_PATTERN)
+    return hypotheticalIndex < 0 || hypotheticalIndex > anecdoteIndex
+  })
+}
+
+export function scrubUnsupportedAnecdoteSentences(content: string, rawInput: string): string {
+  if (!hasStrictNumericClaimConstraint(rawInput) || !APPROVED_FACTS_PATTERN.test(rawInput)) {
+    return content
+  }
+  return content
+    .split(/\n{2,}/u)
+    .map((paragraph) => (paragraph.match(/[^。！？!?；;]+[。！？!?；;]?/gu) ?? [paragraph])
+      .filter((sentence) => !containsUnsupportedAnecdote(sentence))
+      .join("")
+      .trim())
+    .filter(Boolean)
+    .join("\n\n")
 }
 
 export function findUnsupportedFirstPersonClaimFormats(
@@ -102,16 +201,19 @@ export function findUnsupportedFirstPersonClaimFormats(
   parsed: Partial<Record<ContentFormat, string>>,
   targetFormats: ContentFormat[],
 ): ContentFormat[] {
+  if (hasStrictNumericClaimConstraint(context.rawInput) && APPROVED_FACTS_PATTERN.test(context.rawInput)) {
+    return targetFormats.filter((format) => containsUnsupportedAnecdote(parsed[format] || ""))
+  }
   const evidence = [
     context.rawInput,
     context.knowledgeBlock,
     context.ipWikiBlock,
     context.eventStorytellingBlock,
   ].filter(Boolean).join("\n")
-  if (containsUnsupportedAnecdote(evidence)) return []
+  const evidenceHasAnecdote = containsUnsupportedAnecdote(evidence)
 
   return targetFormats.filter((format) =>
-    containsUnsupportedAnecdote(parsed[format] || ""))
+    !evidenceHasAnecdote && containsUnsupportedAnecdote(withoutMethodNote(parsed[format] || "")))
 }
 
 export function isGenericContentRequestWithoutFacts(
@@ -126,8 +228,11 @@ export function isGenericContentRequestWithoutFacts(
     | "taskSpec"
   >,
 ): boolean {
+  const meaningfulKnowledge = context.knowledgeBlock
+    ?.replace(AIM_FACT_PRIORITY_RULE, "")
+    .trim()
   const hasContext = Boolean(
-    context.knowledgeBlock?.trim()
+    meaningfulKnowledge
     || context.ipWikiBlock?.trim()
     || context.topicTitle?.trim()
     || context.topicRationale?.trim()
@@ -167,7 +272,9 @@ export function findLightEditScopeViolationFormats(
     /精简|缩短|压缩|一句话|标题|开头|第一句|前三秒|前3秒|钩子|结尾|收尾|CTA/.test(
       instruction,
     )
-  ) return []
+  ) {
+    return targetFormats.filter((format) => !deliveryBody(parsed[format] || ""))
+  }
   if (!/润色|文字二改|去\s*AI\s*味|这段|这篇|这段话/.test(instruction)) {
     return []
   }
@@ -315,7 +422,7 @@ export function buildGenerationSafetyRetryPrompt(
       ? `上一版 ${findings.copiedFormats.join("、")} 与对标原文过于相似，判定为"几乎没改"。`
       : "",
     findings.unsupportedClaimFormats.length
-      ? `上一版 ${findings.unsupportedClaimFormats.join("、")} 出现了上下文无依据的第一人称经历，判定为事实风险。`
+      ? `上一版 ${findings.unsupportedClaimFormats.join("、")} 出现了上下文无依据的人物、客户、行业或部门场景，判定为事实风险。`
       : "",
     findings.unsupportedNumericClaimFormats.length
       ? `上一版 ${findings.unsupportedNumericClaimFormats.join("、")} 出现了用户原文没有的数字表达，判定为事实风险。`
@@ -328,6 +435,7 @@ export function buildGenerationSafetyRetryPrompt(
             const dropped = sourceText ? findDroppedStructureModules(sourceText, output) : []
             const lengthIssue = output.length < Math.floor(sourceText.length * 0.72)
             const parts: string[] = []
+            if (!deliveryBody(output)) parts.push("没有输出可交付的替换稿")
             if (lengthIssue) parts.push("明显缩短篇幅")
             if (dropped.length > 0) parts.push(`删掉了关键结构模块：${dropped.join("、")}`)
             return `${format}（${parts.join("；")}）`
@@ -345,7 +453,8 @@ export function buildGenerationSafetyRetryPrompt(
 
 【自动质检结果】
 ${retryReasons}
-请重写全部请求格式：保留原选题、原稿全部信息点、结构节奏和目标字数；整段润色必须保持相近篇幅。禁止声称"真事"、"我们公司的人"或"我观察/带过很多人"。无依据的人物案例改为普遍现象、可验证方法或明确写出"假设"的举例。
+请重写全部请求格式：保留原选题、原稿全部信息点、结构节奏和目标字数；整段润色必须保持相近篇幅。禁止声称"真事"、"我们公司的人"或"我观察/带过很多人"。无依据的人物案例改为普遍现象或可验证方法，不得再写具体公司、老板、客户、朋友或学员案例。
+除非用户原文或知识资料逐字提供了该数字，否则禁止新增任何数字，包括金额、百分比、人数、步骤、时长、数量、咨询、线索、成交或效果数字；「一元」「90%」「三秒」「一周」这类修辞性或示例数字也禁止新增。
 除专有名词和固定产品名外，不要连续沿用原文 12 个字以上；不要只替换少量词。${structureRestoreHint}
 
 上一版输出：

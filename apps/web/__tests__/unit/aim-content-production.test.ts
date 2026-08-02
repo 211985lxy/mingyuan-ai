@@ -22,8 +22,12 @@ import {
   buildProducerSystemPrompt,
   buildWorkflowContext,
   ensureContentCreationTrace,
-  findIncompleteGenerationFormats,
 } from "@/lib/aim-generation-prompts"
+import {
+  cleanSpokenDeliveryArtifacts,
+  findIncompleteGenerationFormats,
+  findOverlongGenerationFormats,
+} from "@/lib/aim-spoken-length"
 import {
   AIM_OUTPUT_MAX_CHARS,
   BENCHMARK_RECREATION_PREFILL,
@@ -85,10 +89,10 @@ describe("AIM content production positioning", () => {
     expect(systemPrompt).toContain("好的老板")
   })
 
-  it("keeps one canonical spoken-script instruction without a default word range", () => {
-    expect(FORMAT_INSTRUCTIONS.video_script).toContain("不设默认字数区间")
-    expect(FORMAT_INSTRUCTIONS.video_script).toContain("根据内容完整性决定篇幅")
-    expect(FORMAT_INSTRUCTIONS.video_script).not.toContain("200-500")
+  it("keeps one canonical spoken-script instruction with two-minute and long-form defaults", () => {
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("默认写成约2分钟")
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("3-5分钟长口播")
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("约600-1000个汉字")
     expect(FORMAT_INSTRUCTIONS.koubo_script).toBe(FORMAT_INSTRUCTIONS.video_script)
   })
 
@@ -110,6 +114,64 @@ describe("AIM content production positioning", () => {
       rawInput: "写一句不超过30字的短口播",
       finishReason: "stop",
     })).toEqual([])
+  })
+
+  it("rejects a complete-looking script that is too short for the requested duration", () => {
+    expect(findIncompleteGenerationFormats({
+      parsed: {
+        video_script: "这是给内容产能不稳定的企业老板的一段提醒。团队有想法却持续写不出来，内容也总有机器味。事实证明稳定生产值得认真解决。评论领取诊断清单。",
+      },
+      targetFormats: ["video_script"],
+      rawInput: "写一条60秒完整口播",
+      finishReason: "stop",
+    })).toEqual(["video_script"])
+  })
+
+  it("uses two minutes by default and supports three-to-five-minute long scripts", () => {
+    const shortDefault = "这是一个完整句子。".repeat(30)
+    const longEnoughDefault = "这是一个完整句子。".repeat(50)
+    const tooShortForLongForm = "这是一个完整句子。".repeat(50)
+
+    expect(findIncompleteGenerationFormats({
+      parsed: { video_script: shortDefault },
+      targetFormats: ["video_script"],
+      rawInput: "写一条完整口播",
+      finishReason: "stop",
+    })).toEqual(["video_script"])
+    expect(findIncompleteGenerationFormats({
+      parsed: { video_script: longEnoughDefault },
+      targetFormats: ["video_script"],
+      rawInput: "写一条完整口播",
+      finishReason: "stop",
+    })).toEqual([])
+    expect(findIncompleteGenerationFormats({
+      parsed: { video_script: tooShortForLongForm },
+      targetFormats: ["video_script"],
+      rawInput: "写一条3到5分钟长口播",
+      finishReason: "stop",
+    })).toEqual(["video_script"])
+  })
+
+  it("rejects spoken scripts that run past the requested duration", () => {
+    const twoMinuteOverrun = "这是一个完整句子。".repeat(90)
+    const longFormAllowed = "这是一个完整句子。".repeat(90)
+
+    expect(findOverlongGenerationFormats({
+      parsed: { video_script: twoMinuteOverrun },
+      targetFormats: ["video_script"],
+      rawInput: "写一条2分钟完整口播",
+    })).toEqual(["video_script"])
+    expect(findOverlongGenerationFormats({
+      parsed: { video_script: longFormAllowed },
+      targetFormats: ["video_script"],
+      rawInput: "写一条3到5分钟长口播",
+    })).toEqual([])
+  })
+
+  it("removes unanswered audience-fit questions from the delivered script", () => {
+    expect(cleanSpokenDeliveryArtifacts(
+      "先从一个小切口稳定产能。适合谁？不适合谁？\n\n评论领取清单。",
+    )).toBe("先从一个小切口稳定产能。\n\n评论领取清单。")
   })
 
   it("rejects every format when the model reports token truncation", () => {

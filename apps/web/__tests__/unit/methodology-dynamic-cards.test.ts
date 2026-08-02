@@ -64,6 +64,17 @@ describe("resolveCopyMethodologyPlan", () => {
     expect(plan.cardIds).toContain("local.hook")
   })
 
+  it("完整新稿里的结尾约束不标记为局部优化", () => {
+    const plan = resolveCopyMethodologyPlan({
+      rawInput: "写一条60秒口播，结尾只引导评论领取清单",
+      runtimeTask: "new_copy",
+      mode: "generate",
+    })
+
+    expect(plan.localOptimize).toBeUndefined()
+    expect(plan.cardIds).not.toContain("local.ending")
+  })
+
   it("generate 无信号时推断 lead 并写假设", () => {
     const plan = resolveCopyMethodologyPlan({
       rawInput: "写一条文案",

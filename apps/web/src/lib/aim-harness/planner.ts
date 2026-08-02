@@ -213,7 +213,7 @@ function buildModelPolicy(
     ...(maxTokens ? { maxTokens } : {}),
     targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
-    maxProviderAttempts: fastSpoken ? 1 : stream ? 2 : 3,
+    maxProviderAttempts: fastSpoken ? 2 : stream ? 2 : 3,
   }
 }
 

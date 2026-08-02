@@ -32,8 +32,9 @@ describe("aim agent guides", () => {
 
   it("does not expose structural copyVariants beside purpose skills", () => {
     const guide = getAimAgentGuide("content_producer")
+    const purposeSkills = guide.skills.filter((skill) => skill.group === "内容目的")
     expect((guide as { copyVariants?: unknown }).copyVariants).toBeUndefined()
-    expect(guide.skills.map((s) => s.label)).toEqual(["我要搞流量", "我要获客", "我要讲故事"])
+    expect(purposeSkills.map((s) => s.label)).toEqual(["我要搞流量", "我要获客", "我要讲故事"])
   })
 
   it("uses task-based workflow names on the visible agent list", () => {
@@ -108,7 +109,7 @@ describe("aim agent guides", () => {
   })
 
   it("splits content producer purpose skills into three independent oral skills", () => {
-    const skills = getAimAgentGuide("content_producer").skills
+    const skills = getAimAgentGuide("content_producer").skills.filter((skill) => skill.group === "内容目的")
     const labels = skills.map((skill) => skill.label)
     const ids = skills.map((skill) => skill.id)
 

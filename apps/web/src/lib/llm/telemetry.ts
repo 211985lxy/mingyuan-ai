@@ -198,6 +198,11 @@ export function classifyProviderError(error: unknown): {
     if (status === 408) return { kind: "timeout", retryable: true }
     if (status === 429) return { kind: "rate_limit", retryable: true }
     if (status >= 500) return { kind: "server", retryable: true }
+    // 部分中转站在额度/上游不可用时只返回空 403，无法提供可判定的鉴权正文。
+    // 仅对此精确错误允许切换备用 provider；明确的 403 Forbidden 仍按鉴权失败处理。
+    if (status === 403 && /status code \(no body\)/.test(lower)) {
+      return { kind: "model_unavailable", retryable: true }
+    }
     // 余额/配额耗尽必须允许降级到下一个 provider：DeepSeek 用 402（Payment Required）
     // 表达余额不足，其它中转站多用 403 + 余额文案；两者都不是请求本身有问题。
     if (status === 402 || (status === 403 && /(预扣费|剩余额度|额度不足|余额不足|insufficient (balance|credit|quota)|quota exceeded|credit balance|billing)/.test(lower))) {

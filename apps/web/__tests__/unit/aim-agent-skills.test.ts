@@ -6,10 +6,11 @@ import {
 
 describe("aim agent skills", () => {
   it("拆成三条独立技能：我要搞流量、我要获客、我要讲故事", () => {
-    const ids = CONTENT_PRODUCER_SKILLS.map(s => s.id)
+    const purposeSkills = CONTENT_PRODUCER_SKILLS.filter(s => s.group === "内容目的")
+    const ids = purposeSkills.map(s => s.id)
     expect(ids).toEqual(["traffic_funnel", "lead_acquisition", "general_story"])
 
-    const [t, l, g] = CONTENT_PRODUCER_SKILLS
+    const [t, l, g] = purposeSkills
     expect(t.label).toBe("我要搞流量")
     expect(t.description).toBe("结合热点以及经典话题创作。")
     expect(l.label).toBe("我要获客")

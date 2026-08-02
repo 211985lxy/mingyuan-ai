@@ -19,6 +19,7 @@ import type { EvalFixture, FrozenContext } from "./eval/contracts"
 import { gradeFixture } from "./eval/graders"
 import { judgeEvalCase } from "./eval-rubric"
 import { validateFormat, planAimRun } from "./index"
+import { deliveryBody } from "@/lib/aim-generation-text"
 
 /** What a context adapter returns for a fixture. */
 export interface EvalContext {
@@ -164,7 +165,8 @@ export async function runEvalCase(
     : deterministicEvalExecution(fixture, spec.outputFormats, ctx, runId)
   const drafts = execution.drafts.map((draft) => ({
     ...draft,
-    contentPreview: draft.content,
+    content: deliveryBody(draft.content),
+    contentPreview: deliveryBody(draft.content),
   }))
 
   const formatValidations = drafts.map((draft) => {

@@ -146,10 +146,15 @@ describe("Prisma migrations", () => {
 
     expect(schema).toMatch(/verdictCode\s+String\?/)
     expect(schema).toMatch(/verdictNote\s+String\?/)
-    expect(verdictCodeMigration).toContain("ALTER TABLE ContentOutcome")
+    expect(verdictCodeMigration).toContain("information_schema.COLUMNS")
+    expect(verdictCodeMigration).toContain("ALTER TABLE `ContentOutcome` ADD COLUMN `verdictCode`")
+    expect(verdictCodeMigration).toContain("PREPARE stmt FROM @sql")
     expect(verdictCodeMigration).not.toContain('"ContentOutcome"')
-    expect(verdictNoteMigration).toContain("ADD COLUMN IF NOT EXISTS `verdictCode`")
-    expect(verdictNoteMigration).toContain("ADD COLUMN IF NOT EXISTS `verdictNote`")
+    expect(verdictNoteMigration).toContain("information_schema.COLUMNS")
+    expect(verdictNoteMigration).toContain("ALTER TABLE `ContentOutcome` ADD COLUMN `verdictCode`")
+    expect(verdictNoteMigration).toContain("ALTER TABLE `ContentOutcome` ADD COLUMN `verdictNote`")
+    expect(verdictNoteMigration).toContain("PREPARE verdict_note_stmt FROM @verdict_note_sql")
+    expect(verdictNoteMigration).not.toContain("ADD COLUMN IF NOT EXISTS")
     expect(verdictNoteMigration).not.toMatch(/\bUPDATE\b/i)
   })
 

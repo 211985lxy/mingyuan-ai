@@ -77,4 +77,15 @@ describe("production schema patches", () => {
     expect(learningPatch).toContain("LearningCandidate_requestId_key")
     expect(evalPatch).toContain("EvalFixtureVersion_sourceCandidateId_fkey")
   })
+
+  it("creates the custom AIM skill table required by the public workbench", () => {
+    const customSkillPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("CREATE TABLE IF NOT EXISTS `AimCustomSkill`"),
+    )
+
+    expect(customSkillPatch).toContain("`skillId` VARCHAR(191) NOT NULL")
+    expect(customSkillPatch).toContain("`prompt` MEDIUMTEXT NOT NULL")
+    expect(customSkillPatch).toContain("AimCustomSkill_agentId_skillId_key")
+    expect(customSkillPatch).toContain("AimCustomSkill_agentId_idx")
+  })
 })

@@ -253,6 +253,10 @@ export function resolveAimTurnIntent(input: {
     action = "local_edit"
   }
 
+  // create 表示从零交付完整成稿。输入里的“结尾/CTA”常是新稿约束，不能把
+  // 整条生成缩成局部编辑；真正只改结尾必须由 local_edit 表达。
+  if (action === "create") scope = "full"
+
   const keep: string[] = []
   const avoid: string[] = []
   const passagePolish = looksLikePassagePolish(text)

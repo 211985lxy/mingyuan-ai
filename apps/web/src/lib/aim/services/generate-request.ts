@@ -3,6 +3,7 @@ import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { prepareAimGenerateInput } from "@/lib/aim-harness/request-context"
 import { executeAimRun } from "@/lib/aim-harness/runtime"
 import { actionToRuntimeTask } from "@/lib/aim-intent-vector"
+import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
 import {
   addAimTraceStep,
   createAimTrace,
@@ -212,6 +213,7 @@ export function serializeAimGenerationRun(run: Awaited<ReturnType<typeof execute
     degraded: run.metadata.degraded,
     provider: run.metadata.provider,
     model: run.metadata.model,
+    fastPath: isAimFastSpokenRoute(run.spec?.modelPolicy?.routeKey),
     qualityStatus: run.qualityStatus,
     qualityChecks: run.qualityChecks,
     qualityReport: run.qualityReport,

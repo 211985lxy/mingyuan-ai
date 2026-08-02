@@ -22,6 +22,7 @@ import {
 import type { AimAgentId } from "../contracts"
 import type { AimRunSpec } from "../types"
 import type { PrepareAimContextInput } from "../context-assembly"
+import { isAimFastSpokenRoute } from "../fast-spoken-policy"
 
 /**
  * 并行读取通用背景资产（知识 / 结构 / 方法论 / 竞品诊断 / IP Wiki / 事件叙事）。
@@ -50,6 +51,7 @@ export async function loadGenerationContextBlocks(input: {
     spec.projectId
     && generationIntent.useKnowledge
     && !params.contextOverride
+    && !isAimFastSpokenRoute(spec.modelPolicy.routeKey)
     && (agentId === "content_producer" || agentId === "work_editor" || agentId === "free_copywriter"),
   )
 

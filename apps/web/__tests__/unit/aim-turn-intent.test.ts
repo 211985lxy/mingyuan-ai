@@ -105,6 +105,27 @@ describe("AimTurnIntent（意图优先）", () => {
     expect(intent.action).toBe("create")
   })
 
+  it("新写整条口播时，结尾约束不把范围误判为局部修改", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "为中小企业老板写一条60秒视频号口播。结尾只引导评论领取诊断清单。",
+      targetFormats: ["video_script"],
+    })
+
+    expect(intent.action).toBe("create")
+    expect(intent.scope).toBe("full")
+  })
+
+  it("只改已有文案结尾仍保持局部修改", () => {
+    const intent = resolveAimTurnIntent({
+      rawInput: "只改这篇文案的结尾，正文不要动",
+      runtimeTask: "light_edit",
+      targetFormats: ["video_script"],
+    })
+
+    expect(intent.action).toBe("local_edit")
+    expect(intent.scope).toBe("ending")
+  })
+
   it("按这个结构写一篇仍 → create（写稿词优先）", () => {
     const intent = resolveAimTurnIntent({
       rawInput: "按这个结构写一篇口播",

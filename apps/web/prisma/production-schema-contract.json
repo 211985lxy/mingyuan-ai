@@ -443,6 +443,20 @@
         "createdAt",
         "publishedAt"
       ]
+    },
+    {
+      "name": "AimCustomSkill",
+      "columns": [
+        "id",
+        "skillId",
+        "agentId",
+        "label",
+        "description",
+        "prompt",
+        "group",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   ]
 }

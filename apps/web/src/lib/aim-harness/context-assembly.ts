@@ -156,15 +156,23 @@ export async function prepareAimContext(
 
   // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > agent 默认兜底（content_producer=徐沪生）> none。
   // 在现有 6 块加载之后单独计算，不触碰字节等价红线；解析结果冻结进 spec.methodologyPolicy。
-  const methodologyPolicy = await resolveMethodologyPolicy({
-    userId: params.userId,
-    methodologyProfileIds: params.methodologyProfileIds ?? spec.methodologyProfileIds,
-    rawInput: spec.rawInput,
-    agentId,
-  })
+  const methodologyPolicy: MethodologyPolicy = params.contextOverride
+    ? {
+        source: spec.methodologyPolicy?.source ?? "none",
+        selections: spec.methodologyPolicy?.selections ?? [],
+        versionRows: [],
+      }
+    : await resolveMethodologyPolicy({
+        userId: params.userId,
+        methodologyProfileIds: params.methodologyProfileIds ?? spec.methodologyProfileIds,
+        rawInput: spec.rawInput,
+        agentId,
+      })
   const selectedMethodologyBlock = buildMethodologyProfileBlock(methodologyPolicy)
   // spec 冻结后不可变；把解析出的 policy 合并入副本，使落 AimGeneration.runSpec 的那份含命中版本
-  const specWithMethodology: AimRunSpec = methodologyPolicy.source === "none" && spec.methodologyPolicy === undefined
+  const specWithMethodology: AimRunSpec = params.contextOverride
+    ? spec
+    : methodologyPolicy.source === "none" && spec.methodologyPolicy === undefined
     ? spec
     : { ...spec, methodologyPolicy: toSpecMethodologyPolicy(methodologyPolicy) }
 

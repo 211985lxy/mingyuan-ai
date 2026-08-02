@@ -5,7 +5,14 @@ import {
   findUnsupportedFirstPersonClaimFormats,
   isGenericContentRequestWithoutFacts,
 } from "@/lib/aim-generation-prompts"
-import { findDroppedStructureModules } from "@/lib/aim-generation-guardrails"
+import {
+  findDroppedStructureModules,
+  findUnsupportedNumericClaimFormats,
+  scrubUnsupportedAnecdoteSentences,
+  scrubUnsupportedNumericSentences,
+} from "@/lib/aim-generation-guardrails"
+import { scrubLeakedLightEditFeedback } from "@/lib/aim-generation-text"
+import { AIM_FACT_PRIORITY_RULE } from "@/lib/aim-context-priority"
 import type { AimGenerateContext } from "@/lib/aim-agent-handlers"
 
 function context(overrides: Partial<AimGenerateContext> = {}): AimGenerateContext {
@@ -64,6 +71,12 @@ describe("AIM generation fact guardrails", () => {
       { video_script: "我见过有人发了三百条，询盘还是零。" },
       ["video_script"],
     )).toEqual(["video_script"])
+
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "我见过太多老板卡在这儿。比如先替客户说出痛点。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
   })
 
   it("allows first-person evidence present in project knowledge", () => {
@@ -82,6 +95,179 @@ describe("AIM generation fact guardrails", () => {
     )).toEqual([])
   })
 
+  it("blocks ungrounded friend and industry-owner anecdotes", () => {
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "我有一个朋友，最近靠内容拿到了很多客户。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "有位装修老板，之前做了很多内容却没有询盘。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "上周我看到一个老板的视频，内容做得很热闹。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "我上周就遇到几个老板，他们都说内容获客很难。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "之前有一家本地服务公司做了口播。后来咨询数据明显增长。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "有个做电商的老板问过我，内容到底怎么获客。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "很多老板问我，我们也在发内容，为什么线索质量上不来？" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context(),
+      { video_script: "我跟几个老板聊过，他们都说内容获客很难。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+  })
+
+  it("allows creative marketing numbers while preserving strict fact checks", () => {
+    expect(findUnsupportedNumericClaimFormats(
+      context(),
+      { video_script: "90%的老板都把内容获客做错了。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedNumericClaimFormats(
+      context({ knowledgeBlock: "调研结果：90%的受访者更关注真实案例。" }),
+      { video_script: "调研显示，90%的受访者更关注真实案例。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedNumericClaimFormats(
+      context({ knowledgeBlock: "目标客户：年营收300-3000万的本地服务老板。" }),
+      { video_script: "有位年营收500万的老板，靠内容获得了20条线索。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedNumericClaimFormats(
+      context(),
+      { video_script: "解决这个问题可以先做3步：明确客户、选择问题、设计承接。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedNumericClaimFormats(
+      context(),
+      { video_script: "比如客服团队用 AI 自动处理八成常见问题。" },
+      ["video_script"],
+    )).toEqual([])
+  })
+
+  it("allows creative numbers and illustrative scenarios in light edits", () => {
+    const lightEditContext = context({
+      rawInput: "原稿：AI 可以帮助企业提升效率，但这段表达太空。",
+      polishInstruction: "只修改开头，让它更具体。",
+      runtimeTask: "light_edit",
+    })
+    expect(findUnsupportedNumericClaimFormats(
+      lightEditContext,
+      { video_script: "比如把原本一周的工作压缩到半天。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      lightEditContext,
+      { video_script: "一家贸易公司的财务部门用 AI 批量对账、识别异常。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedFirstPersonClaimFormats(
+      lightEditContext,
+      { video_script: "AI 提效不是口号，而是把重复工作真正交给工具。" },
+      ["video_script"],
+    )).toEqual([])
+  })
+
+  it("ignores structural numbers inside the method note while checking the delivered body", () => {
+    const lightEditContext = context({
+      rawInput: "原稿：AI 可以帮助企业提升效率。",
+      polishInstruction: "只修改开头。",
+      runtimeTask: "light_edit",
+    })
+    expect(findUnsupportedNumericClaimFormats(
+      lightEditContext,
+      { video_script: "[[AIM_METHOD_NOTE]]优化前三秒钩子。[[/AIM_METHOD_NOTE]]\n\nAI 提效不是口号。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedNumericClaimFormats(
+      lightEditContext,
+      { video_script: "[[AIM_METHOD_NOTE]]优化前三秒钩子。[[/AIM_METHOD_NOTE]]\n\n把一周工作压缩到半天。" },
+      ["video_script"],
+    )).toEqual([])
+  })
+
+  it("removes inline user criticism from the light-edit body but keeps its method note", () => {
+    const result = scrubLeakedLightEditFeedback(
+      "[[AIM_METHOD_NOTE]]用户认为这段表达太空。[[/AIM_METHOD_NOTE]]\n\nAI 能接手重复流程，但这段表达太空。",
+      "原稿：AI 可以帮助企业提升效率，但这段表达太空。",
+    )
+    expect(result).toBe(
+      "[[AIM_METHOD_NOTE]]用户认为这段表达太空。[[/AIM_METHOD_NOTE]]\n\nAI 能接手重复流程。",
+    )
+  })
+
+  it("allows structural counts but blocks result counts in a strict brief", () => {
+    const strictContext = context({
+      rawInput: "只允许60天、40条，不得编造其他数字",
+    })
+    expect(findUnsupportedNumericClaimFormats(
+      strictContext,
+      { video_script: "可以先做三条检查，一天内把问题列清楚。" },
+      ["video_script"],
+    )).toEqual([])
+    expect(findUnsupportedNumericClaimFormats(
+      strictContext,
+      { video_script: "最终获得20条线索。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+    expect(findUnsupportedNumericClaimFormats(
+      strictContext,
+      { video_script: "先检查最近10条内容，再统一选题标准。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
+  })
+
+  it("drops complete sentences with unauthorized numbers before delivery", () => {
+    const rawInput = "只允许60天、40条，不得编造其他数字"
+    const result = scrubUnsupportedNumericSentences(
+      "先把客户问题讲清楚。只要一元投入就能成交。60天产出40条内容。最后给出明确行动。",
+      rawInput,
+    )
+
+    expect(result).toBe("先把客户问题讲清楚。60天产出40条内容。最后给出明确行动。")
+  })
+
+  it("keeps creative numbers unless the brief explicitly enables strict fact mode", () => {
+    const content = "先说结论。比如客服能自动处理八成问题。资料显示响应成本降低20%。"
+    expect(scrubUnsupportedNumericSentences(content, "写一段 AI 提效文案"))
+      .toBe(content)
+    expect(scrubUnsupportedNumericSentences(
+      content,
+      "资料显示响应成本降低20%，不得编造其他数字",
+    )).toBe("先说结论。资料显示响应成本降低20%。")
+  })
+
+  it("drops unapproved first-person anecdotes from a closed-world fact brief", () => {
+    const rawInput = "必须准确引用两个事实：某公司60天产出40条内容。痛点是产能不稳。不得编造其他数字"
+    const result = scrubUnsupportedAnecdoteSentences(
+      "先讲清楚客户问题。很多老板问我，为什么线索质量上不来？某公司60天产出40条内容。最后给出行动。",
+      rawInput,
+    )
+
+    expect(result).toBe("先讲清楚客户问题。某公司60天产出40条内容。最后给出行动。")
+  })
+
   it("detects generic generation requests that have no factual context", () => {
     expect(isGenericContentRequestWithoutFacts(context({
       rawInput: "帮我写一条视频脚本。",
@@ -93,6 +279,10 @@ describe("AIM generation fact guardrails", () => {
       rawInput: "帮我写一条视频脚本。",
       knowledgeBlock: "产品卖点：每周复盘线索。",
     }))).toBe(false)
+    expect(isGenericContentRequestWithoutFacts(context({
+      rawInput: "帮我写一条视频脚本。",
+      knowledgeBlock: AIM_FACT_PRIORITY_RULE,
+    }))).toBe(true)
   })
 
   it("flags over-compressed whole-passage polish but not opening-only edits", () => {
@@ -114,6 +304,15 @@ describe("AIM generation fact guardrails", () => {
       { raw_copy: "AI 到底有没有用，看它能否减少重复劳动。" },
       ["raw_copy"],
     )).toEqual([])
+    expect(findLightEditScopeViolationFormats(
+      {
+        rawInput: "原稿：AI 可以帮助企业提升效率，但这段表达太空。",
+        polishInstruction: "只修改开头。",
+        runtimeTask: "light_edit",
+      },
+      { raw_copy: "[[AIM_METHOD_NOTE]]优化前三秒。[[/AIM_METHOD_NOTE]]" },
+      ["raw_copy"],
+    )).toEqual(["raw_copy"])
   })
 })
 

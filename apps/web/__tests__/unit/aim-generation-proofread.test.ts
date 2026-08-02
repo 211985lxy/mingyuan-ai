@@ -35,4 +35,13 @@ describe("proofreadAimResponse", () => {
 
     expect(result.results).toEqual(response.results)
   })
+
+  it("does not launch a second model call after a fast-path generation", async () => {
+    const fastResponse = { ...response, fastPath: true }
+
+    const result = await proofreadAimResponse(fastResponse, "老板口吻")
+
+    expect(result).toBe(fastResponse)
+    expect(polishScript).not.toHaveBeenCalled()
+  })
 })

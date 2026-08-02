@@ -113,6 +113,23 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(result.drafts[0]?.contentPreview).not.toContain("确定性占位")
   })
 
+  it("scores and reports only the deliverable body, excluding internal method notes", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    const result = await runEvalCase(fixture, createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => ({
+        drafts: fixture.expectations.outputFormats.map((format) => ({
+          format,
+          content: "[[AIM_METHOD_NOTE]]内部拆解，不属于成稿。[[/AIM_METHOD_NOTE]]\n\n这是可直接发布的正文。",
+        })),
+        citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+        runId: "run_delivery_body_only",
+      }),
+    })
+
+    expect(result.drafts[0]?.contentPreview).toBe("这是可直接发布的正文。")
+  })
+
   it("refuses a real-model eval when no real executor is configured", async () => {
     await expect(
       runEvalCase(ALL_FIXTURES[0], createFrozenContextAdapter(), { skipRubric: false }),
@@ -132,6 +149,18 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(warnedInsufficientInfo([
       { content: "核心依据完全缺失，当前内容并非完整可发布文案。" },
     ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "这条视频的实际效果目前没法判断，我手里没有任何真实数字，必须先补数据。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "你还没有登记任何发布数据，后台指标都是空的，我不会编数字来凑。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "这次复盘做不了，因为你还没登记发布数据，现在还不知道效果怎么样。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "目前没有登记任何发布数据，所以现在没法告诉你效果怎么样。" },
+    ])).toBe(true)
   })
 
   it("shows the judge the frozen context used by the real executor", () => {
@@ -139,7 +168,8 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     const prompt = buildRubricPrompt(fixture, "用数字、痛点和悬念写出的小红书笔记。")
 
     expect(prompt).toContain("爆款标题套路：数字+痛点+悬念")
-    expect(prompt).toContain("常识性创意表达不属于编造")
+    expect(prompt).toContain("比如/例如/假设")
+    expect(prompt).toContain("属于创意表达，不得判为编造")
     expect(prompt).toContain("我有个学员/客户/朋友")
     expect(prompt).toContain("未提供/待补充")
   })

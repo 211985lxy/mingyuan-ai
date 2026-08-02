@@ -30,9 +30,10 @@ describe("executionPolicy (阶段 1)", () => {
   it("默认 single_shot 策略冻结", () => {
     const spec = planAimRun({
       entrypoint: "generate",
-      agentId: "content_producer",
-      rawInput: "写一条短视频脚本",
-      targetFormats: ["video_script"],
+      agentId: "work_editor",
+      rawInput: "润色这段文案",
+      targetFormats: ["raw_copy"],
+      taskType: "polish",
     })
     expect(spec.executionMode).toBe("single_shot")
     expect(spec.executionPolicy.mode).toBe("single_shot")

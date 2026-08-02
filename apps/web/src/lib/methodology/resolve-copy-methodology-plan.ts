@@ -322,9 +322,6 @@ export function resolveCopyMethodologyPlan(
       cardIds.push("card.lead_gen")
     }
     cardIds.push(ROUTE_TO_CARD[contentRoute])
-    if (localHit.cardId && !isLightEdit && !wantsLogoAida) {
-      cardIds.push(localHit.cardId)
-    }
     // 口播/去AI味时附带人味工具箱；开头优化附带七大开头
     if (localHit.local === "oral") cardIds.push("toolbox.humanizer")
     if (localHit.local === "hook") cardIds.push("toolbox.hooks7")
@@ -352,7 +349,7 @@ export function resolveCopyMethodologyPlan(
     businessGoal,
     contentRoute,
     cardIds: limited,
-    localOptimize: wantsLogoAida ? "structure" : localHit.local,
+    localOptimize: wantsLogoAida ? "structure" : isLightEdit ? localHit.local : undefined,
     structureModel: wantsLogoAida ? "logo_aida" : undefined,
     structureModules,
     confidence,

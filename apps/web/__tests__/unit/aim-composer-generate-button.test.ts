@@ -12,7 +12,7 @@ describe("AIM composer generate button", () => {
   it("requires current input instead of enabling from old messages", () => {
     const canGenerateBlock = source.match(/canGenerate=\{\s*([\s\S]*?)\s*\}\s*primaryActionLabel=/)?.[1] ?? ""
     const canGenerateDefinition =
-      source.match(/const canGenerateBase =([\s\S]*?)\n\n  const composer/)?.[1] ?? ""
+      source.match(/const canGenerateBase =([^\n]+)/)?.[1] ?? ""
 
     expect(canGenerateBlock).toContain("canGenerateBase")
     expect(canGenerateDefinition).toContain("w.input.trim().length > 0")
@@ -38,6 +38,7 @@ describe("AIM composer generate button", () => {
     expect(executeBlock).not.toMatch(/await proofreadAimResponse/)
     expect(generationSource).toContain("async function softProofreadInBackground")
     expect(generationSource).toMatch(/await proofreadAimResponse\(response, input\.agent\.defaultInstruction\)/)
+    expect(generationSource).toContain("if (response.fastPath) return")
   })
 
   it("appends a new assistant turn after every follow-up generation request", () => {

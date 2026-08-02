@@ -21,6 +21,20 @@ describe("migration integrity policy", () => {
     expect(
       findMigrationIntegrityViolations({ baselineMigrations, migrationDirectories, schemaContract }),
     ).toEqual([])
+    expect(schemaContract.tables).toContainEqual({
+      name: "AimCustomSkill",
+      columns: [
+        "id",
+        "skillId",
+        "agentId",
+        "label",
+        "description",
+        "prompt",
+        "group",
+        "createdAt",
+        "updatedAt",
+      ],
+    })
   })
 
   it("rejects a baseline that is not a migration history prefix", () => {

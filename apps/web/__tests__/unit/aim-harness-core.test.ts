@@ -123,7 +123,7 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.stream).toBe(false)
     expect(spec.modelPolicy.targetCapability).toBe("advanced")
     expect(spec.modelPolicy.minimumCapability).toBe("standard")
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(1)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(2)
     expect(spec.executionPolicy).toMatchObject({
       mode: "single_shot",
       timeoutMs: 90000,
@@ -282,6 +282,14 @@ describe("aim-harness fallback policy", () => {
     expect(classifyProviderError(new Error("401 Unauthorized")).retryable).toBe(false)
     expect(classifyProviderError(new Error("403 Forbidden")).retryable).toBe(false)
     expect(classifyProviderError(new Error("No providers configured, missing API_KEY")).retryable).toBe(false)
+  })
+
+  it("falls back on an empty-body 403 from an upstream relay", () => {
+    const error = Object.assign(new Error("403 status code (no body)"), { status: 403 })
+    expect(classifyProviderError(error)).toEqual({
+      kind: "model_unavailable",
+      retryable: true,
+    })
   })
 
   it("falls back when a provider returns a balance or quota 403", async () => {

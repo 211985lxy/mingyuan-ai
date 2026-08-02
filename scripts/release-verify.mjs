@@ -53,12 +53,25 @@ if (skipDailyEval) {
   )
 }
 
-for (const [name, args] of hasDatabaseServices ? [...steps, ...databaseSteps] : steps) {
+const unitTestStepIndex = steps.findIndex(([name]) => name === "Unit and evaluation tests")
+const releaseSteps = hasDatabaseServices
+  ? [
+      ...steps.slice(0, unitTestStepIndex),
+      databaseSteps[0],
+      ...steps.slice(unitTestStepIndex),
+      ...databaseSteps.slice(1),
+    ]
+  : steps
+const releaseEnv = hasDatabaseServices
+  ? { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL }
+  : process.env
+
+for (const [name, args] of releaseSteps) {
   console.log(`\n==> ${name}`)
   const startedAt = Date.now()
   const env = name === "Production build"
-    ? { ...process.env, NODE_ENV: "production" }
-    : process.env
+    ? { ...releaseEnv, NODE_ENV: "production" }
+    : releaseEnv
   const result = spawnSync("pnpm", args, { stdio: "inherit", env })
   if (result.status !== 0) {
     console.error(`release verification failed: ${name}`)

@@ -6,7 +6,7 @@ import {
   ensureContentCreationTrace,
   executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
-import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
+import { AIM_NORTH_STAR_GOAL, LIGHT_EDIT_OUTPUT_BOUNDARY } from "@/lib/aim-intent-boundaries"
 import type { ContentFormat } from "./aim-generator"
 import type {
   AimAgentHandler,
@@ -44,6 +44,9 @@ export class FreeCopywriterHandler implements AimAgentHandler {
       rawInput: params.rawInput,
       runtimeTask: params.runtimeTask,
     })
+    const lightEditBoundary = params.runtimeTask === "light_edit"
+      ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}`
+      : ""
     return `你是一个交货型文案写手，只负责听懂用户当前要求，并把文案直接交出来。
 
 北极星目标：${AIM_NORTH_STAR_GOAL}
@@ -51,6 +54,7 @@ export class FreeCopywriterHandler implements AimAgentHandler {
 ${backgroundSection}
 ${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
 ${compactTask ? `\n${compactTask}` : ""}
+${lightEditBoundary}
 
 规则：
 1. 用户怎么要求就怎么写；用户的指令优先级高于模板、方法论、默认字数和系统习惯。
@@ -102,6 +106,7 @@ ${includeCreationTrace ? `\n${CONTENT_CREATION_TRACE_RULE}` : ""}`
     })
     const userPrompt = `请直接按用户要求写一版文案：
 "${context.rawInput}"
+${context.polishInstruction ? `修改要求：${context.polishInstruction}` : ""}
 ${compactTask ? `\n${compactTask}` : ""}`
     const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,

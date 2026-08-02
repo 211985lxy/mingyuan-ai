@@ -68,6 +68,8 @@ export interface AimGenerateResponse {
   /** 实际命中的 provider / 模型（降级或排查时展示） */
   provider?: string
   model?: string
+  /** 服务端已用单模型快路由完成，客户端不得再发起二次润色。 */
+  fastPath?: boolean
   /** 主稿确定性+LLM 质量结果：pass | warn | fail | skipped */
   qualityStatus?: "pass" | "warn" | "fail" | "skipped"
   /** 每种格式的确定性检查（空内容/长度/禁词/AI 味） */
@@ -475,4 +477,3 @@ export interface MethodologyProfileSummary {
 export function fetchMethodologyProfiles(): Promise<MethodologyProfileSummary[]> {
   return request<MethodologyProfileSummary[]>("/api/methodology-profiles")
 }
-

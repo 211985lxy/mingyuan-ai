@@ -9,6 +9,7 @@ const PROOFREAD_FORMATS = new Set<ContentFormat>(["raw_copy", "video_script", "k
  * @returns 校对后的生成响应
  */
 export async function proofreadAimResponse(response: AimGenerateResponse, persona: string): Promise<AimGenerateResponse> {
+  if (response.fastPath) return response
   const results = await Promise.all(response.results.map(async (result) => {
     if (!PROOFREAD_FORMATS.has(result.format) || result.content.trim().length < 30) return result
     try {
