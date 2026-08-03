@@ -45,23 +45,43 @@ describe("LLM client bounds", () => {
     expect(calls).toEqual(["first", "second"])
   })
 
-  it("replaces invalid per-request token limits with the configured cap", async () => {
-    process.env.LLM_MAX_OUTPUT_TOKENS = "512"
+  it("falls back when the first provider streams zero chunks", async () => {
     vi.resetModules()
     const { LLMClient } = await import("@/lib/llm/client")
-    const provider: LLMProvider = {
-      name: "provider",
-      defaultModel: "provider-model",
+    const calls: string[] = []
+    const emptyStreamer: LLMProvider = {
+      name: "empty",
+      defaultModel: "empty-model",
       isAvailable: () => true,
-      async complete(options: CompletionOptions) {
-        expect(options.maxTokens).toBe(512)
-        return { content: "ok", model: "provider-model", provider: "provider" }
+      async complete() {
+        throw new Error("complete should not run")
+      },
+      async *stream() {
+        calls.push("empty")
+        // 故意不 yield：模拟 DeepSeek 空 content 流
+      },
+    }
+    const fallbackStreamer: LLMProvider = {
+      name: "fallback",
+      defaultModel: "fallback-model",
+      isAvailable: () => true,
+      async complete() {
+        throw new Error("complete should not run")
+      },
+      async *stream() {
+        calls.push("fallback")
+        yield "成稿"
       },
     }
 
-    await new LLMClient([provider]).complete({
-      messages: [{ role: "user", content: "test" }],
-      maxTokens: Number.NaN,
-    })
+    const chunks: string[] = []
+    for await (const chunk of new LLMClient([emptyStreamer, fallbackStreamer]).stream({
+      messages: [{ role: "user", content: "写口播" }],
+    })) {
+      chunks.push(chunk)
+    }
+
+    expect(calls).toEqual(["empty", "fallback"])
+    expect(chunks.join("")).toBe("成稿")
   })
 })

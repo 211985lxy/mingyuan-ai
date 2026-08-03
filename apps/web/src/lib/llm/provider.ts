@@ -90,12 +90,13 @@ export class OpenAICompatibleProvider implements LLMProvider {
     })
 
     const choice = response.choices[0]
-    if (!choice?.message?.content) {
+    const content = extractAssistantText(choice?.message)
+    if (!content) {
       throw new Error(`[${this.name}] Empty response from model ${model}`)
     }
 
     return {
-      content: choice.message.content,
+      content,
       model: response.model,
       provider: this.name,
       finishReason: choice.finish_reason,
@@ -121,9 +122,40 @@ export class OpenAICompatibleProvider implements LLMProvider {
       stream: true,
     })
 
+    // DeepSeek 等推理模型可能先推 reasoning_content、后推 content。
+    // 有正文只出正文；整段流结束仍无正文时，再把推理缓冲当兜底吐出，避免「空流成功」。
+    let contentEmitted = false
+    let reasoningBuffer = ""
     for await (const chunk of response) {
-      const delta = chunk.choices[0]?.delta?.content
-      if (delta) yield delta
+      const delta = chunk.choices[0]?.delta as
+        | { content?: string | null; reasoning_content?: string | null }
+        | undefined
+      const content = typeof delta?.content === "string" ? delta.content : ""
+      if (content) {
+        contentEmitted = true
+        yield content
+        continue
+      }
+      const reasoning = typeof delta?.reasoning_content === "string" ? delta.reasoning_content : ""
+      if (reasoning) reasoningBuffer += reasoning
+    }
+    if (!contentEmitted) {
+      const fallback = reasoningBuffer.trim()
+      if (fallback) yield fallback
     }
   }
+}
+
+/**
+ * DeepSeek v4 等推理模型可能把正文放在 reasoning_content，content 为空。
+ * 优先用 content；为空时回退 reasoning_content，避免误判 Empty response。
+ */
+export function extractAssistantText(message: unknown): string {
+  if (!message || typeof message !== "object") return ""
+  const record = message as { content?: unknown; reasoning_content?: unknown }
+  const content = typeof record.content === "string" ? record.content.trim() : ""
+  if (content) return content
+  const reasoning =
+    typeof record.reasoning_content === "string" ? record.reasoning_content.trim() : ""
+  return reasoning
 }

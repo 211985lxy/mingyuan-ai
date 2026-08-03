@@ -5,6 +5,7 @@ import {
   classifyProviderError,
   reportLlmInvocation,
   reportProviderAttempt,
+  type ProviderErrorKind,
 } from "./telemetry"
 import { env } from "@/env"
 
@@ -33,6 +34,26 @@ function resolveMaxTokens(requested: number | undefined, limit: number): number 
   const parsed = Number(requested)
   if (!Number.isFinite(parsed) || parsed <= 0) return limit
   return Math.min(Math.floor(parsed), limit)
+}
+
+function reportStreamFailure(
+  provider: LLMProvider,
+  options: CompletionOptions,
+  error: Error,
+  errorKind: ProviderErrorKind,
+  startedAt: number,
+  attemptIndex: number,
+) {
+  reportProviderAttempt({
+    provider: provider.name,
+    model: options.model ?? provider.defaultModel,
+    capability: provider.capability,
+    status: "failed",
+    error: error.message,
+    errorKind,
+    durationMs: Date.now() - startedAt,
+    attemptIndex,
+  })
 }
 
 export class LLMClient {
@@ -112,16 +133,7 @@ export class LLMClient {
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
-        reportProviderAttempt({
-          provider: provider.name,
-          model: boundedOptions.model ?? provider.defaultModel,
-          capability: provider.capability,
-          status: "failed",
-          error: lastError.message,
-          errorKind: classified.kind,
-          durationMs: Date.now() - startedAt,
-          attemptIndex: index,
-        })
+        reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, index)
         console.warn(
           `[llm] Provider "${provider.name}" failed (${classified.kind}), trying next:`,
           lastError.message
@@ -177,6 +189,12 @@ export class LLMClient {
           emitted = true
           yield chunk
         }
+        // 空流算失败：否则前端以为「流式成功但没字」，表现为流式输出反复丢失。
+        if (!emitted) {
+          throw new Error(
+            `[${provider.name}] Empty stream from model ${boundedOptions.model ?? provider.defaultModel}`,
+          )
+        }
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
@@ -188,36 +206,14 @@ export class LLMClient {
         return
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        if (emitted) {
-          reportProviderAttempt({
-            provider: provider.name,
-            model: boundedOptions.model ?? provider.defaultModel,
-            capability: provider.capability,
-            status: "failed",
-            error: lastError.message,
-            errorKind: classifyProviderError(error).kind,
-            durationMs: Date.now() - startedAt,
-            attemptIndex: index,
-          })
-          throw lastError
-        }
         const classified = classifyProviderError(error)
-        reportProviderAttempt({
-          provider: provider.name,
-          model: boundedOptions.model ?? provider.defaultModel,
-          capability: provider.capability,
-          status: "failed",
-          error: lastError.message,
-          errorKind: classified.kind,
-          durationMs: Date.now() - startedAt,
-          attemptIndex: index,
-        })
+        reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, index)
+        if (emitted) throw lastError
         console.warn(
           `[llm] Provider "${provider.name}" stream failed (${classified.kind}), trying next:`,
           lastError.message
         )
         if (!classified.retryable) break
-        // 指数退避：rate_limit/server 错误后等待再尝试下一个 provider
         const delay = backoffDelay(index, classified.kind)
         if (delay > 0) await sleep(delay)
       }

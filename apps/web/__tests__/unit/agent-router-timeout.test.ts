@@ -58,38 +58,42 @@ describe("agent router timeout overrides", () => {
     expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
   })
 
-  it("routes content_producer to ZenMux Claude Opus 4.6 first with DeepSeek fallback", async () => {
+  it("routes content_producer to DeepSeek first with APIMart and Sonnet fallback", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     const llm = getAgentLLM("content_producer")
-    expect(llm.providerNames.slice(0, 2)).toEqual(["zenmux", "deepseek"])
-    expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-opus-4.6")
+    expect(llm.providerNames.slice(0, 3)).toEqual(["deepseek", "apimart", "zenmux"])
+    expect(getAgentRecommendedModel("content_producer")).toBe("deepseek-v4-flash")
     expect(llm.providerNames).toContain("deepseek")
     expect(llm.providerNames).toContain("apimart")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(zenmux?.timeout).toBe(120000)
+    expect(zenmux?.timeout).toBe(45000)
     expect(zenmux?.fetchOptions).toMatchObject({ dispatcher: expect.any(Object) })
   })
 
-  it("routes the fast spoken policy only to Claude Opus 4.6 with a 45s timeout", async () => {
+  it("routes fast spoken with DeepSeek first and multi-provider fallback under 45s", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0
 
     const routeKey = "content_producer.fast_spoken"
     const llm = getAgentLLM(routeKey, {
-      minimumCapability: "advanced",
-      maxProviderAttempts: 1,
+      minimumCapability: "standard",
+      maxProviderAttempts: 2,
     })
 
-    expect(llm.providerNames).toEqual(["zenmux"])
-    expect(getAgentRecommendedModel(routeKey)).toBe("anthropic/claude-opus-4.6")
-    expect(ctorArgs).toHaveLength(1)
-    expect(ctorArgs[0]?.timeout).toBe(45000)
-    expect(ctorArgs[0]?.maxRetries).toBe(0)
+    expect(llm.providerNames.slice(0, 3)).toEqual(["deepseek", "apimart", "zenmux"])
+    expect(getAgentRecommendedModel(routeKey)).toBe("deepseek-v4-flash")
+    expect(llm.providerNames).toContain("glm")
+
+    const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
+    const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
+    expect(deepseek?.timeout).toBe(45000)
+    expect(zenmux?.timeout).toBe(45000)
+    expect(zenmux?.maxRetries).toBe(0)
 
     await llm.complete({ messages: [{ role: "user", content: "写一条口播" }] })
-    expect(completionArgs[0]).toMatchObject({ model: "anthropic/claude-opus-4.6" })
+    expect(completionArgs[0]).toMatchObject({ model: "deepseek-v4-flash" })
   })
 
   it("routes business_system_diagnosis to ZenMux Claude Opus 4.6 first with DeepSeek fallback", async () => {

@@ -81,13 +81,17 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 
 export const AGENT_ROUTES = freezeAgentRoutes({
   [AIM_FAST_SPOKEN_ROUTE_KEY]: [
+    // 快口播：国内直连先出字；ZenMux 只能作增强，禁止只挂一条（超时即整单失败、流式也白等）。
+    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
+    { name: "apimart", timeoutMs: 45_000, capability: "advanced" },
     {
       name: "zenmux",
-      model: "anthropic/claude-opus-4.6",
+      model: "anthropic/claude-sonnet-4.6",
       timeoutMs: AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS,
       maxRetries: 0,
       capability: "advanced",
     },
+    { name: "glm", timeoutMs: 30_000, capability: "standard" },
   ],
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
@@ -112,11 +116,12 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "glm", timeoutMs: 20000, capability: "standard" },
   ],
 
-  // ── 内容创作：ZenMux Claude Opus 4.6 优先（生产须配 ZENMUX_PROXY_URL），国内直连兜底 ──
+  // ── 内容创作：稳定优先（DeepSeek/APIMart 先出字），Claude 作增强兜底 ──
+  // ZenMux 挂最前时，连通性/超时会把整段流式「干等后失败」，表现为流式反复丢失。
   content_producer: [
-    { name: "zenmux", model: "anthropic/claude-opus-4.6", timeoutMs: 120000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-flash", capability: "standard" },
-    { name: "apimart", timeoutMs: 60000, capability: "advanced" },
+    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
+    { name: "apimart", timeoutMs: 60_000, capability: "advanced" },
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 45_000, capability: "advanced" },
     { name: "jiekou", capability: "basic" },
     { name: "glm", capability: "standard" },
   ],
