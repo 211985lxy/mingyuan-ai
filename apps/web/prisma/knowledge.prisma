@@ -8,7 +8,7 @@ model AssetCandidate {
   projectId           String
   generationId        String // 来源会议洞察 AimGeneration.id（不建外键，资产可独立于生成记录存续）
   feishuRecordId      String?  @db.VarChar(64) // 来源飞书记录
-  kind                String   @db.VarChar(40) // pain_point | customer_quote | objection | deal_trigger | follow_up_script | content_topic | case_candidate | methodology_revision
+  kind                String   @db.VarChar(40) // pain_point | customer_quote | objection | deal_trigger | follow_up_script | content_topic | case_candidate | methodology_revision | wiki_patch
   title               String   @db.VarChar(200)
   content             String   @db.Text
   evidence            String?  @db.Text // 原文证据，缺省为 null，不伪造
@@ -19,6 +19,8 @@ model AssetCandidate {
   /** 首次晋升写入；历史缺失保持 null，不回填推测 */
   promotedAt          DateTime?
   customerOutcomeProjectionId String? @unique
+  /** wiki_patch 专用：目标 IP 维基页类型（positioning/audience/topic_direction/...）。非 wiki_patch 为 null。 */
+  wikiPageType        String?  @db.VarChar(32)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

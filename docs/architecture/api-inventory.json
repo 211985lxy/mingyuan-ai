@@ -1430,6 +1430,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/meeting-recording",
+      "file": "src/app/api/aim/meeting-recording/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/memories/[id]",
       "file": "src/app/api/aim/memories/[id]/route.ts",
       "methods": [
@@ -1461,7 +1474,7 @@
       "methods": [
         "POST"
       ],
-      "auth": "public",
+      "auth": "user_session",
       "input": "zod_json",
       "query": "none",
       "externalService": false,
@@ -2380,7 +2393,7 @@
       "methods": [
         "POST"
       ],
-      "auth": "public",
+      "auth": "user_session",
       "input": "query",
       "query": "manual",
       "externalService": false,
@@ -2394,7 +2407,7 @@
         "GET",
         "POST"
       ],
-      "auth": "public",
+      "auth": "user_session",
       "input": "query",
       "query": "manual",
       "externalService": false,
@@ -2485,7 +2498,7 @@
       "methods": [
         "GET"
       ],
-      "auth": "public",
+      "auth": "user_session",
       "input": "query",
       "query": "manual",
       "externalService": true,
@@ -2555,6 +2568,19 @@
       "input": "query",
       "query": "manual",
       "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/integrations/douyin/events",
+      "file": "src/app/api/integrations/douyin/events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "signed_integration",
+      "input": "raw_body",
+      "query": "none",
+      "externalService": false,
       "cost": "low",
       "idempotency": false
     },

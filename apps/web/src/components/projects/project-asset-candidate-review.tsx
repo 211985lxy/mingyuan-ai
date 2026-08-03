@@ -9,15 +9,36 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { request } from "@/lib/api/core"
 import { ASSET_CANDIDATE_KIND_LABELS } from "@/lib/aim/asset-candidates"
+import { IP_WIKI_PAGE_TYPE_LABELS, type IpWikiPageType } from "@/lib/ip-wiki/types"
+
+/** wiki_patch 候选不在 ASSET_CANDIDATE_KIND_LABELS 中，单独给中文标签。 */
+const WIKI_PATCH_KIND_LABEL = "维基补充候选"
 
 interface AssetCandidateItem {
   id: string
   kind: string
+  /** wiki_patch 候选的目标 IP 维基页类型；其他 kind 为 null/undefined。 */
+  wikiPageType?: string | null
   title: string
   content: string
   confidence: string
   reviewStatus: string
   evidence?: string | null
+}
+
+function kindLabel(kind: string, wikiPageType?: string | null): string {
+  if (kind === "wiki_patch") {
+    const pageLabel =
+      wikiPageType && wikiPageType in IP_WIKI_PAGE_TYPE_LABELS
+        ? IP_WIKI_PAGE_TYPE_LABELS[wikiPageType as IpWikiPageType]
+        : wikiPageType ?? ""
+    return pageLabel ? `${WIKI_PATCH_KIND_LABEL}·${pageLabel}` : WIKI_PATCH_KIND_LABEL
+  }
+  return ASSET_CANDIDATE_KIND_LABELS[itemKindAsKey(kind)] || kind
+}
+
+function itemKindAsKey(kind: string): keyof typeof ASSET_CANDIDATE_KIND_LABELS {
+  return kind as keyof typeof ASSET_CANDIDATE_KIND_LABELS
 }
 
 interface ProjectAssetCandidateReviewProps {
@@ -132,7 +153,7 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
           {items.map((item) => (
             <li key={item.id} className="rounded-lg border border-border/70 bg-card p-2.5">
               <p className="text-xs font-medium text-foreground">
-                {ASSET_CANDIDATE_KIND_LABELS[item.kind as keyof typeof ASSET_CANDIDATE_KIND_LABELS] || item.kind}
+                {kindLabel(item.kind, item.wikiPageType)}
                 {" · "}
                 {item.title}
               </p>

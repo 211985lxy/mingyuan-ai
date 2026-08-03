@@ -63,6 +63,7 @@ function createPrismaClient() {
     ? rawUrl.replace(/^mysql:\/\//, "mariadb://")
     : "mariadb://build:build@127.0.0.1:3306/mingyuan"
   const url = new URL(connectionString)
+  const isProduction = env.NODE_ENV === "production"
   const adapter = new PrismaMariaDb({
     host: url.hostname,
     port: parseInt(url.port || "3306"),
@@ -73,7 +74,11 @@ function createPrismaClient() {
     connectionLimit: 20,
     idleTimeout: 30000,
     connectTimeout: 5000,
-    allowPublicKeyRetrieval: true,
+    // 安全：allowPublicKeyRetrieval 仅在非生产（本地 Docker MySQL 无 TLS）开启。
+    // 生产环境走 TLS（rejectUnauthorized），避免在不可信网络上从服务器获取公钥，
+    // 降低中间人风险。
+    allowPublicKeyRetrieval: !isProduction,
+    ssl: isProduction ? { rejectUnauthorized: true } : undefined,
   })
   return new PrismaClient({ adapter })
 }

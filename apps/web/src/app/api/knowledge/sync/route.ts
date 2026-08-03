@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { obsidianSyncBodySchema } from "@/features/knowledge/contracts/api"
 import { isKnowledgeCategory } from "@/lib/knowledge-categories"
+import { safeSecretEqual } from "@/lib/aim/work-item-api-auth"
 
 /**
  * @description 处理 POST 请求
@@ -23,7 +24,8 @@ export async function POST(request: NextRequest) {
   }
   const authHeader = request.headers.get("x-obsidian-token")
 
-  if (!authHeader || authHeader !== syncToken) {
+  // 常量时间比对，防时序侧信道（与 cron secret / work-item 鉴权同惯例）。
+  if (!authHeader || !safeSecretEqual(authHeader, syncToken)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
