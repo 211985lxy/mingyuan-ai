@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, BrainCircuit, BookOpen } from "lucide-react"
+import { Loader2, Plus, Search, BrainCircuit, BookOpen, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProjectKnowledgeAssetHealth } from "@/components/projects/project-knowledge-asset-health"
 import { CustomerKnowledgeEntryDialog } from "@/features/knowledge/components/customer-knowledge-entry-dialog"
+import { CustomerSmartImportDialog } from "@/features/knowledge/components/customer-smart-import-dialog"
 import { ExternalAiMemoryImportDialog } from "@/features/knowledge/components/external-ai-memory-import-dialog"
 import { CustomerKnowledgeEntryCard } from "@/features/knowledge/components/customer-knowledge-entry-card"
 import { useCustomerKnowledgeWorkspace } from "@/features/knowledge/hooks/use-customer-knowledge-workspace"
@@ -106,7 +107,10 @@ export function CustomerKnowledgeWorkspace() {
           ))}
 
           <div className="border-t border-border/40 pt-3">
-            <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={ws.openCreate}>
+            <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={ws.openSmartImport}>
+              <Upload className="mr-1.5 h-3.5 w-3.5" />拖文件入库
+            </Button>
+            <Button variant="ghost" size="sm" className="mt-1 w-full justify-start text-muted-foreground" onClick={ws.openCreate}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />手动一条
             </Button>
             <Button variant="ghost" size="sm" className="mt-1 w-full justify-start text-muted-foreground" onClick={ws.openMemoryImport}>
@@ -126,10 +130,16 @@ export function CustomerKnowledgeWorkspace() {
               装账户原料——写稿去创作台，两边不重复。
             </p>
           </div>
-          <Button onClick={() => void openAccountMaterials()} disabled={busy || ws.ensuringAccount} size="sm">
-            {(busy || ws.ensuringAccount) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
-            塞一条经验进去
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={ws.openSmartImport}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              拖文件入库
+            </Button>
+            <Button onClick={() => void openAccountMaterials()} disabled={busy || ws.ensuringAccount} size="sm">
+              {(busy || ws.ensuringAccount) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
+              塞一条经验进去
+            </Button>
+          </div>
         </div>
 
         {/* 资产健康 */}
@@ -193,10 +203,20 @@ export function CustomerKnowledgeWorkspace() {
             <Button variant="outline" size="sm" className="mt-2" onClick={() => void ws.load()}>重试</Button>
           </div>
         ) : ws.visibleEntries.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/60 py-20 text-center">
+          <div className="rounded-lg border border-dashed border-border/60 py-16 text-center">
             <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/40" />
             <p className="mt-3 text-sm font-medium">还没有符合条件的知识</p>
-            <p className="mt-1 text-sm text-muted-foreground">先装几条老板经验、产品卖点或客户案例。</p>
+            <p className="mt-1 text-sm text-muted-foreground">可以拖文件进来自动清洗入库，或手动写一条。</p>
+            <div className="mt-4 flex justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={ws.openSmartImport}>
+                <Upload className="mr-1.5 h-4 w-4" />
+                拖文件入库
+              </Button>
+              <Button size="sm" onClick={ws.openCreate}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                手动一条
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-2">
@@ -230,6 +250,13 @@ export function CustomerKnowledgeWorkspace() {
         projects={ws.projects}
         defaultProjectId={memoryDefaultProjectId}
         onOpenChange={ws.setMemoryImportOpen}
+        onImported={() => void ws.load()}
+      />
+      <CustomerSmartImportDialog
+        open={ws.smartImportOpen}
+        projects={ws.projects}
+        defaultProjectId={memoryDefaultProjectId}
+        onOpenChange={ws.setSmartImportOpen}
         onImported={() => void ws.load()}
       />
     </div>

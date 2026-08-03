@@ -22,6 +22,7 @@ export function useCustomerKnowledgeMutations(input: {
   const [saving, setSaving] = useState(false)
   const [archivingId, setArchivingId] = useState<string | null>(null)
   const [memoryImportOpen, setMemoryImportOpen] = useState(false)
+  const [smartImportOpen, setSmartImportOpen] = useState(false)
 
   function openCreate() {
     setDialogMode("create")
@@ -35,6 +36,10 @@ export function useCustomerKnowledgeMutations(input: {
 
   function openMemoryImport() {
     setMemoryImportOpen(true)
+  }
+
+  function openSmartImport() {
+    setSmartImportOpen(true)
   }
 
   function openEdit(entry: KnowledgeEntry) {
@@ -84,8 +89,11 @@ export function useCustomerKnowledgeMutations(input: {
     archivingId,
     memoryImportOpen,
     setMemoryImportOpen,
+    smartImportOpen,
+    setSmartImportOpen,
     openCreate,
     openMemoryImport,
+    openSmartImport,
     openEdit,
     handleSave,
     handleArchive,

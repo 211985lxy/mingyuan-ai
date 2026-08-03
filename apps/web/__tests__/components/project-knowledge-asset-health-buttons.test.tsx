@@ -53,6 +53,9 @@ describe("ProjectKnowledgeAssetHealth buttons", () => {
     }
 
     await user.click(screen.getAllByRole("button", { name: /待补充/ })[0])
+    expect(screen.getByRole("heading", { name: "补录IP资产" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "拖文件入库" })).toBeInTheDocument()
+    expect(screen.queryByText(/表达风格/)).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "写入知识库" }))
     expect(toast.error).toHaveBeenCalledWith("请填写标题和内容")
     expect(createKnowledge).not.toHaveBeenCalled()

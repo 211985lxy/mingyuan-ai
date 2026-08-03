@@ -2759,6 +2759,32 @@
       "idempotency": false
     },
     {
+      "route": "/api/knowledge/smart-import/confirm",
+      "file": "src/app/api/knowledge/smart-import/confirm/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/knowledge/smart-import",
+      "file": "src/app/api/knowledge/smart-import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/knowledge/sync",
       "file": "src/app/api/knowledge/sync/route.ts",
       "methods": [

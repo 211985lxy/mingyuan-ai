@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
+import { Loader2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -15,11 +15,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { KNOWLEDGE_UPLOAD_ACCEPT } from "@/features/knowledge/admin-knowledge-shared"
 import {
   createKnowledge,
   fetchKnowledgeAssetHealth,
 } from "@/lib/api/knowledge"
-import { CATEGORY_LABELS, type KnowledgeCategory } from "@/lib/knowledge-categories"
+import type { KnowledgeCategory } from "@/lib/knowledge-categories"
 import {
   HEALTH_STATUS_LABELS,
   getSupplementPrompts,
@@ -67,6 +68,8 @@ export function ProjectKnowledgeAssetHealth({
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const [allReady, setAllReady] = useState(false)
   const [form, setForm] = useState({
     category: "positioning_material" as KnowledgeCategory,
@@ -75,6 +78,7 @@ export function ProjectKnowledgeAssetHealth({
     prompts: [] as string[],
   })
   const lastGapRequest = useRef(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -130,6 +134,54 @@ export function ProjectKnowledgeAssetHealth({
     onAllReady?.()
     toast.message("五盒资料已齐，可直接写稿，或继续新增知识。")
   }, [allReady, onAllReady])
+
+  async function fillFormFromFiles(files: File[]) {
+    if (files.length === 0 || importing) return
+    setImporting(true)
+    setDragOver(false)
+    try {
+      const formData = new FormData()
+      for (const file of files) formData.append("files", file)
+      formData.append("projectId", projectId)
+      const response = await fetch("/api/knowledge/smart-import", {
+        method: "POST",
+        body: formData,
+      })
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "解析失败" }))
+        throw new Error(typeof error.error === "string" ? error.error : "解析失败")
+      }
+      const payload = await response.json() as {
+        data?: {
+          processed?: Array<{
+            suggestedTitle?: string
+            originalText?: string
+          }>
+        }
+      }
+      const first = payload.data?.processed?.[0]
+      const originalText = first?.originalText?.trim()
+      if (!originalText) {
+        throw new Error("没从文件里读出可用正文")
+      }
+      setForm((current) => ({
+        ...current,
+        title: (first?.suggestedTitle || files[0]?.name.replace(/\.[^.]+$/, "") || current.title).slice(0, 200),
+        content: originalText,
+      }))
+      toast.success("已填进下方表单，确认后点写入知识库")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "文件解析失败")
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setDragOver(false)
+    void fillFormFromFiles(Array.from(event.dataTransfer.files ?? []))
+  }
 
   async function handleSave() {
     const title = form.title.trim()
@@ -220,9 +272,7 @@ export function ProjectKnowledgeAssetHealth({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              补录「{CATEGORY_LABELS[form.category] ?? form.category}」
-            </DialogTitle>
+            <DialogTitle>补录IP资产</DialogTitle>
             <DialogDescription>
               只补当前缺口，写入现有知识库，不另开第二套页面。
             </DialogDescription>
@@ -235,6 +285,62 @@ export function ProjectKnowledgeAssetHealth({
             </ul>
           ) : null}
           <div className="space-y-3">
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="拖文件入库"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  fileInputRef.current?.click()
+                }
+              }}
+              onClick={() => {
+                if (!importing) fileInputRef.current?.click()
+              }}
+              onDragEnter={(event) => {
+                event.preventDefault()
+                setDragOver(true)
+              }}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault()
+                if (event.currentTarget.contains(event.relatedTarget as Node)) return
+                setDragOver(false)
+              }}
+              onDrop={onDrop}
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-3 py-6 text-center transition-colors",
+                dragOver
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border/70 bg-muted/20 text-muted-foreground hover:border-primary/40",
+                importing && "pointer-events-none opacity-70",
+              )}
+            >
+              {importing ? (
+                <Loader2 className="size-5 animate-spin text-primary" />
+              ) : (
+                <Upload className="size-5" />
+              )}
+              <p className="text-sm font-medium text-foreground">
+                {importing ? "正在清洗文件…" : "把文件拖到这里，或点击选择"}
+              </p>
+              <p className="text-[11px]">PDF / Word / TXT / MD 等，先填进下方，再确认写入</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={KNOWLEDGE_UPLOAD_ACCEPT}
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  void fillFormFromFiles(Array.from(event.target.files ?? []))
+                  event.target.value = ""
+                }}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor={`kb-title-${projectId}`}>标题</Label>
               <Input
@@ -258,7 +364,7 @@ export function ProjectKnowledgeAssetHealth({
                 placeholder="把可复用的事实、案例或话术写清楚"
               />
             </div>
-            <Button className="w-full" disabled={saving} onClick={() => void handleSave()}>
+            <Button className="w-full" disabled={saving || importing} onClick={() => void handleSave()}>
               {saving ? <Loader2 className="size-4 animate-spin" /> : null}
               写入知识库
             </Button>
