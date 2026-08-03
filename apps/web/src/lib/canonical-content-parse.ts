@@ -52,7 +52,6 @@ export function parseCanonicalContentSpec(value: unknown): CanonicalContentSpec 
     : "信任"
   const status = input.status === "confirmed" ? "confirmed" : "draft"
   const version = typeof input.version === "number" && input.version >= 0 ? Math.floor(input.version) : 0
-
   const evidence = Array.isArray(input.evidence) ? input.evidence.filter(isEvidenceItem).slice(0, 24) : []
   const knowledgeUsed = Array.isArray(input.knowledgeUsed)
     ? input.knowledgeUsed
@@ -74,7 +73,6 @@ export function parseCanonicalContentSpec(value: unknown): CanonicalContentSpec 
         }))
         .slice(0, 30)
     : []
-
   const mustKeep = Array.isArray(input.mustKeep)
     ? input.mustKeep.filter((item): item is string => typeof item === "string").map((item) => cleanText(item, 200)).filter(Boolean).slice(0, 8)
     : []

@@ -47,6 +47,10 @@ import { sanitizeUntrustedContextText } from "./context-trust"
 import { buildAimSkillBlock, loadAimSkills } from "./skill-loader"
 import { env } from "@/env"
 import { loadGenerationContextBlocks } from "./context/load-generation-blocks"
+import {
+  loadStyleProfileForGenerate,
+  mergeStyleIntoKnowledgeBlock,
+} from "./context/load-style-profile"
 import { resolveMethodologyInjectionForGenerate } from "./context/resolve-methodology-injection"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
@@ -78,6 +82,8 @@ export interface PrepareAimContextInput {
   methodologyProfileIds?: string[]
   /** 高稳路由/TaskSpec LLM 精化开关（默认开；eval 可关） */
   stableRouting?: boolean
+  /** 写作风格显式覆盖：true=强制启用 false=强制禁用。缺省时由规则引擎按意图推断。 */
+  useStyleProfileOverride?: boolean
 }
 
 /**
@@ -99,7 +105,20 @@ export async function prepareAimContext(
   const params = input // alias for readability vs the original
 
   // 1. 项目校验 + 生成意图（与 buildAimGeneration:1430 / 1460 一致）
-  const generationIntent = await checkProjectAndResolveIntent({ spec, agentId, params, trace })
+  let generationIntent = await checkProjectAndResolveIntent({ spec, agentId, params, trace })
+  // 写作风格显式覆盖：用户在创作台切了开关后，优先用用户选定值（true/false 都覆盖）
+  if (typeof params.useStyleProfileOverride === "boolean") {
+    generationIntent = { ...generationIntent, useStyleProfile: params.useStyleProfileOverride }
+    if (trace) {
+      void addAimTraceStep(trace, {
+        key: "style_profile_override",
+        label: "风格开关覆盖",
+        status: "success",
+        summary: params.useStyleProfileOverride ? "用户启用写作风格" : "用户关闭写作风格",
+        metadata: { override: params.useStyleProfileOverride },
+      })
+    }
+  }
 
   // runtimeTask 已由 planner 冻结在 spec；这里直接采用，不二次解析
   // （buildAimGeneration 接受 params.runtimeTask 覆盖；v2 下 planner 是唯一源）。
@@ -114,8 +133,20 @@ export async function prepareAimContext(
     businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock, ipWikiPages,
   } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, trace })
 
+  // 3.1 写作风格档案（与 chat retrieveChatContextBlocks 对齐；此前 generate 正门未接通）
+  const styleBlock = await loadStyleProfileForGenerate({
+    userId: params.userId,
+    projectId: spec.projectId,
+    useStyleProfile: generationIntent.useStyleProfile,
+    contextOverride: params.contextOverride,
+    trace,
+  })
+
   // 3.2 有界工具环：先查再写（仅 executionPolicy.mode=bounded_tool_loop；eval override 跳过）
-  let knowledgeBlock = knowledgeCtx.knowledgeBlock
+  let knowledgeBlock = mergeStyleIntoKnowledgeBlock(
+    knowledgeCtx.knowledgeBlock,
+    styleBlock,
+  )
   if (spec.executionPolicy.mode === "bounded_tool_loop" && !params.contextOverride) {
     const loopResult = await runAimTraceStep(
       trace,
@@ -221,6 +252,7 @@ export async function prepareAimContext(
     ipWikiBlock: budgeted.blocks.ipWikiBlock,
     viralStructureBlock: budgeted.blocks.viralStructureBlock,
     selectedMethodologyBlock: budgeted.blocks.selectedMethodologyBlock,
+    styleProfileBlock: styleBlock,
     skills,
     taskSpec: taskSpecWithPlan,
   })
@@ -311,7 +343,11 @@ async function checkProjectAndResolveIntent(input: {
     },
     (intent) => ({
       summary: intent.mode,
-      metadata: { useKnowledge: intent.useKnowledge, useMethodology: intent.useMethodology },
+      metadata: {
+        useKnowledge: intent.useKnowledge,
+        useMethodology: intent.useMethodology,
+        useStyleProfile: intent.useStyleProfile,
+      },
     }),
   )
 }

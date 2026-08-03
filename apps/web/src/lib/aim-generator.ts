@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { buildAimGeneration } from "./aim-agent-handlers"
 import { stripAimFormatMarkers } from "./aim/format-marker-cleanup"
+import { scrubPromptLeakageFromBody } from "./aim-generation-text"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import type { ContentScenario } from "@/lib/content-scenario-config"
@@ -49,6 +50,8 @@ export interface AimInput {
   confirmedTurnIntent?: import("@/lib/aim-turn-intent").AimTurnIntent
   /** 发布质检官模式 */
   reviewMode?: import("@/features/newsroom/contracts").ContentReviewMode
+  /** 写作风格显式覆盖：true=强制启用 false=强制禁用。透传到 buildAimGeneration → prepareAimContext。 */
+  useStyleProfileOverride?: boolean
 }
 
 function asStringArray(value: unknown): string[] {
@@ -169,16 +172,18 @@ export function parseMultiFormatResponse(
     const contentStart = start + marker.length
     const end = nextMarker ? raw.indexOf(nextMarker) : raw.length
 
-    // 切片后清除模型可能在末尾自加的格式收尾标记（如 ===END FORMAT===），避免泄漏进成稿。
-    result[format] = stripAimFormatMarkers(raw.substring(
-      contentStart,
-      end === -1 ? undefined : end
-    ))
+    // 切片后清除模型可能在末尾自加的格式收尾标记（如 ===END FORMAT===），再做防御性提词泄漏清洗。
+    result[format] = scrubPromptLeakageFromBody(
+      stripAimFormatMarkers(raw.substring(
+        contentStart,
+        end === -1 ? undefined : end
+      )),
+    )
   }
 
   if (!Object.values(result).some(Boolean) && formats.length === 1) {
-    // 单格式且未命中标记时回落为整段，同样清除可能残留的格式标记。
-    result[formats[0]] = stripAimFormatMarkers(raw)
+    // 单格式且未命中标记时回落为整段：清标记 + 提词泄漏防御。
+    result[formats[0]] = scrubPromptLeakageFromBody(stripAimFormatMarkers(raw))
   }
 
   return result
@@ -215,5 +220,6 @@ export async function generateAimContent(input: AimInput) {
     methodologyProfileIds: input.methodologyProfileIds,
     confirmedTurnIntent: input.confirmedTurnIntent,
     reviewMode: input.reviewMode,
+    useStyleProfileOverride: input.useStyleProfileOverride,
   })
 }

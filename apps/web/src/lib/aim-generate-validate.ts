@@ -57,6 +57,8 @@ export interface ParseGenerateBodyResult {
   confirmedTurnIntent: AimTurnIntent | undefined
   /** 发布质检官模式：报告 / 改稿 */
   reviewMode: "review_report" | "editor_revise" | undefined
+  /** 写作风格显式覆盖：true=强制启用 false=强制禁用 */
+  useStyleProfileOverride: boolean | undefined
 }
 
 /**
@@ -141,6 +143,10 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
     reviewMode:
       body.reviewMode === "editor_revise" || body.reviewMode === "review_report"
         ? body.reviewMode
+        : undefined,
+    useStyleProfileOverride:
+      typeof body.useStyleProfileOverride === "boolean"
+        ? body.useStyleProfileOverride
         : undefined,
   }
 }

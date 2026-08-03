@@ -292,6 +292,8 @@ type AimGenerationInput = Omit<
 > & {
   /** ADR-002：显式选择的命名方法论 profile id（透传到 prepareAimContext 解析）。 */
   methodologyProfileIds?: string[]
+  /** 写作风格显式覆盖：true=强制启用 false=强制禁用。透传到 prepareAimContext。 */
+  useStyleProfileOverride?: boolean
 }
 
 function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
@@ -377,6 +379,7 @@ export async function buildAimGeneration(
     contentScenario: params.contentScenario,
     contextOverride: params.contextOverride,
     methodologyProfileIds: params.methodologyProfileIds,
+    useStyleProfileOverride: params.useStyleProfileOverride,
   })
   const generationMode = resolveGenerationConversationMode(agentId, params)
   const taskSpec = withCopyStudioExecution(

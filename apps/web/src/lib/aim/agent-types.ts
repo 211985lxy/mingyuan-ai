@@ -131,6 +131,8 @@ export interface AimGenerationContextOverride {
   businessDiagnosisBlock?: string
   ipWikiBlock?: string
   eventStorytellingBlock?: string
+  /** Eval-only：冻结写作风格档案；缺省则 generate 不注入风格 */
+  styleProfileBlock?: string
 }
 
 export interface AimGenerateResponse {

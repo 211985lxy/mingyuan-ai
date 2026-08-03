@@ -61,6 +61,8 @@ export interface AimPromptComposerProps {
   onPastedCopyChange?: (next: PastedCopyAttachment | null) => void
   onStyleSampleRequest?: (attachment: PastedCopyAttachment) => void
   styleEnabled?: boolean
+  styleAvailable?: boolean
+  onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   capabilities?: AimAgentCapabilities
 }
@@ -84,6 +86,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
     skills: props.skills ?? [],
     composerMode: props.composerMode ?? "direct",
     styleEnabled: props.styleEnabled ?? false,
+    styleAvailable: props.styleAvailable ?? false,
     ...all.state,
     ...all.local,
     ...all.extra,
@@ -177,7 +180,9 @@ interface AimPromptComposerViewProps {
   primaryActionLabel: string
   showAddMenu: boolean
   styleEnabled: boolean
+  styleAvailable: boolean
   capabilities: AimAgentCapabilities
+  onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   onStartRecording: () => void
   onStopRecording: () => void
@@ -253,7 +258,9 @@ function AimPromptComposerView(p: AimPromptComposerViewProps) {
         primaryActionLabel={p.primaryActionLabel}
         showAddMenu={p.showAddMenu}
         styleEnabled={p.styleEnabled}
+        styleAvailable={p.styleAvailable}
         capabilities={p.capabilities}
+        onToggleStyleEnabled={p.onToggleStyleEnabled}
         onOpenStyleAssets={p.onOpenStyleAssets}
         onStartRecording={p.onStartRecording}
         onStopRecording={p.onStopRecording}

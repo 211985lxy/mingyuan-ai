@@ -174,6 +174,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     taskSpec,
     confirmedTurnIntent: parsed.confirmedTurnIntent,
     reviewMode: parsed.reviewMode,
+    useStyleProfileOverride: parsed.useStyleProfileOverride,
   }))
 }
 

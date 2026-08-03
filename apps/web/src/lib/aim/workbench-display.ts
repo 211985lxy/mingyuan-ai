@@ -1,4 +1,5 @@
 import type { ContentFormat } from "@/lib/api/client"
+import { scrubPromptLeakageFromBody } from "@/lib/aim-generation-text"
 
 export const AIM_FORMAT_LABELS: Record<ContentFormat, string> = {
   video_script: "口播文案",
@@ -41,10 +42,10 @@ export function getAimWorkflowStatusLabel(status?: string | null) {
  */
 export function splitAimMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
-  if (!match) return { methodNote: "", result: normalizeScriptBodySpacing(content) }
+  if (!match) return { methodNote: "", result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(content)) }
   return {
     methodNote: match[1].trim(),
-    result: normalizeScriptBodySpacing(content.replace(match[0], "")),
+    result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(content.replace(match[0], ""))),
   }
 }
 
@@ -58,7 +59,7 @@ export function normalizeScriptBodySpacing(text: string): string {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
-  return compactShortScriptParagraphs(collapsed)
+  return compactShortScriptParagraphs(scrubPromptLeakageFromBody(collapsed))
 }
 
 const SHORT_SCRIPT_PARAGRAPH_CHARS = 40

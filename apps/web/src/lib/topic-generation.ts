@@ -371,7 +371,6 @@ export async function generateTopicCards(
   const maxAttempts = 3
   const recentTitles = input.recentTitles ?? []
   const { refreshCount, selectedCodes, strategy } = selectTopicElements(input)
-
   if (selectedCodes.length < 2) {
     return { success: false, error: "Could not sample enough non-conflicting elements" }
   }
