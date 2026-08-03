@@ -13,6 +13,7 @@ import {
   resolveContentProducerProgressiveFlags,
   type ContentProducerProgressiveFlags,
 } from "@/lib/aim/progressive-prompt-flags"
+import { stripViralToolkitFromMethodology } from "@/lib/ip-copywriting-methodology"
 import type { ContentFormat } from "./aim-generator"
 
 export type { ContentProducerProgressiveFlags }
@@ -167,6 +168,7 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     includeHighRisk: params.includeHighRisk ?? inferred.includeHighRisk,
     includeBenchmark: params.includeBenchmark ?? inferred.includeBenchmark,
     includeOperatingLogicFull: params.includeOperatingLogicFull ?? false,
+    includeViralToolkit: inferred.includeViralToolkit,
   }
 
   const progressiveBlocks = [
@@ -179,8 +181,13 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
       : "",
   ].filter(Boolean)
 
-  const methodologySection = params.methodologyBlock
-    ? `${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}${METHODOLOGY_INJECTION_PREFACE}\n${params.methodologyBlock}`
+  // 专家技能包按需注入：未命中意图时剥离爆款开头库/19条法则等，只保留 DB 方法论。
+  const effectiveMethodology = flags.includeViralToolkit
+    ? params.methodologyBlock
+    : stripViralToolkitFromMethodology(params.methodologyBlock)
+
+  const methodologySection = effectiveMethodology
+    ? `${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}${METHODOLOGY_INJECTION_PREFACE}\n${effectiveMethodology}`
     : params.selectedMethodologyBlock || ""
 
   return `你是一个身经百战的「太极营销创意总监」，正与企业老板（用户）面对面进行爆款营销文案创意碰撞与思路对齐。
@@ -231,6 +238,7 @@ export function measureContentProducerPromptFootprint(opts?: {
     includeHighRisk: false,
     includeBenchmark: false,
     includeOperatingLogicFull: false,
+    includeViralToolkit: false,
     ...opts?.flags,
   }
   const alwaysOnPrompt = buildContentProducerChatPrompt({
@@ -270,9 +278,9 @@ const BUZZWORD_BAN_LINE = "- 禁止使用以下词汇：赋能、闭环、抓手
 const VIDEO_SCRIPT_INSTRUCTION = `【口播文案】
 要求：
 - 用户未指定时长时，默认写成约2分钟的完整口播（约400-500个汉字，禁止超过约550个有效字符）；用户明确要求3-5分钟长口播时，按正常语速完整展开到约600-1000个汉字。时长和篇幅是交付门槛，必须同时避免过短和超时；优先服从用户明确的字数、时长或保持体量要求；如果是对标改写，按对标原文的信息密度和篇幅完整改写，禁止压缩成摘要
-- 开头3秒必须使用下方「爆款开头库」中的一种公式思路，不能平铺直叙
-- 正文必须使用下方「爆款文案结构库」中的一种结构节拍
-- 结尾必须使用下方「结尾类型库」中的一种方式
+- 开头3秒优先有冲突/反差/痛点/好奇，避免平铺直叙；若下方已注入「爆款开头库」可参考其中公式思路
+- 正文按问题→判断→案例→行动的自然节拍推进；若下方已注入「爆款文案结构库」可参考其结构
+- 结尾自然收束或给一个轻行动；若下方已注入「结尾类型库」可参考其方式
 - 只输出纯口播文案正文，不要写画面、镜头、动作、字幕、音效或分镜说明
 - 禁止出现【画面】【旁白】【镜头】【字幕】等任何分镜标签
 ${RHYTHM_RULE_LINE}

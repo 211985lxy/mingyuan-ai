@@ -28,6 +28,7 @@ import {
 } from "./aim-content-creation-trace"
 import { getMaterialAnchorsFromTaskSpec } from "@/features/newsroom/services/build-source-brief"
 import { buildGoalRewritePromptAppendix, verifyMethodologyGoal } from "@/lib/methodology/goal-verifier"
+import { stripViralToolkitFromMethodology } from "@/lib/ip-copywriting-methodology"
 import {
   buildGroundedNumericClaimRule,
   buildGenerationSafetyRetryPrompt,
@@ -385,15 +386,17 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     forGenerate: true,
   })
 
+  // 专家技能包按需注入：未命中意图时剥离爆款开头库/19条法则等，削减 token 过载。
+  const effectiveMethodology = progressive.includeViralToolkit
+    ? context.methodologyBlock : stripViralToolkitFromMethodology(context.methodologyBlock)
+
   // 上下文按优先级：TaskSpec 由 user prompt 注入；IP Wiki / 知识为事实素材；
   // IP 操盘方法论为强参考（结构/钩子/判断标准必须执行）；爆款库仍为弱参考。
   const contextBlocks = [
     context.ipWikiBlock ? `客户 IP 专属档案（仅当前项目，高优先级事实）：\n${context.ipWikiBlock}` : "",
     context.knowledgeBlock ? `当前客户项目知识库（高相关事实条目）：\n${context.knowledgeBlock}` : "",
     context.selectedMethodologyBlock ? `公共指定方法论（强参考，只决定怎么写）：\n${context.selectedMethodologyBlock}` : "",
-    context.methodologyBlock
-      ? `${METHODOLOGY_INJECTION_PREFACE}\n${context.methodologyBlock}`
-      : "",
+    effectiveMethodology ? `${METHODOLOGY_INJECTION_PREFACE}\n${effectiveMethodology}` : "",
     context.businessDiagnosisBlock ? `商业诊断方法（弱参考）：\n${context.businessDiagnosisBlock}` : "",
     context.eventStorytellingBlock ? `事件叙事方法：\n${context.eventStorytellingBlock}` : "",
     context.viralStructureBlock ? `爆款结构库（弱参考）：\n${context.viralStructureBlock}` : "",
@@ -406,11 +409,9 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     "2. 如果用户提供对标文案或爆款文案拆解，先锁定它的核心选题，只学习开头方式、结构节奏、表达密度和转化设计，不照抄具体表达。",
     "3. IP特色、企业知识库、产品卖点和项目案例只能用于替换案例、身份表达、承接动作和语言风格，不能把核心选题改成另一个主题。",
     "4. 如果用户提供公众号长文，优先提炼其中最适合短视频传播的一个核心观点，不要把整篇文章压缩成流水账。",
-    "5. 开头必须单独优化：用冲突、反差、痛点、利益或好奇心打开，避免平铺直叙。",
-    "6. 正文必须单独优化结构：按问题、判断、案例、行动或反差递进组织，让用户能听懂、能拍摄、能转化。",
-    `7. ${knowledgeUseRule}`,
-    "8. 如果上下文包含垂类行业热点，只能自然融合和业务相关的部分，禁止硬蹭热点。",
-    `9. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}`,
+    `5. ${knowledgeUseRule}`,
+    "6. 如果上下文包含垂类行业热点，只能自然融合和业务相关的部分，禁止硬蹭热点。",
+    `7. ${CONTENT_PRODUCER_OPERATING_LOGIC_RULE}`,
     AIM_SESSION_PRIORITY_RULES,
   ].join("\n")
 

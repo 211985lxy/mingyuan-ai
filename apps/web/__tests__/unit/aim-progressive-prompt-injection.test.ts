@@ -76,4 +76,28 @@ describe("progressive content producer prompts", () => {
     expect(footprint.progressiveChars).toBe(0)
     expect(footprint.alwaysOnChars).toBeLessThanOrEqual(Math.floor(LEGACY_ALWAYS_ON_CHARS * 0.7))
   })
+
+  const METHODOLOGY_WITH_TOOLKIT =
+    "DB方法论片段\n\n=== 文案写作核心方法论补充 ===\n七大爆款开头：\n1. 好奇类：XX是一种什么体验。"
+
+  it("viral toolkit stripped when intent not matched (plain copy request)", () => {
+    const prompt = buildContentProducerChatPrompt({
+      knowledgeBlock: "",
+      methodologyBlock: METHODOLOGY_WITH_TOOLKIT,
+      ipWikiBlock: "",
+      rawInput: "写个口播文案讲讲怎么用AI做获客",
+    })
+    expect(prompt).not.toContain("七大爆款开头")
+    expect(prompt).not.toContain("=== 文案写作核心方法论补充 ===")
+  })
+
+  it("viral toolkit injected when user asks to optimize opening", () => {
+    const prompt = buildContentProducerChatPrompt({
+      knowledgeBlock: "",
+      methodologyBlock: METHODOLOGY_WITH_TOOLKIT,
+      ipWikiBlock: "",
+      rawInput: "帮我优化开头，用爆款开头库的公式",
+    })
+    expect(prompt).toContain("七大爆款开头")
+  })
 })

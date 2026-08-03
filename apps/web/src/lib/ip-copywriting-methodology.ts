@@ -1,6 +1,12 @@
 import { getMethodologyBlock } from "@/lib/agent-methodology-store"
 
-const COPYWRITING_CORE_METHODOLOGY = `
+/**
+ * 专家技能包：爆款开头库 / 19条法则 / 5A框架 / 人设视频框架 / 私域承接 / 获客脚本规范 / 去AI味质检。
+ *
+ * 这是"调用技能时才该上的"深度方法论，不应每次生成都全量灌进 prompt。
+ * 通过 includeViralToolkit 开关按需注入；关闭时由 stripViralToolkitFromMethodology 剥离。
+ */
+export const COPYWRITING_CORE_METHODOLOGY = `
 === 文案写作核心方法论补充 ===
 当用户要求优化开头、前 3 秒、第一句话、钩子、起手或开场时，必须调用七大爆款开头库，不要只做同义词替换。
 
@@ -41,12 +47,25 @@ Aware 看见：用热点、痛点、反差让目标人群先停下来。Appeal �
 /**
  * IP 操盘方法论块（DB 优先 + 文件兜底 + 编辑即时生效）。
  * 实际加载逻辑统一收敛到 agent-methodology-store。
- */
-/**
- * @description 构建ipcopywritingmethodologyblock
- * @returns Promise<string>
+ *
+ * 返回值 = DB方法论 + 专家技能包（COPYWRITING_CORE_METHODOLOGY）。
+ * 组装层通过 includeViralToolkit 开关决定是否剥离专家包。
  */
 export async function buildIpCopywritingMethodologyBlock(): Promise<string> {
   const block = await getMethodologyBlock("ip_copywriting")
   return `${block}\n\n${COPYWRITING_CORE_METHODOLOGY}\n`
+}
+
+/** 专家技能包的标记头，用于在组装层精确剥离。 */
+const VIRAL_TOOLKIT_MARKER = "=== 文案写作核心方法论补充 ==="
+
+/**
+ * 从方法论块中剥离专家技能包（爆款开头库/19条法则/5A框架等）。
+ * 当 includeViralToolkit=false 时调用，只保留 DB 方法论，大幅削减 token。
+ */
+export function stripViralToolkitFromMethodology(methodologyBlock: string): string {
+  if (!methodologyBlock) return methodologyBlock
+  const idx = methodologyBlock.indexOf(VIRAL_TOOLKIT_MARKER)
+  if (idx === -1) return methodologyBlock
+  return methodologyBlock.slice(0, idx).replace(/\n{2,}$/, "\n").trimEnd()
 }
