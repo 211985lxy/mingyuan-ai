@@ -101,16 +101,11 @@ describe("AIM fast spoken generation budget", () => {
     expect(mocks.execute.mock.calls[1]?.[2]).not.toContain("正文目标是 400-500")
   })
 
-  it("rewrites an overlong two-minute script within the delivery bound", async () => {
-    mocks.execute
-      .mockResolvedValueOnce({
-        content: `===FORMAT:video_script===\n${"这是明显超过时长但没有句间停顿的完整口播内容".repeat(60)}。`,
-        finishReason: "stop",
-      })
-      .mockResolvedValueOnce({
-        content: `===FORMAT:video_script===\n${"这是面向企业老板的完整口播，讲清问题、判断和行动。".repeat(18)}`,
-        finishReason: "stop",
-      })
+  it("delivers an overlong two-minute script after deterministic trimming without retry", async () => {
+    mocks.execute.mockResolvedValueOnce({
+      content: `===FORMAT:video_script===\n${"这是明显超过时长但没有句间停顿的完整口播内容".repeat(60)}。`,
+      finishReason: "stop",
+    })
 
     await expect(executeGenerateLLMWithBenchmarkRetry(
       "content_producer",
@@ -119,11 +114,7 @@ describe("AIM fast spoken generation budget", () => {
       context(AIM_FAST_SPOKEN_ROUTE_KEY),
       ["video_script"],
     )).resolves.toBeDefined()
-    expect(mocks.execute).toHaveBeenCalledTimes(2)
-    expect(mocks.execute.mock.calls[1]?.[2]).toContain("篇幅过长")
-    expect(mocks.execute.mock.calls[1]?.[2]).toContain("目标是 400-500 个有效字符")
-    expect(mocks.execute.mock.calls[1]?.[2]).toContain("验收范围是 330-550")
-    expect(mocks.execute.mock.calls[1]?.[3]).toMatchObject({ temperature: 0.2 })
+    expect(mocks.execute).toHaveBeenCalledTimes(1)
   })
 
   it("fits a complete overlong script by whole sentences without dropping delivery anchors", () => {

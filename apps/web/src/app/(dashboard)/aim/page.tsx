@@ -44,7 +44,9 @@ import { runBatchReplicateSend } from "@/lib/aim/run-batch-replicate-send"
 import { fetchStyleStatus } from "@/lib/api/aim"
 
 export default function AimPage() {
-  const w = useAimWorkbench()
+  const [styleEnabled, setStyleEnabled] = useState(false)
+  const [styleAvailable, setStyleAvailable] = useState(false)
+  const w = useAimWorkbench({ styleEnabled })
   const router = useRouter()
   const capabilities = useMemo(
     () => getAimAgentCapabilities(w.selectedAgentId),
@@ -53,7 +55,6 @@ export default function AimPage() {
   const [pastedCopy, setPastedCopy] = useState<PastedCopyAttachment | null>(null)
   const [stylePreviewOpen, setStylePreviewOpen] = useState(false)
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
-  const [styleEnabled, setStyleEnabled] = useState(false)
   const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(false)
   const [batchStudioOpen, setBatchStudioOpen] = useState(false)
   const [batchStudioTab, setBatchStudioTab] = useState<BatchTab>("extract")
@@ -115,8 +116,10 @@ export default function AimPage() {
       const status = await fetchStyleStatus({
         projectId: w.projectEnabled ? w.selectedProjectId || undefined : undefined,
       })
-      setStyleEnabled(status.enabled)
+      setStyleAvailable(status.enabled)
+      setStyleEnabled((prev) => status.enabled ? (prev || status.enabled) : false)
     } catch {
+      setStyleAvailable(false)
       setStyleEnabled(false)
     }
   }, [w.projectEnabled, w.selectedProjectId])
@@ -233,6 +236,13 @@ export default function AimPage() {
       router.push(`/projects?focus=style&projectId=${encodeURIComponent(w.selectedProjectId)}`)
     } else { router.push("/projects?focus=style") }
   }
+  const onToggleStyleEnabled = useCallback(() => {
+    setStyleEnabled((prev) => {
+      const next = !prev
+      toast.message(next ? "已启用写作风格，下次生成将沿用你的表达" : "已关闭风格，下次生成使用通用默认风格")
+      return next
+    })
+  }, [])
   const composer = (
     <>
       <AimResearchHint agentId={w.selectedAgentId} />
@@ -257,6 +267,8 @@ export default function AimPage() {
         onPastedCopyChange={capabilities.pasteMode === "plain" ? undefined : setPastedCopy}
         onStyleSampleRequest={capabilities.styleSample ? openStylePreview : undefined}
         styleEnabled={styleEnabled && capabilities.styleSample}
+        styleAvailable={styleAvailable}
+        onToggleStyleEnabled={onToggleStyleEnabled}
         capabilities={capabilities} onOpenStyleAssets={onOpenStyleAssets}
       />
       <AimContextUsage
@@ -402,20 +414,17 @@ export default function AimPage() {
           </>
         )}
       </section>
-
       <AimBenchmarkTopicSearchPanel
         projectId={w.projectEnabled ? w.selectedProjectId || null : null}
         open={benchmarkSearchOpen}
         onOpenChange={setBenchmarkSearchOpen}
       />
-
       <BatchScriptStudio
         open={batchStudioOpen}
         onOpenChange={setBatchStudioOpen}
         initialTab={batchStudioTab}
         projectId={w.projectEnabled ? w.selectedProjectId || null : null}
       />
-
       <AimSkillEditDialog
         open={skillDialogOpen}
         onOpenChange={setSkillDialogOpen}
@@ -430,7 +439,6 @@ export default function AimPage() {
           toast.success("技能已删除")
         }}
       />
-
       <AimStylePreviewDialog
         open={stylePreviewOpen}
         samples={styleSamples}
@@ -441,7 +449,6 @@ export default function AimPage() {
           void refreshStyleStatus()
         }}
       />
-
       {w.wikiDialog.open && w.wikiDialog.context && (
         <IpWikiDialog
           key={w.wikiDialog.context.sourceGenerationId ?? "ip-wiki"}
@@ -449,7 +456,6 @@ export default function AimPage() {
           onClose={() => w.setWikiDialog((prev) => ({ ...prev, open: false }))}
         />
       )}
-
       <WorkflowBriefDialog
         open={w.workflowBriefDialogOpen && !!w.workflowBrief}
         form={w.workflowBriefForm}
@@ -458,7 +464,6 @@ export default function AimPage() {
         onCancel={w.closeWorkflowBriefDialog}
         onConfirm={w.confirmWorkflowBrief}
       />
-
       <WorkflowRecordDialog
         dialog={w.recordDialog}
         busy={w.busy}
@@ -477,7 +482,6 @@ export default function AimPage() {
         onClose={w.closeRecordDialog}
         onSubmit={() => void w.submitRecordDialog()}
       />
-
       <AimProjectAttachDialog
         open={w.projectAttach.open}
         projects={w.projects}

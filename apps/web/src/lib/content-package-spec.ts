@@ -123,7 +123,6 @@ export function buildContentPackageSpec(input: {
   const artifacts: Partial<Record<ContentFormat, string>> = {
     ...(input.previous?.artifacts ?? {}),
   }
-
   for (const format of requested) {
     const content = (input.parsed[format] ?? "").trim()
     if (content.length >= 20) {
@@ -142,7 +141,6 @@ export function buildContentPackageSpec(input: {
       })
     }
   }
-
   const prevCompleted = (input.previous?.completedFormats ?? []).filter(
     (format) => !requested.includes(format as ContentPackageFormat),
   )
@@ -155,7 +153,6 @@ export function buildContentPackageSpec(input: {
     ...prevFailed.filter((item) => !completedFormats.includes(item.format)),
     ...failed,
   ]
-
   const formatMeta: ContentPackageFormatMeta[] = [
     ...(input.previous?.formatMeta ?? []).filter((item) => !requested.includes(item.format as ContentPackageFormat)),
     ...requested.map((format) => ({

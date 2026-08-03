@@ -49,7 +49,8 @@ import { useAimRetroTarget } from "@/features/aim/hooks/use-aim-retro-target"
 /**
  * AIM 工作台总编排：params → hooks → 页面薄装配层。
  */
-export function useAimWorkbench() {
+export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
+  const styleEnabled = options?.styleEnabled
   const router = useRouter()
   const routeSearchParams = useSearchParams()
   const searchParams = useMemo(() => routeSearchParams ?? new URLSearchParams(), [routeSearchParams])
@@ -256,6 +257,7 @@ export function useAimWorkbench() {
     requestAbortRef, pendingScrollMessageIdRef, clearCurrentTaskContext,
     onIsolateTaskSession: isolateTaskSessionExtras,
     openEditorFromResult: syncEditorFromResultProxy, refreshHistory, refreshProjectWorkflow,
+    styleEnabled,
   })
 
   // ---- Workflow actions ----

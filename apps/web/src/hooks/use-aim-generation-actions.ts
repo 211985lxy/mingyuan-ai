@@ -83,6 +83,8 @@ export interface AimGenerationActionInput {
   agentModule?: CopyStudioModule
   /** ADR-002：本次选中的命名方法论 profile id。 */
   selectedMethodologyProfileIds?: string[]
+  /** 写作风格开关：用户显式选择是否启用风格档案。undefined 时由服务端规则推断。 */
+  styleEnabled?: boolean
 }
 
 interface GenerateOptions {
@@ -190,6 +192,8 @@ function buildGenerationRequest(
     } : undefined,
     // 方法论是当前控件偏好，不是上一任务正文；空会话/新任务仍可带上用户已选卡片。
     methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
+    // 写作风格开关：用户显式选择才覆盖；undefined 时服务端规则引擎按意图推断
+    useStyleProfileOverride: input.styleEnabled !== undefined ? input.styleEnabled : undefined,
     confirmedTurnIntent: options.confirmedTurnIntent,
   }
 }

@@ -12,12 +12,16 @@
  *   - contextManifest 含 knowledge 来源 + request 来源（声明式，取代事后反查）
  *   - light_edit 任务：knowledge block 不因 gating 被加载（这里用 contextOverride
  *     直接给定，验证 budget profile 不丢失）
+ *   - 写作风格档案经 styleProfileBlock 并入 knowledge，并记入 manifest
  */
 import { describe, expect, it } from "vitest"
 
 import { prepareAimContext } from "@/lib/aim-harness/context-assembly"
 import { planAimRun } from "@/lib/aim-harness/planner"
 import { AIM_FACT_PRIORITY_RULE } from "@/lib/aim-context-priority"
+import {
+  mergeStyleIntoKnowledgeBlock,
+} from "@/lib/aim-harness/context/load-style-profile"
 import type { PreparedAimContext } from "@/lib/aim-harness/contracts"
 
 function makeSpec(overrides: { rawInput?: string; taskType?: string } = {}) {
@@ -117,5 +121,43 @@ describe("prepareAimContext 装配（阶段 2.2）", () => {
     })
     const reqSource = prepared.contextManifest.find((s) => s.kind === "request")
     expect(reqSource?.charCount).toBe(rawInput.length)
+  })
+
+  it("冻结风格档案并入 knowledge，并记入 style_profile 来源", async () => {
+    const styleProfileBlock = "\n\n=== 写作风格档案（项目风格） ===\n短句、口语、少形容词"
+    const prepared = await prepareAimContext({
+      spec: makeSpec(),
+      userId: "aim-eval",
+      stableRouting: false,
+      contextOverride: {
+        knowledgeBlock: "【知识】护肤成分科普",
+        entries: [],
+        source: "raw",
+        styleProfileBlock,
+      },
+    })
+
+    expect(prepared.blocks.knowledge).toContain("护肤成分科普")
+    expect(prepared.blocks.knowledge).toContain("写作风格档案")
+    expect(prepared.blocks.knowledge).toContain("短句、口语、少形容词")
+
+    const styleSource = prepared.contextManifest.find((s) => s.id === "style_profile")
+    expect(styleSource?.kind).toBe("methodology")
+    expect(styleSource?.charCount).toBe(styleProfileBlock.length)
+  })
+})
+
+describe("mergeStyleIntoKnowledgeBlock", () => {
+  it("风格为空时保持知识原文", () => {
+    expect(mergeStyleIntoKnowledgeBlock("知识块", "")).toBe("知识块")
+    expect(mergeStyleIntoKnowledgeBlock("知识块", "   ")).toBe("知识块")
+  })
+
+  it("仅有风格时直接返回风格", () => {
+    expect(mergeStyleIntoKnowledgeBlock("", "风格块")).toBe("风格块")
+  })
+
+  it("两者都有时风格接在知识后面", () => {
+    expect(mergeStyleIntoKnowledgeBlock("知识块", "风格块")).toBe("知识块\n风格块")
   })
 })

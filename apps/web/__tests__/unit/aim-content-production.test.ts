@@ -174,7 +174,7 @@ describe("AIM content production positioning", () => {
     )).toBe("先从一个小切口稳定产能。\n\n评论领取清单。")
   })
 
-  it("rejects every format when the model reports token truncation", () => {
+  it("rejects genuinely incomplete formats when the model reports token truncation", () => {
     expect(findIncompleteGenerationFormats({
       parsed: {
         video_script: "这是完整句子。",
@@ -184,6 +184,30 @@ describe("AIM content production positioning", () => {
       rawInput: "生成内容",
       finishReason: "length",
     })).toEqual(["video_script", "moments_post"])
+  })
+
+  it("accepts complete spoken scripts even when the model reports token truncation", () => {
+    const completeScript = "这是一段完整的口播文案。".repeat(50)
+    expect(findIncompleteGenerationFormats({
+      parsed: {
+        video_script: completeScript,
+      },
+      targetFormats: ["video_script"],
+      rawInput: "写一条2分钟完整口播",
+      finishReason: "length",
+    })).toEqual([])
+  })
+
+  it("still rejects spoken scripts below the minimum length when truncated", () => {
+    const borderlineScript = "这是一段完整的口播文案。".repeat(25)
+    expect(findIncompleteGenerationFormats({
+      parsed: {
+        video_script: borderlineScript,
+      },
+      targetFormats: ["video_script"],
+      rawInput: "写一条2分钟完整口播",
+      finishReason: "length",
+    })).toEqual(["video_script"])
   })
 
   it("learns shared style from five to ten samples without stitching or copying them", () => {

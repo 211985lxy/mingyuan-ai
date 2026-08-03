@@ -1,7 +1,7 @@
 "use client"
 
 import type { RefObject } from "react"
-import { ListChecks, Loader2, Mic, Plus, Send, Sparkles, Square } from "lucide-react"
+import { ExternalLink, ListChecks, Loader2, Mic, Plus, Send, Sparkles, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
@@ -28,7 +28,9 @@ export function AimActionBar(props: {
   skillQuickOpen?: boolean
   onToggleSkillQuick?: () => void
   styleEnabled: boolean
+  styleAvailable: boolean
   capabilities: AimAgentCapabilities
+  onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   onStartRecording: () => void
   onStopRecording: () => void
@@ -41,7 +43,7 @@ export function AimActionBar(props: {
     busy, isRecording, isTranscribing, isPlanMode, isGenerating, canSubmit, canStop,
     primaryActionLabel, showAddMenu, addMenuOpen, onToggleAddMenu,
     showSkillQuick, skillQuickOpen, onToggleSkillQuick,
-    styleEnabled, capabilities, onOpenStyleAssets,
+    styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets,
     onStartRecording, onStopRecording, onStop, onGenerate,
     fileInputRef, onAddImages,
   } = props
@@ -58,7 +60,9 @@ export function AimActionBar(props: {
         skillQuickOpen={skillQuickOpen}
         onToggleSkillQuick={onToggleSkillQuick}
         styleEnabled={styleEnabled}
+        styleAvailable={styleAvailable}
         capabilities={capabilities}
+        onToggleStyleEnabled={onToggleStyleEnabled}
         onOpenStyleAssets={onOpenStyleAssets}
         isTranscribing={isTranscribing}
         isRecording={isRecording}
@@ -92,7 +96,9 @@ function ActionBarLeft(props: {
   skillQuickOpen?: boolean
   onToggleSkillQuick?: () => void
   styleEnabled: boolean
+  styleAvailable: boolean
   capabilities: AimAgentCapabilities
+  onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   isTranscribing: boolean
   isRecording: boolean
@@ -101,7 +107,7 @@ function ActionBarLeft(props: {
   const {
     busy, fileInputRef, onAddImages, showAddMenu, addMenuOpen,
     onToggleAddMenu, showSkillQuick, skillQuickOpen, onToggleSkillQuick,
-    styleEnabled, capabilities, onOpenStyleAssets,
+    styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets,
     isTranscribing, isRecording, isPlanMode,
   } = props
   return (
@@ -137,16 +143,38 @@ function ActionBarLeft(props: {
           disabled={busy}
         />
       ) : null}
-      {styleEnabled && capabilities.styleSample ? (
-        <button
-          type="button"
-          onClick={onOpenStyleAssets}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/15 bg-gradient-to-r from-primary/[0.07] to-amber-500/[0.04] px-2.5 text-[11px] font-medium text-primary/90 transition-all hover:border-primary/25 hover:from-primary/[0.1] hover:text-primary"
-          title="查看我的表达风格"
-        >
-          <StyleSparkles />
-          我的风格 · 已启用
-        </button>
+      {styleAvailable && capabilities.styleSample ? (
+        <div className="group inline-flex items-center">
+          <button
+            type="button"
+            onClick={onToggleStyleEnabled}
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 rounded-l-full border px-2.5 text-[11px] font-medium transition-all",
+              styleEnabled
+                ? "border-primary/15 bg-gradient-to-r from-primary/[0.07] to-amber-500/[0.04] text-primary/90 hover:border-primary/25 hover:from-primary/[0.1] hover:text-primary"
+                : "border-border/60 bg-card/40 text-muted-foreground hover:border-primary/20 hover:text-foreground",
+            )}
+            title={styleEnabled ? "点击关闭：本次生成不再应用我的表达风格" : "点击开启：生成内容将沿用你的表达风格"}
+          >
+            <StyleSparkles />
+            {styleEnabled ? "我的风格 · 已启用" : "我的风格 · 未启用"}
+          </button>
+          {onOpenStyleAssets ? (
+            <button
+              type="button"
+              onClick={onOpenStyleAssets}
+              className={cn(
+                "inline-flex h-8 items-center rounded-r-full border border-l-0 px-1.5 transition-all",
+                styleEnabled
+                  ? "border-primary/15 bg-gradient-to-r from-amber-500/[0.04] to-primary/[0.05] text-primary/70 hover:text-primary"
+                  : "border-border/60 bg-card/40 text-muted-foreground/70 hover:text-foreground",
+              )}
+              title="查看或管理风格档案"
+            >
+              <ExternalLink className="h-3 w-3" strokeWidth={2} />
+            </button>
+          ) : null}
+        </div>
       ) : null}
       <StatusPill
         isTranscribing={isTranscribing}

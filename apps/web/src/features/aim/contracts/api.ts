@@ -109,6 +109,8 @@ export const aimGenerateBodySchema = z.object({
   writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   traceId: optionalId,
   methodologyProfileIds: methodologyProfileIdsSchema,
+  /** 显式覆盖写作风格开关：true=强制启用 false=强制禁用。缺省时由服务端规则引擎推断 */
+  useStyleProfileOverride: z.boolean().optional(),
   /** 用户确认的本轮意图（生成前确认条回传；有则优先于规则推断） */
   confirmedTurnIntent: z.object({
     summary: z.string().min(1).max(500),

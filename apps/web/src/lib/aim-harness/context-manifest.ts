@@ -58,6 +58,8 @@ export function buildContextManifest(input: {
   ipWikiBlock: string
   viralStructureBlock: string
   selectedMethodologyBlock: string
+  /** 写作风格档案（与 chat 清单 id=style_profile 对齐） */
+  styleProfileBlock?: string
   /** 加载过的 skills；仅当预算后 methodologyBlock 仍含其片段才记入 manifest */
   skills?: LoadedAimSkill[]
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
@@ -88,6 +90,8 @@ export function buildContextManifest(input: {
 
   pushBlockSource(sources, "ip_wiki", "ip_wiki:block", input.ipWikiBlock)
   pushBlockSource(sources, "market_viral", "viral_structure", input.viralStructureBlock)
+  // 与 chat context-assembly 一致：kind=methodology, id=style_profile
+  pushBlockSource(sources, "methodology", "style_profile", input.styleProfileBlock ?? "")
 
   for (const skill of extractSkillsFromBudgetedBlock(
     input.methodologyBlock,

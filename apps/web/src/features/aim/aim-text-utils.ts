@@ -1,6 +1,7 @@
 import type { AimGeneration, ContentFormat } from "@/lib/api/client"
 import { cleanVideoCopyAnalysisMarkdown } from "@/lib/video-copy-display"
 import { FORMAT_LABELS } from "@/features/aim/aim-format-labels"
+import { scrubPromptLeakageFromBody } from "@/lib/aim-generation-text"
 import type { ChatMessage } from "@/features/aim/aim-workbench-types"
 
 /**
@@ -22,10 +23,10 @@ export function extractProgress(content: string): number | null {
  */
 export function splitMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
-  if (!match) return { methodNote: "", result: content }
+  if (!match) return { methodNote: "", result: scrubPromptLeakageFromBody(content).trim() }
   return {
     methodNote: match[1].trim(),
-    result: content.replace(match[0], "").trim(),
+    result: scrubPromptLeakageFromBody(content.replace(match[0], "")).trim(),
   }
 }
 

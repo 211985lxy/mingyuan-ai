@@ -264,7 +264,6 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         overlongFormats,
       }))
     }
-
     const goalVerify = !isLightEdit && methodologyPlan
       ? verifyMethodologyGoal(
           methodologyPlan,
@@ -283,7 +282,6 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       && safety.unsupportedClaimFormats.length === 0
       && safety.lightEditScopeViolationFormats.length === 0
       && incompleteFormats.length === 0
-      && overlongFormats.length === 0
       && goalVerify.ok
       && ipCompliance.ok
     ) {
@@ -291,10 +289,13 @@ export async function executeGenerateLLMWithBenchmarkRetry(
     }
     if (attempt === maxAttempts - 1) {
       if (incompleteFormats.length) {
-        throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
-      }
-      if (overlongFormats.length) {
-        throw new Error("生成结果超过要求时长，已停止交付，请重试本次请求")
+        const hasSubstantialContent = incompleteFormats.every((format) => {
+          const body = (parsed[format] || "").replace(/\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/, "").trim()
+          return body.length >= 80
+        })
+        if (!hasSubstantialContent) {
+          throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
+        }
       }
       if (
         safety.copiedFormats.length
@@ -308,14 +309,14 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       return { completion, parsed, goalVerify, ipCompliance }
     }
 
-    if (incompleteFormats.length || overlongFormats.length) {
+    if (incompleteFormats.length) {
       activePrompt = buildSpokenLengthRetryPrompt({
         userPrompt,
         rawInput: context.rawInput || "",
         parsed,
         targetFormats,
         incompleteFormats,
-        overlongFormats,
+        overlongFormats: [],
       })
     } else if (
       safety.copiedFormats.length

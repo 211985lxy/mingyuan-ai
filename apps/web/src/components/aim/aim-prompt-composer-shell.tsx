@@ -167,7 +167,9 @@ export interface ComposerPanelsAndBarProps {
   primaryActionLabel: string
   showAddMenu: boolean
   styleEnabled: boolean
+  styleAvailable: boolean
   capabilities: AimAgentCapabilities
+  onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   onStartRecording: () => void
   onStopRecording: () => void
@@ -186,8 +188,8 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
     onContentModeChange, showSkills, skills, skillQuery, setSkillQuery,
     filteredSkills, onUseSkill, closeAddMenu, onAddSkill, onEditSkill, fileInputRef,
     isRecording, isTranscribing, isGenerating, canSubmit, canStop,
-    primaryActionLabel, showAddMenu, styleEnabled, capabilities,
-    onOpenStyleAssets, onStartRecording, onStopRecording, onStop, onGenerate,
+    primaryActionLabel, showAddMenu, styleEnabled, styleAvailable, capabilities,
+    onToggleStyleEnabled, onOpenStyleAssets, onStartRecording, onStopRecording, onStop, onGenerate,
   } = props
   return (
     <>
@@ -242,7 +244,9 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
         skillQuickOpen={skillQuickOpen}
         onToggleSkillQuick={toggleSkillQuick}
         styleEnabled={styleEnabled}
+        styleAvailable={styleAvailable}
         capabilities={capabilities}
+        onToggleStyleEnabled={onToggleStyleEnabled}
         onOpenStyleAssets={onOpenStyleAssets}
         onStartRecording={onStartRecording}
         onStopRecording={onStopRecording}
