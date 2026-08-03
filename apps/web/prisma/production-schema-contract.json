@@ -285,7 +285,8 @@
         "crossProjectAllowed",
         "promotedEntryId",
         "promotedAt",
-        "customerOutcomeProjectionId"
+        "customerOutcomeProjectionId",
+        "wikiPageType"
       ]
     },
     {

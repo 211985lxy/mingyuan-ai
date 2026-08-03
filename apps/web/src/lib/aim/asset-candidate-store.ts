@@ -15,6 +15,12 @@ import {
   buildAssetCandidatesFromInsight,
   type AssetCandidateDraft,
 } from "@/lib/aim/asset-candidates"
+import {
+  buildWikiPatchCandidatesFromInsight,
+  type WikiPatchCandidateDraft,
+  WIKI_PATCH_KIND,
+} from "@/lib/aim/wiki-patch-mapper"
+import { applyWikiPatchCandidate } from "@/lib/aim/wiki-patch-apply"
 import type { MeetingInsight } from "@/lib/aim/meeting-insight"
 import { MEETING_INSIGHT_TASK_SPEC_KIND } from "@/lib/aim/meeting-insight-result-sink"
 
@@ -25,6 +31,8 @@ export interface AssetCandidateRecord {
   generationId: string
   feishuRecordId: string | null
   kind: string
+  /** wiki_patch 候选的目标 IP 维基页类型；其他 kind 为 null。 */
+  wikiPageType: string | null
   title: string
   content: string
   evidence: string | null
@@ -167,7 +175,11 @@ export async function generateMeetingAssetCandidates(input: {
     return { ok: false, status: 409, error: "会议洞察数据缺失或损坏，无法生成资产候选。" }
   }
 
-  const drafts = buildAssetCandidatesFromInsight(insight)
+  // 资产候选（→ KnowledgeEntry）+ 维基 patch 候选（→ IP 维基页增量）同节奏生成，
+  // 共享双闸门：审洞察通过后一并产出，候选审批后各自升级。对齐 plan P3。
+  const assetDrafts = buildAssetCandidatesFromInsight(insight)
+  const wikiDrafts = buildWikiPatchCandidatesFromInsight(insight)
+
   const existing = await store.assetCandidate.findMany({
     where: { generationId: generation.id, userId: input.userId },
     take: 500,
@@ -176,7 +188,9 @@ export async function generateMeetingAssetCandidates(input: {
 
   const createdRows: AssetCandidateRecord[] = []
   let skipped = 0
-  for (const draft of drafts) {
+
+  // 资产候选 → KnowledgeEntry 升级路径
+  for (const draft of assetDrafts) {
     const key = `${draft.kind}\u0000${draft.evidence ?? ""}`
     if (existingKeys.has(key)) {
       skipped += 1
@@ -199,6 +213,35 @@ export async function generateMeetingAssetCandidates(input: {
           reviewStatus: "pending",
           crossProjectAllowed: false,
         } satisfies Partial<AssetCandidateRecord> & AssetCandidateDraft,
+      }),
+    )
+  }
+
+  // 维基 patch 候选 → IP 维基页增量合并路径（带 wikiPageType，不升级 KnowledgeEntry）
+  for (const draft of wikiDrafts) {
+    const key = `${draft.kind}\u0000${draft.evidence ?? ""}`
+    if (existingKeys.has(key)) {
+      skipped += 1
+      continue
+    }
+    existingKeys.add(key)
+    createdRows.push(
+      await store.assetCandidate.create({
+        data: {
+          userId: input.userId,
+          projectId,
+          generationId: generation.id,
+          feishuRecordId:
+            typeof taskSpec.workItemRecordId === "string" ? taskSpec.workItemRecordId : null,
+          kind: draft.kind,
+          wikiPageType: draft.wikiPageType,
+          title: draft.title,
+          content: draft.content,
+          evidence: draft.evidence,
+          confidence: draft.confidence,
+          reviewStatus: "pending",
+          crossProjectAllowed: false,
+        } satisfies Partial<AssetCandidateRecord> & WikiPatchCandidateDraft,
       }),
     )
   }
@@ -317,11 +360,27 @@ async function approveAssetCandidate(input: {
   let promotedEntryId = record.promotedEntryId
   let promotedAt = record.promotedAt ?? null
   if (needsPromotion) {
-    const entry = await promoteKnowledgeEntry({
-      store, userId: input.userId, record, crossProjectAllowed,
-    })
-    promotedEntryId = entry.id
-    promotedAt = new Date()
+    if (record.kind === WIKI_PATCH_KIND) {
+      // wiki_patch：应用维基页增量 patch（不升级 KnowledgeEntry），promotedEntryId 标记维基页 id。
+      const patchResult = await applyWikiPatchCandidate({
+        userId: input.userId,
+        projectId: record.projectId,
+        record,
+      })
+      if (!patchResult.ok) {
+        return { ok: false, status: 502, error: patchResult.error }
+      }
+      // applied=false（目标页尚未建立）时用候选 id 占位标记已审，避免重复尝试；
+      // applied=true 用维基页 id。
+      promotedEntryId = patchResult.pageId ?? record.id
+      promotedAt = new Date()
+    } else {
+      const entry = await promoteKnowledgeEntry({
+        store, userId: input.userId, record, crossProjectAllowed,
+      })
+      promotedEntryId = entry.id
+      promotedAt = new Date()
+    }
   } else if (scopeChanged) {
     await syncKnowledgeProjectScope({
       store,
