@@ -22,6 +22,7 @@ interface FakeRow {
   generationId: string
   feishuRecordId: string | null
   kind: string
+  wikiPageType: string | null
   title: string
   content: string
   evidence: string | null
@@ -98,6 +99,7 @@ function makeStore() {
           generationId: String(args.data.generationId),
           feishuRecordId: (args.data.feishuRecordId as string | null) ?? null,
           kind: String(args.data.kind),
+          wikiPageType: (args.data.wikiPageType as string | null) ?? null,
           title: String(args.data.title),
           content: String(args.data.content),
           evidence: (args.data.evidence as string | null) ?? null,
