@@ -132,19 +132,19 @@ export function findIncompleteGenerationFormats(input: {
   finishReason?: string | null
   enforceSpokenLength?: boolean
 }): ContentFormat[] {
-  if (input.finishReason === "length") return [...input.targetFormats]
   const allowsShort = SHORT_OUTPUT_REQUEST.test(input.rawInput)
-  const spokenLengthFloor = requestedSpokenLengthBounds(input.rawInput).min
+  const spokenLengthBounds = requestedSpokenLengthBounds(input.rawInput)
+  const isTruncated = input.finishReason === "length"
 
   return input.targetFormats.filter((format) => {
     const body = (input.parsed[format] || "").replace(METHOD_NOTE_BLOCK, "").trim()
     if (!body) return true
     if (/[，,：:]$/u.test(body)) return true
-    if (input.enforceSpokenLength === false || !isSpokenScriptFormat(format) || allowsShort) return false
+    if (input.enforceSpokenLength === false || !isSpokenScriptFormat(format) || allowsShort) {
+      return isTruncated && body.length < 10
+    }
     const spokenCharacters = countSpokenCharacters(body)
-    // 按用户要求的时长验收有效字数；短于 2 分钟的完整口播不再因为没有句末标点
-    // 被误判为“截断”，模型的 finishReason=length 和时长下限已经覆盖真正截断。
-    return spokenCharacters < spokenLengthFloor
+    return spokenCharacters < spokenLengthBounds.min
   })
 }
 
