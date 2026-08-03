@@ -64,6 +64,9 @@ function createPrismaClient() {
     : "mariadb://build:build@127.0.0.1:3306/mingyuan"
   const url = new URL(connectionString)
   const isProduction = env.NODE_ENV === "production"
+  // 生产机 MySQL 走本机回环时通常未开 TLS；强制 SSL 会导致 pool timeout 并让健康检查失败回滚。
+  // 仅对非本机库启用 TLS。
+  const isLocalMysql = url.hostname === "127.0.0.1" || url.hostname === "localhost"
   const adapter = new PrismaMariaDb({
     host: url.hostname,
     port: parseInt(url.port || "3306"),
@@ -74,11 +77,8 @@ function createPrismaClient() {
     connectionLimit: 20,
     idleTimeout: 30000,
     connectTimeout: 5000,
-    // 安全：allowPublicKeyRetrieval 仅在非生产（本地 Docker MySQL 无 TLS）开启。
-    // 生产环境走 TLS（rejectUnauthorized），避免在不可信网络上从服务器获取公钥，
-    // 降低中间人风险。
-    allowPublicKeyRetrieval: !isProduction,
-    ssl: isProduction ? { rejectUnauthorized: true } : undefined,
+    allowPublicKeyRetrieval: !isProduction || isLocalMysql,
+    ssl: isProduction && !isLocalMysql ? { rejectUnauthorized: true } : undefined,
   })
   return new PrismaClient({ adapter })
 }
