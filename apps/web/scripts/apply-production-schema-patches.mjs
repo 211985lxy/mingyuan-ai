@@ -467,6 +467,8 @@ export const PRODUCTION_SCHEMA_PATCHES = [
   ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
   `ALTER TABLE \`AssetCandidate\`
     ADD COLUMN IF NOT EXISTS \`customerOutcomeProjectionId\` VARCHAR(191) NULL`,
+  `ALTER TABLE \`AssetCandidate\`
+    ADD COLUMN IF NOT EXISTS \`wikiPageType\` VARCHAR(32) NULL`,
 ]
 
 function runMysql(connection, query) {
