@@ -53,7 +53,7 @@ jobs:
       - name: Validate Prisma schema
         run: pnpm --dir apps/web exec prisma validate
       - name: Prepare test database
-        run: pnpm --dir apps/web exec prisma migrate deploy
+        run: pnpm --dir apps/web run test:e2e:prepare
       - name: Lint
         run: pnpm --dir apps/web exec eslint --quiet .
       - name: Typecheck
