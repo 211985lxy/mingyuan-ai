@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile)
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
 /** 飞书 CLI 域（一级命令）。 */
-export type LarkDomain = "base" | "docs" | "sheets" | "drive"
+export type LarkDomain = "base" | "docs" | "sheets" | "drive" | "calendar" | "task"
 
 /** CLI 执行原始结果。 */
 export type LarkCliRawResult = { stdout: string; stderr: string }
@@ -61,7 +61,7 @@ export class LarkCliError extends Error {
 
 // ─── 白名单 ──────────────────────────────────────────────────────────────────
 
-const DOMAIN_WHITELIST: Set<LarkDomain> = new Set(["base", "docs", "sheets", "drive"])
+const DOMAIN_WHITELIST: Set<LarkDomain> = new Set(["base", "docs", "sheets", "drive", "calendar", "task"])
 
 const COMMAND_WHITELIST: Record<LarkDomain, Set<string>> = {
   base: new Set([
@@ -89,6 +89,21 @@ const COMMAND_WHITELIST: Record<LarkDomain, Set<string>> = {
     "+list",
     "+metadata",
     "+permission-add",
+  ]),
+  calendar: new Set([
+    "+create",
+    "+agenda",
+    "+freebusy",
+    "+suggestion",
+  ]),
+  task: new Set([
+    "+create",
+    "+get-my-tasks",
+    "+update",
+    "+assign",
+    "+comment",
+    "+complete",
+    "+reminder",
   ]),
 }
 
