@@ -66,6 +66,14 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // fileInputRef 作为 prop 从父组件透传给 <input ref>;dragOver 是布尔 prop。
+    // 与 page.tsx 同属"ref 经 prop 传递"的合法用法,react-hooks@7 refs 规则误报,同批豁免。
+    files: ["src/features/knowledge/components/customer-smart-import-dropzone.tsx"],
+    rules: {
+      "react-hooks/refs": "off",
+    },
+  },
+  {
     files: ["src/lib/wechat-html-convert.ts"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",

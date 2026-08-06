@@ -6,6 +6,9 @@ WORKDIR /app
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
+# patchedDependencies 声明在根 package.json；install 前必须把 patches/ 拷入，
+# 否则 frozen-lockfile install 找不到 patches/minimatch@3.1.5.patch 而失败。
+COPY patches ./patches
 
 RUN pnpm install --frozen-lockfile
 
