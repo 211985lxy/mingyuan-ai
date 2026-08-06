@@ -109,13 +109,30 @@ describe("sales loop operating mode", () => {
 })
 
 describe("skills + eval candidates + inspiration readiness", () => {
-  it("按 agent 选择 Skill", () => {
-    const skills = selectAimSkills({
+  it("方法论类 Skill 默认不加载，需显式信号命中（按 agent 仍会候选）", () => {
+    // 默认（未点技能）：ip-copywriting 受信号门控，不自动挂
+    const byDefault = selectAimSkills({
       agentId: "work_editor",
       runtimeTask: "new_copy",
     })
-    expect(skills.some((skill) => skill.id === "ip-copywriting")).toBe(true)
+    expect(byDefault.some((skill) => skill.id === "ip-copywriting")).toBe(false)
+
+    // 点了「IP文案方法论」技能（透传 ip_copywriting 信号）：才加载
+    const withSignal = selectAimSkills({
+      agentId: "work_editor",
+      runtimeTask: "new_copy",
+      methodologySignals: new Set(["ip_copywriting"]),
+    })
+    expect(withSignal.some((skill) => skill.id === "ip-copywriting")).toBe(true)
     expect(buildAimSkillBlock([{ id: "x", title: "T", content: "body" }])).toContain("【Skill:T】")
+  })
+
+  it("business-diagnosis 方法论不受内容技能信号门控（专家自用，默认随 agent 加载）", () => {
+    const skills = selectAimSkills({
+      agentId: "business_system_diagnosis",
+      runtimeTask: "new_copy",
+    })
+    expect(skills.some((skill) => skill.id === "business-diagnosis")).toBe(true)
   })
 
   it("质量失败时生成 eval 候选", () => {

@@ -80,6 +80,8 @@ export async function retrieveChatContextBlocks(input: {
   trace?: AimTraceRecorder
   /** ADR-002：显式选择的命名方法论 profile id。 */
   methodologyProfileIds?: string[]
+  /** 方法论类技能一次性透传（与 generate 路径对称；当前 chat 不注入方法论 md，预留扩展）。 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
   /**
    * 目标内容的 AimGeneration id（请求体 resultId）。
    * 仅 content_retro 执行轮用来读发布数据；缺省不查库、不猜最近一条。

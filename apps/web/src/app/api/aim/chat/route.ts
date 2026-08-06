@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
-    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds } = parsed
+    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds, activeMethodologySignals } = parsed
 
     if (projectId && !(await ownsActiveProject(user.id, projectId))) {
       return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
       editorContext,
       trace,
       methodologyProfileIds,
+      activeMethodologySignals,
       // resultId 在飞书导出里就是 AimGeneration id；复盘同语义，缺省不猜
       targetGenerationId: resultId || undefined,
     })

@@ -94,6 +94,8 @@ interface GenerateOptions {
   workflowBriefOverride?: AimWorkflowBriefState | null
   /** 用户确认的本轮意图 */
   confirmedTurnIntent?: AimTurnIntent
+  /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
 
 /**
@@ -194,6 +196,8 @@ function buildGenerationRequest(
     methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
     // 写作风格开关：用户显式选择才覆盖；undefined 时服务端规则引擎按意图推断
     useStyleProfileOverride: input.styleEnabled !== undefined ? input.styleEnabled : undefined,
+    // 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入；未点技能则 undefined（服务端默认不注入）
+    activeMethodologySignals: options.activeMethodologySignals?.length ? options.activeMethodologySignals : undefined,
     confirmedTurnIntent: options.confirmedTurnIntent,
   }
 }

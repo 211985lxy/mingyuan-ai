@@ -387,6 +387,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
   // ---- Send actions ----
   const {
     handleUseSkill, handleGenerate, retryFailedMessage, takeSkillDelegation, peekSkillDelegation,
+    takeMethodologySignals,
   } = useAimSendActions({
     messages, input, selectedAgentId, hasEditorSelection, referenceSelection, draftSelection,
     editorText, sourceOriginalText, sourceAnalysisText, sourceTopicTitle,
@@ -415,6 +416,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     selectedProjectId,
     sendText, generateWithInput,
     consumeSkillDelegation: takeSkillDelegation, peekSkillDelegation,
+    consumeMethodologySignals: takeMethodologySignals,
   })
   // eslint-disable-next-line react-hooks/refs -- reset handlers read this ref outside render.
   clearTurnIntentRef.current = clearPendingTurnIntent

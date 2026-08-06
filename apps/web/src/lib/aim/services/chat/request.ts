@@ -6,7 +6,7 @@
 import type { AimEditorContext } from "@/lib/aim-editor"
 import type { AimMemoryMessage } from "@/lib/aim-memory"
 import { normalizeRequestedCopyStudioModule, supportsCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
-import { parseMethodologyProfileIds } from "@/lib/aim-generate-validate"
+import { parseMethodologyProfileIds, parseActiveMethodologySignals } from "@/lib/aim-generate-validate"
 
 /** Extract plain text from an OpenAI-compatible content field. */
 /**
@@ -63,6 +63,8 @@ export type AimChatRequestBody = {
   traceId?: string
   /** ADR-002：显式选择的命名方法论 profile id（MVP 最多 1 个）。 */
   methodologyProfileIds?: string[]
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
 
 /** Result of parsing the chat body: either a validated request or an error response. */
@@ -112,5 +114,6 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     writerModule: agentModule,
     traceId: typeof record.traceId === "string" ? (record.traceId as string).trim() : undefined,
     methodologyProfileIds: parseMethodologyProfileIds(record),
+    activeMethodologySignals: parseActiveMethodologySignals(record),
   }
 }

@@ -119,6 +119,8 @@ export function planWorkbenchSkillApply(
   nextInput: string
   /** 待登记的一次性委托意图（executionAgentId 缺省时为 null）。 */
   delegation: { prompt: string; executionAgentId: string } | null
+  /** 方法论类技能透传信号：点击后本轮触发对应方法论/爆款结构注入。 */
+  methodologySignals: NonNullable<AimWorkbenchSkill["activateMethodology"]>
 } {
   const prompt = buildSkillPrompt(skill, {
     editorText: context.editorText,
@@ -133,6 +135,7 @@ export function planWorkbenchSkillApply(
     prompt,
     nextInput,
     delegation: executionAgentId ? { prompt, executionAgentId } : null,
+    methodologySignals: [...(skill.activateMethodology ?? [])],
   }
 }
 

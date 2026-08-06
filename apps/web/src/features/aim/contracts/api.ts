@@ -6,6 +6,11 @@ const shortText = z.string().max(2_000)
 const longText = z.string().max(100_000)
 // ADR-002：命名方法论 profile id（MVP 最多 1 个主方法论）
 const methodologyProfileIdsSchema = z.array(z.string().trim().min(1).max(80)).max(1).optional()
+// 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构（未传则默认全部不注入）
+const activeMethodologySignalsSchema = z
+  .array(z.enum(["ip_copywriting", "viral_structure", "event_storytelling"]))
+  .max(4)
+  .optional()
 
 const confirmedBriefSchema = z.object({
   goal: z.string().max(500).optional(),
@@ -75,6 +80,7 @@ export const aimChatBodySchema = z.object({
   agentModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   methodologyProfileIds: methodologyProfileIdsSchema,
+  activeMethodologySignals: activeMethodologySignalsSchema,
 }).strict()
 
 const contentFormatSchema = z.enum([
@@ -109,6 +115,8 @@ export const aimGenerateBodySchema = z.object({
   writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   traceId: optionalId,
   methodologyProfileIds: methodologyProfileIdsSchema,
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构（未传则默认全部不注入） */
+  activeMethodologySignals: activeMethodologySignalsSchema,
   /** 显式覆盖写作风格开关：true=强制启用 false=强制禁用。缺省时由服务端规则引擎推断 */
   useStyleProfileOverride: z.boolean().optional(),
   /** 用户确认的本轮意图（生成前确认条回传；有则优先于规则推断） */

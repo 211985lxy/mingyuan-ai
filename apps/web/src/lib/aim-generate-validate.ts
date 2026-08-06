@@ -4,6 +4,13 @@ import { VALID_TOPIC_TYPES } from "@/lib/topic-validation"
 import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
 import { normalizeConfirmedTurnIntent, type AimTurnIntent } from "@/lib/aim-turn-intent"
 import { agentAllowsContentModeSelector } from "@/lib/aim/agent-capabilities"
+import type { AimMethodologySignal } from "@/lib/aim-agent-guides"
+
+const VALID_METHODOLOGY_SIGNALS = new Set<AimMethodologySignal>([
+  "ip_copywriting",
+  "viral_structure",
+  "event_storytelling",
+])
 
 const VALID_FORMATS = new Set([
   "video_script",
@@ -59,6 +66,8 @@ export interface ParseGenerateBodyResult {
   reviewMode: "review_report" | "editor_revise" | undefined
   /** 写作风格显式覆盖：true=强制启用 false=强制禁用 */
   useStyleProfileOverride: boolean | undefined
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构 */
+  activeMethodologySignals: AimMethodologySignal[] | undefined
 }
 
 /**
@@ -75,6 +84,21 @@ export function parseMethodologyProfileIds(body: Record<string, unknown>): strin
     .filter((id) => id.length > 0)
     .slice(0, 1) // MVP：最多 1 个主方法论
   return ids.length > 0 ? Array.from(new Set(ids)) : undefined
+}
+
+/**
+ * 从请求体解析 activeMethodologySignals：本轮按需注入的方法论/爆款结构信号。
+ * 只接受合法枚举值，过滤非法项；去重，最多 4 个。供 generate / chat 入口复用。
+ */
+export function parseActiveMethodologySignals(body: Record<string, unknown>): AimMethodologySignal[] | undefined {
+  const raw = body.activeMethodologySignals
+  if (!Array.isArray(raw)) return undefined
+  const signals = raw
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item): item is AimMethodologySignal => VALID_METHODOLOGY_SIGNALS.has(item as AimMethodologySignal))
+    .slice(0, 4)
+  return signals.length > 0 ? Array.from(new Set(signals)) : undefined
 }
 
 /**
@@ -139,6 +163,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
     agentModule,
     writerModule: agentModule,
     methodologyProfileIds: parseMethodologyProfileIds(body),
+    activeMethodologySignals: parseActiveMethodologySignals(body),
     confirmedTurnIntent: normalizeConfirmedTurnIntent(body.confirmedTurnIntent) || undefined,
     reviewMode:
       body.reviewMode === "editor_revise" || body.reviewMode === "review_report"

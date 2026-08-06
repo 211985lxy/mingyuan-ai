@@ -52,6 +52,8 @@ export interface AimInput {
   reviewMode?: import("@/features/newsroom/contracts").ContentReviewMode
   /** 写作风格显式覆盖：true=强制启用 false=强制禁用。透传到 buildAimGeneration → prepareAimContext。 */
   useStyleProfileOverride?: boolean
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。透传到 prepareAimContext。 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
 
 function asStringArray(value: unknown): string[] {
@@ -221,5 +223,6 @@ export async function generateAimContent(input: AimInput) {
     confirmedTurnIntent: input.confirmedTurnIntent,
     reviewMode: input.reviewMode,
     useStyleProfileOverride: input.useStyleProfileOverride,
+    activeMethodologySignals: input.activeMethodologySignals,
   })
 }

@@ -21,6 +21,9 @@ export interface AimNextAction {
   prompt: string
 }
 
+/** 方法论信号：技能点击后向后端透传，触发对应方法论/爆款结构的按需注入 */
+export type AimMethodologySignal = "ip_copywriting" | "viral_structure" | "event_storytelling"
+
 export interface AimWorkbenchSkill {
   id: string
   label: string
@@ -33,6 +36,8 @@ export interface AimWorkbenchSkill {
   workbenchAction?: "open_benchmark_search" | "open_batch_script_studio"
   /** 自定义技能标记：true 表示来自数据库（可编辑/删除），false 或缺省为内置 */
   isCustom?: boolean
+  /** 方法论类技能：点击后向后端透传信号，触发对应方法论/爆款结构注入 */
+  activateMethodology?: AimMethodologySignal[]
 }
 
 export interface AimAgentGuide {
