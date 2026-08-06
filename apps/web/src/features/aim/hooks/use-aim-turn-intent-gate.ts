@@ -30,6 +30,11 @@ export type AimSendTextFn = (
 /** 取出技能按钮挂上的一次性委托意图；无委托时返回空对象，不带 undefined 键 */
 export type ConsumeSkillDelegationFn = (text: string) => { executionAgentId?: string }
 
+/** 取出本轮生效的方法论信号；无信号时返回空对象 */
+export type ConsumeMethodologySignalsFn = (
+  text: string,
+) => { activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[] }
+
 function resolveChatEditorContext(input: {
   editorText: string
   messages: AimWorkbenchMessage[]
@@ -54,10 +59,12 @@ function resolveChatEditorContext(input: {
 function buildSendOptions(
   editorContext: AimEditorContext | undefined,
   delegation: { executionAgentId?: string },
-): { editorContext?: AimEditorContext; executionAgentId?: string } | undefined {
+  methodologySignals: { activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[] },
+): { editorContext?: AimEditorContext; executionAgentId?: string; activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[] } | undefined {
   const options = {
     ...(editorContext ? { editorContext } : {}),
     ...delegation,
+    ...methodologySignals,
   }
   return Object.keys(options).length > 0 ? options : undefined
 }
@@ -72,12 +79,18 @@ function dispatchByIntent(input: {
   sendText: AimSendTextFn
   generateWithInput: (
     raw: string,
-    options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
+    options?: {
+      startsNewTask?: boolean
+      confirmedTurnIntent?: AimTurnIntent
+      activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
+    },
   ) => Promise<unknown>
   consumeSkillDelegation?: ConsumeSkillDelegationFn
+  consumeMethodologySignals?: ConsumeMethodologySignalsFn
 }) {
   // 主发送按钮绕开 handleSend，必须在这里取走一次性委托，否则质检技能会静默落到润色引擎
   const delegation = input.consumeSkillDelegation?.(input.text) ?? {}
+  const methodologySignals = input.consumeMethodologySignals?.(input.text) ?? {}
   // generate 故意不支持 executionAgentId；有跨引擎委托时强制走 chat，避免质检变成成稿
   if (input.intent.action === "chat" || delegation.executionAgentId) {
     const editorContext = input.startsNewTask
@@ -88,12 +101,13 @@ function dispatchByIntent(input: {
           labels: input.editorLabels,
           intent: input.intent,
         })
-    void input.sendText(input.text, buildSendOptions(editorContext, delegation))
+    void input.sendText(input.text, buildSendOptions(editorContext, delegation, methodologySignals))
     return
   }
   void input.generateWithInput(input.text, {
     startsNewTask: input.startsNewTask,
     confirmedTurnIntent: input.intent,
+    ...methodologySignals,
   })
 }
 
@@ -118,17 +132,23 @@ export function useAimTurnIntentGate(input: {
   sendText: AimSendTextFn
   generateWithInput: (
     raw: string,
-    options?: { startsNewTask?: boolean; confirmedTurnIntent?: AimTurnIntent },
+    options?: {
+      startsNewTask?: boolean
+      confirmedTurnIntent?: AimTurnIntent
+      activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
+    },
   ) => Promise<unknown>
   /** 技能按钮留下的一次性委托；主发送走门闩时必须由此取走 */
   consumeSkillDelegation?: ConsumeSkillDelegationFn
   /** 只看不取：有跨引擎委托时跳过生成确认，直接走 chat */
   peekSkillDelegation?: ConsumeSkillDelegationFn
+  /** 取出本轮生效的方法论信号；主发送走门闩时必须由此取走 */
+  consumeMethodologySignals?: ConsumeMethodologySignalsFn
 }) {
   const [pendingTurnIntent, setPendingTurnIntent] = useState<PendingTurnIntent | null>(null)
   const [intentResolving, setIntentResolving] = useState(false)
   // 只解构确认/分发真正用到的稳定引用，避免依赖整个 input 大对象导致每次击键都重建回调。
-  const { generateWithInput, sendText, consumeSkillDelegation } = input
+  const { generateWithInput, sendText, consumeSkillDelegation, consumeMethodologySignals } = input
 
   const clearPendingTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -149,8 +169,9 @@ export function useAimTurnIntentGate(input: {
       sendText,
       generateWithInput,
       consumeSkillDelegation,
+      consumeMethodologySignals,
     })
-  }, [pendingTurnIntent, generateWithInput, sendText, consumeSkillDelegation, input.editorText, input.messages, input.editorLabels])
+  }, [pendingTurnIntent, generateWithInput, sendText, consumeSkillDelegation, consumeMethodologySignals, input.editorText, input.messages, input.editorLabels])
 
   const handleCancelTurnIntent = useCallback(() => {
     setPendingTurnIntent(null)
@@ -211,6 +232,7 @@ export function useAimTurnIntentGate(input: {
         sendText: input.sendText,
         generateWithInput: input.generateWithInput,
         consumeSkillDelegation: input.consumeSkillDelegation,
+        consumeMethodologySignals: input.consumeMethodologySignals,
       })
     })()
   }, [input, pendingTurnIntent, intentResolving])

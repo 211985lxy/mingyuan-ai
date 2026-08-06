@@ -84,6 +84,8 @@ export interface PrepareAimContextInput {
   stableRouting?: boolean
   /** 写作风格显式覆盖：true=强制启用 false=强制禁用。缺省时由规则引擎按意图推断。 */
   useStyleProfileOverride?: boolean
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。缺省时默认全部不注入。 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
 
 /**
@@ -120,6 +122,24 @@ export async function prepareAimContext(
     }
   }
 
+  // 方法论类技能信号接管 useMethodology：默认不提取方法论/爆款，只有点了对应技能才注入。
+  // 设计取舍：纯信号驱动（不保留文本意图兜底），否则与「默认什么都不带方法论/爆款」的需求冲突。
+  const activeMethodologySignals = params.activeMethodologySignals ?? []
+  const methodologySignals = new Set<string>(activeMethodologySignals)
+  const signalUseMethodology = activeMethodologySignals.length > 0
+  generationIntent = { ...generationIntent, useMethodology: signalUseMethodology }
+  if (trace) {
+    void addAimTraceStep(trace, {
+      key: "methodology_signal_override",
+      label: "方法论信号接管",
+      status: "success",
+      summary: signalUseMethodology
+        ? `按技能注入：${activeMethodologySignals.join("、")}`
+        : "未点技能：默认不注入方法论/爆款",
+      metadata: { activeMethodologySignals },
+    })
+  }
+
   // runtimeTask 已由 planner 冻结在 spec；这里直接采用，不二次解析
   // （buildAimGeneration 接受 params.runtimeTask 覆盖；v2 下 planner 是唯一源）。
   const runtimeTask = spec.runtimeTask as AimRuntimeTask
@@ -131,7 +151,7 @@ export async function prepareAimContext(
   const {
     knowledgeCtx, viralStructureBlock, methodologyBlock,
     businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock, ipWikiPages,
-  } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, trace })
+  } = await loadGenerationContextBlocks({ spec, params, agentId, knowledgeStrategy, generationIntent, methodologySignals, trace })
 
   // 3.1 写作风格档案（与 chat retrieveChatContextBlocks 对齐；此前 generate 正门未接通）
   const styleBlock = await loadStyleProfileForGenerate({
@@ -181,8 +201,9 @@ export async function prepareAimContext(
   }
 
   // 3.3 Skill 岗位手册按需加载（默认开；AIM_SKILL_LOADING_ENABLED=false 关闭）
+  // 方法论类 skill 受信号门控：只有用户点了对应技能才加载，默认不自动挂
   const skillEnabled = env.AIM_SKILL_LOADING_ENABLED?.trim().toLowerCase() !== "false"
-  const skills = await loadAimSkills({ agentId, runtimeTask, enabled: skillEnabled })
+  const skills = await loadAimSkills({ agentId, runtimeTask, enabled: skillEnabled, methodologySignals })
   const skillBlock = buildAimSkillBlock(skills)
 
   // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > agent 默认兜底（content_producer=徐沪生）> none。

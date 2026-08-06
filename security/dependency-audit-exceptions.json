@@ -13,6 +13,13 @@
     "reason": "Transitive brace-expansion advisories span multiple major lines; pnpm override alone risks breaking minimatch consumers.",
     "controls": "No user-controlled glob expansion on request paths. Revisit after next lockfile refresh / Next 16.2.11 upgrade soak."
   },
+  "GHSA-rgw5-rvv9-x895": {
+    "package": "brace-expansion",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Second brace-expansion advisory ID for the same transitive chain; same override constraint applies.",
+    "controls": "Same as GHSA-3jxr-9vmj-r5cp."
+  },
   "GHSA-52cp-r559-cp3m": {
     "package": "js-yaml",
     "owner": "repository maintainer",
@@ -33,6 +40,20 @@
     "expiresOn": "2026-08-23",
     "reason": "Second fast-uri advisory ID for the same transitive chain.",
     "controls": "Same as GHSA-v2hh-gcrm-f6hx."
+  },
+  "GHSA-7p8r-x3mc-p8w7": {
+    "package": "fast-uri",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "Third fast-uri advisory ID for the same transitive chain; awaiting lockfile soak toward >=3.1.4.",
+    "controls": "Same as GHSA-v2hh-gcrm-f6hx."
+  },
+  "GHSA-mwp4-54f8-5fhr": {
+    "package": "ip-address",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-08-23",
+    "reason": "ip-address 10.2.0 reached only via devDependency chain (release-it -> proxy-agent -> socks -> ip-address); never shipped to runtime.",
+    "controls": "Build/release tooling only; proxy parsing runs on developer machines and CI, not in the production image. Revisit on next release-it/proxy-agent upgrade."
   },
   "GHSA-f88m-g3jw-g9cj": {
     "package": "sharp",

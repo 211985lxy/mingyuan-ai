@@ -161,6 +161,8 @@ export async function assembleAimChatContext(input: {
   trace?: AimTraceRecorder
   /** ADR-002：显式选择的命名方法论 profile id。 */
   methodologyProfileIds?: string[]
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构（与 generate 路径对称）。 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
   /**
    * 目标内容 AimGeneration id（请求体 resultId）。
    * 仅 content_retro 执行轮用于发布数据召回。
@@ -179,7 +181,14 @@ export async function assembleAimChatContext(input: {
     trace,
   })
 
-  const isolatesCurrentTurn = conversationIntent.mode === "new_task" || conversationIntent.mode === "clarify_task_boundary"
+  // 方法论类技能信号接管 useMethodology（与 generate 路径 prepareAimContext 对称）：
+  // 默认不提取方法论/爆款，只有点了对应技能才注入。缺省时回落到文本意图推断值。
+  const activeMethodologySignals = input.activeMethodologySignals ?? []
+  const resolvedConversationIntent = activeMethodologySignals.length > 0
+    ? { ...conversationIntent, useMethodology: true }
+    : conversationIntent
+
+  const isolatesCurrentTurn = resolvedConversationIntent.mode === "new_task" || resolvedConversationIntent.mode === "clarify_task_boundary"
   const blocks = await retrieveChatContextBlocks({
     userId,
     projectId,
@@ -187,10 +196,11 @@ export async function assembleAimChatContext(input: {
     memoryAgentId: agentId,
     query,
     editorContext: isolatesCurrentTurn ? undefined : editorContext,
-    conversationIntent,
+    conversationIntent: resolvedConversationIntent,
     runtimeTask,
     trace,
     methodologyProfileIds: input.methodologyProfileIds,
+    activeMethodologySignals,
     targetGenerationId: input.targetGenerationId,
   })
 

@@ -7,7 +7,7 @@ import {
 } from "@/lib/aim/workbench-helpers"
 import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand } from "@/lib/aim-workbench-commands"
 import { planWorkbenchSkillApply } from "@/features/aim/aim-skill-utils"
-import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import type { AimMethodologySignal, AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
 import type { AimWorkbenchMessage as ChatMessage, AimImageAttachment } from "@/lib/aim/workbench-types"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
@@ -46,11 +46,16 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
   // 技能按钮只把提示词填进输入框，真正发送发生在下一次点击。委托意图挂在
   // 插入的那段提示词上：输入框里还留着它才算数，用户清空重写则自动失效。
   const pendingSkillDelegationRef = useRef<{ prompt: string; executionAgentId: string } | null>(null)
+  // 方法论类技能信号同样挂在那段 prompt 上：输入框还留着才算本轮生效。
+  const pendingMethodologySignalsRef = useRef<{ prompt: string; signals: AimMethodologySignal[] } | null>(null)
 
   const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
     // 内容目的（流量/获客/故事）互斥替换；其它技能前置拼接。用户正文原样保留。
-    const { delegation, nextInput } = planWorkbenchSkillApply(options, skill)
+    const { delegation, nextInput, methodologySignals } = planWorkbenchSkillApply(options, skill)
     pendingSkillDelegationRef.current = delegation
+    pendingMethodologySignalsRef.current = methodologySignals.length
+      ? { prompt: nextInput.includes(skill.prompt) ? skill.prompt : nextInput, signals: methodologySignals }
+      : null
     if (nextInput !== options.input) options.setInput(nextInput)
     toast.success("技能指令已填入")
   }, [options])
@@ -70,11 +75,28 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
     return { executionAgentId: pending.executionAgentId }
   }
 
+  /** 取出本轮生效的方法论信号（输入框仍含技能 prompt 才算数），并清空一次性意图。 */
+  function takeMethodologySignals(text: string): { activeMethodologySignals?: AimMethodologySignal[] } {
+    const pending = pendingMethodologySignalsRef.current
+    pendingMethodologySignalsRef.current = null
+    if (!pending || !text.includes(pending.prompt) || !pending.signals.length) return {}
+    return { activeMethodologySignals: pending.signals }
+  }
+
+  /** 只看不取：判断本轮是否有方法论信号（不消费）。 */
+  function peekMethodologySignals(text: string): { activeMethodologySignals?: AimMethodologySignal[] } {
+    const pending = pendingMethodologySignalsRef.current
+    if (!pending || !text.includes(pending.prompt) || !pending.signals.length) return {}
+    return { activeMethodologySignals: pending.signals }
+  }
+
   async function handleSend() {
     const text = options.input.trim()
     const delegation = takeSkillDelegation(text)
+    const methodologySignals = takeMethodologySignals(text)
     await options.sendText(text, options.hasEditorSelection ? {
       ...delegation,
+      ...methodologySignals,
       editorContext: buildAimEditorContext({
         action: "用户追问",
         referenceSelection: options.referenceSelection.text,
@@ -84,7 +106,7 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       }),
       editorApplyRange: options.draftSelection.text.trim() ? options.draftSelection.range : undefined,
       images: options.imageAttachments,
-    } : { ...delegation, images: options.imageAttachments })
+    } : { ...delegation, ...methodologySignals, images: options.imageAttachments })
   }
 
   async function handleGenerate() {
@@ -103,7 +125,8 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
     const workbenchCommand = detectAimWorkbenchCommand(currentInput)
     if (!startsNewTask && workbenchCommand && options.runWorkbenchCommand(workbenchCommand)) return
     takeSkillDelegation(currentInput)
-    await options.generateWithInput(currentInput, { startsNewTask })
+    const methodologySignals = takeMethodologySignals(currentInput)
+    await options.generateWithInput(currentInput, { startsNewTask, ...methodologySignals })
   }
 
   function retryFailedMessage(message: ChatMessage, busy: boolean) {
@@ -123,5 +146,7 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
     retryFailedMessage,
     takeSkillDelegation,
     peekSkillDelegation,
+    takeMethodologySignals,
+    peekMethodologySignals,
   }
 }

@@ -62,17 +62,36 @@ function repoRootCandidates(): string[] {
   ]
 }
 
+/** 方法论信号 → AimSkillRef.id 映射：内容创作类方法论 skill 按用户显式选择注入 */
+const METHODOLOGY_SIGNAL_TO_SKILL_ID: Record<string, string> = {
+  ip_copywriting: "ip-copywriting",
+  event_storytelling: "event-storytelling",
+}
+
+/** 受信号门控的 skill id：默认不自动加载，只有用户点了对应技能才注入 */
+const SIGNAL_GATED_SKILL_IDS = new Set(Object.values(METHODOLOGY_SIGNAL_TO_SKILL_ID))
+
 /**
  * @description 选择匹配当前 agent/task 的 Skill
  */
 export function selectAimSkills(input: {
   agentId: AimAgentId
   runtimeTask: AimRuntimeTask
+  /** 方法论类技能信号：命中则加载对应方法论 skill；缺省时信号门控类 skill 不自动加载 */
+  methodologySignals?: Set<string>
 }): AimSkillRef[] {
+  const gatedEnabled = new Set<string>(
+    Array.from(input.methodologySignals ?? [])
+      .map((signal) => METHODOLOGY_SIGNAL_TO_SKILL_ID[signal])
+      .filter((value): value is string => Boolean(value)),
+  )
   return AIM_SKILL_CATALOG.filter((skill) => {
     if (!skill.agentIds.includes(input.agentId)) return false
     if (!skill.runtimeTasks || skill.runtimeTasks.length === 0) return true
-    return skill.runtimeTasks.includes(input.runtimeTask)
+    if (!skill.runtimeTasks.includes(input.runtimeTask)) return false
+    // 受信号门控的方法论 skill：只有用户显式点了对应技能才加载，默认不自动挂
+    if (SIGNAL_GATED_SKILL_IDS.has(skill.id)) return gatedEnabled.has(skill.id)
+    return true
   })
 }
 
@@ -83,6 +102,8 @@ export async function loadAimSkills(input: {
   agentId: AimAgentId
   runtimeTask: AimRuntimeTask
   enabled?: boolean
+  /** 方法论类技能信号：命中则加载对应方法论 skill */
+  methodologySignals?: Set<string>
 }): Promise<LoadedAimSkill[]> {
   if (input.enabled === false) return []
   const selected = selectAimSkills(input)

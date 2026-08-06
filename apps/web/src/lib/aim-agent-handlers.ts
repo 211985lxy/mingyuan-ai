@@ -294,6 +294,8 @@ type AimGenerationInput = Omit<
   methodologyProfileIds?: string[]
   /** 写作风格显式覆盖：true=强制启用 false=强制禁用。透传到 prepareAimContext。 */
   useStyleProfileOverride?: boolean
+  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。透传到 prepareAimContext。 */
+  activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
 
 function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
@@ -380,6 +382,7 @@ export async function buildAimGeneration(
     contextOverride: params.contextOverride,
     methodologyProfileIds: params.methodologyProfileIds,
     useStyleProfileOverride: params.useStyleProfileOverride,
+    activeMethodologySignals: params.activeMethodologySignals,
   })
   const generationMode = resolveGenerationConversationMode(agentId, params)
   const taskSpec = withCopyStudioExecution(

@@ -2,3 +2,10 @@
 # Image still copies workspace node_modules for Prisma/runtime parity.
 CVE-2026-13149
 GHSA-f88m-g3jw-g9cj
+# Transitive node-pkg HIGH advisories; same packages already accepted in the
+# dependency audit (GHSA-*), mirrored here so Trivy image scan stays aligned.
+# Remove once lockfile soak upgrades brace-expansion >=5.0.9, fast-uri >=4.1.2,
+# ip-address >=10.3.1 (ip-address is devOnly via release-it, never in runtime).
+CVE-2026-69152
+CVE-2026-18446
+CVE-2026-69192

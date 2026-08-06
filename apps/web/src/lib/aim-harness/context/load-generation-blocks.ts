@@ -37,9 +37,14 @@ export async function loadGenerationContextBlocks(input: {
   agentId: AimAgentId
   knowledgeStrategy: ResolvedKnowledgeStrategy | undefined
   generationIntent: { useKnowledge: boolean; useMethodology: boolean }
+  /** 方法论类技能信号：决定爆款结构/IP文案方法论/事件叙事是否按需注入 */
+  methodologySignals?: Set<string>
   trace?: AimTraceRecorder
 }) {
-  const { spec, params, agentId, knowledgeStrategy, generationIntent, trace } = input
+  const { spec, params, agentId, knowledgeStrategy, generationIntent, methodologySignals, trace } = input
+  const copySignal = methodologySignals?.has("ip_copywriting") ?? false
+  const viralSignal = methodologySignals?.has("viral_structure") ?? false
+  const eventSignal = methodologySignals?.has("event_storytelling") ?? false
   const useEventStorytelling = shouldUseEventStorytelling({
     rawInput: spec.rawInput,
     topicTitle: params.topicTitle,
@@ -118,16 +123,16 @@ export async function loadGenerationContextBlocks(input: {
                 return { ...result, ...merged }
               })
             : Promise.resolve({ knowledgeBlock: "", entries: [], source: "raw" as const }),
-          buildViralStructureBlock(),
-          generationIntent.useMethodology ? buildIpCopywritingMethodologyBlock() : Promise.resolve(""),
+          viralSignal ? buildViralStructureBlock() : Promise.resolve(""),
+          copySignal ? buildIpCopywritingMethodologyBlock() : Promise.resolve(""),
           generationIntent.useMethodology && agentId === "business_system_diagnosis"
             ? buildBusinessDiagnosisMethodologyBlock()
             : Promise.resolve(""),
-          generationIntent.useMethodology && spec.projectId ? buildIpWikiBlock({ projectId: spec.projectId }) : Promise.resolve(""),
-          generationIntent.useMethodology && (agentId === "content_producer" || agentId === "work_editor") && useEventStorytelling
+          spec.projectId ? buildIpWikiBlock({ projectId: spec.projectId }) : Promise.resolve(""),
+          eventSignal && (agentId === "content_producer" || agentId === "work_editor") && useEventStorytelling
             ? buildEventStorytellingMethodologyBlock()
             : Promise.resolve(""),
-          generationIntent.useMethodology && spec.projectId ? loadIpWikiPagesIndexed({ projectId: spec.projectId }) : Promise.resolve({}),
+          spec.projectId ? loadIpWikiPagesIndexed({ projectId: spec.projectId }) : Promise.resolve({}),
         ]),
     ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory, ipWikiPagesVal]) => ({
       summary: `命中 ${knowledge.entries.length} 条知识`,
