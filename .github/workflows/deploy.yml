@@ -1,8 +1,16 @@
 name: Build & Deploy
 
+# 生产部署实际走 scripts/deploy-ecs-standalone.sh（ECS standalone：本地 build →
+# rsync → systemctl 重启 mingyuan-web），不经 ACR/K8s。本 workflow 的 ACR→K8s 链路
+# 从未跑通（GitHub Secrets 缺 ACR_USERNAME/ACR_PASSWORD），每次 push main 都触发
+# 一次注定失败的 run，纯属噪音。改为手动触发，避免自动失败堆积。
+#
+# 恢复自动部署：配好 ACR 凭证后，把下方改回
+#   on:
+#     push:
+#       branches: [main]
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: production-deploy
