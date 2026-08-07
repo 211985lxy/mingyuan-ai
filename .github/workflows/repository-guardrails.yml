@@ -38,7 +38,7 @@ jobs:
       TEST_DATABASE_URL: mysql://root:test-password@127.0.0.1:3306/mingyuan_test
       TEST_REDIS_URL: redis://127.0.0.1:6379
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
