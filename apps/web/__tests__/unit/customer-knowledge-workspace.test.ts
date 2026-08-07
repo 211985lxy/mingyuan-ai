@@ -10,6 +10,24 @@ describe("customer knowledge workspace wiring", () => {
     expect(source).toContain('title: "我的知识库"')
     expect(source).toContain('href: "/knowledge"')
     expect(source).not.toContain("/admin/knowledge")
+    expect(source).not.toContain("/meeting-minutes")
+    expect(source).not.toContain('title: "会议纪要"')
+  })
+
+  it("keeps meeting-minutes route as a knowledge redirect", () => {
+    const page = readFileSync(join(ROOT, "app/(dashboard)/meeting-minutes/page.tsx"), "utf8")
+    expect(page).toContain('redirect("/knowledge?intent=meeting")')
+    expect(page).not.toContain("MeetingMinutesWorkspace")
+  })
+
+  it("wires meeting transcription into the knowledge workspace", () => {
+    const workspace = readFileSync(
+      join(ROOT, "features/knowledge/components/customer-knowledge-workspace.tsx"),
+      "utf8",
+    )
+    expect(workspace).toContain("会议转写")
+    expect(workspace).toContain('intent") !== "meeting"')
+    expect(workspace).toContain("MeetingMinutesImportDialog")
   })
 
   it("adds an account shortcut into /knowledge", () => {

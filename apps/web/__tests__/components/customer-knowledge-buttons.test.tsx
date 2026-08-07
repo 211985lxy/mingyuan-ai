@@ -14,8 +14,23 @@ import type { KnowledgeEntry } from "@/lib/api/client"
 
 const workspaceState = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
 
+vi.mock("@/features/knowledge/components/external-ai-memory-import-dialog", () => ({
+  ExternalAiMemoryImportDialog: () => null,
+}))
+
+vi.mock("@/features/knowledge/components/customer-smart-import-dialog", () => ({
+  CustomerSmartImportDialog: () => null,
+}))
+
+vi.mock("@/features/meeting-minutes/components/meeting-minutes-import-dialog", () => ({
+  MeetingMinutesImportDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="meeting-import-dialog" /> : null,
+}))
+
+const searchParamsState = vi.hoisted(() => ({ current: new URLSearchParams() }))
+
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsState.current,
 }))
 
 vi.mock("@/features/knowledge/hooks/use-customer-knowledge-workspace", () => ({
@@ -26,10 +41,6 @@ vi.mock("@/components/projects/project-knowledge-asset-health", () => ({
   ProjectKnowledgeAssetHealth: ({ openGapRequest }: { openGapRequest: number }) => (
     <div data-testid="asset-health" data-open-gap-request={openGapRequest} />
   ),
-}))
-
-vi.mock("@/features/knowledge/components/external-ai-memory-import-dialog", () => ({
-  ExternalAiMemoryImportDialog: () => null,
 }))
 
 const entry: KnowledgeEntry = {
@@ -82,6 +93,9 @@ function createWorkspace(overrides: Record<string, unknown> = {}) {
     setMemoryImportOpen: vi.fn(),
     openCreate: vi.fn(),
     openMemoryImport: vi.fn(),
+    openSmartImport: vi.fn(),
+    smartImportOpen: false,
+    setSmartImportOpen: vi.fn(),
     openEdit: vi.fn(),
     handleSave: vi.fn(),
     handleArchive: vi.fn().mockResolvedValue(undefined),
@@ -91,6 +105,7 @@ function createWorkspace(overrides: Record<string, unknown> = {}) {
 
 describe("customer knowledge workspace buttons", () => {
   beforeEach(() => {
+    searchParamsState.current = new URLSearchParams()
     workspaceState.current = createWorkspace()
   })
 
@@ -111,6 +126,7 @@ describe("customer knowledge workspace buttons", () => {
     await user.type(screen.getByPlaceholderText("搜索标题、内容或标签"), "交付")
     await user.click(screen.getByRole("button", { name: "手动一条" }))
     await user.click(screen.getByRole("button", { name: "粘贴记忆" }))
+    await user.click(screen.getAllByRole("button", { name: "会议转写" })[0]!)
     await user.click(screen.getByRole("button", { name: "塞一条经验进去" }))
     await user.click(screen.getByRole("button", { name: `编辑知识：${entry.title}` }))
     await user.click(screen.getByRole("button", { name: `归档知识：${entry.title}` }))
@@ -125,9 +141,16 @@ describe("customer knowledge workspace buttons", () => {
     expect(ws.ensureAccount).toHaveBeenCalledTimes(1)
     expect(ws.openEdit).toHaveBeenCalledWith(entry)
     expect(ws.handleArchive).toHaveBeenCalledWith(entry)
+    expect(screen.getByTestId("meeting-import-dialog")).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByTestId("asset-health")).toHaveAttribute("data-open-gap-request", "1")
     })
+  })
+
+  it("opens meeting transcription from intent=meeting", () => {
+    searchParamsState.current = new URLSearchParams("intent=meeting")
+    render(<CustomerKnowledgeWorkspace />)
+    expect(screen.getByTestId("meeting-import-dialog")).toBeInTheDocument()
   })
 
   it("retries a failed knowledge load", async () => {

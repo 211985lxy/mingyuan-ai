@@ -26,15 +26,25 @@ interface TranscriptionStats {
 
 type Stage = "idle" | "uploading" | "transcribing" | "insight" | "done" | "error"
 
+export type MeetingMinutesWorkspaceVariant = "page" | "embedded"
+
 /**
  * 会议纪要工作台：上传腾讯会议本地录制 → 云端转写（说话人分离）→ 自动生成洞察。
  *
  * 文件入口走 OSS 直传（不经飞书 IM，规避 100MB 限制）：
  *   选文件 → /api/assets/upload-url 拿 PUT 预签名 → 直传 OSS → 拿 assetUrl
  *   → /api/aim/meeting-recording 编排（转写 + 建经营事项 + meeting-insight）
+ *
+ * variant=embedded：知识库入库弹层用，去掉独立页英雄头。
  */
-export function MeetingMinutesWorkspace() {
+export function MeetingMinutesWorkspace({
+  variant = "page",
+}: {
+  variant?: MeetingMinutesWorkspaceVariant
+} = {}) {
   const router = useRouter()
+  const embedded = variant === "embedded"
+  const fileInputId = embedded ? "meeting-file-input-embedded" : "meeting-file-input"
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [projectsLoaded, setProjectsLoaded] = useState(false)
   const [projectId, setProjectId] = useState("")
@@ -141,23 +151,16 @@ export function MeetingMinutesWorkspace() {
 
   const busy = stage === "uploading" || stage === "transcribing" || stage === "insight"
 
-  return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-      <WorkbenchHero
-        title="会议纪要"
-        subtitle="上传腾讯会议本地录制，自动转写（说话人分离）并生成结构化洞察与飞书纪要"
-        badge="会议纪要 Agent"
-        backHref="/home"
-        backLabel="返回创作台"
-      />
-
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <FileVideo className="size-4" /> 新建会议转写
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-5">
+  const form = (
+      <Card className={embedded ? "border-0 shadow-none" : "mt-6"}>
+        {embedded ? null : (
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <FileVideo className="size-4" /> 新建会议转写
+            </CardTitle>
+          </CardHeader>
+        )}
+        <CardContent className={embedded ? "space-y-5 p-0" : "space-y-5"}>
           {/* 项目选择 */}
           <div className="space-y-2">
             <Label>客户项目</Label>
@@ -209,13 +212,13 @@ export function MeetingMinutesWorkspace() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => document.getElementById("meeting-file-input")?.click()}
+                onClick={() => document.getElementById(fileInputId)?.click()}
                 disabled={busy}
               >
                 <Upload className="size-4" /> 选择文件
               </Button>
               <input
-                id="meeting-file-input"
+                id={fileInputId}
                 type="file"
                 accept="video/*,audio/*"
                 className="hidden"
@@ -280,6 +283,22 @@ export function MeetingMinutesWorkspace() {
           )}
         </CardContent>
       </Card>
+  )
+
+  if (embedded) {
+    return <div className="w-full">{form}</div>
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+      <WorkbenchHero
+        title="会议纪要"
+        subtitle="上传腾讯会议本地录制，自动转写（说话人分离）并生成结构化洞察与飞书纪要"
+        badge="会议纪要 Agent"
+        backHref="/knowledge"
+        backLabel="返回知识库"
+      />
+      {form}
     </div>
   )
 }

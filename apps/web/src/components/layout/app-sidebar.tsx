@@ -12,7 +12,6 @@ import {
   Plus,
   Users,
   BookOpen,
-  Mic,
 } from "lucide-react"
 import {
   Sidebar,
@@ -57,7 +56,6 @@ const quickNav: NavItem[] = [
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
-  { title: "会议纪要", href: "/meeting-minutes", icon: Mic },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
 ]
 

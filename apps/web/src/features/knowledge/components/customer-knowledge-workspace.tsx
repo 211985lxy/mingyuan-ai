@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Loader2, Plus, Search, BrainCircuit, BookOpen, Upload } from "lucide-react"
+import { Loader2, Plus, Search, BrainCircuit, BookOpen, Upload, Mic } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { CustomerKnowledgeEntryDialog } from "@/features/knowledge/components/cu
 import { CustomerSmartImportDialog } from "@/features/knowledge/components/customer-smart-import-dialog"
 import { ExternalAiMemoryImportDialog } from "@/features/knowledge/components/external-ai-memory-import-dialog"
 import { CustomerKnowledgeEntryCard } from "@/features/knowledge/components/customer-knowledge-entry-card"
+import { MeetingMinutesImportDialog } from "@/features/meeting-minutes/components/meeting-minutes-import-dialog"
 import { useCustomerKnowledgeWorkspace } from "@/features/knowledge/hooks/use-customer-knowledge-workspace"
 import { CATEGORY_GROUPS, CATEGORY_LABELS, KNOWLEDGE_CATEGORIES } from "@/lib/knowledge-categories"
 import type { KnowledgeEntry } from "@/lib/api/client"
@@ -30,6 +31,7 @@ export function CustomerKnowledgeWorkspace() {
   const [accountProjectId, setAccountProjectId] = useState<string | null>(null)
   const [openGapRequest, setOpenGapRequest] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [meetingImportOpen, setMeetingImportOpen] = useState(false)
 
   const memoryDefaultProjectId =
     ws.projectFilter !== "all" && ws.projectFilter !== "none"
@@ -59,6 +61,11 @@ export function CustomerKnowledgeWorkspace() {
     void openAccountMaterials()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.loading, searchParams])
+
+  useEffect(() => {
+    if (searchParams?.get("intent") !== "meeting") return
+    setMeetingImportOpen(true)
+  }, [searchParams])
 
   const healthProjectId = accountProjectId ?? ws.defaultAccountId
   const counts = countByCategory(ws.entries)
@@ -116,6 +123,14 @@ export function CustomerKnowledgeWorkspace() {
             <Button variant="ghost" size="sm" className="mt-1 w-full justify-start text-muted-foreground" onClick={ws.openMemoryImport}>
               <BrainCircuit className="mr-1.5 h-3.5 w-3.5" />粘贴记忆
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 w-full justify-start text-muted-foreground"
+              onClick={() => setMeetingImportOpen(true)}
+            >
+              <Mic className="mr-1.5 h-3.5 w-3.5" />会议转写
+            </Button>
           </div>
         </div>
       </aside>
@@ -134,6 +149,10 @@ export function CustomerKnowledgeWorkspace() {
             <Button variant="outline" size="sm" onClick={ws.openSmartImport}>
               <Upload className="mr-1.5 h-4 w-4" />
               拖文件入库
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setMeetingImportOpen(true)}>
+              <Mic className="mr-1.5 h-4 w-4" />
+              会议转写
             </Button>
             <Button onClick={() => void openAccountMaterials()} disabled={busy || ws.ensuringAccount} size="sm">
               {(busy || ws.ensuringAccount) ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
@@ -206,11 +225,15 @@ export function CustomerKnowledgeWorkspace() {
           <div className="rounded-lg border border-dashed border-border/60 py-16 text-center">
             <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/40" />
             <p className="mt-3 text-sm font-medium">还没有符合条件的知识</p>
-            <p className="mt-1 text-sm text-muted-foreground">可以拖文件进来自动清洗入库，或手动写一条。</p>
+            <p className="mt-1 text-sm text-muted-foreground">可以拖文件进来自动清洗入库，或手动写一条，也可上传会议录制转写。</p>
             <div className="mt-4 flex justify-center gap-2">
               <Button variant="outline" size="sm" onClick={ws.openSmartImport}>
                 <Upload className="mr-1.5 h-4 w-4" />
                 拖文件入库
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setMeetingImportOpen(true)}>
+                <Mic className="mr-1.5 h-4 w-4" />
+                会议转写
               </Button>
               <Button size="sm" onClick={ws.openCreate}>
                 <Plus className="mr-1.5 h-4 w-4" />
@@ -258,6 +281,10 @@ export function CustomerKnowledgeWorkspace() {
         defaultProjectId={memoryDefaultProjectId}
         onOpenChange={ws.setSmartImportOpen}
         onImported={() => void ws.load()}
+      />
+      <MeetingMinutesImportDialog
+        open={meetingImportOpen}
+        onOpenChange={setMeetingImportOpen}
       />
     </div>
   )
