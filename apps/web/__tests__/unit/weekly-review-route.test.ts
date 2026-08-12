@@ -3,7 +3,7 @@ import { NextRequest } from "next/server"
 
 // 每周经营复盘路由测试（90 天计划 3.3）。
 
-const { authenticateRequest, authErrorResponse, computeWeeklyReview } = vi.hoisted(() => ({
+const { authenticateRequest, authErrorResponse, computeWeeklyReview, projectFindFirst } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   computeWeeklyReview: vi.fn(async (_input: { userId: string; start: Date; end: Date }) => ({
@@ -18,11 +18,12 @@ const { authenticateRequest, authErrorResponse, computeWeeklyReview } = vi.hoist
     reusedAssetCount: 2,
     day7Backfill: { due: 3, filled: 2 },
   })),
+  projectFindFirst: vi.fn<() => Promise<{ id: string } | null>>(async () => ({ id: "project-1" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
 vi.mock("@/lib/aim/weekly-review", () => ({ computeWeeklyReview }))
-vi.mock("@/lib/prisma", () => ({ prisma: {} }))
+vi.mock("@/lib/prisma", () => ({ prisma: { clientProject: { findFirst: projectFindFirst } } }))
 
 import { GET } from "@/app/api/aim/review/weekly/route"
 
@@ -48,6 +49,19 @@ describe("GET /api/aim/review/weekly", () => {
     const call = computeWeeklyReview.mock.calls[0][0]
     expect(call.start.toISOString()).toContain("2026-07-06")
     expect(call.end.toISOString()).toContain("2026-07-13")
+  })
+
+  it("验证项目归属并传入周复盘", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly?projectId=project-1"))
+    expect(res.status).toBe(200)
+    expect(projectFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "project-1", userId: "user-1", status: "active" } }))
+    expect(computeWeeklyReview).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project-1" }))
+  })
+
+  it("拒绝其他用户的项目", async () => {
+    projectFindFirst.mockResolvedValueOnce(null)
+    const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly?projectId=project-2"))
+    expect(res.status).toBe(404)
   })
 
   it("非法日期 → 400", async () => {

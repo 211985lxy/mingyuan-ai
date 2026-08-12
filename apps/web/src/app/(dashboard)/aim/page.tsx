@@ -1,5 +1,4 @@
 "use client"
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -41,6 +40,7 @@ import { runBatchReplicateSend } from "@/lib/aim/run-batch-replicate-send"
 import { fetchStyleStatus } from "@/lib/api/aim"
 import { AimEntrySwitch } from "@/features/aim/components/aim-entry-switch"
 import { ProjectWeeklyContent } from "@/features/aim/components/project-weekly-content"
+import { ProjectWeeklyBusinessReview } from "@/features/aim/components/project-weekly-business-review"
 export default function AimPage() {
   const [styleEnabled, setStyleEnabled] = useState(false)
   const [styleAvailable, setStyleAvailable] = useState(false)
@@ -296,6 +296,7 @@ export default function AimPage() {
           projectAccessError={w.projectAccessError}
         />
         {w.projectEnabled && w.selectedProjectId && !isLanding ? <ProjectWeeklyContent projectId={w.selectedProjectId} /> : null}
+        {w.currentWorkflowStage === "results" && w.selectedProjectId ? <ProjectWeeklyBusinessReview projectId={w.selectedProjectId} /> : null}
 
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}

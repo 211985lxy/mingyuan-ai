@@ -27,6 +27,15 @@ export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const params = request.nextUrl.searchParams
+    const projectId = params.get("projectId")?.trim() || undefined
+    if (projectId) {
+      if (projectId.length > 80) return NextResponse.json({ error: "项目标识过长" }, { status: 400 })
+      const project = await prisma.clientProject.findFirst({
+        where: { id: projectId, userId: user.id, status: "active" },
+        select: { id: true },
+      })
+      if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 })
+    }
 
     const end = parseDateParam(params.get("end")) ?? new Date()
     const start = parseDateParam(params.get("start")) ?? new Date(end.getTime() - 7 * DAY_MS)
@@ -42,6 +51,7 @@ export async function GET(request: NextRequest) {
 
     const review = await computeWeeklyReview({
       userId: user.id,
+      projectId,
       start,
       end,
       store: prisma as unknown as WeeklyReviewStorePort,
