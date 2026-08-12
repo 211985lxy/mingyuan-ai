@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import {
   aggregateRunOutcomeMetrics,
   type RunOutcomeMetricFilters,
@@ -67,7 +67,7 @@ async function loadMetricRunUniverse(start: Date, end: Date) {
 }
 
 /** Read-only operating telemetry with bounded period and trace-derived cost. */
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const now = new Date()
   const end = parseDate(request.nextUrl.searchParams.get("end"), now)
   const start = parseDate(
@@ -108,4 +108,4 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     humanHourlyCostCny,
     metrics,
   })
-}, "admin")
+})

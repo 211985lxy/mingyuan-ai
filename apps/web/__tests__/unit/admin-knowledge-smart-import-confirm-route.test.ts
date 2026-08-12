@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: (request: NextRequest) => Promise<Response>) => handler,
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: (request: NextRequest) => Promise<Response>) => handler,
 }))
 
 vi.mock("@/lib/prisma", () => ({

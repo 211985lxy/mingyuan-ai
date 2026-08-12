@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const url = new URL(request.url)
   const status = url.searchParams.get("status") || "active,paused"
   const statuses = status

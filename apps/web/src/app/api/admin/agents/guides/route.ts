@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { isValidAimAgent } from "@/lib/aim-ui-config"
 import { listAgentGuides, setAgentGuideField, clearAgentGuideField } from "@/lib/agent-guide-store"
 
@@ -14,13 +14,13 @@ const ALLOWED_FIELDS = new Set([
 ])
 
 /** GET /api/admin/agents/guides —— 列出全部智能体文案（合并默认 + 覆盖） */
-export const GET = withAdminAuth(async () => {
+export const GET = withAdminOrEditor(async () => {
   const items = await listAgentGuides()
   return NextResponse.json({ data: items })
 })
 
 /** PUT /api/admin/agents/guides —— 更新单个字段覆盖 */
-export const PUT = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const PUT = withAdminOrEditor(async (request: NextRequest, { admin }) => {
   const body = await parseJsonRecord(request)
   const { agentId, field, value } = body ?? {}
 

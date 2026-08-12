@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { isValidAimAgent } from "@/lib/aim-harness/contracts"
 import type { AimCustomSkill } from "@/generated/prisma/client"
 
 /** PATCH /api/admin/aim/skills/[id] —— 更新自定义技能 */
-export const PATCH = withAdminAuth(async (request: NextRequest, { params }) => {
+export const PATCH = withAdminOnly(async (request: NextRequest, { params }) => {
   const id = params?.id
   if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 })
 
@@ -29,7 +29,7 @@ export const PATCH = withAdminAuth(async (request: NextRequest, { params }) => {
 })
 
 /** DELETE /api/admin/aim/skills/[id] —— 删除自定义技能 */
-export const DELETE = withAdminAuth(async (request: NextRequest, { params }) => {
+export const DELETE = withAdminOnly(async (request: NextRequest, { params }) => {
   const id = params?.id
   if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 })
 

@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 
@@ -26,7 +26,7 @@ async function findLinkedKnowledgeEntry(itemId: string) {
 }
 
 // PATCH — 编辑单条素材（事务内联动更新 KnowledgeEntry + 重新向量化）
-export const PATCH = withAdminAuth(async (request, { params }) => {
+export const PATCH = withAdminOrEditor(async (request, { params }) => {
   const itemId = params?.itemId
   if (!itemId) {
     return NextResponse.json({ error: "缺少 itemId" }, { status: 400 })
@@ -115,7 +115,7 @@ export const PATCH = withAdminAuth(async (request, { params }) => {
 })
 
 // DELETE — 删除单条素材（事务内联动归档对应 KnowledgeEntry）
-export const DELETE = withAdminAuth(async (_request, { params }) => {
+export const DELETE = withAdminOrEditor(async (_request, { params }) => {
   const itemId = params?.itemId
   if (!itemId) {
     return NextResponse.json({ error: "缺少 itemId" }, { status: 400 })

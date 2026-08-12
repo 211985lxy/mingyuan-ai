@@ -1,5 +1,4 @@
 import { env } from "@/env"
-import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import OSS from "ali-oss";
@@ -79,42 +78,26 @@ export type TransferFromUrlResult = {
   expiresAt: Date | null;
 };
 
+export {
+  createAssetUploadReservation,
+  completeAssetUploadReservation,
+  headManagedObject,
+  cleanupExpiredUploadReservations,
+  assertCompletedReservationForManagedUrl,
+  UploadReservationError,
+  UPLOAD_SIZE_LIMITS,
+  POLICY_TTL_MS,
+} from "./upload-reservation"
+
 /**
- * Generate a presigned upload URL for client-side direct upload.
- */
-/**
- * @description 生成uploadurl
- * @param fileName - 文件名称
- * @param contentType - 内容类型
- * @returns Promise<
+ * @deprecated 无界 PUT 预签名已下线。请改用 createAssetUploadReservation（POST Policy）。
+ * 保留导出仅为避免旧测试瞬间全红；调用将直接失败。
  */
 export async function generateUploadUrl(
-  fileName: string,
-  contentType: string,
-): Promise<{ uploadUrl: string; assetUrl: string; readUrl: string; expiresAt: string } | null> {
-  if (!isConfigured()) return null;
-
-  const client = getClient();
-  // Use UUID for the key to avoid non-ASCII characters in object keys.
-  const ext = fileName.includes(".") ? "." + fileName.split(".").pop() : "";
-  const key = `uploads/${Date.now()}-${randomUUID()}${ext}`;
-  const url = client.signatureUrl(key, {
-    method: "PUT",
-    "Content-Type": contentType,
-    expires: 3600,
-  });
-
-  // Properly encode each path segment so the stored URL round-trips correctly
-  // through new URL() → extractOssKey() without double-encoding issues.
-  const encodedPath = key
-    .split("/")
-    .map((s) => encodeURIComponent(s))
-    .join("/");
-  const assetUrl = `https://${OSS_BUCKET}.${OSS_REGION}.aliyuncs.com/${encodedPath}`;
-  const readUrl = client.signatureUrl(key, { method: "GET", expires: 7200 });
-  const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
-
-  return { uploadUrl: url, assetUrl, readUrl, expiresAt };
+  _fileName: string,
+  _contentType: string,
+): Promise<null> {
+  return null
 }
 
 /**

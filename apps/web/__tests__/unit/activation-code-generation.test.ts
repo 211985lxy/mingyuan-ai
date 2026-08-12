@@ -5,7 +5,8 @@ const createMany = vi.hoisted(() => vi.fn())
 const recordAdminAudit = vi.hoisted(() => vi.fn())
 
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: (request: NextRequest, context: { admin: { id: string } }) => Promise<Response>) =>
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: (request: NextRequest, context: { admin: { id: string } }) => Promise<Response>) =>
     (request: NextRequest) => handler(request, { admin: { id: "admin-1" } }),
 }))
 

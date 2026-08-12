@@ -1,7 +1,7 @@
 import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import {
   METHODOLOGY_META,
   getMethodologyForAdmin,
@@ -20,7 +20,7 @@ function isValidKey(key: string): key is MethodologyKey {
 }
 
 /** GET /api/admin/methodology/[key] —— 单份方法论详情 */
-export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
+export const GET = withAdminOrEditor(async (_request: NextRequest, { params }) => {
   const key = params?.key
   if (!key || !isValidKey(key)) {
     return NextResponse.json({ error: "key 非法" }, { status: 400 })
@@ -30,7 +30,7 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
 })
 
 /** POST /api/admin/methodology/[key] —— 重置为文件原文（删除 DB 覆盖） */
-export const POST = withAdminAuth(async (request: NextRequest, { admin, params }) => {
+export const POST = withAdminOrEditor(async (request: NextRequest, { admin, params }) => {
   const key = params?.key
   if (!key || !isValidKey(key)) {
     return NextResponse.json({ error: "key 非法" }, { status: 400 })

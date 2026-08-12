@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { prisma } from "@/lib/prisma"
 import {
@@ -89,7 +89,7 @@ function validateAssignmentDraft(draft: GovernanceAssignmentDraft): string | nul
   if (!Number.isFinite(draft.effectiveAt.getTime())) return "effectiveAt 不是有效时间"
   return null
 }
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const url = new URL(request.url)
   const scopeType = url.searchParams.get("scopeType")
   const scopeId = url.searchParams.get("scopeId")
@@ -110,8 +110,8 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     prisma.governanceAssignment.count({ where }),
   ])
   return NextResponse.json({ items, total, limit, offset })
-}, "admin")
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+})
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -169,9 +169,9 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
     { item: created },
     { status: 201, headers: { "x-request-id": requestId } },
   )
-}, "admin")
+})
 /** 停用 / 重新启用 assignment */
-export const PATCH = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const PATCH = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -235,4 +235,4 @@ export const PATCH = withAdminAuth(async (request: NextRequest, { admin }) => {
     { item: updated },
     { headers: { "x-request-id": requestId } },
   )
-}, "admin")
+})

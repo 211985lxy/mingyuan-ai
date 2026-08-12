@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: (request: Request) => Promise<Response>) => handler,
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: (request: Request) => Promise<Response>) => handler,
 }))
 
 vi.mock("@/lib/document-parser", () => ({

@@ -19,3 +19,25 @@ model Asset {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
 }
+
+/// OSS 直传预约：绑定 key / 精确字节数 / Content-Type，避免无界 PUT 预签名
+model AssetUploadReservation {
+  id                 String    @id @default(cuid()) // = uploadId
+  userId             String
+  objectKey          String
+  declaredSizeBytes  Int
+  contentType        String
+  assetType          String // image|document|audio|video
+  status             String // pending|completed|expired|aborted
+  assetUrl           String
+  expiresAt          DateTime
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, status])
+  @@index([expiresAt])
+  @@index([objectKey])
+}

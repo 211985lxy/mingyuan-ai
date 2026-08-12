@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { invalidateBrandingCache } from "@/lib/branding"
 import { prisma } from "@/lib/prisma"
 import { DEFAULT_SYSTEM_SETTINGS } from "@/lib/system-setting-definitions"
 
-export const POST = withAdminAuth(async (_request, { admin }) => {
+export const POST = withAdminOnly(async (_request, { admin }) => {
   let created = 0
 
   for (const setting of DEFAULT_SYSTEM_SETTINGS) {
@@ -27,4 +27,4 @@ export const POST = withAdminAuth(async (_request, { admin }) => {
   return NextResponse.json({
     data: { seeded: created, total: DEFAULT_SYSTEM_SETTINGS.length },
   })
-}, "admin")
+})

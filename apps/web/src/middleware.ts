@@ -6,14 +6,14 @@ import { jwtVerify } from "jose"
  *
  * 背景：`src/app/admin/layout.tsx` 此前仅靠客户端 `AdminAuthGuard`（useEffect 跳转）
  * 拦截，未登录访问 `/admin/*` 时页面 HTML/JS bundle 仍会下发到浏览器，且整体安全
- * 完全依赖"每个 admin API 都记得包裹 withAdminAuth"。本 middleware 在 Edge 运行时
+ * 完全依赖"每个 admin API 都记得包裹 withAdminOnly/withAdminOrEditor"。本 middleware 在 Edge 运行时
  * 增加一道服务端校验，杜绝 bundle 泄露与纵深缺失。
  *
- * 设计原则（与 withAdminAuth 分工）：
+ * 设计原则（与 withAdminOnly/withAdminOrEditor 分工）：
  *   - middleware：轻量 JWT 签名/过期校验（Edge runtime，不连库、不做角色判断）。
- *   - withAdminAuth（API 层）：完整的 sessionVersion/isActive/role 校验，仍是唯一权威。
+ *   - withAdminOnly/withAdminOrEditor（API 层）：完整的 sessionVersion/isActive/role 校验，仍是唯一权威。
  *   - secret 缺失时 fail-open（放行）：生产环境 secret 必然注入，且密钥强度/有效性
- *     由 withAdminAuth 兜底；此处只做"有 cookie 且签名正确"的快速拦截，避免在 Edge
+ *     由 withAdminOnly/withAdminOrEditor 兜底；此处只做"有 cookie 且签名正确"的快速拦截，避免在 Edge
  *     环境（如部分预览环境未注入 secret）误伤正常请求。
  *
  * 注意：Edge runtime 不支持 jsonwebtoken/prisma，因此用 jose 做对称 HS256 校验，
@@ -43,7 +43,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const secret = getSecret()
-  // secret 未配置/过短：fail-open，交由 API 层 withAdminAuth 兜底（它会 fail-fast）。
+  // secret 未配置/过短：fail-open，交由 API 层 withAdminOnly/withAdminOrEditor 兜底（它会 fail-fast）。
   if (!secret) {
     return NextResponse.next()
   }

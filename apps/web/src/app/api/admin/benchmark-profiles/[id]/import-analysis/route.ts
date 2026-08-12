@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags } from "@/lib/knowledge-tags"
@@ -88,7 +88,7 @@ function buildViralContent(
 }
 
 // 一键拉取：把已分析的竞品报告 + 关联的作品池汇总进档案素材（幂等 + 事务化）
-export const POST = withAdminAuth(async (request, { params }) => {
+export const POST = withAdminOrEditor(async (request, { params }) => {
   const id = params?.id
   if (!id) {
     return NextResponse.json({ error: "缺少档案 id" }, { status: 400 })

@@ -1,48 +1,39 @@
-import { NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
+import { NextRequest, NextResponse } from "next/server"
+import { withUserAuth } from "@/lib/user-auth"
+import { incrementSecurityMetric } from "@/lib/security-metrics"
+import {
+  isObsidianExportEnabledForUser,
+  loadObsidianSyncConfig,
+  resolveFixedExportRoot,
+} from "@/lib/obsidian-export"
 
 /**
- * @description 处理 GET 请求
- * @returns 无返回值
+ * @description Obsidian 导出能力状态；默认关闭，不回传服务器绝对路径
  */
-export async function GET() {
+export const GET = withUserAuth(async (_request: NextRequest, { user }) => {
+  if (!isObsidianExportEnabledForUser(user.id)) {
+    incrementSecurityMetric("obsidian.denied", { reason: "status_disabled_or_wrong_user" })
+    return NextResponse.json({
+      enabled: false,
+      isPhysicalMode: false,
+    })
+  }
+
   try {
-    let configFilePath = ""
-    const candidates = [
-      path.join(process.cwd(), ".obsidian-sync.json"),
-      path.join(process.cwd(), "../../", ".obsidian-sync.json"),
-      path.join(process.cwd(), "apps/web", ".obsidian-sync.json"),
-    ]
-
-    for (const c of candidates) {
-      if (fs.existsSync(c)) {
-        configFilePath = c
-        break
-      }
-    }
-
-    if (!configFilePath) {
+    const config = await loadObsidianSyncConfig()
+    if (!config) {
       return NextResponse.json({
+        enabled: true,
         isPhysicalMode: false,
-        obsidianVaultPath: "",
       })
     }
 
-    const fileData = fs.readFileSync(configFilePath, "utf-8")
-    const config = JSON.parse(fileData)
-
-    const vaultPath = config.obsidianVaultPath || ""
-    const isPhysicalMode = !!vaultPath && fs.existsSync(vaultPath)
-
+    const root = await resolveFixedExportRoot(config)
     return NextResponse.json({
-      isPhysicalMode,
-      obsidianVaultPath: vaultPath,
+      enabled: true,
+      isPhysicalMode: root.ok,
     })
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Internal Server Error", details: (error as Error).message },
-      { status: 500 }
-    )
+  } catch {
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
-}
+})

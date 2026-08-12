@@ -13,6 +13,7 @@ model User {
   ipProfile             IpProfile?
   contentGenerationRuns ContentGenerationRun[]
   assets                Asset[]
+  assetUploadReservations AssetUploadReservation[]
   scripts               Script[]
   activationCodes       ActivationCode[]
   topicSelections       TopicSelection[]

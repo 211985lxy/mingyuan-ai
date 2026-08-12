@@ -32,7 +32,7 @@ export type MeetingMinutesWorkspaceVariant = "page" | "embedded"
  * 会议纪要工作台：上传腾讯会议本地录制 → 云端转写（说话人分离）→ 自动生成洞察。
  *
  * 文件入口走 OSS 直传（不经飞书 IM，规避 100MB 限制）：
- *   选文件 → /api/assets/upload-url 拿 PUT 预签名 → 直传 OSS → 拿 assetUrl
+ *   选文件 → /api/assets/upload-url 拿 POST Policy → 直传 OSS → complete → assetUrl
  *   → /api/aim/meeting-recording 编排（转写 + 建经营事项 + meeting-insight）
  *
  * variant=embedded：知识库入库弹层用，去掉独立页英雄头。
@@ -93,32 +93,55 @@ export function MeetingMinutesWorkspace({
     setResultLink("")
 
     try {
-      // 1. 拿 OSS 直传预签名
+      // 1. 拿 OSS PostObject 预约（绑定 sizeBytes）
       setStage("uploading")
       setProgressMsg("正在准备上传…")
       const contentType = file.type || "video/mp4"
+      const assetType = contentType.startsWith("audio/") ? "audio" : "video"
       const urlRes = await fetch("/api/assets/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, contentType }),
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType,
+          sizeBytes: file.size,
+          assetType,
+        }),
       })
       if (!urlRes.ok) {
         const e = await urlRes.json().catch(() => ({}))
         throw new Error(e.error ?? `获取上传地址失败 (${urlRes.status})`)
       }
       const { data: uploadData } = await urlRes.json()
-      if (!uploadData?.uploadUrl || !uploadData?.assetUrl) {
+      if (!uploadData?.uploadUrl || !uploadData?.fields || !uploadData?.assetUrl) {
         throw new Error("上传地址返回不完整。")
       }
 
-      // 2. 直传 OSS
+      // 2. POST 直传 OSS（表单字段由服务端签发）
       setProgressMsg(`正在上传 ${file.name}（${(file.size / 1024 / 1024).toFixed(1)} MB）…`)
-      const putRes = await fetch(uploadData.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": contentType },
-        body: file,
-      })
-      if (!putRes.ok) throw new Error(`上传到 OSS 失败 (${putRes.status})`)
+      const form = new FormData()
+      for (const [key, value] of Object.entries(uploadData.fields as Record<string, string>)) {
+        form.append(key, value)
+      }
+      form.append("file", file)
+      const postRes = await fetch(uploadData.uploadUrl, { method: "POST", body: form })
+      if (!postRes.ok) throw new Error(`上传到 OSS 失败 (${postRes.status})`)
+
+      // 2b. 完成校验并登记素材
+      if (uploadData.uploadId) {
+        const completeRes = await fetch(
+          `/api/assets/uploads/${encodeURIComponent(uploadData.uploadId)}/complete`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: meetingTitle.trim() || file.name }),
+          },
+        )
+        if (!completeRes.ok) {
+          const e = await completeRes.json().catch(() => ({}))
+          throw new Error(e.error ?? `确认上传失败 (${completeRes.status})`)
+        }
+      }
 
       // 3. 转写 + 洞察（编排入口，含转写轮询）
       setStage("transcribing")

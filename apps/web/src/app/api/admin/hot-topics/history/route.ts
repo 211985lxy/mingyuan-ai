@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async (request) => {
+export const GET = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1)
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20))

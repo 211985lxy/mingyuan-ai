@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { BUILT_IN_ACCOUNT_SOURCE_BINDINGS } from "@/lib/account-industry-sources"
 import {
   buildHotSourceBinding,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/hot-source-settings"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async () => {
+export const GET = withAdminOnly(async () => {
   const settings = await prisma.systemSetting.findMany({
     where: { category: HOT_SOURCE_CATEGORY },
     orderBy: { updatedAt: "desc" },
@@ -49,9 +49,9 @@ export const GET = withAdminAuth(async () => {
     )
 
   return NextResponse.json({ data: [...rows, ...builtInRows] })
-}, "admin")
+})
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   const body = await parseJsonRecord(request)
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : ""
   const sourceName = typeof body.sourceName === "string" ? body.sourceName.trim() : ""
@@ -106,4 +106,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
   })
 
   return NextResponse.json({ data: setting })
-}, "admin")
+})

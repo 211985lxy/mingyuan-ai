@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { isValidAimAgent } from "@/lib/aim-harness/contracts"
 import type { AimCustomSkill } from "@/generated/prisma/client"
 
 /** GET /api/admin/aim/skills?agentId=xxx —— 列出自定义技能（可按 agent 过滤） */
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const agentId = request.nextUrl.searchParams.get("agentId") || undefined
   const where = agentId ? { agentId } : {}
   const rows = await prisma.aimCustomSkill.findMany({
@@ -19,7 +19,7 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
 })
 
 /** POST /api/admin/aim/skills —— 新建自定义技能 */
-export const POST = withAdminAuth(async (request: NextRequest) => {
+export const POST = withAdminOnly(async (request: NextRequest) => {
   const body = await parseJsonRecord(request)
   const parsed = parseSkillInput(body)
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })

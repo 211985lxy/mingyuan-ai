@@ -1,11 +1,11 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { invalidateBrandingCache, isBrandingSettingKey } from "@/lib/branding"
 import { prisma } from "@/lib/prisma"
 import { recordAdminAudit } from "@/lib/admin-audit"
 
-export const PUT = withAdminAuth(async (request: NextRequest, { admin, params }) => {
+export const PUT = withAdminOnly(async (request: NextRequest, { admin, params }) => {
   const key = params?.key
   if (!key) {
     return NextResponse.json({ error: "Key required" }, { status: 400 })
@@ -69,4 +69,4 @@ export const PUT = withAdminAuth(async (request: NextRequest, { admin, params })
   })
 
   return NextResponse.json({ data: setting }, { headers: { "x-request-id": requestId } })
-}, "admin")
+})

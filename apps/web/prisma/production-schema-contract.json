@@ -458,6 +458,23 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    {
+      "name": "AssetUploadReservation",
+      "columns": [
+        "id",
+        "userId",
+        "objectKey",
+        "declaredSizeBytes",
+        "contentType",
+        "assetType",
+        "status",
+        "assetUrl",
+        "expiresAt",
+        "completedAt",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   ]
 }

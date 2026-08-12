@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { parseJsonRecord } from "@/lib/api-contract"
 import {
@@ -18,7 +18,7 @@ function parseLimit(value: string | null): number {
   return Math.min(Math.floor(parsed), 100)
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const url = new URL(request.url)
   const generationId = url.searchParams.get("generationId")?.trim()
   const userId = url.searchParams.get("userId")?.trim()
@@ -33,9 +33,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     take: parseLimit(url.searchParams.get("limit")),
   })
   return NextResponse.json({ items })
-}, "admin")
+})
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -91,4 +91,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
       { status: 409 },
     )
   }
-}, "admin")
+})

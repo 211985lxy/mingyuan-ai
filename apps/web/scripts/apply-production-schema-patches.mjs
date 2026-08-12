@@ -469,6 +469,26 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     ADD COLUMN IF NOT EXISTS \`customerOutcomeProjectionId\` VARCHAR(191) NULL`,
   `ALTER TABLE \`AssetCandidate\`
     ADD COLUMN IF NOT EXISTS \`wikiPageType\` VARCHAR(32) NULL`,
+  // ── OSS 直传预约（安全升级：绑定大小/类型/用户目录） ──
+  `CREATE TABLE IF NOT EXISTS \`AssetUploadReservation\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`userId\` VARCHAR(191) NOT NULL,
+    \`objectKey\` VARCHAR(191) NOT NULL,
+    \`declaredSizeBytes\` INT NOT NULL,
+    \`contentType\` VARCHAR(191) NOT NULL,
+    \`assetType\` VARCHAR(191) NOT NULL,
+    \`status\` VARCHAR(191) NOT NULL,
+    \`assetUrl\` VARCHAR(191) NOT NULL,
+    \`expiresAt\` DATETIME(3) NOT NULL,
+    \`completedAt\` DATETIME(3) NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+    INDEX \`AssetUploadReservation_userId_status_idx\`(\`userId\`, \`status\`),
+    INDEX \`AssetUploadReservation_expiresAt_idx\`(\`expiresAt\`),
+    INDEX \`AssetUploadReservation_objectKey_idx\`(\`objectKey\`),
+    PRIMARY KEY (\`id\`),
+    CONSTRAINT \`AssetUploadReservation_userId_fkey\` FOREIGN KEY (\`userId\`) REFERENCES \`User\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE
+  ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 ]
 
 function runMysql(connection, query) {

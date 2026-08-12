@@ -26,7 +26,7 @@ function authOf(source, route) {
   // 由路由注释声明（仍需评审保证声明属实）。
   const declared = source.match(/api-inventory:\s*auth=(signed_integration)\b/)?.[1]
   if (declared) return declared
-  if (source.includes("withAdminAuth")) return "admin_session"
+  if (source.includes("withAdminOnly") || source.includes("withAdminOrEditor") || source.includes("withAdminAuth")) return "admin_session"
   if (source.includes("authenticateAgentRequest")) return "agent_key"
   if (source.includes("withUserAuth") || source.includes("authenticateRequest")) return "user_session"
   if (source.includes("validateCronSecret")) return "cron_secret"
@@ -95,6 +95,8 @@ const unboundedMultipart = entries.filter((entry) => {
   const source = readFileSync(join(root, entry.file), "utf8")
   return !source.includes("enforceUploadSizeLimit")
     && !source.includes("INTERNAL_BETA_LIMITS.uploadBytes")
+    && !source.includes("receiveKnowledgeMultipart")
+    && !source.includes("KNOWLEDGE_MULTIPART_LIMITS")
     && !source.includes("api-inventory: upload-limit=internal-beta")
 })
 if (unboundedMultipart.length) {

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async () => {
+export const GET = withAdminOnly(async () => {
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 

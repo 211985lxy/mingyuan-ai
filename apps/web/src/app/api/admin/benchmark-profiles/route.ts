@@ -1,12 +1,12 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
 const ALLOWED_PLATFORMS = new Set(["douyin", "xiaohongshu", "wechat_channels", "bilibili", "kuaishou"])
 
 // GET — 真实档案列表（支持按项目/状态/平台/搜索筛选 + 分页）
-export const GET = withAdminAuth(async (request) => {
+export const GET = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const projectId = searchParams.get("projectId") ?? ""
   const status = searchParams.get("status") ?? "active"
@@ -48,7 +48,7 @@ export const GET = withAdminAuth(async (request) => {
 })
 
 // POST — 新建真实档案（必须指定 projectId，去重时返回 duplicate flag）
-export const POST = withAdminAuth(async (request) => {
+export const POST = withAdminOrEditor(async (request) => {
   const body = await parseJsonRecord(request)
   const {
     name,

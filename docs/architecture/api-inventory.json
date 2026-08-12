@@ -734,7 +734,7 @@
         "POST"
       ],
       "auth": "admin_session",
-      "input": "multipart",
+      "input": "none",
       "query": "none",
       "externalService": false,
       "cost": "low",
@@ -1702,7 +1702,20 @@
       "input": "bounded_json_object",
       "query": "none",
       "externalService": false,
-      "cost": "high",
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/assets/uploads/[uploadId]/complete",
+      "file": "src/app/api/assets/uploads/[uploadId]/complete/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -2728,7 +2741,7 @@
       "input": "bounded_json_object",
       "query": "none",
       "externalService": false,
-      "cost": "high",
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -2737,7 +2750,7 @@
       "methods": [
         "GET"
       ],
-      "auth": "public",
+      "auth": "user_session",
       "input": "none",
       "query": "none",
       "externalService": false,
@@ -2804,7 +2817,7 @@
         "POST"
       ],
       "auth": "user_session",
-      "input": "multipart",
+      "input": "none",
       "query": "none",
       "externalService": false,
       "cost": "low",

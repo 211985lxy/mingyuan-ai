@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import {
   loadBusinessAttributionSource as collectLarkBusinessAttributionSource,
   readBusinessAttributionSyncConfig,
@@ -50,7 +50,7 @@ function parseCohortQuery(request: NextRequest) {
   return { ok: true as const, start, end, requestedDimension, projectId }
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const query = parseCohortQuery(request)
   if (!query.ok) {
     return NextResponse.json({ error: query.error }, { status: 400 })
@@ -115,4 +115,4 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
       error: error instanceof Error ? error.message : "客户分群经营分析失败",
     }, { status: 409 })
   }
-}, "admin")
+})

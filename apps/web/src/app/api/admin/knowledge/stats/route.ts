@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { CATEGORY_LABELS, SOURCE_TYPE_LABELS } from "@/lib/knowledge-categories"
 import { parseKnowledgeTags } from "@/lib/knowledge-tags"
@@ -7,7 +7,7 @@ import { parseKnowledgeTags } from "@/lib/knowledge-tags"
 const TOTAL_CATEGORIES = 12
 
 // GET — 知识库统计（分类分布、价值分级、项目维度、向量化状态、结构健康度）
-export const GET = withAdminAuth(async (request) => {
+export const GET = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const projectIdParam = searchParams.get("projectId") ?? ""
 

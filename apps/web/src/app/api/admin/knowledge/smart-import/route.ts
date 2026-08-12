@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { parseDocument } from "@/lib/document-parser"
 import { processChunksForSmartImport } from "@/lib/knowledge-auto-processor"
@@ -11,7 +11,7 @@ export const maxDuration = 120
  * POST /api/admin/knowledge/smart-import
  * 接收文件 → 解析 → LLM 分类/标签/去重 → 返回预览结果（不写库）
  */
-export const POST = withAdminAuth(async (request, { admin }) => {
+export const POST = withAdminOrEditor(async (request, { admin }) => {
   const formData = await request.formData()
   const files = formData.getAll("files") as File[]
   const projectIdValue = formData.get("projectId")

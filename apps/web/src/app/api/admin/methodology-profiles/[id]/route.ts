@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import {
   createMethodologyProfileVersion,
@@ -42,7 +42,7 @@ async function requirePublishApproval(
 }
 
 /** GET /api/admin/methodology-profiles/[id] —— 详情 + 全部版本。 */
-export const GET = withAdminAuth(async (_request, { params }) => {
+export const GET = withAdminOrEditor(async (_request, { params }) => {
   const id = params?.id
   if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 })
   const detail = await getMethodologyProfileAdminDetail(id)
@@ -51,7 +51,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
 })
 
 /** PATCH /api/admin/methodology-profiles/[id] —— 更新元信息（名称/别名/状态等）。 */
-export const PATCH = withAdminAuth(async (request: NextRequest, { admin, params }) => {
+export const PATCH = withAdminOrEditor(async (request: NextRequest, { admin, params }) => {
   const id = params?.id
   if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 })
   try {
@@ -105,7 +105,7 @@ export const PATCH = withAdminAuth(async (request: NextRequest, { admin, params 
  * body: { compiledPrompt, contentMarkdown?, status?: "draft"|"published", action?: "publish_version", versionId? }
  * action=publish_version + versionId：把已有 draft 发布。
  */
-export const POST = withAdminAuth(async (request: NextRequest, { admin, params }) => {
+export const POST = withAdminOrEditor(async (request: NextRequest, { admin, params }) => {
   const id = params?.id
   if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 })
   try {

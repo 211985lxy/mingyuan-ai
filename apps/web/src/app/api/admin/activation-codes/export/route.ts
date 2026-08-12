@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
+import { recordAdminAudit } from "@/lib/admin-audit"
 import { prisma } from "@/lib/prisma"
 
 function escapeCsvValue(value: string): string {
@@ -10,7 +11,7 @@ function escapeCsvValue(value: string): string {
   return value
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest, { admin }) => {
   const url = new URL(request.url)
   const status = url.searchParams.get("status") || ""
   const batchId = url.searchParams.get("batchId") || ""
@@ -44,6 +45,18 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     return NextResponse.json({ error: "导出结果超过 10000 条，请先按状态或批次筛选" }, { status: 413 })
   }
 
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "activation_codes.export",
+    targetType: "activation_code_export",
+    metadata: {
+      status: status || null,
+      batchId: batchId || null,
+      resultCount: codes.length,
+    },
+  })
+
   const header = "Code,Status,Duration Days,Batch Note,Used By,Used At,Created At"
   const rows = codes.map((c) => {
     const code = c.code.replace(/(.{4})/g, "$1-").replace(/-$/, "")
@@ -67,6 +80,7 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="activation-codes-${Date.now()}.csv"`,
+      "x-request-id": requestId,
     },
   })
 })

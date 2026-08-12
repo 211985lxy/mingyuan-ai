@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@/generated/prisma/client"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { parseJsonRecord } from "@/lib/api-contract"
 import {
@@ -24,7 +24,7 @@ function limit(value: string | null): number {
   return Math.min(Math.floor(parsed), 100)
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const url = new URL(request.url)
   const projectId = url.searchParams.get("projectId")?.trim()
   const reviewStatus = url.searchParams.get("reviewStatus")?.trim()
@@ -37,7 +37,7 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     take: limit(url.searchParams.get("limit")),
   })
   return NextResponse.json({ items })
-}, "admin")
+})
 
 async function generateApprovedCaseCandidates(
   projectionId: string,
@@ -95,7 +95,7 @@ async function loadOrSyncCustomerOutcomes(mode: "verify" | "sync") {
   return { result, targetId: config.tableId }
 }
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -143,4 +143,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
       { status: 409 },
     )
   }
-}, "admin")
+})

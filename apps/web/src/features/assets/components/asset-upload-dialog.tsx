@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/select";
 import { assetTypeConfig, type AssetType } from "@/features/assets/asset-page-shared";
 import {
-  registerAsset,
   uploadFileToStorage,
 } from "@/lib/api/client";
 
@@ -96,12 +95,12 @@ export function AssetUploadDialog({ onUploaded }: { onUploaded: () => void }) {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const assetUrl = await uploadFileToStorage(assetFile);
-      await registerAsset({
+      const mappedType =
+        assetType === "music" ? "audio" : (assetType as "image" | "video");
+      await uploadFileToStorage(assetFile, {
+        assetType: mappedType,
         name: name.trim(),
-        assetType,
-        url: assetUrl,
-        size: assetFile.size,
+        register: true,
       });
       setOpen(false);
       resetForm();

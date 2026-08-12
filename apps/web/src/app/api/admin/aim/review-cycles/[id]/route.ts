@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { validateHighRiskApproval } from "@/lib/aim/approval-validation"
@@ -66,7 +66,7 @@ async function validateReviewCycleApproval(input: {
   })
 }
 
-export const PATCH = withAdminAuth(async (
+export const PATCH = withAdminOnly(async (
   request: NextRequest,
   { admin, params },
 ) => {
@@ -124,4 +124,4 @@ export const PATCH = withAdminAuth(async (
       error: error instanceof Error ? error.message : "周复盘操作失败",
     }, { status: 409 })
   }
-}, "admin")
+})
