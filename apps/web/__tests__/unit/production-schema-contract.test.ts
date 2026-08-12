@@ -19,6 +19,7 @@ describe("production schema contract", () => {
     expect(byName.get("AssetCandidate")).toEqual(
       expect.arrayContaining(["promotedAt", "promotedEntryId"]),
     )
+    expect(byName.get("TopicSelection")).toEqual(expect.arrayContaining(["projectId"]))
     for (const table of [
       "TaskEfficiencyBaseline",
       "GovernanceAssignment",

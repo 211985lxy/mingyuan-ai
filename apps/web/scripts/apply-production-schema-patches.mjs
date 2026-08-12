@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url"
 import { parseMysqlUrl } from "./verify-production-schema.mjs"
 
 export const PRODUCTION_SCHEMA_PATCHES = [
+  `ALTER TABLE \`TopicSelection\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD INDEX IF NOT EXISTS \`TopicSelection_projectId_createdAt_idx\`(\`projectId\`, \`createdAt\`)`,
   `ALTER TABLE \`AimExecutionTrace\`
     ADD COLUMN IF NOT EXISTS \`inputTokens\` INTEGER NULL,
     ADD COLUMN IF NOT EXISTS \`outputTokens\` INTEGER NULL,

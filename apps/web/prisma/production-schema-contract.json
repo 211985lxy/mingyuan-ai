@@ -1,6 +1,15 @@
 {
   "tables": [
     {
+      "name": "TopicSelection",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "createdAt"
+      ]
+    },
+    {
       "name": "AimGeneration",
       "columns": [
         "id",

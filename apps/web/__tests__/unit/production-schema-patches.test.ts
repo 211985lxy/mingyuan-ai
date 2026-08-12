@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest"
 import { PRODUCTION_SCHEMA_PATCHES } from "../../scripts/apply-production-schema-patches.mjs"
 
 describe("production schema patches", () => {
+  it("adds project scope to TopicSelection for the weekly content board", () => {
+    const topicSelectionPatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
+      patch.startsWith("ALTER TABLE `TopicSelection`") && patch.includes("`projectId`"),
+    )
+
+    expect(topicSelectionPatch).toContain("TopicSelection_projectId_createdAt_idx")
+  })
+
   it("repairs execution trace telemetry columns idempotently", () => {
     const tracePatch = PRODUCTION_SCHEMA_PATCHES.find((patch) =>
       patch.startsWith("ALTER TABLE `AimExecutionTrace`"),
