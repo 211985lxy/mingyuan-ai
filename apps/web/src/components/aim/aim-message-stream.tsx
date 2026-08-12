@@ -59,10 +59,23 @@ function MessageContent({ message, showThinkingProcess }: {
 
 function RunDiagnostics({ message }: { message: AimWorkbenchMessage }) {
   if (!message.deliverables || (!message.degraded && (!message.qualityStatus || message.qualityStatus === "pass")) || !message.runId) return null
+  // 按状态分严重度：fail=红、warn/degraded=琥珀、skipped=中性灰。
+  // 避免 fail 被灰底弱化、与 degraded 严重度倒挂；徽标文案直接点明状态，不再追加次级行。
+  const tone = message.degraded || message.qualityStatus === "warn"
+    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+    : message.qualityStatus === "fail"
+      ? "bg-red-500/10 text-red-600 dark:text-red-400"
+      : "bg-muted"
+  const badge = message.degraded
+    ? "已使用备用模型完成"
+    : message.qualityStatus === "fail"
+      ? "质检未通过"
+      : message.qualityStatus === "warn"
+        ? "待优化"
+        : "免质检"
   return <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${message.degraded ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-muted"}`}>{message.degraded ? "已使用备用模型完成" : "质量提示"}</span>
+    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${tone}`}>{badge}</span>
     <span>执行编号 {message.runId}</span>
-    {message.qualityStatus && message.qualityStatus !== "pass" ? <span>· 质量 {message.qualityStatus === "warn" ? "待优化" : message.qualityStatus === "fail" ? "未通过" : message.qualityStatus}</span> : null}
   </div>
 }
 

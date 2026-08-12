@@ -40,7 +40,7 @@ function TrafficPotential({ check }: { check: NonNullable<QualityCheckReport["pu
 
 function PublishCheck({ check }: { check: NonNullable<QualityCheckReport["publishCheck"]> }) {
   return <div className="mt-4 space-y-3 border-t pt-4">
-    <div className="flex items-center gap-2 text-sm font-semibold">抖音发布前自查<Badge variant={check.verdict === "可发" ? "default" : "destructive"} className="ml-auto">{check.verdict}</Badge></div>
+    <div className="flex items-center gap-2 text-sm font-semibold">发布前自查<Badge variant={check.verdict === "可发" ? "default" : "destructive"} className="ml-auto">{check.verdict}</Badge></div>
     <PublishViolations check={check} />
     <TrafficPotential check={check} />
   </div>
