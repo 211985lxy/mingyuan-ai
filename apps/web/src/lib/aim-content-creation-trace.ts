@@ -135,10 +135,10 @@ ${citationBlock}
 /**
  * @description 确保内容包含创作溯源信息
  */
-export function ensureContentCreationTrace(content: string, context: AimGenerateContext): string {
+export function ensureContentCreationTrace(content: string, context: AimGenerateContext, safetyWarning?: string): string {
   const trimmed = content.trim()
   if (context.runtimeTask === "light_edit") {
-    return normalizeTracedContentSpacing(trimmed)
+    return prependSafetyWarning(normalizeTracedContentSpacing(trimmed), safetyWarning)
   }
   const existing = trimmed.match(METHOD_NOTE_PATTERN)
   const note = existing?.[0] || ""
@@ -147,7 +147,7 @@ export function ensureContentCreationTrace(content: string, context: AimGenerate
   if (complete) {
     const patchedNote = attachDeterministicCitationNote(patchPlaceholderTraceSources(note, context), context)
     const next = patchedNote === note ? trimmed : trimmed.replace(note, patchedNote)
-    return normalizeTracedContentSpacing(next)
+    return prependSafetyWarning(normalizeTracedContentSpacing(next), safetyWarning)
   }
   // 旧版 METHOD_NOTE 缺方法论段：保留原文说明并前置补齐目标/路由/卡片/结构
   if (note && ["风格定位", "教学拆解"].every((label) => note.includes(label))) {
@@ -157,10 +157,27 @@ export function ensureContentCreationTrace(content: string, context: AimGenerate
     const patchedInner = note
       .replace("[[AIM_METHOD_NOTE]]", `[[AIM_METHOD_NOTE]]\n${planSection}\n`)
     const withCite = attachDeterministicCitationNote(patchPlaceholderTraceSources(patchedInner, context), context)
-    return normalizeTracedContentSpacing(trimmed.replace(note, withCite))
+    return prependSafetyWarning(normalizeTracedContentSpacing(trimmed.replace(note, withCite)), safetyWarning)
   }
   const result = existing ? trimmed.replace(existing[0], "").trim() : trimmed
-  return normalizeTracedContentSpacing(`${buildFallbackContentCreationTrace(context)}\n\n${result}`)
+  return prependSafetyWarning(normalizeTracedContentSpacing(`${buildFallbackContentCreationTrace(context)}\n\n${result}`), safetyWarning)
+}
+
+/** 安全风险提示在 METHOD_NOTE 中的前缀（前端据此把提示提升为非折叠横幅，避免被埋在折叠区）。 */
+export const SAFETY_WARNING_MARKER = "⚠ 内容安全提示："
+
+/**
+ * 把安全风险提示注入 METHOD_NOTE 首行（落入"思考依据"区，不污染正文）；
+ * 内容无 METHOD_NOTE 时则前置一个提示块。warning 为空时原样返回。
+ */
+function prependSafetyWarning(content: string, warning: string | undefined): string {
+  if (!warning) return content
+  const openTag = "[[AIM_METHOD_NOTE]]"
+  const note = `${SAFETY_WARNING_MARKER}${warning}`
+  if (content.includes(openTag)) {
+    return content.replace(openTag, `${openTag}\n${note}`)
+  }
+  return `${openTag}\n${note}\n[[/AIM_METHOD_NOTE]]\n\n${content}`
 }
 
 /** METHOD_NOTE 保留；仅压缩正文区多余空行 */

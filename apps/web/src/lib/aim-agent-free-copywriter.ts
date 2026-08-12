@@ -108,7 +108,7 @@ ${includeCreationTrace ? `\n${CONTENT_CREATION_TRACE_RULE}` : ""}`
 "${context.rawInput}"
 ${context.polishInstruction ? `修改要求：${context.polishInstruction}` : ""}
 ${compactTask ? `\n${compactTask}` : ""}`
-    const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
+    const { completion, parsed, safetyWarning } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
       systemPrompt,
       userPrompt,
@@ -118,6 +118,7 @@ ${compactTask ? `\n${compactTask}` : ""}`
     const content = ensureContentCreationTrace(
       parsed[format] || completion.content,
       context,
+      safetyWarning,
     )
     const record = await saveAimGenerationRecord(context, completion, { [format]: content } as Record<ContentFormat, string | undefined>)
 

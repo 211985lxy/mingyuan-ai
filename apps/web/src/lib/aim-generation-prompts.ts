@@ -205,6 +205,23 @@ export function composeLayeredAimPrompt(input: LayeredAimPromptInput): string {
 }
 
 /**
+ * 把末次重写仍命中的安全风险拼成给用户看的中文提示（写入 METHOD_NOTE/思考依据）。
+ * 仅在 maxAttempts 轮重写后仍有安全违规时调用。
+ */
+function summarizeSafetyFindingsForUser(
+  safety: ReturnType<typeof inspectGenerationSafety>,
+  maxAttempts: number,
+): string {
+  const risks = [
+    safety.copiedFormats.length ? `${safety.copiedFormats.join("、")} 与对标原文过于相似` : "",
+    safety.unsupportedClaimFormats.length ? `${safety.unsupportedClaimFormats.join("、")} 含上下文无依据的人物/客户/场景主张` : "",
+    safety.unsupportedNumericClaimFormats.length ? `${safety.unsupportedNumericClaimFormats.join("、")} 含用户原文未出现的数字` : "",
+    safety.lightEditScopeViolationFormats.length ? `${safety.lightEditScopeViolationFormats.join("、")} 轻改越界、丢失原文信息` : "",
+  ].filter(Boolean)
+  return `经 ${maxAttempts} 轮重写仍检出风险（${risks.join("；")}），以下为最后一版，发布前请人工核实。`
+}
+
+/**
  * @description 执行 LLM 生成并带对标抄袭检测重试
  * @param agentId - 智能体 ID
  * @returns 生成结果（完成响应和解析内容）
@@ -286,7 +303,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       && goalVerify.ok
       && ipCompliance.ok
     ) {
-      return { completion, parsed, goalVerify, ipCompliance }
+      return { completion, parsed, goalVerify, ipCompliance, safetyWarning: undefined }
     }
     if (attempt === maxAttempts - 1) {
       if (incompleteFormats.length) {
@@ -298,16 +315,18 @@ export async function executeGenerateLLMWithBenchmarkRetry(
           throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
         }
       }
-      if (
-        safety.copiedFormats.length
-        || safety.unsupportedNumericClaimFormats.length
-        || safety.unsupportedClaimFormats.length
-        || safety.lightEditScopeViolationFormats.length
-      ) {
-        throw new Error("生成结果出现事实风险、过度近似原文或轻改信息丢失，已停止交付")
-      }
-      // 目标质检或 IP 合规末次仍失败：交付最后一版，由 METHOD_NOTE 记录；不硬抛
-      return { completion, parsed, goalVerify, ipCompliance }
+      // 安全闸门末次仍命中：不再硬抛卡死。交付已清洗的最后一版，把具体风险写入
+      // safetyWarning，由 ensureContentCreationTrace 注入 METHOD_NOTE（思考依据）供人工复核。
+      const hasSafetyViolation =
+        safety.copiedFormats.length > 0
+        || safety.unsupportedNumericClaimFormats.length > 0
+        || safety.unsupportedClaimFormats.length > 0
+        || safety.lightEditScopeViolationFormats.length > 0
+      const safetyWarning = hasSafetyViolation
+        ? summarizeSafetyFindingsForUser(safety, maxAttempts)
+        : undefined
+      // 目标质检或 IP 合规末次仍失败：同样交付最后一版，不硬抛
+      return { completion, parsed, goalVerify, ipCompliance, safetyWarning }
     }
 
     if (incompleteFormats.length) {
@@ -353,7 +372,9 @@ ${previousOutput}`
     }
   }
 
-  throw new Error("生成后质检未完成")
+  // 控制流兜底：重试循环的末次迭代必然 return/throw，正常情况到不了这里。
+  // 文案保持用户可读，避免一旦被改动到后外泄内部术语。
+  throw new Error("生成失败，请稍后重试")
 }
 
 /**

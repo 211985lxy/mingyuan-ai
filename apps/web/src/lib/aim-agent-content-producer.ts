@@ -129,7 +129,7 @@ export class ContentProducerHandler implements AimAgentHandler {
     const userPrompt = closedWorldFastRun
       ? `用户批准的全部事实与要求：\n${buildClosedWorldModelInput(context.rawInput)}\n\n写成自然、完整、可直接拍摄且符合指定时长的口播正文。事实标记前依次写清目标客户、用户明确给出的痛点、问题为什么会持续，以及不新增事实和数字的可执行判断；事实标记只能出现一次；标记后只保留用户指定的唯一行动引导。\n输出格式：\n${context.targetFormats.map((format) => `===FORMAT:${format}===`).join("\n")}`
       : buildUserPrompt(context, formatBlocks)
-    const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
+    const { completion, parsed, safetyWarning } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
       systemPrompt,
       userPrompt,
@@ -139,7 +139,7 @@ export class ContentProducerHandler implements AimAgentHandler {
     const traced = Object.fromEntries(
       context.targetFormats.map((format) => [
         format,
-        ensureContentCreationTrace(parsed[format] || "", context),
+        ensureContentCreationTrace(parsed[format] || "", context, safetyWarning),
       ]),
     ) as Record<(typeof context.targetFormats)[number], string>
     const record = await saveAimGenerationRecord(context, completion, traced)

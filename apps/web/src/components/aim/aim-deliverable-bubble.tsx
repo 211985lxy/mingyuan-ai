@@ -5,6 +5,7 @@ import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { AimNextAction } from "@/lib/aim-agent-guides"
 import { AIM_FORMAT_LABELS, splitAimMethodNote } from "@/lib/aim/workbench-display"
+import { SAFETY_WARNING_MARKER } from "@/lib/aim-content-creation-trace"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
 import type { AimGenerateResponse, AimGenerateResult, ContentFormat } from "@/lib/api/client"
@@ -111,10 +112,21 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
 }) {
   const display = splitAimMethodNote(item.content)
   const sessionKey = `${messageKey}:${item.format}`
+  // 安全闸门末次命中时，风险提示被注入 METHOD_NOTE；这里把它提取为非折叠横幅，
+  // 避免发布前必须核实的风险被埋在默认折叠的「思考依据」里。
+  const noteLines = display.methodNote ? display.methodNote.split("\n") : []
+  const safetyWarningLine = noteLines.find((line) => line.trim().startsWith(SAFETY_WARNING_MARKER))
+  const safetyWarning = safetyWarningLine ? safetyWarningLine.trim().slice(SAFETY_WARNING_MARKER.length).trim() : undefined
+  const methodNote = safetyWarning
+    ? noteLines.filter((line) => !line.trim().startsWith(SAFETY_WARNING_MARKER)).join("\n").replace(/^\n+/, "").trim()
+    : display.methodNote
   return <TabsContent value={item.format} className="space-y-3">
-    {display.methodNote ? <details className="rounded-md border border-border bg-muted/25 px-3 py-2.5 text-sm text-muted-foreground">
+    {safetyWarning ? <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
+      <span className="font-medium">⚠ 本版仍检出风险，发布前请人工核实</span>：{safetyWarning}
+    </div> : null}
+    {methodNote ? <details className="rounded-md border border-border bg-muted/25 px-3 py-2.5 text-sm text-muted-foreground">
       <summary className="cursor-pointer select-none font-medium text-foreground/80">思考依据</summary>
-      <div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div>
+      <div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={methodNote} /></div>
     </details> : null}
     <AimInlineDocumentCard
       messageId={messageKey}

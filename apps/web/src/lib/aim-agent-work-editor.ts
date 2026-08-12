@@ -130,7 +130,7 @@ ${workflowContext}
 
 ` : ""}请按作品编辑职责输出成品（润色 / 公众号排版 / 小红书图文）。若没有成稿却要求新写深度长文，只输出引导去内容创作的简短说明。`
 
-    const { completion, parsed } = await executeGenerateLLMWithBenchmarkRetry(
+    const { completion, parsed, safetyWarning } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
       systemPrompt,
       userPrompt,
@@ -138,7 +138,7 @@ ${workflowContext}
       safeTargets,
     )
 
-    const rawText = ensureContentCreationTrace(parsed.raw_copy || parsed.wechat_article || completion.content, context)
+    const rawText = ensureContentCreationTrace(parsed.raw_copy || parsed.wechat_article || completion.content, context, safetyWarning)
     const traced = { ...parsed, raw_copy: rawText }
     const record = await saveAimGenerationRecord(context, completion, traced)
 
