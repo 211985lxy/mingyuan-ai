@@ -26,6 +26,15 @@ const taskSpec = {
     failedFormats: [],
     knowledgeUsed: [],
   },
+  production: {
+    schemaVersion: 1,
+    kind: "shooting_handoff",
+    adapter: "manual",
+    status: "prepared",
+    sourceGenerationId: "gen_1",
+    evidenceRef: "manual-handoff:gen_1",
+    updatedAt: "2026-08-12T00:00:00.000Z",
+  },
 } as unknown as TaskSpec
 
 describe("formatPublishPackText", () => {
@@ -55,5 +64,7 @@ describe("formatPublishPackText", () => {
     expect(text).toContain("（发布后回填）")
     expect(text).toContain("【素材/拍摄交接】")
     expect(text).toContain("景别：近景")
+    expect(text).toContain("生产方式：人工交接")
+    expect(text).toContain("未产生可交付视频")
   })
 })

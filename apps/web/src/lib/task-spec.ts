@@ -2,6 +2,7 @@ import type { AimTaskType } from "@/lib/aim-generator"
 import { isCopyStudioModule, type CopyStudioModule } from "@/lib/copy-studio"
 import type { CanonicalContentSpec } from "@/lib/canonical-content-spec"
 import type { ContentPackageSpec } from "@/lib/content-package-spec"
+import type { ProductionExecutionSpec } from "@/lib/aim/production-execution-spec"
 
 export type CollaborationMode =
   | "direct_delivery"
@@ -82,6 +83,8 @@ export interface TaskSpec {
   canonical?: CanonicalContentSpec
   /** 多平台内容包状态（阶段 3） */
   contentPackage?: ContentPackageSpec
+  /** 平台中立生产执行状态；不以连接器或供应商为正本。 */
+  production?: ProductionExecutionSpec
   /** 编辑室样本锚点（内容机会 SourceBrief） */
   materialAnchors?: import("@/features/newsroom/contracts").SourceBrief
   /** 编辑室流水线阶段（独立于 workflowStatus） */

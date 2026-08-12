@@ -144,6 +144,20 @@ export function buildPublishPackSections(input: PublishPackInput): PublishPackSe
     })
   }
 
+  if (input.taskSpec?.production) {
+    const production = input.taskSpec.production
+    sections.push({
+      key: "production",
+      title: "生产执行",
+      body: [
+        `生产方式：${production.adapter === "manual" ? "人工交接" : "AIM 视频适配器"}`,
+        `状态：${production.status}`,
+        production.deliverableUrl ? `交付物：${production.deliverableUrl}` : "交付物：未产生可交付视频",
+        production.evidenceRef ? `交接证据：${production.evidenceRef}` : "",
+      ].filter(Boolean).join("\n"),
+    })
+  }
+
   for (const item of input.results) {
     if (item === primary || item.format === "shooting_brief") continue
     if (!item.content.trim()) continue
