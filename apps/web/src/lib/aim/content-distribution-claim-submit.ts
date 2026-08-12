@@ -29,6 +29,7 @@ export type SubmitContentDistributionClaimResult =
       openUrl: string | null
       draft: ContentDistributionClaimDraft
       mode: "copy_only"
+      connectorStatus: "disabled"
       reason: string
     }
   | { ok: false; error: string; draft?: ContentDistributionClaimDraft }
@@ -54,6 +55,7 @@ export async function submitContentDistributionClaim(input: {
       openUrl: null,
       draft,
       mode: "copy_only",
+      connectorStatus: "disabled",
       reason: error instanceof Error ? error.message : "飞书经营事项未配置",
     }
   }

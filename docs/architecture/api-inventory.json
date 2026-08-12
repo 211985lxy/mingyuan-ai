@@ -1231,6 +1231,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/connectors",
+      "file": "src/app/api/aim/connectors/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/evolve-style",
       "file": "src/app/api/aim/evolve-style/route.ts",
       "methods": [

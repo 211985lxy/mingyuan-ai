@@ -20,6 +20,8 @@ export interface WorkItemCardInput {
   resultLink?: string
   /** 错误信息（失败时） */
   errorMessage?: string
+  /** AIM 网页端的稳定内容深链。 */
+  aimLink?: string
 }
 
 const CARD_TYPE_CONFIG = {
@@ -72,14 +74,14 @@ export function buildWorkItemCard(bot: FeishuAgentBotConfig, input: WorkItemCard
   }
 
   // 结果链接
-  if (input.resultLink) {
+  if (input.resultLink || input.aimLink) {
     elements.push({
       tag: "action",
       actions: [{
         tag: "button",
         text: { tag: "plain_text", content: "查看完整结果" },
         type: "primary",
-        url: input.resultLink,
+        url: input.resultLink || input.aimLink,
       }],
     })
   }

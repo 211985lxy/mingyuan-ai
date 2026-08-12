@@ -115,6 +115,7 @@ describe("submitContentDistributionClaim", () => {
     })
     expect(result.ok).toBe(true)
     if (!result.ok || result.mode !== "copy_only") throw new Error("expected copy_only")
+    expect(result.connectorStatus).toBe("disabled")
     expect(result.reason).toContain("LARK_WORK_ITEM_TABLE_ID")
     expect(result.draft.plainText).toContain("飞书领取事项草稿")
   })
