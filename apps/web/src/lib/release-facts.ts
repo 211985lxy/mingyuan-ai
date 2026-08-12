@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { isAimWebOnlyReady } from "@/lib/aim/channel-capabilities"
+
 /**
  * 发布事实（release facts）——回答「线上现在跑的到底是哪个 Git 提交」。
  *
@@ -85,6 +87,13 @@ export function computeFeishuWorkItemReady(
   env: Record<string, string | undefined>,
 ): boolean {
   return FEISHU_WORK_ITEM_REQUIRED_ENV.every((name) => nonEmpty(env[name]) !== undefined)
+}
+
+/** AIM 核心闭环是否可在不配置任何连接器时独立运行。 */
+export function computeAimWebOnlyReady(
+  _env: Record<string, string | undefined>,
+): boolean {
+  return isAimWebOnlyReady()
 }
 
 /** 海外模型代理（Xray）是否已配置服务器端出口（只看存在性）。 */
