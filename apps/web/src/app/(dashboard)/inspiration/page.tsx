@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   createInspiration,
   listInspirations,
@@ -23,6 +24,7 @@ import {
   generateFromInspiration,
   listClientProjects,
   type InspirationItem,
+  type ClientProject,
 } from "@/lib/api/client"
 import type { AimGenerateResult } from "@/lib/api/client"
 
@@ -71,6 +73,7 @@ export default function InspirationPage() {
   const [input, setInput] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState("")
+  const [projects, setProjects] = useState<ClientProject[]>([])
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const [reprocessingId, setReprocessingId] = useState<string | null>(null)
 
@@ -80,6 +83,7 @@ export default function InspirationPage() {
       listClientProjects(),
     ]).then(([data, projectData]) => {
       setInspirations(data.items)
+      setProjects(projectData)
       setSelectedProjectId(projectData.find((p) => p.status === "active")?.id || projectData[0]?.id || "")
     }).catch(() => {
       toast.error("加载失败，请刷新重试")
@@ -95,7 +99,7 @@ export default function InspirationPage() {
 
     setSubmitting(true)
     try {
-      const item = await createInspiration({ content: text })
+      const item = await createInspiration({ content: text, projectId: selectedProjectId || undefined })
       setInspirations((prev) => [item, ...prev])
       setInput("")
       toast.success("灵感已保存，AI 正在分析选题方向")
@@ -176,9 +180,22 @@ export default function InspirationPage() {
             className="min-h-28 resize-none"
           />
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              AI 会自动分析灵感，提炼 2-3 个选题方向
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-xs text-muted-foreground">
+                AI 会自动分析灵感，提炼 2-3 个选题方向
+              </p>
+              <Select value={selectedProjectId || "unassigned"} onValueChange={(value) => setSelectedProjectId(!value || value === "unassigned" ? "" : value)}>
+                <SelectTrigger className="h-8 w-[200px] text-xs">
+                  <SelectValue placeholder="暂不归属项目" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">暂不归属项目</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               onClick={handleSubmit}
               disabled={submitting || !input.trim()}

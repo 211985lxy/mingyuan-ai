@@ -21,6 +21,7 @@ import type {
 export interface InspirationItem {
   id: string
   userId: string
+  projectId: string | null
   source: string
   content: string
   aiStatus: string
@@ -116,9 +117,10 @@ export async function testChannelBinding(id: string) {
  * @param status? - status?
  * @returns Promise<
  */
-export async function listInspirations(status?: string): Promise<{ items: InspirationItem[] }> {
+export async function listInspirations(status?: string, projectId?: string): Promise<{ items: InspirationItem[] }> {
   const params = new URLSearchParams()
   if (status) params.set("status", status)
+  if (projectId) params.set("projectId", projectId)
   return request<{ items: InspirationItem[] }>(`/api/inspiration?${params}`)
 }
 
@@ -131,6 +133,7 @@ export async function createInspiration(data: {
   content: string
   source?: string
   autoProcess?: boolean
+  projectId?: string
 }): Promise<InspirationItem> {
   return request<InspirationItem>("/api/inspiration", {
     method: "POST",
