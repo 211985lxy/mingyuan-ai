@@ -15,6 +15,7 @@
 import type { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
+import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
 
 export const INSPIRATION_TARGET_FORMATS = [
   "video_script",
@@ -101,7 +102,7 @@ export function prepareInspirationGeneration(input: {
     actorId: userId,
     projectId,
     trace,
-    runLlmQuality: false,
+    runLlmQuality: resolveLlmQuality("inspiration").run,
   }
 }
 

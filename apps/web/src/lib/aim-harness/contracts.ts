@@ -173,7 +173,7 @@ export interface AimRunRequest {
   contextManifest?: AimContextSource[]
   /** draft-only：不落生成记录（agent_api 外部交付） */
   draftOnly?: boolean
-  /** 是否跑 LLM 质检（默认 true；agent_api / inspiration 关闭） */
+  /** 是否跑 LLM 质检（默认 true；各入口的关闭策略见 llm-quality-policy.ts） */
   runLlmQuality?: boolean
   /** Eval/测试可关闭快照与 trace 回标；生产默认开启 */
   persistSnapshot?: boolean

@@ -23,6 +23,7 @@ import {
 import type { AgentApiContext } from "@/lib/agent-api-auth"
 import { prisma } from "@/lib/prisma"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
+import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
 
 /** 写入一条 Agent API 调用日志（成功或失败共用，逐字迁出原 route）。 */
 /**
@@ -167,7 +168,7 @@ export function prepareAgentAimGeneration(input: {
     topicRationale: parsed.topicRationale,
     actorId: userId,
     projectId: parsed.projectId,
-    runLlmQuality: false,
+    runLlmQuality: resolveLlmQuality("agent_api").run,
   }
 
   const buildDomainInput = (trace?: AimTraceRecorder) => ({

@@ -20,6 +20,7 @@ import { claimBackgroundTask, completeBackgroundTask, failBackgroundTask } from 
 import { prisma } from "@/lib/prisma"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
+import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
 import { createAimTrace } from "@/lib/aim-observability"
 import { extractInvocationResults } from "@/lib/aim-remote/invocation-service"
 import { REMOTE_ERROR_CODE } from "@/lib/aim-remote/contracts"
@@ -91,7 +92,7 @@ export async function executeRemoteInvocationBackgroundTask(taskId: string) {
         polishInstruction: invocation.instruction ?? undefined,
         actorId: invocation.userId,
         projectId: invocation.projectId,
-        runLlmQuality: false,
+        runLlmQuality: resolveLlmQuality("agent_api").run,
         ...(trace ? { trace: { id: trace.id } } : {}),
       },
       (spec) =>

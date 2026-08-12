@@ -142,7 +142,8 @@ export interface AimRunSpec {
    */
   draftOnly?: boolean
   /**
-   * 是否对主稿跑 LLM 质检（只读、不回写）。agent_api / inspiration 入口显式关闭。
+   * 是否对主稿跑 LLM 质检（只读、不回写）。各入口是否关闭由
+   * llm-quality-policy.ts 的 resolveLlmQuality(scenario) 统一决策。
    * 升级阶段 1.2：并入冻结 spec，统一质检开关的事实源。
    */
   runLlmQuality?: boolean

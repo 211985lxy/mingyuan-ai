@@ -6,6 +6,7 @@ import type { EvalContext, EvalExecutionResult, EvalExecutor } from "./eval-runn
 import type { EvalFixture } from "./eval/contracts"
 import { sha256 } from "./hashing"
 import type { AimContextSource } from "./types"
+import { resolveLlmQuality } from "./llm-quality-policy"
 
 type RealCaseRunner = (fixture: EvalFixture, context: EvalContext) => Promise<EvalExecutionResult>
 
@@ -71,7 +72,7 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
     hotTopic: fixture.input.hotTopic,
     actorId: "aim-eval",
     contextManifest,
-    runLlmQuality: false,
+    runLlmQuality: resolveLlmQuality("eval").run,
     persistSnapshot: false,
     stableRouting: false,
   }, async (spec) => {

@@ -38,6 +38,7 @@ import {
   AIM_FAST_SPOKEN_TOTAL_BUDGET_MS,
   isAimFastSpokenRun,
 } from "./fast-spoken-policy"
+import { resolveLlmQuality } from "./llm-quality-policy"
 
 export interface PlanRunInput {
   entrypoint: AimEntrypoint
@@ -298,7 +299,7 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     actorId: input.actorId,
     projectId: input.projectId,
     methodologyProfileIds: input.methodologyProfileIds,
-    runLlmQuality: fastSpoken ? false : undefined,
+    runLlmQuality: fastSpoken ? resolveLlmQuality("fast_spoken").run : undefined,
     executionMode: executionPolicy.mode,
     executionPolicy,
   })

@@ -23,6 +23,7 @@ import {
 import { parseFeishuWorkItem } from "@/lib/aim-feishu-work-item"
 import { executeAimRun } from "@/lib/aim-harness"
 import type { AimRunMetadata } from "@/lib/aim-harness"
+import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
 import { getRegisteredLoop } from "@/lib/aim/loops/registry"
 import { sha256 } from "@/lib/aim-harness/hashing"
 import {
@@ -256,7 +257,7 @@ export async function runMeetingInsightWorkflow(
       actorId: input.actorId,
       projectId: input.projectId,
       persistSnapshot: ports.complete ? false : true,
-      runLlmQuality: false,
+      runLlmQuality: resolveLlmQuality("meeting_insight").run,
       modelPolicy: {
         temperature: loop.modelPolicy.temperature,
         maxTokens: loop.supervisionPolicy.budget.maxOutputTokens,
