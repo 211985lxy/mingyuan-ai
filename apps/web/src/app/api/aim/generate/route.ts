@@ -3,6 +3,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { failAimTrace, type AimTraceRecorder } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
+import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
 import {
   executePreparedAimGeneration,
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     console.error("[aim/generate] Error:", error)
     await failAimTrace(trace, error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "生成失败" },
+      { error: mapAimErrorToUserMessage(error, "生成失败，请稍后重试") },
       { status: 500 }
     )
   }

@@ -3,6 +3,7 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 
 import { ApiError } from "@/lib/api/client"
+import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import type { AimEditorContext, TextSelectionRange } from "@/lib/aim-editor"
 import { agentAllowsThinkingProcess } from "@/lib/aim/agent-capabilities"
 import type { AimAgentId } from "@/lib/aim-ui-config"
@@ -159,11 +160,9 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   } catch (error) {
     const timedOut = error instanceof ApiError && error.status === 408
     const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
-    const content = timedOut
-      ? `对话失败：${error.message}`
-      : stopped
-        ? "已停止本次回复。"
-        : `对话失败：${error instanceof Error ? error.message : "请稍后重试"}`
+    const content = stopped && !timedOut
+      ? "已停止本次回复。"
+      : mapAimErrorToUserMessage(error, "对话失败，请稍后重试")
     input.setMessages((messages) => messages.map((message) => message.id === turn.assistantId
       ? { ...message, content, failure: stopped && !timedOut ? null : { kind: "chat", retryText: text } }
       : message))

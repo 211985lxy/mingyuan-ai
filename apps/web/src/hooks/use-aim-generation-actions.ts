@@ -14,6 +14,7 @@ import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
 import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
+import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import {
   buildAimHistoryRawInput,
   buildAimRawInput,
@@ -348,7 +349,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
       input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
         ? {
             ...message,
-            content: `生成失败：${error instanceof Error ? error.message : "请稍后重试"}`,
+            content: mapAimErrorToUserMessage(error, "生成失败，请稍后重试"),
             regenerating: false,
             failure: { kind: "generate" as const, retryText: currentInput },
           }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
+import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import { executeAimRun, streamAimRun } from "@/lib/aim-harness/runtime"
 import { executeAimChatDomain } from "@/lib/aim-harness/domain-executor"
 import {
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
     console.error("[aim/chat] Error:", error)
     await failAimTrace(trace, error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "对话失败，请稍后重试" },
+      { error: mapAimErrorToUserMessage(error, "对话失败，请稍后重试") },
       { status: 500 }
     )
   }
