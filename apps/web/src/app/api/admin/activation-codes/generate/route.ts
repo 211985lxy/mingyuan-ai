@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { recordAdminAudit } from "@/lib/admin-audit"
@@ -18,7 +18,7 @@ function generateCode(): string {
   return code
 }
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   const { quantity, batchNote, durationDays } = await parseJsonRecord(request)
 
   const qty = parseInt(quantity)
@@ -67,4 +67,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
   return NextResponse.json({
     data: { count: qty, batchId, durationDays: duration },
   }, { headers: { "x-request-id": requestId } })
-}, "admin")
+})

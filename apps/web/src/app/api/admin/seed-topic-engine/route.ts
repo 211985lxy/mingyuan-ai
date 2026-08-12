@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import type { Prisma } from "@/generated/prisma/client"
 import {
   TOPIC_ELEMENTS,
@@ -9,7 +9,7 @@ import {
   ENDING_TYPES,
 } from "../../../../../prisma/seed-topic-engine"
 
-export const POST = withAdminAuth(async () => {
+export const POST = withAdminOnly(async () => {
   const results: string[] = []
 
   for (const el of TOPIC_ELEMENTS) {

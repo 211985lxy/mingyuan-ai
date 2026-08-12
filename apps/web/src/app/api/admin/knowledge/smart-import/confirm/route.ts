@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
@@ -19,7 +19,7 @@ interface ConfirmedEntry {
  * POST /api/admin/knowledge/smart-import/confirm
  * 接收管理员确认的条目 → 批量写入 + 触发向量化
  */
-export const POST = withAdminAuth(async (request) => {
+export const POST = withAdminOrEditor(async (request) => {
   const body = await parseJsonRecord(request)
   const { userId, projectId, entries } = body as {
     userId: string

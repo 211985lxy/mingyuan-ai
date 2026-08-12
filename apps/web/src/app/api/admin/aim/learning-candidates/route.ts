@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { parseJsonRecord } from "@/lib/api-contract"
 import {
@@ -16,7 +16,7 @@ function date(value: unknown): Date | null {
   return Number.isFinite(parsed.getTime()) ? parsed : null
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const reviewStatus = request.nextUrl.searchParams.get("reviewStatus")?.trim()
   const targetType = request.nextUrl.searchParams.get("targetType")?.trim()
   const projectId = request.nextUrl.searchParams.get("projectId")?.trim()
@@ -30,9 +30,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     take: 200,
   })
   return NextResponse.json({ items: rows })
-}, "admin")
+})
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -72,4 +72,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
       error: error instanceof Error ? error.message : "学习候选采集失败",
     }, { status: 409 })
   }
-}, "admin")
+})

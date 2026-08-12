@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { isValidTransition, invalidateTemplateCache } from "@/lib/template-state"
 import { recordAdminAudit } from "@/lib/admin-audit"
 
-export const POST = withAdminAuth(async (request, { admin, params }) => {
+export const POST = withAdminOrEditor(async (request, { admin, params }) => {
   const template = await prisma.contentTemplate.findUnique({
     where: { id: params?.id },
   })

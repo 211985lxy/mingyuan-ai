@@ -1,7 +1,7 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { env } from "@/env"
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import OpenAI from "openai"
 
 /**
@@ -29,7 +29,7 @@ const PROVIDER_CONFIGS: Record<
   },
 }
 
-export const POST = withAdminAuth(async (request: NextRequest) => {
+export const POST = withAdminOnly(async (request: NextRequest) => {
   const body = await parseJsonRecord(request)
   const { messages, model, temperature, max_tokens, stream } = body
   const providerName: ProviderName = body.provider === "openrouter" ? "openrouter" : "jiekou"

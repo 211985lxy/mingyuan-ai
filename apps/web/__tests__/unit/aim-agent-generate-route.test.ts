@@ -82,7 +82,7 @@ describe("POST /api/agent/v1/aim/generate", () => {
     vi.clearAllMocks()
     authenticateAgentRequest.mockResolvedValue({ apiKeyId: "key-1", userId: "user-1" })
     assertAgentAccess.mockReturnValue(undefined)
-    assertAgentProjectAccess.mockReturnValue(undefined)
+    assertAgentProjectAccess.mockResolvedValue(undefined)
     assertAgentScope.mockReturnValue(undefined)
     agentAuthErrorResponse.mockReturnValue(null)
     executeAimRun.mockResolvedValue({
@@ -143,12 +143,30 @@ describe("POST /api/agent/v1/aim/generate", () => {
   it("asserts project access before agent access (immutable order)", async () => {
     await POST(makeRequest({ rawInput: "x", projectId: "p1", agentId: "content_producer", targetFormats: ["video_script"] }))
 
-    // route.ts:82 assertAgentProjectAccess 先于 route.ts:83 assertAgentAccess
+    // project 鉴权必须 await，且先于 agent 鉴权
     const order: string[] = []
-    assertAgentProjectAccess.mockImplementation(() => { order.push("project") })
+    assertAgentProjectAccess.mockImplementation(async () => { order.push("project") })
     assertAgentAccess.mockImplementation(() => { order.push("agent") })
     await POST(makeRequest({ rawInput: "x", projectId: "p1", agentId: "content_producer", targetFormats: ["video_script"] }))
     expect(order).toEqual(["project", "agent"])
+  })
+
+  it("does not continue execution when project access is denied", async () => {
+    assertAgentProjectAccess.mockRejectedValue(new Error("AGENT_PROJECT_FORBIDDEN"))
+    agentAuthErrorResponse.mockReturnValue(
+      new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }),
+    )
+
+    const res = await POST(makeRequest({
+      rawInput: "x",
+      projectId: "p1",
+      agentId: "content_producer",
+      targetFormats: ["video_script"],
+    }))
+
+    expect(res.status).toBe(403)
+    expect(assertAgentAccess).not.toHaveBeenCalled()
+    expect(executeAimRun).not.toHaveBeenCalled()
   })
 
   it("returns 200 with additive harness diagnostics and draft-only warnings", async () => {

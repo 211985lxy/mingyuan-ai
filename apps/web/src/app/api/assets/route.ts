@@ -2,14 +2,19 @@ import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withUserAuth } from "@/lib/user-auth";
-import { signOssUrls } from "@/lib/oss";
+import {
+  assertCompletedReservationForManagedUrl,
+  isManagedOssUrl,
+  signOssUrls,
+  UploadReservationError,
+} from "@/lib/oss";
 
-const VALID_ASSET_TYPES = ["image", "video", "music"];
+const VALID_ASSET_TYPES = ["image", "video", "music", "document"];
 
 // ─── POST /api/assets ──────────────────────────────────
 
 export const POST = withUserAuth(async (request, { user }) => {
-  const { name, assetType, url, size } = await parseJsonRecord(request);
+  const { name, assetType, url, size, uploadId } = await parseJsonRecord(request);
 
   if (!name || !assetType || !url) {
     return NextResponse.json(
@@ -23,6 +28,25 @@ export const POST = withUserAuth(async (request, { user }) => {
       { error: `assetType must be one of: ${VALID_ASSET_TYPES.join(", ")}` },
       { status: 400 },
     );
+  }
+
+  // 托管桶 URL 禁止浏览器随意登记；必须对应已完成的上传预约
+  if (typeof url === "string" && isManagedOssUrl(url)) {
+    try {
+      await assertCompletedReservationForManagedUrl({
+        userId: user.id,
+        assetUrl: url,
+        uploadId: typeof uploadId === "string" ? uploadId : null,
+      });
+    } catch (error) {
+      if (error instanceof UploadReservationError) {
+        return NextResponse.json(
+          { error: error.message, code: error.code },
+          { status: error.status },
+        );
+      }
+      throw error;
+    }
   }
 
   const asset = await prisma.asset.create({

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async () => {
+export const GET = withAdminOrEditor(async () => {
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 

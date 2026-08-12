@@ -33,7 +33,8 @@ vi.mock("@/lib/aim-memory", () => ({
 vi.mock("@/lib/aim/approval-validation", () => ({ validateHighRiskApproval }))
 vi.mock("@/lib/prisma", () => ({ prisma }))
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: unknown) => handler,
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: unknown) => handler,
 }))
 vi.mock("@/lib/admin-audit", () => ({ recordAdminAudit }))
 vi.mock("@/lib/methodology-profile-admin", () => ({

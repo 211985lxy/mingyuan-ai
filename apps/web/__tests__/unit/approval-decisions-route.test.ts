@@ -20,7 +20,8 @@ const {
 }))
 
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: unknown) => handler,
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: unknown) => handler,
 }))
 vi.mock("@/lib/admin-audit", () => ({ recordAdminAudit }))
 vi.mock("@/lib/aim/approval-validation", () => ({ resolveApprovalSubjectScope }))

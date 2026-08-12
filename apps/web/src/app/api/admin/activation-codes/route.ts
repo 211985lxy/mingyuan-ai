@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
+import { recordAdminAudit } from "@/lib/admin-audit"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest, { admin }) => {
   const url = new URL(request.url)
   const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"))
   const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get("pageSize") || "20")))
@@ -48,7 +49,16 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
 
   const batches = batchesRaw.map((b) => b.batchId)
 
-  return NextResponse.json({
-    data: { results, total, page, pageSize, batches },
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "activation_codes.read",
+    targetType: "activation_code_list",
+    metadata: { page, pageSize, status: status || null, batchId: batchId || null, resultCount: results.length },
   })
+
+  return NextResponse.json(
+    { data: { results, total, page, pageSize, batches } },
+    { headers: { "x-request-id": requestId } },
+  )
 })

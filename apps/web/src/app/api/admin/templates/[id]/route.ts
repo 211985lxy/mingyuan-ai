@@ -1,12 +1,12 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly, withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma/client"
 import { invalidateTemplateCache } from "@/lib/template-state"
 
 // GET — Template detail
-export const GET = withAdminAuth(async (_request, { params }) => {
+export const GET = withAdminOrEditor(async (_request, { params }) => {
   const template = await prisma.contentTemplate.findUnique({
     where: { id: params?.id },
   })
@@ -17,7 +17,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
 })
 
 // PUT — Edit template
-export const PUT = withAdminAuth(async (request, { params }) => {
+export const PUT = withAdminOrEditor(async (request, { params }) => {
   const body = await parseJsonRecord(request)
   const template = await prisma.contentTemplate.findUnique({
     where: { id: params?.id },
@@ -52,7 +52,7 @@ export const PUT = withAdminAuth(async (request, { params }) => {
 })
 
 // DELETE — Delete template (admin only)
-export const DELETE = withAdminAuth(async (_request, { params }) => {
+export const DELETE = withAdminOnly(async (_request, { params }) => {
   const template = await prisma.contentTemplate.findUnique({
     where: { id: params?.id },
   })
@@ -67,4 +67,4 @@ export const DELETE = withAdminAuth(async (_request, { params }) => {
   }
   await prisma.contentTemplate.delete({ where: { id: params?.id } })
   return NextResponse.json({ data: { deleted: true } })
-}, "admin")
+})

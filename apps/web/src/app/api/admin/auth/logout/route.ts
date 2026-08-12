@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { clearSessionCookie } from "@/lib/auth-session"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const POST = withAdminAuth(async (_request, { admin }) => {
+export const POST = withAdminOrEditor(async (_request, { admin }) => {
   await prisma.adminUser.update({
     where: { id: admin.id },
     data: { sessionVersion: { increment: 1 } },

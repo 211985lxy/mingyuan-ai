@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { validateHighRiskApproval } from "@/lib/aim/approval-validation"
 import {
@@ -15,13 +15,13 @@ const VALID_KEYS = new Set<MethodologyKey>(
 )
 
 /** GET /api/admin/methodology —— 列出全部方法论（含内容、来源、更新时间） */
-export const GET = withAdminAuth(async () => {
+export const GET = withAdminOrEditor(async () => {
   const items = await listMethodologiesForAdmin()
   return NextResponse.json({ data: items })
 })
 
 /** PUT /api/admin/methodology —— 更新某份方法论内容（写 DB + 失效缓存） */
-export const PUT = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const PUT = withAdminOrEditor(async (request: NextRequest, { admin }) => {
   const body = await parseJsonRecord(request)
   const key = body?.key as string
   const content = body?.content as string

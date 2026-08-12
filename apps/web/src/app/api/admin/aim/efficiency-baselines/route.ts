@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { recordAdminAudit } from "@/lib/admin-audit"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { isPrismaUniqueConstraintError } from "@/lib/aim/aim-run-event-write"
 import { prisma } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const workflowId = request.nextUrl.searchParams.get("workflowId")?.trim()
   const taskType = request.nextUrl.searchParams.get("taskType")?.trim()
   const items = await prisma.taskEfficiencyBaseline.findMany({
@@ -20,9 +20,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     take: 500,
   })
   return NextResponse.json({ items })
-}, "admin")
+})
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   const body = await parseJsonRecord(request, { maxBytes: 8 * 1024 })
   const workflowId = typeof body.workflowId === "string" ? body.workflowId.trim() : ""
   const taskType = typeof body.taskType === "string" ? body.taskType.trim() : ""
@@ -71,4 +71,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
     }
     throw error
   }
-}, "admin")
+})

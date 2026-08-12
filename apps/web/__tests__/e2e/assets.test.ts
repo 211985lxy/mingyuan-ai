@@ -4,7 +4,41 @@ vi.mock("@/lib/oss", () => ({
   deleteManagedOssObject: vi.fn(async () => undefined),
   generateUploadUrl: vi.fn(async () => null),
   signOssUrls: vi.fn(<T>(assets: T) => assets),
+  isManagedOssUrl: vi.fn(() => false),
+  assertCompletedReservationForManagedUrl: vi.fn(async () => undefined),
+  UploadReservationError: class UploadReservationError extends Error {
+    status: number
+    code: string
+    constructor(message: string, options?: { status?: number; code?: string }) {
+      super(message)
+      this.name = "UploadReservationError"
+      this.status = options?.status ?? 400
+      this.code = options?.code ?? "UPLOAD_RESERVATION_ERROR"
+    }
+  },
 }));
+
+vi.mock("@/lib/oss/upload-reservation", () => {
+  class UploadReservationError extends Error {
+    status: number
+    code: string
+    constructor(message: string, options?: { status?: number; code?: string }) {
+      super(message)
+      this.name = "UploadReservationError"
+      this.status = options?.status ?? 400
+      this.code = options?.code ?? "UPLOAD_RESERVATION_ERROR"
+    }
+  }
+  return {
+    UploadReservationError,
+    createAssetUploadReservation: vi.fn(async () => {
+      throw new UploadReservationError("OSS storage is not configured", {
+        status: 503,
+        code: "OSS_NOT_CONFIGURED",
+      })
+    }),
+  }
+});
 import {
   prisma,
   cleanDatabase,
@@ -275,6 +309,23 @@ describe("Assets E2E", () => {
 
   // ─── POST /api/assets/upload-url ───────────────────────
 
+  it("returns UPLOAD_CLIENT_REFRESH_REQUIRED when sizeBytes missing", async () => {
+    const res = await UPLOAD_URL(
+      userReq("/api/assets/upload-url", {
+        method: "POST",
+        body: {
+          fileName: "photo.jpg",
+          contentType: "image/jpeg",
+          assetType: "image",
+        },
+      }),
+      undefined as never,
+    );
+    expect(res.status).toBe(400);
+    const body = await json(res);
+    expect(body.code).toBe("UPLOAD_CLIENT_REFRESH_REQUIRED");
+  });
+
   it("returns 503 when OSS is not configured", async () => {
     const res = await UPLOAD_URL(
       userReq("/api/assets/upload-url", {
@@ -282,6 +333,8 @@ describe("Assets E2E", () => {
         body: {
           fileName: "photo.jpg",
           contentType: "image/jpeg",
+          sizeBytes: 1024,
+          assetType: "image",
         },
       }),
       undefined as never,
@@ -296,7 +349,7 @@ describe("Assets E2E", () => {
     const res = await UPLOAD_URL(
       userReq("/api/assets/upload-url", {
         method: "POST",
-        body: { fileName: "photo.jpg" },
+        body: { fileName: "photo.jpg", sizeBytes: 10, assetType: "image" },
       }),
       undefined as never,
     );

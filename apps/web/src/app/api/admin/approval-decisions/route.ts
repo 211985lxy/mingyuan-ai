@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import {
   createPrismaApprovalDecisionStore,
@@ -147,7 +147,7 @@ async function persistApprovalDecision(input: {
   }
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const url = new URL(request.url)
   const subjectType = url.searchParams.get("subjectType")
   const subjectId = url.searchParams.get("subjectId")
@@ -162,9 +162,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     take: LIST_MAX,
   })
   return NextResponse.json({ items, limit: LIST_MAX })
-}, "admin")
+})
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -216,4 +216,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
     role: match.role,
     projectId: scope.projectId,
   })
-}, "admin")
+})

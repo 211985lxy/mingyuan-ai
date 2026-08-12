@@ -27,10 +27,13 @@ interface AdminPayload {
   sessionVersion: number
 }
 
+type AdminRouteHandler = (
+  request: NextRequest,
+  context: { admin: AdminPayload; params?: Record<string, string> }
+) => Promise<NextResponse>
+
 /**
  * @description 使用 bcrypt 对密码进行哈希加密
- * @param password - 原始密码
- * @returns 哈希后的密码字符串
  */
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12)
@@ -38,9 +41,6 @@ export async function hashPassword(password: string): Promise<string> {
 
 /**
  * @description 验证密码是否与哈希匹配
- * @param password - 原始密码
- * @param hash - 哈希值
- * @returns 匹配返回 true
  */
 export async function verifyPassword(
   password: string,
@@ -51,8 +51,6 @@ export async function verifyPassword(
 
 /**
  * @description 签发管理员 JWT 令牌（有效期 8 小时）
- * @param payload - 管理员载荷（ID、邮箱、角色、会话版本）
- * @returns JWT 令牌字符串
  */
 export function signAdminToken(payload: AdminPayload): string {
   return jwt.sign(payload, requireAdminJwtSecret(), { expiresIn: "8h" })
@@ -60,8 +58,6 @@ export function signAdminToken(payload: AdminPayload): string {
 
 /**
  * @description 验证并解析管理员 JWT 令牌
- * @param token - JWT 令牌字符串
- * @returns 解析后的管理员载荷，无效时返回 null
  */
 export function verifyAdminToken(token: string): AdminPayload | null {
   const secret = requireAdminJwtSecret()
@@ -72,21 +68,9 @@ export function verifyAdminToken(token: string): AdminPayload | null {
   }
 }
 
-/**
- * Admin auth middleware wrapper.
- * Validates admin JWT and optionally checks role.
- */
-/**
- * @description withadminauth
- * @param handler - 处理函数
- * @returns 无返回值
- */
-export function withAdminAuth(
-  handler: (
-    request: NextRequest,
-    context: { admin: AdminPayload; params?: Record<string, string> }
-  ) => Promise<NextResponse>,
-  requiredRole?: AdminRole
+function createAdminAuthWrapper(
+  handler: AdminRouteHandler,
+  allowedRoles: readonly AdminRole[],
 ) {
   return async (
     request: NextRequest,
@@ -109,7 +93,6 @@ export function withAdminAuth(
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
-    // Check if admin is still active
     const dbAdmin = await prisma.adminUser.findUnique({
       where: { id: admin.id },
     })
@@ -121,8 +104,7 @@ export function withAdminAuth(
       return NextResponse.json({ error: "Account disabled" }, { status: 403 })
     }
 
-    // Role check: admin has all permissions, editor is restricted
-    if (requiredRole === "admin" && admin.role !== "admin") {
+    if (!allowedRoles.includes(admin.role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -146,17 +128,25 @@ export function withAdminAuth(
 }
 
 /**
- * Validate CRON_SECRET for cron endpoint protection.
+ * 仅管理员可访问。敏感接口（激活码、AIM 快照、用户、审计等）必须用这个。
  */
+export function withAdminOnly(handler: AdminRouteHandler) {
+  return createAdminAuthWrapper(handler, ["admin"] as const)
+}
+
 /**
- * @description 验证cronsecret
- * @param request - 请求对象
- * @returns boolean
+ * 管理员或编辑员可访问。内容运营（模板、知识库、方法论、对标）用这个。
+ */
+export function withAdminOrEditor(handler: AdminRouteHandler) {
+  return createAdminAuthWrapper(handler, ["admin", "editor"] as const)
+}
+
+/**
+ * Validate CRON_SECRET for cron endpoint protection.
  */
 export function validateCronSecret(request: NextRequest): boolean {
   const auth = request.headers.get("authorization")
   const cronSecret = env.CRON_SECRET
   if (!cronSecret) return false
-  // 常量时间比较，防时序侧信道（与飞书验签、work-item 鉴权同一套惯例）。
   return safeSecretEqual(`Bearer ${cronSecret}`, auth ?? "")
 }

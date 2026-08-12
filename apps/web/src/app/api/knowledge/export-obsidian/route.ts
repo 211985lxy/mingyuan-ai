@@ -1,140 +1,90 @@
-import { parseJsonRecord } from "@/lib/api-contract"
+import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
-import fs from "fs"
-import path from "path"
 import { withUserAuth } from "@/lib/user-auth"
+import { incrementSecurityMetric } from "@/lib/security-metrics"
+import {
+  consumeDailyExportQuota,
+  isObsidianExportEnabledForUser,
+  loadObsidianSyncConfig,
+  measureExportDirUsage,
+  OBSIDIAN_LIMITS,
+  resolveFixedExportRoot,
+  writeObsidianExportFile,
+} from "@/lib/obsidian-export"
 
-export const POST = withUserAuth(async (request: NextRequest) => {
+export const POST = withUserAuth(async (request: NextRequest, { user }) => {
+  if (!isObsidianExportEnabledForUser(user.id)) {
+    incrementSecurityMetric("obsidian.denied", { reason: "disabled_or_wrong_user" })
+    return NextResponse.json({ error: "Obsidian export is disabled" }, { status: 403 })
+  }
+
   try {
-    const body = await parseJsonRecord(request)
-    const { title, content, format = "script" } = body as {
-      title?: string
-      content?: string
-      format?: string
+    const body = await parseJsonRecord(request, { maxBytes: OBSIDIAN_LIMITS.BODY_MAX_BYTES })
+    const title = typeof body.title === "string" ? body.title : ""
+    const content = typeof body.content === "string" ? body.content : ""
+    const format = typeof body.format === "string" ? body.format : "script"
+
+    if (!title.trim() || !content) {
+      return NextResponse.json({ error: "标题和内容不能为空" }, { status: 400 })
     }
 
-    if (!title || !content) {
-      return NextResponse.json(
-        { error: "标题和内容不能为空" },
-        { status: 400 }
-      )
+    if (title.length > OBSIDIAN_LIMITS.TITLE_MAX_CHARS) {
+      incrementSecurityMetric("obsidian.quota", { reason: "title_too_long" })
+      return NextResponse.json({ error: "标题过长" }, { status: 413 })
     }
 
-    // 1. 寻找并加载配置 .obsidian-sync.json
-    let configFilePath = ""
-    const candidates = [
-      path.join(process.cwd(), ".obsidian-sync.json"),
-      path.join(process.cwd(), "../../", ".obsidian-sync.json"),
-      path.join(process.cwd(), "apps/web", ".obsidian-sync.json"),
-    ]
-
-    for (const c of candidates) {
-      if (fs.existsSync(c)) {
-        configFilePath = c
-        break
-      }
+    if (Buffer.byteLength(content, "utf8") > OBSIDIAN_LIMITS.CONTENT_MAX_BYTES) {
+      incrementSecurityMetric("obsidian.quota", { reason: "content_too_large" })
+      return NextResponse.json({ error: "正文过大" }, { status: 413 })
     }
 
-    if (!configFilePath) {
-      return NextResponse.json(
-        { error: "未找到配置文件 .obsidian-sync.json，请确保在项目根目录运行并进行了初始化。" },
-        { status: 404 }
-      )
+    if (!consumeDailyExportQuota(user.id)) {
+      incrementSecurityMetric("obsidian.quota", { reason: "daily_limit" })
+      return NextResponse.json({ error: "今日导出次数已达上限" }, { status: 429 })
     }
 
-    let config: {
-      obsidianVaultPath?: string
-      exportDir?: string
-    } = {}
-    try {
-      const fileData = fs.readFileSync(configFilePath, "utf-8")
-      config = JSON.parse(fileData)
-    } catch (e) {
-      return NextResponse.json(
-        { error: `读取配置文件失败: ${(e as Error).message}` },
-        { status: 500 }
-      )
+    const config = await loadObsidianSyncConfig()
+    if (!config) {
+      return NextResponse.json({ error: "Obsidian 未配置" }, { status: 404 })
     }
 
-    const { obsidianVaultPath, exportDir = "MingyuanGenerated" } = config
-
-    if (!obsidianVaultPath) {
-      return NextResponse.json(
-        { error: "未检测到 Obsidian 物理库配置。请在根目录的 .obsidian-sync.json 中配置 obsidianVaultPath 后再试。" },
-        { status: 400 }
-      )
+    const root = await resolveFixedExportRoot(config)
+    if (!root.ok) {
+      incrementSecurityMetric("obsidian.denied", { reason: root.code })
+      return NextResponse.json({ error: "导出目录不可用" }, { status: 400 })
     }
 
-    if (!fs.existsSync(obsidianVaultPath)) {
-      return NextResponse.json(
-        { error: `配置的 Obsidian 绝对路径不存在: [${obsidianVaultPath}]，请确认该路径在本地是否真实存在。` },
-        { status: 400 }
-      )
+    const usage = await measureExportDirUsage(root.exportRoot)
+    if (
+      usage.bytes >= OBSIDIAN_LIMITS.VAULT_MAX_BYTES
+      || usage.files >= OBSIDIAN_LIMITS.VAULT_MAX_FILES
+    ) {
+      incrementSecurityMetric("obsidian.quota", { reason: "vault_capacity" })
+      return NextResponse.json({ error: "导出目录已达容量上限" }, { status: 429 })
     }
 
-    // 2. 创建导出目标目录
-    const targetFolder = path.join(obsidianVaultPath, exportDir)
-    if (!fs.existsSync(targetFolder)) {
-      try {
-        fs.mkdirSync(targetFolder, { recursive: true })
-      } catch (e) {
-        return NextResponse.json(
-          { error: `创建文案导出目录失败: ${(e as Error).message}` },
-          { status: 500 }
-        )
-      }
+    const written = await writeObsidianExportFile({
+      exportRoot: root.exportRoot,
+      exportDirName: root.exportDirName,
+      title: title.trim(),
+      content,
+      format,
+    })
+
+    if (!written.ok) {
+      incrementSecurityMetric("obsidian.denied", { reason: written.code })
+      return NextResponse.json({ error: "写入失败" }, { status: 500 })
     }
 
-    // 3. 构建安全的防重名文件名
-    const safeTitle = title.replace(/[\\/:*?"<>|]/g, "-").trim()
-    const datePrefix = new Date().toISOString().split("T")[0]
-    let fileName = `${datePrefix}-${safeTitle}.md`
-    let targetFilePath = path.join(targetFolder, fileName)
-    let fileCounter = 1
-
-    while (fs.existsSync(targetFilePath)) {
-      fileName = `${datePrefix}-${safeTitle}-${fileCounter}.md`
-      targetFilePath = path.join(targetFolder, fileName)
-      fileCounter++
-    }
-
-    // 4. 构建带 Frontmatter 的漂亮 Markdown 文件正文
-    const fileContent = `---
-title: "${title}"
-category: "generated_content"
-format: "${format}"
-generatedAt: "${new Date().toISOString()}"
-tags:
-  - Aim/文案
-  - 明远AIM
----
-
-# ${title}
-
-${content}
-`
-
-    // 5. 写入本地磁盘
-    try {
-      fs.writeFileSync(targetFilePath, fileContent, "utf-8")
-    } catch (e) {
-      return NextResponse.json(
-        { error: `写入 Obsidian 文件失败: ${(e as Error).message}` },
-        { status: 500 }
-      )
-    }
-
+    incrementSecurityMetric("obsidian.ok")
     return NextResponse.json({
       success: true,
-      filePath: targetFilePath,
-      relativeFilePath: `${exportDir}/${fileName}`,
-      fileName,
+      fileName: written.fileName,
+      relativeFilePath: written.relativeFilePath,
     })
   } catch (error) {
-    console.error("Export to Obsidian error:", error)
-    return NextResponse.json(
-      { error: "Internal Server Error", details: (error as Error).message },
-      { status: 500 }
-    )
+    const contract = apiRequestErrorResponse(request, error)
+    if (contract) return contract
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 })

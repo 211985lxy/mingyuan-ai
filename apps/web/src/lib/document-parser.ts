@@ -2,12 +2,13 @@ import { execFile } from "node:child_process"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
-import pdfParse from "pdf-parse"
-import mammoth from "mammoth"
-import * as XLSX from "xlsx"
+import { forkDocumentParseWorker } from "./document-parser-child"
+import { DocumentParseError } from "./document-parser-errors"
 
-/** 支持的文件扩展名 */
+export { DocumentParseError } from "./document-parser-errors"
+
 const SUPPORTED_EXTENSIONS = new Set([
   ".txt",
   ".md",
@@ -25,16 +26,29 @@ const SUPPORTED_EXTENSIONS = new Set([
   ".rtf",
 ])
 
-const MARKITDOWN_EXTENSIONS = new Set([".pdf", ".docx", ".xls", ".xlsx", ".pptx", ".html", ".htm", ".json", ".xml", ".rtf"])
-/** OfficeCLI 擅长的 Office 格式（可选增强；未安装则跳过） */
+/** 必须走受限子进程的格式（禁止无界进程内回退） */
+const RESTRICTED_EXTENSIONS = new Set([".pdf", ".docx", ".xls", ".xlsx", ".pptx"])
+
+const MARKITDOWN_EXTENSIONS = new Set([
+  ".pdf",
+  ".docx",
+  ".xls",
+  ".xlsx",
+  ".pptx",
+  ".html",
+  ".htm",
+  ".json",
+  ".xml",
+  ".rtf",
+])
 const OFFICECLI_EXTENSIONS = new Set([".docx", ".xlsx", ".pptx"])
 const execFileAsync = promisify(execFile)
 
-/** 分块阈值：超过此字数按段落边界拆分 */
 const CHUNK_THRESHOLD = 5000
-
-/** 分块最小字数，避免产生过短的碎片 */
 const CHUNK_MIN_SIZE = 500
+const PARSE_TIMEOUT_MS = Number(process.env.DOCUMENT_PARSE_TIMEOUT_MS || 60_000) || 60_000
+const MAX_PARSE_CONCURRENCY = 2
+const MAX_TEXT_BYTES = 1024 * 1024
 
 function officeCliBin(): string {
   const configured = process.env.OFFICECLI_BIN?.trim()
@@ -43,8 +57,6 @@ function officeCliBin(): string {
 
 /**
  * @description 判断是否supportedfile
- * @param fileName - 文件名称
- * @returns boolean
  */
 export function isSupportedFile(fileName: string): boolean {
   const ext = getExtension(fileName)
@@ -57,83 +69,168 @@ function getExtension(fileName: string): string {
   return fileName.slice(dotIndex).toLowerCase()
 }
 
+function assertTextLimit(text: string): void {
+  if (Buffer.byteLength(text, "utf8") > MAX_TEXT_BYTES) {
+    throw new DocumentParseError("提取文本超过 1MiB 上限", {
+      code: "PARSE_TEXT_TOO_LARGE",
+      status: 422,
+    })
+  }
+}
+
+// ─── 并发池（进程级，最多 2 个受限解析） ─────────────────
+
+let activeParses = 0
+const parseWaitQueue: Array<() => void> = []
+
+async function withParseSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (activeParses >= MAX_PARSE_CONCURRENCY) {
+    await new Promise<void>((resolve) => parseWaitQueue.push(resolve))
+  }
+  activeParses += 1
+  try {
+    return await fn()
+  } finally {
+    activeParses -= 1
+    const next = parseWaitQueue.shift()
+    if (next) next()
+  }
+}
+
+function workerScriptPath(): string {
+  // 编译后与源码同相对位置；测试环境用 ts 源文件路径
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  return path.join(here, "document-parser-worker.ts")
+}
+
+async function runRestrictedWorker(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
+  return withParseSlot(async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "aim-parse-"))
+    const input = path.join(dir, `input${getExtension(fileName)}`)
+    try {
+      await writeFile(input, buffer)
+      const text = await forkDocumentParseWorker({
+        workerScript: workerScriptPath(),
+        filePath: input,
+        fileName,
+        timeoutMs: PARSE_TIMEOUT_MS,
+        execArgv: process.execArgv.includes("--import")
+          ? process.execArgv
+          : ["--import", "tsx"],
+      })
+      assertTextLimit(text)
+      return text
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+}
+
 /**
  * 解析文档，返回文本块数组。
- * 小文档返回单元素数组，大文档按段落边界分块。
- *
- * Office 格式抽正文优先级：OfficeCLI（若可用）→ MarkItDown → 内置回退（mammoth/xlsx/pdf）。
- */
-/**
- * @description 解析document
- * @param buffer - 缓冲区
- * @param fileName - 文件名称
- * @returns Promise<string[]>
+ * PDF/DOCX/XLSX/PPTX 仅在受限子进程中解析；失败/超时不回退到无界进程内解析。
  */
 export async function parseDocument(
   buffer: Buffer,
-  fileName: string
+  fileName: string,
 ): Promise<string[]> {
   const ext = getExtension(fileName)
 
   if (!SUPPORTED_EXTENSIONS.has(ext)) {
-    throw new Error(`不支持的文件格式: ${ext}。支持: ${[...SUPPORTED_EXTENSIONS].join(", ")}`)
+    throw new DocumentParseError(
+      `不支持的文件格式: ${ext}。支持: ${[...SUPPORTED_EXTENSIONS].join(", ")}`,
+      { status: 400, code: "PARSE_UNSUPPORTED" },
+    )
   }
 
   let fullText: string
 
-  if (OFFICECLI_EXTENSIONS.has(ext)) {
-    const viaOfficeCli = await parseWithOfficeCli(buffer, ext)
-    if (viaOfficeCli?.trim()) {
-      fullText = viaOfficeCli
-    } else if (MARKITDOWN_EXTENSIONS.has(ext)) {
-      fullText = await parseWithMarkitdown(buffer, ext)
-    } else {
-      fullText = await parseOfficeFallback(buffer, ext)
+  if (RESTRICTED_EXTENSIONS.has(ext)) {
+    fullText = await parseRestrictedDocument(buffer, fileName, ext)
+  } else {
+    switch (ext) {
+      case ".txt":
+      case ".md":
+      case ".markdown":
+        fullText = buffer.toString("utf-8")
+        break
+      case ".csv":
+        fullText = buffer.toString("utf-8")
+        break
+      case ".html":
+      case ".htm":
+      case ".json":
+      case ".xml":
+      case ".rtf":
+        fullText = await parseWithMarkitdownStrict(buffer, ext)
+        break
+      default:
+        throw new DocumentParseError(`不支持的文件格式: ${ext}`, {
+          status: 400,
+          code: "PARSE_UNSUPPORTED",
+        })
     }
-  } else if (MARKITDOWN_EXTENSIONS.has(ext)) {
-    fullText = await parseWithMarkitdown(buffer, ext)
-  } else switch (ext) {
-    case ".txt":
-    case ".md":
-    case ".markdown":
-      fullText = buffer.toString("utf-8")
-      break
-
-    case ".csv":
-      fullText = parseCsvToText(buffer)
-      break
-
-    case ".pdf":
-      fullText = await parsePdf(buffer)
-      break
-
-    default:
-      throw new Error(`不支持的文件格式: ${ext}`)
   }
 
   fullText = fullText.trim()
   if (!fullText) {
-    throw new Error("文档内容为空，未提取到任何文本")
+    throw new DocumentParseError("文档内容为空，未提取到任何文本", {
+      code: "PARSE_EMPTY",
+    })
   }
-
+  assertTextLimit(fullText)
   return chunkText(fullText)
 }
 
-// ─── 格式解析器 ─────────────────────────────────────────────
+async function parseRestrictedDocument(
+  buffer: Buffer,
+  fileName: string,
+  ext: string,
+): Promise<string> {
+  // 优先 OfficeCLI / MarkItDown（同样有 timeout + maxBuffer），失败再走受限 worker
+  // 注意：禁止再调用进程内 mammoth/pdf-parse/xlsx 无界回退
+  if (OFFICECLI_EXTENSIONS.has(ext)) {
+    const viaOfficeCli = await parseWithOfficeCli(buffer, ext)
+    if (viaOfficeCli?.trim()) {
+      assertTextLimit(viaOfficeCli)
+      return viaOfficeCli
+    }
+  }
 
-/**
- * @description 用 OfficeCLI `view … text` 抽正文；未安装或失败返回 null（不抛错）
- */
+  if (MARKITDOWN_EXTENSIONS.has(ext)) {
+    try {
+      const viaMd = await parseWithMarkitdownStrict(buffer, ext)
+      if (viaMd.trim()) {
+        assertTextLimit(viaMd)
+        return viaMd
+      }
+    } catch (error) {
+      // pptx 主要依赖 markitdown；其它格式继续走 worker
+      if (ext === ".pptx") {
+        if (error instanceof DocumentParseError) throw error
+        throw new DocumentParseError(
+          error instanceof Error ? error.message : "MarkItDown 转换失败",
+          { code: "PARSE_CHILD_FAILED" },
+        )
+      }
+    }
+  }
+
+  return runRestrictedWorker(buffer, fileName)
+}
+
 async function parseWithOfficeCli(buffer: Buffer, ext: string): Promise<string | null> {
   const dir = await mkdtemp(path.join(tmpdir(), "aim-officecli-"))
   const input = path.join(dir, `input${ext}`)
   try {
     await writeFile(input, buffer)
-    const { stdout } = await execFileAsync(
-      officeCliBin(),
-      ["view", input, "text"],
-      { timeout: 60_000, maxBuffer: 5 * 1024 * 1024 },
-    )
+    const { stdout } = await execFileAsync(officeCliBin(), ["view", input, "text"], {
+      timeout: PARSE_TIMEOUT_MS,
+      maxBuffer: MAX_TEXT_BYTES,
+    })
     const text = String(stdout ?? "").trim()
     return text || null
   } catch {
@@ -143,64 +240,26 @@ async function parseWithOfficeCli(buffer: Buffer, ext: string): Promise<string |
   }
 }
 
-async function parseOfficeFallback(buffer: Buffer, ext: string): Promise<string> {
-  if (ext === ".docx") return parseDocx(buffer)
-  if (ext === ".xls" || ext === ".xlsx") return parseXlsx(buffer)
-  throw new Error(`无内置回退解析器: ${ext}`)
-}
-
-async function parseWithMarkitdown(buffer: Buffer, ext: string): Promise<string> {
+/** MarkItDown：失败直接抛错，不回退到进程内无界解析 */
+async function parseWithMarkitdownStrict(buffer: Buffer, ext: string): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), "aim-markitdown-"))
   const input = path.join(dir, `input${ext}`)
   try {
     await writeFile(input, buffer)
-    const { stdout } = await execFileAsync("markitdown", [input], { timeout: 60_000, maxBuffer: 5 * 1024 * 1024 })
+    const { stdout } = await execFileAsync("markitdown", [input], {
+      timeout: PARSE_TIMEOUT_MS,
+      maxBuffer: MAX_TEXT_BYTES,
+    })
     return String(stdout)
   } catch (error) {
-    if (ext === ".pdf") return parsePdf(buffer)
-    if (ext === ".docx") return parseDocx(buffer)
-    if (ext === ".xls" || ext === ".xlsx") return parseXlsx(buffer)
-    throw new Error(error instanceof Error ? `MarkItDown 转换失败: ${error.message}` : "MarkItDown 转换失败")
+    throw new DocumentParseError(
+      error instanceof Error ? `MarkItDown 转换失败: ${error.message}` : "MarkItDown 转换失败",
+      { code: "PARSE_CHILD_FAILED" },
+    )
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 }
-
-async function parsePdf(buffer: Buffer): Promise<string> {
-  const data = await pdfParse(buffer)
-  return data.text
-}
-
-async function parseDocx(buffer: Buffer): Promise<string> {
-  const result = await mammoth.extractRawText({ buffer })
-  return result.value
-}
-
-function parseXlsx(buffer: Buffer): string {
-  const workbook = XLSX.read(buffer, { type: "buffer" })
-  const lines: string[] = []
-
-  for (const sheetName of workbook.SheetNames) {
-    const sheet = workbook.Sheets[sheetName]
-    // 使用 sheet_to_csv 获取纯文本行
-    const csv = XLSX.utils.sheet_to_csv(sheet)
-    if (csv.trim()) {
-      if (workbook.SheetNames.length > 1) {
-        lines.push(`【工作表: ${sheetName}】`)
-      }
-      lines.push(csv)
-    }
-  }
-
-  return lines.join("\n\n")
-}
-
-function parseCsvToText(buffer: Buffer): string {
-  // CSV 直接作为文本返回，按行保留
-  return buffer.toString("utf-8")
-}
-
-// ─── 文本分块 ───────────────────────────────────────────────
 
 function chunkText(text: string): string[] {
   if (text.length <= CHUNK_THRESHOLD) {
@@ -208,9 +267,7 @@ function chunkText(text: string): string[] {
   }
 
   const chunks: string[] = []
-  // 按双换行（段落边界）拆分
   const paragraphs = text.split(/\n{2,}/).filter((p) => p.trim())
-
   let current = ""
 
   for (const para of paragraphs) {

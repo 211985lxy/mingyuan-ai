@@ -8,7 +8,8 @@ const { traceFindMany, eventFindMany, aggregateRunOutcomeMetrics } = vi.hoisted(
 }))
 
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: (request: NextRequest, context: unknown) => unknown) =>
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: (request: NextRequest, context: unknown) => unknown) =>
     (request: NextRequest) => handler(request, { admin: { id: "admin-1" } }),
 }))
 vi.mock("@/lib/prisma", () => ({

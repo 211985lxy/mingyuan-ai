@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
 const ALLOWED_PLATFORMS = new Set(["douyin", "xiaohongshu", "bilibili", "kuaishou"])
@@ -19,7 +19,7 @@ async function syncKnowledgeEntryStatus(profileId: string, status: "active" | "a
 }
 
 // GET — 档案详情（含所有素材条目）
-export const GET = withAdminAuth(async (_request, { params }) => {
+export const GET = withAdminOrEditor(async (_request, { params }) => {
   const id = params?.id
   if (!id) {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })
@@ -44,7 +44,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
 })
 
 // PATCH — 更新档案头部字段（含状态恢复）
-export const PATCH = withAdminAuth(async (request, { params }) => {
+export const PATCH = withAdminOrEditor(async (request, { params }) => {
   const id = params?.id
   if (!id) {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })
@@ -101,7 +101,7 @@ export const PATCH = withAdminAuth(async (request, { params }) => {
 })
 
 // DELETE — 软删除（归档），同步归档关联 KnowledgeEntry
-export const DELETE = withAdminAuth(async (_request, { params }) => {
+export const DELETE = withAdminOrEditor(async (_request, { params }) => {
   const id = params?.id
   if (!id) {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })

@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     outputFormats = prepared.targetFormats
 
     // access 断言顺序不可变：project 先于 agent（assertAgentAccess 用原始 agentId）
-    assertAgentProjectAccess(context, projectId)
+    await assertAgentProjectAccess(context, projectId)
     assertAgentAccess(context, agentId)
 
     // 归一化旧别名（ip_video → content_producer），保证写入 DB / 日志 / 响应的 id 一致

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@/generated/prisma/client"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { parseJsonRecord } from "@/lib/api-contract"
 import {
@@ -62,7 +62,7 @@ async function isActiveSystemOwner(systemOwnerId: string): Promise<boolean> {
   return Boolean(assignment)
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest) => {
   const status = request.nextUrl.searchParams.get("status")?.trim()
   const projectId = request.nextUrl.searchParams.get("projectId")?.trim()
   const workflowId = request.nextUrl.searchParams.get("workflowId")?.trim()
@@ -89,9 +89,9 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
     )
   })
   return NextResponse.json({ items })
-}, "admin")
+})
 
-export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
+export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
   let body: Record<string, unknown>
   try {
     body = await parseJsonRecord(request)
@@ -164,4 +164,4 @@ export const POST = withAdminAuth(async (request: NextRequest, { admin }) => {
       error: error instanceof Error ? error.message : "周复盘创建失败",
     }, { status: 409 })
   }
-}, "admin")
+})

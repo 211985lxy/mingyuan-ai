@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 
-export const GET = withAdminAuth(async (_request, { admin }) => {
+export const GET = withAdminOrEditor(async (_request, { admin }) => {
   const record = await prisma.adminUser.findUnique({
     where: { id: admin.id },
     select: { id: true, email: true, name: true, role: true },

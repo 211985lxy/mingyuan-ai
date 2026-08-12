@@ -1,9 +1,9 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const PUT = withAdminAuth(async (request, { params }) => {
+export const PUT = withAdminOrEditor(async (request, { params }) => {
   const { sortOrder } = await parseJsonRecord(request)
   if (typeof sortOrder !== "number") {
     return NextResponse.json({ error: "sortOrder must be a number" }, { status: 400 })

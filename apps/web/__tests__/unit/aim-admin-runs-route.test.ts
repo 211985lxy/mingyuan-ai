@@ -39,9 +39,17 @@ vi.mock("@/lib/prisma", () => ({
 
 // Admin auth: pass through ctx (params) so the route can read runId.
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: (req: unknown, ctx: { params?: Record<string, string> }) => unknown) =>
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: (req: unknown, ctx: { admin?: { id: string }; params?: Record<string, string> }) => unknown) =>
     async (req: unknown, segmentData: { params: Promise<Record<string, string>> }) =>
-      handler(req, { params: segmentData ? await segmentData.params : undefined }),
+      handler(req, {
+        admin: { id: "admin-1" },
+        params: segmentData ? await segmentData.params : undefined,
+      }),
+}))
+
+vi.mock("@/lib/admin-audit", () => ({
+  recordAdminAudit: vi.fn(async () => "req-audit-1"),
 }))
 
 import { GET as getRun } from "@/app/api/admin/aim/runs/[runId]/route"

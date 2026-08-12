@@ -5,7 +5,8 @@ const { getOperatingQualification } = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/admin-auth", () => ({
-  withAdminAuth: (handler: unknown) => handler,
+  withAdminOrEditor: (handler: any) => handler,
+  withAdminOnly: (handler: unknown) => handler,
 }))
 vi.mock("@/lib/aim/operating-qualification-store", () => ({
   getOperatingQualification,

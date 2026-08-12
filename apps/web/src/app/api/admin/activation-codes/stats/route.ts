@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
-export const GET = withAdminAuth(async () => {
+export const GET = withAdminOnly(async () => {
   const [total, used] = await Promise.all([
     prisma.activationCode.count(),
     prisma.activationCode.count({ where: { status: "used" } }),

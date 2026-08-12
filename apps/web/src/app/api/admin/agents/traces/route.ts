@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
+import { recordAdminAudit } from "@/lib/admin-audit"
 import { prisma } from "@/lib/prisma"
 
 function getTraceDelegate() {
@@ -21,7 +22,7 @@ function getRunEventDelegate() {
   }).aimRunEvent
 }
 
-export const GET = withAdminAuth(async (request: NextRequest) => {
+export const GET = withAdminOnly(async (request: NextRequest, { admin }) => {
   const delegate = getTraceDelegate()
   if (!delegate) {
     return NextResponse.json({ error: "AimExecutionTrace client is not generated" }, { status: 503 })
@@ -77,6 +78,14 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
 
   const eventCounts = Object.fromEntries(byEvent.map((row) => [row.event, row._count._all]))
 
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "aim_agent_traces.read",
+    targetType: "aim_execution_trace_list",
+    metadata: { limit, resultCount: traces.length },
+  })
+
   return NextResponse.json({
     data: {
       traces,
@@ -92,5 +101,5 @@ export const GET = withAdminAuth(async (request: NextRequest) => {
         byAgent,
       },
     },
-  })
+  }, { headers: { "x-request-id": requestId } })
 })

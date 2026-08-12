@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { Prisma } from "@/generated/prisma/client"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { parseJsonRecord } from "@/lib/api-contract"
 import {
@@ -26,7 +26,7 @@ function object(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-export const PATCH = withAdminAuth(async (
+export const PATCH = withAdminOnly(async (
   request: NextRequest,
   { admin, params },
 ) => {
@@ -95,4 +95,4 @@ export const PATCH = withAdminAuth(async (
       error: error instanceof Error ? error.message : "学习候选操作失败",
     }, { status: 409 })
   }
-}, "admin")
+})

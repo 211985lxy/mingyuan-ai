@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
 const {
-  withAdminAuth,
+  withAdminOnly,
   recordAdminAudit,
   prisma,
 } = vi.hoisted(() => {
@@ -15,13 +15,13 @@ const {
     update: vi.fn(),
   }
   return {
-    withAdminAuth: (handler: unknown) => handler,
+    withAdminOnly: (handler: unknown) => handler,
     recordAdminAudit: vi.fn(async () => "req_audit_1"),
     prisma: { governanceAssignment },
   }
 })
 
-vi.mock("@/lib/admin-auth", () => ({ withAdminAuth }))
+vi.mock("@/lib/admin-auth", () => ({ withAdminOnly, withAdminOrEditor: withAdminOnly }))
 vi.mock("@/lib/admin-audit", () => ({ recordAdminAudit }))
 vi.mock("@/lib/prisma", () => ({ prisma }))
 

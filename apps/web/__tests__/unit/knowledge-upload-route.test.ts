@@ -6,7 +6,8 @@ const parseDocument = vi.hoisted(() => vi.fn())
 const isSupportedFile = vi.hoisted(() => vi.fn())
 const ensureKnowledgeEmbedding = vi.hoisted(() => vi.fn())
 const enforceKnowledgeBetaLimit = vi.hoisted(() => vi.fn())
-const enforceUploadSizeLimit = vi.hoisted(() => vi.fn())
+const receiveKnowledgeMultipart = vi.hoisted(() => vi.fn())
+const cleanupTempDir = vi.hoisted(() => vi.fn())
 
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth:
@@ -32,6 +33,10 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/document-parser", () => ({
   parseDocument,
   isSupportedFile,
+  DocumentParseError: class DocumentParseError extends Error {
+    status = 422
+    code = "PARSE_FAILED"
+  },
 }))
 
 vi.mock("@/lib/llm/embeddings", () => ({
@@ -44,7 +49,19 @@ vi.mock("@/lib/knowledge-tags", () => ({
 
 vi.mock("@/lib/internal-beta-limits", () => ({
   enforceKnowledgeBetaLimit,
-  enforceUploadSizeLimit,
+}))
+
+vi.mock("@/lib/knowledge-multipart", () => ({
+  receiveKnowledgeMultipart,
+  cleanupTempDir,
+  KnowledgeMultipartError: class KnowledgeMultipartError extends Error {
+    status = 400
+    code = "KNOWLEDGE_MULTIPART_ERROR"
+  },
+}))
+
+vi.mock("node:fs/promises", () => ({
+  readFile: vi.fn(async () => Buffer.from("%PDF-1.4 demo")),
 }))
 
 import { POST } from "@/app/api/knowledge/upload/route"
@@ -72,17 +89,32 @@ describe("POST /api/knowledge/upload", () => {
     isSupportedFile.mockReset()
     ensureKnowledgeEmbedding.mockReset()
     enforceKnowledgeBetaLimit.mockReset()
-    enforceUploadSizeLimit.mockReset()
+    receiveKnowledgeMultipart.mockReset()
+    cleanupTempDir.mockReset()
     ensureKnowledgeEmbedding.mockReturnValue(Promise.resolve())
-    enforceUploadSizeLimit.mockReturnValue(null)
     enforceKnowledgeBetaLimit.mockResolvedValue(null)
     isSupportedFile.mockReturnValue(true)
+    cleanupTempDir.mockResolvedValue(undefined)
   })
 
   it("rejects upload without project id", async () => {
+    receiveKnowledgeMultipart.mockResolvedValue({
+      tempDir: "/tmp/km-test",
+      files: [
+        {
+          fieldName: "file",
+          originalName: "demo.pdf",
+          mimeType: "application/pdf",
+          size: 4,
+          tempPath: "/tmp/km-test/f0.pdf",
+        },
+      ],
+      fields: {},
+    })
+
     const res = await POST(
       makeRequest({
-        file: new File(["demo"], "demo.pdf", { type: "application/pdf" }),
+        file: new File(["%PDF-1.4"], "demo.pdf", { type: "application/pdf" }),
       }) as never,
       undefined as never
     )
@@ -91,9 +123,23 @@ describe("POST /api/knowledge/upload", () => {
     await expect(res.json()).resolves.toMatchObject({
       error: "请选择归属全案",
     })
+    expect(cleanupTempDir).toHaveBeenCalled()
   })
 
   it("imports parsed chunks into the selected project", async () => {
+    receiveKnowledgeMultipart.mockResolvedValue({
+      tempDir: "/tmp/km-test",
+      files: [
+        {
+          fieldName: "file",
+          originalName: "company-profile.pdf",
+          mimeType: "application/pdf",
+          size: 4,
+          tempPath: "/tmp/km-test/f0.pdf",
+        },
+      ],
+      fields: { projectId: "project-1", category: "project_case" },
+    })
     findFirst.mockResolvedValue({ id: "project-1" })
     parseDocument.mockResolvedValue(["第一段", "第二段"])
     create
@@ -102,7 +148,7 @@ describe("POST /api/knowledge/upload", () => {
 
     const res = await POST(
       makeRequest({
-        file: new File(["demo"], "company-profile.pdf", {
+        file: new File(["%PDF-1.4"], "company-profile.pdf", {
           type: "application/pdf",
         }),
         projectId: "project-1",
@@ -147,5 +193,6 @@ describe("POST /api/knowledge/upload", () => {
       select: { id: true },
     })
     expect(ensureKnowledgeEmbedding).toHaveBeenCalledTimes(2)
+    expect(cleanupTempDir).toHaveBeenCalledWith("/tmp/km-test")
   })
 })

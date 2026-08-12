@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 
 // GET — 列出已完成的竞品分析，供「一键拉取」选择。
 // admin 视角跨用户可见全部已完成分析（标注所属用户便于辨认）。
-export const GET = withAdminAuth(async (request) => {
+export const GET = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const platform = searchParams.get("platform") ?? ""
 

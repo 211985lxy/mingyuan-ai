@@ -1,12 +1,12 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags, normalizeValueGrade } from "@/lib/knowledge-tags"
 
 // GET — 查看所有用户的知识库条目（分页+搜索+过滤）
-export const GET = withAdminAuth(async (request) => {
+export const GET = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1)
   const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20))
@@ -54,7 +54,7 @@ export const GET = withAdminAuth(async (request) => {
 })
 
 // POST — 管理员手动录入知识条目
-export const POST = withAdminAuth(async (request, { admin }) => {
+export const POST = withAdminOrEditor(async (request, { admin }) => {
   const body = await parseJsonRecord(request)
   const { category, title, content, tags, sourceType, valueGrade } = body
   const projectId = typeof body.projectId === "string" && body.projectId.trim()
@@ -107,7 +107,7 @@ export const POST = withAdminAuth(async (request, { admin }) => {
 })
 
 // PUT — 管理员强制批量更新（批量变更状态或分类）
-export const PUT = withAdminAuth(async (request) => {
+export const PUT = withAdminOrEditor(async (request) => {
   const body = await parseJsonRecord(request)
   const { ids, action, value } = body
 
@@ -164,7 +164,7 @@ export const PUT = withAdminAuth(async (request) => {
 })
 
 // DELETE — 批量删除
-export const DELETE = withAdminAuth(async (request) => {
+export const DELETE = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const id = searchParams.get("id")
   const ids = searchParams.get("ids")

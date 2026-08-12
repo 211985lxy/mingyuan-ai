@@ -1,11 +1,11 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma/client"
 
 // POST — Create template
-export const POST = withAdminAuth(async (request, { admin }) => {
+export const POST = withAdminOrEditor(async (request, { admin }) => {
   const body = await parseJsonRecord(request)
   const {
     name, displayName, description, scriptTemplate, variables,
@@ -43,7 +43,7 @@ export const POST = withAdminAuth(async (request, { admin }) => {
 })
 
 // GET — List templates (all statuses)
-export const GET = withAdminAuth(async (request) => {
+export const GET = withAdminOrEditor(async (request) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const contentType = searchParams.get("contentType")

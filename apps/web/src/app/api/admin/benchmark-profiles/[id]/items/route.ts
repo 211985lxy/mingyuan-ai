@@ -1,6 +1,6 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { buildDefaultKnowledgeTags, mergeKnowledgeTags } from "@/lib/knowledge-tags"
@@ -16,7 +16,7 @@ const ALLOWED_KINDS = new Set([
 ])
 
 // GET — 档案的素材列表
-export const GET = withAdminAuth(async (_request, { params }) => {
+export const GET = withAdminOrEditor(async (_request, { params }) => {
   const id = params?.id
   if (!id) {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })
@@ -32,7 +32,7 @@ export const GET = withAdminAuth(async (_request, { params }) => {
 })
 
 // POST — 新增一条素材（事务内同步落 KnowledgeEntry 进 RAG）
-export const POST = withAdminAuth(async (request, { params }) => {
+export const POST = withAdminOrEditor(async (request, { params }) => {
   const id = params?.id
   if (!id) {
     return NextResponse.json({ error: "缺少 id" }, { status: 400 })

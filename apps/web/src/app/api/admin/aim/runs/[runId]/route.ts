@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOnly } from "@/lib/admin-auth"
+import { recordAdminAudit } from "@/lib/admin-audit"
 import { prisma } from "@/lib/prisma"
 
 /**
@@ -35,7 +36,7 @@ function getSnapshotDelegate(): SnapshotDelegate | undefined {
   }).aimRunSnapshot
 }
 
-export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
+export const GET = withAdminOnly(async (request: NextRequest, { admin, params }) => {
   const runId = params?.runId
   if (!runId) {
     return NextResponse.json({ error: "缺少 runId" }, { status: 400 })
@@ -64,6 +65,18 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
     return NextResponse.json({ error: "未找到该 runId 的运行记录" }, { status: 404 })
   }
 
+  const requestId = await recordAdminAudit({
+    request,
+    adminId: admin.id,
+    action: "aim_run_snapshot.read",
+    targetType: "aim_run",
+    targetId: runId,
+    metadata: {
+      hasTrace: Boolean(trace),
+      hasSnapshot: Boolean(snapshot),
+    },
+  })
+
   return NextResponse.json({
     data: {
       runId,
@@ -73,5 +86,5 @@ export const GET = withAdminAuth(async (_request: NextRequest, { params }) => {
       snapshot: snapshot ?? null,
       snapshotExpired: !snapshot,
     },
-  })
+  }, { headers: { "x-request-id": requestId } })
 })

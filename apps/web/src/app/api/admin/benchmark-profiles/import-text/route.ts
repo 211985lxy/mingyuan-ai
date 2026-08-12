@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { withAdminAuth } from "@/lib/admin-auth"
+import { withAdminOrEditor } from "@/lib/admin-auth"
 import { parseDocument } from "@/lib/document-parser"
 import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
 
@@ -13,7 +13,7 @@ function formatImportedTextFile(file: ImportedTextFile): string {
   return `【文件：${file.name}】\n${file.text}`
 }
 
-export const POST = withAdminAuth(async (request) => {
+export const POST = withAdminOrEditor(async (request) => {
   const formData = await request.formData()
   const files = formData.getAll("files").filter((item): item is File => item instanceof File)
 
