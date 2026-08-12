@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }))
+
 import { AimEntrySwitch } from "@/features/aim/components/aim-entry-switch"
 
 const projects = [
