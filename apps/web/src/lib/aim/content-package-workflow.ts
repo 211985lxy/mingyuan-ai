@@ -18,6 +18,21 @@ export interface PackageWorkflowAdvanceSuggestion {
   reason: string
 }
 
+export function getContentOperatingReadiness(taskSpec?: TaskSpec | null): {
+  ready: boolean
+  missing: string[]
+} {
+  if (!taskSpec) return { ready: false, missing: ["经营目标", "目标客户", "内容任务", "真实证据", "期望行动"] }
+  const missing = [
+    ["经营目标", taskSpec.goal],
+    ["目标客户", taskSpec.targetCustomer],
+    ["内容任务", taskSpec.contentTask],
+    ["真实证据", taskSpec.knownFacts?.length ? "ok" : taskSpec.exclusiveEvidence],
+    ["期望行动", taskSpec.desiredAction],
+  ].filter(([, value]) => !value).map(([label]) => label as string)
+  return { ready: missing.length === 0, missing }
+}
+
 /**
  * @description 内容包请求格式全部完成且无失败时，建议推进到待审核
  */
@@ -27,6 +42,7 @@ export function suggestWorkflowAfterContentPackageComplete(input: {
 }): PackageWorkflowAdvanceSuggestion | null {
   const pkg = getContentPackageFromTaskSpec(input.taskSpec)
   if (!pkg) return null
+  if (!getContentOperatingReadiness(input.taskSpec).ready) return null
   if (pkg.requestedFormats.length < 2) return null
   if (pkg.failedFormats.length > 0) return null
   const completed = new Set(pkg.completedFormats)

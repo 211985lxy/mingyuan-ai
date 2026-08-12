@@ -28,10 +28,7 @@ import { useAimWorkbenchSkills } from "@/features/aim/hooks/use-aim-workbench-sk
 import { type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
-import {
-  buildContentProducerVideoCopyHref,
-  resolveContentProducerVideoUrl,
-} from "@/lib/aim/video-copy-input"
+import { buildContentProducerVideoCopyHref, resolveContentProducerVideoUrl } from "@/lib/aim/video-copy-input"
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 import {
   assemblePasteUsageInput,
@@ -43,6 +40,7 @@ import { runAnalyticsPasteSend } from "@/lib/aim/run-analytics-paste-send"
 import { runBatchReplicateSend } from "@/lib/aim/run-batch-replicate-send"
 import { fetchStyleStatus } from "@/lib/api/aim"
 import { AimEntrySwitch } from "@/features/aim/components/aim-entry-switch"
+import { ProjectWeeklyContent } from "@/features/aim/components/project-weekly-content"
 export default function AimPage() {
   const [styleEnabled, setStyleEnabled] = useState(false)
   const [styleAvailable, setStyleAvailable] = useState(false)
@@ -297,6 +295,7 @@ export default function AimPage() {
           projectEnabled={w.projectEnabled}
           projectAccessError={w.projectAccessError}
         />
+        {w.projectEnabled && w.selectedProjectId && !isLanding ? <ProjectWeeklyContent projectId={w.selectedProjectId} /> : null}
 
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}

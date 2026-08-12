@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { suggestWorkflowAfterContentPackageComplete } from "@/lib/aim/content-package-workflow"
+import { getContentOperatingReadiness, suggestWorkflowAfterContentPackageComplete } from "@/lib/aim/content-package-workflow"
 import type { TaskSpec } from "@/lib/task-spec"
 
 function taskSpec(partial: {
@@ -9,6 +9,11 @@ function taskSpec(partial: {
   failed?: Array<{ format: string; reason: string }>
 }): TaskSpec {
   return {
+    goal: "建立咨询信任",
+    targetCustomer: "企业创始人",
+    contentTask: "建立专业信任",
+    knownFacts: [{ statement: "真实客户问题", source: "访谈" }],
+    desiredAction: "预约诊断",
     contentPackage: {
       schemaVersion: 1,
       canonicalGenerationId: "gen_1",
@@ -21,6 +26,17 @@ function taskSpec(partial: {
 }
 
 describe("suggestWorkflowAfterContentPackageComplete", () => {
+  it("requires the operating brief before content can be marked publishable", () => {
+    const readiness = getContentOperatingReadiness({
+      goal: "Explain the offer",
+      knownFacts: [],
+      unknowns: [],
+      assumptions: [],
+    } as unknown as TaskSpec)
+    expect(readiness.ready).toBe(false)
+    expect(readiness.missing).toEqual(expect.arrayContaining(["目标客户", "内容任务", "真实证据", "期望行动"]))
+  })
+
   it("suggests pending_review when package is complete from draft", () => {
     const suggestion = suggestWorkflowAfterContentPackageComplete({
       currentStatus: "draft",
