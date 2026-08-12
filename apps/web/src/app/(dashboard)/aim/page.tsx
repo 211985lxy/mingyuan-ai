@@ -8,7 +8,7 @@ import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
 import { AimContextUsage } from "@/components/aim/aim-context-usage"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
-import { AimEvolutionSuggestions, AimLandingHero, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
+import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { AimSkillEditDialog } from "@/components/aim/aim-skill-edit-dialog"
 import { AimStylePreviewDialog } from "@/components/aim/aim-style-preview-dialog"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
@@ -42,7 +42,7 @@ import {
 import { runAnalyticsPasteSend } from "@/lib/aim/run-analytics-paste-send"
 import { runBatchReplicateSend } from "@/lib/aim/run-batch-replicate-send"
 import { fetchStyleStatus } from "@/lib/api/aim"
-
+import { AimEntrySwitch } from "@/features/aim/components/aim-entry-switch"
 export default function AimPage() {
   const [styleEnabled, setStyleEnabled] = useState(false)
   const [styleAvailable, setStyleAvailable] = useState(false)
@@ -364,7 +364,7 @@ export default function AimPage() {
         )}
 
         {isLanding ? (
-          <AimLandingHero />
+          <AimEntrySwitch projects={w.projects} selectedProjectId={w.selectedProjectId} />
         ) : (
           <>
             <AimMessageStream

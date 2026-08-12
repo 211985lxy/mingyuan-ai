@@ -45,6 +45,7 @@ import { useAimPlanOrchestration } from "@/features/aim/hooks/use-aim-plan-orche
 import { useAimTurnIntentGate } from "@/features/aim/hooks/use-aim-turn-intent-gate"
 import { useAimSourceEditorState } from "@/features/aim/hooks/use-aim-source-editor-state"
 import { useAimRetroTarget } from "@/features/aim/hooks/use-aim-retro-target"
+import { shouldShowAimEntrySwitch } from "@/features/aim/aim-entry-mode"
 
 /**
  * AIM 工作台总编排：params → hooks → 页面薄装配层。
@@ -159,7 +160,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
 
   const editorPanelLabels = useMemo(() => getAimEditorPanelLabels(selectedAgentId, editorFormat), [editorFormat, selectedAgentId])
   const currentWorkflowStage = isAimWorkflowStage(workflowStageParam) ? workflowStageParam : getWorkflowStageForAgent(selectedAgentId)
-  const showWorkflowLanding = !agentParam && !workflowStageParam && messages.length === 0 && !input.trim() && !ideaParam
+  const showWorkflowLanding = shouldShowAimEntrySwitch(searchParams) && messages.length === 0 && !input.trim() && !ideaParam
 
   // ---- Analysis + annotation ----
   const analysisTextCandidates = useMemo(() => collectAnalysisTextCandidates(input, messages, sourceAnalysisText), [input, messages, sourceAnalysisText])

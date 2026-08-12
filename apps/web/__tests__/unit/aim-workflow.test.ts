@@ -7,6 +7,7 @@ import {
   parseConfirmedWorkflowBrief,
 } from "@/lib/aim-workflow"
 import { buildTaskSpecSkeleton } from "@/lib/task-spec"
+import { shouldShowAimEntrySwitch } from "@/features/aim/aim-entry-mode"
 
 const baseSpec = buildTaskSpecSkeleton({
   agentId: "content_producer",
@@ -24,6 +25,11 @@ const baseSpec = buildTaskSpecSkeleton({
 })
 
 describe("AIM workflow", () => {
+  it("keeps legacy quick and agent deep links out of the entry chooser", () => {
+    expect(shouldShowAimEntrySwitch(new URLSearchParams())).toBe(true)
+    expect(shouldShowAimEntrySwitch(new URLSearchParams("mode=quick"))).toBe(false)
+    expect(shouldShowAimEntrySwitch(new URLSearchParams("agent=free_copywriter"))).toBe(false)
+  })
   it("exposes exactly four user-facing stages and three content actions", () => {
     expect(AIM_WORKFLOW_STAGES.map((item) => item.id)).toEqual(["direction", "content", "publish", "results"])
     expect(AIM_CONTENT_ACTIONS.map((item) => item.id)).toEqual(["new_copy", "edit_current", "rewrite_reference"])
