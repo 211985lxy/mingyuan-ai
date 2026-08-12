@@ -44,7 +44,9 @@
     "schema:retired-media-preflight": "node scripts/check-retired-media-data.mjs",
     "backup:database": "node scripts/backup-database.mjs",
     "backup:verify": "node scripts/verify-database-backup.mjs",
-    "env:check": "node scripts/check-env-contract.mjs"
+    "env:check": "node scripts/check-env-contract.mjs",
+    "test:e2e:ip-loop": "vitest run --config vitest.ip-loop.config.ts",
+    "smoke:ip-loop": "tsx --tsconfig tsconfig.json scripts/aim-ip-loop-smoke.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
