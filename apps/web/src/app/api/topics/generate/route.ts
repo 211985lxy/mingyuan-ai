@@ -314,6 +314,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const selection = await prisma.topicSelection.create({
     data: {
       userId: user.id,
+      projectId: project?.id ?? null,
       ipProfileId: topicIpProfileRecord.id,
       elementCodes: result.elementCodes as unknown as Prisma.InputJsonValue,
       candidates: result.cards as unknown as Prisma.InputJsonValue,

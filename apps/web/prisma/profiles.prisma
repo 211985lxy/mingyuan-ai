@@ -91,6 +91,7 @@ model ClientProject {
   ipWikiPages            IpWikiPage[]
   benchmarkProfiles      BenchmarkProfile[]
   inspirations           Inspiration[]
+  topicSelections        TopicSelection[]
   channelBindings        ChannelBinding[]
   opportunityCollections OpportunityCollection[]
   customerOutcomes       CustomerOutcomeProjection[]

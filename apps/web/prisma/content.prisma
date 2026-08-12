@@ -186,6 +186,7 @@ model EndingType {
 model TopicSelection {
   id                 String   @id @default(cuid())
   userId             String
+  projectId          String?
   ipProfileId        String
   elementCodes       Json
   candidates         Json
@@ -198,14 +199,14 @@ model TopicSelection {
   recommendedDate    String?  @db.VarChar(10) // YYYY-MM-DD，生成当天日期，便于按天查重
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
-
   user      User      @relation(fields: [userId], references: [id])
   ipProfile IpProfile @relation(fields: [ipProfileId], references: [id])
-
+  project   ClientProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   @@index([userId, status])
   @@index([userId, createdAt(sort: Desc)])
   @@index([ipProfileId])
   @@index([userId, recommendationMode, recommendedDate])
+  @@index([projectId, createdAt])
 }
 
 model ContentTemplate {
