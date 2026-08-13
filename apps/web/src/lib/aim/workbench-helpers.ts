@@ -112,6 +112,17 @@ export function formatAimMessageContentForModel(message: {
   return [text, ...bodies].filter(Boolean).join("\n\n")
 }
 
+export function buildAimRelevantConversation(messages: AimWorkbenchMessage[]) {
+  return messages
+    .map((message) => ({
+      role: message.role,
+      content: formatAimMessageContentForModel(message),
+    }))
+    .filter((message): message is { role: "user" | "assistant"; content: string } =>
+      (message.role === "user" || message.role === "assistant") && message.content.trim().length > 0)
+    .slice(-12)
+}
+
 /**
  * @description 获取 AIM 开头片段（前 1-2 段）
  * @param text - 完整文本

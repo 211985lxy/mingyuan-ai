@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildAimEditorContext,
   buildAimHistoryRawInput,
+  buildAimRelevantConversation,
   buildAimRawInput,
   detectAimLarkToolAction,
   extractBenchmarkAnalysisText,
@@ -94,6 +95,10 @@ describe("AIM workbench helpers", () => {
     const history = buildAimHistoryRawInput("优化这段话", "这个文案结构是什么", messages)
     expect(history).toContain("养了一个内容团队")
     expect(history).toContain("这个文案结构是什么")
+
+    const relevant = buildAimRelevantConversation(messages)
+    expect(relevant).toHaveLength(2)
+    expect(relevant[1].content).toContain("养了一个内容团队")
   })
 
   it("golden: structure ask history still carries prior 口播 body", () => {

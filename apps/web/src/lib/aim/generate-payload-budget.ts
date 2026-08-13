@@ -1,4 +1,5 @@
 import type { AimGenerateBody } from "@/features/aim/contracts/api"
+import { fitAimContentSourceEnvelopeToBudget } from "@/lib/aim/content-source-envelope"
 
 /** 与 /api/aim/generate 的 parseJsonRecord maxBytes(256 KiB) 留余量对齐 */
 export const AIM_GENERATE_REQUEST_BUDGET_BYTES = 240 * 1024
@@ -40,6 +41,23 @@ function truncateMiddleToBytes(text: string, maxBytes: number) {
  */
 export function fitAimGenerateRequestBody(body: AimGenerateRequestBody): AimGenerateRequestBody {
   if (jsonBytes(body) <= AIM_GENERATE_REQUEST_BUDGET_BYTES) return body
+
+  if (body.sourceEnvelope) {
+    const overhead = jsonBytes({ ...body, rawInput: "", sourceEnvelope: undefined })
+    const sourceEnvelope = fitAimContentSourceEnvelopeToBudget(
+      body.sourceEnvelope,
+      Math.max(0, AIM_GENERATE_REQUEST_BUDGET_BYTES - overhead - 512),
+    )
+    const fitted = {
+      ...body,
+      rawInput: sourceEnvelope.currentUserRequest,
+      sourceEnvelope,
+    }
+    if (jsonBytes(fitted) > AIM_GENERATE_REQUEST_BUDGET_BYTES) {
+      throw new Error("来源上下文超出可处理大小")
+    }
+    return fitted
+  }
 
   let fitted: AimGenerateRequestBody = { ...body }
   if (fitted.polishInstruction) {

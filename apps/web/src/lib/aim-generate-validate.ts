@@ -5,6 +5,7 @@ import { parseWorkflowBriefRequest } from "@/lib/aim-workflow"
 import { normalizeConfirmedTurnIntent, type AimTurnIntent } from "@/lib/aim-turn-intent"
 import { agentAllowsContentModeSelector } from "@/lib/aim/agent-capabilities"
 import type { AimMethodologySignal } from "@/lib/aim-agent-guides"
+import { contentSourceEnvelopeSchema, type AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 const VALID_METHODOLOGY_SIGNALS = new Set<AimMethodologySignal>([
   "ip_copywriting",
@@ -68,6 +69,7 @@ export interface ParseGenerateBodyResult {
   useStyleProfileOverride: boolean | undefined
   /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构 */
   activeMethodologySignals: AimMethodologySignal[] | undefined
+  sourceEnvelope: AimContentSourceEnvelope | undefined
 }
 
 /**
@@ -138,6 +140,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
 
   const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
   const agentModule = normalizeRequestedCopyStudioModule(body.agentModule, body.writerModule)
+  const sourceEnvelopeResult = contentSourceEnvelopeSchema.safeParse(body.sourceEnvelope)
 
   return {
     agentId,
@@ -173,6 +176,7 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
       typeof body.useStyleProfileOverride === "boolean"
         ? body.useStyleProfileOverride
         : undefined,
+    sourceEnvelope: sourceEnvelopeResult.success ? sourceEnvelopeResult.data : undefined,
   }
 }
 
@@ -187,12 +191,16 @@ export function validateGenerateInput(parsed: {
   targetFormats: ContentFormat[]
   agentId?: string
   agentModule?: CopyStudioModule
+  sourceEnvelope?: AimContentSourceEnvelope
 }): string | null {
   if (parsed.agentModule && !supportsCopyStudioModule(parsed.agentId)) return "agentModule 只能用于内容创作官"
   if (parsed.agentModule && !agentAllowsContentModeSelector(parsed.agentId)) {
     return "当前专家未授权创作模式选择"
   }
   if (!parsed.rawInput) return "请输入内容"
+  if (parsed.sourceEnvelope && parsed.rawInput !== parsed.sourceEnvelope.currentUserRequest) {
+    return "当前用户要求与来源信封不一致"
+  }
   if (parsed.targetFormats.length === 0) return "请选择至少一种生成格式"
   return null
 }

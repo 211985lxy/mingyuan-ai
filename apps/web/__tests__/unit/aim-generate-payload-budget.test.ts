@@ -46,4 +46,25 @@ describe("AIM generate payload budget", () => {
     expect(parsed.rawInput).toContain("必须保留开头")
     expect(parsed.rawInput).toContain("必须保留结尾")
   })
+
+  it("preserves the source-envelope current request exactly", () => {
+    const currentUserRequest = "不是只改开头，这次要20篇完整脚本"
+    const fitted = fitAimGenerateRequestBody({
+      agentId: "content_producer",
+      rawInput: currentUserRequest,
+      targetFormats: ["video_script"],
+      sourceEnvelope: {
+        currentUserRequest,
+        relevantConversation: Array.from({ length: 20 }, (_, index) => ({
+          role: index % 2 ? "assistant" as const : "user" as const,
+          content: `旧对话${index}${"旧".repeat(10_000)}`,
+        })),
+        referenceMaterials: [],
+      },
+    })
+
+    expect(fitted.rawInput).toBe(currentUserRequest)
+    expect(fitted.sourceEnvelope?.currentUserRequest).toBe(currentUserRequest)
+    expect(bytes(JSON.stringify(fitted))).toBeLessThanOrEqual(AIM_GENERATE_REQUEST_BUDGET_BYTES)
+  })
 })

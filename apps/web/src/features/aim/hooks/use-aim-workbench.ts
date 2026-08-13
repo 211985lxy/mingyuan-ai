@@ -259,6 +259,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     onIsolateTaskSession: isolateTaskSessionExtras,
     openEditorFromResult: syncEditorFromResultProxy, refreshHistory, refreshProjectWorkflow,
     styleEnabled,
+    editorText, editorFormat, sourceOriginalText, sourceAnalysisText,
   })
 
   // ---- Workflow actions ----

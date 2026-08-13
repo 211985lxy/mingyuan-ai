@@ -1,9 +1,9 @@
 import { z } from "zod"
-import { aimGenerateBodySchema } from "@/features/aim/contracts/api"
+import { aimGenerateBodyObjectSchema } from "@/features/aim/contracts/api"
 
 const id = z.string().trim().min(1).max(80)
 
-export const agentAimGenerateBodySchema = aimGenerateBodySchema.pick({
+export const agentAimGenerateBodySchema = aimGenerateBodyObjectSchema.pick({
   rawInput: true,
   projectId: true,
   agentId: true,

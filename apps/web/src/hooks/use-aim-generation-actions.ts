@@ -16,13 +16,13 @@ import type { CopyStudioModule } from "@/lib/copy-studio"
 import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
 import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import {
-  buildAimHistoryRawInput,
   buildAimRawInput,
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
   findLatestAimDeliverableId,
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
+import { buildGenerationSourceEnvelope } from "@/hooks/aim-generation-source-envelope"
 import {
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
@@ -86,6 +86,10 @@ export interface AimGenerationActionInput {
   selectedMethodologyProfileIds?: string[]
   /** 写作风格开关：用户显式选择是否启用风格档案。undefined 时由服务端规则推断。 */
   styleEnabled?: boolean
+  editorText: string
+  editorFormat?: ContentFormat
+  sourceOriginalText: string
+  sourceAnalysisText: string
 }
 
 interface GenerateOptions {
@@ -114,11 +118,6 @@ export function getAimPendingGenerationMessage(projectEnabled: boolean, actionLa
 function getDeliverableReadyMessage(agentTitle: string) {
   return `${agentTitle} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`
 }
-
-/**
- * 同会话追问/改写复用最新交付物 id，避免「最近任务」每问新建一条。
- * 明确新任务或尚无交付物时返回 undefined，走新建。
- */
 export function resolveFollowUpGenerationId(
   startsNewTask: boolean | undefined,
   messages: AimWorkbenchMessage[],
@@ -171,11 +170,21 @@ function buildGenerationRequest(
     currentBrief: input.workflowBrief,
     override: options.workflowBriefOverride,
   })
+  const sourceEnvelope = buildGenerationSourceEnvelope({
+    currentUserRequest: currentInput || rawInput,
+    messages: baseMessages,
+    editorText: input.editorText,
+    editorFormat: input.editorFormat,
+    existingGenerationId,
+    sourceOriginalText: input.sourceOriginalText,
+    sourceAnalysisText: input.sourceAnalysisText,
+  })
   return {
     agentId: input.selectedAgentId,
     agentModule: input.agentModule,
     writerModule: input.agentModule,
-    rawInput: buildAimHistoryRawInput(rawInput, options.retryMessageId ? "" : currentInput, baseMessages),
+    rawInput: sourceEnvelope.currentUserRequest,
+    sourceEnvelope,
     targetFormats: input.agent.defaultFormats,
     projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,
     videoCopyExtractionId: keepContext ? input.sourceVideoCopyExtractionId : undefined,
@@ -469,12 +478,6 @@ async function checkDeliverableQuality(input: AimGenerationActionInput, messageI
  * @returns 无返回值
  */
 export function useAimGenerationActions(input: AimGenerationActionInput) {
-  // 用 ref 持有最新 input，对外返回引用稳定的 generateWithInput：
-  // 避免 input 对象每次渲染换引用时，下游依赖它的 useCallback（如
-  // 意图门闩的 handleConfirmTurnIntent）被连锁重建。
-  // 注意：ref 的更新放进 effect（react-hooks/refs 禁止渲染期写 ref）。
-  // generateWithInput 只在用户交互（点击生成等）时触发，彼时 effect 已执行，
-  // inputRef.current 必为最新值，行为与渲染期同步一致。
   const inputRef = useRef(input)
   useEffect(() => {
     inputRef.current = input

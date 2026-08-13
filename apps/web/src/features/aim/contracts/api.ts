@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { contentSourceEnvelopeSchema } from "@/lib/aim/content-source-envelope"
 
 const id = z.string().trim().min(1).max(80)
 const optionalId = id.optional()
@@ -81,6 +82,7 @@ export const aimChatBodySchema = z.object({
   writerModule: z.enum(["social", "longform", "free", "moments"]).optional(),
   methodologyProfileIds: methodologyProfileIdsSchema,
   activeMethodologySignals: activeMethodologySignalsSchema,
+  sourceEnvelope: contentSourceEnvelopeSchema.optional(),
 }).strict()
 
 const contentFormatSchema = z.enum([
@@ -94,7 +96,7 @@ const contentFormatSchema = z.enum([
   "xiaohongshu_post",
 ])
 
-export const aimGenerateBodySchema = z.object({
+export const aimGenerateBodyObjectSchema = z.object({
   agentId: z.string().max(80).optional(),
   rawInput: longText,
   targetFormats: z.array(contentFormatSchema).max(8).optional(),
@@ -132,7 +134,18 @@ export const aimGenerateBodySchema = z.object({
   }).strict().optional(),
   /** 发布质检官：review_report=只出报告；editor_revise=改稿终稿 */
   reviewMode: z.enum(["review_report", "editor_revise"]).optional(),
+  sourceEnvelope: contentSourceEnvelopeSchema.optional(),
 }).strict()
+
+export const aimGenerateBodySchema = aimGenerateBodyObjectSchema.superRefine((body, ctx) => {
+  if (body.sourceEnvelope && body.rawInput.trim() !== body.sourceEnvelope.currentUserRequest) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "当前用户要求与来源信封不一致",
+      path: ["rawInput"],
+    })
+  }
+})
 
 export const aimEvolveBodySchema = z.object({
   projectId: id,
