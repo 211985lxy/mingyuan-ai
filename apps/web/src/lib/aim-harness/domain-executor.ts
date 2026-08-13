@@ -25,6 +25,7 @@ export async function executeAimGenerationDomain(
     agentId: spec.agentId,
     runtimeTask: spec.runtimeTask,
     runSpec: spec,
+    unifiedContentExecution: spec.unifiedContentExecution,
   })
   return { output, generationId: output.id }
 }

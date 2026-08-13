@@ -79,6 +79,7 @@ export function selectAimSkills(input: {
   runtimeTask: AimRuntimeTask
   /** 方法论类技能信号：命中则加载对应方法论 skill；缺省时信号门控类 skill 不自动加载 */
   methodologySignals?: Set<string>
+  ignoreRuntimeTask?: boolean
 }): AimSkillRef[] {
   const gatedEnabled = new Set<string>(
     Array.from(input.methodologySignals ?? [])
@@ -88,7 +89,7 @@ export function selectAimSkills(input: {
   return AIM_SKILL_CATALOG.filter((skill) => {
     if (!skill.agentIds.includes(input.agentId)) return false
     if (!skill.runtimeTasks || skill.runtimeTasks.length === 0) return true
-    if (!skill.runtimeTasks.includes(input.runtimeTask)) return false
+    if (!input.ignoreRuntimeTask && !skill.runtimeTasks.includes(input.runtimeTask)) return false
     // 受信号门控的方法论 skill：只有用户显式点了对应技能才加载，默认不自动挂
     if (SIGNAL_GATED_SKILL_IDS.has(skill.id)) return gatedEnabled.has(skill.id)
     return true
@@ -104,6 +105,7 @@ export async function loadAimSkills(input: {
   enabled?: boolean
   /** 方法论类技能信号：命中则加载对应方法论 skill */
   methodologySignals?: Set<string>
+  ignoreRuntimeTask?: boolean
 }): Promise<LoadedAimSkill[]> {
   if (input.enabled === false) return []
   const selected = selectAimSkills(input)

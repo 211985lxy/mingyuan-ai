@@ -13,7 +13,6 @@ import {
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
-import { proofreadAimResponse } from "@/lib/aim/generation-proofread"
 import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import {
   buildAimRawInput,
@@ -23,13 +22,13 @@ import {
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
 import { buildGenerationSourceEnvelope } from "@/hooks/aim-generation-source-envelope"
+import { executeAimTurnWithTransientRetry } from "@/hooks/aim-unified-turn-client"
 import {
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
 } from "@/lib/aim/task-session-reset"
 import { mergeAimGenerationIntoMessages } from "@/lib/aim/merge-aim-generation-messages"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
-import type { AimTurnIntent } from "@/lib/aim-turn-intent"
 import { startRunOutcomeActivity } from "@/lib/aim/run-outcome-client"
 import { repurposeDeliverable } from "@/hooks/aim-repurpose-content-package"
 
@@ -97,8 +96,7 @@ interface GenerateOptions {
   startsNewTask?: boolean
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
-  /** 用户确认的本轮意图 */
-  confirmedTurnIntent?: AimTurnIntent
+  executionAgentId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
@@ -208,7 +206,7 @@ function buildGenerationRequest(
     useStyleProfileOverride: input.styleEnabled !== undefined ? input.styleEnabled : undefined,
     // 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入；未点技能则 undefined（服务端默认不注入）
     activeMethodologySignals: options.activeMethodologySignals?.length ? options.activeMethodologySignals : undefined,
-    confirmedTurnIntent: options.confirmedTurnIntent,
+    executionAgentId: options.executionAgentId,
   }
 }
 
@@ -244,67 +242,11 @@ function applyGenerationResponse(
   toast.success(`${input.agent.primaryActionLabel}完毕`)
 }
 
-/** 校对不挡首出：后台软替换交付物与编辑器 */
-async function softProofreadInBackground(
-  input: AimGenerationActionInput,
-  assistantMessageId: string,
-  response: AimGenerateResponse,
-  signal: AbortSignal,
-) {
-  if (response.fastPath) return
-  try {
-    const corrected = await proofreadAimResponse(response, input.agent.defaultInstruction)
-    if (signal.aborted) return
-    const mainResult = corrected.results[0]
-    let didApply = false
-    input.setMessages((messages) => {
-      const target = messages.find((message) => message.id === assistantMessageId)
-      if (!target?.deliverables || target.deliverables.id !== response.id || target.regenerating) {
-        return messages
-      }
-      didApply = true
-      return messages.map((message) => message.id === assistantMessageId
-        ? { ...message, deliverables: corrected }
-        : message)
-    })
-    if (didApply && mainResult && !signal.aborted) {
-      input.openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
-    }
-  } catch {
-    // 校对失败静默保留原稿
-  }
-}
-
 function markGenerationStopped(input: AimGenerationActionInput, assistantMessageId: string) {
   input.setMessages((messages) => messages.map((message) => {
     if (message.id !== assistantMessageId) return message
     return { ...message, content: "已停止本次生成。", regenerating: false, failure: null }
   }))
-}
-
-function isTransientGenerateFailure(error: unknown): boolean {
-  if (!(error instanceof ApiError)) {
-    return error instanceof TypeError || (error instanceof Error && /fetch failed|network|Failed to fetch/i.test(error.message))
-  }
-  return error.status === 408 || error.status === 502 || error.status === 503 || error.status === 504
-}
-
-async function generateAimContentWithTransientRetry(
-  body: Parameters<typeof generateAimContent>[0],
-  signal: AbortSignal,
-): Promise<AimGenerateResponse> {
-  const maxAttempts = 2
-  let lastError: unknown
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      return await generateAimContent(body, signal)
-    } catch (error) {
-      lastError = error
-      if (signal.aborted || attempt >= maxAttempts - 1 || !isTransientGenerateFailure(error)) throw error
-      await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)))
-    }
-  }
-  throw lastError
 }
 
 function beginExclusiveRequest(requestAbortRef: MutableRefObject<AbortController | null>) {
@@ -337,19 +279,36 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     : message))
   input.setIsGenerating(true)
   try {
-    const response = await generateAimContentWithTransientRetry(
-      { ...buildGenerationRequest(input, rawInput, currentInput, baseMessages, options), traceId },
+    const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, options)
+    const response = await executeAimTurnWithTransientRetry(
+      {
+        agentId: request.agentId,
+        executionAgentId: request.executionAgentId,
+        projectId: request.projectId,
+        sourceEnvelope: request.sourceEnvelope,
+        targetFormats: request.targetFormats,
+        methodologyProfileIds: request.methodologyProfileIds,
+        activeMethodologySignals: request.activeMethodologySignals,
+      },
       controller.signal,
     )
     if (controller.signal.aborted) {
       markGenerationStopped(input, assistantMessageId)
       return
     }
-    // 先出稿：不等校对
+    if (response.kind === "clarification" || response.kind === "reply") {
+      input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
+        ? {
+            ...message,
+            content: response.kind === "clarification" ? response.question : response.content,
+            traceId: response.runId || traceId,
+            regenerating: false,
+          }
+        : message))
+      return
+    }
     applyGenerationResponse(input, assistantMessageId, currentInput, response)
     endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
-    // 后台校对软替换（不挡继续改稿）
-    void softProofreadInBackground(input, assistantMessageId, response, controller.signal)
   } catch (error) {
     const stopped = controller.signal.aborted || (error instanceof ApiError && error.status === 499)
     if (stopped) {

@@ -23,6 +23,7 @@ import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { TaskSpec } from "@/lib/task-spec"
 import type { AimRunSpec } from "@/lib/aim-harness/types"
 import type { AimAgentId } from "@/lib/aim-harness/contracts"
+import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 export interface AimChatParams {
   userId: string
@@ -74,6 +75,10 @@ export interface AimGenerateContext {
   runtimeTask?: AimRuntimeTask
   modelPolicy?: AimModelPolicy
   runSpec?: AimRunSpec
+  unifiedContentExecution?: {
+    envelope: AimContentSourceEnvelope
+    brief: string
+  }
 
   // 共享数据上下文
   knowledgeBlock: string

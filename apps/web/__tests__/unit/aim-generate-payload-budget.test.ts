@@ -4,6 +4,7 @@ import {
   AIM_GENERATE_REQUEST_BUDGET_BYTES,
   fitAimGenerateRequestBody,
   serializeAimGenerateRequestBody,
+  serializeAimExecuteRequestBody,
 } from "@/lib/aim/generate-payload-budget"
 
 const bytes = (text: string) => new TextEncoder().encode(text).byteLength
@@ -66,5 +67,25 @@ describe("AIM generate payload budget", () => {
     expect(fitted.rawInput).toBe(currentUserRequest)
     expect(fitted.sourceEnvelope?.currentUserRequest).toBe(currentUserRequest)
     expect(bytes(JSON.stringify(fitted))).toBeLessThanOrEqual(AIM_GENERATE_REQUEST_BUDGET_BYTES)
+  })
+
+  it("budgets unified execute requests without truncating the current request", () => {
+    const currentUserRequest = "完整保留当前要求"
+    const serialized = serializeAimExecuteRequestBody({
+      agentId: "content_producer",
+      sourceEnvelope: {
+        currentUserRequest,
+        relevantConversation: Array.from({ length: 20 }, (_, index) => ({
+          role: index % 2 ? "assistant" as const : "user" as const,
+          content: `历史${index}${"旧".repeat(10_000)}`,
+        })),
+        referenceMaterials: [],
+      },
+      targetFormats: ["video_script"],
+    })
+    const parsed = JSON.parse(serialized) as { sourceEnvelope: { currentUserRequest: string } }
+
+    expect(bytes(serialized)).toBeLessThanOrEqual(AIM_GENERATE_REQUEST_BUDGET_BYTES)
+    expect(parsed.sourceEnvelope.currentUserRequest).toBe(currentUserRequest)
   })
 })

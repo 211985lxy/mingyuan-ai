@@ -96,6 +96,16 @@ const contentFormatSchema = z.enum([
   "xiaohongshu_post",
 ])
 
+export const aimExecuteBodySchema = z.object({
+  agentId: z.string().max(80).optional(),
+  executionAgentId: z.string().max(80).optional(),
+  projectId: optionalId,
+  sourceEnvelope: contentSourceEnvelopeSchema,
+  targetFormats: z.array(contentFormatSchema).min(1).max(8),
+  methodologyProfileIds: methodologyProfileIdsSchema,
+  activeMethodologySignals: activeMethodologySignalsSchema,
+}).strict()
+
 export const aimGenerateBodyObjectSchema = z.object({
   agentId: z.string().max(80).optional(),
   rawInput: longText,
@@ -251,6 +261,7 @@ export const aimEvolveStyleBodySchema = z.object({
 
 export type AimChatBody = z.infer<typeof aimChatBodySchema>
 export type AimGenerateBody = z.infer<typeof aimGenerateBodySchema>
+export type AimExecuteBody = z.infer<typeof aimExecuteBodySchema>
 export type AimWorkflowBriefBody = z.infer<typeof aimWorkflowBriefBodySchema>
 export type AimEvolveStyleBody = z.infer<typeof aimEvolveStyleBodySchema>
 export type StyleProfileDeltaBody = z.infer<typeof styleProfileDeltaSchema>

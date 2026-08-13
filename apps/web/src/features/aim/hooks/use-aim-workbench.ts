@@ -42,7 +42,6 @@ import { collectAnalysisTextCandidates, buildAnnotatedReferenceText } from "@/fe
 import { useAimCopyStudioMode } from "@/features/aim/hooks/use-aim-copy-studio-mode"
 import { useAimProjectScopeSwitch } from "@/features/aim/hooks/use-aim-project-scope-switch"
 import { useAimPlanOrchestration } from "@/features/aim/hooks/use-aim-plan-orchestration"
-import { useAimTurnIntentGate } from "@/features/aim/hooks/use-aim-turn-intent-gate"
 import { useAimSourceEditorState } from "@/features/aim/hooks/use-aim-source-editor-state"
 import { useAimRetroTarget } from "@/features/aim/hooks/use-aim-retro-target"
 import { shouldShowAimEntrySwitch } from "@/features/aim/aim-entry-mode"
@@ -276,7 +275,6 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
 
   // ---- resetConversation (shared by page commands + header) ----
   const busy = isThinking || isGenerating || isQualityChecking || isTranscribing
-  const clearTurnIntentRef = useRef<(() => void) | null>(null)
 
   function resetConversation() {
     runAimWorkbenchNewTaskReset({
@@ -287,7 +285,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
       setSelectedMethodologyProfileIds, setEditorPanelOpen, selectedAgentId, currentProjectScope,
       resetPlan: () => planOrchestration.planSession.resetPlan(),
       setComposerMode: planOrchestration.setComposerMode,
-      clearTurnIntent: clearTurnIntentRef.current, searchParams, router,
+      clearTurnIntent: undefined, searchParams, router,
     })
   }
 
@@ -306,7 +304,6 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     })
     planOrchestration.planSession.abandonPlan()
     planOrchestration.setComposerMode("direct")
-    clearTurnIntentRef.current?.()
   }
 
   const { changeProjectScope } = useAimProjectScopeSwitch({
@@ -396,37 +393,10 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     editorPanelLabels, imageAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
   })
 
-  const {
-    pendingTurnIntent,
-    intentResolving,
-    clearPendingTurnIntent,
-    handleConfirmTurnIntent,
-    handleCancelTurnIntent,
-    handleGenerateOrPlan: handleGenerateWithIntentGate,
-  } = useAimTurnIntentGate({
-    hasEditorSelection,
-    imageCount: imageAttachments.length,
-    handleGenerate,
-    text: input,
-    messageCount: messages.length,
-    messages,
-    editorText,
-    editorLabels: editorPanelLabels,
-    runWorkbenchCommand,
-    defaultFormats: agent.defaultFormats,
-    projectEnabled,
-    selectedProjectId,
-    sendText, generateWithInput,
-    consumeSkillDelegation: takeSkillDelegation, peekSkillDelegation,
-    consumeMethodologySignals: takeMethodologySignals,
-  })
-  // eslint-disable-next-line react-hooks/refs -- reset handlers read this ref outside render.
-  clearTurnIntentRef.current = clearPendingTurnIntent
-
-  /** 统一的生成入口：显式计划指令/开关优先，其余请求走直接模式意图门闩。 */
+  /** 统一的生成入口：显式计划指令/开关优先，其余请求交给服务端统一执行。 */
   const handleGenerateOrPlan = useCallback(() => {
-    planOrchestration.handleGenerateOrPlan(handleGenerateWithIntentGate)
-  }, [handleGenerateWithIntentGate, planOrchestration])
+    planOrchestration.handleGenerateOrPlan(handleGenerate)
+  }, [handleGenerate, planOrchestration])
 
   // ---- Derived flags ----
   const retryFailed = useCallback((message: ChatMessage) => retryFailedMessage(message, busy), [busy, retryFailedMessage])
@@ -486,8 +456,6 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     planSession: planOrchestration.planSession,
     handlePlanConfirm: planOrchestration.handlePlanConfirm,
     handlePlanAbandon: planOrchestration.handlePlanAbandon,
-    // 本轮意图确认
-    pendingTurnIntent, handleConfirmTurnIntent, handleCancelTurnIntent, intentResolving,
     handleEvolveConversation, dismissEvolutionSuggestion, handleSaveEvolutionSuggestion,
     beginWorkflowStage, beginContentAction, handleAimNextAction, closeWorkflowBriefDialog, confirmWorkflowBrief,
     latestDeliverableMessageId: findLatestAimVideoDeliverableMessageId(messages),

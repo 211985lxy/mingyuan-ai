@@ -2,7 +2,6 @@ import { parseGenerateBody, validateGenerateInput } from "@/lib/aim-generate-val
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { prepareAimGenerateInput } from "@/lib/aim-harness/request-context"
 import { executeAimRun } from "@/lib/aim-harness/runtime"
-import { actionToRuntimeTask } from "@/lib/aim-intent-vector"
 import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
 import {
   addAimTraceStep,
@@ -22,9 +21,16 @@ import { prisma } from "@/lib/prisma"
  * @param body - 请求体
  * @returns 无返回值
  */
-export async function prepareAimGenerateRequest(userId: string, body: Record<string, unknown>) {
+export async function prepareAimGenerateRequest(
+  userId: string,
+  body: Record<string, unknown>,
+  internal?: {
+    trace?: AimTraceRecorder
+    unifiedContentExecution?: import("@/lib/aim-harness/contracts").AimRunRequest["unifiedContentExecution"]
+  },
+) {
   const parsed = parseGenerateBody(body)
-  const trace = await createAimTrace({
+  const trace = internal?.trace ?? await createAimTrace({
     id: typeof body.traceId === "string" ? (body.traceId as string).trim() || undefined : undefined,
     userId,
     projectId: parsed.projectId || null,
@@ -59,33 +65,34 @@ export async function prepareAimGenerateRequest(userId: string, body: Record<str
   const workflowBrief = parsed.workflow
     ? await buildWorkflowBrief({ userId, ...parsed.workflow, projectId: parsed.workflow.projectId || parsed.projectId || undefined })
     : undefined
-  const preparedInput = await prepareAimGenerateInput({
-    userId,
-    agentId: parsed.agentId,
-    rawInput: parsed.rawInput,
-    targetFormats: parsed.targetFormats,
-    taskType: parsed.taskType,
-    polishInstruction: parsed.polishInstruction,
-    videoCopyExtractionId: parsed.videoCopyExtractionId,
-    useMarketViralVideos: parsed.useMarketViralVideos,
-    trace,
-  })
-  // 用户确认意图是本次运行唯一权威：action → runtimeTask，禁止后续再向量/LLM 改判
-  const frozenTask = parsed.confirmedTurnIntent
-    ? actionToRuntimeTask(parsed.confirmedTurnIntent.action)
-    : undefined
-  const runtimeTask = frozenTask ?? preparedInput.runtimeTask
-  const intentFrozen = Boolean(frozenTask)
-  if (intentFrozen) {
+  const preparedInput = internal?.unifiedContentExecution
+    ? {
+        rawInput: parsed.rawInput,
+        // 仅用于兼容尚未移除的 Harness 类型；统一入口的语义和执行边界
+        // 只读取 unifiedContentExecution，不再从用户原话映射旧动作分类。
+        runtimeTask: "new_copy" as const,
+      }
+    : await prepareAimGenerateInput({
+        userId,
+        agentId: parsed.agentId,
+        rawInput: parsed.rawInput,
+        targetFormats: parsed.targetFormats,
+        taskType: parsed.taskType,
+        polishInstruction: parsed.polishInstruction,
+        videoCopyExtractionId: parsed.videoCopyExtractionId,
+        useMarketViralVideos: parsed.useMarketViralVideos,
+        trace,
+      })
+  const runtimeTask = preparedInput.runtimeTask
+  if (parsed.confirmedTurnIntent) {
     await addAimTraceStep(trace, {
-      key: "freeze_confirmed_intent",
-      label: "确认意图冻结",
+      key: "legacy_intent_observed",
+      label: "旧意图字段观测",
       status: "success",
-      summary: `runtimeTask=${runtimeTask}（来自用户确认 ${parsed.confirmedTurnIntent!.action}）`,
+      summary: "已忽略旧意图字段的执行控制权",
       metadata: {
-        action: parsed.confirmedTurnIntent!.action,
-        scope: parsed.confirmedTurnIntent!.scope,
-        runtimeTask,
+        action: parsed.confirmedTurnIntent.action,
+        scope: parsed.confirmedTurnIntent.scope,
       },
     })
   }
@@ -97,19 +104,22 @@ export async function prepareAimGenerateRequest(userId: string, body: Record<str
     workflowBrief,
     rawInput: preparedInput.rawInput,
     runtimeTask,
-    intentFrozen,
+    unifiedContentExecution: internal?.unifiedContentExecution,
   }
 }
 
 type PreparedRequest = Extract<Awaited<ReturnType<typeof prepareAimGenerateRequest>>, { ok: true }>
+type UnifiedPreparedRequest = PreparedRequest & {
+  unifiedContentExecution?: import("@/lib/aim-harness/contracts").AimRunRequest["unifiedContentExecution"]
+}
 
 /**
  * @description 执行preparedaimgeneration
  * @param prepared - prepared
  * @returns 无返回值
  */
-export async function executePreparedAimGeneration(prepared: PreparedRequest) {
-  const { parsed, trace, userId, workflowBrief, runtimeTask, intentFrozen } = prepared
+export async function executePreparedAimGeneration(prepared: UnifiedPreparedRequest) {
+  const { parsed, trace, userId, workflowBrief, runtimeTask } = prepared
   const projectId = workflowBrief?.projectId || parsed.projectId
 
   // 派生到已有母稿时，复用其已确认母内容 / 内容包状态
@@ -146,13 +156,13 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     topicSelectionId: parsed.topicSelectionId,
     selectedTopicIndex: parsed.selectedTopicIndex,
     runtimeTask,
-    intentFrozen,
     agentModule: parsed.agentModule,
     writerModule: parsed.writerModule,
     taskSpec,
     actorId: userId,
     projectId,
     methodologyProfileIds: parsed.methodologyProfileIds,
+    unifiedContentExecution: prepared.unifiedContentExecution,
     trace,
   }, (spec) => executeAimGenerationDomain(spec, {
     userId,
@@ -176,6 +186,7 @@ export async function executePreparedAimGeneration(prepared: PreparedRequest) {
     reviewMode: parsed.reviewMode,
     useStyleProfileOverride: parsed.useStyleProfileOverride,
     activeMethodologySignals: parsed.activeMethodologySignals,
+    unifiedContentExecution: prepared.unifiedContentExecution,
   }))
 }
 

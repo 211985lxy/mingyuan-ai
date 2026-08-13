@@ -115,18 +115,12 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       return
     }
     const currentInput = options.input.trim()
-    // generate 不支持 executionAgentId，会静默丢掉委托；有委托必须走 chat，
-    // 否则质检技能会落到当前会话的润色引擎上。
-    if (peekSkillDelegation(currentInput).executionAgentId) {
-      await handleSend()
-      return
-    }
     const startsNewTask = shouldIsolateWritingInstruction(currentInput, options.messages.length > 0)
     const workbenchCommand = detectAimWorkbenchCommand(currentInput)
     if (!startsNewTask && workbenchCommand && options.runWorkbenchCommand(workbenchCommand)) return
-    takeSkillDelegation(currentInput)
+    const delegation = takeSkillDelegation(currentInput)
     const methodologySignals = takeMethodologySignals(currentInput)
-    await options.generateWithInput(currentInput, { startsNewTask, ...methodologySignals })
+    await options.generateWithInput(currentInput, { startsNewTask, ...delegation, ...methodologySignals })
   }
 
   function retryFailedMessage(message: ChatMessage, busy: boolean) {

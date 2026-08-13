@@ -1,17 +1,7 @@
 /**
- * AIM Harness v2 — 统一上下文装配阶段（阶段 2.2）。
- *
- * prepareAimContext 把此前散落在 buildAimGeneration 内部的"装配"职责集中到一个
+ * prepareAimContext 把散落的装配职责集中到一个
  * 函数：项目校验 → runtimeTask/生成意图/知识策略解析 → 并行加载背景 block →
  * TaskSpec 构建 → 压缩 → 上下文预算 → 产出 PreparedAimContext + 声明式来源清单。
- *
- * 关键约束：本函数必须与 buildAimGeneration 原装配逻辑逐字等价（同样的 gating、
- * 同样的 Promise.all 顺序、同样的 budget profile），否则会改变 prompt。阶段 2.3
- * 让 buildAimGeneration 改为调用 prepareAimContext 后，handler 不再自行装配。
- *
- * 注意：route 层的 rawInput 注入（buildRawInputWithVideoCopyContext 等）仍留在
- * route——它们改写的是"用户输入文本"，在 prepareAimContext 之前发生；阶段 2.8
- * 普通 generate 入口迁移时再决定是否下沉。
  */
 
 import { prisma } from "@/lib/prisma"
@@ -20,7 +10,7 @@ import {
   type AimRuntimeTask,
 } from "@/lib/aim-knowledge-strategy"
 import { compressAimMessages } from "@/lib/aim-context-compressor"
-import { applyAimContextBudget } from "@/lib/aim-context-budget"
+import { AIM_UNIFIED_CONTENT_CONTEXT_PROFILE, applyAimContextBudget, applyAimContextProfile } from "@/lib/aim-context-budget"
 import { buildTaskSpecSkeleton, enrichTaskSpecFromRawInput } from "@/lib/task-spec"
 import { refineTaskSpec } from "@/lib/task-spec-llm"
 import { formatLabelForTaskSpec, inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
@@ -108,6 +98,12 @@ export async function prepareAimContext(
 
   // 1. 项目校验 + 生成意图（与 buildAimGeneration:1430 / 1460 一致）
   let generationIntent = await checkProjectAndResolveIntent({ spec, agentId, params, trace })
+  if (spec.unifiedContentExecution) {
+    generationIntent = {
+      ...generationIntent,
+      useKnowledge: spec.contextPolicy.loadKnowledge,
+    }
+  }
   // 写作风格显式覆盖：用户在创作台切了开关后，优先用用户选定值（true/false 都覆盖）
   if (typeof params.useStyleProfileOverride === "boolean") {
     generationIntent = { ...generationIntent, useStyleProfile: params.useStyleProfileOverride }
@@ -203,7 +199,13 @@ export async function prepareAimContext(
   // 3.3 Skill 岗位手册按需加载（默认开；AIM_SKILL_LOADING_ENABLED=false 关闭）
   // 方法论类 skill 受信号门控：只有用户点了对应技能才加载，默认不自动挂
   const skillEnabled = env.AIM_SKILL_LOADING_ENABLED?.trim().toLowerCase() !== "false"
-  const skills = await loadAimSkills({ agentId, runtimeTask, enabled: skillEnabled, methodologySignals })
+  const skills = await loadAimSkills({
+    agentId,
+    runtimeTask,
+    enabled: skillEnabled,
+    methodologySignals,
+    ignoreRuntimeTask: Boolean(spec.unifiedContentExecution),
+  })
   const skillBlock = buildAimSkillBlock(skills)
 
   // 3.5 命名方法论解析（ADR-002）：显式 ID > 文本精确命中 > agent 默认兜底（content_producer=徐沪生）> none。
@@ -407,7 +409,7 @@ async function compressAndBudgetGenerationInput(input: {
     ? `【对话摘要】\n${compressed.summary}\n\n${knowledgeBlock}`
     : knowledgeBlock
   const prioritizedKnowledge = withAimFactPriorityRule(knowledgeWithContext)
-  const budgeted = applyAimContextBudget({
+  const contextBlocks = {
     conversationBlock: "",
     knowledgeBlock: prioritizedKnowledge,
     methodologyBlock: input.methodologyBlock,
@@ -418,7 +420,10 @@ async function compressAndBudgetGenerationInput(input: {
     eventStorytellingBlock: input.eventStorytellingBlock,
     ipWikiBlock: input.ipWikiBlock,
     selectedMethodologyBlock: input.selectedMethodologyBlock,
-  }, runtimeTask, agentId)
+  }
+  const budgeted = spec.unifiedContentExecution
+    ? applyAimContextProfile(contextBlocks, AIM_UNIFIED_CONTENT_CONTEXT_PROFILE)
+    : applyAimContextBudget(contextBlocks, runtimeTask, agentId)
   await addAimTraceStep(trace, {
     key: "context_budget",
     label: "上下文预算",

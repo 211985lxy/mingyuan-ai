@@ -20,6 +20,7 @@ import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowle
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
+import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 import { resolveExecutionPolicy } from "./execution-mode"
 import type {
@@ -77,6 +78,7 @@ export interface PlanRunInput {
   executionMode?: AimExecutionMode
   /** 完整执行策略覆盖；未传则按 mode 默认冻结。 */
   executionPolicy?: Partial<AimExecutionPolicy>
+  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
 }
 
 function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
@@ -162,19 +164,12 @@ function buildModelPolicy(
   agentId: AimAgentId,
   entrypoint: AimEntrypoint,
   stream: boolean,
-  runtimeTask: AimRuntimeTask,
-  targetFormats: ContentFormat[],
+  fastSpoken: boolean,
   agentModule?: CopyStudioModule,
   writerModule?: CopyStudioModule,
 ): AimModelPolicy {
   const isChat = entrypoint === "chat"
   const studioModule = agentModule ?? writerModule
-  const fastSpoken = isAimFastSpokenRun({
-    agentId,
-    entrypoint,
-    runtimeTask,
-    targetFormats,
-  })
   const needsAdvancedReasoning =
     agentId === "content_producer" ||
     agentId === "work_editor" ||
@@ -254,20 +249,26 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     copyStudioModule: input.agentModule ?? input.writerModule,
   })
 
-  const contextPolicy = buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
+  const contextPolicy = input.unifiedContentExecution
+    ? {
+        loadKnowledge: Boolean(input.projectId),
+        loadIpWiki: Boolean(input.projectId),
+        loadMarketViral: Boolean(input.hotTopic || input.videoCopyExtractionId),
+        loadCompetitorWatch: false,
+      }
+    : buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
 
-  const fastSpoken = isAimFastSpokenRun({
-    agentId: input.agentId,
-    entrypoint: input.entrypoint,
-    runtimeTask,
-    targetFormats,
-  })
+  const fastSpoken = !input.unifiedContentExecution && isAimFastSpokenRun({
+      agentId: input.agentId,
+      entrypoint: input.entrypoint,
+      runtimeTask,
+      targetFormats,
+    })
   const defaults = buildModelPolicy(
     input.agentId,
     input.entrypoint,
     input.stream ?? false,
-    runtimeTask,
-    targetFormats,
+    fastSpoken,
     input.agentModule,
     input.writerModule,
   )
@@ -302,5 +303,6 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     runLlmQuality: fastSpoken ? resolveLlmQuality("fast_spoken").run : undefined,
     executionMode: executionPolicy.mode,
     executionPolicy,
+    unifiedContentExecution: input.unifiedContentExecution,
   })
 }

@@ -1,4 +1,4 @@
-import type { AimGenerateBody } from "@/features/aim/contracts/api"
+import type { AimExecuteBody, AimGenerateBody } from "@/features/aim/contracts/api"
 import { fitAimContentSourceEnvelopeToBudget } from "@/lib/aim/content-source-envelope"
 
 /** 与 /api/aim/generate 的 parseJsonRecord maxBytes(256 KiB) 留余量对齐 */
@@ -78,4 +78,15 @@ export function fitAimGenerateRequestBody(body: AimGenerateRequestBody): AimGene
 
 export function serializeAimGenerateRequestBody(body: AimGenerateRequestBody) {
   return JSON.stringify(fitAimGenerateRequestBody(body))
+}
+
+export function serializeAimExecuteRequestBody(body: AimExecuteBody) {
+  const overhead = jsonBytes({ ...body, sourceEnvelope: undefined })
+  const sourceEnvelope = fitAimContentSourceEnvelopeToBudget(
+    body.sourceEnvelope,
+    Math.max(0, AIM_GENERATE_REQUEST_BUDGET_BYTES - overhead - 512),
+  )
+  const fitted = { ...body, sourceEnvelope }
+  if (jsonBytes(fitted) > AIM_GENERATE_REQUEST_BUDGET_BYTES) throw new Error("来源上下文超出可处理大小")
+  return JSON.stringify(fitted)
 }

@@ -22,6 +22,8 @@ import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
 import { formatAimTurnIntentBlock, looksLikePassagePolish, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
+import { buildAimSemanticRevisionPrompt } from "@/lib/aim/semantic-delivery-verifier"
+import { inspectUnifiedGenerationProtocol, shouldApplyLegacyLightEditRules, verifyUnifiedGenerationCandidate } from "@/lib/aim/unified-generation-gate"
 import {
   CONTENT_CREATION_TRACE_RULE,
   NEWSROOM_SAMPLE_CITATION_RULE,
@@ -205,11 +207,6 @@ export function composeLayeredAimPrompt(input: LayeredAimPromptInput): string {
   return sections.filter(Boolean).join("\n\n")
 }
 
-/**
- * @description 执行 LLM 生成并带对标抄袭检测重试
- * @param agentId - 智能体 ID
- * @returns 生成结果（完成响应和解析内容）
- */
 export async function executeGenerateLLMWithBenchmarkRetry(
   agentId: string,
   systemPrompt: string,
@@ -219,19 +216,31 @@ export async function executeGenerateLLMWithBenchmarkRetry(
 ) {
   const groundedNumericRule = buildGroundedNumericClaimRule(context.rawInput)
   let activePrompt = `${userPrompt}${groundedNumericRule}`
-  const isLightEdit = context.runtimeTask === "light_edit"
-  const fastSpokenRoute = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
-  const maxAttempts = fastSpokenRoute ? AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS : 3
+  const isLightEdit = shouldApplyLegacyLightEditRules(context)
+  const fastSpokenRoute = !context.unifiedContentExecution && isAimFastSpokenRoute(context.modelPolicy?.routeKey)
+  const maxAttempts = context.unifiedContentExecution
+    ? 3
+    : fastSpokenRoute ? AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS : 3
   const methodologyPlan = context.methodologyPlan ?? context.taskSpec?.methodologyPlan
   const ipWikiPages = context.ipWikiPages
   const numericEvidence = buildGenerationNumericEvidence(context)
   let isLengthRewrite = false
+  let semanticRevisions = 0
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const modelPolicy = isLengthRewrite && context.modelPolicy
       ? { ...context.modelPolicy, temperature: 0.2 }
       : context.modelPolicy
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, modelPolicy)
+    const deliveryGate = context.unifiedContentExecution ? inspectUnifiedGenerationProtocol(completion, targetFormats) : { passed: true as const }
+    if (!deliveryGate.passed) {
+      if (attempt === maxAttempts - 1) throw new Error("生成结果不包含可安全交付的最终内容")
+      activePrompt = `${userPrompt}\n\n上一版最终内容协议错误：${deliveryGate.code}。只输出带正确格式标记的干净最终正文。`
+      continue
+    }
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
+    if (!context.unifiedContentExecution && !Object.values(parsed).some(Boolean) && targetFormats.length === 1) {
+      parsed[targetFormats[0]] = completion.content.trim()
+    }
     for (const format of targetFormats) {
       parsed[format] = materializeApprovedFacts(parsed[format] || "", context.rawInput)
       if (isLightEdit) parsed[format] = scrubLeakedLightEditFeedback(parsed[format] || "", context.rawInput)
@@ -287,6 +296,17 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       && goalVerify.ok
       && ipCompliance.ok
     ) {
+      if (context.unifiedContentExecution) {
+        const verdict = await verifyUnifiedGenerationCandidate({ context, parsed, targetFormats, agentId })
+        if (!verdict.passed) {
+          semanticRevisions += 1
+          if (semanticRevisions > 2 || attempt === maxAttempts - 1) {
+            throw new Error("连续修正后仍未完成当前要求")
+          }
+          activePrompt = buildAimSemanticRevisionPrompt({ originalPrompt: userPrompt, gaps: verdict.gaps })
+          continue
+        }
+      }
       return { completion, parsed, goalVerify, ipCompliance, safetyWarning: undefined }
     }
     if (attempt === maxAttempts - 1) {
@@ -351,16 +371,8 @@ ${previousOutput}`
     }
   }
 
-  // 控制流兜底（正常不可达）：末次迭代必 return/throw；文案保持用户可读。
   throw new Error("生成失败，请稍后重试")
 }
-
-/**
- * @description 构建内容创作官系统提示词
- * @param agentPrompt - 智能体基础提示词
- * @param context - AIM 生成上下文
- * @returns 完整的系统提示词
- */
 export function buildProducerSystemPrompt(agentPrompt: string, context: AimGenerateContext): string {
   const knowledgeUseRule = buildContentProducerKnowledgeRule({
     runtimeTask: context.runtimeTask,
@@ -385,12 +397,9 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     forGenerate: true,
   })
 
-  // 专家技能包按需注入：未命中意图时剥离爆款开头库/19条法则等，削减 token 过载。
   const effectiveMethodology = progressive.includeViralToolkit
     ? context.methodologyBlock : stripViralToolkitFromMethodology(context.methodologyBlock)
 
-  // 上下文按优先级：TaskSpec 由 user prompt 注入；IP Wiki / 知识为事实素材；
-  // IP 操盘方法论为强参考（结构/钩子/判断标准必须执行）；爆款库仍为弱参考。
   const contextBlocks = [
     context.ipWikiBlock ? `客户 IP 专属档案（仅当前项目，高优先级事实）：\n${context.ipWikiBlock}` : "",
     context.knowledgeBlock ? `当前客户项目知识库（高相关事实条目）：\n${context.knowledgeBlock}` : "",
@@ -440,18 +449,11 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
   })
 }
 
-/**
- * @description 构建userprompt
- * @param context - 上下文
- * @param formatBlocks - 格式Blocks
- * @returns string
- */
 export function buildUserPrompt(context: AimGenerateContext, formatBlocks: string): string {
   const workflowContext = buildWorkflowContext(context)
   const isLightEdit = context.runtimeTask === "light_edit"
   const passagePolish = isLightEdit && looksLikePassagePolish(context.rawInput || "")
 
-  // 冲突10：light_edit 不需要字数保留规则（只改局部，字数规则无意义）
   const explicitWordCountRule = isLightEdit ? null : buildExplicitWordCountPriorityRule(context.rawInput)
 
   const knowledgeHint = buildContentProducerKnowledgeRule({
@@ -462,7 +464,6 @@ export function buildUserPrompt(context: AimGenerateContext, formatBlocks: strin
     ? LIGHT_EDIT_USER_INSTRUCTION
     : `请根据以上内容与任务单，按知识规则生成以下格式的营销内容：\n${knowledgeHint}`
 
-  // 冲突2：light_edit 跳过选题锁定；对标 guardrail 仅 rewrite / 有对标原文时注入
   const includeBenchmarkGuardrail = !isLightEdit && resolveContentProducerProgressiveFlags({
     runtimeTask: context.runtimeTask,
     knowledgeStrategy: context.knowledgeStrategy,

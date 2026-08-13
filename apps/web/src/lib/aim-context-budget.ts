@@ -14,7 +14,7 @@ export interface AimContextBlocks {
 
 type AimContextBlockKey = keyof AimContextBlocks
 
-interface AimContextBudgetProfile {
+export interface AimContextBudgetProfile {
   totalChars: number
   priority: AimContextBlockKey[]
   blockCaps: Partial<Record<AimContextBlockKey, number>>
@@ -30,6 +30,21 @@ const DEFAULT_PRIORITY: AimContextBlockKey[] = [
   "eventStorytellingBlock",
   "viralStructureBlock",
 ]
+
+export const AIM_UNIFIED_CONTENT_CONTEXT_PROFILE: AimContextBudgetProfile = {
+  totalChars: 14_000,
+  priority: DEFAULT_PRIORITY,
+  blockCaps: {
+    conversationBlock: 2_000,
+    ipWikiBlock: 3_000,
+    selectedMethodologyBlock: 2_000,
+    methodologyBlock: 3_000,
+    knowledgeBlock: 4_000,
+    businessDiagnosisBlock: 1_000,
+    eventStorytellingBlock: 1_800,
+    viralStructureBlock: 1_200,
+  },
+}
 
 export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudgetProfile> = {
   light_edit: {
@@ -156,6 +171,21 @@ export function applyAimContextBudget(
         blockCaps: { ...baseProfile.blockCaps, ...agentOverride.blockCaps },
       }
     : baseProfile
+  return applyAimContextProfile(input, profile)
+}
+
+export function applyAimContextProfile(
+  input: AimContextBlocks,
+  profile: AimContextBudgetProfile,
+): {
+  blocks: AimContextBlocks
+  stats: {
+    budgetChars: number
+    originalChars: number
+    includedChars: number
+    truncatedBlocks: AimContextBlockKey[]
+  }
+} {
   const blocks = Object.fromEntries(
     (Object.keys(input) as AimContextBlockKey[]).map((key) => [key, ""]),
   ) as unknown as AimContextBlocks

@@ -1270,6 +1270,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/execute",
+      "file": "src/app/api/aim/execute/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/export-office",
       "file": "src/app/api/aim/export-office/route.ts",
       "methods": [
@@ -1359,19 +1372,6 @@
       "auth": "user_session",
       "input": "none",
       "query": "zod",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/aim/intent-resolve",
-      "file": "src/app/api/aim/intent-resolve/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "zod_json",
-      "query": "none",
       "externalService": false,
       "cost": "low",
       "idempotency": false

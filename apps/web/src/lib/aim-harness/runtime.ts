@@ -77,6 +77,7 @@ function toPlanInput(request: AimRunRequest): PlanRunInput {
     intentFrozen: request.intentFrozen,
     executionMode: request.executionMode,
     executionPolicy: request.executionPolicy,
+    unifiedContentExecution: request.unifiedContentExecution,
   }
 }
 
@@ -90,6 +91,7 @@ function withSpecOverrides(spec: AimRunSpec, request: AimRunRequest): AimRunSpec
     ...spec,
     draftOnly: request.draftOnly ?? spec.draftOnly,
     runLlmQuality: request.runLlmQuality ?? spec.runLlmQuality,
+    unifiedContentExecution: request.unifiedContentExecution ?? spec.unifiedContentExecution,
   }
 }
 

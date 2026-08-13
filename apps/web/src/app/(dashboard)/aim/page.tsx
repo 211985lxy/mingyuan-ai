@@ -17,7 +17,6 @@ import { AimResearchHint } from "@/components/aim/aim-workbench-controls"
 import { AimPlanQuestionCard } from "@/components/aim/aim-plan-question-card"
 import { AimPlanStatusCard } from "@/components/aim/aim-plan-status-card"
 import { AimPlanTaskSpecCard } from "@/components/aim/aim-plan-task-spec-card"
-import { AimTurnIntentConfirmBar } from "@/components/aim/aim-turn-intent-confirm-bar"
 import { AimBenchmarkTopicSearchPanel } from "@/components/aim/aim-benchmark-topic-search-panel"
 import { BatchScriptStudio } from "@/components/aim/batch-script-studio"
 import type { BatchTab } from "@/components/aim/batch-script-studio-sections"
@@ -92,7 +91,7 @@ export default function AimPage() {
     setBatchStudioOpen(false)
   }, [w.selectedAgentId, w.selectedProjectId])
 
-  const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode && !w.pendingTurnIntent
+  const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode
   const contextUsage = useMemo(() => {
     const breakdown = estimateContextUsageBreakdown({
       conversation: w.messages.map((message) => ({
@@ -338,27 +337,6 @@ export default function AimPage() {
               onConfirm={w.handlePlanConfirm}
               onAbandon={w.handlePlanAbandon}
               onReSelect={(field) => w.planSession.reselectField(field)}
-            />
-          </div>
-        )}
-
-        {w.intentResolving && !w.planSession.isPlanMode && (
-          <div className="px-3 py-2 sm:px-5">
-            <p className="mx-auto max-w-lg text-center text-sm text-muted-foreground">
-              正在辨认本轮意图…
-            </p>
-          </div>
-        )}
-
-        {w.pendingTurnIntent && !w.planSession.isPlanMode && (
-          <div className="px-3 py-2 sm:px-5">
-            <AimTurnIntentConfirmBar
-              key={`${w.pendingTurnIntent.text}:${w.pendingTurnIntent.intent.summary}`}
-              intent={w.pendingTurnIntent.intent}
-              busy={w.busy}
-              source={w.pendingTurnIntent.source}
-              onConfirm={w.handleConfirmTurnIntent}
-              onCancel={w.handleCancelTurnIntent}
             />
           </div>
         )}

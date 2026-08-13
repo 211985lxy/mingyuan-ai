@@ -7,6 +7,7 @@ const aimApiSource = readFileSync(join(process.cwd(), "src/lib/api/aim.ts"), "ut
 const helperSource = readFileSync(join(process.cwd(), "src/lib/aim/workbench-helpers.ts"), "utf8")
 const generationSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-generation-actions.ts"), "utf8")
 const chatSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-chat-actions.ts"), "utf8")
+const unifiedTurnSource = readFileSync(join(process.cwd(), "src/hooks/aim-unified-turn-client.ts"), "utf8")
 
 describe("AIM composer generate button", () => {
   it("requires current input instead of enabling from old messages", () => {
@@ -27,18 +28,14 @@ describe("AIM composer generate button", () => {
     expect(generationSource).toContain("正在${actionLabel}，会读取当前项目资料并匹配知识库")
     expect(generationSource).toContain("正在${actionLabel}，将根据本次输入生成交付物")
     expect(executeBlock).toContain("appendPendingGeneration")
-    expect(executeBlock.indexOf("appendPendingGeneration")).toBeLessThan(executeBlock.indexOf("await generateAimContent"))
+    expect(executeBlock.indexOf("appendPendingGeneration")).toBeLessThan(executeBlock.indexOf("await executeAimTurnWithTransientRetry"))
   })
 
-  it("applies the raw generation result before background proofread", () => {
+  it("does not replace a server-verified delivery with an unverified background proofread", () => {
     const executeBlock = generationSource.match(/async function executeGeneration[\s\S]*?async function generateWithInput/)?.[0] ?? ""
     expect(executeBlock).toContain("applyGenerationResponse(input, assistantMessageId, currentInput, response)")
-    expect(executeBlock).toContain("softProofreadInBackground")
-    expect(executeBlock.indexOf("applyGenerationResponse")).toBeLessThan(executeBlock.indexOf("softProofreadInBackground"))
-    expect(executeBlock).not.toMatch(/await proofreadAimResponse/)
-    expect(generationSource).toContain("async function softProofreadInBackground")
-    expect(generationSource).toMatch(/await proofreadAimResponse\(response, input\.agent\.defaultInstruction\)/)
-    expect(generationSource).toContain("if (response.fastPath) return")
+    expect(executeBlock).not.toContain("softProofreadInBackground")
+    expect(generationSource).not.toContain("proofreadAimResponse")
   })
 
   it("appends a new assistant turn after every follow-up generation request", () => {
@@ -63,7 +60,7 @@ describe("AIM composer generate button", () => {
     expect(sendBlock).toContain("prepareAimChatTurn")
     expect(prepareBlock).toContain("正在思考，会先读取上下文和资料，再给出回复")
     expect(sendBlock).toContain("已停止本次回复")
-    expect(sendBlock).toContain("对话失败：")
+    expect(sendBlock).toContain("对话失败，请稍后重试")
     expect(source).not.toContain("思考中占位")
     expect(source).not.toContain("LOADING_MESSAGES")
   })
@@ -78,8 +75,8 @@ describe("AIM composer generate button", () => {
     expect(generationSource).toContain("beginExclusiveRequest")
     expect(generationSource).toContain("requestAbortRef.current?.abort()")
     expect(generationSource).toContain("endExclusiveRequest")
-    expect(generationSource).toContain("generateAimContentWithTransientRetry")
-    expect(generationSource).toContain("isTransientGenerateFailure")
+    expect(generationSource).toContain("executeAimTurnWithTransientRetry")
+    expect(unifiedTurnSource).toContain("isTransientGenerateFailure")
   })
 
   it("does not clear busy when a newer request has taken over the abort ref", () => {

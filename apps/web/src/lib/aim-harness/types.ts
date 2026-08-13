@@ -19,6 +19,7 @@ import type {
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { AimAgentId, AimEntrypoint } from "./contracts"
 import type { ModelCapability } from "@/lib/llm/types"
+import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 export const HARNESS_VERSION = "aim-harness-v1" as const
 
@@ -165,6 +166,7 @@ export interface AimRunSpec {
   executionMode: AimExecutionMode
   /** 冻结执行策略；未传入口一律 single_shot。 */
   executionPolicy: AimExecutionPolicy
+  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
 }
 
 /** 冻结后的命名方法论策略（ADR-002）。 */
