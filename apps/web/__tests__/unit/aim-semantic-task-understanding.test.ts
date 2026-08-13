@@ -83,6 +83,68 @@ describe("semantic task understanding", () => {
     expect(complete).toHaveBeenCalledTimes(2)
   })
 
+  it("falls back to the user's explicit new-copy request when both protocols are invalid", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "我理解了，开始创作。" })
+    const request = "参考这个文案给罗老板写一个新的文案"
+
+    const result = await understandAimContentTurn({
+      envelope: {
+        currentUserRequest: request,
+        relevantConversation: [],
+        currentArtifact: { content: "这是一篇供参考的原文。" },
+        referenceMaterials: [],
+      },
+      complete,
+    })
+
+    expect(result).toEqual({ handling: "deliver", brief: request })
+    expect(complete).toHaveBeenCalledTimes(2)
+  })
+
+  it("recognizes the concise production wording seen in the live failure", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "收到。" })
+    const request = "参考这个给葛老板写一个"
+
+    const result = await understandAimContentTurn({
+      envelope: {
+        currentUserRequest: request,
+        relevantConversation: [],
+        referenceMaterials: [{ title: "用户参考原文", content: "参考文案正文" }],
+      },
+      complete,
+    })
+
+    expect(result).toEqual({ handling: "deliver", brief: request })
+  })
+
+  it("does not turn an analysis question into content delivery when protocols fail", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "这篇是故事结构。" })
+
+    await expect(understandAimContentTurn({
+      envelope: {
+        currentUserRequest: "这个文案是什么结构？",
+        relevantConversation: [],
+        currentArtifact: { content: "参考正文" },
+        referenceMaterials: [],
+      },
+      complete,
+    })).rejects.toThrow("语义理解协议不完整")
+  })
+
+  it("keeps a polite but explicit creation request as delivery", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "好的。" })
+    const request = "你能帮我写一个文案吗？"
+
+    await expect(understandAimContentTurn({
+      envelope: {
+        currentUserRequest: request,
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+      complete,
+    })).resolves.toEqual({ handling: "deliver", brief: request })
+  })
+
   it("accepts only one concrete clarification question", () => {
     const result = parseSemanticTaskUnderstanding(`
 [[AIM_HANDLING:clarify]]
