@@ -57,6 +57,18 @@ function MessageContent({ message, showThinkingProcess }: {
   return <>{message.images?.length ? <div className="mb-2 flex max-w-64 flex-wrap gap-2">{message.images.map((image) => <img key={image.id} src={image.previewUrl} alt={image.name} className="h-20 w-20 rounded-md border object-cover" />)}</div> : null}<p className="whitespace-pre-wrap break-words">{message.content}</p></>
 }
 
+function RecoverableFailure({ message, busy, onRetry }: {
+  message: AimWorkbenchMessage
+  busy: boolean
+  onRetry: (message: AimWorkbenchMessage) => void
+}) {
+  return <div className="max-w-2xl rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+    <p className="font-semibold text-foreground">这次没有完成</p>
+    <p className="mt-1 leading-6 text-muted-foreground">当前内容已保留。你可以直接再试一次，或补充一句最关键的要求。</p>
+    <Button size="sm" variant="outline" className="mt-3 h-8 px-3 text-sm" onClick={() => onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />再试一次</Button>
+  </div>
+}
+
 function RunDiagnostics({ message }: { message: AimWorkbenchMessage }) {
   if (!message.deliverables || (!message.degraded && (!message.qualityStatus || message.qualityStatus === "pass")) || !message.runId) return null
   // 按状态分严重度：fail=红、warn/degraded=琥珀、skipped=中性灰。
@@ -140,11 +152,13 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
   const messageAgentId = isValidAimAgent(message.agentId) ? message.agentId : selectedAgentId
   const showThinkingProcess = agentAllowsThinkingProcess(messageAgentId)
   const showLiveThinking = showThinkingProcess && Boolean(message.traceId)
+  if (message.role === "assistant" && message.failure) {
+    return <div data-message-id={message.id} className="flex justify-start"><div className={message.deliverables ? "w-full" : "max-w-[96%]"}><RecoverableFailure message={message} busy={busy} onRetry={actions.onRetry} />{message.deliverables ? <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} /> : null}</div></div>
+  }
   return <div data-message-id={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
     <div className={`${message.deliverables ? "w-full max-w-full" : "max-w-[96%]"} ${message.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
       <div className={`leading-8 ${message.role === "user" ? "rounded-2xl rounded-tr-sm bg-muted px-4 py-2.5 text-base text-foreground" : "bg-transparent p-0 text-base font-medium text-foreground/90"}`}>{message.role === "assistant" && showLiveThinking && message.traceId ? <div className="mb-3"><ThinkingProcessPanel traceId={message.traceId} type={message.traceType ?? "chat"} /></div> : null}<MessageContent message={message} showThinkingProcess={showThinkingProcess} /></div>
       {choices.length ? <ChoiceStepper groups={choices} busy={busy} onSubmit={actions.onSubmitChoice} /> : null}
-      {message.role === "assistant" && message.failure ? <Button size="sm" variant="outline" className="mt-2 h-8 px-2.5 text-sm" onClick={() => actions.onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />重试本次请求</Button> : null}
       {message.role === "assistant" && message.editorApply?.range && extractReplacementDraft(message.content) ? <Button size="sm" variant="outline" className="mt-2 h-8 px-2.5 text-sm" onClick={() => actions.onApplyReplacement(message)}>应用到文案选区</Button> : null}
       <MessageDeliverable message={message} selectedAgentId={selectedAgentId} selectedProjectId={selectedProjectId} latestDeliverableMessageId={latestDeliverableMessageId} busy={busy} actions={actions} />
       {message.role === "assistant" && message.batchDeliverables ? (

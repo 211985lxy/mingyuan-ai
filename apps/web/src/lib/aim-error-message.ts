@@ -7,9 +7,12 @@
  * 完整原始错误由调用方 console.error + trace 记录，不在此吞掉。
  */
 const CJK_PATTERN = /[\u4e00-\u9fff]/
+const INTERNAL_AIM_ERROR_PATTERN = /^(?:语义理解|澄清协议|非澄清响应)/
+const SEMANTIC_RECOVERY_MESSAGE = "这次没有完整理解你的要求，当前内容已保留。请再试一次，或补充一句最关键的要求。"
 
 export function mapAimErrorToUserMessage(error: unknown, friendlyFallback: string): string {
   const message = error instanceof Error ? error.message : ""
+  if (INTERNAL_AIM_ERROR_PATTERN.test(message)) return SEMANTIC_RECOVERY_MESSAGE
   if (message.includes("连续修正后仍未完成当前要求")) {
     return "这次结果经过两次自动修正仍未完成你的当前要求，未作为正式成稿交付。你的当前稿件已保留，可以直接重试或补充一个关键要求。"
   }

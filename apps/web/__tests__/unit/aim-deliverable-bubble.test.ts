@@ -54,6 +54,33 @@ describe("AimDeliverableBubble", () => {
     expect(html).not.toContain("版本")
   })
 
+  it("keeps safety verification outside the copyable body", () => {
+    const html = renderToStaticMarkup(createElement(AimDeliverableBubble, {
+      messageId: "message-risk",
+      deliverables: {
+        id: "generation-risk",
+        results: [{
+          format: "video_script",
+          content: "[[AIM_METHOD_NOTE]]\n⚠ 内容安全提示：客户经营数字待核实\n[[/AIM_METHOD_NOTE]]\n这是可复制的正文。",
+          wordCount: 9,
+        }],
+        knowledgeUsed: [],
+      },
+      agentId: "content_producer",
+      workflowStage: "content",
+      nextActions: [],
+      onRepurpose: vi.fn(),
+      onQuality: vi.fn(),
+      onMarkStatus: vi.fn(),
+      onNextAction: vi.fn(),
+      isBusy: false,
+    }))
+
+    expect(html).toContain("发布前请人工核实")
+    expect(html).toContain("不会复制进正文")
+    expect(html).toContain("这是可复制的正文")
+  })
+
   it("keeps old deliverable content visible while regenerating", () => {
     const html = renderToStaticMarkup(createElement(AimDeliverableBubble, {
       messageId: "message-1",

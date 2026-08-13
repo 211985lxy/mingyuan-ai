@@ -9,7 +9,7 @@ import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 // 隔离 RunDiagnostics：交付气泡与运行结果动作组件涉及交互态/上下文，与本测试无关，
 // 在 renderToStaticMarkup 下打桩为空，避免 SSR 副作用干扰质量行的断言。
 vi.mock("@/components/aim/aim-deliverable-bubble", () => ({
-  AimDeliverableBubble: () => null,
+  AimDeliverableBubble: ({ deliverables }: { deliverables: AimGenerateResponse }) => createElement("div", null, deliverables.results[0]?.content),
 }))
 vi.mock("@/components/aim/aim-run-outcome-select-items", () => ({
   AimRunOutcomeActions: () => null,
@@ -64,6 +64,54 @@ describe("AIM message stream", () => {
     expect(html).toContain("请选择方向")
     expect(html).toContain("做客户案例")
     expect(html).toContain("做观点判断")
+  })
+
+  it("renders a recoverable failure as status instead of technical正文", () => {
+    const html = renderToStaticMarkup(createElement(AimMessageStream, {
+      messages: [{
+        id: "message-failure",
+        role: "assistant",
+        content: "语义理解协议不完整",
+        failure: { kind: "generate", retryText: "写一篇供暖口播" },
+      }],
+      busy: false,
+      agentIntro: "内容工作台",
+      workflowStage: "content",
+      selectedAgentId: "content_producer",
+      selectedProjectId: "project-1",
+      actions,
+    }))
+
+    expect(html).toContain("这次没有完成")
+    expect(html).toContain("当前内容已保留")
+    expect(html).toContain("再试一次")
+    expect(html).not.toContain("语义理解协议不完整")
+    expect(html).not.toContain("重试本次请求")
+  })
+
+  it("keeps an existing deliverable visible when a follow-up attempt fails", () => {
+    const html = renderToStaticMarkup(createElement(AimMessageStream, {
+      messages: [{
+        id: "message-with-draft",
+        role: "assistant",
+        content: "语义理解协议不完整",
+        deliverables: {
+          id: "generation-existing",
+          results: [{ format: "video_script", content: "已生成并保留的旧正文", wordCount: 10 }],
+          knowledgeUsed: [],
+        },
+        failure: { kind: "generate", retryText: "继续优化" },
+      }],
+      busy: false,
+      agentIntro: "内容工作台",
+      workflowStage: "content",
+      selectedAgentId: "content_producer",
+      selectedProjectId: "project-1",
+      actions,
+    }))
+
+    expect(html).toContain("这次没有完成")
+    expect(html).toContain("已生成并保留的旧正文")
   })
 })
 

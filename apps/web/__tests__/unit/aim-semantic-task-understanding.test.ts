@@ -35,6 +35,54 @@ describe("semantic task understanding", () => {
     expect(complete).toHaveBeenCalledOnce()
   })
 
+  it("repairs an incomplete protocol once without changing the current request", async () => {
+    const complete = vi.fn()
+      .mockResolvedValueOnce({ content: "用户要基于现有材料写一篇供暖口播。" })
+      .mockResolvedValueOnce({
+        content: "[[AIM_HANDLING:deliver]]\n[[AIM_TASK_BRIEF]]\n基于现有材料交付一篇可直接使用的供暖口播。\n[[/AIM_TASK_BRIEF]]",
+      })
+
+    const result = await understandAimContentTurn({
+      envelope: {
+        currentUserRequest: "按这些材料写一篇供暖口播",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+      complete,
+    })
+
+    expect(result).toEqual({
+      handling: "deliver",
+      brief: "基于现有材料交付一篇可直接使用的供暖口播。",
+    })
+    expect(complete).toHaveBeenCalledTimes(2)
+    expect(complete.mock.calls[1]?.[1]).toContain("按这些材料写一篇供暖口播")
+    expect(complete.mock.calls[1]?.[1]).toContain("用户要基于现有材料写一篇供暖口播")
+  })
+
+  it("repairs a malformed clarification protocol once", async () => {
+    const complete = vi.fn()
+      .mockResolvedValueOnce({
+        content: "[[AIM_HANDLING:clarify]]\n[[AIM_TASK_BRIEF]]需要确认对象。[[/AIM_TASK_BRIEF]]",
+      })
+      .mockResolvedValueOnce({
+        content: "[[AIM_HANDLING:clarify]]\n[[AIM_TASK_BRIEF]]需要确认对象。[[/AIM_TASK_BRIEF]]\n[[AIM_CLARIFICATION]]你要修改当前编辑器里的稿子吗？[[/AIM_CLARIFICATION]]",
+      })
+
+    const result = await understandAimContentTurn({
+      envelope: {
+        currentUserRequest: "帮我改一下这个",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+      complete,
+    })
+
+    expect(result.handling).toBe("clarify")
+    expect(result.clarificationQuestion).toContain("当前编辑器")
+    expect(complete).toHaveBeenCalledTimes(2)
+  })
+
   it("accepts only one concrete clarification question", () => {
     const result = parseSemanticTaskUnderstanding(`
 [[AIM_HANDLING:clarify]]

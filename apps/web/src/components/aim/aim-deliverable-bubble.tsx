@@ -122,7 +122,7 @@ function DeliverableResult({ item, generationId, messageKey, inlineEditKey, onIn
     : display.methodNote
   return <TabsContent value={item.format} className="space-y-3">
     {safetyWarning ? <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
-      <span className="font-medium">⚠ 本版仍检出风险，发布前请人工核实</span>：{safetyWarning}
+      <span className="font-medium">⚠ 本版仍检出风险，发布前请人工核实</span>：{safetyWarning}<span className="ml-1 opacity-80">（此提示不会复制进正文）</span>
     </div> : null}
     {methodNote ? <details className="rounded-md border border-border bg-muted/25 px-3 py-2.5 text-sm text-muted-foreground">
       <summary className="cursor-pointer select-none font-medium text-foreground/80">思考依据</summary>

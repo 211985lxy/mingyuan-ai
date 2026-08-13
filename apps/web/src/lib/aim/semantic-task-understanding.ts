@@ -21,7 +21,14 @@ const SEMANTIC_TASK_SYSTEM_PROMPT = `
 按协议输出：[[AIM_HANDLING:respond|deliver|clarify]]、[[AIM_TASK_BRIEF]]...[[/AIM_TASK_BRIEF]]；clarify 时再输出 [[AIM_CLARIFICATION]]...[[/AIM_CLARIFICATION]]。
 `.trim()
 
+const SEMANTIC_TASK_REPAIR_SYSTEM_PROMPT = `
+你只修复语义任务理解的输出格式，不重新判断任务，不增加、删除或改写用户意图。
+根据当前用户原话与上一次输出，严格返回：[[AIM_HANDLING:respond|deliver|clarify]]、[[AIM_TASK_BRIEF]]...[[/AIM_TASK_BRIEF]]；clarify 时再返回唯一一个 [[AIM_CLARIFICATION]]...[[/AIM_CLARIFICATION]]。
+不得输出协议之外的解释，不得输出业务动作标签。
+`.trim()
+
 const FORBIDDEN_ACTION_LABEL = /\b(?:create|local_edit|rewrite|batch|scope|mustKeep)\b/i
+const SEMANTIC_PROTOCOL_ERROR_PATTERN = /^(?:语义理解|澄清协议|非澄清响应)/
 
 export function parseSemanticTaskUnderstanding(text: string): AimSemanticTaskUnderstanding {
   const handlingMatch = text.match(/\[\[AIM_HANDLING:(respond|deliver|clarify)\]\]/)
@@ -67,7 +74,19 @@ export async function understandAimContentTurn(input: {
     SEMANTIC_TASK_SYSTEM_PROMPT,
     renderEnvelopeForUnderstanding(input.envelope),
   )
-  return parseSemanticTaskUnderstanding(completion.content)
+  try {
+    return parseSemanticTaskUnderstanding(completion.content)
+  } catch (error) {
+    if (!(error instanceof Error) || !SEMANTIC_PROTOCOL_ERROR_PATTERN.test(error.message)) throw error
+    const repaired = await input.complete(
+      SEMANTIC_TASK_REPAIR_SYSTEM_PROMPT,
+      [
+        `【当前用户原话】\n${input.envelope.currentUserRequest}`,
+        `【上一次输出】\n${completion.content}`,
+      ].join("\n\n"),
+    )
+    return parseSemanticTaskUnderstanding(repaired.content)
+  }
 }
 
 export async function understandAimContentTurnWithTrace(input: {
