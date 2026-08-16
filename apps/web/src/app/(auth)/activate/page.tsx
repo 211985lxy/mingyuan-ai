@@ -46,7 +46,7 @@ export default function ActivatePage() {
         setSession(liveUser)
 
         if (liveUser.subscriptionStatus === "active") {
-          router.replace("/home")
+          router.replace("/lite")
         }
       })
       .catch((error) => {
@@ -73,7 +73,7 @@ export default function ActivatePage() {
     try {
       const nextUser = await activateUser(code)
       updateUser(nextUser)
-      router.replace("/home")
+      router.replace("/lite")
     } catch (error) {
       setSubmitError(
         error instanceof ApiError ? error.message : "激活失败，请稍后重试"

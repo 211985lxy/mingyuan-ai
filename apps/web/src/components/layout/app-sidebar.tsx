@@ -12,6 +12,7 @@ import {
   Plus,
   Users,
   BookOpen,
+  Zap,
 } from "lucide-react"
 import {
   Sidebar,
@@ -52,6 +53,7 @@ interface NavItem {
 
 /** 一级导航：创作台统一开工；爆款拆解保留高频入口 */
 const quickNav: NavItem[] = [
+  { title: "极简模式", href: "/lite", icon: Zap },
   { title: "创作台", href: "/home", icon: PenLine },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "市场洞察", href: "/opportunities", icon: Users },
