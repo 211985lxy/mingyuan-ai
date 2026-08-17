@@ -26,8 +26,8 @@ export default function LiteLayout({
   const email = user?.email?.trim() || "账户"
   const initial = email.slice(0, 1).toUpperCase()
 
-  // 极简版只有两个页面：对话（默认）与我的作品
-  const isChat = pathname === "/lite"
+  // 极简版页面：大脑选择器 + 对话（默认）与我的作品
+  const isChat = pathname === "/lite" || pathname.startsWith("/lite/chat")
   const isWorks = pathname.startsWith("/lite/works")
 
   return (
@@ -53,7 +53,7 @@ export default function LiteLayout({
               )}
             >
               <MessageCircle className="size-3.5" />
-              对话
+              AIM 大脑
             </Link>
             <Link
               href="/lite/works"

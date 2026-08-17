@@ -17,6 +17,8 @@ export interface LiteChatControllerOptions {
   stream: LiteStreamFn
   /** 业务错误（超时/服务端错误）回调；用户主动停止不算错误 */
   onError?: (message: string) => void
+  /** 会话绑定的 AIM 专家；缺省为通用大脑 */
+  agentId?: string
 }
 
 export function createLiteChatController(options: LiteChatControllerOptions) {
@@ -70,6 +72,7 @@ export function createLiteChatController(options: LiteChatControllerOptions) {
 
     try {
       await stream(payload, {
+        agentId: options.agentId,
         signal: abortController.signal,
         onDelta: (_delta, content) => appendAssistantDelta(content),
       })

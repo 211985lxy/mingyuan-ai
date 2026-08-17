@@ -12,11 +12,13 @@ import {
 /**
  * 极简版对话：内存态会话，刷新即新会话。
  * 复用 /api/aim/chat 流式接口，与完整版共用后端与鉴权。
+ * agentId 存在时绑定对应 AIM 专家，否则为通用大脑。
  */
-export function useLiteChat() {
+export function useLiteChat(agentId?: string) {
   const [controller] = useState(() =>
     createLiteChatController({
       stream: chatAimStream,
+      agentId,
       onError: (message) => toast.error(message),
     }),
   )
