@@ -117,6 +117,23 @@ describe("semantic task understanding", () => {
     expect(result).toEqual({ handling: "deliver", brief: request })
   })
 
+  it("falls back to an explicit optimization request when both protocols are invalid", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "收到，开始修改。" })
+    const request = "请优化修改下面这篇文案，直接给出可发布终稿。"
+
+    const result = await understandAimContentTurn({
+      envelope: {
+        currentUserRequest: request,
+        relevantConversation: [],
+        referenceMaterials: [{ title: "待修改原文", content: "参考文案正文" }],
+      },
+      complete,
+    })
+
+    expect(result).toEqual({ handling: "deliver", brief: request })
+    expect(complete).toHaveBeenCalledTimes(2)
+  })
+
   it("does not turn an analysis question into content delivery when protocols fail", async () => {
     const complete = vi.fn().mockResolvedValue({ content: "这篇是故事结构。" })
 

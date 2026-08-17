@@ -29,7 +29,7 @@ const SEMANTIC_TASK_REPAIR_SYSTEM_PROMPT = `
 
 const FORBIDDEN_ACTION_LABEL = /\b(?:create|local_edit|rewrite|batch|scope|mustKeep)\b/i
 const SEMANTIC_PROTOCOL_ERROR_PATTERN = /^(?:语义理解|澄清协议|非澄清响应)/
-const FULL_CONTENT_CREATION_PATTERN = /(?:写|生成|创作|仿写|改写|重写|做|出).{0,12}(?:文案|口播|文章|脚本|内容|一篇|一版|一个)/
+const FULL_CONTENT_CREATION_PATTERN = /(?:写|生成|创作|仿写|改写|重写|修改|优化|润色|做|出).{0,12}(?:文案|口播|文章|脚本|内容|一篇|一版|一个)/
 const CONTENT_ANALYSIS_QUESTION_PATTERN = /(?:是什么|什么结构|什么类型|为何|为什么|怎么改|如何优化|哪种|哪个|是否).*[？?]?$/
 
 function fallbackExplicitContentCreation(envelope: AimContentSourceEnvelope): AimSemanticTaskUnderstanding | null {
