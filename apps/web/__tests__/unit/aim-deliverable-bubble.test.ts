@@ -67,6 +67,7 @@ describe("AimDeliverableBubble", () => {
         knowledgeUsed: [],
       },
       agentId: "content_producer",
+      isCurrentVersion: true,
       workflowStage: "content",
       nextActions: [],
       onRepurpose: vi.fn(),

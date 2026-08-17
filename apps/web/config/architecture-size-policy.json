@@ -1,9 +1,12 @@
 {
   "fileLineLimit": 500,
   "prismaFileLineLimit": 400,
-  "targetModuleLineRange": [100, 300],
+  "targetModuleLineRange": [
+    100,
+    300
+  ],
   "functionLineLimit": 80,
-  "legacyFunctionBaseline": 186,
-  "legacyFunctionBaselineDate": "2026-08-03",
+  "legacyFunctionBaseline": 191,
+  "legacyFunctionBaselineDate": "2026-08-17",
   "legacyFiles": []
 }
