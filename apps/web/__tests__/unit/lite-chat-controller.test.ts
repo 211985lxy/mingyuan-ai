@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from "vitest"
 
 import { ApiError } from "@/lib/api/core"
-import { createLiteChatController } from "@/features/lite/lite-chat-controller"
+import {
+  createLiteChatController,
+  type LiteStreamFn,
+} from "@/features/lite/lite-chat-controller"
 
-function createStreamMock(impl?: (options: { onDelta: (delta: string, content: string) => void; signal: AbortSignal }) => Promise<{ content: string }>) {
-  return vi.fn(async (messages: Array<{ role: string; content: string }>, options: { onDelta: (delta: string, content: string) => void; signal: AbortSignal }) => {
-    if (impl) return impl(options)
-    void messages
-    void options
+type StreamImpl = (options: {
+  onDelta: (delta: string, content: string) => void
+}) => Promise<{ content: string }>
+
+function createStreamMock(impl?: StreamImpl): LiteStreamFn {
+  return vi.fn(async (_messages: Parameters<LiteStreamFn>[0], options: Parameters<LiteStreamFn>[1]) => {
+    if (impl) return impl({ onDelta: options.onDelta })
     return { content: "" }
-  })
+  }) as unknown as LiteStreamFn
 }
 
 describe("createLiteChatController", () => {
