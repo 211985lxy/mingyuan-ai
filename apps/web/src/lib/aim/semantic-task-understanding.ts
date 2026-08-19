@@ -39,6 +39,36 @@ function fallbackExplicitContentCreation(envelope: AimContentSourceEnvelope): Ai
   return { handling: "deliver", brief: envelope.currentUserRequest.trim() }
 }
 
+/** 同步判定常见交付/问答，跳过额外 LLM「语义理解」以降低首字延迟。 */
+export function resolveSemanticUnderstandingFastPath(
+  envelope: AimContentSourceEnvelope,
+): AimSemanticTaskUnderstanding | null {
+  const explicit = fallbackExplicitContentCreation(envelope)
+  if (explicit) return explicit
+
+  const request = envelope.currentUserRequest.trim()
+  const normalizedRequest = request.replace(/\s+/g, "")
+  if (!normalizedRequest) return null
+
+  if (CONTENT_ANALYSIS_QUESTION_PATTERN.test(normalizedRequest)) {
+    return { handling: "respond", brief: request }
+  }
+
+  const materialChars = envelope.referenceMaterials.reduce((sum, item) => sum + item.content.length, 0)
+    + (envelope.currentArtifact?.content?.length ?? 0)
+    + envelope.relevantConversation.reduce((sum, turn) => sum + turn.content.length, 0)
+
+  if (materialChars >= 120 || request.length >= 120) {
+    const brief = request
+      || envelope.currentArtifact?.content.slice(0, 400)
+      || envelope.referenceMaterials[0]?.content.slice(0, 400)
+      || "基于当前材料生成交付物"
+    return { handling: "deliver", brief: brief.trim() }
+  }
+
+  return null
+}
+
 export function parseSemanticTaskUnderstanding(text: string): AimSemanticTaskUnderstanding {
   const handlingMatch = text.match(/\[\[AIM_HANDLING:(respond|deliver|clarify)\]\]/)
   const briefMatch = text.match(/\[\[AIM_TASK_BRIEF\]\]([\s\S]*?)\[\[\/AIM_TASK_BRIEF\]\]/)
@@ -79,6 +109,9 @@ export async function understandAimContentTurn(input: {
   envelope: AimContentSourceEnvelope
   complete: CompletePort
 }): Promise<AimSemanticTaskUnderstanding> {
+  const fastPath = resolveSemanticUnderstandingFastPath(input.envelope)
+  if (fastPath) return fastPath
+
   const completion = await input.complete(
     SEMANTIC_TASK_SYSTEM_PROMPT,
     renderEnvelopeForUnderstanding(input.envelope),

@@ -3,6 +3,7 @@ import type { AimGenerateContext } from "@/lib/aim/agent-types"
 import type { ContentFormat } from "@/lib/aim-generator"
 import { inspectAimDeliveryCandidate, parseStrictMultiFormatResponse } from "@/lib/aim/output-delivery-gate"
 import { verifyAimDelivery } from "@/lib/aim/semantic-delivery-verifier"
+import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
 
 export function shouldApplyLegacyLightEditRules(
   context: Pick<AimGenerateContext, "runtimeTask" | "unifiedContentExecution">,
@@ -26,6 +27,8 @@ export async function verifyUnifiedGenerationCandidate(input: {
   agentId: string
 }) {
   if (!input.context.unifiedContentExecution) return { passed: true as const }
+  // 快速口播已有格式/长度/安全闸门；再跑一轮 LLM 语义验收会把 90s 预算叠到 3 分钟以上。
+  if (isAimFastSpokenRoute(input.context.modelPolicy?.routeKey)) return { passed: true as const }
   const candidate = input.targetFormats
     .map((format) => `===FORMAT:${format}===\n${input.parsed[format] || ""}`)
     .join("\n\n")

@@ -258,7 +258,9 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
       }
     : buildContextPolicy(input.agentId, input.entrypoint, runtimeTask, input.hotTopic)
 
-  const fastSpoken = !input.unifiedContentExecution && isAimFastSpokenRun({
+  // 统一 execute 入口也要走 fast_spoken；此前误把 unifiedContentExecution 当成慢路径开关，
+  // 导致口播生成多跑语义理解 + 全量知识检索 + 语义验收，体感「一直转不出字」。
+  const fastSpoken = isAimFastSpokenRun({
       agentId: input.agentId,
       entrypoint: input.entrypoint,
       runtimeTask,

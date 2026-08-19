@@ -217,7 +217,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   const groundedNumericRule = buildGroundedNumericClaimRule(context.rawInput)
   let activePrompt = `${userPrompt}${groundedNumericRule}`
   const isLightEdit = shouldApplyLegacyLightEditRules(context)
-  const fastSpokenRoute = !context.unifiedContentExecution && isAimFastSpokenRoute(context.modelPolicy?.routeKey)
+  const fastSpokenRoute = isAimFastSpokenRoute(context.modelPolicy?.routeKey)
   const maxAttempts = context.unifiedContentExecution
     ? 3
     : fastSpokenRoute ? AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS : 3

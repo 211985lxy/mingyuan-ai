@@ -116,6 +116,31 @@ export function getAimPendingGenerationMessage(projectEnabled: boolean, actionLa
 function getDeliverableReadyMessage(agentTitle: string) {
   return `${agentTitle} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`
 }
+
+const GENERATION_PROGRESS_STAGES = [
+  { afterMs: 12_000, message: (actionLabel: string) => `正在理解你的要求，随后${actionLabel}…` },
+  { afterMs: 28_000, message: () => "正在读取项目资料并匹配知识库…" },
+  { afterMs: 55_000, message: (actionLabel: string) => `正在连接模型${actionLabel}，请稍候…` },
+  { afterMs: 95_000, message: () => "生成仍在进行，复杂任务可能需要 2–3 分钟；也可点停止后重试。" },
+] as const
+
+function startGenerationProgressTicker(
+  input: AimGenerationActionInput,
+  assistantMessageId: string,
+  actionLabel: string,
+) {
+  const timers = GENERATION_PROGRESS_STAGES.map(({ afterMs, message }) =>
+    setTimeout(() => {
+      input.setMessages((messages) => messages.map((item) => {
+        if (item.id !== assistantMessageId || item.regenerating === false) return item
+        return { ...item, content: message(actionLabel) }
+      }))
+    }, afterMs),
+  )
+  return () => {
+    for (const timer of timers) clearTimeout(timer)
+  }
+}
 export function resolveFollowUpGenerationId(
   startsNewTask: boolean | undefined,
   messages: AimWorkbenchMessage[],
@@ -273,6 +298,7 @@ function endExclusiveRequest(
 async function executeGeneration(input: AimGenerationActionInput, currentInput: string, rawInput: string, options: GenerateOptions) {
   const controller = beginExclusiveRequest(input.requestAbortRef)
   const { assistantMessageId, baseMessages } = appendPendingGeneration(input, currentInput, options)
+  const stopProgressTicker = startGenerationProgressTicker(input, assistantMessageId, input.agent.primaryActionLabel)
   const traceId = crypto.randomUUID()
   input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
     ? { ...message, traceId, traceType: "generate" as const }
@@ -324,6 +350,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
         : message))
     }
   } finally {
+    stopProgressTicker()
     endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
   }
 }
