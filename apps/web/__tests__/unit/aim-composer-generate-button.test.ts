@@ -28,7 +28,7 @@ describe("AIM composer generate button", () => {
     expect(generationSource).toContain("正在${actionLabel}，会读取当前项目资料并匹配知识库")
     expect(generationSource).toContain("正在${actionLabel}，将根据本次输入生成交付物")
     expect(executeBlock).toContain("appendPendingGeneration")
-    expect(executeBlock.indexOf("appendPendingGeneration")).toBeLessThan(executeBlock.indexOf("await executeAimTurnWithTransientRetry"))
+    expect(executeBlock.indexOf("appendPendingGeneration")).toBeLessThan(executeBlock.indexOf("await generateAimContentWithTransientRetry"))
   })
 
   it("does not replace a server-verified delivery with an unverified background proofread", () => {
@@ -75,7 +75,7 @@ describe("AIM composer generate button", () => {
     expect(generationSource).toContain("beginExclusiveRequest")
     expect(generationSource).toContain("requestAbortRef.current?.abort()")
     expect(generationSource).toContain("endExclusiveRequest")
-    expect(generationSource).toContain("executeAimTurnWithTransientRetry")
+    expect(generationSource).toContain("generateAimContentWithTransientRetry")
     expect(unifiedTurnSource).toContain("isTransientGenerateFailure")
   })
 

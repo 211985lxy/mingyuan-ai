@@ -14,7 +14,9 @@ export function shouldApplyLegacyLightEditRules(
 export function inspectUnifiedGenerationProtocol(
   completion: Pick<CompletionResult, "content" | "finishReason">,
   targetFormats: ContentFormat[],
+  options?: { relaxForSingleFormat?: boolean },
 ): { passed: true } | { passed: false; code: string } {
+  if (options?.relaxForSingleFormat) return { passed: true }
   const parsed = parseStrictMultiFormatResponse(completion.content, targetFormats)
   if (!parsed.ok) return { passed: false, code: parsed.code }
   return inspectAimDeliveryCandidate({ contents: parsed.contents, finishReason: completion.finishReason })

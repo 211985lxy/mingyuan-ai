@@ -22,7 +22,7 @@ import {
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
 import { buildGenerationSourceEnvelope } from "@/hooks/aim-generation-source-envelope"
-import { executeAimTurnWithTransientRetry } from "@/hooks/aim-unified-turn-client"
+import { generateAimContentWithTransientRetry } from "@/hooks/aim-unified-turn-client"
 import {
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
@@ -306,31 +306,13 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
   input.setIsGenerating(true)
   try {
     const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, options)
-    const response = await executeAimTurnWithTransientRetry(
-      {
-        agentId: request.agentId,
-        executionAgentId: request.executionAgentId,
-        projectId: request.projectId,
-        sourceEnvelope: request.sourceEnvelope,
-        targetFormats: request.targetFormats,
-        methodologyProfileIds: request.methodologyProfileIds,
-        activeMethodologySignals: request.activeMethodologySignals,
-      },
-      controller.signal,
-    )
+    const { executionAgentId, ...generateBody } = request
+    const response = await generateAimContentWithTransientRetry({
+      ...generateBody,
+      agentId: executionAgentId || generateBody.agentId,
+    }, controller.signal)
     if (controller.signal.aborted) {
       markGenerationStopped(input, assistantMessageId)
-      return
-    }
-    if (response.kind === "clarification" || response.kind === "reply") {
-      input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
-        ? {
-            ...message,
-            content: response.kind === "clarification" ? response.question : response.content,
-            traceId: response.runId || traceId,
-            regenerating: false,
-          }
-        : message))
       return
     }
     applyGenerationResponse(input, assistantMessageId, currentInput, response)
@@ -340,14 +322,16 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     if (stopped) {
       markGenerationStopped(input, assistantMessageId)
     } else {
-      input.setMessages((messages) => messages.map((message) => message.id === assistantMessageId
+      const message = mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
+      toast.error(message)
+      input.setMessages((messages) => messages.map((item) => item.id === assistantMessageId
         ? {
-            ...message,
-            content: mapAimErrorToUserMessage(error, "生成失败，请稍后重试"),
+            ...item,
+            content: message,
             regenerating: false,
             failure: { kind: "generate" as const, retryText: currentInput },
           }
-        : message))
+        : item))
     }
   } finally {
     stopProgressTicker()
