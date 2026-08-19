@@ -121,6 +121,9 @@ export interface PublishCheckViolation {
   category: string
   reason: string
   suggest: string
+  ruleId?: string
+  advisory?: boolean
+  evidence?: string
 }
 
 export interface PublishCheckReport {
@@ -134,6 +137,8 @@ export interface PublishCheckReport {
   }
   trafficWeakness: string[]
   minimalRewrite: string
+  disclaimer?: string
+  recheckHint?: string
 }
 
 export interface QualityCheckReport {

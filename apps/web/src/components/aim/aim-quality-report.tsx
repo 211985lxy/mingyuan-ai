@@ -19,9 +19,19 @@ function QualityDimensions({ report }: { report: QualityCheckReport }) {
 function PublishViolations({ check }: { check: NonNullable<QualityCheckReport["publishCheck"]> }) {
   if (!check.violations.length) return <p className="text-sm text-muted-foreground">未发现明显发布违规风险。</p>
   return <div className="space-y-2">{check.violations.map((violation) =>
-    <div key={`${violation.text}-${violation.category}`} className="rounded-lg border p-3 text-sm">
-      <div className="mb-1 flex flex-wrap items-center gap-2"><span className="font-medium">「{violation.text}」</span><Badge variant={violation.severity === "high" ? "destructive" : "secondary"} className="text-[10px]">{violation.category}</Badge></div>
+    <div
+      key={`${violation.ruleId || ""}-${violation.text}-${violation.category}`}
+      className={`rounded-lg border p-3 text-sm ${violation.advisory ? "border-dashed opacity-90" : ""}`}
+    >
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span className="font-medium">「{violation.text}」</span>
+        {violation.ruleId ? <Badge variant="outline" className="text-[10px]">{violation.ruleId}</Badge> : null}
+        <Badge variant={violation.advisory ? "secondary" : violation.severity === "high" ? "destructive" : "secondary"} className="text-[10px]">
+          {violation.advisory ? "仅提示" : violation.category}
+        </Badge>
+      </div>
       <p className="text-xs text-muted-foreground">{violation.reason}</p>
+      {violation.evidence ? <p className="mt-1 text-xs text-muted-foreground">{violation.evidence}</p> : null}
       <p className="mt-1 text-xs text-foreground">{violation.suggest}</p>
     </div>)}</div>
 }
@@ -41,8 +51,10 @@ function TrafficPotential({ check }: { check: NonNullable<QualityCheckReport["pu
 function PublishCheck({ check }: { check: NonNullable<QualityCheckReport["publishCheck"]> }) {
   return <div className="mt-4 space-y-3 border-t pt-4">
     <div className="flex items-center gap-2 text-sm font-semibold">发布前自查<Badge variant={check.verdict === "可发" ? "default" : "destructive"} className="ml-auto">{check.verdict}</Badge></div>
+    {check.disclaimer ? <p className="text-xs text-muted-foreground">{check.disclaimer}</p> : null}
     <PublishViolations check={check} />
     <TrafficPotential check={check} />
+    {check.recheckHint ? <p className="text-xs text-muted-foreground">{check.recheckHint}</p> : null}
   </div>
 }
 
