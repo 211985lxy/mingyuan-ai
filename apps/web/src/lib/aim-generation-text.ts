@@ -143,6 +143,131 @@ export function scrubLeakedLightEditFeedback(content: string, rawInput: string):
   return [methodNote, body].filter(Boolean).join("\n\n")
 }
 
+// ─── 口播正文思维链泄漏检测 ─────────────────────────────────────────
+//
+// 背景：单格式口播走非统一执行路径时 FORMAT 解析失败、整段原始输出直接当正文
+// （aim-generation-prompts.ts 的单格式 fallback），模型会把任务分析、草稿标记、
+// 自检报告写进正文交付给用户。检测遵循与提词清洗相同的原则：只认「不可能
+// 出现在真实口播成稿里」的行级特征，宁可漏检不可误杀。
+// ────────────────────────────────────────────────────────────────────
+
+/** 强标记：单独一行命中即判定泄漏（真实成稿中不可能出现） */
+const SPOKEN_COT_STRONG_LINE_PATTERNS: RegExp[] = [
+  /^需要先?判断/u,
+  /^(?:写|输出)(?:正文)?草稿[:：]/u,
+  /^用户说[「'"“]?/u,
+  /^本轮(?:意图|任务|输入)/u,
+  /^(?:重新)?写(?:一版|正文)/u,
+]
+
+/** 弱标记：一行命中记 1 分，≥2 分才判定泄漏 */
+const SPOKEN_COT_WEAK_LINE_PATTERNS: RegExp[] = [
+  /^检查[「'"“]?[^」'"”]{0,30}[」'"”]?[:：]/u,
+  /(?:上一轮|上轮|前一轮)(?:输出|质检|生成|内容|成稿)/u,
+  /质检(?:要求|未通过|未过|标准|的)/u,
+  /任务单(?:给了|要求|：|:)/u,
+  /工作流上下文给了/u,
+  /^关于[「'"“][^」'"”]{0,20}[」'"”]业务露出[:：]/u,
+  /^需要自然叙事/u,
+  /^针对(?:用户)?(?:说|输入)/u,
+  /^(?:关于|至于)(?:结尾|开头|CTA)/u,
+]
+
+function matchSpokenCotLine(line: string): { strong: boolean; weak: boolean } {
+  const trimmed = line.trim()
+  if (!trimmed) return { strong: false, weak: false }
+  const strong = SPOKEN_COT_STRONG_LINE_PATTERNS.some((p) => p.test(trimmed))
+  const weak = !strong && SPOKEN_COT_WEAK_LINE_PATTERNS.some((p) => p.test(trimmed))
+  return { strong, weak }
+}
+
+/**
+ * 检测口播正文（应先剥离 METHOD_NOTE）中的思维链泄漏行。
+ * 判定标准：任一强标记命中，或弱标记命中 ≥2 行。
+ */
+export function detectSpokenChainOfThoughtLeakage(body: string): string[] {
+  if (!body) return []
+  const norm = withoutMethodNote(body).replace(/\r\n/g, "\n")
+  const lines = norm.split("\n")
+  const hits: string[] = []
+  let weakCount = 0
+  for (const line of lines) {
+    const { strong, weak } = matchSpokenCotLine(line)
+    if (strong) {
+      hits.push(line.trim())
+      continue
+    }
+    if (weak) {
+      weakCount += 1
+      hits.push(line.trim())
+    }
+  }
+  const hasStrong = lines.some((line) => matchSpokenCotLine(line).strong)
+  if (!hasStrong && weakCount < 2) return []
+  return hits
+}
+
+/** 口播正文是否判定为思维链泄漏（含 METHOD_NOTE 的完整内容可直接传入） */
+export function isSpokenChainOfThoughtLeaked(content: string): boolean {
+  return detectSpokenChainOfThoughtLeakage(content).length > 0
+}
+
+export interface SpokenFinalDraftExtraction {
+  draft: string
+  removedLines: string[]
+}
+
+/**
+ * 从泄漏的口播输出中提取成稿正文（末次 attempt 兜底）：
+ * 1. 存在「写正文草稿：」类分隔行时，取其后的全部内容；
+ * 2. 否则删除全部泄漏特征行；
+ * METHOD_NOTE 块保留在结果最前（沿用交付时 ensureContentCreationTrace 的拼装约定）。
+ */
+export function extractSpokenFinalDraft(content: string): SpokenFinalDraftExtraction {
+  if (!content) return { draft: content, removedLines: [] }
+  const methodNote = content.match(METHOD_NOTE_BLOCK_PATTERN)?.[0]
+  const body = withoutMethodNote(content).replace(/\r\n/g, "\n")
+
+  const draftSeparator = body.match(/(?:^|\n)[^\n]{0,20}(?:写|输出)(?:正文)?草稿[:：][^\n]*\n?/u)
+  if (draftSeparator) {
+    // 自检报告常出现在草稿之后，分隔提取后仍需删除残留泄漏行
+    const after = removeCotLines(body.slice((draftSeparator.index ?? 0) + draftSeparator[0].length)).trim()
+    if (after.length >= 80) {
+      return {
+        draft: [methodNote, after].filter(Boolean).join("\n\n"),
+        removedLines: body.slice(0, draftSeparator.index).split("\n").map((l) => l.trim()).filter(Boolean),
+      }
+    }
+  }
+
+  const draft = [methodNote, removeCotLines(body).replace(/\n{3,}/g, "\n\n").trim()]
+    .filter(Boolean)
+    .join("\n\n")
+  return { draft, removedLines: collectCotLines(body) }
+}
+
+function removeCotLines(body: string): string {
+  return body
+    .split("\n")
+    .filter((line) => {
+      const { strong, weak } = matchSpokenCotLine(line)
+      return !strong && !weak
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+}
+
+function collectCotLines(body: string): string[] {
+  return body
+    .split("\n")
+    .filter((line) => {
+      const { strong, weak } = matchSpokenCotLine(line)
+      return strong || weak
+    })
+    .map((l) => l.trim())
+    .filter(Boolean)
+}
+
 export function buildGenerationNumericEvidence(context: Pick<
   AimGenerateContext,
   "rawInput" | "knowledgeBlock" | "ipWikiBlock" | "eventStorytellingBlock" | "taskSpec"

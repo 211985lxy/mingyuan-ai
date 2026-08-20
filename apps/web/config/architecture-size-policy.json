@@ -8,5 +8,11 @@
   "functionLineLimit": 80,
   "legacyFunctionBaseline": 191,
   "legacyFunctionBaselineDate": "2026-08-17",
-  "legacyFiles": []
+  "legacyFiles": [
+    {
+      "path": "src/lib/aim-generation-prompts.ts",
+      "maxLines": 520,
+      "target": "src/lib/aim/（拆分 producer 提示词构建与生成循环闸门）"
+    }
+  ]
 }

@@ -48,7 +48,7 @@ describe("AIM generate latency fixes", () => {
         brief: "写口播",
       },
       modelPolicy: { routeKey: AIM_FAST_SPOKEN_ROUTE_KEY },
-    } as AimGenerateContext
+    } as unknown as AimGenerateContext
 
     await expect(verifyUnifiedGenerationCandidate({
       context,

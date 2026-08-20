@@ -169,6 +169,40 @@ const PASSAGE_REF_WORDS = [
 /** 短指令「帮我润色下」：无指代也默认轻改，避免 new_copy 误建整篇 */
 const BARE_POLISH_PATTERN = /^(?:帮我)?(?:润色|优化|顺一下|改改|改一下)(?:一下|下|下吧)?[。.!！？?]*$/
 
+/**
+ * 「继续」类续接输入：rawInput 由客户端把历史用户消息拼接后再 append 本轮输入，
+ * 因此续接词出现在尾部。只认整词收尾，避免误伤「继续往下讲开头」这类带范围的输入
+ * （带范围会走 local_edit/scope 逻辑）。
+ */
+const CONTINUATION_TAIL_PATTERN = /(?:继续|接着写|接着说|接着来|接着出|再来一版)[。.!！？?\s]*$/u
+
+/** rawInput 尾部是否为「继续」类续接指令（本轮输入几乎只有续接词） */
+export function isAimContinuationInput(rawInput: string): boolean {
+  return CONTINUATION_TAIL_PATTERN.test((rawInput || "").trimEnd())
+}
+
+/**
+ * 续接指令块：把「继续」翻译成模型无法误解的显式指令。
+ * 仅在未显式确认意图时注入（confirmedTurnIntent 优先）。
+ */
+export function formatAimContinuationDirective(): string {
+  return [
+    "【续接指令】用户本轮输入是「继续」类续接指令：继续执行上文任务单，直接输出完整成稿正文。",
+    "- 正文从第一句起就是可直接使用的成稿；禁止输出任务分析、结构拆解、草稿标记（如「写正文草稿：」）或质检自检报告（如「检查……：有。」）。",
+    "- 分析与自检过程只允许写在 [[AIM_METHOD_NOTE]] 块内，禁止进入正文。",
+    "- 若上一轮成稿质检未通过，按任务单结构要求重写整篇，同样只输出成稿。",
+  ].join("\n")
+}
+
+/** buildWorkflowContext 数组元素：续接输入且未显式确认意图时返回续接指令块，否则 null */
+export function continuationDirectiveBlockIfApplicable(
+  rawInput: string,
+  hasConfirmedIntent: boolean,
+): string | null {
+  if (hasConfirmedIntent) return null
+  return isAimContinuationInput(rawInput) ? formatAimContinuationDirective() : null
+}
+
 export function looksLikeCopyAnalysisQuestion(text: string): boolean {
   // 点名开头/标题等局部部位时，优先走部位轻改，不要当成「整篇怎么优化」建议问句
   if (includesAny(text, [...LOCAL_EDIT_PART_WORDS])) return false

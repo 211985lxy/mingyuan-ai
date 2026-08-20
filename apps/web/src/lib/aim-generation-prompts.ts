@@ -19,7 +19,7 @@ import {
 } from "@/lib/aim-intent-boundaries"
 import { buildPromptFewshotBlock } from "@/lib/aim-prompt-fewshots"
 import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
-import { formatAimTurnIntentBlock, looksLikePassagePolish, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
+import { continuationDirectiveBlockIfApplicable, formatAimTurnIntentBlock, looksLikePassagePolish, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
 import { buildAimSemanticRevisionPrompt } from "@/lib/aim/semantic-delivery-verifier"
@@ -40,7 +40,8 @@ import {
   scrubUnsupportedAnecdoteSentences,
   scrubUnsupportedNumericSentences,
 } from "@/lib/aim-generation-guardrails"
-import { buildGenerationNumericEvidence, scrubLeakedLightEditFeedback } from "@/lib/aim-generation-text"
+import { buildGenerationNumericEvidence, scrubLeakedLightEditFeedback, withoutMethodNote } from "@/lib/aim-generation-text"
+import { applySpokenCotFinalExtraction, buildSpokenCotLeakRetryPrompt, collectSpokenCotLeakHits } from "@/lib/aim/spoken-cot-leakage-gate"
 import {
   buildIpWikiComplianceRewritePrompt,
   verifyIpWikiCompliance,
@@ -128,6 +129,7 @@ export function buildWorkflowContext(context: {
   const taskSpec = context.taskSpec
   return [
     formatAimTurnIntentBlock(turnIntent),
+    continuationDirectiveBlockIfApplicable(context.rawInput || "", Boolean(context.confirmedTurnIntent)),
     taskSpec
       ? ["本次内容运营任务单：", ...renderTaskSpecLines(taskSpec)].join("\n")
       : null,
@@ -251,6 +253,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         parsed[format] = cleanSpokenDeliveryArtifacts(parsed[format] || "")
       }
     }
+    const cotLeakHits = collectSpokenCotLeakHits(parsed, targetFormats, attempt + 1)
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
     const incompleteFormats = findIncompleteGenerationFormats({
       parsed,
@@ -293,6 +296,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       && safety.unsupportedClaimFormats.length === 0
       && safety.lightEditScopeViolationFormats.length === 0
       && incompleteFormats.length === 0
+      && cotLeakHits.size === 0
       && goalVerify.ok
       && ipCompliance.ok
     ) {
@@ -310,11 +314,10 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       return { completion, parsed, goalVerify, ipCompliance, safetyWarning: undefined }
     }
     if (attempt === maxAttempts - 1) {
+      const cotSafetyWarning = cotLeakHits.size ? applySpokenCotFinalExtraction(parsed, cotLeakHits) : undefined
       if (incompleteFormats.length) {
-        const hasSubstantialContent = incompleteFormats.every((format) => {
-          const body = (parsed[format] || "").replace(/\[\[AIM_METHOD_NOTE\]\][\s\S]*?\[\[\/AIM_METHOD_NOTE\]\]/, "").trim()
-          return body.length >= 80
-        })
+        const hasSubstantialContent = incompleteFormats.every((format) =>
+          withoutMethodNote(parsed[format] || "").length >= 80)
         if (!hasSubstantialContent) {
           throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
         }
@@ -322,10 +325,17 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       // 安全闸门末次仍命中：不再硬抛，交付已清洗的末版；风险写入 safetyWarning，
       // 经 ensureContentCreationTrace 注入 METHOD_NOTE 供人工复核（目标质检/IP 合规末次失败同理）。
       const safetyWarning =
-        safety.copiedFormats.length || safety.unsupportedNumericClaimFormats.length
+        cotSafetyWarning
+        || (safety.copiedFormats.length || safety.unsupportedNumericClaimFormats.length
         || safety.unsupportedClaimFormats.length || safety.lightEditScopeViolationFormats.length
-        ? summarizeSafetyFindingsForUser(safety, maxAttempts) : undefined
+          ? summarizeSafetyFindingsForUser(safety, maxAttempts) : undefined)
       return { completion, parsed, goalVerify, ipCompliance, safetyWarning }
+    }
+
+    if (cotLeakHits.size) {
+      isLengthRewrite = false
+      activePrompt = buildSpokenCotLeakRetryPrompt(userPrompt, cotLeakHits)
+      continue
     }
 
     if (incompleteFormats.length) {
@@ -431,6 +441,7 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     "正文每一段都要推进信息，不要堆形容词，不要写营销黑话。",
     "先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。像该 IP 真人说话；跟最近成稿密度对齐。",
     "文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。",
+    "口播正文纯净性红线：正文从第一句起就是可直接使用的成稿。「需要先判断一下…」「用户说…」「上一轮质检未通过…」「写正文草稿：」「检查……：有。」等任务分析、草稿标记与自检报告句式一律禁止出现在正文，只能写在 [[AIM_METHOD_NOTE]] 块内。",
     "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。",
     "没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。",
     `所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。`,

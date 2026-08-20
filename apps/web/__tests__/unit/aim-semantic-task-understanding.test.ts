@@ -42,9 +42,10 @@ describe("semantic task understanding", () => {
         content: "[[AIM_HANDLING:deliver]]\n[[AIM_TASK_BRIEF]]\n基于现有材料交付一篇可直接使用的供暖口播。\n[[/AIM_TASK_BRIEF]]",
       })
 
+    // 注意：显式创作请求会被 fast path 直接放行，不走 LLM；这里用模糊表述覆盖协议修复分支
     const result = await understandAimContentTurn({
       envelope: {
-        currentUserRequest: "按这些材料写一篇供暖口播",
+        currentUserRequest: "帮罗老板安排今天这条",
         relevantConversation: [],
         referenceMaterials: [],
       },
@@ -56,7 +57,7 @@ describe("semantic task understanding", () => {
       brief: "基于现有材料交付一篇可直接使用的供暖口播。",
     })
     expect(complete).toHaveBeenCalledTimes(2)
-    expect(complete.mock.calls[1]?.[1]).toContain("按这些材料写一篇供暖口播")
+    expect(complete.mock.calls[1]?.[1]).toContain("帮罗老板安排今天这条")
     expect(complete.mock.calls[1]?.[1]).toContain("用户要基于现有材料写一篇供暖口播")
   })
 
@@ -83,7 +84,7 @@ describe("semantic task understanding", () => {
     expect(complete).toHaveBeenCalledTimes(2)
   })
 
-  it("falls back to the user's explicit new-copy request when both protocols are invalid", async () => {
+  it("returns the user's explicit new-copy request via fast path without any LLM call", async () => {
     const complete = vi.fn().mockResolvedValue({ content: "我理解了，开始创作。" })
     const request = "参考这个文案给罗老板写一个新的文案"
 
@@ -98,7 +99,7 @@ describe("semantic task understanding", () => {
     })
 
     expect(result).toEqual({ handling: "deliver", brief: request })
-    expect(complete).toHaveBeenCalledTimes(2)
+    expect(complete).not.toHaveBeenCalled()
   })
 
   it("recognizes the concise production wording seen in the live failure", async () => {
@@ -117,7 +118,7 @@ describe("semantic task understanding", () => {
     expect(result).toEqual({ handling: "deliver", brief: request })
   })
 
-  it("does not turn an analysis question into content delivery when protocols fail", async () => {
+  it("routes analysis questions to respond via fast path instead of delivering content", async () => {
     const complete = vi.fn().mockResolvedValue({ content: "这篇是故事结构。" })
 
     await expect(understandAimContentTurn({
@@ -128,7 +129,8 @@ describe("semantic task understanding", () => {
         referenceMaterials: [],
       },
       complete,
-    })).rejects.toThrow("语义理解协议不完整")
+    })).resolves.toEqual({ handling: "respond", brief: "这个文案是什么结构？" })
+    expect(complete).not.toHaveBeenCalled()
   })
 
   it("keeps a polite but explicit creation request as delivery", async () => {
