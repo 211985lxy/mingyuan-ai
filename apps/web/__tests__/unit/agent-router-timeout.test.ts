@@ -96,18 +96,18 @@ describe("agent router timeout overrides", () => {
     expect(completionArgs[0]).toMatchObject({ model: "deepseek-v4-flash" })
   })
 
-  it("routes business_system_diagnosis to ZenMux Claude Opus 4.6 first with DeepSeek fallback", async () => {
+  it("routes business_system_diagnosis to the fast direct model before long-gateway fallbacks", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0
 
     const llm = getAgentLLM("business_system_diagnosis")
-    expect(llm.providerNames.slice(0, 2)).toEqual(["zenmux", "deepseek"])
-    expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("anthropic/claude-opus-4.6")
+    expect(llm.providerNames.slice(0, 2)).toEqual(["deepseek", "zenmux"])
+    expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("deepseek-v4-flash")
     expect(llm.providerNames).toContain("deepseek")
     expect(llm.providerNames).toContain("apimart")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(zenmux?.timeout).toBe(120000)
+    expect(zenmux?.timeout).toBe(45000)
   })
 
   it("attaches proxy dispatcher to ZenMux when APIMART_PROXY_URL is set", async () => {

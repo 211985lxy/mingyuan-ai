@@ -137,9 +137,9 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "jiekou", capability: "basic" },
   ],
   business_system_diagnosis: [
-    // 商业诊断优先 Claude Opus 4.6：长链路结构化诊断更稳，DeepSeek / APIMart 兜底
-    { name: "zenmux", model: "anthropic/claude-opus-4.6", timeoutMs: 120000, capability: "advanced" },
-    { name: "deepseek", capability: "standard" },
+    // 工作台等待上限为 180 秒；先走直连模型，避免网关长超时后才开始生成整份报告。
+    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45000, capability: "standard" },
+    { name: "zenmux", model: "anthropic/claude-opus-4.6", timeoutMs: 45000, capability: "advanced" },
     { name: "apimart", capability: "advanced" },
     { name: "openrouter", model: "deepseek/deepseek-v4-pro", capability: "advanced" },
     { name: "openrouter", model: "z-ai/glm-5.2", capability: "advanced" },

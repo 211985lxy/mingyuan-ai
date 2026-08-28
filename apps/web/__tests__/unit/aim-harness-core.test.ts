@@ -155,6 +155,18 @@ describe("aim-harness planner", () => {
     expect(edit.modelPolicy.maxProviderAttempts).toBe(3)
   })
 
+  it("bounds business_system_diagnosis reports to the workbench response budget", () => {
+    const spec = planAimRun({
+      entrypoint: "generate",
+      agentId: "business_system_diagnosis",
+      rawInput: "请根据这份企业资料生成商业诊断报告",
+      targetFormats: ["raw_copy"],
+    })
+
+    expect(spec.modelPolicy.maxTokens).toBe(4096)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(2)
+  })
+
   it("freezes modelPolicy for chat entrypoints (temp 0.7, no maxTokens)", () => {
     const spec = planAimRun({
       entrypoint: "chat",

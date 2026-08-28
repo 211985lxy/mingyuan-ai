@@ -188,7 +188,10 @@ function buildModelPolicy(
     : agentId === "work_editor" ? 0.75
     : 0.8
 
-  // ── maxTokens：深度长文 12k；作品编辑（润色/排版）8k；社交短文 4k ──
+  // 商业诊断报告需在工作台 180 秒等待窗口内交付，避免大输出叠加 provider fallback 超时。
+  const isBusinessSystemDiagnosis = agentId === "business_system_diagnosis"
+
+  // ── maxTokens：深度长文 12k；商业诊断 4k；作品编辑（润色/排版）8k；社交短文 4k ──
   const maxTokens = isChat
     ? undefined
     : fastSpoken ? AIM_FAST_SPOKEN_MAX_TOKENS
@@ -196,6 +199,7 @@ function buildModelPolicy(
     : studioModule === "social" ? 4096
     : studioModule === "free" ? 6144
     : studioModule === "moments" ? 6144
+    : isBusinessSystemDiagnosis ? 4096
     : agentId === "work_editor" ? 8192
     : 8192
 
@@ -209,7 +213,7 @@ function buildModelPolicy(
     ...(maxTokens ? { maxTokens } : {}),
     targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
-    maxProviderAttempts: fastSpoken ? 2 : stream ? 2 : 3,
+    maxProviderAttempts: fastSpoken || stream || isBusinessSystemDiagnosis ? 2 : 3,
   }
 }
 
