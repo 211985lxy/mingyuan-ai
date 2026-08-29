@@ -21,6 +21,7 @@ export function mergeAimGenerationIntoMessages(
     workflowStage: patch.workflowStage,
     contentAction: patch.contentAction,
     regenerating: patch.regenerating ?? false,
+    pendingGeneration: patch.pendingGeneration ?? false,
     failure: patch.failure ?? null,
     traceId: patch.traceId,
     traceType: patch.traceType,

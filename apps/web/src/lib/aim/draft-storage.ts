@@ -102,7 +102,7 @@ function parseDraft(raw: string | null): AimDraft | null {
     agentModule: normalizeWorkbenchCopyStudioModule(draft.selectedAgentId, draft.agentModule),
     selectedProjectId: typeof draft.selectedProjectId === "string" ? draft.selectedProjectId : "",
     input: typeof draft.input === "string" ? draft.input : "",
-    messages: draft.messages,
+    messages: stripPendingGenerationMessages(draft.messages),
     videoCopyExtractionId: typeof draft.videoCopyExtractionId === "string" ? draft.videoCopyExtractionId : undefined,
     sourceOriginalText: typeof draft.sourceOriginalText === "string" ? draft.sourceOriginalText : undefined,
     sourceAnalysisText: typeof draft.sourceAnalysisText === "string" ? draft.sourceAnalysisText : undefined,
@@ -114,6 +114,22 @@ function parseDraft(raw: string | null): AimDraft | null {
     editorPanelWidth: typeof draft.editorPanelWidth === "number" ? clampEditorPanelWidth(draft.editorPanelWidth) : undefined,
     editorPanelOpen: typeof draft.editorPanelOpen === "boolean" ? draft.editorPanelOpen : undefined,
   }
+}
+
+/** 旧版本草稿没有 pendingGeneration 标记，只能按占位文案特征识别（生成中刷新落下的脏数据） */
+const LEGACY_PENDING_MESSAGE_PATTERN =
+  /^正在[^，\n]{1,12}，(?:会读取当前项目资料并匹配知识库，再生成交付物|将根据本次输入生成交付物)…$|^正在理解你的要求，随后[^，\n]{1,12}…$|^正在读取项目资料并匹配知识库…$|^正在连接模型[^，\n]{1,12}，请稍候…$|^生成仍在进行，复杂任务可能需要 2–3 分钟；也可点停止后重试。$/u
+
+/**
+ * 生成中的占位气泡不进草稿：生成会在服务端跑完并进历史，
+ * 草稿里留下它只会让刷新/恢复后的会话永远显示「生成中」。
+ */
+export function stripPendingGenerationMessages(messages: AimDraft["messages"]): AimDraft["messages"] {
+  return messages.filter((message) => {
+    if (message?.role !== "assistant") return true
+    if (message.pendingGeneration === true) return false
+    return !LEGACY_PENDING_MESSAGE_PATTERN.test(message.content || "")
+  })
 }
 
 /**
@@ -153,9 +169,10 @@ export function saveAimDraft(draft: AimDraft, projectScope: AimDraftProjectScope
   if (typeof window === "undefined") return
   try {
     const storageKey = aimDraftStorageKey(draft.selectedAgentId, projectScope)
+    const messages = stripPendingGenerationMessages(draft.messages)
     if (
       !draft.input.trim()
-      && draft.messages.length === 0
+      && messages.length === 0
       && !draft.editorText?.trim()
       && !draft.sourceOriginalText?.trim()
       && !draft.sourceAnalysisText?.trim()
@@ -166,7 +183,7 @@ export function saveAimDraft(draft: AimDraft, projectScope: AimDraftProjectScope
       window.sessionStorage.removeItem(storageKey)
       return
     }
-    window.sessionStorage.setItem(storageKey, JSON.stringify(draft))
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ ...draft, messages }))
     window.sessionStorage.setItem(aimDraftScopePointerKey(draft.selectedAgentId), projectScope)
   } catch {
     // Losing a browser draft is better than breaking the editor.

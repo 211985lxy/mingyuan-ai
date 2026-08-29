@@ -132,7 +132,7 @@ function startGenerationProgressTicker(
   const timers = GENERATION_PROGRESS_STAGES.map(({ afterMs, message }) =>
     setTimeout(() => {
       input.setMessages((messages) => messages.map((item) => {
-        if (item.id !== assistantMessageId || item.regenerating === false) return item
+        if (item.id !== assistantMessageId || item.pendingGeneration === false) return item
         return { ...item, content: message(actionLabel) }
       }))
     }, afterMs),
@@ -170,6 +170,7 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
       content: getAimPendingGenerationMessage(input.projectEnabled, input.agent.primaryActionLabel),
       agentId: input.agent.id,
       regenerating: false,
+      pendingGeneration: true,
     },
   ])
   if (currentInput) input.setInput("")
@@ -270,7 +271,17 @@ function applyGenerationResponse(
 function markGenerationStopped(input: AimGenerationActionInput, assistantMessageId: string) {
   input.setMessages((messages) => messages.map((message) => {
     if (message.id !== assistantMessageId) return message
-    return { ...message, content: "已停止本次生成。", regenerating: false, failure: null }
+    return { ...message, content: "已停止本次生成。", regenerating: false, pendingGeneration: false, failure: null }
+  }))
+}
+
+/** 立即把仍在生成中的占位气泡标记为已停止（忽略已完成的交付消息） */
+function markPendingMessageStoppedIfAny(input: AimGenerationActionInput) {
+  const pendingId = input.pendingScrollMessageIdRef.current
+  if (!pendingId) return
+  input.setMessages((messages) => messages.map((message) => {
+    if (message.id !== pendingId || message.pendingGeneration !== true) return message
+    return { ...message, content: "已停止本次生成。", pendingGeneration: false }
   }))
 }
 
@@ -329,6 +340,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
             ...item,
             content: message,
             regenerating: false,
+            pendingGeneration: false,
             failure: { kind: "generate" as const, retryText: currentInput },
           }
         : item))
@@ -459,7 +471,14 @@ export function useAimGenerationActions(input: AimGenerationActionInput) {
   )
   return {
     generateWithInput: stableGenerateWithInput,
-    stopGeneration: () => input.requestAbortRef.current?.abort(),
+    stopGeneration: () => {
+      // 立即中止请求并强制清忙状态：不依赖 abort 回调链（挂起的请求/质检可能迟迟不结束）
+      input.requestAbortRef.current?.abort()
+      input.requestAbortRef.current = null
+      input.setIsGenerating(false)
+      input.setIsQualityChecking(false)
+      markPendingMessageStoppedIfAny(input)
+    },
     repurposeDeliverable: (messageId: string) => (formats: ContentFormat | ContentFormat[]) =>
       repurposeDeliverable(input, messageId, formats),
     checkDeliverableQuality: (messageId: string) => () => checkDeliverableQuality(input, messageId),

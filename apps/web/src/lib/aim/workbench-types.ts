@@ -31,6 +31,8 @@ export interface AimWorkbenchMessage {
   traceType?: "chat" | "generate" | null
   /** 同线程重新生成中：保留旧交付物可见，避免闪断 */
   regenerating?: boolean
+  /** 生成中的占位气泡：不写入草稿，避免刷新后看到永远停在「生成中」的消息 */
+  pendingGeneration?: boolean
   /** 批量复刻交付物：由 runBatchReplicateSend 产出，不走标准生成链路。
    *  在聊天流内以批量卡片形式展示 N 条生成的文案。 */
   batchDeliverables?: BatchDeliverableResult | null

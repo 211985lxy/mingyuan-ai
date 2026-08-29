@@ -8,6 +8,8 @@ const helperSource = readFileSync(join(process.cwd(), "src/lib/aim/workbench-hel
 const generationSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-generation-actions.ts"), "utf8")
 const chatSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-chat-actions.ts"), "utf8")
 const unifiedTurnSource = readFileSync(join(process.cwd(), "src/hooks/aim-unified-turn-client.ts"), "utf8")
+const composerSource = readFileSync(join(process.cwd(), "src/components/aim/aim-prompt-composer.tsx"), "utf8")
+const generationActionsSource = readFileSync(join(process.cwd(), "src/hooks/use-aim-generation-actions.ts"), "utf8")
 
 describe("AIM composer generate button", () => {
   it("requires current input instead of enabling from old messages", () => {
@@ -83,5 +85,34 @@ describe("AIM composer generate button", () => {
     const endBlock = generationSource.match(/function endExclusiveRequest[\s\S]*?\n}/)?.[0] ?? ""
     expect(endBlock).toContain("requestAbortRef.current === controller")
     expect(endBlock).toContain("clearBusy()")
+  })
+
+  it("allows sending a new request while a generation is still running", () => {
+    // 生成中不再禁发：canSend 只受录音/转写限制，不再含 !busy
+    const composerDerivedBlock =
+      composerSource.match(/function useComposerDerivedState[\s\S]*?^}/m)?.[0] ?? ""
+    expect(composerDerivedBlock).toContain("const canSend = !isRecording && !isTranscribing && pasteReadyForSend")
+    expect(composerDerivedBlock).not.toContain("!busy && !isRecording && pasteReadyForSend")
+    // 计划模式仍要求空闲
+    expect(composerDerivedBlock).toContain("const canPlan =\n    !busy")
+  })
+
+  it("stop and new-task force-clear busy state instead of relying on abort callbacks", () => {
+    expect(generationActionsSource).toContain("input.setIsGenerating(false)")
+    expect(generationActionsSource).toContain("markPendingMessageStoppedIfAny(input)")
+    const workbenchHookSource = readFileSync(
+      join(process.cwd(), "src/features/aim/hooks/use-aim-workbench.ts"),
+      "utf8",
+    )
+    const resetBlock = workbenchHookSource.match(/function resetConversation[\s\S]*?\n  }/)?.[0] ?? ""
+    expect(resetBlock).toContain("setIsThinking(false)")
+    expect(resetBlock).toContain("setIsGenerating(false)")
+    expect(resetBlock).toContain("setIsQualityChecking(false)")
+  })
+
+  it("does not persist in-flight generation placeholders into the session draft", () => {
+    const draftStorageSource = readFileSync(join(process.cwd(), "src/lib/aim/draft-storage.ts"), "utf8")
+    expect(draftStorageSource).toContain("export function stripPendingGenerationMessages")
+    expect(draftStorageSource).toContain("stripPendingGenerationMessages(draft.messages)")
   })
 })

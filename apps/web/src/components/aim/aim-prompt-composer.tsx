@@ -105,6 +105,7 @@ function useComposerAllState(props: AimPromptComposerProps) {
   } = props
   const state = useComposerDerivedState({
     value, busy: busy || false, isRecording: isRecording || false,
+    isTranscribing: props.isTranscribing || false,
     canGenerate: canGenerate || false, onStop,
     composerMode, pastedCopy, onPastedCopyChange, onStyleSampleRequest,
     imageAttachments, capabilitiesProp, isPlanSessionActive,
@@ -277,6 +278,7 @@ interface UseComposerDerivedStateInput {
   value: string
   busy: boolean
   isRecording: boolean
+  isTranscribing: boolean
   canGenerate: boolean
   onStop?: () => void
   composerMode: AimComposerMode
@@ -294,7 +296,7 @@ interface UseComposerDerivedStateInput {
 
 function useComposerDerivedState(input: UseComposerDerivedStateInput) {
   const {
-    value, busy, isRecording, canGenerate, onStop,
+    value, busy, isRecording, isTranscribing, canGenerate, onStop,
     composerMode, pastedCopy, onPastedCopyChange, onStyleSampleRequest,
     imageAttachments, capabilitiesProp, isPlanSessionActive,
     onComposerModeChange, showContentMode, showSkills, onAddImages,
@@ -318,7 +320,9 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
       : null,
     hasImages: imageAttachments.length > 0,
   })
-  const canSend = !busy && !isRecording && pasteReadyForSend
+  // 生成/质检进行中不再禁发：直接发送会自动接替当前请求（beginExclusiveRequest 中止旧请求）；
+  // 仅录音/转写这类语音流和计划模式仍要求空闲。
+  const canSend = !isRecording && !isTranscribing && pasteReadyForSend
   const canPlan =
     !busy && !isRecording && value.trim().length > 0 &&
     (!pastedCopy || Boolean(effectivePasteUsage))

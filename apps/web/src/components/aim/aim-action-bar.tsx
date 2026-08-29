@@ -309,7 +309,8 @@ function PrimaryButton(props: {
       )}
       title={isPlanMode ? "开始规划" : primaryActionLabel}
     >
-      {isGenerating ? (
+      {/* 生成中但已输入新内容 → 显示发送（点击接替当前请求）；仅在不可发送时显示转圈 */}
+      {isGenerating && !canSubmit ? (
         <Loader2 className="h-[18px] w-[18px] animate-spin" />
       ) : isPlanMode ? (
         <>

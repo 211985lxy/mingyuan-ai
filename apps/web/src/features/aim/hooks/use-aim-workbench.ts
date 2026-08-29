@@ -287,6 +287,11 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
       setComposerMode: planOrchestration.setComposerMode,
       clearTurnIntent: undefined, searchParams, router,
     })
+    // 强制清忙状态：不依赖被中止请求的回调链（挂起请求/质检可能迟迟不结束）
+    requestAbortRef.current = null
+    setIsThinking(false)
+    setIsGenerating(false)
+    setIsQualityChecking(false)
   }
 
   const restoreScopeDraft = (nextDraft: AimDraft | null) => {

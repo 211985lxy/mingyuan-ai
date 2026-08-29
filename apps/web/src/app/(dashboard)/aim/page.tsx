@@ -131,6 +131,11 @@ export default function AimPage() {
   }, [])
 
   const handleComposerGenerate = useCallback(() => {
+    // 视频提取完成时会自动改写输入/会话，进行中发送新请求会互相踩踏；提示等待或取消
+    if (isProcessingVideo) {
+      toast.message("视频文案提取中", { description: "提取完成后会自动带入内容；也可以点红色按钮停止等待。" })
+      return
+    }
     if (capabilities.videoCopyExtraction) {
       const videoUrl = resolveContentProducerVideoUrl(w.selectedAgentId, w.input)
       if (videoUrl) {
@@ -207,7 +212,7 @@ export default function AimPage() {
       }
     }
     w.handleGenerate()
-  }, [capabilities, openStylePreview, pastedCopy, processVideoUrl, w])
+  }, [capabilities, isProcessingVideo, openStylePreview, pastedCopy, processVideoUrl, w])
 
   const composerPlaceholder = w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : PASTE_COMPOSER_PLACEHOLDER
   const canGenerateBase = (w.input.trim().length > 0 || w.imageAttachments.length > 0 || Boolean(pastedCopy)) && (!w.projectEnabled || Boolean(w.selectedProjectId)) && !w.isUploadingImage
@@ -285,7 +290,10 @@ export default function AimPage() {
           AgentIcon={w.agent.icon}
           showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
-          onReset={w.resetConversation}
+          onReset={() => {
+            cancelVideoProcessing()
+            w.resetConversation()
+          }}
         />
 
         <AimProjectNotices
