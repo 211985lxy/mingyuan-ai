@@ -4,7 +4,6 @@ import { OpenAICompatibleProvider } from "./provider"
 import type { LLMProvider, LLMProviderConfig, ModelCapability } from "./types"
 import { COPY_STUDIO_ROUTE_KEYS, type CopyStudioModule } from "@/lib/copy-studio"
 import {
-  AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS,
   AIM_FAST_SPOKEN_ROUTE_KEY,
 } from "@/lib/aim-harness/fast-spoken-policy"
 
@@ -81,16 +80,19 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
 
 export const AGENT_ROUTES = freezeAgentRoutes({
   [AIM_FAST_SPOKEN_ROUTE_KEY]: [
-    // 快口播：国内直连先出字；ZenMux 只能作增强，禁止只挂一条（超时即整单失败、流式也白等）。
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
-    { name: "apimart", timeoutMs: 45_000, capability: "advanced" },
+    // 业务决策（2026-08-29）：文案尽量 Claude，不可用降级 DeepSeek pro → flash。
+    // ZenMux 首位必须短超时快失败（20s 经验值），避免流式「干等后失败」；
+    // 降级链保证通道故障时 20s 内切到 DeepSeek 继续出稿。
     {
       name: "zenmux",
       model: "anthropic/claude-sonnet-4.6",
-      timeoutMs: AIM_FAST_SPOKEN_PROVIDER_TIMEOUT_MS,
+      timeoutMs: 20_000,
       maxRetries: 0,
       capability: "advanced",
     },
+    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 45_000, capability: "advanced" },
+    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
+    { name: "apimart", timeoutMs: 45_000, capability: "advanced" },
     { name: "glm", timeoutMs: 30_000, capability: "standard" },
   ],
   // ── 高质量写作 / 选题策划组 ──
@@ -116,12 +118,13 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "glm", timeoutMs: 20000, capability: "standard" },
   ],
 
-  // ── 内容创作：稳定优先（DeepSeek/APIMart 先出字），Claude 作增强兜底 ──
-  // ZenMux 挂最前时，连通性/超时会把整段流式「干等后失败」，表现为流式反复丢失。
+  // ── 内容创作：Claude 质量优先（业务决策 2026-08-29），DeepSeek 系降级保出稿 ──
+  // ZenMux 短超时快失败，通道故障 20s 内降级，避免流式干等。
   content_producer: [
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20_000, capability: "advanced" },
+    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 45_000, capability: "advanced" },
     { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
     { name: "apimart", timeoutMs: 60_000, capability: "advanced" },
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 45_000, capability: "advanced" },
     { name: "jiekou", capability: "basic" },
     { name: "glm", capability: "standard" },
   ],
