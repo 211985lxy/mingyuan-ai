@@ -1,7 +1,8 @@
 import { env } from "@/env"
 import { createGatewayLLM } from "@/lib/llm/gateway-client"
+import { CROSS_GATEWAY_MODELS } from "@/lib/llm/models"
 
-const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || "anthropic/claude-sonnet-4.6"
+const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || CROSS_GATEWAY_MODELS.claudeSonnet
 const DEFAULT_CHUNK_CHARS = 4500
 const MIN_SOURCE_CHARS = 8
 

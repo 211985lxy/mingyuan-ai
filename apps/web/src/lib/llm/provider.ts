@@ -55,7 +55,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
   readonly defaultModel: string
   private apiKey: string
 
+  private config: LLMProviderConfig
+
   constructor(config: LLMProviderConfig) {
+    this.config = config
     this.name = config.name
     this.capability = config.capability
     this.apiKey = config.apiKey
@@ -75,6 +78,21 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
   isAvailable(): boolean {
     return !!this.apiKey
+  }
+
+  /**
+   * 模型名-供应商兼容预检（发请求前过滤，防止错配 400）：
+   * - 聚合网关：认识一切模型名（含 vendor/model 跨网关格式）
+   * - 直连供应商：跨网关格式（含 /）必不认识；自家名按 ownModelPrefixes 前缀判断；
+   *   未声明前缀时不过滤（保持旧行为）
+   */
+  supportsModel(model: string): boolean {
+    if (this.config.isGateway) return true
+    if (model.includes("/")) return false
+    const prefixes = this.config.ownModelPrefixes
+    if (!prefixes || prefixes.length === 0) return true
+    const lower = model.toLowerCase()
+    return prefixes.some((prefix) => lower.startsWith(prefix))
   }
 
   async complete(options: CompletionOptions): Promise<CompletionResult> {

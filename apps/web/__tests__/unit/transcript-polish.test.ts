@@ -8,13 +8,11 @@ const { complete, mockEnv } = vi.hoisted(() => ({
 }))
 
 vi.mock("@/env", () => ({ env: mockEnv }))
-vi.mock("@/lib/llm", () => ({
-  LLMClient: {
-    shared: () => ({
-      available: true,
-      complete,
-    }),
-  },
+vi.mock("@/lib/llm/gateway-client", () => ({
+  createGatewayLLM: () => ({
+    available: true,
+    complete,
+  }),
 }))
 
 import { polishTranscript, splitTranscriptChunks } from "@/lib/transcript-polish"

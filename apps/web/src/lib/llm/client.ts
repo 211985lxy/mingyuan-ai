@@ -114,6 +114,14 @@ export class LLMClient {
 
     for (let index = 0; index < Math.min(this.providers.length, maxAttempts); index += 1) {
       const provider = this.providers[index]
+      if (
+        boundedOptions.model
+        && provider.supportsModel
+        && !provider.supportsModel(boundedOptions.model)
+      ) {
+        // 模型名-供应商错配：跳过而不是发出去吃 400（400 不可重试会中断整链）
+        continue
+      }
       const startedAt = Date.now()
       try {
         const result = await provider.complete(boundedOptions)
@@ -138,6 +146,15 @@ export class LLMClient {
           `[llm] Provider "${provider.name}" failed (${classified.kind}), trying next:`,
           lastError.message
         )
+        if (
+          classified.kind === "client"
+          && /model|unsupported/i.test(lastError.message)
+        ) {
+          console.error(
+            `[llm-config] 疑似模型名-供应商错配：provider=${provider.name} model=${boundedOptions.model ?? provider.defaultModel}。` +
+              "该模型名应只发给认识它的聚合网关（见 createGatewayLLM / AGENT_ROUTES）。",
+          )
+        }
         // Non-retryable errors must not silently switch models.
         if (!classified.retryable) break
         // 指数退避：rate_limit/server 错误后等待再尝试下一个 provider
@@ -146,6 +163,18 @@ export class LLMClient {
       }
     }
 
+    if (
+      !lastError
+      && boundedOptions.model
+      && this.providers.every(
+        (p) => p.supportsModel && !p.supportsModel(boundedOptions.model as string),
+      )
+    ) {
+      throw new Error(
+        `[llm-config] 模型名 "${boundedOptions.model}" 不被任何已配置供应商认识（${this.providers.map((p) => p.name).join(", ")}）。` +
+          "请检查模型名拼写或改走聚合网关（createGatewayLLM）。",
+      )
+    }
     throw lastError ?? new Error("[llm] All providers failed")
   }
 
@@ -181,6 +210,13 @@ export class LLMClient {
     for (let index = 0; index < Math.min(this.providers.length, maxAttempts); index += 1) {
       const provider = this.providers[index]
       if (!provider.stream) continue
+      if (
+        boundedOptions.model
+        && provider.supportsModel
+        && !provider.supportsModel(boundedOptions.model)
+      ) {
+        continue
+      }
 
       const startedAt = Date.now()
       let emitted = false
@@ -219,6 +255,18 @@ export class LLMClient {
       }
     }
 
+    if (
+      !lastError
+      && boundedOptions.model
+      && this.providers.every(
+        (p) => p.supportsModel && !p.supportsModel(boundedOptions.model as string),
+      )
+    ) {
+      throw new Error(
+        `[llm-config] 模型名 "${boundedOptions.model}" 不被任何已配置供应商认识（${this.providers.map((p) => p.name).join(", ")}）。` +
+          "请检查模型名拼写或改走聚合网关（createGatewayLLM）。",
+      )
+    }
     throw lastError ?? new Error("[llm] No streaming providers available")
   }
 

@@ -2,13 +2,14 @@ import { env } from "@/env"
 import type { ContentTemplate } from "@/generated/prisma/client"
 import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
+import { CROSS_GATEWAY_MODELS } from "@/lib/llm/models"
 
 // ─── Model configuration ──────────────────────────────────
 // Meta-prompt generation & scoring: Sonnet 4.6 (analytical, structured)
 // Script creation: GPT-5.4 (creative, fluent Chinese)
-const META_MODEL = env.META_PROMPT_MODEL || "anthropic/claude-sonnet-4.6"
-const SCRIPT_MODEL = env.SCRIPT_GENERATION_MODEL || "anthropic/claude-sonnet-4.6"
-const SCORE_MODEL = env.SCORE_MODEL || "anthropic/claude-sonnet-4.6"
+const META_MODEL = env.META_PROMPT_MODEL || CROSS_GATEWAY_MODELS.claudeSonnet
+const SCRIPT_MODEL = env.SCRIPT_GENERATION_MODEL || CROSS_GATEWAY_MODELS.claudeSonnet
+const SCORE_MODEL = env.SCORE_MODEL || CROSS_GATEWAY_MODELS.claudeSonnet
 
 // Per-step timeout: prevents one slow step from consuming the entire 120s budget
 const STEP_TIMEOUT_MS = 30_000 // 30s per LLM call
