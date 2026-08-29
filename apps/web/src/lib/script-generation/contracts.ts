@@ -7,7 +7,7 @@ import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-temp
 // Meta-prompt generation & scoring: Sonnet 4.6 (analytical, structured)
 // Script creation: GPT-5.4 (creative, fluent Chinese)
 const META_MODEL = env.META_PROMPT_MODEL || "anthropic/claude-sonnet-4.6"
-const SCRIPT_MODEL = env.SCRIPT_GENERATION_MODEL || "deepseek-v4-flash"
+const SCRIPT_MODEL = env.SCRIPT_GENERATION_MODEL || "anthropic/claude-sonnet-4.6"
 const SCORE_MODEL = env.SCORE_MODEL || "anthropic/claude-sonnet-4.6"
 
 // Per-step timeout: prevents one slow step from consuming the entire 120s budget

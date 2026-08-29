@@ -1,7 +1,7 @@
 import { env } from "@/env"
-import { LLMClient } from "@/lib/llm"
+import { createGatewayLLM } from "@/lib/llm/gateway-client"
 
-const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || "deepseek-v4-flash"
+const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || "anthropic/claude-sonnet-4.6"
 const DEFAULT_CHUNK_CHARS = 4500
 const MIN_SOURCE_CHARS = 8
 
@@ -32,7 +32,7 @@ export async function polishTranscript(
   const source = text.trim()
   if (source.length < MIN_SOURCE_CHARS) return source
 
-  const llm = LLMClient.shared()
+  const llm = createGatewayLLM()
   if (!llm.available) return source
 
   const chunkChars = options.chunkChars ?? DEFAULT_CHUNK_CHARS
@@ -61,7 +61,7 @@ export async function polishTranscript(
 export const correctAsrText = polishTranscript
 
 async function polishChunk(
-  llm: ReturnType<typeof LLMClient.shared>,
+  llm: ReturnType<typeof createGatewayLLM>,
   model: string,
   chunk: string,
 ): Promise<string> {

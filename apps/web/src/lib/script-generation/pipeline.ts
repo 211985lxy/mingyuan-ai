@@ -1,4 +1,5 @@
 import { LLMClient } from "@/lib/llm"
+import { createGatewayLLM } from "@/lib/llm/gateway-client"
 import { buildContextBlock } from "./context"
 import type { GenerateScriptCandidatesParams, HotTopicFusionContext, ScriptGenerationResult } from "./contracts"
 import { fallbackResult } from "./fallback"
@@ -15,7 +16,7 @@ import { buildGenerationResult, withTimeout } from "./utils"
 export async function generateScriptCandidates(
   params: GenerateScriptCandidatesParams
 ): Promise<ScriptGenerationResult> {
-  const llm = LLMClient.shared()
+  const llm = createGatewayLLM()
 
   if (!llm.available) {
     return fallbackResult(params)
