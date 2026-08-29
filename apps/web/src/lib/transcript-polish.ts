@@ -1,7 +1,7 @@
 import { env } from "@/env"
 import { LLMClient } from "@/lib/llm"
 
-const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || "openai/gpt-5.4"
+const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || "deepseek-v4-flash"
 const DEFAULT_CHUNK_CHARS = 4500
 const MIN_SOURCE_CHARS = 8
 

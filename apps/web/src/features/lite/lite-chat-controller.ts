@@ -71,11 +71,16 @@ export function createLiteChatController(options: LiteChatControllerOptions) {
       .map((message) => ({ role: message.role, content: message.content })) as AimChatMessage[]
 
     try {
-      await stream(payload, {
+      const result = await stream(payload, {
         agentId: options.agentId,
         signal: abortController.signal,
         onDelta: (_delta, content) => appendAssistantDelta(content),
       })
+      // 流正常结束但零内容：多为服务端异常中断（网络截断/内部错误），按失败处理
+      if (!result.content.trim()) {
+        removeTrailingEmptyAssistant()
+        onError?.("生成失败，请重试；若持续失败请联系客服")
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 499) {
         // 用户主动停止：保留已生成的部分内容，不算错误

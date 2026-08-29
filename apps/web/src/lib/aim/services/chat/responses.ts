@@ -49,16 +49,26 @@ export function streamChatContent(
           await options?.finalize?.(output, true)
           controller.close()
         } catch (error) {
-          await addAimTraceStep(trace, {
-            key: "llm_stream_chat",
-            label: "LLM 流式聊天生成",
-            status: "failed",
-            durationMs: Date.now() - startedAt,
-            error: error instanceof Error ? error.message : String(error),
-          })
-          await failAimTrace(trace, error)
-          await options?.finalize?.(output, false)
+          // 先把错误送达流（前端立即停止等待），观测与收尾写入不得阻塞错误传播：
+          // 它们一旦挂起/抛错会导致流永不关闭，前端表现为无限「思考中」。
           controller.error(error)
+          try {
+            await addAimTraceStep(trace, {
+              key: "llm_stream_chat",
+              label: "LLM 流式聊天生成",
+              status: "failed",
+              durationMs: Date.now() - startedAt,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            await failAimTrace(trace, error)
+          } catch (traceError) {
+            console.error("[aim/chat/stream] trace 记录失败（不影响错误已送达前端）:", traceError)
+          }
+          try {
+            await options?.finalize?.(output, false)
+          } catch (finalizeError) {
+            console.error("[aim/chat/stream] finalize 失败（不影响错误已送达前端）:", finalizeError)
+          }
         }
       },
     }),
