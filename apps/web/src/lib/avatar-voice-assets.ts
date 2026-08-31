@@ -417,6 +417,7 @@ export async function ensureUserAvatarVoiceAssets(
         externalSpeakerId: true,
         speakerName: true,
       },
+      take: 500,
     }),
     prisma.asset.findMany({
       where: {
@@ -425,6 +426,7 @@ export async function ensureUserAvatarVoiceAssets(
         externalSpeakerId: { not: null },
       },
       select: { externalSpeakerId: true },
+      take: 1000,
     }),
   ]);
 

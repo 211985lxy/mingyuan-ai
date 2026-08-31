@@ -20,7 +20,6 @@ import {
   TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS,
   topicGenerateBodySchema,
 } from "@/features/topics/contracts/api"
-
 export const maxDuration = 60
 
 const RECOMMENDATION_MODES = new Set<RecommendationMode>(["normal", "daily", "weekly"])

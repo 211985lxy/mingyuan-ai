@@ -91,6 +91,7 @@ export async function normalizePackagingInputs(input: {
           assetType: true,
           url: true,
         },
+        take: assetIds.size,
       })
     : [];
   const assetMap = new Map(assets.map((asset) => [asset.id, asset]));

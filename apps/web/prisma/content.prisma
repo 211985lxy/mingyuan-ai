@@ -39,7 +39,6 @@ model Script {
   @@index([structureId])
   @@index([topicSelectionId])
 }
-
 model ContentGenerationRun {
   id                String   @id @default(cuid())
   userId            String
@@ -78,7 +77,6 @@ model ContentGenerationRun {
   @@index([hotTopicId])
   @@index([topicSelectionId])
 }
-
 model HotTopicFitCache {
   id          String   @id @default(cuid())
   cacheKey    String   @unique
@@ -94,7 +92,6 @@ model HotTopicFitCache {
   @@index([topicId, templateId, structureId])
   @@index([ipProfileId, updatedAt])
 }
-
 model VideoStructure {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -125,7 +122,6 @@ model VideoStructure {
   @@index([origin, status])
   @@index([userId, createdAt(sort: Desc)])
 }
-
 model TopicElement {
   id            String   @id @default(cuid())
   code          String   @unique
@@ -140,7 +136,6 @@ model TopicElement {
 
   @@index([status, sortOrder])
 }
-
 model OpeningType {
   id          String   @id @default(cuid())
   code        String   @unique
@@ -155,7 +150,6 @@ model OpeningType {
 
   @@index([status, sortOrder])
 }
-
 model CopyStructure {
   id          String   @id @default(cuid())
   code        String   @unique
@@ -170,7 +164,6 @@ model CopyStructure {
 
   @@index([status, sortOrder])
 }
-
 model EndingType {
   id          String   @id @default(cuid())
   code        String   @unique

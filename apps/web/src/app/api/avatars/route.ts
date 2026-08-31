@@ -18,19 +18,11 @@ import {
 import { enforceCountBetaLimit } from "@/lib/internal-beta-limits"
 import { acquireProviderSlot, releaseProviderSlot } from "@/lib/digital-human-semaphore"
 
-// ─── POST /api/avatars ─────────────────────────────────
-
 export const POST = withUserAuth(async (request, { user }) => {
   const requestId = `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-  console.log(`[${requestId}] Avatar creation initiated by user ${user.id}`)
-
   const { name, cloneType, videoUrl, imageUrl, projectId } =
     await parseJsonRecord(request)
-
-  console.log(`[${requestId}] Request params: name=${name}, cloneType=${cloneType}, videoUrl=${!!videoUrl}, imageUrl=${!!imageUrl}`)
-
   if (!name || !cloneType || typeof projectId !== "string" || !projectId.trim()) {
-    console.warn(`[${requestId}] Validation failed: missing name or cloneType`)
     return NextResponse.json(
       { error: "name, cloneType and projectId are required" },
       { status: 400 }
@@ -47,39 +39,23 @@ export const POST = withUserAuth(async (request, { user }) => {
       { status: 404 },
     )
   }
-
   const validCloneTypes = ["fast", "professional", "image"]
   if (!validCloneTypes.includes(cloneType)) {
-    console.warn(`[${requestId}] Validation failed: invalid cloneType=${cloneType}`)
     return NextResponse.json(
       { error: "cloneType must be one of: fast, professional, image" },
       { status: 400 }
     )
   }
 
-  // Validate required fields per type
   if (cloneType === "fast" && !videoUrl) {
-    console.warn(`[${requestId}] Validation failed: fast clone requires videoUrl`)
-    return NextResponse.json(
-      { error: "videoUrl is required for fast clone" },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "videoUrl is required for fast clone" }, { status: 400 })
   }
   if (cloneType === "professional" && !videoUrl) {
-    console.warn(`[${requestId}] Validation failed: professional clone requires videoUrl`)
-    return NextResponse.json(
-      { error: "videoUrl is required for professional clone" },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "videoUrl is required for professional clone" }, { status: 400 })
   }
   if (cloneType === "image" && !imageUrl) {
-    console.warn(`[${requestId}] Validation failed: image clone requires imageUrl`)
-    return NextResponse.json(
-      { error: "imageUrl is required for image clone" },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: "imageUrl is required for image clone" }, { status: 400 })
   }
-
   const provider = getDigitalHumanProvider()
   let authText: string
   try {
@@ -93,18 +69,15 @@ export const POST = withUserAuth(async (request, { user }) => {
     }
     throw error
   }
-
   if (provider === "chanjing" && cloneType !== "fast") {
     return NextResponse.json(
       { error: "蝉镜当前仅支持极速视频克隆，请上传本人训练视频", code: "UNSUPPORTED_CLONE_TYPE" },
       { status: 422 },
     )
   }
-
   const limitResponse = await enforceCountBetaLimit({ userId: user.id, kind: "avatar" })
   if (limitResponse) return limitResponse
 
-  // Read the server-confirmed authorization record (recorded once, reused for all avatar creations)
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
@@ -113,11 +86,8 @@ export const POST = withUserAuth(async (request, { user }) => {
       authVideoConfirmedAt: true,
     },
   })
-
   const authVideoUrl = dbUser?.authVideoUrl
-
   if (!authVideoUrl || !dbUser?.authVideoConfirmedAt || dbUser.authVideoText !== authText) {
-    console.warn(`[${requestId}] User ${user.id} missing authVideoUrl`)
     return NextResponse.json(
       {
         error: "请先按页面显示的授权原文录制并确认授权视频",
@@ -133,9 +103,6 @@ export const POST = withUserAuth(async (request, { user }) => {
       { status: 422 },
     )
   }
-
-  console.log(`[${requestId}] Resolved authVideoUrl, proceeding with URL signing`)
-
   let signedVideoUrl: string | undefined
   let signedAuthVideoUrl: string
   let signedImageUrl: string | undefined
@@ -151,7 +118,6 @@ export const POST = withUserAuth(async (request, { user }) => {
     signedImageUrl = imageUrl
       ? resolveUpstreamReadableUrl(imageUrl, "imageUrl")
       : undefined
-    console.log(`[${requestId}] URL signing successful`)
   } catch (error) {
     console.error(`[${requestId}] URL resolution failed:`, error)
     if (error instanceof AssetReadabilityError) {
@@ -166,7 +132,6 @@ export const POST = withUserAuth(async (request, { user }) => {
     }
     throw error
   }
-
   const acquired = await acquireProviderSlot(provider)
   if (!acquired) {
     return NextResponse.json(
@@ -175,8 +140,6 @@ export const POST = withUserAuth(async (request, { user }) => {
     )
   }
 
-  // Create Avatar record only after a provider slot is reserved. A successful
-  // provider task keeps the slot until callback/poll settlement releases it.
   let avatar
   try {
     avatar = await prisma.avatar.create({
@@ -195,9 +158,6 @@ export const POST = withUserAuth(async (request, { user }) => {
     await releaseProviderSlot(provider)
     throw error
   }
-
-  console.log(`[${requestId}] Avatar record created: ${avatar.id}, submitting to digital-human provider`)
-
   try {
     let taskId: string
 
@@ -222,22 +182,13 @@ export const POST = withUserAuth(async (request, { user }) => {
       })
     }
 
-    console.log(`[${requestId}] Provider API call successful, taskId: ${taskId}`)
-
-    // Store externalTaskId on avatar. The reserved provider slot remains held
-    // until a verified terminal callback or polling result.
     const updatedAvatar = await prisma.avatar.update({
       where: { id: avatar.id },
       data: { externalTaskId: taskId },
     })
 
-    console.log(`[${requestId}] Avatar ${avatar.id} created successfully with externalTaskId ${taskId}`)
     return NextResponse.json({ data: updatedAvatar }, { status: 201 })
   } catch (error) {
-    console.error(`[${requestId}] Provider API call failed for avatar ${avatar.id}:`, error)
-    console.error(`[${requestId}] Error details: ${error instanceof Error ? error.message : String(error)}`)
-
-    // If provider call fails, mark avatar as failed and return the reserved slot.
     const errorCode = error instanceof Error && "code" in error ? (error as { code: string }).code : null
     const errorMessage = error instanceof Error ? error.message : "克隆任务提交失败，请检查视频质量后重试"
     await prisma.avatar.update({
@@ -250,23 +201,15 @@ export const POST = withUserAuth(async (request, { user }) => {
     })
     await releaseProviderSlot(provider)
 
-    console.log(`[${requestId}] Avatar ${avatar.id} marked as failed in database`)
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 })
-
-// ─── GET /api/avatars ──────────────────────────────────
-
 export const GET = withUserAuth(async (request, { user }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const projectId = searchParams.get("projectId")
   const page = parseInt(searchParams.get("page") ?? "1", 10)
   const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10)
-
   if (projectId) {
     const project = await prisma.clientProject.findFirst({
       where: { id: projectId, userId: user.id },
@@ -279,11 +222,9 @@ export const GET = withUserAuth(async (request, { user }) => {
       )
     }
   }
-
   const where: { userId: string; status?: string; projectId?: string } = { userId: user.id }
   if (status) where.status = status
   if (projectId) where.projectId = projectId
-
   const [results, total] = await Promise.all([
     prisma.avatar.findMany({
       where,
@@ -293,11 +234,8 @@ export const GET = withUserAuth(async (request, { user }) => {
     }),
     prisma.avatar.count({ where }),
   ])
-
-  // Add computed preview/thumbnail/cover fields, then sign all OSS URLs
   const resultsWithPreview = results.map((avatar) => {
     const videoSrc = avatar.demoVideoUrl || avatar.sourceVideoUrl;
-    // Fallback: generate cover from video thumbnail when DB coverUrl is null
     const coverUrl = avatar.coverUrl
       || (videoSrc ? generateVideoThumbnailUrl(videoSrc) : null);
     return signOssUrls({

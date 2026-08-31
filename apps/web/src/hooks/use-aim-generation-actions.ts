@@ -474,7 +474,7 @@ export function useAimGenerationActions(input: AimGenerationActionInput) {
     stopGeneration: () => {
       // 立即中止请求并强制清忙状态：不依赖 abort 回调链（挂起的请求/质检可能迟迟不结束）
       input.requestAbortRef.current?.abort()
-      input.requestAbortRef.current = null
+      inputRef.current.requestAbortRef.current = null
       input.setIsGenerating(false)
       input.setIsQualityChecking(false)
       markPendingMessageStoppedIfAny(input)

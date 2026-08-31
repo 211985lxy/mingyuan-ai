@@ -180,7 +180,7 @@ describe("Prisma migrations", () => {
     expect(prismaConfig).not.toContain("changethis")
   })
 
-  it("requires backup evidence before retiring production media data", () => {
+  it("keeps the retired-media preflight guarded after digital-human restoration", () => {
     const preflight = readFileSync(
       path.join(appRoot, "scripts/check-retired-media-data.mjs"),
       "utf8",
@@ -191,13 +191,15 @@ describe("Prisma migrations", () => {
     )
 
     expect(preflight).toContain("RETIRED_MEDIA_BACKUP_REFERENCE")
+    expect(preflight).toContain("digital-human-restored")
+    expect(preflight).toContain("no destructive preflight")
     expect(deployWorkflow).toContain(
       "RETIRED_MEDIA_BACKUP_REFERENCE: ${{ secrets.RETIRED_MEDIA_BACKUP_REFERENCE }}",
     )
     expect(deployWorkflow).toContain("run: pnpm security:audit")
   })
 
-  it("repairs the known empty authVideoUrl production drift without breaking fresh databases", () => {
+  it("keeps the historical authVideoUrl drift repair migration available", () => {
     const preflight = readFileSync(
       path.join(appRoot, "scripts/check-retired-media-data.mjs"),
       "utf8",
@@ -210,8 +212,8 @@ describe("Prisma migrations", () => {
       "utf8",
     )
 
-    expect(preflight).toContain("column:User.authVideoUrl")
-    expect(preflight).toContain("Known authVideoUrl repair drift preflight passed.")
+    expect(preflight).toContain('User: ["authVideoUrl"]')
+    expect(preflight).toContain("digital-human-restored")
     expect(repair).toContain("information_schema`.`COLUMNS")
     expect(repair).toContain("ALTER TABLE `User` DROP COLUMN `authVideoUrl`")
     expect(repair).toContain("PREPARE drop_auth_video_column_statement")
@@ -222,6 +224,8 @@ describe("Prisma migrations", () => {
     const migrationSql = readMigrationSql()
 
     expect(schema).toContain("authorizationConfirmedAt")
+    expect(schema).toContain("authVideoText")
+    expect(schema).toContain("authVideoConfirmedAt")
     expect(schema).toContain("idempotencyKey")
     expect(schema).toContain("aimGenerationId")
     expect(migrationSql).toContain("VideoTask_idempotencyKey_key")

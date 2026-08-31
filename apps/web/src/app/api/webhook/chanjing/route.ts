@@ -33,16 +33,12 @@ function authorizeChanjingWebhook(request: NextRequest): boolean {
   const secret = env.CHANJING_WEBHOOK_SECRET
   if (!secret) return true
   const provided = request.headers.get("x-webhook-secret")
-  // Chanjing's documented callback does not include this custom header. When
-  // a gateway adds it, validate it; otherwise rely on provider-side lookup
-  // before changing any local task state.
   if (!provided) return true
   const a = Buffer.from(secret)
   const b = Buffer.from(provided)
   if (a.length !== b.length) return false
   return timingSafeEqual(a, b)
 }
-
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId()
   digitalHumanEventsTotal.inc({ provider: "chanjing", event: "callback", status: "received" })

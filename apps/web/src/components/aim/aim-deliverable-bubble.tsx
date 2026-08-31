@@ -194,6 +194,9 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
  */
 export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
   const { deliverables, regenerating = false, nextActions = [], onNextAction, isBusy } = props
+  const digitalHumanActions = nextActions.filter(
+    (action) => action.workbenchAction === "generate_digital_human_video",
+  )
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
   const [digitalHumanOpen, setDigitalHumanOpen] = useState(false)
   const activeFormat = deliverables.results.some((item) => item.format === activeTab) ? activeTab : deliverables.results[0]?.format || "raw_copy"
@@ -234,9 +237,9 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
       topicTitle={props.topicTitle}
       projectId={props.projectId}
     />
-    {nextActions.length > 0 && !regenerating ? (
+    {digitalHumanActions.length > 0 && !regenerating ? (
       <div className="mt-3 flex flex-wrap gap-2">
-        {nextActions.map((action) => (
+        {digitalHumanActions.map((action) => (
           <Button
             key={action.id}
             type="button"
