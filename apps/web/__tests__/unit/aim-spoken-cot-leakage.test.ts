@@ -64,6 +64,12 @@ describe("detectSpokenChainOfThoughtLeakage（口播思维链泄漏检测）", (
     const body = `${CLEAN_BODY}\n\n写正文草稿：\n${CLEAN_BODY}`
     expect(isSpokenChainOfThoughtLeaked(body)).toBe(true)
   })
+
+  it("把口播时长和字数说明当作格式提示泄漏，而不是成稿正文", () => {
+    const body = `3. 这是一份口播脚本（约2分钟，400-550字）。\n\n${CLEAN_BODY}`
+    const hits = detectSpokenChainOfThoughtLeakage(body)
+    expect(hits).toContain("3. 这是一份口播脚本（约2分钟，400-550字）。")
+  })
 })
 
 describe("extractSpokenFinalDraft（末次成稿提取兜底）", () => {
