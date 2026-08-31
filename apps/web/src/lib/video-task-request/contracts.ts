@@ -22,6 +22,11 @@ export const AVATAR_REQUIRING_TYPES: VideoTaskType[] = [
 
 export type CreateVideoTaskInput = {
   type?: string;
+  projectId?: string;
+  aimGenerationId?: string;
+  aspectRatio?: "9:16" | "16:9";
+  actionId?: string;
+  provider?: "chanjing" | "shanjian";
   avatarId?: string;
   scriptId?: string;
   scriptContent?: string;
@@ -56,6 +61,7 @@ export type ResolvedAvatar = {
   id: string;
   name: string;
   userId: string;
+  projectId: string | null;
   status: string;
   externalVirtualmanId: string | null;
   externalSpeakerId: string | null;

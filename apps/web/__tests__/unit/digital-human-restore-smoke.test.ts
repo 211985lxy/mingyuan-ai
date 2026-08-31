@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 import { ACTIVE_VIDEO_TASK_STATUSES, isActiveVideoTaskStatus } from "@/lib/video-task-domain"
 import { VALID_VIDEO_TASK_TYPES } from "@/lib/video-task-request/contracts"
@@ -34,5 +36,13 @@ describe("digital-human restore smoke", () => {
 
   it("defaults the digital-human provider to Chanjing", () => {
     expect(getDigitalHumanProvider()).toBe("chanjing")
+  })
+
+  it("does not auto-trigger paid 4K enhancement after first-phase delivery", () => {
+    const settlement = readFileSync(
+      resolve(__dirname, "../../src/lib/video-task-settlement.ts"),
+      "utf8",
+    )
+    expect(settlement).not.toContain("triggerVideoEnhancement")
   })
 })

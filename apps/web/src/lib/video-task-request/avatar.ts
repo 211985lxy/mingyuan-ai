@@ -3,17 +3,18 @@ import { AVATAR_REQUIRING_TYPES, type CreateVideoTaskInput, type ResolvedAvatar,
 
 export async function resolveVideoTaskAvatar(input: {
   userId: string;
+  projectId?: string | null;
   videoType: VideoTaskType;
   body: CreateVideoTaskInput;
 }): Promise<ResolvedAvatar | null> {
   if (!AVATAR_REQUIRING_TYPES.includes(input.videoType)) return null;
-  if (input.body.virtualmanId && input.body.speakerId) return buildPublicAvatar(input.userId, input.body);
+  if (input.body.virtualmanId && input.body.speakerId) return buildPublicAvatar(input.userId, input.projectId ?? null, input.body);
   if (!input.body.avatarId) {
     throw new VideoTaskRequestError("avatarId or (virtualmanId + speakerId) is required", 400);
   }
 
   const avatar = await loadAvatar(input.body.avatarId);
-  validateOwnedAvatar(avatar, input.userId);
+  validateOwnedAvatar(avatar, input.userId, input.projectId ?? null);
   const speakerId = await resolveAvatarSpeakerId({
     avatarId: avatar.id,
     userId: input.userId,
@@ -26,12 +27,13 @@ export async function resolveVideoTaskAvatar(input: {
   return { ...avatar, externalSpeakerId: speakerId };
 }
 
-function buildPublicAvatar(userId: string, body: CreateVideoTaskInput): ResolvedAvatar {
+function buildPublicAvatar(userId: string, projectId: string | null, body: CreateVideoTaskInput): ResolvedAvatar {
   const name = body.avatarName || "公共数字人";
   return {
     id: "public",
     name,
     userId,
+    projectId,
     status: "ready",
     externalVirtualmanId: body.virtualmanId as string,
     externalSpeakerId: body.speakerId as string,
@@ -42,15 +44,17 @@ function buildPublicAvatar(userId: string, body: CreateVideoTaskInput): Resolved
 async function loadAvatar(avatarId: string) {
   return prisma.avatar.findUnique({
     where: { id: avatarId },
-    select: { id: true, name: true, userId: true, status: true, externalVirtualmanId: true, externalSpeakerId: true, speakerName: true },
+    select: { id: true, name: true, userId: true, projectId: true, status: true, externalVirtualmanId: true, externalSpeakerId: true, speakerName: true },
   });
 }
 
 function validateOwnedAvatar(
   avatar: Awaited<ReturnType<typeof loadAvatar>>,
   userId: string,
+  projectId: string | null,
 ): asserts avatar is NonNullable<typeof avatar> {
   if (!avatar || avatar.userId !== userId) throw new VideoTaskRequestError("Avatar not found", 404);
+  if (projectId && avatar.projectId !== projectId) throw new VideoTaskRequestError("Avatar not found", 404);
   if (avatar.status !== "ready") throw new VideoTaskRequestError("Avatar is not ready", 422);
   if (!avatar.externalVirtualmanId) throw new VideoTaskRequestError("Avatar clone did not produce required IDs", 422);
 }

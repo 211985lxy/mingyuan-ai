@@ -8,6 +8,7 @@ import { TaskReservationError } from "./contracts";
 export type VideoTaskReservation = {
   taskId: string;
   resolvedSourceTemplateId: string | null;
+  existingTask?: Record<string, unknown>;
 };
 
 export async function reserveVideoTask(input: {
@@ -19,8 +20,20 @@ export async function reserveVideoTask(input: {
   scriptContent: string;
   videoType: VideoTaskType;
   shanjianPayload: Record<string, unknown>;
+  projectId: string | null;
+  aimGenerationId: string | null;
+  provider: "chanjing" | "shanjian";
+  idempotencyKey: string;
 }): Promise<VideoTaskReservation> {
   return prisma.$transaction(async (tx) => {
+    const existing = await tx.videoTask.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+    if (existing) {
+      return {
+        taskId: existing.id,
+        resolvedSourceTemplateId: existing.scriptId,
+        existingTask: existing as unknown as Record<string, unknown>,
+      };
+    }
     await tx.$queryRaw`SELECT id FROM User WHERE id = ${input.userId} FOR UPDATE`;
     await enforceConcurrencyLimit(tx, input.userId);
     await reservePlanIfNeeded(tx, input.plan, input.userId);
@@ -28,6 +41,8 @@ export async function reserveVideoTask(input: {
     const task = await tx.videoTask.create({
       data: {
         userId: input.userId,
+        projectId: input.projectId,
+        aimGenerationId: input.aimGenerationId,
         avatarId: input.avatar?.id === "public" ? null : input.avatar?.id ?? null,
         scriptId: script.id,
         productionPlanId: input.plan?.id ?? null,
@@ -36,6 +51,8 @@ export async function reserveVideoTask(input: {
         structureSnapshot: input.plan?.structureSnapshot as Prisma.InputJsonValue ?? undefined,
         packagingSnapshot: input.plan?.packagingSnapshot as Prisma.InputJsonValue ?? undefined,
         status: "queued",
+        provider: input.provider,
+        idempotencyKey: input.idempotencyKey,
         videoType: input.videoType,
         scriptContent: input.scriptContent,
         avatarName: input.avatar?.name ?? input.body.avatarName ?? "",

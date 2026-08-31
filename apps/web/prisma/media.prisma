@@ -3,8 +3,12 @@
 model Avatar {
   id                   String   @id @default(cuid())
   userId               String
+  projectId            String?
   name                 String
   status               String   @default("uploading") // uploading | cloning | ready | failed
+  provider             String   @default("chanjing") // chanjing | shanjian
+  authorizationText    String?  @db.Text
+  authorizationConfirmedAt DateTime?
   coverUrl             String?
   sourceVideoUrl       String?
   externalTaskId       String?  @unique
@@ -18,10 +22,13 @@ model Avatar {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id])
+  user       User          @relation(fields: [userId], references: [id])
+  project    ClientProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   videoTasks VideoTask[]
 
   @@index([userId, status])
+  @@index([userId, projectId, status])
+  @@index([provider, externalTaskId])
   @@index([externalTaskId])
 }
 

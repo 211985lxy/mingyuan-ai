@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 // Active: all non-terminal states (used for concurrency check, settlement where clause)
 export const ACTIVE_VIDEO_TASK_STATUSES = ["queued", "pending", "processing"] as const;
 // In-flight: tasks that have acquired a Shanjian slot (used for semaphore calibration)
@@ -36,6 +38,29 @@ export function isInFlightVideoTaskStatus(status: string): boolean {
 
 export function isTerminalVideoTaskStatus(status: string): boolean {
   return (TERMINAL_VIDEO_TASK_STATUSES as readonly string[]).includes(status);
+}
+
+export function buildVideoTaskIdempotencyKey(input: {
+  userId: string;
+  projectId: string | null;
+  aimGenerationId?: string | null;
+  avatarId: string | null;
+  scriptContent: string;
+  aspectRatio: "9:16" | "16:9";
+  provider: "chanjing" | "shanjian";
+  actionId?: string | null;
+}): string {
+  const canonical = JSON.stringify({
+    userId: input.userId,
+    projectId: input.projectId,
+    aimGenerationId: input.aimGenerationId ?? null,
+    avatarId: input.avatarId,
+    scriptContent: input.scriptContent.replace(/\s+/g, " ").trim(),
+    aspectRatio: input.aspectRatio,
+    provider: input.provider,
+    actionId: input.actionId ?? null,
+  });
+  return createHash("sha256").update(canonical).digest("hex");
 }
 
 export function buildPendingDeliverySnapshot(): VideoTaskDeliverySnapshot {

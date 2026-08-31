@@ -1,6 +1,18 @@
-import { DigitalHumanProviderError } from "@/lib/digital-human-provider";
+import { Prisma } from "@/generated/prisma/client";
+import {
+  DigitalHumanProviderError,
+  getDigitalHumanProvider,
+  type DigitalHumanProvider,
+} from "@/lib/digital-human-provider";
+import { prisma } from "@/lib/prisma";
+import { buildVideoTaskIdempotencyKey } from "@/lib/video-task-domain";
+import {
+  AVATAR_REQUIRING_TYPES,
+  type CreateVideoTaskInput,
+  type ResolvedPlan,
+  VideoTaskRequestError,
+} from "./contracts";
 import { resolveVideoTaskAvatar } from "./avatar";
-import { type CreateVideoTaskInput, type ResolvedPlan, VideoTaskRequestError } from "./contracts";
 import { buildShanjianSubmitPayload, resolveVideoTaskType } from "./payload";
 import { resolveProductionPlan } from "./plan";
 import { reserveVideoTask, type VideoTaskReservation } from "./reservation";
@@ -21,17 +33,33 @@ export type CreatedVideoTask = {
 export async function createVideoTask(
   userId: string,
   body: CreateVideoTaskInput,
+  options: { provider?: DigitalHumanProvider } = {},
 ): Promise<CreatedVideoTask> {
   const plan = await resolveProductionPlan(userId, body.productionPlanId);
   const videoType = resolveVideoTaskType(plan, body.type);
-  const avatar = await resolveVideoTaskAvatar({ userId, videoType, body });
+  const projectId = await resolveTaskProject(userId, body.projectId, videoType);
+  const aimGenerationId = await resolveAimGeneration(userId, projectId, body.aimGenerationId);
+  const provider = options.provider ?? getDigitalHumanProvider();
+  const aspectRatio = resolveAspectRatio(body.aspectRatio);
+  const avatar = await resolveVideoTaskAvatar({ userId, projectId, videoType, body });
   const resolvedScript = await resolveVideoTaskScript({ userId, body, plan, videoType });
+  const idempotencyKey = buildVideoTaskIdempotencyKey({
+    userId,
+    projectId,
+    aimGenerationId,
+    avatarId: avatar?.id === "public" ? null : avatar?.id ?? null,
+    scriptContent: resolvedScript.content,
+    aspectRatio,
+    provider,
+    actionId: body.actionId,
+  });
   const shanjianPayload = buildShanjianSubmitPayload({
     body,
     plan,
     videoType,
     avatar,
     scriptContent: resolvedScript.content,
+    aspectRatio,
   });
 
   let reservation: VideoTaskReservation | null = null;
@@ -45,17 +73,82 @@ export async function createVideoTask(
       scriptContent: resolvedScript.content,
       videoType,
       shanjianPayload,
+      projectId,
+      aimGenerationId,
+      provider,
+      idempotencyKey,
     });
+    if (reservation.existingTask) {
+      return toCreatedTask(
+        reservation.existingTask,
+        reservation.existingTask.status === "completed" ? 201 : 202,
+        reservation,
+      );
+    }
     const result = await submitReservedVideoTask({
       reservation,
       plan,
       videoType,
       shanjianSubmitPayload: shanjianPayload,
+      provider,
     });
     return toCreatedTask(result.task, result.queued ? 202 : 201, reservation);
   } catch (error) {
+    if (isUniqueViolation(error) && idempotencyKey) {
+      const existing = await prisma.videoTask.findUnique({ where: { idempotencyKey } });
+      if (existing) return toCreatedTask(existing as unknown as Record<string, unknown>, existing.status === "completed" ? 201 : 202, {
+        taskId: existing.id,
+        resolvedSourceTemplateId: existing.scriptId,
+      });
+    }
     return recoverOrThrow(error, reservation, plan);
   }
+}
+
+async function resolveTaskProject(
+  userId: string,
+  requestedProjectId: string | undefined,
+  videoType: string,
+): Promise<string | null> {
+  const projectId = requestedProjectId?.trim() || null;
+  if (!projectId) {
+    if (AVATAR_REQUIRING_TYPES.includes(videoType as (typeof AVATAR_REQUIRING_TYPES)[number])) {
+      throw new VideoTaskRequestError("projectId is required for digital-human video tasks", 400, { field: "projectId" });
+    }
+    return null;
+  }
+  const project = await prisma.clientProject.findFirst({
+    where: { id: projectId, userId, status: "active" },
+    select: { id: true },
+  });
+  if (!project) throw new VideoTaskRequestError("Project not found", 404, { field: "projectId" });
+  return project.id;
+}
+
+async function resolveAimGeneration(
+  userId: string,
+  projectId: string | null,
+  requestedGenerationId: string | undefined,
+): Promise<string | null> {
+  const generationId = requestedGenerationId?.trim() || null;
+  if (!generationId) return null;
+  if (!projectId) throw new VideoTaskRequestError("projectId is required with aimGenerationId", 400, { field: "projectId" });
+  const generation = await prisma.aimGeneration.findFirst({
+    where: { id: generationId, userId, projectId },
+    select: { id: true },
+  });
+  if (!generation) throw new VideoTaskRequestError("AIM generation not found", 404, { field: "aimGenerationId" });
+  return generation.id;
+}
+
+function resolveAspectRatio(value: CreateVideoTaskInput["aspectRatio"]): "9:16" | "16:9" {
+  if (!value) return "9:16";
+  if (value === "9:16" || value === "16:9") return value;
+  throw new VideoTaskRequestError("aspectRatio must be 9:16 or 16:9", 400, { field: "aspectRatio" });
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 function toCreatedTask(

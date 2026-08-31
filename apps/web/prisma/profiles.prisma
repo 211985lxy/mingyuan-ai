@@ -84,6 +84,8 @@ model ClientProject {
 
   user                   User                        @relation(fields: [userId], references: [id])
   aimGenerations         AimGeneration[]
+  avatars                Avatar[]
+  videoTasks             VideoTask[]
   knowledgeEntries       KnowledgeEntry[]
   knowledgeEntities      KnowledgeEntity[]
   assetCandidates        AssetCandidate[]

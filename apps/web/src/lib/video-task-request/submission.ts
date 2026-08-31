@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import {
   DigitalHumanProviderError,
-  getDigitalHumanProvider,
   submitVideoToProvider,
+  type DigitalHumanProvider,
 } from "@/lib/digital-human-provider";
 import { acquireSlot } from "@/lib/shanjian-semaphore";
 import { compensateVideoTaskSubmissionFailure, finalizeAcceptedVideoTaskSubmission } from "@/lib/video-task-settlement";
@@ -39,8 +39,9 @@ export async function submitReservedVideoTask(input: {
   plan: ResolvedPlan | null;
   videoType: VideoTaskType;
   shanjianSubmitPayload: Record<string, unknown>;
+  provider: DigitalHumanProvider;
 }): Promise<SubmissionResult> {
-  if (getDigitalHumanProvider() === "shanjian" && !await acquireSlot()) {
+  if (input.provider === "shanjian" && !await acquireSlot()) {
     return { queued: true, task: await loadReservedTask(input.reservation.taskId) };
   }
   await prisma.videoTask.update({ where: { id: input.reservation.taskId }, data: { status: "pending" } });
@@ -70,9 +71,10 @@ async function submitToUpstream(input: {
   reservation: VideoTaskReservation;
   videoType: VideoTaskType;
   shanjianSubmitPayload: Record<string, unknown>;
+  provider: DigitalHumanProvider;
 }): Promise<AcceptedSubmission> {
   try {
-    const result = await submitVideoToProvider(input.videoType, input.shanjianSubmitPayload);
+    const result = await submitVideoToProvider(input.provider, input.videoType, input.shanjianSubmitPayload);
     return { externalTaskId: result.taskId, shanjianPayload: result.payload };
   } catch (error) {
     await compensateVideoTaskSubmissionFailure({

@@ -40,6 +40,7 @@ model AimGeneration {
 
   user                User                 @relation(fields: [userId], references: [id])
   project             ClientProject?       @relation(fields: [projectId], references: [id])
+  videoTasks          VideoTask[]
   contentOutcomes     ContentOutcome[]
   outcomeAttributions OutcomeAttribution[]
 

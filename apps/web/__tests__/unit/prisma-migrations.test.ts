@@ -216,4 +216,16 @@ describe("Prisma migrations", () => {
     expect(repair).toContain("ALTER TABLE `User` DROP COLUMN `authVideoUrl`")
     expect(repair).toContain("PREPARE drop_auth_video_column_statement")
   })
+
+  it("adds project lineage and idempotency for digital-human tasks", () => {
+    const schema = readPrismaSchema()
+    const migrationSql = readMigrationSql()
+
+    expect(schema).toContain("authorizationConfirmedAt")
+    expect(schema).toContain("idempotencyKey")
+    expect(schema).toContain("aimGenerationId")
+    expect(migrationSql).toContain("VideoTask_idempotencyKey_key")
+    expect(migrationSql).toContain("Avatar_projectId_fkey")
+    expect(migrationSql).toContain("VideoTask_projectId_fkey")
+  })
 })

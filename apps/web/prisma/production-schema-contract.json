@@ -491,8 +491,12 @@
       "columns": [
         "id",
         "userId",
+        "projectId",
         "name",
         "status",
+        "provider",
+        "authorizationText",
+        "authorizationConfirmedAt",
         "externalTaskId",
         "externalVirtualmanId"
       ]
@@ -502,7 +506,13 @@
       "columns": [
         "id",
         "userId",
+        "projectId",
+        "aimGenerationId",
         "status",
+        "provider",
+        "idempotencyKey",
+        "retryOfTaskId",
+        "providerAttempts",
         "scriptContent",
         "avatarName",
         "externalTaskId",

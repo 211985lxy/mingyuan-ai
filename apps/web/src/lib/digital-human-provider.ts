@@ -175,11 +175,12 @@ const CHANJING_VIDEO_TYPES = new Set([
 ])
 
 export async function submitVideoToProvider(
+  provider: DigitalHumanProvider,
   videoType: string,
   payload: Record<string, unknown>,
 ): Promise<ShanjianSubmitResult> {
   try {
-    if (getDigitalHumanProvider() === "chanjing") {
+    if (provider === "chanjing") {
       if (!CHANJING_VIDEO_TYPES.has(videoType)) {
         throw new DigitalHumanProviderError(
           "UNSUPPORTED_VIDEO_TYPE",
@@ -199,7 +200,14 @@ export async function submitVideoToProvider(
           "缺少数字人、音色或口播文案，无法提交蝉镜出片任务",
         )
       }
-      return await createDigitalHumanVideo({ personId, audioManId, text })
+      const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
+      return await createDigitalHumanVideo({
+        personId,
+        audioManId,
+        text,
+        width: aspectRatio === "16:9" ? 1920 : 1080,
+        height: aspectRatio === "16:9" ? 1080 : 1920,
+      })
     }
 
     const { submitToShanjian } = await import("@/lib/shanjian-submit")

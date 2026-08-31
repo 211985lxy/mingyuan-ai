@@ -19,8 +19,9 @@ export function buildShanjianSubmitPayload(input: {
   videoType: VideoTaskType;
   avatar: ResolvedAvatar | null;
   scriptContent: string;
+  aspectRatio?: "9:16" | "16:9";
 }): Record<string, unknown> {
-  const { body, plan, videoType, avatar, scriptContent } = input;
+  const { body, plan, videoType, avatar, scriptContent, aspectRatio = "9:16" } = input;
   const { type, avatarId, scriptId, scriptContent: _, sourceTemplateId, styleId, productionPlanId, ...rest } = body;
   const resolved = resolveUpstreamPackaging(plan);
   const planMaterials = resolved.materials ? toMaterialItems(resolved.materials) : undefined;
@@ -40,6 +41,7 @@ export function buildShanjianSubmitPayload(input: {
     speakerId: avatar?.externalSpeakerId ?? null,
     speakerExtra,
     processRules,
+    aspectRatio,
     ...(planMaterials ? { materials: planMaterials } : {}),
     ...(planPackRules ? { packRules: planPackRules } : {}),
     ...(videoType === "custom_virtualman_broadcast" && plan

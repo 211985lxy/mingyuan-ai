@@ -13,7 +13,6 @@ import {
   isTerminalVideoTaskStatus,
 } from "@/lib/video-task-domain";
 import { releaseSlot } from "@/lib/shanjian-semaphore";
-import { triggerVideoEnhancement } from "@/lib/video-task-enhancement";
 
 type VideoTaskRecord = Awaited<ReturnType<typeof prisma.videoTask.findUnique>>;
 
@@ -311,19 +310,6 @@ export async function settleVideoTaskSuccess(input: {
   // Release the Shanjian slot only if task was in pending/processing (not queued)
   if (updated.count > 0 && (task.status === "pending" || task.status === "processing")) {
     await releaseSlot();
-  }
-
-  // Trigger 4K enhancement if delivery is durable and video is stored in OSS.
-  // Fire-and-forget: enhancement failure must NEVER block 1080p delivery.
-  // Per ENHANCE-01: auto-trigger after completed+durable.
-  // Per ENHANCE-04: catch errors silently — 1080p remains accessible.
-  if (archived.deliveryStatus === "durable" && isManagedOssUrl(archived.videoUrl)) {
-    triggerVideoEnhancement({
-      taskId: input.taskId,
-      sourceVideoUrl: archived.videoUrl,
-    }).catch((err) => {
-      console.error(`[enhancement] Failed to trigger for task ${input.taskId}:`, err);
-    });
   }
 
   return findTask(input.taskId);
