@@ -5,7 +5,12 @@ import { ACTIVE_VIDEO_TASK_STATUSES, isActiveVideoTaskStatus } from "@/lib/video
 import { VALID_VIDEO_TASK_TYPES } from "@/lib/video-task-request/contracts"
 import { PLAN_CONCURRENCY_LIMITS } from "@/types/content-template"
 import { AIM_AGENT_GUIDES } from "@/lib/aim-agent-guides"
-import { getDigitalHumanProvider } from "@/lib/digital-human-provider"
+import {
+  getDigitalHumanAuthorizationText,
+  getDigitalHumanProvider,
+  hasExactDigitalHumanAuthorizationText,
+  matchesDigitalHumanAuthorizationText,
+} from "@/lib/digital-human-provider"
 
 describe("digital-human restore smoke", () => {
   it("exposes virtualman broadcast as a valid video task type", () => {
@@ -44,5 +49,17 @@ describe("digital-human restore smoke", () => {
       "utf8",
     )
     expect(settlement).not.toContain("triggerVideoEnhancement")
+  })
+
+  it("never falls back to the branding name for authorization text", () => {
+    const route = readFileSync(
+      resolve(__dirname, "../../src/app/api/auth/auth-video/route.ts"),
+      "utf8",
+    )
+    expect(route).not.toContain("getBrandingConfig")
+    expect(matchesDigitalHumanAuthorizationText("  授权原文\r\n", "授权原文")).toBe(true)
+    expect(matchesDigitalHumanAuthorizationText("另一段文案", "授权原文")).toBe(false)
+    expect(hasExactDigitalHumanAuthorizationText("明显不匹配的授权文案", "chanjing")).toBe(false)
+    expect(typeof getDigitalHumanAuthorizationText).toBe("function")
   })
 })

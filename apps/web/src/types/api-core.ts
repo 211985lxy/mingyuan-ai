@@ -109,8 +109,12 @@ export interface GeneratePositioningError {
 export interface ApiAvatar {
   id: string
   userId: string
+  projectId: string | null
   name: string
   status: string
+  provider: "chanjing" | "shanjian" | string
+  authorizationText: string | null
+  authorizationConfirmedAt: string | null
   coverUrl: string | null
   sourceVideoUrl: string | null
   previewUrl: string | null

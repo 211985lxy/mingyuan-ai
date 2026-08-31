@@ -8,11 +8,14 @@ import { AssetsTab } from "@/features/assets/components/assets-tab"
 import { AvatarsTab } from "@/features/assets/components/avatars-tab"
 import { AssetFlowOverview } from "@/features/assets/components/page-sections"
 import { listAssets, listAvatars } from "@/lib/api/client"
+import { listClientProjects, type ClientProject } from "@/lib/api/projects"
 import type { ApiAsset, ApiAvatar } from "@/types/api"
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<ApiAsset[]>([])
   const [avatars, setAvatars] = useState<ApiAvatar[]>([])
+  const [projects, setProjects] = useState<ClientProject[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState("")
   const [assetsLoading, setAssetsLoading] = useState(true)
   const [avatarsLoading, setAvatarsLoading] = useState(true)
 
@@ -28,10 +31,26 @@ export default function AssetsPage() {
     }
   }, [])
 
-  const fetchAvatars = useCallback(async () => {
+  const fetchProjects = useCallback(async () => {
+    try {
+      const nextProjects = await listClientProjects("active")
+      setProjects(nextProjects)
+      setSelectedProjectId((current) =>
+        nextProjects.some((project) => project.id === current)
+          ? current
+          : nextProjects[0]?.id ?? "",
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "项目加载失败，请重试")
+      setProjects([])
+      setSelectedProjectId("")
+    }
+  }, [])
+
+  const fetchAvatars = useCallback(async (projectId: string) => {
     setAvatarsLoading(true)
     try {
-      setAvatars(await listAvatars())
+      setAvatars(projectId ? await listAvatars(projectId) : [])
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "数字人加载失败，请重试")
       setAvatars([])
@@ -42,8 +61,12 @@ export default function AssetsPage() {
 
   useEffect(() => {
     void Promise.resolve().then(fetchAssets)
-    void Promise.resolve().then(fetchAvatars)
-  }, [fetchAssets, fetchAvatars])
+    void Promise.resolve().then(fetchProjects)
+  }, [fetchAssets, fetchProjects])
+
+  useEffect(() => {
+    void Promise.resolve().then(() => fetchAvatars(selectedProjectId))
+  }, [fetchAvatars, selectedProjectId])
 
   const readyAvatarCount = avatars.filter((item) => item.status === "ready").length
 
@@ -71,7 +94,14 @@ export default function AssetsPage() {
           <TabsTrigger value="assets">素材（{assets.length}）</TabsTrigger>
         </TabsList>
         <TabsContent value="avatars">
-          <AvatarsTab avatars={avatars} loading={avatarsLoading} onRefresh={fetchAvatars} />
+          <AvatarsTab
+            avatars={avatars}
+            loading={avatarsLoading}
+            projects={projects}
+            projectId={selectedProjectId}
+            onProjectChange={setSelectedProjectId}
+            onRefresh={() => fetchAvatars(selectedProjectId)}
+          />
         </TabsContent>
         <TabsContent value="assets">
           <AssetsTab assets={assets} loading={assetsLoading} onRefresh={fetchAssets} />

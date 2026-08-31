@@ -1,19 +1,22 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
-import { getBrandingConfig } from "@/lib/branding"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import {
   cloneFastAvatar,
   cloneProfessionalAvatar,
   cloneImageAvatar,
+  getDigitalHumanAuthorizationText,
+  getDigitalHumanProvider,
+  DigitalHumanProviderError,
 } from "@/lib/digital-human-provider"
-import { generateSignedUrl, generateVideoThumbnailUrl, signOssUrls } from "@/lib/oss"
+import { generateSignedUrl, generateVideoThumbnailUrl, isManagedOssUrl, signOssUrls } from "@/lib/oss"
 import {
   AssetReadabilityError,
   resolveUpstreamReadableUrl,
 } from "@/lib/upstream-media"
 import { enforceCountBetaLimit } from "@/lib/internal-beta-limits"
+import { acquireProviderSlot, releaseProviderSlot } from "@/lib/digital-human-semaphore"
 
 // ─── POST /api/avatars ─────────────────────────────────
 
@@ -21,16 +24,27 @@ export const POST = withUserAuth(async (request, { user }) => {
   const requestId = `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   console.log(`[${requestId}] Avatar creation initiated by user ${user.id}`)
 
-  const { name, cloneType, videoUrl, imageUrl } =
+  const { name, cloneType, videoUrl, imageUrl, projectId } =
     await parseJsonRecord(request)
 
   console.log(`[${requestId}] Request params: name=${name}, cloneType=${cloneType}, videoUrl=${!!videoUrl}, imageUrl=${!!imageUrl}`)
 
-  if (!name || !cloneType) {
+  if (!name || !cloneType || typeof projectId !== "string" || !projectId.trim()) {
     console.warn(`[${requestId}] Validation failed: missing name or cloneType`)
     return NextResponse.json(
-      { error: "name and cloneType are required" },
+      { error: "name, cloneType and projectId are required" },
       { status: 400 }
+    )
+  }
+
+  const project = await prisma.clientProject.findFirst({
+    where: { id: projectId.trim(), userId: user.id, status: "active" },
+    select: { id: true },
+  })
+  if (!project) {
+    return NextResponse.json(
+      { error: "客户项目不存在或已归档", code: "PROJECT_NOT_FOUND" },
+      { status: 404 },
     )
   }
 
@@ -66,24 +80,57 @@ export const POST = withUserAuth(async (request, { user }) => {
     )
   }
 
+  const provider = getDigitalHumanProvider()
+  let authText: string
+  try {
+    authText = getDigitalHumanAuthorizationText(provider)
+  } catch (error) {
+    if (error instanceof DigitalHumanProviderError && error.code === "AUTH_TEXT_NOT_CONFIGURED") {
+      return NextResponse.json(
+        { error: error.message, code: error.code, provider },
+        { status: 503 },
+      )
+    }
+    throw error
+  }
+
+  if (provider === "chanjing" && cloneType !== "fast") {
+    return NextResponse.json(
+      { error: "蝉镜当前仅支持极速视频克隆，请上传本人训练视频", code: "UNSUPPORTED_CLONE_TYPE" },
+      { status: 422 },
+    )
+  }
+
   const limitResponse = await enforceCountBetaLimit({ userId: user.id, kind: "avatar" })
   if (limitResponse) return limitResponse
 
-  // Read authVideoUrl from the user record (recorded once, reused for all avatar creations)
+  // Read the server-confirmed authorization record (recorded once, reused for all avatar creations)
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { authVideoUrl: true },
+    select: {
+      authVideoUrl: true,
+      authVideoText: true,
+      authVideoConfirmedAt: true,
+    },
   })
 
   const authVideoUrl = dbUser?.authVideoUrl
-  const branding = await getBrandingConfig()
-  const authText = branding.name
 
-  if (!authVideoUrl) {
+  if (!authVideoUrl || !dbUser?.authVideoConfirmedAt || dbUser.authVideoText !== authText) {
     console.warn(`[${requestId}] User ${user.id} missing authVideoUrl`)
     return NextResponse.json(
-      { error: "请先录制授权视频。在创建数字人前，需要先录制一段包含特定文字的授权视频以验证身份。" },
+      {
+        error: "请先按页面显示的授权原文录制并确认授权视频",
+        code: "AUTH_VIDEO_CONFIRMATION_REQUIRED",
+        authorizationText: authText,
+      },
       { status: 400 }
+    )
+  }
+  if (!isManagedOssUrl(authVideoUrl)) {
+    return NextResponse.json(
+      { error: "授权视频必须先上传到 AIM 存储", code: "AUTH_VIDEO_STORAGE_REQUIRED" },
+      { status: 422 },
     )
   }
 
@@ -120,15 +167,34 @@ export const POST = withUserAuth(async (request, { user }) => {
     throw error
   }
 
-  // Create Avatar record
-  const avatar = await prisma.avatar.create({
-    data: {
-      userId: user.id,
-      name,
-      status: "cloning",
-      sourceVideoUrl: videoUrl || imageUrl,
-    },
-  })
+  const acquired = await acquireProviderSlot(provider)
+  if (!acquired) {
+    return NextResponse.json(
+      { error: "数字人服务当前任务较多，请稍后重试", code: "PROVIDER_BUSY", provider },
+      { status: 429 },
+    )
+  }
+
+  // Create Avatar record only after a provider slot is reserved. A successful
+  // provider task keeps the slot until callback/poll settlement releases it.
+  let avatar
+  try {
+    avatar = await prisma.avatar.create({
+      data: {
+        userId: user.id,
+        projectId: project.id,
+        name: String(name).trim(),
+        status: "cloning",
+        provider,
+        authorizationText: authText,
+        authorizationConfirmedAt: dbUser.authVideoConfirmedAt,
+        sourceVideoUrl: videoUrl || imageUrl,
+      },
+    })
+  } catch (error) {
+    await releaseProviderSlot(provider)
+    throw error
+  }
 
   console.log(`[${requestId}] Avatar record created: ${avatar.id}, submitting to digital-human provider`)
 
@@ -158,7 +224,8 @@ export const POST = withUserAuth(async (request, { user }) => {
 
     console.log(`[${requestId}] Provider API call successful, taskId: ${taskId}`)
 
-    // Store externalTaskId on avatar
+    // Store externalTaskId on avatar. The reserved provider slot remains held
+    // until a verified terminal callback or polling result.
     const updatedAvatar = await prisma.avatar.update({
       where: { id: avatar.id },
       data: { externalTaskId: taskId },
@@ -170,7 +237,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     console.error(`[${requestId}] Provider API call failed for avatar ${avatar.id}:`, error)
     console.error(`[${requestId}] Error details: ${error instanceof Error ? error.message : String(error)}`)
 
-    // If Shanjian call fails, mark avatar as failed
+    // If provider call fails, mark avatar as failed and return the reserved slot.
     const errorCode = error instanceof Error && "code" in error ? (error as { code: string }).code : null
     const errorMessage = error instanceof Error ? error.message : "克隆任务提交失败，请检查视频质量后重试"
     await prisma.avatar.update({
@@ -181,6 +248,7 @@ export const POST = withUserAuth(async (request, { user }) => {
         errorMessage,
       },
     })
+    await releaseProviderSlot(provider)
 
     console.log(`[${requestId}] Avatar ${avatar.id} marked as failed in database`)
     return NextResponse.json(
@@ -195,11 +263,26 @@ export const POST = withUserAuth(async (request, { user }) => {
 export const GET = withUserAuth(async (request, { user }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
+  const projectId = searchParams.get("projectId")
   const page = parseInt(searchParams.get("page") ?? "1", 10)
   const pageSize = parseInt(searchParams.get("pageSize") ?? "20", 10)
 
-  const where: { userId: string; status?: string } = { userId: user.id }
+  if (projectId) {
+    const project = await prisma.clientProject.findFirst({
+      where: { id: projectId, userId: user.id },
+      select: { id: true },
+    })
+    if (!project) {
+      return NextResponse.json(
+        { error: "客户项目不存在", code: "PROJECT_NOT_FOUND" },
+        { status: 404 },
+      )
+    }
+  }
+
+  const where: { userId: string; status?: string; projectId?: string } = { userId: user.id }
   if (status) where.status = status
+  if (projectId) where.projectId = projectId
 
   const [results, total] = await Promise.all([
     prisma.avatar.findMany({

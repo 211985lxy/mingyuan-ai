@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { Loader2, Plus, RotateCcw, User } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -16,16 +16,22 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   createAvatar,
+  getAuthVideoRequirements,
   retryAvatar,
   saveAuthVideo,
   uploadFileToStorage,
 } from "@/lib/api/client"
+import type { ClientProject } from "@/lib/api/projects"
 import type { ApiAvatar } from "@/types/api"
 
 const STATUS_LABEL: Record<string, string> = {
   uploading: "上传中",
+  reviewing: "审核中",
+  queued: "排队中",
   cloning: "克隆中",
   ready: "可用",
   failed: "失败",
@@ -34,17 +40,23 @@ const STATUS_LABEL: Record<string, string> = {
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "ready") return "default"
   if (status === "failed") return "destructive"
-  if (status === "cloning" || status === "uploading") return "secondary"
+  if (status === "cloning" || status === "uploading" || status === "reviewing" || status === "queued") return "secondary"
   return "outline"
 }
 
 export function AvatarsTab({
   avatars,
   loading,
+  projects,
+  projectId,
+  onProjectChange,
   onRefresh,
 }: {
   avatars: ApiAvatar[]
   loading: boolean
+  projects: ClientProject[]
+  projectId: string
+  onProjectChange: (projectId: string) => void
   onRefresh: () => void
 }) {
   if (loading) {
@@ -66,18 +78,41 @@ export function AvatarsTab({
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          先录一段授权视频，再上传本人素材做极速克隆。就绪后可在作品编辑里一键出片。
-        </p>
-        <CreateAvatarDialog onCreated={onRefresh} />
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">
+            先录一段授权视频，再上传本人素材做极速克隆。就绪后可在作品编辑里一键出片。
+          </p>
+          {projects.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="avatar-project" className="text-xs text-muted-foreground">当前项目</Label>
+              <Select value={projectId || undefined} onValueChange={(value) => value && onProjectChange(value)}>
+                <SelectTrigger id="avatar-project" className="h-8 w-[220px] text-xs">
+                  <SelectValue placeholder="选择客户项目" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+        </div>
+        <CreateAvatarDialog projectId={projectId} disabled={!projectId} onCreated={onRefresh} />
       </div>
 
-      {avatars.length === 0 ? (
+      {!projectId ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <p className="text-sm text-muted-foreground">请先创建一个客户项目，再创建项目专属数字人。</p>
+          </CardContent>
+        </Card>
+      ) : avatars.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <User className="h-10 w-10 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">还没有数字人，先创建一个。</p>
-            <CreateAvatarDialog onCreated={onRefresh} />
+            <CreateAvatarDialog projectId={projectId} onCreated={onRefresh} />
           </CardContent>
         </Card>
       ) : (
@@ -164,19 +199,48 @@ function AvatarCard({
   )
 }
 
-function CreateAvatarDialog({ onCreated }: { onCreated: () => void }) {
+function CreateAvatarDialog({
+  projectId,
+  disabled = false,
+  onCreated,
+}: {
+  projectId: string
+  disabled?: boolean
+  onCreated: () => void
+}) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [authFile, setAuthFile] = useState<File | null>(null)
   const [sourceFile, setSourceFile] = useState<File | null>(null)
+  const [authorizationText, setAuthorizationText] = useState("")
+  const [provider, setProvider] = useState<"chanjing" | "shanjian">("chanjing")
+  const [authConfirmed, setAuthConfirmed] = useState(false)
+  const [requirementsLoading, setRequirementsLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const reset = useCallback(() => {
     setName("")
     setAuthFile(null)
     setSourceFile(null)
+    setAuthorizationText("")
+    setAuthConfirmed(false)
+    setRequirementsLoading(false)
     setSubmitting(false)
   }, [])
+
+  async function loadAuthorizationRequirements() {
+    setRequirementsLoading(true)
+    try {
+      const requirements = await getAuthVideoRequirements()
+      setProvider(requirements.provider)
+      setAuthorizationText(requirements.authorizationText)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "授权文案加载失败")
+      setAuthorizationText("")
+    } finally {
+      setRequirementsLoading(false)
+    }
+  }
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -191,14 +255,21 @@ function CreateAvatarDialog({ onCreated }: { onCreated: () => void }) {
       toast.error("请上传用于克隆的本人视频")
       return
     }
+    if (!authorizationText || !authConfirmed) {
+      toast.error("请先阅读并确认按原文录制授权视频")
+      return
+    }
 
     setSubmitting(true)
     try {
       const authUpload = await uploadFileToStorage(authFile, {
         assetType: "video",
-        register: false,
+        register: true,
       })
-      await saveAuthVideo(authUpload.assetUrl)
+      await saveAuthVideo(authUpload.assetUrl, {
+        uploadId: authUpload.uploadId,
+        authText: authorizationText,
+      })
 
       const sourceUpload = await uploadFileToStorage(sourceFile, {
         assetType: "video",
@@ -207,6 +278,7 @@ function CreateAvatarDialog({ onCreated }: { onCreated: () => void }) {
 
       await createAvatar({
         name: name.trim(),
+        projectId,
         cloneType: "fast",
         videoUrl: sourceUpload.assetUrl,
       })
@@ -223,15 +295,16 @@ function CreateAvatarDialog({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Dialog
+      <Dialog
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) reset()
+        if (next) void loadAuthorizationRequirements()
+        else reset()
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm">
+        <Button size="sm" disabled={disabled}>
           <Plus className="mr-1 h-4 w-4" />
           创建数字人
         </Button>
@@ -258,9 +331,24 @@ function CreateAvatarDialog({ onCreated }: { onCreated: () => void }) {
               accept="video/*"
               onChange={(e) => setAuthFile(e.target.files?.[0] ?? null)}
             />
-            <p className="text-xs text-muted-foreground">
-              录一次即可复用。需按产品要求念出授权文案。
-            </p>
+            {requirementsLoading ? (
+              <p className="text-xs text-muted-foreground">正在加载授权文案…</p>
+            ) : authorizationText ? (
+              <div className="rounded-md border bg-muted/40 p-3 text-xs leading-5">
+                <p className="mb-1 font-medium">{provider === "chanjing" ? "蝉镜" : "闪剪"}授权原文（请逐字朗读）</p>
+                <p className="whitespace-pre-wrap">{authorizationText}</p>
+                <label className="mt-3 flex items-start gap-2">
+                  <Checkbox
+                    checked={authConfirmed}
+                    onCheckedChange={(checked) => setAuthConfirmed(checked === true)}
+                    disabled={submitting}
+                  />
+                  <span>我已按以上原文录制授权视频，并确认本人同意用于数字人制作。</span>
+                </label>
+              </div>
+            ) : (
+              <p className="text-xs text-destructive">授权文案暂不可用，请联系管理员配置后重试。</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="source-video">克隆素材视频</Label>

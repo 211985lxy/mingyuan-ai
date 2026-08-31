@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withUserAuth } from "@/lib/user-auth";
-import { deleteAvatarAsset } from "@/lib/digital-human-provider";
+import {
+  deleteAvatarAssetForProvider,
+  normalizeDigitalHumanProvider,
+} from "@/lib/digital-human-provider";
 import { signOssUrls } from "@/lib/oss";
 
 // ─── GET /api/avatars/[id] ─────────────────────────────
@@ -48,7 +51,10 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
 
   // Fire-and-forget: delete external assets
   if (avatar.externalVirtualmanId) {
-    deleteAvatarAsset(avatar.externalVirtualmanId).catch(() => {});
+    deleteAvatarAssetForProvider(
+      normalizeDigitalHumanProvider(avatar.provider),
+      avatar.externalVirtualmanId,
+    ).catch(() => {});
   }
 
   await prisma.avatar.delete({ where: { id, userId: user.id } });

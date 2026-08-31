@@ -258,6 +258,8 @@
       "name": "User",
       "columns": [
         "authVideoUrl",
+        "authVideoText",
+        "authVideoConfirmedAt",
         "email",
         "id"
       ]

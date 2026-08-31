@@ -21,6 +21,14 @@ import { env } from "@/env"
 
 export type DigitalHumanProvider = "chanjing" | "shanjian"
 
+export function isDigitalHumanProvider(value: unknown): value is DigitalHumanProvider {
+  return value === "chanjing" || value === "shanjian"
+}
+
+export function normalizeDigitalHumanProvider(value: unknown): DigitalHumanProvider {
+  return value === "shanjian" ? "shanjian" : "chanjing"
+}
+
 export class DigitalHumanProviderError extends Error {
   constructor(
     public code: string,
@@ -36,6 +44,51 @@ export function getDigitalHumanProvider(): DigitalHumanProvider {
   const configured = env.DIGITAL_HUMAN_PROVIDER
   if (configured === "chanjing" || configured === "shanjian") return configured
   return "chanjing"
+}
+
+export function normalizeDigitalHumanAuthorizationText(value: string): string {
+  return value.replace(/\r\n/g, "\n").trim()
+}
+
+export function matchesDigitalHumanAuthorizationText(
+  provided: unknown,
+  expected: string,
+): boolean {
+  return typeof provided === "string"
+    && normalizeDigitalHumanAuthorizationText(provided) === normalizeDigitalHumanAuthorizationText(expected)
+}
+
+/**
+ * 返回当前供应商要求用户在授权视频中逐字朗读的原文。
+ *
+ * 这段文字是供应商账户配置的一部分，不能从品牌名、用户输入或前端
+ * 拼接得到。未配置时直接阻止授权视频提交，避免将错误文案送到供应商。
+ */
+export function getDigitalHumanAuthorizationText(
+  provider: DigitalHumanProvider = getDigitalHumanProvider(),
+): string {
+  const configured = provider === "chanjing"
+    ? env.CHANJING_AUTH_TEXT
+    : env.SHANJIAN_AUTH_TEXT
+  const text = configured ? normalizeDigitalHumanAuthorizationText(configured) : ""
+  if (!text) {
+    throw new DigitalHumanProviderError(
+      "AUTH_TEXT_NOT_CONFIGURED",
+      `${provider === "chanjing" ? "蝉镜" : "闪剪"}授权文案暂未配置，请联系管理员`,
+    )
+  }
+  return text
+}
+
+export function hasExactDigitalHumanAuthorizationText(
+  provided: unknown,
+  provider: DigitalHumanProvider = getDigitalHumanProvider(),
+): boolean {
+  try {
+    return matchesDigitalHumanAuthorizationText(provided, getDigitalHumanAuthorizationText(provider))
+  } catch {
+    return false
+  }
 }
 
 export function isDigitalHumanConfigured(): boolean {
@@ -55,14 +108,17 @@ function wrapError(error: unknown): DigitalHumanProviderError {
   return new DigitalHumanProviderError("PROVIDER_ERROR", "数字人服务异常，请稍后重试")
 }
 
-export async function cloneFastAvatar(input: {
-  name: string
-  videoUrl: string
-  authVideoUrl: string
-  authText: string
-}): Promise<string> {
+export async function cloneFastAvatarForProvider(
+  provider: DigitalHumanProvider,
+  input: {
+    name: string
+    videoUrl: string
+    authVideoUrl: string
+    authText: string
+  },
+): Promise<string> {
   try {
-    if (getDigitalHumanProvider() === "chanjing") {
+    if (provider === "chanjing") {
       return await cloneChanjingFastAvatar(input)
     }
     return await cloneShanjianFastAvatar({
@@ -75,12 +131,24 @@ export async function cloneFastAvatar(input: {
   }
 }
 
-export async function cloneProfessionalAvatar(input: {
+export async function cloneFastAvatar(input: {
+  name: string
   videoUrl: string
   authVideoUrl: string
   authText: string
 }): Promise<string> {
-  if (getDigitalHumanProvider() === "chanjing") {
+  return cloneFastAvatarForProvider(getDigitalHumanProvider(), input)
+}
+
+export async function cloneProfessionalAvatarForProvider(
+  provider: DigitalHumanProvider,
+  input: {
+    videoUrl: string
+    authVideoUrl: string
+    authText: string
+  },
+): Promise<string> {
+  if (provider === "chanjing") {
     throw new DigitalHumanProviderError(
       "UNSUPPORTED_CLONE_TYPE",
       "蝉镜暂不支持专业克隆，请使用极速克隆",
@@ -93,12 +161,23 @@ export async function cloneProfessionalAvatar(input: {
   }
 }
 
-export async function cloneImageAvatar(input: {
-  imageUrl: string
+export async function cloneProfessionalAvatar(input: {
+  videoUrl: string
   authVideoUrl: string
   authText: string
 }): Promise<string> {
-  if (getDigitalHumanProvider() === "chanjing") {
+  return cloneProfessionalAvatarForProvider(getDigitalHumanProvider(), input)
+}
+
+export async function cloneImageAvatarForProvider(
+  provider: DigitalHumanProvider,
+  input: {
+    imageUrl: string
+    authVideoUrl: string
+    authText: string
+  },
+): Promise<string> {
+  if (provider === "chanjing") {
     throw new DigitalHumanProviderError(
       "UNSUPPORTED_CLONE_TYPE",
       "蝉镜暂不支持图片克隆，请上传训练视频",
@@ -111,9 +190,20 @@ export async function cloneImageAvatar(input: {
   }
 }
 
-export async function deleteAvatarAsset(externalId: string): Promise<void> {
+export async function cloneImageAvatar(input: {
+  imageUrl: string
+  authVideoUrl: string
+  authText: string
+}): Promise<string> {
+  return cloneImageAvatarForProvider(getDigitalHumanProvider(), input)
+}
+
+export async function deleteAvatarAssetForProvider(
+  provider: DigitalHumanProvider,
+  externalId: string,
+): Promise<void> {
   try {
-    if (getDigitalHumanProvider() === "chanjing") {
+    if (provider === "chanjing") {
       await deleteCustomisedPerson(externalId)
       return
     }
@@ -121,6 +211,10 @@ export async function deleteAvatarAsset(externalId: string): Promise<void> {
   } catch (error) {
     throw wrapError(error)
   }
+}
+
+export async function deleteAvatarAsset(externalId: string): Promise<void> {
+  return deleteAvatarAssetForProvider(getDigitalHumanProvider(), externalId)
 }
 
 export async function getAvatarCloneStatus(taskId: string) {

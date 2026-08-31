@@ -11,6 +11,8 @@ import {
   getAvatarCloneTaskInfo,
   getVideoTaskInfo,
 } from "@/lib/chanjing"
+import { normalizeDigitalHumanProvider } from "@/lib/digital-human-provider"
+import { releaseProviderSlot } from "@/lib/digital-human-semaphore"
 import { logger, generateRequestId } from "@/lib/logger"
 import { transferFromUrl } from "@/lib/oss"
 import { prisma } from "@/lib/prisma"
@@ -113,9 +115,21 @@ async function handleAvatarCallback(
   mapped: Awaited<ReturnType<typeof getAvatarCloneTaskInfo>>,
 ) {
   const { status, result, errorCode, errorMessage } = mapped
+  const avatar = await prisma.avatar.findUnique({
+    where: { id: avatarId },
+    select: {
+      userId: true,
+      name: true,
+      sourceVideoUrl: true,
+      provider: true,
+    },
+  })
+  if (!avatar) return
+  const provider = normalizeDigitalHumanProvider(avatar.provider)
+
   if (status === "succeed") {
     if (!result?.virtualmanId) {
-      await prisma.avatar.updateMany({
+      const updated = await prisma.avatar.updateMany({
         where: { id: avatarId, status: "cloning" },
         data: {
           status: "failed",
@@ -123,14 +137,11 @@ async function handleAvatarCallback(
           errorMessage: "克隆完成但未返回数字人 ID，请重新克隆",
         },
       })
+      if (updated.count > 0) await releaseProviderSlot(provider)
       return
     }
 
-    const avatar = await prisma.avatar.findUnique({
-      where: { id: avatarId },
-      select: { userId: true, name: true, sourceVideoUrl: true },
-    })
-    const speakerName = `${avatar?.name ?? "数字人"}的声音`
+    const speakerName = `${avatar.name ?? "数字人"}的声音`
     const ossCoverUrl = result.coverUrl
       ? await transferFromUrl(result.coverUrl, `avatars/${avatarId}/cover.jpg`)
       : null
@@ -145,7 +156,9 @@ async function handleAvatarCallback(
         speakerName,
       },
     })
-    if (updated.count === 0 || !avatar) return
+    if (updated.count === 0) return
+
+    await releaseProviderSlot(provider)
 
     if (result.speakerId) {
       await ensureAvatarVoiceAsset({
@@ -178,10 +191,11 @@ async function handleAvatarCallback(
   }
 
   if (status === "failed") {
-    await prisma.avatar.updateMany({
+    const updated = await prisma.avatar.updateMany({
       where: { id: avatarId, status: "cloning" },
       data: { status: "failed", errorCode: errorCode ?? null, errorMessage: errorMessage ?? null },
     })
+    if (updated.count > 0) await releaseProviderSlot(provider)
   }
 }
 

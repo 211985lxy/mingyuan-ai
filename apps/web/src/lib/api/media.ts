@@ -20,8 +20,10 @@ import type {
 /**
  * @description 列出用户数字人
  */
-export async function listAvatars(): Promise<ApiAvatar[]> {
-  const payload = await request<{ data: PaginatedResponse<ApiAvatar> }>("/api/avatars?page=1&pageSize=100")
+export async function listAvatars(projectId?: string): Promise<ApiAvatar[]> {
+  const params = new URLSearchParams({ page: "1", pageSize: "100" })
+  if (projectId) params.set("projectId", projectId)
+  const payload = await request<{ data: PaginatedResponse<ApiAvatar> }>(`/api/avatars?${params.toString()}`)
   return payload.data.results
 }
 
@@ -58,12 +60,31 @@ export async function deleteAvatar(id: string): Promise<void> {
 /**
  * @description 保存授权视频地址（创建数字人前需要）
  */
-export async function saveAuthVideo(authVideoUrl: string): Promise<{ authVideoUrl: string | null }> {
-  const payload = await request<{ user: { authVideoUrl?: string | null } }>("/api/auth/auth-video", {
+export async function getAuthVideoRequirements(): Promise<{
+  provider: "chanjing" | "shanjian"
+  authorizationText: string
+}> {
+  return request("/api/auth/auth-video")
+}
+
+/**
+ * @description 保存已上传并按服务端原文确认的授权视频
+ */
+export async function saveAuthVideo(
+  authVideoUrl: string,
+  options: { uploadId: string; authText: string },
+): Promise<{ authVideoUrl: string | null; authorizationText: string }> {
+  const payload = await request<{
+    user: { authVideoUrl?: string | null }
+    authorizationText: string
+  }>("/api/auth/auth-video", {
     method: "POST",
-    body: JSON.stringify({ authVideoUrl }),
+    body: JSON.stringify({ authVideoUrl, uploadId: options.uploadId, authText: options.authText }),
   })
-  return { authVideoUrl: payload.user.authVideoUrl ?? authVideoUrl }
+  return {
+    authVideoUrl: payload.user.authVideoUrl ?? authVideoUrl,
+    authorizationText: payload.authorizationText,
+  }
 }
 
 /**

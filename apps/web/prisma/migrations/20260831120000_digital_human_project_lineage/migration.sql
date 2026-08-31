@@ -4,6 +4,22 @@
 
 SET @schema_name = DATABASE();
 
+SELECT COUNT(*) INTO @has_user_auth_text
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = @schema_name AND TABLE_NAME = 'User' AND COLUMN_NAME = 'authVideoText';
+SET @sql = IF(@has_user_auth_text = 0,
+  'ALTER TABLE `User` ADD COLUMN `authVideoText` TEXT NULL',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SELECT COUNT(*) INTO @has_user_auth_confirmed
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = @schema_name AND TABLE_NAME = 'User' AND COLUMN_NAME = 'authVideoConfirmedAt';
+SET @sql = IF(@has_user_auth_confirmed = 0,
+  'ALTER TABLE `User` ADD COLUMN `authVideoConfirmedAt` DATETIME(3) NULL',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 SELECT COUNT(*) INTO @has_avatar_project_id
 FROM information_schema.COLUMNS
 WHERE TABLE_SCHEMA = @schema_name AND TABLE_NAME = 'Avatar' AND COLUMN_NAME = 'projectId';
