@@ -4,7 +4,7 @@ import {
   submitVideoToProvider,
   type DigitalHumanProvider,
 } from "@/lib/digital-human-provider";
-import { acquireSlot } from "@/lib/shanjian-semaphore";
+import { acquireProviderSlot } from "@/lib/digital-human-semaphore";
 import { compensateVideoTaskSubmissionFailure, finalizeAcceptedVideoTaskSubmission } from "@/lib/video-task-settlement";
 import type { ResolvedPlan, VideoTaskType } from "./contracts";
 import type { VideoTaskReservation } from "./reservation";
@@ -41,7 +41,7 @@ export async function submitReservedVideoTask(input: {
   shanjianSubmitPayload: Record<string, unknown>;
   provider: DigitalHumanProvider;
 }): Promise<SubmissionResult> {
-  if (input.provider === "shanjian" && !await acquireSlot()) {
+  if (!await acquireProviderSlot(input.provider)) {
     return { queued: true, task: await loadReservedTask(input.reservation.taskId) };
   }
   await prisma.videoTask.update({ where: { id: input.reservation.taskId }, data: { status: "pending" } });

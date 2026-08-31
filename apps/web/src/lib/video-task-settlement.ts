@@ -12,7 +12,7 @@ import {
   buildPendingDeliverySnapshot,
   isTerminalVideoTaskStatus,
 } from "@/lib/video-task-domain";
-import { releaseSlot } from "@/lib/shanjian-semaphore";
+import { releaseProviderSlot, type DigitalHumanProvider } from "@/lib/digital-human-semaphore";
 
 type VideoTaskRecord = Awaited<ReturnType<typeof prisma.videoTask.findUnique>>;
 
@@ -26,6 +26,10 @@ type SuccessfulResult = {
   coverUrl?: string;
   duration?: number;
 };
+
+function resolveTaskProvider(provider: string | null | undefined): DigitalHumanProvider {
+  return provider === "shanjian" ? "shanjian" : "chanjing";
+}
 
 async function findTask(taskId: string): Promise<VideoTaskRecord> {
   return prisma.videoTask.findUnique({
@@ -262,10 +266,10 @@ export async function settleVideoTaskFailure(input: {
     return updated.count;
   });
 
-  // Only release a Shanjian slot if the task was actually in-flight (pending/processing).
-  // Queued tasks never acquired a slot, so releasing would corrupt the semaphore.
+  // Release only the provider slot acquired by an in-flight task. Queued tasks
+  // never acquired a slot, so releasing would corrupt the provider counter.
   if (updatedCount > 0 && (task.status === "pending" || task.status === "processing")) {
-    await releaseSlot();
+    await releaseProviderSlot(resolveTaskProvider(task.provider));
   }
 
   return findTask(input.taskId);
@@ -307,9 +311,9 @@ export async function settleVideoTaskSuccess(input: {
     },
   });
 
-  // Release the Shanjian slot only if task was in pending/processing (not queued)
+  // Release only the provider slot if task was in pending/processing (not queued)
   if (updated.count > 0 && (task.status === "pending" || task.status === "processing")) {
-    await releaseSlot();
+    await releaseProviderSlot(resolveTaskProvider(task.provider));
   }
 
   return findTask(input.taskId);

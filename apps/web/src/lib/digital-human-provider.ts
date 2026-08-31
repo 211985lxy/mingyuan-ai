@@ -124,8 +124,15 @@ export async function deleteAvatarAsset(externalId: string): Promise<void> {
 }
 
 export async function getAvatarCloneStatus(taskId: string) {
+  return getAvatarCloneStatusForProvider(getDigitalHumanProvider(), taskId)
+}
+
+export async function getAvatarCloneStatusForProvider(
+  provider: DigitalHumanProvider,
+  taskId: string,
+) {
   try {
-    if (getDigitalHumanProvider() === "chanjing") {
+    if (provider === "chanjing") {
       return await getAvatarCloneTaskInfo(taskId)
     }
     return await getShanjianTaskInfo(taskId)
@@ -135,8 +142,15 @@ export async function getAvatarCloneStatus(taskId: string) {
 }
 
 export async function getVideoTaskStatus(taskId: string) {
+  return getVideoTaskStatusForProvider(getDigitalHumanProvider(), taskId)
+}
+
+export async function getVideoTaskStatusForProvider(
+  provider: DigitalHumanProvider,
+  taskId: string,
+) {
   try {
-    if (getDigitalHumanProvider() === "chanjing") {
+    if (provider === "chanjing") {
       return await getVideoTaskInfo(taskId)
     }
     return await getShanjianTaskInfo(taskId)

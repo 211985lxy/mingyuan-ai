@@ -2,7 +2,8 @@ import { createAvatarVoiceCloneAsset, createAvatarVoiceCloneAssetFromVideo, ensu
 import { triggerAvatarDemoVideo } from "@/lib/avatar-demo";
 import { transferFromUrl } from "@/lib/oss";
 import { prisma } from "@/lib/prisma";
-import { getAvatarCloneStatus } from "@/lib/digital-human-provider";
+import { getAvatarCloneStatusForProvider } from "@/lib/digital-human-provider";
+import { releaseProviderSlot, type DigitalHumanProvider } from "@/lib/digital-human-semaphore";
 import { acquireTaskRecoveryLock } from "./lock";
 import type { TaskRecoveryCandidates } from "./queries";
 
@@ -23,14 +24,18 @@ async function pollStaleAvatar(avatar: StaleAvatar, logPrefix: string): Promise<
   if (!externalTaskId || !await acquireTaskRecoveryLock(`poll:${externalTaskId}`)) return false;
 
   try {
-    const taskResult = await getAvatarCloneStatus(externalTaskId);
+    const taskResult = await getAvatarCloneStatusForProvider(
+      normalizeProvider(avatar.provider),
+      externalTaskId,
+    );
     if (taskResult.status === "succeed") {
       await settleAvatarCloneSuccess(avatar, taskResult, logPrefix);
     } else if (taskResult.status === "failed") {
-      await prisma.avatar.updateMany({
+      const updated = await prisma.avatar.updateMany({
         where: { id: avatar.id, status: "cloning" },
         data: { status: "failed", errorCode: taskResult.errorCode ?? null, errorMessage: taskResult.errorMessage ?? null },
       });
+      if (updated.count > 0) await releaseProviderSlot(normalizeProvider(avatar.provider));
     }
     return true;
   } catch (error) {
@@ -41,12 +46,12 @@ async function pollStaleAvatar(avatar: StaleAvatar, logPrefix: string): Promise<
 
 async function settleAvatarCloneSuccess(
   avatar: StaleAvatar,
-  taskResult: Awaited<ReturnType<typeof getAvatarCloneStatus>>,
+  taskResult: Awaited<ReturnType<typeof getAvatarCloneStatusForProvider>>,
   logPrefix: string,
 ): Promise<void> {
   const virtualmanId = taskResult.result?.virtualmanId;
   if (!virtualmanId) {
-    await markAvatarMissingVirtualmanId(avatar.id);
+    await markAvatarMissingVirtualmanId(avatar.id, avatar.provider);
     return;
   }
 
@@ -62,13 +67,14 @@ async function settleAvatarCloneSuccess(
     },
   });
   if (updated.count === 0) return;
+  await releaseProviderSlot(normalizeProvider(avatar.provider));
 
   await createAvatarVoiceAsset(avatar, taskResult, speakerName);
   triggerAvatarDemoIfReady(avatar.id, virtualmanId, taskResult.result?.speakerId, logPrefix);
 }
 
-async function markAvatarMissingVirtualmanId(avatarId: string): Promise<void> {
-  await prisma.avatar.updateMany({
+async function markAvatarMissingVirtualmanId(avatarId: string, provider: string): Promise<void> {
+  const updated = await prisma.avatar.updateMany({
     where: { id: avatarId, status: "cloning" },
     data: {
       status: "failed",
@@ -76,6 +82,7 @@ async function markAvatarMissingVirtualmanId(avatarId: string): Promise<void> {
       errorMessage: "克隆完成但未返回数字人 ID，请重新克隆",
     },
   });
+  if (updated.count > 0) await releaseProviderSlot(normalizeProvider(provider));
 }
 
 async function transferAvatarCover(coverUrl: string | undefined, avatarId: string): Promise<string | null> {
@@ -84,7 +91,7 @@ async function transferAvatarCover(coverUrl: string | undefined, avatarId: strin
 
 async function createAvatarVoiceAsset(
   avatar: StaleAvatar,
-  taskResult: Awaited<ReturnType<typeof getAvatarCloneStatus>>,
+  taskResult: Awaited<ReturnType<typeof getAvatarCloneStatusForProvider>>,
   speakerName: string,
 ): Promise<void> {
   const result = taskResult.result;
@@ -154,4 +161,8 @@ async function repairAvatarDemo(avatar: MissingDemoAvatar, logPrefix: string): P
     console.error(`${logPrefix} Failed to repair demo video for avatar ${avatar.id}:`, error);
     return false;
   }
+}
+
+function normalizeProvider(provider: string): DigitalHumanProvider {
+  return provider === "shanjian" ? "shanjian" : "chanjing";
 }

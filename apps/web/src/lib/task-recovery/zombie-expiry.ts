@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { releaseSlot } from "@/lib/shanjian-semaphore";
+import { releaseProviderSlot } from "@/lib/digital-human-semaphore";
 import { settleVideoTaskFailure } from "@/lib/video-task-settlement";
 import {
   AVATAR_CLONE_ZOMBIE_TIMEOUT_MS,
@@ -54,17 +54,23 @@ async function expireCloningAvatars(now: Date, logPrefix: string): Promise<void>
     take: 20,
   });
   for (const avatar of avatars) {
-    await expireCloningAvatar(avatar.id, logPrefix);
+    await expireCloningAvatar(avatar.id, avatar.provider, logPrefix);
   }
 }
 
-async function expireCloningAvatar(avatarId: string, logPrefix: string): Promise<void> {
+async function expireCloningAvatar(
+  avatarId: string,
+  provider: string,
+  logPrefix: string,
+): Promise<void> {
   try {
     const updated = await prisma.avatar.updateMany({
       where: { id: avatarId, status: "cloning" },
       data: { status: "failed", errorCode: "CLONING_TIMEOUT", errorMessage: "数字人克隆超时，请重试" },
     });
-    if (updated.count > 0) await releaseSlot();
+    if (updated.count > 0) {
+      await releaseProviderSlot(provider === "shanjian" ? "shanjian" : "chanjing");
+    }
     console.warn(`${logPrefix} Expired zombie cloning avatar ${avatarId}`);
   } catch (error) {
     console.error(`${logPrefix} Failed to expire zombie cloning avatar ${avatarId}:`, error);

@@ -1,4 +1,5 @@
-import { getVideoTaskStatus } from "@/lib/digital-human-provider";
+import { getVideoTaskStatusForProvider } from "@/lib/digital-human-provider";
+import type { DigitalHumanProvider } from "@/lib/digital-human-semaphore";
 import { settleVideoTaskFailure, settleVideoTaskSuccess } from "@/lib/video-task-settlement";
 import { acquireTaskRecoveryLock } from "./lock";
 import type { TaskRecoveryCandidates } from "./queries";
@@ -19,7 +20,10 @@ async function pollVideoTask(task: VideoTask, logPrefix: string): Promise<boolea
   if (!externalTaskId || !await acquireTaskRecoveryLock(`poll:${externalTaskId}`)) return false;
 
   try {
-    const result = await getVideoTaskStatus(externalTaskId);
+    const result = await getVideoTaskStatusForProvider(
+      normalizeProvider(task.provider),
+      externalTaskId,
+    );
     if (result.status === "succeed") await settleSuccessfulVideo(task.id, result, logPrefix);
     if (result.status === "failed") await settleVideoTaskFailure({ taskId: task.id, errorCode: result.errorCode ?? null, errorMessage: result.errorMessage ?? null, source: "recovery" });
     return true;
@@ -31,7 +35,7 @@ async function pollVideoTask(task: VideoTask, logPrefix: string): Promise<boolea
 
 async function settleSuccessfulVideo(
   taskId: string,
-  result: Awaited<ReturnType<typeof getVideoTaskStatus>>,
+  result: Awaited<ReturnType<typeof getVideoTaskStatusForProvider>>,
   logPrefix: string,
 ): Promise<void> {
   if (!result.result?.videoUrl) {
@@ -43,6 +47,10 @@ async function settleSuccessfulVideo(
     result: { videoUrl: result.result.videoUrl, coverUrl: result.result.coverUrl, duration: result.result.duration },
     source: "recovery",
   });
+}
+
+function normalizeProvider(provider: string): DigitalHumanProvider {
+  return provider === "shanjian" ? "shanjian" : "chanjing";
 }
 
 export async function expireOrphanedPendingTasks(
