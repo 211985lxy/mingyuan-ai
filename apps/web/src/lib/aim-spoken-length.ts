@@ -6,6 +6,7 @@ const SHORT_OUTPUT_REQUEST = /(一句话?|标题|口号|金句|不超过\s*\d+\s
 const SPOKEN_SCRIPT_FORMATS = new Set<ContentFormat>(["video_script", "koubo_script"])
 const SPOKEN_ACTION_PATTERN = /先|再|然后|建议|做法|方法|建立|固定|校准|检查|复盘|行动/u
 const SPOKEN_CAUSE_PATTERN = /因为|原因|问题在|为什么|导致|所以/u
+const EXPLICIT_LENGTH_PATTERN = /\d+(?:\.\d+)?\s*(?:分钟|分|秒|字)/u
 
 interface SpokenLengthBounds {
   min: number
@@ -51,6 +52,10 @@ function countSpokenCharacters(content: string): number {
   return (content.match(/[\p{Script=Han}\p{Letter}\p{Number}]/gu) ?? []).length
 }
 
+function hasExplicitSpokenLength(rawInput: string): boolean {
+  return EXPLICIT_LENGTH_PATTERN.test(rawInput || "")
+}
+
 export function isSpokenScriptFormat(format: ContentFormat): boolean {
   return SPOKEN_SCRIPT_FORMATS.has(format)
 }
@@ -66,6 +71,7 @@ export function cleanSpokenDeliveryArtifacts(content: string): string {
 }
 
 export function fitOverlongSpokenContent(content: string, rawInput: string): string {
+  if (!hasExplicitSpokenLength(rawInput)) return content
   const bounds = requestedSpokenLengthBounds(rawInput)
   if (countSpokenCharacters(content) <= bounds.max) return content
 
@@ -140,6 +146,10 @@ export function findIncompleteGenerationFormats(input: {
     const body = (input.parsed[format] || "").replace(METHOD_NOTE_BLOCK, "").trim()
     if (!body) return true
     if (/[，,：:]$/u.test(body)) return true
+    if (!hasExplicitSpokenLength(input.rawInput)) {
+      if (isTruncated && body.length < 10) return true
+      return !/[。！？!?]$/u.test(body)
+    }
     if (input.enforceSpokenLength === false || !isSpokenScriptFormat(format) || allowsShort) {
       return isTruncated && body.length < 10
     }
@@ -154,6 +164,7 @@ export function findOverlongGenerationFormats(input: {
   rawInput: string
 }): ContentFormat[] {
   if (SHORT_OUTPUT_REQUEST.test(input.rawInput)) return []
+  if (!hasExplicitSpokenLength(input.rawInput)) return []
   const spokenLengthCeiling = requestedSpokenLengthBounds(input.rawInput).max
   return input.targetFormats.filter((format) => {
     if (!isSpokenScriptFormat(format)) return false

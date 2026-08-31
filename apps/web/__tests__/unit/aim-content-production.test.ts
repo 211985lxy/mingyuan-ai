@@ -89,8 +89,9 @@ describe("AIM content production positioning", () => {
     expect(systemPrompt).toContain("好的老板")
   })
 
-  it("keeps one canonical spoken-script instruction with two-minute and long-form defaults", () => {
-    expect(FORMAT_INSTRUCTIONS.video_script).toContain("默认写成约2分钟")
+  it("keeps one canonical spoken-script instruction without inventing a duration", () => {
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("未指定时长或字数时，不自行增加时长要求")
+    expect(FORMAT_INSTRUCTIONS.video_script).not.toContain("默认写成约2分钟")
     expect(FORMAT_INSTRUCTIONS.video_script).toContain("3-5分钟长口播")
     expect(FORMAT_INSTRUCTIONS.video_script).toContain("约600-1000个汉字")
     expect(FORMAT_INSTRUCTIONS.koubo_script).toBe(FORMAT_INSTRUCTIONS.video_script)
@@ -127,7 +128,7 @@ describe("AIM content production positioning", () => {
     })).toEqual(["video_script"])
   })
 
-  it("uses two minutes by default and supports three-to-five-minute long scripts", () => {
+  it("does not impose two-minute length when duration is unspecified", () => {
     const shortDefault = "这是一个完整句子。".repeat(30)
     const longEnoughDefault = "这是一个完整句子。".repeat(50)
     const tooShortForLongForm = "这是一个完整句子。".repeat(50)
@@ -137,7 +138,7 @@ describe("AIM content production positioning", () => {
       targetFormats: ["video_script"],
       rawInput: "写一条完整口播",
       finishReason: "stop",
-    })).toEqual(["video_script"])
+    })).toEqual([])
     expect(findIncompleteGenerationFormats({
       parsed: { video_script: longEnoughDefault },
       targetFormats: ["video_script"],
