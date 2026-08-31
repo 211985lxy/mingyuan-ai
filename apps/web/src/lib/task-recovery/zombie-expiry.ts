@@ -19,7 +19,7 @@ async function expireProcessingVideos(now: Date, logPrefix: string): Promise<voi
     take: 20,
   });
   for (const task of tasks) {
-    await expireVideoTask(task.id, "PROCESSING_TIMEOUT", "视频生成超时（超过 2 小时），请重试", false, logPrefix);
+    await expireVideoTask(task.id, "PROCESSING_TIMEOUT", "视频生成超时（超过 60 分钟），请重试", false, logPrefix);
   }
 }
 

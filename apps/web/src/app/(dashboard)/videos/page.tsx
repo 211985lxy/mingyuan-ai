@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { listVideoTasks, retryVideoTask } from "@/lib/api/client"
+import { listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
 import type { ApiVideoTask } from "@/types/api"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -21,6 +21,7 @@ export default function VideosPage() {
   const [tasks, setTasks] = useState<ApiVideoTask[]>([])
   const [loading, setLoading] = useState(true)
   const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [transferringId, setTransferringId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -44,6 +45,19 @@ export default function VideosPage() {
       toast.error(error instanceof Error ? error.message : "重试失败")
     } finally {
       setRetryingId(null)
+    }
+  }
+
+  async function handleTransferRetry(id: string) {
+    setTransferringId(id)
+    try {
+      const next = await retryVideoTaskTransfer(id)
+      setTasks((current) => current.map((task) => task.id === next.id ? next : task))
+      toast.success(next.deliveryStatus === "durable" ? "成片已转存到 AIM" : "转存仍未完成，请稍后再试")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "转存重试失败")
+    } finally {
+      setTransferringId(null)
     }
   }
 
@@ -102,6 +116,11 @@ export default function VideosPage() {
                   {task.status === "failed" ? (
                     <Button size="sm" variant="outline" disabled={retryingId === task.id} onClick={() => void handleRetry(task.id)}>
                       {retryingId === task.id ? "提交中…" : "重试"}
+                    </Button>
+                  ) : null}
+                  {task.status === "completed" && task.deliveryStatus === "degraded" ? (
+                    <Button size="sm" variant="outline" disabled={transferringId === task.id} onClick={() => void handleTransferRetry(task.id)}>
+                      {transferringId === task.id ? "转存中…" : "重试转存"}
                     </Button>
                   ) : null}
                   {task.status === "completed" && task.videoUrl ? (

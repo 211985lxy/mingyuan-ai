@@ -1,4 +1,5 @@
 import { getVideoTaskStatusForProvider } from "@/lib/digital-human-provider";
+import { digitalHumanEventsTotal } from "@/lib/metrics";
 import type { DigitalHumanProvider } from "@/lib/digital-human-semaphore";
 import { settleVideoTaskFailure, settleVideoTaskSuccess } from "@/lib/video-task-settlement";
 import { acquireTaskRecoveryLock } from "./lock";
@@ -20,14 +21,18 @@ async function pollVideoTask(task: VideoTask, logPrefix: string): Promise<boolea
   if (!externalTaskId || !await acquireTaskRecoveryLock(`poll:${externalTaskId}`)) return false;
 
   try {
+    const provider = normalizeProvider(task.provider);
+    digitalHumanEventsTotal.inc({ provider, event: "poll", status: "started" });
     const result = await getVideoTaskStatusForProvider(
-      normalizeProvider(task.provider),
+      provider,
       externalTaskId,
     );
+    digitalHumanEventsTotal.inc({ provider, event: "poll", status: result.status });
     if (result.status === "succeed") await settleSuccessfulVideo(task.id, result, logPrefix);
     if (result.status === "failed") await settleVideoTaskFailure({ taskId: task.id, errorCode: result.errorCode ?? null, errorMessage: result.errorMessage ?? null, source: "recovery" });
     return true;
   } catch (error) {
+    digitalHumanEventsTotal.inc({ provider: normalizeProvider(task.provider), event: "provider_error", status: "poll" });
     console.error(`${logPrefix} Failed to poll video task ${task.id}:`, error);
     return false;
   }

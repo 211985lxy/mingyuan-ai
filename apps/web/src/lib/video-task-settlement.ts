@@ -13,6 +13,7 @@ import {
   isTerminalVideoTaskStatus,
 } from "@/lib/video-task-domain";
 import { releaseProviderSlot, type DigitalHumanProvider } from "@/lib/digital-human-semaphore";
+import { digitalHumanEventsTotal } from "@/lib/metrics";
 
 type VideoTaskRecord = Awaited<ReturnType<typeof prisma.videoTask.findUnique>>;
 
@@ -41,17 +42,21 @@ async function archiveVideoTaskOutput(input: {
   taskId: string;
   result: SuccessfulResult;
 }) {
-  const videoTransfer = await transferFromUrlDetailed(
-    input.result.videoUrl!,
-    `videos/${input.taskId}/video.mp4`,
-  );
+  const videoTransfer = isManagedOssUrl(input.result.videoUrl!)
+    ? { url: input.result.videoUrl!, durable: true, warning: null, expiresAt: null }
+    : await transferFromUrlDetailed(
+        input.result.videoUrl!,
+        `videos/${input.taskId}/video.mp4`,
+      );
 
   if (!videoTransfer.durable) {
     const coverTransfer = input.result.coverUrl
-      ? await transferFromUrlDetailed(
-          input.result.coverUrl,
-          `videos/${input.taskId}/cover.jpg`,
-        )
+      ? isManagedOssUrl(input.result.coverUrl)
+        ? { url: input.result.coverUrl, durable: true, warning: null, expiresAt: null }
+        : await transferFromUrlDetailed(
+            input.result.coverUrl,
+            `videos/${input.taskId}/cover.jpg`,
+          )
       : null;
 
     const warning = coverTransfer?.warning
@@ -75,10 +80,12 @@ async function archiveVideoTaskOutput(input: {
   let coverExpiresAt: Date | null = null;
 
   if (input.result.coverUrl) {
-    const coverTransfer = await transferFromUrlDetailed(
-      input.result.coverUrl,
-      `videos/${input.taskId}/cover.jpg`,
-    );
+    const coverTransfer = isManagedOssUrl(input.result.coverUrl)
+      ? { url: input.result.coverUrl, durable: true, warning: null, expiresAt: null }
+      : await transferFromUrlDetailed(
+          input.result.coverUrl,
+          `videos/${input.taskId}/cover.jpg`,
+        );
     if (coverTransfer.durable) {
       coverUrl = coverTransfer.url;
     } else {
@@ -270,6 +277,7 @@ export async function settleVideoTaskFailure(input: {
   // never acquired a slot, so releasing would corrupt the provider counter.
   if (updatedCount > 0 && (task.status === "pending" || task.status === "processing")) {
     await releaseProviderSlot(resolveTaskProvider(task.provider));
+    digitalHumanEventsTotal.inc({ provider: resolveTaskProvider(task.provider), event: "settlement", status: "failed" });
   }
 
   return findTask(input.taskId);
@@ -287,9 +295,46 @@ export async function settleVideoTaskSuccess(input: {
     return task;
   }
 
-  const archived = await archiveVideoTaskOutput({
-    taskId: input.taskId,
-    result: input.result,
+  const provider = resolveTaskProvider(task.provider);
+  let archived: Awaited<ReturnType<typeof archiveVideoTaskOutput>>;
+  try {
+    archived = await archiveVideoTaskOutput({
+      taskId: input.taskId,
+      result: input.result,
+    });
+  } catch (error) {
+    // The provider has already completed. Preserve its result as a degraded
+    // delivery and expose transfer retry instead of creating another provider order.
+    digitalHumanEventsTotal.inc({ provider, event: "transfer", status: "failed" });
+    const fallback = await prisma.videoTask.updateMany({
+      where: {
+        id: input.taskId,
+        status: { in: [...ACTIVE_VIDEO_TASK_STATUSES] },
+      },
+      data: {
+        status: "completed",
+        videoUrl: input.result.videoUrl,
+        coverUrl: input.result.coverUrl ?? null,
+        duration: input.result.duration ?? null,
+        completedAt: new Date(),
+        errorCode: "TRANSFER_FAILED",
+        errorMessage: error instanceof Error ? error.message : "成片转存失败，可稍后重试转存",
+        deliveryStatus: "degraded",
+        deliveryWarning: "供应商已完成生成，但 AIM 存储转存失败；请重试转存，不会重复生成。",
+        deliveryExpiresAt: null,
+      },
+    });
+    if (fallback.count > 0 && (task.status === "pending" || task.status === "processing")) {
+      await releaseProviderSlot(provider);
+      digitalHumanEventsTotal.inc({ provider, event: "settlement", status: "degraded" });
+    }
+    return findTask(input.taskId);
+  }
+
+  digitalHumanEventsTotal.inc({
+    provider,
+    event: "transfer",
+    status: archived.deliveryStatus === "durable" ? "success" : "degraded",
   });
 
   const updated = await prisma.videoTask.updateMany({
@@ -313,10 +358,65 @@ export async function settleVideoTaskSuccess(input: {
 
   // Release only the provider slot if task was in pending/processing (not queued)
   if (updated.count > 0 && (task.status === "pending" || task.status === "processing")) {
-    await releaseProviderSlot(resolveTaskProvider(task.provider));
+    await releaseProviderSlot(provider);
+    digitalHumanEventsTotal.inc({ provider, event: "settlement", status: "completed" });
   }
 
   return findTask(input.taskId);
+}
+
+export class VideoTaskTransferRetryError extends Error {
+  constructor(readonly code: string, message: string, readonly status: number) {
+    super(message);
+    this.name = "VideoTaskTransferRetryError";
+  }
+}
+
+/** 仅重试 AIM 存储转存，不会再次创建供应商任务。 */
+export async function retryVideoTaskTransfer(input: {
+  taskId: string;
+  userId: string;
+}) {
+  const task = await prisma.videoTask.findFirst({
+    where: { id: input.taskId, userId: input.userId },
+  });
+  if (!task) throw new VideoTaskTransferRetryError("TASK_NOT_FOUND", "视频任务不存在", 404);
+  if (task.status !== "completed" || task.deliveryStatus !== "degraded" || !task.videoUrl) {
+    throw new VideoTaskTransferRetryError("TRANSFER_RETRY_NOT_AVAILABLE", "当前任务没有可重试的转存问题", 422);
+  }
+
+  const provider = resolveTaskProvider(task.provider);
+  try {
+    const archived = await archiveVideoTaskOutput({
+      taskId: task.id,
+      result: { videoUrl: task.videoUrl, coverUrl: task.coverUrl ?? undefined, duration: task.duration ?? undefined },
+    });
+    digitalHumanEventsTotal.inc({ provider, event: "transfer", status: archived.deliveryStatus === "durable" ? "success" : "degraded" });
+    await prisma.videoTask.updateMany({
+      where: { id: task.id, userId: input.userId, status: "completed", deliveryStatus: "degraded" },
+      data: {
+        videoUrl: archived.videoUrl,
+        coverUrl: archived.coverUrl,
+        deliveryStatus: archived.deliveryStatus,
+        deliveryWarning: archived.deliveryWarning,
+        deliveryExpiresAt: archived.deliveryExpiresAt,
+        errorCode: archived.deliveryStatus === "durable" ? null : "TRANSFER_FAILED",
+        errorMessage: archived.deliveryStatus === "durable" ? null : "转存仍未完成，请稍后重试",
+      },
+    });
+    return findTask(task.id);
+  } catch (error) {
+    digitalHumanEventsTotal.inc({ provider, event: "transfer", status: "failed" });
+    await prisma.videoTask.updateMany({
+      where: { id: task.id, userId: input.userId, status: "completed", deliveryStatus: "degraded" },
+      data: {
+        errorCode: "TRANSFER_FAILED",
+        errorMessage: error instanceof Error ? error.message : "转存仍未完成，请稍后重试",
+        deliveryWarning: "供应商已完成生成，但 AIM 存储转存仍未完成；请稍后重试。",
+      },
+    });
+    throw new VideoTaskTransferRetryError("TRANSFER_FAILED", "成片转存失败，请稍后重试", 502);
+  }
 }
 
 export function buildReservedVideoTaskDefaults() {

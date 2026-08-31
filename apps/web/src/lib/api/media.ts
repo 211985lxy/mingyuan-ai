@@ -123,6 +123,15 @@ export async function retryVideoTask(id: string): Promise<ApiVideoTask> {
   return payload.data
 }
 
+/** @description 仅重试成片转存，不重新生成 */
+export async function retryVideoTaskTransfer(id: string): Promise<ApiVideoTask> {
+  const payload = await request<{ data: ApiVideoTask }>(`/api/tasks/${encodeURIComponent(id)}/retry-transfer`, {
+    method: "POST",
+    timeout: 15000,
+  })
+  return payload.data
+}
+
 /**
  * @description 列出assets
  * @param assetType? - assetType?

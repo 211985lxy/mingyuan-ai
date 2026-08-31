@@ -67,3 +67,11 @@ export const webhookTotal = new Counter({
   labelNames: ["type", "status"] as const,
   registers: [metricsRegistry],
 })
+
+/** Digital-human lifecycle counters. Labels never contain customer text or media URLs. */
+export const digitalHumanEventsTotal = new Counter({
+  name: "mingyuan_digital_human_events_total",
+  help: "Digital-human provider lifecycle events",
+  labelNames: ["provider", "event", "status"] as const,
+  registers: [metricsRegistry],
+})

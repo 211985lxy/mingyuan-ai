@@ -5,6 +5,7 @@ import {
   type DigitalHumanProvider,
 } from "@/lib/digital-human-provider";
 import { acquireProviderSlot } from "@/lib/digital-human-semaphore";
+import { digitalHumanEventsTotal } from "@/lib/metrics";
 import { compensateVideoTaskSubmissionFailure, finalizeAcceptedVideoTaskSubmission } from "@/lib/video-task-settlement";
 import type { ResolvedPlan, VideoTaskType } from "./contracts";
 import type { VideoTaskReservation } from "./reservation";
@@ -42,6 +43,7 @@ export async function submitReservedVideoTask(input: {
   provider: DigitalHumanProvider;
 }): Promise<SubmissionResult> {
   if (!await acquireProviderSlot(input.provider)) {
+    digitalHumanEventsTotal.inc({ provider: input.provider, event: "submission", status: "queued" });
     return { queued: true, task: await loadReservedTask(input.reservation.taskId) };
   }
   await prisma.videoTask.update({ where: { id: input.reservation.taskId }, data: { status: "pending" } });
@@ -55,6 +57,7 @@ export async function submitReservedVideoTask(input: {
       shanjianPayload: accepted.shanjianPayload,
     });
     if (!task) throw new Error("Submitted task could not be reloaded");
+    digitalHumanEventsTotal.inc({ provider: input.provider, event: "submission", status: "accepted" });
     return { queued: false, task };
   } catch (error) {
     throw new AcceptedSubmissionFinalizeError(accepted, error);
@@ -77,6 +80,7 @@ async function submitToUpstream(input: {
     const result = await submitVideoToProvider(input.provider, input.videoType, input.shanjianSubmitPayload);
     return { externalTaskId: result.taskId, shanjianPayload: result.payload };
   } catch (error) {
+    digitalHumanEventsTotal.inc({ provider: input.provider, event: "provider_error", status: "submit" });
     await compensateVideoTaskSubmissionFailure({
       taskId: input.reservation.taskId,
       errorCode: error instanceof DigitalHumanProviderError ? error.code : undefined,

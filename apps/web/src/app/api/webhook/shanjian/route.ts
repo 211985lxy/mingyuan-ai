@@ -16,7 +16,13 @@ import {
   createAvatarVoiceCloneAssetFromVideo,
 } from "@/lib/avatar-voice-assets";
 import { logger, generateRequestId } from "@/lib/logger";
-import { webhookTotal } from "@/lib/metrics";
+import { digitalHumanEventsTotal, webhookTotal } from "@/lib/metrics";
+import {
+  getAvatarCloneStatusForProvider,
+  getVideoTaskStatusForProvider,
+  normalizeDigitalHumanProvider,
+} from "@/lib/digital-human-provider";
+import { releaseProviderSlot } from "@/lib/digital-human-semaphore";
 import type { WebhookPayload } from "@/types/shanjian";
 
 export const runtime = "nodejs";
@@ -44,6 +50,7 @@ function authorizeShanjianWebhook(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
+  digitalHumanEventsTotal.inc({ provider: "shanjian", event: "callback", status: "received" });
 
   if (!authorizeShanjianWebhook(request)) {
     if (!env.SHANJIAN_WEBHOOK_SECRET) {
@@ -62,7 +69,7 @@ export async function POST(request: NextRequest) {
     return apiRequestErrorResponse(request, error)!;
   }
 
-  const { taskId, status, result, errorCode, errorMessage } = payload;
+  const { taskId, status } = payload;
 
   if (!taskId) {
     log.warn({ requestId }, "Webhook received without taskId");
@@ -73,7 +80,7 @@ export async function POST(request: NextRequest) {
 
   // Redis dedup: SET NX with 24h expiry
   try {
-    const set = await redis.set(`webhook:${taskId}`, "1", "EX", 86400, "NX");
+    const set = await redis.set(`webhook:shanjian:${taskId}`, "1", "EX", 86400, "NX");
     if (!set) {
       reqLog.info("Duplicate webhook, skipping");
       webhookTotal.inc({ type: "duplicate", status });
@@ -89,13 +96,15 @@ export async function POST(request: NextRequest) {
       where: { externalTaskId: taskId },
     });
     if (avatar) {
+      const verified = await getAvatarCloneStatusForProvider("shanjian", taskId);
       await handleAvatarCallback(
         avatar.id,
-        status,
-        result,
-        errorCode,
-        errorMessage,
+        verified.status,
+        verified.result,
+        verified.errorCode,
+        verified.errorMessage,
       );
+      digitalHumanEventsTotal.inc({ provider: "shanjian", event: "callback", status: verified.status });
       return NextResponse.json({ ok: true });
     }
 
@@ -103,13 +112,15 @@ export async function POST(request: NextRequest) {
       where: { externalTaskId: taskId },
     });
     if (videoTask) {
+      const verified = await getVideoTaskStatusForProvider("shanjian", taskId);
       await handleVideoCallback(
         videoTask,
-        status,
-        result,
-        errorCode,
-        errorMessage,
+        verified.status,
+        verified.result,
+        verified.errorCode,
+        verified.errorMessage,
       );
+      digitalHumanEventsTotal.inc({ provider: "shanjian", event: "callback", status: verified.status });
       return NextResponse.json({ ok: true });
     }
 
@@ -117,7 +128,9 @@ export async function POST(request: NextRequest) {
       where: { externalTaskId: taskId },
     });
     if (asset) {
-      await handleVoiceCallback(asset, status, result, errorCode, errorMessage);
+      const verified = await getVideoTaskStatusForProvider("shanjian", taskId);
+      await handleVoiceCallback(asset, verified.status, verified.result, verified.errorCode, verified.errorMessage);
+      digitalHumanEventsTotal.inc({ provider: "shanjian", event: "callback", status: verified.status });
       return NextResponse.json({ ok: true });
     }
 
@@ -126,18 +139,22 @@ export async function POST(request: NextRequest) {
       where: { demoTaskId: taskId },
     });
     if (demoAvatar) {
-      await handleDemoVideoCallback(demoAvatar.id, status, result);
+      const verified = await getVideoTaskStatusForProvider("shanjian", taskId);
+      await handleDemoVideoCallback(demoAvatar.id, verified.status, verified.result);
+      digitalHumanEventsTotal.inc({ provider: "shanjian", event: "callback", status: verified.status });
       return NextResponse.json({ ok: true });
     }
 
     reqLog.warn("No entity found for webhook taskId");
     webhookTotal.inc({ type: "orphan", status });
+    return NextResponse.json({ ok: false, error: "Unknown task" }, { status: 404 });
   } catch (error) {
     reqLog.error({ error: error instanceof Error ? error.stack : "unknown" }, "Webhook processing failed");
+    digitalHumanEventsTotal.inc({ provider: "shanjian", event: "provider_error", status: "callback" });
     webhookTotal.inc({ type: "error", status: "error" });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ error: "Webhook verification failed" }, { status: 502 });
 }
 
 // ─── Avatar Callback ────────────────────────────────────
@@ -151,10 +168,17 @@ async function handleAvatarCallback(
   errorCode?: string,
   errorMessage?: string,
 ) {
+  const avatar = await prisma.avatar.findUnique({
+    where: { id: avatarId },
+    select: { userId: true, name: true, sourceVideoUrl: true, provider: true },
+  });
+  if (!avatar) return;
+  const provider = normalizeDigitalHumanProvider(avatar.provider);
+
   if (status === "succeed") {
     // virtualmanId is required for the avatar to be usable — if absent, treat as failed
     if (!result?.virtualmanId) {
-      await prisma.avatar.updateMany({
+      const updated = await prisma.avatar.updateMany({
         where: { id: avatarId, status: "cloning" },
         data: {
           status: "failed",
@@ -162,6 +186,7 @@ async function handleAvatarCallback(
           errorMessage: "克隆完成但未返回数字人 ID，请重新克隆",
         },
       });
+      if (updated.count > 0) await releaseProviderSlot(provider);
       return;
     }
 
@@ -174,16 +199,7 @@ async function handleAvatarCallback(
       );
     }
 
-    const avatar = await prisma.avatar.findUnique({
-      where: { id: avatarId },
-      select: {
-        userId: true,
-        name: true,
-        sourceVideoUrl: true,
-      },
-    });
-
-    const speakerName = `${avatar?.name ?? "数字人"}的声音`;
+    const speakerName = `${avatar.name}的声音`;
 
     const updated = await prisma.avatar.updateMany({
       where: { id: avatarId, status: "cloning" },
@@ -196,9 +212,11 @@ async function handleAvatarCallback(
       },
     });
 
-    if (updated.count === 0 || !avatar) {
+    if (updated.count === 0) {
       return;
     }
+
+    await releaseProviderSlot(provider);
 
     if (result?.speakerId) {
       await ensureAvatarVoiceAsset({
@@ -244,7 +262,7 @@ async function handleAvatarCallback(
       );
     }
   } else if (status === "failed") {
-    await prisma.avatar.updateMany({
+    const updated = await prisma.avatar.updateMany({
       where: { id: avatarId, status: "cloning" },
       data: {
         status: "failed",
@@ -252,6 +270,7 @@ async function handleAvatarCallback(
         errorMessage: errorMessage ?? null,
       },
     });
+    if (updated.count > 0) await releaseProviderSlot(provider);
   }
 }
 

@@ -4,6 +4,7 @@ import { transferFromUrl } from "@/lib/oss";
 import { prisma } from "@/lib/prisma";
 import { getAvatarCloneStatusForProvider } from "@/lib/digital-human-provider";
 import { releaseProviderSlot, type DigitalHumanProvider } from "@/lib/digital-human-semaphore";
+import { digitalHumanEventsTotal } from "@/lib/metrics";
 import { acquireTaskRecoveryLock } from "./lock";
 import type { TaskRecoveryCandidates } from "./queries";
 
@@ -24,10 +25,13 @@ async function pollStaleAvatar(avatar: StaleAvatar, logPrefix: string): Promise<
   if (!externalTaskId || !await acquireTaskRecoveryLock(`poll:${externalTaskId}`)) return false;
 
   try {
+    const provider = normalizeProvider(avatar.provider);
+    digitalHumanEventsTotal.inc({ provider, event: "poll", status: "started" });
     const taskResult = await getAvatarCloneStatusForProvider(
-      normalizeProvider(avatar.provider),
+      provider,
       externalTaskId,
     );
+    digitalHumanEventsTotal.inc({ provider, event: "poll", status: taskResult.status });
     if (taskResult.status === "succeed") {
       await settleAvatarCloneSuccess(avatar, taskResult, logPrefix);
     } else if (taskResult.status === "failed") {
@@ -39,6 +43,7 @@ async function pollStaleAvatar(avatar: StaleAvatar, logPrefix: string): Promise<
     }
     return true;
   } catch (error) {
+    digitalHumanEventsTotal.inc({ provider: normalizeProvider(avatar.provider), event: "provider_error", status: "poll" });
     console.error(`${logPrefix} Failed to poll avatar ${avatar.id}:`, error);
     return false;
   }

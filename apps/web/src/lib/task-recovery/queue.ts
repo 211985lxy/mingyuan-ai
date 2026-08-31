@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@/generated/prisma/client"
 import { submitVideoToProvider } from "@/lib/digital-human-provider"
 import {
   acquireProviderSlot,
@@ -12,6 +13,7 @@ import {
   compensateVideoTaskSubmissionFailure,
   finalizeAcceptedVideoTaskSubmission,
 } from "@/lib/video-task-settlement"
+import { digitalHumanEventsTotal } from "@/lib/metrics"
 
 const PROVIDERS: DigitalHumanProvider[] = ["chanjing", "shanjian"]
 
@@ -64,15 +66,32 @@ async function submitQueuedTask(
 
     const payload = task.shanjianPayload as Record<string, unknown> | null
     const result = await submitVideoToProvider(provider, task.videoType, payload ?? {})
-    await finalizeAcceptedVideoTaskSubmission({
-      taskId: task.id,
-      externalTaskId: result.taskId,
-      productionPlanId: task.productionPlanId,
-      shanjianPayload: result.payload,
-    })
+    try {
+      await finalizeAcceptedVideoTaskSubmission({
+        taskId: task.id,
+        externalTaskId: result.taskId,
+        productionPlanId: task.productionPlanId,
+        shanjianPayload: result.payload,
+      })
+    } catch (finalizeError) {
+      // The provider accepted the order. Persist its id with a narrow
+      // conditional update before considering the queue attempt failed; never
+      // submit a second provider order for the same accepted result.
+      const recovered = await prisma.videoTask.updateMany({
+        where: { id: task.id, status: "pending", externalTaskId: null },
+        data: {
+          status: "processing",
+          externalTaskId: result.taskId,
+          shanjianPayload: result.payload as Prisma.InputJsonValue,
+        },
+      })
+      if (recovered.count === 0) throw finalizeError
+    }
+    digitalHumanEventsTotal.inc({ provider, event: "submission", status: "accepted" })
     console.log(`${logPrefix} Submitted queued ${provider} task ${task.id}, externalTaskId=${result.taskId}`)
     return true
   } catch (error) {
+    digitalHumanEventsTotal.inc({ provider, event: "provider_error", status: "queue" })
     console.error(`${logPrefix} Failed to submit queued ${provider} task ${task.id}:`, error)
     await compensateVideoTaskSubmissionFailure({
       taskId: task.id,

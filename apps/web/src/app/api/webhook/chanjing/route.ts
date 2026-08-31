@@ -17,7 +17,7 @@ import { logger, generateRequestId } from "@/lib/logger"
 import { transferFromUrl } from "@/lib/oss"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
-import { webhookTotal } from "@/lib/metrics"
+import { digitalHumanEventsTotal, webhookTotal } from "@/lib/metrics"
 import {
   settleVideoTaskFailure,
   settleVideoTaskSuccess,
@@ -45,6 +45,7 @@ function authorizeChanjingWebhook(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId()
+  digitalHumanEventsTotal.inc({ provider: "chanjing", event: "callback", status: "received" })
 
   if (!authorizeChanjingWebhook(request)) {
     log.warn({ requestId }, "Webhook 鉴权失败")
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
     if (avatar) {
       const mapped = await getAvatarCloneTaskInfo(entityId)
       await handleAvatarCallback(avatar.id, mapped)
+      digitalHumanEventsTotal.inc({ provider: "chanjing", event: "callback", status: mapped.status })
       return NextResponse.json({ ok: true })
     }
 
@@ -92,6 +94,7 @@ export async function POST(request: NextRequest) {
       const mapped = await getVideoTaskInfo(entityId)
       if (videoTask) {
         await handleVideoCallback(videoTask, mapped)
+        digitalHumanEventsTotal.inc({ provider: "chanjing", event: "callback", status: mapped.status })
         return NextResponse.json({ ok: true })
       }
       if (demoAvatar) {
@@ -102,12 +105,14 @@ export async function POST(request: NextRequest) {
 
     reqLog.warn("No entity found for webhook id")
     webhookTotal.inc({ type: "orphan", status: String(payload.status ?? "unknown") })
+    return NextResponse.json({ ok: false, error: "Unknown task" }, { status: 404 })
   } catch (error) {
     reqLog.error({ error: error instanceof Error ? error.stack : "unknown" }, "Webhook processing failed")
+    digitalHumanEventsTotal.inc({ provider: "chanjing", event: "provider_error", status: "callback" })
     webhookTotal.inc({ type: "error", status: "error" })
   }
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ error: "Webhook verification failed" }, { status: 502 })
 }
 
 async function handleAvatarCallback(
