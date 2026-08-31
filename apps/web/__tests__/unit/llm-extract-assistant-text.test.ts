@@ -9,10 +9,10 @@ describe("extractAssistantText", () => {
     ).toBe("成稿正文")
   })
 
-  it("falls back to reasoning_content when content is empty", () => {
+  it("does not expose reasoning_content when content is empty", () => {
     expect(
       extractAssistantText({ content: "", reasoning_content: "  只剩推理里的话  " }),
-    ).toBe("只剩推理里的话")
+    ).toBe("")
   })
 
   it("returns empty string when both are missing", () => {

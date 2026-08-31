@@ -140,10 +140,9 @@ export class OpenAICompatibleProvider implements LLMProvider {
       stream: true,
     })
 
-    // DeepSeek 等推理模型可能先推 reasoning_content、后推 content。
-    // 有正文只出正文；整段流结束仍无正文时，再把推理缓冲当兜底吐出，避免「空流成功」。
+    // DeepSeek 等推理模型可能先推 reasoning_content、后推 content；思考字段只丢弃，不能展示给用户。
+    // 若整段流没有正文，抛错让 LLMClient 切换到下一个 provider，禁止把思考过程当答案。
     let contentEmitted = false
-    let reasoningBuffer = ""
     for await (const chunk of response) {
       const delta = chunk.choices[0]?.delta as
         | { content?: string | null; reasoning_content?: string | null }
@@ -152,28 +151,20 @@ export class OpenAICompatibleProvider implements LLMProvider {
       if (content) {
         contentEmitted = true
         yield content
-        continue
       }
-      const reasoning = typeof delta?.reasoning_content === "string" ? delta.reasoning_content : ""
-      if (reasoning) reasoningBuffer += reasoning
     }
     if (!contentEmitted) {
-      const fallback = reasoningBuffer.trim()
-      if (fallback) yield fallback
+      throw new Error(`[${this.name}] Empty response from model ${model}`)
     }
   }
 }
 
 /**
- * DeepSeek v4 等推理模型可能把正文放在 reasoning_content，content 为空。
- * 优先用 content；为空时回退 reasoning_content，避免误判 Empty response。
+ * 思考字段不属于用户答案。若正文为空，返回空字符串让上层按 provider 失败处理并切换模型。
  */
 export function extractAssistantText(message: unknown): string {
   if (!message || typeof message !== "object") return ""
   const record = message as { content?: unknown; reasoning_content?: unknown }
   const content = typeof record.content === "string" ? record.content.trim() : ""
-  if (content) return content
-  const reasoning =
-    typeof record.reasoning_content === "string" ? record.reasoning_content.trim() : ""
-  return reasoning
+  return content
 }
