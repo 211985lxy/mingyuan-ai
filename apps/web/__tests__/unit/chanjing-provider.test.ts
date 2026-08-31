@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest"
 import {
+  buildDigitalHumanVideoPayload,
+  classifyChanjingFileStatus,
   mapCustomisedPersonToTaskResult,
   mapVideoToTaskResult,
+  waitForFileReady,
 } from "@/lib/chanjing"
 
 describe("chanjing provider mapping", () => {
@@ -55,5 +58,44 @@ describe("chanjing provider mapping", () => {
 
     expect(mapped.status).toBe("failed")
     expect(mapped.errorMessage).toContain("蝉豆不足")
+  })
+
+  it("accepts only file status 1 as ready", () => {
+    expect(classifyChanjingFileStatus(0)).toBe("pending")
+    expect(classifyChanjingFileStatus(1)).toBe("ready")
+    expect(classifyChanjingFileStatus(98)).toBe("failed")
+    expect(classifyChanjingFileStatus(99)).toBe("failed")
+    expect(classifyChanjingFileStatus(100)).toBe("failed")
+  })
+
+  it("waits through pending file states before continuing", async () => {
+    const statuses = [0, 0, 1]
+    let calls = 0
+
+    await waitForFileReady("file-1", {
+      fetchDetail: async () => ({ id: "file-1", status: statuses[calls++] ?? 1 }),
+      intervalMs: 1,
+      maxAttempts: 3,
+      sleep: async () => {},
+    })
+
+    expect(calls).toBe(3)
+  })
+
+  it("marks compliance watermark in the generated video payload", () => {
+    const payload = buildDigitalHumanVideoPayload({
+      personId: "person-1",
+      audioManId: "voice-1",
+      text: "这是测试口播",
+      width: 1080,
+      height: 1920,
+    })
+
+    expect(payload).toMatchObject({
+      add_compliance_watermark: true,
+      screen_width: 1080,
+      screen_height: 1920,
+      person: { id: "person-1" },
+    })
   })
 })

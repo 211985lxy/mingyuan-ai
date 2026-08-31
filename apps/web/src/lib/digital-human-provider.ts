@@ -35,8 +35,7 @@ export class DigitalHumanProviderError extends Error {
 export function getDigitalHumanProvider(): DigitalHumanProvider {
   const configured = env.DIGITAL_HUMAN_PROVIDER
   if (configured === "chanjing" || configured === "shanjian") return configured
-  if (isChanjingConfigured()) return "chanjing"
-  return "shanjian"
+  return "chanjing"
 }
 
 export function isDigitalHumanConfigured(): boolean {

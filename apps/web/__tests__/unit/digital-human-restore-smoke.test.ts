@@ -3,6 +3,7 @@ import { ACTIVE_VIDEO_TASK_STATUSES, isActiveVideoTaskStatus } from "@/lib/video
 import { VALID_VIDEO_TASK_TYPES } from "@/lib/video-task-request/contracts"
 import { PLAN_CONCURRENCY_LIMITS } from "@/types/content-template"
 import { AIM_AGENT_GUIDES } from "@/lib/aim-agent-guides"
+import { getDigitalHumanProvider } from "@/lib/digital-human-provider"
 
 describe("digital-human restore smoke", () => {
   it("exposes virtualman broadcast as a valid video task type", () => {
@@ -29,5 +30,9 @@ describe("digital-human restore smoke", () => {
     )
     expect(work?.workbenchAction).toBe("generate_digital_human_video")
     expect(producer?.workbenchAction).toBe("generate_digital_human_video")
+  })
+
+  it("defaults the digital-human provider to Chanjing", () => {
+    expect(getDigitalHumanProvider()).toBe("chanjing")
   })
 })

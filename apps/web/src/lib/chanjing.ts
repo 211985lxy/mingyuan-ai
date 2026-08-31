@@ -153,15 +153,49 @@ function guessFileName(url: string, fallback: string): string {
   return fallback
 }
 
-async function waitForFileReady(fileId: string): Promise<void> {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    const detail = await request<ChanjingFileDetail>("GET", "/common/file_detail", {
-      params: { id: fileId },
-      timeoutMs: 8000,
-    })
-    if (detail.status === 1 || detail.status === 2) return
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+export type ChanjingFileReadiness = "pending" | "ready" | "failed"
+
+export function classifyChanjingFileStatus(status: number): ChanjingFileReadiness {
+  if (status === 1) return "ready"
+  if (status === 0) return "pending"
+  return "failed"
+}
+
+export async function waitForFileReady(
+  fileId: string,
+  options: {
+    fetchDetail?: (fileId: string) => Promise<ChanjingFileDetail>
+    intervalMs?: number
+    maxAttempts?: number
+    sleep?: (ms: number) => Promise<void>
+  } = {},
+): Promise<void> {
+  const fetchDetail = options.fetchDetail ?? (async (id: string) => request<ChanjingFileDetail>(
+    "GET",
+    "/common/file_detail",
+    { params: { id }, timeoutMs: 8000 },
+  ))
+  const intervalMs = options.intervalMs ?? 5000
+  const maxAttempts = options.maxAttempts ?? 13
+  const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const detail = await fetchDetail(fileId)
+    const readiness = classifyChanjingFileStatus(detail.status)
+    if (readiness === "ready") return
+    if (readiness === "failed") {
+      throw new ChanjingError(
+        "CHANJING_FILE_NOT_READY",
+        detail.msg || `蝉镜文件不可用（状态 ${detail.status}）`,
+      )
+    }
+    if (attempt < maxAttempts - 1) await sleep(intervalMs)
   }
+
+  throw new ChanjingError(
+    "CHANJING_FILE_READY_TIMEOUT",
+    "蝉镜素材仍在同步，请稍后重试",
+  )
 }
 
 export async function uploadFileFromUrl(
@@ -183,12 +217,16 @@ export async function uploadFileFromUrl(
     )
   }
 
-  const body = await sourceRes.arrayBuffer()
-  const putRes = await fetch(upload.sign_url, {
+  if (!sourceRes.body) {
+    throw new ChanjingError("UPSTREAM_FILE_EMPTY", "素材文件没有可读取内容")
+  }
+  const uploadRequest: RequestInit & { duplex: "half" } = {
     method: "PUT",
     headers: { "Content-Type": upload.mime_type || "application/octet-stream" },
-    body,
-  })
+    body: sourceRes.body,
+    duplex: "half",
+  }
+  const putRes = await fetch(upload.sign_url, uploadRequest)
   if (!putRes.ok) {
     throw new ChanjingError(
       "CHANJING_UPLOAD_FAILED",
@@ -246,18 +284,18 @@ export interface ChanjingSubmitResult {
   payload: Record<string, unknown>
 }
 
-export async function createDigitalHumanVideo(input: {
+export function buildDigitalHumanVideoPayload(input: {
   personId: string
   audioManId: string
   text: string
   width?: number
   height?: number
-}): Promise<ChanjingSubmitResult> {
+}): Record<string, unknown> {
   const screenWidth = input.width ?? 1080
   const screenHeight = input.height ?? 1920
   const personHeight = Math.round(screenHeight * 0.75)
 
-  const body = {
+  return {
     person: {
       id: input.personId,
       x: 0,
@@ -278,8 +316,19 @@ export async function createDigitalHumanVideo(input: {
     bg_color: "#EDEDED",
     screen_width: screenWidth,
     screen_height: screenHeight,
+    add_compliance_watermark: true,
     callback: WEBHOOK_URL || undefined,
   }
+}
+
+export async function createDigitalHumanVideo(input: {
+  personId: string
+  audioManId: string
+  text: string
+  width?: number
+  height?: number
+}): Promise<ChanjingSubmitResult> {
+  const body = buildDigitalHumanVideoPayload(input)
 
   const taskId = await request<string>("POST", "/create_video", {
     body,

@@ -8,8 +8,8 @@ import {
   ensureAvatarVoiceAsset,
 } from "@/lib/avatar-voice-assets"
 import {
-  mapCustomisedPersonToTaskResult,
-  mapVideoToTaskResult,
+  getAvatarCloneTaskInfo,
+  getVideoTaskInfo,
 } from "@/lib/chanjing"
 import { logger, generateRequestId } from "@/lib/logger"
 import { transferFromUrl } from "@/lib/oss"
@@ -20,11 +20,7 @@ import {
   settleVideoTaskFailure,
   settleVideoTaskSuccess,
 } from "@/lib/video-task-settlement"
-import type {
-  ChanjingCustomisedPerson,
-  ChanjingVideoTask,
-  ChanjingWebhookPayload,
-} from "@/types/chanjing"
+import type { ChanjingWebhookPayload } from "@/types/chanjing"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -33,33 +29,22 @@ const log = logger.child({ component: "webhook-chanjing" })
 
 function authorizeChanjingWebhook(request: NextRequest): boolean {
   const secret = env.CHANJING_WEBHOOK_SECRET
-  if (!secret) return false
+  if (!secret) return true
   const provided = request.headers.get("x-webhook-secret")
-  if (!provided) return false
+  // Chanjing's documented callback does not include this custom header. When
+  // a gateway adds it, validate it; otherwise rely on provider-side lookup
+  // before changing any local task state.
+  if (!provided) return true
   const a = Buffer.from(secret)
   const b = Buffer.from(provided)
   if (a.length !== b.length) return false
   return timingSafeEqual(a, b)
 }
 
-function isCustomisedPersonPayload(
-  payload: ChanjingWebhookPayload,
-): payload is ChanjingCustomisedPerson {
-  return typeof payload.status === "number" && payload.status <= 5 && !("video_url" in payload)
-}
-
-function isVideoPayload(payload: ChanjingWebhookPayload): payload is ChanjingVideoTask {
-  return typeof payload.status === "number" && payload.status >= 10
-}
-
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId()
 
   if (!authorizeChanjingWebhook(request)) {
-    if (!env.CHANJING_WEBHOOK_SECRET) {
-      log.error({ requestId }, "CHANJING_WEBHOOK_SECRET 未配置，拒绝回调")
-      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 503 })
-    }
     log.warn({ requestId }, "Webhook 鉴权失败")
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
@@ -92,23 +77,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (isCustomisedPersonPayload(payload)) {
-      const avatar = await prisma.avatar.findFirst({ where: { externalTaskId: entityId } })
-      if (avatar) {
-        await handleAvatarCallback(avatar.id, mapCustomisedPersonToTaskResult(payload))
-        return NextResponse.json({ ok: true })
-      }
+    const avatar = await prisma.avatar.findFirst({ where: { externalTaskId: entityId } })
+    if (avatar) {
+      const mapped = await getAvatarCloneTaskInfo(entityId)
+      await handleAvatarCallback(avatar.id, mapped)
+      return NextResponse.json({ ok: true })
     }
 
-    if (isVideoPayload(payload)) {
-      const mapped = mapVideoToTaskResult(payload)
-      const videoTask = await prisma.videoTask.findFirst({ where: { externalTaskId: entityId } })
+    const videoTask = await prisma.videoTask.findFirst({ where: { externalTaskId: entityId } })
+    const demoAvatar = await prisma.avatar.findFirst({ where: { demoTaskId: entityId } })
+    if (videoTask || demoAvatar) {
+      const mapped = await getVideoTaskInfo(entityId)
       if (videoTask) {
         await handleVideoCallback(videoTask, mapped)
         return NextResponse.json({ ok: true })
       }
-
-      const demoAvatar = await prisma.avatar.findFirst({ where: { demoTaskId: entityId } })
       if (demoAvatar) {
         await handleDemoVideoCallback(demoAvatar.id, mapped)
         return NextResponse.json({ ok: true })
@@ -127,7 +110,7 @@ export async function POST(request: NextRequest) {
 
 async function handleAvatarCallback(
   avatarId: string,
-  mapped: ReturnType<typeof mapCustomisedPersonToTaskResult>,
+  mapped: Awaited<ReturnType<typeof getAvatarCloneTaskInfo>>,
 ) {
   const { status, result, errorCode, errorMessage } = mapped
   if (status === "succeed") {
@@ -204,7 +187,7 @@ async function handleAvatarCallback(
 
 async function handleVideoCallback(
   videoTask: { id: string; status: string },
-  mapped: ReturnType<typeof mapVideoToTaskResult>,
+  mapped: Awaited<ReturnType<typeof getVideoTaskInfo>>,
 ) {
   if (videoTask.status === "completed" || videoTask.status === "failed") return
   if (mapped.status === "succeed") {
@@ -231,7 +214,7 @@ async function handleVideoCallback(
 
 async function handleDemoVideoCallback(
   avatarId: string,
-  mapped: ReturnType<typeof mapVideoToTaskResult>,
+  mapped: Awaited<ReturnType<typeof getVideoTaskInfo>>,
 ) {
   if (mapped.status === "succeed") {
     const demoVideoUrl = mapped.result?.videoUrl
