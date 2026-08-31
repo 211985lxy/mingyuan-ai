@@ -25,6 +25,7 @@ import {
 } from "@/lib/aim-generation-prompts"
 import {
   cleanSpokenDeliveryArtifacts,
+  buildSpokenLengthRetryPrompt,
   findIncompleteGenerationFormats,
   findOverlongGenerationFormats,
 } from "@/lib/aim-spoken-length"
@@ -151,6 +152,19 @@ describe("AIM content production positioning", () => {
       rawInput: "写一条3到5分钟长口播",
       finishReason: "stop",
     })).toEqual(["video_script"])
+  })
+
+  it("does not reintroduce a default duration in completeness retries", () => {
+    const prompt = buildSpokenLengthRetryPrompt({
+      userPrompt: "按用户要求写完整口播",
+      rawInput: "帮我写一条完整口播文案",
+      parsed: { video_script: "这段话还没说完，但" },
+      targetFormats: ["video_script"],
+      incompleteFormats: ["video_script"],
+      overlongFormats: [],
+    })
+    expect(prompt).toContain("未指定时长或字数时，不要擅自增加篇幅要求")
+    expect(prompt).not.toContain("正文目标是 400-500")
   })
 
   it("rejects spoken scripts that run past the requested duration", () => {

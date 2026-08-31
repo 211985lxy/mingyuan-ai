@@ -205,6 +205,11 @@ export function buildSpokenLengthRetryPrompt(input: {
 }): string {
   const bounds = requestedSpokenLengthBounds(input.rawInput)
   const hasSpokenFormat = input.targetFormats.some(isSpokenScriptFormat)
+  const spokenLengthRule = hasSpokenFormat
+    ? hasExplicitSpokenLength(input.rawInput)
+      ? `- 口播必须有完整开头、展开和收束，禁止停在半句话。\n- 正文目标是 ${bounds.targetMin}-${bounds.targetMax} 个有效字符，验收范围是 ${bounds.min}-${bounds.max}，不得用重复句凑长度。`
+      : "- 口播必须有完整开头、展开和收束，禁止停在半句话；未指定时长或字数时，不要擅自增加篇幅要求。"
+    : "- 保持用户要求的修改范围，只补齐中断的句子并完整收束，不要扩写成另一篇。"
   const lengthIssue = input.overlongFormats.length
     ? `上一版篇幅过长，不能交付。请把 ${input.overlongFormats.join("、")} 压缩到 ${bounds.targetMin}-${bounds.targetMax} 个有效字符。`
     : `上一版在正文中途结束或篇幅不足，不能交付。请重新完整输出 ${input.incompleteFormats.join("、")}。`
@@ -219,9 +224,7 @@ export function buildSpokenLengthRetryPrompt(input: {
 【完整性重试】
 ${lengthIssue}
 - 减少内部推理，优先保证正文完整。
-${hasSpokenFormat
-    ? `- 口播必须有完整开头、展开和收束，禁止停在半句话。\n- 正文目标是 ${bounds.targetMin}-${bounds.targetMax} 个有效字符，验收范围是 ${bounds.min}-${bounds.max}，不得用重复句凑长度。`
-    : "- 保持用户要求的修改范围，只补齐中断的句子并完整收束，不要扩写成另一篇。"}
+${spokenLengthRule}
 - 每种格式都必须以完整句子结束，并保留 ===FORMAT:格式名=== 标记。
 
 请基于下面的上一版定向压缩或扩写，不要另起主题；事实标记必须原样保留：
