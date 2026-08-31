@@ -19,6 +19,8 @@ export interface AimNextAction {
   label: string
   targetAgentId?: AimAgentId
   prompt: string
+  /** 工作台本地动作：不塞进聊天框，改为打开面板 */
+  workbenchAction?: "generate_digital_human_video"
 }
 
 /** 方法论信号：技能点击后向后端透传，触发对应方法论/爆款结构的按需注入 */
@@ -91,6 +93,12 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     nextActions: [
       { id: "publish_package", label: "生成发布计划", prompt: PUBLISH_PLAN_PROMPT },
       { id: "to_work_editor", label: "带入作品编辑", targetAgentId: "work_editor", prompt: "请把下面成稿做作品编辑：文字二改/润色、公众号排版或小红书图文改写。" },
+      {
+        id: "generate_digital_human_video",
+        label: "用数字人生成视频",
+        prompt: "用数字人生成视频",
+        workbenchAction: "generate_digital_human_video",
+      },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],
   },
@@ -112,6 +120,12 @@ export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
     outputAssets: ["润色成稿", "公众号排版正文", "小红书图文笔记", "发布质检报告", "最小改法", "复检清单", "发布前判断"],
     skills: [...WORK_EDITOR_SKILLS, ...REVIEW_SKILLS],
     nextActions: [
+      {
+        id: "generate_digital_human_video",
+        label: "用数字人生成视频",
+        prompt: "用数字人生成视频",
+        workbenchAction: "generate_digital_human_video",
+      },
       { id: "to_content_producer", label: "带入内容创作", targetAgentId: "content_producer", prompt: "请基于下面作品，按流量漏斗、线索获客或通用故事之一，重写一条可拍摄的短视频口播正文。" },
       { id: "save_knowledge", label: "保存为档案素材", prompt: "保存为 AIM 档案素材。" },
     ],

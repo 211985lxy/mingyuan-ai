@@ -5,9 +5,9 @@ import { useAuthStore } from "@/lib/store"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type {
-  ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
+  ApiAsset, ApiAvatar, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiScript, ApiUser,
-  ApiVideoStructure,
+  ApiVideoStructure, ApiVideoTask,
   AuthResponse,
   HotTopicsResponse, PaginatedResponse,
   PublicTemplateDetail, PublicTemplateListItem, ApiTopicGenerateResponse, ApiTopicSelectResponse,
@@ -16,6 +16,82 @@ import type {
   ApiAiHotBriefing, ApiHotDecisionResponse, ApiHotDecisionSource, ApiMarketHotSnapshot,
   ApiVideoCopyExtraction, ApiAgentApiKeySummary, ApiTopicCard,
 } from "@/types/api"
+
+/**
+ * @description 列出用户数字人
+ */
+export async function listAvatars(): Promise<ApiAvatar[]> {
+  const payload = await request<{ data: PaginatedResponse<ApiAvatar> }>("/api/avatars?page=1&pageSize=100")
+  return payload.data.results
+}
+
+/**
+ * @description 创建数字人克隆任务
+ */
+export async function createAvatar(input: Record<string, unknown>): Promise<ApiAvatar> {
+  const payload = await request<{ data: ApiAvatar }>("/api/avatars", {
+    method: "POST",
+    body: JSON.stringify(input),
+    timeout: 15000,
+  })
+  return payload.data
+}
+
+/**
+ * @description 重试失败的数字人克隆
+ */
+export async function retryAvatar(id: string): Promise<ApiAvatar> {
+  const payload = await request<{ data: ApiAvatar }>(`/api/avatars/${id}/retry`, {
+    method: "POST",
+    timeout: 15000,
+  })
+  return payload.data
+}
+
+/**
+ * @description 删除数字人
+ */
+export async function deleteAvatar(id: string): Promise<void> {
+  await request(`/api/avatars/${id}`, { method: "DELETE" })
+}
+
+/**
+ * @description 保存授权视频地址（创建数字人前需要）
+ */
+export async function saveAuthVideo(authVideoUrl: string): Promise<{ authVideoUrl: string | null }> {
+  const payload = await request<{ user: { authVideoUrl?: string | null } }>("/api/auth/auth-video", {
+    method: "POST",
+    body: JSON.stringify({ authVideoUrl }),
+  })
+  return { authVideoUrl: payload.user.authVideoUrl ?? authVideoUrl }
+}
+
+/**
+ * @description 列出视频成片任务
+ */
+export async function listVideoTasks(): Promise<ApiVideoTask[]> {
+  const payload = await request<{ data: PaginatedResponse<ApiVideoTask> }>("/api/tasks?page=1&pageSize=100")
+  return payload.data.results
+}
+
+/**
+ * @description 查询单个视频任务
+ */
+export async function getVideoTask(id: string): Promise<ApiVideoTask> {
+  const payload = await request<{ data: ApiVideoTask }>(`/api/tasks/${id}`)
+  return payload.data
+}
+
+/**
+ * @description 提交数字人视频生成任务
+ */
+export async function createVideoTask(input: Record<string, unknown>): Promise<ApiVideoTask> {
+  const payload = await request<{ data: ApiVideoTask }>("/api/tasks", {
+    method: "POST",
+    body: JSON.stringify(input),
+  })
+  return payload.data
+}
 
 /**
  * @description 列出assets

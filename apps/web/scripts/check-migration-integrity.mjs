@@ -7,7 +7,7 @@ const BASELINE_MIGRATIONS_PATH = resolve(WEB_ROOT, "prisma", "baseline", "migrat
 const MIGRATIONS_PATH = resolve(WEB_ROOT, "prisma", "migrations")
 const PRODUCTION_SCHEMA_CONTRACT_PATH = resolve(WEB_ROOT, "prisma", "production-schema-contract.json")
 
-const RETIRED_SCHEMA_COLUMNS = [{ table: "User", column: "authVideoUrl" }]
+const RETIRED_SCHEMA_COLUMNS = [] // digital-human domain restored; authVideoUrl is active again
 
 export function findMigrationIntegrityViolations({ baselineMigrations, migrationDirectories, schemaContract }) {
   const violations = []

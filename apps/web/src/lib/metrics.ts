@@ -60,3 +60,10 @@ export const redisConnectionStatus = new Gauge({
   help: "Redis connection status (1=connected, 0=disconnected)",
   registers: [metricsRegistry],
 })
+
+export const webhookTotal = new Counter({
+  name: "mingyuan_webhook_total",
+  help: "Total webhook callbacks processed",
+  labelNames: ["type", "status"] as const,
+  registers: [metricsRegistry],
+})
