@@ -6,10 +6,11 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { listVideoTasks } from "@/lib/api/client"
+import { listVideoTasks, retryVideoTask } from "@/lib/api/client"
 import type { ApiVideoTask } from "@/types/api"
 
 const STATUS_LABEL: Record<string, string> = {
+  queued: "排队中",
   pending: "排队中",
   processing: "生成中",
   completed: "已完成",
@@ -19,6 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function VideosPage() {
   const [tasks, setTasks] = useState<ApiVideoTask[]>([])
   const [loading, setLoading] = useState(true)
+  const [retryingId, setRetryingId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -32,8 +34,21 @@ export default function VideosPage() {
     }
   }, [])
 
+  async function handleRetry(id: string) {
+    setRetryingId(id)
+    try {
+      const next = await retryVideoTask(id)
+      setTasks((current) => [next, ...current.filter((task) => task.id !== next.id)])
+      toast.success("已重新提交生成，仍沿用原供应商")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "重试失败")
+    } finally {
+      setRetryingId(null)
+    }
+  }
+
   useEffect(() => {
-    void refresh()
+    void Promise.resolve().then(refresh)
   }, [refresh])
 
   return (
@@ -75,6 +90,7 @@ export default function VideosPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{task.avatarName || "数字人口播"}</p>
                     <Badge variant="secondary">{STATUS_LABEL[task.status] ?? task.status}</Badge>
+                    <Badge variant="outline">{task.provider === "shanjian" ? "闪剪备用" : "蝉镜"}</Badge>
                   </div>
                   <p className="line-clamp-2 text-sm text-muted-foreground">{task.scriptContent}</p>
                   <p className="text-xs text-muted-foreground">
@@ -82,14 +98,21 @@ export default function VideosPage() {
                     {task.errorMessage ? ` · ${task.errorMessage}` : ""}
                   </p>
                 </div>
-                {task.status === "completed" && task.videoUrl ? (
-                  <Button
-                    size="sm"
-                    onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}
-                  >
-                    打开成片
-                  </Button>
-                ) : null}
+                <div className="flex shrink-0 gap-2">
+                  {task.status === "failed" ? (
+                    <Button size="sm" variant="outline" disabled={retryingId === task.id} onClick={() => void handleRetry(task.id)}>
+                      {retryingId === task.id ? "提交中…" : "重试"}
+                    </Button>
+                  ) : null}
+                  {task.status === "completed" && task.videoUrl ? (
+                    <Button
+                      size="sm"
+                      onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}
+                    >
+                      打开成片
+                    </Button>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
           ))}

@@ -148,10 +148,14 @@ export interface ApiVideoProductionPlan {
 export interface ApiVideoTask {
   id: string;
   userId: string;
+  projectId: string | null;
+  aimGenerationId: string | null;
   avatarId: string | null;
+  retryOfTaskId: string | null;
   scriptId: string | null;
   productionPlanId: string | null;
   status: string;
+  provider: "chanjing" | "shanjian" | string;
   deliveryStatus: string;
   deliveryWarning: string | null;
   videoType: string;

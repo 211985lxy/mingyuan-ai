@@ -254,6 +254,8 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
       open={digitalHumanOpen}
       onOpenChange={setDigitalHumanOpen}
       initialScript={activeContent}
+      projectId={props.projectId}
+      aimGenerationId={deliverables.id}
     />
   </div>
 }

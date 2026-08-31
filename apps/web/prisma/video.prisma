@@ -10,7 +10,7 @@ model VideoTask {
   productionPlanId    String?
   structureId         String?
   packagingTemplateId String?
-  status              String    @default("pending") // pending | processing | completed | failed
+  status              String    @default("pending") // queued | pending | processing | completed | failed
   provider            String    @default("chanjing") // chanjing | shanjian
   idempotencyKey      String?   @unique
   retryOfTaskId       String?

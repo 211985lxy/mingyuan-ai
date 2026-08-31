@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
 import { withUserAuth } from "@/lib/user-auth"
+import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
+import { createVideoTask } from "@/lib/video-task-request/service"
+import { VideoTaskRequestError } from "@/lib/video-task-request/contracts"
+import { normalizeDigitalHumanProvider } from "@/lib/digital-human-provider"
 
 // ─── POST /api/tasks/[id]/retry ───────────────────────
 // Create a new video task from a failed one, reusing the same parameters.
@@ -38,23 +42,27 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   const requestId = `task-retry-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
   console.log(`[${requestId}] Video task retry initiated for ${task.id} by user ${user.id}`)
 
-  // Build the body to re-submit to POST /api/tasks via internal redirect
-  // We store enough context in the original task to rebuild the request
+  const limitResponse = await enforceDailyBetaLimit(user.id, "video_task")
+  if (limitResponse) return limitResponse
+
+  // Rebuild from the immutable snapshot. Do not pass scriptId: a retry must
+  // use the exact text that was originally submitted, even if the source
+  // script has since been edited.
   const retryPayload: Record<string, unknown> = {
     type: task.videoType,
     scriptContent: task.scriptContent,
     avatarName: task.avatarName,
+    projectId: task.projectId ?? undefined,
+    aimGenerationId: task.aimGenerationId ?? undefined,
+    actionId: `retry:${task.id}:${Date.now()}`,
+    retryOfTaskId: task.id,
   }
 
   if (task.avatarId) {
     retryPayload.avatarId = task.avatarId
   }
 
-  if (task.scriptId) {
-    retryPayload.scriptId = task.scriptId
-  }
-
-  // Re-use shanjianPayload for extra params (speakerId, virtualmanId, etc.)
+  // Re-use the recorded payload only for provider-neutral optional inputs.
   if (task.shanjianPayload && typeof task.shanjianPayload === "object") {
     const sp = task.shanjianPayload as Record<string, unknown>
     if (sp.virtualmanId) retryPayload.virtualmanId = sp.virtualmanId
@@ -62,14 +70,23 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
     if (sp.styleId) retryPayload.styleId = sp.styleId
     if (sp.speakerExtra) retryPayload.speakerExtra = sp.speakerExtra
     if (sp.processRules) retryPayload.processRules = sp.processRules
+    if (sp.aspectRatio === "16:9" || sp.aspectRatio === "9:16") retryPayload.aspectRatio = sp.aspectRatio
   }
 
-  // Return the retry payload for the frontend to re-submit via createVideoTask
-  // This avoids duplicating all the complex task creation logic
-  return NextResponse.json({
-    data: {
+  try {
+    const result = await createVideoTask(
+      user.id,
       retryPayload,
-      originalTaskId: task.id,
-    },
-  })
+      {
+        provider: normalizeDigitalHumanProvider(task.provider),
+        retryOfTaskId: task.id,
+      },
+    )
+    return NextResponse.json({ data: result.data }, { status: result.status })
+  } catch (error) {
+    if (error instanceof VideoTaskRequestError) {
+      return NextResponse.json({ error: error.message, ...error.details }, { status: error.status })
+    }
+    throw error
+  }
 })

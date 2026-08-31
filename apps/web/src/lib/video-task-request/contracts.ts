@@ -26,6 +26,7 @@ export type CreateVideoTaskInput = {
   aimGenerationId?: string;
   aspectRatio?: "9:16" | "16:9";
   actionId?: string;
+  retryOfTaskId?: string;
   provider?: "chanjing" | "shanjian";
   avatarId?: string;
   scriptId?: string;

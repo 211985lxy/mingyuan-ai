@@ -33,13 +33,14 @@ export type CreatedVideoTask = {
 export async function createVideoTask(
   userId: string,
   body: CreateVideoTaskInput,
-  options: { provider?: DigitalHumanProvider } = {},
+  options: { provider?: DigitalHumanProvider; retryOfTaskId?: string } = {},
 ): Promise<CreatedVideoTask> {
   const plan = await resolveProductionPlan(userId, body.productionPlanId);
   const videoType = resolveVideoTaskType(plan, body.type);
   const projectId = await resolveTaskProject(userId, body.projectId, videoType);
   const aimGenerationId = await resolveAimGeneration(userId, projectId, body.aimGenerationId);
   const provider = options.provider ?? getDigitalHumanProvider();
+  const retryOfTaskId = await resolveRetrySource(userId, options.retryOfTaskId ?? body.retryOfTaskId, projectId, provider);
   const aspectRatio = resolveAspectRatio(body.aspectRatio);
   const avatar = await resolveVideoTaskAvatar({ userId, projectId, videoType, body });
   const resolvedScript = await resolveVideoTaskScript({ userId, body, plan, videoType });
@@ -77,6 +78,7 @@ export async function createVideoTask(
       aimGenerationId,
       provider,
       idempotencyKey,
+      retryOfTaskId,
     });
     if (reservation.existingTask) {
       return toCreatedTask(
@@ -103,6 +105,27 @@ export async function createVideoTask(
     }
     return recoverOrThrow(error, reservation, plan);
   }
+}
+
+async function resolveRetrySource(
+  userId: string,
+  requestedRetryId: string | undefined,
+  projectId: string | null,
+  provider: DigitalHumanProvider,
+): Promise<string | null> {
+  const retryOfTaskId = requestedRetryId?.trim() || null;
+  if (!retryOfTaskId) return null;
+  const original = await prisma.videoTask.findFirst({
+    where: { id: retryOfTaskId, userId },
+    select: { id: true, status: true, projectId: true, provider: true },
+  });
+  if (!original) throw new VideoTaskRequestError("Original video task not found", 404, { field: "retryOfTaskId" });
+  if (original.status !== "failed") throw new VideoTaskRequestError("Only failed video tasks can be retried", 422, { field: "retryOfTaskId" });
+  if (original.projectId !== projectId) throw new VideoTaskRequestError("Retry task must stay within the original project", 422, { field: "projectId" });
+  if (provider !== original.provider && provider !== "shanjian") {
+    throw new VideoTaskRequestError("Cross-provider retry requires an administrator action", 403, { code: "ADMIN_PROVIDER_SWITCH_REQUIRED" });
+  }
+  return original.id;
 }
 
 async function resolveTaskProject(

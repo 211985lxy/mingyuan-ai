@@ -24,6 +24,7 @@ export async function reserveVideoTask(input: {
   aimGenerationId: string | null;
   provider: "chanjing" | "shanjian";
   idempotencyKey: string;
+  retryOfTaskId?: string | null;
 }): Promise<VideoTaskReservation> {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.videoTask.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
@@ -53,6 +54,10 @@ export async function reserveVideoTask(input: {
         status: "queued",
         provider: input.provider,
         idempotencyKey: input.idempotencyKey,
+        retryOfTaskId: input.retryOfTaskId ?? null,
+        providerAttempts: input.retryOfTaskId
+          ? [{ provider: input.provider, retryOfTaskId: input.retryOfTaskId }]
+          : undefined,
         videoType: input.videoType,
         scriptContent: input.scriptContent,
         avatarName: input.avatar?.name ?? input.body.avatarName ?? "",

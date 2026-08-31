@@ -114,6 +114,15 @@ export async function createVideoTask(input: Record<string, unknown>): Promise<A
   return payload.data
 }
 
+/** @description 重试失败的视频任务（沿用原供应商，不自动切换） */
+export async function retryVideoTask(id: string): Promise<ApiVideoTask> {
+  const payload = await request<{ data: ApiVideoTask }>(`/api/tasks/${encodeURIComponent(id)}/retry`, {
+    method: "POST",
+    timeout: 15000,
+  })
+  return payload.data
+}
+
 /**
  * @description 列出assets
  * @param assetType? - assetType?

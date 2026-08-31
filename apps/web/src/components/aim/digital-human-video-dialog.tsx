@@ -15,10 +15,18 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { createVideoTask, getVideoTask, listAvatars } from "@/lib/api/client"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ApiAvatar, ApiVideoTask } from "@/types/api"
 
 const MAX_SCRIPT_CHARS = 2500
 const POLL_MS = 4000
+const TASK_STATUS_LABEL: Record<string, string> = {
+  queued: "排队中",
+  pending: "排队中",
+  processing: "生成中",
+  completed: "已完成",
+  failed: "失败",
+}
 
 function estimateSpeechSeconds(text: string): number {
   // Rough Chinese spoken pace ~4 chars/sec
@@ -29,14 +37,19 @@ export function DigitalHumanVideoDialog({
   open,
   onOpenChange,
   initialScript,
+  projectId,
+  aimGenerationId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialScript: string
+  projectId?: string | null
+  aimGenerationId?: string | null
 }) {
   const [avatars, setAvatars] = useState<ApiAvatar[]>([])
   const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("")
+  const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16")
   const [script, setScript] = useState(initialScript)
   const [submitting, setSubmitting] = useState(false)
   const [task, setTask] = useState<ApiVideoTask | null>(null)
@@ -53,8 +66,14 @@ export function DigitalHumanVideoDialog({
     setScript(initialScript)
     setTask(null)
     setSelectedAvatarId("")
+    setAspectRatio("9:16")
+    if (!projectId) {
+      setAvatars([])
+      setLoadingAvatars(false)
+      return
+    }
     setLoadingAvatars(true)
-    void listAvatars()
+    void listAvatars(projectId)
       .then((rows) => {
         setAvatars(rows)
         const firstReady = rows.find((item) => item.status === "ready")
@@ -65,7 +84,7 @@ export function DigitalHumanVideoDialog({
         setAvatars([])
       })
       .finally(() => setLoadingAvatars(false))
-  }, [open, initialScript])
+  }, [open, initialScript, projectId])
 
   useEffect(() => {
     if (!task || !["pending", "processing"].includes(task.status)) return
@@ -89,6 +108,10 @@ export function DigitalHumanVideoDialog({
       toast.error("请选择一个可用数字人")
       return
     }
+    if (!projectId) {
+      toast.error("请先选择一个客户项目")
+      return
+    }
     if (tooLong) {
       toast.error(`文案偏长（建议不超过 ${MAX_SCRIPT_CHARS} 字），请先精简后再生成`)
       return
@@ -98,8 +121,11 @@ export function DigitalHumanVideoDialog({
     try {
       const created = await createVideoTask({
         type: "virtualman_broadcast",
+        projectId,
+        aimGenerationId: aimGenerationId ?? undefined,
         avatarId: selectedAvatarId,
         scriptContent: cleaned,
+        aspectRatio,
       })
       setTask(created)
       toast.success("已提交生成，成片会自动刷新状态")
@@ -121,6 +147,11 @@ export function DigitalHumanVideoDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {!projectId ? (
+            <div className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+              这份稿件尚未绑定客户项目，暂不能生成项目视频。请先回到 AIM 选择一个项目。
+            </div>
+          ) : null}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">选择数字人</p>
@@ -161,6 +192,17 @@ export function DigitalHumanVideoDialog({
           </div>
 
           <div className="space-y-2">
+            <p className="text-sm font-medium">画面比例</p>
+            <Select value={aspectRatio} onValueChange={(value) => value && setAspectRatio(value as "9:16" | "16:9")}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="9:16">9:16 竖屏（1080×1920）</SelectItem>
+                <SelectItem value="16:9">16:9 横屏（1920×1080）</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium">口播文案</p>
               <span className="text-xs text-muted-foreground">
@@ -185,7 +227,7 @@ export function DigitalHumanVideoDialog({
             <div className="space-y-2 rounded-md border bg-muted/30 px-3 py-3 text-sm">
               <div className="flex items-center gap-2">
                 <span className="font-medium">任务状态</span>
-                <Badge variant="secondary">{task.status}</Badge>
+                <Badge variant="secondary">{TASK_STATUS_LABEL[task.status] ?? task.status}</Badge>
               </div>
               {["pending", "processing"].includes(task.status) ? (
                 <p className="flex items-center gap-2 text-muted-foreground">
@@ -211,11 +253,11 @@ export function DigitalHumanVideoDialog({
 
           <Button
             className="w-full"
-            disabled={submitting || loadingAvatars || readyAvatars.length === 0 || Boolean(task && ["pending", "processing"].includes(task.status))}
+            disabled={!projectId || submitting || loadingAvatars || readyAvatars.length === 0 || Boolean(task)}
             onClick={() => void handleSubmit()}
           >
             {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {task ? "再次提交生成" : "提交生成"}
+            {task ? (task.status === "completed" ? "已生成" : "任务已提交") : "提交生成"}
           </Button>
         </div>
       </DialogContent>
