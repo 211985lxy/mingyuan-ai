@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { parseQuery } from "@/lib/api-contract"
 import { aimHistoryQuerySchema } from "@/features/aim/contracts/api"
+import { normalizeAimGenerationForRead } from "@/lib/aim/history-normalize"
 
 /**
  * @description 处理 GET 请求
@@ -48,16 +49,19 @@ export async function GET(request: NextRequest) {
       includeTotal === "true" ? prisma.aimGeneration.count({ where }) : Promise.resolve(0),
     ])
 
-    // 归一化：旧别名记录的 agentId 统一为当前规范 id
-    const normalized = records.map((record) => ({
-      ...record,
-      agentId:
-        record.agentId === "ip_video"
-          ? "content_producer"
-          : record.agentId === "deep_copywriter"
-            ? "work_editor"
-            : record.agentId,
-    }))
+    // 归一化：旧别名记录的 agentId 统一为当前规范 id；
+    // 内容列读取时剥离 METHOD_NOTE（思考依据放 reasoningByFormat，正文保持可发布纯净）
+    const normalized = records.map((record) =>
+      normalizeAimGenerationForRead({
+        ...record,
+        agentId:
+          record.agentId === "ip_video"
+            ? "content_producer"
+            : record.agentId === "deep_copywriter"
+              ? "work_editor"
+              : record.agentId,
+      }),
+    )
 
     return NextResponse.json(includeTotal === "true" ? { items: normalized, total } : normalized)
   } catch (error) {

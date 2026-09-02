@@ -75,12 +75,13 @@ describe("resolveCopyMethodologyPlan", () => {
     expect(plan.cardIds).not.toContain("local.ending")
   })
 
-  it("generate 无信号时推断 lead 并写假设", () => {
+  it("generate 无信号时保持 unclear，不再默认获客", () => {
     const plan = resolveCopyMethodologyPlan({
       rawInput: "写一条文案",
       mode: "generate",
     })
-    expect(plan.businessGoal).toBe("lead")
+    expect(plan.businessGoal).toBe("unclear")
+    expect(plan.cardIds).not.toContain("card.lead_gen")
     expect(plan.source).toBe("inferred")
     expect(plan.assumptions.length).toBeGreaterThan(0)
   })

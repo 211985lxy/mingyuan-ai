@@ -140,40 +140,29 @@ export class OpenAICompatibleProvider implements LLMProvider {
       stream: true,
     })
 
-    // DeepSeek 等推理模型可能先推 reasoning_content、后推 content。
-    // 有正文只出正文；整段流结束仍无正文时，再把推理缓冲当兜底吐出，避免「空流成功」。
-    let contentEmitted = false
-    let reasoningBuffer = ""
+    // 推理模型的 reasoning_content 是内部思维链，绝不能成为用户可见内容：
+    // 只透传 content 增量；流结束仍无正文时保持空流，由上游空内容校验显式失败，
+    // 再交给模型路由重试兜底（宁可见的失败，不可见的思维链泄漏）。
     for await (const chunk of response) {
       const delta = chunk.choices[0]?.delta as
         | { content?: string | null; reasoning_content?: string | null }
         | undefined
       const content = typeof delta?.content === "string" ? delta.content : ""
       if (content) {
-        contentEmitted = true
         yield content
-        continue
       }
-      const reasoning = typeof delta?.reasoning_content === "string" ? delta.reasoning_content : ""
-      if (reasoning) reasoningBuffer += reasoning
-    }
-    if (!contentEmitted) {
-      const fallback = reasoningBuffer.trim()
-      if (fallback) yield fallback
     }
   }
 }
 
 /**
- * DeepSeek v4 等推理模型可能把正文放在 reasoning_content，content 为空。
- * 优先用 content；为空时回退 reasoning_content，避免误判 Empty response。
+ * 只认 content 作为助手正文；reasoning_content 属于内部思维链，
+ * 任何情况下都不作为答案或客户可见内容返回（用户指令唯一真源整改约定）。
+ * content 为空时返回空串，由调用方按「空响应」显式失败并走路由重试。
  */
 export function extractAssistantText(message: unknown): string {
   if (!message || typeof message !== "object") return ""
   const record = message as { content?: unknown; reasoning_content?: unknown }
   const content = typeof record.content === "string" ? record.content.trim() : ""
-  if (content) return content
-  const reasoning =
-    typeof record.reasoning_content === "string" ? record.reasoning_content.trim() : ""
-  return reasoning
+  return content
 }

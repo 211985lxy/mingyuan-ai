@@ -3,7 +3,7 @@ import { buildBenchmarkMaterialPrefill } from "@/lib/aim-benchmark-length"
 import { assessBenchmarkRewrite } from "@/lib/aim-benchmark-quality"
 import { normalizeKnowledgeUsed } from "@/lib/aim-knowledge-cite"
 import { stripAimFormatMarkers } from "@/lib/aim/format-marker-cleanup"
-import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
+import { AIM_FORMAT_LABELS, splitAimMethodNote } from "@/lib/aim/workbench-display"
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { extractEditorDraftFromAssistantText, type AimEditorContext, type TextSelectionRange } from "@/lib/aim-editor"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
@@ -285,9 +285,9 @@ export function buildAimBenchmarkQualityMessage(input: {
     report.reusedSamples.length
       ? `- 复用片段示例：${report.reusedSamples.map((sample) => `「${sample}」`).join("、")}`
       : "- 复用片段示例：未发现明显连续复用。",
-    report.lengthPassed && !report.tooSimilar
-      ? "- 结论：这版在字数和照抄风险上基本合格，可以继续看表达质量。"
-      : "- 结论：这版还不合格，优先按原文字数重写，并替换开头、案例、过渡句或行动引导。",
+    report.tooSimilar
+      ? "- 结论：照抄风险高，需要替换开头、案例、过渡句或行动引导后重写；字数比例仅供参考，除非你选择了“保持原体量”，长度本身不构成不合格。"
+      : "- 结论：照抄风险可控；字数比例仅供参考，除非你选择了“保持原体量”，长度不构成不合格，可继续看表达质量。",
   ].join("\n\n")
 }
 
@@ -334,10 +334,16 @@ export function mapAimGenerationToDeliverables(item: AimGeneration): AimGenerate
   const knowledgeUsed = normalizeKnowledgeUsed(item.knowledgeUsed)
   return {
     id: item.id,
-    results: contents.map((content) => ({
-      ...content,
-      wordCount: content.content.length,
-    })),
+    results: contents.map((content) => {
+      // 旧客户端缓存/本地存储可能仍带 METHOD_NOTE：这里兜底拆分并保持字数只算正文
+      const display = splitAimMethodNote(content.content)
+      return {
+        ...content,
+        content: display.result,
+        reasoningSummary: item.reasoningByFormat?.[content.format] ?? (display.methodNote || undefined),
+        wordCount: display.result.length,
+      }
+    }),
     knowledgeUsed,
     taskSpec: item.taskSpec ?? undefined,
     workflowStatus: item.workflowStatus || "draft",

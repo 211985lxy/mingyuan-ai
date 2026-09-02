@@ -279,18 +279,13 @@ export function resolveCopyMethodologyPlan(
     confidence = 0.85
     assumptions.push("已点名漏斗/LOGO/AIDA模型；业务目标未另写明，默认按线索获客收束到业务CTA")
   } else {
-    // generate：老板 IP 默认偏获客；chat 可保持 unclear 供追问
-    if (input.mode === "chat") {
-      businessGoal = "unclear"
-      source = "inferred"
-      confidence = 0.3
-      assumptions.push("对话目标未明，可追问一题确认（获客/转化/人设信任/品牌曝光）")
-    } else {
-      businessGoal = "lead"
-      source = "inferred"
-      confidence = 0.45
-      assumptions.push("未检出明确目标词，按老板IP默认推断为线索获客(lead)")
-    }
+    // 用户指令唯一真源整改：目标未检出时不再默认"获客"。
+    // generate 与 chat 一律保持 unclear（跳过目标硬质检、不注入获客卡与 CTA 硬门槛），
+    // 目标缺口交由统一追问入口确认。
+    businessGoal = "unclear"
+    source = "inferred"
+    confidence = 0.3
+    assumptions.push("未检出明确目标词，内容目标未确认；不默认按获客处理，可追问一题确认（获客/转化/人设信任/品牌曝光）")
   }
 
   if (taskGoal.sourceBits.length) {
@@ -318,9 +313,8 @@ export function resolveCopyMethodologyPlan(
   } else {
     if (businessGoal !== "unclear") {
       cardIds.push(GOAL_TO_BUSINESS_CARD[businessGoal])
-    } else if (input.mode !== "chat") {
-      cardIds.push("card.lead_gen")
     }
+    // 目标 unclear 时不注入任何业务目标卡（含 lead_gen 兜底），CTA 不作为隐藏要求
     cardIds.push(ROUTE_TO_CARD[contentRoute])
     // 口播/去AI味时附带人味工具箱；开头优化附带七大开头
     if (localHit.local === "oral") cardIds.push("toolbox.humanizer")

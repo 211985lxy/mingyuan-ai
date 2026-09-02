@@ -310,7 +310,8 @@ describe("AIM high-risk loop prompt coverage", () => {
     expect(systemPrompt).toContain("小红书图文")
     expect(systemPrompt).toContain("内容创作")
     expect(systemPrompt).toContain("框架阶段或追问阶段，不要追加“验证结果”区块")
-    expect(systemPrompt).toContain("正式交付内容结尾追加一个简短“验证结果”区块")
+    expect(systemPrompt).toContain("验证结论绝不进正文")
+    expect(systemPrompt).not.toContain("正式交付内容结尾追加一个简短“验证结果”区块")
   })
 
   it("keeps work_editor generate focused on editing, not deep-longform drafting", async () => {

@@ -37,7 +37,14 @@ export type AimExecuteRequest = AimExecuteBody
 export type AimExecuteResponse =
   | ({ kind: "deliverable" } & AimGenerateResponse)
   | { kind: "reply"; content: string; runId?: string }
-  | { kind: "clarification"; question: string; runId?: string }
+  | {
+    kind: "clarification"
+    /** 完整追问文本（含编号），旧字段保持兼容 */
+    question: string
+    /** 编号追问列表（一次最多 3 个） */
+    questions?: string[]
+    runId?: string
+  }
 
 export interface AimWorkflowBriefResponse {
   stage: import("@/lib/aim-workflow").AimWorkflowStage
@@ -48,7 +55,10 @@ export interface AimWorkflowBriefResponse {
 
 export interface AimGenerateResult {
   format: ContentFormat
+  /** 可直接发布的正文（服务端已剥离 METHOD_NOTE） */
   content: string
+  /** 高层思考依据（仅折叠区展示；不进复制/编辑/发布/字数） */
+  reasoningSummary?: string
   wordCount: number
 }
 
@@ -152,6 +162,8 @@ export interface AimGeneration {
   retroSnapshots?: AimRetroSnapshot[]
   calibrationRules?: AimCalibrationRule[]
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
+  /** 历史读取归一化：各格式的高层思考依据（内容列已剥离 METHOD_NOTE，只含可发布正文） */
+  reasoningByFormat?: Partial<Record<ContentFormat, string>>
 }
 
 /**

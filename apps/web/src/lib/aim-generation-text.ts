@@ -6,6 +6,27 @@ export function withoutMethodNote(content: string): string {
   return content.replace(METHOD_NOTE_BLOCK_PATTERN, "").trim()
 }
 
+export interface ParsedGenerationContent {
+  /** 可直接发布的正文（METHOD_NOTE/FORMAT 标记已剥离 + 提词泄漏清洗） */
+  content: string
+  /** 高层思考依据（METHOD_NOTE 内文）；无标记时为 undefined */
+  reasoningSummary?: string
+}
+
+/**
+ * 读取时把「METHOD_NOTE + 正文」的存量文本拆成 正文 + 思考依据。
+ * 旧库内容无需迁移：所有出参统一经过本函数归一（幂等，干净文本原样返回）。
+ */
+export function splitGenerationReasoning(raw: string): ParsedGenerationContent {
+  const match = raw.match(METHOD_NOTE_BLOCK_PATTERN)
+  if (!match) return { content: deliveryBody(raw) }
+  const inner = match[0]
+    .replace(/^\[\[AIM_METHOD_NOTE\]\]/u, "")
+    .replace(/\[\[\/AIM_METHOD_NOTE\]\]$/u, "")
+    .trim()
+  return { content: deliveryBody(raw), reasoningSummary: inner || undefined }
+}
+
 export function deliveryBody(content: string): string {
   return scrubPromptLeakageFromBody(
     withoutMethodNote(content)

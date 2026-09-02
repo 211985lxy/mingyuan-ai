@@ -31,6 +31,24 @@ import { isAimFastSpokenRoute } from "../fast-spoken-policy"
  * eval 分支、trace summary/metadata 全部一字不改——这是与 buildAimGeneration 字节
  * 等价的核心，不得调整门控或顺序。
  */
+/**
+ * 用户指令唯一真源整改：IP Wiki / 项目事实底盘不再无条件自动加载。
+ * 仅当 (a) 用户明确要求结合项目/知识库资料，或 (b) 当前任务已确认需要项目事实
+ * （useKnowledge 且非轻改）时加载；轻改原稿默认不注入业务事实，避免偷偷扩写。
+ * 无项目（projectId 为空）时恒为 false。
+ */
+export function resolveIpWikiLoadFlag(input: {
+  projectId?: string | null
+  rawInput: string
+  useKnowledge: boolean
+  runtimeTask?: string
+}): boolean {
+  if (!input.projectId) return false
+  const explicitProjectMaterialRequest = /结合(?:一下)?(?:项目|知识库|档案)|(?:用|参考|按)(?:一下)?(?:项目|知识库|档案)的?(?:资料|信息|事实|数据)?|项目资料|知识库资料/.test(input.rawInput)
+  return explicitProjectMaterialRequest
+    || (input.useKnowledge && input.runtimeTask !== "light_edit")
+}
+
 export async function loadGenerationContextBlocks(input: {
   spec: AimRunSpec
   params: PrepareAimContextInput
@@ -84,6 +102,13 @@ export async function loadGenerationContextBlocks(input: {
 
   const knowledgeQuery = enrichKnowledgeQueryWithPainIntent(spec.rawInput, painIntent)
 
+  const shouldLoadIpWiki = resolveIpWikiLoadFlag({
+    projectId: spec.projectId,
+    rawInput: spec.rawInput,
+    useKnowledge: generationIntent.useKnowledge,
+    runtimeTask: spec.runtimeTask,
+  })
+
   const [knowledgeCtx, viralStructureBlock, methodologyBlock, businessDiagnosisBlock, ipWikiBlock, eventStorytellingBlock, ipWikiPages] = await runAimTraceStep(
     trace,
     "load_generation_context",
@@ -128,11 +153,11 @@ export async function loadGenerationContextBlocks(input: {
           generationIntent.useMethodology && agentId === "business_system_diagnosis"
             ? buildBusinessDiagnosisMethodologyBlock()
             : Promise.resolve(""),
-          spec.projectId ? buildIpWikiBlock({ projectId: spec.projectId }) : Promise.resolve(""),
+          shouldLoadIpWiki ? buildIpWikiBlock({ projectId: spec.projectId }) : Promise.resolve(""),
           eventSignal && (agentId === "content_producer" || agentId === "work_editor") && useEventStorytelling
             ? buildEventStorytellingMethodologyBlock()
             : Promise.resolve(""),
-          spec.projectId ? loadIpWikiPagesIndexed({ projectId: spec.projectId }) : Promise.resolve({}),
+          shouldLoadIpWiki ? loadIpWikiPagesIndexed({ projectId: spec.projectId }) : Promise.resolve({}),
         ]),
     ([knowledge, viralStructure, methodology, businessDiagnosis, ipWiki, eventStory, ipWikiPagesVal]) => ({
       summary: `命中 ${knowledge.entries.length} 条知识`,

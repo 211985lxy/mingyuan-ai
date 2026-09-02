@@ -72,7 +72,8 @@ describe("aim agent guides", () => {
     expect(guideText).toContain("我要讲故事")
     expect(guide.quickPrompts).toHaveLength(3)
     expect(guide.scenarios).toEqual(["我要搞流量口播", "我要获客口播", "我要讲故事口播"])
-    expect(guide.defaultInstruction).toContain("未说明时默认按流量漏斗处理")
+    expect(guide.defaultInstruction).toContain("未说明内容目的时先追问一句")
+    expect(guide.defaultInstruction).not.toContain("未说明时默认按流量漏斗处理")
     expect(guide.defaultInstruction).not.toContain("对标再创作")
     expect(guide.quickPrompts.join("\n")).not.toContain("多平台")
   })
@@ -96,7 +97,8 @@ describe("aim agent guides", () => {
     const action = getAimAgentGuide("content_producer").nextActions.find((item) => item.id === "publish_package")
 
     expect(action?.label).toBe("生成发布计划")
-    expect(action?.prompt).toContain("12 条内容排产表")
+    expect(action?.prompt).toContain("内容排产表")
+    expect(action?.prompt).toContain("排产数量只服从用户指令")
     expect(action?.prompt).toContain("序号、选题标题、核心钩子、内容角度、适合平台/形式、发布话题、承接动作")
     expect(action?.prompt).toContain("品牌/IP/账号相关话题")
   })
@@ -232,7 +234,8 @@ describe("aim agent guides", () => {
     const publishAction = getAimAgentGuide("content_producer").nextActions.find((a) => a.id === "publish_package")
 
     expect(skills.find((s) => s.id === "content_fission")).toBeUndefined()
-    expect(publishAction?.prompt).toContain("12 条内容排产表")
+    expect(publishAction?.prompt).toContain("内容排产表")
+    expect(publishAction?.prompt).toContain("排产数量只服从用户指令")
     expect(publishAction?.prompt).not.toContain("裂变为短视频")
   })
 

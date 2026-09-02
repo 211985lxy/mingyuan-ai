@@ -102,4 +102,34 @@ describe("AimDeliverableBubble", () => {
     expect(html).toContain("正在重出一版")
     expect(html).toContain("opacity-55")
   })
+
+  it("prefers the server-provided reasoningSummary and keeps it out of the body", () => {
+    const html = renderToStaticMarkup(createElement(AimDeliverableBubble, {
+      messageId: "message-split",
+      deliverables: {
+        id: "generation-split",
+        results: [{
+          format: "video_script",
+          // 服务端已剥离 METHOD_NOTE：content 只含可发布正文
+          content: "这是纯净的发布正文。",
+          reasoningSummary: "目标判定：获客；使用资料：客户访谈",
+          wordCount: 9,
+        }],
+        knowledgeUsed: [],
+      },
+      agentId: "content_producer",
+      isCurrentVersion: true,
+      nextActions: [],
+      onRepurpose: vi.fn(),
+      onQuality: vi.fn(),
+      onMarkStatus: vi.fn(),
+      isBusy: false,
+    }))
+
+    // 思考依据进折叠区，正文区保持纯净
+    expect(html).toContain("思考依据")
+    expect(html).toContain("目标判定：获客")
+    expect(html).toContain("这是纯净的发布正文。")
+    expect(html).not.toContain("AIM_METHOD_NOTE")
+  })
 })

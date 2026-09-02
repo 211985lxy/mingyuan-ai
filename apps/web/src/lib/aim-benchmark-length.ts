@@ -88,19 +88,16 @@ export function buildExplicitWordCountPriorityRule(text: string | null | undefin
 }
 
 /**
- * @description 构建对标文案字数参考规则（基于原文字数生成 95%-105% 范围）
- * @param transcript - 对标原文转录文本
- * @param userInstruction - 可选的用户指令文本
- * @returns 字数参考规则文本，无法生成时返回 null
+ * @description 构建对标文案长度规则（用户指令唯一真源整改后）
+ * 长度策略只来自用户显式选择：
+ * - 自定义长度：用户写了明确字数 → 字数优先规则；
+ * - 保持原体量：用户明确说"保持/别缩短原稿体量" → 保持篇幅规则；
+ * - 自由长度：用户什么都没说 → 不注入任何隐藏长度规则（原 95%-105% 自动对齐已移除，
+ *   缺长度策略时由统一追问入口补问，不在生成侧偷偷默认）。
+ * @param transcript - 对标原文转录文本（保留参数兼容旧调用，不再参与默认规则）
+ * @param userInstruction - 用户指令文本
+ * @returns 长度规则文本，用户未选择长度策略时返回 null
  */
 export function buildBenchmarkLengthRule(transcript: string | null | undefined, userInstruction?: string | null) {
-  const explicitRule = buildExplicitWordCountPriorityRule(userInstruction)
-  if (explicitRule) return explicitRule
-
-  const count = (transcript || "").replace(/\s+/g, "").length
-  if (count === 0) return null
-  const min = Math.max(1, Math.round(count * 0.95))
-  const max = Math.min(Math.round(count * 1.05), AIM_OUTPUT_MAX_CHARS)
-  const target = Math.min(count, AIM_OUTPUT_MAX_CHARS)
-  return `字数参考规则：如果用户没有另写明确字数要求，本次生成的对标改写正文参考对标原文体量；对标原文约 ${count} 字，目标约 ${target} 字，控制在 ${Math.min(min, AIM_OUTPUT_MAX_CHARS)}-${max} 字；如果用户另写了 2000 字、至少 2000 字等明确要求，必须优先服从用户字数，但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
+  return buildExplicitWordCountPriorityRule(userInstruction)
 }

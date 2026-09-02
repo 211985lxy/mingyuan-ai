@@ -17,8 +17,11 @@ describe("opening recommendation prompt", () => {
     expect(prompt).toContain("第一秒必须有停留理由")
     expect(prompt).toContain("禁止空泛开场")
     expect(prompt).toContain("以下为基于当前信息的默认假设")
-    expect(prompt).toContain("至少输出 10 条")
+    // 数量/画面建议/推荐榜只按用户明确要求给，不再固定 10 条 / 3 画面 / 推荐榜
+    expect(prompt).not.toContain("至少输出 10 条")
+    expect(prompt).not.toContain("最推荐的 3 条")
+    expect(prompt).toContain("数量严格按用户指令")
     expect(prompt).toContain("开头画面建议")
-    expect(prompt).toContain("最推荐的 3 条")
+    expect(prompt).toContain("先用一句话追问需要几条开头")
   })
 })

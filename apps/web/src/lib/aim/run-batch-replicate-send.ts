@@ -4,6 +4,24 @@ import type { PastedCopyAttachment } from "@/lib/aim/paste-copy-attachment"
 import { splitScripts } from "@/lib/aim/script-structure-extractor-types"
 import type { AimWorkbenchMessage, BatchDeliverableResult } from "@/lib/aim/workbench-types"
 
+const CHINESE_DIGITS: Record<string, number> = {
+  一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+}
+
+/**
+ * 从指令解析"生成几条"（用户指令唯一真源：批量数量只来自用户，不再默认 3 条）。
+ * 支持"生成5条 / 出三条 / 5条 / 要5个版本"等写法。
+ */
+export function parseBatchReplicateCount(instruction: string): number | null {
+  const text = instruction.trim()
+  if (!text) return null
+  const digit = text.match(/(?:生成|写|出|做|要|复刻)?\s*(\d{1,2})\s*[条个](?![^条个]{0,2}对标)/)
+  if (digit) return Number(digit[1])
+  const chinese = text.match(/(?:生成|写|出|做|要|复刻)?\s*([一二三四五六七八九十])\s*[条个]/)
+  if (chinese) return CHINESE_DIGITS[chinese[1]] ?? null
+  return null
+}
+
 /**
  * 批量复刻粘贴发送：检测到多条对标文案时，走 pipeline API 一键提取结构 + 生成文案，
  * 结果以 batchDeliverables 挂到 assistant 消息，展示在聊天流内。
@@ -27,7 +45,21 @@ export async function runBatchReplicateSend(input: {
   }
 
   const scripts = splitScripts(attachment.content)
-  const count = 3 // 默认生成 3 条，后续可由指令解析
+  const count = parseBatchReplicateCount(instruction)
+
+  // 数量缺失：一次追问，不落任何隐藏默认值；保留粘贴附件与输入，用户补数量后重发即走本分流
+  if (!count) {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `batch-ask-${Date.now()}`,
+        role: "assistant" as const,
+        content: `这次批量复刻要生成几条新文案？直接在指令里补上数量（例如「生成 5 条」）再发送。已粘贴的 ${scripts.length} 条对标文案我会保留。`,
+      },
+    ])
+    toast.message("请补充生成数量", { description: "例如在输入框补一句「生成 5 条」后重新发送。" })
+    return true
+  }
 
   // 1. 立即插入用户消息（展示用户粘贴了什么）
   const userMessage: AimWorkbenchMessage = {

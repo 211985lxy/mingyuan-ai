@@ -7,6 +7,7 @@ import {
   parseAimHistoryUpdate,
 } from "@/lib/aim/services/history-update"
 import { buildOutcomeUpdate, sanitizeOutcomeBody, type SanitizedOutcome } from "@/lib/content-outcome"
+import { normalizeAimGenerationForRead } from "@/lib/aim/history-normalize"
 
 /**
  * @description 处理 GET 请求
@@ -27,7 +28,7 @@ export async function GET(
     if (!record) {
       return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
     }
-    return NextResponse.json({
+    return NextResponse.json(normalizeAimGenerationForRead({
       ...record,
       agentId:
         record.agentId === "ip_video"
@@ -35,7 +36,7 @@ export async function GET(
           : record.agentId === "deep_copywriter"
             ? "work_editor"
             : record.agentId,
-    })
+    }))
   } catch (error) {
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "生成记录读取失败" },

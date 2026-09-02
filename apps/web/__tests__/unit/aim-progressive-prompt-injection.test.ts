@@ -33,7 +33,7 @@ describe("progressive content producer prompts", () => {
       includeBenchmark: false,
     })
 
-    expect(prompt).not.toContain("发布话题推荐 6 个")
+    expect(prompt).not.toContain("发布话题数量只服从用户明确要求")
     expect(prompt).not.toContain("高风险任务验证规则")
     expect(prompt).not.toContain("至少 30% 可感知重写")
     expect(prompt).toContain("禁止另写整篇")
@@ -61,7 +61,8 @@ describe("progressive content producer prompts", () => {
       ipWikiBlock: "",
       rawInput: "给我整套发布包和发布话题",
     })
-    expect(prompt).toContain("发布话题推荐 6 个")
+    expect(prompt).toContain("发布话题数量只服从用户明确要求")
+    expect(prompt).not.toContain("发布话题推荐 6 个")
   })
 
   it("always-on footprint shrinks ≥30% vs legacy concatenated rules", () => {

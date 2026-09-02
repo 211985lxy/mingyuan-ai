@@ -77,7 +77,23 @@ export function ChannelBindingsPanel() {
     setProjectId((current) => current || projectItems[0]?.id || "")
   }
 
-  useEffect(() => { void reload().catch((error) => toast.error(error instanceof Error ? error.message : "群聊绑定读取失败")) }, [])
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const [bindings, projectItems] = await Promise.all([listChannelBindings(), listClientProjects()])
+        if (cancelled) return
+        setItems(bindings)
+        setProjects(projectItems)
+        setProjectId((current) => current || projectItems[0]?.id || "")
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "群聊绑定读取失败")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function submit() {
     if (!projectId || !externalChatId.trim()) return toast.error("请选择项目并填写群 ID")

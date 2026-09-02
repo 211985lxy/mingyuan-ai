@@ -157,6 +157,35 @@ describe("semantic task understanding", () => {
     expect(result.clarificationQuestion).toContain("左侧最新口播")
   })
 
+  it("accepts up to three numbered clarification questions in one turn", () => {
+    const result = parseSemanticTaskUnderstanding(`
+[[AIM_HANDLING:clarify]]
+[[AIM_TASK_BRIEF]]用户要写一篇新稿，但主题、受众、目标与篇幅都未说明。[[/AIM_TASK_BRIEF]]
+[[AIM_CLARIFICATION]]
+1. 这篇内容写什么主题、给谁看？
+2. 内容目标是什么：搞流量、获客咨询、成交转化，还是建立人设信任？
+3. 篇幅要多长？
+[[/AIM_CLARIFICATION]]`)
+
+    expect(result.handling).toBe("clarify")
+    expect(result.clarificationQuestions).toHaveLength(3)
+    expect(result.clarificationQuestions?.[0]).not.toMatch(/^1[.、]/)
+    expect(result.clarificationQuestions?.[0]).toContain("主题")
+    expect(result.clarificationQuestion).toContain("篇幅要多长")
+  })
+
+  it("rejects more than three clarification questions", () => {
+    expect(() => parseSemanticTaskUnderstanding(`
+[[AIM_HANDLING:clarify]]
+[[AIM_TASK_BRIEF]]缺口较多。[[/AIM_TASK_BRIEF]]
+[[AIM_CLARIFICATION]]
+1. 主题是什么？
+2. 给谁看？
+3. 目标是什么？
+4. 多长？
+[[/AIM_CLARIFICATION]]`)).toThrow("最多包含三个问题")
+  })
+
   it("rejects business action labels in the protocol output", () => {
     expect(() => parseSemanticTaskUnderstanding(`
 [[AIM_HANDLING:deliver]]

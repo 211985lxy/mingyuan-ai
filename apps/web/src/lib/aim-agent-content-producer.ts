@@ -11,6 +11,7 @@ import {
   isGenericContentRequestWithoutFacts,
 } from "@/lib/aim-generation-prompts"
 import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import {
   buildClosedWorldModelInput,
   hasStrictNumericClaimConstraint,
@@ -81,11 +82,10 @@ export class ContentProducerHandler implements AimAgentHandler {
       const record = await saveAimGenerationRecord(context, completion, traced)
       return {
         id: record.id,
-        results: context.targetFormats.map((format) => ({
-          format,
-          content: traced[format],
-          wordCount: traced[format].length,
-        })),
+        results: context.targetFormats.map((format) => {
+          const { content, reasoningSummary } = splitGenerationReasoning(traced[format])
+          return { format, content, reasoningSummary, wordCount: content.length }
+        }),
         knowledgeUsed: record.knowledgeUsed as any[],
         taskSpec: (record as {
           taskSpec?: import("@/lib/task-spec").TaskSpec
@@ -151,11 +151,10 @@ export class ContentProducerHandler implements AimAgentHandler {
 
     return {
       id: record.id,
-      results: context.targetFormats.map((format) => ({
-        format,
-        content: traced[format],
-        wordCount: traced[format].length,
-      })),
+      results: context.targetFormats.map((format) => {
+        const { content, reasoningSummary } = splitGenerationReasoning(traced[format])
+        return { format, content, reasoningSummary, wordCount: content.length }
+      }),
       knowledgeUsed: record.knowledgeUsed as any[],
       taskSpec: (record as { taskSpec?: import("@/lib/task-spec").TaskSpec }).taskSpec,
       workflowStatus: (record as { workflowStatus?: string }).workflowStatus || "draft",

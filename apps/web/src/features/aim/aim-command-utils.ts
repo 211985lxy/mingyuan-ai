@@ -150,8 +150,8 @@ export function buildBenchmarkQualityMessage(input: {
     report.reusedSamples.length
       ? `- 复用片段示例：${report.reusedSamples.map((sample) => `「${sample}」`).join("、")}`
       : "- 复用片段示例：未发现明显连续复用。",
-    report.lengthPassed && !report.tooSimilar
-      ? "- 结论：这版在字数和照抄风险上基本合格，可以继续看表达质量。"
-      : "- 结论：这版还不合格，优先按原文字数重写，并替换开头、案例、过渡句或行动引导。",
+    report.tooSimilar
+      ? "- 结论：照抄风险高，需要替换开头、案例、过渡句或行动引导后重写；字数比例仅供参考，除非你选择了“保持原体量”，长度本身不构成不合格。"
+      : "- 结论：照抄风险可控；字数比例仅供参考，除非你选择了“保持原体量”，长度不构成不合格，可继续看表达质量。",
   ].join("\n\n")
 }

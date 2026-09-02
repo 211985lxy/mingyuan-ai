@@ -16,20 +16,21 @@ import type { CopyStudioModule } from "@/lib/copy-studio"
 import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import {
   buildAimRawInput,
-  extractBenchmarkAnalysisText,
-  extractBenchmarkOriginalText,
-  findLatestAimDeliverableId,
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
 import { buildGenerationSourceEnvelope } from "@/hooks/aim-generation-source-envelope"
-import { generateAimContentWithTransientRetry } from "@/hooks/aim-unified-turn-client"
+import {
+  applyExecuteTurnResponse,
+  applyGenerationResponse,
+  buildExecuteTurnRequest,
+  resolveFollowUpGenerationId,
+} from "@/hooks/aim-generation-delivery-flow"
+import { executeAimTurnWithTransientRetry, generateAimContentWithTransientRetry } from "@/hooks/aim-unified-turn-client"
 import {
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
 } from "@/lib/aim/task-session-reset"
-import { mergeAimGenerationIntoMessages } from "@/lib/aim/merge-aim-generation-messages"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
-import { startRunOutcomeActivity } from "@/lib/aim/run-outcome-client"
 import { repurposeDeliverable } from "@/hooks/aim-repurpose-content-package"
 
 type MessageSetter = Dispatch<SetStateAction<AimWorkbenchMessage[]>>
@@ -113,10 +114,6 @@ export function getAimPendingGenerationMessage(projectEnabled: boolean, actionLa
     : `正在${actionLabel}，将根据本次输入生成交付物…`
 }
 
-function getDeliverableReadyMessage(agentTitle: string) {
-  return `${agentTitle} 交付物已生成，可直接复制使用，也能继续在下方对话里让我改写。`
-}
-
 const GENERATION_PROGRESS_STAGES = [
   { afterMs: 12_000, message: (actionLabel: string) => `正在理解你的要求，随后${actionLabel}…` },
   { afterMs: 28_000, message: () => "正在读取项目资料并匹配知识库…" },
@@ -141,14 +138,6 @@ function startGenerationProgressTicker(
     for (const timer of timers) clearTimeout(timer)
   }
 }
-export function resolveFollowUpGenerationId(
-  startsNewTask: boolean | undefined,
-  messages: AimWorkbenchMessage[],
-): string | undefined {
-  if (startsNewTask) return undefined
-  return findLatestAimDeliverableId(messages)
-}
-
 function appendPendingGeneration(input: AimGenerationActionInput, currentInput: string, options: GenerateOptions) {
   const assistantMessageId = nextAimWorkbenchId()
   input.pendingScrollMessageIdRef.current = assistantMessageId
@@ -236,37 +225,8 @@ function buildGenerationRequest(
   }
 }
 
-function applyGenerationResponse(
-  input: AimGenerationActionInput,
-  assistantMessageId: string,
-  currentInput: string,
-  response: AimGenerateResponse,
-) {
-  startRunOutcomeActivity(response.runId)
-  const originalText = extractBenchmarkOriginalText(currentInput)
-  const analysisText = extractBenchmarkAnalysisText(currentInput)
-  if (originalText) input.setSourceOriginalText(originalText)
-  if (analysisText) input.setSourceAnalysisText(analysisText)
-  input.setMessages((messages) => mergeAimGenerationIntoMessages(messages, assistantMessageId, {
-    content: getDeliverableReadyMessage(input.agent.title),
-    agentId: input.agent.id,
-    deliverables: response,
-    runId: response.runId ?? null,
-    degraded: response.degraded ?? null,
-    qualityStatus: response.qualityStatus ?? null,
-    workflowStage: input.currentWorkflowStage,
-    contentAction: input.contentAction,
-    regenerating: false,
-    failure: null,
-  }))
-  const mainResult = response.results[0]
-  if (mainResult) input.openEditorFromResult(assistantMessageId, mainResult.format, mainResult.content)
-  void input.refreshHistory({ force: true })
-  if (input.selectedProjectId) void input.refreshProjectWorkflow()
-  input.setWorkflowBrief(null)
-  input.setContentAction(null)
-  toast.success(`${input.agent.primaryActionLabel}完毕`)
-}
+/** 统一执行入口的请求构建与响应应用已拆至 aim-generation-delivery-flow（保持模块 ≤500 行） */
+export { resolveFollowUpGenerationId } from "@/hooks/aim-generation-delivery-flow"
 
 function markGenerationStopped(input: AimGenerationActionInput, assistantMessageId: string) {
   input.setMessages((messages) => messages.map((message) => {
@@ -317,6 +277,20 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
   input.setIsGenerating(true)
   try {
     const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, options)
+    // 创作台主生成（文案创作 content_producer）切到统一执行入口：
+    // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
+    const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
+    if (useUnifiedEntry) {
+      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, options)
+      const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
+      if (controller.signal.aborted) {
+        markGenerationStopped(input, assistantMessageId)
+        return
+      }
+      applyExecuteTurnResponse(input, assistantMessageId, response, currentInput)
+      endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
+      return
+    }
     const { executionAgentId, ...generateBody } = request
     const response = await generateAimContentWithTransientRetry({
       ...generateBody,
@@ -454,6 +428,12 @@ async function checkDeliverableQuality(input: AimGenerationActionInput, messageI
   }
 }
 
+/** 模块级助手：中止并复位请求控制器（跨函数边界变更 ref，避开 hook 参数直接变异的编译器规则） */
+function resetGenerationAbortController(ref: MutableRefObject<AbortController | null>) {
+  ref.current?.abort()
+  ref.current = null
+}
+
 /**
  * @description React Hook：aimgenerationed
  * @param input - 输入数据
@@ -473,8 +453,7 @@ export function useAimGenerationActions(input: AimGenerationActionInput) {
     generateWithInput: stableGenerateWithInput,
     stopGeneration: () => {
       // 立即中止请求并强制清忙状态：不依赖 abort 回调链（挂起的请求/质检可能迟迟不结束）
-      input.requestAbortRef.current?.abort()
-      input.requestAbortRef.current = null
+      resetGenerationAbortController(input.requestAbortRef)
       input.setIsGenerating(false)
       input.setIsQualityChecking(false)
       markPendingMessageStoppedIfAny(input)

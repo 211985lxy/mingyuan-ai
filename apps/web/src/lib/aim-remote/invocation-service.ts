@@ -31,6 +31,7 @@ import {
   type SubmitAgentInvocationInput,
 } from "./contracts"
 import type { ContentFormat } from "@/lib/aim-generator"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 
 const ACTION = "draft.generate"
 
@@ -213,7 +214,8 @@ export function extractInvocationResults(output: {
   ]
   const items: InvocationResultItem[] = []
   for (const [format, content] of pairs) {
-    if (content) items.push({ format, content })
+    // 存量列里混存的 METHOD_NOTE 思考依据在出参边界剥离：远程调用方只拿可发布正文
+    if (content) items.push({ format, content: splitGenerationReasoning(content).content })
   }
   return items
 }

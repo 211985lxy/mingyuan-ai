@@ -144,7 +144,10 @@ export interface AimGenerateResponse {
   id: string
   results: Array<{
     format: ContentFormat
+    /** 可直接发布的正文（不含 METHOD_NOTE 思考依据） */
     content: string
+    /** 高层思考依据（METHOD_NOTE 内文），仅 UI 折叠区展示，不参与复制/编辑/发布/字数 */
+    reasoningSummary?: string
     wordCount: number
   }>
   knowledgeUsed: Array<{

@@ -89,11 +89,33 @@ describe("AIM content production positioning", () => {
     expect(systemPrompt).toContain("好的老板")
   })
 
-  it("keeps one canonical spoken-script instruction with two-minute and long-form defaults", () => {
-    expect(FORMAT_INSTRUCTIONS.video_script).toContain("默认写成约2分钟")
-    expect(FORMAT_INSTRUCTIONS.video_script).toContain("3-5分钟长口播")
-    expect(FORMAT_INSTRUCTIONS.video_script).toContain("约600-1000个汉字")
+  it("keeps one canonical spoken-script instruction with no hidden length defaults", () => {
+    // 用户指令唯一真源：口播模板不再自带默认时长/字数门槛，篇幅只服从用户明确要求
+    expect(FORMAT_INSTRUCTIONS.video_script).not.toContain("默认写成约2分钟")
+    expect(FORMAT_INSTRUCTIONS.video_script).not.toContain("400-500")
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("不设默认时长、默认字数或交付门槛")
+    expect(FORMAT_INSTRUCTIONS.video_script).toContain("篇幅只服从用户明确要求")
     expect(FORMAT_INSTRUCTIONS.koubo_script).toBe(FORMAT_INSTRUCTIONS.video_script)
+  })
+
+  it("honors an explicit word-count range as the acceptance bounds", () => {
+    // 用户明确要求"2分钟、400到550字"时严格执行：字数区间直接作为验收边界
+    expect(findIncompleteGenerationFormats({
+      parsed: { video_script: "完整句子。".repeat(30) },
+      targetFormats: ["video_script"],
+      rawInput: "2分钟，400到550字",
+      finishReason: "stop",
+    })).toEqual(["video_script"])
+    expect(findOverlongGenerationFormats({
+      parsed: { video_script: "长句子啊。".repeat(150) },
+      targetFormats: ["video_script"],
+      rawInput: "400-550字",
+    })).toEqual(["video_script"])
+    expect(findOverlongGenerationFormats({
+      parsed: { video_script: "长句子啊。".repeat(150) },
+      targetFormats: ["video_script"],
+      rawInput: "写一条完整口播",
+    })).toEqual([])
   })
 
   it("rejects a spoken script that ends halfway through a sentence", () => {
@@ -127,23 +149,25 @@ describe("AIM content production positioning", () => {
     })).toEqual(["video_script"])
   })
 
-  it("uses two minutes by default and supports three-to-five-minute long scripts", () => {
-    const shortDefault = "这是一个完整句子。".repeat(30)
-    const longEnoughDefault = "这是一个完整句子。".repeat(50)
+  it("does not enforce a hidden default length when the user gave no duration", () => {
+    const shortComplete = "这是一个完整句子。".repeat(30)
+    const longComplete = "这是一个完整句子。".repeat(50)
     const tooShortForLongForm = "这是一个完整句子。".repeat(50)
 
+    // 未指定时长：长度不再是隐藏门槛，完整成稿（即使偏短）直接通过
     expect(findIncompleteGenerationFormats({
-      parsed: { video_script: shortDefault },
-      targetFormats: ["video_script"],
-      rawInput: "写一条完整口播",
-      finishReason: "stop",
-    })).toEqual(["video_script"])
-    expect(findIncompleteGenerationFormats({
-      parsed: { video_script: longEnoughDefault },
+      parsed: { video_script: shortComplete },
       targetFormats: ["video_script"],
       rawInput: "写一条完整口播",
       finishReason: "stop",
     })).toEqual([])
+    expect(findIncompleteGenerationFormats({
+      parsed: { video_script: longComplete },
+      targetFormats: ["video_script"],
+      rawInput: "写一条完整口播",
+      finishReason: "stop",
+    })).toEqual([])
+    // 用户显式给了时长（3到5分钟）时，低于该时长下限仍判不达标
     expect(findIncompleteGenerationFormats({
       parsed: { video_script: tooShortForLongForm },
       targetFormats: ["video_script"],
@@ -420,10 +444,12 @@ describe("AIM content production positioning", () => {
     expect(AIM_HIGH_RISK_LOOP_RULE).toContain("简单问答、局部润色、单句改写、纯发散创意")
   })
 
-  it("keeps content_review minimal while adding the loop rule for formal deliverables", () => {
+  it("keeps content_review minimal while keeping verification out of the publishable body", () => {
     const prompt = buildContentReviewGeneratePrompt("企业知识库")
 
-    expect(prompt).toContain("正式交付内容结尾追加一个简短“验证结果”区块")
+    // 验证结果只进 METHOD_NOTE（思考依据），不再追加进可发布正文
+    expect(prompt).toContain("验证结论绝不进正文")
+    expect(prompt).not.toContain("正式交付内容结尾追加一个简短“验证结果”区块")
     expect(prompt).toContain("不要整篇重写")
     expect(prompt).toContain("最小修改建议")
   })
@@ -440,13 +466,17 @@ describe("AIM content production positioning", () => {
     expect(block).toContain("【私域素材】")
   })
 
-  it("keeps benchmark rewrites close to the original copy length", () => {
-    const rule = buildBenchmarkLengthRule("一 二 三 四 五") || ""
-
-    expect(rule).toContain("目标约 5 字")
-    expect(rule).toContain("控制在 5-5 字")
-    expect(rule).toContain("如果用户没有另写明确字数要求")
-    expect(buildBenchmarkLengthRule("")).toBeNull()
+  it("no longer forces benchmark rewrites to match the original length by default", () => {
+    // 用户指令唯一真源：未选择长度策略时不再注入 95%-105% 对标长度规则
+    expect(buildBenchmarkLengthRule("一 二 三 四 五")).toBeNull()
+    expect(buildBenchmarkLengthRule("测".repeat(6000))).toBeNull()
+    // 用户显式给了字数 → 只服从用户字数（保留全局上限提醒）
+    const explicit = buildBenchmarkLengthRule("一 二 三 四 五", "写一篇 3000 字的改写稿") || ""
+    expect(explicit).toContain("必须优先服从用户字数")
+    expect(explicit).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
+    // 用户明确要保持原体量 → 保持篇幅规则
+    const preserve = buildBenchmarkLengthRule("一 二 三 四 五", "别越改越短，保持原文体量") || ""
+    expect(preserve).toContain("保留当前稿子的主体信息密度和体量")
   })
 
   it("switches long benchmark transcripts to content producer longform earlier", () => {
@@ -474,10 +504,9 @@ describe("AIM content production positioning", () => {
     expect(buildExplicitWordCountPriorityRule("不要压缩，按原稿体量来")).toContain("不要越改越短")
   })
 
-  it("caps benchmark rewrite guidance at the global max length", () => {
-    const rule = buildBenchmarkLengthRule("测".repeat(6000)) || ""
+  it("caps explicit benchmark word-count guidance at the global max length", () => {
+    const rule = buildBenchmarkLengthRule("测".repeat(6000), "至少写 8000 字") || ""
 
-    expect(rule).toContain(`目标约 ${AIM_OUTPUT_MAX_CHARS} 字`)
     expect(rule).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
   })
 
