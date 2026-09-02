@@ -33,7 +33,9 @@ function authorizeChanjingWebhook(request: NextRequest): boolean {
   const secret = env.CHANJING_WEBHOOK_SECRET
   if (!secret) return true
   const provided = request.headers.get("x-webhook-secret")
-  if (!provided) return true
+  // fail-closed：密钥已配置时，缺失或错误的服务密钥一律拒绝，
+  // 否则调用方只需省略请求头即可绕过校验。
+  if (!provided) return false
   const a = Buffer.from(secret)
   const b = Buffer.from(provided)
   if (a.length !== b.length) return false
