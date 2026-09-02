@@ -10,6 +10,7 @@ import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
 import { AimSkillEditDialog } from "@/components/aim/aim-skill-edit-dialog"
 import { AimStylePreviewDialog } from "@/components/aim/aim-style-preview-dialog"
+import { AimIpProfileDialog, AimIpProfileEntryBar } from "@/components/aim/aim-ip-profile-dialog"
 import { WorkflowBriefDialog } from "@/components/aim/workflow-brief-dialog"
 import { WorkflowRecordDialog } from "@/components/aim/workflow-record-dialog"
 import { AimProjectAttachDialog } from "@/components/aim/aim-project-attach-dialog"
@@ -51,6 +52,7 @@ export default function AimPage() {
   )
   const [pastedCopy, setPastedCopy] = useState<PastedCopyAttachment | null>(null)
   const [stylePreviewOpen, setStylePreviewOpen] = useState(false)
+  const [ipProfileOpen, setIpProfileOpen] = useState(false)
   const [styleSamples, setStyleSamples] = useState<Array<{ content: string; label?: "core" | "normal" }>>([])
   const [benchmarkSearchOpen, setBenchmarkSearchOpen] = useState(false)
   const [batchStudioOpen, setBatchStudioOpen] = useState(false)
@@ -302,6 +304,9 @@ export default function AimPage() {
           projectEnabled={w.projectEnabled}
           projectAccessError={w.projectAccessError}
         />
+        {w.projectEnabled && w.selectedProjectId && !isLanding ? (
+          <AimIpProfileEntryBar onOpen={() => setIpProfileOpen(true)} />
+        ) : null}
         {w.projectEnabled && w.selectedProjectId && !isLanding ? <ProjectWeeklyContent projectId={w.selectedProjectId} /> : null}
         {w.currentWorkflowStage === "results" && w.selectedProjectId ? <ProjectWeeklyBusinessReview projectId={w.selectedProjectId} /> : null}
 
@@ -434,6 +439,11 @@ export default function AimPage() {
           setPastedCopy(null)
           void refreshStyleStatus()
         }}
+      />
+      <AimIpProfileDialog
+        open={ipProfileOpen}
+        projectId={w.projectEnabled ? w.selectedProjectId || null : null}
+        onOpenChange={setIpProfileOpen}
       />
       {w.wikiDialog.open && w.wikiDialog.context && (
         <IpWikiDialog
