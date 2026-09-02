@@ -33,21 +33,6 @@ export interface AimIpProfileDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-/** 创作台入口条：让"档案"看得见、点得开 */
-export function AimIpProfileEntryBar({ onOpen }: { onOpen: () => void }) {
-  return (
-    <div className="flex items-center px-3 py-1 sm:px-5">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
-      >
-        IP 档案 · 填一次，生成时整块带上（我是谁 / 卖什么 / 服务谁）
-      </button>
-    </div>
-  )
-}
-
 function CompletenessBanner({ hints }: { hints: string[] }) {
   if (hints.length === 0) {
     return (
