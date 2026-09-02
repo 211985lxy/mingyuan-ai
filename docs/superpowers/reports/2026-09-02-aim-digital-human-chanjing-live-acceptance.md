@@ -61,7 +61,14 @@ typecheck 0 错误；lint 0 errors；live-fire E2E 10/10；chanjing 相关单测
 
 ## 6. 遗留
 
-- 20 任务灰度矩阵、闪剪管理员备用链路的真实验证（等非生产闪剪凭证）。
+- 20 任务灰度矩阵：**暂缓执行（2026-09-02 使用方决策）**。只读接口摸底：
+  剩余蝉豆 45（其中 32 个 30 天内过期），按豆计费、单价未明示，余额大概率
+  不足以支撑 20 任务。执行器已就绪：dry-run 直接运行
+  `pnpm exec tsx scripts/chanjing-gray-matrix.ts`，确认后加 `--run=20`；
+  小批试单价可用 `--run=3` + `pnpm exec tsx scripts/chanjing-account-status.ts`。
+- 闪剪管理员备用链路的真实验证（等非生产闪剪凭证）。
 - audio 型下单目前仅客户端能力，未接入产品路由流（建议单独评审后接入）。
 - 供应商临时 URL 已过期风险已通过本地转存缓解；正式转存应走 AIM OSS
   （需配置 OSS 凭证后由转存重试通道完成）。
+- 凭证仍保留在本地 `apps/web/.env.local`（gitignored）供后续矩阵执行；
+  如需清除删除该文件中两行 CHANJING_* 即可。
