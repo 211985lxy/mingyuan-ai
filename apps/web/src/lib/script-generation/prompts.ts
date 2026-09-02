@@ -13,14 +13,14 @@ export function buildMetaPromptText(
   directions: ScriptDirection[],
 ): string {
   const lines = [
-    "请根据以下上下文创作 3 条短视频口播文案。",
+    "请根据以下上下文创作短视频口播文案（条数按用户要求；未说明时先问一句要几条）。",
     "",
     contextBlock,
     "",
     "【共通要求】",
     "- 文案是可直接朗读的纯口播文本。",
     "- 不要输出任何结构标签、说明、括号注释、错误提示或 markdown。",
-    "- 每条文案都要落到明确 CTA。",
+    "- 行动引导（CTA）只在用户明确要求或目标已确认为获客/成交时给出，不默认添加。",
   ]
 
   if (params.structure) {
@@ -72,7 +72,7 @@ export function buildDirectGenerationPrompt(
   params: GenerateScriptCandidatesParams,
 ): string {
   const lines = [
-    "请基于以下上下文，直接创作 3 条不同角度的短视频口播文案。",
+    "请基于以下上下文，直接创作多条不同角度的短视频口播文案（条数按用户要求）。",
     "",
     contextBlock,
     "",

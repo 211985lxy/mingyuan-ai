@@ -155,7 +155,7 @@ describe("aim agent guides", () => {
     expect(guide.scenarios).toEqual(["搜对标选题", "对标选题池", "按目的出题", "筛高潜", "会议提炼"])
     expect(guide.skills.find((skill) => skill.id === "market_benchmark_search")?.workbenchAction)
       .toBe("open_benchmark_search")
-    expect(guide.defaultInstruction).toContain("优先按目的出题")
+    expect(guide.defaultInstruction).toContain("未说明时先问一句")
   })
 
   it("keeps review skills to full check and publish decision", () => {
@@ -187,9 +187,11 @@ describe("aim agent guides", () => {
     ].join("\n")
 
     expect(skill?.label).toBe("对标选题池")
-    expect(skill?.prompt).toContain("30 条可直接开拍的候选选题")
-    expect(skill?.prompt).toContain("5 条 S 级优先选题")
-    expect(skill?.prompt).toContain("10 条 A 级连续栏目选题")
+    expect(skill?.prompt).not.toContain("30 条")
+    // 数量已改随用户指令：只锁结构项存在，不锁数字
+    expect(skill?.prompt).toContain("S 级优先选题")
+    expect(skill?.prompt).toContain("A 级连续栏目选题")
+    expect(skill?.prompt).not.toContain("至少 8 条")
     expect(guideText).toContain("S级优先选题")
     expect(guideText).toContain("A级连续栏目选题")
   })
@@ -201,7 +203,7 @@ describe("aim agent guides", () => {
     expect(skill?.prompt).toContain("完整资产包")
     expect(skill?.prompt).toContain("选题 + 执行物料")
     expect(skill?.prompt).toContain("关键信息抽取表")
-    expect(skill?.prompt).toContain("至少 12 条")
+    expect(skill?.prompt).not.toContain("至少")
     expect(skill?.prompt).toContain("不要结尾反问")
   })
 

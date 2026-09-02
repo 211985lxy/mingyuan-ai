@@ -12,6 +12,7 @@ import {
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
+import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 import { ownsActiveProject } from "@/lib/resource-ownership"
 import { prisma } from "@/lib/prisma"
 
@@ -138,7 +139,12 @@ export async function executePreparedAimGeneration(prepared: UnifiedPreparedRequ
   const { getMaterialAnchorsFromTaskSpec } = await import("@/features/newsroom/services/build-source-brief")
   const { buildRawInputWithOpportunityBrief } = await import("@/lib/aim-generate-context")
   const anchors = getMaterialAnchorsFromTaskSpec(taskSpec)
-  const rawInput = buildRawInputWithOpportunityBrief(prepared.rawInput, anchors)
+  const rawInputWithAnchors = buildRawInputWithOpportunityBrief(prepared.rawInput, anchors)
+  // 旧入口补渲染来源信封：统一入口之外的 agent 也把参考材料/当前作品/最近对话
+  // 带给模型，不再静默丢弃（修复"界面看着有素材、模型看不见"）
+  const rawInput = prepared.unifiedContentExecution
+    ? rawInputWithAnchors
+    : appendEnvelopeContext(rawInputWithAnchors, parsed.sourceEnvelope)
 
   return executeAimRun({
     entrypoint: "generate",
@@ -188,6 +194,28 @@ export async function executePreparedAimGeneration(prepared: UnifiedPreparedRequ
     activeMethodologySignals: parsed.activeMethodologySignals,
     unifiedContentExecution: prepared.unifiedContentExecution,
   }))
+}
+
+
+/** 旧入口的信封渲染：参考材料/当前作品/最近对话拼接进 rawInput（带各自的字符上限） */
+function appendEnvelopeContext(rawInput: string, envelope?: AimContentSourceEnvelope): string {
+  if (!envelope) return rawInput
+  const parts: string[] = []
+  for (const item of envelope.referenceMaterials ?? []) {
+    if (!item.content.trim()) continue
+    parts.push(`【参考材料：${item.title}】\n${item.content.slice(0, 12_000)}`)
+  }
+  const artifact = envelope.currentArtifact?.content?.trim()
+  if (artifact) parts.push(`【当前作品】\n${artifact.slice(0, 12_000)}`)
+  const recent = (envelope.relevantConversation ?? []).slice(-6)
+    .filter((turn) => turn.content.trim())
+  if (recent.length) {
+    parts.push(`【最近对话】\n${recent
+      .map((turn) => `${turn.role === "user" ? "用户" : "助手"}：${turn.content.slice(0, 600)}`)
+      .join("\n")}`)
+  }
+  if (!parts.length) return rawInput
+  return `${rawInput}\n\n${parts.join("\n\n")}`
 }
 
 /**

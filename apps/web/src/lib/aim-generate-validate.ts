@@ -141,6 +141,12 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
   const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
   const agentModule = normalizeRequestedCopyStudioModule(body.agentModule, body.writerModule)
   const sourceEnvelopeResult = contentSourceEnvelopeSchema.safeParse(body.sourceEnvelope)
+  if (body.sourceEnvelope && !sourceEnvelopeResult.success) {
+    // 不再无声丢素材：信封校验失败要留下证据（单字段>10万字符/轮数>20/材料>8条等）
+    console.warn("[aim-generate] sourceEnvelope 校验失败，参考材料/当前作品将不可见", {
+      issues: sourceEnvelopeResult.error.issues.slice(0, 3).map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    })
+  }
 
   return {
     agentId,

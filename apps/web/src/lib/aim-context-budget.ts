@@ -50,12 +50,12 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
   light_edit: {
     totalChars: 5_000,
     priority: DEFAULT_PRIORITY,
-    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 2_000, ipWikiBlock: 1_000, selectedMethodologyBlock: 1_200, methodologyBlock: 1_500 },
+    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 2_000, ipWikiBlock: 3_000, selectedMethodologyBlock: 1_200, methodologyBlock: 1_500 },
   },
   rewrite_copy: {
     totalChars: 9_000,
     priority: DEFAULT_PRIORITY,
-    blockCaps: { conversationBlock: 1_500, ipWikiBlock: 2_500, selectedMethodologyBlock: 1_500, knowledgeBlock: 3_500, methodologyBlock: 2_500 },
+    blockCaps: { conversationBlock: 1_500, ipWikiBlock: 3_000, selectedMethodologyBlock: 1_500, knowledgeBlock: 3_500, methodologyBlock: 2_500 },
   },
   new_copy: {
     totalChars: 14_000,
@@ -101,7 +101,7 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
     },
   },
   quality_review: {
-    totalChars: 8_000,
+    totalChars: 10_000,
     priority: [
       "conversationBlock",
       "knowledgeBlock",
@@ -112,7 +112,8 @@ export const AIM_CONTEXT_BUDGET_PROFILES: Record<AimRuntimeTask, AimContextBudge
       "viralStructureBlock",
       "eventStorytellingBlock",
     ],
-    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 4_500, selectedMethodologyBlock: 1_200, methodologyBlock: 1_500, ipWikiBlock: 500 },
+    // 质检要对照档案看卖点/人设是否落地：档案块给足额度，不再砍到 500 字
+    blockCaps: { conversationBlock: 1_500, knowledgeBlock: 3_500, selectedMethodologyBlock: 1_200, methodologyBlock: 1_500, ipWikiBlock: 3_000 },
   },
 }
 
@@ -130,7 +131,7 @@ const AGENT_BUDGET_OVERRIDES: Partial<Record<string, { totalChars?: number; bloc
   },
   work_editor: {
     totalChars: 10_000,
-    blockCaps: { knowledgeBlock: 2_500, conversationBlock: 3_000, eventStorytellingBlock: 800, ipWikiBlock: 2_000 },
+    blockCaps: { knowledgeBlock: 2_500, conversationBlock: 3_000, eventStorytellingBlock: 800, ipWikiBlock: 3_000 },
   },
 }
 

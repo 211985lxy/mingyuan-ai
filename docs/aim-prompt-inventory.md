@@ -149,10 +149,10 @@ METHOD_NOTE 思考依据（10 节，含"八字与紫微"命理小节——无资
 4. 聊天显示不剥 ===FORMAT=== 标记——splitAimMethodNote 已补标记清洗
 5. 知识检索预过滤白名单在 persona/hot_topic 档排除 product_usp、customer_pain——已补权重，卖点/痛点条目不再整类缺席
 
-**待办（按优先级）：**
-- A. 旧 generate 路径丢弃整个 sourceEnvelope：非创作官 agent（作品编辑/诊断等）生成时对标原文、当前作品、对话历史不进提示词——与"双栈合并"一并解决
-- B. 隐藏默认值残留（用户点名才触发类）：小红书固定 8 页+引导页CTA（三处未对齐）、script-generation 流水线写死 3 条+强制CTA、选题/会议技能硬数（30/12/10/8/5 条）、开头"3-5 个"与标题"5-10 个"默认、traffic 卡"每 5-8 秒"节奏公式与强制收藏抓手、business_diagnosis"长期选题"误触发 100 条选题库
-- C. 低预算档档案砍尾：quality_review ipWiki cap=500、rewrite_copy 2500、work_editor 2000（公平分页后仍被预算砍）
-- D. 聊天流式中途 METHOD_NOTE 在闭合前实时可见（需流式 mask）
-- E. compressAimMessages 压缩时用户消息只留前 3 行（早期粘贴的核心素材在摘要中消失）
-- F. envelope 超预算时参考材料从末尾整删 + zod safeParse 失败静默置空 envelope
+**待办 A–F 已全部修复（2026-09-02 第三轮）：**
+- A. 旧 generate 路径补渲染来源信封（appendEnvelopeContext）：非创作官 agent 的参考材料/当前作品/最近对话现在进提示词
+- B. 隐藏默认值批量清理：小红书 8 页/引导页CTA（三处）、脚本流水线 3 条+强制CTA、选题/会议技能硬数（30/12/10/8/5）、开头"3-5 个"与标题"5-10 个"、traffic 卡"每 5-8 秒"公式与强制收藏/站队、诊断"长期选题→100 条"误触发、8-12 条默认、五拍占比公式、每条强加 CTA、"至少 1 个品牌话题"、"未说明优先按目的出题"→ 全部改为"数量/结构只按用户指令，没说先问一句"
+- C. 低预算档档案砍尾修复：quality_review 500→3000（总预算 8000→10000，从知识块挪额度）、rewrite_copy 2500→3000、light_edit 1000→3000、work_editor 2000→3000
+- D. 流式思考 mask：splitAimMethodNote 处理未闭合 METHOD_NOTE——note 起始后全部进折叠区，不再当正文实时渲染
+- E. 压缩摘要用户消息保留 600 字（原只留 3 行），早期粘贴的卖点/数字不再消失
+- F. 信封超载时参考材料先逐条腰斩（保头保尾）再整删；safeParse 失败留下 warn 证据不再无声置空

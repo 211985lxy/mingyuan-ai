@@ -11,7 +11,7 @@ export function buildMetaPromptMessages(contextBlock: string, params: GenerateSc
     {
       role: "system" as const,
       content: [
-        "你是一位短视频营销策略专家。你的任务是：根据用户提供的上下文信息，为 3 条短视频文案分别生成完整的创作方向。",
+        "你是一位短视频营销策略专家。你的任务是：根据用户提供的上下文信息，为每条短视频文案分别生成完整的创作方向（条数与请求一致）。",
         "必须输出 JSON 对象，不要输出解释文字。",
         "",
         "输出格式：",
@@ -24,7 +24,7 @@ export function buildMetaPromptMessages(contextBlock: string, params: GenerateSc
         "}",
         "",
         "要求：",
-        "1. 必须返回 3 条 directions，不能少。",
+        "1. directions 条数与请求的成稿条数一致。",
         "2. 每条 direction 的四个字段都必须完整、具体、可执行，不能只写半句。",
         "3. 三条文案的开场策略和叙事风格必须明显不同。",
         "4. 如果提供了热点洞察与适配结论，必须遵守适配结论；当结论为 caution 或 avoid 时，不得强行把热点标题硬塞进文案。",

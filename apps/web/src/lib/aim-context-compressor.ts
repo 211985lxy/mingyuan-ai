@@ -327,7 +327,9 @@ function buildSummary(
         // 去重（相邻相同内容）
         const deduped = lines.filter((l) => l.trim() !== lastContent)
         if (deduped.length > 0) {
-          summaryContent += `用户：${deduped.slice(0, 3).join(" | ")}\n`
+          // 按字符保留（600 字）：早期粘贴的卖点/数字/案例不能在摘要里只剩三行
+          const merged = deduped.join(" | ").slice(0, 600)
+          summaryContent += `用户：${merged}\n`
           lastContent = deduped[deduped.length - 1]
         }
       }

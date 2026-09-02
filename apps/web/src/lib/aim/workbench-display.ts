@@ -41,8 +41,17 @@ export function getAimWorkflowStatusLabel(status?: string | null) {
  * @returns 分离后的方法注释和结果
  */
 export function splitAimMethodNote(content: string) {
-  const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
   const stripFormatMarkers = (text: string) => text.replace(/===FORMAT(?::[^=\n]+)?===/gu, "")
+  const OPEN_TAG = "[[AIM_METHOD_NOTE]]"
+  const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
+  // 流式未闭合：note 开始之后的全部内容先进折叠区，避免思考过程当正文实时渲染
+  if (!match && content.includes(OPEN_TAG)) {
+    const [before, ...rest] = content.split(OPEN_TAG)
+    return {
+      methodNote: rest.join(OPEN_TAG).trim(),
+      result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(stripFormatMarkers(before))),
+    }
+  }
   if (!match) {
     return { methodNote: "", result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(stripFormatMarkers(content))) }
   }

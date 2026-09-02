@@ -113,6 +113,16 @@ export function fitAimContentSourceEnvelopeToBudget(
   while (jsonBytes(fitted) > maxBytes && fitted.relevantConversation.length > 0) {
     fitted = { ...fitted, relevantConversation: fitted.relevantConversation.slice(1) }
   }
+  // 参考材料先逐条腰斩（保头保尾），尽量不整条丢弃——对标原文/拆解是核心素材
+  if (jsonBytes(fitted) > maxBytes) {
+    fitted = {
+      ...fitted,
+      referenceMaterials: fitted.referenceMaterials.map((item) => ({
+        ...item,
+        content: truncateMiddleToBytes(item.content, 12_000),
+      })),
+    }
+  }
   while (jsonBytes(fitted) > maxBytes && fitted.referenceMaterials.length > 0) {
     fitted = { ...fitted, referenceMaterials: fitted.referenceMaterials.slice(0, -1) }
   }
