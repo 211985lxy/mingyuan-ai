@@ -75,7 +75,8 @@ async function getAccessToken(forceRefresh = false): Promise<string> {
   return cachedToken.token
 }
 
-async function request<T>(
+// 供同域子模块（如 chanjing-audio）复用的请求通道，业务代码勿直接使用
+export async function request<T>(
   method: "GET" | "POST",
   path: string,
   options?: {
@@ -351,9 +352,16 @@ function mapPersonStatus(status: number): TaskStatus {
   return "processing"
 }
 
-function mapVideoStatus(status: number): TaskStatus {
-  if (status === 30) return "succeed"
-  if (status >= 40) return "failed"
+function mapVideoStatus(video: ChanjingVideoTask): TaskStatus {
+  // 规范枚举优先；数值 status（30 成功 / >=40 失败）为旧约定，仅在
+  // queue_status 缺失时兜底。
+  if (video.queue_status) {
+    if (video.queue_status === "completed") return "succeed"
+    if (video.queue_status === "failed" || video.queue_status === "other") return "failed"
+    return "processing"
+  }
+  if (video.status === 30) return "succeed"
+  if (video.status >= 40) return "failed"
   return "processing"
 }
 
@@ -380,7 +388,7 @@ export function mapCustomisedPersonToTaskResult(
 }
 
 export function mapVideoToTaskResult(video: ChanjingVideoTask): TaskResult {
-  const mappedStatus = mapVideoStatus(video.status)
+  const mappedStatus = mapVideoStatus(video)
   return {
     taskId: video.id,
     status: mappedStatus,
@@ -407,3 +415,4 @@ export async function getVideoTaskInfo(videoId: string): Promise<TaskResult> {
   const video = await getVideoTask(videoId)
   return mapVideoToTaskResult(video)
 }
+
