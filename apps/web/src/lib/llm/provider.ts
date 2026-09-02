@@ -140,17 +140,21 @@ export class OpenAICompatibleProvider implements LLMProvider {
       stream: true,
     })
 
-    // 推理模型的 reasoning_content 是内部思维链，绝不能成为用户可见内容：
-    // 只透传 content 增量；流结束仍无正文时保持空流，由上游空内容校验显式失败，
-    // 再交给模型路由重试兜底（宁可见的失败，不可见的思维链泄漏）。
+    // 推理模型的 reasoning_content 是内部思维链，绝不能成为用户可见内容：只透传 content 增量；
+    // 整段流结束仍无正文时抛错，让模型路由切换到下一个 provider（宁可见的失败，不可见的思维链泄漏）。
+    let contentEmitted = false
     for await (const chunk of response) {
       const delta = chunk.choices[0]?.delta as
         | { content?: string | null; reasoning_content?: string | null }
         | undefined
       const content = typeof delta?.content === "string" ? delta.content : ""
       if (content) {
+        contentEmitted = true
         yield content
       }
+    }
+    if (!contentEmitted) {
+      throw new Error(`[${this.name}] Empty response from model ${model}`)
     }
   }
 }
