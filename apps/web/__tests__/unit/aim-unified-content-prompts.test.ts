@@ -60,4 +60,14 @@ describe("unified content prompt", () => {
     expect(prompt).toContain("【参考材料：框架】")
     expect(prompt).toContain("用户原话与临时理解冲突时，以用户原话为准")
   })
+
+  it("spells out the exact machine format markers the strict delivery gate requires", () => {
+    // 回归锁定：模型曾照抄格式模板里的中文标签（===FORMAT:口播文案===）导致严格门禁
+    // missing_final_marker 三连败；统一提示词必须逐字列出机器键标记。
+    const prompt = buildUnifiedProducerUserPrompt(context, "【口播文案】要求：……")
+    expect(prompt).toContain("【输出标记】")
+    expect(prompt).toContain("===FORMAT:video_script===")
+    expect(prompt).toContain("不要用中文格式名代替")
+    expect(buildUnifiedProducerSystemPrompt(context)).toContain("英文键名")
+  })
 })

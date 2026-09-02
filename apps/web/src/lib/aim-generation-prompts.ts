@@ -235,8 +235,14 @@ export async function executeGenerateLLMWithBenchmarkRetry(
     const completion = await executeGenerateLLM(agentId, systemPrompt, activePrompt, modelPolicy)
     const deliveryGate = context.unifiedContentExecution ? inspectUnifiedGenerationProtocol(completion, targetFormats) : { passed: true as const }
     if (!deliveryGate.passed) {
+      // 硬失败前留下证据（失败码/模型/输出摘要），不再零证据硬 500
+      console.warn("[aim-generation] unified delivery gate rejected", {
+        code: deliveryGate.code, attempt: attempt + 1, model: completion.model, provider: completion.provider,
+        contentHead: completion.content.slice(0, 120), contentLength: completion.content.length,
+      })
       if (attempt === maxAttempts - 1) throw new Error("生成结果不包含可安全交付的最终内容")
-      activePrompt = `${userPrompt}\n\n上一版最终内容协议错误：${deliveryGate.code}。只输出带正确格式标记的干净最终正文。`
+      const expectedMarkers = targetFormats.map((format) => `===FORMAT:${format}===`).join("、")
+      activePrompt = `${userPrompt}\n\n上一版最终内容协议错误：${deliveryGate.code}。必须逐字包含且仅包含这些标记：${expectedMarkers}（不要用中文格式名）；每个标记后面直接跟该格式的干净最终正文。`
       continue
     }
     const parsed = parseMultiFormatResponse(completion.content, targetFormats)
