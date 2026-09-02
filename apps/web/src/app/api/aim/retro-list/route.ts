@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { parseQuery } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 
 export const dynamic = "force-dynamic"
@@ -90,7 +91,7 @@ function pickTitle(record: {
 }): string {
   const topic = record.topicTitle?.trim()
   if (topic) return topic.slice(0, 80)
-  const body = (record.rawCopy || record.videoScript || record.rawInput || "").trim()
+  const body = splitGenerationReasoning(record.rawCopy || record.videoScript || record.rawInput || "").content.trim()
   return body.slice(0, 80) || "未命名内容"
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import { buildAimExportDocx, type OfficeExportSection } from "@/lib/aim/export-office-docx"
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import type { ContentFormat } from "@/lib/aim-generator"
@@ -90,11 +91,12 @@ export async function POST(request: NextRequest) {
 
       for (const item of FORMAT_COLUMNS) {
         if (formatFilter && item.format !== formatFilter) continue
-        const content = record[item.column]
-        if (typeof content === "string" && content.trim()) {
+        const raw = record[item.column]
+        if (typeof raw === "string" && raw.trim()) {
           sections.push({
             heading: AIM_FORMAT_LABELS[item.format] || item.format,
-            content,
+            // 存量列可能混存 METHOD_NOTE，导出前剥离，只导出可发布正文
+            content: splitGenerationReasoning(raw).content,
           })
         }
       }

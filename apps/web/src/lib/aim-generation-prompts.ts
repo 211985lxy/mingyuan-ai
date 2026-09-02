@@ -446,7 +446,6 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     "口播正文纯净性红线：正文从第一句起就是可直接使用的成稿。「需要先判断一下…」「用户说…」「上一轮质检未通过…」「写正文草稿：」「检查……：有。」等任务分析、草稿标记与自检报告句式一律禁止出现在正文，只能写在 [[AIM_METHOD_NOTE]] 块内。",
     "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。",
     "没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。",
-    `所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。`,
     progressive.includeBenchmark ? `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}` : "",
     creationTraceRule,
     newsroomRule,

@@ -28,7 +28,6 @@ import {
   findIncompleteGenerationFormats,
 } from "@/lib/aim-spoken-length"
 import {
-  AIM_OUTPUT_MAX_CHARS,
   BENCHMARK_RECREATION_PREFILL,
   buildBenchmarkLengthRule,
   buildBenchmarkMaterialPrefill,
@@ -454,7 +453,8 @@ describe("AIM content production positioning", () => {
     // 用户显式给了字数 → 只服从用户字数（保留全局上限提醒）
     const explicit = buildBenchmarkLengthRule("一 二 三 四 五", "写一篇 3000 字的改写稿") || ""
     expect(explicit).toContain("必须优先服从用户字数")
-    expect(explicit).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
+    // 全局字数上限话术已移除：字数只随用户原话
+    expect(explicit).not.toContain("不得超过")
     // 用户明确要保持原体量 → 保持篇幅规则
     const preserve = buildBenchmarkLengthRule("一 二 三 四 五", "别越改越短，保持原文体量") || ""
     expect(preserve).toContain("保留当前稿子的主体信息密度和体量")
@@ -475,7 +475,7 @@ describe("AIM content production positioning", () => {
     const rule = buildBenchmarkLengthRule("一 二 三 四 五", "请写一篇不少于2000字的长文") || ""
 
     expect(rule).toContain("必须优先服从用户字数")
-    expect(rule).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
+    expect(rule).not.toContain("不得超过")
     expect(rule).not.toContain("控制在 5-5 字")
     expect(buildExplicitWordCountPriorityRule("请输出两千字")).toContain("必须优先服从用户字数")
   })
@@ -485,10 +485,11 @@ describe("AIM content production positioning", () => {
     expect(buildExplicitWordCountPriorityRule("不要压缩，按原稿体量来")).toContain("不要越改越短")
   })
 
-  it("caps explicit benchmark word-count guidance at the global max length", () => {
+  it("no longer caps explicit benchmark word counts at a global maximum", () => {
+    // 字数只随用户原话：用户要 8000 字就按 8000 字写，不再压回 5000
     const rule = buildBenchmarkLengthRule("测".repeat(6000), "至少写 8000 字") || ""
-
-    expect(rule).toContain(`不得超过 ${AIM_OUTPUT_MAX_CHARS} 字`)
+    expect(rule).toContain("必须优先服从用户字数")
+    expect(rule).not.toContain("不得超过")
   })
 
   it("requires visible rewrite for benchmark copy", () => {

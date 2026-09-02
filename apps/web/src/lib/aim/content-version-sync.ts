@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client"
 import type { ContentFormat } from "@/lib/aim-generator"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 
 export type AimGenerationContentColumn =
   | "videoScript"
@@ -76,5 +77,7 @@ export async function readAimGenerationContent(
   })
   if (!row) return null
   const value = (row as Record<string, unknown>)[column]
-  return typeof value === "string" && value.trim() ? value : null
+  if (typeof value !== "string" || !value.trim()) return null
+  // 存量列可能混存 METHOD_NOTE：版本时间线只保留可发布正文
+  return splitGenerationReasoning(value).content || null
 }

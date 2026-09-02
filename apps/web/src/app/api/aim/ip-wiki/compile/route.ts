@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import { compilePositioningToWiki, type ExistingWikiPageRef } from "@/lib/ip-wiki/compile"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 
 export const maxDuration = 60
 
@@ -53,7 +54,8 @@ export async function POST(request: NextRequest) {
       // 优先用调用方传入的实时文本（可能是用户在交付气泡里编辑过的版本），
       // 没传再回退数据库原文；sourceGenerationId 始终用于来源溯源。
       if (!effectiveText) {
-        effectiveText = (generation.rawCopy ?? "").trim()
+        // 剥离 METHOD_NOTE，避免把思考依据编进 wiki 污染后续检索素材
+        effectiveText = splitGenerationReasoning(generation.rawCopy ?? "").content.trim()
       }
     }
 

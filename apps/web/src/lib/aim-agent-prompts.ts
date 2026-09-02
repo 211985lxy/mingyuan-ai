@@ -213,7 +213,6 @@ ${progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : ""}
 6. ${knowledgeRule}
 7. ${AIM_SESSION_PRIORITY_RULES}；方法论只决定怎么写，不得盖过本轮明确要求。
 8. ${flags.includeOperatingLogicFull ? CONTENT_PRODUCER_OPERATING_LOGIC_RULE : CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE}
-9. 所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字；这是总上限，不会替代各格式原本该短就短的长度边界。
 
 请直接根据上文与用户的历史对话，产出下一轮内容。`
 }

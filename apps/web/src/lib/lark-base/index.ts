@@ -1,3 +1,4 @@
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import {
   fireEmbedding,
   runLarkBaseCommand,
@@ -366,7 +367,8 @@ export async function importLarkBaseKnowledge(input: {
 }
 
 function summarizeAimGeneration(record: Record<string, unknown>) {
-  return String(
+  // 存量列可能混存 METHOD_NOTE 思考依据，导出前剥离，只给可发布正文
+  return splitGenerationReasoning(String(
     record.videoScript ||
     record.rawCopy ||
     record.momentsPost ||
@@ -375,7 +377,7 @@ function summarizeAimGeneration(record: Record<string, unknown>) {
     record.shootingBrief ||
     record.rawInput ||
     "",
-  ).slice(0, 2000)
+  )).content.slice(0, 2000)
 }
 
 /**

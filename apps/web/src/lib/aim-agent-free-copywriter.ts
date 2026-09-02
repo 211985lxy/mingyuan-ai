@@ -6,6 +6,7 @@ import {
   ensureContentCreationTrace,
   executeGenerateLLMWithBenchmarkRetry,
 } from "@/lib/aim-generation-prompts"
+import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import { AIM_NORTH_STAR_GOAL, LIGHT_EDIT_OUTPUT_BOUNDARY } from "@/lib/aim-intent-boundaries"
 import type { ContentFormat } from "./aim-generator"
 import type {
@@ -122,9 +123,10 @@ ${compactTask ? `\n${compactTask}` : ""}`
     )
     const record = await saveAimGenerationRecord(context, completion, { [format]: content } as Record<ContentFormat, string | undefined>)
 
+    const split = splitGenerationReasoning(content)
     return {
       id: record.id,
-      results: [{ format, content, wordCount: content.length }],
+      results: [{ format, content: split.content, reasoningSummary: split.reasoningSummary, wordCount: split.content.length }],
       knowledgeUsed: record.knowledgeUsed as any[],
       taskSpec: (record as { taskSpec?: import("@/lib/task-spec").TaskSpec }).taskSpec,
     }

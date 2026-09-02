@@ -79,10 +79,10 @@ export function hasWordCountPreservationIntent(text: string | null | undefined) 
  */
 export function buildExplicitWordCountPriorityRule(text: string | null | undefined) {
   if (hasExplicitWordCountRequirement(text)) {
-    return `用户输入里已有明确字数要求，必须优先服从用户字数；格式模板的默认字数范围、对标原文字数 95%-105% 和原文字数硬规则都只能作为节奏参考，不能压缩用户要求的长度；但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
+    return `用户输入里已有明确字数要求，必须优先服从用户字数；格式模板的默认字数范围和对标原文字数都只能作为节奏参考，不能压缩用户要求的长度。`
   }
   if (hasWordCountPreservationIntent(text)) {
-    return `用户输入里明确表达了保持篇幅、不要越改越短的意图；必须保留当前稿子的主体信息密度和体量，除非用户明确要求精简，否则不要主动压缩长度；但所有生成内容统一不得超过 ${AIM_OUTPUT_MAX_CHARS} 字。`
+    return `用户输入里明确表达了保持篇幅、不要越改越短的意图；必须保留当前稿子的主体信息密度和体量，除非用户明确要求精简，否则不要主动压缩长度。`
   }
   return null
 }

@@ -42,10 +42,13 @@ export function getAimWorkflowStatusLabel(status?: string | null) {
  */
 export function splitAimMethodNote(content: string) {
   const match = content.match(/\[\[AIM_METHOD_NOTE\]\]([\s\S]*?)\[\[\/AIM_METHOD_NOTE\]\]/)
-  if (!match) return { methodNote: "", result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(content)) }
+  const stripFormatMarkers = (text: string) => text.replace(/===FORMAT(?::[^=\n]+)?===/gu, "")
+  if (!match) {
+    return { methodNote: "", result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(stripFormatMarkers(content))) }
+  }
   return {
     methodNote: match[1].trim(),
-    result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(content.replace(match[0], ""))),
+    result: normalizeScriptBodySpacing(scrubPromptLeakageFromBody(stripFormatMarkers(content.replace(match[0], "")))),
   }
 }
 

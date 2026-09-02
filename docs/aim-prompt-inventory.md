@@ -134,3 +134,25 @@ METHOD_NOTE 思考依据（10 节，含"八字与紫微"命理小节——无资
    d. 沉淀回路——对标拆解结果一键存为爆款方法论页（页型已支持，缺写入入口）；
 3. 50 种人物风格洗稿库（鲁迅式/王小波式…）——内容资产建设，非架构问题；
 4. 专职智能体拆分（账号拆解 / 前采整理 / 信息流话术 / 探店 / 短剧剧本）——走场景体系扩展还是独立智能体，取决于定位取舍。
+
+
+---
+
+## 七、深度审计第二轮（2026-09-02 上线后）
+
+三路并行扫描（隐藏默认值 / 静默截断 / 思考泄漏）结果与处置：
+
+**本轮已修（7 项）：**
+1. free_copywriter / work_editor 出参未拆思考依据（根因）——殃及外部 Agent API、飞书渠道回复、Word/飞书导出；已套 splitGenerationReasoning，与创作官同口径
+2. 五个服务端直读宽表列的旁路全部补剥离：飞书导出 summarizeAimGeneration、IP Wiki 编译（防思考依据被编进 wiki 污染后续检索）、复盘列表标题、Word 导出、版本首存 seeding
+3. 5000 字全局输出上限话术（"字数只随用户"承诺的残留漏洞）——两处提示词注入 + 规则文本全部移除
+4. 聊天显示不剥 ===FORMAT=== 标记——splitAimMethodNote 已补标记清洗
+5. 知识检索预过滤白名单在 persona/hot_topic 档排除 product_usp、customer_pain——已补权重，卖点/痛点条目不再整类缺席
+
+**待办（按优先级）：**
+- A. 旧 generate 路径丢弃整个 sourceEnvelope：非创作官 agent（作品编辑/诊断等）生成时对标原文、当前作品、对话历史不进提示词——与"双栈合并"一并解决
+- B. 隐藏默认值残留（用户点名才触发类）：小红书固定 8 页+引导页CTA（三处未对齐）、script-generation 流水线写死 3 条+强制CTA、选题/会议技能硬数（30/12/10/8/5 条）、开头"3-5 个"与标题"5-10 个"默认、traffic 卡"每 5-8 秒"节奏公式与强制收藏抓手、business_diagnosis"长期选题"误触发 100 条选题库
+- C. 低预算档档案砍尾：quality_review ipWiki cap=500、rewrite_copy 2500、work_editor 2000（公平分页后仍被预算砍）
+- D. 聊天流式中途 METHOD_NOTE 在闭合前实时可见（需流式 mask）
+- E. compressAimMessages 压缩时用户消息只留前 3 行（早期粘贴的核心素材在摘要中消失）
+- F. envelope 超预算时参考材料从末尾整删 + zod safeParse 失败静默置空 envelope
