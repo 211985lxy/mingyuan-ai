@@ -59,6 +59,7 @@ const BASIC_INPUT_TEMPLATE: AimInputTemplateField[] = [
   { label: "产品服务", placeholder: "具体产品、服务或交付" },
   { label: "目标客户", placeholder: "客户是谁，他们最焦虑什么" },
   { label: "核心卖点", placeholder: "最多 3 个真实优势" },
+  { label: "独特人设", placeholder: "经历、身份反差、口头禅、表达特点；可不填，没有就不装" },
   { label: "内容目标", placeholder: "涨粉/咨询/到店/成交/建立信任；可不填，我从内容推断" },
   { label: "篇幅要求", placeholder: "想要多少字/多长时间；可不填，不填就按内容自然收束（改写/仿写参考原文篇幅）" },
   { label: "对标参考", placeholder: "可粘贴对标文案、爆款拆解或账号打法" },
