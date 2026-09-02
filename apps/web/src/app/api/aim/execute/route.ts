@@ -6,14 +6,8 @@ import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
 import { createAimTrace, failAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
 import { understandAimContentTurnWithTrace } from "@/lib/aim/semantic-task-understanding"
-import {
-  buildNumberedClarification,
-  collectIntentClarificationGaps,
-  isClarificationAnswerTurn,
-  mergeClarificationQuestions,
-  resolveUserIntentFromEnvelope,
-  type IntentClarificationGap,
-} from "@/lib/aim/resolved-user-intent"
+import { MOUNTED_RULE_BLOCK_LABELS } from "@/lib/aim/mounted-rule-blocks"
+import { resolveExecuteTurnGate } from "@/lib/aim/execute-turn-intent-gate"
 import { executeVerifiedUnifiedDelivery, executeVerifiedUnifiedReply } from "@/lib/aim/services/unified-content-execution"
 import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -44,39 +38,36 @@ export async function POST(request: NextRequest) {
       trace,
     })
 
-    // 确定性意图解析 + 按任务类型的关键缺口检查（与 LLM 理解互补）。
-    // 用户正在回答上一轮追问时不再追加确定性追问，避免重复问已确认字段。
-    const intent = resolveUserIntentFromEnvelope(parsed.sourceEnvelope, parsed.targetFormats)
-    const deterministicGaps = isClarificationAnswerTurn(parsed.sourceEnvelope)
-      ? []
-      : collectIntentClarificationGaps(intent)
+    // 意图门：意图解析 + 关键缺口 + 规则块挂载 + 追问组装（显性化，轨迹可见）
+    const gate = resolveExecuteTurnGate({
+      envelope: parsed.sourceEnvelope,
+      handling: understanding.handling,
+      llmQuestions: understanding.clarificationQuestions,
+      formats: parsed.targetFormats,
+    })
+    const mountedSummary = gate.mountedRuleBlocks.length
+      ? `｜挂载 ${gate.mountedRuleBlocks.map((id) => MOUNTED_RULE_BLOCK_LABELS[id]).join("、")}`
+      : ""
     await addAimTraceStep(trace, {
       key: "resolve_user_intent",
       label: "意图约束解析",
       status: "success",
-      summary: `${intent.taskKind}｜${intent.isNewTask ? "新任务" : "延续任务"}｜缺口 ${deterministicGaps.length} 项`,
+      summary: `${gate.intent.taskKind}｜${gate.intent.isNewTask ? "新任务" : "延续任务"}｜缺口 ${gate.deterministicGaps.length} 项${mountedSummary}`,
       metadata: {
-        taskKind: intent.taskKind,
-        isNewTask: intent.isNewTask,
-        lengthPolicy: intent.lengthPolicy,
-        constraintSources: intent.constraintSources,
-        gaps: deterministicGaps.map((gap) => gap.field),
+        taskKind: gate.intent.taskKind,
+        isNewTask: gate.intent.isNewTask,
+        lengthPolicy: gate.intent.lengthPolicy,
+        constraintSources: gate.intent.constraintSources,
+        gaps: gate.deterministicGaps.map((gap) => gap.field),
+        mountedRuleBlocks: gate.mountedRuleBlocks,
       },
     })
 
-    let gapsToAsk: IntentClarificationGap[] = []
-    if (understanding.handling === "clarify") {
-      gapsToAsk = mergeClarificationQuestions(understanding.clarificationQuestions ?? [], deterministicGaps)
-    } else if (understanding.handling === "deliver" && deterministicGaps.length > 0) {
-      // 用户指令唯一真源：关键缺口未确认不先生成，也不用隐藏默认值顶替
-      gapsToAsk = deterministicGaps
-    }
-    const clarificationText = gapsToAsk.length ? buildNumberedClarification(gapsToAsk) : undefined
-    if (clarificationText) {
+    if (gate.clarification) {
       return NextResponse.json({
         kind: "clarification",
-        question: clarificationText,
-        questions: gapsToAsk.map((gap) => gap.question),
+        question: gate.clarification.question,
+        questions: gate.clarification.questions,
         runId: trace?.id,
       })
     }
