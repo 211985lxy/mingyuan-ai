@@ -70,7 +70,13 @@ describe("aim agent guides", () => {
     expect(guideText).toContain("我要搞流量")
     expect(guideText).toContain("我要获客")
     expect(guideText).toContain("我要讲故事")
-    expect(guide.quickPrompts).toHaveLength(3)
+    expect(guide.quickPrompts).toHaveLength(6)
+    // 后 3 条是常用追问（迭代短语），对齐成熟文案智能体的用户引导
+    expect(guide.quickPrompts.slice(3)).toEqual([
+      "改得更像真人口播一点，去AI味",
+      "换个开头，前 3 秒更抓人",
+      "再来 3 版不同角度",
+    ])
     expect(guide.scenarios).toEqual(["我要搞流量口播", "我要获客口播", "我要讲故事口播"])
     expect(guide.defaultInstruction).toContain("未说明内容目的时先追问一句")
     expect(guide.defaultInstruction).not.toContain("未说明时默认按流量漏斗处理")
