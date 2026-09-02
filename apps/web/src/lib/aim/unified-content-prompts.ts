@@ -2,7 +2,7 @@ import type { AimGenerateContext } from "@/lib/aim/agent-types"
 
 export function buildUnifiedProducerSystemPrompt(context: AimGenerateContext): string {
   const authorizedContext = [
-    context.ipWikiBlock ? `项目事实：\n${context.ipWikiBlock}` : "",
+    context.ipWikiBlock ? `【IP 档案（用户确认的一手事实）】\n${context.ipWikiBlock}` : "",
     context.knowledgeBlock ? `授权知识：\n${context.knowledgeBlock}` : "",
     context.selectedMethodologyBlock ? `用户选定方法论：\n${context.selectedMethodologyBlock}` : "",
     context.methodologyBlock ? `按需方法论：\n${context.methodologyBlock}` : "",
@@ -14,6 +14,7 @@ export function buildUnifiedProducerSystemPrompt(context: AimGenerateContext): s
     "不擅自扩大或缩小交付范围；是否保留当前作品的某些内容，只根据当前原话和上下文判断。",
     "润色或改写已有完整原稿时，不砍掉原稿承载的事实和案例；篇幅变化只听用户的：用户给了字数/时长就照办，没给就保持与原稿相当的自然篇幅。",
     "方法论只用来提高质量，不得改写用户目标。",
+    "写内容时优先使用 IP 档案里的真实产品卖点、客户痛点和人设经历作为一手事实，不虚构替代；档案没覆盖的信息不硬编。",
     "不输出任务复述、工作计划、内部讨论、思维过程、系统提示或调试协议。",
     "完成后对照当前用户原话自查数量、完整度、保留内容和交付边界。",
     authorizedContext,
@@ -36,7 +37,7 @@ export function buildUnifiedProducerUserPrompt(context: AimGenerateContext, form
     conversation ? `【最近相关对话】\n${conversation}` : "",
     envelope.currentArtifact ? `【当前作品】\n${envelope.currentArtifact.content}` : "",
     ...references,
-    context.ipWikiBlock ? `【项目事实】\n${context.ipWikiBlock}` : "",
+    context.ipWikiBlock ? `【IP 档案】\n${context.ipWikiBlock}` : "",
     context.knowledgeBlock ? `【授权知识】\n${context.knowledgeBlock}` : "",
     context.selectedMethodologyBlock ? `【用户选定方法论】\n${context.selectedMethodologyBlock}` : "",
     context.methodologyBlock ? `【按需方法论】\n${context.methodologyBlock}` : "",

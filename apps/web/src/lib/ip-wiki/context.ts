@@ -27,8 +27,15 @@ export interface IpWikiBlockInput {
 // 不是全局方法论源；全局方法论仍通过独立 methodologyBlock 注入。
 const BLOCK_PAGE_TYPES = [...IP_WIKI_CORE_PAGE_TYPES, "viral_methodology" as IpWikiPageType]
 
-const MAX_PAGES_IN_BLOCK = 6
-const MAX_CONTENT_CHARS = 1200
+const MAX_PAGES_IN_BLOCK = 8
+/**
+ * 档案块总预算：与统一上下文预算的 ipWikiBlock 上限对齐。
+ * 修复（2026-09）：此前每页截 1200 字、6 页上限，前几页吃光 3000 字预算后
+ * 排在后面的成交路径（卖点）/人设被整段砍掉，导致成稿体现不出卖点与 IP 特点。
+ * 现改为块内公平分页：每页保底字数 + 按页数均分，七类档案页都在场。
+ */
+const MAX_BLOCK_TOTAL_CHARS = 3_000
+const MIN_PAGE_CHARS = 200
 
 /**
  * @description 构建ipwikiblock
@@ -209,12 +216,18 @@ export function formatIpWikiBlock(pages: IpWikiPageRow[]): string {
   const ordered = sortPagesForBlock(coreOnly).slice(0, MAX_PAGES_IN_BLOCK)
   if (ordered.length === 0) return ""
 
+  // 块内公平分页：预留标题/策略行开销后按页均分正文预算，每页保底 MIN_PAGE_CHARS
+  const perPageCap = Math.max(
+    MIN_PAGE_CHARS,
+    Math.floor((MAX_BLOCK_TOTAL_CHARS - 700) / ordered.length),
+  )
+
   const sections = ordered.map((page) => {
     const label = page.pageType === "viral_methodology"
       ? "项目爆款策略（客户专属）"
       : IP_WIKI_PAGE_TYPE_LABELS[page.pageType] ?? page.pageType
     const header = `【${label}】${page.title}`.trim()
-    const body = page.content.trim().slice(0, MAX_CONTENT_CHARS)
+    const body = page.content.trim().slice(0, perPageCap)
     const strategy =
       page.pageType === "content_strategy"
         ? formatStrategyFrontmatter(asRecord(page.frontmatter))
@@ -222,11 +235,12 @@ export function formatIpWikiBlock(pages: IpWikiPageRow[]): string {
     return [header, strategy, body].filter(Boolean).join("\n")
   })
 
-  return [
+  const block = [
     "=== IP 定位维基（已编译定位底盘，生成内容时必须以此为准）===",
     "",
     sections.join("\n\n"),
   ].join("\n")
+  return block.length > MAX_BLOCK_TOTAL_CHARS ? block.slice(0, MAX_BLOCK_TOTAL_CHARS) : block
 }
 
 /**

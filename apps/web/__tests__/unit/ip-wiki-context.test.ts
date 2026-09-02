@@ -136,3 +136,31 @@ describe("formatFallbackPositioningBlock", () => {
     expect(block).not.toContain("定位资料9")
   })
 })
+
+describe("formatIpWikiBlock 公平分页（修复：卖点/人设不再被预算砍掉）", () => {
+  it("七类档案页全部在场，每页有实质内容，总长不超预算", () => {
+    const types = ["positioning", "persona", "content_strategy", "audience", "conversion_path", "topic_direction", "viral_methodology"] as const
+    const block = formatIpWikiBlock(types.map((pageType) => makeRow({
+      pageType,
+      title: pageType,
+      content: "字".repeat(1500), // 每页都远超均分预算
+    })))
+    expect(block.length).toBeLessThanOrEqual(3000)
+    for (const label of ["定位主张", "人设", "内容策略底盘", "目标人群", "成交路径", "选题方向", "项目爆款策略（客户专属）"]) {
+      expect(block).toContain(`【${label}】`)
+    }
+    // 每个分节都保住保底正文（200 字），不再出现只有标题没有内容的档案页
+    const sections = block.split(/\n\n+/).filter((section) => section.startsWith("【"))
+    expect(sections.length).toBe(7)
+    for (const section of sections) {
+      expect(section.replace(/^【[^】]+】.*\n/, "").length).toBeGreaterThanOrEqual(180)
+    }
+  })
+
+  it("单页档案可用满近 2300 字，不再被 1200 字截半", () => {
+    const block = formatIpWikiBlock([
+      makeRow({ pageType: "positioning", title: "档案", content: "好".repeat(2600) }),
+    ])
+    expect(block).toContain("好".repeat(2000))
+  })
+})
