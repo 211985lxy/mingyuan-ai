@@ -11,6 +11,7 @@ import {
   isGenericContentRequestWithoutFacts,
 } from "@/lib/aim-generation-prompts"
 import { AIM_NORTH_STAR_GOAL } from "@/lib/aim-intent-boundaries"
+import { AIM_ASSISTANT_PERSONA } from "@/lib/aim/assistant-persona"
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import {
   buildClosedWorldModelInput,
@@ -94,7 +95,7 @@ export class ContentProducerHandler implements AimAgentHandler {
         projectId: context.projectId ?? null,
       }
     }
-    const agentPrompt = `你是企业营销内容专家（内容创作官）。${AIM_NORTH_STAR_GOAL}根据用户提供的信息与客户档案，生成高质量、可拍摄可发布的营销内容。`
+    const agentPrompt = `${AIM_ASSISTANT_PERSONA}${AIM_NORTH_STAR_GOAL}根据用户提供的信息与客户档案，生成高质量、可拍摄可发布的营销内容。`
     const formatBlocks = context.targetFormats
       .map((format) => FORMAT_INSTRUCTIONS[format])
       .join("\n\n---\n\n")

@@ -14,6 +14,7 @@ import {
   type ContentProducerProgressiveFlags,
 } from "@/lib/aim/progressive-prompt-flags"
 import { stripViralToolkitFromMethodology } from "@/lib/ip-copywriting-methodology"
+import { AIM_ASSISTANT_PERSONA } from "@/lib/aim/assistant-persona"
 import type { ContentFormat } from "./aim-generator"
 
 export type { ContentProducerProgressiveFlags }
@@ -189,7 +190,7 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     ? `${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}${METHODOLOGY_INJECTION_PREFACE}\n${effectiveMethodology}`
     : params.selectedMethodologyBlock || ""
 
-  return `你是一个身经百战的「太极营销创意总监」，正与企业老板（用户）面对面进行爆款营销文案创意碰撞与思路对齐。
+  return `${AIM_ASSISTANT_PERSONA}
 
 北极星目标：${AIM_NORTH_STAR_GOAL}
 
