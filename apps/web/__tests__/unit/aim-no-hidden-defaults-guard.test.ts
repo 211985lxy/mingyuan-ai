@@ -44,6 +44,14 @@ describe("用户指令唯一真源：隐藏默认值禁止重现", () => {
     expect(FORMAT_INSTRUCTIONS.shooting_brief).not.toMatch(/必拍镜头至少|至少给\s*\d+\s*条/)
   })
 
+  it("场景配置不得夹带字数上限或数量硬指标", () => {
+    const scenarioSource = source("src/lib/content-scenario-config.ts")
+    expect(scenarioSource).not.toMatch(/控制在\s*\d+\s*字以内/)
+    expect(scenarioSource).not.toMatch(/至少\s*\d+\s*个/)
+    // 防虚构优先：不得强制"每个论点必须附带具体案例"（会诱发编造）
+    expect(scenarioSource).not.toContain("禁止纯讲道理")
+  })
+
   it("发布包规则不得固定话题数量或行数", () => {
     expect(PUBLISH_PACKAGE_CHAT_RULE).not.toMatch(/默认输出\s*\d+\s*个/)
     expect(PUBLISH_PACKAGE_CHAT_RULE).not.toMatch(/推荐\s*\d+\s*个/)
