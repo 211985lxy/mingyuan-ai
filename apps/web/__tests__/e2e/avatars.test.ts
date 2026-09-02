@@ -10,17 +10,31 @@ import {
 
 // ─── Mock Shanjian before imports ─────────────────────────
 
+const E2E_OSS_AUTH_VIDEO_URL = "https://e2e-assets.oss-cn-e2e.aliyuncs.com/auth-video.mp4";
+const E2E_AUTH_TEXT = "我是E2E测试用户，同意授权克隆我的数字人形象";
+
 const {
   mockCloneFastAvatar,
   mockCloneProfessionalAvatar,
   mockCloneImageAvatar,
   mockDeleteAsset,
-} = vi.hoisted(() => ({
-  mockCloneFastAvatar: vi.fn(),
-  mockCloneProfessionalAvatar: vi.fn(),
-  mockCloneImageAvatar: vi.fn(),
-  mockDeleteAsset: vi.fn(),
-}));
+} = vi.hoisted(() => {
+  // 授权视频必须是受管 OSS URL（isManagedOssUrl 校验），这里配置一套
+  // 仅用于签名的假 OSS 参数；签名是本地 HMAC 计算，不会发起网络请求。
+  process.env.OSS_REGION = "oss-cn-e2e";
+  process.env.OSS_ACCESS_KEY_ID = "e2e-oss-key";
+  process.env.OSS_ACCESS_KEY_SECRET = "e2e-oss-secret";
+  process.env.OSS_BUCKET = "e2e-assets";
+  // 成功提交的克隆任务会占用并发槽直到终态，E2E 内没有回调环节释放，
+  // 因此放宽上限避免第二个任务 429。
+  process.env.SHANJIAN_MAX_CONCURRENT = "10";
+  return {
+    mockCloneFastAvatar: vi.fn(),
+    mockCloneProfessionalAvatar: vi.fn(),
+    mockCloneImageAvatar: vi.fn(),
+    mockDeleteAsset: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/shanjian", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/shanjian")>();
@@ -43,11 +57,11 @@ import {
 } from "./helpers";
 import { POST, GET } from "@/app/api/avatars/route";
 import { GET as GET_BY_ID, DELETE } from "@/app/api/avatars/[id]/route";
-import { BRANDING_SETTING_KEYS } from "@/lib/branding-config";
 import jwt from "jsonwebtoken";
 
 let user: { id: string; email: string };
 let token: string;
+let projectId: string;
 
 function userReq(url: string, opts: { method?: string; body?: unknown } = {}) {
   return req(url, { ...opts, headers: { Authorization: `Bearer ${token}` } });
@@ -62,7 +76,9 @@ describe("Avatars E2E", () => {
         email: "avatar-test@e2e.com",
         password: "hashed",
         name: "Avatar Tester",
-        authVideoUrl: "https://example.com/auth.mp4",
+        authVideoUrl: E2E_OSS_AUTH_VIDEO_URL,
+        authVideoText: E2E_AUTH_TEXT,
+        authVideoConfirmedAt: new Date(),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
@@ -72,9 +88,19 @@ describe("Avatars E2E", () => {
       process.env.JWT_SECRET!,
       { expiresIn: "1h" },
     );
+    const project = await prisma.clientProject.create({
+      data: { userId: user.id, name: "E2E 数字人项目" },
+    });
+    projectId = project.id;
   });
 
   afterAll(async () => {
+    // 清理本文件注入的 process.env，避免同进程内污染后续测试文件的 env 快照
+    delete process.env.OSS_REGION;
+    delete process.env.OSS_ACCESS_KEY_ID;
+    delete process.env.OSS_ACCESS_KEY_SECRET;
+    delete process.env.OSS_BUCKET;
+    delete process.env.SHANJIAN_MAX_CONCURRENT;
     await cleanDatabase();
     await disconnectAll();
   });
@@ -89,23 +115,6 @@ describe("Avatars E2E", () => {
   // ─── POST /api/avatars ──────────────────────────────────
 
   it("creates avatar with cloneType=fast", async () => {
-    await prisma.systemSetting.upsert({
-      where: { key: BRANDING_SETTING_KEYS.name },
-      update: {
-        value: "品牌授权测试",
-        type: "string",
-        category: "branding",
-        description: "测试当前品牌名",
-      },
-      create: {
-        key: BRANDING_SETTING_KEYS.name,
-        value: "品牌授权测试",
-        type: "string",
-        category: "branding",
-        description: "测试当前品牌名",
-      },
-    });
-
     mockCloneFastAvatar.mockResolvedValue("ext-task-fast-1");
 
     const res = await POST(
@@ -114,9 +123,8 @@ describe("Avatars E2E", () => {
         body: {
           name: "Fast Avatar",
           cloneType: "fast",
+          projectId,
           videoUrl: "https://example.com/video.mp4",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
         },
       }),
       undefined as never,
@@ -135,8 +143,10 @@ describe("Avatars E2E", () => {
     });
     expect(dbAvatar).not.toBeNull();
     expect(dbAvatar!.externalTaskId).toBe("ext-task-fast-1");
+    expect(dbAvatar!.projectId).toBe(projectId);
+    expect(dbAvatar!.provider).toBe("shanjian");
     expect(mockCloneFastAvatar).toHaveBeenCalledWith(
-      expect.objectContaining({ authText: "品牌授权测试" }),
+      expect.objectContaining({ authText: E2E_AUTH_TEXT }),
     );
   });
 
@@ -147,9 +157,8 @@ describe("Avatars E2E", () => {
         body: {
           name: "Bad",
           cloneType: "invalid",
+          projectId,
           videoUrl: "https://example.com/video.mp4",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
         },
       }),
       undefined as never,
@@ -165,9 +174,8 @@ describe("Avatars E2E", () => {
         method: "POST",
         body: {
           cloneType: "fast",
+          projectId,
           videoUrl: "https://example.com/video.mp4",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
         },
       }),
       undefined as never,
@@ -182,8 +190,7 @@ describe("Avatars E2E", () => {
         body: {
           name: "No Video",
           cloneType: "fast",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
+          projectId,
         },
       }),
       undefined as never,
@@ -199,25 +206,29 @@ describe("Avatars E2E", () => {
       data: { authVideoUrl: null },
     });
 
-    const res = await POST(
-      userReq("/api/avatars", {
-        method: "POST",
-        body: {
-          name: "No Auth",
-          cloneType: "fast",
-          videoUrl: "https://example.com/video.mp4",
-        },
-      }),
-      undefined as never,
-    );
-    expect(res.status).toBe(400);
-    const body = await json(res);
-    expect(body.error).toContain("请先录制授权视频");
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { authVideoUrl: "https://example.com/auth.mp4" },
-    });
+    try {
+      const res = await POST(
+        userReq("/api/avatars", {
+          method: "POST",
+          body: {
+            name: "No Auth",
+            cloneType: "fast",
+            projectId,
+            videoUrl: "https://example.com/video.mp4",
+          },
+        }),
+        undefined as never,
+      );
+      expect(res.status).toBe(400);
+      const body = await json(res);
+      expect(body.error).toContain("授权原文");
+    } finally {
+      // 断言失败也必须恢复授权视频，避免污染后续用例
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { authVideoUrl: E2E_OSS_AUTH_VIDEO_URL },
+      });
+    }
   });
 
   it("creates avatar with cloneType=professional", async () => {
@@ -229,9 +240,8 @@ describe("Avatars E2E", () => {
         body: {
           name: "Pro Avatar",
           cloneType: "professional",
+          projectId,
           videoUrl: "https://example.com/video.mp4",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
         },
       }),
       undefined as never,
@@ -248,9 +258,14 @@ describe("Avatars E2E", () => {
         email: "poor-avatar@e2e.com",
         password: "hashed",
         name: "Poor",
-        authVideoUrl: "https://example.com/auth.mp4",
+        authVideoUrl: E2E_OSS_AUTH_VIDEO_URL,
+        authVideoText: E2E_AUTH_TEXT,
+        authVideoConfirmedAt: new Date(),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
+    });
+    const poorProject = await prisma.clientProject.create({
+      data: { userId: poorUser.id, name: "另一个用户的项目" },
     });
     const poorToken = jwt.sign(
       { id: poorUser.id, email: poorUser.email },
@@ -264,9 +279,8 @@ describe("Avatars E2E", () => {
         body: {
           name: "Pro Avatar",
           cloneType: "professional",
+          projectId: poorProject.id,
           videoUrl: "https://example.com/video.mp4",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
         },
         headers: { Authorization: `Bearer ${poorToken}` },
       }),
@@ -284,9 +298,8 @@ describe("Avatars E2E", () => {
         body: {
           name: "Image Avatar",
           cloneType: "image",
+          projectId,
           imageUrl: "https://example.com/photo.jpg",
-          authVideoUrl: "https://example.com/auth.mp4",
-          authText: "明远AIM授权",
         },
       }),
       undefined as never,
@@ -390,6 +403,7 @@ describe("Avatars E2E", () => {
         userId: user.id,
         name: "To Delete",
         status: "ready",
+        provider: "shanjian",
         externalVirtualmanId: "vm-to-delete",
         externalSpeakerId: "sp-to-delete",
       },
@@ -421,7 +435,12 @@ describe("Avatars E2E", () => {
       where: { email: "other-avatar@e2e.com" },
     });
     const otherAvatar = await prisma.avatar.create({
-      data: { userId: otherUser!.id, name: "Other To Delete", status: "ready" },
+      data: {
+        userId: otherUser!.id,
+        name: "Other To Delete",
+        status: "ready",
+        provider: "shanjian",
+      },
     });
 
     const res = await DELETE(

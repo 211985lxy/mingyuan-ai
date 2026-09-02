@@ -47,6 +47,7 @@ import jwt from "jsonwebtoken"
 
 let user: { id: string; email: string }
 let token: string
+let projectId: string
 let readyAvatar: { id: string; name: string; externalVirtualmanId: string; externalSpeakerId: string }
 
 function userReq(url: string, opts: { method?: string; body?: unknown } = {}) {
@@ -68,13 +69,19 @@ describe("Video Tasks E2E", () => {
     })
     user = { id: u.id, email: u.email }
     token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET!, { expiresIn: "1h" })
+    const project = await prisma.clientProject.create({
+      data: { userId: user.id, name: "E2E 口播项目" },
+    })
+    projectId = project.id
 
-    // Create a ready avatar for video generation
+    // Create a ready avatar for video generation (must belong to the same project)
     const avatar = await prisma.avatar.create({
       data: {
         userId: user.id,
+        projectId,
         name: "Ready Avatar",
         status: "ready",
+        provider: "shanjian",
         externalVirtualmanId: "vm-ready-1",
         externalSpeakerId: "sp-ready-1",
       },
@@ -123,6 +130,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: readyAvatar.id,
+          projectId,
           scriptContent: "这是一段测试文案，用于生成数字人口播视频。",
           styleId: "style-001",
         },
@@ -170,6 +178,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: readyAvatar.id,
+          projectId,
           scriptId: script.id,
           styleId: "style-from-script",
         },
@@ -234,6 +243,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: readyAvatar.id,
+          projectId,
           productionPlanId: plan.id,
         },
       }),
@@ -292,6 +302,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: readyAvatar.id,
+          projectId,
           productionPlanId: plan.id,
         },
       }),
@@ -340,6 +351,7 @@ describe("Video Tasks E2E", () => {
         method: "POST",
         body: {
           type: "virtualman_broadcast",
+          projectId,
           scriptContent: "Test",
           styleId: "s1",
         },
@@ -353,7 +365,7 @@ describe("Video Tasks E2E", () => {
 
   it("rejects task with non-ready avatar", async () => {
     const cloningAvatar = await prisma.avatar.create({
-      data: { userId: user.id, name: "Cloning", status: "cloning" },
+      data: { userId: user.id, projectId, name: "Cloning", status: "cloning" },
     })
 
     const res = await POST(
@@ -362,6 +374,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: cloningAvatar.id,
+          projectId,
           scriptContent: "Test",
           styleId: "s1",
         },
@@ -380,6 +393,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: "nonexistent-avatar",
+          projectId,
           scriptContent: "Test",
           styleId: "s1",
         },
@@ -403,11 +417,15 @@ describe("Video Tasks E2E", () => {
       },
     })
     const poorToken = jwt.sign({ id: poorUser.id, email: poorUser.email }, process.env.JWT_SECRET!, { expiresIn: "1h" })
+    const poorProject = await prisma.clientProject.create({
+      data: { userId: poorUser.id, name: "另一个用户的口播项目" },
+    })
 
     // Create a ready avatar for the poor user
     const poorAvatar = await prisma.avatar.create({
       data: {
         userId: poorUser.id,
+        projectId: poorProject.id,
         name: "Poor Avatar",
         status: "ready",
         externalVirtualmanId: "vm-poor",
@@ -421,6 +439,7 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: poorAvatar.id,
+          projectId: poorProject.id,
           scriptContent: "Test",
           styleId: "s1",
         },
@@ -440,13 +459,15 @@ describe("Video Tasks E2E", () => {
         body: {
           type: "virtualman_broadcast",
           avatarId: readyAvatar.id,
+          projectId,
           scriptContent: "This will fail",
           styleId: "style-fail",
         },
       }),
       undefined as never
     )
-    expect(res.status).toBe(500)
+    // 供应商提交失败按上游错误返回 502
+    expect(res.status).toBe(502)
   })
 
   it("creates realman_broadcast task (no avatar validation required)", async () => {

@@ -14,6 +14,12 @@ process.env.ADMIN_JWT_SECRET = "test-e2e-admin-jwt-secret-at-least-32-bytes"
 process.env.JWT_SECRET = "test-e2e-user-jwt-secret-at-least-32-bytes"
 process.env.CRON_SECRET = "test-e2e-cron-secret-at-least-32-bytes"
 
+// 数字人链路 E2E 环境：闪剪供应商（客户端在各文件内 vi.mock）。
+// 回调路由 fail-closed，未配置密钥时直接 503，因此必须提供密钥。
+process.env.DIGITAL_HUMAN_PROVIDER = "shanjian"
+process.env.SHANJIAN_WEBHOOK_SECRET = "test-e2e-shanjian-webhook-secret"
+process.env.SHANJIAN_AUTH_TEXT = "我是E2E测试用户，同意授权克隆我的数字人形象"
+
 for (const key of [
   "APIMART_API_KEY",
   "DEEPSEEK_API_KEY",

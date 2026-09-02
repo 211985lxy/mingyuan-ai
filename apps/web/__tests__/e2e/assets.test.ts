@@ -160,8 +160,8 @@ describe("Assets E2E", () => {
         method: "POST",
         body: {
           name: "Bad Type",
-          assetType: "document",
-          url: "https://example.com/doc.pdf",
+          assetType: "archive",
+          url: "https://example.com/doc.zip",
         },
       }),
       undefined as never,

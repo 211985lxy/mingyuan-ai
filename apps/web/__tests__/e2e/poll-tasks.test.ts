@@ -62,10 +62,11 @@ describe("Poll Tasks Cron E2E", () => {
     mockGetTaskInfo.mockReset();
     mockGenerateRawVideo.mockReset();
     await cleanRedis();
-    // Clean up video tasks and avatars between tests
+    // 恢复通道是全局 cron：查询不按用户过滤。套件内其他文件可能留下
+    // 任意用户的 avatar / videoTask / asset，这里必须清空全表保证确定性。
     await prisma.videoTask.deleteMany();
-    await prisma.avatar.deleteMany({ where: { userId: user.id } });
-    await prisma.asset.deleteMany({ where: { userId: user.id } });
+    await prisma.avatar.deleteMany();
+    await prisma.asset.deleteMany();
   });
 
   // ─── Auth ─────────────────────────────────────────────
@@ -96,6 +97,7 @@ describe("Poll Tasks Cron E2E", () => {
         userId: user.id,
         name: "Stale Avatar",
         status: "cloning",
+        provider: "shanjian",
         externalTaskId: "stale-avatar-1",
       },
     });
@@ -145,6 +147,7 @@ describe("Poll Tasks Cron E2E", () => {
         userId: user.id,
         name: "Stale Fail Avatar",
         status: "cloning",
+        provider: "shanjian",
         externalTaskId: "stale-avatar-fail",
       },
     });
@@ -181,6 +184,7 @@ describe("Poll Tasks Cron E2E", () => {
         userId: user.id,
         avatarId: avatar.id,
         status: "processing",
+        provider: "shanjian",
         scriptContent: "Stale script",
         avatarName: "VT Poll Avatar",
         externalTaskId: "stale-video-1",
@@ -224,6 +228,7 @@ describe("Poll Tasks Cron E2E", () => {
         userId: user.id,
         avatarId: avatar.id,
         status: "processing",
+        provider: "shanjian",
         scriptContent: "Stale fail",
         avatarName: "VT Poll Fail",
         externalTaskId: "stale-video-fail",
@@ -345,6 +350,7 @@ describe("Poll Tasks Cron E2E", () => {
         userId: user.id,
         name: "Avatar Missing Demo",
         status: "ready",
+        provider: "shanjian",
         externalVirtualmanId: "vm-ready-demo",
         externalSpeakerId: "sp-ready-demo",
         speakerName: "Avatar Missing Demo的声音",
