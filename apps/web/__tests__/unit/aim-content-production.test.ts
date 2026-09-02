@@ -26,7 +26,6 @@ import {
 import {
   cleanSpokenDeliveryArtifacts,
   findIncompleteGenerationFormats,
-  findOverlongGenerationFormats,
 } from "@/lib/aim-spoken-length"
 import {
   AIM_OUTPUT_MAX_CHARS,
@@ -98,23 +97,19 @@ describe("AIM content production positioning", () => {
     expect(FORMAT_INSTRUCTIONS.koubo_script).toBe(FORMAT_INSTRUCTIONS.video_script)
   })
 
-  it("honors an explicit word-count range as the acceptance bounds", () => {
-    // 用户明确要求"2分钟、400到550字"时严格执行：字数区间直接作为验收边界
+  it("never gates on word counts even when the user gave explicit numbers", () => {
+    // 用户指令唯一真源：字数/时长只进提示词由模型照办，永远不做代码级验收边界
     expect(findIncompleteGenerationFormats({
       parsed: { video_script: "完整句子。".repeat(30) },
       targetFormats: ["video_script"],
       rawInput: "2分钟，400到550字",
       finishReason: "stop",
-    })).toEqual(["video_script"])
-    expect(findOverlongGenerationFormats({
+    })).toEqual([])
+    expect(findIncompleteGenerationFormats({
       parsed: { video_script: "长句子啊。".repeat(150) },
       targetFormats: ["video_script"],
       rawInput: "400-550字",
-    })).toEqual(["video_script"])
-    expect(findOverlongGenerationFormats({
-      parsed: { video_script: "长句子啊。".repeat(150) },
-      targetFormats: ["video_script"],
-      rawInput: "写一条完整口播",
+      finishReason: "stop",
     })).toEqual([])
   })
 
@@ -138,7 +133,8 @@ describe("AIM content production positioning", () => {
     })).toEqual([])
   })
 
-  it("rejects a complete-looking script that is too short for the requested duration", () => {
+  it("accepts a complete-looking short script even when a duration was requested", () => {
+    // 时长要求只是提示词约定，成稿完整性才是代码口径
     expect(findIncompleteGenerationFormats({
       parsed: {
         video_script: "这是给内容产能不稳定的企业老板的一段提醒。团队有想法却持续写不出来，内容也总有机器味。事实证明稳定生产值得认真解决。评论领取诊断清单。",
@@ -146,7 +142,7 @@ describe("AIM content production positioning", () => {
       targetFormats: ["video_script"],
       rawInput: "写一条60秒完整口播",
       finishReason: "stop",
-    })).toEqual(["video_script"])
+    })).toEqual([])
   })
 
   it("does not enforce a hidden default length when the user gave no duration", () => {
@@ -167,28 +163,12 @@ describe("AIM content production positioning", () => {
       rawInput: "写一条完整口播",
       finishReason: "stop",
     })).toEqual([])
-    // 用户显式给了时长（3到5分钟）时，低于该时长下限仍判不达标
+    // 用户显式给了时长也一样：长度只进提示词，不是代码验收口径
     expect(findIncompleteGenerationFormats({
       parsed: { video_script: tooShortForLongForm },
       targetFormats: ["video_script"],
       rawInput: "写一条3到5分钟长口播",
       finishReason: "stop",
-    })).toEqual(["video_script"])
-  })
-
-  it("rejects spoken scripts that run past the requested duration", () => {
-    const twoMinuteOverrun = "这是一个完整句子。".repeat(90)
-    const longFormAllowed = "这是一个完整句子。".repeat(90)
-
-    expect(findOverlongGenerationFormats({
-      parsed: { video_script: twoMinuteOverrun },
-      targetFormats: ["video_script"],
-      rawInput: "写一条2分钟完整口播",
-    })).toEqual(["video_script"])
-    expect(findOverlongGenerationFormats({
-      parsed: { video_script: longFormAllowed },
-      targetFormats: ["video_script"],
-      rawInput: "写一条3到5分钟长口播",
     })).toEqual([])
   })
 
@@ -222,7 +202,8 @@ describe("AIM content production positioning", () => {
     })).toEqual([])
   })
 
-  it("still rejects spoken scripts below the minimum length when truncated", () => {
+  it("accepts a complete short spoken script even when truncated (no minimum length)", () => {
+    // 不再有最低字数口径：成稿完整（有终止标点、内容充分）即交付，长度只随用户原话
     const borderlineScript = "这是一段完整的口播文案。".repeat(25)
     expect(findIncompleteGenerationFormats({
       parsed: {
@@ -231,7 +212,7 @@ describe("AIM content production positioning", () => {
       targetFormats: ["video_script"],
       rawInput: "写一条2分钟完整口播",
       finishReason: "length",
-    })).toEqual(["video_script"])
+    })).toEqual([])
   })
 
   it("learns shared style from five to ten samples without stitching or copying them", () => {

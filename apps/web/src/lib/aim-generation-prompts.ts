@@ -47,7 +47,7 @@ import {
   verifyIpWikiCompliance,
 } from "@/lib/ip-wiki/compliance"
 import { AIM_FAST_SPOKEN_MAX_GENERATION_ATTEMPTS, isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
-import { buildSpokenLengthRetryPrompt, cleanSpokenDeliveryArtifacts, findIncompleteGenerationFormats, findOverlongGenerationFormats, fitOverlongSpokenContent, getSpokenLengthGateDiagnostics, isSpokenScriptFormat } from "@/lib/aim-spoken-length"
+import { buildSpokenLengthRetryPrompt, cleanSpokenDeliveryArtifacts, findIncompleteGenerationFormats, getSpokenLengthGateDiagnostics, isSpokenScriptFormat } from "@/lib/aim-spoken-length"
 export { CONTENT_CREATION_TRACE_RULE, NEWSROOM_SAMPLE_CITATION_RULE, ensureContentCreationTrace }
 export {
   findLightEditScopeViolationFormats,
@@ -255,12 +255,12 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       parsed[format] = scrubUnsupportedNumericSentences(parsed[format] || "", context.rawInput, numericEvidence, !isLightEdit && !fastSpokenRoute)
       parsed[format] = scrubUnsupportedAnecdoteSentences(parsed[format] || "", context.rawInput)
       if (isSpokenScriptFormat(format)) {
-        parsed[format] = fitOverlongSpokenContent(parsed[format] || "", context.rawInput)
         parsed[format] = cleanSpokenDeliveryArtifacts(parsed[format] || "")
       }
     }
     const cotLeakHits = collectSpokenCotLeakHits(parsed, targetFormats, attempt + 1)
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
+    // 完整性重试只针对截断/半句话；字数永远不是验收口径（用户给长度只进提示词）
     const incompleteFormats = findIncompleteGenerationFormats({
       parsed,
       targetFormats,
@@ -268,14 +268,10 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       finishReason: completion.finishReason,
       enforceSpokenLength: !isLightEdit,
     })
-    const overlongFormats = isLightEdit ? [] : findOverlongGenerationFormats({
-      parsed,
-      targetFormats,
-      rawInput: context.rawInput || "",
-    })
-    if (incompleteFormats.length || overlongFormats.length) {
+    const overlongFormats: ContentFormat[] = []
+    if (incompleteFormats.length) {
       isLengthRewrite = true
-      console.warn("[aim-generation] spoken length gate", getSpokenLengthGateDiagnostics({
+      console.warn("[aim-generation] completeness gate", getSpokenLengthGateDiagnostics({
         attempt: attempt + 1,
         parsed,
         targetFormats,

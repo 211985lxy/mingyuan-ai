@@ -82,9 +82,13 @@ describe("用户指令唯一真源：隐藏默认值禁止重现", () => {
     })).toBe(false)
   })
 
-  it("口播重试不得注入用户未确认的默认字数（源码扫描）", () => {
+  it("口播模块不得存在任何字数验收机制（源码扫描）", () => {
     const spokenLength = source("src/lib/aim-spoken-length.ts")
-    expect(spokenLength).not.toContain("min: 330")
-    expect(spokenLength).not.toContain("targetMin: 400")
+    // 字数/时长只进提示词由模型照办；代码侧不得有验收边界、超长判定或静默裁剪
+    expect(spokenLength).not.toContain("requestedSpokenLengthBounds")
+    expect(spokenLength).not.toContain("findOverlongGenerationFormats")
+    expect(spokenLength).not.toContain("fitOverlongSpokenContent")
+    expect(spokenLength).not.toContain("countSpokenCharacters")
+    expect(spokenLength).toContain("字数/时长永远不做代码级口径")
   })
 })

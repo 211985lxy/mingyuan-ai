@@ -84,16 +84,13 @@ describe("resolveUserIntentFromEnvelope", () => {
     expect(gaps.map((gap) => gap.field)).toEqual(["modificationScope"])
   })
 
-  it("asks for length strategy on benchmark rewrite without a user length choice", () => {
+  it("never asks about length on benchmark rewrite; length rides on the user's own words", () => {
     const intent = resolveUserIntentFromEnvelope(envelope({
       request: "按对标原文重新写一版",
       materials: [{ title: "对标原文", content: "对标爆款正文。".repeat(40) }],
     }))
     expect(intent.taskKind).toBe("benchmark_rewrite")
-    expect(intent.lengthPolicy).toBe("unset")
-    const gaps = collectIntentClarificationGaps(intent)
-    expect(gaps.map((gap) => gap.field)).toEqual(["length"])
-    expect(gaps[0].question).toContain("保持原体量")
+    expect(collectIntentClarificationGaps(intent)).toEqual([])
   })
 
   it("keeps user keep-original volume choice and skips the length question", () => {
@@ -122,16 +119,17 @@ describe("resolveUserIntentFromEnvelope", () => {
     expect(collectIntentClarificationGaps(withCount)).toEqual([])
   })
 
-  it("caps new-draft clarification at three questions in priority order", () => {
+  it("asks new-draft gaps without ever asking about length", () => {
     const intent = resolveUserIntentFromEnvelope(envelope({ request: "帮我写个文案" }))
     const gaps = collectIntentClarificationGaps(intent)
-    expect(gaps.length).toBe(3)
-    expect(gaps.map((gap) => gap.field)).toEqual(["topic", "goal", "length"])
+    // 篇幅不是缺口：字数只随用户原话，不追问
+    expect(gaps.map((gap) => gap.field)).toEqual(["topic", "goal"])
     const text = buildNumberedClarification(gaps)
-    expect(text).toContain(`${AIM_CLARIFICATION_LEAD} 3 件事`)
+    expect(text).toContain(`${AIM_CLARIFICATION_LEAD} 2 件事`)
     expect(text).toContain("1. ")
     expect(text).toContain("2. ")
-    expect(text).toContain("3. ")
+    expect(text).not.toContain("3. ")
+    expect(text).not.toMatch(/篇幅|多长|字数/)
   })
 
   it("does not ask CTA for a plain new draft without a lead/convert goal", () => {

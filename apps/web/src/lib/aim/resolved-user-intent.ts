@@ -207,9 +207,9 @@ export function resolveUserIntentFromEnvelope(
 
 /**
  * 按任务类型检查关键缺口（只有会实质改变成稿的字段才追问）：
- * - 新稿：主题、受众、内容目标、长度（形式由 targetFormats 提供，不问）；
- * - 润色/改写完整原稿：只问修改范围是否清楚，不重复问体量（原稿自然给出）；
- * - 对标改写：问长度策略（保持原体量 / 自定义 / 自由）；
+ * - 新稿：主题、受众、内容目标（形式由 targetFormats 提供，不问）；
+ *   篇幅永远不问：字数/时长不是系统的口径，用户给长度就照办，没给就自然收束；
+ * - 润色/改写完整原稿：只问修改范围是否清楚；
  * - 批量复刻 / 开头优化 / 仿写：问数量与输出形式；
  * - CTA 只在获客/成交目标已确认时作为要求，不默认追问。
  */
@@ -227,9 +227,6 @@ export function collectIntentClarificationGaps(intent: ResolvedUserIntent): Inte
       if (!intent.goal) {
         gaps.push({ field: "goal", question: "内容目标是什么：搞流量、获客咨询、成交转化，还是建立人设信任？" })
       }
-      if (intent.lengthPolicy === "unset") {
-        gaps.push({ field: "length", question: "篇幅要多长？例如 1 分钟口播、500 字；不限的话由内容自然收束。" })
-      }
       break
     }
     case "polish_existing": {
@@ -239,9 +236,7 @@ export function collectIntentClarificationGaps(intent: ResolvedUserIntent): Inte
       break
     }
     case "benchmark_rewrite": {
-      if (intent.lengthPolicy === "unset") {
-        gaps.push({ field: "length", question: "长度按哪种来：保持原体量、你指定字数，还是自由长度？" })
-      }
+      // 长度不问也不默认：用户要保体量/给字数会写在原话里，由提示词照办
       break
     }
     case "batch_replicate": {

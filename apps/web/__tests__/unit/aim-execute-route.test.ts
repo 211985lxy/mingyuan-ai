@@ -80,10 +80,10 @@ beforeEach(() => {
 })
 
 describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交付）", () => {
-  it("asks up to three numbered questions once when a new draft lacks key fields", async () => {
+  it("asks numbered questions once for key gaps, never about length", async () => {
     understandAimContentTurnWithTrace.mockResolvedValue({
       handling: "deliver",
-      brief: "用户要一篇新文案，但主题受众目标篇幅都未说明。",
+      brief: "用户要一篇新文案，但主题受众目标未说明。",
     })
 
     const response = await executeRequest(baseBody())
@@ -91,11 +91,12 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
 
     expect(response.status).toBe(200)
     expect(data.kind).toBe("clarification")
-    expect(data.questions).toHaveLength(3)
+    // 篇幅不在追问范围：只剩主题/受众与内容目标两问
+    expect(data.questions).toHaveLength(2)
     expect(data.question).toContain("在动笔前先确认")
     expect(data.question).toContain("1. ")
     expect(data.question).toContain("2. ")
-    expect(data.question).toContain("3. ")
+    expect(data.question).not.toMatch(/篇幅|多长|字数/)
     // 关键缺口未确认不先生成
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
   })

@@ -11,7 +11,6 @@ vi.mock("@/lib/aim-agent-model", () => ({
 }))
 
 import { executeGenerateLLMWithBenchmarkRetry } from "@/lib/aim-generation-prompts"
-import { fitOverlongSpokenContent } from "@/lib/aim-spoken-length"
 import type { AimGenerateContext } from "@/lib/aim-agent-handlers"
 import { AIM_FAST_SPOKEN_ROUTE_KEY } from "@/lib/aim-harness/fast-spoken-policy"
 import {
@@ -101,7 +100,7 @@ describe("AIM fast spoken generation budget", () => {
     expect(mocks.execute.mock.calls[1]?.[2]).not.toContain("正文目标是 400-500")
   })
 
-  it("delivers an overlong two-minute script after deterministic trimming without retry", async () => {
+  it("delivers an overlong script as-is without trimming or retry", async () => {
     mocks.execute.mockResolvedValueOnce({
       content: `===FORMAT:video_script===\n${"这是明显超过时长但没有句间停顿的完整口播内容".repeat(60)}。`,
       finishReason: "stop",
@@ -115,30 +114,6 @@ describe("AIM fast spoken generation budget", () => {
       ["video_script"],
     )).resolves.toBeDefined()
     expect(mocks.execute).toHaveBeenCalledTimes(1)
-  })
-
-  it("fits a complete overlong script by whole sentences without dropping delivery anchors", () => {
-    const rawInput = "为中小企业老板写一条2分钟口播。痛点是有想法没产能、AI味重。必须准确引用两个事实：某公司60天产出40条内容、获得127条线索；成本从800元降到210元。结尾只引导评论领取诊断清单。不得编造其他数字"
-    const content = [
-      "如果你是已经有团队的中小企业老板，这条讲给你听。",
-      "你有想法没产能，成稿还有明显AI味。",
-      "团队每天都在重新开会，选题反复讨论，稿子来回修改，发布节奏持续波动。".repeat(20),
-      "问题反复出现，因为团队缺少稳定的生产逻辑。",
-      "先固定目标客户和销售场景，再统一结构并按线索质量复盘。",
-      "某公司60天产出40条内容、获得127条线索；成本从800元降到210元。",
-      "评论领取诊断清单。",
-    ].join("\n\n")
-
-    const fitted = fitOverlongSpokenContent(content, rawInput)
-    const length = (fitted.match(/[\p{Script=Han}\p{Letter}\p{Number}]/gu) ?? []).length
-
-    expect(length).toBeGreaterThanOrEqual(330)
-    expect(length).toBeLessThanOrEqual(550)
-    expect(fitted).toContain("有想法没产能")
-    expect(fitted).toContain("因为团队缺少稳定的生产逻辑")
-    expect(fitted).toContain("先固定目标客户")
-    expect(fitted).toContain("60天产出40条内容")
-    expect(fitted).toMatch(/评论领取诊断清单。$/)
   })
 
   it("blocks a strict script when removing unauthorized numeric sentences leaves no deliverable", async () => {
