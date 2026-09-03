@@ -141,8 +141,9 @@ describe("技能跨引擎委托：技能按钮 → 发送", () => {
     expect(sendText.mock.calls[1][1]).not.toHaveProperty("executionAgentId")
   })
 
-  // generate 不支持 executionAgentId，落到那条路等于静默换回当前会话的引擎
-  it("有委托时生成入口改走 chat，不把委托丢给 generate", async () => {
+  // generate 请求已透传 executionAgentId 并映射到 agentId（见 use-aim-generation-actions），
+  // 委托直接随 generate 切引擎，无需改走 chat。
+  it("有委托时生成入口把 executionAgentId 透传给 generate", async () => {
     const { hook, generateWithInput, sendText, getInput } = setup()
 
     act(() => {
@@ -153,8 +154,8 @@ describe("技能跨引擎委托：技能按钮 → 发送", () => {
       await hook.result.current.handleGenerate()
     })
 
-    expect(generateWithInput).not.toHaveBeenCalled()
-    expect(sendText).toHaveBeenCalledWith(
+    expect(sendText).not.toHaveBeenCalled()
+    expect(generateWithInput).toHaveBeenCalledWith(
       TITLE_REVIEW_SKILL.prompt,
       expect.objectContaining({ executionAgentId: "content_review" }),
     )
