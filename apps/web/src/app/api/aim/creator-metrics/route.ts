@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { computeWeeklyReview } from "@/lib/aim/weekly-review"
-import { fetchCreatorMetrics, type CreatorMetricsResponse } from "@/lib/aim/creator-metrics"
+import { fetchCreatorMetrics } from "@/lib/aim/creator-metrics"
 import { prisma } from "@/lib/prisma"
-import type { WeeklyReviewStorePort } from "@/lib/aim/weekly-review"
 
 export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 const DAY_MS = 24 * 3600 * 1000
 
@@ -16,13 +15,9 @@ function parseDateParam(value: string | null): Date | null {
 }
 
 /**
- * 每周经营复盘（90 天计划 3.3）：五个主指标 + 第 7 天回填率。
+ * 创作者平台表现（飞书数据总线，上游 data-scientist-community 同步）。
  * 查询参数 start/end（ISO 日期，end 不含）；缺省为最近 7 天。
- */
-/**
- * @description 处理 GET 请求
- * @param request - 请求对象
- * @returns 无返回值
+ * 未配置返回 not_configured（200），由前端展示配置引导，不报错。
  */
 export async function GET(request: NextRequest) {
   try {
@@ -50,21 +45,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "start 必须早于 end" }, { status: 400 })
     }
 
-    // 平台表现与经营复盘并行读取；总线失败不拖垮复盘（error/not_configured 显式下传）
-    const [review, platformMetrics] = await Promise.all([
-      computeWeeklyReview({
-        userId: user.id,
-        projectId,
-        start,
-        end,
-        store: prisma as unknown as WeeklyReviewStorePort,
-      }),
-      fetchCreatorMetrics({ start, end }).catch<CreatorMetricsResponse>((error) => ({
-        status: "error",
-        message: `读取创作者数据总线失败：${error instanceof Error ? error.message : String(error)}`,
-      })),
-    ])
-    return NextResponse.json({ review, platformMetrics })
+    const platformMetrics = await fetchCreatorMetrics({ start, end })
+    return NextResponse.json(platformMetrics as unknown)
   } catch (error) {
     const authResp = authErrorResponse(error)
     if (authResp) return authResp

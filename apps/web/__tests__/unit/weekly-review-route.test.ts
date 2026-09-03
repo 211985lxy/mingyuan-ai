@@ -3,9 +3,13 @@ import { NextRequest } from "next/server"
 
 // 每周经营复盘路由测试（90 天计划 3.3）。
 
-const { authenticateRequest, authErrorResponse, computeWeeklyReview, projectFindFirst } = vi.hoisted(() => ({
+const { authenticateRequest, authErrorResponse, computeWeeklyReview, fetchCreatorMetrics, projectFindFirst } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
+  fetchCreatorMetrics: vi.fn(async (_input: { start: Date; end: Date }) => ({
+    status: "not_configured",
+    message: "未配置创作者数据总线的飞书 Base",
+  })),
   computeWeeklyReview: vi.fn(async (_input: { userId: string; start: Date; end: Date }) => ({
     periodStart: "2026-07-11T00:00:00.000Z",
     periodEnd: "2026-07-18T00:00:00.000Z",
@@ -23,6 +27,7 @@ const { authenticateRequest, authErrorResponse, computeWeeklyReview, projectFind
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
 vi.mock("@/lib/aim/weekly-review", () => ({ computeWeeklyReview }))
+vi.mock("@/lib/aim/creator-metrics", () => ({ fetchCreatorMetrics }))
 vi.mock("@/lib/prisma", () => ({ prisma: { clientProject: { findFirst: projectFindFirst } } }))
 
 import { GET } from "@/app/api/aim/review/weekly/route"
@@ -39,6 +44,16 @@ describe("GET /api/aim/review/weekly", () => {
     expect(computeWeeklyReview).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),
     )
+  })
+
+  it("附带创作者平台表现，与复盘同周期", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly"))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.platformMetrics).toEqual({ status: "not_configured", message: expect.any(String) })
+    const call = fetchCreatorMetrics.mock.calls[0][0]
+    expect(call.start).toBeInstanceOf(Date)
+    expect(call.end).toBeInstanceOf(Date)
   })
 
   it("显式 start/end 透传", async () => {
