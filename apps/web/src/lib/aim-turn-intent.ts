@@ -9,6 +9,7 @@ import { formatLabelForTaskSpec, inferContentFormatsFromRawInput } from "@/lib/a
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import { LOCAL_EDIT_PART_WORDS } from "@/lib/aim-intent-boundaries"
+import { tryResolveInterviewIntent, type InterviewTranscriptFlags } from "@/lib/aim-interview-routing"
 
 export type AimTurnIntentAction =
   | "create"
@@ -17,6 +18,7 @@ export type AimTurnIntentAction =
   | "review"
   | "position"
   | "chat"
+  | "interview_build_profile"
 
 export type AimTurnIntentScope =
   | "opening"
@@ -25,6 +27,7 @@ export type AimTurnIntentScope =
   | "cta"
   | "full"
   | "unspecified"
+  | "ip_profile"
 
 export interface AimTurnIntent {
   /** 给模型与用户看的一句话意图 */
@@ -42,6 +45,9 @@ export interface AimTurnIntent {
   /** 用户在确认条补充的说明（不改变 action/scope） */
   userSupplement?: string
 }
+
+// 采访路由拆出到独立模块（遵守 ≤ 500 行约束）
+export { tryResolveInterviewIntent, type InterviewTranscriptFlags } from "@/lib/aim-interview-routing"
 
 export interface AimArchiveGapInput {
   /** 是否已选客户项目 */
@@ -245,10 +251,22 @@ export function resolveAimTurnIntent(input: {
   /** 向量/外部覆盖：强制行动与范围 */
   forceAction?: AimTurnIntentAction
   forceScope?: AimTurnIntentScope
+  /** 采访逐字稿标志：转写结果返回 readyForInterviewSkill=true 时，调用方透传进来 */
+  transcript?: InterviewTranscriptFlags
+  /** 兼容字段：readyForInterviewSkill 扁平写法 */
+  readyForInterviewSkill?: boolean
 }): AimTurnIntent {
   const text = `${input.rawInput || ""} ${input.polishInstruction || ""}`.trim()
   const deliverable = resolveDeliverable(input.rawInput || "", input.targetFormats)
   let scope = resolveScope(text)
+
+  // 采访路由（transcript 标志 + 触发词）拆出到 aim-interview-routing.ts
+  const interviewIntent = tryResolveInterviewIntent({
+    text,
+    transcript: input.transcript,
+    readyForInterviewSkill: input.readyForInterviewSkill,
+  })
+  if (interviewIntent) return interviewIntent
 
   let action = actionFromRuntimeTask(input.runtimeTask) || "chat"
 
@@ -334,6 +352,7 @@ export function resolveAimTurnIntent(input: {
     cta: "只改行动引导",
     full: "整篇",
     unspecified: "按用户点名范围",
+    ip_profile: "IP 画像建档范围",
   }
 
   const actionLabel: Record<AimTurnIntentAction, string> = {
@@ -343,6 +362,7 @@ export function resolveAimTurnIntent(input: {
     review: "质检",
     position: "定位/人设梳理",
     chat: "对话协助",
+    interview_build_profile: "IP 画像采访建档",
   }
 
   const summary = action === "local_edit" && passagePolish
@@ -420,10 +440,10 @@ export function applyTurnIntentSupplement(base: AimTurnIntent, note: string): Ai
 }
 
 const TURN_INTENT_ACTIONS = new Set<AimTurnIntentAction>([
-  "create", "local_edit", "rewrite", "review", "position", "chat",
+  "create", "local_edit", "rewrite", "review", "position", "chat", "interview_build_profile",
 ])
 const TURN_INTENT_SCOPES = new Set<AimTurnIntentScope>([
-  "opening", "title", "ending", "cta", "full", "unspecified",
+  "opening", "title", "ending", "cta", "full", "unspecified", "ip_profile",
 ])
 
 /** 校验并归一化前端回传的确认意图 */

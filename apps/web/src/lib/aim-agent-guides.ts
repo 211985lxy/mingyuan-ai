@@ -4,6 +4,7 @@ import {
   BUSINESS_SYSTEM_SKILLS,
   CONTENT_PRODUCER_SKILLS,
   CONTENT_RETRO_SKILLS,
+  IP_INTERVIEW_SKILLS,
   REVIEW_SKILLS,
   TOPIC_PLANNING_SKILLS,
   WORK_EDITOR_SKILLS,
@@ -38,6 +39,8 @@ export interface AimWorkbenchSkill {
   isCustom?: boolean
   /** 方法论类技能：点击后向后端透传信号，触发对应方法论/爆款结构注入 */
   activateMethodology?: AimMethodologySignal[]
+  /** 技能用途标记（如 profile_building / content_production），供后端按用途筛选 skill */
+  purpose?: string
 }
 
 export interface AimAgentGuide {
@@ -72,8 +75,37 @@ const PUBLISH_PLAN_PROMPT = [
   "排产数量只服从用户指令：用户指定了几条就排几条；用户没说数量时，先用一句话追问要排几条（例如 7 条/12 条），不要默认按 12 条排。",
 ].join("\n")
 
+// 画像构建类 Agent Guide：承载 IP 采访建档技能。
+// 注：ip_builder 不在默认 AimAgentId 枚举中（避免改动 Harness 架构与默认路由）。
+// 后端仅在 resolveAimTurnIntent 返回 interview_build_profile / ip_profile 时，
+// 将本 guide 的 skills / 配置透传给前端。content_producer / work_editor 等内容生产类
+// Agent 一律不暴露 ip_interview。
+export const IP_BUILDER_AGENT_ID = "ip_builder" as const
+export const IP_BUILDER_AGENT_GUIDE: AimAgentGuide = {
+  intro: "这里是 IP 画像与老板说明书采访建档。通过 30 分钟结构化六维问答（一次一问口语化），把你的经历、业务、擅长边界、服务人群、表达习惯、内容边界全部采集齐全，最后输出结构化 JSON，确认应用后写入档案。",
+  placeholder: "说「开始采访」或「帮我做老板说明书」，我会从第一个问题开始，一个一个问你…",
+  defaultInstruction: "你是一位有 10 年经验的创业顾问兼品牌定位专家，现在负责为这位老板做「老板说明书」采访建档。严格按 ip_interview skill 的规则执行：一次一问口语化、六大维度全覆盖、不编造、不越权写正式文档、结束只输出 JSON 并等用户回复「确认应用」。",
+  quickPrompts: [
+    "开始采访，做一份完整的老板说明书。",
+    "帮我做老板说明书，从经历开始问。",
+    "画像建档：采集我的 IP 六维信息。",
+  ],
+  primaryActionLabel: "开始采访建档",
+  scenarios: ["老板说明书采访", "IP 画像建档", "人设信息采集", "品牌定位结构化存档"],
+  inputTemplate: [
+    { label: "当前身份", placeholder: "行业/职位/公司名或个人品牌名" },
+    { label: "一句话介绍", placeholder: "你是做什么的，帮谁解决什么问题；可不填，采访中补" },
+  ],
+  outputAssets: ["六维采访结构化 JSON", "老板说明书摘要", "IP 画像档案"],
+  nextActions: [
+    { id: "apply_profile", label: "确认并写入画像", prompt: "确认应用：将以上采访结构化 JSON 写入 IP 画像与老板说明书档案。" },
+    { id: "to_content_producer", label: "转内容创作", targetAgentId: "content_producer", prompt: "请基于下面 IP 画像档案，选一个维度切入，生成一条可拍摄的口播正文。" },
+  ],
+  skills: IP_INTERVIEW_SKILLS,
+}
+
 // 技能定义已迁至 @/lib/aim-agent-skills（CONTENT_PRODUCER_SKILLS / TOPIC_PLANNING_SKILLS /
-// REVIEW_SKILLS / WORK_EDITOR_SKILLS / BUSINESS_SYSTEM_SKILLS / CONTENT_RETRO_SKILLS）。
+// REVIEW_SKILLS / WORK_EDITOR_SKILLS / BUSINESS_SYSTEM_SKILLS / CONTENT_RETRO_SKILLS / IP_INTERVIEW_SKILLS）。
 
 export const AIM_AGENT_GUIDES: Record<AimAgentId, AimAgentGuide> = {
   content_producer: {

@@ -1647,7 +1647,7 @@
       ],
       "auth": "user_session",
       "input": "multipart",
-      "query": "none",
+      "query": "manual",
       "externalService": false,
       "cost": "medium",
       "idempotency": false
@@ -2725,6 +2725,19 @@
       "auth": "signed_integration",
       "input": "raw_body",
       "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/internal/afu-bridge/cards",
+      "file": "src/app/api/internal/afu-bridge/cards/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "bounded_json_object",
+      "query": "none",
       "externalService": false,
       "cost": "low",
       "idempotency": false

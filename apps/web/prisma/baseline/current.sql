@@ -1353,3 +1353,32 @@ ALTER TABLE `VideoProductionPlan` ADD CONSTRAINT `VideoProductionPlan_structureI
 
 -- AddForeignKey
 ALTER TABLE `VideoProductionPlan` ADD CONSTRAINT `VideoProductionPlan_packagingTemplateId_fkey` FOREIGN KEY (`packagingTemplateId`) REFERENCES `VideoPackagingTemplate`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- CreateTable
+CREATE TABLE `UserQuestionCard` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `projectId` VARCHAR(191) NULL,
+    `originalText` TEXT NOT NULL,
+    `source` VARCHAR(40) NOT NULL DEFAULT 'other',
+    `occurrenceCount` INTEGER NOT NULL DEFAULT 1,
+    `customerRef` VARCHAR(191) NULL,
+    `status` VARCHAR(24) NOT NULL DEFAULT 'pending',
+    `userQuoteSnippets` JSON NOT NULL,
+    `similarityGroupKey` VARCHAR(191) NULL,
+    `topicSelectionId` VARCHAR(40) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `UserQuestionCard_userId_createdAt_idx`(`userId`, `createdAt` DESC),
+    INDEX `UserQuestionCard_similarityGroupKey_idx`(`similarityGroupKey`),
+    INDEX `UserQuestionCard_status_idx`(`status`),
+    INDEX `UserQuestionCard_projectId_createdAt_idx`(`projectId`, `createdAt` DESC),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `UserQuestionCard` ADD CONSTRAINT `UserQuestionCard_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `UserQuestionCard` ADD CONSTRAINT `UserQuestionCard_projectId_fkey` FOREIGN KEY (`projectId`) REFERENCES `ClientProject`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

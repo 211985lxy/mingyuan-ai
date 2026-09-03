@@ -6,8 +6,8 @@
     300
   ],
   "functionLineLimit": 80,
-  "legacyFunctionBaseline": 193,
-  "legacyFunctionBaselineDate": "2026-08-29",
+  "legacyFunctionBaseline": 197,
+  "legacyFunctionBaselineDate": "2026-09-03",
   "legacyFiles": [
     {
       "path": "src/lib/aim-generation-prompts.ts",

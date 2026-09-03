@@ -124,12 +124,19 @@ function normalizeCreativeTrace(
   }
 }
 
+type ScoreNumericKeys = "projectFit" | "contentValue" | "viralHook" | "conversionFit" | "feasibility"
+const SCORE_NUMERIC_KEYS: ScoreNumericKeys[] = ["projectFit", "contentValue", "viralHook", "conversionFit", "feasibility"]
+
 export type ScoreBreakdownNullable = {
   projectFit: number | null
   contentValue: number | null
   viralHook: number | null
   conversionFit: number | null
   feasibility: number | null
+  /** 用户问题命中加分标识（仅命中后附加，未命中不出现，保持旧数据兼容） */
+  userQuestionBoost?: true
+  /** 命中的 UserQuestionCard.id 列表，按匹配顺序排列 */
+  matchedQuestionIds?: string[]
 }
 
 function clampScore(value: unknown): number | null {
@@ -144,13 +151,24 @@ function clampScore(value: unknown): number | null {
  * @returns 归一化后的评分细分对象
  */
 export function normalizeScoreBreakdown(breakdown: TopicCard["scoreBreakdown"]): ScoreBreakdownNullable {
-  return {
+  const base: ScoreBreakdownNullable = {
     projectFit: breakdown ? clampScore(breakdown.projectFit) : null,
     contentValue: breakdown ? clampScore(breakdown.contentValue) : null,
     viralHook: breakdown ? clampScore(breakdown.viralHook) : null,
     conversionFit: breakdown ? clampScore(breakdown.conversionFit) : null,
     feasibility: breakdown ? clampScore(breakdown.feasibility) : null,
   }
+  // 新字段透传：只有当输入显式声明时才保留，避免给旧数据"加默认值"。
+  if (breakdown && typeof breakdown === "object") {
+    const record = breakdown as ScoreBreakdownNullable
+    if (record.userQuestionBoost === true) {
+      base.userQuestionBoost = true
+    }
+    if (Array.isArray(record.matchedQuestionIds)) {
+      base.matchedQuestionIds = record.matchedQuestionIds.filter((id): id is string => typeof id === "string")
+    }
+  }
+  return base
 }
 
 function weightedScore(breakdown: ScoreBreakdownNullable): number | null {
@@ -167,14 +185,14 @@ function weightedScore(breakdown: ScoreBreakdownNullable): number | null {
 
 function verdictFor(score: number | null, breakdown: ScoreBreakdownNullable): NonNullable<TopicCard["reviewVerdict"]> | undefined {
   if (score === null) return undefined
-  const values = Object.values(breakdown)
-  if (values.some((value) => value !== null && value < 40)) return "revise"
+  const numericValues = SCORE_NUMERIC_KEYS.map((key) => breakdown[key])
+  if (numericValues.some((value) => value !== null && value < 40)) return "revise"
   if (score >= 80) return "strong"
   if (score >= 65) return "usable"
   return "observe"
 }
 
-const SCORE_LABELS: Record<keyof ScoreBreakdownNullable, string> = {
+const SCORE_LABELS: Record<ScoreNumericKeys, string> = {
   projectFit: "客户/项目匹配度",
   contentValue: "内容价值",
   viralHook: "传播钩子",
@@ -182,8 +200,8 @@ const SCORE_LABELS: Record<keyof ScoreBreakdownNullable, string> = {
   feasibility: "执行可行性",
 }
 
-function weakestDimension(breakdown: ScoreBreakdownNullable): keyof ScoreBreakdownNullable | null {
-  const entries = (Object.keys(breakdown) as Array<keyof ScoreBreakdownNullable>)
+function weakestDimension(breakdown: ScoreBreakdownNullable): ScoreNumericKeys | null {
+  const entries = SCORE_NUMERIC_KEYS
     .map((key) => ({ key, value: breakdown[key] }))
     .filter((entry) => entry.value !== null)
   if (entries.length === 0) return null

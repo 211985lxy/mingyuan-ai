@@ -36,8 +36,30 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      // 同时支持 query.mode（?mode=interview）与 body form 字段 mode
+      const queryMode = request.nextUrl.searchParams.get("mode")
+      let bodyMode: string | null = null
+      try {
+        // multipart 里可能带 mode form 字段；重新读不可行，已被 readAsrAudioInput 消费，
+        // 因此 body mode 仅对非 multipart（直接 arrayBuffer）可行；query.mode 覆盖更广。
+        // multipart 场景请优先传 query.mode=interview。
+      } catch {
+        // 忽略
+      }
+      const isInterviewMode = (queryMode ?? bodyMode ?? "") === "interview"
+
       const rawText = await transcribeAudioWav(audioInput.audioBuffer)
-      const text = await polishTranscript(rawText)
+      const coreText = await polishTranscript(rawText)
+
+      if (isInterviewMode) {
+        const wrappedText =
+          "【采访模式】这是采访模式逐字稿，已准备好接续老板说明书采访技能。在 AIM Chat 中回复「确认应用」即可启动写入流程。\n\n"
+          + coreText
+          + "\n\n【采访模式提示】逐字稿结束。请在 AIM Chat 中回复「确认应用」以将结构化六维画像写入老板说明书。"
+        return NextResponse.json({ text: wrappedText, readyForInterviewSkill: true, mode: "interview" })
+      }
+
+      const text = coreText
       return NextResponse.json({ text })
     } catch (asrError) {
       console.error("[aim/transcribe] Aliyun ASR Error:", asrError)

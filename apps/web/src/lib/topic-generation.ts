@@ -7,7 +7,12 @@ import {
 import type { TopicCard } from "@/lib/topic-validation"
 import { sampleElements, sampleWithHistory, pickStrategy } from "@/lib/topic-element-logic"
 import type { DerivationStrategy } from "@/lib/topic-element-logic"
-import type { TopicElement } from "@/generated/prisma/client"
+import type { TopicElement, PrismaClient } from "@/generated/prisma/client"
+import { prisma } from "@/lib/prisma"
+import type { ScoreBreakdownNullable } from "@/lib/topic-card-normalization"
+import { applyUserQuestionBoost, extractKeywords } from "@/lib/user-question-boost"
+export { applyUserQuestionBoost, extractKeywords } from "@/lib/user-question-boost"
+export type { ScoreBreakdown } from "@/lib/user-question-boost"
 import {
   coerceTopicCards,
   fallbackTopicCards,
@@ -62,6 +67,8 @@ export interface TopicGenerationInput {
   refreshCount?: number
   /** Content line themes from IpProfile.content.themes (name + ratio) */
   contentThemes?: Array<{ name: string; ratio: number }>
+  /** 当前用户 ID，用于 userQuestionBoost 加权（接入用户问题库命中） */
+  userId?: string
 }
 
 const TOPIC_SOURCE_LABELS: Record<string, string> = {
@@ -340,7 +347,6 @@ function validateGeneratedCards(
   }))
   return { success: true as const, data }
 }
-
 function buildFallbackTopicResult(
   input: TopicGenerationInput,
   selectedCodes: string[],
@@ -418,9 +424,29 @@ export async function generateTopicCards(
         console.log(
           `[topic-gen] Success on attempt ${attempt + 1}, model=${result.model}, strategy=${strategy}`,
         )
+        // ── userQuestionBoost 加权：命中用户问题库（occurrenceCount≥3）的卡片 projectFit +15 ──
+        // 纯函数 + try/catch 兜底，任何错误都回退为原 scoreBreakdown，不影响主流程。
+        const boostedCards = input.userId
+          ? await Promise.all(
+              validated.data.map(async (card) => {
+                try {
+                  const boosted = await applyUserQuestionBoost(
+                    card.scoreBreakdown,
+                    card.title,
+                    card.rationale ?? "",
+                    input.userId!,
+                    prisma as unknown as PrismaClient,
+                  )
+                  return { ...card, scoreBreakdown: boosted as typeof card.scoreBreakdown }
+                } catch {
+                  return card
+                }
+              }),
+            )
+          : validated.data
         return {
           success: true,
-          cards: validated.data,
+          cards: boostedCards,
           elementCodes: selectedCodes,
           promptText: fullPromptText,
           model: result.model,

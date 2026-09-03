@@ -30,6 +30,10 @@ export interface OpportunityItem {
   opportunityScore?: number
   scoreConfidence?: "high" | "medium" | "low"
   scoreBreakdown?: ScoreBreakdown
+  /** 用户问题命中加分标识（仅命中时出现，前端无需穿透 scoreBreakdown 即可展示） */
+  userQuestionBoost?: true
+  /** 命中的用户问题卡 ID 列表（来自 applyUserQuestionBoost 管线） */
+  matchedQuestionIds?: string[]
 }
 
 export interface ScoreBreakdown {
@@ -38,6 +42,10 @@ export interface ScoreBreakdown {
   burst: number
   crossPlatform: number
   projectMatch: number
+  /** 用户问题命中加分标识（applyUserQuestionBoost 后处理时写入，不参与加权排序） */
+  userQuestionBoost?: true
+  /** 命中的用户问题卡 ID 列表，用于前端追溯匹配来源 */
+  matchedQuestionIds?: string[]
 }
 
 export interface SearchFilters {

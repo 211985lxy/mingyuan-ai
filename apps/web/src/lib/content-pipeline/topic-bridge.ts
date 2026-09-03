@@ -117,6 +117,7 @@ export async function extractTopicsFromVideo(
       elements,
       topicSources,
       recommendationMode: input.mode || "normal",
+      userId,
     })
 
     if (!result.success) {

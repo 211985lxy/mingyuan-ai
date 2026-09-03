@@ -23,8 +23,8 @@ describe("viral_methodology IpWikiPageType", () => {
     expect(IP_WIKI_CORE_PAGE_TYPES).not.toContain("viral_methodology")
   })
 
-  it("should bring total page types to 9", () => {
-    expect(IP_WIKI_PAGE_TYPES).toHaveLength(9)
+  it("should include viral_methodology alongside 10 total types (boss_brief was added later)", () => {
+    expect(IP_WIKI_PAGE_TYPES).toHaveLength(10)
   })
 
   it("should preserve all existing types", () => {

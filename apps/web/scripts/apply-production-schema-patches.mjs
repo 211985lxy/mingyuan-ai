@@ -492,6 +492,53 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     PRIMARY KEY (\`id\`),
     CONSTRAINT \`AssetUploadReservation_userId_fkey\` FOREIGN KEY (\`userId\`) REFERENCES \`User\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE
   ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  // ── AgentApiKey / AgentApiCallLog / AgentInvocation（AIM Remote Invocation V2.1） ──
+  `ALTER TABLE \`AgentApiKey\`
+    ADD COLUMN IF NOT EXISTS \`clientType\` VARCHAR(20) NULL,
+    ADD COLUMN IF NOT EXISTS \`allowedScopes\` JSON NOT NULL DEFAULT (JSON_ARRAY()),
+    ADD COLUMN IF NOT EXISTS \`minuteLimit\` INTEGER NOT NULL DEFAULT 60,
+    ADD COLUMN IF NOT EXISTS \`dailyTokenLimit\` INTEGER NULL,
+    ADD COLUMN IF NOT EXISTS \`maxInputChars\` INTEGER NOT NULL DEFAULT 50000,
+    ADD COLUMN IF NOT EXISTS \`expiresAt\` DATETIME(3) NULL`,
+  `ALTER TABLE \`AgentApiCallLog\`
+    ADD COLUMN IF NOT EXISTS \`invocationId\` VARCHAR(191) NULL`,
+  `CREATE TABLE IF NOT EXISTS \`AgentInvocation\` (
+    \`id\` VARCHAR(191) NOT NULL,
+    \`apiKeyId\` VARCHAR(191) NOT NULL,
+    \`userId\` VARCHAR(191) NOT NULL,
+    \`projectId\` VARCHAR(191) NOT NULL,
+    \`agentId\` VARCHAR(191) NOT NULL,
+    \`action\` VARCHAR(191) NOT NULL DEFAULT 'draft.generate',
+    \`idempotencyKey\` VARCHAR(128) NOT NULL,
+    \`requestHash\` VARCHAR(64) NOT NULL,
+    \`rawInput\` MEDIUMTEXT NOT NULL,
+    \`targetFormats\` JSON NOT NULL,
+    \`instruction\` TEXT NULL,
+    \`status\` VARCHAR(24) NOT NULL DEFAULT 'queued',
+    \`backgroundTaskId\` VARCHAR(191) NULL,
+    \`runId\` VARCHAR(64) NULL,
+    \`aimGenerationId\` VARCHAR(30) NULL,
+    \`provider\` VARCHAR(64) NULL,
+    \`model\` VARCHAR(128) NULL,
+    \`degraded\` BOOLEAN NOT NULL DEFAULT FALSE,
+    \`inputTokens\` INTEGER NULL,
+    \`outputTokens\` INTEGER NULL,
+    \`costCny\` DECIMAL(10, 6) NULL,
+    \`errorCode\` VARCHAR(48) NULL,
+    \`errorMessage\` TEXT NULL,
+    \`queuedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`startedAt\` DATETIME(3) NULL,
+    \`completedAt\` DATETIME(3) NULL,
+    \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    \`updatedAt\` DATETIME(3) NOT NULL,
+    PRIMARY KEY (\`id\`),
+    CONSTRAINT \`AgentInvocation_apiKeyId_fkey\` FOREIGN KEY (\`apiKeyId\`) REFERENCES \`AgentApiKey\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT \`AgentInvocation_userId_fkey\` FOREIGN KEY (\`userId\`) REFERENCES \`User\`(\`id\`) ON DELETE RESTRICT ON UPDATE CASCADE,
+    UNIQUE INDEX \`AgentInvocation_apiKeyId_action_idempotencyKey_key\`(\`apiKeyId\`, \`action\`, \`idempotencyKey\`),
+    INDEX \`AgentInvocation_apiKeyId_status_idx\`(\`apiKeyId\`, \`status\`),
+    INDEX \`AgentInvocation_userId_createdAt_idx\`(\`userId\`, \`createdAt\` DESC),
+    INDEX \`AgentInvocation_status_queuedAt_idx\`(\`status\`, \`queuedAt\`)
+  ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
 ]
 
 function runMysql(connection, query) {

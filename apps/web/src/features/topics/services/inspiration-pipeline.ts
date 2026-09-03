@@ -178,6 +178,7 @@ export async function processInspirationPipeline(inspirationId: string): Promise
           ],
           recommendationMode: "normal",
           refreshCount: 0,
+          userId: inspiration.userId,
         })
         // Store generated candidates on the Inspiration for observation,
         // but do NOT write TopicSelection or KnowledgeEntry

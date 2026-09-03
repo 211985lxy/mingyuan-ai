@@ -45,6 +45,7 @@ import type {
   AimGenerateResponse,
 } from "@/lib/aim/agent-types"
 import { AIM_FACT_PRIORITY_VERSION, withAimFactPriorityRule } from "@/lib/aim-context-priority"
+import { getLaunchRules } from "@/lib/launch-rules"
 
 export type {
   AimAgentHandler,
@@ -76,6 +77,52 @@ export {
   extractBenchmarkOriginalCopy,
   isBenchmarkCopyTooSimilar,
 } from "@/lib/aim-benchmark-quality"
+
+
+/**
+ * 纯函数：按内容任务卡生成 prompt 文本块（字符级可预测，便于断言）。
+ * @returns 任务卡文本；若开关关或 core_claim 为空，返回空串（零注入）。
+ */
+export function buildTaskCardPromptBlock(
+  enabled: boolean,
+  card:
+    | {
+        audience?: string
+        pain?: string
+        core_claim?: string
+        case_refs?: string[]
+        product_link?: string
+        platform_angles?: Record<string, string>
+      }
+    | null
+    | undefined,
+): string {
+  if (!enabled) return ""
+  if (!card || !card.core_claim || !String(card.core_claim).trim()) return ""
+  const audience = card.audience?.trim() || "(未填写)"
+  const pain = card.pain?.trim() || "(未填写)"
+  const core = String(card.core_claim).trim()
+  const caseRefs = Array.isArray(card.case_refs) && card.case_refs.length > 0
+    ? card.case_refs.filter((s) => typeof s === "string" && s.trim().length > 0).join("，")
+    : "(未提供)"
+  const productLink = card.product_link?.trim() || "(未填写)"
+  const pa = card.platform_angles && typeof card.platform_angles === "object"
+    ? Object.entries(card.platform_angles)
+        .filter(([, v]) => typeof v === "string" && v.trim().length > 0)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(" / ")
+    : ""
+  const platformAngles = pa || "(未填写)"
+  return (
+    "\n\n=== 本轮任务卡 ===\n" +
+    `写给谁: ${audience}\n` +
+    `用户痛点: ${pain}\n` +
+    `核心观点: ${core}\n` +
+    `素材案例: ${caseRefs}\n` +
+    `承接产品: ${productLink}\n` +
+    `平台角度: ${platformAngles}`
+  )
+}
 
 const HANDLERS: Record<AimAgentId, AimAgentHandler> = {
   content_producer: new ContentProducerHandler(),
@@ -296,6 +343,15 @@ type AimGenerationInput = Omit<
   useStyleProfileOverride?: boolean
   /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。透传到 prepareAimContext。 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
+  /** 本轮内容任务卡（灰度开 + core_claim 非空触发 prompt 块注入）。 */
+  contentTaskCard?: {
+    audience?: string
+    pain?: string
+    core_claim?: string
+    case_refs?: string[]
+    product_link?: string
+    platform_angles?: Record<string, string>
+  }
 }
 
 function buildGenerationRunSpec(agentId: string, params: AimGenerationInput) {
@@ -399,7 +455,12 @@ export async function buildAimGeneration(
       runtimeTask: prepared.spec.runtimeTask,
       modelPolicy: prepared.spec.modelPolicy,
       knowledgeBlock: prepared.blocks.knowledge,
-      methodologyBlock: prepared.blocks.methodology,
+      methodologyBlock:
+        prepared.blocks.methodology +
+        buildTaskCardPromptBlock(
+          getLaunchRules(params.userId).enable_content_task_card,
+          params.contentTaskCard,
+        ),
       businessDiagnosisBlock: prepared.blocks.businessDiagnosis,
       viralStructureBlock: prepared.blocks.viralStructure,
       eventStorytellingBlock: prepared.blocks.eventStorytelling,

@@ -8,6 +8,7 @@ import { extractFirstPublicUrl, extractVideoUrlFromText } from "@/lib/video-text
 import { resolveCanonicalSourceKey } from "@/lib/video-canonical-key"
 import { allowChannelMessage } from "@/lib/channel-rate-limiter"
 import { InspirationPipelineError } from "@/lib/inspiration-pipeline-error"
+import { afterInspirationCreatedProcessQuestion } from "./user-question-normalize"
 import { recordChannelMetric } from "@/lib/channel-metrics"
 import { isReplySuppressed, isExecutionMode, resolveExecutionMode, type ExecutionMode } from "@/lib/execution-mode"
 import { evaluateIngressPolicy } from "@/lib/ingress-policy"
@@ -345,6 +346,18 @@ export async function ingestInspirationEvent(
     }
     return record
   })
+
+  // ── UserQuestionCard 管线：fire-and-forget，不阻塞主流程 ──
+  if (inspiration.id === proposedId) {
+    // 仅在**新建**而非复用 dedupe 记录时触发
+    void afterInspirationCreatedProcessQuestion({
+      id: inspiration.id,
+      userId,
+      projectId: input.projectId,
+      content: input.content,
+      source: sourceToStoredSource(input.platform),
+    })
+  }
 
   // Record metrics fire-and-forget (don't block the critical path)
   recordChannelMetric({ metric: "received", platform: input.platform, externalChatId: input.externalChatId, externalAccountId: input.externalAccountId }).catch(() => {})

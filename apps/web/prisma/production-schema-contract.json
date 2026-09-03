@@ -484,6 +484,81 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    {
+      "name": "AgentApiKey",
+      "columns": [
+        "id",
+        "userId",
+        "name",
+        "keyPrefix",
+        "keyHash",
+        "status",
+        "allowedProjects",
+        "allowedAgents",
+        "dailyLimit",
+        "lastUsedAt",
+        "clientType",
+        "allowedScopes",
+        "minuteLimit",
+        "dailyTokenLimit",
+        "maxInputChars",
+        "expiresAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "name": "AgentApiCallLog",
+      "columns": [
+        "id",
+        "apiKeyId",
+        "userId",
+        "projectId",
+        "agentId",
+        "action",
+        "inputSummary",
+        "outputFormats",
+        "status",
+        "errorMessage",
+        "durationMs",
+        "aimGenerationId",
+        "invocationId",
+        "createdAt"
+      ]
+    },
+    {
+      "name": "AgentInvocation",
+      "columns": [
+        "id",
+        "apiKeyId",
+        "userId",
+        "projectId",
+        "agentId",
+        "action",
+        "idempotencyKey",
+        "requestHash",
+        "rawInput",
+        "targetFormats",
+        "instruction",
+        "status",
+        "backgroundTaskId",
+        "runId",
+        "aimGenerationId",
+        "provider",
+        "model",
+        "degraded",
+        "inputTokens",
+        "outputTokens",
+        "costCny",
+        "errorCode",
+        "errorMessage",
+        "queuedAt",
+        "startedAt",
+        "completedAt",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   ]
 }

@@ -25,7 +25,9 @@ export interface IpWikiBlockInput {
 // 这里只允许装配带 projectId 的客户专属页。
 // viral_methodology 是历史类型名，在 IP Wiki 中表示“针对当前客户适配后的项目爆款策略”，
 // 不是全局方法论源；全局方法论仍通过独立 methodologyBlock 注入。
-const BLOCK_PAGE_TYPES = [...IP_WIKI_CORE_PAGE_TYPES, "viral_methodology" as IpWikiPageType]
+// 显式将 boss_brief 放在 BLOCK_PAGE_TYPES 首位（最高阅读优先级）—— 与 biography / methodology 同级或更高
+// 不放入 IP_WIKI_CORE_PAGE_TYPES：避免 lint/core 完整性门禁在无 boss_brief 档案时错报缺失（它是采访后才产生的补充画像）
+export const BLOCK_PAGE_TYPES = ["boss_brief" as IpWikiPageType, ...IP_WIKI_CORE_PAGE_TYPES, "viral_methodology" as IpWikiPageType]
 
 const MAX_PAGES_IN_BLOCK = 8
 /**

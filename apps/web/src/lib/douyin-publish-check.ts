@@ -7,15 +7,19 @@
 
 import {
   COMMERCIAL_BIND_HINTS,
+  EXTRA_COMPLIANCE_RULE_IDS,
   PUBLISH_PRECHECK_DISCLAIMER,
   PUBLISH_PRECHECK_RECHECK_HINT,
   PUBLISH_PRECHECK_RULES,
   SAFE_CONTEXT_PHRASES,
+  filterRulesByComplianceSwitch,
+  getClearedTerms,
   type PublishPrecheckRule,
 } from "@/lib/aim/publish-precheck-rules"
+import { isComplianceExtraRuleEnabled } from "@/lib/launch-rules"
 
 export type DouyinPublishVerdict = "可发" | "改完可发" | "高风险勿发"
-export type DouyinPublishSeverity = "high" | "mid" | "low"
+export type DouyinPublishSeverity = "high" | "mid" | "medium" | "low"
 
 export interface DouyinPublishViolation {
   text: string
@@ -101,9 +105,12 @@ function hasDangerousBind(content: string, rule: PublishPrecheckRule, term: stri
   })
 }
 
-function collectSurfaceHits(content: string): SurfaceHit[] {
+function collectSurfaceHits(
+  content: string,
+  rules: PublishPrecheckRule[] = PUBLISH_PRECHECK_RULES,
+): SurfaceHit[] {
   const hits: SurfaceHit[] = []
-  for (const rule of PUBLISH_PRECHECK_RULES) {
+  for (const rule of rules) {
     // 长词优先，减少短词误切
     const terms = [...rule.surfaceTerms].sort((a, b) => b.length - a.length)
     for (const term of terms) {
@@ -130,7 +137,14 @@ function judgeHits(content: string, hits: SurfaceHit[]): DouyinPublishViolation[
 
     if (isSafeAbsoluteContext(content, hit.term)) continue
 
-    const bound = hasDangerousBind(content, hit.rule, hit.term)
+    // Task 10：R06_* ~ R09_* 新规则使用 clearedWhen.terms 程序化豁免
+    // （注意：对象 clearedWhen 中 terms 为空数组或 undefined → 不豁免，比如 R08）
+    const clearedTerms = getClearedTerms(hit.rule)
+    if (clearedTerms.length > 0 && clearedTerms.some((t) => content.includes(t))) continue
+
+    // 对 R06_* / R07_* / R08_* / R09_*：规则本身就是高置信度词面命中 → 无需危险绑定也必改
+    const extraRule = new Set<string>([...EXTRA_COMPLIANCE_RULE_IDS]).has(hit.rule.id)
+    const bound = extraRule ? true : hasDangerousBind(content, hit.rule, hit.term)
     if (!bound) {
       // 词面有了但无危险绑定 → 仅提示（低优先级）
       violations.push({
@@ -184,10 +198,16 @@ function buildMinimalRewrite(content: string, violations: DouyinPublishViolation
   const blocking = violations.filter((item) => !item.advisory)
   for (const violation of blocking) {
     const rule = PUBLISH_PRECHECK_RULES.find((item) => item.id === violation.ruleId)
-    const replacement =
-      rule?.replaceWith ||
-      violation.suggest.match(/「([^」]+)」/)?.[1] ||
-      "更稳妥的说法"
+    const rw = rule?.replaceWith
+    let replacement = "更稳妥的说法"
+    if (typeof rw === "string") {
+      replacement = rw || violation.suggest.match(/「([^」]+)」/)?.[1] || "更稳妥的说法"
+    } else if (rw && typeof rw === "object") {
+      // R06：逐命中词字典映射；找不到就退回到 suggest 里的「」或通用兜底
+      replacement = (rw as Record<string, string>)[violation.text] ?? violation.suggest.match(/「([^」]+)」/)?.[1] ?? "更稳妥的说法"
+    } else {
+      replacement = violation.suggest.match(/「([^」]+)」/)?.[1] ?? "更稳妥的说法"
+    }
     rewritten = rewritten.split(violation.text).join(replacement)
   }
   return rewritten
@@ -264,8 +284,16 @@ function resolveVerdict(violations: DouyinPublishViolation[]): DouyinPublishVerd
 /**
  * @description 运行抖音发布前自查（词面召回 + 语境判定）
  */
-export function runDouyinPublishCheck(content: string): DouyinPublishCheck {
-  const hits = collectSurfaceHits(content)
+export function runDouyinPublishCheck(
+  content: string,
+  overrideComplianceSwitch?: boolean,
+): DouyinPublishCheck {
+  const extraEnabled =
+    overrideComplianceSwitch !== undefined
+      ? overrideComplianceSwitch
+      : isComplianceExtraRuleEnabled()
+  const effectiveRules = filterRulesByComplianceSwitch(PUBLISH_PRECHECK_RULES, extraEnabled)
+  const hits = collectSurfaceHits(content, effectiveRules)
   const violations = judgeHits(content, hits)
   const blocking = violations.filter((item) => !item.advisory)
   const verdict = resolveVerdict(violations)
@@ -281,3 +309,41 @@ export function runDouyinPublishCheck(content: string): DouyinPublishCheck {
     recheckHint: blocking.length > 0 ? PUBLISH_PRECHECK_RECHECK_HINT : undefined,
   }
 }
+
+/**
+ * 便捷入口：返回 0-100 的合规分数（越低越危险），以及按 severity 的扣分明细。
+ * 给 Task 10 单测和调用方一个「扣分点」视角：R08（批量做账号=high）一定会被识别为高风险扣分。
+ */
+export function flowScore(
+  content: string,
+  overrideComplianceSwitch?: boolean,
+): {
+  score: number
+  level: "高" | "中" | "低"
+  deductions: { ruleId?: string; severity: DouyinPublishSeverity; text: string; reason: string }[]
+} {
+  const check = runDouyinPublishCheck(content, overrideComplianceSwitch)
+  const blocking = check.violations.filter((v) => !v.advisory)
+  const deductions = blocking.map((v) => ({
+    ruleId: v.ruleId,
+    severity: v.severity,
+    text: v.text,
+    reason: v.reason,
+  }))
+  // 复用 trafficScore 的逻辑 + 合规额外扣分项（extra rules 的 high/mid 加强惩罚）
+  let s = check.trafficScore.score
+  const extra = new Set<string>([...EXTRA_COMPLIANCE_RULE_IDS])
+  for (const d of deductions) {
+    if (d.ruleId && extra.has(d.ruleId)) {
+      if (d.severity === "high") s -= 10
+      else if (d.severity === "mid") s -= 5
+    }
+  }
+  s = Math.max(0, Math.min(100, s))
+  return {
+    score: s,
+    level: s >= 80 ? "高" : s >= 60 ? "中" : "低",
+    deductions,
+  }
+}
+

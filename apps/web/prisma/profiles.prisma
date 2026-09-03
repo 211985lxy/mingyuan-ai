@@ -94,6 +94,7 @@ model ClientProject {
   topicSelections        TopicSelection[]
   channelBindings        ChannelBinding[]
   opportunityCollections OpportunityCollection[]
+  userQuestionCards       UserQuestionCard[]
   customerOutcomes       CustomerOutcomeProjection[]
 
   @@index([userId, status])

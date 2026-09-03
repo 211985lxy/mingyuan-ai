@@ -43,3 +43,99 @@ export function buildLocalChecklist(title: string, content: string): XhsChecklis
     { item: "density", status: dense ? "warn" : "pass", note: dense ? "存在长段落" : "段落正常" },
   ]
 }
+
+// ─── 复用 Task 10 合规规则（R06_* ~ R09_*） ────────────────────────────────
+import {
+  EXTRA_COMPLIANCE_RULE_IDS,
+  PUBLISH_PRECHECK_RULES,
+  runPublishPrecheck,
+  type PublishPrecheckHit,
+  type PublishPrecheckSeverity,
+} from "@/lib/aim/publish-precheck-rules"
+import { isComplianceExtraRuleEnabled } from "@/lib/launch-rules"
+
+/** 小红书合规问题（兼容已有的 XhsReviewIssue 并带 severity/ruleId） */
+export interface XhsComplianceIssue {
+  /** 与既有 XhsReviewIssue.type 对齐：ruleId / absolute / emoji ... */
+  type: string
+  /** 规则 ID（命中 publish-precheck 规则时为原 rule id） */
+  ruleId?: string
+  severity: "high" | "medium" | "low"
+  text: string
+  suggestion: string
+  category?: string
+  sourceNote?: string
+  matchedTerm?: string
+}
+
+/**
+ * 按平台要求 severity 归一：high / medium / low。
+ * 小红书与抖音统一对外不暴露「mid」旧写法。
+ */
+function normalizeSev(s: PublishPrecheckSeverity): "high" | "medium" | "low" {
+  if (s === "mid") return "medium"
+  return s
+}
+
+/**
+ * @description 运行小红书专属合规检查（复用 PUBLISH_PRECHECK_RULES 同一规则对象，
+ * 由 @/lib/launch-rules 中的 complianceExtraRules 开关决定是否加载 R06_* ~ R09_*）。
+ *
+ * 规则来源：src/lib/aim/publish-precheck-rules.ts，保持与抖音发布前自查
+ * 一致的 id / severity / suggest / reason / replaceWith，保证双平台规则库统一。
+ *
+ * @param text 正文 + 标题拼接后的检查文本
+ * @param overrideComplianceSwitch 测试用：可强制覆盖 complianceExtraRules 开关；
+ *                                 缺省则读取全局 launch-rules。
+ */
+export function runXhsComplianceCheck(
+  text: string,
+  overrideComplianceSwitch?: boolean,
+): XhsComplianceIssue[] {
+  const extraEnabled =
+    overrideComplianceSwitch !== undefined
+      ? overrideComplianceSwitch
+      : isComplianceExtraRuleEnabled()
+
+  const hits: PublishPrecheckHit[] = runPublishPrecheck(text, extraEnabled, {
+    rules: PUBLISH_PRECHECK_RULES,
+  })
+
+  // 只对外输出：1) baseline 中绝对化相关（命中）保持兼容；2) R06_* ~ R09_*
+  // Task 10 特别要求 R06（品牌词）命中即输出 medium 提示；R07/R08/R09 同理至少各一条
+  const issues: XhsComplianceIssue[] = hits.map((h) => ({
+    type: h.ruleId.startsWith("R0") ? "rule" : "compliance",
+    ruleId: h.ruleId,
+    severity: normalizeSev(h.severity),
+    text: `【${h.category}】命中「${h.matchedTerm}」：${h.reason}`,
+    suggestion: h.suggest,
+    category: h.category,
+    sourceNote: h.sourceNote,
+    matchedTerm: h.matchedTerm,
+  }))
+
+  // 保留原 Task 10 需要的命中对象数组（xhs-review 原结构 + 新规则复用）
+  return issues
+}
+
+/** 便捷：只返回 Task 10 新增 R06_* ~ R09_* 的命中（方便外部消费者或单测） */
+export function runXhsExtraComplianceOnly(
+  text: string,
+  overrideComplianceSwitch?: boolean,
+): XhsComplianceIssue[] {
+  const all = runXhsComplianceCheck(text, overrideComplianceSwitch)
+  const extra = new Set<string>([...EXTRA_COMPLIANCE_RULE_IDS])
+  return all.filter((x) => x.ruleId && extra.has(x.ruleId))
+}
+
+/** 与既有 XhsReviewIssue 兼容的视图（仅保留 type/text/suggestion 三字段）。 */
+export function runXhsComplianceAsReviewIssues(
+  text: string,
+  overrideComplianceSwitch?: boolean,
+): XhsReviewIssue[] {
+  return runXhsComplianceCheck(text, overrideComplianceSwitch).map((x) => ({
+    type: x.ruleId ?? x.type,
+    text: x.text,
+    suggestion: x.suggestion,
+  }))
+}

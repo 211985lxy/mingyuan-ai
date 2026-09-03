@@ -20,6 +20,9 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
   const task = await claimBackgroundTask(prisma, taskId)
   if (!task) return false
   try {
+    // 注：UserQuestionCard 建卡已在 inspiration-events.ts 的 afterInspirationCreatedProcessQuestion
+    // 中 fire-and-forget 触发（仅新建时），此处不再重复调用以避免 occurrenceCount 翻倍。
+
     const result = await processInspirationPipeline(task.aggregateId)
     if (result.outcome === "deferred") {
       await deferBackgroundTask(prisma, {

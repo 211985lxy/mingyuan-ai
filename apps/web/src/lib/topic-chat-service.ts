@@ -49,6 +49,7 @@ export async function handleTopicChatMessage(input: {
     ],
     recommendationMode: "normal",
     refreshCount: 0,
+    userId: input.userId,
   })
 
   if (!result.success) throw new Error(result.error || "选题生成失败")

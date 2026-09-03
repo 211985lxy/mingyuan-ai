@@ -55,6 +55,15 @@ export interface AimInput {
   /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。透传到 prepareAimContext。 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
   unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
+  /** 本轮内容任务卡（非空 core_claim 触发 prompt 块注入）。 */
+  contentTaskCard?: {
+    audience?: string
+    pain?: string
+    core_claim?: string
+    case_refs?: string[]
+    product_link?: string
+    platform_angles?: Record<string, string>
+  }
 }
 
 function asStringArray(value: unknown): string[] {
@@ -202,5 +211,6 @@ export async function generateAimContent(input: AimInput) {
     useStyleProfileOverride: input.useStyleProfileOverride,
     activeMethodologySignals: input.activeMethodologySignals,
     unifiedContentExecution: input.unifiedContentExecution,
+    contentTaskCard: input.contentTaskCard,
   })
 }

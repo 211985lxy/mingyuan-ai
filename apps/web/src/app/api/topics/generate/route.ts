@@ -280,6 +280,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     recentTitles,
     refreshCount,
     contentThemes,
+    userId: user.id,
   })
 
   if (!result.success && (benchmarkSources.length > 0 || videoCopySources.length > 0 || hotTopicSources.length > 0)) {
@@ -297,6 +298,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       recentTitles,
       refreshCount,
       contentThemes,
+      userId: user.id,
     })
   }
 

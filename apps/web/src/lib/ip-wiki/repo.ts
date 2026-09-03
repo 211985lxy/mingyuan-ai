@@ -192,3 +192,164 @@ export async function updateIpWikiPage(input: {
   })
   return row as unknown as IpWikiPageRow
 }
+
+
+// ═══════════════════════════════════════════════════════════
+// 老板说明书 · 采访 → ipWikiPage(boss_brief) 入库
+// ═══════════════════════════════════════════════════════════
+
+import {
+  validateInterviewSixDim,
+  renderBossBriefContent,
+  buildBossBriefFrontmatter,
+  type InterviewSixDim,
+} from "@/lib/ip-wiki/boss-brief-types"
+import { applyInterviewToPersona, type InterviewPersona } from "@/lib/assistant-persona"
+import { applyInterviewToStyleProfile } from "@/lib/style-profile"
+
+export interface UpsertBossBriefResult {
+  applied: boolean
+  /** applied=false 时给出原因 */
+  reason?: "not_confirmed" | "invalid_input" | "error"
+  /** 错误详情 */
+  errorDetail?: string
+  /** 成功写入的 ipWikiPage row（applied=true 时非空） */
+  page?: IpWikiPageRow
+  /** 同步派生的 assistant persona 对象（供调用方自行落库 / 使用） */
+  persona?: InterviewPersona
+  /** 同步派生的 style profile draft（供调用方自行落库 / 使用） */
+  styleProfileDraft?: ReturnType<typeof applyInterviewToStyleProfile>
+}
+
+/** 类似 llm-json-retry 的 2 次尝试：裸 JSON → 去 markdown 围栏后再 JSON，都失败抛错。 */
+function parseInterviewRaw(raw: string): unknown {
+  let data: unknown = null
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const cleaned = attempt === 0
+        ? raw
+        : raw
+            .replace(/^\s*```(?:json)?\s*\n?/i, "")
+            .replace(/\n?```\s*$/i, "")
+            .trim()
+      data = JSON.parse(cleaned)
+      return data
+    } catch {
+      // 第二轮再试
+    }
+  }
+  throw new Error("interviewResult JSON 解析失败（已重试去 markdown 围栏）")
+}
+
+/**
+ * 将采访六维画像 upsert 成 ipWikiPage(boss_brief) 记录，并同步派生
+ * persona 与 style-profile 的纯函数结果（不越权写其它表）。
+ *
+ * 写入权限门槛：必须显式传 confirmed=true，否则拒绝写入。
+ * 这是为了防止 AI 自动越权写入老板说明书。
+ *
+ * @param input.userId     写入人（与 project 所属 user 一致，由调用方校验）
+ * @param input.projectId  即任务描述中的 ipProfileId —— 当前项目使用 projectId 命名。
+ * @param input.confirmed  必须为 true 才写入。
+ * @param input.interviewResult  已解析对象或采访模式输出的原始 JSON 字符串。
+ * @param input.oldPersona       可选，传给 applyInterviewToPersona 做合并。
+ * @param input.oldStyleContent  可选，传给 applyInterviewToStyleProfile 做合并。
+ */
+export async function upsertBossBriefFromInterview(input: {
+  userId: string
+  projectId: string
+  confirmed: boolean
+  interviewResult: InterviewSixDim | string
+  sourceGenerationId?: string
+  oldPersona?: Partial<InterviewPersona>
+  oldStyleContent?: string | null
+}): Promise<UpsertBossBriefResult> {
+  // ── 权限闸门 ────────────────────────────────────────────────
+  if (input.confirmed !== true) {
+    return { applied: false, reason: "not_confirmed" }
+  }
+
+  const { userId, projectId } = input
+  if (!userId || !projectId) {
+    return {
+      applied: false,
+      reason: "invalid_input",
+      errorDetail: "userId 与 projectId 均不能为空",
+    }
+  }
+
+  try {
+    // ── 解析 + 校验（复用 llm-json-retry 的 2 次尝试语义） ───
+    const rawObj =
+      typeof input.interviewResult === "string"
+        ? parseInterviewRaw(input.interviewResult)
+        : input.interviewResult
+    const dim = validateInterviewSixDim(rawObj)
+
+    // ── 派生 persona / style（纯函数，不落库） ───────────────
+    const persona = applyInterviewToPersona(dim, input.oldPersona)
+    const styleProfileDraft = applyInterviewToStyleProfile({
+      expressionStyle: dim.expressionStyle,
+      contentBoundaries: dim.contentBoundaries,
+      strengthsWeaknesses: dim.strengthsWeaknesses,
+      oldContent: input.oldStyleContent ?? null,
+    })
+
+    // ── Upsert IpWikiPage：归档旧 active(boss_brief) → 新建 version+1 ──
+    const latest = await prisma.ipWikiPage.findFirst({
+      where: {
+        projectId,
+        userId,
+        pageType: "boss_brief",
+        status: "active",
+      },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    })
+    if (latest) {
+      await prisma.ipWikiPage.updateMany({
+        where: { projectId, userId, pageType: "boss_brief", status: "active" },
+        data: { status: "archived" },
+      })
+    }
+
+    const content = renderBossBriefContent(dim)
+    const frontmatter = buildBossBriefFrontmatter(dim)
+
+    const row = await prisma.ipWikiPage.create({
+      data: {
+        userId,
+        projectId,
+        pageType: "boss_brief",
+        title: "老板说明书",
+        content,
+        frontmatter: frontmatter as object,
+        sources: [
+          {
+            kind: "aim_generation" as const,
+            id: input.sourceGenerationId ?? "interview_build_profile",
+            label: "老板说明书采访六维摘要",
+          },
+        ] as object,
+        links: ["定位主张", "人设", "内容策略底盘", "目标人群"] as object,
+        sourceGenerationId: input.sourceGenerationId ?? null,
+        version: (latest?.version ?? 0) + 1,
+        status: "active",
+      },
+    })
+
+    return {
+      applied: true,
+      page: row as unknown as IpWikiPageRow,
+      persona,
+      styleProfileDraft,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return {
+      applied: false,
+      reason: "error",
+      errorDetail: msg,
+    }
+  }
+}

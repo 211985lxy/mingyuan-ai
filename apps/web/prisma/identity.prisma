@@ -43,6 +43,7 @@ model User {
   methodologyProfiles   MethodologyProfile[]
   opportunitySearchRuns OpportunitySearchRun[]
   opportunityCollections OpportunityCollection[]
+  userQuestionCards      UserQuestionCard[]
 }
 
 model AdminUser {

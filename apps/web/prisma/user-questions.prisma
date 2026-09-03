@@ -1,0 +1,26 @@
+// 用户问题库 — 从飞书群/私信等渠道采集的真实用户提问，
+// 经 similarityGroupKey 去重聚合后，用于选题评分加权（userQuestionBoost）。
+// 拆出独立文件以遵守 Prisma domain ≤ 400 行约束。
+model UserQuestionCard {
+  id                 String   @id @default(cuid())
+  userId             String
+  projectId          String?  @db.VarChar(191)
+  originalText       String   @db.Text
+  source             String   @default("other") @db.VarChar(40)
+  occurrenceCount    Int      @default(1)
+  customerRef        String?  @db.VarChar(191)
+  status             String   @default("pending") @db.VarChar(24)
+  userQuoteSnippets  Json
+  similarityGroupKey String?  @db.VarChar(191)
+  topicSelectionId   String?  @db.VarChar(40)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user      User            @relation(fields: [userId], references: [id])
+  project   ClientProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([similarityGroupKey])
+  @@index([status])
+  @@index([projectId, createdAt(sort: Desc)])
+}

@@ -102,6 +102,7 @@ export async function executePreparedAimGeneration({
     selectedTopicIndex: parsed.selectedTopicIndex,
     trace,
     taskSpec: context.taskSpec,
+    contentTaskCard: parsed.contentTaskCard,
   }))
 }
 

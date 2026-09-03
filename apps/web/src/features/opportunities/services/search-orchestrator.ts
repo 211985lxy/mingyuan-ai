@@ -82,10 +82,25 @@ export async function orchestrateSearch(input: OrchestratorInput): Promise<Searc
   const filtered = applyFilters(deduped, input.filters)
 
   // 6. 评分排序
+  // 6. 评分排序（主排序仍由 weightedScore / opportunityScore 主导，不影响）
   const scored = scoreItems(filtered)
 
+  // 6b. 用户问题命中标识透传：把 scoreBreakdown.userQuestionBoost / matchedQuestionIds
+  //     复制到 item 顶层，前端无需穿透 scoreBreakdown 即可展示。
+  const lifted = scored.map((item) => {
+    const bd = item.scoreBreakdown
+    if (!bd || (bd.userQuestionBoost !== true && !Array.isArray(bd.matchedQuestionIds))) {
+      return item
+    }
+    return {
+      ...item,
+      ...(bd.userQuestionBoost === true ? { userQuestionBoost: true as const } : {}),
+      ...(Array.isArray(bd.matchedQuestionIds) ? { matchedQuestionIds: bd.matchedQuestionIds } : {}),
+    }
+  })
+
   const response: SearchResponse = {
-    items: scored.slice(0, input.count),
+    items: lifted.slice(0, input.count),
     warnings,
     platformStatus,
   }

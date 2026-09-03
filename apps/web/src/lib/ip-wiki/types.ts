@@ -13,6 +13,7 @@ export type IpWikiPageType =
   | "conversion_path" // 成交路径与产品阶梯
   | "topic_direction" // 选题方向
   | "viral_methodology" // 爆款方法论：爆款结构 / 钩子 / 情绪曲线
+  | "boss_brief" // 老板说明书：采访六维画像（经历 / 业务 / 擅长不擅长 / 服务谁 / 表达习惯 / 内容边界）
   | "index" // 维基目录（导航入口）
   | "log" // 操作日志（时序记录）
 
@@ -24,6 +25,7 @@ export const IP_WIKI_PAGE_TYPES: IpWikiPageType[] = [
   "conversion_path",
   "topic_direction",
   "viral_methodology",
+  "boss_brief",
   "index",
   "log",
 ]
@@ -45,6 +47,7 @@ export const IP_WIKI_PAGE_TYPE_LABELS: Record<IpWikiPageType, string> = {
   conversion_path: "成交路径",
   topic_direction: "选题方向",
   viral_methodology: "爆款方法论",
+  boss_brief: "老板说明书",
   index: "维基目录",
   log: "操作日志",
 }

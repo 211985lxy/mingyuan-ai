@@ -70,6 +70,14 @@ export interface ParseGenerateBodyResult {
   /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构 */
   activeMethodologySignals: AimMethodologySignal[] | undefined
   sourceEnvelope: AimContentSourceEnvelope | undefined
+  contentTaskCard?: {
+    audience?: string
+    pain?: string
+    core_claim?: string
+    case_refs?: string[]
+    product_link?: string
+    platform_angles?: Record<string, string>
+  }
 }
 
 /**
@@ -183,6 +191,44 @@ export function parseGenerateBody(body: Record<string, unknown>): ParseGenerateB
         ? body.useStyleProfileOverride
         : undefined,
     sourceEnvelope: sourceEnvelopeResult.success ? sourceEnvelopeResult.data : undefined,
+    contentTaskCard: normalizeContentTaskCard(body.contentTaskCard),
+  }
+}
+
+
+
+/**
+ * 从请求体解析内容任务卡：
+ *  - 非对象或 null → undefined
+ *  - core_claim 为空串或非字符串 → 整体视为未启用（返回 undefined）
+ *  - case_refs 过滤掉非字符串 / 空值
+ */
+function normalizeContentTaskCard(raw: unknown): ParseGenerateBodyResult["contentTaskCard"] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined
+  const rec = raw as Record<string, unknown>
+  const coreClaim = typeof rec.core_claim === "string" ? rec.core_claim.trim() : ""
+  if (!coreClaim) return undefined
+  const audience = typeof rec.audience === "string" ? rec.audience : undefined
+  const pain = typeof rec.pain === "string" ? rec.pain : undefined
+  const caseRefsRaw = Array.isArray(rec.case_refs) ? rec.case_refs : []
+  const case_refs = caseRefsRaw
+    .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+  const product_link = typeof rec.product_link === "string" ? rec.product_link : undefined
+  let platform_angles: Record<string, string> | undefined
+  if (rec.platform_angles && typeof rec.platform_angles === "object" && !Array.isArray(rec.platform_angles)) {
+    const pa: Record<string, string> = {}
+    for (const [k, v] of Object.entries(rec.platform_angles)) {
+      if (typeof v === "string") pa[k] = v
+    }
+    if (Object.keys(pa).length > 0) platform_angles = pa
+  }
+  return {
+    audience: audience || undefined,
+    pain: pain || undefined,
+    core_claim: coreClaim,
+    case_refs: case_refs.length > 0 ? case_refs : undefined,
+    product_link: product_link || undefined,
+    platform_angles,
   }
 }
 
