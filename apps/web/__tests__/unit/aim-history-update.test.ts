@@ -12,6 +12,7 @@ describe("AIM history update", () => {
       workflowStatus: "published",
       reviewNote: "  复核通过  ",
       publishPlatform: "  抖音  ",
+      publishUrl: "  https://www.douyin.com/video/123  ",
       retroSnapshot: { summary: "  有效  ", actualData: "  10 个咨询  " },
       calibrationRule: { rule: "  下次保留案例  " },
     }, CREATED_AT, { fromStatus: "ready_to_publish" })
@@ -27,6 +28,7 @@ describe("AIM history update", () => {
     expect(data.workflowStatus).toBe("published")
     expect(data.reviewNote).toBe("复核通过")
     expect(data.publishPlatform).toBe("抖音")
+    expect(data.publishUrl).toBe("https://www.douyin.com/video/123")
     expect(data.publishedAt).toBeInstanceOf(Date)
     expect(data.retroSnapshots).toEqual([
       { summary: "旧复盘" },
@@ -63,11 +65,28 @@ describe("AIM history update", () => {
     })
   })
 
-  it("allows published when existing platform is present", () => {
+  it("rejects published without publishUrl（WP-A 作品键强制点）", () => {
+    expect(
+      parseAimHistoryUpdate(
+        { workflowStatus: "published", publishPlatform: "抖音" },
+        CREATED_AT,
+        { fromStatus: "ready_to_publish" },
+      ),
+    ).toEqual({
+      ok: false,
+      error: "登记已发布时必须填写作品链接或作品 ID（用于经营归因）",
+    })
+  })
+
+  it("allows published reusing existing platform and 作品键（本次不传也可）", () => {
     const parsed = parseAimHistoryUpdate(
       { workflowStatus: "published" },
       CREATED_AT,
-      { fromStatus: "ready_to_publish", existingPublishPlatform: "小红书" },
+      {
+        fromStatus: "ready_to_publish",
+        existingPublishPlatform: "小红书",
+        existingPublishUrl: "https://www.xiaohongshu.com/explore/abc",
+      },
     )
     expect(parsed.ok).toBe(true)
   })

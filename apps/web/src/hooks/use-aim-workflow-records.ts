@@ -4,6 +4,7 @@ import { useCallback, useState, type Dispatch, type SetStateAction } from "react
 import { toast } from "sonner"
 
 import type {
+  LeadRecordForm,
   OutcomeForm,
   OutcomeWindow,
   PublishRecordForm,
@@ -16,6 +17,7 @@ import {
   type AimDecisionSnapshot,
   type AimRetroSnapshot,
 } from "@/lib/api/client"
+import { registerAimLeadAttribution } from "@/lib/api/lead-attribution"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import {
   reportWebFinalDisposition,
@@ -31,6 +33,7 @@ import type { TaskSpec } from "@/lib/task-spec"
 const ACCEPTED_WORKFLOW_STATUSES = new Set(["ready_to_shoot", "ready_to_publish", "published"])
 const EMPTY_DECISION: AimDecisionSnapshot = { summary: "", targetUser: "", expectedSignal: "", confidence: "" }
 const EMPTY_PUBLISH: PublishRecordForm = { publishPlatform: "抖音", publishUrl: "" }
+const EMPTY_LEAD: LeadRecordForm = { externalLeadId: "", externalDealId: "", externalPaymentId: "" }
 const EMPTY_RETRO: AimRetroSnapshot = { summary: "", actualData: "", verdict: "", nextRule: "" }
 const EMPTY_RULE: AimCalibrationRule = { rule: "", source: "内容复盘" }
 
@@ -60,20 +63,23 @@ async function saveDecisionRecord(generationId: string, form: AimDecisionSnapsho
   toast.success("已记下发布前判断")
 }
 
-async function savePublishRecord(
+/** 导出供单测复用：强制点①客户端前置校验 */
+export async function savePublishRecord(
   generationId: string,
   form: PublishRecordForm,
   setMessages?: Dispatch<SetStateAction<AimWorkbenchMessage[]>>,
 ) {
   const publishPlatform = form.publishPlatform.trim() || "抖音"
   if (!publishPlatform) throw new Error("请填写发布平台")
+  const publishUrl = form.publishUrl.trim()
+  // 强制点①：进入已发布必须挂作品键（链接或作品 ID），否则经营归因链断裂
+  if (!publishUrl) throw new Error("请填写作品链接或作品 ID（用于经营归因）")
   // 先进入待发布（状态机合法路径），再登记已发布
   try {
     await updateAimWorkflowStatus(generationId, { workflowStatus: "ready_to_publish" })
   } catch {
     // 已在更后状态或同态时忽略，下一步会再校验
   }
-  const publishUrl = form.publishUrl.trim()
   await updateAimWorkflowStatus(generationId, {
     workflowStatus: "published",
     publishPlatform,
@@ -84,6 +90,20 @@ async function savePublishRecord(
     publishPlatform,
     publishUrl,
   }))
+}
+
+/** 导出供单测复用：强制点②客户端前置校验 */
+export async function saveLeadRecord(generationId: string, form: LeadRecordForm) {
+  const externalLeadId = form.externalLeadId.trim()
+  // 强制点②：线索必须显式挂来源；不确定来源就不登记（运营侧兜底为 unknown）
+  if (!externalLeadId) throw new Error("请填写线索标识（微信号 / 手机号 / 线索编号）")
+  await registerAimLeadAttribution({
+    generationId,
+    externalLeadId,
+    externalDealId: form.externalDealId.trim() || undefined,
+    externalPaymentId: form.externalPaymentId.trim() || undefined,
+  })
+  toast.success("已登记线索归因")
 }
 
 function buildRetroOutcome(form: OutcomeForm, window: OutcomeWindow, platform: string) {
@@ -137,6 +157,8 @@ interface RecordForms {
   setPublishForm: Dispatch<SetStateAction<PublishRecordForm>>
   retroForm: AimRetroSnapshot
   setRetroForm: Dispatch<SetStateAction<AimRetroSnapshot>>
+  leadForm: LeadRecordForm
+  setLeadForm: Dispatch<SetStateAction<LeadRecordForm>>
   outcomeForm: OutcomeForm
   setOutcomeForm: Dispatch<SetStateAction<OutcomeForm>>
   outcomeWindow: OutcomeWindow
@@ -149,10 +171,11 @@ function useAimRecordForms(): RecordForms {
   const [decisionForm, setDecisionForm] = useState<AimDecisionSnapshot>(EMPTY_DECISION)
   const [publishForm, setPublishForm] = useState<PublishRecordForm>(EMPTY_PUBLISH)
   const [retroForm, setRetroForm] = useState<AimRetroSnapshot>(EMPTY_RETRO)
+  const [leadForm, setLeadForm] = useState<LeadRecordForm>(EMPTY_LEAD)
   const [outcomeForm, setOutcomeForm] = useState<OutcomeForm>({})
   const [outcomeWindow, setOutcomeWindow] = useState<OutcomeWindow>("7")
   const [retroRuleForm, setRetroRuleForm] = useState<AimCalibrationRule>(EMPTY_RULE)
-  return { decisionForm, setDecisionForm, publishForm, setPublishForm, retroForm, setRetroForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow, retroRuleForm, setRetroRuleForm }
+  return { decisionForm, setDecisionForm, publishForm, setPublishForm, retroForm, setRetroForm, leadForm, setLeadForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow, retroRuleForm, setRetroRuleForm }
 }
 
 function resetFormForMode(mode: WorkflowRecordMode, taskSpec: TaskSpec | null | undefined, forms: RecordForms) {
@@ -165,6 +188,8 @@ function resetFormForMode(mode: WorkflowRecordMode, taskSpec: TaskSpec | null | 
     })
   } else if (mode === "publish") {
     forms.setPublishForm(EMPTY_PUBLISH)
+  } else if (mode === "lead") {
+    forms.setLeadForm(EMPTY_LEAD)
   } else {
     forms.setRetroForm(EMPTY_RETRO)
     forms.setRetroRuleForm(EMPTY_RULE)
@@ -219,6 +244,8 @@ function useRecordDialogHandlers(input: {
         }
         toast.success("已登记发布")
         input.workflow.onPublished?.(dialog.generationId)
+      } else if (dialog.mode === "lead") {
+        await saveLeadRecord(dialog.generationId, input.forms.leadForm)
       } else {
         await saveRetroRecord({
           generationId: dialog.generationId,

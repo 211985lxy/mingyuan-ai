@@ -89,6 +89,7 @@ export function canTransitionWorkflowStatus(
 export interface WorkflowTransitionInput {
   from: string | null | undefined
   to: string
+  /** 生效值：调用方负责以「本次传入 ?? 库内已存」合并后传入 */
   publishPlatform?: string | null
   publishUrl?: string | null
 }
@@ -98,7 +99,7 @@ export type WorkflowTransitionResult =
   | { ok: false; error: string }
 
 /**
- * @description 校验工作流状态转换；进入 published 必须有发布平台
+ * @description 校验工作流状态转换；进入 published 必须有发布平台与作品键（链接或作品 ID）
  */
 export function assertWorkflowTransition(input: WorkflowTransitionInput): WorkflowTransitionResult {
   if (!isAimWorkflowStatus(input.to)) {
@@ -116,9 +117,11 @@ export function assertWorkflowTransition(input: WorkflowTransitionInput): Workfl
     }
   }
   if (to === "published") {
-    const platform = input.publishPlatform?.trim()
-    if (!platform) {
+    if (!input.publishPlatform?.trim()) {
       return { ok: false, error: "登记已发布时必须填写发布平台" }
+    }
+    if (!input.publishUrl?.trim()) {
+      return { ok: false, error: "登记已发布时必须填写作品链接或作品 ID（用于经营归因）" }
     }
   }
   return { ok: true, from, to }

@@ -27,6 +27,19 @@ describe("aim workflow status machine", () => {
       assertWorkflowTransition({
         from: "ready_to_publish",
         to: "published",
+      }),
+    ).toEqual({
+      ok: false,
+      error: "登记已发布时必须填写发布平台",
+    })
+  })
+
+  it("requires publishUrl（作品键）when entering published（WP-A 经营归因强制点）", () => {
+    expect(
+      assertWorkflowTransition({
+        from: "ready_to_publish",
+        to: "published",
+        publishPlatform: "抖音",
       }).ok,
     ).toBe(false)
 
@@ -35,6 +48,16 @@ describe("aim workflow status machine", () => {
         from: "ready_to_publish",
         to: "published",
         publishPlatform: "抖音",
+        publishUrl: "  ",
+      }).ok,
+    ).toBe(false)
+
+    expect(
+      assertWorkflowTransition({
+        from: "ready_to_publish",
+        to: "published",
+        publishPlatform: "抖音",
+        publishUrl: "https://www.douyin.com/video/123",
       }),
     ).toEqual({ ok: true, from: "ready_to_publish", to: "published" })
   })

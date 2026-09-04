@@ -2,9 +2,10 @@
 
 import { memo, useMemo, useState } from "react"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { AimNextAction } from "@/lib/aim-agent-guides"
-import { AIM_FORMAT_LABELS, splitAimMethodNote } from "@/lib/aim/workbench-display"
+import { AIM_FORMAT_LABELS, AIM_SOFT_ACTION_CLASS, splitAimMethodNote } from "@/lib/aim/workbench-display"
 import { SAFETY_WARNING_MARKER } from "@/lib/aim-content-creation-trace"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
@@ -33,6 +34,7 @@ export interface AimDeliverableBubbleProps {
   onOpenDecision?: () => void
   onOpenPublish?: () => void
   onOpenRetro?: () => void
+  onOpenLead?: () => void
   onAttachProject?: (generationId: string) => void
   /** 内联编辑会话：当前占用的 messageId:format */
   inlineEditKey?: string | null
@@ -187,6 +189,23 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
   </Tabs>
 }
 
+/** 经营记录入口行：发布前判断 / 登记发布 / 填写复盘 / 登记线索。
+ *  90bb0b0d 精简时误删了唯一入口导致登记对话框不可达，这里恢复最小按钮行。 */
+function WorkflowRecordActions({ onOpenDecision, onOpenPublish, onOpenRetro, onOpenLead }: {
+  onOpenDecision?: () => void
+  onOpenPublish?: () => void
+  onOpenRetro?: () => void
+  onOpenLead?: () => void
+}) {
+  if (!onOpenDecision && !onOpenPublish && !onOpenRetro && !onOpenLead) return null
+  return <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+    {onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenDecision}>发布前判断</Button> : null}
+    {onOpenPublish ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenPublish}>登记发布</Button> : null}
+    {onOpenRetro ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenRetro}>填写复盘</Button> : null}
+    {onOpenLead ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenLead}>登记线索</Button> : null}
+  </div>
+}
+
 /**
  * @description aimdeliverablebubble
  * @param props - 组件属性
@@ -219,6 +238,12 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
       persona={props.persona}
       topicTitle={props.topicTitle}
       projectId={props.projectId}
+    />
+    <WorkflowRecordActions
+      onOpenDecision={props.onOpenDecision}
+      onOpenPublish={props.onOpenPublish}
+      onOpenRetro={props.onOpenRetro}
+      onOpenLead={props.onOpenLead}
     />
   </div>
 }

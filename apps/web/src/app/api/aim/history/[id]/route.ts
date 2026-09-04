@@ -71,6 +71,7 @@ export async function PATCH(
         topicSelectionId: true,
         workflowStatus: true,
         publishPlatform: true,
+        publishUrl: true,
       },
     })
     if (!existing) {
@@ -80,6 +81,7 @@ export async function PATCH(
     const input = parseAimHistoryUpdate(body, new Date().toISOString(), {
       fromStatus: existing.workflowStatus,
       existingPublishPlatform: existing.publishPlatform,
+      existingPublishUrl: existing.publishUrl,
     })
     if (!input.ok) {
       return NextResponse.json({ error: input.error }, { status: 400 })

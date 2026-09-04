@@ -92,12 +92,17 @@ function normalizeHistoryUpdate(body: JsonRecord, createdAt: string) {
  * @param createdAt - createdAt
  * @param options.fromStatus - 当前状态（用于转换校验）
  * @param options.existingPublishPlatform - 已登记平台（进入 published 时可复用）
+ * @param options.existingPublishUrl - 已登记作品键（进入 published 时可复用）
  * @returns ParsedHistoryUpdate
  */
 export function parseAimHistoryUpdate(
   body: unknown,
   createdAt = new Date().toISOString(),
-  options?: { fromStatus?: string | null; existingPublishPlatform?: string | null },
+  options?: {
+    fromStatus?: string | null
+    existingPublishPlatform?: string | null
+    existingPublishUrl?: string | null
+  },
 ): ParsedHistoryUpdate {
   const data = normalizeHistoryUpdate(isRecordObject(body) ? body : {}, createdAt)
   if (data.decisionSnapshot && !data.decisionSnapshot.summary) {
@@ -117,7 +122,7 @@ export function parseAimHistoryUpdate(
       from: options?.fromStatus,
       to: data.workflowStatus,
       publishPlatform: data.publishPlatform ?? options?.existingPublishPlatform,
-      publishUrl: data.publishUrl,
+      publishUrl: data.publishUrl ?? options?.existingPublishUrl,
     })
     if (!transition.ok) return { ok: false, error: transition.error }
   }

@@ -25,12 +25,14 @@ describe("AIM workflow dialogs", () => {
       decisionForm: { summary: "" },
       publishForm: { publishPlatform: "视频号", publishUrl: "https://example.com/post" },
       retroForm: { summary: "" },
+      leadForm: { externalLeadId: "", externalDealId: "", externalPaymentId: "" },
       ruleForm: { rule: "" },
       outcomeForm: {},
       outcomeWindow: "7",
       onDecisionChange: vi.fn(),
       onPublishChange: vi.fn(),
       onRetroChange: vi.fn(),
+      onLeadChange: vi.fn(),
       onRuleChange: vi.fn(),
       onOutcomeChange: vi.fn(),
       onOutcomeWindowChange: vi.fn(),
@@ -39,6 +41,31 @@ describe("AIM workflow dialogs", () => {
     expect(getWorkflowRecordDialogCopy("publish").title).toBe("登记发布")
     expect(html).toContain("视频号")
     expect(html).toContain("https://example.com/post")
+    expect(html).not.toContain("这次结果怎么判断")
+  })
+
+  it("renders lead attribution fields for the lead mode（WP-B）", () => {
+    const html = renderToStaticMarkup(createElement(WorkflowRecordFields, {
+      dialog: { mode: "lead", generationId: "generation-1" },
+      decisionForm: { summary: "" },
+      publishForm: { publishPlatform: "抖音", publishUrl: "" },
+      retroForm: { summary: "" },
+      leadForm: { externalLeadId: "wx_lead_1", externalDealId: "", externalPaymentId: "" },
+      ruleForm: { rule: "" },
+      outcomeForm: {},
+      outcomeWindow: "7",
+      onDecisionChange: vi.fn(),
+      onPublishChange: vi.fn(),
+      onRetroChange: vi.fn(),
+      onLeadChange: vi.fn(),
+      onRuleChange: vi.fn(),
+      onOutcomeChange: vi.fn(),
+      onOutcomeWindowChange: vi.fn(),
+    }))
+
+    expect(getWorkflowRecordDialogCopy("lead").title).toBe("登记线索")
+    expect(html).toContain("wx_lead_1")
+    expect(html).toContain("线索标识")
     expect(html).not.toContain("这次结果怎么判断")
   })
 

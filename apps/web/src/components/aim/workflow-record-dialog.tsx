@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import type { AimCalibrationRule, AimDecisionSnapshot, AimRetroSnapshot } from "@/lib/api/client"
 
-export type WorkflowRecordMode = "decision" | "publish" | "retro"
+export type WorkflowRecordMode = "decision" | "publish" | "retro" | "lead"
 export interface WorkflowRecordDialogState { mode: WorkflowRecordMode; generationId: string }
 export interface PublishRecordForm { publishPlatform: string; publishUrl: string }
+export interface LeadRecordForm { externalLeadId: string; externalDealId: string; externalPaymentId: string }
 export type OutcomeWindow = "7" | "14" | "30"
 export type OutcomeForm = Record<string, string>
 
@@ -24,7 +25,17 @@ function DecisionFields({ form, onChange }: { form: AimDecisionSnapshot; onChang
 function PublishFields({ form, onChange }: { form: PublishRecordForm; onChange: (form: PublishRecordForm) => void }) {
   return <div className="space-y-3">
     <div className="space-y-1.5"><p className="text-sm font-medium">发布平台</p><Input value={form.publishPlatform} onChange={(event) => onChange({ ...form, publishPlatform: event.target.value })} placeholder="抖音 / 小红书 / 视频号" /></div>
-    <div className="space-y-1.5"><p className="text-sm font-medium">内容链接</p><Input value={form.publishUrl} onChange={(event) => onChange({ ...form, publishUrl: event.target.value })} placeholder="粘贴发布后的链接，没有可先留空。" /></div>
+    <div className="space-y-1.5"><p className="text-sm font-medium">作品链接或作品 ID（必填）</p><Input value={form.publishUrl} onChange={(event) => onChange({ ...form, publishUrl: event.target.value })} placeholder="粘贴发布后的链接或作品 ID，用于经营归因" /></div>
+  </div>
+}
+
+function LeadFields({ form, onChange }: { form: LeadRecordForm; onChange: (form: LeadRecordForm) => void }) {
+  return <div className="space-y-3">
+    <div className="space-y-1.5"><p className="text-sm font-medium">线索标识（必填）</p><Input value={form.externalLeadId} onChange={(event) => onChange({ ...form, externalLeadId: event.target.value })} placeholder="微信号 / 手机号 / 线索编号" /><p className="text-xs text-muted-foreground">来源自动挂到本条内容；不确定来源就不要挂。同一线索重复登记会合并不重复计数。</p></div>
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="space-y-1.5"><p className="text-sm font-medium">成交记录编号（选填）</p><Input value={form.externalDealId} onChange={(event) => onChange({ ...form, externalDealId: event.target.value })} placeholder="已成交才填" /></div>
+      <div className="space-y-1.5"><p className="text-sm font-medium">回款记录编号（选填）</p><Input value={form.externalPaymentId} onChange={(event) => onChange({ ...form, externalPaymentId: event.target.value })} placeholder="已回款才填" /></div>
+    </div>
   </div>
 }
 
@@ -99,8 +110,9 @@ function RetroFields({ form, rule, outcome, outcomeWindow, onChange, onRuleChang
 
 const DIALOG_COPY = {
   decision: { title: "发布前判断", description: "把这条为什么发、准备打到谁、想验证什么先记下来。" },
-  publish: { title: "登记发布", description: "记录发到哪个平台，顺手把状态推进到已发布。" },
+  publish: { title: "登记发布", description: "记录发到哪个平台、作品链接在哪；没有链接就先别标记已发布。" },
   retro: { title: "填写复盘", description: "只写结果判断和下次同类内容的判断规则。" },
+  lead: { title: "登记线索", description: "把新加微/进线的线索挂到本条内容做经营归因。" },
 }
 
 /**
@@ -117,12 +129,13 @@ export function getWorkflowRecordDialogCopy(mode?: WorkflowRecordMode) {
  * @param props - 组件属性
  * @returns 无返回值
  */
-export function WorkflowRecordFields(props: Pick<WorkflowRecordDialogProps, "dialog" | "decisionForm" | "publishForm" | "retroForm" | "ruleForm" | "outcomeForm" | "outcomeWindow" | "onDecisionChange" | "onPublishChange" | "onRetroChange" | "onRuleChange" | "onOutcomeChange" | "onOutcomeWindowChange">) {
+export function WorkflowRecordFields(props: Pick<WorkflowRecordDialogProps, "dialog" | "decisionForm" | "publishForm" | "retroForm" | "ruleForm" | "leadForm" | "outcomeForm" | "outcomeWindow" | "onDecisionChange" | "onPublishChange" | "onRetroChange" | "onRuleChange" | "onLeadChange" | "onOutcomeChange" | "onOutcomeWindowChange">) {
   const mode = props.dialog?.mode
   return <>
     {mode === "decision" ? <DecisionFields form={props.decisionForm} onChange={props.onDecisionChange} /> : null}
     {mode === "publish" ? <PublishFields form={props.publishForm} onChange={props.onPublishChange} /> : null}
     {mode === "retro" ? <RetroFields form={props.retroForm} rule={props.ruleForm} outcome={props.outcomeForm} outcomeWindow={props.outcomeWindow} onChange={props.onRetroChange} onRuleChange={props.onRuleChange} onOutcomeChange={props.onOutcomeChange} onOutcomeWindowChange={props.onOutcomeWindowChange} /> : null}
+    {mode === "lead" ? <LeadFields form={props.leadForm} onChange={props.onLeadChange} /> : null}
   </>
 }
 
@@ -133,12 +146,14 @@ interface WorkflowRecordDialogProps {
   publishForm: PublishRecordForm
   retroForm: AimRetroSnapshot
   ruleForm: AimCalibrationRule
+  leadForm: LeadRecordForm
   outcomeForm: OutcomeForm
   outcomeWindow: OutcomeWindow
   onDecisionChange: (form: AimDecisionSnapshot) => void
   onPublishChange: (form: PublishRecordForm) => void
   onRetroChange: (form: AimRetroSnapshot) => void
   onRuleChange: (form: AimCalibrationRule) => void
+  onLeadChange: (form: LeadRecordForm) => void
   onOutcomeChange: (form: OutcomeForm) => void
   onOutcomeWindowChange: (window: OutcomeWindow) => void
   onClose: () => void

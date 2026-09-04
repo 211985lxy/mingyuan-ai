@@ -463,12 +463,14 @@ export default function AimPage() {
         decisionForm={w.decisionForm}
         publishForm={w.publishForm}
         retroForm={w.retroForm}
+        leadForm={w.leadForm}
         ruleForm={w.retroRuleForm}
         outcomeForm={w.outcomeForm}
         outcomeWindow={w.outcomeWindow}
         onDecisionChange={w.setDecisionForm}
         onPublishChange={w.setPublishForm}
         onRetroChange={w.setRetroForm}
+        onLeadChange={w.setLeadForm}
         onRuleChange={w.setRetroRuleForm}
         onOutcomeChange={w.setOutcomeForm}
         onOutcomeWindowChange={w.setOutcomeWindow}
