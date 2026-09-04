@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   formatPublishOutcomeBlock,
+  type AttributionRecordLike,
   type SanitizedOutcomeLike,
 } from "@/lib/aim/content-outcome-context"
 
@@ -24,6 +25,17 @@ function outcome(overrides: Partial<SanitizedOutcomeLike> = {}): SanitizedOutcom
     userVerdict: null,
     verdictNote: "转化效果不错",
     verdictCode: "effective",
+    ...overrides,
+  }
+}
+
+function attribution(overrides: Partial<AttributionRecordLike> = {}): AttributionRecordLike {
+  return {
+    externalLeadId: "wx-lead-01",
+    externalDealId: null,
+    externalPaymentId: null,
+    attributionMethod: "explicit",
+    occurredAt: new Date("2026-08-20T00:00:00.000Z"),
     ...overrides,
   }
 }
@@ -105,5 +117,49 @@ describe("formatPublishOutcomeBlock", () => {
     expect(result.block).toContain("已有复盘")
     expect(result.block).toContain("结论：开头有效")
     expect(result.block).toContain("下次规则：下次保留同类开头")
+  })
+
+  it("WP-D：线索归因逐条列出，方式如实呈现、不明不许美化", () => {
+    const result = formatPublishOutcomeBlock({
+      outcomes: [],
+      retroSnapshots: [],
+      attributions: [
+        attribution(),
+        attribution({
+          externalLeadId: "wx-lead-02",
+          attributionMethod: "unknown",
+          externalDealId: "deal-9",
+        }),
+      ],
+    })
+
+    expect(result.hasData).toBe(true)
+    expect(result.block).toContain("线索归因：共 2 条登记")
+    expect(result.block).toContain("线索「wx-lead-01」｜明确归因｜未挂成交｜登记 2026-08-20")
+    expect(result.block).toContain("线索「wx-lead-02」｜来源不明｜已挂成交/回款｜登记 2026-08-20")
+  })
+
+  it("WP-D：有发布数据但没归因记录时，明确提示未登记并引导回登记", () => {
+    const result = formatPublishOutcomeBlock({
+      outcomes: [outcome()],
+      retroSnapshots: [],
+      attributions: [],
+    })
+
+    expect(result.block).toContain("线索归因：未登记")
+    expect(result.block).toContain("回内容卡片登记")
+    expect(result.block).not.toContain("线索归因：共")
+  })
+
+  it("WP-D：只有线索归因也算有数据，空窗口照常显示未登记", () => {
+    const result = formatPublishOutcomeBlock({
+      outcomes: [],
+      retroSnapshots: [],
+      attributions: [attribution()],
+    })
+
+    expect(result.hasData).toBe(true)
+    expect(result.block).toContain("线索「wx-lead-01」")
+    expect(result.block).toContain("7 天窗口：未登记")
   })
 })

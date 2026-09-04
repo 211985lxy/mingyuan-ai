@@ -8,11 +8,13 @@
  * 4. 非复盘引擎 → 完全不查，装配字段与无发布数据路径一致
  * 5. 跨引擎委托到 content_retro → 仍能读到数据
  * 6. 换 userId 拿不到别人的数据
+ * 7. WP-D：线索归因记录（含归因方式）随区块进入复盘上下文；只有归因也算有数据
  */
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const {
   findFirst,
+  findAttributions,
   resolveAimConversationIntent,
   buildAimKnowledgeContext,
   getStyleProfileBlock,
@@ -27,6 +29,7 @@ const {
   shouldUseMarketViralContextForTask,
 } = vi.hoisted(() => ({
   findFirst: vi.fn(),
+  findAttributions: vi.fn(async () => []),
   resolveAimConversationIntent: vi.fn(async () => ({
     mode: "chat",
     reason: "test",
@@ -52,6 +55,7 @@ const {
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     aimGeneration: { findFirst },
+    outcomeAttribution: { findMany: findAttributions },
   },
 }))
 
@@ -216,6 +220,71 @@ describe("content_retro chat 发布数据接线", () => {
     expect(block).toContain("营收 未填写 元")
     expect(block).toContain("成交 0 单")
     expect(block).not.toContain("播放 0 次")
+  })
+
+  it("WP-D：已登记线索归因按用户隔离读出并进入区块", async () => {
+    findFirst.mockResolvedValue({
+      retroSnapshots: [],
+      contentOutcomes: [registeredOutcome()],
+    })
+    findAttributions.mockResolvedValue([
+      {
+        externalLeadId: "wx-lead-01",
+        externalDealId: "deal-9",
+        externalPaymentId: null,
+        attributionMethod: "explicit",
+        occurredAt: new Date("2026-08-20T00:00:00.000Z"),
+      },
+      {
+        externalLeadId: "wx-lead-02",
+        externalDealId: null,
+        externalPaymentId: null,
+        attributionMethod: "unknown",
+        occurredAt: new Date("2026-08-21T00:00:00.000Z"),
+      },
+    ])
+
+    const block = await resolvePublishOutcomeBlock({
+      executionAgentId: "content_retro",
+      userId: "user-1",
+      generationId: "gen-1",
+    })
+
+    expect(findAttributions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { generationId: "gen-1", userId: "user-1" },
+      }),
+    )
+    expect(block).toContain("线索归因：共 2 条登记")
+    expect(block).toContain("线索「wx-lead-01」｜明确归因｜已挂成交/回款")
+    expect(block).toContain("线索「wx-lead-02」｜来源不明｜未挂成交")
+    expect(block).not.toContain("线索归因：未登记")
+  })
+
+  it("WP-D：只有线索归因、发布数据未登记也算有数据，不让复盘走编数分支", async () => {
+    findFirst.mockResolvedValue({
+      retroSnapshots: [],
+      contentOutcomes: [],
+    })
+    findAttributions.mockResolvedValue([
+      {
+        externalLeadId: "wx-lead-03",
+        externalDealId: null,
+        externalPaymentId: null,
+        attributionMethod: "first_touch",
+        occurredAt: new Date("2026-08-22T00:00:00.000Z"),
+      },
+    ])
+
+    const block = await resolvePublishOutcomeBlock({
+      executionAgentId: "content_retro",
+      userId: "user-1",
+      generationId: "gen-1",
+    })
+
+    expect(block).toBeDefined()
+    expect(block).toContain("线索「wx-lead-03」｜首触归因｜未挂成交")
+    expect(block).not.toContain("请先去登记")
   })
 
   it("非 content_retro 普通会话 → 不查发布数据，装配字段与无目标路径一致", async () => {

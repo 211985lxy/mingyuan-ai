@@ -9,6 +9,13 @@
 export const ATTRIBUTION_METHODS = ["explicit", "first_touch", "unknown"] as const
 export type AttributionMethod = (typeof ATTRIBUTION_METHODS)[number]
 
+/** 归因方式的对外中文标签；unknown 必须显示为「来源不明」，禁止美化。 */
+export const ATTRIBUTION_METHOD_LABELS: Record<AttributionMethod, string> = {
+  explicit: "明确归因",
+  first_touch: "首触归因",
+  unknown: "来源不明",
+}
+
 export const ATTRIBUTION_CONFIDENCES = ["high", "medium", "low"] as const
 export type AttributionConfidence = (typeof ATTRIBUTION_CONFIDENCES)[number]
 

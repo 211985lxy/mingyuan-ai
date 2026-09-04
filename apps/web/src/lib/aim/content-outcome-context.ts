@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import {
+  ATTRIBUTION_METHOD_LABELS,
+  normalizeAttributionMethod,
+} from "@/lib/aim/outcome-attribution"
+import {
   OUTCOME_VERDICT_CODE_LABELS,
   resolveOutcomeVerdictCode,
 } from "@/lib/aim/outcome-verdict"
@@ -33,6 +37,15 @@ export interface RetroSnapshotLike {
   verdict?: string
   nextRule?: string
   createdAt?: string
+}
+
+/** 线索归因记录的只读投影（WP-D：复盘必须看见这条内容带来的可追溯线索）。 */
+export interface AttributionRecordLike {
+  externalLeadId: string
+  externalDealId: string | null
+  externalPaymentId: string | null
+  attributionMethod: string
+  occurredAt: Date
 }
 
 export interface PublishOutcomeContext {
@@ -83,11 +96,30 @@ function formatRetroSnapshots(snapshots: RetroSnapshotLike[]): string[] {
   return lines
 }
 
+function formatAttributions(attributions: AttributionRecordLike[]): string[] {
+  if (attributions.length === 0) {
+    return [
+      "线索归因：未登记（这条内容还没有挂任何可追溯线索；如私域有加微/进线，请回内容卡片登记）",
+    ]
+  }
+  const lines = [`线索归因：共 ${attributions.length} 条登记`]
+  for (const record of attributions) {
+    const method = ATTRIBUTION_METHOD_LABELS[normalizeAttributionMethod(record.attributionMethod)]
+    const dealBound = record.externalDealId || record.externalPaymentId ? "已挂成交/回款" : "未挂成交"
+    lines.push(
+      `- 线索「${record.externalLeadId}」｜${method}｜${dealBound}｜登记 ${displayDate(record.occurredAt)}`,
+    )
+  }
+  return lines
+}
+
 export function formatPublishOutcomeBlock(input: {
   outcomes: SanitizedOutcomeLike[]
   retroSnapshots: RetroSnapshotLike[]
+  attributions?: AttributionRecordLike[]
 }): PublishOutcomeContext {
-  if (input.outcomes.length === 0 && input.retroSnapshots.length === 0) {
+  const attributions = input.attributions ?? []
+  if (input.outcomes.length === 0 && input.retroSnapshots.length === 0 && attributions.length === 0) {
     return { hasData: false, block: EMPTY_BLOCK }
   }
 
@@ -97,6 +129,7 @@ export function formatPublishOutcomeBlock(input: {
     lines.push(...(outcome ? formatOutcome(outcome) : [`${windowDay} 天窗口：未登记`]), "")
   }
   lines.push(...formatRetroSnapshots(input.retroSnapshots))
+  lines.push(...formatAttributions(attributions))
   return { hasData: true, block: lines.join("\n").trim() }
 }
 
@@ -104,17 +137,24 @@ export async function loadPublishOutcomeContext(input: {
   generationId: string
   userId: string
 }): Promise<PublishOutcomeContext> {
-  const generation = await prisma.aimGeneration.findFirst({
-    where: { id: input.generationId, userId: input.userId },
-    select: {
-      retroSnapshots: true,
-      contentOutcomes: {
-        where: { userId: input.userId },
-        orderBy: { collectWindowDay: "asc" },
-        take: 3,
+  const [generation, attributions] = await Promise.all([
+    prisma.aimGeneration.findFirst({
+      where: { id: input.generationId, userId: input.userId },
+      select: {
+        retroSnapshots: true,
+        contentOutcomes: {
+          where: { userId: input.userId },
+          orderBy: { collectWindowDay: "asc" },
+          take: 3,
+        },
       },
-    },
-  })
+    }),
+    prisma.outcomeAttribution.findMany({
+      where: { generationId: input.generationId, userId: input.userId },
+      orderBy: { occurredAt: "asc" },
+      take: 50,
+    }),
+  ])
   if (!generation) return { hasData: false, block: EMPTY_BLOCK }
 
   const rawSnapshots = Array.isArray(generation.retroSnapshots)
@@ -128,6 +168,7 @@ export async function loadPublishOutcomeContext(input: {
   return formatPublishOutcomeBlock({
     outcomes: generation.contentOutcomes,
     retroSnapshots,
+    attributions,
   })
 }
 

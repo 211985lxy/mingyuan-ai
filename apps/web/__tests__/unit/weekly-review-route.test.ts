@@ -3,7 +3,7 @@ import { NextRequest } from "next/server"
 
 // 每周经营复盘路由测试（90 天计划 3.3）。
 
-const { authenticateRequest, authErrorResponse, computeWeeklyReview, fetchCreatorMetrics, projectFindFirst } = vi.hoisted(() => ({
+const { authenticateRequest, authErrorResponse, computeWeeklyReview, computeTaskAttributionInsights, fetchCreatorMetrics, projectFindFirst } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   fetchCreatorMetrics: vi.fn(async (_input: { start: Date; end: Date }) => ({
@@ -22,11 +22,22 @@ const { authenticateRequest, authErrorResponse, computeWeeklyReview, fetchCreato
     reusedAssetCount: 2,
     day7Backfill: { due: 3, filled: 2 },
   })),
+  computeTaskAttributionInsights: vi.fn(async (_input: { userId: string; start: Date; end: Date }) => [
+    {
+      contentTask: "吸引目标客户",
+      publishedCount: 3,
+      viewsTotal: 12000,
+      traceableLeadCount: 2,
+      unknownLeadCount: 1,
+      sampleNote: null,
+    },
+  ]),
   projectFindFirst: vi.fn<() => Promise<{ id: string } | null>>(async () => ({ id: "project-1" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
 vi.mock("@/lib/aim/weekly-review", () => ({ computeWeeklyReview }))
+vi.mock("@/lib/aim/attribution-insights", () => ({ computeTaskAttributionInsights }))
 vi.mock("@/lib/aim/creator-metrics", () => ({ fetchCreatorMetrics }))
 vi.mock("@/lib/prisma", () => ({ prisma: { clientProject: { findFirst: projectFindFirst } } }))
 
@@ -54,6 +65,18 @@ describe("GET /api/aim/review/weekly", () => {
     const call = fetchCreatorMetrics.mock.calls[0][0]
     expect(call.start).toBeInstanceOf(Date)
     expect(call.end).toBeInstanceOf(Date)
+  })
+
+  it("附带选题归因聚合，与复盘同周期同范围（WP-D）", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly"))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.taskInsights).toEqual([
+      expect.objectContaining({ contentTask: "吸引目标客户", traceableLeadCount: 2, unknownLeadCount: 1 }),
+    ])
+    expect(computeTaskAttributionInsights).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1" }),
+    )
   })
 
   it("显式 start/end 透传", async () => {

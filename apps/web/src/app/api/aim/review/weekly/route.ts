@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { computeWeeklyReview } from "@/lib/aim/weekly-review"
+import { computeTaskAttributionInsights, type AttributionInsightsStorePort } from "@/lib/aim/attribution-insights"
 import { fetchCreatorMetrics, type CreatorMetricsResponse } from "@/lib/aim/creator-metrics"
 import { prisma } from "@/lib/prisma"
 import type { WeeklyReviewStorePort } from "@/lib/aim/weekly-review"
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 平台表现与经营复盘并行读取；总线失败不拖垮复盘（error/not_configured 显式下传）
-    const [review, platformMetrics] = await Promise.all([
+    const [review, platformMetrics, taskInsights] = await Promise.all([
       computeWeeklyReview({
         userId: user.id,
         projectId,
@@ -63,8 +64,15 @@ export async function GET(request: NextRequest) {
         status: "error",
         message: `读取创作者数据总线失败：${error instanceof Error ? error.message : String(error)}`,
       })),
+      computeTaskAttributionInsights({
+        userId: user.id,
+        projectId,
+        start,
+        end,
+        store: prisma as unknown as AttributionInsightsStorePort,
+      }),
     ])
-    return NextResponse.json({ review, platformMetrics })
+    return NextResponse.json({ review, platformMetrics, taskInsights })
   } catch (error) {
     const authResp = authErrorResponse(error)
     if (authResp) return authResp

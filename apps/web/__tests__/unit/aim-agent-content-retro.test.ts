@@ -91,16 +91,36 @@ describe("content retro prompts", () => {
     }
   })
 
-  it("locks the five-section output structure", () => {
+  it("locks the six-section output structure with a mandatory attribution section", () => {
     const prompt = buildContentRetroGeneratePrompt({ knowledgeBlock: "企业知识库" })
 
     expect(prompt).toContain("结果说明")
     expect(prompt).toContain("打中了什么，没打中什么")
+    expect(prompt).toContain("线索归因")
+    expect(prompt).toContain("暂无线索归因")
+    expect(prompt).toContain("不许跳过这一段")
     expect(prompt).toContain("这次判断哪里对，哪里错")
     expect(prompt).toContain("下次遇到同类内容该怎么判断")
     expect(prompt).toContain("1-3 条能继续执行的动作")
     expect(prompt).toContain("不是商业模式诊断")
     expect(prompt).toContain("不需要走四层诊断结构")
+  })
+
+  it("forbids dressing up unknown attribution as a known source", () => {
+    const chatPrompt = buildContentRetroChatPrompt({
+      contextBlock: "企业知识库",
+      publishOutcomeBlock: "线索归因：共 1 条登记\n- 线索「wx-1」｜来源不明｜未挂成交",
+    })
+    const generatePrompt = buildContentRetroGeneratePrompt({
+      knowledgeBlock: "企业知识库",
+      publishOutcomeBlock: "线索归因：未登记",
+    })
+
+    for (const prompt of [chatPrompt, generatePrompt]) {
+      expect(prompt).toContain("就必须如实说来源不明")
+      expect(prompt).toContain("禁止说成明确来源或猜测具体渠道")
+      expect(prompt).toContain("发布数据与线索归因都以【发布数据】区块为准")
+    }
   })
 
   it("keeps content retro out of four-layer diagnosis framing", () => {

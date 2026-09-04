@@ -112,12 +112,19 @@ function sumPeriodSnapshotDeltas(
   return total
 }
 
+/** 快照去重所需的最小字段（供跨模块复用，OutcomeRow 结构上兼容）。 */
+export interface SnapshotKeyRow {
+  generationId: string
+  collectWindowDay: number
+  collectedAt: Date
+}
+
 /**
  * 7/14/30 为累计快照：同一 generation 只保留周期内最成熟窗口
  *（collectWindowDay 最大；并列取 collectedAt 最新），禁止三窗直接相加。
  */
-export function pickPeriodEndSnapshots(rows: OutcomeRow[]): OutcomeRow[] {
-  const best = new Map<string, OutcomeRow>()
+export function pickPeriodEndSnapshots<T extends SnapshotKeyRow>(rows: T[]): T[] {
+  const best = new Map<string, T>()
   for (const row of rows) {
     const prev = best.get(row.generationId)
     if (!prev) {
