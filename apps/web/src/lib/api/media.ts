@@ -76,7 +76,7 @@ export async function completeAssetUpload(
   uploadId: string,
   options?: { name?: string },
 ) {
-  const payload = await request<{ data: ApiAsset }>(
+  const payload = await request<{ data: ApiAsset & { readUrl?: string } }>(
     `/api/assets/uploads/${encodeURIComponent(uploadId)}/complete`,
     {
       method: "POST",
@@ -177,7 +177,8 @@ export async function uploadImageForAimChat(file: File) {
   })
   return {
     assetUrl: result.assetUrl,
-    readUrl: result.assetUrl,
+    // 私有桶：complete 返回的签名读 URL（预览与模型 image_url 都用它）
+    readUrl: result.asset?.readUrl ?? result.assetUrl,
     uploadId: result.uploadId,
   }
 }

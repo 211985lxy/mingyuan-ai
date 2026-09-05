@@ -1845,7 +1845,7 @@
       "input": "bounded_json_object",
       "query": "none",
       "externalService": false,
-      "cost": "low",
+      "cost": "high",
       "idempotency": false
     },
     {
