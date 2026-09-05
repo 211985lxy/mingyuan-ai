@@ -157,7 +157,7 @@ export default function LiteChatPage() {
       <div className="shrink-0 border-t bg-background px-4 pb-4 pt-3">
         <div className="mx-auto w-full max-w-3xl">
           <div
-            className={`relative flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-sm focus-within:border-primary/40 ${dragOver ? "border-primary/60 bg-primary/5" : ""}`}
+            className={`relative rounded-2xl border bg-card p-2 shadow-sm focus-within:border-primary/40 ${dragOver ? "border-primary/60 bg-primary/5" : ""}`}
             onDragOver={(event) => {
               if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
                 event.preventDefault()
@@ -180,65 +180,63 @@ export default function LiteChatPage() {
                 </span>
               </div>
             ) : null}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                const files = Array.from(event.target.files ?? [])
-                if (files.length) routeFiles(files)
-                event.target.value = ""
-              }}
-            />
-            <LiteAddMenu busy={busy} onPickFiles={() => fileInputRef.current?.click()} />
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              placeholder="输入你的问题，可直接粘贴图片/文件，Enter 发送"
-              className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0"
-              rows={1}
-              onChange={(event) => setInput(event.target.value)}
-              onPaste={handlePaste}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                  event.preventDefault()
-                  handleSubmit()
-                }
-              }}
-            />
-            {busy ? (
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-9 shrink-0 cursor-pointer rounded-xl"
-                aria-label="停止生成"
-                onClick={stop}
-              >
-                <Square className="size-3.5" />
-              </Button>
-            ) : (
-              <Button
-                size="icon"
-                className="size-9 shrink-0 cursor-pointer rounded-xl"
-                aria-label="发送"
-                disabled={attachmentPending || (!input.trim() && !hasAttachments)}
-                onClick={handleSubmit}
-              >
-                <ArrowUp className="size-4" />
-              </Button>
-            )}
+            {hasAttachments ? (
+              <div className="mb-2 flex flex-wrap items-center gap-2 border-b border-border/50 pb-2 pl-1">
+                <ImageAttachments bare imageAttachments={imageAttachments} onRemoveImage={removeImage} busy={busy} />
+                <FileAttachmentChips bare fileAttachments={fileAttachments} onRemoveFile={removeFile} busy={busy} />
+              </div>
+            ) : null}
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? [])
+                  if (files.length) routeFiles(files)
+                  event.target.value = ""
+                }}
+              />
+              <LiteAddMenu busy={busy} onPickFiles={() => fileInputRef.current?.click()} />
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                placeholder="输入你的问题，可直接粘贴图片/文件，Enter 发送"
+                className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0"
+                rows={1}
+                onChange={(event) => setInput(event.target.value)}
+                onPaste={handlePaste}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault()
+                    handleSubmit()
+                  }
+                }}
+              />
+              {busy ? (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="size-9 shrink-0 cursor-pointer rounded-xl"
+                  aria-label="停止生成"
+                  onClick={stop}
+                >
+                  <Square className="size-3.5" />
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  className="size-9 shrink-0 cursor-pointer rounded-xl"
+                  aria-label="发送"
+                  disabled={attachmentPending || (!input.trim() && !hasAttachments)}
+                  onClick={handleSubmit}
+                >
+                  <ArrowUp className="size-4" />
+                </Button>
+              )}
+            </div>
           </div>
-          {hasAttachments ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <FileAttachmentChips fileAttachments={fileAttachments} onRemoveFile={removeFile} busy={busy} />
-            </div>
-          ) : null}
-          {imageAttachments.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <ImageAttachments imageAttachments={imageAttachments} onRemoveImage={removeImage} busy={busy} />
-            </div>
-          ) : null}
           <div className="mt-2 flex items-center justify-center gap-3 text-[11px] text-muted-foreground/70">
             <span>对话为临时会话，刷新后开启新对话</span>
             {messages.length > 0 ? (

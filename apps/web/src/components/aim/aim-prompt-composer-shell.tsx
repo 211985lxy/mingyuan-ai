@@ -136,10 +136,12 @@ export function ImageAttachments(props: {
   imageAttachments: Array<{ id: string; name: string; previewUrl: string }>
   onRemoveImage?: (id: string) => void
   busy: boolean
+  /** 紧凑模式：去掉工作台卡片的内建留白（供极简版等窄容器嵌入） */
+  bare?: boolean
 }) {
-  const { imageAttachments, onRemoveImage, busy } = props
+  const { imageAttachments, onRemoveImage, busy, bare } = props
   return (
-    <div className="flex gap-2 overflow-x-auto px-4 pb-2">
+    <div className={cn("flex gap-2 overflow-x-auto", bare ? "" : "px-4 pb-2")}>
       {imageAttachments.map((image) => (
         <div
           key={image.id}
@@ -177,10 +179,12 @@ export function FileAttachmentChips(props: {
   fileAttachments: FileAttachmentChip[]
   onRemoveFile?: (id: string) => void
   busy: boolean
+  /** 紧凑模式：去掉工作台卡片的内建留白（供极简版等窄容器嵌入） */
+  bare?: boolean
 }) {
-  const { fileAttachments, onRemoveFile, busy } = props
+  const { fileAttachments, onRemoveFile, busy, bare } = props
   return (
-    <div className="flex gap-2 overflow-x-auto px-4 pb-2">
+    <div className={cn("flex gap-2 overflow-x-auto", bare ? "" : "px-4 pb-2")}>
       {fileAttachments.map((file) => (
         <div
           key={file.id}
