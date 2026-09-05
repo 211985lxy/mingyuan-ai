@@ -1,7 +1,8 @@
 # 创作者数据总线：上游工具安装与飞书同步配置指引
 
-> 面向对象：AIM 用户（或运营协助配置）· 更新：2026-09-03 · 配套方案：`docs/plans/2026-09-03-creator-metrics-feishu-data-bus-plan.md`
+> 面向对象：AIM 用户（或运营协助配置）· 更新：2026-09-05 · 配套方案：`docs/plans/2026-09-03-creator-metrics-feishu-data-bus-plan.md`
 > 上游工具：[Xavier-168/data-scientist-community](https://github.com/Xavier-168/data-scientist-community)（第三方独立开源项目，v0.1.0-rc.2）
+> 本地显示名：已于 2026-09-05 改为**「明动数据雷达」**（仅改界面标题与本机数据目录名，上游仓库名、代码与更新机制不变；本机安装于 `~/tools/data-scientist-community`，Node 走 brew `node@22`，Python 走 3.11 venv）
 
 ## 0. 使用前必读（免责与边界）
 
@@ -41,7 +42,7 @@ chmod +x start.sh scripts/*.sh
 ```
 
 - 启动后本地仪表盘为 `http://127.0.0.1:8811`（仅本机）。
-- **首次采集必须由账号本人在可见浏览器窗口扫码/登录**；Cookie/Profile 保存在 `~/Library/Application Support/数据科学家 Community/`，不进源码目录、不上传。
+- **首次采集必须由账号本人在可见浏览器窗口扫码/登录**；Cookie/Profile 保存在 `~/Library/Application Support/明动数据雷达/`，不进源码目录、不上传。
 - 工具每 6 小时做一次保守登录态检查（状态检查，非 Cookie 自动刷新）。
 - 若 `python3 -m venv` 报 `dlopen`/`pyexpat`/`ensurepip` 错误，说明系统 Python 标准库损坏，先重装完整 Python（推荐 3.12）。
 
