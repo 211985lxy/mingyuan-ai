@@ -34,3 +34,5 @@ export const smsLoginBodySchema = z.object({
   phone,
   code: z.string().trim().regex(/^\d{6}$/, "请输入 6 位数字验证码"),
 }).strict()
+
+export const douyinCompleteBodySchema = smsLoginBodySchema
