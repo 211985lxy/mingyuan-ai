@@ -11,7 +11,7 @@ import { useLiteChat } from "@/features/lite/use-lite-chat"
 import { useAimImageAttachments } from "@/hooks/use-aim-image-attachments"
 import { useAimFileAttachments } from "@/hooks/use-aim-file-attachments"
 import { ImageAttachments, FileAttachmentChips } from "@/components/aim/aim-prompt-composer-shell"
-import { AIM_ATTACHMENT_ACCEPT, collectPasteFiles, splitPastedFiles } from "@/lib/aim/file-attachments"
+import { collectPasteFiles, splitPastedFiles } from "@/lib/aim/file-attachments"
 
 const EXAMPLE_PROMPTS = [
   "帮我写一条短视频口播文案，主题是「老板为什么要做个人 IP」",
@@ -147,7 +147,6 @@ export default function LiteChatPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept={AIM_ATTACHMENT_ACCEPT}
               multiple
               className="hidden"
               onChange={(event) => {

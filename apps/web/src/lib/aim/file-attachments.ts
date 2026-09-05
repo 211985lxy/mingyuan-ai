@@ -53,20 +53,14 @@ export function readAudioDurationSeconds(file: File): Promise<number | null> {
 }
 
 /**
- * 附件格式统一分类：
+ * 附件格式统一分类（选择器不设 accept 白名单，任意文件可选，
+ * 由服务端解析/嗅探给出人话结论）：
  *  - 图片（image/*）→ 图片通道：原图上传，模型直接看图
- *  - 文档/文本（下方扩展名）→ 文件通道：服务端解析成文字并入上下文
+ *  - 文档/文本（pdf/docx/txt/md/csv/xls/pptx/html/json…）→ 解析成文字并入上下文
  *  - 未知扩展名的文本类（.tst/.log 等）→ 文本嗅探兜底，能读就收
- *  - 音频/视频/压缩包/可执行 → 暂不支持（各有专门通道或为二进制）
- * 文件选择器的 accept 用此常量，保证所有入口支持面一致。
+ *  - 音频（audio/* 或 mp3/wav/m4a…）→ 上传后自动转写
+ *  - 二进制（压缩包/可执行/老版 Office）→ 明确拒绝并提示
  */
-export const AIM_ATTACHMENT_ACCEPT = [
-  ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif",
-  ".pdf", ".docx", ".txt", ".md", ".markdown", ".csv",
-  ".xls", ".xlsx", ".pptx", ".html", ".htm", ".rtf", ".json", ".xml",
-  "image/*",
-].join(",")
-
 const TRUNCATION_NOTE = "\n…（文件过长，已截断）…\n"
 
 /** 粘贴/拖入的文件按现有通道分流：图片走图片上传，其余走文本解析。 */

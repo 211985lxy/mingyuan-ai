@@ -6,7 +6,7 @@ import { ExternalLink, ListChecks, Loader2, Mic, Paperclip, Plus, Send, Sparkles
 import { Button } from "@/components/ui/button"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
 import { type AimAgentCapabilities } from "@/lib/aim/agent-capabilities"
-import { AIM_ATTACHMENT_ACCEPT, splitPastedFiles } from "@/lib/aim/file-attachments"
+import { splitPastedFiles } from "@/lib/aim/file-attachments"
 import { cn } from "@/lib/utils"
 
 /** 底部操作条（+按钮 / 我的风格 / 状态 pill / 语音 / 停止 / 发送）。
@@ -378,7 +378,6 @@ function AttachFileButton(props: {
       <input
         ref={fileInputRef}
         type="file"
-        accept={AIM_ATTACHMENT_ACCEPT}
         multiple
         className="hidden"
         onChange={(event) => {

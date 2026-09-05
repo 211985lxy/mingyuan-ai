@@ -1849,6 +1849,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/assets/uploads/[uploadId]/put",
+      "file": "src/app/api/assets/uploads/[uploadId]/put/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/auth/activate",
       "file": "src/app/api/auth/activate/route.ts",
       "methods": [
