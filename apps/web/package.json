@@ -68,7 +68,7 @@
     "jose": "6.2.3",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.26.0",
     "mammoth": "^1.8.0",
     "mcp-handler": "1.1.0",
     "mysql2": "^3.15.3",
