@@ -99,7 +99,7 @@ export default function AimPage() {
   const contextUsage = useMemo(() => {
     const breakdown = estimateContextUsageBreakdown({
       conversation: w.messages.map((message) => ({
-        content: formatAimMessageContentForModel(message),
+        content: appendAimFileAttachmentsToContent(formatAimMessageContentForModel(message), message.files),
         imageCount: message.images?.length ?? 0,
       })),
       currentInput: w.input,
@@ -219,7 +219,7 @@ export default function AimPage() {
   }, [capabilities, isProcessingVideo, openStylePreview, pastedCopy, processVideoUrl, w])
 
   const composerPlaceholder = w.composerMode === "plan" ? "用一句话描述你想做什么内容…" : PASTE_COMPOSER_PLACEHOLDER
-  const canGenerateBase = (w.input.trim().length > 0 || w.imageAttachments.length > 0 || Boolean(pastedCopy)) && (!w.projectEnabled || Boolean(w.selectedProjectId)) && !w.isUploadingImage
+  const canGenerateBase = (w.input.trim().length > 0 || w.imageAttachments.length > 0 || w.fileAttachments.length > 0 || Boolean(pastedCopy)) && (!w.projectEnabled || Boolean(w.selectedProjectId)) && !w.isUploadingImage && !w.isUploadingFiles
   const onAddSkill = w.params.agentParam ? () => { setEditingSkill(null); setSkillDialogOpen(true) } : undefined
   const onEditSkill = w.params.agentParam ? (skill: AimWorkbenchSkill) => { setEditingSkill(skill); setSkillDialogOpen(true) } : undefined
   const onUseSkill = (skill: AimWorkbenchSkill) => {
@@ -255,7 +255,7 @@ export default function AimPage() {
       <AimPromptComposer
         value={w.input} placeholder={composerPlaceholder}
         busy={w.busy || isProcessingVideo} isRecording={w.isRecording}
-        isTranscribing={w.isTranscribing} isGenerating={w.isGenerating || w.isUploadingImage || isProcessingVideo}
+        isTranscribing={w.isTranscribing} isGenerating={w.isGenerating || w.isUploadingImage || w.isUploadingFiles || isProcessingVideo}
         canGenerate={canGenerateBase}
         primaryActionLabel={w.hasEditorSelection ? w.editorPanelLabels.selectActionLabel : w.agent.primaryActionLabel}
         onChange={w.setInput} onGenerate={handleComposerGenerate}
@@ -264,7 +264,7 @@ export default function AimPage() {
         showSkills={Boolean(w.params.agentParam)} skills={skillState.skills}
         onAddSkill={onAddSkill} onEditSkill={onEditSkill} onUseSkill={onUseSkill}
         imageAttachments={w.imageAttachments} onAddImages={(files) => void w.addImages(files)}
-        onRemoveImage={w.removeImage} composerMode={w.composerMode}
+        onRemoveImage={w.removeImage} composerMode={w.composerMode} fileAttachments={w.fileAttachments} onAddFiles={w.addFiles} onRemoveFile={w.removeFile}
         onComposerModeChange={w.setComposerMode} canUsePlanMode={w.canUsePlanMode}
         isPlanSessionActive={w.planSession.isPlanMode}
         showContentMode={capabilities.contentModeSelector}

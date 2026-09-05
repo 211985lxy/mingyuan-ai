@@ -17,7 +17,8 @@ import {
   prepareAimChatTurn,
   reportAimChatRevision,
 } from "@/lib/aim/workbench-helpers"
-import type { AimImageAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import type { AimImageAttachment, AimFileAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
 import { persistContentRetroAfterChat } from "@/lib/aim/persist-content-retro"
 import { toast } from "sonner"
 
@@ -25,6 +26,7 @@ export interface SendAimTextOptions {
   editorContext?: AimEditorContext
   editorApplyRange?: TextSelectionRange
   images?: AimImageAttachment[]
+  files?: AimFileAttachment[]
   retryMessageId?: string
   /** 本轮委托执行引擎；与会话 agentId 平级，缺省则不委托 */
   executionAgentId?: string
@@ -43,6 +45,7 @@ interface AimChatActionInput {
   requestAbortRef: MutableRefObject<AbortController | null>
   clearCurrentTaskContext: () => void
   clearImages: () => void
+  clearFiles: () => void
   /** 软隔离新任务：清流程 brief / URL 任务态等。 */
   onIsolateTaskSession?: () => void
   runWorkbenchCommand: (command: AimWorkbenchCommand) => boolean | void
@@ -81,7 +84,7 @@ async function executeChatRequest(
   const { hasContent } = await runAimChatRequest({
     messages: buildAimChatMessages(thread.map((message) => ({
       role: message.role,
-      content: formatAimMessageContentForModel(message),
+      content: appendAimFileAttachmentsToContent(formatAimMessageContentForModel(message), message.files),
       images: message.images,
     }))),
     agentId: input.selectedAgentId,
@@ -128,7 +131,8 @@ async function executeChatRequest(
 
 async function sendAimText(input: AimChatActionInput, text: string, options: SendAimTextOptions = {}) {
   const images = options.images ?? []
-  if (!text && images.length === 0) return
+  const files = options.files ?? []
+  if (!text && images.length === 0 && files.length === 0) return
   const startsNewTask = !options.retryMessageId && shouldIsolateWritingInstruction(text, input.messages.length > 0)
   const command = detectAimWorkbenchCommand(text)
   if (!startsNewTask && command && input.runWorkbenchCommand(command)) return
@@ -137,7 +141,7 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   input.requestAbortRef.current?.abort()
   const controller = new AbortController()
   input.requestAbortRef.current = controller
-  const turn = prepareAimChatTurn({ messages: input.messages, text, images, retryMessageId: options.retryMessageId, startsNewTask, editorApplyRange: options.editorApplyRange })
+  const turn = prepareAimChatTurn({ messages: input.messages, text, images, files, retryMessageId: options.retryMessageId, startsNewTask, editorApplyRange: options.editorApplyRange })
   // 作品编辑等不展示思考过程的专家：不挂 trace，避免空转 SSE 拖住观感
   const executionAgent = options.executionAgentId ?? input.selectedAgentId
   const attachTrace = agentAllowsThinkingProcess(executionAgent)
@@ -154,6 +158,7 @@ async function sendAimText(input: AimChatActionInput, text: string, options: Sen
   }
   input.setInput("")
   if (images.length) input.clearImages()
+  if (files.length) input.clearFiles()
   input.setIsThinking(true)
   try {
     await executeChatRequest(input, text, { ...options, editorContext: startsNewTask ? undefined : options.editorContext }, controller, turn.assistantId, turn.thread, traceId)

@@ -7,7 +7,7 @@ import { AIM_FORMAT_LABELS, splitAimMethodNote } from "@/lib/aim/workbench-displ
 import { reportAimRunEvent } from "@/lib/aim/run-events"
 import { extractEditorDraftFromAssistantText, type AimEditorContext, type TextSelectionRange } from "@/lib/aim-editor"
 import type { EditorPanelLabels } from "@/lib/aim-editor-labels"
-import type { AimImageAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import type { AimImageAttachment, AimFileAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 import { getContentPackageFromTaskSpec } from "@/lib/content-package-spec"
 import type { AimChatToolAction, AimGenerateResponse, AimGeneration, ContentFormat } from "@/lib/api/client"
 
@@ -411,6 +411,7 @@ export function prepareAimChatTurn(input: {
   messages: AimWorkbenchMessage[]
   text: string
   images: AimImageAttachment[]
+  files?: AimFileAttachment[]
   retryMessageId?: string
   startsNewTask: boolean
   editorApplyRange?: TextSelectionRange
@@ -423,8 +424,9 @@ export function prepareAimChatTurn(input: {
   const userMessage: AimWorkbenchMessage = {
     id: nextAimWorkbenchId(),
     role: "user",
-    content: input.text || "请分析这张图片。",
+    content: input.text || (input.files?.length ? "请查看我附带的文件。" : "请分析这张图片。"),
     images: input.images,
+    files: input.files,
   }
   const thread = input.retryMessageId ? baseMessages : [...baseMessages, userMessage]
   const assistantId = nextAimWorkbenchId()

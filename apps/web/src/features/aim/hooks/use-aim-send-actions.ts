@@ -9,7 +9,7 @@ import { shouldIsolateWritingInstruction, detectAimWorkbenchCommand } from "@/li
 import { planWorkbenchSkillApply } from "@/features/aim/aim-skill-utils"
 import type { AimMethodologySignal, AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import type { AimEditorSelection } from "@/components/aim/benchmark-editor-panel"
-import type { AimWorkbenchMessage as ChatMessage, AimImageAttachment } from "@/lib/aim/workbench-types"
+import type { AimWorkbenchMessage as ChatMessage, AimImageAttachment, AimFileAttachment } from "@/lib/aim/workbench-types"
 import { getAimEditorPanelLabels } from "@/lib/aim-editor-labels"
 
 interface UseAimSendActionsOptions {
@@ -26,6 +26,7 @@ interface UseAimSendActionsOptions {
   sourceTopicTitle: string
   editorPanelLabels: ReturnType<typeof getAimEditorPanelLabels>
   imageAttachments: AimImageAttachment[]
+  fileAttachments: AimFileAttachment[]
   setInput: (value: string | ((prev: string) => string)) => void
   sendText: (text: string, options?: Record<string, unknown>) => Promise<void>
   generateWithInput: (input: string, options?: Record<string, unknown>) => Promise<string | number | undefined>
@@ -106,11 +107,12 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       }),
       editorApplyRange: options.draftSelection.text.trim() ? options.draftSelection.range : undefined,
       images: options.imageAttachments,
-    } : { ...delegation, ...methodologySignals, images: options.imageAttachments })
+      files: options.fileAttachments,
+    } : { ...delegation, ...methodologySignals, images: options.imageAttachments, files: options.fileAttachments })
   }
 
   async function handleGenerate() {
-    if (options.hasEditorSelection || options.imageAttachments.length > 0) {
+    if (options.hasEditorSelection || options.imageAttachments.length > 0 || options.fileAttachments.length > 0) {
       await handleSend()
       return
     }

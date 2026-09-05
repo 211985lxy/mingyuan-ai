@@ -1,29 +1,31 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 
-import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
 import {
+  buildFilteredSkills,
+  useContentModeOptions,
+  type AimComposerMode,
+} from "@/components/aim/aim-prompt-shared"
+import {
+  ComposerAttachmentRows,
   ComposerCardShell,
   ComposerPanelsAndBar,
   ComposerTextarea,
-  ImageAttachments,
 } from "@/components/aim/aim-prompt-composer-shell"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import {
   getAimAgentCapabilities,
   type AimAgentCapabilities,
 } from "@/lib/aim/agent-capabilities"
-import {
-  COPY_STUDIO_MODULES,
-  COPY_STUDIO_MODULE_LABELS,
-  type CopyStudioModule,
-} from "@/lib/copy-studio"
+import { COPY_STUDIO_MODULE_LABELS, type CopyStudioModule } from "@/lib/copy-studio"
 import {
   canSubmitWithPasteAttachment,
   type PastedCopyAttachment,
   type PasteUsage,
 } from "@/lib/aim/paste-copy-attachment"
+import { splitPastedFiles } from "@/lib/aim/file-attachments"
+import type { AimFileAttachment } from "@/lib/aim/workbench-types"
 import { useAimPasteCopyAttachment } from "@/features/aim/hooks/use-aim-paste-copy-attachment"
 
 export type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
@@ -48,8 +50,11 @@ export interface AimPromptComposerProps {
   onAddSkill?: () => void
   onEditSkill?: (skill: AimWorkbenchSkill) => void
   imageAttachments?: Array<{ id: string; name: string; previewUrl: string }>
-  onAddImages?: (files: FileList) => void
+  onAddImages?: (files: FileList | File[]) => void
   onRemoveImage?: (id: string) => void
+  fileAttachments?: AimFileAttachment[]
+  onAddFiles?: (files: File[]) => void
+  onRemoveFile?: (id: string) => void
   composerMode?: AimComposerMode
   onComposerModeChange?: (mode: AimComposerMode) => void
   canUsePlanMode?: boolean
@@ -77,6 +82,7 @@ export function AimPromptComposer(props: AimPromptComposerProps) {
     ...props,
     pastedCopy: props.pastedCopy ?? null,
     imageAttachments: props.imageAttachments ?? [],
+    fileAttachments: props.fileAttachments ?? [],
     busy: props.busy ?? false,
     isRecording: props.isRecording ?? false,
     isTranscribing: props.isTranscribing ?? false,
@@ -99,8 +105,8 @@ function useComposerAllState(props: AimPromptComposerProps) {
   const {
     value, busy, isRecording, canGenerate, onStop,
     composerMode = "direct", pastedCopy = null, onPastedCopyChange, onStyleSampleRequest,
-    imageAttachments = [], capabilities: capabilitiesProp, isPlanSessionActive = false,
-    onComposerModeChange, showContentMode = false, showSkills = false, onAddImages,
+    imageAttachments = [], fileAttachments = [], capabilities: capabilitiesProp, isPlanSessionActive = false,
+    onComposerModeChange, showContentMode = false, showSkills = false, onAddImages, onAddFiles,
     onAddSkill, onEditSkill,
   } = props
   const state = useComposerDerivedState({
@@ -108,17 +114,17 @@ function useComposerAllState(props: AimPromptComposerProps) {
     isTranscribing: props.isTranscribing || false,
     canGenerate: canGenerate || false, onStop,
     composerMode, pastedCopy, onPastedCopyChange, onStyleSampleRequest,
-    imageAttachments, capabilitiesProp, isPlanSessionActive,
-    onComposerModeChange, showContentMode, showSkills, onAddImages,
+    imageAttachments, fileAttachments, capabilitiesProp, isPlanSessionActive,
+    onComposerModeChange, showContentMode, showSkills, onAddImages, onAddFiles,
   })
-  const { capabilities, isPlanMode, applyUsage, handlePaste, allowedUsages, pasteEnabled,
+  const { capabilities, isPlanMode, applyUsage, handlePaste, handleDroppedFiles, allowedUsages, pasteEnabled,
     canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel } = state
   const local = useComposerLocalState({ value, skills: props.skills || [] })
   const contentModeLabel =
     props.contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[props.contentMode]
   const contentModeOptions = useContentModeOptions()
   return {
-    state: { capabilities, isPlanMode, applyUsage, handlePaste, allowedUsages, pasteEnabled,
+    state: { capabilities, isPlanMode, applyUsage, handlePaste, handleDroppedFiles, allowedUsages, pasteEnabled,
       canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel },
     local,
     extra: { contentModeLabel, contentModeOptions },
@@ -140,11 +146,14 @@ interface AimPromptComposerViewProps {
   value: string
   onChange: (v: string) => void
   handlePaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
+  handleDroppedFiles?: (files: File[]) => void
   canSubmit: boolean
   onGenerate: () => void
   placeholder: string
   imageAttachments: Array<{ id: string; name: string; previewUrl: string }>
+  fileAttachments: AimFileAttachment[]
   onRemoveImage?: (id: string) => void
+  onRemoveFile?: (id: string) => void
   addMenuOpen: boolean
   setAddMenuOpen: (v: boolean | ((p: boolean) => boolean)) => void
   toggleAddMenu: () => void
@@ -207,19 +216,19 @@ function AimPromptComposerView(p: AimPromptComposerViewProps) {
         value={p.value}
         onChange={p.onChange}
         handlePaste={p.handlePaste}
-        pasteEnabled={p.pasteEnabled}
+        handleDroppedFiles={p.handleDroppedFiles}
         canSubmit={p.canSubmit}
         onGenerate={p.onGenerate}
         placeholder={p.placeholder}
         busy={p.busy}
       />
-      {p.imageAttachments.length > 0 ? (
-        <ImageAttachments
-          imageAttachments={p.imageAttachments}
-          onRemoveImage={p.onRemoveImage}
-          busy={p.busy}
-        />
-      ) : null}
+      <ComposerAttachmentRows
+        imageAttachments={p.imageAttachments}
+        fileAttachments={p.fileAttachments}
+        onRemoveImage={p.onRemoveImage}
+        onRemoveFile={p.onRemoveFile}
+        busy={p.busy}
+      />
       <ComposerPanelsAndBar
         addMenuOpen={p.addMenuOpen}
         setAddMenuOpen={p.setAddMenuOpen}
@@ -286,24 +295,26 @@ interface UseComposerDerivedStateInput {
   onPastedCopyChange?: (next: PastedCopyAttachment | null) => void
   onStyleSampleRequest?: (attachment: PastedCopyAttachment) => void
   imageAttachments: Array<unknown>
+  fileAttachments: AimFileAttachment[]
   capabilitiesProp?: AimAgentCapabilities
   isPlanSessionActive: boolean
   onComposerModeChange?: (mode: AimComposerMode) => void
   showContentMode: boolean
   showSkills: boolean
-  onAddImages?: (files: FileList) => void
+  onAddImages?: (files: FileList | File[]) => void
+  onAddFiles?: (files: File[]) => void
 }
 
 function useComposerDerivedState(input: UseComposerDerivedStateInput) {
   const {
     value, busy, isRecording, isTranscribing, canGenerate, onStop,
     composerMode, pastedCopy, onPastedCopyChange, onStyleSampleRequest,
-    imageAttachments, capabilitiesProp, isPlanSessionActive,
-    onComposerModeChange, showContentMode, showSkills, onAddImages,
+    imageAttachments, fileAttachments, capabilitiesProp, isPlanSessionActive,
+    onComposerModeChange, showContentMode, showSkills, onAddImages, onAddFiles,
   } = input
   const capabilities = capabilitiesProp ?? getAimAgentCapabilities("content_producer")
   const isPlanMode = composerMode === "plan"
-  const { applyUsage, handlePaste, allowedUsages, pasteEnabled } = useAimPasteCopyAttachment({
+  const { applyUsage, handlePaste: handleCopyPaste, allowedUsages, pasteEnabled } = useAimPasteCopyAttachment({
     value,
     pastedCopy,
     onPastedCopyChange: capabilities.pasteMode === "plain" ? undefined : onPastedCopyChange,
@@ -311,6 +322,26 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
     imageCount: imageAttachments.length,
     capabilities,
   })
+  // 粘贴/拖入的文件优先按附件处理（图片走图片通道，其余走文件解析）；
+  // 剪贴板没有文件时再交给长文案粘贴捕获，两条通道互不抢事件。
+  const routeClipboardFiles = useCallback((files: File[]) => {
+    const { images, documents } = splitPastedFiles(files)
+    if (images.length) onAddImages?.(images)
+    if (documents.length) onAddFiles?.(documents)
+  }, [onAddImages, onAddFiles])
+  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardFiles = Array.from(event.clipboardData?.files ?? [])
+    if (clipboardFiles.length > 0 && (onAddImages || onAddFiles)) {
+      event.preventDefault()
+      routeClipboardFiles(clipboardFiles)
+      return
+    }
+    handleCopyPaste(event)
+  }, [handleCopyPaste, onAddFiles, onAddImages, routeClipboardFiles])
+  const handleDroppedFiles = useCallback((files: File[]) => {
+    if (files.length === 0 || (!onAddImages && !onAddFiles)) return
+    routeClipboardFiles(files)
+  }, [onAddFiles, onAddImages, routeClipboardFiles])
   const effectivePasteUsage = pastedCopy?.usage
     ?? (allowedUsages.length === 1 ? allowedUsages[0] : undefined)
   const pasteReadyForSend = canSubmitWithPasteAttachment({
@@ -319,6 +350,7 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
       ? { ...pastedCopy, usage: effectivePasteUsage }
       : null,
     hasImages: imageAttachments.length > 0,
+    hasFiles: fileAttachments.length > 0,
   })
   // 生成/质检进行中不再禁发：直接发送会自动接替当前请求（beginExclusiveRequest 中止旧请求）；
   // 仅录音/转写这类语音流和计划模式仍要求空闲。
@@ -345,7 +377,7 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
           ? " · 发布数据"
           : undefined
   return {
-    capabilities, isPlanMode, applyUsage, handlePaste,
+    capabilities, isPlanMode, applyUsage, handlePaste, handleDroppedFiles,
     allowedUsages: allowedUsages as PasteUsage[],
     pasteEnabled, effectivePasteUsage, canSubmit, canStop,
     showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel,
@@ -450,39 +482,4 @@ function useAddMenuCloseOnEscape(
       document.removeEventListener("keydown", closeOnEscape)
     }
   }, [addMenuOpen, close, rootRef])
-}
-
-function useContentModeOptions(): Array<{
-  id: CopyStudioModule | undefined
-  label: string
-  hint: string
-}> {
-  return useMemo(() => ([
-    { id: undefined, label: "智能选择", hint: "按内容自动路由" },
-    ...COPY_STUDIO_MODULES.map((module) => ({
-      id: module as CopyStudioModule | undefined,
-      label: COPY_STUDIO_MODULE_LABELS[module],
-      hint: "",
-    })),
-  ]), [])
-}
-
-function buildFilteredSkills(
-  skillQuery: string,
-  skills: AimWorkbenchSkill[],
-): Array<{ group: string; items: AimWorkbenchSkill[] }> {
-  const query = skillQuery.trim().toLowerCase()
-  const base = query
-    ? skills.filter((skill) =>
-        `${skill.label} ${skill.description}`.toLowerCase().includes(query),
-      )
-    : skills
-  const groups: Array<{ group: string; items: AimWorkbenchSkill[] }> = []
-  for (const skill of base) {
-    const key = skill.group ?? ""
-    const existing = groups.find((g) => g.group === key)
-    if (existing) existing.items.push(skill)
-    else groups.push({ group: key, items: [skill] })
-  }
-  return groups
 }
