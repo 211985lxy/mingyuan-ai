@@ -1,13 +1,17 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { ArrowUp, Plus, Square } from "lucide-react"
+import { ArrowUp, Paperclip, Plus, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { LiteMessageList } from "@/features/lite/components/lite-message-list"
 import { useLiteChat } from "@/features/lite/use-lite-chat"
+import { useAimImageAttachments } from "@/hooks/use-aim-image-attachments"
+import { useAimFileAttachments } from "@/hooks/use-aim-file-attachments"
+import { ImageAttachments, FileAttachmentChips } from "@/components/aim/aim-prompt-composer-shell"
+import { AIM_ATTACHMENT_ACCEPT, collectPasteFiles, splitPastedFiles } from "@/lib/aim/file-attachments"
 
 const EXAMPLE_PROMPTS = [
   "帮我写一条短视频口播文案，主题是「老板为什么要做个人 IP」",
@@ -19,13 +23,40 @@ export default function LiteChatPage() {
   const { messages, busy, send, stop, reset } = useLiteChat()
   const [input, setInput] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const {
+    imageAttachments, isUploadingImage, addImages, removeImage, clearImages,
+  } = useAimImageAttachments()
+  const {
+    fileAttachments, isUploadingFiles, addFiles, removeFile, clearFiles,
+  } = useAimFileAttachments()
+
+  const routeFiles = useCallback((files: File[]) => {
+    const { images, documents } = splitPastedFiles(files)
+    if (images.length) void addImages(images)
+    if (documents.length) void addFiles(documents)
+  }, [addImages, addFiles])
+
+  const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = collectPasteFiles(event.clipboardData)
+    if (files.length === 0) return
+    event.preventDefault()
+    routeFiles(files)
+  }, [routeFiles])
+
+  const hasAttachments = imageAttachments.length > 0 || fileAttachments.length > 0
+  const attachmentPending = isUploadingImage || isUploadingFiles
 
   const handleSubmit = useCallback(() => {
-    if (busy || !input.trim()) return
-    void send(input)
+    if (busy || attachmentPending) return
+    if (!input.trim() && !hasAttachments) return
+    void send(input, { images: imageAttachments, files: fileAttachments })
     setInput("")
+    clearImages()
+    clearFiles()
     textareaRef.current?.focus()
-  }, [busy, input, send])
+  }, [attachmentPending, busy, clearFiles, clearImages, fileAttachments, hasAttachments, imageAttachments, input, send])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -63,10 +94,33 @@ export default function LiteChatPage() {
         )}
       </div>
 
-      {/* 输入区 */}
+      {/* 输入区：整卡可拖放文件 */}
       <div className="shrink-0 border-t bg-background px-4 pb-4 pt-3">
         <div className="mx-auto w-full max-w-3xl">
-          <div className="flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-sm focus-within:border-primary/40">
+          <div
+            className={`relative flex items-end gap-2 rounded-2xl border bg-card p-2 shadow-sm focus-within:border-primary/40 ${dragOver ? "border-primary/60 bg-primary/5" : ""}`}
+            onDragOver={(event) => {
+              if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
+                event.preventDefault()
+                setDragOver(true)
+              }
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(event) => {
+              const droppedFiles = Array.from(event.dataTransfer?.files ?? [])
+              if (droppedFiles.length === 0) return
+              event.preventDefault()
+              setDragOver(false)
+              routeFiles(droppedFiles)
+            }}
+          >
+            {dragOver ? (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-2xl bg-primary/10">
+                <span className="rounded-full bg-background/95 px-3 py-1.5 text-xs font-medium text-foreground shadow">
+                  松开以添加文件
+                </span>
+              </div>
+            ) : null}
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -79,6 +133,8 @@ export default function LiteChatPage() {
                     onClick={() => {
                       reset()
                       setInput("")
+                      clearImages()
+                      clearFiles()
                       textareaRef.current?.focus()
                     }}
                   >
@@ -88,13 +144,36 @@ export default function LiteChatPage() {
               />
               <TooltipContent side="top">开新对话</TooltipContent>
             </Tooltip>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={AIM_ATTACHMENT_ACCEPT}
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? [])
+                if (files.length) routeFiles(files)
+                event.target.value = ""
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 shrink-0 cursor-pointer rounded-xl text-muted-foreground"
+              aria-label="添加文件"
+              disabled={busy}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="size-4" />
+            </Button>
             <Textarea
               ref={textareaRef}
               value={input}
-              placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
+              placeholder="输入你的问题，可直接粘贴图片/文件，Enter 发送"
               className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none focus-visible:ring-0"
               rows={1}
               onChange={(event) => setInput(event.target.value)}
+              onPaste={handlePaste}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault()
@@ -117,13 +196,23 @@ export default function LiteChatPage() {
                 size="icon"
                 className="size-9 shrink-0 cursor-pointer rounded-xl"
                 aria-label="发送"
-                disabled={!input.trim()}
+                disabled={attachmentPending || (!input.trim() && !hasAttachments)}
                 onClick={handleSubmit}
               >
                 <ArrowUp className="size-4" />
               </Button>
             )}
           </div>
+          {hasAttachments ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <FileAttachmentChips fileAttachments={fileAttachments} onRemoveFile={removeFile} busy={busy} />
+            </div>
+          ) : null}
+          {imageAttachments.length > 0 ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <ImageAttachments imageAttachments={imageAttachments} onRemoveImage={removeImage} busy={busy} />
+            </div>
+          ) : null}
           <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
             对话为临时会话，刷新后开启新对话
           </p>
