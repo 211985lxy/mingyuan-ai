@@ -1595,7 +1595,7 @@
       "input": "query",
       "query": "manual",
       "externalService": false,
-      "cost": "low",
+      "cost": "high",
       "idempotency": false
     },
     {
@@ -1844,6 +1844,45 @@
       "auth": "public",
       "input": "none",
       "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/douyin/callback",
+      "file": "src/app/api/auth/douyin/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/douyin/complete",
+      "file": "src/app/api/auth/douyin/complete/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/douyin/start",
+      "file": "src/app/api/auth/douyin/start/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public",
+      "input": "query",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false

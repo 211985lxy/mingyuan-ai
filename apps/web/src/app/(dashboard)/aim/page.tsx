@@ -29,7 +29,6 @@ import { type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import { buildContentProducerVideoCopyHref, resolveContentProducerVideoUrl } from "@/lib/aim/video-copy-input"
-import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 import {
   assemblePasteUsageInput,

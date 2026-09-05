@@ -72,10 +72,40 @@ function inPeriod(value: Date | null, start: Date, end: Date): value is Date {
   return value != null && value.getTime() >= start.getTime() && value.getTime() < end.getTime()
 }
 
-/**
- * 计算 [start, end) 周期内按内容任务聚合的选题归因。
- * 返回顺序：可追溯线索多在前；「未标注」固定最后。
- */
+/** 归因聚合的中间桶（按内容任务分组）。 */
+interface TaskBucket {
+  contentTask: string
+  publishedCount: number
+  viewsKnown: number
+  viewsSum: number
+  traceable: number
+  unknown: number
+}
+
+function aggregateByTask(input: {
+  generations: InsightGenerationRow[]
+  viewsByGeneration: Map<string, number | null>
+  leadsByGeneration: Map<string, { traceable: number; unknown: number }>
+}): TaskBucket[] {
+  const grouped = new Map<string, TaskBucket>()
+  for (const generation of input.generations) {
+    const task = resolveContentTask(generation.taskSpec)
+    const bucket = grouped.get(task) ?? { contentTask: task, publishedCount: 0, viewsKnown: 0, viewsSum: 0, traceable: 0, unknown: 0 }
+    bucket.publishedCount += 1
+    const views = input.viewsByGeneration.get(generation.id)
+    if (views != null && Number.isFinite(views)) {
+      bucket.viewsKnown += 1
+      bucket.viewsSum += views
+    }
+    const leads = input.leadsByGeneration.get(generation.id)
+    bucket.traceable += leads?.traceable ?? 0
+    bucket.unknown += leads?.unknown ?? 0
+    grouped.set(task, bucket)
+  }
+  return [...grouped.values()]
+}
+
+/** 计算 [start, end) 周期内按内容任务聚合的选题归因。返回顺序：可追溯线索多在前；「未标注」固定最后。 */
 export async function computeTaskAttributionInsights(input: {
   userId?: string
   projectId?: string
@@ -119,31 +149,9 @@ export async function computeTaskAttributionInsights(input: {
     leadsByGeneration.set(row.generationId, bucket)
   }
 
-  const grouped = new Map<string, {
-    publishedCount: number
-    viewsKnown: number
-    viewsSum: number
-    traceable: number
-    unknown: number
-  }>()
-  for (const generation of generations) {
-    const task = resolveContentTask(generation.taskSpec)
-    const bucket = grouped.get(task) ?? { publishedCount: 0, viewsKnown: 0, viewsSum: 0, traceable: 0, unknown: 0 }
-    bucket.publishedCount += 1
-    const views = viewsByGeneration.get(generation.id)
-    if (views != null && Number.isFinite(views)) {
-      bucket.viewsKnown += 1
-      bucket.viewsSum += views
-    }
-    const leads = leadsByGeneration.get(generation.id)
-    bucket.traceable += leads?.traceable ?? 0
-    bucket.unknown += leads?.unknown ?? 0
-    grouped.set(task, bucket)
-  }
-
-  return [...grouped.entries()]
-    .map(([contentTask, bucket]) => ({
-      contentTask,
+  return aggregateByTask({ generations, viewsByGeneration, leadsByGeneration })
+    .map((bucket) => ({
+      contentTask: bucket.contentTask,
       publishedCount: bucket.publishedCount,
       viewsTotal: bucket.viewsKnown > 0 ? bucket.viewsSum : null,
       traceableLeadCount: bucket.traceable,
