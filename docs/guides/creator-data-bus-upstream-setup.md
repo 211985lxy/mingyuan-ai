@@ -23,7 +23,7 @@
 
 ## 2. 安装上游工具
 
-当前为源码仓库发布（无签名 DMG）。以下命令摘自上游 README（v0.1.0-rc.2，**尚未实测**，P0 时回填实测结果）：
+当前为源码仓库发布（无签名 DMG）。以下命令已在 2026-09-05 P0 实测跑通（本机 macOS，Python 3.11 venv）：
 
 ```bash
 git clone https://github.com/Xavier-168/data-scientist-community.git
@@ -66,7 +66,9 @@ chmod +x start.sh scripts/*.sh
 5. **把该多维表格共享给 AIM 的飞书机器人账号**（可阅读权限即可）——AIM 通过飞书开放接口读取，无共享则读不到。
 6. 记下该多维表格的 `app_token`（表格 URL 中 `base/` 后面那段）。
 
-## 4. 在 AIM 侧启用（P1 上线后）
+## 4. 在 AIM 侧启用（已上线，2026-09-05 P0 实测通过）
+
+> **P0 实测记录（2026-09-05）**：全链路已打通并冒烟通过——飞书同步 OAuth + 抖音授权「IP明远」→ 首次同步 2 次 SUCCESS（27 作品）→ base 建在用户本人飞书空间（默认空表「数据表」不是数据表；数据在「平台明细V2」）→ 共享给 AIM 应用（appid `cli_aa839aa942b89bef`）→ `LARK_CREATOR_METRICS_*` 配置进 `.env.local` → 冒烟 `status: ok`（27 posts、总播放 54,807、零警告）。实战注意：①工具写的 base 不出现在 drive 搜索里，直接从数据雷达「同步记录」或用户飞书「云文档→最近」找；②AIM 应用需事先开通 `base:record:read`（本机 bot 已实测读写删全量）；③技术细节见 `docs/plans/2026-09-05-douyin-binding-lark-runbook.md`。
 
 服务端已支持三个环境变量（部署配置中设置）：
 
