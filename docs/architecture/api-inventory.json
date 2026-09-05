@@ -1823,6 +1823,32 @@
       "idempotency": false
     },
     {
+      "route": "/api/auth/sms/login",
+      "file": "src/app/api/auth/sms/login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/sms/send",
+      "file": "src/app/api/auth/sms/send/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/brief/ai-fill",
       "file": "src/app/api/brief/ai-fill/route.ts",
       "methods": [

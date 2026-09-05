@@ -38,14 +38,8 @@ export async function POST(request: NextRequest) {
     try {
       // 同时支持 query.mode（?mode=interview）与 body form 字段 mode
       const queryMode = request.nextUrl.searchParams.get("mode")
-      let bodyMode: string | null = null
-      try {
-        // multipart 里可能带 mode form 字段；重新读不可行，已被 readAsrAudioInput 消费，
-        // 因此 body mode 仅对非 multipart（直接 arrayBuffer）可行；query.mode 覆盖更广。
-        // multipart 场景请优先传 query.mode=interview。
-      } catch {
-        // 忽略
-      }
+      // body mode 解析已随 readAsrAudioInput 重构移除，仅保留 query.mode 入口
+      const bodyMode: string | null = null
       const isInterviewMode = (queryMode ?? bodyMode ?? "") === "interview"
 
       const rawText = await transcribeAudioWav(audioInput.audioBuffer)
