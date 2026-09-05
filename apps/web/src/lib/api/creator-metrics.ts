@@ -16,6 +16,16 @@ export type CreatorPlatformMetric = {
   shares: number | null
   collects: number | null
   followersDelta: number | null
+  /** 质量指标（数据雷达同步，可能缺省）：小数比例或 null */
+  quality: {
+    completionRate: number | null
+    likeRate: number | null
+    commentRate: number | null
+    shareRate: number | null
+    collectRate: number | null
+    coverClickRate: number | null
+    bounceRate3s: number | null
+  } | null
 }
 
 export type CreatorMetricsResult =

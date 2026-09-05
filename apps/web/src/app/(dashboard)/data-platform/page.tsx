@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+
+import { OwnAccountSection } from "@/app/(dashboard)/data-platform/own-account-section"
 import { AlertCircle, BarChart3, DatabaseZap, ExternalLink, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -226,6 +228,8 @@ export default function DataPlatformPage() {
           刷新
         </Button>
       </PageHeader>
+
+      <OwnAccountSection />
 
       {errorMsg ? (
         <Card>
