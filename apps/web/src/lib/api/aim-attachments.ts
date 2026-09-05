@@ -30,3 +30,23 @@ export async function parseAimChatAttachment(file: File): Promise<AimAttachmentP
     truncated: Boolean(data.truncated),
   }
 }
+
+/**
+ * 聊天音频附件转写：已直传 OSS 的音频 URL → 阿里云录音文件识别 → 转写文本。
+ */
+export async function transcribeAimAudioAttachment(input: {
+  audioUrl: string
+  name: string
+}): Promise<{ text: string }> {
+  const response = await fetch("/api/aim/attachment-transcribe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ audioUrl: input.audioUrl }),
+  })
+  const data: { text?: string; error?: string } | null = await response.json().catch(() => null)
+
+  if (!response.ok || !data?.text) {
+    throw new Error(data?.error || `${input.name} 转写失败`)
+  }
+  return { text: data.text }
+}

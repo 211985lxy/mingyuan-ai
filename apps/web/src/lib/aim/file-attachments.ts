@@ -9,6 +9,49 @@ export const AIM_FILE_ATTACHMENTS_TOTAL_MAX_CHARS = 60_000
 /** 输入框一次最多挂载的文件附件数（与图片上限 4 同量级）。 */
 export const AIM_FILE_ATTACHMENT_MAX_COUNT = 3
 
+/** 音频附件自动转写的时长上限（分钟）：控 ASR 计费与转写等待。 */
+export const AIM_AUDIO_MAX_MINUTES = 30
+
+/** 音频附件扩展名白名单（mime 常为空，按扩展名识别）。 */
+const AUDIO_EXTENSIONS = new Set([
+  ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma", ".amr", ".opus",
+])
+
+/** 判断是否为音频附件（mime audio/* 或扩展名命中白名单）。 */
+export function isAudioFile(file: { type?: string; name: string }): boolean {
+  if (file.type?.startsWith("audio/")) return true
+  const dotIndex = file.name.lastIndexOf(".")
+  if (dotIndex === -1) return false
+  return AUDIO_EXTENSIONS.has(file.name.slice(dotIndex).toLowerCase())
+}
+
+/** 浏览器侧读取本地音频时长（秒）；读不到（非音频/格式不支持）返回 null。 */
+export function readAudioDurationSeconds(file: File): Promise<number | null> {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file)
+      const audio = new Audio()
+      const cleanup = () => {
+        URL.revokeObjectURL(url)
+        audio.removeAttribute("src")
+      }
+      audio.preload = "metadata"
+      audio.onloadedmetadata = () => {
+        const duration = Number.isFinite(audio.duration) ? audio.duration : null
+        cleanup()
+        resolve(duration)
+      }
+      audio.onerror = () => {
+        cleanup()
+        resolve(null)
+      }
+      audio.src = url
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
 /**
  * 附件格式统一分类：
  *  - 图片（image/*）→ 图片通道：原图上传，模型直接看图
@@ -75,12 +118,15 @@ export function appendAimFileAttachmentsToContent(
   const blocks: string[] = []
   let remaining = AIM_FILE_ATTACHMENTS_TOTAL_MAX_CHARS
   for (const file of readyFiles) {
+    const label = file.kind === "audio"
+      ? `【音频 ${file.name} · 转写稿】`
+      : `【附件 ${file.name}】`
     if (remaining <= 0) {
-      blocks.push(`【附件 ${file.name}】内容过长，本次未随消息发送`)
+      blocks.push(`${label}内容过长，本次未随消息发送`)
       continue
     }
     const budget = Math.min(AIM_FILE_ATTACHMENT_MAX_CHARS, remaining)
-    blocks.push(`【附件 ${file.name}】\n${clampFileText(file.content, budget)}`)
+    blocks.push(`${label}\n${clampFileText(file.content, budget)}`)
     remaining -= budget
   }
   const prefix = content.trim() ? `${content.trim()}\n\n` : ""

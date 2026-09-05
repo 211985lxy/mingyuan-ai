@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type MutableRefObject, type ReactNode } from "react"
-import { FileText, Loader2 } from "lucide-react"
+import { AudioLines, FileText, Loader2 } from "lucide-react"
 
 import { AimActionBar } from "@/components/aim/aim-action-bar"
 import { AimAddMenuPanel } from "@/components/aim/aim-add-menu-panel"
@@ -165,8 +165,16 @@ export function ImageAttachments(props: {
   )
 }
 
+type FileAttachmentChip = {
+  id: string
+  name: string
+  size: number
+  status: "uploading" | "ready"
+  kind?: "file" | "audio"
+}
+
 export function FileAttachmentChips(props: {
-  fileAttachments: Array<{ id: string; name: string; size: number; status: "uploading" | "ready" }>
+  fileAttachments: FileAttachmentChip[]
   onRemoveFile?: (id: string) => void
   busy: boolean
 }) {
@@ -179,7 +187,9 @@ export function FileAttachmentChips(props: {
           className="flex h-14 shrink-0 items-center gap-2 rounded-xl bg-muted px-3"
         >
           {file.status === "uploading" ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" aria-label="解析中" />
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" aria-label={file.kind === "audio" ? "转写中" : "解析中"} />
+          ) : file.kind === "audio" ? (
+            <AudioLines className="h-4 w-4 shrink-0 text-primary" aria-hidden />
           ) : (
             <FileText className="h-4 w-4 shrink-0 text-primary" aria-hidden />
           )}
@@ -188,7 +198,9 @@ export function FileAttachmentChips(props: {
               {file.name}
             </span>
             <span className="text-[11px] text-muted-foreground">
-              {file.status === "uploading" ? "解析中…" : formatAimFileSize(file.size)}
+              {file.status === "uploading"
+                ? file.kind === "audio" ? "转写中…" : "解析中…"
+                : file.kind === "audio" ? "已转写 · 发送时读稿" : formatAimFileSize(file.size)}
             </span>
           </span>
           <button

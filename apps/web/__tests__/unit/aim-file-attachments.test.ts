@@ -6,6 +6,7 @@ import {
   appendAimFileAttachmentsToContent,
   collectPasteFiles,
   formatAimFileSize,
+  isAudioFile,
   splitPastedFiles,
 } from "@/lib/aim/file-attachments"
 import { canSubmitWithPasteAttachment } from "@/lib/aim/paste-copy-attachment"
@@ -150,6 +151,30 @@ describe("extractSniffedText", () => {
 
   it("rejects empty files", () => {
     expect(() => extractSniffedText(Buffer.alloc(0), "empty.tst")).toThrow(AttachmentTextError)
+  })
+})
+
+describe("isAudioFile", () => {
+  it("recognizes audio by mime and by extension", () => {
+    expect(isAudioFile({ type: "audio/mpeg", name: "x" })).toBe(true)
+    expect(isAudioFile({ type: "", name: "采访.m4a" })).toBe(true)
+    expect(isAudioFile({ type: "audio/wav", name: "rec.wav" })).toBe(true)
+  })
+
+  it("does not treat documents or images as audio", () => {
+    expect(isAudioFile({ type: "", name: "data.tst" })).toBe(false)
+    expect(isAudioFile({ type: "image/png", name: "a.png" })).toBe(false)
+    expect(isAudioFile({ type: "video/mp4", name: "v.mp4" })).toBe(false)
+  })
+})
+
+describe("appendAimFileAttachmentsToContent audio transcript", () => {
+  it("labels audio attachments as transcripts", () => {
+    const output = appendAimFileAttachmentsToContent("总结这段", [
+      { id: "a1", name: "采访.m4a", size: 100, content: "发言人A: 开头", status: "ready", kind: "audio" },
+    ])
+    expect(output).toContain("【音频 采访.m4a · 转写稿】")
+    expect(output).toContain("发言人A: 开头")
   })
 })
 

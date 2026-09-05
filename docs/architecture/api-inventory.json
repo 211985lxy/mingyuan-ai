@@ -1244,6 +1244,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/attachment-transcribe",
+      "file": "src/app/api/aim/attachment-transcribe/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/chat",
       "file": "src/app/api/aim/chat/route.ts",
       "methods": [
