@@ -152,6 +152,7 @@ interface AimPromptComposerViewProps {
   placeholder: string
   imageAttachments: Array<{ id: string; name: string; previewUrl: string }>
   fileAttachments: AimFileAttachment[]
+  onAddFiles?: (files: File[]) => void
   onRemoveImage?: (id: string) => void
   onRemoveFile?: (id: string) => void
   addMenuOpen: boolean
@@ -210,6 +211,7 @@ function AimPromptComposerView(p: AimPromptComposerViewProps) {
       applyUsage={p.applyUsage}
       allowedUsages={p.allowedUsages}
       autoUsageLabel={p.autoUsageLabel}
+      onFileDrop={p.handleDroppedFiles}
     >
       <ComposerTextarea
         textareaRef={p.textareaRef}
@@ -245,6 +247,7 @@ function AimPromptComposerView(p: AimPromptComposerViewProps) {
         onComposerModeChange={p.onComposerModeChange}
         showPlanModeControl={p.showPlanModeControl}
         onAddImages={p.onAddImages}
+        onAddFiles={p.onAddFiles}
         showContentModeControl={p.showContentModeControl}
         contentMode={p.contentMode}
         contentModeLabel={p.contentModeLabel}
