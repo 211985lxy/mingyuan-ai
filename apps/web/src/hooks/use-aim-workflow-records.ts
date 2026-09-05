@@ -18,6 +18,7 @@ import {
   type AimRetroSnapshot,
 } from "@/lib/api/client"
 import { registerAimLeadAttribution } from "@/lib/api/lead-attribution"
+import { importOutcomeFile } from "@/lib/api/outcome-import"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import {
   reportWebFinalDisposition,
@@ -104,6 +105,13 @@ export async function saveLeadRecord(generationId: string, form: LeadRecordForm)
     externalPaymentId: form.externalPaymentId.trim() || undefined,
   })
   toast.success("已登记线索归因")
+}
+
+/** 导出供单测复用：复盘表格导入（识别到的指标直接写入该内容的发布数据） */
+export async function saveOutcomeImport(generationId: string, file: File) {
+  const result = await importOutcomeFile({ generationId, file })
+  toast.success(result.summary)
+  return result
 }
 
 function buildRetroOutcome(form: OutcomeForm, window: OutcomeWindow, platform: string) {
@@ -219,6 +227,7 @@ function useRecordDialogHandlers(input: {
     finalDisposition: FinalDisposition,
   ) => Promise<void>
 }) {
+  const [outcomeImporting, setOutcomeImporting] = useState(false)
   const openRecordDialog = useCallback((messageId: string, mode: WorkflowRecordMode) => {
     const deliverable = input.workflow.messages.find((message) => message.id === messageId)?.deliverables
     if (!deliverable?.id || deliverable.id.startsWith("polish-")) return toast.error("只有已保存的内容才能记录")
@@ -262,7 +271,20 @@ function useRecordDialogHandlers(input: {
       toast.error(error instanceof Error ? error.message : "保存失败")
     }
   }, [input])
-  return { openRecordDialog, submitRecordDialog }
+  /** 复盘对话框内上传平台导出表格：写入成功后刷新记录，失败如实 toast */
+  const uploadOutcomeFile = useCallback(async (file: File) => {
+    if (!input.recordDialog) return toast.error("请先选择要复盘的内容")
+    setOutcomeImporting(true)
+    try {
+      await saveOutcomeImport(input.recordDialog.generationId, file)
+      input.refreshRecords()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "表格导入失败")
+    } finally {
+      setOutcomeImporting(false)
+    }
+  }, [input])
+  return { openRecordDialog, submitRecordDialog, uploadOutcomeFile, outcomeImporting }
 }
 
 /**
@@ -328,7 +350,7 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     },
     [input.messages, reportMessageOutcome],
   )
-  const { openRecordDialog, submitRecordDialog } = useRecordDialogHandlers({
+  const { openRecordDialog, submitRecordDialog, uploadOutcomeFile, outcomeImporting } = useRecordDialogHandlers({
     workflow: input,
     forms,
     recordDialog,
@@ -344,5 +366,7 @@ export function useAimWorkflowRecords(input: UseAimWorkflowRecordsInput) {
     handleFinalDisposition,
     openRecordDialog,
     submitRecordDialog,
+    uploadOutcomeFile,
+    outcomeImporting,
   }
 }

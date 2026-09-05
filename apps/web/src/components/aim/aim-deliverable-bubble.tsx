@@ -189,20 +189,31 @@ function DeliverableTabs({ results, activeFormat, onTabChange, generationId, mes
   </Tabs>
 }
 
-/** 经营记录入口行：发布前判断 / 登记发布 / 填写复盘 / 登记线索。
+/** 经营记录入口行：发布前判断 / 登记发布 / 填写复盘 / 登记线索 / 查看报告。
  *  90bb0b0d 精简时误删了唯一入口导致登记对话框不可达，这里恢复最小按钮行。 */
-function WorkflowRecordActions({ onOpenDecision, onOpenPublish, onOpenRetro, onOpenLead }: {
+function WorkflowRecordActions({ onOpenDecision, onOpenPublish, onOpenRetro, onOpenLead, reportHref }: {
   onOpenDecision?: () => void
   onOpenPublish?: () => void
   onOpenRetro?: () => void
   onOpenLead?: () => void
+  reportHref?: string
 }) {
-  if (!onOpenDecision && !onOpenPublish && !onOpenRetro && !onOpenLead) return null
+  if (!onOpenDecision && !onOpenPublish && !onOpenRetro && !onOpenLead && !reportHref) return null
   return <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
     {onOpenDecision ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenDecision}>发布前判断</Button> : null}
     {onOpenPublish ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenPublish}>登记发布</Button> : null}
     {onOpenRetro ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenRetro}>填写复盘</Button> : null}
     {onOpenLead ? <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={onOpenLead}>登记线索</Button> : null}
+    {reportHref ? (
+      <a
+        href={reportHref}
+        target="_blank"
+        rel="noreferrer"
+        className={`inline-flex h-8 items-center rounded-md px-3 text-sm font-medium ${AIM_SOFT_ACTION_CLASS}`}
+      >
+        查看报告
+      </a>
+    ) : null}
   </div>
 }
 
@@ -244,6 +255,7 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
       onOpenPublish={props.onOpenPublish}
       onOpenRetro={props.onOpenRetro}
       onOpenLead={props.onOpenLead}
+      reportHref={`/api/aim/history/${deliverables.id}/retro-report`}
     />
   </div>
 }

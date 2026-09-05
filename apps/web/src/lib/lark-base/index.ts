@@ -1,4 +1,5 @@
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
+import { buildLarkOutcomeExportFields } from "./outcome-export"
 import {
   fireEmbedding,
   runLarkBaseCommand,
@@ -47,11 +48,16 @@ export function readLarkBaseConfig(env: EnvLike, tableType: LarkTableType): Lark
   }
 }
 
+const RESULT_TABLE_ENV_KEYS: Partial<Record<LarkResultType, string>> = {
+  topic: "LARK_TOPIC_TABLE_ID",
+  outcome: "LARK_OUTCOME_TABLE_ID",
+}
+
 function readResultTableConfig(env: EnvLike, resultType: LarkResultType): LarkConfig {
   const baseToken = env.LARK_BASE_TOKEN?.trim()
   if (!baseToken) throw new Error("缺少 LARK_BASE_TOKEN")
 
-  const tableKey = resultType === "topic" ? "LARK_TOPIC_TABLE_ID" : "LARK_RESULT_TABLE_ID"
+  const tableKey = RESULT_TABLE_ENV_KEYS[resultType] ?? "LARK_RESULT_TABLE_ID"
   const tableId = env[tableKey]?.trim()
   if (!tableId) throw new Error(`缺少 ${tableKey}`)
 
@@ -417,6 +423,14 @@ export async function exportLarkBaseResult(input: {
       "AIM结果ID": input.resultId,
       "项目名称": project.name || input.projectId,
     }
+  } else if (input.resultType === "outcome") {
+    // 复盘记录写出（岗位卡：存数据库 + 同步飞书）。字段构建见 outcome-export.ts。
+    fields = await buildLarkOutcomeExportFields({
+      db: input.db,
+      userId: input.userId,
+      resultId: input.resultId,
+      projectName: project.name || input.projectId,
+    })
   } else {
     const generation = await input.db.aimGeneration?.findFirst({
       where: { id: input.resultId, userId: input.userId, projectId: input.projectId },

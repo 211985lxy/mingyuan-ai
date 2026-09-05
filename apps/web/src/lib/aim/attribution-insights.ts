@@ -61,7 +61,8 @@ export interface AttributionInsightsStorePort {
 const UNSPECIFIED_TASK = "未标注"
 const MIN_SAMPLE = 3
 
-function resolveContentTask(taskSpec: unknown): string {
+/** 从 taskSpec 提取内容任务标签；未标注/无效输入归「未标注」，不猜测补齐。 */
+export function resolveContentTask(taskSpec: unknown): string {
   if (typeof taskSpec !== "object" || taskSpec === null) return UNSPECIFIED_TASK
   const value = (taskSpec as { contentTask?: unknown }).contentTask
   return typeof value === "string" && value.trim() ? value.trim() : UNSPECIFIED_TASK

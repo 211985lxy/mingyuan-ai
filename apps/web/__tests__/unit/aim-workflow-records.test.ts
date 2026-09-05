@@ -9,12 +9,15 @@ const { updateAimWorkflowStatus, registerAimLeadAttribution, toast } = vi.hoiste
 vi.mock("sonner", () => ({ toast }))
 vi.mock("@/lib/api/client", () => ({ updateAimWorkflowStatus }))
 vi.mock("@/lib/api/lead-attribution", () => ({ registerAimLeadAttribution }))
+vi.mock("@/lib/api/outcome-import", () => ({ importOutcomeFile: vi.fn() }))
 
 import {
   parseAimOutcomeNumber,
   saveLeadRecord,
+  saveOutcomeImport,
   savePublishRecord,
 } from "@/hooks/use-aim-workflow-records"
+import { importOutcomeFile } from "@/lib/api/outcome-import"
 
 describe("AIM workflow record metrics", () => {
   it("keeps missing and invalid metrics distinct from zero", () => {
@@ -87,5 +90,36 @@ describe("WP-B 强制点②：线索登记必须显式挂来源", () => {
       externalPaymentId: undefined,
     })
     expect(toast.success).toHaveBeenCalledWith("已登记线索归因")
+  })
+})
+
+describe("复盘表格导入（P1a 客户端）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("saveOutcomeImport 成功时 toast 解析 summary", async () => {
+    const { importOutcomeFile } = await import("@/lib/api/outcome-import")
+    const mock = importOutcomeFile as unknown as ReturnType<typeof vi.fn>
+    mock.mockResolvedValueOnce({ summary: "平台 douyin｜7 天窗口｜已识别 views=1200", confidence: "medium", missingHints: ["评论"] })
+
+    const { saveOutcomeImport } = await import("@/hooks/use-aim-workflow-records")
+    const result = await saveOutcomeImport("gen-1", new File(["x"], "export.csv", { type: "text/csv" }))
+
+    expect(mock).toHaveBeenCalledWith({ generationId: "gen-1", file: expect.any(File) })
+    expect(result.summary).toContain("views=1200")
+    expect(toast.success).toHaveBeenCalledWith("平台 douyin｜7 天窗口｜已识别 views=1200")
+  })
+
+  it("saveOutcomeImport 失败时抛出服务端人话错误", async () => {
+    const { importOutcomeFile } = await import("@/lib/api/outcome-import")
+    const mock = importOutcomeFile as unknown as ReturnType<typeof vi.fn>
+    mock.mockRejectedValueOnce(new Error("没有识别到可用的发布数据字段"))
+
+    const { saveOutcomeImport } = await import("@/hooks/use-aim-workflow-records")
+    await expect(
+      saveOutcomeImport("gen-1", new File(["空"], "empty.csv", { type: "text/csv" })),
+    ).rejects.toThrow("没有识别到可用的发布数据字段")
+    expect(toast.success).not.toHaveBeenCalled()
   })
 })

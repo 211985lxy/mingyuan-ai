@@ -4,7 +4,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import { exportLarkBaseResult, type LarkResultType } from "@/lib/lark-base-tool"
 
-const RESULT_TYPES = new Set(["topic", "script", "positioning", "moments_copy"])
+const RESULT_TYPES = new Set(["topic", "script", "positioning", "moments_copy", "outcome"])
 
 /**
  * @description 处理 POST 请求

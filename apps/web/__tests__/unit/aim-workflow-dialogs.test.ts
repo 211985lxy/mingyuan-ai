@@ -91,4 +91,42 @@ describe("AIM workflow dialogs", () => {
     expect(html).toContain("判断备注")
     expect(html).toContain("客户不匹配")
   })
+
+  it("renders the spreadsheet import row in retro mode only when handler is wired（P1a UI 入口）", () => {
+    const baseProps = {
+      dialog: { mode: "retro", generationId: "generation-1" } as const,
+      decisionForm: { summary: "" },
+      publishForm: { publishPlatform: "抖音", publishUrl: "" },
+      retroForm: { summary: "" },
+      leadForm: { externalLeadId: "", externalDealId: "", externalPaymentId: "" },
+      ruleForm: { rule: "" },
+      outcomeForm: {},
+      outcomeWindow: "7",
+      onDecisionChange: vi.fn(),
+      onPublishChange: vi.fn(),
+      onRetroChange: vi.fn(),
+      onRuleChange: vi.fn(),
+      onOutcomeChange: vi.fn(),
+      onOutcomeWindowChange: vi.fn(),
+    }
+    const withUpload = renderToStaticMarkup(createElement(WorkflowRecordFields, {
+      ...baseProps,
+      onOutcomeFileUpload: vi.fn(),
+      outcomeImporting: false,
+    }))
+    expect(withUpload).toContain("上传平台导出表格")
+    expect(withUpload).toContain("未识别的不写入")
+    expect(withUpload).toContain('accept=".xlsx,.xls,.csv"')
+
+    // 未接线（旧调用方）不渲染上传行；publish 模式也没有
+    const withoutUpload = renderToStaticMarkup(createElement(WorkflowRecordFields, baseProps))
+    expect(withoutUpload).not.toContain("上传平台导出表格")
+
+    const publishMode = renderToStaticMarkup(createElement(WorkflowRecordFields, {
+      ...baseProps,
+      dialog: { mode: "publish", generationId: "generation-1" },
+      onOutcomeFileUpload: vi.fn(),
+    }))
+    expect(publishMode).not.toContain("上传平台导出表格")
+  })
 })

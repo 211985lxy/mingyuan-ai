@@ -140,6 +140,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     outcomeWindow, setOutcomeWindow,
     retroRuleForm, setRetroRuleForm,
     handleMarkStatus, handleFinalDisposition, openRecordDialog, submitRecordDialog,
+    uploadOutcomeFile, outcomeImporting,
   } = useAimWorkflowRecords({
     messages,
     setMessages,
@@ -443,6 +444,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     recordDialog, closeRecordDialog, decisionForm, setDecisionForm, publishForm, setPublishForm,
     retroForm, setRetroForm, leadForm, setLeadForm, outcomeForm, setOutcomeForm, outcomeWindow, setOutcomeWindow,
     retroRuleForm, setRetroRuleForm, handleMarkStatus, handleFinalDisposition, openRecordDialog, submitRecordDialog,
+    uploadOutcomeFile, outcomeImporting,
     wikiDialog,
     isImitating, isSavingEditor, imitateStyleId, setImitateStyleId, handleImitate, saveEditorToDeliverable, applyEditorReplacement, applyRestoredContent,
     scrollRef,

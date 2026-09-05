@@ -553,6 +553,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/benchmark-table",
+      "file": "src/app/api/admin/benchmark-table/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/channel-metrics",
       "file": "src/app/api/admin/channel-metrics/route.ts",
       "methods": [
@@ -1362,6 +1375,19 @@
       "idempotency": true
     },
     {
+      "route": "/api/aim/history/[id]/retro-report",
+      "file": "src/app/api/aim/history/[id]/retro-report/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/history/[id]",
       "file": "src/app/api/aim/history/[id]/route.ts",
       "methods": [
@@ -1495,6 +1521,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/outcome-import",
+      "file": "src/app/api/aim/outcome-import/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/aim/outcomes/reminders",
       "file": "src/app/api/aim/outcomes/reminders/route.ts",
       "methods": [
@@ -1518,6 +1557,19 @@
       "query": "none",
       "externalService": false,
       "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/reports/monthly",
+      "file": "src/app/api/aim/reports/monthly/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
       "idempotency": false
     },
     {

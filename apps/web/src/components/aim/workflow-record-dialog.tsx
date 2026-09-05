@@ -89,7 +89,35 @@ function OutcomeFields({ form, window, onChange, onWindowChange }: {
   </div>
 }
 
-function RetroFields({ form, rule, outcome, outcomeWindow, onChange, onRuleChange, onOutcomeChange, onOutcomeWindowChange }: {
+function OutcomeImportRow({ onUpload, uploading }: { onUpload?: (file: File) => void; uploading?: boolean }) {
+  if (!onUpload) return null
+  return <div className="flex flex-wrap items-center gap-2">
+    <input
+      id="aim-outcome-import-file"
+      type="file"
+      accept=".xlsx,.xls,.csv"
+      className="hidden"
+      disabled={uploading}
+      onChange={(event) => {
+        const file = event.target.files?.[0]
+        event.target.value = ""
+        if (file) onUpload(file)
+      }}
+    />
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      disabled={uploading}
+      onClick={() => document.getElementById("aim-outcome-import-file")?.click()}
+    >
+      {uploading ? "导入中…" : "上传平台导出表格"}
+    </Button>
+    <span className="text-xs text-muted-foreground">xlsx / csv；识别到的指标直接登记为该内容的发布数据，未识别的不写入</span>
+  </div>
+}
+
+function RetroFields({ form, rule, outcome, outcomeWindow, onChange, onRuleChange, onOutcomeChange, onOutcomeWindowChange, onFileUpload, uploading }: {
   form: AimRetroSnapshot
   rule: AimCalibrationRule
   outcome: OutcomeForm
@@ -98,6 +126,8 @@ function RetroFields({ form, rule, outcome, outcomeWindow, onChange, onRuleChang
   onRuleChange: (form: AimCalibrationRule) => void
   onOutcomeChange: (form: OutcomeForm) => void
   onOutcomeWindowChange: (window: OutcomeWindow) => void
+  onFileUpload?: (file: File) => void
+  uploading?: boolean
 }) {
   return <div className="space-y-3">
     <div className="space-y-1.5"><p className="text-sm font-medium">这次结果怎么判断</p><Textarea value={form.summary} onChange={(event) => onChange({ ...form, summary: event.target.value })} placeholder="比如：播放一般，但收藏和私信明显高，说明题不破圈，但很能打中目标人。" /></div>
@@ -105,6 +135,7 @@ function RetroFields({ form, rule, outcome, outcomeWindow, onChange, onRuleChang
     <div className="space-y-1.5"><p className="text-sm font-medium">这次判断哪里对，哪里错</p><Textarea value={form.verdict ?? ""} onChange={(event) => onChange({ ...form, verdict: event.target.value })} placeholder="比如：判断对在痛点，判断错在标题太像教程合集。" /></div>
     <div className="space-y-1.5"><p className="text-sm font-medium">下次同类内容怎么判断</p><Textarea value={rule.rule} onChange={(event) => onRuleChange({ ...rule, rule: event.target.value })} placeholder="比如：工具类长教程先看能不能压成一个明确场景，否则不做大而全。" /></div>
     <OutcomeFields form={outcome} window={outcomeWindow} onChange={onOutcomeChange} onWindowChange={onOutcomeWindowChange} />
+    <OutcomeImportRow onUpload={onFileUpload} uploading={uploading} />
   </div>
 }
 
@@ -129,12 +160,12 @@ export function getWorkflowRecordDialogCopy(mode?: WorkflowRecordMode) {
  * @param props - 组件属性
  * @returns 无返回值
  */
-export function WorkflowRecordFields(props: Pick<WorkflowRecordDialogProps, "dialog" | "decisionForm" | "publishForm" | "retroForm" | "ruleForm" | "leadForm" | "outcomeForm" | "outcomeWindow" | "onDecisionChange" | "onPublishChange" | "onRetroChange" | "onRuleChange" | "onLeadChange" | "onOutcomeChange" | "onOutcomeWindowChange">) {
+export function WorkflowRecordFields(props: Pick<WorkflowRecordDialogProps, "dialog" | "decisionForm" | "publishForm" | "retroForm" | "ruleForm" | "leadForm" | "outcomeForm" | "outcomeWindow" | "onDecisionChange" | "onPublishChange" | "onRetroChange" | "onRuleChange" | "onLeadChange" | "onOutcomeChange" | "onOutcomeWindowChange" | "onOutcomeFileUpload" | "outcomeImporting">) {
   const mode = props.dialog?.mode
   return <>
     {mode === "decision" ? <DecisionFields form={props.decisionForm} onChange={props.onDecisionChange} /> : null}
     {mode === "publish" ? <PublishFields form={props.publishForm} onChange={props.onPublishChange} /> : null}
-    {mode === "retro" ? <RetroFields form={props.retroForm} rule={props.ruleForm} outcome={props.outcomeForm} outcomeWindow={props.outcomeWindow} onChange={props.onRetroChange} onRuleChange={props.onRuleChange} onOutcomeChange={props.onOutcomeChange} onOutcomeWindowChange={props.onOutcomeWindowChange} /> : null}
+    {mode === "retro" ? <RetroFields form={props.retroForm} rule={props.ruleForm} outcome={props.outcomeForm} outcomeWindow={props.outcomeWindow} onChange={props.onRetroChange} onRuleChange={props.onRuleChange} onOutcomeChange={props.onOutcomeChange} onOutcomeWindowChange={props.onOutcomeWindowChange} onFileUpload={props.onOutcomeFileUpload} uploading={props.outcomeImporting} /> : null}
     {mode === "lead" ? <LeadFields form={props.leadForm} onChange={props.onLeadChange} /> : null}
   </>
 }
@@ -156,6 +187,8 @@ interface WorkflowRecordDialogProps {
   onLeadChange: (form: LeadRecordForm) => void
   onOutcomeChange: (form: OutcomeForm) => void
   onOutcomeWindowChange: (window: OutcomeWindow) => void
+  onOutcomeFileUpload?: (file: File) => void
+  outcomeImporting?: boolean
   onClose: () => void
   onSubmit: () => void
 }

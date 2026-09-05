@@ -4,7 +4,7 @@ type EnsureEmbeddingFn = (entryId: string) => Promise<void>
 let ensureEmbedding: EnsureEmbeddingFn | null = null
 
 export type LarkTableType = "topic_review" | "project_management" | "data_archive"
-export type LarkResultType = "topic" | "script" | "positioning" | "moments_copy"
+export type LarkResultType = "topic" | "script" | "positioning" | "moments_copy" | "outcome"
 type LarkCommand = "+table-get" | "+field-list" | "+record-list" | "+record-get" | "+record-upsert"
 
 export type RunCommand = (command: LarkCommand, args: string[]) => Promise<unknown>
@@ -29,6 +29,9 @@ export type DbLike = {
     findFirst(args: unknown): Promise<Record<string, unknown> | null>
   }
   topicSelection?: {
+    findFirst(args: unknown): Promise<Record<string, unknown> | null>
+  }
+  contentOutcome?: {
     findFirst(args: unknown): Promise<Record<string, unknown> | null>
   }
 }
