@@ -195,7 +195,8 @@ export async function headManagedObject(objectKey: string): Promise<ManagedObjec
   }
 }
 
-async function loadCompletableReservation(uploadId: string, userId: string) {
+/** 服务端代理上传（同源 put 路由）复用同一套预约校验：归属/pending/未过期。 */
+export async function loadCompletableReservation(uploadId: string, userId: string) {
   const reservation = await prisma.assetUploadReservation.findUnique({
     where: { id: uploadId },
   })

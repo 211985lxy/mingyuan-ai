@@ -7,6 +7,7 @@ import { chatAimStream } from "@/lib/api/aim-chat"
 import {
   createLiteChatController,
   type LiteChatMessage,
+  type LiteSendExtras,
 } from "@/features/lite/lite-chat-controller"
 
 /**
@@ -26,11 +27,11 @@ export function useLiteChat(agentId?: string) {
   const messages = useSyncExternalStore(controller.subscribe, controller.getMessages)
   const busy = useSyncExternalStore(controller.subscribe, controller.getBusy)
 
-  const send = useCallback((text: string) => controller.send(text), [controller])
+  const send = useCallback((text: string, extras?: LiteSendExtras) => controller.send(text, extras), [controller])
   const stop = useCallback(() => controller.stop(), [controller])
   const reset = useCallback(() => controller.reset(), [controller])
 
   return { messages, busy, send, stop, reset }
 }
 
-export type { LiteChatMessage }
+export type { LiteChatMessage, LiteSendExtras }

@@ -145,11 +145,12 @@ export function canSubmitWithPasteAttachment(input: {
   text: string
   attachment: PastedCopyAttachment | null
   hasImages?: boolean
+  hasFiles?: boolean
 }): boolean {
-  const { text, attachment, hasImages } = input
+  const { text, attachment, hasImages, hasFiles } = input
   if (attachment && !attachment.usage) return false
   if (attachment?.usage === "style_sample") return false
-  return text.trim().length > 0 || Boolean(attachment) || Boolean(hasImages)
+  return text.trim().length > 0 || Boolean(attachment) || Boolean(hasImages) || Boolean(hasFiles)
 }
 
 // ─── 批量复刻识别 ──────────────────────────────────────────

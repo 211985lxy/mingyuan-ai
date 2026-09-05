@@ -1,11 +1,12 @@
 "use client"
 
-import type { RefObject } from "react"
-import { ExternalLink, ListChecks, Loader2, Mic, Plus, Send, Sparkles, Square } from "lucide-react"
+import { useRef, type RefObject } from "react"
+import { ExternalLink, ListChecks, Loader2, Mic, Paperclip, Plus, Send, Sparkles, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
 import { type AimAgentCapabilities } from "@/lib/aim/agent-capabilities"
+import { splitPastedFiles } from "@/lib/aim/file-attachments"
 import { cn } from "@/lib/utils"
 
 /** 底部操作条（+按钮 / 我的风格 / 状态 pill / 语音 / 停止 / 发送）。
@@ -38,6 +39,7 @@ export function AimActionBar(props: {
   onGenerate: () => void
   fileInputRef: RefObject<HTMLInputElement | null>
   onAddImages?: (files: FileList) => void
+  onAddFiles?: (files: File[]) => void
 }) {
   const {
     busy, isRecording, isTranscribing, isPlanMode, isGenerating, canSubmit, canStop,
@@ -45,7 +47,7 @@ export function AimActionBar(props: {
     showSkillQuick, skillQuickOpen, onToggleSkillQuick,
     styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets,
     onStartRecording, onStopRecording, onStop, onGenerate,
-    fileInputRef, onAddImages,
+    fileInputRef, onAddImages, onAddFiles,
   } = props
   return (
     <div className="flex items-center justify-between gap-2 border-t border-border/50 px-2.5 pb-2.5 pt-2">
@@ -53,6 +55,7 @@ export function AimActionBar(props: {
         busy={busy}
         fileInputRef={fileInputRef}
         onAddImages={onAddImages}
+        onAddFiles={onAddFiles}
         showAddMenu={showAddMenu}
         addMenuOpen={addMenuOpen}
         onToggleAddMenu={onToggleAddMenu}
@@ -89,6 +92,7 @@ function ActionBarLeft(props: {
   busy: boolean
   fileInputRef: RefObject<HTMLInputElement | null>
   onAddImages?: (files: FileList) => void
+  onAddFiles?: (files: File[]) => void
   showAddMenu: boolean
   addMenuOpen: boolean
   onToggleAddMenu: () => void
@@ -105,7 +109,7 @@ function ActionBarLeft(props: {
   isPlanMode: boolean
 }) {
   const {
-    busy, fileInputRef, onAddImages, showAddMenu, addMenuOpen,
+    busy, fileInputRef, onAddImages, onAddFiles, showAddMenu, addMenuOpen,
     onToggleAddMenu, showSkillQuick, skillQuickOpen, onToggleSkillQuick,
     styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets,
     isTranscribing, isRecording, isPlanMode,
@@ -116,6 +120,7 @@ function ActionBarLeft(props: {
         fileInputRef={fileInputRef}
         onAddImages={onAddImages}
       />
+      {onAddFiles ? <AttachFileButton busy={busy} onAddFiles={onAddFiles} onAddImages={onAddImages} /> : null}
       {showAddMenu ? (
         <Button
           type="button"
@@ -357,6 +362,50 @@ function HiddenImageInput(props: {
         event.target.value = ""
       }}
     />
+  )
+}
+
+/** 「回形针」通用文件入口：WebKit 内嵌浏览器粘贴/拖拽受限时的可靠通道。 */
+function AttachFileButton(props: {
+  busy: boolean
+  onAddFiles: (files: File[]) => void
+  onAddImages?: (files: FileList) => void
+}) {
+  const { busy, onAddFiles, onAddImages } = props
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? [])
+          if (files.length) {
+            const { images, documents } = splitPastedFiles(files)
+            if (documents.length) onAddFiles(documents)
+            if (images.length && onAddImages) {
+              const dt = new DataTransfer()
+              images.forEach((image) => dt.items.add(image))
+              onAddImages(dt.files)
+            }
+          }
+          event.target.value = ""
+        }}
+      />
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="h-8.5 w-8.5 rounded-xl p-0 text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={busy}
+        title="添加文件：图片（PNG/JPG…）直接看图；文档文本（PDF/Word/Excel/PPT/TXT/MD/CSV…及任意文本类）自动读取内容"
+      >
+        <Paperclip className="h-[17px] w-[17px]" strokeWidth={2.1} />
+      </Button>
+    </>
   )
 }
 

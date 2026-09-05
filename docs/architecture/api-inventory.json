@@ -1231,6 +1231,32 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/attachment-parse",
+      "file": "src/app/api/aim/attachment-parse/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/attachment-transcribe",
+      "file": "src/app/api/aim/attachment-transcribe/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/aim/chat",
       "file": "src/app/api/aim/chat/route.ts",
       "methods": [
@@ -1817,6 +1843,19 @@
       ],
       "auth": "user_session",
       "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/assets/uploads/[uploadId]/put",
+      "file": "src/app/api/assets/uploads/[uploadId]/put/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "multipart",
       "query": "none",
       "externalService": false,
       "cost": "low",

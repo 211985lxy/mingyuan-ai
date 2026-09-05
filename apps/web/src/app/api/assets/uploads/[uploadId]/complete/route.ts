@@ -1,6 +1,7 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
+import { generateSignedUrl, isManagedOssUrl } from "@/lib/oss"
 import {
   completeAssetUploadReservation,
   UploadReservationError,
@@ -28,7 +29,11 @@ export const POST = withUserAuth(async (request, { user, params }) => {
       userId: user.id,
       name,
     })
-    return NextResponse.json({ data: asset }, { status: 201 })
+    // 私有桶：裸 URL 浏览器/模型都拉取不到，附带长期签名读 URL 供聊天预览与多模态输入
+    const readUrl = isManagedOssUrl(asset.url)
+      ? generateSignedUrl(asset.url, 7 * 24 * 3600)
+      : asset.url
+    return NextResponse.json({ data: { ...asset, readUrl } }, { status: 201 })
   } catch (error) {
     if (error instanceof UploadReservationError) {
       return NextResponse.json(

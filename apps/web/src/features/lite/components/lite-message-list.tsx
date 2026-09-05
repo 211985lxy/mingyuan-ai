@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { Sparkles } from "lucide-react"
+import { Paperclip, Sparkles } from "lucide-react"
 
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import type { LiteChatMessage } from "@/features/lite/lite-chat-controller"
@@ -33,8 +33,26 @@ export function LiteMessageList({
         if (message.role === "user") {
           return (
             <div key={index} className="flex justify-end">
-              <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-                {message.content}
+              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+                {message.images?.length ? (
+                  <div className="mb-1.5 flex max-w-56 flex-wrap gap-1.5">
+                    {message.images.map((image) => (
+                      <img
+                        key={image.id}
+                        src={image.previewUrl}
+                        alt={image.name}
+                        className="h-16 w-16 rounded-lg border border-white/25 object-cover"
+                      />
+                    ))}
+                  </div>
+                ) : null}
+                {message.fileCount ? (
+                  <p className="mb-1 flex items-center gap-1 text-xs opacity-90">
+                    <Paperclip className="size-3" aria-hidden />
+                    已附加 {message.fileCount} 个文件
+                  </p>
+                ) : null}
+                <p className="whitespace-pre-wrap">{message.content}</p>
               </div>
             </div>
           )

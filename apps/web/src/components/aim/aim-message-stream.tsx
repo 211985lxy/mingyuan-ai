@@ -1,7 +1,7 @@
 "use client"
 
 import { forwardRef, useCallback, useState, type Ref } from "react"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, FileText } from "lucide-react"
 import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
 import { AimBatchDeliverableBubble } from "@/components/aim/aim-batch-deliverable-bubble"
 import { AimMessageJumpRail } from "@/components/aim/aim-message-jump-rail"
@@ -16,6 +16,7 @@ import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import type { AimWorkflowStage } from "@/lib/aim-workflow"
 import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-groups"
 import { splitAimMethodNote } from "@/lib/aim/workbench-display"
+import { formatAimFileSize } from "@/lib/aim/file-attachments"
 import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
 import type { ContentFormat } from "@/lib/api/client"
 import type { WorkflowRecordMode } from "@/components/aim/workflow-record-dialog"
@@ -54,7 +55,7 @@ function MessageContent({ message, showThinkingProcess }: {
       && !message.traceId
     return <>{showMethodNote ? <details className="mb-3 rounded-md border border-border bg-muted/25 px-3 py-2.5 text-sm text-muted-foreground"><summary className="cursor-pointer select-none font-medium text-foreground/80">思考依据</summary><div className="mt-2 border-t border-border/60 pt-2"><MarkdownRenderer content={display.methodNote} /></div></details> : null}<MarkdownRenderer content={display.result} /></>
   }
-  return <>{message.images?.length ? <div className="mb-2 flex max-w-64 flex-wrap gap-2">{message.images.map((image) => <img key={image.id} src={image.previewUrl} alt={image.name} className="h-20 w-20 rounded-md border object-cover" />)}</div> : null}<p className="whitespace-pre-wrap break-words">{message.content}</p></>
+  return <>{message.images?.length ? <div className="mb-2 flex max-w-64 flex-wrap gap-2">{message.images.map((image) => <img key={image.id} src={image.previewUrl} alt={image.name} className="h-20 w-20 rounded-md border object-cover" />)}</div> : null}{message.files?.length ? <div className="mb-2 flex max-w-72 flex-wrap gap-2">{message.files.map((file) => <span key={file.id} className="inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border bg-muted/60 px-2.5 text-xs text-foreground"><FileText className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden /><span className="truncate" title={file.name}>{file.name}</span><span className="shrink-0 text-muted-foreground">{formatAimFileSize(file.size)}</span></span>)}</div> : null}<p className="whitespace-pre-wrap break-words">{message.content}</p></>
 }
 
 function RecoverableFailure({ message, busy, onRetry }: {

@@ -49,6 +49,8 @@ function signPopRpcRequest(args: {
   params: Record<string, string>
   accessKeyId: string
   accessKeySecret: string
+  /** 必须与实际发送的 HTTP 方法一致，否则服务端重算签名不匹配 */
+  method?: "GET" | "POST"
 }): string {
   const queryParams: Record<string, string> = {
     AccessKeyId: args.accessKeyId,
@@ -69,8 +71,8 @@ function signPopRpcRequest(args: {
     .map((key) => `${percentEncode(key)}=${percentEncode(queryParams[key])}`)
     .join("&")
 
-  // 构建待签名字符串
-  const stringToSign = `GET&${percentEncode("/")}&${percentEncode(canonicalizedQueryString)}`
+  // 构建待签名字符串（Method 必须与实际请求方法一致）
+  const stringToSign = `${args.method ?? "GET"}&${percentEncode("/")}&${percentEncode(canonicalizedQueryString)}`
 
   // 计算签名（HMAC-SHA1，key 末尾拼 "&"）
   const signature = crypto
@@ -244,7 +246,7 @@ async function submitRecordingTask(
   }
 
   const { accessKeyId, accessKeySecret } = resolveAliyunAccessKey()
-  // SubmitTask 为 POST，但 POP RPC 签名固定按 GET 签（阿里云 POP 惯例）。
+  // 签名 Method 与下方 fetch 的 POST 保持一致（此前按 GET 签、POST 发，服务端必然 SignatureDoesNotMatch）
   const requestUrl = signPopRpcRequest({
     endpoint: FILETRANS_ENDPOINT,
     regionId: FILETRANS_REGION,
@@ -253,6 +255,7 @@ async function submitRecordingTask(
     params: { Task: JSON.stringify(task) },
     accessKeyId,
     accessKeySecret,
+    method: "POST",
   })
 
   const response = await fetch(requestUrl, {

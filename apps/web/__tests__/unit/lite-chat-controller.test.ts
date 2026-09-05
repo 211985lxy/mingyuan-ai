@@ -40,6 +40,29 @@ describe("createLiteChatController", () => {
     )
   })
 
+
+  it("带图片与文件附件发送：最新消息按多模态上行，气泡保留缩略图与计数", async () => {
+    const stream = createStreamMock(async () => ({ content: "收到" }))
+    const controller = createLiteChatController({ stream })
+    const images = [{ id: "img-1", name: "shot.png", assetUrl: "oss://a", readUrl: "https://r/a.png", previewUrl: "https://r/a.png" }]
+    const files = [{ id: "file-1", name: "data.tst", size: 10, content: "A,B\n1,2", status: "ready" as const }]
+
+    await controller.send("帮我分析", { images, files })
+
+    const messages = controller.getMessages()
+    expect(messages[0].images).toHaveLength(1)
+    expect(messages[0].fileCount).toBe(1)
+    expect(messages[0].content).toBe("帮我分析")
+    // payload 最新一条：文本并入文件正文，图片转 image_url 多模态
+    const payload = (stream as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    const latest = payload[payload.length - 1]
+    expect(Array.isArray(latest.content)).toBe(true)
+    const parts = latest.content as Array<{ type: string; text?: string }>
+    expect(parts[0].type).toBe("text")
+    expect(parts[0].text).toContain("【附件 data.tst】")
+    expect(JSON.stringify(parts)).toContain("image_url")
+  })
+
   it("用户主动停止（499）保留已生成的部分内容，且不触发 onError", async () => {
     const onError = vi.fn()
     const stream = createStreamMock(async ({ onDelta }) => {

@@ -1,5 +1,10 @@
 import type { AimChatMessage } from "@/lib/api/aim-chat"
 import { ApiError } from "@/lib/api/core"
+import {
+  appendAimFileAttachmentsToContent,
+} from "@/lib/aim/file-attachments"
+import { buildAimChatContent } from "@/lib/aim/chat-request"
+import type { AimFileAttachment, AimImageAttachment } from "@/lib/aim/workbench-types"
 
 /**
  * 极简版对话控制器：不依赖 React，可直接单测。
@@ -9,6 +14,15 @@ import { ApiError } from "@/lib/api/core"
 export interface LiteChatMessage {
   role: "user" | "assistant"
   content: string
+  /** 用户消息携带的图片（缩略图展示，发送时按多模态 image_url 上行） */
+  images?: AimImageAttachment[]
+  /** 用户消息携带的文件/音频附件数（仅计数徽标；正文已并入模型文本） */
+  fileCount?: number
+}
+
+export interface LiteSendExtras {
+  images?: AimImageAttachment[]
+  files?: AimFileAttachment[]
 }
 
 export type LiteStreamFn = typeof import("@/lib/api/aim-chat").chatAimStream
@@ -52,23 +66,37 @@ export function createLiteChatController(options: LiteChatControllerOptions) {
     }
   }
 
-  async function send(text: string): Promise<void> {
+  async function send(text: string, extras: LiteSendExtras = {}): Promise<void> {
+    const images = extras.images ?? []
+    const files = extras.files ?? []
     const trimmed = text.trim()
-    if (!trimmed || busy) return
+    if ((!trimmed && images.length === 0 && files.length === 0) || busy) return
 
     messages = [
       ...messages,
-      { role: "user", content: trimmed },
+      {
+        role: "user",
+        content: trimmed || (images.length ? "请分析这张图片。" : "请查看我附带的文件。"),
+        ...(images.length ? { images } : {}),
+        ...(files.length ? { fileCount: files.length } : {}),
+      },
       { role: "assistant", content: "" },
     ]
     busy = true
     abortController = new AbortController()
     notify()
 
-    // 极简版只用纯文本消息，直接满足 AimChatMessage 的 content 联合类型
-    const payload = messages
-      .filter((message) => message.content)
-      .map((message) => ({ role: message.role, content: message.content })) as AimChatMessage[]
+    // 历史轮只上行纯文本；最新一条用户消息并入文件正文与图片多模态
+    const history = messages.filter((message) => message.content).slice(0, -1)
+    const latest = messages[messages.length - 2]
+    const latestContent = buildAimChatContent(
+      appendAimFileAttachmentsToContent(latest.content, files),
+      images.map((image) => ({ readUrl: image.readUrl })),
+    )
+    const payload = [
+      ...history.map((message) => ({ role: message.role, content: message.content })),
+      { role: "user" as const, content: latestContent },
+    ] as AimChatMessage[]
 
     try {
       const result = await stream(payload, {

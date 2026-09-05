@@ -10,11 +10,24 @@ export interface AimImageAttachment {
   previewUrl: string
 }
 
+/** 非图片文件附件：粘贴/拖入后解析为文本，发送时并入用户消息给模型。 */
+export interface AimFileAttachment {
+  id: string
+  name: string
+  size: number
+  /** 解析/转写出的正文；uploading 状态时为空 */
+  content: string
+  status: "uploading" | "ready"
+  /** audio = 音频附件（content 为其转写稿）；缺省视为普通文本/文档附件 */
+  kind?: "file" | "audio"
+}
+
 export interface AimWorkbenchMessage {
   id: string
   role: "user" | "assistant"
   content: string
   images?: AimImageAttachment[]
+  files?: AimFileAttachment[]
   agentId?: string | null
   deliverables?: AimGenerateResponse | null
   qualityReport?: QualityCheckReport | null

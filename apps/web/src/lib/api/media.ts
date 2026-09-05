@@ -76,7 +76,7 @@ export async function completeAssetUpload(
   uploadId: string,
   options?: { name?: string },
 ) {
-  const payload = await request<{ data: ApiAsset }>(
+  const payload = await request<{ data: ApiAsset & { readUrl?: string } }>(
     `/api/assets/uploads/${encodeURIComponent(uploadId)}/complete`,
     {
       method: "POST",
@@ -115,6 +115,20 @@ async function postFileToOss(
   }
 }
 
+/** 同源代理上传兜底：直传 OSS 被跨域/网络拦截（fetch 抛 TypeError）时走自家服务器。 */
+async function putFileViaProxy(uploadId: string, file: File): Promise<void> {
+  const form = new FormData()
+  form.append("file", file)
+  const response = await fetch(`/api/assets/uploads/${encodeURIComponent(uploadId)}/put`, {
+    method: "POST",
+    body: form,
+  })
+  if (!response.ok) {
+    const data: { error?: string } | null = await response.json().catch(() => null)
+    throw new ApiError(data?.error || "文件上传失败", response.status, null)
+  }
+}
+
 /**
  * @description 预约 → POST 直传 OSS → complete 登记
  */
@@ -132,7 +146,16 @@ export async function uploadFileToStorage(
     file.type || "application/octet-stream",
     { sizeBytes: file.size, assetType },
   )
-  await postFileToOss(signed.uploadUrl, signed.fields, file)
+  try {
+    await postFileToOss(signed.uploadUrl, signed.fields, file)
+  } catch (error) {
+    // 网络层失败（跨域拦截/断网）走同源代理；OSS 明确报错则原样抛出
+    if (error instanceof TypeError) {
+      await putFileViaProxy(signed.uploadId, file)
+    } else {
+      throw error
+    }
+  }
 
   if (options?.register === false) {
     return { assetUrl: signed.assetUrl, uploadId: signed.uploadId, asset: null }
@@ -154,7 +177,8 @@ export async function uploadImageForAimChat(file: File) {
   })
   return {
     assetUrl: result.assetUrl,
-    readUrl: result.assetUrl,
+    // 私有桶：complete 返回的签名读 URL（预览与模型 image_url 都用它）
+    readUrl: result.asset?.readUrl ?? result.assetUrl,
     uploadId: result.uploadId,
   }
 }

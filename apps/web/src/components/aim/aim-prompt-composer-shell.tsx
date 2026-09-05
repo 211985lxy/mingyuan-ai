@@ -1,6 +1,7 @@
 "use client"
 
-import type { MutableRefObject, ReactNode } from "react"
+import { useState, type MutableRefObject, type ReactNode } from "react"
+import { AudioLines, FileText, Loader2 } from "lucide-react"
 
 import { AimActionBar } from "@/components/aim/aim-action-bar"
 import { AimAddMenuPanel } from "@/components/aim/aim-add-menu-panel"
@@ -14,6 +15,7 @@ import {
   type PastedCopyAttachment,
   type PasteUsage,
 } from "@/lib/aim/paste-copy-attachment"
+import { formatAimFileSize } from "@/lib/aim/file-attachments"
 import { cn } from "@/lib/utils"
 
 import type { SkillGroup } from "@/components/aim/aim-add-menu-panel-sections"
@@ -29,12 +31,15 @@ export function ComposerCardShell(props: {
   applyUsage: (usage: PasteUsage) => void
   allowedUsages: PasteUsage[]
   autoUsageLabel: string | undefined
+  /** 整卡可作拖放目标：textarea 太小，拖到卡片任意处都算 */
+  onFileDrop?: (files: File[]) => void
   children: ReactNode
 }) {
   const {
     rootRef, pastedCopy, pasteEnabled, busy,
-    onPastedCopyChange, applyUsage, allowedUsages, autoUsageLabel, children,
+    onPastedCopyChange, applyUsage, allowedUsages, autoUsageLabel, onFileDrop, children,
   } = props
+  const [dragOver, setDragOver] = useState(false)
   return (
     <div ref={rootRef} className="mx-auto w-full max-w-6xl xl:max-w-7xl">
       <div
@@ -42,9 +47,31 @@ export function ComposerCardShell(props: {
           "relative overflow-visible rounded-[20px] bg-gradient-to-br from-card via-card/95 to-secondary/30 backdrop-blur-md",
           "shadow-[0_0_0_1px_rgba(239,231,220,0.95),0_12px_40px_-16px_rgba(37,33,29,0.16),0_2px_8px_-4px_rgba(37,33,29,0.06)]",
           "focus-within:shadow-[0_0_0_1.5px_rgba(209,74,51,0.32),0_18px_52px_-16px_rgba(209,74,51,0.2),0_3px_12px_-4px_rgba(209,74,51,0.1)]",
+          dragOver && "shadow-[0_0_0_2px_rgba(209,74,51,0.5)]",
           "transition-all duration-200",
         )}
+        onDragOver={(event) => {
+          if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
+            event.preventDefault()
+            setDragOver(true)
+          }
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(event) => {
+          const droppedFiles = Array.from(event.dataTransfer?.files ?? [])
+          if (droppedFiles.length === 0) return
+          event.preventDefault()
+          setDragOver(false)
+          onFileDrop?.(droppedFiles)
+        }}
       >
+        {dragOver ? (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-[20px] bg-primary/10 backdrop-blur-[1px]">
+            <span className="rounded-full bg-background/95 px-4 py-2 text-sm font-medium text-foreground shadow">
+              松开以添加文件
+            </span>
+          </div>
+        ) : null}
         {pastedCopy && pasteEnabled ? (
           <AimPastedCopyAttachmentBar
             attachment={pastedCopy}
@@ -66,14 +93,14 @@ export function ComposerTextarea(props: {
   value: string
   onChange: (v: string) => void
   handlePaste?: (event: React.ClipboardEvent<HTMLTextAreaElement>) => void
-  pasteEnabled: boolean
+  handleDroppedFiles?: (files: File[]) => void
   canSubmit: boolean
   onGenerate: () => void
   placeholder: string
   busy: boolean
 }) {
   const {
-    textareaRef, value, onChange, handlePaste, pasteEnabled,
+    textareaRef, value, onChange, handlePaste, handleDroppedFiles,
     canSubmit, onGenerate, placeholder, busy,
   } = props
   return (
@@ -81,7 +108,17 @@ export function ComposerTextarea(props: {
       ref={textareaRef}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      onPaste={pasteEnabled ? handlePaste : undefined}
+      onPaste={(event) => handlePaste?.(event)}
+      onDragOver={(event) => {
+        if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) event.preventDefault()
+      }}
+      onDrop={(event) => {
+        const droppedFiles = Array.from(event.dataTransfer?.files ?? [])
+        if (droppedFiles.length === 0) return
+        event.preventDefault()
+        event.stopPropagation()
+        handleDroppedFiles?.(droppedFiles)
+      }}
       onKeyDown={(event) => {
         if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return
         event.preventDefault()
@@ -99,10 +136,12 @@ export function ImageAttachments(props: {
   imageAttachments: Array<{ id: string; name: string; previewUrl: string }>
   onRemoveImage?: (id: string) => void
   busy: boolean
+  /** 紧凑模式：去掉工作台卡片的内建留白（供极简版等窄容器嵌入） */
+  bare?: boolean
 }) {
-  const { imageAttachments, onRemoveImage, busy } = props
+  const { imageAttachments, onRemoveImage, busy, bare } = props
   return (
-    <div className="flex gap-2 overflow-x-auto px-4 pb-2">
+    <div className={cn("flex gap-2 overflow-x-auto", bare ? "" : "px-4 pb-2")}>
       {imageAttachments.map((image) => (
         <div
           key={image.id}
@@ -128,6 +167,82 @@ export function ImageAttachments(props: {
   )
 }
 
+type FileAttachmentChip = {
+  id: string
+  name: string
+  size: number
+  status: "uploading" | "ready"
+  kind?: "file" | "audio"
+}
+
+export function FileAttachmentChips(props: {
+  fileAttachments: FileAttachmentChip[]
+  onRemoveFile?: (id: string) => void
+  busy: boolean
+  /** 紧凑模式：去掉工作台卡片的内建留白（供极简版等窄容器嵌入） */
+  bare?: boolean
+}) {
+  const { fileAttachments, onRemoveFile, busy, bare } = props
+  return (
+    <div className={cn("flex gap-2 overflow-x-auto", bare ? "" : "px-4 pb-2")}>
+      {fileAttachments.map((file) => (
+        <div
+          key={file.id}
+          className="flex h-14 shrink-0 items-center gap-2 rounded-xl bg-muted px-3"
+        >
+          {file.status === "uploading" ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" aria-label={file.kind === "audio" ? "转写中" : "解析中"} />
+          ) : file.kind === "audio" ? (
+            <AudioLines className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+          ) : (
+            <FileText className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+          )}
+          <span className="flex max-w-40 flex-col">
+            <span className="truncate text-xs font-medium text-foreground" title={file.name}>
+              {file.name}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              {file.status === "uploading"
+                ? file.kind === "audio" ? "转写中…" : "解析中…"
+                : file.kind === "audio" ? "已转写 · 发送时读稿" : formatAimFileSize(file.size)}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="rounded-full bg-background/90 p-0.5 text-foreground shadow"
+            onClick={() => onRemoveFile?.(file.id)}
+            disabled={busy}
+            title="移除文件"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 输入框内的附件区：图片缩略图 + 文件 chip 两种通道并列。 */
+export function ComposerAttachmentRows(props: {
+  imageAttachments: Array<{ id: string; name: string; previewUrl: string }>
+  fileAttachments: Array<{ id: string; name: string; size: number; status: "uploading" | "ready" }>
+  onRemoveImage?: (id: string) => void
+  onRemoveFile?: (id: string) => void
+  busy: boolean
+}) {
+  const { imageAttachments, fileAttachments, onRemoveImage, onRemoveFile, busy } = props
+  return (
+    <>
+      {imageAttachments.length > 0 ? (
+        <ImageAttachments imageAttachments={imageAttachments} onRemoveImage={onRemoveImage} busy={busy} />
+      ) : null}
+      {fileAttachments.length > 0 ? (
+        <FileAttachmentChips fileAttachments={fileAttachments} onRemoveFile={onRemoveFile} busy={busy} />
+      ) : null}
+    </>
+  )
+}
+
 export interface ComposerPanelsAndBarProps {
   addMenuOpen: boolean
   setAddMenuOpen: (v: boolean | ((p: boolean) => boolean)) => void
@@ -142,6 +257,7 @@ export interface ComposerPanelsAndBarProps {
   onComposerModeChange?: (mode: AimComposerMode) => void
   showPlanModeControl: boolean
   onAddImages?: (files: FileList) => void
+  onAddFiles?: (files: File[]) => void
   showContentModeControl: boolean
   contentMode: CopyStudioModule | undefined
   contentModeLabel: string
@@ -182,7 +298,7 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
     addMenuOpen, toggleAddMenu,
     showSkillQuick, skillQuickOpen, toggleSkillQuick,
     busy, isPlanMode, canUsePlanMode, composerMode,
-    onComposerModeChange, showPlanModeControl, onAddImages,
+    onComposerModeChange, showPlanModeControl, onAddImages, onAddFiles,
     showContentModeControl, contentMode, contentModeLabel,
     contentModeExpanded, setContentModeExpanded, contentModeOptions,
     onContentModeChange, showSkills, skills, skillQuery, setSkillQuery,
@@ -254,6 +370,7 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
         onGenerate={onGenerate}
         fileInputRef={fileInputRef}
         onAddImages={onAddImages}
+        onAddFiles={onAddFiles}
       />
     </>
   )

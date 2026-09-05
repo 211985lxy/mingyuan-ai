@@ -18,6 +18,7 @@ import { useAimEditorActions } from "@/hooks/use-aim-editor-actions"
 import { useAimEvolutionActions } from "@/hooks/use-aim-evolution-actions"
 import { useAimGenerationActions, type AimWorkflowBriefState } from "@/hooks/use-aim-generation-actions"
 import { useAimImageAttachments } from "@/hooks/use-aim-image-attachments"
+import { useAimFileAttachments } from "@/hooks/use-aim-file-attachments"
 import { useAimWorkflowActions } from "@/hooks/use-aim-workflow-actions"
 import { useAimDraftAutosave, useAimMessageAutoScroll, useAimSourceHydration } from "@/hooks/use-aim-workbench-effects"
 import { useAimAgentDraftSwitch, useAimHistoryLoad, useAimTopicPrefill, useAimVideoCopyPrefill } from "@/hooks/use-aim-route-sync"
@@ -73,6 +74,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages || [])
   const [input, setInput] = useState(() => initialDraft?.input || "")
   const { imageAttachments, isUploadingImage, addImages, removeImage, clearImages } = useAimImageAttachments()
+  const { fileAttachments, isUploadingFiles, addFiles, removeFile, clearFiles } = useAimFileAttachments()
   const sourceEditor = useAimSourceEditorState(initialDraft)
   const retroTarget = useAimRetroTarget(messages)
   const {
@@ -339,7 +341,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
   const { sendText } = useAimChatActions({
     messages, setMessages, setInput, setIsThinking,
     selectedAgentId, selectedProjectId, projectEnabled, agentModule,
-    requestAbortRef, clearCurrentTaskContext, clearImages,
+    requestAbortRef, clearCurrentTaskContext, clearImages, clearFiles,
     onIsolateTaskSession: isolateTaskSessionExtras, runWorkbenchCommand,
   })
 
@@ -397,7 +399,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
   } = useAimSendActions({
     messages, input, selectedAgentId, hasEditorSelection, referenceSelection, draftSelection,
     editorText, sourceOriginalText, sourceAnalysisText, sourceTopicTitle,
-    editorPanelLabels, imageAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
+    editorPanelLabels, imageAttachments, fileAttachments, setInput, sendText, generateWithInput, runWorkbenchCommand,
   })
 
   /** 统一的生成入口：显式计划指令/开关优先，其余请求交给服务端统一执行。 */
@@ -431,6 +433,7 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     params,
     selectedAgentId, messages, input,
     imageAttachments, isUploadingImage, addImages, removeImage,
+    fileAttachments, isUploadingFiles, addFiles, removeFile, clearFiles,
     sourceOriginalText, sourceAnalysisText, sourceTopicTitle, sourceTopicRationale, sourceVideoCopyExtractionId,
     editorText, editorFormat, editorSourceMessageId, editorPanelWidth, editorPanelOpen,
     editorPanelLabels, referenceSelection, draftSelection, annotatedReferenceText,

@@ -15,7 +15,7 @@ export function useAimImageAttachments() {
   const [imageAttachments, setImageAttachments] = useState<AimImageAttachment[]>([])
   const [isUploadingImage, setIsUploadingImage] = useState(false)
 
-  async function addImages(files: FileList) {
+  async function addImages(files: FileList | File[]) {
     const uploadedImages: AimImageAttachment[] = []
     setIsUploadingImage(true)
     try {
