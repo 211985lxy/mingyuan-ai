@@ -58,6 +58,15 @@ export async function loginUserBySms(phone: string, code: string): Promise<AuthR
   })
 }
 
+/** 完成首次抖音扫码后的手机号绑定登录 */
+export async function completeDouyinLogin(phone: string, code: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/api/auth/douyin/complete", {
+    auth: false,
+    method: "POST",
+    body: JSON.stringify({ phone, code }),
+  })
+}
+
 /**
  * @description 开发环境快捷登录
  * @returns 认证响应

@@ -1,24 +1,28 @@
 "use client"
 
 import React from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, QrCode } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { ApiError, loginUserBySms, sendSmsLoginCode } from "@/lib/api/client"
+import { completeDouyinLogin, sendSmsLoginCode } from "@/lib/api/auth"
+import { ApiError } from "@/lib/api/client"
 import type { ApiUser } from "@/types/api-core"
 import { CodeField, PhoneField, CODE_PATTERN, PHONE_PATTERN } from "./sms-fields"
 
-export { CODE_PATTERN, PHONE_PATTERN } from "./sms-fields"
+export function DouyinLoginForm(props: { disabled: boolean; onError: (message: string) => void }) {
+  function startLogin() {
+    window.location.assign("/api/auth/douyin/start")
+  }
 
-function validateSmsForm(phone: string, code: string) {
-  const next: { phone?: string; code?: string } = {}
-  if (!PHONE_PATTERN.test(phone.trim())) next.phone = "请输入有效的手机号"
-  if (!CODE_PATTERN.test(code.trim())) next.code = "请输入 6 位数字验证码"
-  return next
+  return (
+    <Button type="button" size="lg" className="w-full cursor-pointer" disabled={props.disabled} onClick={startLogin}>
+      <QrCode className="size-4" />
+      抖音扫码登录
+    </Button>
+  )
 }
 
-
-export function SmsLoginForm(props: {
+export function DouyinPhoneBindForm(props: {
   onSuccess: (user: ApiUser) => void
   onError: (message: string) => void
   disabled: boolean
@@ -32,11 +36,11 @@ export function SmsLoginForm(props: {
 
   React.useEffect(() => {
     if (countdown <= 0) return
-    const timer = setInterval(() => setCountdown((c) => c - 1), 1000)
+    const timer = setInterval(() => setCountdown((current) => current - 1), 1000)
     return () => clearInterval(timer)
   }, [countdown])
 
-  async function handleSendCode() {
+  async function sendCode() {
     if (!PHONE_PATTERN.test(phone.trim())) {
       setErrors({ phone: "请输入有效的手机号" })
       return
@@ -53,16 +57,18 @@ export function SmsLoginForm(props: {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const next = validateSmsForm(phone, code)
+    const next: { phone?: string; code?: string } = {}
+    if (!PHONE_PATTERN.test(phone.trim())) next.phone = "请输入有效的手机号"
+    if (!CODE_PATTERN.test(code.trim())) next.code = "请输入 6 位数字验证码"
     setErrors(next)
     if (Object.keys(next).length > 0) return
 
     setLoading(true)
     props.onError("")
     try {
-      const session = await loginUserBySms(phone.trim(), code.trim())
+      const session = await completeDouyinLogin(phone.trim(), code.trim())
       props.onSuccess(session.user)
     } catch (error) {
       props.onError(error instanceof ApiError ? error.message : "登录失败，请稍后重试")
@@ -72,7 +78,8 @@ export function SmsLoginForm(props: {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">抖音登录还差一步：绑定手机号后，手机号才是你的 AIM 主账号。</p>
       <PhoneField value={phone} onChange={setPhone} error={errors.phone} />
       <CodeField
         value={code}
@@ -81,20 +88,12 @@ export function SmsLoginForm(props: {
         countdown={countdown}
         sending={sending}
         disabled={loading || props.disabled}
-        onSend={handleSendCode}
+        onSend={sendCode}
       />
-      <Button
-        type="submit"
-        size="lg"
-        disabled={loading || props.disabled}
-        className="w-full cursor-pointer transition-colors duration-200"
-      >
+      <Button type="submit" size="lg" disabled={loading || props.disabled} className="w-full cursor-pointer">
         {loading && <Loader2 className="size-4 animate-spin" />}
-        登录 / 注册
+        绑定手机号并登录
       </Button>
-      <p className="text-xs text-muted-foreground">
-        未注册的手机号验证通过后将自动创建账号。
-      </p>
     </form>
   )
 }
