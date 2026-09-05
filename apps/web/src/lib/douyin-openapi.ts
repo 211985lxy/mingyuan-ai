@@ -107,6 +107,17 @@ function ensureConfig() {
   return { clientKey, clientSecret, redirectUri, scope }
 }
 
+function ensureLoginConfig() {
+  const clientKey = env.DOUYIN_CLIENT_KEY?.trim()
+  const redirectUri = env.DOUYIN_LOGIN_REDIRECT_URI?.trim()
+  if (!clientKey || !redirectUri) {
+    throw new Error(
+      "抖音扫码登录环境变量未配置，请检查 DOUYIN_CLIENT_KEY / DOUYIN_LOGIN_REDIRECT_URI。",
+    )
+  }
+  return { clientKey, redirectUri }
+}
+
 async function safeFetchJson<T>(url: string, init?: RequestInit, label?: string): Promise<T | null> {
   try {
     const resp = await fetch(url, {
@@ -148,6 +159,20 @@ export function buildDouyinAuthorizationUrl(state: string): string {
     state,
     response_type: "code",
     // 官方推荐 PC 端使用 qrcode 模式优先展示二维码
+    from: "openapi",
+  })
+  return `${DOUYIN_CONNECT_URL}?${params.toString()}`
+}
+
+/** 构造只申请 user_info 的抖音扫码登录地址；与数据同步授权完全分离。 */
+export function buildDouyinLoginAuthorizationUrl(state: string): string {
+  const { clientKey, redirectUri } = ensureLoginConfig()
+  const params = new URLSearchParams({
+    client_key: clientKey,
+    redirect_uri: redirectUri,
+    scope: "user_info",
+    state,
+    response_type: "code",
     from: "openapi",
   })
   return `${DOUYIN_CONNECT_URL}?${params.toString()}`
