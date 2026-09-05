@@ -160,7 +160,7 @@ describe("Assets E2E", () => {
         method: "POST",
         body: {
           name: "Bad Type",
-          assetType: "document",
+          assetType: "hologram",
           url: "https://example.com/doc.pdf",
         },
       }),
@@ -169,6 +169,23 @@ describe("Assets E2E", () => {
     expect(res.status).toBe(400);
     const body = await json(res);
     expect(body.error).toContain("assetType");
+  });
+
+  it("accepts document assetType (upload reservation flow)", async () => {
+    const res = await POST(
+      userReq("/api/assets", {
+        method: "POST",
+        body: {
+          name: "Doc Asset",
+          assetType: "document",
+          url: "https://example.com/doc.pdf",
+        },
+      }),
+      undefined as never,
+    );
+    expect(res.status).toBe(201);
+    const body = await json(res);
+    expect(body.data.assetType).toBe("document");
   });
 
   it("rejects POST with missing required fields", async () => {
