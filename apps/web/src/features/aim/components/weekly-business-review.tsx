@@ -4,10 +4,12 @@ function metric(value: number | null, suffix = ""): string {
   return value == null ? "待回填" : `${value}${suffix}`
 }
 
-export function WeeklyBusinessReview({ review, taskInsights = [], narrative }: {
+export function WeeklyBusinessReview({ review, taskInsights = [], narrative, monthlyReportHref }: {
   review: AimWeeklyBusinessReview
   taskInsights?: TaskAttributionInsight[]
   narrative?: AimWeeklyNarrative
+  /** WP-E 月报入口：新标签打开一页式「内容→线索→成交」月报 */
+  monthlyReportHref?: string
 }) {
   const backfill = review.day7Backfill.due === 0
     ? "尚未到期"
@@ -23,6 +25,13 @@ export function WeeklyBusinessReview({ review, taskInsights = [], narrative }: {
   ]
   return (
     <section aria-label="本周经营复盘" className="space-y-2">
+      {monthlyReportHref ? (
+        <p className="text-right text-xs">
+          <a href={monthlyReportHref} target="_blank" rel="noreferrer" className="text-primary underline-offset-2 hover:underline">
+            本月经营月报（内容→线索→成交）→
+          </a>
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 sm:grid-cols-4">
         {items.map(([label, value]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{value}</p></div>)}
       </div>

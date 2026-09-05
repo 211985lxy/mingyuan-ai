@@ -3,7 +3,6 @@ import { buildLarkOutcomeExportFields } from "./outcome-export"
 import {
   fireEmbedding,
   runLarkBaseCommand,
-  setEmbeddingHook,
   type DbLike,
   type EnvLike,
   type LarkConfig,

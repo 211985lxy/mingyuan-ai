@@ -9,6 +9,7 @@
 - 月报 v1 已交付：`lib/aim/monthly-report.ts`（聚合：最成熟快照 30&gt;14&gt;7、空值≠0、dataNotes 数据缺口）+ `lib/aim/monthly-report-html.ts`（一页式）+ `api/aim/reports/monthly/route.ts`（`?month=YYYY-MM&projectId=&format=json|html`）。测试 `aim-monthly-report.test.ts` 10 例。
 - 基准表 v0 已交付：`lib/aim/benchmark-table.ts`（客户×内容任务聚合；单客户发布 &lt;3 不进表；活跃客户 &lt;5 强制「仅内部参考，禁止对外」；dealCount 空值≠0）+ `api/admin/benchmark-table/route.ts`（`withAdminOrEditor`，`?days=` 默认 90）。测试 `aim-benchmark-table.test.ts` 4 例。
 - 门闩：typecheck ✅（本工作包文件）· 单测 3115 全过 ✅ · arch:size 基线内 ✅。
+- 收尾批次（同日）：周报面板新增「本月经营月报」入口（`weekly-business-review.tsx` 直链 `/api/aim/reports/monthly?projectId=`，新标签打开，当前月缺省）；benchmark-table lint 修复（空接口→类型别名、未用变量）；新增 `aim-weekly-review-entry.test.ts` 4 例。
 
 
 

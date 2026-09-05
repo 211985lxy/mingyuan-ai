@@ -27,7 +27,12 @@ export function ProjectWeeklyBusinessReview({ projectId }: { projectId: string }
   if (!review) return null
   return (
     <div className="border-b px-3 py-2 sm:px-5">
-      <WeeklyBusinessReview review={review} taskInsights={taskInsights} narrative={narrative} />
+      <WeeklyBusinessReview
+        review={review}
+        taskInsights={taskInsights}
+        narrative={narrative}
+        monthlyReportHref={`/api/aim/reports/monthly?projectId=${encodeURIComponent(projectId)}`}
+      />
       <CreatorPlatformMetrics metrics={platformMetrics} />
     </div>
   )

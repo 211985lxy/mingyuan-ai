@@ -20,7 +20,7 @@ export interface BenchmarkGenerationRow {
   taskSpec: unknown
 }
 
-export interface BenchmarkOutcomeRow extends MonthlyReportOutcomeRow {}
+export type BenchmarkOutcomeRow = MonthlyReportOutcomeRow
 
 export interface BenchmarkAttributionRow {
   generationId: string
@@ -93,7 +93,7 @@ function aggregateCustomerTasks(input: {
   }
 
   const grouped = new Map<string, BenchmarkGroupTotal>()
-  for (const [userId, rows] of byCustomer) {
+  for (const rows of byCustomer.values()) {
     if (rows.length < MIN_PUBLISHED_PER_CUSTOMER) continue
     const taskBuckets = new Map<string, Omit<BenchmarkGroupTotal, "customerCount">>()
     for (const generation of rows) {
