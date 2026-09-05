@@ -2,16 +2,20 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { parseDocument, isSupportedFile, DocumentParseError } from "@/lib/document-parser"
 import { extractSniffedText, AttachmentTextError } from "@/lib/aim/attachment-text"
+import { isLikelyScannedPdf, ocrPdfPagesWithVision, renderPdfPagesToImages } from "@/lib/aim/scanned-pdf-ocr"
 import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 
 export const dynamic = "force-dynamic"
+// 扫描件视觉转写含页面渲染与多模态调用，对齐 process-video 时长。
+export const maxDuration = 120
 
 const MAX_TEXT_LENGTH = 200_000
 
 /**
  * @description 聊天文件附件解析：pdf/docx/xlsx 等走 parseDocument，
- *  未知扩展名（.tst/.log 等）按纯文本探测；只返回文本，不落库不占 OSS。
+ *  未知扩展名（.tst/.log 等）按纯文本探测；PDF 文字层过少判定为扫描件，
+ *  自动把前几页渲染成图片交给视觉模型转写（零新依赖）；只返回文本，不落库不占 OSS。
  */
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +39,13 @@ export async function POST(request: NextRequest) {
       if (isSupportedFile(file.name)) {
         const chunks = await parseDocument(buffer, file.name)
         text = chunks.join("\n\n")
+        if (isLikelyScannedPdf({ fileName: file.name, textLength: text.trim().length })) {
+          const pages = await renderPdfPagesToImages(buffer)
+          if (pages.length > 0) {
+            const ocr = await ocrPdfPagesWithVision({ pageImages: pages, fileName: file.name })
+            if (ocr.text.trim()) text = ocr.text
+          }
+        }
       } else {
         text = extractSniffedText(buffer, file.name)
       }
