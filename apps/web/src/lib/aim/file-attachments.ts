@@ -22,6 +22,25 @@ export function splitPastedFiles(files: FileList | File[]): { images: File[]; do
   return { images, documents }
 }
 
+/**
+ * 从 paste 事件取文件：优先 files（访达复制文件）；
+ * 为空时回退读取 items 里的图片（截图后直接 Cmd+V，浏览器以 image/png 位图形式提供）。
+ */
+export function collectPasteFiles(
+  dataTransfer: Pick<DataTransfer, "files" | "items"> | null | undefined,
+): File[] {
+  const direct = Array.from(dataTransfer?.files ?? [])
+  if (direct.length > 0) return direct
+  const items = Array.from(dataTransfer?.items ?? [])
+  const files: File[] = []
+  for (const item of items) {
+    if (item.kind !== "file") continue
+    const file = item.getAsFile()
+    if (file) files.push(file)
+  }
+  return files
+}
+
 function clampFileText(text: string, maxChars: number): string {
   const trimmed = text.trim()
   if (trimmed.length <= maxChars) return trimmed

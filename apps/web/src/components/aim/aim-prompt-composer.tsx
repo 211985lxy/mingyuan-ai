@@ -24,7 +24,7 @@ import {
   type PastedCopyAttachment,
   type PasteUsage,
 } from "@/lib/aim/paste-copy-attachment"
-import { splitPastedFiles } from "@/lib/aim/file-attachments"
+import { collectPasteFiles, splitPastedFiles } from "@/lib/aim/file-attachments"
 import type { AimFileAttachment } from "@/lib/aim/workbench-types"
 import { useAimPasteCopyAttachment } from "@/features/aim/hooks/use-aim-paste-copy-attachment"
 
@@ -333,7 +333,8 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
     if (documents.length) onAddFiles?.(documents)
   }, [onAddImages, onAddFiles])
   const handlePaste = useCallback((event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const clipboardFiles = Array.from(event.clipboardData?.files ?? [])
+    // files 为空时补读 items 里的图片：覆盖「截图后直接粘贴」的场景
+    const clipboardFiles = collectPasteFiles(event.clipboardData)
     if (clipboardFiles.length > 0 && (onAddImages || onAddFiles)) {
       event.preventDefault()
       routeClipboardFiles(clipboardFiles)

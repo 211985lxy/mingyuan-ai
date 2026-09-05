@@ -82,6 +82,27 @@ describe("AimPromptComposer 粘贴文件分流", () => {
     expect(onAddImages).not.toHaveBeenCalled()
   })
 
+  it("截图位图粘贴（files 空、items 有 image/png）→ 调 onAddImages 且阻止默认", () => {
+    const onAddFiles = vi.fn()
+    const onAddImages = vi.fn()
+    render(<AimPromptComposer {...baseProps({ onAddFiles, onAddImages })} />)
+    const textarea = screen.getByPlaceholderText("说说你的需求")
+
+    const png = new File(["bitmap"], "screenshot.png", { type: "image/png" })
+    const dt = {
+      files: [],
+      items: [{ kind: "file", type: "image/png", getAsFile: () => png }],
+    } as unknown as DataTransfer
+    const event = new Event("paste", { bubbles: true, cancelable: true })
+    Object.defineProperty(event, "clipboardData", { value: dt })
+    fireEvent(textarea, event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(onAddImages).toHaveBeenCalledTimes(1)
+    expect(onAddImages.mock.calls[0][0][0].name).toBe("screenshot.png")
+    expect(onAddFiles).not.toHaveBeenCalled()
+  })
+
   it("拖放文件到输入框 → 调 onAddFiles", () => {
     const onAddFiles = vi.fn()
     render(<AimPromptComposer {...baseProps({ onAddFiles })} />)

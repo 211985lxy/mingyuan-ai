@@ -4,6 +4,7 @@ import {
   AIM_FILE_ATTACHMENTS_TOTAL_MAX_CHARS,
   AIM_FILE_ATTACHMENT_MAX_CHARS,
   appendAimFileAttachmentsToContent,
+  collectPasteFiles,
   formatAimFileSize,
   splitPastedFiles,
 } from "@/lib/aim/file-attachments"
@@ -22,6 +23,33 @@ describe("splitPastedFiles", () => {
     const result = splitPastedFiles([image, document])
     expect(result.images.map((file) => file.name)).toEqual(["a.png"])
     expect(result.documents.map((file) => file.name)).toEqual(["data.tst"])
+  })
+})
+
+describe("collectPasteFiles", () => {
+  it("prefers clipboardData.files when present", () => {
+    const file = new File(["x"], "a.tst", { type: "" })
+    const result = collectPasteFiles({ files: [file] as unknown as FileList, items: [] as unknown as DataTransferItemList })
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe("a.tst")
+  })
+
+  it("falls back to image items for screenshot pastes (files empty)", () => {
+    const png = new File(["bitmap"], "screenshot.png", { type: "image/png" })
+    const result = collectPasteFiles({
+      files: [] as unknown as FileList,
+      items: [
+        { kind: "string", type: "text/plain" },
+        { kind: "file", type: "image/png", getAsFile: () => png },
+      ] as unknown as DataTransferItemList,
+    })
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe("image/png")
+  })
+
+  it("returns empty when neither files nor image items exist", () => {
+    expect(collectPasteFiles(null)).toEqual([])
+    expect(collectPasteFiles(undefined)).toEqual([])
   })
 })
 
