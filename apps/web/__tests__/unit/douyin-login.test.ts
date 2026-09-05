@@ -159,6 +159,42 @@ describe("Douyin login challenge", () => {
     expect(response.headers.get("set-cookie")).toContain("douyin_login_state=")
   })
 
+  it("returns Douyin login errors to the forwarded public origin", async () => {
+    buildLoginUrl.mockImplementationOnce(() => {
+      throw new Error("抖音扫码登录环境变量未配置")
+    })
+
+    const response = await startDouyinLogin(
+      new NextRequest("http://127.0.0.1:3000/api/auth/douyin/start", {
+        headers: {
+          host: "mingyuan-ai.cn",
+          "x-forwarded-host": "mingyuan-ai.cn",
+          "x-forwarded-proto": "https",
+        },
+      }),
+    )
+
+    expect(response.headers.get("location")).toMatch(
+      /^https:\/\/mingyuan-ai\.cn\/login\?douyin_error=/,
+    )
+  })
+
+  it("returns invalid Douyin callbacks to the forwarded public origin", async () => {
+    const response = await douyinCallback(
+      new NextRequest("http://127.0.0.1:3000/api/auth/douyin/callback", {
+        headers: {
+          host: "mingyuan-ai.cn",
+          "x-forwarded-host": "mingyuan-ai.cn",
+          "x-forwarded-proto": "https",
+        },
+      }),
+    )
+
+    expect(response.headers.get("location")).toMatch(
+      /^https:\/\/mingyuan-ai\.cn\/login\?douyin_error=/,
+    )
+  })
+
   it("logs in an existing Douyin identity without asking for a phone", async () => {
     prismaMocks.identityFindUnique.mockResolvedValue({ userId: "u1", openId: "open-1" })
 

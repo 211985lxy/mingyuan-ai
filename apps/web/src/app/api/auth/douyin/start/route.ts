@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { buildDouyinLoginAuthorizationUrl } from "@/lib/douyin-openapi"
 import { env } from "@/env"
+import { getRequestOrigin } from "@/lib/auth-session"
 
 export const runtime = "nodejs"
 
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     return response
   } catch (error) {
     const message = error instanceof Error ? error.message : "抖音扫码登录暂不可用"
-    const login = new URL("/login", request.url)
+    const login = new URL("/login", getRequestOrigin(request))
     login.searchParams.set("douyin_error", message)
     return NextResponse.redirect(login, { status: 302 })
   }

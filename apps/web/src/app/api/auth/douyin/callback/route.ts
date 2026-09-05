@@ -6,7 +6,7 @@ import {
   type DouyinToken,
 } from "@/lib/douyin-openapi"
 import { env } from "@/env"
-import { setSessionCookie } from "@/lib/auth-session"
+import { getRequestOrigin, setSessionCookie } from "@/lib/auth-session"
 import { signUserToken } from "@/lib/user-auth"
 import { getSubscriptionStatus } from "@/lib/subscription"
 import { prisma } from "@/lib/prisma"
@@ -18,7 +18,8 @@ const CHALLENGE_COOKIE = "douyin_login_challenge"
 const COOKIE_MAX_AGE = 10 * 60
 
 export async function GET(request: NextRequest) {
-  const login = new URL("/login", request.url)
+  const requestOrigin = getRequestOrigin(request)
+  const login = new URL("/login", requestOrigin)
   const params = request.nextUrl.searchParams
   const code = params.get("code")
   const state = params.get("state")
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
 
       const destination = new URL(
         getSubscriptionStatus(user.expiresAt) === "active" ? "/lite" : "/activate",
-        request.url,
+        requestOrigin,
       )
       const response = NextResponse.redirect(destination, { status: 302 })
       setSessionCookie(response, "user", signUserToken({ id: user.id, email: user.email }))
