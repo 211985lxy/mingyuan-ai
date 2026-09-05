@@ -6,7 +6,7 @@ import { ExternalLink, ListChecks, Loader2, Mic, Paperclip, Plus, Send, Sparkles
 import { Button } from "@/components/ui/button"
 import type { AimComposerMode } from "@/components/aim/aim-prompt-shared"
 import { type AimAgentCapabilities } from "@/lib/aim/agent-capabilities"
-import { splitPastedFiles } from "@/lib/aim/file-attachments"
+import { AIM_ATTACHMENT_ACCEPT, splitPastedFiles } from "@/lib/aim/file-attachments"
 import { cn } from "@/lib/utils"
 
 /** 底部操作条（+按钮 / 我的风格 / 状态 pill / 语音 / 停止 / 发送）。
@@ -378,6 +378,7 @@ function AttachFileButton(props: {
       <input
         ref={fileInputRef}
         type="file"
+        accept={AIM_ATTACHMENT_ACCEPT}
         multiple
         className="hidden"
         onChange={(event) => {
@@ -401,7 +402,7 @@ function AttachFileButton(props: {
         className="h-8.5 w-8.5 rounded-xl p-0 text-muted-foreground transition-all hover:bg-muted/70 hover:text-foreground"
         onClick={() => fileInputRef.current?.click()}
         disabled={busy}
-        title="添加文件（TXT/MD/PDF/Word/Excel/TST 等，内容会被智能体读取）"
+        title="添加文件：图片（PNG/JPG…）直接看图；文档文本（PDF/Word/Excel/PPT/TXT/MD/CSV…及任意文本类）自动读取内容"
       >
         <Paperclip className="h-[17px] w-[17px]" strokeWidth={2.1} />
       </Button>

@@ -9,6 +9,21 @@ export const AIM_FILE_ATTACHMENTS_TOTAL_MAX_CHARS = 60_000
 /** 输入框一次最多挂载的文件附件数（与图片上限 4 同量级）。 */
 export const AIM_FILE_ATTACHMENT_MAX_COUNT = 3
 
+/**
+ * 附件格式统一分类：
+ *  - 图片（image/*）→ 图片通道：原图上传，模型直接看图
+ *  - 文档/文本（下方扩展名）→ 文件通道：服务端解析成文字并入上下文
+ *  - 未知扩展名的文本类（.tst/.log 等）→ 文本嗅探兜底，能读就收
+ *  - 音频/视频/压缩包/可执行 → 暂不支持（各有专门通道或为二进制）
+ * 文件选择器的 accept 用此常量，保证所有入口支持面一致。
+ */
+export const AIM_ATTACHMENT_ACCEPT = [
+  ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif",
+  ".pdf", ".docx", ".txt", ".md", ".markdown", ".csv",
+  ".xls", ".xlsx", ".pptx", ".html", ".htm", ".rtf", ".json", ".xml",
+  "image/*",
+].join(",")
+
 const TRUNCATION_NOTE = "\n…（文件过长，已截断）…\n"
 
 /** 粘贴/拖入的文件按现有通道分流：图片走图片上传，其余走文本解析。 */
