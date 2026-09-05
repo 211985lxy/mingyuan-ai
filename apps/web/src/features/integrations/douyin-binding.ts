@@ -19,6 +19,44 @@ export type DouyinBindingView = {
   createdAt: string
 }
 
+export class DouyinIdentityConflictError extends Error {
+  readonly code = "DOUYIN_IDENTITY_CONFLICT"
+
+  constructor() {
+    super("这个抖音账号已经绑定其他 AIM 账号")
+    this.name = "DouyinIdentityConflictError"
+  }
+}
+
+/** 确保一个抖音 openid 只归属一个 AIM 用户；同一用户重复绑定保持幂等。 */
+export async function claimDouyinLoginIdentity(userId: string, token: DouyinToken): Promise<void> {
+  const existing = await prisma.douyinLoginIdentity.findUnique({
+    where: { openId: token.openId },
+  })
+  if (existing) {
+    if (existing.userId !== userId) throw new DouyinIdentityConflictError()
+    return
+  }
+
+  // 兼容该身份表上线前已经存在的数据绑定记录。
+  const legacyRows = await prisma.douyinAccountBinding.findMany({
+    where: { openId: token.openId },
+    select: { userId: true },
+  }) ?? []
+  const legacyOwners = new Set(legacyRows.map((row) => row.userId))
+  if (legacyOwners.size > 0 && (legacyOwners.size > 1 || !legacyOwners.has(userId))) {
+    throw new DouyinIdentityConflictError()
+  }
+
+  await prisma.douyinLoginIdentity.create({
+    data: {
+      userId,
+      openId: token.openId,
+      unionId: token.unionId ?? null,
+    },
+  })
+}
+
 function toView(row: {
   id: string
   openId: string

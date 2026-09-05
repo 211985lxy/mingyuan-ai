@@ -7,6 +7,8 @@ const prismaMocks = vi.hoisted(() => ({
   bindingFindFirst: vi.fn(),
   bindingDelete: vi.fn(),
   bindingUpdate: vi.fn(),
+  identityFindUnique: vi.fn(),
+  identityCreate: vi.fn(),
 }))
 
 const fetchUserProfile = vi.hoisted(() => vi.fn())
@@ -20,6 +22,10 @@ vi.mock("@/lib/prisma", () => ({
       findFirst: prismaMocks.bindingFindFirst,
       delete: prismaMocks.bindingDelete,
       update: prismaMocks.bindingUpdate,
+    },
+    douyinLoginIdentity: {
+      findUnique: prismaMocks.identityFindUnique,
+      create: prismaMocks.identityCreate,
     },
   },
 }))
@@ -37,7 +43,11 @@ vi.mock("@/lib/user-auth", () => ({
 
 import { GET as listAccounts } from "@/app/api/integrations/douyin/accounts/route"
 import { POST as refreshAccount, DELETE as unbindAccount } from "@/app/api/integrations/douyin/accounts/[id]/route"
-import { upsertDouyinBinding, listDouyinBindings } from "@/features/integrations/douyin-binding"
+import {
+  claimDouyinLoginIdentity,
+  upsertDouyinBinding,
+  listDouyinBindings,
+} from "@/features/integrations/douyin-binding"
 
 const PROFILE = {
   openId: "open-1",
@@ -91,6 +101,33 @@ beforeEach(() => {
 })
 
 describe("douyin binding service", () => {
+  it("claims a new Douyin openid for the current AIM user", async () => {
+    prismaMocks.identityFindUnique.mockResolvedValue(null)
+    prismaMocks.identityCreate.mockResolvedValue({})
+
+    await claimDouyinLoginIdentity("u1", TOKEN)
+
+    expect(prismaMocks.identityCreate).toHaveBeenCalledWith({
+      data: { userId: "u1", openId: "open-1", unionId: null },
+    })
+  })
+
+  it("allows the existing owner to claim the same openid again", async () => {
+    prismaMocks.identityFindUnique.mockResolvedValue({ userId: "u1", openId: "open-1" })
+
+    await claimDouyinLoginIdentity("u1", TOKEN)
+
+    expect(prismaMocks.identityCreate).not.toHaveBeenCalled()
+  })
+
+  it("rejects a different user from claiming an owned openid", async () => {
+    prismaMocks.identityFindUnique.mockResolvedValue({ userId: "other-user", openId: "open-1" })
+
+    await expect(claimDouyinLoginIdentity("u1", TOKEN)).rejects.toMatchObject({
+      code: "DOUYIN_IDENTITY_CONFLICT",
+    })
+  })
+
   it("upserts a binding with token and profile snapshot", async () => {
     prismaMocks.bindingUpsert.mockResolvedValue({})
     await upsertDouyinBinding({ userId: "u1", token: TOKEN, profile: PROFILE as never })

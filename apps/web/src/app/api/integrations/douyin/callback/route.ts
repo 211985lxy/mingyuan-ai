@@ -10,7 +10,10 @@ import {
   type DouyinToken,
 } from "@/lib/douyin-openapi"
 import { env } from "@/env"
-import { upsertDouyinBinding } from "@/features/integrations/douyin-binding"
+import {
+  claimDouyinLoginIdentity,
+  upsertDouyinBinding,
+} from "@/features/integrations/douyin-binding"
 
 export const runtime = "nodejs"
 
@@ -74,6 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     /* 4.5 绑定关系落库（AIM 侧持久化，供后续免扫码读取/刷新） */
+    await claimDouyinLoginIdentity(auth.id, token)
     await upsertDouyinBinding({ userId: auth.id, token, profile })
 
     /* 5. 写入飞书 Base（账号表 + 视频数据表） */
