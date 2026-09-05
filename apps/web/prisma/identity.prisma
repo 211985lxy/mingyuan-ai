@@ -12,6 +12,7 @@ model User {
   updatedAt DateTime  @updatedAt
 
   ipProfile             IpProfile?
+  douyinBindings        DouyinAccountBinding[]
   contentGenerationRuns ContentGenerationRun[]
   assets                Asset[]
   assetUploadReservations AssetUploadReservation[]
@@ -109,6 +110,34 @@ model SystemSetting {
   updatedBy   String?
   updatedAt   DateTime  @updatedAt
   createdAt   DateTime  @default(now())
+}
+
+// 抖音开放平台扫码授权绑定：一个 AIM 用户可绑多个抖音号；同一抖音号也可被多个用户绑定
+// token 为敏感凭证：仅存数据库，禁止写日志 / API 返回
+model DouyinAccountBinding {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  openId  String   @db.VarChar(128)
+  unionId String?  @db.VarChar(128)
+  scope   String   @db.VarChar(500)
+
+  // OAuth 凭证（用于后续免扫码刷新资料）
+  accessToken    String    @db.VarChar(512)
+  refreshToken   String    @db.VarChar(512)
+  accessExpiresAt DateTime
+
+  // 资料快照（最近一次成功拉取）
+  profileSnapshot Json?
+  lastSyncedAt    DateTime?
+  syncStatus      String    @default("ok") @db.VarChar(20) // ok | expired | failed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, openId])
+  @@index([openId])
 }
 
 // 手机号短信验证码：只存哈希，5 分钟有效，失败 5 次作废，一次性消费

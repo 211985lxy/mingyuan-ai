@@ -10,6 +10,7 @@ import {
   type DouyinToken,
 } from "@/lib/douyin-openapi"
 import { env } from "@/env"
+import { upsertDouyinBinding } from "@/features/integrations/douyin-binding"
 
 export const runtime = "nodejs"
 
@@ -19,8 +20,9 @@ export const runtime = "nodejs"
  *         → 写入飞书 Base → 302 回 Dashboard（带上结果状态）
  */
 export async function GET(request: NextRequest) {
+  let auth: { id: string; email: string }
   try {
-    await authenticateRequest(request)
+    auth = await authenticateRequest(request)
   } catch (err) {
     return authErrorResponse(err)
   }
@@ -71,30 +73,43 @@ export async function GET(request: NextRequest) {
       throw new Error("抖音用户信息读取失败，可能是 user_info scope 未审核通过。")
     }
 
+    /* 4.5 绑定关系落库（AIM 侧持久化，供后续免扫码读取/刷新） */
+    await upsertDouyinBinding({ userId: auth.id, token, profile })
+
     /* 5. 写入飞书 Base（账号表 + 视频数据表） */
     let syncResult: { accounts: number; videos: number; fansWritten: boolean } | null = null
     if (env.LARK_PLATFORM_DATA_BASE_TOKEN) {
       syncResult = await syncDouyinDataToLarkBase({ profile, videos, token })
     }
 
-    /* 6. 回跳 Dashboard + 成功状态参数 */
-    homeRedirect.searchParams.set("douyin_ok", "1")
-    homeRedirect.searchParams.set("nickname", encodeURIComponent(profile.nickname))
-    homeRedirect.searchParams.set("fans", String(profile.followers ?? 0))
-    homeRedirect.searchParams.set("videos_count", String(videos.length))
-    if (syncResult) {
-      homeRedirect.searchParams.set("lark_accounts", String(syncResult.accounts))
-      homeRedirect.searchParams.set("lark_videos", String(syncResult.videos))
-    }
-    const resp = NextResponse.redirect(homeRedirect, { status: 302 })
-    resp.cookies.delete("douyin_oauth_state")
-    return resp
+    applySuccessParams(homeRedirect, profile, videos.length, syncResult)
+    return redirectWithStateCookieCleared(homeRedirect)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error("[douyin-callback] 失败:", message)
     homeRedirect.searchParams.set("douyin_error", encodeURIComponent(message))
-    const resp = NextResponse.redirect(homeRedirect, { status: 302 })
-    resp.cookies.delete("douyin_oauth_state")
-    return resp
+    return redirectWithStateCookieCleared(homeRedirect)
   }
+}
+
+function applySuccessParams(
+  homeRedirect: URL,
+  profile: { nickname: string; followers?: number | null },
+  videoCount: number,
+  syncResult: { accounts: number; videos: number } | null,
+) {
+  homeRedirect.searchParams.set("douyin_ok", "1")
+  homeRedirect.searchParams.set("nickname", encodeURIComponent(profile.nickname))
+  homeRedirect.searchParams.set("fans", String(profile.followers ?? 0))
+  homeRedirect.searchParams.set("videos_count", String(videoCount))
+  if (syncResult) {
+    homeRedirect.searchParams.set("lark_accounts", String(syncResult.accounts))
+    homeRedirect.searchParams.set("lark_videos", String(syncResult.videos))
+  }
+}
+
+function redirectWithStateCookieCleared(target: URL) {
+  const resp = NextResponse.redirect(target, { status: 302 })
+  resp.cookies.delete("douyin_oauth_state")
+  return resp
 }

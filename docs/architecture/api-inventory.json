@@ -2637,6 +2637,33 @@
       "idempotency": true
     },
     {
+      "route": "/api/integrations/douyin/accounts/[id]",
+      "file": "src/app/api/integrations/douyin/accounts/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/integrations/douyin/accounts",
+      "file": "src/app/api/integrations/douyin/accounts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/integrations/douyin/auth",
       "file": "src/app/api/integrations/douyin/auth/route.ts",
       "methods": [
@@ -2660,7 +2687,7 @@
       "query": "manual",
       "externalService": true,
       "cost": "low",
-      "idempotency": false
+      "idempotency": true
     },
     {
       "route": "/api/integrations/douyin/events",
