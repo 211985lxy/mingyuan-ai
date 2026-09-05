@@ -13,6 +13,11 @@
       "path": "src/lib/aim-generation-prompts.ts",
       "maxLines": 520,
       "target": "src/lib/aim/（拆分 producer 提示词构建与生成循环闸门）"
+    },
+    {
+      "path": "src/env.ts",
+      "maxLines": 520,
+      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）"
     }
   ]
 }

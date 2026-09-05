@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { validateCronSecret } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
+import { purgeExpiredCodes } from "@/features/auth/sms-verification"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -28,13 +29,14 @@ export async function GET(request: NextRequest) {
       where: { expiresAt: { lt: now } },
     })
 
-    const [hotItems, snapshots] = await Promise.all([
+    const [hotItems, snapshots, expiredSmsCodes] = await Promise.all([
       prisma.douyinHotItem.deleteMany({
         where: { fetchedAt: { lt: thirtyDaysAgo } },
       }),
       prisma.douyinHotSnapshot.deleteMany({
         where: { fetchedAt: { lt: ninetyDaysAgo } },
       }),
+      purgeExpiredCodes(),
     ])
 
     return NextResponse.json({
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
         hotItems: hotItems.count,
         snapshots: snapshots.count,
         aimSnapshots: aimSnapshots?.count ?? 0,
+        expiredSmsCodes,
       },
     })
   } catch (error) {

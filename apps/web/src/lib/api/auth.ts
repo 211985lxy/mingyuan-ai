@@ -32,6 +32,33 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 }
 
 /**
+ * @description 发送手机登录验证码
+ * @param phone - 手机号
+ * @returns 发送结果（含重试间隔）
+ */
+export async function sendSmsLoginCode(phone: string): Promise<{ sent: boolean; retryAfterSeconds: number }> {
+  return request<{ sent: boolean; retryAfterSeconds: number }>("/api/auth/sms/send", {
+    auth: false,
+    method: "POST",
+    body: JSON.stringify({ phone }),
+  })
+}
+
+/**
+ * @description 手机号验证码登录
+ * @param phone - 手机号
+ * @param code - 6 位验证码
+ * @returns 认证响应
+ */
+export async function loginUserBySms(phone: string, code: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/api/auth/sms/login", {
+    auth: false,
+    method: "POST",
+    body: JSON.stringify({ phone, code }),
+  })
+}
+
+/**
  * @description 开发环境快捷登录
  * @returns 认证响应
  */

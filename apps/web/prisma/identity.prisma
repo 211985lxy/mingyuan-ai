@@ -2,7 +2,8 @@
 
 model User {
   id        String    @id @default(cuid())
-  email     String    @unique
+  email     String    @unique // 手机号注册用户为 `${phone}@phone.local` 占位
+  phone     String?   @unique // 手机号验证码登录通道；存量邮箱用户为空
   password  String
   name      String
   plan      String    @default("free") // free | basic | pro
@@ -99,13 +100,29 @@ model ActivationCode {
 }
 
 model SystemSetting {
-  id          String   @id @default(cuid())
-  key         String   @unique
-  value       String   @db.Text
-  type        String   @default("string") // string | number | boolean | json
-  category    String   @default("general")
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String    @db.Text
+  type        String    @default("string") // string | number | boolean | json
+  category    String    @default("general")
   description String?
   updatedBy   String?
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+}
+
+// 手机号短信验证码：只存哈希，5 分钟有效，失败 5 次作废，一次性消费
+model SmsVerificationCode {
+  id         String    @id @default(cuid())
+  phone      String    @db.VarChar(20)
+  codeHash   String    @db.VarChar(191)
+  purpose    String    @default("login") // login
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  ip         String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@index([expiresAt])
 }

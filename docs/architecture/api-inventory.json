@@ -1443,6 +1443,19 @@
       "idempotency": false
     },
     {
+      "route": "/api/aim/lead-attributions",
+      "file": "src/app/api/aim/lead-attributions/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/aim/meeting-insights/[id]/asset-candidates",
       "file": "src/app/api/aim/meeting-insights/[id]/asset-candidates/route.ts",
       "methods": [
@@ -1825,6 +1838,32 @@
     {
       "route": "/api/auth/register",
       "file": "src/app/api/auth/register/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/sms/login",
+      "file": "src/app/api/auth/sms/login/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/auth/sms/send",
+      "file": "src/app/api/auth/sms/send/route.ts",
       "methods": [
         "POST"
       ],
