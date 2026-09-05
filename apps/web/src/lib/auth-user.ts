@@ -30,7 +30,10 @@ export function buildAuthUserPayload(user: AuthUserRecord): AuthUserPayload {
 
   return {
     id: user.id,
-    email: user.email,
+    // 手机号注册用户的占位邮箱不外露，展示为手机号
+    email: user.email.endsWith("@phone.local")
+      ? user.email.replace(/@phone\.local$/, "")
+      : user.email,
     name: user.name,
     plan: user.plan,
     createdAt: user.createdAt.toISOString(),

@@ -71,3 +71,23 @@ export async function allowAuthAttempt(
     return checkMemory(key, rule)
   }
 }
+
+/**
+ * @description 与 allowAuthAttempt 类似，但计数只绑定显式 key（不含 IP）。
+ * 用于短信验证码防轰炸：同一手机号在任何 IP 上的发送次数都要受限。
+ */
+export async function allowKeyedAttempt(
+  scope: string,
+  key: string,
+  rule: RateLimitRule,
+): Promise<boolean> {
+  const redisKey = `auth-rate:${scope}:${createHash("sha256").update(key).digest("hex")}`
+  if (!env.REDIS_URL) return checkMemory(redisKey, rule)
+
+  try {
+    const count = Number(await redis.eval(RATE_LIMIT_SCRIPT, 1, redisKey, String(rule.windowSeconds)))
+    return Number.isFinite(count) && count <= rule.limit
+  } catch {
+    return checkMemory(redisKey, rule)
+  }
+}
