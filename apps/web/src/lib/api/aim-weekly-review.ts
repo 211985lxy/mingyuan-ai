@@ -29,14 +29,32 @@ export interface TaskAttributionInsight {
 export interface AimWeeklyReviewPayload {
   review: AimWeeklyBusinessReview
   taskInsights: TaskAttributionInsight[]
+  narrative?: AimWeeklyNarrative
 }
 
+/** 四段式周报长文（服务端 env 灰度默认关；enabled=false 时无 markdown）。 */
+export type AimWeeklyNarrative =
+  | { enabled: false }
+  | {
+      enabled: true
+      /** llm=三段由模型补写；template=LLM 失败回退模板初稿；empty=无数据不出报告 */
+      source: "llm" | "template" | "empty"
+      markdown: string
+      generatedAt: string
+      fallbackReason?: string
+    }
+
 export async function fetchAimWeeklyReview(projectId?: string): Promise<AimWeeklyReviewPayload> {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams({ narrative: "1" })
   if (projectId) params.set("projectId", projectId)
   const response = await request<{
     review: AimWeeklyBusinessReview
     taskInsights?: TaskAttributionInsight[]
+    narrative?: AimWeeklyNarrative
   }>(`/api/aim/review/weekly?${params.toString()}`)
-  return { review: response.review, taskInsights: response.taskInsights ?? [] }
+  return {
+    review: response.review,
+    taskInsights: response.taskInsights ?? [],
+    narrative: response.narrative,
+  }
 }

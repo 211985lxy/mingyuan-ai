@@ -125,3 +125,22 @@ describe("GET /api/aim/review/weekly", () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe("GET /api/aim/review/weekly · narrative 灰度（WP-D 移交项）", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete process.env.AIM_WEEKLY_NARRATIVE_ENABLED
+  })
+
+  it("未开启 env 时 ?narrative=1 返回 enabled:false，不生成长文", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly?narrative=1"))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ narrative: { enabled: false } })
+  })
+
+  it("不带 narrative 参数时不返回 narrative 字段（默认关）", async () => {
+    const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly"))
+    const body = await res.json()
+    expect(body.narrative).toBeUndefined()
+  })
+})

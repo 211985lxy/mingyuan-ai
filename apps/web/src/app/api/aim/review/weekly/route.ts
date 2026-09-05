@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { env } from "@/env"
 import { computeWeeklyReview } from "@/lib/aim/weekly-review"
 import { computeTaskAttributionInsights, type AttributionInsightsStorePort } from "@/lib/aim/attribution-insights"
+import { generateWeeklyNarrative } from "@/lib/aim/weekly-review-narrative"
 import { fetchCreatorMetrics, type CreatorMetricsResponse } from "@/lib/aim/creator-metrics"
 import { prisma } from "@/lib/prisma"
 import type { WeeklyReviewStorePort } from "@/lib/aim/weekly-review"
@@ -72,7 +74,15 @@ export async function GET(request: NextRequest) {
         store: prisma as unknown as AttributionInsightsStorePort,
       }),
     ])
-    return NextResponse.json({ review, platformMetrics, taskInsights })
+    // 四段式周报长文：默认关（AIM_WEEKLY_NARRATIVE_ENABLED=true 且 ?narrative=1 才生成）
+    let narrative: Record<string, unknown> | undefined
+    if (params.get("narrative") === "1") {
+      const enabled = ["true", "1"].includes((env.AIM_WEEKLY_NARRATIVE_ENABLED ?? "").trim().toLowerCase())
+      narrative = enabled
+        ? { enabled: true, ...(await generateWeeklyNarrative({ review, taskInsights })) }
+        : { enabled: false }
+    }
+    return NextResponse.json({ review, platformMetrics, taskInsights, ...(narrative ? { narrative } : {}) })
   } catch (error) {
     const authResp = authErrorResponse(error)
     if (authResp) return authResp

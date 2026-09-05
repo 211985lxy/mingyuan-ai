@@ -1,8 +1,17 @@
 # 周报四段式长文生成实施计划（WP-D 移交项）
 
-> 状态：待立项（本批仅登记，不实施）· 日期：2026-09-05
+> 状态：已实现（2026-09-05，提前于原排期，含单测） · 日期：2026-09-05
 > 来源：《2026-09-04-retro-agent-attribution-wpd-plan.md》第三节："不做周报 LLM 四段式长文生成（原 P2 愿景）：本期只做数据进入 + 强制段落，长文另行立项。"
 > 对齐：岗位卡「数据复盘官」输出四段式——已确认的数据事实 / 基于数据的判断 / 暂时不能确定的原因 / 下一轮建议。
+
+## 交付记录（2026-09-05）
+
+- `lib/aim/weekly-review-narrative.ts`：事实段由纯函数从结构化真源逐条拼出（数字与 JSON 完全一致）；二/三/四段由 LLM 补写（`LLMClient.shared()`，可注入替身）；LLM 失败/截断/缺标题 → 回退模板初稿并如实标注 fallbackReason；全空数据周返回 empty（显式「不编造结论」），不调用 LLM。
+- 路由：`api/aim/review/weekly` 增 `?narrative=1`，env `AIM_WEEKLY_NARRATIVE_ENABLED` 灰度（默认关；直接读 process.env，与 lark 模块同做法，不动 env.ts）。
+- UI：`weekly-business-review.tsx` 增「四段式周报」折叠区（标注「自动初稿 · 对外使用前必须人工审核」）；`project-weekly-business-review.tsx` 透传。
+- 测试：`aim-weekly-review-narrative.test.ts` 9 例 + `weekly-review-route.test.ts` 增 2 例（灰度门控）。
+- 验收对照：①事实段数字一致 ✅ ②全空周不出假报告 ✅ ③样本不足建议含「继续积累数据」✅。
+- 已知边界：docx 导出复用未做（周报暂无导出入口，markdown 可直接复制；导出接入随客户月报 R3 一并评估）。
 
 ## 一、现状
 

@@ -30,7 +30,7 @@
 | R1（老板手动） | **WP-C P0 真实数据验证**：本人账号装「明动数据雷达」→ 真实同步一次 → 人工核对 5 张表 → AIM 冒烟；失败即止损 | `2026-09-03-creator-metrics-feishu-data-bus-plan.md` 第 8 节 | **等老板执行**（代码已就绪，零代码风险） |
 | R1（本批） | 复盘导入补强：Excel/CSV 上传 ✅、HTML 复盘报告 ✅、飞书写出复盘记录 ✅、**UI 入口 ✅**（复盘对话框「上传表格」+ 交付卡片「查看报告」） | `2026-09-05-retro-import-enhancement-plan.md` | **P1 全部交付**（2026-09-05，单测 34 例） |
 | R2 | WP-E 归因资产化：客户月报 v1 ✅（`api/aim/reports/monthly`）；**跨客户基准表 v0 ✅**（`api/admin/benchmark-table`） | `2026-09-05-attribution-asset-wpe-plan.md` | **本批全部交付**（月报 10 例 + 基准表 4 例） |
-| R2 末 | 周报四段式长文生成（WP-D 移交项） | `2026-09-05-weekly-review-narrative-plan.md` | 待立项（依赖 WP-E 真实数据样本） |
+| R2 | 周报四段式长文生成（WP-D 移交项）**✅ 已实现（提前）**：事实段纯函数拼装 + LLM 补写后三段 + 失败回退模板 + 空周不出假报告；env 灰度默认关 | `2026-09-05-weekly-review-narrative-plan.md` | **交付**（2026-09-05，11 例） |
 | 暂缓 | 截图识别回填（OCR） | retro-import-enhancement 第 4 节 | 待 P1 跑通后评估 |
 | R3 | WP-F 结果制商业试点（5 种子客户） | 根目录归因计划第五节 | 待 R1/R2 门槛达成 |
 

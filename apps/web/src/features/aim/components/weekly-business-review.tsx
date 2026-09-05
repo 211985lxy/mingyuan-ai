@@ -1,12 +1,13 @@
-import type { AimWeeklyBusinessReview, TaskAttributionInsight } from "@/lib/api/aim-weekly-review"
+import type { AimWeeklyBusinessReview, AimWeeklyNarrative, TaskAttributionInsight } from "@/lib/api/aim-weekly-review"
 
 function metric(value: number | null, suffix = ""): string {
   return value == null ? "待回填" : `${value}${suffix}`
 }
 
-export function WeeklyBusinessReview({ review, taskInsights = [] }: {
+export function WeeklyBusinessReview({ review, taskInsights = [], narrative }: {
   review: AimWeeklyBusinessReview
   taskInsights?: TaskAttributionInsight[]
+  narrative?: AimWeeklyNarrative
 }) {
   const backfill = review.day7Backfill.due === 0
     ? "尚未到期"
@@ -26,7 +27,29 @@ export function WeeklyBusinessReview({ review, taskInsights = [] }: {
         {items.map(([label, value]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{value}</p></div>)}
       </div>
       <TaskAttributionSection insights={taskInsights} />
+      <NarrativeSection narrative={narrative} />
     </section>
+  )
+}
+
+/** 四段式周报长文（WP-D 移交项）：自动初稿，对外使用前必须人审。 */
+function NarrativeSection({ narrative }: { narrative?: AimWeeklyNarrative }) {
+  if (!narrative || narrative.enabled === false) return null
+  const sourceLabel = narrative.source === "llm"
+    ? "AI 补写初稿"
+    : narrative.source === "template"
+      ? "模板初稿（AI 生成失败，原因如实标注）"
+      : "无数据周"
+  return (
+    <details className="rounded-lg border p-3" aria-label="四段式周报">
+      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+        四段式周报（{sourceLabel} · 对外使用前必须人工审核）
+      </summary>
+      <pre className="mt-2 whitespace-pre-wrap break-words border-t border-border/60 pt-2 font-sans text-sm leading-6">{narrative.markdown}</pre>
+      {narrative.fallbackReason ? (
+        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">AI 补写失败原因：{narrative.fallbackReason}（已回退模板，未编造内容）</p>
+      ) : null}
+    </details>
   )
 }
 
