@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
-import { ArrowUp, Paperclip, RotateCcw, Square } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { ArrowUp, Paperclip, Plus, RotateCcw, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,6 +17,66 @@ const EXAMPLE_PROMPTS = [
   "把这段话改成小红书风格的种草文案",
   "帮我梳理本周内容选题，给出 5 个方向",
 ]
+
+/** 左下角「+」弹出菜单：添加文件（图片/文档/音频）；拖入输入框等效。 */
+function LiteAddMenu(props: { busy: boolean; onPickFiles: () => void }) {
+  const { busy, onPickFiles } = props
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onPointerDown(event: PointerEvent) {
+      if (rootRef.current?.contains(event.target as Node)) return
+      setOpen(false)
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("pointerdown", onPointerDown)
+    document.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown)
+      document.removeEventListener("keydown", onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="添加"
+        aria-expanded={open}
+        disabled={busy}
+        className="size-9 shrink-0 cursor-pointer rounded-xl text-muted-foreground"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Plus className="size-4" />
+      </Button>
+      {open ? (
+        <div className="absolute bottom-[calc(100%+0.5rem)] left-0 z-30 w-60 overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-md">
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/70"
+            onClick={() => {
+              setOpen(false)
+              onPickFiles()
+            }}
+          >
+            <Paperclip className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="flex flex-col">
+              <span>添加文件</span>
+              <span className="text-[11px] text-muted-foreground">
+                图片 / 文档 / 音频，也可直接拖入输入框
+              </span>
+            </span>
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 export default function LiteChatPage() {
   const { messages, busy, send, stop, reset } = useLiteChat()
@@ -131,16 +191,7 @@ export default function LiteChatPage() {
                 event.target.value = ""
               }}
             />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 shrink-0 cursor-pointer rounded-xl text-muted-foreground"
-              aria-label="添加文件"
-              disabled={busy}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip className="size-4" />
-            </Button>
+            <LiteAddMenu busy={busy} onPickFiles={() => fileInputRef.current?.click()} />
             <Textarea
               ref={textareaRef}
               value={input}
