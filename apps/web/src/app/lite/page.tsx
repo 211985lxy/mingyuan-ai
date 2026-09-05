@@ -1,11 +1,10 @@
 "use client"
 
 import { useCallback, useRef, useState } from "react"
-import { ArrowUp, Paperclip, Plus, Square } from "lucide-react"
+import { ArrowUp, Paperclip, RotateCcw, Square } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { LiteMessageList } from "@/features/lite/components/lite-message-list"
 import { useLiteChat } from "@/features/lite/use-lite-chat"
 import { useAimImageAttachments } from "@/hooks/use-aim-image-attachments"
@@ -121,29 +120,6 @@ export default function LiteChatPage() {
                 </span>
               </div>
             ) : null}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-9 shrink-0 cursor-pointer rounded-xl text-muted-foreground"
-                    aria-label="开新对话"
-                    disabled={busy || messages.length === 0}
-                    onClick={() => {
-                      reset()
-                      setInput("")
-                      clearImages()
-                      clearFiles()
-                      textareaRef.current?.focus()
-                    }}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                }
-              />
-              <TooltipContent side="top">开新对话</TooltipContent>
-            </Tooltip>
             <input
               ref={fileInputRef}
               type="file"
@@ -212,9 +188,26 @@ export default function LiteChatPage() {
               <ImageAttachments imageAttachments={imageAttachments} onRemoveImage={removeImage} busy={busy} />
             </div>
           ) : null}
-          <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
-            对话为临时会话，刷新后开启新对话
-          </p>
+          <div className="mt-2 flex items-center justify-center gap-3 text-[11px] text-muted-foreground/70">
+            <span>对话为临时会话，刷新后开启新对话</span>
+            {messages.length > 0 ? (
+              <button
+                type="button"
+                className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                disabled={busy}
+                onClick={() => {
+                  reset()
+                  setInput("")
+                  clearImages()
+                  clearFiles()
+                  textareaRef.current?.focus()
+                }}
+              >
+                <RotateCcw className="size-3" aria-hidden />
+                开新对话
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

@@ -107,12 +107,12 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       }),
       editorApplyRange: options.draftSelection.text.trim() ? options.draftSelection.range : undefined,
       images: options.imageAttachments,
-      files: options.fileAttachments,
-    } : { ...delegation, ...methodologySignals, images: options.imageAttachments, files: options.fileAttachments })
+      files: options.fileAttachments ?? [],
+    } : { ...delegation, ...methodologySignals, images: options.imageAttachments, files: options.fileAttachments ?? [] })
   }
 
   async function handleGenerate() {
-    if (options.hasEditorSelection || options.imageAttachments.length > 0 || options.fileAttachments.length > 0) {
+    if (options.hasEditorSelection || options.imageAttachments.length > 0 || (options.fileAttachments?.length ?? 0) > 0) {
       await handleSend()
       return
     }
