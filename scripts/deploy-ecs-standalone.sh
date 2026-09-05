@@ -72,6 +72,7 @@ CI=true corepack pnpm --filter @mingyuan/web run arch:size
 CI=true corepack pnpm --filter @mingyuan/web exec next build --webpack
 node scripts/materialize-standalone-node-modules.mjs apps/web/.next/standalone
 node scripts/validate-standalone-artifact.mjs apps/web/.next/standalone
+node apps/web/scripts/build-document-parser-worker.mjs
 
 # 写入发布事实清单：线上可通过 /api/healthz 回读 releaseSha/buildTime/version，
 # 使「线上版本 = 哪个 Git 提交」始终可验证（90 天计划 0.3）。

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { existsSync } from "node:fs"
 import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -98,8 +99,16 @@ async function withParseSlot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 function workerScriptPath(): string {
-  // 编译后与源码同相对位置；测试环境用 ts 源文件路径
+  // 生产 standalone：构建期把 worker 打包为零依赖 .mjs（服务器无 tsx），server.js 以 apps/web 为工作目录
   const here = path.dirname(fileURLToPath(import.meta.url))
+  const compiledCandidates = [
+    path.join(process.cwd(), "document-parser-worker.mjs"),
+    path.join(here, "document-parser-worker.mjs"),
+  ]
+  for (const candidate of compiledCandidates) {
+    if (existsSync(candidate)) return candidate
+  }
+  // 开发/测试环境：tsx 直跑 ts 源码
   return path.join(here, "document-parser-worker.ts")
 }
 
@@ -112,14 +121,17 @@ async function runRestrictedWorker(
     const input = path.join(dir, `input${getExtension(fileName)}`)
     try {
       await writeFile(input, buffer)
+      const workerScript = workerScriptPath()
       const text = await forkDocumentParseWorker({
-        workerScript: workerScriptPath(),
+        workerScript,
         filePath: input,
         fileName,
         timeoutMs: PARSE_TIMEOUT_MS,
-        execArgv: process.execArgv.includes("--import")
-          ? process.execArgv
-          : ["--import", "tsx"],
+        execArgv: workerScript.endsWith(".mjs")
+          ? []
+          : process.execArgv.includes("--import")
+            ? process.execArgv
+            : ["--import", "tsx"],
       })
       assertTextLimit(text)
       return text
