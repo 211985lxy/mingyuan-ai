@@ -32,6 +32,7 @@
 | R2 | WP-E 归因资产化：客户月报 v1 ✅（`api/aim/reports/monthly`）；**跨客户基准表 v0 ✅**（`api/admin/benchmark-table`） | `2026-09-05-attribution-asset-wpe-plan.md` | **本批全部交付**（月报 10 例 + 基准表 4 例） |
 | R2 | 周报四段式长文生成（WP-D 移交项）**✅ 已实现（提前）**：事实段纯函数拼装 + LLM 补写后三段 + 失败回退模板 + 空周不出假报告；env 灰度默认关 | `2026-09-05-weekly-review-narrative-plan.md` | **交付**（2026-09-05，11 例） |
 | 暂缓 | 截图识别回填（OCR） | retro-import-enhancement 第 4 节 | 待 P1 跑通后评估 |
+| **生产上线** | **2026-09-05 晚 ✅**：main `cc6ad181` 走治理合并（SMS 双实现内容级一致）→ 发布门禁全绿 → deploy-ecs-standalone → releaseSha 线上验证一致；后并行工作流继续部署 `16057a52`（含 file-attachments 完整版）。生产 env 已配：LARK_CREATOR_METRICS_* ×3、LARK_PLATFORM_* ×3、SMS 四件套（aliyun/杭州宇米教育科技/SMS_338570101/AccessKey），RAM 用户 mingyuan-sms-sender 已授 AliyunDysmsFullAccess（实测 API 通）。**手机验证码登录只差运营商报备（1-3 天自动）** | runbook：`2026-09-05-douyin-binding-lark-runbook.md` | ✅ 上线完成 |
 | R3 | WP-F 结果制商业试点（5 种子客户） | 根目录归因计划第五节 | 待 R1/R2 门槛达成 |
 
 ## 四、本周（R1W1，9/04–9/17 第 1 周）剩余动作
