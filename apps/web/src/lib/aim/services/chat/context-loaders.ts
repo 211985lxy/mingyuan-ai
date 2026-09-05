@@ -36,6 +36,7 @@ import {
   type MethodologyPolicy,
 } from "@/lib/methodology-profile-store"
 import { resolvePublishOutcomeBlock } from "@/lib/aim/content-outcome-context"
+import { loadOwnAccountPlatformContext } from "@/lib/aim/own-account-platform-context"
 
 export type RetrievedChatContextBlocks = {
   knowledgeBlock: string
@@ -211,11 +212,19 @@ export async function retrieveChatContextBlocks(input: {
         trace,
         "publish_outcome_context",
         "发布结果数据召回",
-        () => resolvePublishOutcomeBlock({
-          executionAgentId: agentId,
-          userId,
-          generationId: input.targetGenerationId,
-        }),
+        async () => {
+          const baseBlock = await resolvePublishOutcomeBlock({
+            executionAgentId: agentId,
+            userId,
+            generationId: input.targetGenerationId,
+          })
+          // 方案 A：自有账号平台表现（抖音官方 API）并入复盘块；未绑定/失败时模块自带显式降级文案
+          const ownAccount = await loadOwnAccountPlatformContext({ userId })
+          if (!ownAccount.hasData) return baseBlock
+          return baseBlock
+            ? `${baseBlock}\n\n${ownAccount.block}`
+            : ownAccount.block
+        },
         (block) => ({
           summary: block ? "已注入发布数据" : "未注入发布数据",
           metadata: {

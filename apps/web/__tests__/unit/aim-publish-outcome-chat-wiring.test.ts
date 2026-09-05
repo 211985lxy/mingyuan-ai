@@ -56,7 +56,13 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     aimGeneration: { findFirst },
     outcomeAttribution: { findMany: findAttributions },
+    // 方案 A 自有账号平台表现：接线后复盘轮会读绑定表；测试默认无绑定（引导文案分支，hasData=false 不进块）
+    douyinAccountBinding: { findFirst: vi.fn(async () => null), update: vi.fn(async () => ({})) },
   },
+}))
+vi.mock("@/lib/douyin-openapi", () => ({
+  refreshDouyinAccessToken: vi.fn(),
+  fetchDouyinRecentVideos: vi.fn(async () => []),
 }))
 
 vi.mock("@/lib/aim-conversation-intent", () => ({ resolveAimConversationIntent }))
