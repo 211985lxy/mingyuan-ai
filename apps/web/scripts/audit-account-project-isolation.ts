@@ -534,8 +534,14 @@ async function main(): Promise<void> {
     printReport(result.report)
     printRows(result.report)
     console.log(`[dry-run] no writes were performed. Report saved to ${file}`)
-    console.log("To backfill, review conflicts, then run:")
-    console.log("  pnpm --dir apps/web account:isolation-audit -- --apply --report-id " + result.report.reportId)
+    // --apply would be rejected for a report with conflicts, so only advertise it
+    // when the audit is actually applicable.
+    if (result.report.zeroConflicts) {
+      console.log("To backfill, review the report, then run:")
+      console.log("  pnpm --dir apps/web account:isolation-audit -- --apply --report-id " + result.report.reportId)
+    } else {
+      console.log("Report has conflicts/manual-review rows that block --apply; resolve ownership first, then re-run the audit.")
+    }
   } finally {
     await prisma.$disconnect()
   }
