@@ -10,6 +10,15 @@ export const BACKGROUND_TASK_STATUS = {
   cancelled: "cancelled",
 } as const
 
+/**
+ * Stable reason written into `BackgroundTask.lastError` when a task is cancelled
+ * because the owning account's project binding changed after the task was queued.
+ * Kept as a literal here so this module stays free of the prisma singleton;
+ * a unit test pins it to the canonical `ACCOUNT_PROJECT_CONTEXT_STALE` in
+ * account-project-context.ts.
+ */
+export const STALE_PROJECT_BACKGROUND_TASK_REASON = "ACCOUNT_PROJECT_CONTEXT_STALE"
+
 const RETRY_BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000]
 const DEFAULT_LEASE_TTL_MS = 6 * 60_000
 
@@ -133,6 +142,42 @@ export async function deferBackgroundTask(
       lastError: null,
     },
   })
+}
+
+/**
+ * @description cancelstale_projectbackgroundtask
+ * @param prisma - prisma
+ * @param taskId - task ID
+ * @param now - now
+ * @returns 无返回值
+ *
+ * Cancel a queued / leased / retry-wait background task whose owning account's
+ * project binding changed after it was enqueued. Only pending or in-flight tasks
+ * are matched — completed history (succeeded / failed / cancelled) is never
+ * rewritten. Returns rows updated (0 | 1).
+ */
+export async function cancelStaleProjectBackgroundTask(
+  prisma: Pick<PrismaClient, "backgroundTask">,
+  taskId: string,
+  now = new Date(),
+) {
+  const updated = await prisma.backgroundTask.updateMany({
+    where: {
+      id: taskId,
+      status: {
+        in: [BACKGROUND_TASK_STATUS.queued, BACKGROUND_TASK_STATUS.leased, BACKGROUND_TASK_STATUS.retryWait],
+      },
+    },
+    data: {
+      status: BACKGROUND_TASK_STATUS.cancelled,
+      lastError: STALE_PROJECT_BACKGROUND_TASK_REASON,
+      completedAt: now,
+      leaseToken: null,
+      leaseExpiresAt: null,
+      availableAt: now,
+    },
+  })
+  return updated.count
 }
 
 /**

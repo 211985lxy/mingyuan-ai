@@ -420,6 +420,40 @@ export interface IsolationAuditTx {
   loadSnapshot(): Promise<IsolationAuditSnapshot>
   /** Conditional write: only succeeds while the row still has projectId = null. Returns rows updated (0 | 1). */
   setProjectId(target: ApplyTarget): Promise<number>
+  /**
+   * Task 6 quarantine extension (optional). A data layer that supports proactive
+   * quarantine of stale queued/in-flight resources implements all three members
+   * together; Task 5 data layers that do not are left untouched (see
+   * `quarantineStaleQueuedResources` on `RunIsolationAuditCliInput`).
+   *
+   * List queued/pending/in-flight resources whose project no longer matches the
+   * owning account's current binding. Ids only — reports stay content-free.
+   */
+  loadStaleQueuedResources?(): Promise<StaleQueuedResources>
+  /** Conditional write: fail a stale queued/running AgentInvocation with the stable code. Returns rows updated (0 | 1). */
+  quarantineStaleAgentInvocation?(id: string): Promise<number>
+  /** Conditional write: cancel a stale queued/leased/retry-wait BackgroundTask with the stable reason. Returns rows updated (0 | 1). */
+  quarantineStaleBackgroundTask?(id: string): Promise<number>
+}
+
+/** A stale pending resource the data layer identified for quarantine (ids only; reports stay content-free). */
+export interface StaleQueuedResourceTarget {
+  id: string
+}
+export interface StaleQueuedResources {
+  agentInvocations: StaleQueuedResourceTarget[]
+  backgroundTasks: StaleQueuedResourceTarget[]
+}
+
+export interface QuarantineClassOutcome {
+  listed: number
+  updated: number
+  skippedRaced: number
+}
+/** Per-class quarantine counts surfaced so the CLI can write them to the audit log. */
+export interface QuarantineApplyResult {
+  agentInvocations: QuarantineClassOutcome
+  backgroundTasks: QuarantineClassOutcome
 }
 
 export type ApplyWriteStatus = "applied" | "raced"
@@ -438,6 +472,8 @@ export interface AuditCliResult {
   appliedCount: number
   skippedRacedCount: number
   writes: ApplyWrite[]
+  /** Task 6: set in apply mode when `quarantineStaleQueuedResources` is requested. */
+  quarantine?: QuarantineApplyResult | null
 }
 
 export interface RunIsolationAuditCliInput {
@@ -448,6 +484,13 @@ export interface RunIsolationAuditCliInput {
   report?: IsolationAuditReport | null
   nowMs?: number
   reportTtlMs?: number
+  /**
+   * Task 6: when apply runs, also quarantine stale queued/in-flight resources
+   * (AgentInvocation + BackgroundTask) inside the SAME transaction, so a binding
+   * change and its old-project task disposal are all-or-nothing. Requires the
+   * optional quarantine extension on `IsolationAuditTx`.
+   */
+  quarantineStaleQueuedResources?: boolean
 }
 
 export async function runIsolationAuditCli(input: RunIsolationAuditCliInput): Promise<AuditCliResult> {
@@ -467,7 +510,7 @@ export async function runIsolationAuditCli(input: RunIsolationAuditCliInput): Pr
   return input.store.withTransaction(async (tx): Promise<AuditCliResult> => {
     const freshSummary = classifyIsolationSnapshot(await tx.loadSnapshot())
     const validation = validateReportForApply({ report, nowMs })
-    if (!validation.ok) return { mode: "apply", report, validation, appliedCount: 0, skippedRacedCount: 0, writes: [] }
+    if (!validation.ok) return { mode: "apply", report, validation, appliedCount: 0, skippedRacedCount: 0, writes: [], quarantine: null }
 
     const plan = planIsolationApply({ report, freshSummary })
     const writes: ApplyWrite[] = []
@@ -483,6 +526,42 @@ export async function runIsolationAuditCli(input: RunIsolationAuditCliInput): Pr
         writes.push({ model: target.model, id: target.id, projectId: target.candidateProjectId, status: "raced" })
       }
     }
-    return { mode: "apply", report, validation, plan, appliedCount, skippedRacedCount, writes }
+    // Task 6: quarantine stale queued/in-flight resources in the SAME transaction.
+    // Any failure here propagates and rolls the whole transaction back, so a
+    // binding/schema change can never leave "old project tasks still active".
+    const quarantine = input.quarantineStaleQueuedResources
+      ? await quarantineStaleQueuedResourcesInTx(tx)
+      : null
+    return { mode: "apply", report, validation, plan, appliedCount, skippedRacedCount, writes, quarantine }
   })
+}
+
+/**
+ * Orchestrate the per-class quarantine of stale queued resources. Each class
+ * (AgentInvocation vs BackgroundTask) is counted independently; a rejected
+ * conditional write is recorded as skipped/raced (a concurrent writer already
+ * finalised the row), while a thrown write error propagates so the surrounding
+ * DB transaction rolls back (no half state).
+ */
+async function quarantineStaleQueuedResourcesInTx(tx: IsolationAuditTx): Promise<QuarantineApplyResult> {
+  if (!tx.loadStaleQueuedResources || !tx.quarantineStaleAgentInvocation || !tx.quarantineStaleBackgroundTask) {
+    throw new Error(
+      "quarantineStaleQueuedResources requires the stale-resource quarantine data layer " +
+        "(loadStaleQueuedResources + quarantineStaleAgentInvocation + quarantineStaleBackgroundTask)"
+    )
+  }
+  const stale = await tx.loadStaleQueuedResources()
+  const agentInvocations: QuarantineClassOutcome = { listed: stale.agentInvocations.length, updated: 0, skippedRaced: 0 }
+  for (const target of stale.agentInvocations) {
+    const updated = await tx.quarantineStaleAgentInvocation(target.id)
+    if (updated > 0) agentInvocations.updated += 1
+    else agentInvocations.skippedRaced += 1
+  }
+  const backgroundTasks: QuarantineClassOutcome = { listed: stale.backgroundTasks.length, updated: 0, skippedRaced: 0 }
+  for (const target of stale.backgroundTasks) {
+    const updated = await tx.quarantineStaleBackgroundTask(target.id)
+    if (updated > 0) backgroundTasks.updated += 1
+    else backgroundTasks.skippedRaced += 1
+  }
+  return { agentInvocations, backgroundTasks }
 }

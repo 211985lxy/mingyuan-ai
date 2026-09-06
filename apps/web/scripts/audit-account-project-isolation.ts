@@ -35,9 +35,13 @@ import {
   type IsolationAuditStore,
   type IsolationAuditTx,
   type ScriptCandidateRow,
+  type StaleQueuedResources,
+  type StaleQueuedResourceTarget,
   type VideoCopyExtractionCandidateRow,
   type WatchAccountCandidateRow,
 } from "../src/lib/account-project-isolation-audit"
+import { cancelStaleProjectBackgroundTask } from "../src/lib/background-tasks"
+import { failStaleProjectAgentInvocation } from "../src/lib/aim-remote/invocation-service"
 
 type QueryClient = Pick<
   PrismaClient,
@@ -51,6 +55,7 @@ type QueryClient = Pick<
   | "topicSelection"
   | "backgroundTask"
   | "agentInvocation"
+  | "user"
 >
 
 function createPrismaClient(): PrismaClient {
@@ -331,6 +336,64 @@ async function countCrossProjectReferences(client: QueryClient): Promise<number>
 /* Store + conditional apply writes                                    */
 /* ------------------------------------------------------------------ */
 
+/** AgentInvocation statuses that are still pending/in-flight (never completed). */
+const ACTIVE_INVOCATION_STATUSES = ["queued", "running"]
+/** BackgroundTask statuses that are still pending/in-flight (never completed). */
+const ACTIVE_TASK_STATUSES = ["queued", "leased", "retry_wait"]
+
+/**
+ * Task 6 quarantine: list queued/pending/in-flight resources whose project no
+ * longer matches the owning account's CURRENT binding.
+ *
+ * - AgentInvocation rows carry their own projectId; a queued/running invocation
+ *   is stale when the account is currently bound to a different project.
+ * - BackgroundTask rows carry no project column; the only provable project link
+ *   the audit data layer has is the agent-invocation two-resource pair created
+ *   by submitInvocation (aggregateType "agent_invocation" -> AgentInvocation).
+ *   Such a task is stale exactly when its invocation is stale. The other worker
+ *   task kinds are project-scoped through their own aggregates and are already
+ *   stopped by the Task-1 execution gate when they are claimed.
+ * - Completed history (succeeded/failed/cancelled) is never listed.
+ *
+ * Only ids are returned — reports/logs stay content-free.
+ */
+async function listStaleQueuedResources(client: QueryClient): Promise<StaleQueuedResources> {
+  const [pendingInvocations, pendingInvocationTasks] = await Promise.all([
+    client.agentInvocation.findMany({
+      where: { status: { in: ACTIVE_INVOCATION_STATUSES } },
+      select: { id: true, userId: true, projectId: true },
+    }),
+    client.backgroundTask.findMany({
+      where: { status: { in: ACTIVE_TASK_STATUSES }, aggregateType: "agent_invocation" },
+      select: { id: true, aggregateId: true },
+    }),
+  ])
+  if (pendingInvocations.length === 0 && pendingInvocationTasks.length === 0) {
+    return { agentInvocations: [], backgroundTasks: [] }
+  }
+  const userIds = [...new Set(pendingInvocations.map((inv) => inv.userId))]
+  const boundUsers = await client.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, boundProjectId: true },
+  })
+  const boundProjectByUserId = new Map(boundUsers.map((u) => [u.id, u.boundProjectId]))
+  const staleInvocationIds = new Set<string>()
+  const agentInvocations: StaleQueuedResourceTarget[] = []
+  for (const invocation of pendingInvocations) {
+    const boundProjectId = boundProjectByUserId.get(invocation.userId)
+    // Only accounts that ARE bound count: a queued resource whose project no
+    // longer matches the account's current binding is stale.
+    if (boundProjectId != null && boundProjectId !== invocation.projectId) {
+      staleInvocationIds.add(invocation.id)
+      agentInvocations.push({ id: invocation.id })
+    }
+  }
+  const backgroundTasks: StaleQueuedResourceTarget[] = pendingInvocationTasks
+    .filter((task) => task.aggregateId !== null && staleInvocationIds.has(task.aggregateId))
+    .map((task) => ({ id: task.id }))
+  return { agentInvocations, backgroundTasks }
+}
+
 async function setProjectIdIfNull(client: QueryClient, target: ApplyTarget): Promise<number> {
   // Conditional update: only matches while the row still has projectId = null, so a concurrent
   // writer can never be overwritten and scope is never widened.
@@ -359,6 +422,11 @@ function makeStore(prisma: PrismaClient): IsolationAuditStore {
   const txFor = (client: QueryClient): IsolationAuditTx => ({
     loadSnapshot: () => loadAuditSnapshot(client),
     setProjectId: (target) => setProjectIdIfNull(client, target),
+    // Task 6 quarantine extension: stale queued/in-flight resources are listed
+    // and quarantined inside the SAME transaction as the schema writes.
+    loadStaleQueuedResources: () => listStaleQueuedResources(client),
+    quarantineStaleAgentInvocation: (id) => failStaleProjectAgentInvocation(client as PrismaClient, id),
+    quarantineStaleBackgroundTask: (id) => cancelStaleProjectBackgroundTask(client as PrismaClient, id),
   })
   return {
     loadSnapshot: () => loadAuditSnapshot(prisma),
@@ -430,6 +498,7 @@ async function main(): Promise<void> {
         apply: true,
         report,
         reportTtlMs: DEFAULT_REPORT_TTL_MS,
+        quarantineStaleQueuedResources: true,
       })
       printReport(result.report)
       if (result.validation && !result.validation.ok) {
@@ -445,6 +514,16 @@ async function main(): Promise<void> {
       }
       for (const skipped of result.plan?.skippedChanged ?? []) {
         console.log(`skip ${skipped.model} ${skipped.id} reason=${skipped.reason}`)
+      }
+      if (result.quarantine) {
+        const inv = result.quarantine.agentInvocations
+        const task = result.quarantine.backgroundTasks
+        console.log(
+          `[quarantine] AgentInvocation listed=${inv.listed} updated=${inv.updated} skipped_raced=${inv.skippedRaced} (failed ACCOUNT_PROJECT_CONTEXT_STALE)`
+        )
+        console.log(
+          `[quarantine] BackgroundTask listed=${task.listed} updated=${task.updated} skipped_raced=${task.skippedRaced} (cancelled ACCOUNT_PROJECT_CONTEXT_STALE)`
+        )
       }
       return
     }
