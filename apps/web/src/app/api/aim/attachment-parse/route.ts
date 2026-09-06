@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { parseDocument, isSupportedFile, DocumentParseError } from "@/lib/document-parser"
 import { extractSniffedText, AttachmentTextError } from "@/lib/aim/attachment-text"
 import { isLikelyScannedPdf, ocrPdfPagesWithVision, renderPdfPagesToImages } from "@/lib/aim/scanned-pdf-ocr"
-import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
+import { enforceChatAttachmentSizeLimit } from "@/lib/internal-beta-limits"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 
 export const dynamic = "force-dynamic"
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     if (files.length > 1) {
       return NextResponse.json({ error: "单次只支持解析一个文件" }, { status: 400 })
     }
-    const uploadLimitResponse = enforceUploadSizeLimit(files)
+    const uploadLimitResponse = enforceChatAttachmentSizeLimit(files)
     if (uploadLimitResponse) return uploadLimitResponse
 
     const file = files[0]

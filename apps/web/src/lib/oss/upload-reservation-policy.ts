@@ -10,7 +10,8 @@ export const POLICY_TTL_MS = 5 * 60 * 1000
 
 export const UPLOAD_SIZE_LIMITS = {
   image: 8 * 1024 * 1024,
-  document: 10 * 1024 * 1024,
+  // 聊天附件场景扫描件 PDF 常超 10MB，放宽到与聊天附件限制一致（知识库导入另有 10MB 入口限制不受影响）
+  document: 30 * 1024 * 1024,
   audio: 200 * 1024 * 1024,
   video: 200 * 1024 * 1024,
 } as const

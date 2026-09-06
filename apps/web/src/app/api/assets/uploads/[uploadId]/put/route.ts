@@ -5,7 +5,7 @@ import {
   loadCompletableReservation,
   UploadReservationError,
 } from "@/lib/oss/upload-reservation"
-import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
+import { enforceChatAttachmentSizeLimit } from "@/lib/internal-beta-limits"
 
 // api-inventory: upload-limit=internal-beta
 
@@ -24,7 +24,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "file required" }, { status: 400 })
   }
-  const uploadLimitResponse = enforceUploadSizeLimit([file])
+  const uploadLimitResponse = enforceChatAttachmentSizeLimit([file])
   if (uploadLimitResponse) return uploadLimitResponse
 
   try {

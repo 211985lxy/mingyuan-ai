@@ -94,6 +94,7 @@ const unboundedMultipart = entries.filter((entry) => {
   if (entry.input !== "multipart") return false
   const source = readFileSync(join(root, entry.file), "utf8")
   return !source.includes("enforceUploadSizeLimit")
+    && !source.includes("enforceChatAttachmentSizeLimit")
     && !source.includes("INTERNAL_BETA_LIMITS.uploadBytes")
     && !source.includes("receiveKnowledgeMultipart")
     && !source.includes("KNOWLEDGE_MULTIPART_LIMITS")

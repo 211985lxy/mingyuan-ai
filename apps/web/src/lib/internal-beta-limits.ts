@@ -12,6 +12,8 @@ export const INTERNAL_BETA_LIMITS = {
   clientProjects: 3,
   knowledgeEntriesPerProject: 100,
   uploadBytes: 10 * 1024 * 1024,
+  /** 聊天附件（文档/PDF/音频）单独放宽：扫描件 PDF 常超 10MB */
+  chatAttachmentBytes: 30 * 1024 * 1024,
 }
 
 type DailyKind = "aim_chat" | "aim_generate" | "video_copy_extraction" | "competitor_analysis"
@@ -194,6 +196,17 @@ export async function enforceKnowledgeBetaLimit(input: {
  * @param files - 待上传的文件列表
  * @returns 超过限制返回 413 响应，未超过返回 null
  */
+/** 聊天附件专用：放宽到 chatAttachmentBytes，错误文案与通用版一致。 */
+export function enforceChatAttachmentSizeLimit(files: File[]) {
+  const oversized = files.find((file) => file.size > INTERNAL_BETA_LIMITS.chatAttachmentBytes)
+  return oversized
+    ? NextResponse.json(
+        { error: `单个文件不能超过 ${Math.round(INTERNAL_BETA_LIMITS.chatAttachmentBytes / 1024 / 1024)}MB`, code: "CHAT_ATTACHMENT_TOO_LARGE" },
+        { status: 413 },
+      )
+    : null
+}
+
 export function enforceUploadSizeLimit(files: File[]) {
   const oversized = files.find((file) => file.size > INTERNAL_BETA_LIMITS.uploadBytes)
   return oversized
