@@ -16,6 +16,8 @@ export interface AimWorkbenchHeaderProps {
   showStageProgress: boolean
   /** @deprecated 阶段条改为只读进度，不再用于切换专家 */
   onStageChange?: (stage: AimWorkflowStage) => void
+  /** 当前登录账号绑定的项目名称；只读展示，不提供切换入口。 */
+  projectName?: string | null
   onReset: () => void
 }
 
@@ -28,6 +30,7 @@ export function AimWorkbenchHeader({
   agentTitle,
   AgentIcon,
   showStageProgress,
+  projectName,
   onReset,
 }: AimWorkbenchHeaderProps) {
   const currentIndex = AIM_WORKFLOW_STAGES.findIndex(
@@ -73,6 +76,12 @@ export function AimWorkbenchHeader({
           {agentTitle}
         </p>
       )}
+
+      {projectName ? (
+        <span className="hidden max-w-44 truncate rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground sm:inline-flex" title="账号绑定项目">
+          项目：{projectName}
+        </span>
+      ) : null}
 
       <Button
         type="button"

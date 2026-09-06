@@ -29,7 +29,6 @@ import { type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import { buildContentProducerVideoCopyHref, resolveContentProducerVideoUrl } from "@/lib/aim/video-copy-input"
-import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 import {
   assemblePasteUsageInput,
@@ -96,6 +95,7 @@ export default function AimPage() {
   }, [w.selectedAgentId, w.selectedProjectId])
 
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode
+  const boundProjectName = w.projects.find((project) => project.id === w.selectedProjectId)?.name ?? null
   const contextUsage = useMemo(() => {
     const breakdown = estimateContextUsageBreakdown({
       conversation: w.messages.map((message) => ({
@@ -292,6 +292,7 @@ export default function AimPage() {
           workflowStage={w.currentWorkflowStage}
           agentTitle={isLanding ? "创作台" : w.agent.title}
           AgentIcon={w.agent.icon}
+          projectName={boundProjectName}
           showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
           onReset={() => {
