@@ -40,10 +40,11 @@ export async function buildTopicContext(
   copyStructureCode: string,
   endingTypeCode: string,
   userId: string,
+  projectId?: string,
 ): Promise<TopicContext> {
   const [topicSelection, openingType, copyStructure, endingType] = await Promise.all([
     prisma.topicSelection.findUnique({
-      where: { id: topicSelectionId, userId },
+      where: { id: topicSelectionId, userId, ...(projectId ? { projectId } : {}) },
     }),
     prisma.openingType.findUnique({
       where: { code: openingTypeCode, status: "published" },

@@ -13,6 +13,8 @@ const AGENT_AIM_AGENT_ID_SET = new Set<string>(AGENT_AIM_AGENT_IDS)
 export type AgentApiContext = {
   apiKeyId: string
   userId: string
+  /** 登录账号绑定的唯一项目；undefined 仅表示旧的内存调用方未提供该字段。 */
+  boundProjectId?: string | null
   allowedProjects: string[]
   allowedAgents: AimAgentId[]
   /** V2.1 remote: client type of this key (codex | workbuddy | custom). Null for legacy keys. */
@@ -94,14 +96,20 @@ export function buildAgentApiContext(apiKey: {
   dailyTokenLimit: number | null
   maxInputChars: number | null
   expiresAt: Date | null
+  boundProjectId?: string | null
 }): AgentApiContext {
   const clientType = AGENT_CLIENT_TYPES.includes(apiKey.clientType as AgentClientType)
     ? (apiKey.clientType as AgentClientType)
     : null
+  const allowedProjects = readStringArray(apiKey.allowedProjects)
   return {
     apiKeyId: apiKey.id,
     userId: apiKey.userId,
-    allowedProjects: readStringArray(apiKey.allowedProjects),
+    boundProjectId: apiKey.boundProjectId,
+    // 账号绑定是最终边界；API Key 自身的历史项目白名单只能进一步收窄，不能放大。
+    allowedProjects: apiKey.boundProjectId === undefined
+      ? allowedProjects
+      : allowedProjects.filter((projectId) => projectId === apiKey.boundProjectId),
     allowedAgents: readStringArray(apiKey.allowedAgents)
       .map((agent) => normalizeAimAgentId(agent))
       .filter(
@@ -141,7 +149,11 @@ export async function authenticateAgentToken(token: string) {
     throw new Error("KEY_EXPIRED")
   }
 
-  return apiKey
+  const account = await prisma.user.findUnique({
+    where: { id: apiKey.userId },
+    select: { boundProjectId: true },
+  })
+  return { ...apiKey, boundProjectId: account?.boundProjectId ?? null }
 }
 
 /**
@@ -176,6 +188,9 @@ export async function authenticateAgentRequest(request: NextRequest): Promise<Ag
  * @returns 无返回值，无权时抛出错误
  */
 export async function assertAgentProjectAccess(context: AgentApiContext, projectId: string) {
+  if (context.boundProjectId !== undefined && context.boundProjectId !== projectId) {
+    throw new Error("AGENT_PROJECT_FORBIDDEN")
+  }
   if (!context.allowedProjects.includes(projectId)) {
     throw new Error("AGENT_PROJECT_FORBIDDEN")
   }
@@ -241,4 +256,3 @@ export function agentAuthErrorResponse(error: unknown): NextResponse | null {
   const item = map[error.message]
   return item ? NextResponse.json({ error: item.error }, { status: item.status }) : null
 }
-
