@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { extractAndPersistForEntry } from "@/lib/knowledge-entity-extractor"
 import { enforceKnowledgeBetaLimit } from "@/lib/internal-beta-limits"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 interface ConfirmedEntry {
   title: string
@@ -22,34 +23,25 @@ interface ConfirmedEntry {
 export const POST = withUserAuth(async (request, { user }) => {
   const body = await parseJsonRecord(request)
   const projectIdRaw = body.projectId
-  const projectId =
+  const requestedProjectId =
     typeof projectIdRaw === "string" && projectIdRaw.trim()
       ? projectIdRaw.trim()
-      : null
+      : undefined
   const entries = Array.isArray(body.entries) ? (body.entries as ConfirmedEntry[]) : null
-
-  if (!projectId) {
-    return NextResponse.json({ error: "请选择归属全案" }, { status: 400 })
-  }
 
   if (!entries || entries.length === 0) {
     return NextResponse.json({ error: "参数错误" }, { status: 400 })
   }
 
-  const project = await prisma.clientProject.findFirst({
-    where: {
-      id: projectId,
-      userId: user.id,
-      status: "active",
-    },
-    select: { id: true },
-  })
-
-  if (!project) {
-    return NextResponse.json(
-      { error: "IP营销全案不存在或已归档" },
-      { status: 404 },
-    )
+  let project: Awaited<ReturnType<typeof resolveBoundProject>>
+  try {
+    project = await resolveBoundProject({ userId: user.id, requestedProjectId })
+  } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
+    throw error
   }
 
   const toCreate = entries.filter((entry) => !entry.skip)
@@ -94,3 +86,9 @@ export const POST = withUserAuth(async (request, { user }) => {
     data: { created: created.length },
   })
 })
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
+}

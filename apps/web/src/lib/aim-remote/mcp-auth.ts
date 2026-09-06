@@ -71,5 +71,9 @@ export async function loadContextForApiKey(apiKeyId: string): Promise<AgentApiCo
   const apiKey = await prisma.agentApiKey.findUnique({ where: { id: apiKeyId } })
   if (!apiKey || apiKey.status !== "active") return null
   if (apiKey.expiresAt && apiKey.expiresAt.getTime() <= Date.now()) return null
-  return buildAgentApiContext(apiKey)
+  const account = await prisma.user.findUnique({
+    where: { id: apiKey.userId },
+    select: { boundProjectId: true },
+  })
+  return buildAgentApiContext({ ...apiKey, boundProjectId: account?.boundProjectId ?? null })
 }

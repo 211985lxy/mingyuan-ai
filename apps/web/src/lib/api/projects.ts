@@ -81,6 +81,16 @@ export interface ClientProject {
   }>
 }
 
+export type AccountProjectContextResponse =
+  | { status: "bound"; project: ClientProject }
+  | { status: "setup_required" }
+  | { status: "admin_review_required"; projectCount: number }
+  | { status: "inactive_project_recovery_required"; projectCount: number }
+
+export async function getAccountProjectContext(): Promise<AccountProjectContextResponse> {
+  return request<AccountProjectContextResponse>("/api/account/project-context")
+}
+
 export interface CreateClientProjectRequest {
   name: string
   companyName?: string

@@ -3,6 +3,7 @@
 model Script {
   id               String    @id @default(cuid())
   userId           String
+  projectId        String?   @db.VarChar(191)
   content          String    @db.Text
   sourceTemplateId String?
   generationRunId  String?
@@ -30,6 +31,7 @@ model Script {
   generationRun ContentGenerationRun? @relation(fields: [generationRunId], references: [id])
   ipProfile     IpProfile?            @relation(fields: [ipProfileId], references: [id])
   structure     VideoStructure?       @relation(fields: [structureId], references: [id])
+  project       ClientProject?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userId, status])
@@ -37,11 +39,13 @@ model Script {
   @@index([ipProfileId])
   @@index([structureId])
   @@index([topicSelectionId])
+  @@index([userId, projectId, createdAt(sort: Desc)])
 }
 
 model ContentGenerationRun {
   id                String   @id @default(cuid())
   userId            String
+  projectId         String?  @db.VarChar(191)
   ipProfileId       String
   templateId        String
   structureId       String?
@@ -69,6 +73,7 @@ model ContentGenerationRun {
   user      User            @relation(fields: [userId], references: [id])
   ipProfile IpProfile       @relation(fields: [ipProfileId], references: [id])
   structure VideoStructure? @relation(fields: [structureId], references: [id])
+  project   ClientProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   scripts   Script[]
 
   @@index([userId, createdAt])
@@ -76,6 +81,7 @@ model ContentGenerationRun {
   @@index([structureId])
   @@index([hotTopicId])
   @@index([topicSelectionId])
+  @@index([userId, projectId, createdAt(sort: Desc)])
 }
 
 model HotTopicFitCache {
@@ -327,6 +333,7 @@ model AimConversation {
   userId          String
   projectId       String
   platform        String   @db.VarChar(40)   // feishu | wecom | workbuddy_wechat
+  externalAccountId String @default("") @db.VarChar(191) // 同一项目下的外部矩阵账号
   externalChatId  String   @db.VarChar(191)
   agentId         String   @db.VarChar(40)   // content_producer | work_editor | ...
   lastMessageAt   DateTime @default(now())
@@ -335,7 +342,7 @@ model AimConversation {
 
   messages AimConversationMessage[]
 
-  @@unique([platform, externalChatId, agentId])
+  @@unique([platform, externalAccountId, externalChatId, agentId], map: "AimConversation_platform_extAccountId_extChatId_agentId_key")
   @@index([userId, updatedAt])
   @@index([projectId, updatedAt])
 }

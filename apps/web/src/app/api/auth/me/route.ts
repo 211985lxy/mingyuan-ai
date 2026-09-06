@@ -13,6 +13,7 @@ export const GET = withUserAuth(async (_request, { user }) => {
       plan: true,
       createdAt: true,
       expiresAt: true,
+      boundProjectId: true,
     },
   })
 

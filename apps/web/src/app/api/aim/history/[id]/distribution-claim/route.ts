@@ -5,6 +5,7 @@ import { buildContentDistributionClaimDraft } from "@/lib/aim/content-distributi
 import { submitContentDistributionClaim } from "@/lib/aim/content-distribution-claim-submit"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { TaskSpec } from "@/lib/task-spec"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -19,9 +20,10 @@ export async function POST(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const boundProject = await resolveBoundProject({ userId: user.id })
 
     const record = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id },
+      where: { id, userId: user.id, projectId: boundProject.id },
       select: {
         id: true,
         projectId: true,
@@ -78,6 +80,9 @@ export async function POST(
       reason: result.mode === "copy_only" ? result.reason : undefined,
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: error instanceof Error ? error.message : "创建飞书领取事项失败" },
       { status: 500 },

@@ -455,7 +455,11 @@ async function buildContextTaskSpec(input: {
     : null
   const topicSelectionRow = params.topicSelectionId
     ? await prisma.topicSelection.findFirst({
-        where: { id: params.topicSelectionId, userId: params.userId },
+        where: {
+          id: params.topicSelectionId,
+          userId: params.userId,
+          ...(spec.projectId ? { projectId: spec.projectId } : {}),
+        },
         select: { sourceHighlights: true, candidates: true },
       }).catch(() => null)
     : null

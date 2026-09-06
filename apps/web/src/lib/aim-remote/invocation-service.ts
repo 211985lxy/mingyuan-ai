@@ -13,10 +13,18 @@
 
 import { createHash } from "node:crypto"
 import { prisma } from "@/lib/prisma"
+import type { PrismaClient } from "@/generated/prisma/client"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import type { AgentApiContext } from "@/lib/agent-api-auth"
 import { assertAgentProjectAccess, assertAgentAccess } from "@/lib/agent-api-auth"
 import { checkMinuteQuota, assertDailyTokenBudget } from "@/lib/agent-token-quota"
+import {
+  ACCOUNT_PROJECT_CONTEXT_STALE,
+  ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+  isAccountProjectContextError,
+  resolveBoundProjectId,
+} from "@/lib/account-project-context"
+import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
 import {
   AGENT_REMOTE_GENERATE_TASK_KIND,
   DEFAULT_POLL_AFTER_SECONDS,
@@ -34,6 +42,49 @@ import type { ContentFormat } from "@/lib/aim-generator"
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 
 const ACTION = "draft.generate"
+
+/**
+ * Fail a queued / running AgentInvocation whose owning account's project binding
+ * changed after submission, using the stable stale-context error code. Completed
+ * invocations are never rewritten (the conditional status guard only matches
+ * queued/running). Returns rows updated (0 | 1).
+ */
+export async function failStaleProjectAgentInvocation(
+  prisma: Pick<PrismaClient, "agentInvocation">,
+  invocationId: string,
+  now = new Date(),
+) {
+  const updated = await prisma.agentInvocation.updateMany({
+    where: { id: invocationId, status: { in: ["queued", "running"] } },
+    data: {
+      status: "failed",
+      errorCode: ACCOUNT_PROJECT_CONTEXT_STALE,
+      errorMessage: ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+      completedAt: now,
+    },
+  })
+  if (updated.count > 0) {
+    // A stale queued/running invocation was actually quarantined. Content-free
+    // counter — code dimension only, never the invocation id or any body text.
+    incrementIsolationMetric("stale_task_quarantined_total", {
+      code: ACCOUNT_PROJECT_CONTEXT_STALE,
+    })
+  }
+  return updated.count
+}
+
+/**
+ * Resolve the project an invocation must be snapshotted under at creation time.
+ * Server-built contexts (REST/MCP auth) always carry the account's boundProjectId
+ * resolved from User at request time; in that world the stored project is the
+ * CURRENT binding, re-resolved server-side (`resolveBoundProjectId`), never a
+ * client-supplied id. Legacy in-memory contexts without a binding snapshot fall
+ * back to the already-asserted requested project id.
+ */
+export async function resolveInvocationProjectId(context: AgentApiContext, requestedProjectId: string): Promise<string> {
+  if (context.boundProjectId === undefined) return requestedProjectId
+  return resolveBoundProjectId({ userId: context.userId, requestedProjectId })
+}
 
 /** Compute a stable hash of the request payload for idempotency conflict detection. */
 export function computeRequestHash(input: SubmitAgentInvocationInput): string {
@@ -83,6 +134,25 @@ export async function submitInvocation(
   await assertAgentProjectAccess(context, input.projectId)
   assertAgentAccess(context, input.agentId)
 
+  // ── Snapshot the CURRENT account binding (Task 6) ──
+  // The stored invocation project must be the account's current bound project,
+  // resolved server-side. A client-supplied arbitrary projectId can never be
+  // honoured: if the client asks for a project the account is no longer bound
+  // to, the submission is rejected (no silent move of an old-project task).
+  let projectId: string
+  try {
+    projectId = await resolveInvocationProjectId(context, input.projectId)
+  } catch (error) {
+    if (isAccountProjectContextError(error)) {
+      // The account-project context rejected the requested project (rebound,
+      // unbound, or no longer available). Surface it through the wire error the
+      // remote surface already understands instead of a raw typed error.
+      throw new Error("AGENT_PROJECT_FORBIDDEN")
+    }
+    throw error
+  }
+  const inputWithResolvedProject = { ...input, projectId }
+
   // ── Quota: per-minute requests + daily token budget ──
   const minuteCheck = await checkMinuteQuota(context.apiKeyId, context.minuteLimit)
   if (!minuteCheck.allowed) {
@@ -95,7 +165,7 @@ export async function submitInvocation(
     return { ok: false, errorCode: code as typeof REMOTE_ERROR_CODE.DAILY_TOKEN_EXCEEDED, errorMessage: "每日 Token 预算已用尽" }
   }
 
-  const requestHash = computeRequestHash(input)
+  const requestHash = computeRequestHash(inputWithResolvedProject)
 
   // ── Idempotency: check for an existing invocation with this key ──
   const existing = await prisma.agentInvocation.findUnique({
@@ -114,7 +184,7 @@ export async function submitInvocation(
       data: {
         apiKeyId: context.apiKeyId,
         userId: context.userId,
-        projectId: input.projectId,
+        projectId,
         agentId: input.agentId,
         action: ACTION,
         idempotencyKey: input.idempotencyKey,

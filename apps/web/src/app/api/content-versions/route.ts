@@ -7,6 +7,7 @@ import {
   readAimGenerationContent,
   syncAimGenerationContent,
 } from "@/lib/aim/content-version-sync"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 30
 
@@ -35,6 +36,7 @@ function summary(version: AimContentVersion) {
 }
 
 export const GET = withUserAuth(async (request, { user }) => {
+  const project = await resolveBoundProject({ userId: user.id })
   const search = new URL(request.url).searchParams
   const id = search.get("id")
   const generationId = search.get("generationId")
@@ -46,10 +48,28 @@ export const GET = withUserAuth(async (request, { user }) => {
       where: { id, userId: user.id },
     })
     if (!version) return NextResponse.json({ error: "版本不存在" }, { status: 404 })
+    if (!(await versionBelongsToProject(version, user.id, project.id))) {
+      return NextResponse.json({ error: "版本不存在" }, { status: 404 })
+    }
     return NextResponse.json({ data: { ...summary(version), content: version.content } })
   }
   if (!generationId && !conversationId) {
     return NextResponse.json({ error: "缺少 generationId 或 conversationId" }, { status: 400 })
+  }
+
+  if (generationId) {
+    const generation = await prisma.aimGeneration.findFirst({
+      where: { id: generationId, userId: user.id, projectId: project.id },
+      select: { id: true },
+    })
+    if (!generation) return NextResponse.json({ error: "生成记录不存在或无权访问" }, { status: 404 })
+  }
+  if (conversationId) {
+    const conversation = await prisma.aimConversation.findFirst({
+      where: { id: conversationId, userId: user.id, projectId: project.id },
+      select: { id: true },
+    })
+    if (!conversation) return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 })
   }
 
   const versions = await prisma.aimContentVersion.findMany({
@@ -61,6 +81,7 @@ export const GET = withUserAuth(async (request, { user }) => {
 })
 
 export const POST = withUserAuth(async (request, { user }) => {
+  const project = await resolveBoundProject({ userId: user.id })
   const body = await parseJsonRecord(request)
   const generationId = typeof body.generationId === "string" && body.generationId ? body.generationId : null
   const conversationId = typeof body.conversationId === "string" && body.conversationId ? body.conversationId : null
@@ -73,8 +94,12 @@ export const POST = withUserAuth(async (request, { user }) => {
   if (!content.trim()) return NextResponse.json({ error: "content 不能为空" }, { status: 400 })
   if (!VALID_SOURCES.has(source)) return NextResponse.json({ error: "source 不合法" }, { status: 400 })
   if (generationId) {
-    const ownedGeneration = await prisma.aimGeneration.findFirst({ where: { id: generationId, userId: user.id }, select: { id: true } })
+    const ownedGeneration = await prisma.aimGeneration.findFirst({ where: { id: generationId, userId: user.id, projectId: project.id }, select: { id: true } })
     if (!ownedGeneration) return NextResponse.json({ error: "生成记录不存在或无权访问" }, { status: 404 })
+  }
+  if (conversationId) {
+    const ownedConversation = await prisma.aimConversation.findFirst({ where: { id: conversationId, userId: user.id, projectId: project.id }, select: { id: true } })
+    if (!ownedConversation) return NextResponse.json({ error: "会话不存在或无权访问" }, { status: 404 })
   }
 
   let version!: AimContentVersion
@@ -88,6 +113,7 @@ export const POST = withUserAuth(async (request, { user }) => {
           format,
           content,
           source,
+          projectId: project.id,
         }),
       )
       break
@@ -111,6 +137,7 @@ async function saveContentVersion(
     format: string
     content: string
     source: string
+    projectId: string
   },
 ): Promise<AimContentVersion> {
   const rows = input.generationId
@@ -130,6 +157,7 @@ async function saveContentVersion(
         generationId: input.generationId,
         format: input.format,
         content: input.content,
+        projectId: input.projectId,
       })
     }
     return tx.aimContentVersion.findUniqueOrThrow({ where: { id: latest.id } })
@@ -144,6 +172,7 @@ async function saveContentVersion(
       userId: input.userId,
       generationId: input.generationId,
       format: input.format,
+      projectId: input.projectId,
     })
     if (prior && prior !== input.content) {
       const seeded = await tx.aimContentVersion.create({
@@ -169,6 +198,7 @@ async function saveContentVersion(
       generationId: input.generationId,
       format: input.format,
       content: input.content,
+      projectId: input.projectId,
     })
   }
 
@@ -184,4 +214,26 @@ async function saveContentVersion(
       parentVersionId,
     },
   })
+}
+
+async function versionBelongsToProject(
+  version: AimContentVersion,
+  userId: string,
+  projectId: string,
+): Promise<boolean> {
+  if (version.generationId) {
+    const generation = await prisma.aimGeneration.findFirst({
+      where: { id: version.generationId, userId, projectId },
+      select: { id: true },
+    })
+    if (!generation) return false
+  }
+  if (version.conversationId) {
+    const conversation = await prisma.aimConversation.findFirst({
+      where: { id: version.conversationId, userId, projectId },
+      select: { id: true },
+    })
+    if (!conversation) return false
+  }
+  return Boolean(version.generationId || version.conversationId)
 }

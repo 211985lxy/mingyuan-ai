@@ -7,6 +7,7 @@ import {
   formatSourceBriefSummary,
 } from "@/features/newsroom/services/build-source-brief"
 import type { Prisma } from "@/generated/prisma/client"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * POST /api/content-opportunities/collections/:id/create-work-item
@@ -18,8 +19,10 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
   }
 
+  const project = await resolveBoundProject({ userId: user.id })
+
   const collection = await prisma.opportunityCollection.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: user.id, projectId: project.id },
   })
 
   if (!collection) {
@@ -68,7 +71,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   const generation = await prisma.aimGeneration.create({
     data: {
       userId: user.id,
-      projectId: collection.projectId,
+      projectId: project.id,
       agentId: "content_producer",
       rawInput,
       workflowStatus: "draft",

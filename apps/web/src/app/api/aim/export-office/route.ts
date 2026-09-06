@@ -7,6 +7,7 @@ import { buildAimExportDocx, type OfficeExportSection } from "@/lib/aim/export-o
 import { AIM_FORMAT_LABELS } from "@/lib/aim/workbench-display"
 import type { ContentFormat } from "@/lib/aim-generator"
 import { getCanonicalFromTaskSpec } from "@/lib/canonical-content-spec"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -39,6 +40,7 @@ const FORMAT_COLUMNS: Array<{ format: ContentFormat; column: keyof {
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    const project = await resolveBoundProject({ userId: user.id })
     const body = await parseJsonRecord(request)
 
     const sectionsFromBody = Array.isArray(body.sections)
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
     const generationId = typeof body.generationId === "string" ? body.generationId.trim() : ""
     if (sections.length === 0 && generationId) {
       const record = await prisma.aimGeneration.findFirst({
-        where: { id: generationId, userId: user.id },
+        where: { id: generationId, userId: user.id, projectId: project.id },
         select: {
           id: true,
           taskSpec: true,
@@ -140,6 +142,10 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     if (error instanceof Error && (error.message === "Unauthorized" || error.message === "Invalid token")) {
       return authErrorResponse(error)
     }
@@ -149,4 +155,10 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

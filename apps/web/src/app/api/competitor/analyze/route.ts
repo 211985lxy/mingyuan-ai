@@ -9,6 +9,7 @@ import { COMPETITOR_ANALYSIS_TASK_KIND } from "@/lib/competitor-analysis/backgro
 import { getCompetitorPlatformGate } from '@/lib/competitor-analysis/platform-scope'
 import { enforceDailyBetaLimit } from '@/lib/internal-beta-limits'
 import { competitorAnalyzeBodySchema } from "@/features/competitor/contracts/api"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 // Pipeline can take up to 5 minutes (scrape + comments + AI)
 export const maxDuration = 300
@@ -46,10 +47,24 @@ export const POST = withUserAuth(async (request, { user }) => {
     }, { status: 400 })
   }
 
+  // 竞品分析记录只挂在账号绑定项目下；写库前先解析绑定项目。
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
+
   // Create the analysis record in pending state
   const analysis = await prisma.$transaction(async (tx) => {
     const created = await tx.competitorAnalysis.create({ data: {
       userId: user.id,
+      projectId,
       targetUrl: parsed.pureUrl,
       platform: parsed.platform,
       platformUserId: parsed.rawUserId ?? null,

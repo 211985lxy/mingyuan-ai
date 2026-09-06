@@ -35,6 +35,8 @@ interface TraceStep {
 
 interface TraceSummary {
   id: string
+  userId: string | null
+  projectId: string | null
   agentId: string | null
   action: string
   status: TraceStatus
@@ -170,6 +172,7 @@ export default function AdminAgentsPage() {
               <div className="space-y-3">
                 <div className="rounded-lg border border-white/10 bg-slate-950/70 p-3 text-sm text-slate-300">
                   <p className="font-medium text-slate-100">{selected.agentId || "unknown"} · {selected.action}</p>
+                  <p className="mt-1 text-xs text-slate-600">账号：{selected.userId || "—"} · 项目：{selected.projectId || "—"}</p>
                   <p className="mt-2 text-xs text-slate-500">输入：{selected.inputSummary || "无摘要"}</p>
                   {selected.outputSummary ? <p className="mt-1 text-xs text-slate-500">输出：{selected.outputSummary}</p> : null}
                   {selected.errorMessage ? <p className="mt-1 text-xs text-red-300">错误：{selected.errorMessage}</p> : null}
@@ -205,6 +208,7 @@ export default function AdminAgentsPage() {
                   <StatusBadge status={trace.status} />
                 </div>
                 <p className="mt-2 line-clamp-2 text-xs text-slate-500">{trace.inputSummary || "无输入摘要"}</p>
+                <p className="mt-1 truncate text-[11px] text-slate-600">账号：{trace.userId || "—"} · 项目：{trace.projectId || "—"}</p>
                 <p className="mt-2 text-[11px] text-slate-600">{formatDuration(trace.durationMs)} · {new Date(trace.createdAt).toLocaleString("zh-CN")}</p>
               </button>
             ))}

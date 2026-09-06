@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findMany, count, authenticateRequest, authErrorResponse } = vi.hoisted(() => ({
+const { findMany, count, authenticateRequest, authErrorResponse, resolveBoundProject } = vi.hoisted(() => ({
   findMany: vi.fn(),
   count: vi.fn(),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -20,6 +21,13 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/user-auth", () => ({
   authenticateRequest,
   authErrorResponse,
+}))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
 }))
 
 import { GET } from "@/app/api/aim/history/route"

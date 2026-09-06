@@ -169,6 +169,77 @@ export async function getAdminUserStats() {
   return request<{ data: UserStats }>("/api/admin/users/stats")
 }
 
+/**
+ * @description 获取账号与 IP 项目的绑定状态，供管理员处理历史账号。
+ */
+export async function getAccountProjectBindings() {
+  return request<{ data: AccountProjectBindingItem[] }>("/api/admin/account-project-bindings")
+}
+
+/**
+ * @description 为一个 AIM 登录账号绑定一个已有 IP 项目。
+ */
+export async function bindAccountProject(userId: string, projectId: string) {
+  return request<{ status: "bound"; project: AccountProjectBindingProject }>(
+    "/api/admin/account-project-bindings",
+    {
+      method: "POST",
+      body: JSON.stringify({ userId, projectId }),
+    },
+  )
+}
+
+// ─── Account project repair / inactive-project recovery (admin two-step confirm) ───
+
+/**
+ * @description 只读预览“修复/恢复”影响：返回当前绑定、目标项目、知识与内容计数、
+ * 将被取消的任务数、无法自动归属的历史记录数（绝不返回正文内容）。
+ */
+export async function getAccountProjectRepairPreview(
+  userId: string,
+  projectId: string,
+  reactivate: boolean,
+) {
+  const qs = new URLSearchParams({ projectId })
+  if (reactivate) qs.set("reactivate", "1")
+  return request<{ impact: AccountProjectRepairImpact }>(
+    `/api/admin/account-project-bindings/${encodeURIComponent(userId)}/preview?${qs}`,
+  )
+}
+
+/**
+ * @description 二次确认第一步：管理员填好原因后生成短期确认 token（绑定账号、项目、
+ * 恢复决定与原因），并返回影响摘要。
+ */
+export async function createAccountProjectRepairConfirmation(
+  userId: string,
+  input: { projectId: string; reason: string; reactivate: boolean },
+) {
+  return request<{ impact: AccountProjectRepairImpact; token: string }>(
+    `/api/admin/account-project-bindings/${encodeURIComponent(userId)}/preview`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  )
+}
+
+/**
+ * @description 二次确认第二步：携带 token + reason 原子执行修复/恢复并写审计。
+ */
+export async function repairAccountProjectBinding(
+  userId: string,
+  input: { token: string; reason: string },
+) {
+  return request<{ data: AccountProjectRepairResult }>(
+    `/api/admin/account-project-bindings/${encodeURIComponent(userId)}/repair`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  )
+}
+
 // ─── Activation Codes ────────────────────────────────────
 
 /**
@@ -380,6 +451,64 @@ export interface UserStats {
   total: number
   byPlan: { plan: string; count: number }[]
   newThisWeek: number
+}
+
+export interface AccountProjectBindingProject {
+  id: string
+  userId?: string
+  name: string
+  status: string
+  updatedAt?: string
+}
+
+export type AccountProjectBindingStatus =
+  | "bound"
+  | "setup_required"
+  | "admin_review_required"
+  | "inactive_project_recovery_required"
+
+export interface AccountProjectBindingItem {
+  userId: string
+  email: string
+  name: string
+  status: AccountProjectBindingStatus
+  boundProjectId: string | null
+  projectBoundAt: string | null
+  projectBindingSource: string | null
+  projectCount: number
+  projects: Array<{
+    id: string
+    name: string
+    status: string
+    updatedAt: string
+  }>
+}
+
+export interface AccountProjectRepairImpact {
+  userId: string
+  currentBinding: { id: string; name: string; status: string } | null
+  targetProject: { id: string; name: string; status: string }
+  reactivationRequired: boolean
+  targetContentCounts: {
+    knowledgeEntries: number
+    scripts: number
+    aimGenerations: number
+  }
+  wouldCancel: {
+    agentInvocations: number
+    backgroundTasks: number
+  }
+  unattributedHistoryCount: number
+}
+
+export interface AccountProjectRepairResult {
+  previousProjectId: string | null
+  nextProjectId: string
+  target: { id: string; name: string; status: string }
+  reactivated: boolean
+  failedInvocationCount: number
+  cancelledTaskCount: number
+  unattributedHistoryCount: number
 }
 
 export interface ActivationCodeItem {

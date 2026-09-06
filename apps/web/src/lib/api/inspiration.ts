@@ -37,6 +37,8 @@ export interface ChannelBindingItem {
   id: string
   platform: "feishu" | "workbuddy_wechat" | "wecom"
   externalChatId: string
+  /** 同一平台下的外部账号标识；用于矩阵账号区分，留空表示默认账号。 */
+  externalAccountId: string
   projectId: string
   triggerMode: "mention_or_keyword" | "all"
   triggerKeywords: string[]
@@ -74,7 +76,8 @@ export async function listChannelBindings(): Promise<ChannelBindingItem[]> {
 export async function saveChannelBinding(input: {
   platform: ChannelBindingItem["platform"]
   externalChatId: string
-  projectId: string
+  externalAccountId?: string
+  projectId?: string
   triggerMode: ChannelBindingItem["triggerMode"]
   triggerKeywords: string[]
   executionMode?: ChannelBindingItem["executionMode"]

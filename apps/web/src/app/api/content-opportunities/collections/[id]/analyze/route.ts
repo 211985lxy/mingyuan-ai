@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import { areBackgroundTasksEnabled } from "@/lib/background-task-runtime"
 import { OPPORTUNITY_ANALYZE_TASK_KIND } from "@/features/opportunities/services/analyze-background-task"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * POST /api/content-opportunities/collections/[id]/analyze
@@ -15,12 +16,14 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
   }
 
+  const project = await resolveBoundProject({ userId: user.id })
+
   if (!areBackgroundTasksEnabled()) {
     return NextResponse.json({ error: "BACKGROUND_TASKS_UNAVAILABLE" }, { status: 503 })
   }
 
   const collection = await prisma.opportunityCollection.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: user.id, projectId: project.id },
   })
 
   if (!collection) {

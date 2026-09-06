@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { redis } from "@/lib/redis"
+import {
+  incrementIsolationMetric,
+  normalizeIsolationEntryType,
+} from "@/lib/account-project-isolation-metrics"
 
 export type AimTraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -275,4 +279,43 @@ export async function failAimTrace(trace: AimTraceRecorder | undefined, error: u
     errorMessage: summarizeText(message),
   })
   publishTraceEvent(trace.id, { type: "done", status: "failed" })
+}
+
+/**
+ * Emit a minimal, safe audit log for a generate request that was rejected
+ * because the client-supplied project context does not match the account's
+ * bound project.
+ *
+ * Security: logs ONLY safe identifiers (source, userId, requested project id,
+ * and the error code). NEVER logs customer content, chat text, body, or the
+ * untrusted project's data.
+ */
+export async function logAimProjectContextRejection(input: {
+  source: string
+  userId: string
+  requestedProjectId: string | null
+  error: unknown
+}): Promise<void> {
+  const code =
+    input.error && typeof input.error === "object" && typeof (input.error as { code?: unknown }).code === "string"
+      ? (input.error as { code: string }).code
+      : "UNKNOWN"
+  if (code !== "UNKNOWN") {
+    // Isolation observability (web/generate path). The metric stores ONLY the
+    // entry type + stable error code — never the userId, requested project id
+    // or any customer/body text. The internal source discriminator "generate"
+    // maps onto the shared isolation entry vocabulary as "web"; unknown source
+    // values are dropped so no stray text can ever become a label.
+    const entry = normalizeIsolationEntryType(input.source)
+    if (entry) {
+      incrementIsolationMetric("project_context_mismatch_total", { entry, code })
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.error("[aim-generate-project-rejected]", {
+    source: input.source,
+    userId: input.userId,
+    requestedProjectId: input.requestedProjectId,
+    code,
+  })
 }

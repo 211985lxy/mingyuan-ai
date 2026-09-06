@@ -14,7 +14,7 @@ import {
 import type { StructureBlueprint, TopicContext, HotTopicFusionContext } from "@/lib/script-generator"
 import type { ApiHotTopicFit, ApiHotTopicInsight } from "@/types/api"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
-import { ownsActiveProject } from "@/lib/resource-ownership"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 import { buildTopicContext } from "@/features/aim/services/script-topic-context"
 import { buildIpWikiBlock } from "@/lib/ip-wiki/context"
 import { parseMethodologyProfileIds } from "@/lib/aim-generate-validate"
@@ -48,7 +48,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   // Phase 14: COPY-04 hot topic fusion
   const hotTopicFusionTitle = typeof body.hotTopicFusionTitle === "string" ? body.hotTopicFusionTitle : null
   const hotTopicFusionPoints = Array.isArray(body.hotTopicFusionPoints) ? body.hotTopicFusionPoints as string[] : null
-  const projectId = typeof body.projectId === "string" && body.projectId ? body.projectId : undefined
+  const requestedProjectId = typeof body.projectId === "string" && body.projectId ? body.projectId.trim() : undefined
   // ADR-002：显式选择的命名方法论 profile id（MVP 最多 1 个）
   const methodologyProfileIds = parseMethodologyProfileIds(body)
 
@@ -62,8 +62,17 @@ export const POST = withUserAuth(async (request, { user }) => {
     )
   }
 
-  if (projectId && !(await ownsActiveProject(user.id, projectId))) {
-    return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
   }
 
   const [template, videoStructure] = await Promise.all([
@@ -83,6 +92,12 @@ export const POST = withUserAuth(async (request, { user }) => {
       where: {
         OR: [{ id: structureId }, { name: structureId }],
         status: "published",
+        AND: [{
+          OR: [
+            { origin: "canonical" },
+            { origin: "extracted", userId: user.id, projectId },
+          ],
+        }],
       },
       select: {
         id: true,
@@ -198,6 +213,7 @@ export const POST = withUserAuth(async (request, { user }) => {
         copyStructureCode,
         endingTypeCode,
         user.id,
+        projectId,
       )
       console.log(`[${requestId}] Topic context loaded: opening=${openingTypeCode}, structure=${copyStructureCode}, ending=${endingTypeCode}`)
     } catch (error) {
@@ -278,6 +294,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       const run = await tx.contentGenerationRun.create({
         data: {
           userId: user.id,
+          projectId,
           ipProfileId: ipProfile.id,
           templateId: template.id,
           structureId: videoStructure.id,
@@ -306,6 +323,7 @@ export const POST = withUserAuth(async (request, { user }) => {
           tx.script.create({
             data: {
               userId: user.id,
+              projectId,
               content,
               sourceTemplateId: template.id,
               generationRunId: run.id,
@@ -332,6 +350,7 @@ export const POST = withUserAuth(async (request, { user }) => {
             tx.script.create({
               data: {
                 userId: user.id,
+                projectId,
                 content,
                 sourceTemplateId: template.id,
                 generationRunId: run.id,

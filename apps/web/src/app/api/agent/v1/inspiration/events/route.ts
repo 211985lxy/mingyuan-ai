@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { parseJsonBody } from "@/lib/api-contract"
 import { agentAuthErrorResponse, assertAgentProjectAccess, assertAgentScope, authenticateAgentRequest, recordAgentApiCall, type AgentApiContext } from "@/lib/agent-api-auth"
-import { inspirationEventBodySchema } from "@/features/knowledge/contracts/api"
+import { agentInspirationEventBodySchema } from "@/features/aim/contracts/agent-api"
 import { ingestInspirationEvent } from "@/features/topics/services/inspiration-events"
 import { InspirationPipelineError } from "@/lib/inspiration-pipeline-error"
 import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
@@ -77,10 +77,12 @@ export async function POST(request: NextRequest) {
   try {
     context = await authenticateAgentRequest(request)
     assertAgentScope(context, AGENT_SCOPE.inspirationIngest)
-    const body = await parseJsonBody(request, inspirationEventBodySchema, { maxBytes: 16 * 1024 })
-    projectId = body.projectId
+    const parsedBody = await parseJsonBody(request, agentInspirationEventBodySchema, { maxBytes: 16 * 1024 })
+    projectId = parsedBody.projectId || context.boundProjectId || ""
+    if (!projectId) throw new Error("请选择 IP 营销全案")
+    const body = { ...parsedBody, projectId }
     inputSummary = buildPrivacySafeSummary(body)
-    await assertAgentProjectAccess(context, body.projectId)
+    await assertAgentProjectAccess(context, projectId)
     const result = await ingestInspirationEvent(body, context.userId)
     await recordAgentApiCall({ context, action: "inspiration.events.ingest", projectId, inputSummary, status: "success", durationMs: Date.now() - startedAt })
     return NextResponse.json(result, { status: 202 })

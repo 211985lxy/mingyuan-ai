@@ -7,6 +7,7 @@ export interface ApiUser {
   plan: string;
   createdAt?: string;
   expiresAt?: string | null;
+  boundProjectId?: string | null;
   isActivated?: boolean;
   subscriptionStatus?: "inactive" | "active" | "expired";
 }

@@ -8,14 +8,16 @@ import { prisma } from "@/lib/prisma"
  * @param userId - 用户 ID
  * @returns 无返回值
  */
-export async function processInspiration(inspirationId: string, userId: string) {
+export async function processInspiration(inspirationId: string, userId: string, projectId?: string) {
+  if (!projectId) throw new Error("INSPIRATION_PROJECT_FORBIDDEN")
+  const projectScope = projectId ? { projectId } : {}
   const claimed = await prisma.inspiration.updateMany({
-    where: { id: inspirationId, userId, aiStatus: { in: ["pending", "failed"] } },
+    where: { id: inspirationId, userId, ...projectScope, aiStatus: { in: ["pending", "failed"] } },
     data: { aiStatus: "processing", errorMessage: null },
   })
   if (claimed.count === 0) {
     const existing = await prisma.inspiration.findFirst({
-      where: { id: inspirationId, userId },
+      where: { id: inspirationId, userId, ...projectScope },
       select: { aiStatus: true },
     })
     if (!existing) throw new Error("灵感记录不存在")
@@ -25,7 +27,7 @@ export async function processInspiration(inspirationId: string, userId: string) 
 
   try {
     const inspiration = await prisma.inspiration.findFirst({
-      where: { id: inspirationId, userId },
+      where: { id: inspirationId, userId, ...projectScope },
       select: { content: true },
     })
     if (!inspiration) throw new Error("灵感记录不存在")
@@ -46,7 +48,7 @@ export async function processInspiration(inspirationId: string, userId: string) 
     const topics = Array.isArray(parsed.topics) ? parsed.topics.slice(0, 3) : []
 
     await prisma.inspiration.updateMany({
-      where: { id: inspirationId, userId, aiStatus: "processing" },
+      where: { id: inspirationId, userId, ...projectScope, aiStatus: "processing" },
       data: {
         aiStatus: "completed",
         generatedTopics: topics as Prisma.InputJsonValue,
@@ -57,7 +59,7 @@ export async function processInspiration(inspirationId: string, userId: string) 
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI 处理失败"
     await prisma.inspiration.updateMany({
-      where: { id: inspirationId, userId, aiStatus: "processing" },
+      where: { id: inspirationId, userId, ...projectScope, aiStatus: "processing" },
       data: { aiStatus: "failed", errorMessage: message },
     })
     throw error

@@ -31,6 +31,7 @@ const {
   executeAimChatDomain,
   streamAimChatDomain,
   ownsActiveProject,
+  resolveBoundProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   authErrorResponse: vi.fn((): Response | null => null),
@@ -61,6 +62,7 @@ const {
   executeAimChatDomain: vi.fn(),
   streamAimChatDomain: vi.fn(),
   ownsActiveProject: vi.fn(async () => true),
+  resolveBoundProject: vi.fn(async () => ({ id: "p1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
@@ -94,6 +96,13 @@ vi.mock("@/lib/aim-harness/runtime", () => ({ executeAimRun, streamAimRun }))
 vi.mock("@/lib/aim-harness/domain-executor", () => ({ executeAimChatDomain, streamAimChatDomain }))
 vi.mock("@/lib/aim-harness/hashing", () => ({ sha256: vi.fn(() => "hash") }))
 vi.mock("@/lib/resource-ownership", () => ({ ownsActiveProject }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/aim/chat/route"
 
@@ -128,10 +137,14 @@ describe("POST /api/aim/chat", () => {
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
     ownsActiveProject.mockResolvedValue(true)
+    resolveBoundProject.mockResolvedValue({ id: "p1", name: "测试项目", status: "active" })
   })
 
   it("rejects a project that is not owned before loading customer context", async () => {
-    ownsActiveProject.mockResolvedValueOnce(false)
+    resolveBoundProject.mockRejectedValueOnce(new (class extends Error {
+      code = "PROJECT_CONTEXT_MISMATCH"
+      status = 409
+    })("当前账号只能使用已绑定的项目"))
 
     const res = await POST(makeRequest({
       agentId: "content_producer",
@@ -140,9 +153,9 @@ describe("POST /api/aim/chat", () => {
     }))
     const body = await res.json()
 
-    expect(res.status).toBe(404)
-    expect(body.error).toBe("IP 营销全案不存在或已归档")
-    expect(ownsActiveProject).toHaveBeenCalledWith("user-1", "project-from-another-user")
+    expect(res.status).toBe(409)
+    expect(body.error).toBe("当前账号只能使用已绑定的项目")
+    expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-from-another-user" })
     expect(executeAimRun).not.toHaveBeenCalled()
     expect(streamAimRun).not.toHaveBeenCalled()
   })
@@ -168,11 +181,11 @@ describe("POST /api/aim/chat", () => {
   })
 
   it("delegates tool actions and requires a project", async () => {
-    // 缺 projectId → 400
-    const missing = await POST(makeRequest({ toolAction: "lark_xxx", messages: [{ role: "user", content: "x" }] }))
-    expect(missing.status).toBe(400)
-
+    // 缺 projectId 时由账号绑定自动补齐项目上下文
     handleLarkToolAction.mockResolvedValue({ ok: true, summary: "已执行" })
+    const missing = await POST(makeRequest({ toolAction: "lark_xxx", messages: [{ role: "user", content: "x" }] }))
+    expect(missing.status).toBe(200)
+
     const res = await POST(makeRequest({ toolAction: "lark_xxx", projectId: "p1", resultId: "r1", messages: [{ role: "user", content: "x" }] }))
     const body = await res.json()
 

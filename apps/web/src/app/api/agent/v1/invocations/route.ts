@@ -18,7 +18,7 @@ import {
 
 const submitSchema = z.object({
   idempotencyKey: z.string().trim().min(MIN_IDEMPOTENCY_KEY_LENGTH).max(MAX_IDEMPOTENCY_KEY_LENGTH),
-  projectId: z.string().trim().min(1).max(80),
+  projectId: z.string().trim().min(1).max(80).optional(),
   agentId: z.string().trim().min(1).max(60),
   rawInput: z.string().min(1).max(MAX_RAW_INPUT_CHARS),
   targetFormats: z.array(z.string()).min(MIN_TARGET_FORMATS).max(MAX_TARGET_FORMATS),
@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
     const context = await authenticateAgentRequest(request)
     assertAgentScope(context, AGENT_SCOPE.draftsSubmit)
     const body = await parseJsonBody(request, submitSchema, { maxBytes: 64 * 1024 })
+    const projectId = body.projectId || context.boundProjectId || ""
 
     const result = await submitInvocation(context, {
       idempotencyKey: body.idempotencyKey,
-      projectId: body.projectId,
+      projectId,
       agentId: body.agentId as never,
       rawInput: body.rawInput,
       targetFormats: body.targetFormats as never,

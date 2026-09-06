@@ -9,7 +9,7 @@ import {
   type StyleProfileDelta,
   type StyleSampleInput,
 } from "@/lib/aim-style-evolution"
-import { ownsActiveProject } from "@/lib/resource-ownership"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 import { aimEvolveStyleBodySchema } from "@/features/aim/contracts/api"
 
 // 提取 + 合并两次 LLM 调用，给足时间
@@ -26,11 +26,11 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const body = await parseJsonBody(request, aimEvolveStyleBodySchema, { maxBytes: 512 * 1024 })
-    const projectId = resolveProjectId(body.projectId)
-
-    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
-      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
-    }
+    const requestedProjectId = resolveProjectId(body.projectId)
+    const projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
 
     const operation = body.operation
 
@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
       created: result.created,
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/evolve-style] Error:", error)

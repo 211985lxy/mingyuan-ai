@@ -128,16 +128,34 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     \`userId\` VARCHAR(30) NOT NULL,
     \`projectId\` VARCHAR(30) NOT NULL,
     \`platform\` VARCHAR(40) NOT NULL,
+    \`externalAccountId\` VARCHAR(191) NOT NULL DEFAULT '',
     \`externalChatId\` VARCHAR(191) NOT NULL,
     \`agentId\` VARCHAR(40) NOT NULL,
     \`lastMessageAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     \`updatedAt\` DATETIME(3) NOT NULL,
-    UNIQUE INDEX \`AimConversation_platform_externalChatId_agentId_key\`(\`platform\`, \`externalChatId\`, \`agentId\`),
+    UNIQUE INDEX \`AimConversation_platform_extAccountId_extChatId_agentId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`, \`agentId\`),
     INDEX \`AimConversation_userId_updatedAt_idx\`(\`userId\`, \`updatedAt\`),
     INDEX \`AimConversation_projectId_updatedAt_idx\`(\`projectId\`, \`updatedAt\`),
     PRIMARY KEY (\`id\`)
   ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  `ALTER TABLE \`AimConversation\`
+    ADD COLUMN IF NOT EXISTS \`externalAccountId\` VARCHAR(191) NOT NULL DEFAULT ''`,
+  // 旧版唯一键没有外部账号维度；动态判断后再替换，兼容已存在和新建表。
+  `SET @aim_conversation_drop_old_index = (
+      SELECT IF(COUNT(*) > 0,
+        'ALTER TABLE AimConversation DROP INDEX AimConversation_platform_externalChatId_agentId_key',
+        'SELECT 1')
+      FROM information_schema.statistics
+      WHERE table_schema = DATABASE()
+        AND table_name = 'AimConversation'
+        AND index_name = 'AimConversation_platform_externalChatId_agentId_key'
+    );
+    PREPARE aim_conversation_drop_stmt FROM @aim_conversation_drop_old_index;
+    EXECUTE aim_conversation_drop_stmt;
+    DEALLOCATE PREPARE aim_conversation_drop_stmt`,
+  `ALTER TABLE \`AimConversation\`
+    ADD UNIQUE INDEX IF NOT EXISTS \`AimConversation_platform_extAccountId_extChatId_agentId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`, \`agentId\`)`,
   `CREATE TABLE IF NOT EXISTS \`AimConversationMessage\` (
     \`id\` VARCHAR(30) NOT NULL,
     \`conversationId\` VARCHAR(30) NOT NULL,
@@ -539,6 +557,22 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     INDEX \`AgentInvocation_userId_createdAt_idx\`(\`userId\`, \`createdAt\` DESC),
     INDEX \`AgentInvocation_status_queuedAt_idx\`(\`status\`, \`queuedAt\`)
   ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  // ── 历史账号级内容表增加可选项目归属（account-project isolation Task 3） ──
+  `ALTER TABLE \`CompetitorAnalysis\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD INDEX IF NOT EXISTS \`CompetitorAnalysis_userId_projectId_createdAt_idx\`(\`userId\`, \`projectId\`, \`createdAt\` DESC)`,
+  `ALTER TABLE \`WatchAccount\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD INDEX IF NOT EXISTS \`WatchAccount_userId_projectId_createdAt_idx\`(\`userId\`, \`projectId\`, \`createdAt\` DESC)`,
+  `ALTER TABLE \`VideoCopyExtraction\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD INDEX IF NOT EXISTS \`VideoCopyExtraction_userId_projectId_createdAt_idx\`(\`userId\`, \`projectId\`, \`createdAt\` DESC)`,
+  `ALTER TABLE \`ContentGenerationRun\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD INDEX IF NOT EXISTS \`ContentGenerationRun_userId_projectId_createdAt_idx\`(\`userId\`, \`projectId\`, \`createdAt\` DESC)`,
+  `ALTER TABLE \`Script\`
+    ADD COLUMN IF NOT EXISTS \`projectId\` VARCHAR(191) NULL,
+    ADD INDEX IF NOT EXISTS \`Script_userId_projectId_createdAt_idx\`(\`userId\`, \`projectId\`, \`createdAt\` DESC)`,
 ]
 
 function runMysql(connection, query) {

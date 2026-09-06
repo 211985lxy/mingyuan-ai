@@ -96,6 +96,7 @@ export default function AimPage() {
   }, [w.selectedAgentId, w.selectedProjectId])
 
   const isLanding = w.showWorkflowLanding && !w.planSession.isPlanMode
+  const boundProjectName = w.projects.find((project) => project.id === w.selectedProjectId)?.name ?? null
   const contextUsage = useMemo(() => {
     const breakdown = estimateContextUsageBreakdown({
       conversation: w.messages.map((message) => ({
@@ -292,6 +293,7 @@ export default function AimPage() {
           workflowStage={w.currentWorkflowStage}
           agentTitle={isLanding ? "创作台" : w.agent.title}
           AgentIcon={w.agent.icon}
+          projectName={boundProjectName}
           showStageProgress={!isLanding}
           onStageChange={w.beginWorkflowStage}
           onReset={() => {

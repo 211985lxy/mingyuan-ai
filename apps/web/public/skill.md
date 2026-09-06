@@ -5,7 +5,7 @@ description: Call Mingdong AIM agents to generate draft-only IP content assets f
 
 # 明动 AIM Agent Skill
 
-明动 AIM 是一个面向 IP 内容增长的草稿生成能力。外部 Agent 可以读取本文档，使用授权的 API Key 调用 AIM 智能体，为指定 IP 营销全案生成内容草稿。所有接口使用当前 `skill.md` 所在站点作为同源地址。
+明动 AIM 是一个面向 IP 内容增长的草稿生成能力。外部 Agent 可以读取本文档，使用授权的 API Key 调用 AIM 智能体，为登录账号绑定的 IP 营销全案生成内容草稿。所有接口使用当前 `skill.md` 所在站点作为同源地址。
 
 ## 能力边界
 
@@ -33,7 +33,7 @@ description: Call Mingdong AIM agents to generate draft-only IP content assets f
 Authorization: Bearer maim_xxx
 ```
 
-API Key 由明动 AIM 后台创建。每个 Key 会绑定可访问的 IP 营销全案、可调用的智能体和每日调用上限。
+API Key 由明动 AIM 后台创建。每个 AIM 登录账号只能绑定一个 IP 营销全案；Key 会继承该账号的项目边界、可调用的智能体和每日调用上限。账号登录后自动使用绑定项目，不提供项目切换。
 
 ## 接口
 
@@ -45,13 +45,13 @@ GET /api/agent/v1/capabilities
 
 返回当前可调用的智能体、支持的输出格式和能力边界。
 
-### 查看可访问项目
+### 查看当前绑定项目
 
 ```http
 GET /api/agent/v1/projects
 ```
 
-返回当前 API Key 可访问的 IP 营销全案列表。外部 Agent 生成内容时必须显式传入其中一个 `projectId`。
+返回当前 API Key 所属账号的绑定项目。正常调用可以省略 `projectId`，AIM 会自动使用该项目；如果显式传入，必须与绑定项目一致。
 
 ### 生成内容草稿
 
@@ -62,7 +62,6 @@ Authorization: Bearer maim_xxx
 
 {
   "agentId": "content_producer",
-  "projectId": "project_id",
   "rawInput": "把这个选题生成视频脚本、朋友圈和拍摄交接单。",
   "targetFormats": ["video_script", "moments_post", "shooting_brief"],
   "instruction": "语气更像老板本人，少用营销黑话。",
@@ -70,6 +69,8 @@ Authorization: Bearer maim_xxx
   "topicRationale": "适合教育企业客户理解 AI 员工的价值"
 }
 ```
+
+`projectId` 为兼容旧调用保留为可选字段；不传时自动取账号绑定项目，传入其他项目会被拒绝。
 
 允许的 `targetFormats`：
 

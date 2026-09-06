@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   knowledgeFindUnique: vi.fn(),
   knowledgeUpsert: vi.fn(),
   ensureKnowledgeEmbedding: vi.fn(),
+  resolveBoundProject: vi.fn(),
 }))
 
 vi.mock("@/env", () => ({
@@ -29,6 +30,13 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/llm/embeddings", () => ({
   ensureKnowledgeEmbedding: mocks.ensureKnowledgeEmbedding,
+}))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject: mocks.resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
 }))
 
 import { POST } from "@/app/api/knowledge/sync/route"
@@ -60,6 +68,7 @@ describe("Obsidian knowledge sync ownership", () => {
     mocks.knowledgeFindUnique.mockResolvedValue(null)
     mocks.knowledgeUpsert.mockResolvedValue({ id: entry.id, title: entry.title })
     mocks.ensureKnowledgeEmbedding.mockResolvedValue(undefined)
+    mocks.resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
   })
 
   it("binds writes to the configured user", async () => {
@@ -69,10 +78,7 @@ describe("Obsidian knowledge sync ownership", () => {
     }))
 
     expect(response.status).toBe(200)
-    expect(mocks.projectFindFirst).toHaveBeenCalledWith({
-      where: { id: "project-1", userId: "configured-user" },
-      select: { id: true },
-    })
+    expect(mocks.resolveBoundProject).toHaveBeenCalledWith({ userId: "configured-user", requestedProjectId: "project-1" })
     expect(mocks.knowledgeUpsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: entry.id, userId: "configured-user" },
       create: expect.objectContaining({ userId: "configured-user", projectId: "project-1" }),

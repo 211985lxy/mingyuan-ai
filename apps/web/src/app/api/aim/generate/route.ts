@@ -33,7 +33,12 @@ export async function POST(request: NextRequest) {
       await parseJsonRecord(request, { maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES }),
     )
     trace = prepared.trace
-    if (!prepared.ok) return NextResponse.json({ error: prepared.validationError }, { status: prepared.status ?? 400 })
+    if (!prepared.ok) {
+      return NextResponse.json({
+        error: prepared.validationError,
+        ...(prepared.errorCode ? { code: prepared.errorCode } : {}),
+      }, { status: prepared.status ?? 400 })
+    }
 
     const run = await executePreparedAimGeneration(prepared)
     await recordAimGenerationQuality(prepared.trace, run)

@@ -1,18 +1,11 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { prisma } from "@/lib/prisma"
 import { listIpWikiPages, saveIpWikiPageBatch, type SaveIpWikiPageInput } from "@/lib/ip-wiki/repo"
 import { isIpWikiPageType } from "@/lib/ip-wiki/types"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 30
-
-async function ensureProject(userId: string, projectId: string) {
-  return prisma.clientProject.findFirst({
-    where: { id: projectId, userId, status: "active" },
-    select: { id: true },
-  })
-}
 
 /** GET /api/aim/ip-wiki/pages?projectId=... —— 列出某 IP 全案的 active 维基页 */
 /**
@@ -23,18 +16,17 @@ async function ensureProject(userId: string, projectId: string) {
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const projectId = request.nextUrl.searchParams.get("projectId")?.trim() ?? ""
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
-    }
-    const project = await ensureProject(user.id, projectId)
-    if (!project) {
-      return NextResponse.json({ error: "IP营销全案不存在或已归档" }, { status: 404 })
-    }
+    const projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: request.nextUrl.searchParams.get("projectId"),
+    })).id
 
     const pages = await listIpWikiPages({ projectId })
     return NextResponse.json({ pages })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/ip-wiki/pages GET] Error:", error)
@@ -52,22 +44,19 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const body = await parseJsonRecord(request)
-    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+    const requestedProjectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const sourceGenerationId =
       typeof body.sourceGenerationId === "string" ? body.sourceGenerationId.trim() : undefined
     const rawPages = Array.isArray(body.pages) ? body.pages : []
 
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
-    }
     if (rawPages.length === 0) {
       return NextResponse.json({ error: "pages 不能为空" }, { status: 400 })
     }
 
-    const project = await ensureProject(user.id, projectId)
-    if (!project) {
-      return NextResponse.json({ error: "IP营销全案不存在或已归档" }, { status: 404 })
-    }
+    const projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
 
     const pages: SaveIpWikiPageInput[] = []
     for (const item of rawPages) {
@@ -102,6 +91,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ pages: saved }, { status: 201 })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/ip-wiki/pages POST] Error:", error)

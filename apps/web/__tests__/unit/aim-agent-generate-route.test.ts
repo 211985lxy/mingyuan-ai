@@ -123,6 +123,22 @@ describe("POST /api/agent/v1/aim/generate", () => {
     expect(body.error).toBe("请选择 IP 营销全案")
   })
 
+  it("defaults an omitted projectId to the login account's bound project", async () => {
+    authenticateAgentRequest.mockResolvedValue({
+      apiKeyId: "key-1",
+      userId: "user-1",
+      boundProjectId: "p1",
+      allowedProjects: ["p1"],
+    })
+
+    const res = await POST(makeRequest({ rawInput: "写一条口播", agentId: "content_producer", targetFormats: ["video_script"] }))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.projectId).toBe("p1")
+    expect(assertAgentProjectAccess).toHaveBeenCalledWith(expect.objectContaining({ boundProjectId: "p1" }), "p1")
+  })
+
   it("returns 400 when targetFormats is empty", async () => {
     const res = await POST(makeRequest({ rawInput: "x", projectId: "p1", agentId: "content_producer", targetFormats: [] }))
     const body = await res.json()

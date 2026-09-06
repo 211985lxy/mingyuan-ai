@@ -47,4 +47,36 @@ describe("POST /api/agent/v1/inspiration/events", () => {
     expect(mocks.ingestInspirationEvent).toHaveBeenCalledWith(expect.objectContaining({ platform: "workbuddy_wechat", externalChatId: "chat-1" }), "user-1")
     expect(mocks.recordAgentApiCall).toHaveBeenCalledWith(expect.objectContaining({ action: "inspiration.events.ingest", status: "success" }))
   })
+
+  it("defaults an omitted projectId to the login account's bound project", async () => {
+    mocks.authenticateAgentRequest.mockResolvedValue({
+      apiKeyId: "key-1",
+      userId: "user-1",
+      boundProjectId: "project-1",
+      allowedProjects: ["project-1"],
+      allowedAgents: [],
+    })
+
+    const request = new NextRequest("http://localhost/api/agent/v1/inspiration/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer maim_test" },
+      body: JSON.stringify({
+        platform: "workbuddy_wechat",
+        externalChatId: "chat-1",
+        externalSenderId: "sender-1",
+        content: "@助手 收选题 https://v.douyin.com/demo/",
+      }),
+    })
+
+    const response = await POST(request)
+    expect(response.status).toBe(202)
+    expect(mocks.assertAgentProjectAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ boundProjectId: "project-1" }),
+      "project-1",
+    )
+    expect(mocks.ingestInspirationEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1" }),
+      "user-1",
+    )
+  })
 })

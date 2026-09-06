@@ -11,12 +11,24 @@ import {
   listExtractedStructures,
   saveExtractedStructure,
 } from "@/lib/aim/script-structure-store"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 // ─── GET: 列出当前用户已提取的结构模板 ───────────────────
 
 export const GET = withUserAuth(async (request, { user }) => {
   const url = new URL(request.url)
-  const projectId = url.searchParams.get("projectId") || undefined
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: url.searchParams.get("projectId"),
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
   const limitParam = url.searchParams.get("limit")
   const limit = limitParam ? Number(limitParam) : 50
 
@@ -44,7 +56,18 @@ export const POST = withUserAuth(async (request, { user }) => {
     return NextResponse.json({ error: "请提供至少一条文案内容" }, { status: 400 })
   }
 
-  const projectId = typeof body.projectId === "string" ? body.projectId : undefined
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: typeof body.projectId === "string" ? body.projectId : undefined,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
 
   try {
     const extraction = await extractStructuresFromBatch(scripts)

@@ -43,6 +43,8 @@
     "schema:migration-status": "prisma migrate status",
     "schema:migration-integrity": "node scripts/check-migration-integrity.mjs",
     "schema:retired-media-preflight": "node scripts/check-retired-media-data.mjs",
+    "account:binding-backfill": "DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' tsx --tsconfig tsconfig.json scripts/backfill-account-project-bindings.ts",
+    "account:isolation-audit": "DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' tsx --tsconfig tsconfig.json scripts/audit-account-project-isolation.ts",
     "backup:database": "node scripts/backup-database.mjs",
     "backup:verify": "node scripts/verify-database-backup.mjs",
     "env:check": "node scripts/check-env-contract.mjs",

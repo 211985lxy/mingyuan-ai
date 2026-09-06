@@ -47,13 +47,18 @@ export async function syncAimGenerationContent(
     generationId: string
     format: string
     content: string
+    projectId?: string
   },
 ): Promise<{ column: AimGenerationContentColumn | null }> {
   const column = contentFormatToGenerationColumn(input.format)
   if (!column) return { column: null }
 
   const result = await tx.aimGeneration.updateMany({
-    where: { id: input.generationId, userId: input.userId },
+    where: {
+      id: input.generationId,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
     data: { [column]: input.content },
   })
   if (result.count === 0) {
@@ -67,12 +72,16 @@ export async function syncAimGenerationContent(
  */
 export async function readAimGenerationContent(
   tx: Prisma.TransactionClient,
-  input: { userId: string; generationId: string; format: string },
+  input: { userId: string; generationId: string; format: string; projectId?: string },
 ): Promise<string | null> {
   const column = contentFormatToGenerationColumn(input.format)
   if (!column) return null
   const row = await tx.aimGeneration.findFirst({
-    where: { id: input.generationId, userId: input.userId },
+    where: {
+      id: input.generationId,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
     select: { [column]: true },
   })
   if (!row) return null

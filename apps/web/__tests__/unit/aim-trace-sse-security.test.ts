@@ -7,6 +7,7 @@ const {
   brokerSubscribe,
   brokerCanAccept,
   brokerGetMetrics,
+  resolveBoundProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   findFirst: vi.fn(),
@@ -18,6 +19,7 @@ const {
     timedOut: 0,
     redisErrors: 0,
   })),
+  resolveBoundProject: vi.fn(),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -41,6 +43,13 @@ vi.mock("@/lib/aim-trace-stream-broker", () => ({
     }),
   },
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { GET } from "@/app/api/aim/trace/[traceId]/route"
 
@@ -55,6 +64,7 @@ describe("GET /api/aim/trace/[traceId] ownership and live subscribe gates", () =
   beforeEach(() => {
     vi.clearAllMocks()
     authenticateRequest.mockResolvedValue({ id: "user-1", email: "a@b.c" })
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     findFirst.mockResolvedValue(null)
     brokerCanAccept.mockResolvedValue({ ok: true })
     brokerSubscribe.mockResolvedValue({
@@ -79,7 +89,7 @@ describe("GET /api/aim/trace/[traceId] ownership and live subscribe gates", () =
     })
     expect(missing.status).toBe(404)
     expect(findFirst).toHaveBeenCalledWith({
-      where: { id: "missing", userId: "user-1" },
+      where: { id: "missing", userId: "user-1", projectId: "project-1" },
       select: expect.any(Object),
     })
     expect(brokerSubscribe).not.toHaveBeenCalled()

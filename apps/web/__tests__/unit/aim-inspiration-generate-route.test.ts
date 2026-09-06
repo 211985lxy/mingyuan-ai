@@ -11,12 +11,14 @@ const {
   executeAimRun,
   inspirationFindFirst,
   inspirationUpdate,
+  resolveBoundProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   authErrorResponse: vi.fn((): Response | null => null),
   executeAimRun: vi.fn(),
   inspirationFindFirst: vi.fn(),
   inspirationUpdate: vi.fn(async () => ({})),
+  resolveBoundProject: vi.fn(async () => ({ id: "p1", name: "项目一", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -44,6 +46,7 @@ vi.mock("@/lib/aim-observability", () => ({
 vi.mock("@/lib/aim-harness/runtime", () => ({
   executeAimRun,
 }))
+vi.mock("@/lib/account-project-context", () => ({ resolveBoundProject }))
 
 import { POST } from "@/app/api/inspiration/[id]/generate/route"
 
@@ -77,18 +80,16 @@ describe("POST /api/inspiration/[id]/generate", () => {
     expect(res.status).toBe(404)
     expect(body.error).toBe("灵感记录不存在")
     // 归属隔离：findFirst 必须按 id + userId 过滤
-    expect(inspirationFindFirst).toHaveBeenCalledWith({ where: { id: "insp-1", userId: "user-1" } })
+    expect(inspirationFindFirst).toHaveBeenCalledWith({ where: { id: "insp-1", userId: "user-1", projectId: "p1" } })
     expect(executeAimRun).not.toHaveBeenCalled()
   })
 
-  it("returns 400 when projectId is missing", async () => {
+  it("uses the account-bound project when projectId is missing", async () => {
     inspirationFindFirst.mockResolvedValue({ id: "insp-1", content: "灵感内容" })
 
     const res = await POST(makeRequest({}), { params: Promise.resolve(ctx) })
-    const body = await res.json()
-
-    expect(res.status).toBe(400)
-    expect(body.error).toBe("请选择 IP 营销全案")
+    expect(res.status).toBe(200)
+    expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: undefined })
   })
 
   it("returns 200, runs the harness with entrypoint inspiration and writes back the result", async () => {

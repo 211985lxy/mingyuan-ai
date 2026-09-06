@@ -16,17 +16,15 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   createInspiration,
   listInspirations,
   processInspiration,
   generateFromInspiration,
-  listClientProjects,
   type InspirationItem,
-  type ClientProject,
 } from "@/lib/api/client"
 import type { AimGenerateResult } from "@/lib/api/client"
+import { getAccountProjectContext } from "@/lib/api/projects"
 
 const SOURCE_LABELS: Record<string, string> = {
   text: "手动输入",
@@ -72,19 +70,24 @@ export default function InspirationPage() {
   const [loading, setLoading] = useState(true)
   const [input, setInput] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [selectedProjectId, setSelectedProjectId] = useState("")
-  const [projects, setProjects] = useState<ClientProject[]>([])
+  const [boundProjectId, setBoundProjectId] = useState("")
+  const [boundProjectName, setBoundProjectName] = useState("")
   const [generatingId, setGeneratingId] = useState<string | null>(null)
   const [reprocessingId, setReprocessingId] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
       listInspirations(),
-      listClientProjects(),
-    ]).then(([data, projectData]) => {
+      getAccountProjectContext(),
+    ]).then(([data, context]) => {
       setInspirations(data.items)
-      setProjects(projectData)
-      setSelectedProjectId(projectData.find((p) => p.status === "active")?.id || projectData[0]?.id || "")
+      if (context.status === "bound") {
+        setBoundProjectId(context.project.id)
+        setBoundProjectName(context.project.name)
+      } else {
+        setBoundProjectId("")
+        setBoundProjectName("")
+      }
     }).catch(() => {
       toast.error("加载失败，请刷新重试")
     }).finally(() => setLoading(false))
@@ -99,7 +102,11 @@ export default function InspirationPage() {
 
     setSubmitting(true)
     try {
-      const item = await createInspiration({ content: text, projectId: selectedProjectId || undefined })
+      if (!boundProjectId) {
+        toast.error("请先完成 IP 项目绑定")
+        return
+      }
+      const item = await createInspiration({ content: text, projectId: boundProjectId })
       setInspirations((prev) => [item, ...prev])
       setInput("")
       toast.success("灵感已保存，AI 正在分析选题方向")
@@ -129,7 +136,7 @@ export default function InspirationPage() {
   }
 
   async function handleGenerateContent(inspiration: InspirationItem) {
-    if (!selectedProjectId) {
+    if (!boundProjectId) {
       toast.error("你的 IP 营销全案还在配置中")
       return
     }
@@ -137,7 +144,7 @@ export default function InspirationPage() {
     setGeneratingId(inspiration.id)
     try {
       const result = await generateFromInspiration(inspiration.id, {
-        projectId: selectedProjectId,
+        projectId: boundProjectId,
         topicTitle: undefined,
       })
       setInspirations((prev) =>
@@ -184,21 +191,13 @@ export default function InspirationPage() {
               <p className="text-xs text-muted-foreground">
                 AI 会自动分析灵感，提炼 2-3 个选题方向
               </p>
-              <Select value={selectedProjectId || "unassigned"} onValueChange={(value) => setSelectedProjectId(!value || value === "unassigned" ? "" : value)}>
-                <SelectTrigger className="h-8 w-[200px] text-xs">
-                  <SelectValue placeholder="暂不归属项目" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">暂不归属项目</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="rounded-md bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground">
+                当前项目：{boundProjectName || "尚未完成绑定"}
+              </span>
             </div>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !input.trim()}
+              disabled={submitting || !input.trim() || !boundProjectId}
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -351,7 +350,7 @@ export default function InspirationPage() {
                           重新分析
                         </Button>
                       )}
-                      {item.aiStatus === "completed" && selectedProjectId && (
+                      {item.aiStatus === "completed" && boundProjectId && (
                         <Button
                           variant="outline"
                           size="sm"

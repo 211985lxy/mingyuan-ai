@@ -3,13 +3,15 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { withUserAuth } from "@/lib/user-auth"
 import { searchBodySchema } from "@/features/opportunities/contracts/api"
 import { orchestrateSearch } from "@/features/opportunities/services/search-orchestrator"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * POST /api/content-opportunities/search
  * 跨平台内容搜索（RedFox 优先 → TikHub 兜底）
  */
-export const POST = withUserAuth(async (request, { user: _user }) => {
+export const POST = withUserAuth(async (request, { user }) => {
   const body = await parseJsonBody(request, searchBodySchema, { maxBytes: 4 * 1024 })
+  await resolveBoundProject({ userId: user.id, requestedProjectId: body.projectId })
 
   try {
     const result = await orchestrateSearch({

@@ -26,7 +26,7 @@ import {
   buildAimResultLink,
   createAimGenerationInsightResultSink,
 } from "@/lib/aim/meeting-insight-result-sink"
-import { prisma } from "@/lib/prisma"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 // 录音文件识别含提交+轮询，长会议耗时较长；对齐 process-video 的 maxDuration。
@@ -69,26 +69,26 @@ export async function POST(request: NextRequest) {
   }
 
   const assetUrl = (body.assetUrl ?? "").trim()
-  const projectId = (body.projectId ?? "").trim()
+  const requestedProjectId = (body.projectId ?? "").trim()
   const customer = (body.customer ?? "").trim()
   const meetingTitle = (body.meetingTitle ?? "").trim()
   const speakerNum = body.speakerNum && body.speakerNum >= 2 ? body.speakerNum : undefined
 
   if (!assetUrl) return badRequest("缺少 assetUrl：请先直传 OSS 拿到资源 URL。")
-  if (!projectId) return badRequest("缺少 projectId。")
   if (!customer) return badRequest("缺少 customer。")
   if (!meetingTitle) return badRequest("缺少 meetingTitle。")
 
-  // 3. 项目归属校验（与 meeting-insight 路由一致，项目零串线）
-  const project = await prisma.clientProject.findUnique({
-    where: { id: projectId },
-    select: { userId: true },
-  })
-  if (!project || project.userId !== userId) {
-    return NextResponse.json(
-      { ok: false, error: "项目不存在或不属于当前用户。" },
-      { status: 403 },
-    )
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ ok: false, error: error.message, code: error.code }, { status: error.status })
+    }
+    return NextResponse.json({ ok: false, error: "项目上下文不可用。" }, { status: 409 })
   }
 
   // 4. OSS 签名 URL（给阿里云 ASR 公网可读访问）

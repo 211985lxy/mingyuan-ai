@@ -19,11 +19,16 @@ export type RunOutcomeWriteResult =
 export async function writeFinalRunOutcome(input: {
   runId: string
   userId: string
+  projectId?: string
   channel: RunOutcomeChannel
   outcome: Omit<RunOutcomeMetadata, "channel" | "manualBaselineMinutes">
 }): Promise<RunOutcomeWriteResult> {
   const trace = await prisma.aimExecutionTrace.findFirst({
-    where: { runId: input.runId, userId: input.userId },
+    where: {
+      runId: input.runId,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     select: {
       id: true,

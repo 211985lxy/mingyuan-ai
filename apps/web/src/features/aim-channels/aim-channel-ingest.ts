@@ -13,6 +13,8 @@ import type { AimAgentId } from "@/lib/aim-harness/contracts"
 export interface AimChannelIngestInput {
   platform: string
   externalMessageId: string
+  /** 外部矩阵账号 ID；不同外部账号分开保留会话历史 */
+  externalAccountId?: string
   externalChatId: string
   externalSenderId?: string
   userId: string
@@ -70,8 +72,9 @@ export async function ingestAimChannelMessage(input: AimChannelIngestInput): Pro
   const result = await prisma.$transaction(async (tx) => {
     const conversation = await tx.aimConversation.upsert({
       where: {
-        platform_externalChatId_agentId: {
+        platform_externalAccountId_externalChatId_agentId: {
           platform: input.platform,
+          externalAccountId: input.externalAccountId || "",
           externalChatId: input.externalChatId,
           agentId,
         },
@@ -80,6 +83,7 @@ export async function ingestAimChannelMessage(input: AimChannelIngestInput): Pro
         userId: input.userId,
         projectId: input.projectId,
         platform: input.platform,
+        externalAccountId: input.externalAccountId || "",
         externalChatId: input.externalChatId,
         agentId,
       },

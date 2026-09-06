@@ -4,6 +4,7 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { AIM_AGENT_IDS } from "@/lib/aim-harness/contracts"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 const VALID_AGENT_IDS = Array.from(AIM_AGENT_IDS)
 
@@ -11,7 +12,7 @@ const createSchema = z.object({
   platform: z.enum(["feishu", "workbuddy_wechat", "wecom"]),
   externalChatId: z.string().trim().min(1).max(191),
   externalAccountId: z.string().trim().max(191).optional(),
-  projectId: z.string().trim().min(1).max(80),
+  projectId: z.string().trim().min(1).max(80).optional(),
   triggerMode: z.enum(["mention_or_keyword", "all"]).default("mention_or_keyword"),
   triggerKeywords: z.array(z.string().trim().min(1).max(40)).max(10).default(["收选题"]),
   executionMode: z.enum(["capture_only", "evaluate", "live"]).default("capture_only"),
@@ -29,8 +30,9 @@ const createSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    const boundProject = await resolveBoundProject({ userId: user.id })
     const bindings = await prisma.channelBinding.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, projectId: boundProject.id },
       orderBy: { updatedAt: "desc" },
       take: 100,
       include: { project: { select: { id: true, name: true, status: true } } },
@@ -40,9 +42,10 @@ export async function GET(request: NextRequest) {
     const bindingIds = bindings.map((b) => b.id)
     const recentInspirations = bindingIds.length > 0
       ? await prisma.inspiration.groupBy({
-          by: ["source"],
+          by: ["source", "externalAccountId"],
           where: {
             userId: user.id,
+            projectId: boundProject.id,
             source: { in: bindings.map((b) => b.platform) },
             createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
           },
@@ -53,9 +56,9 @@ export async function GET(request: NextRequest) {
 
     const recentOutboxStats = bindingIds.length > 0
       ? await prisma.channelReplyOutbox.groupBy({
-          by: ["platform", "status"],
+          by: ["platform", "externalAccountId", "status"],
           where: {
-            inspiration: { userId: user.id },
+            inspiration: { userId: user.id, projectId: boundProject.id },
             createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
           },
           _count: { id: true },
@@ -63,13 +66,20 @@ export async function GET(request: NextRequest) {
       : []
 
     // Build lookup maps
-    const inspirationsByPlatform = new Map(recentInspirations.map((r) => [r.source, r]))
-    const outboxByPlatformStatus = new Map(recentOutboxStats.map((r) => [`${r.platform}:${r.status}`, r._count.id]))
+    const inspirationsByChannel = new Map(recentInspirations.map((r) => [
+      `${r.source}:${r.externalAccountId || ""}`,
+      r,
+    ]))
+    const outboxByChannelStatus = new Map(recentOutboxStats.map((r) => [
+      `${r.platform}:${r.externalAccountId || ""}:${r.status}`,
+      r._count.id,
+    ]))
 
     const items = bindings.map((binding) => {
-      const recentInsp = inspirationsByPlatform.get(binding.platform)
-      const deadLetterCount = outboxByPlatformStatus.get(`${binding.platform}:dead_letter`) ?? 0
-      const sentCount = outboxByPlatformStatus.get(`${binding.platform}:sent`) ?? 0
+      const channelKey = `${binding.platform}:${binding.externalAccountId || ""}`
+      const recentInsp = inspirationsByChannel.get(channelKey)
+      const deadLetterCount = outboxByChannelStatus.get(`${channelKey}:dead_letter`) ?? 0
+      const sentCount = outboxByChannelStatus.get(`${channelKey}:sent`) ?? 0
       const healthStatus = deadLetterCount > 0 ? "degraded" : sentCount > 0 ? "healthy" : "unknown"
 
       return {
@@ -84,6 +94,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json({ error: "群聊绑定读取失败" }, { status: 500 })
   }
 }
@@ -97,8 +111,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const body = await parseJsonBody(request, createSchema, { maxBytes: 8 * 1024 })
-    const project = await prisma.clientProject.findFirst({ where: { id: body.projectId, userId: user.id, status: "active" }, select: { id: true } })
-    if (!project) return NextResponse.json({ error: "项目不存在或不可用" }, { status: 403 })
+    const boundProject = await resolveBoundProject({ userId: user.id, requestedProjectId: body.projectId })
     const existing = await prisma.channelBinding.findUnique({
       where: { platform_externalAccountId_externalChatId: { platform: body.platform, externalAccountId: body.externalAccountId || "", externalChatId: body.externalChatId } },
       select: { userId: true },
@@ -106,9 +119,9 @@ export async function POST(request: NextRequest) {
     if (existing && existing.userId !== user.id) return NextResponse.json({ error: "该群已绑定到其他 AIM 账号" }, { status: 409 })
     const binding = await prisma.channelBinding.upsert({
       where: { platform_externalAccountId_externalChatId: { platform: body.platform, externalAccountId: body.externalAccountId || "", externalChatId: body.externalChatId } },
-      create: { ...body, userId: user.id, status: "active" },
+      create: { ...body, projectId: boundProject.id, userId: user.id, status: "active" },
       update: {
-        projectId: body.projectId,
+        projectId: boundProject.id,
         triggerMode: body.triggerMode,
         triggerKeywords: body.triggerKeywords,
         executionMode: body.executionMode,
@@ -120,6 +133,16 @@ export async function POST(request: NextRequest) {
     })
     return NextResponse.json(binding, { status: existing ? 200 : 201 })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json({ error: "群聊绑定保存失败" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

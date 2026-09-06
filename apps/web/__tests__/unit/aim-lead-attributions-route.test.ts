@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findFirst, authenticateRequest, authErrorResponse, store } = vi.hoisted(() => ({
+const { findFirst, authenticateRequest, authErrorResponse, resolveBoundProject, store } = vi.hoisted(() => ({
   findFirst: vi.fn(),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
+  resolveBoundProject: vi.fn(async () => ({ id: "proj-1" })),
   store: {
     findByExternalRecordId: vi.fn(async () => null),
     findByExternalLeadId: vi.fn(async () => null),
@@ -19,6 +20,10 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { aimGeneration: { findFirst } },
 }))
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {},
+}))
 vi.mock("@/lib/aim/outcome-attribution-prisma", () => ({
   createPrismaOutcomeAttributionStore: vi.fn(() => store),
 }))
@@ -54,6 +59,7 @@ describe("aim lead attributions route（WP-B 强制点②）", () => {
     vi.clearAllMocks()
     authenticateRequest.mockResolvedValue({ id: "user-1" })
     authErrorResponse.mockReturnValue(null)
+    resolveBoundProject.mockResolvedValue({ id: "proj-1" })
     store.findByExternalRecordId.mockResolvedValue(null)
     store.findByExternalLeadId.mockResolvedValue(null)
     store.findByExternalDealId.mockResolvedValue(null)
@@ -91,7 +97,7 @@ describe("aim lead attributions route（WP-B 强制点②）", () => {
 
     expect(response.status).toBe(201)
     expect(findFirst).toHaveBeenCalledWith({
-      where: { id: "gen-1", userId: "user-1" },
+      where: { id: "gen-1", userId: "user-1", projectId: "proj-1" },
       select: { id: true },
     })
     expect(store.create).toHaveBeenCalledTimes(1)

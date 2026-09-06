@@ -6,6 +6,7 @@ import { processVideo } from "@/lib/content-pipeline"
 import { validateCronSecret } from "@/lib/admin-auth"
 import { withUserAuth } from "@/lib/user-auth"
 import { env } from "@/env"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 120
 
@@ -47,7 +48,10 @@ async function runInternalPipeline(request: NextRequest) {
   try {
     const body = await parseJsonBody(request, processVideoSchema)
     const userId = body.userId?.trim() || env.CONTENT_PIPELINE_USER_ID?.trim() || undefined
-    return await executePipeline(body, userId)
+    const projectId = userId
+      ? (await resolveBoundProject({ userId })).id
+      : undefined
+    return await executePipeline(body, userId, projectId)
   } catch (error) {
     return pipelineErrorResponse(error)
   }
@@ -57,7 +61,8 @@ async function runInternalPipeline(request: NextRequest) {
 const userPipelineHandler = withUserAuth(async (request, { user }) => {
   try {
     const body = await parseJsonBody(request, processVideoSchema)
-    return await executePipeline(body, user.id)
+    const project = await resolveBoundProject({ userId: user.id })
+    return await executePipeline(body, user.id, project.id)
   } catch (error) {
     return pipelineErrorResponse(error)
   }
@@ -66,6 +71,7 @@ const userPipelineHandler = withUserAuth(async (request, { user }) => {
 async function executePipeline(
   body: z.infer<typeof processVideoSchema>,
   userId: string | undefined,
+  projectId: string | undefined,
 ) {
   const { url, source, contextText, skipAiProcessing, skipTopicExtraction, skipCompetitorCheck, skipCopyInspiration } = body
 
@@ -87,6 +93,7 @@ async function executePipeline(
     source: sourceLabel,
     contextText,
     userId,
+    projectId,
     skipAiProcessing,
     skipTopicExtraction,
     skipCompetitorCheck,
@@ -112,6 +119,15 @@ async function executePipeline(
 }
 
 function pipelineErrorResponse(error: unknown) {
+  if (error && typeof error === "object" && "status" in error && "code" in error) {
+    const contextError = error as { status?: unknown; code?: unknown; message?: unknown }
+    if (typeof contextError.status === "number" && typeof contextError.code === "string") {
+      return NextResponse.json(
+        { error: typeof contextError.message === "string" ? contextError.message : "账号项目上下文不可用", code: contextError.code },
+        { status: contextError.status },
+      )
+    }
+  }
   return NextResponse.json(
     { error: error instanceof Error ? error.message : "内部错误" },
     { status: 500 },

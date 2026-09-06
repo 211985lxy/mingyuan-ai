@@ -6,6 +6,14 @@ import {
   planBackgroundTaskFailure,
 } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
+import {
+  ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+  accountProjectContextStaleErrorString,
+  assertAccountProjectExecutionContext,
+  isAccountProjectContextError,
+  logAccountProjectContextRejection,
+  logLegacyNullProjectTaskRejection,
+} from "@/lib/account-project-context"
 import { processInspirationPipeline } from "./inspiration-pipeline"
 import { isPipelineRetryable, formatPipelineUserMessage } from "@/lib/inspiration-pipeline-error"
 import { enqueueReply } from "./reply-outbox"
@@ -19,6 +27,65 @@ import { recordChannelMetric } from "@/lib/channel-metrics"
 export async function executeInspirationPipelineBackgroundTask(taskId: string) {
   const task = await claimBackgroundTask(prisma, taskId)
   if (!task) return false
+
+  // ── Re-validate account-project binding before any model call / write ──
+  // If the account's bound project changed after the task was queued, fail
+  // without calling the model. The mismatch is not recoverable.
+  const owner = await prisma.inspiration.findUnique({
+    where: { id: task.aggregateId },
+    select: { userId: true, projectId: true },
+  })
+  if (owner) {
+    // 历史空项目记录（改绑前遗留，projectId = null）没有可验证的项目边界 →
+    // 隔离（ACCOUNT_PROJECT_CONTEXT_STALE、不重试），绝不解析到“当前绑定”继续跑流水线。
+    if (!owner.projectId) {
+      await logLegacyNullProjectTaskRejection({
+        source: "inspiration",
+        taskId: task.id,
+        userId: owner.userId,
+      })
+      await failInspirationPipelineForStaleContext(task.aggregateId)
+      await failBackgroundTask(prisma, {
+        taskId: task.id,
+        leaseToken: task.leaseToken!,
+        attempt: task.attempt,
+        maxAttempts: task.maxAttempts,
+        retryable: false,
+        error: accountProjectContextStaleErrorString(),
+      })
+      return true
+    }
+
+    try {
+      await assertAccountProjectExecutionContext({
+        userId: owner.userId,
+        projectId: owner.projectId,
+        source: "inspiration",
+      })
+    } catch (error) {
+      if (isAccountProjectContextError(error)) {
+        await logAccountProjectContextRejection({
+          source: "inspiration",
+          userId: owner.userId,
+          taskId: task.id,
+          expectedProjectId: owner.projectId,
+          error,
+        })
+        await failInspirationPipelineForStaleContext(task.aggregateId)
+        await failBackgroundTask(prisma, {
+          taskId: task.id,
+          leaseToken: task.leaseToken!,
+          attempt: task.attempt,
+          maxAttempts: task.maxAttempts,
+          retryable: false,
+          error: accountProjectContextStaleErrorString(),
+        })
+        return true
+      }
+      throw error
+    }
+  }
+
   try {
     // 注：UserQuestionCard 建卡已在 inspiration-events.ts 的 afterInspirationCreatedProcessQuestion
     // 中 fire-and-forget 触发（仅新建时），此处不再重复调用以避免 occurrenceCount 翻倍。
@@ -79,4 +146,42 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
     })
   }
   return true
+}
+
+/**
+ * Mark the inspiration failed and enqueue a NON-LEAKING generic error reply when
+ * the account-project binding went stale. Mirrors the existing failure branch,
+ * but the reply text is always the safe generic message (never a project name).
+ */
+async function failInspirationPipelineForStaleContext(inspirationId: string): Promise<void> {
+  const inspiration = await prisma.inspiration.findUnique({
+    where: { id: inspirationId },
+    select: { source: true, externalChatId: true, externalMessageId: true, externalAccountId: true },
+  })
+  await prisma.$transaction(async (tx) => {
+    await tx.inspiration.updateMany({
+      where: { id: inspirationId, aiStatus: { not: "completed" } },
+      data: { aiStatus: "failed", processingStage: "failed", errorMessage: ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE },
+    })
+    if (inspiration?.source) {
+      await enqueueReply({
+        inspirationId,
+        replyType: "error",
+        platform: inspiration.source,
+        externalAccountId: inspiration.externalAccountId || undefined,
+        externalChatId: inspiration.externalChatId || "",
+        externalMessageId: inspiration.externalMessageId ?? undefined,
+        replyText: ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+        skipBackgroundTask: false,
+      }, tx as never)
+    }
+  })
+  if (inspiration?.source) {
+    recordChannelMetric({
+      metric: "pipeline_failed",
+      platform: inspiration.source,
+      externalChatId: inspiration.externalChatId ?? undefined,
+      externalAccountId: undefined,
+    }).catch(() => {})
+  }
 }

@@ -240,6 +240,8 @@
       "name": "ContentGenerationRun",
       "columns": [
         "id",
+        "userId",
+        "projectId",
         "topicSelectionId",
         "openingTypeCode",
         "copyStructureCode",
@@ -250,15 +252,36 @@
       "name": "Script",
       "columns": [
         "id",
+        "userId",
+        "projectId",
         "topicSelectionId",
         "isHotTopicVersion"
+      ]
+    },
+    {
+      "name": "CompetitorAnalysis",
+      "columns": [
+        "id",
+        "userId",
+        "projectId"
+      ]
+    },
+    {
+      "name": "WatchAccount",
+      "columns": [
+        "id",
+        "userId",
+        "projectId"
       ]
     },
     {
       "name": "User",
       "columns": [
         "id",
-        "email"
+        "email",
+        "boundProjectId",
+        "projectBoundAt",
+        "projectBindingSource"
       ]
     },
     {
@@ -374,6 +397,7 @@
         "userId",
         "projectId",
         "platform",
+        "externalAccountId",
         "externalChatId",
         "agentId",
         "lastMessageAt"
@@ -410,6 +434,8 @@
       "name": "VideoCopyExtraction",
       "columns": [
         "id",
+        "userId",
+        "projectId",
         "sourceUrl",
         "status",
         "provider",

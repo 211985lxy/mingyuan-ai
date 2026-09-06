@@ -13,6 +13,7 @@ import {
 } from "@/lib/aim/aim-run-event-write"
 import { parseRunOutcomeMetadata } from "@/lib/aim/run-outcome-telemetry"
 import { writeFinalRunOutcome } from "@/lib/aim/run-outcome-write-service"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 const EVENTS = new Set([
   "copied", "revised", "accepted",
@@ -32,6 +33,7 @@ type RouteContext = { params: Promise<{ runId: string }> }
 async function writeWebFinalDisposition(
   runId: string,
   userId: string,
+  projectId: string,
   body: AimRunEventBody,
   reason?: string,
 ) {
@@ -47,7 +49,7 @@ async function writeWebFinalDisposition(
       { status: 400 },
     )
   }
-  const result = await writeFinalRunOutcome({ runId, userId, channel: "web", outcome })
+  const result = await writeFinalRunOutcome({ runId, userId, projectId, channel: "web", outcome })
   if (!result.ok) {
     return NextResponse.json(
       { error: result.error },
@@ -63,11 +65,12 @@ async function writeWebFinalDisposition(
 async function writeLegacyRunEvent(
   runId: string,
   userId: string,
+  projectId: string,
   body: AimRunEventBody,
   reason?: string,
 ) {
   const ownedRun = await prisma.aimExecutionTrace.findFirst({
-    where: { runId, userId },
+    where: { runId, userId, projectId },
     select: { id: true, durationMs: true, totalTokens: true, costCny: true },
   })
   if (!ownedRun) {
@@ -113,6 +116,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const user = await authenticateRequest(request)
     const { runId } = await context.params
     const body = await parseJsonBody(request, aimRunEventBodySchema, { maxBytes: 16 * 1024 })
+    const project = await resolveBoundProject({ userId: user.id })
 
     if (!runId.startsWith("run_") || runId.length > 40) {
       return NextResponse.json({ error: "无效的执行编号" }, { status: 400 })
@@ -125,13 +129,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
       ? body.reason
       : undefined
     if (body.event === "final_disposition") {
-      return writeWebFinalDisposition(runId, user.id, body, reason)
+      return writeWebFinalDisposition(runId, user.id, project.id, body, reason)
     }
-    return writeLegacyRunEvent(runId, user.id, body, reason)
+    return writeLegacyRunEvent(runId, user.id, project.id, body, reason)
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? apiRequestErrorResponse(request, error) ?? NextResponse.json(
       { error: "运行事件记录失败" },
       { status: 500 },
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

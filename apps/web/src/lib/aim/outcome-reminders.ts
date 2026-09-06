@@ -88,12 +88,18 @@ function hasAnyBusinessMetric(row: OutcomeMetricRow): boolean {
  */
 export async function findDueOutcomeReminders(input: {
   userId: string
+  projectId?: string
   now?: Date
   store: OutcomeReminderStorePort
 }): Promise<OutcomeReminderDue[]> {
   const now = input.now ?? new Date()
   const generations = await input.store.aimGeneration.findMany({
-    where: { userId: input.userId, workflowStatus: "published", publishedAt: { not: null } },
+    where: {
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+      workflowStatus: "published",
+      publishedAt: { not: null },
+    },
     take: 500,
   })
   const published = generations.filter((g) => g.publishedAt != null)

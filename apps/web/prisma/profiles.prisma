@@ -82,7 +82,8 @@ model ClientProject {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user                   User                        @relation(fields: [userId], references: [id])
+  user                   User                        @relation("ProjectOwner", fields: [userId], references: [id])
+  boundAccount           User?                       @relation("AccountBoundProject")
   aimGenerations         AimGeneration[]
   knowledgeEntries       KnowledgeEntry[]
   knowledgeEntities      KnowledgeEntity[]
@@ -90,11 +91,16 @@ model ClientProject {
   aimMemories            AimMemory[]
   ipWikiPages            IpWikiPage[]
   benchmarkProfiles      BenchmarkProfile[]
+  competitorAnalyses     CompetitorAnalysis[]
+  watchAccounts          WatchAccount[]
+  videoCopyExtractions   VideoCopyExtraction[]
+  contentGenerationRuns  ContentGenerationRun[]
+  scripts                Script[]
   inspirations           Inspiration[]
   topicSelections        TopicSelection[]
   channelBindings        ChannelBinding[]
   opportunityCollections OpportunityCollection[]
-  userQuestionCards       UserQuestionCard[]
+  userQuestionCards      UserQuestionCard[]
   customerOutcomes       CustomerOutcomeProjection[]
 
   @@index([userId, status])

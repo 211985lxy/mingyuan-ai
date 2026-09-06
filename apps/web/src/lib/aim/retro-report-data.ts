@@ -85,9 +85,14 @@ export async function loadRetroReportData(
   db: RetroReportDbPort,
   userId: string,
   generationId: string,
+  projectId?: string,
 ): Promise<RetroReportData | null> {
   const generation = await db.aimGeneration.findFirst({
-    where: { id: generationId, userId },
+    where: {
+      id: generationId,
+      userId,
+      ...(projectId ? { projectId } : {}),
+    },
     select: {
       id: true, topicTitle: true, rawInput: true, workflowStatus: true,
       publishPlatform: true, publishUrl: true, publishedAt: true, createdAt: true, retroSnapshots: true,

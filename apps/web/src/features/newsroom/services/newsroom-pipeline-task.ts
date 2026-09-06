@@ -5,6 +5,13 @@ import {
   planBackgroundTaskFailure,
 } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
+import {
+  accountProjectContextStaleErrorString,
+  assertAccountProjectExecutionContext,
+  isAccountProjectContextError,
+  logAccountProjectContextRejection,
+  logLegacyNullProjectTaskRejection,
+} from "@/lib/account-project-context"
 import { generateAimContent } from "@/lib/aim-generator"
 import {
   buildSourceBrief,
@@ -55,6 +62,65 @@ export async function executeNewsroomPipelineBackgroundTask(taskId: string): Pro
   const task = await claimBackgroundTask(prisma, taskId)
   if (!task) return false
 
+  // ── Re-validate account-project binding before any model call / write ──
+  // If the account's bound project changed after the task was queued, fail
+  // without calling the model. The mismatch is not recoverable.
+  const generation = await prisma.aimGeneration.findUnique({
+    where: { id: task.aggregateId },
+    select: { userId: true, projectId: true },
+  })
+  if (generation) {
+    // 历史空项目记录（改绑前遗留，projectId = null）没有可验证的项目边界 →
+    // 隔离（ACCOUNT_PROJECT_CONTEXT_STALE、不重试），绝不解析到“当前绑定”继续
+    // 用旧 taskSpec/锚点跑模型。
+    if (!generation.projectId) {
+      await logLegacyNullProjectTaskRejection({
+        source: "newsroom",
+        taskId: task.id,
+        userId: generation.userId,
+      })
+      await markNewsroomGenerationFailed(task.aggregateId, task.id)
+      await failBackgroundTask(prisma, {
+        taskId: task.id,
+        leaseToken: task.leaseToken!,
+        attempt: task.attempt,
+        maxAttempts: task.maxAttempts,
+        retryable: false,
+        error: accountProjectContextStaleErrorString(),
+      })
+      return true
+    }
+
+    try {
+      await assertAccountProjectExecutionContext({
+        userId: generation.userId,
+        projectId: generation.projectId,
+        source: "newsroom",
+      })
+    } catch (error) {
+      if (isAccountProjectContextError(error)) {
+        await logAccountProjectContextRejection({
+          source: "newsroom",
+          userId: generation.userId,
+          taskId: task.id,
+          expectedProjectId: generation.projectId,
+          error,
+        })
+        await markNewsroomGenerationFailed(task.aggregateId, task.id)
+        await failBackgroundTask(prisma, {
+          taskId: task.id,
+          leaseToken: task.leaseToken!,
+          attempt: task.attempt,
+          maxAttempts: task.maxAttempts,
+          retryable: false,
+          error: accountProjectContextStaleErrorString(),
+        })
+        return true
+      }
+      throw error
+    }
+  }
+
   try {
     await runNewsroomPipeline(task.aggregateId, task.id)
     await completeBackgroundTask(prisma, task.id, task.leaseToken!)
@@ -75,25 +141,29 @@ export async function executeNewsroomPipelineBackgroundTask(taskId: string): Pro
       retryable: plan.status !== "failed",
       error: message,
     })
-
-    try {
-      const existing = await prisma.aimGeneration.findUnique({
-        where: { id: task.aggregateId },
-        select: { taskSpec: true },
-      })
-      const taskSpec = existing?.taskSpec && typeof existing.taskSpec === "object"
-        ? mergeNewsroom(existing.taskSpec as unknown as TaskSpec, { stage: "failed", pipelineTaskId: task.id })
-        : undefined
-      if (taskSpec) {
-        await prisma.aimGeneration.update({
-          where: { id: task.aggregateId },
-          data: { taskSpec: asJson(taskSpec), status: "failed" },
-        })
-      }
-    } catch {
-      // ignore secondary failure
-    }
+    await markNewsroomGenerationFailed(task.aggregateId, task.id)
     return true
+  }
+}
+
+/** Mark the AimGeneration failed (best-effort) — shared by the stale-context and generic error paths. */
+async function markNewsroomGenerationFailed(generationId: string, pipelineTaskId: string): Promise<void> {
+  try {
+    const existing = await prisma.aimGeneration.findUnique({
+      where: { id: generationId },
+      select: { taskSpec: true },
+    })
+    const taskSpec = existing?.taskSpec && typeof existing.taskSpec === "object"
+      ? mergeNewsroom(existing.taskSpec as unknown as TaskSpec, { stage: "failed", pipelineTaskId })
+      : undefined
+    if (taskSpec) {
+      await prisma.aimGeneration.update({
+        where: { id: generationId },
+        data: { taskSpec: asJson(taskSpec), status: "failed" },
+      })
+    }
+  } catch {
+    // ignore secondary failure
   }
 }
 

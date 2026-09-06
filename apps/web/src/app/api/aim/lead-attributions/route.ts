@@ -7,6 +7,7 @@ import {
   upsertOutcomeAttribution,
 } from "@/lib/aim/outcome-attribution"
 import { createPrismaOutcomeAttributionStore } from "@/lib/aim/outcome-attribution-prisma"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -30,6 +31,7 @@ function readOptionalId(value: unknown): string | undefined {
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    const project = await resolveBoundProject({ userId: user.id })
     const body = await parseJsonRecord(request)
     const generationId = typeof body.generationId === "string" ? body.generationId.trim() : ""
     const externalLeadId = typeof body.externalLeadId === "string" ? body.externalLeadId.trim() : ""
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "请填写线索标识（微信号 / 手机号 / 线索编号）" }, { status: 400 })
     }
     const generation = await prisma.aimGeneration.findFirst({
-      where: { id: generationId, userId: user.id },
+      where: { id: generationId, userId: user.id, projectId: project.id },
       select: { id: true },
     })
     if (!generation) {
@@ -65,9 +67,19 @@ export async function POST(request: NextRequest) {
       throw error
     }
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? apiRequestErrorResponse(request, error) ?? NextResponse.json(
       { error: "线索归因登记失败" },
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

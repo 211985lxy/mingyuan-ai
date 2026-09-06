@@ -96,6 +96,7 @@ export async function handleTopicChatMessage(input: {
     const selection = await tx.topicSelection.create({
       data: {
         userId: input.userId,
+        projectId: project.id,
         ipProfileId: topicIpProfile.id,
         elementCodes: result.elementCodes as unknown as Prisma.InputJsonValue,
         candidates: result.cards as unknown as Prisma.InputJsonValue,

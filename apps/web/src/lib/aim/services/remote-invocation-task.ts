@@ -18,6 +18,14 @@
 
 import { claimBackgroundTask, completeBackgroundTask, failBackgroundTask } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
+import {
+  ACCOUNT_PROJECT_CONTEXT_STALE,
+  ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+  accountProjectContextStaleErrorString,
+  assertAccountProjectExecutionContext,
+  isAccountProjectContextError,
+  logAccountProjectContextRejection,
+} from "@/lib/account-project-context"
 import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
@@ -48,6 +56,42 @@ export async function executeRemoteInvocationBackgroundTask(taskId: string) {
     if (!invocation) {
       await completeBackgroundTask(prisma, task.id, task.leaseToken!)
       return true
+    }
+
+    // ── Re-validate account-project binding before spending tokens ──
+    // If the account's bound project changed (or was disabled) after the task
+    // was queued, fail without calling the model. The mismatch is not recoverable.
+    try {
+      await assertAccountProjectExecutionContext({
+        userId: invocation.userId,
+        projectId: invocation.projectId,
+        source: "remote",
+      })
+    } catch (error) {
+      if (isAccountProjectContextError(error)) {
+        await logAccountProjectContextRejection({
+          source: "remote",
+          userId: invocation.userId,
+          taskId: task.id,
+          expectedProjectId: invocation.projectId,
+          error,
+        })
+        await failInvocation(
+          invocationId,
+          ACCOUNT_PROJECT_CONTEXT_STALE,
+          ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+        )
+        await failBackgroundTask(prisma, {
+          taskId: task.id,
+          leaseToken: task.leaseToken!,
+          attempt: task.attempt,
+          maxAttempts: task.maxAttempts,
+          retryable: false,
+          error: accountProjectContextStaleErrorString(),
+        })
+        return true
+      }
+      throw error
     }
 
     // ── Re-validate the owning key before spending tokens ──

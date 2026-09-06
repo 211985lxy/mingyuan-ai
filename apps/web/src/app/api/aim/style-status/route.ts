@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { ownsActiveProject } from "@/lib/resource-ownership"
 import { hasActiveStyleProfile } from "@/lib/style-profile"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * GET /api/aim/style-status?projectId=
@@ -10,15 +10,15 @@ import { hasActiveStyleProfile } from "@/lib/style-profile"
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const projectId = request.nextUrl.searchParams.get("projectId")?.trim() || ""
+    const requestedProjectId = request.nextUrl.searchParams.get("projectId")?.trim() || undefined
+    const projectId = (await resolveBoundProject({ userId: user.id, requestedProjectId })).id
 
-    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
-      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
-    }
-
-    const status = await hasActiveStyleProfile(user.id, projectId || null)
+    const status = await hasActiveStyleProfile(user.id, projectId)
     return NextResponse.json(status)
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     return NextResponse.json({ error: "风格状态读取失败" }, { status: 500 })

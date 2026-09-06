@@ -6,15 +6,26 @@ import { isAimFastSpokenRoute } from "@/lib/aim-harness/fast-spoken-policy"
 import {
   addAimTraceStep,
   createAimTrace,
-  failAimTrace,
+  logAimProjectContextRejection,
   runAimTraceStep,
   summarizeText,
   type AimTraceRecorder,
 } from "@/lib/aim-observability"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
-import { ownsActiveProject } from "@/lib/resource-ownership"
+import {
+  AccountProjectContextError,
+  resolveBoundProject,
+} from "@/lib/account-project-context"
+import { ApiRequestError } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
+
+/**
+ * 稳定错误码：请求指定的 `existingGenerationId` 属于同一账号但不在其绑定项目下。
+ * 与现有 `ACCOUNT_PROJECT_CONTEXT_STALE` 等稳定错误码模式一致；绝不静默当作
+ * “没有旧稿”继续生成，避免跨项目引用。
+ */
+export const EXISTING_GENERATION_NOT_IN_BOUND_PROJECT = "EXISTING_GENERATION_NOT_IN_BOUND_PROJECT"
 
 /**
  * @description prepareaimgeneraterequest
@@ -31,10 +42,47 @@ export async function prepareAimGenerateRequest(
   },
 ) {
   const parsed = parseGenerateBody(body)
+
+  // 基础字段校验（纯函数）：先于任何 trace / 执行解析，避免为无效请求落 trace。
+  const validationError = validateGenerateInput(parsed)
+  if (validationError) {
+    return { ok: false as const, trace: undefined, validationError, status: 400 as const, errorCode: "INVALID_REQUEST" as const }
+  }
+
+  // 先解析账号绑定项目：正式 trace 的 projectId 只能来自服务端解析的绑定项目，
+  // 绝不能用客户端传入的 projectId（它可能指向不可信项目）。
+  let boundProject
+  try {
+    boundProject = await resolveBoundProject({
+      userId,
+      requestedProjectId: parsed.projectId || parsed.workflow?.projectId,
+    })
+    if (parsed.projectId && parsed.workflow?.projectId && parsed.projectId !== parsed.workflow.projectId) {
+      throw new AccountProjectContextError("PROJECT_CONTEXT_MISMATCH", "请求中的项目上下文不一致")
+    }
+  } catch (error) {
+    // 绑定校验失败：记录为安全/审计事件，绝不创建挂在不可信项目下的正式 trace。
+    await logAimProjectContextRejection({
+      source: "generate",
+      userId,
+      requestedProjectId: parsed.projectId || parsed.workflow?.projectId || null,
+      error,
+    })
+    const projectError = error instanceof Error ? error.message : "账号项目上下文不可用"
+    return {
+      ok: false as const,
+      trace: undefined,
+      validationError: projectError,
+      status: error instanceof AccountProjectContextError ? error.status : 409,
+      errorCode: error instanceof AccountProjectContextError ? error.code : "BOUND_PROJECT_UNAVAILABLE",
+    }
+  }
+
+  // 现在才创建正式 trace，projectId 为已解析的绑定项目（服务端权威值）。
   const trace = internal?.trace ?? await createAimTrace({
     id: typeof body.traceId === "string" ? (body.traceId as string).trim() || undefined : undefined,
     userId,
-    projectId: parsed.projectId || null,
+    projectId: boundProject.id,
     agentId: parsed.agentId || null,
     action: "generate",
     inputSummary: parsed.rawInput,
@@ -47,24 +95,23 @@ export async function prepareAimGenerateRequest(
     inputSummary: summarizeText(body),
     metadata: { agentId: parsed.agentId, targetFormats: parsed.targetFormats },
   })
-  const validationError = await runAimTraceStep(
-    trace,
-    "validate_input",
-    "输入校验",
-    () => validateGenerateInput(parsed),
-    (error) => ({ summary: error ? "校验失败" : "校验通过", error: error || undefined }),
-  )
-  if (validationError) {
-    await failAimTrace(trace, validationError)
-    return { ok: false as const, trace, validationError, status: 400 as const }
-  }
-  if (parsed.projectId && !await ownsActiveProject(userId, parsed.projectId)) {
-    const projectError = "项目不存在或已归档"
-    await failAimTrace(trace, projectError)
-    return { ok: false as const, trace, validationError: projectError, status: 404 as const }
-  }
-  const workflowBrief = parsed.workflow
-    ? await buildWorkflowBrief({ userId, ...parsed.workflow, projectId: parsed.workflow.projectId || parsed.projectId || undefined })
+  await addAimTraceStep(trace, {
+    key: "validate_input",
+    label: "输入校验",
+    status: "success",
+    summary: "校验通过",
+  })
+  await addAimTraceStep(trace, {
+    key: "resolve_project_context",
+    label: "账号项目绑定校验",
+    status: "success",
+    summary: `已锁定项目：${boundProject.name}`,
+    metadata: { projectId: boundProject.id, binding: "account" },
+  })
+
+  const scopedParsed = { ...parsed, projectId: boundProject.id }
+  const workflowBrief = scopedParsed.workflow
+    ? await buildWorkflowBrief({ userId, ...scopedParsed.workflow, projectId: boundProject.id })
     : undefined
   const preparedInput = internal?.unifiedContentExecution
     ? {
@@ -75,32 +122,32 @@ export async function prepareAimGenerateRequest(
       }
     : await prepareAimGenerateInput({
         userId,
-        agentId: parsed.agentId,
-        rawInput: parsed.rawInput,
-        targetFormats: parsed.targetFormats,
-        taskType: parsed.taskType,
-        polishInstruction: parsed.polishInstruction,
-        videoCopyExtractionId: parsed.videoCopyExtractionId,
-        useMarketViralVideos: parsed.useMarketViralVideos,
+        agentId: scopedParsed.agentId,
+        rawInput: scopedParsed.rawInput,
+        targetFormats: scopedParsed.targetFormats,
+        taskType: scopedParsed.taskType,
+        polishInstruction: scopedParsed.polishInstruction,
+        videoCopyExtractionId: scopedParsed.videoCopyExtractionId,
+        useMarketViralVideos: scopedParsed.useMarketViralVideos,
         trace,
       })
   const runtimeTask = preparedInput.runtimeTask
-  if (parsed.confirmedTurnIntent) {
+  if (scopedParsed.confirmedTurnIntent) {
     await addAimTraceStep(trace, {
       key: "legacy_intent_observed",
       label: "旧意图字段观测",
       status: "success",
       summary: "已忽略旧意图字段的执行控制权",
       metadata: {
-        action: parsed.confirmedTurnIntent.action,
-        scope: parsed.confirmedTurnIntent.scope,
+        action: scopedParsed.confirmedTurnIntent.action,
+        scope: scopedParsed.confirmedTurnIntent.scope,
       },
     })
   }
   return {
     ok: true as const,
     userId,
-    parsed,
+    parsed: scopedParsed,
     trace,
     workflowBrief,
     rawInput: preparedInput.rawInput,
@@ -123,14 +170,22 @@ export async function executePreparedAimGeneration(prepared: UnifiedPreparedRequ
   const { parsed, trace, userId, workflowBrief, runtimeTask } = prepared
   const projectId = workflowBrief?.projectId || parsed.projectId
 
-  // 派生到已有母稿时，复用其已确认母内容 / 内容包状态
+  // 派生到已有母稿时，复用其已确认母内容 / 内容包状态。
+  // 只允许读取 id + userId + 绑定项目完全一致的记录，杜绝跨项目引用。
   let taskSpec = workflowBrief?.taskSpec
   if (parsed.existingGenerationId && !taskSpec) {
     const existing = await prisma.aimGeneration.findFirst({
-      where: { id: parsed.existingGenerationId, userId },
+      where: { id: parsed.existingGenerationId, userId, projectId },
       select: { taskSpec: true },
     })
-    if (existing?.taskSpec && typeof existing.taskSpec === "object" && !Array.isArray(existing.taskSpec)) {
+    if (!existing) {
+      throw new ApiRequestError(
+        404,
+        EXISTING_GENERATION_NOT_IN_BOUND_PROJECT,
+        "已有作品不属于当前账号的绑定项目，无法复用",
+      )
+    }
+    if (existing.taskSpec && typeof existing.taskSpec === "object" && !Array.isArray(existing.taskSpec)) {
       taskSpec = existing.taskSpec as unknown as import("@/lib/task-spec").TaskSpec
     }
   }

@@ -20,6 +20,7 @@ import {
   TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS,
   topicGenerateBodySchema,
 } from "@/features/topics/contracts/api"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 60
 
@@ -59,7 +60,19 @@ export const POST = withUserAuth(async (request, { user }) => {
     )
   }
 
-  const projectId = typeof body.projectId === "string" ? body.projectId : null
+  const requestedProjectId = typeof body.projectId === "string" ? body.projectId : null
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
   const knowledgeEntryIds = Array.isArray(body.knowledgeEntryIds)
     ? body.knowledgeEntryIds.filter((value: unknown): value is string => typeof value === "string")
     : []
@@ -122,7 +135,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     }),
     // Fetch last 5 topic generations for history-aware derivation
     prisma.topicSelection.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, projectId },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { elementCodes: true, candidates: true },
@@ -158,7 +171,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       },
     }).catch(() => null),
     prisma.watchAccount.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, projectId },
       orderBy: { lastRefreshedAt: "desc" },
       take: 6,
       select: {
@@ -174,6 +187,7 @@ export const POST = withUserAuth(async (request, { user }) => {
     prisma.videoCopyExtraction.findMany({
       where: {
         userId: user.id,
+        projectId,
         status: "completed",
       },
       orderBy: { completedAt: "desc" },
@@ -316,7 +330,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const selection = await prisma.topicSelection.create({
     data: {
       userId: user.id,
-      projectId: project?.id ?? null,
+      projectId,
       ipProfileId: topicIpProfileRecord.id,
       elementCodes: result.elementCodes as unknown as Prisma.InputJsonValue,
       candidates: result.cards as unknown as Prisma.InputJsonValue,

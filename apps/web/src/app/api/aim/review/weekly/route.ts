@@ -7,6 +7,7 @@ import { generateWeeklyNarrative } from "@/lib/aim/weekly-review-narrative"
 import { fetchCreatorMetrics, type CreatorMetricsResponse } from "@/lib/aim/creator-metrics"
 import { prisma } from "@/lib/prisma"
 import type { WeeklyReviewStorePort } from "@/lib/aim/weekly-review"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -31,15 +32,9 @@ export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const params = request.nextUrl.searchParams
-    const projectId = params.get("projectId")?.trim() || undefined
-    if (projectId) {
-      if (projectId.length > 80) return NextResponse.json({ error: "项目标识过长" }, { status: 400 })
-      const project = await prisma.clientProject.findFirst({
-        where: { id: projectId, userId: user.id, status: "active" },
-        select: { id: true },
-      })
-      if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 })
-    }
+    const requestedProjectId = params.get("projectId")?.trim() || undefined
+    if (requestedProjectId && requestedProjectId.length > 80) return NextResponse.json({ error: "项目标识过长" }, { status: 400 })
+    const projectId = (await resolveBoundProject({ userId: user.id, requestedProjectId })).id
 
     const end = parseDateParam(params.get("end")) ?? new Date()
     const start = parseDateParam(params.get("start")) ?? new Date(end.getTime() - 7 * DAY_MS)
@@ -84,8 +79,18 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ review, platformMetrics, taskInsights, ...(narrative ? { narrative } : {}) })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

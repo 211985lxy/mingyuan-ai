@@ -1,17 +1,10 @@
 import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { prisma } from "@/lib/prisma"
 import { updateIpWikiPage } from "@/lib/ip-wiki/repo"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 30
-
-async function ensureProject(userId: string, projectId: string) {
-  return prisma.clientProject.findFirst({
-    where: { id: projectId, userId, status: "active" },
-    select: { id: true },
-  })
-}
 
 /**
  * PUT /api/aim/ip-wiki/pages/[id] —— 客户自助编辑某 active 维基页（人工确认后的维护入口）。
@@ -37,7 +30,7 @@ export async function PUT(
     const user = await authenticateRequest(request)
     const { id } = await ctx.params
     const body = await parseJsonRecord(request)
-    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+    const requestedProjectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const title = typeof body.title === "string" ? body.title : undefined
     const content = typeof body.content === "string" ? body.content : undefined
     const frontmatter =
@@ -46,9 +39,6 @@ export async function PUT(
         : undefined
     const links = Array.isArray(body.links) ? (body.links as string[]) : undefined
 
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
-    }
     if (title === undefined && content === undefined && frontmatter === undefined && links === undefined) {
       return NextResponse.json({ error: "至少提供 title/content/frontmatter/links 之一" }, { status: 400 })
     }
@@ -59,10 +49,10 @@ export async function PUT(
       return NextResponse.json({ error: "content 不能为空" }, { status: 400 })
     }
 
-    const project = await ensureProject(user.id, projectId)
-    if (!project) {
-      return NextResponse.json({ error: "IP营销全案不存在或已归档" }, { status: 404 })
-    }
+    const projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
 
     const page = await updateIpWikiPage({
       userId: user.id,
@@ -76,6 +66,9 @@ export async function PUT(
 
     return NextResponse.json({ page }, { status: 201 })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/ip-wiki/pages/[id] PUT] Error:", error)

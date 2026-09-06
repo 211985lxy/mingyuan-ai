@@ -6,6 +6,7 @@ import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { obsidianSyncBodySchema } from "@/features/knowledge/contracts/api"
 import { isKnowledgeCategory } from "@/lib/knowledge-categories"
 import { safeSecretEqual } from "@/lib/aim/work-item-api-auth"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * @description 处理 POST 请求
@@ -44,17 +45,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "同步接口绑定用户不存在" }, { status: 503 })
     }
 
-    let targetProjectId: string | null = null
-    if (projectId) {
-      const project = await prisma.clientProject.findFirst({
-        where: { id: projectId, userId: targetUserId },
-        select: { id: true },
+    let boundProject: Awaited<ReturnType<typeof resolveBoundProject>>
+    try {
+      boundProject = await resolveBoundProject({
+        userId: targetUserId,
+        requestedProjectId: projectId || undefined,
       })
-      if (!project) {
-        return NextResponse.json({ error: "Project does not exist for target user" }, { status: 404 })
+    } catch (error) {
+      if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+        const contextError = error as { message: string; code: string; status: number }
+        return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
       }
-      targetProjectId = project.id
+      throw error
     }
+    const targetProjectId = boundProject.id
 
     const results = []
 
@@ -85,7 +89,7 @@ export async function POST(request: NextRequest) {
           tags: entry.tags,
           sourceType: "obsidian",
           status: "active",
-          ...(targetProjectId ? { projectId: targetProjectId } : {}),
+          projectId: targetProjectId,
           updatedAt: new Date(),
         },
         create: {
@@ -122,4 +126,10 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

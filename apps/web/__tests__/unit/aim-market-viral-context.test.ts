@@ -31,7 +31,7 @@ describe("buildRawInputWithMarketViralContext", () => {
       { nickname: "账号A", targetUrl: "https://a.com", viralVideos: [] },
     ])
 
-    const result = await buildRawInputWithMarketViralContext("user-1", "帮我做定位", true)
+    const result = await buildRawInputWithMarketViralContext("user-1", "帮我做定位", true, "project-a")
     expect(result).toBe("帮我做定位")
   })
 
@@ -54,7 +54,7 @@ describe("buildRawInputWithMarketViralContext", () => {
       },
     ])
 
-    const result = await buildRawInputWithMarketViralContext("user-1", "IP定位方案", true)
+    const result = await buildRawInputWithMarketViralContext("user-1", "IP定位方案", true, "project-a")
 
     expect(result).toContain("市场洞察爆款作品上下文")
     expect(result).toContain("客户经历资产")
@@ -64,11 +64,11 @@ describe("buildRawInputWithMarketViralContext", () => {
     expect(result).toContain("TOP 1")
     expect(result).toContain("3个搞钱思路让你少走弯路")
     expect(mockFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: "user-1" } }),
+      expect.objectContaining({ where: { userId: "user-1", projectId: "project-a" } }),
     )
   })
 
-  it("queries with correct userId for data isolation", async () => {
+  it("queries with correct userId + projectId for data isolation", async () => {
     mockFindMany.mockResolvedValue([
       {
         nickname: "测试",
@@ -79,11 +79,12 @@ describe("buildRawInputWithMarketViralContext", () => {
       },
     ])
 
-    await buildRawInputWithMarketViralContext("user-42", "输入", true)
+    await buildRawInputWithMarketViralContext("user-42", "输入", true, "project-a")
 
     expect(mockFindMany).toHaveBeenCalledTimes(1)
     const callArgs = mockFindMany.mock.calls[0][0] as Record<string, unknown>
     expect((callArgs.where as { userId: string }).userId).toBe("user-42")
+    expect((callArgs.where as { projectId: string }).projectId).toBe("project-a")
   })
 })
 
@@ -100,7 +101,7 @@ describe("buildRawInputWithVideoCopyContext", () => {
       analysisResult: { markdown: "## 结构拆解\n这是可读拆解", topComments: [] },
     })
 
-    const result = await buildRawInputWithVideoCopyContext("user-1", "改成我的文案", "copy-1")
+    const result = await buildRawInputWithVideoCopyContext("user-1", "改成我的文案", "copy-1", "project-a")
 
     expect(result).toContain("结构化拆解：\n## 结构拆解")
     expect(result).toContain("这是可读拆解")

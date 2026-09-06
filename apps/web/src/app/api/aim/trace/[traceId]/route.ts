@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { AimTraceStreamBroker } from "@/lib/aim-trace-stream-broker"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 const SSE_TIMEOUT_MS = 90_000
 
@@ -11,6 +12,15 @@ export async function GET(
   const auth = await authenticateSafe(request)
   if (auth.error) return auth.error
   const userId = auth.userId!
+  let boundProjectId: string
+  try {
+    boundProjectId = (await resolveBoundProject({ userId })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return Response.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    return new Response("Project context unavailable", { status: 409 })
+  }
 
   const { traceId } = await params
   if (!traceId || traceId.length > 100) {
@@ -19,7 +29,7 @@ export async function GET(
 
   // 归属校验必须在回放与实时订阅之前；非所有者与不存在统一 404
   const record = await prisma.aimExecutionTrace.findFirst({
-    where: { id: traceId, userId },
+    where: { id: traceId, userId, projectId: boundProjectId },
     select: { id: true, userId: true, status: true, steps: true },
   })
   if (!record) {

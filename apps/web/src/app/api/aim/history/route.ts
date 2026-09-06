@@ -4,6 +4,10 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { parseQuery } from "@/lib/api-contract"
 import { aimHistoryQuerySchema } from "@/features/aim/contracts/api"
 import { normalizeAimGenerationForRead } from "@/lib/aim/history-normalize"
+import {
+  AccountProjectContextError,
+  resolveBoundProject,
+} from "@/lib/account-project-context"
 
 /**
  * @description 处理 GET 请求
@@ -28,9 +32,14 @@ export async function GET(request: NextRequest) {
             ? { agentId }
             : {}
 
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: projectId,
+    })
+
     const where = {
       userId: user.id,
-      ...(projectId ? { projectId } : {}),
+      projectId: boundProject.id,
       ...resolvedAgentFilter,
       ...(scope === "pending" ? {
         OR: [
@@ -65,9 +74,19 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(includeTotal === "true" ? { items: normalized, total } : normalized)
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "AIM 历史读取失败" },
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

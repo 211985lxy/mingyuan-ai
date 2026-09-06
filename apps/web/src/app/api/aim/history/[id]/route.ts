@@ -8,6 +8,10 @@ import {
 } from "@/lib/aim/services/history-update"
 import { buildOutcomeUpdate, sanitizeOutcomeBody, type SanitizedOutcome } from "@/lib/content-outcome"
 import { normalizeAimGenerationForRead } from "@/lib/aim/history-normalize"
+import {
+  AccountProjectContextError,
+  resolveBoundProject,
+} from "@/lib/account-project-context"
 
 /**
  * @description 处理 GET 请求
@@ -22,8 +26,9 @@ export async function GET(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const boundProject = await resolveBoundProject({ userId: user.id })
     const record = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id },
+      where: { id, userId: user.id, projectId: boundProject.id },
     })
     if (!record) {
       return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
@@ -38,6 +43,10 @@ export async function GET(
             : record.agentId,
     }))
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "生成记录读取失败" },
       { status: 500 }
@@ -58,9 +67,11 @@ export async function PATCH(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const boundProject = await resolveBoundProject({ userId: user.id })
     const body = await parseJsonRecord(request)
 
     const existing = await prisma.aimGeneration.findFirst({
+      // 允许把历史 quick 记录首次归档到绑定项目；已有其他项目记录仍不可见。
       where: { id, userId: user.id },
       select: {
         id: true,
@@ -77,6 +88,9 @@ export async function PATCH(
     if (!existing) {
       return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
     }
+    if (existing.projectId && existing.projectId !== boundProject.id) {
+      return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
+    }
 
     const input = parseAimHistoryUpdate(body, new Date().toISOString(), {
       fromStatus: existing.workflowStatus,
@@ -87,17 +101,16 @@ export async function PATCH(
       return NextResponse.json({ error: input.error }, { status: 400 })
     }
 
-    let projectId: string | undefined
+    let projectId: string | undefined = boundProject.id
     if (typeof body.projectId === "string" && body.projectId.trim()) {
-      const ownedProject = await prisma.clientProject.findFirst({
-        where: { id: body.projectId.trim(), userId: user.id, status: "active" },
-        select: { id: true },
+      const requestedProject = await resolveBoundProject({
+        userId: user.id,
+        requestedProjectId: body.projectId.trim(),
       })
-      if (!ownedProject) return NextResponse.json({ error: "客户全案不存在或不可用" }, { status: 404 })
-      if (existing.projectId && existing.projectId !== ownedProject.id) {
+      if (existing.projectId && existing.projectId !== requestedProject.id) {
         return NextResponse.json({ error: "已归属客户全案的内容不能直接转移" }, { status: 409 })
       }
-      projectId = ownedProject.id
+      projectId = requestedProject.id
     }
 
     let retroOutcome: { sanitized: SanitizedOutcome; presentKeys: Set<string> } | undefined
@@ -155,6 +168,10 @@ export async function PATCH(
 
     return NextResponse.json(record)
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? apiRequestErrorResponse(request, error) ?? NextResponse.json(
       { error: "生成记录更新失败" },
       { status: 500 }
@@ -175,9 +192,10 @@ export async function DELETE(
   try {
     const user = await authenticateRequest(_request)
     const { id } = await params
+    const boundProject = await resolveBoundProject({ userId: user.id })
 
     const existing = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id },
+      where: { id, userId: user.id, projectId: boundProject.id },
       select: { id: true },
     })
     if (!existing) {
@@ -187,9 +205,19 @@ export async function DELETE(
     await prisma.aimGeneration.delete({ where: { id } })
     return new NextResponse(null, { status: 204 })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "生成记录删除失败" },
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

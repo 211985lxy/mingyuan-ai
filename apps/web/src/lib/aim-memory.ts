@@ -244,9 +244,15 @@ export async function approveAimMemoryCandidate(input: {
   id: string
   userId: string
   reviewerId: string
+  projectId?: string | null
 }): Promise<boolean> {
   const result = await prisma.aimMemory.updateMany({
-    where: { id: input.id, userId: input.userId, status: "candidate" },
+    where: {
+      id: input.id,
+      userId: input.userId,
+      status: "candidate",
+      ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+    },
     data: {
       status: "active",
       reviewerId: input.reviewerId,
@@ -263,9 +269,15 @@ export async function rejectAimMemoryCandidate(input: {
   id: string
   userId: string
   reviewerId: string
+  projectId?: string | null
 }): Promise<boolean> {
   const result = await prisma.aimMemory.updateMany({
-    where: { id: input.id, userId: input.userId, status: "candidate" },
+    where: {
+      id: input.id,
+      userId: input.userId,
+      status: "candidate",
+      ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+    },
     data: {
       status: "rejected",
       reviewerId: input.reviewerId,

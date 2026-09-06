@@ -18,6 +18,7 @@ const MODULE_INFO: Record<string, { module: string; description: string }> = {
   "/admin/methodology-profiles": { module: "智能体", description: "命名方法论" },
   "/admin/retrieval-test": { module: "智能体", description: "检索测试" },
   "/admin/users": { module: "运营管理", description: "用户管理" },
+  "/admin/account-project-bindings": { module: "运营管理", description: "账号项目绑定" },
   "/admin/activation-codes": { module: "运营管理", description: "激活码管理" },
   "/admin/usage": { module: "运营管理", description: "使用记录" },
   "/admin/settings": { module: "系统", description: "系统设置" },

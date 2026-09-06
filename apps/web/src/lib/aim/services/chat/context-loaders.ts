@@ -164,7 +164,7 @@ export async function retrieveChatContextBlocks(input: {
           trace,
           "competitor_context",
           "竞品上下文召回",
-          () => buildAimCompetitorWatchContext(userId, query).catch(() => ""),
+          () => buildAimCompetitorWatchContext(userId, query, projectId).catch(() => ""),
           (block) => ({ summary: block ? "已召回竞品上下文" : "无竞品上下文", metadata: { chars: block.length } }),
         )
       : ""
@@ -217,6 +217,7 @@ export async function retrieveChatContextBlocks(input: {
             executionAgentId: agentId,
             userId,
             generationId: input.targetGenerationId,
+            projectId,
           })
           // 方案 A：自有账号平台表现（抖音官方 API）并入复盘块；未绑定/失败时模块自带显式降级文案
           const ownAccount = await loadOwnAccountPlatformContext({ userId })

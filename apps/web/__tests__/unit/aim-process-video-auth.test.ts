@@ -26,6 +26,10 @@ const { processVideo, authMode, validateCronSecret } = vi.hoisted(() => ({
   validateCronSecret: vi.fn(() => authMode.current === "cron"),
 }))
 
+const { resolveBoundProject } = vi.hoisted(() => ({
+  resolveBoundProject: vi.fn(async () => ({ id: "project-bound" })),
+}))
+
 vi.mock("@/lib/content-pipeline", () => ({ processVideo }))
 vi.mock("@/lib/video-text-extractor", () => ({
   assertSupportedVideoUrl: (url: string) => url,
@@ -54,6 +58,7 @@ vi.mock("@/env", () => ({
     CONTENT_PIPELINE_USER_ID: "pipeline_internal",
   },
 }))
+vi.mock("@/lib/account-project-context", () => ({ resolveBoundProject }))
 
 import { POST } from "@/app/api/aim/process-video/route"
 

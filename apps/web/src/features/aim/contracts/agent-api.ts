@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { aimGenerateBodyObjectSchema } from "@/features/aim/contracts/api"
+import { inspirationEventBodySchema } from "@/features/knowledge/contracts/api"
 
 const id = z.string().trim().min(1).max(80)
 
@@ -11,13 +12,15 @@ export const agentAimGenerateBodySchema = aimGenerateBodyObjectSchema.pick({
   topicTitle: true,
   topicRationale: true,
 }).extend({
-  projectId: id,
+  // 登录账号只有一个绑定项目；不传时由路由从账号绑定上下文补齐。
+  projectId: id.optional(),
   agentId: id,
   instruction: z.string().max(20_000).optional(),
 }).strict()
 
 export const agentWechatImportBodySchema = z.object({
-  projectId: id,
+  // 登录账号只有一个绑定项目；不传时由路由从账号绑定上下文补齐。
+  projectId: id.optional(),
   rawText: z.string().trim().min(1).max(50_000),
 }).strict()
 
@@ -44,6 +47,12 @@ const confirmedEntrySchema = z.object({
 }).strict()
 
 export const agentWechatConfirmBodySchema = z.object({
-  projectId: id,
+  // 登录账号只有一个绑定项目；不传时由路由从账号绑定上下文补齐。
+  projectId: id.optional(),
   entries: z.array(confirmedEntrySchema).min(1).max(50),
+}).strict()
+
+/** Agent 渠道事件沿用主事件契约，但项目由账号绑定上下文自动补齐。 */
+export const agentInspirationEventBodySchema = inspirationEventBodySchema.extend({
+  projectId: id.optional(),
 }).strict()

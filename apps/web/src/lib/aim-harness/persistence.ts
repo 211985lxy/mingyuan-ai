@@ -104,7 +104,11 @@ export async function saveAimGenerationRecord(
 
   if (context.existingGenerationId) {
     existingRow = await prisma.aimGeneration.findFirst({
-      where: { id: context.existingGenerationId, userId: context.userId },
+      where: {
+        id: context.existingGenerationId,
+        userId: context.userId,
+        ...(context.projectId ? { projectId: context.projectId } : {}),
+      },
       select: {
         id: true,
         videoScript: true,
@@ -205,7 +209,11 @@ export async function saveAimGenerationRecord(
   const persist = async (payload: typeof data) => {
     if (context.existingGenerationId) {
       const existing = existingRow ?? await prisma.aimGeneration.findFirst({
-        where: { id: context.existingGenerationId, userId: context.userId },
+        where: {
+          id: context.existingGenerationId,
+          userId: context.userId,
+          ...(context.projectId ? { projectId: context.projectId } : {}),
+        },
         select: { id: true },
       })
       if (existing) {

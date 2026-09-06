@@ -13,6 +13,7 @@ import {
   receiveKnowledgeMultipart,
 } from "@/lib/knowledge-multipart"
 import { readFile } from "node:fs/promises"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const POST = withUserAuth(async (request, { user }) => {
   let tempDir: string | null = null
@@ -21,12 +22,8 @@ export const POST = withUserAuth(async (request, { user }) => {
     tempDir = received.tempDir
 
     const category = received.fields.category || "product_usp"
-    const projectId = received.fields.projectId?.trim() || null
+    const requestedProjectId = received.fields.projectId?.trim() || undefined
     const fileEntry = received.files[0]
-
-    if (!projectId) {
-      return NextResponse.json({ error: "请选择归属全案" }, { status: 400 })
-    }
 
     if (!fileEntry) {
       return NextResponse.json({ error: "请上传文件" }, { status: 400 })
@@ -39,21 +36,7 @@ export const POST = withUserAuth(async (request, { user }) => {
       )
     }
 
-    const project = await prisma.clientProject.findFirst({
-      where: {
-        id: projectId,
-        userId: user.id,
-        status: "active",
-      },
-      select: { id: true },
-    })
-
-    if (!project) {
-      return NextResponse.json(
-        { error: "IP营销全案不存在或已归档" },
-        { status: 404 },
-      )
-    }
+    const project = await resolveBoundProject({ userId: user.id, requestedProjectId })
 
     const buffer = await readFile(fileEntry.tempPath)
     const chunks = await parseDocument(buffer, fileEntry.originalName)
@@ -107,8 +90,21 @@ export const POST = withUserAuth(async (request, { user }) => {
         { status: error.status },
       )
     }
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json(
+        { error: contextError.message, code: contextError.code },
+        { status: contextError.status },
+      )
+    }
     throw error
   } finally {
     await cleanupTempDir(tempDir)
   }
 })
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
+}

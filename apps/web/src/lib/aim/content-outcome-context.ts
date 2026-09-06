@@ -136,14 +136,23 @@ export function formatPublishOutcomeBlock(input: {
 export async function loadPublishOutcomeContext(input: {
   generationId: string
   userId: string
+  /** 当前账号绑定项目；传入时禁止读取同账号历史项目的结果。 */
+  projectId?: string | null
 }): Promise<PublishOutcomeContext> {
   const [generation, attributions] = await Promise.all([
     prisma.aimGeneration.findFirst({
-      where: { id: input.generationId, userId: input.userId },
+      where: {
+        id: input.generationId,
+        userId: input.userId,
+        ...(input.projectId ? { projectId: input.projectId } : {}),
+      },
       select: {
         retroSnapshots: true,
         contentOutcomes: {
-          where: { userId: input.userId },
+          where: {
+            userId: input.userId,
+            ...(input.projectId ? { projectId: input.projectId } : {}),
+          },
           orderBy: { collectWindowDay: "asc" },
           take: 3,
         },
@@ -192,6 +201,7 @@ export async function resolvePublishOutcomeBlock(input: {
   executionAgentId: string
   userId: string
   generationId?: string | null
+  projectId?: string | null
 }): Promise<string | undefined> {
   const generationId = input.generationId?.trim() ?? ""
   if (!shouldLoadPublishOutcomeContext(input.executionAgentId, generationId)) {
@@ -200,6 +210,7 @@ export async function resolvePublishOutcomeBlock(input: {
   const outcome = await loadPublishOutcomeContext({
     generationId,
     userId: input.userId,
+    projectId: input.projectId,
   })
   return outcome.hasData ? outcome.block : undefined
 }

@@ -22,7 +22,10 @@ import {
   parseAimChatBody,
   prepareAimChatExecution,
 } from "@/lib/aim/services/chat-context"
-import { ownsActiveProject } from "@/lib/resource-ownership"
+import {
+  AccountProjectContextError,
+  resolveBoundProject,
+} from "@/lib/account-project-context"
 import { resolveAimExecutionAgent } from "@/lib/aim/services/aim-execution-agent"
 
 /** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
@@ -47,10 +50,19 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
-    const { messages, agentId, projectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds, activeMethodologySignals } = parsed
-
-    if (projectId && !(await ownsActiveProject(user.id, projectId))) {
-      return NextResponse.json({ error: "IP 营销全案不存在或已归档" }, { status: 404 })
+    const { messages, agentId, projectId: requestedProjectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds, activeMethodologySignals } = parsed
+    let projectId: string
+    try {
+      projectId = (await resolveBoundProject({
+        userId: user.id,
+        requestedProjectId,
+      })).id
+    } catch (error) {
+      if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+        const contextError = error as { message: string; code: string; status: number }
+        return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+      }
+      throw error
     }
 
     // 技能跨引擎委托：只换本轮执行引擎，trace / 记忆仍挂在会话智能体名下。
@@ -143,4 +155,10 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

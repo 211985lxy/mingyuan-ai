@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { generatePlanQuestions } from "@/lib/aim/plan-option-engine"
-import { ownsActiveProject } from "@/lib/resource-ownership"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 import type { PlanTaskSpec, PlanTaskSpecField } from "@/lib/aim/plan-types"
 import { PLAN_MAX_ROUNDS, PLAN_MAX_TOTAL_QUESTIONS, PLAN_TASK_SPEC_FIELDS } from "@/lib/aim/plan-types"
 
@@ -21,13 +21,13 @@ export async function POST(request: NextRequest) {
     // ── 入参校验 ──
     const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const requirement = typeof body.requirement === "string" ? body.requirement.trim().slice(0, 1000) : ""
-    if (!projectId) return NextResponse.json({ error: "请先选择 IP 营销全案" }, { status: 400 })
     if (!requirement) return NextResponse.json({ error: "请输入一句话需求" }, { status: 400 })
 
-    // ── 项目权限校验 ──
-    if (!await ownsActiveProject(user.id, projectId)) {
-      return NextResponse.json({ error: "项目不存在或已归档" }, { status: 404 })
-    }
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: projectId || undefined,
+    })
+    const scopedProjectId = boundProject.id
 
     // ── 解析可选参数 ──
     const confirmedFields = sanitizeConfirmedFields(body.confirmedFields)
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // ── 生成问题 ──
     const result = await generatePlanQuestions({
-      projectId,
+      projectId: scopedProjectId,
       userId: user.id,
       requirement,
       confirmedFields: confirmedFields ?? {},
@@ -56,6 +56,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     const contractResponse = apiRequestErrorResponse(request, error)

@@ -1,11 +1,9 @@
 "use client"
 
 import { MessageCircle, Workflow } from "lucide-react"
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface AimEntryProject {
   id: string
@@ -25,9 +23,14 @@ export function AimEntrySwitch(props: {
   const onOperating = props.onOperating ?? ((selectedProjectId: string) => {
     router.replace(`/aim?projectId=${encodeURIComponent(selectedProjectId)}&stage=direction`)
   })
-  const [projectId, setProjectId] = useState(
-    props.selectedProjectId || projects.find((project) => project.status === "active")?.id || projects[0]?.id || "",
-  )
+  // The server returns at most the account-bound project. Never offer a
+  // project picker here: an AIM login account has one fixed project context.
+  const boundProject = props.selectedProjectId
+    ? projects.find((project) => project.id === props.selectedProjectId)
+    : projects.length === 1
+      ? projects[0]
+      : undefined
+  const projectId = boundProject?.id || ""
 
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-y-auto px-4 py-10">
@@ -53,10 +56,9 @@ export function AimEntrySwitch(props: {
               <Workflow className="mt-0.5 size-5 text-primary" />
               <div><strong className="text-sm">运行 IP 闭环</strong><p className="mt-1 text-xs text-muted-foreground">定方向、做内容、发布、看结果</p></div>
             </div>
-            <Select value={projectId || null} onValueChange={(value) => setProjectId(value || "")}>
-              <SelectTrigger><SelectValue placeholder="选择老板 IP 项目" /></SelectTrigger>
-              <SelectContent>{projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              当前绑定项目：{boundProject?.name || "尚未完成项目绑定"}
+            </p>
             <Button type="button" className="w-full" aria-label="Run IP loop" disabled={!projectId} onClick={() => onOperating(projectId)}>进入本周经营</Button>
           </div>
         </div>

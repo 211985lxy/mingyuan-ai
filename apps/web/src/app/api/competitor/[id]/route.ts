@@ -1,12 +1,25 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withUserAuth } from '@/lib/user-auth'
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const GET = withUserAuth(async (_request, { user, params }) => {
   const id = (params as { id: string }).id
 
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
+
   const analysis = await prisma.competitorAnalysis.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: user.id, projectId },
   })
 
   if (!analysis) {
@@ -57,16 +70,26 @@ export const GET = withUserAuth(async (_request, { user, params }) => {
 export const DELETE = withUserAuth(async (_request, { user, params }) => {
   const id = (params as { id: string }).id
 
-  const analysis = await prisma.competitorAnalysis.findFirst({
-    where: { id, userId: user.id },
-    select: { id: true },
-  })
-
-  if (!analysis) {
-    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
   }
 
-  await prisma.competitorAnalysis.delete({ where: { id, userId: user.id } })
+  // id + userId + projectId 条件删除：属于其他项目（或空项目）的记录一律视为不存在。
+  const result = await prisma.competitorAnalysis.deleteMany({
+    where: { id, userId: user.id, projectId },
+  })
+
+  if (result.count === 0) {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+  }
 
   return new NextResponse(null, { status: 204 })
 })

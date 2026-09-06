@@ -3,7 +3,7 @@ import { NextRequest } from "next/server"
 
 // 创作者数据总线路由：鉴权 / 参数校验 / not_configured 降级透传。
 
-const { authenticateRequest, authErrorResponse, fetchCreatorMetrics, projectFindFirst } = vi.hoisted(() => ({
+const { authenticateRequest, authErrorResponse, fetchCreatorMetrics, projectFindFirst, resolveBoundProject } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   fetchCreatorMetrics: vi.fn(async (_input: { start: Date; end: Date }) => ({
@@ -11,16 +11,24 @@ const { authenticateRequest, authErrorResponse, fetchCreatorMetrics, projectFind
     message: "未配置创作者数据总线的飞书 Base",
   })),
   projectFindFirst: vi.fn<() => Promise<{ id: string } | null>>(async () => ({ id: "project-1" })),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
 vi.mock("@/lib/aim/creator-metrics", () => ({ fetchCreatorMetrics }))
 vi.mock("@/lib/prisma", () => ({ prisma: { clientProject: { findFirst: projectFindFirst } } }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error { code = "PROJECT_CONTEXT_MISMATCH"; status = 409 },
+}))
 
 import { GET } from "@/app/api/aim/creator-metrics/route"
 
 describe("GET /api/aim/creator-metrics", () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "测试项目", status: "active" })
+  })
 
   it("缺省周期最近 7 天，返回总线响应", async () => {
     const res = await GET(new NextRequest("http://localhost/api/aim/creator-metrics"))
@@ -45,9 +53,9 @@ describe("GET /api/aim/creator-metrics", () => {
   })
 
   it("项目不存在返回 404", async () => {
-    projectFindFirst.mockResolvedValueOnce(null)
+    resolveBoundProject.mockRejectedValueOnce({ message: "项目不存在", code: "PROJECT_CONTEXT_MISMATCH", status: 409 })
     const res = await GET(new NextRequest("http://localhost/api/aim/creator-metrics?projectId=p-1"))
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(409)
   })
 
   it("未认证返回 401", async () => {

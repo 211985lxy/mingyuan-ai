@@ -12,6 +12,7 @@ import { executeVerifiedUnifiedDelivery, executeVerifiedUnifiedReply } from "@/l
 import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 180
 
@@ -24,26 +25,31 @@ export async function POST(request: NextRequest) {
     const parsed = aimExecuteBodySchema.parse(await parseJsonRecord(request, {
       maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES,
     }))
-    const agentId = parsed.executionAgentId || parsed.agentId || "content_producer"
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: parsed.projectId,
+    })
+    const scopedParsed = { ...parsed, projectId: boundProject.id }
+    const agentId = scopedParsed.executionAgentId || scopedParsed.agentId || "content_producer"
     trace = await createAimTrace({
       userId: user.id,
-      projectId: parsed.projectId ?? null,
+      projectId: boundProject.id,
       agentId,
       action: "generate",
-      inputSummary: parsed.sourceEnvelope.currentUserRequest,
+      inputSummary: scopedParsed.sourceEnvelope.currentUserRequest,
     })
     const understanding = await understandAimContentTurnWithTrace({
-      envelope: parsed.sourceEnvelope,
+      envelope: scopedParsed.sourceEnvelope,
       agentId,
       trace,
     })
 
     // 意图门：意图解析 + 关键缺口 + 规则块挂载 + 追问组装（显性化，轨迹可见）
     const gate = resolveExecuteTurnGate({
-      envelope: parsed.sourceEnvelope,
+      envelope: scopedParsed.sourceEnvelope,
       handling: understanding.handling,
       llmQuestions: understanding.clarificationQuestions,
-      formats: parsed.targetFormats,
+      formats: scopedParsed.targetFormats,
     })
     const mountedSummary = gate.mountedRuleBlocks.length
       ? `｜挂载 ${gate.mountedRuleBlocks.map((id) => MOUNTED_RULE_BLOCK_LABELS[id]).join("、")}`
@@ -72,12 +78,16 @@ export async function POST(request: NextRequest) {
       })
     }
     if (understanding.handling === "respond") {
-      const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed, understanding, trace })
+      const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed: scopedParsed, understanding, trace })
       return NextResponse.json({ kind: "reply", content, runId: trace?.id })
     }
-    const run = await executeVerifiedUnifiedDelivery({ userId: user.id, parsed, understanding, trace })
+    const run = await executeVerifiedUnifiedDelivery({ userId: user.id, parsed: scopedParsed, understanding, trace })
     return NextResponse.json({ kind: "deliverable", ...serializeAimGenerationRun(run) })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     const contractResponse = apiRequestErrorResponse(request, error)
@@ -88,4 +98,10 @@ export async function POST(request: NextRequest) {
       : mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
     return NextResponse.json({ error: message }, { status: error instanceof Error && error.message.includes("连续修正") ? 422 : 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

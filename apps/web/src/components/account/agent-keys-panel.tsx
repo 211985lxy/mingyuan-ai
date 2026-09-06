@@ -68,7 +68,6 @@ export function AgentKeysPanel() {
   // Create form state
   const [name, setName] = useState("")
   const [clientType, setClientType] = useState<"codex" | "workbuddy" | "custom">("codex")
-  const [projectIds, setProjectIds] = useState("")
   const [dailyLimit, setDailyLimit] = useState(20)
 
   async function reload() {
@@ -97,9 +96,8 @@ export function AgentKeysPanel() {
   }
 
   async function createKey() {
-    const projects = projectIds.split(",").map((s) => s.trim()).filter(Boolean)
-    if (!name.trim() || projects.length === 0) {
-      toast.error("请填写名称和至少一个项目 ID")
+    if (!name.trim()) {
+      toast.error("请填写名称")
       return
     }
     setBusy(true)
@@ -110,7 +108,7 @@ export function AgentKeysPanel() {
         body: JSON.stringify({
           name: name.trim(),
           clientType,
-          projects,
+          projects: [],
           dailyLimit,
         }),
       })
@@ -123,7 +121,6 @@ export function AgentKeysPanel() {
       setRevealed(true)
       setShowCreate(false)
       setName("")
-      setProjectIds("")
       await reload()
       toast.success("Key 已创建，请立即复制保存")
     } catch (error) {
@@ -209,9 +206,9 @@ export function AgentKeysPanel() {
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs">项目 ID（逗号分隔）</Label>
-                <Input value={projectIds} onChange={(e) => setProjectIds(e.target.value)} placeholder="proj_a,proj_b" />
+              <div className="space-y-1 rounded-md bg-muted/50 px-3 py-2">
+                <Label className="text-xs">项目范围</Label>
+                <p className="mt-1 text-xs text-muted-foreground">自动使用当前 AIM 账号绑定的 IP 项目，不允许跨项目调用。</p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">每日调用上限</Label>

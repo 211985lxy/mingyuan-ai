@@ -31,6 +31,7 @@ const {
   executeAimChatDomain,
   streamAimChatDomain,
   ownsActiveProject,
+  resolveBoundProject,
   addAimTraceStep,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
@@ -62,6 +63,7 @@ const {
   executeAimChatDomain: vi.fn(),
   streamAimChatDomain: vi.fn(),
   ownsActiveProject: vi.fn(async () => true),
+  resolveBoundProject: vi.fn(async () => ({ id: "p1", name: "测试项目", status: "active" })),
   addAimTraceStep: vi.fn(async () => undefined),
 }))
 
@@ -102,6 +104,13 @@ vi.mock("@/lib/aim-observability", () => ({
 vi.mock("@/lib/aim-harness/runtime", () => ({ executeAimRun, streamAimRun }))
 vi.mock("@/lib/aim-harness/domain-executor", () => ({ executeAimChatDomain, streamAimChatDomain }))
 vi.mock("@/lib/resource-ownership", () => ({ ownsActiveProject }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/aim/chat/route"
 
@@ -147,6 +156,7 @@ describe("POST /api/aim/chat 技能跨引擎委托", () => {
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
     ownsActiveProject.mockResolvedValue(true)
+    resolveBoundProject.mockResolvedValue({ id: "p1", name: "测试项目", status: "active" })
     stubHarnessRun()
   })
 
