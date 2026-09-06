@@ -1,11 +1,60 @@
+import { createHash, createHmac, randomUUID } from "node:crypto"
 import { prisma } from "@/lib/prisma"
-import type { Prisma } from "@/generated/prisma/client"
+import type { Prisma, PrismaClient } from "@/generated/prisma/client"
 import { ApiRequestError } from "@/lib/api-contract"
+import {
+  BACKGROUND_TASK_STATUS,
+  cancelStaleProjectBackgroundTask,
+} from "@/lib/background-tasks"
 
 export type AccountProjectContextStatus =
   | "bound"
   | "setup_required"
   | "admin_review_required"
+  | "inactive_project_recovery_required"
+
+/** Project statuses that mean the project is paused / not usable for the account. */
+export const INACTIVE_PROJECT_STATUSES = ["paused", "archived"] as const
+export const ACTIVE_PROJECT_STATUS = "active"
+
+export function isInactiveProjectStatus(status: string): boolean {
+  return (INACTIVE_PROJECT_STATUSES as readonly string[]).includes(status)
+}
+
+export type AccountProjectStatusCounts = {
+  activeProjectCount: number
+  inactiveProjectCount: number
+}
+
+/**
+ * Canonical account-project status derivation (Task 7): active and inactive
+ * projects are counted separately so an account whose only projects are
+ * paused/archived lands in `inactive_project_recovery_required` instead of the
+ * create-first-project or admin-review buckets. This is the SINGLE source of
+ * truth shared by the context read, first-project creation and the admin list.
+ */
+export function deriveAccountProjectContextStatus(
+  counts: AccountProjectStatusCounts,
+): AccountProjectContextStatus {
+  if (counts.activeProjectCount > 0) return "admin_review_required"
+  if (counts.inactiveProjectCount > 0) return "inactive_project_recovery_required"
+  return "setup_required"
+}
+
+/** Derive the admin-list status straight from a user row + its project rows. */
+export function deriveAccountProjectBindingStatus(input: {
+  boundProjectId: string | null
+  projects: Array<{ status: string }>
+}): AccountProjectContextStatus {
+  if (input.boundProjectId) return "bound"
+  let activeProjectCount = 0
+  let inactiveProjectCount = 0
+  for (const project of input.projects) {
+    if (project.status === ACTIVE_PROJECT_STATUS) activeProjectCount += 1
+    else if (isInactiveProjectStatus(project.status)) inactiveProjectCount += 1
+  }
+  return deriveAccountProjectContextStatus({ activeProjectCount, inactiveProjectCount })
+}
 
 export type BoundProject = {
   id: string
@@ -27,14 +76,19 @@ export type AccountProjectContext =
   | { status: "bound"; project: BoundProject }
   | { status: "setup_required" }
   | { status: "admin_review_required"; projectCount: number }
+  | { status: "inactive_project_recovery_required"; projectCount: number }
 
 export type AccountProjectContextErrorCode =
   | "ACCOUNT_NOT_FOUND"
   | "ACCOUNT_PROJECT_SETUP_REQUIRED"
   | "ACCOUNT_PROJECT_REVIEW_REQUIRED"
+  | "ACCOUNT_PROJECT_RECOVERY_REQUIRED"
   | "ACCOUNT_ALREADY_BOUND"
+  | "ACCOUNT_BINDING_CHANGED"
   | "PROJECT_CONTEXT_MISMATCH"
   | "BOUND_PROJECT_UNAVAILABLE"
+  | "PROJECT_NOT_FOUND"
+  | "TARGET_NOT_ACTIVE"
 
 export class AccountProjectContextError extends ApiRequestError {
   readonly code: AccountProjectContextErrorCode
@@ -69,6 +123,8 @@ const projectSelect = {
   status: true,
 } as const
 
+type ProjectCountDb = Pick<PrismaClient, "clientProject">
+
 async function getUserBinding(userId: string): Promise<string | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -80,6 +136,22 @@ async function getUserBinding(userId: string): Promise<string | null> {
   }
 
   return user.boundProjectId
+}
+
+/** Count active vs inactive projects of an account (the status-model inputs). */
+async function countAccountProjects(
+  db: ProjectCountDb,
+  userId: string,
+): Promise<AccountProjectStatusCounts> {
+  const [activeProjectCount, inactiveProjectCount] = await Promise.all([
+    db.clientProject.count({
+      where: { userId, status: ACTIVE_PROJECT_STATUS },
+    }),
+    db.clientProject.count({
+      where: { userId, status: { in: [...INACTIVE_PROJECT_STATUSES] } },
+    }),
+  ])
+  return { activeProjectCount, inactiveProjectCount }
 }
 
 export async function getAccountProjectContext(
@@ -103,13 +175,16 @@ export async function getAccountProjectContext(
     return { status: "bound", project }
   }
 
-  const projectCount = await prisma.clientProject.count({
-    where: { userId },
-  })
+  const counts = await countAccountProjects(prisma, userId)
+  const status = deriveAccountProjectContextStatus(counts)
 
-  if (projectCount === 0) return { status: "setup_required" }
-
-  return { status: "admin_review_required", projectCount }
+  if (status === "admin_review_required") {
+    return { status, projectCount: counts.activeProjectCount }
+  }
+  if (status === "inactive_project_recovery_required") {
+    return { status, projectCount: counts.inactiveProjectCount }
+  }
+  return { status: "setup_required" }
 }
 
 export async function resolveBoundProject(options: {
@@ -219,7 +294,6 @@ export async function logAccountProjectContextRejection(input: {
       boundProjectId = null
     }
   }
-  // eslint-disable-next-line no-console
   console.error(`[account-project-context-stale]`, {
     source: input.source,
     taskId: input.taskId,
@@ -251,11 +325,19 @@ export async function createInitialAccountProject(
       )
     }
 
-    const projectCount = await tx.clientProject.count({ where: { userId } })
-    if (projectCount > 0) {
+    // 创建首个项目时使用与状态判定相同的口径（active vs inactive 分开统计）：
+    // 只有真正“零项目”的账号（setup_required）可以自助创建；仅有停用项目的
+    // 账号必须走管理员恢复，避免死循环。
+    const counts = await countAccountProjects(tx as unknown as ProjectCountDb, userId)
+    const status = deriveAccountProjectContextStatus(counts)
+    if (status !== "setup_required") {
       throw new AccountProjectContextError(
-        "ACCOUNT_PROJECT_REVIEW_REQUIRED",
-        "账号存在未绑定项目，请联系管理员完成绑定",
+        status === "admin_review_required"
+          ? "ACCOUNT_PROJECT_REVIEW_REQUIRED"
+          : "ACCOUNT_PROJECT_RECOVERY_REQUIRED",
+        status === "admin_review_required"
+          ? "账号存在未绑定项目，请联系管理员完成绑定"
+          : "账号仅存在停用项目，请联系管理员恢复后绑定",
       )
     }
 
@@ -356,4 +438,466 @@ export async function bindAccountProject(options: {
 
     return project
   })
+}
+
+// ---------------------------------------------------------------------------
+// Task 7 — admin preview / audited repair + confirmation token
+// ---------------------------------------------------------------------------
+
+type RepairImpactDb = Pick<
+  PrismaClient,
+  | "user"
+  | "clientProject"
+  | "knowledgeEntry"
+  | "script"
+  | "aimGeneration"
+  | "agentInvocation"
+  | "backgroundTask"
+>
+
+export type AccountProjectRepairImpact = {
+  userId: string
+  currentBinding: { id: string; name: string; status: string } | null
+  targetProject: { id: string; name: string; status: string }
+  reactivationRequired: boolean
+  targetContentCounts: {
+    knowledgeEntries: number
+    scripts: number
+    aimGenerations: number
+  }
+  /** Pending old-project work that the repair would quarantine. */
+  wouldCancel: {
+    agentInvocations: number
+    backgroundTasks: number
+  }
+  /** Historical records that stay under the old project (cannot be auto-attributed). */
+  unattributedHistoryCount: number
+}
+
+type PendingAgentProjectWork = {
+  pendingInvocations: Array<{ id: string; backgroundTaskId: string | null }>
+  backgroundTaskIds: string[]
+}
+
+/**
+ * Enumerate the account's pending work for a project it is leaving:
+ * - queued/running AgentInvocation rows that carry userId + projectId directly;
+ * - their linked BackgroundTasks, plus orphan queued/leased/retry-wait
+ *   BackgroundTasks whose aggregate is one of those invocations.
+ *
+ * BackgroundTask itself has no project column (Task 6 review note), so the
+ * enumeration is done through the project-scoped aggregate rows. Completed
+ * history is never matched.
+ */
+async function findPendingAgentProjectWork(
+  db: RepairImpactDb,
+  input: { userId: string; projectId: string },
+): Promise<PendingAgentProjectWork> {
+  const pendingInvocations = await db.agentInvocation.findMany({
+    where: {
+      userId: input.userId,
+      projectId: input.projectId,
+      status: { in: ["queued", "running"] },
+    },
+    select: { id: true, backgroundTaskId: true },
+  })
+  const invocationIds = pendingInvocations.map((invocation) => invocation.id)
+  const linkedTaskIds = pendingInvocations
+    .map((invocation) => invocation.backgroundTaskId)
+    .filter((id): id is string => Boolean(id))
+
+  const orphanTasks =
+    invocationIds.length > 0
+      ? await db.backgroundTask.findMany({
+          where: {
+            aggregateType: "agent_invocation",
+            aggregateId: { in: invocationIds },
+            status: {
+              in: [
+                BACKGROUND_TASK_STATUS.queued,
+                BACKGROUND_TASK_STATUS.leased,
+                BACKGROUND_TASK_STATUS.retryWait,
+              ],
+            },
+          },
+          select: { id: true },
+        })
+      : []
+
+  return {
+    pendingInvocations,
+    backgroundTaskIds: [
+      ...new Set([...linkedTaskIds, ...orphanTasks.map((task) => task.id)]),
+    ],
+  }
+}
+
+/**
+ * Quarantine the enumerated old-project work. AgentInvocation rows are failed
+ * with the stable ACCOUNT_PROJECT_CONTEXT_STALE code (same semantics as
+ * `failStaleProjectAgentInvocation` in invocation-service.ts, applied inline to
+ * keep this module free of that service's import graph); pending BackgroundTasks
+ * are cancelled via the Task 6 primitive `cancelStaleProjectBackgroundTask`.
+ * Only pending / in-flight rows are touched; completed history is never
+ * rewritten.
+ */
+async function quarantinePendingAgentProjectWork(
+  db: RepairImpactDb,
+  input: { userId: string; projectId: string },
+): Promise<{ failedInvocationCount: number; cancelledTaskCount: number }> {
+  const pending = await findPendingAgentProjectWork(db, input)
+  const now = new Date()
+  let failedInvocationCount = 0
+  let cancelledTaskCount = 0
+
+  for (const invocation of pending.pendingInvocations) {
+    const updated = await db.agentInvocation.updateMany({
+      where: { id: invocation.id, status: { in: ["queued", "running"] } },
+      data: {
+        status: "failed",
+        errorCode: ACCOUNT_PROJECT_CONTEXT_STALE,
+        errorMessage: ACCOUNT_PROJECT_CONTEXT_STALE_MESSAGE,
+        completedAt: now,
+      },
+    })
+    failedInvocationCount += updated.count
+  }
+  for (const taskId of pending.backgroundTaskIds) {
+    cancelledTaskCount += await cancelStaleProjectBackgroundTask(db as never, taskId, now)
+  }
+
+  return { failedInvocationCount, cancelledTaskCount }
+}
+
+/**
+ * Read-only impact preview for an admin repair/recovery. Counts only — NEVER
+ * returns knowledge/script/generation body content.
+ */
+export async function getAccountProjectRepairImpact(
+  db: RepairImpactDb,
+  input: { userId: string; targetProjectId: string; reactivate: boolean },
+): Promise<AccountProjectRepairImpact> {
+  const user = await db.user.findUnique({
+    where: { id: input.userId },
+    select: {
+      id: true,
+      boundProjectId: true,
+      boundProject: { select: { id: true, name: true, status: true } },
+    },
+  })
+  if (!user) {
+    throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
+  }
+
+  const target = await db.clientProject.findUnique({
+    where: { id: input.targetProjectId },
+    select: { id: true, userId: true, name: true, status: true },
+  })
+  if (!target) {
+    throw new AccountProjectContextError("PROJECT_NOT_FOUND", "目标项目不存在", 404)
+  }
+  if (target.userId !== input.userId) {
+    throw new AccountProjectContextError(
+      "PROJECT_CONTEXT_MISMATCH",
+      "项目不属于当前账号",
+    )
+  }
+  if (target.status !== ACTIVE_PROJECT_STATUS && !input.reactivate) {
+    throw new AccountProjectContextError(
+      "TARGET_NOT_ACTIVE",
+      "目标项目不是 active；如需停用项目恢复请勾选恢复为 active",
+    )
+  }
+
+  const previousProjectId = user.boundProjectId
+  const leavingPrevious = Boolean(previousProjectId) && previousProjectId !== target.id
+
+  const [knowledgeEntries, scripts, targetAimGenerations] = await Promise.all([
+    db.knowledgeEntry.count({
+      where: { userId: input.userId, projectId: target.id },
+    }),
+    db.script.count({
+      where: { userId: input.userId, projectId: target.id },
+    }),
+    db.aimGeneration.count({
+      where: { userId: input.userId, projectId: target.id },
+    }),
+  ])
+
+  let pending: PendingAgentProjectWork = { pendingInvocations: [], backgroundTaskIds: [] }
+  if (leavingPrevious && previousProjectId) {
+    pending = await findPendingAgentProjectWork(db, {
+      userId: input.userId,
+      projectId: previousProjectId,
+    })
+  }
+
+  let unattributedHistoryCount = 0
+  if (leavingPrevious && previousProjectId) {
+    unattributedHistoryCount = await db.aimGeneration.count({
+      where: { userId: input.userId, projectId: previousProjectId },
+    })
+  }
+
+  return {
+    userId: input.userId,
+    currentBinding: user.boundProject
+      ? {
+          id: user.boundProject.id,
+          name: user.boundProject.name,
+          status: user.boundProject.status,
+        }
+      : null,
+    targetProject: {
+      id: target.id,
+      name: target.name,
+      status: target.status,
+    },
+    reactivationRequired: target.status !== ACTIVE_PROJECT_STATUS,
+    targetContentCounts: {
+      knowledgeEntries,
+      scripts,
+      aimGenerations: targetAimGenerations,
+    },
+    wouldCancel: {
+      agentInvocations: pending.pendingInvocations.length,
+      backgroundTasks: pending.backgroundTaskIds.length,
+    },
+    unattributedHistoryCount,
+  }
+}
+
+export type AccountProjectRepairResult = {
+  previousProjectId: string | null
+  nextProjectId: string
+  target: { id: string; name: string; status: string }
+  reactivated: boolean
+  failedInvocationCount: number
+  cancelledTaskCount: number
+  unattributedHistoryCount: number
+}
+
+/**
+ * Dedicated audited repair — separate from `bindAccountProject`, which must
+ * CONTINUE to forbid replacement. All-or-nothing: the binding re-claim, optional
+ * reactivation and the old-project quarantine run inside one transaction, so a
+ * failed quarantine rolls the binding change back (no half-state).
+ */
+export async function repairAccountProjectBinding(options: {
+  userId: string
+  previousProjectId: string | null
+  nextProjectId: string
+  reactivateNext: boolean
+}): Promise<AccountProjectRepairResult> {
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: options.userId },
+      select: { boundProjectId: true },
+    })
+    if (!user) {
+      throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
+    }
+    if (user.boundProjectId !== options.previousProjectId) {
+      throw new AccountProjectContextError(
+        "ACCOUNT_BINDING_CHANGED",
+        "账号绑定已变化，请重新预览后再执行",
+      )
+    }
+
+    const target = await tx.clientProject.findUnique({
+      where: { id: options.nextProjectId },
+      select: { id: true, userId: true, name: true, status: true },
+    })
+    if (!target) {
+      throw new AccountProjectContextError("PROJECT_NOT_FOUND", "目标项目不存在", 404)
+    }
+    if (target.userId !== options.userId) {
+      throw new AccountProjectContextError(
+        "PROJECT_CONTEXT_MISMATCH",
+        "项目不属于当前账号",
+      )
+    }
+
+    let reactivated = false
+    if (target.status !== ACTIVE_PROJECT_STATUS) {
+      if (!options.reactivateNext) {
+        throw new AccountProjectContextError(
+          "TARGET_NOT_ACTIVE",
+          "目标项目不是 active；如需停用项目恢复请先勾选恢复为 active",
+        )
+      }
+      reactivated = true
+      await tx.clientProject.update({
+        where: { id: target.id },
+        data: { status: ACTIVE_PROJECT_STATUS },
+      })
+    }
+
+    const sameBinding = user.boundProjectId === options.nextProjectId
+    if (!sameBinding) {
+      // Conditional re-claim closes the concurrent-admin race: if the binding
+      // moved since the preview token was issued, zero rows match and we abort.
+      const claim = await tx.user.updateMany({
+        where: {
+          id: options.userId,
+          boundProjectId: options.previousProjectId,
+        },
+        data: {
+          boundProjectId: options.nextProjectId,
+          projectBoundAt: new Date(),
+          projectBindingSource: "admin_repair",
+        },
+      })
+      if (claim.count !== 1) {
+        throw new AccountProjectContextError(
+          "ACCOUNT_BINDING_CHANGED",
+          "账号绑定已变化，请重新预览后再执行",
+        )
+      }
+    }
+
+    let unattributedHistoryCount = 0
+    let failedInvocationCount = 0
+    let cancelledTaskCount = 0
+    if (options.previousProjectId && !sameBinding) {
+      unattributedHistoryCount = await tx.aimGeneration.count({
+        where: { userId: options.userId, projectId: options.previousProjectId },
+      })
+      const quarantined = await quarantinePendingAgentProjectWork(
+        tx as unknown as RepairImpactDb,
+        { userId: options.userId, projectId: options.previousProjectId },
+      )
+      failedInvocationCount = quarantined.failedInvocationCount
+      cancelledTaskCount = quarantined.cancelledTaskCount
+    }
+
+    return {
+      previousProjectId: options.previousProjectId,
+      nextProjectId: options.nextProjectId,
+      target: {
+        id: target.id,
+        name: target.name,
+        status: reactivated ? ACTIVE_PROJECT_STATUS : target.status,
+      },
+      reactivated,
+      failedInvocationCount,
+      cancelledTaskCount,
+      unattributedHistoryCount,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Short-lived HMAC confirmation token (admin two-step confirm → atomic repair)
+// ---------------------------------------------------------------------------
+
+export const ACCOUNT_PROJECT_REPAIR_TOKEN_TTL_MS = 10 * 60 * 1000
+const ACCOUNT_PROJECT_REPAIR_TOKEN_PURPOSE = "account_project_repair"
+const ACCOUNT_PROJECT_REPAIR_TOKEN_VERSION = 1 as const
+
+export type AccountProjectRepairTokenPayload = {
+  v: typeof ACCOUNT_PROJECT_REPAIR_TOKEN_VERSION
+  purpose: typeof ACCOUNT_PROJECT_REPAIR_TOKEN_PURPOSE
+  userId: string
+  previousProjectId: string | null
+  projectId: string
+  reactivate: boolean
+  reasonHash: string
+  issuedAtMs: number
+  expiresAtMs: number
+  nonce: string
+}
+
+export function hashAccountProjectRepairReason(reason: string): string {
+  return createHash("sha256").update(reason, "utf8").digest("hex")
+}
+
+/** Server-side secret shared with the admin session (lazily read, ≥32 chars). */
+function repairTokenSecret(): string {
+  const secret = process.env.ADMIN_JWT_SECRET
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      "ADMIN_JWT_SECRET 未配置或长度不足(需 ≥32 字符)，无法签发/校验账号项目修复确认 token",
+    )
+  }
+  return secret
+}
+
+function signRepairTokenPayload(encoded: string): string {
+  return createHmac("sha256", repairTokenSecret())
+    .update(encoded, "utf8")
+    .digest("hex")
+}
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return diff === 0
+}
+
+/**
+ * Mint a short-lived, stateless confirmation token for an admin repair. The
+ * token binds userId + previousProjectId + targetProjectId + reactivation +
+ * reason so it cannot be replayed against a different target or reason.
+ */
+export function createAccountProjectRepairToken(input: {
+  userId: string
+  previousProjectId: string | null
+  projectId: string
+  reactivate: boolean
+  reason: string
+  nowMs?: number
+}): string {
+  const issuedAtMs = input.nowMs ?? Date.now()
+  const payload: AccountProjectRepairTokenPayload = {
+    v: ACCOUNT_PROJECT_REPAIR_TOKEN_VERSION,
+    purpose: ACCOUNT_PROJECT_REPAIR_TOKEN_PURPOSE,
+    userId: input.userId,
+    previousProjectId: input.previousProjectId,
+    projectId: input.projectId,
+    reactivate: input.reactivate,
+    reasonHash: hashAccountProjectRepairReason(input.reason),
+    issuedAtMs,
+    expiresAtMs: issuedAtMs + ACCOUNT_PROJECT_REPAIR_TOKEN_TTL_MS,
+    nonce: randomUUID(),
+  }
+  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")
+  return `${encoded}.${signRepairTokenPayload(encoded)}`
+}
+
+/** Verify a repair confirmation token; returns null when invalid or expired. */
+export function verifyAccountProjectRepairToken(
+  token: string,
+  nowMs = Date.now(),
+): AccountProjectRepairTokenPayload | null {
+  const separator = token.lastIndexOf(".")
+  if (separator <= 0 || separator === token.length - 1) return null
+
+  const encoded = token.slice(0, separator)
+  const signature = token.slice(separator + 1)
+  if (!constantTimeEqual(signRepairTokenPayload(encoded), signature)) return null
+
+  let payload: unknown
+  try {
+    payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"))
+  } catch {
+    return null
+  }
+  if (!payload || typeof payload !== "object") return null
+
+  const record = payload as Record<string, unknown>
+  if (record.v !== ACCOUNT_PROJECT_REPAIR_TOKEN_VERSION) return null
+  if (record.purpose !== ACCOUNT_PROJECT_REPAIR_TOKEN_PURPOSE) return null
+  if (typeof record.userId !== "string") return null
+  if (record.previousProjectId !== null && typeof record.previousProjectId !== "string") {
+    return null
+  }
+  if (typeof record.projectId !== "string") return null
+  if (typeof record.reasonHash !== "string") return null
+  if (typeof record.expiresAtMs !== "number" || record.expiresAtMs <= nowMs) return null
+
+  return payload as AccountProjectRepairTokenPayload
 }
