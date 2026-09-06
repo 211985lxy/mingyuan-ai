@@ -10,6 +10,7 @@ import {
   assertAccountProjectExecutionContext,
   isAccountProjectContextError,
   logAccountProjectContextRejection,
+  logLegacyNullProjectTaskRejection,
 } from "@/lib/account-project-context"
 import { generateAimContent } from "@/lib/aim-generator"
 import {
@@ -69,10 +70,31 @@ export async function executeNewsroomPipelineBackgroundTask(taskId: string): Pro
     select: { userId: true, projectId: true },
   })
   if (generation) {
+    // 历史空项目记录（改绑前遗留，projectId = null）没有可验证的项目边界 →
+    // 隔离（ACCOUNT_PROJECT_CONTEXT_STALE、不重试），绝不解析到“当前绑定”继续
+    // 用旧 taskSpec/锚点跑模型。
+    if (!generation.projectId) {
+      await logLegacyNullProjectTaskRejection({
+        source: "newsroom",
+        taskId: task.id,
+        userId: generation.userId,
+      })
+      await markNewsroomGenerationFailed(task.aggregateId, task.id)
+      await failBackgroundTask(prisma, {
+        taskId: task.id,
+        leaseToken: task.leaseToken!,
+        attempt: task.attempt,
+        maxAttempts: task.maxAttempts,
+        retryable: false,
+        error: accountProjectContextStaleErrorString(),
+      })
+      return true
+    }
+
     try {
       await assertAccountProjectExecutionContext({
         userId: generation.userId,
-        projectId: generation.projectId || "",
+        projectId: generation.projectId,
         source: "newsroom",
       })
     } catch (error) {
@@ -81,7 +103,7 @@ export async function executeNewsroomPipelineBackgroundTask(taskId: string): Pro
           source: "newsroom",
           userId: generation.userId,
           taskId: task.id,
-          expectedProjectId: generation.projectId || "",
+          expectedProjectId: generation.projectId,
           error,
         })
         await markNewsroomGenerationFailed(task.aggregateId, task.id)

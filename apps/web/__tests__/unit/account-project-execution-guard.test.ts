@@ -148,6 +148,25 @@ function wasTaskMarkedSuccess() {
   })
 }
 
+/** Data of the last `status: "failed"` background-task update (if any). */
+function taskFailCallData(): { status?: string; lastError?: string } | undefined {
+  const calls = prismaMock.backgroundTask.updateMany.mock.calls
+  const failCall = calls.find((c) => {
+    const data = (c[0] as { data?: Record<string, unknown> })?.data
+    return data && data.status === "failed"
+  })
+  return failCall ? (failCall[0] as { data?: { status?: string; lastError?: string } }).data : undefined
+}
+
+/** Whether any background-task update parked the task in retry_wait. */
+function wasTaskRetryWaiting() {
+  const calls = prismaMock.backgroundTask.updateMany.mock.calls
+  return calls.some((c) => {
+    const data = (c[0] as { data?: Record<string, unknown> })?.data
+    return data?.status === "retry_wait"
+  })
+}
+
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
@@ -352,6 +371,37 @@ describe("newsroom pipeline worker", () => {
     expect(generateAimContentMock).not.toHaveBeenCalled()
     expect(wasTaskMarkedSuccess()).toBe(false)
   })
+
+  it("quarantines a legacy null-project generation task (stale, not retried, no model call)", async () => {
+    bindUserTo("bound-proj")
+    // A pre-scoping generation row carries projectId = null: after the account is
+    // bound there is NO verifiable project boundary — resolveBoundProject would
+    // otherwise let it through by resolving to the CURRENT binding.
+    prismaMock.aimGeneration.findUnique.mockResolvedValue({
+      userId: "user-1",
+      projectId: null,
+      taskSpec: null,
+    })
+
+    const ok = await executeNewsroomPipelineBackgroundTask("task-1")
+
+    expect(ok).toBe(true)
+    expect(generateAimContentMock).not.toHaveBeenCalled()
+    expect(wasTaskMarkedSuccess()).toBe(false)
+    expect(taskFailCallData()?.status).toBe("failed")
+    expect(taskFailCallData()?.lastError).toContain(ACCOUNT_PROJECT_CONTEXT_STALE)
+    expect(wasTaskRetryWaiting()).toBe(false)
+    // Safe, content-free log: source + task id + user id + stable code only.
+    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    expect(entries[0]).toEqual({
+      source: "newsroom",
+      taskId: "task-1",
+      userId: "user-1",
+      expectedProjectId: null,
+      boundProjectId: null,
+      code: ACCOUNT_PROJECT_CONTEXT_STALE,
+    })
+  })
 })
 
 describe("inspiration background worker", () => {
@@ -367,6 +417,32 @@ describe("inspiration background worker", () => {
     expect(ok).toBe(true)
     expect(processInspirationMock).not.toHaveBeenCalled()
     expect(wasTaskMarkedSuccess()).toBe(false)
+  })
+
+  it("quarantines a legacy null-project inspiration task (stale, not retried, no processing)", async () => {
+    bindUserTo("bound-proj")
+    prismaMock.inspiration.findUniqueOrThrow.mockResolvedValue({
+      userId: "user-1",
+      projectId: null,
+    })
+
+    const ok = await executeInspirationBackgroundTask("task-1")
+
+    expect(ok).toBe(true)
+    expect(processInspirationMock).not.toHaveBeenCalled()
+    expect(wasTaskMarkedSuccess()).toBe(false)
+    expect(taskFailCallData()?.status).toBe("failed")
+    expect(taskFailCallData()?.lastError).toContain(ACCOUNT_PROJECT_CONTEXT_STALE)
+    expect(wasTaskRetryWaiting()).toBe(false)
+    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    expect(entries[0]).toEqual({
+      source: "inspiration",
+      taskId: "task-1",
+      userId: "user-1",
+      expectedProjectId: null,
+      boundProjectId: null,
+      code: ACCOUNT_PROJECT_CONTEXT_STALE,
+    })
   })
 })
 
@@ -387,5 +463,35 @@ describe("inspiration pipeline background worker", () => {
     expect(ok).toBe(true)
     expect(processInspirationPipelineMock).not.toHaveBeenCalled()
     expect(wasTaskMarkedSuccess()).toBe(false)
+  })
+
+  it("quarantines a legacy null-project inspiration pipeline task (stale, not retried, no processing)", async () => {
+    bindUserTo("bound-proj")
+    prismaMock.inspiration.findUnique.mockResolvedValue({
+      userId: "user-1",
+      projectId: null,
+      source: "douyin",
+      externalChatId: "chat-1",
+      externalMessageId: "msg-1",
+      externalAccountId: "acc-1",
+    })
+
+    const ok = await executeInspirationPipelineBackgroundTask("task-1")
+
+    expect(ok).toBe(true)
+    expect(processInspirationPipelineMock).not.toHaveBeenCalled()
+    expect(wasTaskMarkedSuccess()).toBe(false)
+    expect(taskFailCallData()?.status).toBe("failed")
+    expect(taskFailCallData()?.lastError).toContain(ACCOUNT_PROJECT_CONTEXT_STALE)
+    expect(wasTaskRetryWaiting()).toBe(false)
+    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    expect(entries[0]).toEqual({
+      source: "inspiration",
+      taskId: "task-1",
+      userId: "user-1",
+      expectedProjectId: null,
+      boundProjectId: null,
+      code: ACCOUNT_PROJECT_CONTEXT_STALE,
+    })
   })
 })

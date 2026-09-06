@@ -260,6 +260,30 @@ export async function assertAccountProjectExecutionContext(input: {
   return resolveBoundProject({ userId: input.userId, requestedProjectId: input.projectId })
 }
 
+/**
+ * Minimal, safe audit line for a LEGACY null-project background task (the owning
+ * record carries NO project id, e.g. queued before account-project scoping). Such
+ * a task has no verifiable project boundary once the account is bound/rebound, so
+ * the worker quarantines it instead of resolving to the current binding. Logs
+ * ONLY safe identifiers (source, task id, user id) + the stable stale code —
+ * never customer content, and never project ids (there is no legitimate one).
+ */
+export async function logLegacyNullProjectTaskRejection(input: {
+  source: AccountProjectExecutionContextSource
+  taskId: string
+  userId: string
+}): Promise<void> {
+  // eslint-disable-next-line no-console
+  console.error(`[account-project-context-stale]`, {
+    source: input.source,
+    taskId: input.taskId,
+    userId: input.userId,
+    expectedProjectId: null,
+    boundProjectId: null,
+    code: ACCOUNT_PROJECT_CONTEXT_STALE,
+  })
+}
+
 /** Narrow an unknown error to the typed account-project context error. */
 export function isAccountProjectContextError(error: unknown): error is AccountProjectContextError {
   return error instanceof AccountProjectContextError

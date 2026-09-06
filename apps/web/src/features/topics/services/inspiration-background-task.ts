@@ -5,6 +5,7 @@ import {
   assertAccountProjectExecutionContext,
   isAccountProjectContextError,
   logAccountProjectContextRejection,
+  logLegacyNullProjectTaskRejection,
 } from "@/lib/account-project-context"
 import { processInspiration } from "./process-inspiration"
 
@@ -23,14 +24,25 @@ export async function executeInspirationBackgroundTask(taskId: string) {
   try {
     const inspiration = await prisma.inspiration.findUniqueOrThrow({ where: { id: task.aggregateId }, select: { userId: true, projectId: true } })
     contextUserId = inspiration.userId
-    contextProjectId = inspiration.projectId ?? ""
+    // 历史空项目记录（改绑前遗留，projectId = null）没有可验证的项目边界 →
+    // 隔离（ACCOUNT_PROJECT_CONTEXT_STALE、不重试），绝不回退到账号级上下文继续处理。
+    if (!inspiration.projectId) {
+      await logLegacyNullProjectTaskRejection({
+        source: "inspiration",
+        taskId: task.id,
+        userId: inspiration.userId,
+      })
+      await failBackgroundTask(prisma, { taskId: task.id, leaseToken: task.leaseToken!, attempt: task.attempt, maxAttempts: task.maxAttempts, retryable: false, error: accountProjectContextStaleErrorString() })
+      return true
+    }
+    contextProjectId = inspiration.projectId
     // ── Re-validate account-project binding before any model call / write ──
     await assertAccountProjectExecutionContext({
       userId: inspiration.userId,
-      projectId: inspiration.projectId ?? "",
+      projectId: inspiration.projectId,
       source: "inspiration",
     })
-    await processInspiration(task.aggregateId, inspiration.userId, inspiration.projectId ?? undefined)
+    await processInspiration(task.aggregateId, inspiration.userId, inspiration.projectId)
     await completeBackgroundTask(prisma, task.id, task.leaseToken!)
   } catch (error) {
     if (isAccountProjectContextError(error)) {

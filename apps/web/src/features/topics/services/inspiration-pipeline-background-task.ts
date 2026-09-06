@@ -12,6 +12,7 @@ import {
   assertAccountProjectExecutionContext,
   isAccountProjectContextError,
   logAccountProjectContextRejection,
+  logLegacyNullProjectTaskRejection,
 } from "@/lib/account-project-context"
 import { processInspirationPipeline } from "./inspiration-pipeline"
 import { isPipelineRetryable, formatPipelineUserMessage } from "@/lib/inspiration-pipeline-error"
@@ -35,10 +36,30 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
     select: { userId: true, projectId: true },
   })
   if (owner) {
+    // 历史空项目记录（改绑前遗留，projectId = null）没有可验证的项目边界 →
+    // 隔离（ACCOUNT_PROJECT_CONTEXT_STALE、不重试），绝不解析到“当前绑定”继续跑流水线。
+    if (!owner.projectId) {
+      await logLegacyNullProjectTaskRejection({
+        source: "inspiration",
+        taskId: task.id,
+        userId: owner.userId,
+      })
+      await failInspirationPipelineForStaleContext(task.aggregateId)
+      await failBackgroundTask(prisma, {
+        taskId: task.id,
+        leaseToken: task.leaseToken!,
+        attempt: task.attempt,
+        maxAttempts: task.maxAttempts,
+        retryable: false,
+        error: accountProjectContextStaleErrorString(),
+      })
+      return true
+    }
+
     try {
       await assertAccountProjectExecutionContext({
         userId: owner.userId,
-        projectId: owner.projectId ?? "",
+        projectId: owner.projectId,
         source: "inspiration",
       })
     } catch (error) {
@@ -47,7 +68,7 @@ export async function executeInspirationPipelineBackgroundTask(taskId: string) {
           source: "inspiration",
           userId: owner.userId,
           taskId: task.id,
-          expectedProjectId: owner.projectId ?? "",
+          expectedProjectId: owner.projectId,
           error,
         })
         await failInspirationPipelineForStaleContext(task.aggregateId)
