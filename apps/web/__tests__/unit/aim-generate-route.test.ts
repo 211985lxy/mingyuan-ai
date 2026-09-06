@@ -13,6 +13,7 @@ const {
   buildRawInputWithCommentInsightContext,
   buildRawInputWithOpportunityBrief,
   ownsActiveProject,
+  resolveBoundProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
@@ -32,6 +33,7 @@ const {
   buildRawInputWithCommentInsightContext: vi.fn(async (_userId, rawInput) => rawInput),
   buildRawInputWithOpportunityBrief: vi.fn((rawInput) => rawInput),
   ownsActiveProject: vi.fn(async () => true),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -46,6 +48,13 @@ vi.mock("@/lib/internal-beta-limits", () => ({
 vi.mock("@/lib/resource-ownership", () => ({
   ownsActiveProject,
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 vi.mock("@/lib/aim-generator", () => ({
   generateAimContent,
@@ -59,6 +68,7 @@ vi.mock("@/lib/aim-observability", () => ({
   createAimTrace: vi.fn(async () => undefined),
   addAimTraceStep: vi.fn(async () => undefined),
   failAimTrace: vi.fn(async () => undefined),
+  logAimProjectContextRejection: vi.fn(async () => undefined),
   runAimTraceStep: vi.fn(async (_trace, _key, _label, fn) => fn()),
   summarizeText: vi.fn((input: unknown) => String(input ?? "")),
 }))
@@ -128,6 +138,7 @@ describe("POST /api/aim/generate", () => {
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
     ownsActiveProject.mockResolvedValue(true)
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "测试项目", status: "active" })
   })
 
   it("accepts generate bodies larger than the default 64 KiB parser limit", async () => {
@@ -156,7 +167,7 @@ describe("POST /api/aim/generate", () => {
   })
 
   it("rejects a project that is not owned before generation starts", async () => {
-    ownsActiveProject.mockResolvedValueOnce(false)
+    resolveBoundProject.mockRejectedValueOnce(new Error("当前账号只能使用已绑定的项目"))
 
     const res = await POST(makeRequest({
       agentId: "content_producer",
@@ -165,8 +176,8 @@ describe("POST /api/aim/generate", () => {
       projectId: "project-from-another-user",
     }))
 
-    expect(res.status).toBe(404)
-    expect(ownsActiveProject).toHaveBeenCalledWith("user-1", "project-from-another-user")
+    expect(res.status).toBe(409)
+    expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-from-another-user" })
     expect(generateAimContent).not.toHaveBeenCalled()
   })
 
