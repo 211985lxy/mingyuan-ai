@@ -125,6 +125,7 @@ export async function POST(request: Request) {
             source: `${platformLabel}群`,
             contextText: detection.textWithoutLinks,
             userId: binding.userId || undefined,
+            projectId: binding.projectId,
           }).then(async (result) => {
             if (isReplySuppressed(globalMode)) return
             try {
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
           platform: "feishu",
           externalMessageId: event.messageId,
           externalChatId: event.chatId,
+          externalAccountId: binding.externalAccountId || undefined,
           externalSenderId: event.senderId,
           userId: binding.userId,
           projectId: binding.projectId,

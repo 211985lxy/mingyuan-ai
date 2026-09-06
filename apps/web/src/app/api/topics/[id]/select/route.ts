@@ -3,9 +3,11 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { topicSelectBodySchema } from "@/features/topics/contracts/api"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 export const POST = withUserAuth(async (request, { user, params }) => {
   const topicSelectionId = params?.id
+  const project = await resolveBoundProject({ userId: user.id })
 
   if (!topicSelectionId) {
     return NextResponse.json(
@@ -32,6 +34,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
       where: {
         id: topicSelectionId,
         userId: user.id,
+        projectId: project.id,
         status: "pending",
       },
       data: {
@@ -46,7 +49,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
     if (!Array.isArray(candidates) || selectedIndex >= candidates.length) {
       // Rollback: shouldn't happen since we control generation, but guard anyway
       await prisma.topicSelection.update({
-        where: { id: topicSelectionId, userId: user.id },
+        where: { id: topicSelectionId, userId: user.id, projectId: project.id },
         data: { selectedIndex: null, status: "pending" },
       })
       return NextResponse.json(

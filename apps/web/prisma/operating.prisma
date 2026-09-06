@@ -1,7 +1,9 @@
 // Operating-system projections (WP-3 / WP-4)
 // ContentOutcome remains the content-window snapshot; these models hold per-event business facts.
 
-/** 版本化人工效率基线（WP-1）；用于节省时间计算 */
+/**
+ * 版本化人工效率基线（WP-1）；用于节省时间计算
+ */
 model TaskEfficiencyBaseline {
   id                  String   @id @default(cuid())
   workflowId          String   @db.VarChar(80)
@@ -18,26 +20,32 @@ model TaskEfficiencyBaseline {
   @@index([validFrom])
 }
 
-/** 逐笔经营归因（WP-3）：内容 → 线索/预约/成交/回款；不建 CRM 实体 */
+/**
+ * 逐笔经营归因（WP-3）：内容 → 线索/预约/成交/回款；不建 CRM 实体
+ */
 model OutcomeAttribution {
-  id                    String   @id @default(cuid())
-  userId                String
-  generationId          String
-  externalLeadId        String   @db.VarChar(80)
-  externalAppointmentId String?  @db.VarChar(80)
-  externalDealId        String?  @db.VarChar(80)
-  externalPaymentId     String?  @db.VarChar(80)
-  externalRecordId      String?  @db.VarChar(80)
-  externalTableId       String?  @db.VarChar(80)
-  externalSourceContentId String? @db.VarChar(80)
-  externalAttributionConfirmer String? @db.VarChar(120)
-  /** explicit | first_touch | unknown */
-  attributionMethod     String   @db.VarChar(20)
-  /** high | medium | low */
-  attributionConfidence String   @db.VarChar(10)
-  occurredAt            DateTime
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                           String   @id @default(cuid())
+  userId                       String
+  generationId                 String
+  externalLeadId               String   @db.VarChar(80)
+  externalAppointmentId        String?  @db.VarChar(80)
+  externalDealId               String?  @db.VarChar(80)
+  externalPaymentId            String?  @db.VarChar(80)
+  externalRecordId             String?  @db.VarChar(80)
+  externalTableId              String?  @db.VarChar(80)
+  externalSourceContentId      String?  @db.VarChar(80)
+  externalAttributionConfirmer String?  @db.VarChar(120)
+  /**
+   * explicit | first_touch | unknown
+   */
+  attributionMethod            String   @db.VarChar(20)
+  /**
+   * high | medium | low
+   */
+  attributionConfidence        String   @db.VarChar(10)
+  occurredAt                   DateTime
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
 
   user       User          @relation(fields: [userId], references: [id])
   generation AimGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
@@ -70,14 +78,16 @@ model CustomerOutcomeProjection {
   observedFrom      DateTime
   observedTo        DateTime
   evidenceRef       String    @db.VarChar(500)
-  /** pending | approved | rejected */
+  /**
+   * pending | approved | rejected
+   */
   reviewStatus      String    @db.VarChar(20)
   reviewerRef       String?   @db.VarChar(120)
   reviewedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  project ClientProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project       ClientProject   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   caseCandidate AssetCandidate?
 
   @@unique([externalOutcomeId])
@@ -86,21 +96,25 @@ model CustomerOutcomeProjection {
   @@index([metricCode])
 }
 
-/** 周度经营复盘周期（WP-5） */
+/**
+ * 周度经营复盘周期（WP-5）
+ */
 model ReviewCycle {
-  id              String    @id @default(cuid())
-  requestId       String?   @unique @db.VarChar(191)
-  periodStart     DateTime
-  periodEnd       DateTime
-  status          String    @default("draft") @db.VarChar(20) // draft | signed
-  metricsSnapshot Json
-  systemOwnerId   String    @db.VarChar(191)
-  /** 筛选维度快照：projectId / workflowId / ownerId / channel */
-  filterSnapshot  Json?
-  signedAt        DateTime?
-  signedApprovalId String?  @unique @db.VarChar(191)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  requestId        String?   @unique @db.VarChar(191)
+  periodStart      DateTime
+  periodEnd        DateTime
+  status           String    @default("draft") @db.VarChar(20) // draft | signed
+  metricsSnapshot  Json
+  systemOwnerId    String    @db.VarChar(191)
+  /**
+   * 筛选维度快照：projectId / workflowId / ownerId / channel
+   */
+  filterSnapshot   Json?
+  signedAt         DateTime?
+  signedApprovalId String?   @unique @db.VarChar(191)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   actions ReviewAction[]
 
@@ -109,17 +123,19 @@ model ReviewCycle {
   @@index([systemOwnerId])
 }
 
-/** 周复盘行动项台账（WP-5） */
+/**
+ * 周复盘行动项台账（WP-5）
+ */
 model ReviewAction {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   reviewCycleId String
-  title         String    @db.VarChar(200)
-  ownerId       String    @db.VarChar(191)
+  title         String   @db.VarChar(200)
+  ownerId       String   @db.VarChar(191)
   dueAt         DateTime
-  status        String    @default("open") @db.VarChar(20) // open | done | cancelled
-  evidenceRef   String?   @db.VarChar(500)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  status        String   @default("open") @db.VarChar(20) // open | done | cancelled
+  evidenceRef   String?  @db.VarChar(500)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   reviewCycle ReviewCycle @relation(fields: [reviewCycleId], references: [id], onDelete: Cascade)
 
@@ -144,7 +160,9 @@ model LearningCandidate {
   reviewStatus String   @default("pending") @db.VarChar(20) // pending | approved | rejected | promoted
   reviewerId   String?
   promotedRef  String?  @db.VarChar(191)
-  /** 幂等键：同一 source+target 不重复建候选 */
+  /**
+   * 幂等键：同一 source+target 不重复建候选
+   */
   requestId    String   @unique @db.VarChar(191)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -158,22 +176,24 @@ model LearningCandidate {
   @@index([generationId])
 }
 
-/** 经人工批准的版本化 Eval fixture；draft 不进入正式评估集。 */
+/**
+ * 经人工批准的版本化 Eval fixture；draft 不进入正式评估集。
+ */
 model EvalFixtureVersion {
-  id                   String    @id @default(cuid())
-  fixtureKey           String    @db.VarChar(120)
-  version              Int
-  sourceCandidateId    String    @unique
-  payload              Json
-  status               String    @default("draft") @db.VarChar(20) // draft | qualified | active | rejected
-  deterministicPassedAt DateTime?
-  dailyPassedAt        DateTime?
-  qualificationMetrics Json?
-  qualificationEvidenceRef String? @db.VarChar(500)
-  activationApprovalId String?   @unique @db.VarChar(191)
-  activatedAt          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                       String    @id @default(cuid())
+  fixtureKey               String    @db.VarChar(120)
+  version                  Int
+  sourceCandidateId        String    @unique
+  payload                  Json
+  status                   String    @default("draft") @db.VarChar(20) // draft | qualified | active | rejected
+  deterministicPassedAt    DateTime?
+  dailyPassedAt            DateTime?
+  qualificationMetrics     Json?
+  qualificationEvidenceRef String?   @db.VarChar(500)
+  activationApprovalId     String?   @unique @db.VarChar(191)
+  activatedAt              DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   sourceCandidate LearningCandidate @relation(fields: [sourceCandidateId], references: [id], onDelete: Restrict)
 

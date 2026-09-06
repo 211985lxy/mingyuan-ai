@@ -12,6 +12,7 @@ const {
   listAssetCandidates,
   findDueOutcomeReminders,
   validateHighRiskApproval,
+  resolveBoundProject,
   prisma,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
@@ -21,6 +22,7 @@ const {
   listAssetCandidates: vi.fn(async () => []),
   findDueOutcomeReminders: vi.fn(),
   validateHighRiskApproval: vi.fn(),
+  resolveBoundProject: vi.fn(async () => ({ id: "proj_1", name: "项目一", status: "active" })),
   prisma: {
     assetCandidate: {
       findFirst: vi.fn(),
@@ -36,6 +38,13 @@ vi.mock("@/lib/aim/asset-candidate-store", () => ({
 }))
 vi.mock("@/lib/aim/outcome-reminders", () => ({ findDueOutcomeReminders }))
 vi.mock("@/lib/aim/approval-validation", () => ({ validateHighRiskApproval }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 vi.mock("@/lib/prisma", () => ({ prisma }))
 
 import { POST as generatePOST } from "@/app/api/aim/meeting-insights/[id]/asset-candidates/route"

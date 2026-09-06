@@ -2,7 +2,7 @@ import { parseJsonRecord } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { permanentlyDeleteOwnedProject } from "@/features/projects/services/project-lifecycle"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 function cleanText(value: unknown, maxLength = 500) {
   if (typeof value !== "string") return undefined
@@ -32,6 +32,7 @@ export async function PATCH(
     const user = await authenticateRequest(request)
     const { id } = await params
     const body = await parseJsonRecord(request)
+    await resolveBoundProject({ userId: user.id, requestedProjectId: id })
 
     const existing = await prisma.clientProject.findFirst({
       where: { id, userId: user.id },
@@ -44,6 +45,9 @@ export async function PATCH(
     const nextStatus = typeof body.status === "string" && VALID_STATUS.has(body.status)
       ? body.status
       : undefined
+    if (nextStatus && nextStatus !== "active") {
+      return NextResponse.json({ error: "账号绑定项目不能暂停或归档", code: "ACCOUNT_PROJECT_STATUS_LOCKED" }, { status: 409 })
+    }
 
     const project = await prisma.clientProject.update({
       where: { id, userId: user.id },
@@ -61,6 +65,10 @@ export async function PATCH(
 
     return NextResponse.json(project)
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "客户项目更新失败" },
       { status: 500 }
@@ -81,6 +89,7 @@ export async function DELETE(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    await resolveBoundProject({ userId: user.id, requestedProjectId: id })
 
     const existing = await prisma.clientProject.findFirst({
       where: { id, userId: user.id },
@@ -90,25 +99,24 @@ export async function DELETE(
       return NextResponse.json({ error: "客户项目不存在" }, { status: 404 })
     }
 
-    const url = new URL(request.url)
-    if (url.searchParams.get("permanent") === "true") {
-      if (url.searchParams.get("confirm") !== existing.name) {
-        return NextResponse.json({ error: "永久删除必须使用项目名称确认" }, { status: 400 })
-      }
-      const deleted = await permanentlyDeleteOwnedProject(user.id, id)
-      return NextResponse.json({ deleted: Boolean(deleted), details: deleted })
-    }
-
-    const project = await prisma.clientProject.update({
-      where: { id, userId: user.id },
-      data: { status: "archived" },
-    })
-
-    return NextResponse.json(project)
+    return NextResponse.json(
+      { error: "账号绑定项目不能归档或删除", code: "ACCOUNT_PROJECT_STATUS_LOCKED" },
+      { status: 409 },
+    )
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "客户项目归档失败" },
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

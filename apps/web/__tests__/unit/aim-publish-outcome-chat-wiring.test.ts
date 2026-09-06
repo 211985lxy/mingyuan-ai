@@ -157,7 +157,7 @@ describe("content_retro chat 发布数据接线", () => {
     const context = await assembleRetro({ targetGenerationId: "gen-owned" })
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "gen-owned", userId: "user-1" },
+        where: { id: "gen-owned", userId: "user-1", projectId: "p1" },
       }),
     )
     expect(context.publishOutcomeBlock).toContain("播放 1200 次")
@@ -200,6 +200,17 @@ describe("content_retro chat 发布数据接线", () => {
     })
     expect(prompt).toContain("未登记发布数据")
     expect(prompt).toContain("请先去登记")
+  })
+
+  it("不会把同账号其他项目的发布数据带入当前绑定项目", async () => {
+    findFirst.mockResolvedValue(null)
+
+    const context = await assembleRetro({ targetGenerationId: "gen-other-project" })
+
+    expect(context.publishOutcomeBlock).toBeUndefined()
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "gen-other-project", userId: "user-1", projectId: "p1" },
+    }))
   })
 
   it("已登记数据里 null 输出未填写，真实 0 输出 0", async () => {
@@ -332,7 +343,7 @@ describe("content_retro chat 发布数据接线", () => {
 
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "gen-delegated", userId: "user-1" },
+        where: { id: "gen-delegated", userId: "user-1", projectId: "p1" },
       }),
     )
     expect(context.publishOutcomeBlock).toContain("播放 555 次")

@@ -102,7 +102,9 @@ export async function POST(request: NextRequest) {
     assertAgentScope(context, AGENT_SCOPE.knowledgeConfirm)
     const body = await parseJsonBody(request, agentWechatConfirmBodySchema, { maxBytes: 3 * 1024 * 1024 })
 
-    projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+    projectId = typeof body.projectId === "string" && body.projectId.trim()
+      ? body.projectId.trim()
+      : context.boundProjectId ?? ""
     entries = Array.isArray(body.entries) ? body.entries : []
 
     if (!projectId) {

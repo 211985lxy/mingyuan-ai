@@ -3,6 +3,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { findDueOutcomeReminders } from "@/lib/aim/outcome-reminders"
 import { prisma } from "@/lib/prisma"
 import type { OutcomeReminderStorePort } from "@/lib/aim/outcome-reminders"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -19,14 +20,26 @@ export const dynamic = "force-dynamic"
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    const project = await resolveBoundProject({ userId: user.id })
     const reminders = await findDueOutcomeReminders({
       userId: user.id,
+      projectId: project.id,
       store: prisma as unknown as OutcomeReminderStorePort,
     })
     return NextResponse.json({ reminders, generatedAt: new Date().toISOString() })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

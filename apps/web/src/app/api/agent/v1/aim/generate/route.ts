@@ -39,7 +39,14 @@ export async function POST(request: NextRequest) {
     assertAgentScope(context, AGENT_SCOPE.draftsSubmit)
     const body = await parseJsonRecord(request, { maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES })
 
-    const prepared = prepareAgentGenerateBody(body)
+    const prepared = prepareAgentGenerateBody({
+      ...body,
+      // Agent API 调用跟随登录账号的唯一项目绑定；显式传入的项目仍会经过
+      // assertAgentProjectAccess 校验，不能借此跨到其他客户项目。
+      projectId: typeof body.projectId === "string" && body.projectId.trim()
+        ? body.projectId
+        : context.boundProjectId ?? undefined,
+    })
     if (!prepared.ok) throw new Error(prepared.validationError)
     projectId = prepared.projectId
     agentId = prepared.agentId

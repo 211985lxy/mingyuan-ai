@@ -36,6 +36,8 @@ export interface TopicExtractionInput {
   summary?: string
   /** AIM 用户 ID（必须，用于加载 IP Profile 和存 DB） */
   userId: string
+  /** 当前 AIM 账号绑定的项目，用于把视频流水线产生的选题落到正确客户 */
+  projectId?: string
   /** 推荐模式 */
   mode?: "normal" | "daily" | "weekly"
 }
@@ -128,6 +130,7 @@ export async function extractTopicsFromVideo(
     const selection = await prisma.topicSelection.create({
       data: {
         userId,
+        projectId: input.projectId ?? null,
         ipProfileId: ipProfile.id,
         elementCodes: result.elementCodes,
         candidates: result.cards,

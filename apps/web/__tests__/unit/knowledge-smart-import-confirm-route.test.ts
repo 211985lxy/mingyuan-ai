@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   ensureEmbedding: vi.fn().mockResolvedValue(undefined),
   extractEntities: vi.fn().mockResolvedValue(undefined),
   enforceLimit: vi.fn().mockResolvedValue(null),
+  resolveBoundProject: vi.fn(),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -41,6 +42,13 @@ vi.mock("@/lib/knowledge-entity-extractor", () => ({
 vi.mock("@/lib/internal-beta-limits", () => ({
   enforceKnowledgeBetaLimit: (...args: unknown[]) => mocks.enforceLimit(...args),
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject: mocks.resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/knowledge/smart-import/confirm/route"
 
@@ -55,6 +63,8 @@ function request(body: unknown) {
 describe("POST /api/knowledge/smart-import/confirm", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.resolveBoundProject.mockReset()
+    mocks.resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     mocks.enforceLimit.mockResolvedValue(null)
     mocks.create.mockReturnValue({ operation: "create" })
     mocks.transaction.mockResolvedValue([
@@ -67,19 +77,23 @@ describe("POST /api/knowledge/smart-import/confirm", () => {
     ])
   })
 
-  it("rejects missing project id", async () => {
+  it("uses the account-bound project when project id is missing", async () => {
     const response = await POST(
       request({
         entries: [{ title: "a", content: "b", category: "customer_pain", tags: [] }],
       }) as never,
       undefined as never,
     )
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({ error: "请选择归属全案" })
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ data: { created: 1 } })
+    expect(mocks.create).toHaveBeenCalledWith({ data: expect.objectContaining({ projectId: "project-1" }) })
   })
 
   it("returns 404 for project not owned by user", async () => {
-    mocks.findFirst.mockResolvedValue(null)
+    mocks.resolveBoundProject.mockRejectedValue(Object.assign(new Error("当前账号只能使用已绑定的项目"), {
+      code: "PROJECT_CONTEXT_MISMATCH",
+      status: 409,
+    }))
     const response = await POST(
       request({
         projectId: "project-x",
@@ -87,12 +101,12 @@ describe("POST /api/knowledge/smart-import/confirm", () => {
       }) as never,
       undefined as never,
     )
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(409)
     expect(mocks.transaction).not.toHaveBeenCalled()
   })
 
   it("creates entries as the logged-in user and queues side effects", async () => {
-    mocks.findFirst.mockResolvedValue({ id: "project-1" })
+    mocks.resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
 
     const response = await POST(
       request({

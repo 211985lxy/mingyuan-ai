@@ -9,6 +9,7 @@ const {
   executeVerifiedUnifiedDelivery,
   executeVerifiedUnifiedReply,
   serializeAimGenerationRun,
+  resolveBoundProject,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
@@ -20,6 +21,7 @@ const {
     id: "generation-1",
     results: [{ format: "video_script", content: "成稿正文。", wordCount: 6 }],
   })),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -29,6 +31,13 @@ vi.mock("@/lib/user-auth", () => ({
 
 vi.mock("@/lib/internal-beta-limits", () => ({
   enforceDailyBetaLimit,
+}))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
 }))
 
 vi.mock("@/lib/aim-observability", () => ({
@@ -77,6 +86,7 @@ function baseBody(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  resolveBoundProject.mockResolvedValue({ id: "project-1", name: "测试项目", status: "active" })
 })
 
 describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交付）", () => {

@@ -10,6 +10,10 @@ import {
   knowledgeCreateBodySchema,
   knowledgeListQuerySchema,
 } from "@/features/knowledge/contracts/api"
+import {
+  AccountProjectContextError,
+  resolveBoundProject,
+} from "@/lib/account-project-context"
 
 /**
  * @description 处理 GET 请求
@@ -23,13 +27,17 @@ export async function GET(request: NextRequest) {
       request,
       knowledgeListQuerySchema,
     )
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: projectId,
+    })
 
     const entries = await prisma.knowledgeEntry.findMany({
       where: {
         userId: user.id,
+        projectId: boundProject.id,
         status,
         ...(category ? { category } : {}),
-        ...(projectId ? { projectId } : {}),
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
       skip: (page - 1) * pageSize,
@@ -38,6 +46,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(entries)
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "知识库读取失败" },
       { status: 500 }
@@ -55,14 +67,10 @@ export async function POST(request: NextRequest) {
     const user = await authenticateRequest(request)
     const body = await parseJsonBody(request, knowledgeCreateBodySchema, { maxBytes: 64 * 1024 })
     const { category, title, content, tags, sourceType, projectId, valueGrade } = body
-    const requiresProject = new Set([
-      "daily_inspiration",
-      "benchmark_reference",
-      "user_insight",
-      "hot_topic",
-      "positioning_material",
-      "private_domain_material",
-    ])
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: projectId,
+    })
 
     if (!category || !title || !content) {
       return NextResponse.json(
@@ -71,34 +79,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (requiresProject.has(category) && (!projectId || typeof projectId !== "string")) {
-      return NextResponse.json(
-        { error: "projectId 必填" },
-        { status: 400 }
-      )
-    }
-
-    if (projectId) {
-      const project = await prisma.clientProject.findFirst({
-        where: { id: projectId, userId: user.id, status: "active" },
-        select: { id: true },
-      })
-
-      if (!project) {
-        return NextResponse.json(
-          { error: "IP营销全案不存在或已归档" },
-          { status: 404 }
-        )
-      }
-    }
-
-    const limitResponse = await enforceKnowledgeBetaLimit({ userId: user.id, projectId })
+    const limitResponse = await enforceKnowledgeBetaLimit({ userId: user.id, projectId: boundProject.id })
     if (limitResponse) return limitResponse
 
     const entry = await prisma.knowledgeEntry.create({
       data: {
         userId: user.id,
-        projectId: projectId || null,
+        projectId: boundProject.id,
         category,
         title,
         content,
@@ -110,13 +97,23 @@ export async function POST(request: NextRequest) {
 
     // Fire-and-forget: generate embedding + extract entities/relations for the new entry
     ensureKnowledgeEmbedding(entry.id).catch(() => {})
-    extractAndPersistForEntry(entry.id, content, { userId: user.id, projectId: projectId || null }).catch(() => {})
+    extractAndPersistForEntry(entry.id, content, { userId: user.id, projectId: boundProject.id }).catch(() => {})
 
     return NextResponse.json(entry, { status: 201 })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "知识创建失败" },
       { status: 500 }
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

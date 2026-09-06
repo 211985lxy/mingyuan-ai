@@ -35,8 +35,15 @@ export const INSPIRATION_TARGET_FORMATS = [
 export async function findOwnedInspiration(input: {
   id: string
   userId: string
+  projectId?: string
 }) {
-  return prisma.inspiration.findFirst({ where: { id: input.id, userId: input.userId } })
+  return prisma.inspiration.findFirst({
+    where: {
+      id: input.id,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
+  })
 }
 
 /** 准备 inspiration generate 请求的判别联合结果（对齐 generate 入口的 prepare 形态）。 */
@@ -60,13 +67,15 @@ export async function prepareInspirationGenerateRequest(input: {
   id: string
   userId: string
   body: Record<string, unknown>
+  projectId?: string
 }): Promise<PreparedInspirationGenerateRequest> {
   const { id, userId, body } = input
-  const inspiration = await findOwnedInspiration({ id, userId })
+  const requestedProjectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+  const projectId = input.projectId?.trim() || requestedProjectId
+  const inspiration = await findOwnedInspiration({ id, userId, projectId: projectId || undefined })
   if (!inspiration) {
     return { ok: false, status: 404, error: "灵感记录不存在" }
   }
-  const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
   if (!projectId) {
     return { ok: false, status: 400, error: "请选择 IP 营销全案" }
   }

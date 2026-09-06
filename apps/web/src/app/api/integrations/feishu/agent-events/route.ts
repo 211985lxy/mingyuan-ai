@@ -81,18 +81,22 @@ function verifyEncryptedPayload(
  * 解析消息发送者的 userId 和 projectId。
  * 优先使用 channel binding，回落到环境变量默认值。
  */
-async function resolveMessageContext(chatId: string): Promise<{ userId: string; projectId: string } | null> {
+async function resolveMessageContext(chatId: string): Promise<{ userId: string; projectId: string; externalAccountId: string } | null> {
   // 优先查 channel binding
   const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: chatId })
   if (binding) {
-    return { userId: binding.userId, projectId: binding.projectId }
+    return {
+      userId: binding.userId,
+      projectId: binding.projectId,
+      externalAccountId: binding.externalAccountId || "",
+    }
   }
 
   // 回落到环境变量默认值
   const userId = env.FEISHU_AGENT_BOT_DEFAULT_USER_ID?.trim()
   const projectId = env.FEISHU_AGENT_BOT_DEFAULT_PROJECT_ID?.trim()
   if (userId && projectId) {
-    return { userId, projectId }
+    return { userId, projectId, externalAccountId: "" }
   }
 
   return null
@@ -188,6 +192,7 @@ export async function POST(request: Request) {
         platform: `feishu:${bot.botId}`,
         externalMessageId: event.messageId,
         externalChatId: event.chatId,
+        externalAccountId: context.externalAccountId || bot.botId,
         externalSenderId: event.senderId,
         userId: context.userId,
         projectId: context.projectId,

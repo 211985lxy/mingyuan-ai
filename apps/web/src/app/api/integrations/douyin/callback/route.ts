@@ -14,6 +14,7 @@ import {
   claimDouyinLoginIdentity,
   upsertDouyinBinding,
 } from "@/features/integrations/douyin-binding"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 export const runtime = "nodejs"
 
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
   let auth: { id: string; email: string }
   try {
     auth = await authenticateRequest(request)
+    await resolveBoundProject({ userId: auth.id })
   } catch (err) {
     return authErrorResponse(err)
   }

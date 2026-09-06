@@ -23,11 +23,12 @@ Content-Type: application/json
   "externalMessageId": "optional-message-id",
   "externalChatId": "wechat-chat-id",
   "externalSenderId": "wechat-sender-id",
-  "projectId": "aim-project-id",
   "content": "@助手 收选题 https://v.douyin.com/xxxx/",
   "occurredAt": "2026-07-20T12:00:00Z"
 }
 ```
+
+`projectId` 为兼容旧调用可选；WorkBuddy 绑定的多个微信/抖音渠道账号都归属于同一个 AIM 登录账号，并共享该账号绑定项目的知识库。未传时 AIM 自动使用绑定项目，不能跨项目写入。
 
 收到 `202` 且 `duplicate=false` 后立即在原群回复“已收录，正在提取视频文案并生成选题。”；`shadowMode=true` 时只记录，不发送任何群消息。
 

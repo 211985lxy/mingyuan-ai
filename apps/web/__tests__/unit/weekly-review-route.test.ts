@@ -3,7 +3,7 @@ import { NextRequest } from "next/server"
 
 // 每周经营复盘路由测试（90 天计划 3.3）。
 
-const { authenticateRequest, authErrorResponse, computeWeeklyReview, computeTaskAttributionInsights, fetchCreatorMetrics, projectFindFirst } = vi.hoisted(() => ({
+const { authenticateRequest, authErrorResponse, computeWeeklyReview, computeTaskAttributionInsights, fetchCreatorMetrics, projectFindFirst, resolveBoundProject } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   fetchCreatorMetrics: vi.fn(async (_input: { start: Date; end: Date }) => ({
@@ -33,6 +33,7 @@ const { authenticateRequest, authErrorResponse, computeWeeklyReview, computeTask
     },
   ]),
   projectFindFirst: vi.fn<() => Promise<{ id: string } | null>>(async () => ({ id: "project-1" })),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
@@ -40,11 +41,18 @@ vi.mock("@/lib/aim/weekly-review", () => ({ computeWeeklyReview }))
 vi.mock("@/lib/aim/attribution-insights", () => ({ computeTaskAttributionInsights }))
 vi.mock("@/lib/aim/creator-metrics", () => ({ fetchCreatorMetrics }))
 vi.mock("@/lib/prisma", () => ({ prisma: { clientProject: { findFirst: projectFindFirst } } }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error { code = "PROJECT_CONTEXT_MISMATCH"; status = 409 },
+}))
 
 import { GET } from "@/app/api/aim/review/weekly/route"
 
 describe("GET /api/aim/review/weekly", () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "测试项目", status: "active" })
+  })
 
   it("缺省周期为最近 7 天，返回五主指标", async () => {
     const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly"))
@@ -92,14 +100,14 @@ describe("GET /api/aim/review/weekly", () => {
   it("验证项目归属并传入周复盘", async () => {
     const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly?projectId=project-1"))
     expect(res.status).toBe(200)
-    expect(projectFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "project-1", userId: "user-1", status: "active" } }))
+    expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-1" })
     expect(computeWeeklyReview).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project-1" }))
   })
 
   it("拒绝其他用户的项目", async () => {
-    projectFindFirst.mockResolvedValueOnce(null)
+    resolveBoundProject.mockRejectedValueOnce({ message: "项目不存在", code: "PROJECT_CONTEXT_MISMATCH", status: 409 })
     const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly?projectId=project-2"))
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(409)
   })
 
   it("非法日期 → 400", async () => {

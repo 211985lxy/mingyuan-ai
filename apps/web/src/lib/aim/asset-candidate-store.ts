@@ -55,7 +55,7 @@ interface GenerationSnapshot {
 /** prisma 的最小投影（便于注入测试替身）。 */
 export interface AssetCandidateStorePort {
   aimGeneration: {
-    findFirst(args: { where: { id: string; userId: string } }): Promise<GenerationSnapshot | null>
+    findFirst(args: { where: { id: string; userId: string; projectId?: string } }): Promise<GenerationSnapshot | null>
     update(args: {
       where: { id: string }
       data: { taskSpec: Record<string, unknown> }
@@ -67,7 +67,7 @@ export interface AssetCandidateStorePort {
       orderBy?: unknown
       take?: number
     }): Promise<AssetCandidateRecord[]>
-    findFirst(args: { where: { id: string; userId: string } }): Promise<AssetCandidateRecord | null>
+    findFirst(args: { where: { id: string; userId: string; projectId?: string } }): Promise<AssetCandidateRecord | null>
     create(args: { data: Record<string, unknown> }): Promise<AssetCandidateRecord>
     update(args: {
       where: { id: string }
@@ -133,13 +133,18 @@ function parseStoredInsight(value: unknown): MeetingInsight | null {
 export async function generateMeetingAssetCandidates(input: {
   userId: string
   generationId: string
+  projectId?: string
   approve?: boolean
   store?: AssetCandidateStorePort
   now?: () => Date
 }): Promise<GenerateAssetCandidatesResult> {
   const store = input.store ?? getDefaultAssetCandidateStore()
   const generation = await store.aimGeneration.findFirst({
-    where: { id: input.generationId, userId: input.userId },
+    where: {
+      id: input.generationId,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
   })
   if (!generation) return { ok: false, status: 404, error: "not found" }
 
@@ -168,6 +173,9 @@ export async function generateMeetingAssetCandidates(input: {
   const projectId = generation.projectId?.trim()
   if (!projectId) {
     return { ok: false, status: 409, error: "会议洞察缺少项目归属，禁止生成资产候选。" }
+  }
+  if (input.projectId && projectId !== input.projectId) {
+    return { ok: false, status: 404, error: "会议洞察不存在或无权操作。" }
   }
 
   const insight = parseStoredInsight(taskSpec.insight)
@@ -410,6 +418,7 @@ async function approveAssetCandidate(input: {
 export async function reviewAssetCandidate(input: {
   userId: string
   candidateId: string
+  projectId?: string
   action: "approve" | "reject"
   promote?: boolean
   crossProjectAllowed?: boolean
@@ -417,7 +426,11 @@ export async function reviewAssetCandidate(input: {
 }): Promise<ReviewAssetCandidateResult> {
   const store = input.store ?? getDefaultAssetCandidateStore()
   const record = await store.assetCandidate.findFirst({
-    where: { id: input.candidateId, userId: input.userId },
+    where: {
+      id: input.candidateId,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
   })
   if (!record) return { ok: false, status: 404, error: "not found" }
   if (input.action === "reject") return rejectAssetCandidate(store, record)

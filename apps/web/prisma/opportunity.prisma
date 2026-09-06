@@ -4,10 +4,10 @@ model OpportunitySearchRun {
   id             String   @id @default(cuid())
   userId         String
   keyword        String
-  platforms      Json     // ["douyin", "wechat_channels"]
-  filters        Json?    // { sortOrder, timeRange, ... }
+  platforms      Json // ["douyin", "wechat_channels"]
+  filters        Json? // { sortOrder, timeRange, ... }
   status         String   @default("completed") // running | completed | partial | failed
-  platformStatus Json?    // { douyin: "ok", wechat_channels: "error:..." }
+  platformStatus Json? // { douyin: "ok", wechat_channels: "error:..." }
   resultCount    Int      @default(0)
   createdAt      DateTime @default(now())
 
@@ -19,12 +19,12 @@ model OpportunitySearchRun {
 }
 
 model OpportunityItemSnapshot {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   searchRunId      String
-  platform         String   // douyin | wechat_channels
-  sourceId         String   // 平台原始 ID
+  platform         String // douyin | wechat_channels
+  sourceId         String // 平台原始 ID
   sourceUrl        String?
-  title            String?  @db.Text
+  title            String?   @db.Text
   authorName       String?
   authorId         String?
   followerCount    Int?
@@ -37,7 +37,7 @@ model OpportunityItemSnapshot {
   collects         Int?
   opportunityScore Float?
   scoreBreakdown   Json?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
   searchRun OpportunitySearchRun @relation(fields: [searchRunId], references: [id], onDelete: Cascade)
 
@@ -51,9 +51,9 @@ model OpportunityCollection {
   userId           String
   projectId        String?
   name             String
-  items            Json     // 选中的样本快照数组
+  items            Json // 选中的样本快照数组
   status           String   @default("draft") // draft | analyzing | analyzed | failed
-  analysisResult   Json?    // CollectionAnalysis
+  analysisResult   Json? // CollectionAnalysis
   analysisError    String?  @db.Text
   backgroundTaskId String?
   createdAt        DateTime @default(now())

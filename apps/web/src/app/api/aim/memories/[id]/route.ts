@@ -4,6 +4,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { approveAimMemoryCandidate, rejectAimMemoryCandidate } from "@/lib/aim-memory"
 import { validateHighRiskApproval } from "@/lib/aim/approval-validation"
 import { prisma } from "@/lib/prisma"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -19,6 +20,7 @@ export async function PATCH(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const project = await resolveBoundProject({ userId: user.id })
 
     let body: Record<string, unknown>
     try {
@@ -38,7 +40,7 @@ export async function PATCH(
         return NextResponse.json({ error: "promote 缺少 workflowId" }, { status: 400 })
       }
       const memory = await prisma.aimMemory.findFirst({
-        where: { id, userId: user.id },
+        where: { id, userId: user.id, projectId: project.id },
         select: { projectId: true },
       })
       if (!memory) {
@@ -61,8 +63,8 @@ export async function PATCH(
 
     const ok =
       body.action === "approve"
-        ? await approveAimMemoryCandidate({ id, userId: user.id, reviewerId: user.id })
-        : await rejectAimMemoryCandidate({ id, userId: user.id, reviewerId: user.id })
+        ? await approveAimMemoryCandidate({ id, userId: user.id, reviewerId: user.id, projectId: project.id })
+        : await rejectAimMemoryCandidate({ id, userId: user.id, reviewerId: user.id, projectId: project.id })
 
     if (!ok) {
       return NextResponse.json(
@@ -77,8 +79,18 @@ export async function PATCH(
       status: body.action === "approve" ? "active" : "rejected",
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

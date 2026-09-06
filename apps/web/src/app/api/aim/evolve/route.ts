@@ -2,12 +2,12 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { aimEvolveBodySchema } from "@/features/aim/contracts/api"
-import { prisma } from "@/lib/prisma"
 import {
   extractAimEvolutionSuggestions,
   normalizeEvolutionMessages,
 } from "@/lib/aim-chat-evolution"
 import { persistAimMemories } from "@/lib/aim-memory"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * @description 处理 POST 请求
@@ -18,24 +18,18 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const body = await parseJsonBody(request, aimEvolveBodySchema, { maxBytes: 256 * 1024 })
-    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+    const requestedProjectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const agentId = typeof body.agentId === "string" ? body.agentId : ""
     const shouldPersist = body.persist === true
     const messages = normalizeEvolutionMessages(body.messages)
 
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
-    }
+    const projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
+
     if (messages.length < 2) {
       return NextResponse.json({ suggestions: [] })
-    }
-
-    const project = await prisma.clientProject.findFirst({
-      where: { id: projectId, userId: user.id, status: "active" },
-      select: { id: true },
-    })
-    if (!project) {
-      return NextResponse.json({ error: "IP营销全案不存在或已归档" }, { status: 404 })
     }
 
     const suggestions = await extractAimEvolutionSuggestions({
@@ -53,6 +47,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ suggestions })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/evolve] Error:", error)

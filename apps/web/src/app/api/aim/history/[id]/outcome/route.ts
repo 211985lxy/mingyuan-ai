@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { sanitizeOutcomeBody, buildOutcomeUpdate, type SanitizedOutcome } from "@/lib/content-outcome"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -19,9 +20,10 @@ export async function GET(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const boundProject = await resolveBoundProject({ userId: user.id })
 
     const owned = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id },
+      where: { id, userId: user.id, projectId: boundProject.id },
       select: { id: true, topicSelectionId: true, projectId: true },
     })
     if (!owned) return NextResponse.json({ error: "not found" }, { status: 404 })
@@ -37,6 +39,9 @@ export async function GET(
       projectId: owned.projectId,
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })
@@ -56,12 +61,16 @@ export async function PUT(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const boundProject = await resolveBoundProject({ userId: user.id })
 
     const owned = await prisma.aimGeneration.findFirst({
       where: { id, userId: user.id },
       select: { id: true, topicSelectionId: true, projectId: true },
     })
     if (!owned) return NextResponse.json({ error: "not found" }, { status: 404 })
+    if (owned.projectId && owned.projectId !== boundProject.id) {
+      return NextResponse.json({ error: "not found" }, { status: 404 })
+    }
 
     let body: Record<string, unknown>
     try {
@@ -93,7 +102,7 @@ export async function PUT(
         userId: user.id,
         generationId: id,
         topicSelectionId: owned.topicSelectionId,
-        projectId: owned.projectId,
+        projectId: boundProject.id,
         ...sanitized,
       },
       // PATCH 语义：只更新请求体里出现过的字段，避免重复部分提交时清掉已填数据
@@ -101,6 +110,9 @@ export async function PUT(
     })
     return NextResponse.json({ outcome })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })

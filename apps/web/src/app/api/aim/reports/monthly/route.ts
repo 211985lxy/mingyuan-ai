@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { computeMonthlyOperatingReport, parseMonthString } from "@/lib/aim/monthly-report"
 import { renderMonthlyReportHtml } from "@/lib/aim/monthly-report-html"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -26,17 +27,12 @@ export async function GET(request: NextRequest) {
     if (!parseMonthString(monthParam)) {
       return NextResponse.json({ error: "month 格式应为 YYYY-MM" }, { status: 400 })
     }
-    const projectId = url.searchParams.get("projectId")?.trim() || null
-
-    let projectName: string | null = null
-    if (projectId) {
-      const project = await prisma.clientProject.findFirst({
-        where: { id: projectId, userId: user.id },
-        select: { name: true },
-      })
-      if (!project) return NextResponse.json({ error: "project not found" }, { status: 404 })
-      projectName = project.name
-    }
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: url.searchParams.get("projectId"),
+    })
+    const projectId = boundProject.id
+    const projectName: string | null = boundProject.name
 
     const report = await computeMonthlyOperatingReport({
       userId: user.id,
@@ -92,6 +88,9 @@ export async function GET(request: NextRequest) {
       headers: { "content-type": "text/html; charset=utf-8" },
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })

@@ -8,6 +8,7 @@ const ensureKnowledgeEmbedding = vi.hoisted(() => vi.fn())
 const enforceKnowledgeBetaLimit = vi.hoisted(() => vi.fn())
 const receiveKnowledgeMultipart = vi.hoisted(() => vi.fn())
 const cleanupTempDir = vi.hoisted(() => vi.fn())
+const resolveBoundProject = vi.hoisted(() => vi.fn())
 
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth:
@@ -63,6 +64,13 @@ vi.mock("@/lib/knowledge-multipart", () => ({
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(async () => Buffer.from("%PDF-1.4 demo")),
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/knowledge/upload/route"
 
@@ -84,6 +92,8 @@ function makeRequest(input: {
 describe("POST /api/knowledge/upload", () => {
   beforeEach(() => {
     findFirst.mockReset()
+    resolveBoundProject.mockReset()
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     create.mockReset()
     parseDocument.mockReset()
     isSupportedFile.mockReset()
@@ -97,7 +107,7 @@ describe("POST /api/knowledge/upload", () => {
     cleanupTempDir.mockResolvedValue(undefined)
   })
 
-  it("rejects upload without project id", async () => {
+  it("rejects upload when the account has no bound project", async () => {
     receiveKnowledgeMultipart.mockResolvedValue({
       tempDir: "/tmp/km-test",
       files: [
@@ -112,6 +122,10 @@ describe("POST /api/knowledge/upload", () => {
       fields: {},
     })
 
+    resolveBoundProject.mockRejectedValue(Object.assign(new Error("账号尚未绑定项目，请先完成项目设置"), {
+      code: "ACCOUNT_PROJECT_SETUP_REQUIRED",
+      status: 409,
+    }))
     const res = await POST(
       makeRequest({
         file: new File(["%PDF-1.4"], "demo.pdf", { type: "application/pdf" }),
@@ -119,9 +133,9 @@ describe("POST /api/knowledge/upload", () => {
       undefined as never
     )
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(409)
     await expect(res.json()).resolves.toMatchObject({
-      error: "请选择归属全案",
+      error: "账号尚未绑定项目，请先完成项目设置",
     })
     expect(cleanupTempDir).toHaveBeenCalled()
   })
@@ -140,7 +154,7 @@ describe("POST /api/knowledge/upload", () => {
       ],
       fields: { projectId: "project-1", category: "project_case" },
     })
-    findFirst.mockResolvedValue({ id: "project-1" })
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     parseDocument.mockResolvedValue(["第一段", "第二段"])
     create
       .mockResolvedValueOnce({ id: "entry-1" })
@@ -164,14 +178,7 @@ describe("POST /api/knowledge/upload", () => {
         entries: [{ id: "entry-1" }, { id: "entry-2" }],
       },
     })
-    expect(findFirst).toHaveBeenCalledWith({
-      where: {
-        id: "project-1",
-        userId: "user-1",
-        status: "active",
-      },
-      select: { id: true },
-    })
+    expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-1" })
     expect(create).toHaveBeenNthCalledWith(1, {
       data: expect.objectContaining({
         userId: "user-1",

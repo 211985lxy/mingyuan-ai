@@ -65,8 +65,9 @@ describe("ingestAimChannelMessage", () => {
     expect(mocks.conversationUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          platform_externalChatId_agentId: {
+          platform_externalAccountId_externalChatId_agentId: {
             platform: "feishu",
+            externalAccountId: "",
             externalChatId: "oc_1",
             agentId: "content_producer",
           },

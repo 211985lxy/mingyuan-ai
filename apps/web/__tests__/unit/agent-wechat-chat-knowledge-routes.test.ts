@@ -100,6 +100,22 @@ describe("agent wechat chat knowledge routes", () => {
     expect(mocks.processChunksForSmartImport).not.toHaveBeenCalled()
   })
 
+  it("defaults an omitted projectId to the login account's bound project", async () => {
+    mocks.authenticateAgentRequest.mockResolvedValue({ ...context, boundProjectId: "project-1" })
+    mocks.processChunksForSmartImport.mockResolvedValue({ entries: [] })
+
+    const response = await preview(request("/api/agent/v1/knowledge/wechat-chat/import", {
+      rawText: "客户：最担心交付效果",
+    }))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ projectId: "project-1" })
+    expect(mocks.assertAgentProjectAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ boundProjectId: "project-1" }),
+      "project-1",
+    )
+  })
+
   it("does not write when the project scope is denied", async () => {
     mocks.assertAgentProjectAccess.mockImplementationOnce(() => { throw new Error("AGENT_PROJECT_FORBIDDEN") })
     mocks.agentAuthErrorResponse.mockReturnValueOnce(NextResponse.json({ error: "Project is not allowed for this API key" }, { status: 403 }))

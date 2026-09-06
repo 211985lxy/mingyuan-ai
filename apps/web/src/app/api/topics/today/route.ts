@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * GET /api/topics/today?mode=daily
@@ -13,12 +14,17 @@ import { withUserAuth } from "@/lib/user-auth"
  */
 export const GET = withUserAuth(async (request, { user }) => {
   const url = new URL(request.url)
+  const project = await resolveBoundProject({
+    userId: user.id,
+    requestedProjectId: url.searchParams.get("projectId") || undefined,
+  })
   const mode = url.searchParams.get("mode") || "daily"
   const today = new Date().toISOString().split("T")[0] // YYYY-MM-DD
 
   const selection = await prisma.topicSelection.findFirst({
     where: {
       userId: user.id,
+      projectId: project.id,
       recommendationMode: mode,
       recommendedDate: today,
     },

@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findFirst, upsert, authenticateRequest, authErrorResponse, parseDocument, enforceUploadSizeLimit } =
+const { findFirst, upsert, authenticateRequest, authErrorResponse, resolveBoundProject, parseDocument, enforceUploadSizeLimit } =
   vi.hoisted(() => ({
     findFirst: vi.fn(),
     upsert: vi.fn(),
     authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
     authErrorResponse: vi.fn(() => null),
+    resolveBoundProject: vi.fn(async () => ({ id: "proj-1" })),
     parseDocument: vi.fn(async () => ["播放量：1,200 点赞数：350 评论数：88 私信数：12 近7天"]),
     enforceUploadSizeLimit: vi.fn(() => null),
   }))
@@ -18,6 +19,10 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {},
+}))
 vi.mock("@/lib/document-parser", () => ({ parseDocument }))
 vi.mock("@/lib/internal-beta-limits", () => ({ enforceUploadSizeLimit }))
 
@@ -39,6 +44,7 @@ describe("aim outcome-import route（复盘表格导入 P1a）", () => {
     vi.clearAllMocks()
     authenticateRequest.mockResolvedValue({ id: "user-1" })
     authErrorResponse.mockReturnValue(null)
+    resolveBoundProject.mockResolvedValue({ id: "proj-1" })
     enforceUploadSizeLimit.mockReturnValue(null)
     parseDocument.mockResolvedValue(["播放量：1,200 点赞数：350 评论数：88 私信数：12 近7天"])
     findFirst.mockResolvedValue({ id: "gen-1", topicSelectionId: "topic-1", projectId: "proj-1" })

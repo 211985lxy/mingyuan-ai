@@ -16,8 +16,8 @@ model UserQuestionCard {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  user      User            @relation(fields: [userId], references: [id])
-  project   ClientProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user    User           @relation(fields: [userId], references: [id])
+  project ClientProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([similarityGroupKey])

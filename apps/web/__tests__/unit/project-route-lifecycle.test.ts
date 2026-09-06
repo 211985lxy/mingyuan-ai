@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
   permanentlyDelete: vi.fn(),
+  resolveBoundProject: vi.fn(async () => ({ id: "p1", name: "客户项目", status: "active" })),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -16,6 +17,13 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/features/projects/services/project-lifecycle", () => ({
   permanentlyDeleteOwnedProject: mocks.permanentlyDelete,
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject: mocks.resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { DELETE } from "@/app/api/projects/[id]/route"
 
@@ -27,32 +35,42 @@ describe("project DELETE lifecycle", () => {
     mocks.permanentlyDelete.mockResolvedValue({ generations: 2 })
   })
 
-  it("keeps the existing DELETE behavior as archive by default", async () => {
+  it("does not archive the account-bound project", async () => {
     const response = await DELETE(new Request("https://example.com/api/projects/p1") as never, {
       params: Promise.resolve({ id: "p1" }),
     })
 
-    expect(response.status).toBe(200)
-    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "archived" } }))
+    expect(response.status).toBe(409)
+    expect(mocks.update).not.toHaveBeenCalled()
     expect(mocks.permanentlyDelete).not.toHaveBeenCalled()
   })
 
-  it("requires the exact project name before permanent deletion", async () => {
+  it("does not allow permanent deletion of the account-bound project", async () => {
     const response = await DELETE(new Request("https://example.com/api/projects/p1?permanent=true&confirm=wrong") as never, {
       params: Promise.resolve({ id: "p1" }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(409)
     expect(mocks.permanentlyDelete).not.toHaveBeenCalled()
   })
 
-  it("permanently deletes only after explicit confirmation", async () => {
+  it("keeps the binding lock even with permanent-delete confirmation", async () => {
     const response = await DELETE(new Request("https://example.com/api/projects/p1?permanent=true&confirm=%E5%AE%A2%E6%88%B7%E9%A1%B9%E7%9B%AE") as never, {
       params: Promise.resolve({ id: "p1" }),
     })
 
-    expect(response.status).toBe(200)
-    expect(mocks.permanentlyDelete).toHaveBeenCalledWith("u1", "p1")
+    expect(response.status).toBe(409)
+    expect(mocks.permanentlyDelete).not.toHaveBeenCalled()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it("does not let an account archive its only bound project", async () => {
+    const response = await DELETE(new Request("https://example.com/api/projects/p1") as never, {
+      params: Promise.resolve({ id: "p1" }),
+    })
+
+    // This expectation is intentionally red until the account binding guard is wired.
+    expect(response.status).toBe(409)
     expect(mocks.update).not.toHaveBeenCalled()
   })
 })

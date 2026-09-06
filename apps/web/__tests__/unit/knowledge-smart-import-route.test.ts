@@ -5,6 +5,7 @@ const parseDocument = vi.hoisted(() => vi.fn())
 const isSupportedFile = vi.hoisted(() => vi.fn())
 const processChunksForSmartImport = vi.hoisted(() => vi.fn())
 const enforceUploadSizeLimit = vi.hoisted(() => vi.fn())
+const resolveBoundProject = vi.hoisted(() => vi.fn())
 
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth:
@@ -38,6 +39,13 @@ vi.mock("@/lib/knowledge-auto-processor", () => ({
 vi.mock("@/lib/internal-beta-limits", () => ({
   enforceUploadSizeLimit,
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/knowledge/smart-import/route"
 
@@ -54,6 +62,8 @@ function makeRequest(input: { files?: File[]; projectId?: string }) {
 describe("POST /api/knowledge/smart-import", () => {
   beforeEach(() => {
     findFirst.mockReset()
+    resolveBoundProject.mockReset()
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     parseDocument.mockReset()
     isSupportedFile.mockReset()
     processChunksForSmartImport.mockReset()
@@ -62,15 +72,17 @@ describe("POST /api/knowledge/smart-import", () => {
     isSupportedFile.mockReturnValue(true)
   })
 
-  it("rejects when project id is missing", async () => {
+  it("uses the account-bound project when project id is missing", async () => {
+    parseDocument.mockResolvedValue(["hello"])
+    processChunksForSmartImport.mockResolvedValue([])
     const res = await POST(
       makeRequest({
         files: [new File(["hello"], "note.md", { type: "text/markdown" })],
       }) as never,
       undefined as never,
     )
-    expect(res.status).toBe(400)
-    await expect(res.json()).resolves.toMatchObject({ error: "请选择归属全案" })
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ data: { projectId: "project-1" } })
   })
 
   it("rejects when no files uploaded", async () => {
@@ -83,7 +95,10 @@ describe("POST /api/knowledge/smart-import", () => {
   })
 
   it("returns 404 when project is not owned by user", async () => {
-    findFirst.mockResolvedValue(null)
+    resolveBoundProject.mockRejectedValue(Object.assign(new Error("当前账号只能使用已绑定的项目"), {
+      code: "PROJECT_CONTEXT_MISMATCH",
+      status: 409,
+    }))
     const res = await POST(
       makeRequest({
         projectId: "project-x",
@@ -91,16 +106,13 @@ describe("POST /api/knowledge/smart-import", () => {
       }) as never,
       undefined as never,
     )
-    expect(res.status).toBe(404)
-    expect(findFirst).toHaveBeenCalledWith({
-      where: { id: "project-x", userId: "user-1", status: "active" },
-      select: { id: true },
-    })
+    expect(res.status).toBe(409)
+    expect(processChunksForSmartImport).not.toHaveBeenCalled()
   })
 
   it("rejects unsupported file names", async () => {
     isSupportedFile.mockReturnValue(false)
-    findFirst.mockResolvedValue({ id: "project-1" })
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     const res = await POST(
       makeRequest({
         projectId: "project-1",
@@ -115,7 +127,7 @@ describe("POST /api/knowledge/smart-import", () => {
   })
 
   it("parses files and returns cleaned preview without writing", async () => {
-    findFirst.mockResolvedValue({ id: "project-1" })
+    resolveBoundProject.mockResolvedValue({ id: "project-1", name: "项目一", status: "active" })
     parseDocument.mockResolvedValue(["老板卖点一段"])
     processChunksForSmartImport.mockResolvedValue([
       {

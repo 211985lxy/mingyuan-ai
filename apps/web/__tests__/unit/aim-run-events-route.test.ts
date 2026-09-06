@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findFirst, create, authenticateRequest, authErrorResponse, writeFinalRunOutcome } = vi.hoisted(() => ({
+const { findFirst, create, authenticateRequest, authErrorResponse, writeFinalRunOutcome, resolveBoundProject } = vi.hoisted(() => ({
   findFirst: vi.fn(),
   create: vi.fn(),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   writeFinalRunOutcome: vi.fn(),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "项目一", status: "active" })),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -18,6 +19,13 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
 vi.mock("@/lib/aim/run-outcome-write-service", () => ({ writeFinalRunOutcome }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/aim/runs/[runId]/events/route"
 
@@ -42,7 +50,7 @@ describe("aim run events route", () => {
 
     expect(response.status).toBe(201)
     expect(findFirst).toHaveBeenCalledWith({
-      where: { runId: "run_123", userId: "user-1" },
+      where: { runId: "run_123", userId: "user-1", projectId: "project-1" },
       select: { id: true, durationMs: true, totalTokens: true, costCny: true },
     })
     expect(create).toHaveBeenCalledWith({
@@ -97,6 +105,7 @@ describe("aim run events route", () => {
     expect(writeFinalRunOutcome).toHaveBeenCalledWith(expect.objectContaining({
       channel: "web",
       userId: "user-1",
+      projectId: "project-1",
       outcome: expect.objectContaining({ channel: "web", requestId: "req-web-1" }),
     }))
   })

@@ -62,7 +62,7 @@ export function ChannelBindingsPanel() {
   const [items, setItems] = useState<ChannelBindingItem[]>([])
   const [projects, setProjects] = useState<ClientProject[]>([])
   const [platform, setPlatform] = useState<ChannelBindingItem["platform"]>("feishu")
-  const [projectId, setProjectId] = useState("")
+  const [externalAccountId, setExternalAccountId] = useState("")
   const [externalChatId, setExternalChatId] = useState("")
   const [keywords, setKeywords] = useState("收选题")
   const [executionMode, setExecutionMode] = useState<ChannelBindingItem["executionMode"]>("live")
@@ -74,7 +74,6 @@ export function ChannelBindingsPanel() {
     const [bindings, projectItems] = await Promise.all([listChannelBindings(), listClientProjects()])
     setItems(bindings)
     setProjects(projectItems)
-    setProjectId((current) => current || projectItems[0]?.id || "")
   }
 
   useEffect(() => {
@@ -85,7 +84,6 @@ export function ChannelBindingsPanel() {
         if (cancelled) return
         setItems(bindings)
         setProjects(projectItems)
-        setProjectId((current) => current || projectItems[0]?.id || "")
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "群聊绑定读取失败")
       }
@@ -96,12 +94,12 @@ export function ChannelBindingsPanel() {
   }, [])
 
   async function submit() {
-    if (!projectId || !externalChatId.trim()) return toast.error("请选择项目并填写群 ID")
+    if (projects.length !== 1 || !externalChatId.trim()) return toast.error("请先完成项目绑定并填写群 ID")
     setBusy(true)
     try {
       await saveChannelBinding({
         platform,
-        projectId,
+        externalAccountId: externalAccountId.trim() || undefined,
         externalChatId: externalChatId.trim(),
         triggerMode: "mention_or_keyword",
         triggerKeywords: keywords.split(/[，,]/).map((item) => item.trim()).filter(Boolean),
@@ -110,6 +108,7 @@ export function ChannelBindingsPanel() {
         defaultAgentId: routeTarget === "aim" ? (defaultAgentId || null) : null,
       })
       setExternalChatId("")
+      setExternalAccountId("")
       await reload()
       toast.success("群聊绑定已保存")
     } catch (error) {
@@ -143,12 +142,18 @@ export function ChannelBindingsPanel() {
   return <Card>
     <CardHeader>
       <CardTitle>群聊选题采集</CardTitle>
-      <CardDescription>绑定群 ID 与 AIM 项目</CardDescription>
+      <CardDescription>绑定抖音/视频号等外部渠道；多个渠道共用当前账号绑定项目的知识库</CardDescription>
     </CardHeader>
     <CardContent className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <div className="space-y-1.5"><Label>平台</Label><Select value={platform} onValueChange={(value) => setPlatform((value || "feishu") as ChannelBindingItem["platform"])}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(PLATFORM_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-        <div className="space-y-1.5"><Label>项目</Label><Select value={projectId} onValueChange={(value) => setProjectId(value || "")}><SelectTrigger><SelectValue placeholder="选择项目" /></SelectTrigger><SelectContent>{projects.map((project) => <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>)}</SelectContent></Select></div>
+        <div className="space-y-1.5">
+          <Label>绑定项目</Label>
+          <div className="flex h-9 items-center rounded-md border bg-muted/40 px-3 text-sm">
+            {projects.length === 1 ? projects[0].name : "尚未完成项目绑定"}
+          </div>
+        </div>
+        <div className="space-y-1.5"><Label>外部账号 ID（可选）</Label><Input value={externalAccountId} onChange={(event) => setExternalAccountId(event.target.value)} placeholder="矩阵账号标识" /></div>
         <div className="space-y-1.5"><Label>外部群 ID</Label><Input value={externalChatId} onChange={(event) => setExternalChatId(event.target.value)} placeholder="chat_id" /></div>
       </div>
       <div className="flex flex-col gap-3 md:flex-row md:items-end">
@@ -214,7 +219,7 @@ export function ChannelBindingsPanel() {
               {HEALTH_LABELS[item.healthStatus].label}
             </span>
           </div>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{item.project.name} · {item.externalChatId}</p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{item.project.name} · {item.externalAccountId ? `${item.externalAccountId} · ` : ""}{item.externalChatId}</p>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
             <span>最近收消息: {formatRelativeTime(item.lastReceivedAt)}</span>
             <span>24h 收 {item.receivedCount24h} · 回复 {item.sentCount24h}</span>

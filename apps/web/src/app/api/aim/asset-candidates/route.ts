@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { listAssetCandidates } from "@/lib/aim/asset-candidate-store"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -14,18 +15,32 @@ export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const params = request.nextUrl.searchParams
+    const project = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: params.get("projectId") || undefined,
+    })
     const takeParam = Number(params.get("take"))
     const candidates = await listAssetCandidates({
       userId: user.id,
-      projectId: params.get("projectId") || undefined,
+      projectId: project.id,
       reviewStatus: params.get("reviewStatus") || undefined,
       kind: params.get("kind") || undefined,
       take: Number.isFinite(takeParam) && takeParam > 0 ? takeParam : undefined,
     })
     return NextResponse.json({ candidates })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

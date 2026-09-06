@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findFirst, outcomeFindMany, attributionFindMany, authenticateRequest, authErrorResponse } = vi.hoisted(() => ({
+const { findFirst, outcomeFindMany, attributionFindMany, authenticateRequest, authErrorResponse, resolveBoundProject } = vi.hoisted(() => ({
   findFirst: vi.fn(),
   outcomeFindMany: vi.fn(async () => []),
   attributionFindMany: vi.fn(async () => []),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
+  resolveBoundProject: vi.fn(async () => ({ id: "proj-1" })),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -17,6 +18,10 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {},
+}))
 
 import { GET } from "@/app/api/aim/history/[id]/retro-report/route"
 
@@ -37,6 +42,7 @@ describe("aim retro-report route（HTML 复盘报告）", () => {
     vi.clearAllMocks()
     authenticateRequest.mockResolvedValue({ id: "user-1" })
     authErrorResponse.mockReturnValue(null)
+    resolveBoundProject.mockResolvedValue({ id: "proj-1" })
     outcomeFindMany.mockResolvedValue([])
     attributionFindMany.mockResolvedValue([])
     findFirst.mockResolvedValue({

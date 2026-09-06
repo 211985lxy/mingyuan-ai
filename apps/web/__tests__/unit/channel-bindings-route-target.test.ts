@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   findFirst: vi.fn(),
   upsert: vi.fn(),
+  resolveBoundProject: vi.fn(),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -30,6 +31,13 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject: mocks.resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { POST } from "@/app/api/account/channel-bindings/route"
 
@@ -46,6 +54,7 @@ describe("channel-bindings routeTarget / defaultAgentId", () => {
     vi.clearAllMocks()
     mocks.authenticateRequest.mockResolvedValue({ id: "user-1" })
     mocks.findFirst.mockResolvedValue({ id: "proj-1" }) // project exists
+    mocks.resolveBoundProject.mockResolvedValue({ id: "proj-1", name: "P", status: "active" })
     mocks.findUnique.mockResolvedValue(null) // no existing binding
     mocks.upsert.mockImplementation(async (args: { create: Record<string, unknown> }) => ({
       id: "binding-1",

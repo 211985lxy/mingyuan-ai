@@ -4,6 +4,7 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { AIM_AGENT_IDS } from "@/lib/aim-harness/contracts"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 const VALID_AGENT_IDS = Array.from(AIM_AGENT_IDS)
 
@@ -28,19 +29,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const user = await authenticateRequest(request)
     const { id } = await params
     const body = await parseJsonBody(request, updateSchema, { maxBytes: 8 * 1024 })
-    const binding = await prisma.channelBinding.findFirst({ where: { id, userId: user.id }, select: { id: true } })
+    const boundProject = await resolveBoundProject({ userId: user.id, requestedProjectId: body.projectId })
+    const binding = await prisma.channelBinding.findFirst({ where: { id, userId: user.id, projectId: boundProject.id }, select: { id: true } })
     if (!binding) return NextResponse.json({ error: "群聊绑定不存在" }, { status: 404 })
-    if (body.projectId) {
-      const project = await prisma.clientProject.findFirst({ where: { id: body.projectId, userId: user.id, status: "active" }, select: { id: true } })
-      if (!project) return NextResponse.json({ error: "项目不存在或不可用" }, { status: 403 })
-    }
     const updated = await prisma.channelBinding.update({
       where: { id },
-      data: body,
+      data: { ...body, projectId: boundProject.id },
       include: { project: { select: { id: true, name: true, status: true } } },
     })
     return NextResponse.json(updated)
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json({ error: "群聊绑定更新失败" }, { status: 500 })
   }
 }
@@ -55,10 +57,21 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
-    const result = await prisma.channelBinding.deleteMany({ where: { id, userId: user.id } })
+    const boundProject = await resolveBoundProject({ userId: user.id })
+    const result = await prisma.channelBinding.deleteMany({ where: { id, userId: user.id, projectId: boundProject.id } })
     if (result.count === 0) return NextResponse.json({ error: "群聊绑定不存在" }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json({ error: "群聊绑定删除失败" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

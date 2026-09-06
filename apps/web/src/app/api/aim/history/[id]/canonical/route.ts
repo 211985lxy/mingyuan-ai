@@ -13,6 +13,7 @@ import {
   type CanonicalContentSpec,
 } from "@/lib/canonical-content-spec"
 import type { TaskSpec } from "@/lib/task-spec"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * POST — 确认或修订母内容（写入 AimGeneration.taskSpec.canonical）
@@ -25,6 +26,7 @@ export async function POST(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const project = await resolveBoundProject({ userId: user.id })
     const body = await parseJsonRecord(request)
     const action = body.action === "revise" ? "revise" : body.action === "confirm" ? "confirm" : null
     if (!action) {
@@ -32,7 +34,7 @@ export async function POST(
     }
 
     const record = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id },
+      where: { id, userId: user.id, projectId: project.id },
       select: {
         id: true,
         taskSpec: true,
@@ -113,9 +115,19 @@ export async function POST(
       },
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     return (
       authErrorResponse(error) ??
       NextResponse.json({ error: "母内容确认失败" }, { status: 500 })
     )
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

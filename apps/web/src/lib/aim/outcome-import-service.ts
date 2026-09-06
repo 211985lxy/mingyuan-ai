@@ -37,10 +37,15 @@ export async function importOutcomeFromText(input: {
   db: OutcomeImportDbPort
   userId: string
   generationId: string
+  projectId?: string
   text: string
 }): Promise<OutcomeImportResult> {
   const owned = await input.db.aimGeneration.findFirst({
-    where: { id: input.generationId, userId: input.userId },
+    where: {
+      id: input.generationId,
+      userId: input.userId,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
+    },
     select: { id: true, topicSelectionId: true, projectId: true },
   })
   if (!owned) return { status: "not_found" }

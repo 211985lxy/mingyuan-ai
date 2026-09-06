@@ -3,6 +3,7 @@ import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@/generated/prisma/client"
 import { syncAimGenerationContent } from "@/lib/aim/content-version-sync"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 30
 
@@ -10,8 +11,14 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   const id = params?.id
   if (!id) return NextResponse.json({ error: "缺少版本 id" }, { status: 400 })
 
+  const project = await resolveBoundProject({ userId: user.id })
+
   const target = await prisma.aimContentVersion.findFirst({ where: { id, userId: user.id } })
   if (!target) return NextResponse.json({ error: "版本不存在" }, { status: 404 })
+
+  if (!(await versionBelongsToProject(target, user.id, project.id))) {
+    return NextResponse.json({ error: "版本不存在" }, { status: 404 })
+  }
 
   try {
     const version = await prisma.$transaction(async (tx) => {
@@ -25,6 +32,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
           generationId: target.generationId,
           format: target.format,
           content: target.content,
+          projectId: project.id,
         })
       }
 
@@ -67,4 +75,26 @@ async function lockLatest(
         WHERE userId = ${userId} AND conversationId = ${conversationId} AND format = ${format}
         ORDER BY versionNo DESC LIMIT 1 FOR UPDATE`
   return rows[0]
+}
+
+async function versionBelongsToProject(
+  version: { generationId: string | null; conversationId: string | null },
+  userId: string,
+  projectId: string,
+): Promise<boolean> {
+  if (version.generationId) {
+    const generation = await prisma.aimGeneration.findFirst({
+      where: { id: version.generationId, userId, projectId },
+      select: { id: true },
+    })
+    if (!generation) return false
+  }
+  if (version.conversationId) {
+    const conversation = await prisma.aimConversation.findFirst({
+      where: { id: version.conversationId, userId, projectId },
+      select: { id: true },
+    })
+    if (!conversation) return false
+  }
+  return Boolean(version.generationId || version.conversationId)
 }

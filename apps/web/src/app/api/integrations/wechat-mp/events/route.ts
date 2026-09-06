@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { NextResponse } from "next/server"
 import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * 微信公众号消息接收端点（路由二）
@@ -105,12 +106,18 @@ export async function POST(request: Request) {
     const firstLink = detection.links[0]
     const pipelineUserId = process.env.CONTENT_PIPELINE_USER_ID || ""
 
-    processVideo({
-      videoUrl: firstLink.url,
-      source: "视频号",
-      contextText: detection.textWithoutLinks,
-      userId: pipelineUserId || undefined,
-    }).catch(() => {})
+    void (async () => {
+      const projectId = pipelineUserId
+        ? (await resolveBoundProject({ userId: pipelineUserId })).id
+        : undefined
+      await processVideo({
+        videoUrl: firstLink.url,
+        source: "视频号",
+        contextText: detection.textWithoutLinks,
+        userId: pipelineUserId || undefined,
+        projectId,
+      })
+    })().catch(() => {})
 
     const platformLabel =
       firstLink.platform === "channels" ? "视频号" :

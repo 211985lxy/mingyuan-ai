@@ -16,6 +16,7 @@ import {
   Compass,
   FlaskConical,
   Users,
+  Link2,
   KeyRound,
   Receipt,
   Settings,
@@ -90,6 +91,7 @@ const navGroups: NavGroup[] = [
     labelEn: "Operations",
     items: [
       { title: "用户", titleEn: "Users", href: "/admin/users", icon: Users },
+      { title: "账号项目绑定", titleEn: "Account Projects", href: "/admin/account-project-bindings", icon: Link2 },
       { title: "激活码", titleEn: "Codes", href: "/admin/activation-codes", icon: KeyRound },
       { title: "使用记录", titleEn: "Usage", href: "/admin/usage", icon: Receipt },
     ],

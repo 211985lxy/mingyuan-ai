@@ -158,7 +158,7 @@ export const aimGenerateBodySchema = aimGenerateBodyObjectSchema.superRefine((bo
 })
 
 export const aimEvolveBodySchema = z.object({
-  projectId: id,
+  projectId: id.optional(),
   agentId: z.string().max(80).optional(),
   persist: z.boolean().optional(),
   messages: z.array(chatMessageSchema).min(1).max(50),

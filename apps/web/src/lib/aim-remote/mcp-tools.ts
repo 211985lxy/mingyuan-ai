@@ -120,7 +120,7 @@ export function registerAimMcpTools(server: McpServer): void {
       description: "异步提交一次草稿生成任务。必须携带 idempotencyKey（相同键+相同请求不重复消耗 Token）。返回 invocationId 用于轮询。",
       inputSchema: {
         idempotencyKey: z.string().min(MIN_IDEMPOTENCY_KEY_LENGTH).max(MAX_IDEMPOTENCY_KEY_LENGTH),
-        projectId: z.string().min(1).max(80),
+        projectId: z.string().min(1).max(80).optional(),
         agentId: z.string().min(1).max(60),
         rawInput: z.string().min(1).max(MAX_RAW_INPUT_CHARS),
         targetFormats: z.array(z.string()).min(MIN_TARGET_FORMATS).max(MAX_TARGET_FORMATS),
@@ -136,7 +136,7 @@ export function registerAimMcpTools(server: McpServer): void {
 
       const result = await submitInvocation(resolved.context, {
         idempotencyKey: args.idempotencyKey,
-        projectId: args.projectId,
+        projectId: args.projectId || resolved.context.boundProjectId || "",
         agentId: args.agentId as never,
         rawInput: args.rawInput,
         targetFormats: args.targetFormats as never,

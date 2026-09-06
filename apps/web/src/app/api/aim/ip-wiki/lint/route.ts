@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { prisma } from "@/lib/prisma"
 import { runIpWikiLint } from "@/lib/ip-wiki/lint"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 30
-
-async function ensureProject(userId: string, projectId: string) {
-  return prisma.clientProject.findFirst({
-    where: { id: projectId, userId, status: "active" },
-    select: { id: true },
-  })
-}
 
 /** GET /api/aim/ip-wiki/lint?projectId=... —— 对某 IP 全案的维基页跑体检 */
 /**
@@ -21,18 +14,17 @@ async function ensureProject(userId: string, projectId: string) {
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    const projectId = request.nextUrl.searchParams.get("projectId")?.trim() ?? ""
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
-    }
-    const project = await ensureProject(user.id, projectId)
-    if (!project) {
-      return NextResponse.json({ error: "IP营销全案不存在或已归档" }, { status: 404 })
-    }
+    const projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: request.nextUrl.searchParams.get("projectId"),
+    })).id
 
     const report = await runIpWikiLint({ projectId })
     return NextResponse.json({ report })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/ip-wiki/lint GET] Error:", error)

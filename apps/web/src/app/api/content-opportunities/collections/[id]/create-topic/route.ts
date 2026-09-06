@@ -3,6 +3,7 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import { createTopicBodySchema } from "@/features/opportunities/contracts/api"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * POST /api/content-opportunities/collections/[id]/create-topic
@@ -14,9 +15,10 @@ export const POST = withUserAuth(async (request, { user, params }) => {
     return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
   }
   const body = await parseJsonBody(request, createTopicBodySchema, { maxBytes: 4 * 1024 })
+  const project = await resolveBoundProject({ userId: user.id })
 
   const collection = await prisma.opportunityCollection.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: user.id, projectId: project.id },
   })
 
   if (!collection) {
@@ -36,6 +38,7 @@ export const POST = withUserAuth(async (request, { user, params }) => {
   const topicSelection = await prisma.topicSelection.create({
     data: {
       userId: user.id,
+      projectId: project.id,
       ipProfileId: ipProfile.id,
       elementCodes: { source: "opportunity_collection", collectionId: id },
       candidates: [{

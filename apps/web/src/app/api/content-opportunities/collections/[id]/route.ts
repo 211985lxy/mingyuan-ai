@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * GET /api/content-opportunities/collections/[id]
@@ -12,8 +13,10 @@ export const GET = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
   }
 
+  const project = await resolveBoundProject({ userId: user.id })
+
   const collection = await prisma.opportunityCollection.findFirst({
-    where: { id, userId: user.id },
+    where: { id, userId: user.id, projectId: project.id },
   })
 
   if (!collection) {
@@ -32,8 +35,10 @@ export const DELETE = withUserAuth(async (_request, { user, params }) => {
     return NextResponse.json({ error: "缺少研究篮 ID" }, { status: 400 })
   }
 
+  const project = await resolveBoundProject({ userId: user.id })
+
   const result = await prisma.opportunityCollection.deleteMany({
-    where: { id, userId: user.id },
+    where: { id, userId: user.id, projectId: project.id },
   })
 
   if (result.count === 0) {

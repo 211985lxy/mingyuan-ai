@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { buildDouyinAuthorizationUrl } from "@/lib/douyin-openapi"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 export const runtime = "nodejs"
 
@@ -15,7 +16,8 @@ export const runtime = "nodejs"
  */
 export async function GET(request: NextRequest) {
   try {
-    await authenticateRequest(request)
+    const user = await authenticateRequest(request)
+    await resolveBoundProject({ userId: user.id })
   } catch (err) {
     return authErrorResponse(err)
   }

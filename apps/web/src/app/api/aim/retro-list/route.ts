@@ -5,6 +5,7 @@ import { parseQuery } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -124,11 +125,15 @@ export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const { projectId, limit = 30 } = parseQuery(request, querySchema)
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: projectId,
+    })
 
     const records = await prisma.aimGeneration.findMany({
       where: {
         userId: user.id,
-        ...(projectId ? { projectId } : {}),
+        projectId: boundProject.id,
         OR: [
           { workflowStatus: "published" },
           { contentOutcomes: { some: {} } },
@@ -143,6 +148,9 @@ export async function GET(request: NextRequest) {
     const items = (records as unknown as RetroListRecord[]).map(toRetroListItem)
     return NextResponse.json({ items })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     return authErrorResponse(error) ?? NextResponse.json(
       { error: "复盘列表读取失败" },
       { status: 500 },

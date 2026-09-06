@@ -10,6 +10,7 @@ import {
   prepareInspirationGenerateRequest,
   prepareInspirationGeneration,
 } from "@/lib/aim/services/inspiration-generation"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * @description 处理 POST 请求
@@ -25,9 +26,13 @@ export async function POST(
     const user = await authenticateRequest(request)
     const { id } = await params
     const body = await parseJsonRecord(request)
+    const project = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: typeof body.projectId === "string" ? body.projectId : undefined,
+    })
 
     // 归属隔离 + 校验收口到 prepare（404 先于 400，顺序与原 route 一致）
-    const prepared = await prepareInspirationGenerateRequest({ id, userId: user.id, body })
+    const prepared = await prepareInspirationGenerateRequest({ id, userId: user.id, body, projectId: project.id })
     if (!prepared.ok) {
       return NextResponse.json({ error: prepared.error }, { status: prepared.status })
     }

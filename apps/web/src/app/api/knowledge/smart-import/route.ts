@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
-import { prisma } from "@/lib/prisma"
 import { parseDocument, isSupportedFile } from "@/lib/document-parser"
 import { processChunksForSmartImport } from "@/lib/knowledge-auto-processor"
 import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 120
 
@@ -17,14 +17,10 @@ export const POST = withUserAuth(async (request, { user }) => {
     (file): file is File => file instanceof File && file.size >= 0 && Boolean(file.name),
   )
   const projectIdValue = formData.get("projectId")
-  const projectId =
+  const requestedProjectId =
     typeof projectIdValue === "string" && projectIdValue.trim()
       ? projectIdValue.trim()
-      : null
-
-  if (!projectId) {
-    return NextResponse.json({ error: "请选择归属全案" }, { status: 400 })
-  }
+      : undefined
 
   if (files.length === 0) {
     return NextResponse.json({ error: "请上传至少一个文件" }, { status: 400 })
@@ -41,20 +37,15 @@ export const POST = withUserAuth(async (request, { user }) => {
   const uploadLimitResponse = enforceUploadSizeLimit(files)
   if (uploadLimitResponse) return uploadLimitResponse
 
-  const project = await prisma.clientProject.findFirst({
-    where: {
-      id: projectId,
-      userId: user.id,
-      status: "active",
-    },
-    select: { id: true },
-  })
-
-  if (!project) {
-    return NextResponse.json(
-      { error: "IP营销全案不存在或已归档" },
-      { status: 404 },
-    )
+  let project: Awaited<ReturnType<typeof resolveBoundProject>>
+  try {
+    project = await resolveBoundProject({ userId: user.id, requestedProjectId })
+  } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
+    throw error
   }
 
   const allChunks: string[] = []
@@ -98,3 +89,9 @@ export const POST = withUserAuth(async (request, { user }) => {
     },
   })
 })
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
+}

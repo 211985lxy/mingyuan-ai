@@ -9,6 +9,7 @@ const {
   validateHighRiskApproval,
   updateMethodologyProfileMeta,
   recordAdminAudit,
+  resolveBoundProject,
   prisma,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user_1" })),
@@ -18,6 +19,7 @@ const {
   validateHighRiskApproval: vi.fn(),
   updateMethodologyProfileMeta: vi.fn(),
   recordAdminAudit: vi.fn(async () => "audit_1"),
+  resolveBoundProject: vi.fn(async () => ({ id: "proj_1", name: "项目一", status: "active" })),
   prisma: {
     aimMemory: {
       findFirst: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock("@/lib/aim-memory", () => ({
   rejectAimMemoryCandidate,
 }))
 vi.mock("@/lib/aim/approval-validation", () => ({ validateHighRiskApproval }))
+vi.mock("@/lib/account-project-context", () => ({ resolveBoundProject }))
 vi.mock("@/lib/prisma", () => ({ prisma }))
 vi.mock("@/lib/admin-auth", () => ({
   withAdminOrEditor: (handler: any) => handler,

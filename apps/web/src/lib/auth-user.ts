@@ -7,6 +7,7 @@ type AuthUserRecord = {
   plan: string
   createdAt: Date
   expiresAt?: Date | null
+  boundProjectId?: string | null
 }
 
 export type AuthUserPayload = {
@@ -16,6 +17,7 @@ export type AuthUserPayload = {
   plan: string
   createdAt: string
   expiresAt: string | null
+  boundProjectId: string | null
   isActivated: boolean
   subscriptionStatus: SubscriptionStatus
 }
@@ -38,6 +40,7 @@ export function buildAuthUserPayload(user: AuthUserRecord): AuthUserPayload {
     plan: user.plan,
     createdAt: user.createdAt.toISOString(),
     expiresAt: user.expiresAt ? user.expiresAt.toISOString() : null,
+    boundProjectId: user.boundProjectId ?? null,
     isActivated: subscriptionStatus === "active",
     subscriptionStatus,
   }

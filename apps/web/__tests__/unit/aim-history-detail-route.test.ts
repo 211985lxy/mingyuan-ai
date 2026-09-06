@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
+  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -23,6 +24,13 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/user-auth", () => ({
   authenticateRequest: mocks.authenticateRequest,
   authErrorResponse: mocks.authErrorResponse,
+}))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject: mocks.resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
 }))
 
 import { GET, PATCH } from "@/app/api/aim/history/[id]/route"
@@ -46,7 +54,7 @@ describe("aim history detail route", () => {
 
     const response = await GET(new NextRequest("http://localhost/api/aim/history/generation-1"), params)
 
-    expect(mocks.generationFindFirst).toHaveBeenCalledWith({ where: { id: "generation-1", userId: "user-1" } })
+    expect(mocks.generationFindFirst).toHaveBeenCalledWith({ where: { id: "generation-1", userId: "user-1", projectId: "project-1" } })
     expect(await response.json()).toEqual({ id: "generation-1", agentId: "content_producer", reasoningByFormat: {} })
   })
 
@@ -63,7 +71,6 @@ describe("aim history detail route", () => {
       id: "generation-1", projectId: null, topicSelectionId: null,
       retroSnapshots: [], calibrationRules: [], decisionSnapshot: null,
     })
-    mocks.projectFindFirst.mockResolvedValueOnce({ id: "project-1" })
 
     const response = await PATCH(new NextRequest("http://localhost/api/aim/history/generation-1", {
       method: "PATCH",
@@ -72,10 +79,7 @@ describe("aim history detail route", () => {
     }), params)
 
     expect(response.status).toBe(200)
-    expect(mocks.projectFindFirst).toHaveBeenCalledWith({
-      where: { id: "project-1", userId: "user-1", status: "active" },
-      select: { id: true },
-    })
+    expect(mocks.resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-1" })
     expect(mocks.generationUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "generation-1" }, data: expect.objectContaining({ projectId: "project-1" }),
     }))
@@ -90,7 +94,7 @@ describe("aim history detail route", () => {
       id: "generation-1", projectId: null, topicSelectionId: null,
       retroSnapshots: [], calibrationRules: [], decisionSnapshot: null,
     })
-    mocks.projectFindFirst.mockResolvedValueOnce(null)
+    mocks.resolveBoundProject.mockRejectedValueOnce({ message: "当前账号只能使用已绑定的项目", code: "PROJECT_CONTEXT_MISMATCH", status: 409 })
 
     const response = await PATCH(new NextRequest("http://localhost/api/aim/history/generation-1", {
       method: "PATCH",
@@ -98,7 +102,7 @@ describe("aim history detail route", () => {
       headers: { "content-type": "application/json" },
     }), params)
 
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(409)
     expect(mocks.transaction).not.toHaveBeenCalled()
   })
 

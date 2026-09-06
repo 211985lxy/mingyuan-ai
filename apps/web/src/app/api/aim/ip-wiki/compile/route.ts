@@ -4,6 +4,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import { compilePositioningToWiki, type ExistingWikiPageRef } from "@/lib/ip-wiki/compile"
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const maxDuration = 60
 
@@ -21,23 +22,17 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const body = await parseJsonRecord(request)
-    const projectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
+    const requestedProjectId = typeof body.projectId === "string" ? body.projectId.trim() : ""
     const sourceGenerationId =
       typeof body.sourceGenerationId === "string" ? body.sourceGenerationId.trim() : ""
     const positioningText =
       typeof body.positioningText === "string" ? body.positioningText.trim() : ""
 
-    if (!projectId) {
-      return NextResponse.json({ error: "projectId 必填" }, { status: 400 })
-    }
-
-    const project = await prisma.clientProject.findFirst({
-      where: { id: projectId, userId: user.id, status: "active" },
-      select: { id: true, name: true },
+    const project = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
     })
-    if (!project) {
-      return NextResponse.json({ error: "IP营销全案不存在或已归档" }, { status: 404 })
-    }
+    const projectId = project.id
 
     let effectiveText = positioningText
     let effectiveGenerationId = sourceGenerationId
@@ -86,6 +81,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ pages, sourceGenerationId: effectiveGenerationId ?? null })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[aim/ip-wiki/compile] Error:", error)

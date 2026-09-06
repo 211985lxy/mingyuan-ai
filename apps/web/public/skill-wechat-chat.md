@@ -5,7 +5,7 @@ description: Import WeChat or WeCom chat exports into Mingdong AIM as reviewed k
 
 # 明动 AIM 微信聊天导入 Skill
 
-这个 Skill 用于把微信/企微聊天导出文本转成明动 AIM 知识库条目。它适合整理客户聊天、成交问答、痛点反馈、项目讨论，不适合用来生成文案。
+这个 Skill 用于把微信/企微聊天导出文本转成明动 AIM 知识库条目。它适合整理客户聊天、成交问答、痛点反馈、项目讨论，不适合用来生成文案。知识会写入当前 AIM 登录账号绑定的项目。
 
 所有接口使用当前 `skill-wechat-chat.md` 所在站点作为同源地址。
 
@@ -43,10 +43,11 @@ Content-Type: application/json
 Authorization: Bearer maim_xxx
 
 {
-  "projectId": "project_id",
   "rawText": "2026-07-09 10:00 张三: 客户现在最担心的是交付效果..."
 }
 ```
+
+`projectId` 为兼容旧调用可选；不传时自动使用账号绑定项目，传入其他项目会被拒绝。
 
 返回结构：
 
@@ -79,7 +80,6 @@ Content-Type: application/json
 Authorization: Bearer maim_xxx
 
 {
-  "projectId": "project_id",
   "entries": [
     {
       "title": "客户最担心交付效果",

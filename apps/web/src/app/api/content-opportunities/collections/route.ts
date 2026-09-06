@@ -3,6 +3,7 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { withUserAuth } from "@/lib/user-auth"
 import { prisma } from "@/lib/prisma"
 import { createCollectionBodySchema } from "@/features/opportunities/contracts/api"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * POST /api/content-opportunities/collections
@@ -10,11 +11,12 @@ import { createCollectionBodySchema } from "@/features/opportunities/contracts/a
  */
 export const POST = withUserAuth(async (request, { user }) => {
   const body = await parseJsonBody(request, createCollectionBodySchema, { maxBytes: 32 * 1024 })
+  const project = await resolveBoundProject({ userId: user.id, requestedProjectId: body.projectId })
 
   const collection = await prisma.opportunityCollection.create({
     data: {
       userId: user.id,
-      projectId: body.projectId || null,
+      projectId: project.id,
       name: body.name,
       items: body.items as unknown as object[],
       status: "draft",
@@ -32,10 +34,15 @@ export const GET = withUserAuth(async (request, { user }) => {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status") || undefined
   const limit = Math.min(Number(searchParams.get("limit")) || 20, 50)
+  const project = await resolveBoundProject({
+    userId: user.id,
+    requestedProjectId: searchParams.get("projectId"),
+  })
 
   const collections = await prisma.opportunityCollection.findMany({
     where: {
       userId: user.id,
+      projectId: project.id,
       ...(status ? { status } : {}),
     },
     orderBy: { createdAt: "desc" },

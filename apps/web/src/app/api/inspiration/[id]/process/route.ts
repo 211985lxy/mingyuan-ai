@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { processInspiration } from "@/features/topics/services/process-inspiration"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /**
  * @description 处理 POST 请求
@@ -15,8 +16,9 @@ export async function POST(
   try {
     const user = await authenticateRequest(request)
     const { id } = await params
+    const project = await resolveBoundProject({ userId: user.id })
 
-    const result = await processInspiration(id, user.id)
+    const result = await processInspiration(id, user.id, project.id)
     return NextResponse.json({ ok: true, ...result, message: "AI 处理已完成" })
   } catch (error) {
     if (error instanceof Error && error.message === "灵感正在处理中，请稍后") {

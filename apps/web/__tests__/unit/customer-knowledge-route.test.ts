@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   ensureKnowledgeEmbedding: vi.fn(),
   extractAndPersistForEntry: vi.fn(),
   enforceKnowledgeBetaLimit: vi.fn(),
+  resolveBoundProject: vi.fn(),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -44,6 +45,13 @@ vi.mock("@/lib/knowledge-entity-extractor", () => ({
 vi.mock("@/lib/internal-beta-limits", () => ({
   enforceKnowledgeBetaLimit: mocks.enforceKnowledgeBetaLimit,
 }))
+vi.mock("@/lib/account-project-context", () => ({
+  resolveBoundProject: mocks.resolveBoundProject,
+  AccountProjectContextError: class AccountProjectContextError extends Error {
+    code = "PROJECT_CONTEXT_MISMATCH"
+    status = 409
+  },
+}))
 
 import { GET as listKnowledge, POST as createKnowledge } from "@/app/api/knowledge/route"
 import { GET as getKnowledge, PUT as updateKnowledge, DELETE as archiveKnowledge } from "@/app/api/knowledge/[id]/route"
@@ -63,6 +71,7 @@ describe("customer knowledge API ownership", () => {
     mocks.enforceKnowledgeBetaLimit.mockResolvedValue(null)
     mocks.ensureKnowledgeEmbedding.mockReturnValue(Promise.resolve())
     mocks.extractAndPersistForEntry.mockReturnValue(Promise.resolve())
+    mocks.resolveBoundProject.mockResolvedValue({ id: "project-a", name: "当前项目", status: "active" })
   })
 
   it("lists only the current user's entries", async () => {
@@ -70,7 +79,7 @@ describe("customer knowledge API ownership", () => {
     const response = await listKnowledge(jsonRequest("http://localhost/api/knowledge?status=active"))
     expect(response.status).toBe(200)
     expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ userId: "user-a", status: "active" }),
+      where: expect.objectContaining({ userId: "user-a", projectId: "project-a", status: "active" }),
     }))
   })
 
@@ -91,7 +100,7 @@ describe("customer knowledge API ownership", () => {
     )
     expect(response.status).toBe(404)
     expect(mocks.findFirst).toHaveBeenCalledWith({
-      where: { id: "kb-b", userId: "user-a" },
+      where: { id: "kb-b", userId: "user-a", projectId: "project-a" },
     })
   })
 
@@ -120,7 +129,7 @@ describe("customer knowledge API ownership", () => {
   })
 
   it("archives by status instead of hard delete", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "kb-a", userId: "user-a" })
+    mocks.findFirst.mockResolvedValueOnce({ id: "kb-a", userId: "user-a", projectId: "project-a" })
     mocks.update.mockResolvedValueOnce({ id: "kb-a", status: "archived" })
     const response = await archiveKnowledge(
       jsonRequest("http://localhost/api/knowledge/kb-a", { method: "DELETE" }),
@@ -134,7 +143,11 @@ describe("customer knowledge API ownership", () => {
   })
 
   it("cannot bind knowledge to another user's project on create", async () => {
-    mocks.projectFindFirst.mockResolvedValueOnce(null)
+    mocks.resolveBoundProject.mockRejectedValueOnce({
+      message: "当前账号只能使用已绑定的项目",
+      code: "PROJECT_CONTEXT_MISMATCH",
+      status: 409,
+    })
     const response = await createKnowledge(
       jsonRequest("http://localhost/api/knowledge", {
         method: "POST",
@@ -147,17 +160,18 @@ describe("customer knowledge API ownership", () => {
         }),
       }),
     )
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(409)
     expect(mocks.create).not.toHaveBeenCalled()
-    expect(mocks.projectFindFirst).toHaveBeenCalledWith({
-      where: { id: "project-b", userId: "user-a", status: "active" },
-      select: { id: true },
-    })
+    expect(mocks.projectFindFirst).not.toHaveBeenCalled()
   })
 
   it("cannot rebind knowledge to another user's project on update", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ id: "kb-a", userId: "user-a", projectId: null })
-    mocks.projectFindFirst.mockResolvedValueOnce(null)
+    mocks.findFirst.mockResolvedValueOnce({ id: "kb-a", userId: "user-a", projectId: "project-a" })
+    mocks.resolveBoundProject.mockRejectedValueOnce({
+      message: "当前账号只能使用已绑定的项目",
+      code: "PROJECT_CONTEXT_MISMATCH",
+      status: 409,
+    })
     const response = await updateKnowledge(
       jsonRequest("http://localhost/api/knowledge/kb-a", {
         method: "PUT",
@@ -166,7 +180,7 @@ describe("customer knowledge API ownership", () => {
       }),
       { params: Promise.resolve({ id: "kb-a" }) },
     )
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(409)
     expect(mocks.update).not.toHaveBeenCalled()
   })
 })

@@ -11,6 +11,7 @@ import {
   defaultScopesForClientType,
   type AgentClientType,
 } from "@/lib/aim-remote/contracts"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const AGENT_AGENT_ALLOWLIST: readonly string[] = Object.freeze([
   "business_system_diagnosis",
@@ -25,7 +26,8 @@ export const AGENT_AGENT_ALLOWLIST: readonly string[] = Object.freeze([
 const createSchema = z.object({
   name: z.string().trim().min(1).max(60),
   clientType: z.enum(AGENT_CLIENT_TYPES as unknown as [AgentClientType, ...AgentClientType[]]),
-  projects: z.array(z.string().trim().min(1)).min(1).max(20),
+  // 项目由登录账号绑定关系决定；保留可选字段兼容旧客户端，但不再允许多项目 Key。
+  projects: z.array(z.string().trim().min(1)).max(20).default([]),
   agents: z.array(z.string().trim().min(1)).max(10).default([...AGENT_AGENT_ALLOWLIST]),
   scopes: z.array(z.string()).optional(),
   dailyLimit: z.number().int().min(1).max(1000).default(50),
@@ -47,6 +49,7 @@ function hashKey(key: string) {
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    await resolveBoundProject({ userId: user.id })
     const keys = await prisma.agentApiKey.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -90,6 +93,9 @@ export async function GET(request: NextRequest) {
       })),
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[account/agent-keys] Error:", error)
@@ -106,18 +112,18 @@ export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     const body = await parseJsonBody(request, createSchema)
+    const requestedProjects = body.projects ?? []
 
-    // Validate projects belong to the user and are active
-    const projects = await prisma.clientProject.findMany({
-      where: { id: { in: body.projects }, userId: user.id, status: "active" },
-      take: body.projects.length,
-      select: { id: true },
-    })
-    if (projects.length !== body.projects.length) {
-      const found = new Set(projects.map((p) => p.id))
-      const missing = body.projects.filter((id) => !found.has(id))
-      return NextResponse.json({ error: `项目不存在或不可用：${missing.join(", ")}` }, { status: 403 })
+    if (requestedProjects.length > 1) {
+      return NextResponse.json({
+        error: "一个 AIM 账号只能为绑定项目创建 API Key",
+        code: "ACCOUNT_PROJECT_STATUS_LOCKED",
+      }, { status: 409 })
     }
+    const boundProject = await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjects[0] || undefined,
+    })
 
     // Validate agents (schema defaults to the allowlist when omitted)
     const agents = body.agents ?? AGENT_AGENT_ALLOWLIST
@@ -145,7 +151,7 @@ export async function POST(request: NextRequest) {
         name: body.name,
         keyPrefix: plainKey.slice(0, 14),
         keyHash: hashKey(plainKey),
-        allowedProjects: body.projects,
+        allowedProjects: [boundProject.id],
         allowedAgents: agents,
         dailyLimit: body.dailyLimit,
         clientType: body.clientType,
@@ -169,6 +175,9 @@ export async function POST(request: NextRequest) {
       warning: "明文 Key 仅显示这一次，关闭后无法再次查看。",
     }, { status: 201 })
   } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     console.error("[account/agent-keys/create] Error:", error)

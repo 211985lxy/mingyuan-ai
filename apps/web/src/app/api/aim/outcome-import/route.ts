@@ -5,6 +5,7 @@ import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
 import { importOutcomeFromText } from "@/lib/aim/outcome-import-service"
 import { prisma } from "@/lib/prisma"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 export const dynamic = "force-dynamic"
 
@@ -18,6 +19,7 @@ const MAX_TEXT_LENGTH = 200_000
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    const project = await resolveBoundProject({ userId: user.id })
 
     const formData = await request.formData()
     const generationId = formData.get("generationId")
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
       db: prisma,
       userId: user.id,
       generationId: generationId.trim(),
+      projectId: project.id,
       text,
     })
 
@@ -71,8 +74,18 @@ export async function POST(request: NextRequest) {
       missingHints: result.missingHints,
     })
   } catch (error) {
+    if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
+      const contextError = error as { message: string; code: string; status: number }
+      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+    }
     const authResp = authErrorResponse(error)
     if (authResp) return authResp
     return NextResponse.json({ error: "服务器错误" }, { status: 500 })
   }
+}
+
+function isAccountProjectContextError(error: unknown): error is { message: string; code: string; status: number } {
+  return typeof error === "object" && error !== null
+    && typeof (error as { code?: unknown }).code === "string"
+    && typeof (error as { status?: unknown }).status === "number"
 }

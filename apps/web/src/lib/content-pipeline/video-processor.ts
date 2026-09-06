@@ -50,6 +50,8 @@ export interface VideoProcessingInput {
   skipCopyInspiration?: boolean
   /** AIM 用户 ID（5c/5e 需要） */
   userId?: string
+  /** AIM 登录账号绑定的项目（5c 选题落库使用） */
+  projectId?: string
 }
 
 export interface VideoProcessingResult {
@@ -151,6 +153,7 @@ export async function processVideo(input: VideoProcessingInput): Promise<VideoPr
         transcript: extraction.transcript,
         summary: aiSummary?.summary,
         userId: input.userId || "",
+        projectId: input.projectId,
       }).catch(() => ({
         success: false,
         cards: [],
