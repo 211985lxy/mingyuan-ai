@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@/lib/prisma"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 /** 竞品匹配时按平台加载的 WatchAccount 上限：监控账号是有限集合，超出视为异常。 */
 const WATCH_ACCOUNT_MATCH_LIMIT = 500
@@ -35,8 +36,10 @@ export interface CompetitorMatchInput {
   platform: string
   /** 视频原始链接（用于反向匹配 targetUrl） */
   videoUrl?: string
-  /** 限定查询的用户 ID（可选，不传则查所有用户） */
+  /** 限定查询的用户 ID（不传则不做竞品标记） */
   userId?: string
+  /** 限定查询的账号绑定项目（不传则以 userId 的绑定项目为准） */
+  projectId?: string
 }
 
 // ─── 核心函数 ──────────────────────────────────────────────────────
@@ -51,18 +54,23 @@ export async function checkCompetitorMatch(
   const empty: CompetitorMatchResult = { isCompetitor: false }
 
   try {
-    // 构建 Prisma where 条件
-    const conditions: Array<Record<string, unknown>> = []
+    // 竞品匹配必须落在“用户 + 绑定项目”内；两者都缺失时禁止跨账号全局扫描。
+    if (!input.userId) return empty
 
-    // 策略 1：按平台筛选
-    conditions.push({ platform: input.platform })
-
-    // 策略 2：按用户筛选（如果指定了 userId）
-    if (input.userId) {
-      conditions.push({ userId: input.userId })
+    let scope = input.projectId
+    if (!scope) {
+      scope = (await resolveBoundProject({ userId: input.userId })).id
     }
+    if (!scope) return empty
 
-    // 查询该平台的所有 WatchAccount
+    // 构建 Prisma where 条件
+    const conditions: Array<Record<string, unknown>> = [
+      { platform: input.platform },
+      { userId: input.userId },
+      { projectId: scope },
+    ]
+
+    // 查询该平台、该账号绑定项目下的所有 WatchAccount
     const accounts = await prisma.watchAccount.findMany({
       where: { AND: conditions },
       take: WATCH_ACCOUNT_MATCH_LIMIT,

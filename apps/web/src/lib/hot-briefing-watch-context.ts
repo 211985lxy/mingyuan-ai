@@ -4,6 +4,7 @@
 // 渲染风格与 aim-competitor-watch-context.ts 保持一致，但精简、标注时效。
 
 import { prisma } from "@/lib/prisma"
+import { resolveBoundProject } from "@/lib/account-project-context"
 import type { NormalizedVideo } from "@/lib/tikhub/types"
 
 type WatchAccountDigest = {
@@ -39,11 +40,22 @@ const EMPTY = "（暂无对标账号动态，请在工作台添加并刷新对�
  */
 export async function buildWatchAccountDigest(
   userId: string | null | undefined,
+  projectId?: string,
 ): Promise<string> {
   if (!userId) return EMPTY
 
+  // 简报只读当前账号绑定项目下的对标账号，绝不回退到全账号数据。
+  let scope = projectId
+  if (!scope) {
+    try {
+      scope = (await resolveBoundProject({ userId })).id
+    } catch {
+      return EMPTY
+    }
+  }
+
   const accounts = await prisma.watchAccount.findMany({
-    where: { userId },
+    where: { userId, projectId: scope },
     orderBy: [{ lastRefreshedAt: "desc" }, { createdAt: "desc" }],
     take: 5,
     select: {

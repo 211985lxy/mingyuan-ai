@@ -1,5 +1,19 @@
 import { prisma } from "@/lib/prisma"
+import { resolveBoundProject } from "@/lib/account-project-context"
 import type { NormalizedVideo } from "@/lib/tikhub/types"
+
+/** 只允许把“当前账号绑定项目”下的对标账号塞进模型上下文。 */
+async function watchContextProjectScope(
+  userId: string,
+  projectId?: string | null,
+): Promise<string | null> {
+  if (projectId) return projectId
+  try {
+    return (await resolveBoundProject({ userId })).id
+  } catch {
+    return null
+  }
+}
 
 type WatchAccountForAim = {
   nickname: string | null
@@ -72,13 +86,20 @@ export function formatWatchAccountsForAim(query: string, accounts: WatchAccountF
  * @description 构建 AIM 竞品监控上下文（从数据库加载对标账号数据）
  * @param userId - 用户 ID
  * @param query - 用户查询文本
- * @returns 竞品监控上下文文本，无需时返回空字符串
+ * @param projectId - 路由入口解析后的绑定项目；缺省时以账号绑定为准
+ * @returns 竞品监控上下文文本，无需或无法确定项目时返回空字符串
  */
-export async function buildAimCompetitorWatchContext(userId: string, query: string): Promise<string> {
+export async function buildAimCompetitorWatchContext(
+  userId: string,
+  query: string,
+  projectId?: string,
+): Promise<string> {
   if (!wantsWatchAccountContext(query)) return ""
+  const scope = await watchContextProjectScope(userId, projectId)
+  if (!scope) return ""
 
   const accounts = await prisma.watchAccount.findMany({
-    where: { userId },
+    where: { userId, projectId: scope },
     orderBy: [{ lastRefreshedAt: "desc" }, { createdAt: "desc" }],
     take: 10,
     select: {

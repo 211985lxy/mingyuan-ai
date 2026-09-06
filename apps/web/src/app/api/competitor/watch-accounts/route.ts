@@ -7,10 +7,25 @@ import { getCompetitorPlatformGate } from "@/lib/competitor-analysis/platform-sc
 import { resolveCompetitorProfileInput } from "@/lib/competitor-analysis/profile-url"
 import { enforceCountBetaLimit } from "@/lib/internal-beta-limits"
 import { watchAccountCreateBodySchema } from "@/features/competitor/contracts/api"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
-export const GET = withUserAuth(async (_request, { user }) => {
+export const GET = withUserAuth(async (request, { user }) => {
+  const url = new URL(request.url)
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: url.searchParams.get("projectId"),
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
+
   const accounts = await prisma.watchAccount.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, projectId },
     orderBy: { createdAt: "desc" },
     take: 50,
   })
@@ -43,6 +58,18 @@ export const POST = withUserAuth(async (request, { user }) => {
     }, { status: 400 })
   }
 
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
+
   let resolved
   try {
     resolved = await resolveCompetitorProfileInput(parsed)
@@ -53,7 +80,7 @@ export const POST = withUserAuth(async (request, { user }) => {
 
   // Check if already exists
   const existing = await prisma.watchAccount.findFirst({
-    where: { userId: user.id, targetUrl: resolved.targetUrl },
+    where: { userId: user.id, projectId, targetUrl: resolved.targetUrl },
   })
   if (existing) {
     return NextResponse.json({ error: "该账号已在监控列表中" }, { status: 409 })
@@ -65,6 +92,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   const account = await prisma.watchAccount.create({
     data: {
       userId: user.id,
+      projectId,
       targetUrl: resolved.targetUrl,
       platform: parsed.platform,
       platformUserId: resolved.platformUserId,

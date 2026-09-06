@@ -148,18 +148,19 @@ async function createStructureRow(args: {
 /** 列出用户已提取的结构模板。
  *  - 只返回 origin=extracted 且 status=published
  *  - 按 createdAt 倒序
- *  - projectId 匹配：同 projectId 或 projectId 为 null（全局） */
+ *  - 提取结构必须挂在调用方的绑定项目下；历史 projectId=null 的记录不进入列表 */
 export async function listExtractedStructures(
   userId: string,
   projectId?: string,
   limit = 50,
 ): Promise<ScriptStructureRecord[]> {
+  if (!projectId) return []
   const rows = await prisma.videoStructure.findMany({
     where: {
       origin: "extracted",
       status: "published",
       userId,
-      ...(projectId ? { OR: [{ projectId }, { projectId: null }] } : {}),
+      projectId,
     },
     orderBy: { createdAt: "desc" },
     take: Math.min(100, Math.max(1, limit)),
@@ -171,12 +172,18 @@ export async function listExtractedStructures(
 export async function getStructure(
   id: string,
   userId?: string,
+  projectId?: string,
 ): Promise<ScriptStructureRecord | null> {
   const row = await prisma.videoStructure.findUnique({ where: { id } })
   if (!row) return null
-  // extracted 结构校验归属；canonical 结构公开可读
-  if (row.origin === "extracted" && userId && row.userId !== userId) {
-    return null
+  // canonical 是公开种子模板，无归属、天然无项目，始终可读。
+  if (row.origin === "canonical") return toRecord(row)
+  // extracted 结构必须同时满足：归属当前用户 + 挂在绑定项目下。
+  // 历史 projectId=null 的提取结构不允许被解析进任何生成/读取上下文。
+  if (row.origin === "extracted") {
+    if (!userId || row.userId !== userId) return null
+    if (!projectId || row.projectId !== projectId) return null
+    return toRecord(row)
   }
   return toRecord(row)
 }
@@ -185,11 +192,13 @@ export async function getStructure(
 export async function deleteExtractedStructure(
   id: string,
   userId: string,
+  projectId?: string,
 ): Promise<{ ok: boolean }> {
   const row = await prisma.videoStructure.findUnique({ where: { id } })
   if (!row) return { ok: false }
   if (row.origin !== "extracted") return { ok: false }
   if (row.userId !== userId) return { ok: false }
+  if (projectId && row.projectId !== null && row.projectId !== projectId) return { ok: false }
   await prisma.videoStructure.delete({ where: { id } })
   return { ok: true }
 }
@@ -206,7 +215,7 @@ export async function saveGeneratedScripts(args: {
   structureId: string
   projectId?: string
 }): Promise<Array<{ id: string; title: string; content: string }>> {
-  const { scripts, userId, structureId } = args
+  const { scripts, userId, structureId, projectId } = args
   return prisma.$transaction(async (tx) => {
     const created: Array<{ id: string; title: string; content: string }> = []
     for (const script of scripts) {
@@ -216,6 +225,7 @@ export async function saveGeneratedScripts(args: {
           content: script.content,
           structureId,
           status: "draft",
+          projectId,
           qualityMetadata: { title: script.title, segmentOrder: script.segmentOrder } as never,
         },
       })

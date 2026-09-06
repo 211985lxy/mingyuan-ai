@@ -163,7 +163,7 @@ export async function retrieveChatContextBlocks(input: {
           trace,
           "competitor_context",
           "竞品上下文召回",
-          () => buildAimCompetitorWatchContext(userId, query).catch(() => ""),
+          () => buildAimCompetitorWatchContext(userId, query, projectId).catch(() => ""),
           (block) => ({ summary: block ? "已召回竞品上下文" : "无竞品上下文", metadata: { chars: block.length } }),
         )
       : ""
@@ -215,6 +215,7 @@ export async function retrieveChatContextBlocks(input: {
           executionAgentId: agentId,
           userId,
           generationId: input.targetGenerationId,
+          projectId,
         }),
         (block) => ({
           summary: block ? "已注入发布数据" : "未注入发布数据",

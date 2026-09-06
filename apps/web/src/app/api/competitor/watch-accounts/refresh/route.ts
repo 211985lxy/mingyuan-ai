@@ -7,6 +7,7 @@ import { generateRequestId, hashLogIdentifier, logger } from "@/lib/logger"
 import { enforceWatchRefreshBetaLimit } from "@/lib/internal-beta-limits"
 import { calculateViralVideos } from "@/lib/competitor-watch-viral"
 import { watchAccountRefreshBodySchema } from "@/features/competitor/contracts/api"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 type RefreshLog = Pick<typeof logger, "info" | "error">
 
@@ -34,8 +35,8 @@ async function refreshAccount(
     )
     const viralPicks = calculateViralVideos(sortedVideos, account.platform)
 
-    await prisma.watchAccount.update({
-      where: { id: account.id, userId: account.userId },
+    await prisma.watchAccount.updateMany({
+      where: { id: account.id, userId: account.userId, projectId: account.projectId },
       data: {
         platformUserId: collected.platformUserId,
         nickname: collected.account.nickname,
@@ -53,8 +54,8 @@ async function refreshAccount(
     return { id: account.id, targetUrl: account.targetUrl, status: "success" }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
-    await prisma.watchAccount.update({
-      where: { id: account.id, userId: account.userId },
+    await prisma.watchAccount.updateMany({
+      where: { id: account.id, userId: account.userId, projectId: account.projectId },
       data: { refreshStatus: "failed", refreshError: errorMessage },
     })
     log.error({ accountId: account.id, err }, "Account refresh failed")
@@ -65,13 +66,25 @@ async function refreshAccount(
 export const POST = withUserAuth(async (request, { user }) => {
   const body = await parseJsonBody(request, watchAccountRefreshBodySchema, { maxBytes: 1024 })
 
-  const where = { userId: user.id }
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
+
+  const where: { userId: string; projectId: string; id?: string } = { userId: user.id, projectId }
   if (body.accountId) {
-    ;(where as Record<string, unknown>).id = body.accountId
+    where.id = body.accountId
   }
 
   const accounts = await prisma.watchAccount.findMany({
-    where: where as { userId: string; id?: string },
+    where,
     orderBy: { createdAt: "desc" },
     take: 50,
   })
@@ -88,7 +101,7 @@ export const POST = withUserAuth(async (request, { user }) => {
   log.info(`Starting refresh for ${accounts.length} watch accounts`)
 
   await prisma.watchAccount.updateMany({
-    where: { userId: user.id, id: { in: accounts.map((account) => account.id) } },
+    where: { userId: user.id, projectId, id: { in: accounts.map((account) => account.id) } },
     data: { refreshStatus: "refreshing", refreshError: null },
   })
 

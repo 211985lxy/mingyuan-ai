@@ -19,8 +19,36 @@ import {
   submitFallbackVideoExtraction,
 } from "@/lib/video-extraction-fallback"
 import { polishTranscript } from "@/lib/transcript-polish"
+import { resolveBoundProject } from "@/lib/account-project-context"
 
 const VIDEO_COPY_ANALYSIS_VERSION = "timeline-12s-v1"
+
+/**
+ * 历史素材读取的项目作用域：显式传入的 projectId（路由入口已解析）优先；
+ * 否则以账号绑定的 active 项目为准（单账号单项目）。
+ * 账号没有可用绑定项目时返回 null —— 调用方**不得**回退到仅 userId 的用户级数据。
+ */
+async function contentProjectScope(
+  userId: string,
+  projectId?: string | null,
+): Promise<string | null> {
+  if (projectId) return projectId
+  try {
+    return (await resolveBoundProject({ userId })).id
+  } catch {
+    return null
+  }
+}
+
+/** create 等写路径必须能确定项目，否则直接抛类型化配置错误，禁止写入 projectId: null。 */
+async function requireContentProjectScope(
+  userId: string,
+  projectId?: string | null,
+): Promise<string> {
+  if (projectId) return projectId
+  const project = await resolveBoundProject({ userId })
+  return project.id
+}
 
 type VideoCopyExtractionRecord = NonNullable<
   Awaited<ReturnType<typeof prisma.videoCopyExtraction.findUnique>>
@@ -145,15 +173,18 @@ export function serializeVideoCopyExtraction(
  */
 export async function createVideoCopyExtraction(
   userId: string,
-  inputUrl: string
+  inputUrl: string,
+  projectId?: string,
 ): Promise<VideoCopyExtractionRecord> {
   const sourceUrl = assertSupportedVideoUrl(inputUrl)
   const platform = detectVideoPlatform(sourceUrl)
   assertVideoTextProviderReady(platform)
+  const resolvedProjectId = await requireContentProjectScope(userId, projectId)
 
   const record = await prisma.videoCopyExtraction.create({
     data: {
       userId,
+      projectId: resolvedProjectId,
       sourceUrl,
       platform,
       status: "queued",
@@ -189,10 +220,13 @@ export async function createVideoCopyExtraction(
  */
 export async function getVideoCopyExtractionForUser(
   userId: string,
-  id: string
+  id: string,
+  projectId?: string,
 ): Promise<VideoCopyExtractionRecord | null> {
+  const scope = await contentProjectScope(userId, projectId)
+  if (!scope) return null
   return prisma.videoCopyExtraction.findFirst({
-    where: { id, userId },
+    where: { id, userId, projectId: scope },
   })
 }
 
@@ -205,8 +239,11 @@ export async function getVideoCopyExtractionForUser(
 export async function startVideoCopyExtractionFallback(
   userId: string,
   id: string,
+  projectId?: string,
 ): Promise<VideoCopyExtractionRecord | null> {
-  const record = await getVideoCopyExtractionForUser(userId, id)
+  const scope = await contentProjectScope(userId, projectId)
+  if (!scope) return null
+  const record = await getVideoCopyExtractionForUser(userId, id, scope)
   if (!record) return null
   if (record.provider === "self_hosted" && record.fallbackJobId && record.status !== "failed") return record
 
@@ -241,9 +278,12 @@ export async function startVideoCopyExtractionFallback(
  */
 export async function syncVideoCopyExtraction(
   userId: string,
-  id: string
+  id: string,
+  projectId?: string,
 ): Promise<VideoCopyExtractionRecord | null> {
-  const record = await getVideoCopyExtractionForUser(userId, id)
+  const scope = await contentProjectScope(userId, projectId)
+  if (!scope) return null
+  const record = await getVideoCopyExtractionForUser(userId, id, scope)
   if (!record) return null
 
   if (record.status === "completed" || record.status === "failed") {
@@ -350,7 +390,7 @@ export async function syncVideoCopyExtraction(
     }
   }
 
-  const latest = await getVideoCopyExtractionForUser(userId, id)
+  const latest = await getVideoCopyExtractionForUser(userId, id, scope)
   if (!latest?.transcript) return latest
   const currentAnalysis = latest.analysisResult as { analysisVersion?: unknown } | null
   if (currentAnalysis?.analysisVersion === VIDEO_COPY_ANALYSIS_VERSION) return latest

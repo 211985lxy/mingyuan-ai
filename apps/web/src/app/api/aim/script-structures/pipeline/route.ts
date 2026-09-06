@@ -13,6 +13,7 @@ import {
   saveExtractedStructure,
   saveGeneratedScripts,
 } from "@/lib/aim/script-structure-store"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 
 // ─── POST: 一键串联（提取结构 → 生成文案） ─────────────────
 
@@ -35,10 +36,17 @@ export const POST = withUserAuth(async (request, { user }) => {
   }
   const count = typeof body.count === "number" ? body.count : 1
   const topicTitle = typeof body.topicTitle === "string" ? body.topicTitle : undefined
-  const projectId = typeof body.projectId === "string" ? body.projectId : ""
-
-  if (!projectId) {
-    return NextResponse.json({ error: "请先选择一个项目，生成文案需要项目知识库" }, { status: 400 })
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: typeof body.projectId === "string" ? body.projectId : undefined,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
   }
 
   try {

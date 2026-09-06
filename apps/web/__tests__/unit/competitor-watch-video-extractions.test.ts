@@ -30,12 +30,13 @@ describe("createWatchVideoExtraction", () => {
         userId: "user_1",
         watchAccountId: "account_2",
         videoUrl: "https://www.douyin.com/video/123",
+        projectId: "project-a",
         db: dbMock(null),
       }),
     ).rejects.toThrow("对标账号不存在或无权限")
   })
 
-  it("reuses an existing extraction for the same user and video url", async () => {
+  it("reuses an existing extraction for the same user, url and project", async () => {
     const existing = { id: "extract_1", sourceUrl: "https://www.douyin.com/video/123" }
     const createExtraction = vi.fn()
 
@@ -43,6 +44,7 @@ describe("createWatchVideoExtraction", () => {
       userId: "user_1",
       watchAccountId: "account_1",
       videoUrl: "https://www.douyin.com/video/123",
+      projectId: "project-a",
       db: dbMock({ id: "account_1" }, existing),
       createExtraction,
     })
