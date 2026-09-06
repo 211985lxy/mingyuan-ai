@@ -406,6 +406,88 @@ describe("repairAccountProjectBinding", () => {
       }),
     )
   })
+
+  // ── Task 10 review: admin audit must be atomic with the binding change ──
+
+  describe("in-transaction admin audit (withinTransaction hook)", () => {
+    /** Commit-only transaction simulator that rolls back writes when the callback throws. */
+    function installCommitTrackingTransaction(adminAuditLogCreate: ReturnType<typeof vi.fn>) {
+      const db = { boundProjectId: "project-a" as string | null }
+      let committed = false
+      m.user.findUnique.mockImplementation(async () => ({ boundProjectId: db.boundProjectId }))
+      m.user.updateMany.mockImplementation(async ({ where, data }: { where: { id: string; boundProjectId: string | null }; data: { boundProjectId: string } }) => {
+        if (where.id === "user-1" && where.boundProjectId === db.boundProjectId) {
+          db.boundProjectId = data.boundProjectId
+          return { count: 1 }
+        }
+        return { count: 0 }
+      })
+      m.transaction.mockImplementation(async (callback: (tx: Record<string, unknown>) => Promise<unknown>) => {
+        const snapshot = db.boundProjectId
+        const tx = {
+          user: m.user,
+          clientProject: m.clientProject,
+          aimGeneration: m.aimGeneration,
+          agentInvocation: m.agentInvocation,
+          backgroundTask: m.backgroundTask,
+          adminAuditLog: { create: adminAuditLogCreate },
+        }
+        try {
+          const outcome = await callback(tx)
+          committed = true
+          return outcome
+        } catch (error) {
+          db.boundProjectId = snapshot // simulate prisma rollback
+          throw error
+        }
+      })
+      return { db, isCommitted: () => committed }
+    }
+
+    function repairWithAudit(withinTransaction: (tx: { adminAuditLog: { create: ReturnType<typeof vi.fn> } }) => Promise<void>) {
+      return repairAccountProjectBinding({
+        userId: "user-1",
+        previousProjectId: "project-a",
+        nextProjectId: "project-b",
+        reactivateNext: false,
+        withinTransaction,
+      })
+    }
+
+    it("writes the admin audit row inside the committing transaction", async () => {
+      const auditCreate = vi.fn().mockResolvedValue({ id: "audit-1" })
+      const { db, isCommitted } = installCommitTrackingTransaction(auditCreate)
+      m.clientProject.findUnique.mockResolvedValue({ id: "project-b", userId: "user-1", name: "项目B", status: "active" })
+      m.aimGeneration.count.mockResolvedValue(0)
+      m.agentInvocation.findMany.mockResolvedValue([])
+
+      const result = await repairWithAudit(async (tx) => {
+        await tx.adminAuditLog.create({ data: { adminId: "admin-1", action: "account_project.repair" } })
+      })
+
+      expect(result.nextProjectId).toBe("project-b")
+      expect(auditCreate).toHaveBeenCalledTimes(1)
+      expect(db.boundProjectId).toBe("project-b") // bound + audit committed together
+      expect(isCommitted()).toBe(true)
+    })
+
+    it("rolls the binding change back when the in-transaction audit write fails", async () => {
+      const auditError = new Error("audit write failed")
+      const auditCreate = vi.fn().mockRejectedValue(auditError)
+      const { db, isCommitted } = installCommitTrackingTransaction(auditCreate)
+      m.clientProject.findUnique.mockResolvedValue({ id: "project-b", userId: "user-1", name: "项目B", status: "active" })
+      m.aimGeneration.count.mockResolvedValue(0)
+      m.agentInvocation.findMany.mockResolvedValue([])
+
+      await expect(repairWithAudit(async (tx) => {
+        await tx.adminAuditLog.create({ data: { adminId: "admin-1", action: "account_project.repair" } })
+      })).rejects.toThrow(auditError)
+
+      // No half-state: the binding claim was rolled back together with the audit.
+      expect(db.boundProjectId).toBe("project-a")
+      expect(isCommitted()).toBe(false)
+    })
+  })
 })
 
 describe("account project repair confirmation token", () => {

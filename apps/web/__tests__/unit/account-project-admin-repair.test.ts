@@ -262,7 +262,12 @@ describe("admin account project repair route", () => {
       unattributedHistoryCount: 7,
     }
     verifyToken.mockReturnValue(validPayload())
-    repairBinding.mockResolvedValue(repairResult)
+    // The real repair service runs its own transaction and invokes the audit
+    // hook (withinTransaction) BEFORE commit; mirror that contract here.
+    repairBinding.mockImplementation(async ({ withinTransaction }: { withinTransaction?: (tx: unknown, outcome: unknown) => Promise<void> }) => {
+      if (withinTransaction) await withinTransaction("tx-sentinel", repairResult)
+      return repairResult
+    })
 
     const response = await repairPOST(
       jsonRequest(
@@ -280,6 +285,7 @@ describe("admin account project repair route", () => {
       previousProjectId: "project-a",
       nextProjectId: "project-b",
       reactivateNext: false,
+      withinTransaction: expect.any(Function),
     })
     expect(recordAdminAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -297,7 +303,29 @@ describe("admin account project repair route", () => {
           unattributedHistoryCount: 7,
         }),
       }),
+      "tx-sentinel",
     )
+  })
+
+  it("fails closed when the in-transaction audit write throws (no success response)", async () => {
+    verifyToken.mockReturnValue(validPayload())
+    recordAdminAudit.mockRejectedValue(new Error("audit write failed"))
+    repairBinding.mockImplementation(async ({ withinTransaction }: { withinTransaction?: (tx: unknown, outcome: unknown) => Promise<void> }) => {
+      if (withinTransaction) await withinTransaction(undefined, {})
+      return { previousProjectId: "project-a", nextProjectId: "project-b" }
+    })
+
+    const response = await repairPOST(
+      jsonRequest(
+        "http://localhost/api/admin/account-project-bindings/user-1/repair",
+        "POST",
+        { token: "token-1", reason: "错误绑定修复" },
+      ),
+    )
+
+    // 审计失败必须让整个修复报错（真实 DB 中该事务回滚），而不是返回成功。
+    expect(response.status).toBe(500)
+    expect(response.headers.get("x-request-id")).toBeNull()
   })
 
   it("gates the preview and repair surface behind admin auth", () => {

@@ -108,20 +108,27 @@ describe("admin account project binding route", () => {
 
   it("binds a selected project and records an admin audit", async () => {
     const project = { id: "project-ai", userId: "user-1", name: "AI商业顾问", status: "active" }
-    bindAccountProject.mockResolvedValue(project)
+    // The real service runs its own transaction and calls the audit hook
+    // (withinTransaction) before commit; mirror that contract here.
+    bindAccountProject.mockImplementation(async ({ withinTransaction }: { withinTransaction?: (tx: unknown) => Promise<void> }) => {
+      if (withinTransaction) await withinTransaction("tx-sentinel")
+      return project
+    })
 
     const response = await POST(makeRequest("POST", { userId: "user-1", projectId: "project-ai" }))
     expect(response.status).toBe(200)
+    expect(response.headers.get("x-request-id")).toBe("audit-1")
     await expect(response.json()).resolves.toEqual({ status: "bound", project })
     expect(bindAccountProject).toHaveBeenCalledWith({
       userId: "user-1",
       projectId: "project-ai",
       source: "admin_review",
+      withinTransaction: expect.any(Function),
     })
     expect(recordAdminAudit).toHaveBeenCalledWith(expect.objectContaining({
       adminId: "admin-1",
       action: "account_project.bind",
       targetId: "user-1",
-    }))
+    }), "tx-sentinel")
   })
 })

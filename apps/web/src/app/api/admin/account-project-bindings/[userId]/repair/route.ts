@@ -57,33 +57,37 @@ export const POST = withAdminOnly(async (request: NextRequest, { admin, params }
       )
     }
 
+    // 审计写入与修复在同一 `$transaction` 内：审计失败 → 整个修复（含绑定变更、
+    // 停用项目恢复、旧项目任务隔离）回滚，绝不出现“已变更但无审计”的修复。
+    let auditRequestId = ""
     const result = await repairAccountProjectBinding({
       userId,
       previousProjectId: payload.previousProjectId,
       nextProjectId: payload.projectId,
       reactivateNext: payload.reactivate,
-    })
-
-    const requestId = await recordAdminAudit({
-      request,
-      adminId: admin.id,
-      action: "account_project.repair",
-      targetType: "user",
-      targetId: userId,
-      metadata: {
-        previousProjectId: result.previousProjectId,
-        nextProjectId: result.nextProjectId,
-        reason,
-        reactivate: payload.reactivate,
-        failedInvocationCount: result.failedInvocationCount,
-        cancelledTaskCount: result.cancelledTaskCount,
-        unattributedHistoryCount: result.unattributedHistoryCount,
+      withinTransaction: async (tx, outcome) => {
+        auditRequestId = await recordAdminAudit({
+          request,
+          adminId: admin.id,
+          action: "account_project.repair",
+          targetType: "user",
+          targetId: userId,
+          metadata: {
+            previousProjectId: outcome.previousProjectId,
+            nextProjectId: outcome.nextProjectId,
+            reason,
+            reactivate: payload.reactivate,
+            failedInvocationCount: outcome.failedInvocationCount,
+            cancelledTaskCount: outcome.cancelledTaskCount,
+            unattributedHistoryCount: outcome.unattributedHistoryCount,
+          },
+        }, tx)
       },
     })
 
     return NextResponse.json(
       { data: result },
-      { headers: { "x-request-id": requestId } },
+      { headers: { "x-request-id": auditRequestId } },
     )
   } catch (error) {
     return (

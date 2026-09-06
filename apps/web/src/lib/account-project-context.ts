@@ -416,6 +416,12 @@ export async function bindAccountProject(options: {
   userId: string
   projectId: string
   source?: "admin_review" | "migration"
+  /**
+   * Runs INSIDE the committing `$transaction`, before commit. Used by the admin
+   * bind route to write the audit row atomically: if this hook throws, the
+   * binding claim rolls back with it (no binding change without an audit row).
+   */
+  withinTransaction?: (tx: Prisma.TransactionClient) => Promise<void>
 }) {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
@@ -452,7 +458,10 @@ export async function bindAccountProject(options: {
       )
     }
 
-    if (user.boundProjectId === project.id) return project
+    if (user.boundProjectId === project.id) {
+      await options.withinTransaction?.(tx)
+      return project
+    }
 
     const binding = await tx.user.updateMany({
       where: { id: options.userId, boundProjectId: null },
@@ -468,6 +477,10 @@ export async function bindAccountProject(options: {
         "账号已经绑定其他项目，不能替换",
       )
     }
+
+    // Audit write is part of the same transaction — a failure here rolls the
+    // binding change back so a repair/bind never persists un-audited.
+    await options.withinTransaction?.(tx)
 
     return project
   })
@@ -721,14 +734,25 @@ export type AccountProjectRepairResult = {
 /**
  * Dedicated audited repair — separate from `bindAccountProject`, which must
  * CONTINUE to forbid replacement. All-or-nothing: the binding re-claim, optional
- * reactivation and the old-project quarantine run inside one transaction, so a
- * failed quarantine rolls the binding change back (no half-state).
+ * reactivation, the old-project quarantine AND the admin audit hook run inside
+ * one transaction, so a failed quarantine (or failed audit write) rolls the
+ * binding change back (no half-state, no un-audited repair).
  */
 export async function repairAccountProjectBinding(options: {
   userId: string
   previousProjectId: string | null
   nextProjectId: string
   reactivateNext: boolean
+  /**
+   * Runs INSIDE the committing `$transaction`, after the quarantine, before
+   * commit. Receives the computed outcome so the caller can write an audit row
+   * whose metadata includes the quarantine counts. Throwing rolls the whole
+   * repair back (binding change never persists un-audited).
+   */
+  withinTransaction?: (
+    tx: Prisma.TransactionClient,
+    outcome: AccountProjectRepairResult,
+  ) => Promise<void>
 }): Promise<AccountProjectRepairResult> {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
@@ -812,7 +836,7 @@ export async function repairAccountProjectBinding(options: {
       cancelledTaskCount = quarantined.cancelledTaskCount
     }
 
-    return {
+    const outcome: AccountProjectRepairResult = {
       previousProjectId: options.previousProjectId,
       nextProjectId: options.nextProjectId,
       target: {
@@ -825,6 +849,12 @@ export async function repairAccountProjectBinding(options: {
       cancelledTaskCount,
       unattributedHistoryCount,
     }
+
+    // Audit write is part of the same transaction — a failure here rolls the
+    // whole repair back so a repair never persists un-audited.
+    await options.withinTransaction?.(tx, outcome)
+
+    return outcome
   })
 }
 

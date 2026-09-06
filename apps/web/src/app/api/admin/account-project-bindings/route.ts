@@ -62,19 +62,28 @@ export const POST = withAdminOnly(async (request: NextRequest, { admin }) => {
       return NextResponse.json({ error: "userId 与 projectId 必填" }, { status: 400 })
     }
 
-    const project = await bindAccountProject({ userId, projectId, source: "admin_review" })
-    const requestId = await recordAdminAudit({
-      request,
-      adminId: admin.id,
-      action: "account_project.bind",
-      targetType: "user",
-      targetId: userId,
-      metadata: { projectId, source: "admin_review" },
+    // 审计写入与绑定在同一 `$transaction` 内：审计失败 → 整个绑定回滚，
+    // 绝不出现“账号已绑定但无审计”的状态。
+    let auditRequestId = ""
+    const project = await bindAccountProject({
+      userId,
+      projectId,
+      source: "admin_review",
+      withinTransaction: async (tx) => {
+        auditRequestId = await recordAdminAudit({
+          request,
+          adminId: admin.id,
+          action: "account_project.bind",
+          targetType: "user",
+          targetId: userId,
+          metadata: { projectId, source: "admin_review" },
+        }, tx)
+      },
     })
 
     return NextResponse.json(
       { status: "bound", project },
-      { headers: { "x-request-id": requestId } },
+      { headers: { "x-request-id": auditRequestId } },
     )
   } catch (error) {
     return contextErrorResponse(error) ?? NextResponse.json(
