@@ -97,6 +97,61 @@
       "idempotency": true
     },
     {
+      "route": "/api/account/project-context",
+      "file": "src/app/api/account/project-context/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/account-project-bindings/[userId]/preview",
+      "file": "src/app/api/admin/account-project-bindings/[userId]/preview/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/account-project-bindings/[userId]/repair",
+      "file": "src/app/api/admin/account-project-bindings/[userId]/repair/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/account-project-bindings",
+      "file": "src/app/api/admin/account-project-bindings/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/activation-codes/export",
       "file": "src/app/api/admin/activation-codes/export/route.ts",
       "methods": [
@@ -2327,7 +2382,7 @@
       ],
       "auth": "user_session",
       "input": "zod_json",
-      "query": "none",
+      "query": "manual",
       "externalService": true,
       "cost": "low",
       "idempotency": false
@@ -3197,7 +3252,7 @@
       ],
       "auth": "user_session",
       "input": "bounded_json_object",
-      "query": "manual",
+      "query": "none",
       "externalService": false,
       "cost": "low",
       "idempotency": false
@@ -3472,7 +3527,7 @@
       ],
       "auth": "user_session",
       "input": "bounded_json_object",
-      "query": "none",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false
