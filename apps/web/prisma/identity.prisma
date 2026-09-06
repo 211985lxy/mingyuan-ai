@@ -11,42 +11,48 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  ipProfile             IpProfile?
-  douyinBindings        DouyinAccountBinding[]
-  douyinLoginIdentities DouyinLoginIdentity[]
-  contentGenerationRuns ContentGenerationRun[]
-  assets                Asset[]
+  // 一个 AIM 登录账号只绑定一个 IP/客户项目；项目本身仍可作为知识与生成的隔离边界。
+  boundProjectId       String?   @unique
+  projectBoundAt       DateTime?
+  projectBindingSource String?   @db.VarChar(24)
+
+  ipProfile               IpProfile?
+  douyinBindings          DouyinAccountBinding[]
+  douyinLoginIdentities   DouyinLoginIdentity[]
+  contentGenerationRuns   ContentGenerationRun[]
+  assets                  Asset[]
   assetUploadReservations AssetUploadReservation[]
-  scripts               Script[]
-  activationCodes       ActivationCode[]
-  topicSelections       TopicSelection[]
-  competitorAnalyses    CompetitorAnalysis[]
-  watchAccounts         WatchAccount[]
-  videoCopyExtractions  VideoCopyExtraction[]
-  knowledgeEntries      KnowledgeEntry[]
-  knowledgeEntities     KnowledgeEntity[]
-  aimGenerations        AimGeneration[]
-  aimMemories           AimMemory[]
-  clientProjects        ClientProject[]
-  ipWikiPages           IpWikiPage[]
-  benchmarkProfiles     BenchmarkProfile[]
-  inspirations          Inspiration[]
-  channelBindings       ChannelBinding[]
-  agentApiKeys          AgentApiKey[]
-  agentApiCallLogs      AgentApiCallLog[]
-  agentInvocations      AgentInvocation[]
-  aimExecutionTraces    AimExecutionTrace[]
-  aimRunSnapshots       AimRunSnapshot[]
-  aimRunEvents          AimRunEvent[]
-  contentOutcomes       ContentOutcome[]
-  outcomeAttributions   OutcomeAttribution[]
-  assetCandidates       AssetCandidate[]
-  commentInsightJobs    CommentInsightJob[]
-  aimContentVersions    AimContentVersion[]
-  methodologyProfiles   MethodologyProfile[]
-  opportunitySearchRuns OpportunitySearchRun[]
-  opportunityCollections OpportunityCollection[]
-  userQuestionCards      UserQuestionCard[]
+  scripts                 Script[]
+  activationCodes         ActivationCode[]
+  topicSelections         TopicSelection[]
+  competitorAnalyses      CompetitorAnalysis[]
+  watchAccounts           WatchAccount[]
+  videoCopyExtractions    VideoCopyExtraction[]
+  knowledgeEntries        KnowledgeEntry[]
+  knowledgeEntities       KnowledgeEntity[]
+  aimGenerations          AimGeneration[]
+  aimMemories             AimMemory[]
+  clientProjects          ClientProject[]          @relation("ProjectOwner")
+  boundProject            ClientProject?           @relation("AccountBoundProject", fields: [boundProjectId], references: [id], onDelete: SetNull)
+  ipWikiPages             IpWikiPage[]
+  benchmarkProfiles       BenchmarkProfile[]
+  inspirations            Inspiration[]
+  channelBindings         ChannelBinding[]
+  agentApiKeys            AgentApiKey[]
+  agentApiCallLogs        AgentApiCallLog[]
+  agentInvocations        AgentInvocation[]
+  aimExecutionTraces      AimExecutionTrace[]
+  aimRunSnapshots         AimRunSnapshot[]
+  aimRunEvents            AimRunEvent[]
+  contentOutcomes         ContentOutcome[]
+  outcomeAttributions     OutcomeAttribution[]
+  assetCandidates         AssetCandidate[]
+  commentInsightJobs      CommentInsightJob[]
+  aimContentVersions      AimContentVersion[]
+  methodologyProfiles     MethodologyProfile[]
+  opportunitySearchRuns   OpportunitySearchRun[]
+  opportunityCollections  OpportunityCollection[]
+  userQuestionCards       UserQuestionCard[]
 }
 
 model AdminUser {
@@ -102,15 +108,15 @@ model ActivationCode {
 }
 
 model SystemSetting {
-  id          String    @id @default(cuid())
-  key         String    @unique
-  value       String    @db.Text
-  type        String    @default("string") // string | number | boolean | json
-  category    String    @default("general")
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String   @db.Text
+  type        String   @default("string") // string | number | boolean | json
+  category    String   @default("general")
   description String?
   updatedBy   String?
-  updatedAt   DateTime  @updatedAt
-  createdAt   DateTime  @default(now())
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }
 
 // 抖音开放平台扫码授权绑定：一个 AIM 用户可绑多个抖音号；同一抖音号也可被多个用户绑定
@@ -120,13 +126,13 @@ model DouyinAccountBinding {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  openId  String   @db.VarChar(128)
-  unionId String?  @db.VarChar(128)
-  scope   String   @db.VarChar(500)
+  openId  String  @db.VarChar(128)
+  unionId String? @db.VarChar(128)
+  scope   String  @db.VarChar(500)
 
   // OAuth 凭证（用于后续免扫码刷新资料）
-  accessToken    String    @db.VarChar(512)
-  refreshToken   String    @db.VarChar(512)
+  accessToken     String   @db.VarChar(512)
+  refreshToken    String   @db.VarChar(512)
   accessExpiresAt DateTime
 
   // 资料快照（最近一次成功拉取）

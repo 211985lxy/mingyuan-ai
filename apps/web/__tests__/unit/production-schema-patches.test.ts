@@ -34,7 +34,7 @@ describe("production schema patches", () => {
 
     expect(bindingPatch).toContain("ADD COLUMN IF NOT EXISTS `routeTarget`")
     expect(bindingPatch).toContain("ADD COLUMN IF NOT EXISTS `defaultAgentId`")
-    expect(conversationPatch).toContain("AimConversation_platform_externalChatId_agentId_key")
+    expect(conversationPatch).toContain("AimConversation_platform_externalAccountId_externalChatId_agentId_key")
     expect(messagePatch).toContain("AimConversationMessage_dedupeKey_key")
     expect(messagePatch).toContain("AimConversationMessage_conversationId_fkey")
   })
@@ -95,5 +95,23 @@ describe("production schema patches", () => {
     expect(customSkillPatch).toContain("`prompt` MEDIUMTEXT NOT NULL")
     expect(customSkillPatch).toContain("AimCustomSkill_agentId_skillId_key")
     expect(customSkillPatch).toContain("AimCustomSkill_agentId_idx")
+  })
+
+  it("adds optional project scope to the five legacy account-level content tables idempotently", () => {
+    for (const table of [
+      "CompetitorAnalysis",
+      "WatchAccount",
+      "VideoCopyExtraction",
+      "ContentGenerationRun",
+      "Script",
+    ]) {
+      const projectPatch = PRODUCTION_SCHEMA_PATCHES.find(
+        (patch) => patch.startsWith(`ALTER TABLE \`${table}\``) && patch.includes("projectId"),
+      )
+
+      expect(projectPatch, `missing project scope production patch for ${table}`).toBeDefined()
+      expect(projectPatch).toContain("ADD COLUMN IF NOT EXISTS `projectId` VARCHAR(191) NULL")
+      expect(projectPatch).toContain(`ADD INDEX IF NOT EXISTS \`${table}_userId_projectId_createdAt_idx\``)
+    }
   })
 })
