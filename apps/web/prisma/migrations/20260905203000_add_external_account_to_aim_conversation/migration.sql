@@ -4,5 +4,7 @@ ALTER TABLE `AimConversation`
 
 DROP INDEX `AimConversation_platform_externalChatId_agentId_key` ON `AimConversation`;
 
-CREATE UNIQUE INDEX `AimConversation_platform_externalAccountId_externalChatId_agentId_key`
+-- MySQL caps identifiers at 64 chars; the auto-style name would be 69, so keep
+-- the unique index name short while preserving the four-column uniqueness scope.
+CREATE UNIQUE INDEX `AimConversation_platform_extAccountId_extChatId_agentId_key`
   ON `AimConversation`(`platform`, `externalAccountId`, `externalChatId`, `agentId`);

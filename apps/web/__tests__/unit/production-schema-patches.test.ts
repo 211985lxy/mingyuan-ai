@@ -34,7 +34,7 @@ describe("production schema patches", () => {
 
     expect(bindingPatch).toContain("ADD COLUMN IF NOT EXISTS `routeTarget`")
     expect(bindingPatch).toContain("ADD COLUMN IF NOT EXISTS `defaultAgentId`")
-    expect(conversationPatch).toContain("AimConversation_platform_externalAccountId_externalChatId_agentId_key")
+    expect(conversationPatch).toContain("AimConversation_platform_extAccountId_extChatId_agentId_key")
     expect(messagePatch).toContain("AimConversationMessage_dedupeKey_key")
     expect(messagePatch).toContain("AimConversationMessage_conversationId_fkey")
   })

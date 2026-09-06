@@ -342,7 +342,7 @@ model AimConversation {
 
   messages AimConversationMessage[]
 
-  @@unique([platform, externalAccountId, externalChatId, agentId])
+  @@unique([platform, externalAccountId, externalChatId, agentId], map: "AimConversation_platform_extAccountId_extChatId_agentId_key")
   @@index([userId, updatedAt])
   @@index([projectId, updatedAt])
 }

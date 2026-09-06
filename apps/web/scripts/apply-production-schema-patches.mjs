@@ -134,7 +134,7 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     \`lastMessageAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     \`updatedAt\` DATETIME(3) NOT NULL,
-    UNIQUE INDEX \`AimConversation_platform_externalAccountId_externalChatId_agentId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`, \`agentId\`),
+    UNIQUE INDEX \`AimConversation_platform_extAccountId_extChatId_agentId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`, \`agentId\`),
     INDEX \`AimConversation_userId_updatedAt_idx\`(\`userId\`, \`updatedAt\`),
     INDEX \`AimConversation_projectId_updatedAt_idx\`(\`projectId\`, \`updatedAt\`),
     PRIMARY KEY (\`id\`)
@@ -155,7 +155,7 @@ export const PRODUCTION_SCHEMA_PATCHES = [
     EXECUTE aim_conversation_drop_stmt;
     DEALLOCATE PREPARE aim_conversation_drop_stmt`,
   `ALTER TABLE \`AimConversation\`
-    ADD UNIQUE INDEX IF NOT EXISTS \`AimConversation_platform_externalAccountId_externalChatId_agentId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`, \`agentId\`)`,
+    ADD UNIQUE INDEX IF NOT EXISTS \`AimConversation_platform_extAccountId_extChatId_agentId_key\`(\`platform\`, \`externalAccountId\`, \`externalChatId\`, \`agentId\`)`,
   `CREATE TABLE IF NOT EXISTS \`AimConversationMessage\` (
     \`id\` VARCHAR(30) NOT NULL,
     \`conversationId\` VARCHAR(30) NOT NULL,
