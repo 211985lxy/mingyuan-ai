@@ -2,6 +2,7 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
+import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 import {
   WATCH_VIDEO_RECOMMENDATION_CATEGORIES,
   recommendWatchVideos,
@@ -29,22 +30,36 @@ function compactText(value: unknown, limit = 1200): string {
 
 export const POST = withUserAuth(async (request, { user }) => {
   const body = await parseJsonBody(request, watchRecommendationsBodySchema, { maxBytes: 8 * 1024 })
-  const projectId = typeof body.projectId === "string" ? body.projectId : null
+  // 兼容旧客户端传空 projectId：绑定账号只允许在其绑定的项目内做推荐。
+  const requestedProjectId = typeof body.projectId === "string" ? body.projectId.trim() : null
   const intent = typeof body.intent === "string" ? body.intent.trim() : ""
 
+  // 解析到账号绑定的项目；若请求体传了其他项目 id，按闸门规则拒绝
+  // （PROJECT_CONTEXT_MISMATCH），绝不读取旧项目/历史空项目下的监控账号。
+  let projectId: string
+  try {
+    projectId = (await resolveBoundProject({
+      userId: user.id,
+      requestedProjectId: requestedProjectId || undefined,
+    })).id
+  } catch (error) {
+    if (error instanceof AccountProjectContextError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status })
+    }
+    throw error
+  }
+
   const [project, ipProfile, accounts] = await Promise.all([
-    projectId
-      ? prisma.clientProject.findFirst({
-          where: { id: projectId, userId: user.id, status: "active" },
-          select: {
-            name: true,
-            industry: true,
-            targetCustomer: true,
-            offer: true,
-            deliveryGoal: true,
-          },
-        })
-      : Promise.resolve(null),
+    prisma.clientProject.findFirst({
+      where: { id: projectId, userId: user.id, status: "active" },
+      select: {
+        name: true,
+        industry: true,
+        targetCustomer: true,
+        offer: true,
+        deliveryGoal: true,
+      },
+    }),
     prisma.ipProfile.findUnique({
       where: { userId: user.id },
       select: {
@@ -55,8 +70,9 @@ export const POST = withUserAuth(async (request, { user }) => {
         promptSnapshot: true,
       },
     }).catch(() => null),
+    // 只取绑定项目下的监控账号；历史空项目/旧项目的账号及其视频不进入推荐池。
     prisma.watchAccount.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, projectId },
       orderBy: [{ lastRefreshedAt: "desc" }, { createdAt: "desc" }],
       take: 10,
       select: {
@@ -70,10 +86,6 @@ export const POST = withUserAuth(async (request, { user }) => {
       },
     }),
   ])
-
-  if (projectId && !project) {
-    return NextResponse.json({ error: "客户项目不存在或已归档" }, { status: 404 })
-  }
 
   const targetText = [
     intent,
