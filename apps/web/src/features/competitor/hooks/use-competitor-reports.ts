@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { toast } from "sonner"
 import { listCompetitorReports } from "@/lib/api/client"
 import type { ApiCompetitorReport } from "@/types/api"
 
 /**
  * @description React Hook：competitorreports
- * @param targetUrl? - 目标Url?
+ * 报告历史默认按「全部账号」加载；传入 targetUrl 时按单个账号过滤。
  * @returns 无返回值
  */
-export function useCompetitorReports(targetUrl?: string) {
+export function useCompetitorReports() {
   const [reports, setReports] = useState<ApiCompetitorReport[]>([])
   const [reportsLoading, setReportsLoading] = useState(true)
 
-  const loadReports = useCallback(async (url: string, showLoading = true) => {
+  const loadReports = useCallback(async (url?: string, showLoading = true) => {
     if (showLoading) setReportsLoading(true)
     try {
       const data = await listCompetitorReports(1, 10, url)
@@ -23,12 +23,6 @@ export function useCompetitorReports(targetUrl?: string) {
       if (showLoading) setReportsLoading(false)
     }
   }, [])
-
-  useEffect(() => {
-    if (!targetUrl) return
-    const timer = window.setTimeout(() => void loadReports(targetUrl), 0)
-    return () => window.clearTimeout(timer)
-  }, [loadReports, targetUrl])
 
   return { loadReports, reports, reportsLoading }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronDown, ChevronRight, RefreshCw, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -58,7 +58,13 @@ function useCompetitorWorkbenchState() {
   } = useCompetitorWatchAccounts()
   const { extractingVideoId, videoExtractions, extractVideo } = useCompetitorVideoExtractions()
   const activeAccount = resolveActiveAccount(accounts, activeAccountId)
-  const { loadReports, reports, reportsLoading } = useCompetitorReports(activeAccount?.targetUrl)
+  const { loadReports, reports, reportsLoading } = useCompetitorReports()
+  const [reportScope, setReportScope] = useState<"all" | "account">("all")
+
+  useEffect(() => {
+    const targetUrl = reportScope === "all" || !activeAccount?.targetUrl ? undefined : activeAccount.targetUrl
+    void loadReports(targetUrl)
+  }, [loadReports, reportScope, activeAccount?.targetUrl])
 
   async function handleAnalyze(url: string) {
     setAnalyzingUrl(url)
@@ -80,6 +86,7 @@ function useCompetitorWorkbenchState() {
     removeAccount, setActiveAccountId, setAddUrl,
     extractingVideoId, videoExtractions, extractVideo,
     activeAccount, reports, reportsLoading,
+    reportScope, setReportScope,
     analyzingUrl, handleAnalyze,
   }
 }
@@ -142,7 +149,7 @@ export function CompetitorWorkbench() {
       ) : null}
 
       {sortedAccounts.length > 0 ? (
-        <RecentReportsCard reports={s.reports} loading={s.reportsLoading} />
+        <RecentReportsCard reports={s.reports} loading={s.reportsLoading} scope={s.reportScope} onScopeChange={s.setReportScope} />
       ) : null}
     </div>
   )
