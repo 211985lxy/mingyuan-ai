@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { redis } from "@/lib/redis"
+import {
+  incrementIsolationMetric,
+  normalizeIsolationEntryType,
+} from "@/lib/account-project-isolation-metrics"
 
 export type AimTraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -296,6 +300,17 @@ export async function logAimProjectContextRejection(input: {
     input.error && typeof input.error === "object" && typeof (input.error as { code?: unknown }).code === "string"
       ? (input.error as { code: string }).code
       : "UNKNOWN"
+  if (code !== "UNKNOWN") {
+    // Isolation observability (web/generate path). The metric stores ONLY the
+    // entry type + stable error code — never the userId, requested project id
+    // or any customer/body text. The internal source discriminator "generate"
+    // maps onto the shared isolation entry vocabulary as "web"; unknown source
+    // values are dropped so no stray text can ever become a label.
+    const entry = normalizeIsolationEntryType(input.source)
+    if (entry) {
+      incrementIsolationMetric("project_context_mismatch_total", { entry, code })
+    }
+  }
   // eslint-disable-next-line no-console
   console.error("[aim-generate-project-rejected]", {
     source: input.source,

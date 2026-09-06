@@ -6,6 +6,7 @@ import {
   BACKGROUND_TASK_STATUS,
   cancelStaleProjectBackgroundTask,
 } from "@/lib/background-tasks"
+import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
 
 export type AccountProjectContextStatus =
   | "bound"
@@ -288,6 +289,14 @@ export async function logAccountProjectContextRejection(input: {
   let code: AccountProjectContextErrorCode | "UNKNOWN" = "UNKNOWN"
   if (isAccountProjectContextError(input.error)) {
     code = input.error.code
+    // Isolation observability: every gate rejection counts with content-free
+    // dimensions ONLY — entry type + stable error code (see
+    // account-project-isolation-metrics.ts). Never user ids, project names or
+    // any customer/body text.
+    incrementIsolationMetric("project_context_mismatch_total", {
+      entry: input.source,
+      code,
+    })
     try {
       boundProjectId = await getUserBinding(input.userId)
     } catch {
@@ -560,7 +569,15 @@ async function quarantinePendingAgentProjectWork(
         completedAt: now,
       },
     })
-    failedInvocationCount += updated.count
+    if (updated.count > 0) {
+      failedInvocationCount += updated.count
+      // Same content-free quarantine counter as failStaleProjectAgentInvocation
+      // (applied inline here to keep this module free of that service's import
+      // graph): a stale queued/running invocation was actually quarantined.
+      incrementIsolationMetric("stale_task_quarantined_total", {
+        code: ACCOUNT_PROJECT_CONTEXT_STALE,
+      })
+    }
   }
   for (const taskId of pending.backgroundTaskIds) {
     cancelledTaskCount += await cancelStaleProjectBackgroundTask(db as never, taskId, now)

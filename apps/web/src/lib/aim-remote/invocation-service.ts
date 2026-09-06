@@ -24,6 +24,7 @@ import {
   isAccountProjectContextError,
   resolveBoundProjectId,
 } from "@/lib/account-project-context"
+import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
 import {
   AGENT_REMOTE_GENERATE_TASK_KIND,
   DEFAULT_POLL_AFTER_SECONDS,
@@ -62,6 +63,13 @@ export async function failStaleProjectAgentInvocation(
       completedAt: now,
     },
   })
+  if (updated.count > 0) {
+    // A stale queued/running invocation was actually quarantined. Content-free
+    // counter — code dimension only, never the invocation id or any body text.
+    incrementIsolationMetric("stale_task_quarantined_total", {
+      code: ACCOUNT_PROJECT_CONTEXT_STALE,
+    })
+  }
   return updated.count
 }
 

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import type { PrismaClient } from "@/generated/prisma/client"
+import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
 
 export const BACKGROUND_TASK_STATUS = {
   queued: "queued",
@@ -177,6 +178,13 @@ export async function cancelStaleProjectBackgroundTask(
       availableAt: now,
     },
   })
+  if (updated.count > 0) {
+    // A stale queued/leased/retry-wait task was actually quarantined. Count with
+    // the stable, content-free code dimension only (see the metrics module).
+    incrementIsolationMetric("stale_task_quarantined_total", {
+      code: STALE_PROJECT_BACKGROUND_TASK_REASON,
+    })
+  }
   return updated.count
 }
 

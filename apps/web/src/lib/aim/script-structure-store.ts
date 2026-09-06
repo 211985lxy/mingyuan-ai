@@ -5,6 +5,7 @@ import {
 } from "@/lib/aim/script-structure-extractor"
 import type { GeneratedScript } from "@/lib/aim/script-structure-generator"
 import { SCRIPT_DELIMITER } from "@/lib/aim/script-structure-extractor"
+import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -182,7 +183,17 @@ export async function getStructure(
   // 历史 projectId=null 的提取结构不允许被解析进任何生成/读取上下文。
   if (row.origin === "extracted") {
     if (!userId || row.userId !== userId) return null
-    if (!projectId || row.projectId !== projectId) return null
+    if (!projectId || row.projectId !== projectId) {
+      // Task 4 null-project guard: a legacy extracted structure that still
+      // carries projectId = null was refused for a project-scoped path. Counted
+      // with a content-free type label only (see the isolation metrics module).
+      if (row.projectId === null && Boolean(projectId)) {
+        incrementIsolationMetric("legacy_null_scope_blocked_total", {
+          type: "script_structure",
+        })
+      }
+      return null
+    }
     return toRecord(row)
   }
   return toRecord(row)
