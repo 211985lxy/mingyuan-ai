@@ -34,7 +34,9 @@ async function probeHop(name: string, model: string, timeoutMs?: number, maxRetr
   try {
     const result = await provider.complete({
       messages: [{ role: "user", content: "Reply with the single word OK." }],
-      maxTokens: 16,
+      // 推理型模型（DeepSeek v4 pro / 文心 5.1）会先消耗思考 token，
+      // 预算太小会得到空正文，把健康线路误报成 failed。
+      maxTokens: 512,
     })
     const durationMs = Date.now() - startedAt
     if (result.content.trim()) {
