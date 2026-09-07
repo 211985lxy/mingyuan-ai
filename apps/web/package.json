@@ -28,6 +28,7 @@
     "eval:content-baseline": "tsx --tsconfig tsconfig.json scripts/aim-content-baseline.ts",
     "eval:memory": "tsx --tsconfig tsconfig.json scripts/aim-memory-eval.ts",
     "config:gap-status": "tsx --tsconfig tsconfig.json scripts/print-gap-config-status.ts",
+    "llm:probe": "tsx --tsconfig tsconfig.json scripts/probe-aim-model-routes.ts",
     "arch:check": "tsx --tsconfig tsconfig.json scripts/check-aim-architecture.ts",
     "longfn:report": "tsx --tsconfig tsconfig.json scripts/count-long-functions.ts",
     "longfn:baseline": "tsx --tsconfig tsconfig.json scripts/count-long-functions.ts --write-baseline",

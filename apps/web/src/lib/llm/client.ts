@@ -9,6 +9,7 @@ import {
 } from "./telemetry"
 import { env } from "@/env"
 import { AimDeadlineExceededError } from "./execution-deadline"
+import { isProviderCircuitOpen, observeProviderCircuit } from "./provider-circuit"
 
 let _instance: LLMClient | null = null
 
@@ -101,6 +102,10 @@ export class LLMClient {
     return false
   }
 
+  private providerModel(provider: LLMProvider, options: CompletionOptions): string {
+    return options.model ?? provider.defaultModel ?? provider.name
+  }
+
   /**
    * Run a chat completion through the provider chain.
    * Tries each provider in order; falls back on failure.
@@ -137,12 +142,15 @@ export class LLMClient {
       if (this.shouldSkipWithoutConsuming(provider, boundedOptions.model, requestedVendors)) {
         continue
       }
+      const modelName = this.providerModel(provider, boundedOptions)
+      if (await isProviderCircuitOpen(provider.name, modelName)) continue
       requestedVendors.add(provider.name)
       const attemptIndex = actualRequests
       actualRequests += 1
       const startedAt = Date.now()
       try {
         const result = await provider.complete(boundedOptions)
+        await observeProviderCircuit(provider.name, modelName, { ok: true })
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
@@ -160,6 +168,7 @@ export class LLMClient {
         if (error instanceof AimDeadlineExceededError) throw error
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
+        await observeProviderCircuit(provider.name, modelName, { ok: false, kind: classified.kind, message: lastError.message })
         reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, attemptIndex)
         console.warn(
           `[llm] Provider "${provider.name}" failed (${classified.kind}), trying next:`,
@@ -231,6 +240,8 @@ export class LLMClient {
       if (this.shouldSkipWithoutConsuming(provider, boundedOptions.model, requestedVendors, true)) {
         continue
       }
+      const modelName = this.providerModel(provider, boundedOptions)
+      if (await isProviderCircuitOpen(provider.name, modelName)) continue
 
       requestedVendors.add(provider.name)
       const attemptIndex = actualRequests
@@ -247,6 +258,7 @@ export class LLMClient {
             `[${provider.name}] Empty stream from model ${boundedOptions.model ?? provider.defaultModel}`,
           )
         }
+        await observeProviderCircuit(provider.name, modelName, { ok: true })
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
@@ -260,6 +272,7 @@ export class LLMClient {
         if (error instanceof AimDeadlineExceededError) throw error
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
+        await observeProviderCircuit(provider.name, modelName, { ok: false, kind: classified.kind, message: lastError.message })
         reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, attemptIndex)
         if (emitted) throw lastError
         console.warn(
