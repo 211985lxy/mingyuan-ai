@@ -13,6 +13,7 @@ import {
   Users,
   BookOpen,
   BarChart3,
+  AudioLines,
   Zap,
 } from "lucide-react"
 import {
@@ -57,6 +58,7 @@ const quickNav: NavItem[] = [
   { title: "极简模式", href: "/lite", icon: Zap },
   { title: "创作台", href: "/home", icon: PenLine },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
+  { title: "语音工坊", href: "/voice-studio", icon: AudioLines },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "数据看板", href: "/data-platform", icon: BarChart3 },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
