@@ -145,3 +145,46 @@ sequenceDiagram
 2. Prisma 单例来源 → **默认复用 `@/lib/prisma`**，lazy 动态 import；若其为 edge 不安全再退化成 registry 内自建。
 3. 六文件删除 `SYSTEM_PROMPT` 后是否有外部引用 → T3 开工前再全量 grep 一次；若无引用则直接删。
 4. `@db.Text` 与 PRD 的 `content:String` 表述差异 → **采用 `@db.Text`**（String 在 MySQL 是 varchar(191)，会截断）。
+
+---
+
+## 9. 实现记录（落地核验 · 2026-09-07 23:05）
+
+**落地分支**：`feat/aim-workbench-experience-upgrade` · commit `ffad9ab2` · 16 文件、+1454/-119 行。
+
+### 实际交付
+| 路径 | 状态 |
+|---|---|
+| `apps/web/prisma/prompt.prisma` | 新增，33 行（PromptTemplate + PromptVersion，`content: String @db.Text`，`@@unique([templateKey, version])`）|
+| `apps/web/prisma/migrations/20260907000000_add_prompt_registry/migration.sql` | 新增，35 行（`CREATE TABLE IF NOT EXISTS` + 唯一索引 + FK CASCADE）|
+| `apps/web/prisma/seed-prompt-registry.ts` | 新增，184 行（幂等：仅当 key 无版本时写 draft v1；支持 `--export --out=path` 反向导出）|
+| `apps/web/src/lib/prompt/types.ts` | 新增，132 行（PROMPT_KEYS / PromptSeed / PromptRecord / GetOptions / selectVersion 纯函数）|
+| `apps/web/src/lib/prompt/seeds.ts` | 新增，175 行（六条 prompt 逐字搬运；数组形态用 `.join("\n")`）|
+| `apps/web/src/lib/prompt/registry.ts` | 新增，273 行（同步 get/getMessages、stale-while-revalidate、in-flight 去重、REFRESH_RETRY_INTERVAL_MS=60s 节流、warn 每 key 一次）|
+| `apps/web/__tests__/unit/prompt-registry.test.ts` | 新增，240 行（16 用例：选版优先级、DB 失败回落、warn-once、seed 幂等、getMessages 结构）|
+| 6 调用点 | `knowledge-entity-extractor.ts` / `marketing-analysis.ts` / `comment-radar/analyzer.ts` / `transcript-polish.ts` / `competitor-analysis/analyzer.ts` / `aim/meeting-insight-extract.ts`，均改为 `promptRegistry.get/getMessages(key, …)`，内联 `SYSTEM_PROMPT` 已删除 |
+| `mingyuan/docs/plans/2026-09-07-aim-maturity-five-step-upgrade-design.md` | 总纲 |
+| `mingyuan/docs/plans/2026-09-07-prompt-registry-prd.md` | PRD |
+| `mingyuan/docs/plans/2026-09-07-prompt-registry-design.md` | 本设计文档 |
+
+### 关键决策落地
+- **同步优先**：六个调用点（尤其 `buildExtractionPrompt` 同步纯函数）零签名修改，registry 全部同步 API。
+- **lazy 动态 import**：`loadVersions` 内 `await import("@/lib/prisma")`，无 DB 的单测/edge 环境无副作用。
+- **`@db.Text`**：迁移 SQL 与 prisma schema 都明确 `TEXT`，与设计一致。
+- **种子不变 prompt**：seed v1 = 迁移前 `SYSTEM_PROMPT` 逐字原文（数组形态 `.join("\n")`），首次行为与现状零差异。
+
+### 验证结果
+- ✅ `npx vitest run __tests__/unit/prompt-registry.test.ts`：**16/16 通过**（10ms）
+- ✅ 四个禁区文件 `git diff` vs HEAD：**零改动**（`aim-agent-prompts.ts`、`aim/unified-content-prompts.ts`、`llm/client.ts`、`llm/types.ts`）
+- ✅ 六调用点 `grep -E "你是|你是一位"`：**全部 clean**（无中文字面 prompt 残留）
+
+### 与设计的偏差
+- 无实质性偏差。`@db.Text` 在 prisma schema 与 SQL 迁移里都正确落地。
+- seed 脚本未自动挂到 `prisma/seed.ts`（设计 §8 显式说明「刻意不改 seed.ts」，需运维手动加 2 行）。
+
+### 未做（本批范围之外）
+- 缓存 TTL / 手动 reload（P1）
+- fixtureKey 升 qualified 门禁（P1）
+- 评估调用日志注入（P1）
+- 批 1（函数拼接型 6 文件）/ 批 2（API 路由内联 2 文件）
+- 首屏即对话、能力 API 契约收敛、HITL 内联、组织协同显性化（其余四步）
