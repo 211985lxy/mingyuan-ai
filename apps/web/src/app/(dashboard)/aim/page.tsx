@@ -225,12 +225,7 @@ export default function AimPage() {
   const onUseSkill = (skill: AimWorkbenchSkill) => {
     if (skill.workbenchAction === "open_benchmark_search") { setBenchmarkSearchOpen(true); toast.success("已打开对标选题搜索"); return }
     if (skill.workbenchAction === "open_batch_script_studio") {
-      const tabMap: Record<string, BatchTab> = {
-        batch_extract_structure: "extract",
-        batch_generate_scripts: "generate",
-        batch_copy_pipeline: "pipeline",
-      }
-      setBatchStudioTab(tabMap[skill.id] ?? "extract")
+      setBatchStudioTab("extract")
       setBatchStudioOpen(true)
       toast.success("已打开批量文案工作室")
       return
