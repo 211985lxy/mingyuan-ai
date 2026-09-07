@@ -90,14 +90,18 @@ vi.mock("@/lib/aim/services/generate-request", () => ({
   serializeAimGenerationRun,
 }))
 
-vi.mock("@/lib/aim/generation-attempt", () => ({
-  startAimGenerationAttempt,
-  markAimGenerationRunning,
-  markAimGenerationAwaitingInput,
-  discardAimGenerationAttempt,
-  failAimGenerationAttempt,
-  AimGenerationAttemptError,
-}))
+vi.mock("@/lib/aim/generation-attempt", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/aim/generation-attempt")>()
+  return {
+    ...actual,
+    startAimGenerationAttempt,
+    markAimGenerationRunning,
+    markAimGenerationAwaitingInput,
+    discardAimGenerationAttempt,
+    failAimGenerationAttempt,
+    AimGenerationAttemptError,
+  }
+})
 
 import { POST } from "@/app/api/aim/execute/route"
 
@@ -372,6 +376,52 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(discardAimGenerationAttempt).not.toHaveBeenCalled()
     const data = await response.json()
     expect(data.generationId).toBe("generated-attempt")
+  })
+
+  it("replays a completed attempt with the stored copy and does not call the model", async () => {
+    startAimGenerationAttempt.mockResolvedValueOnce({
+      id: "web_0123456789abcdef01234567",
+      created: false,
+      replay: "completed",
+      results: [{ format: "video_script", content: "成稿正文，已经写好。", wordCount: 10 }],
+      knowledgeUsed: [],
+    })
+
+    const response = await executeRequest(baseBody({
+      attemptId: "web_0123456789abcdef01234567",
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.kind).toBe("deliverable")
+    expect(data.generationId).toBe("web_0123456789abcdef01234567")
+    expect(data.results).toEqual([
+      { format: "video_script", content: "成稿正文，已经写好。", wordCount: 10 },
+    ])
+    expect(understandAimContentTurnWithTrace).not.toHaveBeenCalled()
+    expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
+  })
+
+  it("replays a failed attempt with the original error code and does not call the model", async () => {
+    startAimGenerationAttempt.mockResolvedValueOnce({
+      id: "web_0123456789abcdef01234567",
+      created: false,
+      replay: "failed",
+      errorCode: "MODEL_TIMEOUT",
+      errorMessage: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
+    })
+
+    const response = await executeRequest(baseBody({
+      attemptId: "web_0123456789abcdef01234567",
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(504)
+    expect(data.code).toBe("MODEL_TIMEOUT")
+    expect(data.generationId).toBe("web_0123456789abcdef01234567")
+    expect(data.error).toContain("素材和要求已保留")
+    expect(understandAimContentTurnWithTrace).not.toHaveBeenCalled()
+    expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
   })
 
   it("returns GENERATION_IN_PROGRESS for the same attempt without calling the model", async () => {

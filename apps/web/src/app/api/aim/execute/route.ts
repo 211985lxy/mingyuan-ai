@@ -20,6 +20,7 @@ import {
   markAimGenerationAwaitingInput,
   markAimGenerationRunning,
   startAimGenerationAttempt,
+  buildAimAttemptReplayResponse,
 } from "@/lib/aim/generation-attempt"
 
 export const maxDuration = 180
@@ -51,22 +52,8 @@ export async function POST(request: NextRequest) {
       targetFormats: scopedParsed.targetFormats,
     })
     attempt = { id: started.id, created: started.created, userId: user.id, projectId: boundProject.id }
-    if (started.replay === "completed") {
-      return NextResponse.json({
-        kind: "deliverable",
-        id: started.id,
-        generationId: started.id,
-        results: [],
-        knowledgeUsed: [],
-      })
-    }
-    if (started.replay === "failed") {
-      return NextResponse.json({
-        error: started.errorMessage || "生成失败",
-        code: "INTERNAL_ERROR",
-        generationId: started.id,
-      }, { status: 500 })
-    }
+    const replayed = buildAimAttemptReplayResponse(started)
+    if (replayed) return NextResponse.json(replayed.body, { status: replayed.status })
     await markAimGenerationRunning(attempt)
     trace = await createAimTrace({
       userId: user.id,
@@ -153,10 +140,10 @@ export async function POST(request: NextRequest) {
     if (authResponse) return authResponse
     const contractResponse = apiRequestErrorResponse(request, error)
     if (contractResponse) return contractResponse
-    if (attempt) await failAimGenerationAttempt({ ...attempt, error }).catch(() => undefined)
-    await failAimTrace(trace, error)
     const requestId = request.headers.get("x-request-id") || crypto.randomUUID()
     const failure = toAimFailureResponse(error, requestId)
+    if (attempt) await failAimGenerationAttempt({ ...attempt, error, code: failure.code }).catch(() => undefined)
+    await failAimTrace(trace, error)
     if (!failure.runId && trace?.id) failure.runId = trace.id
     const message = error instanceof Error && error.message.includes("连续修正")
       ? error.message

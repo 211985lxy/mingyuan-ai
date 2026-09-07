@@ -1,8 +1,22 @@
 import { prisma } from "@/lib/prisma"
 import { normalizeAimAgentId } from "@/lib/aim-harness/contracts"
+import {
+  aimFailureHttpStatus,
+  classifyAimFailure,
+  mapAimFailureCodeToUserMessage,
+  type AimFailureCode,
+} from "@/lib/aim-error-message"
 
 const WEB_ATTEMPT_ID = /^web_[a-f0-9]{24}$/
 const STALE_AFTER_MS = 10 * 60 * 1000
+const CONTENT_COLUMNS = [
+  ["videoScript", "video_script"],
+  ["wechatArticle", "wechat_article"],
+  ["momentsPost", "moments_post"],
+  ["communityMessage", "community_message"],
+  ["shootingBrief", "shooting_brief"],
+  ["rawCopy", "raw_copy"],
+] as const
 
 export type AimGenerationAttemptCode =
   | "INVALID_REQUEST"
@@ -22,6 +36,22 @@ export class AimGenerationAttemptError extends Error {
 }
 
 export type AimGenerationReplay = "continue" | "completed" | "failed" | "awaiting_input"
+
+export type AimGenerationReplayResult = {
+  format: string
+  content: string
+  wordCount: number
+}
+
+export type AimGenerationAttemptStart = {
+  id: string
+  created: boolean
+  replay: AimGenerationReplay
+  results?: AimGenerationReplayResult[]
+  knowledgeUsed?: unknown
+  errorCode?: AimFailureCode
+  errorMessage?: string
+}
 
 function cleanDbText(value: string) {
   return value.replace(/\u0000/g, "").replace(/[\u{10000}-\u{10FFFF}]/gu, "")
@@ -55,6 +85,9 @@ export async function startAimGenerationAttempt(input: {
       select: {
         userId: true, projectId: true, agentId: true, rawInput: true,
         formatsRequested: true, status: true, errorMessage: true,
+        videoScript: true, wechatArticle: true, momentsPost: true,
+        communityMessage: true, shootingBrief: true, rawCopy: true,
+        knowledgeUsed: true,
       },
     })
     if (existing) return replayExistingAttempt(id, input.userId, projectId, agentId, rawInput, input.targetFormats, existing)
@@ -121,10 +154,11 @@ export async function failAimGenerationAttempt(input: {
   error: unknown
   code?: string
 }) {
-  const errorMessage = cleanDbText(input.error instanceof Error ? input.error.message : "生成失败").slice(0, 2000)
+  const code = input.code || classifyAimFailure(input.error)
+  const errorMessage = `${code}: ${mapAimFailureCodeToUserMessage(code)}`
   await prisma.aimGeneration.updateMany({
     where: attemptWhere(input.id, input.userId, input.projectId),
-    data: { status: "failed", errorMessage },
+    data: { status: "failed", errorMessage: cleanDbText(errorMessage).slice(0, 2000) },
   })
 }
 
@@ -143,6 +177,55 @@ export async function sweepStaleAimGenerations(now = new Date()) {
   return result.count
 }
 
+export function buildAimAttemptReplayResponse(started: AimGenerationAttemptStart) {
+  if (started.replay === "completed") {
+    return {
+      status: 200,
+      body: {
+        kind: "deliverable" as const,
+        id: started.id,
+        generationId: started.id,
+        results: started.results ?? [],
+        knowledgeUsed: started.knowledgeUsed ?? [],
+      },
+    }
+  }
+  if (started.replay !== "failed") return null
+  const code = started.errorCode ?? "INTERNAL_ERROR"
+  return {
+    status: aimFailureHttpStatus(code),
+    body: {
+      error: started.errorMessage || mapAimFailureCodeToUserMessage(code),
+      code,
+      generationId: started.id,
+    },
+  }
+}
+
+function resultsFromGeneration(existing: Record<string, unknown>): AimGenerationReplayResult[] {
+  return CONTENT_COLUMNS.flatMap(([column, format]) => {
+    const content = existing[column]
+    if (typeof content !== "string" || !content) return []
+    return [{ format, content, wordCount: content.length }]
+  })
+}
+
+function parseStoredAttemptFailure(errorMessage: string | null): {
+  errorCode: AimFailureCode
+  errorMessage: string
+} {
+  const raw = errorMessage?.trim() || "生成失败"
+  const matched = raw.match(/^([A-Z][A-Z0-9_]+):\s*([\s\S]*)$/)
+  if (matched) {
+    const errorCode = classifyAimFailure({ code: matched[1] })
+    return {
+      errorCode: matched[1] === "INTERNAL_ERROR" ? "INTERNAL_ERROR" : errorCode,
+      errorMessage: matched[2] || mapAimFailureCodeToUserMessage(errorCode),
+    }
+  }
+  return { errorCode: classifyAimFailure(new Error(raw)), errorMessage: raw }
+}
+
 function replayExistingAttempt(
   id: string,
   userId: string,
@@ -158,8 +241,15 @@ function replayExistingAttempt(
     formatsRequested: unknown
     status: string
     errorMessage: string | null
+    videoScript?: string | null
+    wechatArticle?: string | null
+    momentsPost?: string | null
+    communityMessage?: string | null
+    shootingBrief?: string | null
+    rawCopy?: string | null
+    knowledgeUsed?: unknown
   },
-) {
+): AimGenerationAttemptStart {
   if (
     existing.userId !== userId
     || existing.projectId !== projectId
@@ -169,7 +259,7 @@ function replayExistingAttempt(
     throw new AimGenerationAttemptError("INVALID_REQUEST", "生成任务标识与当前请求不一致", id)
   }
   if (existing.status === "awaiting_input") {
-    return { id, created: false as const, replay: "continue" as const }
+    return { id, created: false, replay: "continue" }
   }
   if (existing.rawInput !== rawInput) {
     throw new AimGenerationAttemptError("INVALID_REQUEST", "生成任务标识与当前请求不一致", id)
@@ -178,15 +268,16 @@ function replayExistingAttempt(
     throw new AimGenerationAttemptError("GENERATION_IN_PROGRESS", "同一生成任务仍在执行中", id)
   }
   if (existing.status === "pending") {
-    return { id, created: false as const, replay: "continue" as const }
+    return { id, created: false, replay: "continue" }
   }
   if (existing.status === "completed" || existing.status === "degraded") {
-    return { id, created: false as const, replay: "completed" as const }
+    return {
+      id,
+      created: false,
+      replay: "completed",
+      results: resultsFromGeneration(existing),
+      knowledgeUsed: Array.isArray(existing.knowledgeUsed) ? existing.knowledgeUsed : [],
+    }
   }
-  return {
-    id,
-    created: false as const,
-    replay: "failed" as const,
-    errorMessage: existing.errorMessage ?? "生成失败",
-  }
+  return { id, created: false, replay: "failed", ...parseStoredAttemptFailure(existing.errorMessage) }
 }

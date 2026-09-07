@@ -98,11 +98,15 @@ describe("AIM generation attempt lifecycle", () => {
       agentId: baseInput.agentId,
       formatsRequested: baseInput.targetFormats,
       status: "completed",
+      videoScript: "成稿正文，已经写好。",
+      knowledgeUsed: [{ title: "资料A" }],
     })
     await expect(startAimGenerationAttempt(baseInput)).resolves.toMatchObject({
       id: baseInput.attemptId,
       created: false,
       replay: "completed",
+      results: [{ format: "video_script", content: "成稿正文，已经写好。", wordCount: 10 }],
+      knowledgeUsed: [{ title: "资料A" }],
     })
 
     findUnique.mockResolvedValue({
@@ -112,7 +116,7 @@ describe("AIM generation attempt lifecycle", () => {
       agentId: "business_diagnosis",
       formatsRequested: ["raw_copy"],
       status: "failed",
-      errorMessage: "模型暂时不可用",
+      errorMessage: "MODEL_TIMEOUT: 模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
     })
     await expect(startAimGenerationAttempt({
       ...baseInput,
@@ -120,7 +124,8 @@ describe("AIM generation attempt lifecycle", () => {
       targetFormats: ["raw_copy"],
     })).resolves.toMatchObject({
       replay: "failed",
-      errorMessage: "模型暂时不可用",
+      errorCode: "MODEL_TIMEOUT",
+      errorMessage: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
     })
     expect(create).not.toHaveBeenCalled()
   })
@@ -193,7 +198,7 @@ describe("AIM generation attempt lifecycle", () => {
       },
       data: expect.objectContaining({
         status: "failed",
-        errorMessage: "模型暂时不可用",
+        errorMessage: "PROVIDER_UNAVAILABLE: 模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
       }),
     })
   })
