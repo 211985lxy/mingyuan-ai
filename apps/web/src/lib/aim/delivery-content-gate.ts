@@ -15,7 +15,7 @@ export type AimDeliveryViolation =
   | "missing_final_content"
 
 export class AimDeliveryContentError extends Error {
-  readonly code = "DELIVERY_REASONING_LEAK"
+  readonly code = "DELIVERY_CONSTRAINT_VIOLATION"
   readonly violations: AimDeliveryViolation[]
 
   constructor(violations: AimDeliveryViolation[]) {

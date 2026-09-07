@@ -32,7 +32,7 @@ describe("runAimHarness failure telemetry", () => {
     })
   })
 
-  it("classifies a shared deadline as GENERATION_DEADLINE", async () => {
+  it("classifies a shared deadline as MODEL_TIMEOUT", async () => {
     try {
       await runAimHarness({
         plan: {
@@ -48,7 +48,7 @@ describe("runAimHarness failure telemetry", () => {
       throw new Error("expected failure")
     } catch (error) {
       expect(error).toBeInstanceOf(AimRunExecutionError)
-      expect((error as AimRunExecutionError).code).toBe("GENERATION_DEADLINE")
+      expect((error as AimRunExecutionError).code).toBe("MODEL_TIMEOUT")
       expect((error as AimRunExecutionError).runId).toMatch(/^run_/)
     }
   })

@@ -8,16 +8,18 @@ const INTERNAL_AIM_ERROR_PATTERN = /^(?:语义理解|澄清协议|非澄清响�
 const SEMANTIC_RECOVERY_MESSAGE = "这次没有完整理解你的要求，当前内容已保留。请再试一次，或补充一句最关键的要求。"
 
 export type AimFailureCode =
+  | "INVALID_REQUEST"
+  | "BOUND_PROJECT_UNAVAILABLE"
   | "MODEL_TIMEOUT"
-  | "MODEL_EMPTY_RESPONSE"
-  | "MODEL_UNAVAILABLE"
+  | "PROVIDER_UNAVAILABLE"
   | "PROVIDER_AUTH"
-  | "PROVIDER_BALANCE"
-  | "GENERATION_DEADLINE"
-  | "DELIVERY_REASONING_LEAK"
-  | "INSTRUCTION_MISMATCH"
+  | "PROVIDER_QUOTA"
+  | "EMPTY_OUTPUT"
+  | "DELIVERY_CONSTRAINT_VIOLATION"
+  | "GENERATION_IN_PROGRESS"
   | "STALE_EXECUTION"
-  | "UNKNOWN"
+  | "USER_ABORTED"
+  | "INTERNAL_ERROR"
 
 export type AimFailureResponse = {
   error: string
@@ -29,16 +31,40 @@ export type AimFailureResponse = {
 }
 
 const USER_MESSAGE: Record<AimFailureCode, string> = {
+  INVALID_REQUEST: "这次请求不完整，请核对后重新提交。",
+  BOUND_PROJECT_UNAVAILABLE: "当前绑定的全案不可用，请先选择可用的 IP 营销全案。",
   MODEL_TIMEOUT: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
-  MODEL_EMPTY_RESPONSE: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
-  MODEL_UNAVAILABLE: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
+  PROVIDER_UNAVAILABLE: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
   PROVIDER_AUTH: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
-  PROVIDER_BALANCE: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
-  GENERATION_DEADLINE: "本次生成超过等待上限，系统已停止继续消耗。素材和要求已保留，可直接重试。",
-  DELIVERY_REASONING_LEAK: "生成结果没有满足你当前的要求，未作为正式成稿交付。",
-  INSTRUCTION_MISMATCH: "生成结果没有满足你当前的要求，未作为正式成稿交付。",
+  PROVIDER_QUOTA: "模型服务额度不足，素材和要求已保留。请稍后重试或联系管理员。",
+  EMPTY_OUTPUT: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
+  DELIVERY_CONSTRAINT_VIOLATION: "生成结果没有满足你当前的要求，未作为正式成稿交付。",
+  GENERATION_IN_PROGRESS: "同一生成任务仍在执行中，请稍候，不要重复提交。",
   STALE_EXECUTION: "本次生成超过等待上限，系统已停止继续消耗。素材和要求已保留，可直接重试。",
-  UNKNOWN: "生成失败，请稍后重试",
+  USER_ABORTED: "已停止本次生成。素材和要求已保留，可直接再试一次。",
+  INTERNAL_ERROR: "生成失败，请稍后重试",
+}
+
+const LEGACY_FAILURE_CODE: Record<string, AimFailureCode> = {
+  MODEL_EMPTY_RESPONSE: "EMPTY_OUTPUT",
+  MODEL_UNAVAILABLE: "PROVIDER_UNAVAILABLE",
+  PROVIDER_BALANCE: "PROVIDER_QUOTA",
+  GENERATION_DEADLINE: "MODEL_TIMEOUT",
+  DELIVERY_REASONING_LEAK: "DELIVERY_CONSTRAINT_VIOLATION",
+  INSTRUCTION_MISMATCH: "DELIVERY_CONSTRAINT_VIOLATION",
+  UNKNOWN: "INTERNAL_ERROR",
+}
+
+const NON_RECOVERABLE: ReadonlySet<AimFailureCode> = new Set([
+  "PROVIDER_AUTH",
+  "INVALID_REQUEST",
+  "BOUND_PROJECT_UNAVAILABLE",
+  "INTERNAL_ERROR",
+])
+
+function normalizeAimFailureCode(code: string): AimFailureCode | undefined {
+  if (code in USER_MESSAGE) return code as AimFailureCode
+  return LEGACY_FAILURE_CODE[code]
 }
 
 export class AimRunExecutionError extends Error {
@@ -62,7 +88,7 @@ export class AimRunExecutionError extends Error {
     this.name = "AimRunExecutionError"
     this.code = input.code
     this.runId = input.runId
-    this.recoverable = input.code !== "UNKNOWN" && input.code !== "PROVIDER_AUTH"
+    this.recoverable = !NON_RECOVERABLE.has(input.code)
     this.providerAttempts = input.providerAttempts ?? []
     this.promptHash = input.promptHash
     this.contextHash = input.contextHash
@@ -71,37 +97,40 @@ export class AimRunExecutionError extends Error {
 }
 
 export function classifyAimFailure(error: unknown, attempts: ProviderAttempt[] = []): AimFailureCode {
-  const code = typeof error === "object" && error && "code" in error
+  const rawCode = typeof error === "object" && error && "code" in error
     ? String((error as { code?: unknown }).code)
     : ""
-  if (code === "GENERATION_DEADLINE" || code === "DELIVERY_REASONING_LEAK") return code
-  if (code in USER_MESSAGE) return code as AimFailureCode
+  const normalized = rawCode ? normalizeAimFailureCode(rawCode) : undefined
+  if (normalized) return normalized
   const message = error instanceof Error ? error.message : String(error ?? "")
   if (INTERNAL_AIM_ERROR_PATTERN.test(message) || message.includes("连续修正后仍未完成当前要求")) {
-    return "INSTRUCTION_MISMATCH"
+    return "DELIVERY_CONSTRAINT_VIOLATION"
   }
   const last = [...attempts].reverse().find((attempt) => attempt.status === "failed")
   if (last?.errorKind === "timeout") return "MODEL_TIMEOUT"
   if (last?.errorKind === "auth") return "PROVIDER_AUTH"
-  if (last?.errorKind === "model_unavailable") return "MODEL_UNAVAILABLE"
+  if (last?.errorKind === "model_unavailable") return "PROVIDER_UNAVAILABLE"
   if (last?.errorKind === "rate_limit" && /(balance|额度|余额|quota|credit|402)/i.test(last.error || "")) {
-    return "PROVIDER_BALANCE"
+    return "PROVIDER_QUOTA"
   }
   if (/(empty response|empty completion|no output)/i.test(message) || last?.errorKind === "server" && /empty/i.test(last.error || "")) {
-    return "MODEL_EMPTY_RESPONSE"
+    return "EMPTY_OUTPUT"
   }
   if (/(timeout|timed out|deadline)/i.test(message)) return "MODEL_TIMEOUT"
-  return "UNKNOWN"
+  if (/aborted|用户停止|已停止本次生成/i.test(message)) return "USER_ABORTED"
+  return "INTERNAL_ERROR"
 }
 
-export function mapAimFailureCodeToUserMessage(code: AimFailureCode): string {
-  return USER_MESSAGE[code]
+export function mapAimFailureCodeToUserMessage(code: AimFailureCode | string): string {
+  return USER_MESSAGE[normalizeAimFailureCode(code) ?? "INTERNAL_ERROR"]
 }
 
 export function aimFailureHttpStatus(code: AimFailureCode): number {
-  if (code === "GENERATION_DEADLINE" || code === "STALE_EXECUTION") return 504
-  if (code === "DELIVERY_REASONING_LEAK" || code === "INSTRUCTION_MISMATCH") return 422
-  if (code === "UNKNOWN") return 500
+  if (code === "INVALID_REQUEST" || code === "USER_ABORTED") return 400
+  if (code === "GENERATION_IN_PROGRESS" || code === "BOUND_PROJECT_UNAVAILABLE") return 409
+  if (code === "DELIVERY_CONSTRAINT_VIOLATION") return 422
+  if (code === "MODEL_TIMEOUT" || code === "STALE_EXECUTION") return 504
+  if (code === "INTERNAL_ERROR") return 500
   return 503
 }
 
@@ -111,10 +140,10 @@ export function toAimFailureResponse(error: unknown, requestId: string): AimFail
   return {
     error: mapAimFailureCodeToUserMessage(code),
     code,
-    recoverable: runError?.recoverable ?? (code !== "UNKNOWN" && code !== "PROVIDER_AUTH"),
+    recoverable: runError?.recoverable ?? !NON_RECOVERABLE.has(code),
     runId: runError?.runId,
     requestId,
-    retryAfterMs: code === "GENERATION_DEADLINE" ? 0 : undefined,
+    retryAfterMs: code === "MODEL_TIMEOUT" ? 0 : undefined,
   }
 }
 
@@ -122,6 +151,6 @@ export function mapAimErrorToUserMessage(error: unknown, friendlyFallback: strin
   const message = error instanceof Error ? error.message : ""
   if (INTERNAL_AIM_ERROR_PATTERN.test(message)) return SEMANTIC_RECOVERY_MESSAGE
   const classified = classifyAimFailure(error)
-  if (classified !== "UNKNOWN") return mapAimFailureCodeToUserMessage(classified)
+  if (classified !== "INTERNAL_ERROR") return mapAimFailureCodeToUserMessage(classified)
   return message && CJK_PATTERN.test(message) ? message : friendlyFallback
 }

@@ -40,15 +40,19 @@ describe("mapAimErrorToUserMessage", () => {
 })
 
 describe("aim failure codes", () => {
-  it("maps timeout, deadline and delivery leak to distinct user actions", () => {
-    expect(classifyAimFailure(new AimDeadlineExceededError())).toBe("GENERATION_DEADLINE")
-    expect(classifyAimFailure(new AimDeliveryContentError(["reasoning_leak"]))).toBe("DELIVERY_REASONING_LEAK")
+  it("maps timeout, deadline and delivery leak to distinct V2 user actions", () => {
+    expect(classifyAimFailure(new AimDeadlineExceededError())).toBe("MODEL_TIMEOUT")
+    expect(classifyAimFailure(new AimDeliveryContentError(["reasoning_leak"]))).toBe("DELIVERY_CONSTRAINT_VIOLATION")
     expect(classifyAimFailure(new Error("timeout"), [{
       provider: "zenmux", status: "failed", attemptIndex: 0, errorKind: "timeout", error: "timed out",
     }])).toBe("MODEL_TIMEOUT")
+    expect(classifyAimFailure({ code: "GENERATION_DEADLINE" })).toBe("MODEL_TIMEOUT")
+    expect(classifyAimFailure({ code: "DELIVERY_REASONING_LEAK" })).toBe("DELIVERY_CONSTRAINT_VIOLATION")
+    expect(classifyAimFailure({ code: "MODEL_EMPTY_RESPONSE" })).toBe("EMPTY_OUTPUT")
+    expect(classifyAimFailure({ code: "PROVIDER_BALANCE" })).toBe("PROVIDER_QUOTA")
     expect(mapAimFailureCodeToUserMessage("MODEL_TIMEOUT")).toContain("更换线路")
-    expect(mapAimFailureCodeToUserMessage("GENERATION_DEADLINE")).toContain("等待上限")
-    expect(mapAimFailureCodeToUserMessage("DELIVERY_REASONING_LEAK")).toContain("未作为正式成稿")
+    expect(mapAimFailureCodeToUserMessage("DELIVERY_CONSTRAINT_VIOLATION")).toContain("未作为正式成稿")
     expect(mapAimFailureCodeToUserMessage("MODEL_TIMEOUT")).not.toContain("补充")
+    expect(mapAimFailureCodeToUserMessage("PROVIDER_QUOTA")).not.toContain("补充")
   })
 })

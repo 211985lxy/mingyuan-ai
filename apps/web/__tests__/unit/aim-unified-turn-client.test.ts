@@ -38,6 +38,6 @@ describe("unified turn silent retry", () => {
   })
 
   it("never silently retries delivery contract failures", () => {
-    expect(shouldRetryTransiently(new ApiError("未交付", 422, { code: "DELIVERY_REASONING_LEAK" }))).toBe(false)
+    expect(shouldRetryTransiently(new ApiError("未交付", 422, { code: "DELIVERY_CONSTRAINT_VIOLATION" }))).toBe(false)
   })
 })
