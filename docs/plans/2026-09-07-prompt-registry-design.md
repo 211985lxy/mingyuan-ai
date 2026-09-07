@@ -220,3 +220,28 @@ sequenceDiagram
 ### 边界与已知保留（非缺陷）
 - `buildPublishOutcomeSection`（导出函数，有外部调用方）两个分支文案与 `buildPolishInstructions` 五段条件指令仍在代码里——前者是运行时数据区块包装、后者是逻辑选择的指令片段，均不属于静态正本；留批2/P1 酌情收编。
 - work-editor「知识库为空降级策略」文案保留在调用点（降级分支，非主 prompt 正本）。
+
+---
+
+## 11. 批2 实现记录（API 路由内联型 · 2026-09-08）——Step① 收官
+
+**落地分支**：`feat/aim-workbench-experience-upgrade`。全仓扫描 `src/app/api` 共 4 个路由触达 LLM，其中 3 个为内联 prompt（总纲点名的 2 个 + `competitor/search-channels/analyze`）；`competitor-analysis/methodology/compile` 委托 `viral-methodology-compiler` 的 lib 构建器，不属「路由内联」，与 `lib` 内其余散落 prompt 一并列为**批3 扫尾候选**。
+
+### 交付
+| 路径 | 状态 |
+|---|---|
+| `src/lib/prompt/seeds-api-routes.ts` | 新增，7 条 seed（brief/ai-fill 的 system + 有/无描述双分支 user；knowledge/distill 的 system + user；search-channels/analyze 的 system + user） |
+| `src/lib/prompt/types.ts` | PROMPT_KEYS 30 → 37 |
+| `src/lib/prompt/seeds.ts` | 聚合追加 `API_ROUTES_PROMPT_SEEDS` |
+| 3 个 route | 内联模板删除，改为 `promptRegistry.get` + `fillPromptTemplate`；鉴权/解析/响应逻辑零改动 |
+
+### 等价性证明（逐字节）
+`prompt-batch2-snapshot.test.ts` 两段式（同批1 方法）：mock 鉴权/prisma/LLM/Tikhub 后真实调用三个 POST handler，捕获 LLM 收到的 messages（8 案例：ai-fill 双模板条件 × 双 user 分支、distill、analyze）。迁移后比对**一次通过**。
+
+### 验证
+- ✅ 快照比对 8/8 逐字节一致
+- ✅ 全量单测 3226 passed；`tsc --noEmit` 零错误；改动文件 ESLint 无新增告警
+- ✅ 三路由 `grep "你是"` 无字面残留；seed 脚本自动纳管
+
+### Step① 完成度
+批0（6 常量）+ 批1（24 函数拼接型）+ 批2（7 路由内联）= **37 个 prompt 单元入册**。剩余散落 prompt（`viral-methodology-compiler`、`buildPublishOutcomeSection` 分支文案、`buildPolishInstructions` 指令片段、work-editor 知识库降级文案等 lib 级零散点）建议作为批3 扫尾，随后进入总纲第②步（能力 API 契约收敛）。
