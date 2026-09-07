@@ -369,7 +369,9 @@ export default function AimPage() {
               latestDeliverableMessageId={w.latestDeliverableMessageId}
               quickPrompts={getAimAgentGuide(w.selectedAgentId).quickPrompts}
               actions={{
-                onSubmitChoice: (text) => void w.sendText(text),
+                // 澄清选项回答必须回到统一生成入口，复用 awaiting_input 的任务 ID；
+                // 走普通 chat 会丢失原任务状态，导致模型重新理解甚至再次追问。
+                onSubmitChoice: (text) => void w.generateWithInput(text),
                 onRetry: w.retryFailed,
                 onApplyReplacement: w.applyEditorReplacement,
                 onRepurpose: w.handleRepurpose,
