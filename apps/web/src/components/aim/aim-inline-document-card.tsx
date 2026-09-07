@@ -1,7 +1,7 @@
 "use client"
 
 import { useLayoutEffect, useRef, useState } from "react"
-import { Check, Clipboard, Loader2, X } from "lucide-react"
+import { Check, Clipboard, Download, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { applySelectionReplacement, type TextSelectionRange } from "@/lib/aim-editor"
@@ -12,6 +12,7 @@ import {
   type InlinePendingReplacement,
   type InlineSelectionActionId,
 } from "@/lib/aim/inline-editor-session"
+import { buildMarkdownFilename, downloadMarkdown } from "@/lib/aim/download-markdown"
 import { AIM_SOFT_ACTION_CLASS } from "@/lib/aim/workbench-display"
 import type { ContentFormat } from "@/lib/api/client"
 
@@ -182,6 +183,11 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
     toast.success("已复制")
   }
 
+  function exportMarkdown() {
+    downloadMarkdown(buildMarkdownFilename(props.topicTitle), editing ? draft : props.content)
+    toast.success("已导出 Markdown")
+  }
+
   const selectionBarVisible = editing && selection.text.trim().length > 0
 
   const toolbar = (
@@ -199,6 +205,9 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
         )}
         <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => void copyText()}>
           {copied ? <Check className="h-3.5 w-3.5" /> : <Clipboard className="h-3.5 w-3.5" />}复制
+        </Button>
+        <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={exportMarkdown}>
+          <Download className="h-3.5 w-3.5" />导出
         </Button>
     </div>
   )
