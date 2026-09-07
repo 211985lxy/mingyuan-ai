@@ -41,6 +41,7 @@ export function buildExecuteTurnRequest(
   currentInput: string,
   baseMessages: AimWorkbenchMessage[],
   options: AimExecuteTurnRequestOptions,
+  attemptId?: string,
 ) {
   const existingGenerationId = resolveFollowUpGenerationId(
     options.startsNewTask || baseMessages.length === 0,
@@ -56,6 +57,7 @@ export function buildExecuteTurnRequest(
     sourceAnalysisText: input.sourceAnalysisText,
   })
   return {
+    attemptId,
     agentId: input.selectedAgentId,
     executionAgentId: options.executionAgentId,
     projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,

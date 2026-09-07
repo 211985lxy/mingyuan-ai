@@ -9,6 +9,10 @@ const {
   executeVerifiedUnifiedDelivery,
   executeVerifiedUnifiedReply,
   serializeAimGenerationRun,
+  aimGenerationFindUnique,
+  aimGenerationCreate,
+  aimGenerationUpdateMany,
+  aimGenerationDeleteMany,
 } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
@@ -20,6 +24,21 @@ const {
     id: "generation-1",
     results: [{ format: "video_script", content: "成稿正文。", wordCount: 6 }],
   })),
+  aimGenerationFindUnique: vi.fn(async () => null),
+  aimGenerationCreate: vi.fn(async ({ data }: { data: { id?: string } }) => ({ id: data.id || "generated-attempt" })),
+  aimGenerationUpdateMany: vi.fn(async () => ({ count: 1 })),
+  aimGenerationDeleteMany: vi.fn(async () => ({ count: 1 })),
+}))
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    aimGeneration: {
+      findUnique: aimGenerationFindUnique,
+      create: aimGenerationCreate,
+      updateMany: aimGenerationUpdateMany,
+      deleteMany: aimGenerationDeleteMany,
+    },
+  },
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -99,6 +118,8 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(data.question).not.toMatch(/篇幅|多长|字数/)
     // 关键缺口未确认不先生成
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
+    expect(aimGenerationCreate).toHaveBeenCalledOnce()
+    expect(aimGenerationDeleteMany).toHaveBeenCalledOnce()
   })
 
   it("does not ask again when the user is answering a previous clarification", async () => {
@@ -122,6 +143,9 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
 
     expect(data.kind).toBe("deliverable")
     expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledOnce()
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      generationAttemptId: "generated-attempt",
+    }))
   })
 
   it("generates directly when a complete original draft covers volume and scope (894字场景)", async () => {
@@ -183,5 +207,75 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(data.kind).toBe("reply")
     expect(data.content).toContain("故事型")
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
+    expect(aimGenerationCreate).toHaveBeenCalledOnce()
+    expect(aimGenerationDeleteMany).toHaveBeenCalledOnce()
+  })
+
+  it("keeps the task recoverable when semantic understanding fails before delivery", async () => {
+    understandAimContentTurnWithTrace.mockRejectedValue(new Error("语义理解暂时不可用"))
+
+    const response = await executeRequest(baseBody({
+      attemptId: "web_abcdef0123456789abcdef01",
+      sourceEnvelope: {
+        currentUserRequest: "对标标题：豆包 Agent 教程\n对标原文：完整参考文案",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+    }))
+
+    expect(response.status).toBe(500)
+    expect(aimGenerationCreate).toHaveBeenCalledOnce()
+    expect(aimGenerationUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: "web_abcdef0123456789abcdef01",
+        userId: "user-1",
+        projectId: null,
+      },
+      data: expect.objectContaining({
+        status: "failed",
+        errorMessage: "语义理解暂时不可用",
+      }),
+    }))
+    expect(aimGenerationDeleteMany).not.toHaveBeenCalled()
+  })
+
+  it("persists an imported-copy task before generation and keeps it recoverable after failure", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "用户要求按带入的对标材料生成一篇新文案。",
+    })
+    executeVerifiedUnifiedDelivery.mockRejectedValue(new Error("模型暂时不可用"))
+
+    const response = await executeRequest(baseBody({
+      attemptId: "web_0123456789abcdef01234567",
+      sourceEnvelope: {
+        currentUserRequest: "对标标题：豆包 Agent 教程\n对标原文：完整参考文案",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+    }))
+
+    expect(response.status).toBe(500)
+    expect(aimGenerationCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        id: "web_0123456789abcdef01234567",
+        userId: "user-1",
+        projectId: null,
+        agentId: "content_producer",
+        rawInput: expect.stringContaining("豆包 Agent 教程"),
+        status: "pending",
+      }),
+    }))
+    expect(aimGenerationUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: "web_0123456789abcdef01234567",
+        userId: "user-1",
+        projectId: null,
+      },
+      data: expect.objectContaining({
+        status: "failed",
+        errorMessage: "模型暂时不可用",
+      }),
+    }))
   })
 })

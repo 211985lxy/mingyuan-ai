@@ -7,7 +7,6 @@ import {
   ApiError,
   checkScriptQuality,
   generateAimContent,
-  type AimGenerateResponse,
   type ContentFormat,
 } from "@/lib/api/client"
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
@@ -281,7 +280,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
     const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
     if (useUnifiedEntry) {
-      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, options)
+      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, options, `web_${traceId.replace(/-/g, "").slice(0, 24)}`)
       const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
       if (controller.signal.aborted) {
         markGenerationStopped(input, assistantMessageId)
@@ -318,6 +317,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
             failure: { kind: "generate" as const, retryText: currentInput },
           }
         : item))
+      void input.refreshHistory({ force: true })
     }
   } finally {
     stopProgressTicker()

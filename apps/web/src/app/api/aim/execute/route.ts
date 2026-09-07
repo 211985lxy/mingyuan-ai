@@ -12,11 +12,36 @@ import { executeVerifiedUnifiedDelivery, executeVerifiedUnifiedReply } from "@/l
 import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
+import {
+  discardAimGenerationAttempt,
+  failAimGenerationAttempt,
+  startAimGenerationAttempt,
+} from "@/lib/aim/generation-attempt"
 
 export const maxDuration = 180
 
+type GenerationAttempt = { id: string; userId: string; projectId?: string; created: boolean }
+
+async function handleAimExecuteError(
+  request: NextRequest,
+  error: unknown,
+  trace: AimTraceRecorder | undefined,
+  attempt: GenerationAttempt | undefined,
+) {
+  if (attempt) await failAimGenerationAttempt({ ...attempt, error }).catch(() => undefined)
+  const authResponse = authErrorResponse(error)
+  if (authResponse) return authResponse
+  const contractResponse = apiRequestErrorResponse(request, error)
+  if (contractResponse) return contractResponse
+  await failAimTrace(trace, error)
+  const revisionFailed = error instanceof Error && error.message.includes("连续修正")
+  const message = revisionFailed ? error.message : mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
+  return NextResponse.json({ error: message }, { status: revisionFailed ? 422 : 500 })
+}
+
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
+  let attempt: GenerationAttempt | undefined
   try {
     const user = await authenticateRequest(request)
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_generate")
@@ -25,6 +50,11 @@ export async function POST(request: NextRequest) {
       maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES,
     }))
     const agentId = parsed.executionAgentId || parsed.agentId || "content_producer"
+    const startedAttempt = await startAimGenerationAttempt({
+      attemptId: parsed.attemptId, userId: user.id, projectId: parsed.projectId, agentId,
+      rawInput: parsed.sourceEnvelope.currentUserRequest, targetFormats: parsed.targetFormats,
+    })
+    attempt = { ...startedAttempt, userId: user.id, projectId: parsed.projectId }
     trace = await createAimTrace({
       userId: user.id,
       projectId: parsed.projectId ?? null,
@@ -64,6 +94,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (gate.clarification) {
+      await discardAimGenerationAttempt(attempt)
       return NextResponse.json({
         kind: "clarification",
         question: gate.clarification.question,
@@ -73,19 +104,18 @@ export async function POST(request: NextRequest) {
     }
     if (understanding.handling === "respond") {
       const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed, understanding, trace })
+      await discardAimGenerationAttempt(attempt)
       return NextResponse.json({ kind: "reply", content, runId: trace?.id })
     }
-    const run = await executeVerifiedUnifiedDelivery({ userId: user.id, parsed, understanding, trace })
+    const run = await executeVerifiedUnifiedDelivery({
+      userId: user.id,
+      parsed,
+      understanding,
+      trace,
+      generationAttemptId: attempt.id,
+    })
     return NextResponse.json({ kind: "deliverable", ...serializeAimGenerationRun(run) })
   } catch (error) {
-    const authResponse = authErrorResponse(error)
-    if (authResponse) return authResponse
-    const contractResponse = apiRequestErrorResponse(request, error)
-    if (contractResponse) return contractResponse
-    await failAimTrace(trace, error)
-    const message = error instanceof Error && error.message.includes("连续修正")
-      ? error.message
-      : mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
-    return NextResponse.json({ error: message }, { status: error instanceof Error && error.message.includes("连续修正") ? 422 : 500 })
+    return handleAimExecuteError(request, error, trace, attempt)
   }
 }

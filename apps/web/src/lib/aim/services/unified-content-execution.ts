@@ -59,6 +59,7 @@ export async function executeVerifiedUnifiedDelivery(input: {
   parsed: AimExecuteBody
   understanding: AimSemanticTaskUnderstanding
   trace?: AimTraceRecorder
+  generationAttemptId?: string
 }) {
   const unifiedContentExecution = {
     envelope: input.parsed.sourceEnvelope,
@@ -72,6 +73,7 @@ export async function executeVerifiedUnifiedDelivery(input: {
     targetFormats: input.parsed.targetFormats,
     methodologyProfileIds: input.parsed.methodologyProfileIds,
     activeMethodologySignals: input.parsed.activeMethodologySignals,
+    existingGenerationId: input.generationAttemptId,
   }, {
     trace: input.trace,
     unifiedContentExecution,

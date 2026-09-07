@@ -97,6 +97,7 @@ const contentFormatSchema = z.enum([
 ])
 
 export const aimExecuteBodySchema = z.object({
+  attemptId: z.string().regex(/^web_[a-f0-9]{24}$/).optional(),
   agentId: z.string().max(80).optional(),
   executionAgentId: z.string().max(80).optional(),
   projectId: optionalId,
