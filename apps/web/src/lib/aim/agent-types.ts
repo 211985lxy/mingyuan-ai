@@ -24,6 +24,7 @@ import type { TaskSpec } from "@/lib/task-spec"
 import type { AimRunSpec } from "@/lib/aim-harness/types"
 import type { AimAgentId } from "@/lib/aim-harness/contracts"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
 
 export interface AimChatParams {
   userId: string
@@ -78,6 +79,7 @@ export interface AimGenerateContext {
   unifiedContentExecution?: {
     envelope: AimContentSourceEnvelope
     brief: string
+    intent: ResolvedUserIntent
   }
 
   // 共享数据上下文

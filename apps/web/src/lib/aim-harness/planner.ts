@@ -20,7 +20,6 @@ import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowle
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
-import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 import { resolveExecutionPolicy } from "./execution-mode"
 import type {
@@ -32,6 +31,7 @@ import type {
   AimModelPolicy,
   AimModelPolicyOverride,
   AimRunSpec,
+  UnifiedContentExecution,
 } from "./types"
 import {
   AIM_FAST_SPOKEN_MAX_TOKENS,
@@ -78,7 +78,7 @@ export interface PlanRunInput {
   executionMode?: AimExecutionMode
   /** 完整执行策略覆盖；未传则按 mode 默认冻结。 */
   executionPolicy?: Partial<AimExecutionPolicy>
-  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
+  unifiedContentExecution?: UnifiedContentExecution
 }
 
 function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {

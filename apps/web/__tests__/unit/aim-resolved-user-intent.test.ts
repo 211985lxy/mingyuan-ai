@@ -140,6 +140,34 @@ describe("resolveUserIntentFromEnvelope", () => {
     expect(gaps.some((gap) => /CTA|行动引导/.test(gap.question))).toBe(false)
   })
 
+  it("does not inherit a previous task's length when the current turn only says 重写这篇", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "重写这篇",
+      currentArtifact: "当前编辑器里的成稿正文，长度足够。".repeat(10),
+      conversation: [
+        { role: "user", content: "写一条2分钟、400-550字口播" },
+        { role: "assistant", content: "已交付上一版口播。" },
+      ],
+    }))
+    expect(intent.lengthPolicy).toBe("unset")
+    expect(intent.lengthText).toBeUndefined()
+    expect(intent.constraintSources.length).toBeUndefined()
+  })
+
+  it("inherits previous length only when the current turn explicitly keeps it", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "保持上一版2分钟，重写这篇",
+      currentArtifact: "当前编辑器里的成稿正文，长度足够。".repeat(10),
+      conversation: [
+        { role: "user", content: "写一条2分钟、400-550字口播" },
+        { role: "assistant", content: "已交付上一版口播。" },
+      ],
+    }))
+    expect(intent.lengthPolicy).toBe("user_explicit")
+    expect(intent.lengthText).toMatch(/2\s*分钟/)
+    expect(intent.constraintSources.length).toBe("user_current")
+  })
+
   it("keeps a follow-up reference (继续改这篇) out of new-task isolation", () => {
     const intent = resolveUserIntentFromEnvelope(envelope({
       request: "继续改这篇，把结尾承接再收紧一点",

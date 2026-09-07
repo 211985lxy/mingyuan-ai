@@ -1,5 +1,29 @@
 import type { AimGenerateContext } from "@/lib/aim/agent-types"
 import { AIM_ASSISTANT_PERSONA } from "@/lib/aim/assistant-persona"
+import type { AimContentGoal, ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
+
+const GOAL_LABELS: Record<AimContentGoal, string> = {
+  traffic: "搞流量",
+  lead: "获客咨询",
+  convert: "成交转化",
+  trust: "建立人设信任",
+  brand: "品牌",
+}
+
+function buildConfirmedIntentBlock(intent?: ResolvedUserIntent): string {
+  if (!intent) return ""
+  const lines: string[] = []
+  if (intent.modificationScope) lines.push(`修改范围：${intent.modificationScope}`)
+  if (intent.lengthPolicy === "user_explicit" && intent.lengthText) {
+    lines.push(`长度要求：${intent.lengthText}`)
+  } else if (intent.lengthPolicy === "keep_original") {
+    lines.push("长度要求：保持原稿体量")
+  }
+  if (typeof intent.quantity === "number") lines.push(`数量：${intent.quantity}`)
+  if (intent.goal) lines.push(`内容目标：${GOAL_LABELS[intent.goal]}`)
+  if (!lines.length) return ""
+  return `【已确认要求】\n${lines.join("\n")}`
+}
 
 export function buildUnifiedProducerSystemPrompt(context: AimGenerateContext): string {
   const authorizedContext = [
@@ -27,7 +51,7 @@ export function buildUnifiedProducerSystemPrompt(context: AimGenerateContext): s
 export function buildUnifiedProducerUserPrompt(context: AimGenerateContext, formatBlocks: string): string {
   const execution = context.unifiedContentExecution
   if (!execution) throw new Error("统一内容执行缺少来源信封")
-  const { envelope, brief } = execution
+  const { envelope, brief, intent } = execution
   const conversation = envelope.relevantConversation
     .map((turn) => `${turn.role === "user" ? "用户" : "助手"}：${turn.content}`)
     .join("\n\n")
@@ -36,6 +60,7 @@ export function buildUnifiedProducerUserPrompt(context: AimGenerateContext, form
   return [
     `【当前用户原话】\n${envelope.currentUserRequest}`,
     `【临时任务理解】\n${brief}\n用户原话与临时理解冲突时，以用户原话为准。`,
+    buildConfirmedIntentBlock(intent),
     conversation ? `【最近相关对话】\n${conversation}` : "",
     envelope.currentArtifact ? `【当前作品】\n${envelope.currentArtifact.content}` : "",
     ...references,

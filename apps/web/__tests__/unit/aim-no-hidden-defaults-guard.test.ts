@@ -7,6 +7,9 @@ import {
   FORMAT_INSTRUCTIONS,
   PUBLISH_PACKAGE_CHAT_RULE,
 } from "@/lib/aim-agent-prompts"
+import { buildUnifiedProducerUserPrompt } from "@/lib/aim/unified-content-prompts"
+import { resolveUserIntentFromEnvelope } from "@/lib/aim/resolved-user-intent"
+import type { AimGenerateContext } from "@/lib/aim/agent-types"
 import { buildBenchmarkLengthRule } from "@/lib/aim-benchmark-length"
 import { AIM_IMITATE_REWRITE_SKILL_PROMPT } from "@/lib/aim-imitate-rewrite"
 import { parseBatchReplicateCount } from "@/lib/aim/run-batch-replicate-send"
@@ -88,6 +91,81 @@ describe("用户指令唯一真源：隐藏默认值禁止重现", () => {
       useKnowledge: false,
       runtimeTask: "new_copy",
     })).toBe(false)
+  })
+
+  it("统一入口不得再把润色硬编码成 new_copy", () => {
+    const generateRequest = source("src/lib/aim/services/generate-request.ts")
+    expect(generateRequest).not.toMatch(/runtimeTask:\s*"new_copy"\s+as const/)
+  })
+
+  it("未指定长度时，统一 Prompt 不得补分钟或字数区间", () => {
+    const envelope = {
+      currentUserRequest: "请优化修改，直接给可发布终稿",
+      relevantConversation: [],
+      referenceMaterials: [{ title: "用户参考原文", content: "这是一篇完整的原始稿件。".repeat(60) }],
+    }
+    const prompt = buildUnifiedProducerUserPrompt({
+      userId: "user-1",
+      agentId: "content_producer",
+      rawInput: envelope.currentUserRequest,
+      targetFormats: ["video_script"],
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      businessDiagnosisBlock: "",
+      viralStructureBlock: "",
+      eventStorytellingBlock: "",
+      ipWikiBlock: "",
+      selectedMethodologyBlock: "",
+      retrievedEntries: [],
+      retrievedSource: "raw",
+      knowledgeStrategy: "deep",
+      unifiedContentExecution: {
+        envelope,
+        brief: "整篇精修当前原稿",
+        intent: resolveUserIntentFromEnvelope(envelope),
+      },
+    } as unknown as AimGenerateContext, "口播格式要求")
+
+    expect(prompt).not.toMatch(/默认.{0,8}\d+\s*分钟/)
+    expect(prompt).not.toMatch(/\d{3}\s*[-—到]\s*\d{3}\s*个?汉?字/)
+    expect(prompt).not.toMatch(/2\s*分钟/)
+    expect(prompt).not.toMatch(/400\s*[-—到]\s*550/)
+    expect(prompt).not.toMatch(/长度未指定|未给长度时默认|字数区间/)
+  })
+
+  it("统一 Prompt 只写出 intent 已确认的范围、长度、数量和目标", () => {
+    const envelope = {
+      currentUserRequest: "写一条1分钟口播，面向实体店老板，目标是引流获客，给3条",
+      relevantConversation: [],
+      referenceMaterials: [],
+    }
+    const prompt = buildUnifiedProducerUserPrompt({
+      userId: "user-1",
+      agentId: "content_producer",
+      rawInput: envelope.currentUserRequest,
+      targetFormats: ["video_script"],
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      businessDiagnosisBlock: "",
+      viralStructureBlock: "",
+      eventStorytellingBlock: "",
+      ipWikiBlock: "",
+      selectedMethodologyBlock: "",
+      retrievedEntries: [],
+      retrievedSource: "raw",
+      knowledgeStrategy: "deep",
+      unifiedContentExecution: {
+        envelope,
+        brief: "新口播",
+        intent: resolveUserIntentFromEnvelope(envelope),
+      },
+    } as unknown as AimGenerateContext, "口播格式要求")
+
+    expect(prompt).toContain("长度要求：1分钟")
+    expect(prompt).toContain("内容目标：获客咨询")
+    expect(prompt).toContain("数量：3")
+    expect(prompt).not.toContain("修改范围：")
+    expect(prompt).not.toMatch(/未指定|未确认/)
   })
 
   it("口播模块不得存在任何字数验收机制（源码扫描）", () => {

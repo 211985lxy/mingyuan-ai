@@ -123,6 +123,49 @@ function detectTaskKind(envelope: AimContentSourceEnvelope): AimIntentTaskKind {
   return "new_draft"
 }
 
+function resolveLengthConstraint(input: {
+  request: string
+  confirmedText: string
+  envelope: AimContentSourceEnvelope
+  taskKind: AimIntentTaskKind
+}): {
+  lengthPolicy: ResolvedUserIntent["lengthPolicy"]
+  lengthText?: string
+  source?: IntentConstraintSource
+} {
+  const explicitInRequest = LENGTH_EXPLICIT_PATTERN.test(input.request)
+  const keepOriginalInRequest = LENGTH_KEEP_ORIGINAL_PATTERN.test(input.request)
+  // 历史任务里的时长/字数不是本轮已确认要求。只有正在回答本轮追问时，才允许从最近用户回答里取长度。
+  const answeringClarification = isClarificationAnswerTurn(input.envelope)
+  const explicitInConfirmed = answeringClarification
+    && !explicitInRequest
+    && LENGTH_EXPLICIT_PATTERN.test(input.confirmedText)
+  const keepOriginalInConfirmed = answeringClarification
+    && !keepOriginalInRequest
+    && LENGTH_KEEP_ORIGINAL_PATTERN.test(input.confirmedText)
+  const materialDerivesLength = input.taskKind === "polish_existing"
+    && Boolean(
+      input.envelope.referenceMaterials.some((item) => item.content.trim().length >= 120)
+        || (input.envelope.currentArtifact?.content?.trim().length ?? 0) >= 120,
+    )
+  const lengthPolicy: ResolvedUserIntent["lengthPolicy"] = explicitInRequest || explicitInConfirmed
+    ? "user_explicit"
+    : keepOriginalInRequest || keepOriginalInConfirmed
+      ? "keep_original"
+      : materialDerivesLength
+        ? "material_derived"
+        : "unset"
+  return {
+    lengthPolicy,
+    lengthText: lengthPolicy === "user_explicit"
+      ? (input.request.match(LENGTH_EXPLICIT_PATTERN)?.[0] ?? input.confirmedText.match(LENGTH_EXPLICIT_PATTERN)?.[0])
+      : undefined,
+    source: explicitInRequest || explicitInConfirmed
+      ? (explicitInRequest ? "user_current" : "task_confirmed")
+      : undefined,
+  }
+}
+
 /**
  * 从信封确定性解析当前意图（规则可测；LLM 语义理解负责模糊语义，二者互补）。
  * 「本任务已确认要求」= 追问后用户的最近回答（recentUserText）。
@@ -134,7 +177,6 @@ export function resolveUserIntentFromEnvelope(
   const request = envelope.currentUserRequest
   // 确定性字段同时扫描：当前原话（最高优先）+ 最近用户回答（本任务已确认）
   const confirmedText = recentUserText(envelope)
-  const combinedText = [request, confirmedText].filter(Boolean).join("\n")
 
   const taskKind = detectTaskKind(envelope)
   const isNewTask = NEW_TASK_SIGNAL_PATTERN.test(request)
@@ -155,24 +197,8 @@ export function resolveUserIntentFromEnvelope(
   if (goalInRequest) sources.goal = "user_current"
   else if (goal) sources.goal = "task_confirmed"
 
-  const explicitLengthInRequest = LENGTH_EXPLICIT_PATTERN.test(request)
-  const keepOriginalInRequest = LENGTH_KEEP_ORIGINAL_PATTERN.test(request)
-  const explicitLengthInConfirmed = !explicitLengthInRequest && LENGTH_EXPLICIT_PATTERN.test(confirmedText)
-  const keepOriginalInConfirmed = !keepOriginalInRequest && LENGTH_KEEP_ORIGINAL_PATTERN.test(confirmedText)
-  // 只有润色完整原稿才允许从素材推导体量；对标改写必须由用户选长度策略（保持/自定义/自由）
-  const materialDerivesLength = taskKind === "polish_existing"
-    && Boolean(
-      envelope.referenceMaterials.some((item) => item.content.trim().length >= 120)
-        || (envelope.currentArtifact?.content?.trim().length ?? 0) >= 120,
-    )
-  const lengthPolicy: ResolvedUserIntent["lengthPolicy"] = explicitLengthInRequest || explicitLengthInConfirmed
-    ? "user_explicit"
-    : keepOriginalInRequest || keepOriginalInConfirmed
-      ? "keep_original"
-      : materialDerivesLength
-        ? "material_derived"
-        : "unset"
-  if (explicitLengthInRequest || explicitLengthInConfirmed) sources.length = explicitLengthInRequest ? "user_current" : "task_confirmed"
+  const length = resolveLengthConstraint({ request, confirmedText, envelope, taskKind })
+  if (length.source) sources.length = length.source
 
   const quantityInRequest = detectQuantity(request)
   const quantityInConfirmed = quantityInRequest ?? detectQuantity(confirmedText)
@@ -194,10 +220,8 @@ export function resolveUserIntentFromEnvelope(
     topic: GENERIC_TOPICLESS_REQUEST.test(request.trim()) ? undefined : request.trim().slice(0, 120) || undefined,
     audience,
     goal,
-    lengthPolicy,
-    lengthText: lengthPolicy === "user_explicit"
-      ? (request.match(LENGTH_EXPLICIT_PATTERN)?.[0] ?? confirmedText.match(LENGTH_EXPLICIT_PATTERN)?.[0])
-      : undefined,
+    lengthPolicy: length.lengthPolicy,
+    lengthText: length.lengthText,
     quantity,
     formats,
     isNewTask,

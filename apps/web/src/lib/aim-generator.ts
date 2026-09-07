@@ -6,6 +6,7 @@ import type { AimTraceRecorder } from "@/lib/aim-observability"
 import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { AimRunSpec } from "@/lib/aim-harness/types"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
 
 export type ContentFormat =
   | "video_script"
@@ -54,7 +55,7 @@ export interface AimInput {
   useStyleProfileOverride?: boolean
   /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构。透传到 prepareAimContext。 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
-  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
+  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string; intent: ResolvedUserIntent }
   /** 本轮内容任务卡（非空 core_claim 触发 prompt 块注入）。 */
   contentTaskCard?: {
     audience?: string

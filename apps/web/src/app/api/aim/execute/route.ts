@@ -77,11 +77,17 @@ export async function POST(request: NextRequest) {
         runId: trace?.id,
       })
     }
-    if (understanding.handling === "respond") {
+    if (gate.intent.taskKind === "answer_question" || understanding.handling === "respond") {
       const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed: scopedParsed, understanding, trace })
       return NextResponse.json({ kind: "reply", content, runId: trace?.id })
     }
-    const run = await executeVerifiedUnifiedDelivery({ userId: user.id, parsed: scopedParsed, understanding, trace })
+    const run = await executeVerifiedUnifiedDelivery({
+      userId: user.id,
+      parsed: scopedParsed,
+      understanding,
+      intent: gate.intent,
+      trace,
+    })
     return NextResponse.json({ kind: "deliverable", ...serializeAimGenerationRun(run) })
   } catch (error) {
     if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {

@@ -12,6 +12,7 @@
 
 import type { CopyStudioModule } from "@/lib/copy-studio"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
 
 /** AIM 内容智能体的规范 id（唯一事实源） */
 export type AimAgentId =
@@ -197,7 +198,13 @@ export interface AimRunRequest {
   executionMode?: AimExecutionMode
   /** 完整执行策略；未传则按 single_shot 冻结默认值。 */
   executionPolicy?: Partial<AimExecutionPolicy>
-  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
+  unifiedContentExecution?: UnifiedContentExecution
+}
+
+export interface UnifiedContentExecution {
+  envelope: AimContentSourceEnvelope
+  brief: string
+  intent: ResolvedUserIntent
 }
 
 /**

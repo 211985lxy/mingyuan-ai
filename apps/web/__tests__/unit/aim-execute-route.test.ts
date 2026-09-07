@@ -194,4 +194,110 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(data.content).toContain("故事型")
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
   })
+
+  it("passes resolved polish intent into delivery for a full-draft refine", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "用户要求整篇精修并直接给可发布终稿。",
+    })
+    executeVerifiedUnifiedDelivery.mockResolvedValue({ output: {}, metadata: { runId: "r2" }, spec: {} })
+
+    await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "请优化修改，直接给可发布终稿",
+        relevantConversation: [],
+        referenceMaterials: [{ title: "用户参考原文", content: "这是一篇完整的原始稿件。".repeat(60) }],
+      },
+    }))
+
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      intent: expect.objectContaining({ taskKind: "polish_existing" }),
+    }))
+  })
+
+  it("passes resolved local-edit intent when the user only wants the opener changed", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "只改当前稿开头。",
+    })
+    executeVerifiedUnifiedDelivery.mockResolvedValue({ output: {}, metadata: { runId: "r3" }, spec: {} })
+
+    await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "帮我改一下开头",
+        relevantConversation: [],
+        currentArtifact: { content: "这是一段已经写好的当前稿内容，长度足够作为完整原稿使用。".repeat(6) },
+        referenceMaterials: [],
+      },
+    }))
+
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      intent: expect.objectContaining({
+        taskKind: "polish_existing",
+        modificationScope: "开头",
+      }),
+    }))
+  })
+
+  it("passes benchmark rewrite intent when the user asks to rewrite against a reference", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "参考对标重写一版。",
+    })
+    executeVerifiedUnifiedDelivery.mockResolvedValue({ output: {}, metadata: { runId: "r4" }, spec: {} })
+
+    await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "按对标原文重新写一版",
+        relevantConversation: [],
+        referenceMaterials: [{ title: "对标原文", content: "对标爆款正文。".repeat(40) }],
+      },
+    }))
+
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      intent: expect.objectContaining({ taskKind: "benchmark_rewrite" }),
+    }))
+  })
+
+  it("passes new-draft intent for a complete new copy request", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "写一篇新口播。",
+    })
+    executeVerifiedUnifiedDelivery.mockResolvedValue({ output: {}, metadata: { runId: "r5" }, spec: {} })
+
+    await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "写一篇讲AI提效的口播，写给中小企业老板，目标是引流获客",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+    }))
+
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      intent: expect.objectContaining({ taskKind: "new_draft" }),
+    }))
+  })
+
+  it("answers analysis questions even if the LLM wrongly asks to generate", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "误判成生成。",
+    })
+    executeVerifiedUnifiedReply.mockResolvedValue("这是故事型结构。")
+
+    const response = await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "这个文案是什么结构？",
+        relevantConversation: [],
+        currentArtifact: { content: "参考正文" },
+        referenceMaterials: [],
+      },
+    }))
+    const data = await response.json()
+
+    expect(data.kind).toBe("reply")
+    expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
+    expect(executeVerifiedUnifiedReply).toHaveBeenCalledOnce()
+  })
 })
