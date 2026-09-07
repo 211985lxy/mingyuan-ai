@@ -14,7 +14,7 @@ export interface AimWorkbenchHeaderProps {
   AgentIcon: ComponentType<{ className?: string }>
   /** 空状态（未开始任务）时不展示完整四阶段步骤条，避免与正文快捷入口重复 */
   showStageProgress: boolean
-  /** @deprecated 阶段条改为只读进度，不再用于切换专家 */
+  /** 点击非当前阶段时切换工作流阶段（同时切到该阶段默认专家并写回 URL） */
   onStageChange?: (stage: AimWorkflowStage) => void
   onReset: () => void
 }
@@ -28,6 +28,7 @@ export function AimWorkbenchHeader({
   agentTitle,
   AgentIcon,
   showStageProgress,
+  onStageChange,
   onReset,
 }: AimWorkbenchHeaderProps) {
   const currentIndex = AIM_WORKFLOW_STAGES.findIndex(
@@ -62,6 +63,7 @@ export function AimWorkbenchHeader({
                   stage={stage}
                   index={index}
                   currentIndex={currentIndex}
+                  onStageChange={onStageChange}
                 />
               ))}
             </ol>
@@ -92,18 +94,29 @@ function StageItem(props: {
   stage: (typeof AIM_WORKFLOW_STAGES)[number]
   index: number
   currentIndex: number
+  onStageChange?: (stage: AimWorkflowStage) => void
 }) {
-  const { stage, index, currentIndex } = props
+  const { stage, index, currentIndex, onStageChange } = props
   const isCurrent = stage.id === (AIM_WORKFLOW_STAGES[currentIndex]?.id ?? null)
   const isDone = index < currentIndex
   const isNext = index === currentIndex + 1
+  const clickable = !isCurrent && Boolean(onStageChange)
+  const Tag = clickable ? "button" : "span"
   return (
     <li className="flex items-center">
-      <span
+      <Tag
+        {...(clickable
+          ? {
+              type: "button" as const,
+              "aria-label": `切换到${stage.title}`,
+              onClick: () => onStageChange?.(stage.id),
+            }
+          : {})}
         title={stage.description}
         aria-current={isCurrent ? "step" : undefined}
         className={cn(
           "relative inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-[12px] font-medium leading-none transition-all duration-200",
+          clickable && "cursor-pointer hover:bg-primary/8 hover:text-primary",
           isCurrent &&
             "bg-gradient-to-r from-primary/15 via-primary/10 to-amber-500/10 text-primary shadow-[0_0_0_1px_rgba(209,74,51,0.18),0_2px_8px_-4px_rgba(209,74,51,0.25)]",
           isDone && "text-muted-foreground/85",
@@ -139,7 +152,7 @@ function StageItem(props: {
         >
           {stage.title}
         </span>
-      </span>
+      </Tag>
       {index < AIM_WORKFLOW_STAGES.length - 1 ? (
         <span
           className={cn(
