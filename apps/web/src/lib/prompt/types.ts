@@ -69,6 +69,11 @@ export const PROMPT_KEYS = {
   knowledgeDistillUser: "knowledge.distill.user",
   competitorChannelsTopicAnalysis: "competitor.search_channels.topic_analysis",
   competitorChannelsTopicAnalysisUser: "competitor.search_channels.topic_analysis_user",
+  // ── 批3：lib 级零散点扫尾 ──
+  competitorMethodologyCompile: "competitor.methodology.compile",
+  contentRetroOutcomeMissing: "aim.content_retro.outcome_missing",
+  contentRetroOutcomePresent: "aim.content_retro.outcome_present",
+  workEditorKnowledgeFallback: "aim.work_editor.knowledge_fallback",
 } as const
 
 export type PromptKey = (typeof PROMPT_KEYS)[keyof typeof PROMPT_KEYS]

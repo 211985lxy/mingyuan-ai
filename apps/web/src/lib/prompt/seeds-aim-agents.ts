@@ -188,7 +188,23 @@ const CONTENT_RETRO_GENERATE = `你是「数据复盘」，负责对单条已发
 【禁止输出】新文案、完整重写稿、播放量预测、商业模式四层诊断、生意系统体检报告。
 请直接输出数据复盘，不写套话、黑话和前言。`
 
-/** work_editor / content_review / content_retro 批1 seed。 */
+// ── 批3：content_retro 发布数据区块分支文案（原 buildPublishOutcomeSection） ──
+
+const CONTENT_RETRO_OUTCOME_MISSING = `【发布数据】未登记发布数据。
+你必须明确告诉用户：当前没有登记发布数据和线索归因，请先去登记这条内容发布后的真实结果（含加微/进线线索归因），再来做复盘。
+绝对不许编造任何数字、播放量、点赞、评论、转发或转化结果。`
+
+const CONTENT_RETRO_OUTCOME_PRESENT = `【发布数据】
+{block}
+
+以上是用户已登记的真实发布结果与线索归因。只基于这些数据判断，缺什么就说缺什么，不许补编数字。`
+
+// ── 批3：work_editor 知识库为空降级文案（原 aim-agent-work-editor.ts generate） ──
+
+const WORK_EDITOR_KNOWLEDGE_FALLBACK = `【知识库状态】当前未检索到与本次编辑相关的知识库内容。
+降级策略：完全基于用户提供的成稿/素材完成编辑，不要编造企业案例或事实。`
+
+/** work_editor / content_review / content_retro 批1 seed + 批3 扫尾。 */
 export const AIM_AGENTS_PROMPT_SEEDS: PromptSeed[] = [
   {
     key: PROMPT_KEYS.workEditorChat,
@@ -253,5 +269,29 @@ export const AIM_AGENTS_PROMPT_SEEDS: PromptSeed[] = [
     version: 1,
     type: "function",
     content: CONTENT_RETRO_GENERATE,
+  },
+  {
+    key: PROMPT_KEYS.contentRetroOutcomeMissing,
+    domain: "aim",
+    description: "发布数据未登记区块（原 buildPublishOutcomeSection 空分支）",
+    version: 1,
+    type: "inline",
+    content: CONTENT_RETRO_OUTCOME_MISSING,
+  },
+  {
+    key: PROMPT_KEYS.contentRetroOutcomePresent,
+    domain: "aim",
+    description: "发布数据已登记区块（原 buildPublishOutcomeSection 数据分支）",
+    version: 1,
+    type: "function",
+    content: CONTENT_RETRO_OUTCOME_PRESENT,
+  },
+  {
+    key: PROMPT_KEYS.workEditorKnowledgeFallback,
+    domain: "aim",
+    description: "作品编辑知识库为空降级文案（原 aim-agent-work-editor.ts generate）",
+    version: 1,
+    type: "inline",
+    content: WORK_EDITOR_KNOWLEDGE_FALLBACK,
   },
 ]

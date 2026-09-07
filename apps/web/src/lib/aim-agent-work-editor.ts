@@ -86,8 +86,7 @@ export class WorkEditorHandler implements AimAgentHandler {
 
     const knowledgeSection = context.knowledgeBlock?.trim()
       ? context.knowledgeBlock
-      : `【知识库状态】当前未检索到与本次编辑相关的知识库内容。
-降级策略：完全基于用户提供的成稿/素材完成编辑，不要编造企业案例或事实。`
+      : promptRegistry.get(PROMPT_KEYS.workEditorKnowledgeFallback).content
 
     const systemPrompt = fillPromptTemplate(
       promptRegistry.get(PROMPT_KEYS.workEditorGenerate).content,
