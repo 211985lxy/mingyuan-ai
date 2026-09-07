@@ -1,8 +1,11 @@
 /**
- * 技能按钮 → 发送链路的委托透传。
+ * 技能按钮 → 一键出稿链路的委托透传。
  *
- * 技能按钮只把提示词填进输入框，真正发送发生在下一次点击；
- * 这里钉死"委托意图能活到那一次发送"，以及"用户改写掉提示词后自动失效"。
+ * 点技能直接把指令填进输入框并立即生成/发送；这里钉死：
+ *   1. 委托意图能在同一次点击里透传到生成/发送请求；
+ *   2. 技能属于当前智能体时不带引擎字段；
+ *   3. 有编辑器选区时走发送（带编辑器上下文）；
+ *   4. 委托只生效一次，之后的手动发送不再复用引擎。
  */
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import { renderHook, act } from "@testing-library/react"
@@ -60,41 +63,52 @@ function setup(overrides: Record<string, unknown> = {}) {
   return { hook, sendText, generateWithInput, getInput: () => input }
 }
 
-describe("技能跨引擎委托：技能按钮 → 发送", () => {
+describe("技能一键出稿：点技能 → 立即生成/发送", () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it("质检技能填入后发送，请求带上质检引擎", async () => {
-    const { hook, sendText, getInput } = setup()
+  it("点质检技能立即生成，请求带上质检引擎", async () => {
+    const { hook, generateWithInput, sendText } = setup()
 
-    act(() => {
+    await act(async () => {
       hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
     })
-    hook.rerender({ input: getInput() })
-    await act(async () => {
-      await hook.result.current.handleSend()
-    })
 
-    expect(sendText).toHaveBeenCalledWith(
+    expect(sendText).not.toHaveBeenCalled()
+    expect(generateWithInput).toHaveBeenCalledWith(
       TITLE_REVIEW_SKILL.prompt,
       expect.objectContaining({ executionAgentId: "content_review" }),
     )
   })
 
-  it("技能属于当前智能体时不带引擎字段，行为不变", async () => {
-    const { hook, sendText, getInput } = setup()
+  it("点当前智能体自己的技能时不带引擎字段", async () => {
+    const { hook, generateWithInput } = setup()
 
-    act(() => {
+    await act(async () => {
       hook.result.current.handleUseSkill(POLISH_SKILL)
     })
-    hook.rerender({ input: getInput() })
-    await act(async () => {
-      await hook.result.current.handleSend()
+
+    expect(generateWithInput).toHaveBeenCalledTimes(1)
+    expect(generateWithInput.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
+  })
+
+  it("有编辑器选区时点技能走发送，带质检引擎和编辑器上下文", async () => {
+    const { hook, sendText, generateWithInput } = setup({
+      hasEditorSelection: true,
+      editorText: "待质检的草稿",
+      draftSelection: { text: "待质检的草稿", range: { start: 0, end: 0 } },
     })
 
-    expect(sendText).toHaveBeenCalledTimes(1)
-    expect(sendText.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
+    await act(async () => {
+      hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
+    })
+
+    expect(generateWithInput).not.toHaveBeenCalled()
+    expect(sendText).toHaveBeenCalledWith(
+      TITLE_REVIEW_SKILL.prompt,
+      expect.objectContaining({ executionAgentId: "content_review" }),
+    )
   })
 
   it("没点技能直接发送时不带引擎字段", async () => {
@@ -108,60 +122,7 @@ describe("技能跨引擎委托：技能按钮 → 发送", () => {
     expect(sendText.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
   })
 
-  it("用户把技能提示词改掉后委托自动失效", async () => {
-    const { hook, sendText } = setup()
-
-    act(() => {
-      hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
-    })
-    // 用户清空重写，输入框里已经没有技能提示词
-    hook.rerender({ input: "算了，直接帮我改一版" })
-    await act(async () => {
-      await hook.result.current.handleSend()
-    })
-
-    expect(sendText.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
-  })
-
-  it("委托只用一次，第二次发送不再复用", async () => {
-    const { hook, sendText, getInput } = setup()
-
-    act(() => {
-      hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
-    })
-    hook.rerender({ input: getInput() })
-    await act(async () => {
-      await hook.result.current.handleSend()
-    })
-    await act(async () => {
-      await hook.result.current.handleSend()
-    })
-
-    expect(sendText.mock.calls[0][1]).toMatchObject({ executionAgentId: "content_review" })
-    expect(sendText.mock.calls[1][1]).not.toHaveProperty("executionAgentId")
-  })
-
-  // generate 请求已透传 executionAgentId 并映射到 agentId（见 use-aim-generation-actions），
-  // 委托直接随 generate 切引擎，无需改走 chat。
-  it("有委托时生成入口把 executionAgentId 透传给 generate", async () => {
-    const { hook, generateWithInput, sendText, getInput } = setup()
-
-    act(() => {
-      hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
-    })
-    hook.rerender({ input: getInput() })
-    await act(async () => {
-      await hook.result.current.handleGenerate()
-    })
-
-    expect(sendText).not.toHaveBeenCalled()
-    expect(generateWithInput).toHaveBeenCalledWith(
-      TITLE_REVIEW_SKILL.prompt,
-      expect.objectContaining({ executionAgentId: "content_review" }),
-    )
-  })
-
-  it("没有委托时生成入口照常走 generate，且不带引擎字段", async () => {
+  it("没点技能直接生成时不带引擎字段", async () => {
     const { hook, generateWithInput, sendText } = setup()
 
     hook.rerender({ input: "帮我写一版新的口播" })
@@ -172,5 +133,21 @@ describe("技能跨引擎委托：技能按钮 → 发送", () => {
     expect(sendText).not.toHaveBeenCalled()
     expect(generateWithInput).toHaveBeenCalledTimes(1)
     expect(generateWithInput.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
+  })
+
+  it("技能委托只生效一次，之后的手动发送不再复用引擎", async () => {
+    const { hook, generateWithInput, sendText } = setup()
+
+    await act(async () => {
+      hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
+    })
+    expect(generateWithInput.mock.calls[0][1]).toMatchObject({ executionAgentId: "content_review" })
+
+    // 输入框残留技能 prompt，但委托已在点击时消费；手动再发送不应再带引擎
+    hook.rerender({ input: TITLE_REVIEW_SKILL.prompt })
+    await act(async () => {
+      await hook.result.current.handleSend()
+    })
+    expect(sendText.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
   })
 })
