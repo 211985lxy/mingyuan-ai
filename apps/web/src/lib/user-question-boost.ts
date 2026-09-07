@@ -93,6 +93,8 @@ export async function applyUserQuestionBoost(
     const questionCards = await prismaAny.userQuestionCard.findMany({
       where: { userId, occurrenceCount: { gte: 3 } },
       select: { id: true, originalText: true },
+      // 提问加分只取高频卡片的候选集，封顶避免长期用户的无限增长查询。
+      take: 100,
     }) as Array<{ id: string; originalText: string }>
 
     if (!Array.isArray(questionCards) || questionCards.length === 0) {

@@ -546,6 +546,8 @@ async function findPendingAgentProjectWork(
       status: { in: ["queued", "running"] },
     },
     select: { id: true, backgroundTaskId: true },
+    // 排查报告只关心未完成任务；正常积压远低于该上限，封顶防止全表扫描。
+    take: 200,
   })
   const invocationIds = pendingInvocations.map((invocation) => invocation.id)
   const linkedTaskIds = pendingInvocations
@@ -558,15 +560,10 @@ async function findPendingAgentProjectWork(
           where: {
             aggregateType: "agent_invocation",
             aggregateId: { in: invocationIds },
-            status: {
-              in: [
-                BACKGROUND_TASK_STATUS.queued,
-                BACKGROUND_TASK_STATUS.leased,
-                BACKGROUND_TASK_STATUS.retryWait,
-              ],
-            },
+            status: { in: [BACKGROUND_TASK_STATUS.queued, BACKGROUND_TASK_STATUS.leased, BACKGROUND_TASK_STATUS.retryWait] },
           },
           select: { id: true },
+          take: 200,
         })
       : []
 
