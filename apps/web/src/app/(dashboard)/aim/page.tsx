@@ -25,7 +25,7 @@ import type { BatchTab } from "@/components/aim/batch-script-studio-sections"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { useAimWorkbenchSkills } from "@/features/aim/hooks/use-aim-workbench-skills"
-import { type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import { getAimAgentGuide, type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
@@ -364,6 +364,7 @@ export default function AimPage() {
               selectedAgentId={w.selectedAgentId}
               selectedProjectId={w.selectedProjectId}
               latestDeliverableMessageId={w.latestDeliverableMessageId}
+              quickPrompts={getAimAgentGuide(w.selectedAgentId).quickPrompts}
               actions={{
                 onSubmitChoice: (text) => void w.sendText(text),
                 onRetry: w.retryFailed,
