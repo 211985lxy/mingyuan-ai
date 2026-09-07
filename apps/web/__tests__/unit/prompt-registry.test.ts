@@ -6,7 +6,7 @@
  * - DB 失败回落 seed 且不抛错，warn 每 key 只打一次
  * - seed 幂等（重复 registerSeed / 重复 get 行为稳定）
  * - getMessages 返回 [{role:"system"},{role:"user"}]
- * - 六个 key 的内置 seed 非空且可回落
+ * - 全部 key 的内置 seed 非空、唯一且可回落
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -210,9 +210,11 @@ describe("prompt-registry seed 与缓存", () => {
   })
 })
 
-describe("prompt-registry 批0 六个内置 seed", () => {
-  it("六个 key 全部注册且内容非空", () => {
-    expect(PROMPT_SEEDS).toHaveLength(6)
+describe("prompt-registry 内置 seed（批0 六个 + 批1 二十四个）", () => {
+  it("全部 key 注册且内容非空、key 唯一", () => {
+    expect(PROMPT_SEEDS).toHaveLength(30)
+    const seedKeys = PROMPT_SEEDS.map((seed) => seed.key)
+    expect(new Set(seedKeys).size).toBe(seedKeys.length)
     for (const key of Object.values(PROMPT_KEYS)) {
       const record = promptRegistry.get(key)
       expect(record.content.length, `${key} 应有内置 seed`).toBeGreaterThan(0)

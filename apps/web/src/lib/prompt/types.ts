@@ -17,14 +17,49 @@ export type PromptStatus = "draft" | "qualified" | "active"
 /** prompt 正文。统一 string（数组形态已 join）。 */
 export type PromptContent = string
 
-/** 批0 六个 key。新增 prompt 必须先在此登记。 */
+/**
+ * 批0 六个 key + 批1 函数拼接型 24 个 key。新增 prompt 必须先在此登记。
+ * 批1 的 function 型 seed 以 `{name}` 占位（配合 fillPromptTemplate 使用），
+ * 占位符名只能用 ASCII `\w` 字符。
+ */
 export const PROMPT_KEYS = {
+  // ── 批0：常量型 ──
   knowledgeEntityExtract: "knowledge.entity_extract.default",
   marketingShortvideo: "marketing.analysis.shortvideo",
   commentRadar: "comment.insight.radar",
   transcriptPolish: "marketing.analysis.transcript_polish",
   competitorAnalysis: "competitor.analysis.default",
   meetingInsight: "aim.meeting.insight_extract.default",
+  // ── 批1：语义任务理解 ──
+  semanticTaskUnderstanding: "aim.semantic_task.understanding",
+  semanticTaskRepair: "aim.semantic_task.repair",
+  // ── 批1：work_editor ──
+  workEditorChat: "aim.work_editor.chat",
+  workEditorGenerate: "aim.work_editor.generate",
+  workEditorGenerateUser: "aim.work_editor.generate_user",
+  // ── 批1：content_review ──
+  contentReviewChat: "aim.content_review.chat",
+  contentReviewGenerate: "aim.content_review.generate",
+  contentEditorRevise: "aim.content_review.editor_revise",
+  // ── 批1：content_retro ──
+  contentRetroChat: "aim.content_retro.chat",
+  contentRetroGenerate: "aim.content_retro.generate",
+  // ── 批1：script_polish ──
+  scriptPolishImitateSystem: "aim.script_polish.imitate_system",
+  scriptPolishImitateUser: "aim.script_polish.imitate_user",
+  scriptPolishProofreadSystem: "aim.script_polish.proofread_system",
+  scriptPolishProofreadUser: "aim.script_polish.proofread_user",
+  scriptPolishPolishSystem: "aim.script_polish.polish_system",
+  scriptPolishPolishUser: "aim.script_polish.polish_user",
+  // ── 批1：质量门控 ──
+  qualityGateEvaluation: "quality.gate.combined_evaluation",
+  qualityGateEvaluationSystem: "quality.gate.evaluation_system",
+  qualityGateRewrite: "quality.gate.rewrite",
+  qualityGateRewriteSystem: "quality.gate.rewrite_system",
+  qualityGateHookRewrite: "quality.gate.hook_rewrite",
+  qualityGateOralRewrite: "quality.gate.oral_rewrite",
+  qualityGateLogicRewrite: "quality.gate.logic_rewrite",
+  qualityGateEditorialRewrite: "quality.gate.editorial_rewrite",
 } as const
 
 export type PromptKey = (typeof PROMPT_KEYS)[keyof typeof PROMPT_KEYS]

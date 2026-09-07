@@ -188,3 +188,35 @@ sequenceDiagram
 - 评估调用日志注入（P1）
 - 批 1（函数拼接型 6 文件）/ 批 2（API 路由内联 2 文件）
 - 首屏即对话、能力 API 契约收敛、HITL 内联、组织协同显性化（其余四步）
+
+---
+
+## 10. 批1 实现记录（函数拼接型 · 2026-09-08）
+
+**落地分支**：`feat/aim-workbench-experience-upgrade`（承接批0）。方案：沿用批0 的 seed v1 逐字兜底 + 同步 registry，函数拼接型的 `${…}` 插值改为 `{name}` 占位符（语义与原 quality-gate 私有 `fillTemplate` 完全一致），调用点预组运行时区块后经 `fillPromptTemplate` 注入。
+
+### 交付
+| 路径 | 状态 |
+|---|---|
+| `src/lib/prompt/template.ts` | 新增，`fillPromptTemplate`（`{name}` 单遍替换、未知 key 空串；quality-gate 私有实现收编为共享） |
+| `src/lib/prompt/types.ts` | PROMPT_KEYS 6 → 30（semantic_task 2 / work_editor 3 / content_review 3 / content_retro 2 / script_polish 6 / quality_gate 8） |
+| `src/lib/prompt/seeds-aim-agents.ts` | 新增，8 条 seed（work_editor / content_review / content_retro） |
+| `src/lib/prompt/seeds-aim-services.ts` | 新增，8 条 seed（semantic_task / script_polish） |
+| `src/lib/prompt/seeds-quality-gate.ts` | 新增，8 条 seed（6 模板 + 2 内联 system） |
+| `src/lib/prompt/seeds.ts` | 改为聚合入口（批0 原文不动，追加三个批1 数组） |
+| 6 调用点 | 删除全部字面 prompt（work-editor 骨架、review/retro builder、script-polish 数组 join、semantic-task 2 常量、quality-gate 6 模板 + 2 内联 system + 私有 fillTemplate） |
+| 测试 | `prompt-batch1-snapshot.test.ts`（迁移前基线 29 案例）+ registry 测试扩到 30 seed 断言 + 两个源码契约测试纳入 seed 文件读取 |
+
+### 等价性证明（逐字节）
+`prompt-batch1-snapshot.test.ts` 两段式：先在迁移前 commit（`d773d0a3`）把六个文件全部 builder 在条件分支全覆盖下的真实输出写入 fixtures JSON（29 案例：light_edit 开关、workflow/ipWiki 有无、发布数据有无、topicTitle 有无、四类靶向重写等）；迁移后同一测试比对模式逐案例 `toBe` 断言。**迁移中快照实测抓出 2 处换行归属漂移（imitate user 的 topicTitle 尾换行、polish user 的空首元素前导换行 + 尾随双换行），均已修正后全绿。**
+
+### 验证
+- ✅ 快照比对 29/29 逐字节一致
+- ✅ 全量单测 3225 passed（467 文件；含 107 个六个文件直接相关用例）
+- ✅ `tsc --noEmit` 零错误、改动文件 ESLint 零告警
+- ✅ 四禁区文件 vs HEAD 零 diff；六文件 `grep "你是"` 无字面残留
+- ✅ seed 脚本零改动自动纳管（新 key 首次跑 `seed-prompt-registry.ts` 幂等写入 draft v1）
+
+### 边界与已知保留（非缺陷）
+- `buildPublishOutcomeSection`（导出函数，有外部调用方）两个分支文案与 `buildPolishInstructions` 五段条件指令仍在代码里——前者是运行时数据区块包装、后者是逻辑选择的指令片段，均不属于静态正本；留批2/P1 酌情收编。
+- work-editor「知识库为空降级策略」文案保留在调用点（降级分支，非主 prompt 正本）。

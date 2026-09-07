@@ -11,6 +11,9 @@ import {
 } from "@/lib/aim-generation-prompts"
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import { AIM_NORTH_STAR_GOAL, AIM_SESSION_PRIORITY_RULES, LIGHT_EDIT_OUTPUT_BOUNDARY } from "@/lib/aim-intent-boundaries"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import type { ContentFormat } from "./aim-generator"
 import type {
   AimAgentHandler,
@@ -51,33 +54,20 @@ export class WorkEditorHandler implements AimAgentHandler {
     // 该规则自身声明「局部润色、单句改写不要追加验证结果区块」；若在 light_edit 下注入，
     // 模型会同时收到「保留原文、只改局部」与「追加验证结果区块」两个相反指令。
     const highRiskBlock = isLightEdit ? "" : `\n${AIM_HIGH_RISK_LOOP_RULE}`
-    return `你是「作品编辑」，只做三件事：文字二改/润色、公众号排版、小红书图文改写。
-默认输入是已有成稿或素材。不要从零写深度长文或公众号新稿；用户要新写长文时，明确提示去「内容创作」。
-
-北极星目标：${AIM_NORTH_STAR_GOAL}
-
-企业已有核心知识库（参考背景）：
-${contextBlock}
-${workflowContext ? `\n工作流任务单：\n${workflowContext}\n` : ""}
-IP操盘方法论（编辑时的强参考，不得整段抄进回复）：
-${params.methodologyBlock}
-${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
-${lightEditBlock}${highRiskBlock}
-
-你的对话原则：
-1. 先判断用户当前要做哪一类：文字二改/润色、公众号排版，还是小红书图文改写；直接输出对应成品，不强制先出框架、不追问一堆问题。
-2. 润色：保留作者立场、关键事实和真实数据，明显去 AI 味，纠正错别字和病句；不要擅自改主题或扩写成全新长文。
-3. 公众号排版：优化段落长度、补充小标题、梳理开篇钩子和结尾引导；配图位置用【配图：说明】标注；输出可直接用于公众号的正文。
-4. 小红书图文：输出标题（数量按用户指令，没说先问一句）、封面主标题/副标题、正文、贴合搜索习惯的话题标签、图文结构与逐页配图脚本（页数按用户指令，没说按信息量自然组织）；每页只讲一个信息点。
-5. 若用户要求审查/排查违禁词、敏感词或限流风险：先输出【审查】（命中项 + 风险 + 建议改法；没有就写未发现），再输出【修复稿】完整可发正文；不要只列词表，也不要跳过审查直接改。
-6. 若用户没有提供成稿/素材却要求「写一篇深度文章/从零起稿」，简短说明应改用「内容创作」，并询问是否已有成稿需要编辑。
-7. 正文最后一句写完就停止，不要追加拆分方向、私域话术、其他平台分发内容或「你看是否符合」这类确认尾句。
-8. 热点只能自然融合，禁止硬蹭或编造。
-9. 如果用户要求把成稿整理成发布文案/发布话题/发布包，必须遵守：
-${PUBLISH_PACKAGE_CHAT_RULE}
-10. ${AIM_SESSION_PRIORITY_RULES}
-
-请直接根据上文与用户的历史对话，产出下一轮内容。`
+    return fillPromptTemplate(
+      promptRegistry.get(PROMPT_KEYS.workEditorChat).content,
+      {
+        northStarGoal: AIM_NORTH_STAR_GOAL,
+        contextBlock,
+        workflowBlock: workflowContext ? `\n工作流任务单：\n${workflowContext}\n` : "",
+        methodologyBlock: params.methodologyBlock,
+        ipWikiBlock: params.ipWikiBlock ? `\n${params.ipWikiBlock}` : "",
+        lightEditBlock,
+        highRiskBlock,
+        publishPackageRule: PUBLISH_PACKAGE_CHAT_RULE,
+        sessionPriorityRules: AIM_SESSION_PRIORITY_RULES,
+      },
+    )
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
@@ -94,42 +84,32 @@ ${PUBLISH_PACKAGE_CHAT_RULE}
     )
     const safeTargets = allowed.length > 0 ? allowed : ["raw_copy" as ContentFormat]
 
-    const agentPrompt = `你是「作品编辑」，只做文字二改/润色、公众号排版或小红书图文改写。
-输入应是已有成稿或素材。禁止从零写深度长文；若输入明显是「请写一篇全新长文」且没有成稿，输出一句引导去「内容创作」，不要硬写长文。
-
-【核心输出规则 — 严格遵循】
-- 先判断本轮是：润色 / 公众号排版 / 小红书图文改写，只输出对应一类成品。
-- 润色：保真、去 AI 味、不改立场与关键数据；默认保留篇幅，除非用户明确要求精简。
-- 公众号排版：小标题 + 可读段落 + 【配图：说明】；不要另起全新选题。
-- 小红书图文：标题、封面、正文、话题、逐页脚本一次给齐。
-- 正文最后一句写完就停止；禁止拆分方向、私域话术、多平台二次分发、确认尾句。
-- 热点只能自然融合，禁止硬蹭或编造。
-- 不暴露外部参考来源细节。`
-
     const knowledgeSection = context.knowledgeBlock?.trim()
       ? context.knowledgeBlock
       : `【知识库状态】当前未检索到与本次编辑相关的知识库内容。
 降级策略：完全基于用户提供的成稿/素材完成编辑，不要编造企业案例或事实。`
 
-    const systemPrompt = `${agentPrompt}
-
-${knowledgeSection}
-${context.methodologyBlock
-  ? `IP操盘方法论（编辑时参考）：\n${context.methodologyBlock}`
-  : ""}
-${context.eventStorytellingBlock}
-${context.ipWikiBlock ? `${context.ipWikiBlock}\n` : ""}
-${context.runtimeTask === "light_edit" ? `${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""}
-请严格按照用户指定的编辑类型输出，不要添加解释、点评或确认尾句。`
+    const systemPrompt = fillPromptTemplate(
+      promptRegistry.get(PROMPT_KEYS.workEditorGenerate).content,
+      {
+        knowledgeSection,
+        methodologyBlock: context.methodologyBlock
+          ? `IP操盘方法论（编辑时参考）：\n${context.methodologyBlock}`
+          : "",
+        eventStorytellingBlock: context.eventStorytellingBlock,
+        ipWikiBlock: context.ipWikiBlock ? `${context.ipWikiBlock}\n` : "",
+        lightEditBlock: context.runtimeTask === "light_edit" ? `${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : "",
+      },
+    )
 
     const workflowContext = buildWorkflowContext(context)
-    const userPrompt = `用户输入的原始内容：
-"${context.rawInput}"
-
-${workflowContext ? `工作流上下文：
-${workflowContext}
-
-` : ""}请按作品编辑职责输出成品（润色 / 公众号排版 / 小红书图文）。若没有成稿却要求新写深度长文，只输出引导去内容创作的简短说明。`
+    const userPrompt = fillPromptTemplate(
+      promptRegistry.get(PROMPT_KEYS.workEditorGenerateUser).content,
+      {
+        rawInput: context.rawInput,
+        workflowBlock: workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : "",
+      },
+    )
 
     const { completion, parsed, safetyWarning } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,

@@ -1,13 +1,16 @@
 /**
- * Prompt Registry 内置兜底 seed（seed v1）。
+ * Prompt Registry 内置兜底 seed（seed v1）聚合入口。
  *
- * ⚠️ 本文件是「逐字原文」仓库：六条 content 与迁移前各 lib 文件里的
- * SYSTEM_PROMPT **逐字一致**（数组形态的用 .join("\n") 保持同样结果）。
+ * ⚠️ 各 seed 文件是「逐字原文」仓库：content 与迁移前各 lib 文件里的
+ * prompt **逐字一致**（数组形态的用 .join("\n") 保持同样结果）。
  * 修改 content 等于改线上 prompt，必须走版本化流程（新增版本而非改 seed）。
  *
  * 用途：DB 不可用 / 未命中时的同步兜底，保证首次行为与迁移前零差异。
  */
 
+import { AIM_AGENTS_PROMPT_SEEDS } from "./seeds-aim-agents"
+import { AIM_SERVICES_PROMPT_SEEDS } from "./seeds-aim-services"
+import { QUALITY_GATE_PROMPT_SEEDS } from "./seeds-quality-gate"
 import { PROMPT_KEYS, type PromptSeed } from "./types"
 
 // ── 1. knowledge.entity_extract.default（原 knowledge-entity-extractor.ts） ──
@@ -122,7 +125,7 @@ const MEETING_INSIGHT_LINES = [
   "- 全部字段为中文。pains/goals/objections/followUps/diagnosisQuestions/topicCandidates 为字符串数组；deliveryTasks 和 evidence 为对象数组。",
 ]
 
-/** 批0 六个内置 seed。registry 启动时注册，DB 未命中时作为兜底。 */
+/** 批0 + 批1 全部内置 seed。registry 启动时注册，DB 未命中时作为兜底。 */
 export const PROMPT_SEEDS: PromptSeed[] = [
   {
     key: PROMPT_KEYS.knowledgeEntityExtract,
@@ -172,4 +175,7 @@ export const PROMPT_SEEDS: PromptSeed[] = [
     type: "system",
     content: MEETING_INSIGHT_LINES.join("\n"),
   },
+  ...AIM_AGENTS_PROMPT_SEEDS,
+  ...AIM_SERVICES_PROMPT_SEEDS,
+  ...QUALITY_GATE_PROMPT_SEEDS,
 ]
