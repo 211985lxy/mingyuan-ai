@@ -6,7 +6,7 @@ import { executeVerifiedUnifiedDelivery, executeVerifiedUnifiedReply } from "@/l
 
 const { resolveBoundProject, executeAimRun, addAimTraceStep } = vi.hoisted(() => ({
   resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
-  executeAimRun: vi.fn(async () => ({
+  executeAimRun: vi.fn(async (_request: unknown) => ({
     output: { results: [] },
     metadata: { runId: "run-1", degraded: false },
     spec: {},

@@ -181,7 +181,11 @@ vi.mock("@/lib/prisma", () => ({ prisma: DB.prisma }))
 // Route handlers wrap their inner handler with withUserAuth; pass straight through.
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth: (handler: (request: unknown, context: { user: { id: string }; params?: Record<string, string> }) => unknown) =>
-    handler,
+    async (request: unknown, segmentData: { user: { id: string }; params?: Promise<Record<string, string>> }) =>
+      handler(request, {
+        ...segmentData,
+        params: segmentData.params ? await segmentData.params : undefined,
+      }),
 }))
 
 // Server-authoritative binding resolver for route tests.
@@ -213,9 +217,12 @@ beforeEach(() => {
 })
 
 function ctx() {
-  return { user: { id: "user-1", email: "u@test.com" } }
+  return { user: { id: "user-1", email: "u@test.com" }, params: Promise.resolve<Record<string, string>>({}) }
 }
-function makeRequest(url: string, init?: RequestInit) {
+function ctxWithParams(params: Record<string, string>) {
+  return { ...ctx(), params: Promise.resolve(params) }
+}
+function makeRequest(url: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
   return new NextRequest(url, init)
 }
 
@@ -287,7 +294,7 @@ describe("watched competitor accounts", () => {
   it("delete route 404s a same-user account from project-b", async () => {
     const response = await deleteWatchAccount(
       makeRequest("http://localhost/api/competitor/watch-accounts/wa-b"),
-      { ...ctx(), params: { id: "wa-b" } },
+      ctxWithParams({ id: "wa-b" }),
     )
     expect(response.status).toBe(404)
   })
@@ -295,7 +302,7 @@ describe("watched competitor accounts", () => {
   it("delete route removes a same-user account from the bound project", async () => {
     const response = await deleteWatchAccount(
       makeRequest("http://localhost/api/competitor/watch-accounts/wa-a"),
-      { ...ctx(), params: { id: "wa-a" } },
+      ctxWithParams({ id: "wa-a" }),
     )
     expect(response.status).toBe(200)
   })
@@ -315,7 +322,7 @@ describe("competitor analyses — list + detail scoped to bound project", () => 
   it("detail route returns 404 for a same-user analysis from project-b", async () => {
     const response = await getCompetitorAnalysis(
       makeRequest("http://localhost/api/competitor/ca-b"),
-      { ...ctx(), params: { id: "ca-b" } },
+      ctxWithParams({ id: "ca-b" }),
     )
     expect(response.status).toBe(404)
   })
@@ -323,7 +330,7 @@ describe("competitor analyses — list + detail scoped to bound project", () => 
   it("detail route returns the bound-project analysis", async () => {
     const response = await getCompetitorAnalysis(
       makeRequest("http://localhost/api/competitor/ca-a"),
-      { ...ctx(), params: { id: "ca-a" } },
+      ctxWithParams({ id: "ca-a" }),
     )
     expect(response.status).toBe(200)
   })
@@ -364,7 +371,7 @@ describe("script + content generation run writes are stamped with the bound proj
     )
 
     await saveGeneratedScripts({
-      scripts: [{ title: "t", content: "content", segmentOrder: [0] }],
+      scripts: [{ title: "t", content: "content", segmentOrder: ["0"] }],
       userId: "user-1",
       structureId: "vs-1",
       projectId: BOUND,

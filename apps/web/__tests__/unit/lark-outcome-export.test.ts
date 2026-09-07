@@ -46,7 +46,7 @@ const outcomeRow = {
 
 describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
   it("未配置 LARK_OUTCOME_TABLE_ID 时显式报错，不落通用结果表", async () => {
-    const env = { ...BASE_ENV }
+    const env: Record<string, string | undefined> = { ...BASE_ENV }
     delete env.LARK_OUTCOME_TABLE_ID
     await expect(
       exportLarkBaseResult({
@@ -76,7 +76,7 @@ describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
   })
 
   it("写出字段：行级唯一键=outcome.id，未回填指标不列入内容", async () => {
-    const runCommand = vi.fn(async () => ({ ok: true }))
+    const runCommand = vi.fn(async (_command: string, _args: string[]) => ({ ok: true }))
     const result = await exportLarkBaseResult({
       userId: "user-1",
       projectId: "proj-1",
@@ -106,7 +106,7 @@ describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
   })
 
   it("全空指标记录仍可导出，内容显式说明无数据", async () => {
-    const runCommand = vi.fn(async () => ({}))
+    const runCommand = vi.fn(async (_command: string, _args: string[]) => ({}))
     await exportLarkBaseResult({
       userId: "user-1",
       projectId: "proj-1",

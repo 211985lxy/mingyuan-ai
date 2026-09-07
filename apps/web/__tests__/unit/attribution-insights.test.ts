@@ -40,7 +40,9 @@ function createStore(fixture: StoreFixture) {
     generations,
     aimGeneration: { findMany: vi.fn(async () => generations) },
     contentOutcome: { findMany: vi.fn(async () => fixture.outcomes ?? []) },
-    outcomeAttribution: { findMany: vi.fn(async () => fixture.attributions ?? []) },
+    outcomeAttribution: {
+      findMany: vi.fn(async (_args: { where?: Record<string, unknown>; take?: number }) => fixture.attributions ?? []),
+    },
   }
   return store as typeof store & AttributionInsightsStorePort
 }

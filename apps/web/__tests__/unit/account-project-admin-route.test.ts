@@ -39,6 +39,13 @@ function makeRequest(method: string, body?: Record<string, unknown>) {
   })
 }
 
+// The real `withAdminOnly` wrapper types the exported handlers as
+// (request, segmentData: { params: Promise<Record<string, string>> }).
+// The mocked wrapper injects its own admin context and ignores this argument,
+// so passing a resolved (empty) params object keeps the type contract without
+// changing runtime behavior.
+const segmentData = { params: Promise.resolve({}) }
+
 describe("admin account project binding route", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -66,7 +73,7 @@ describe("admin account project binding route", () => {
       },
     ])
 
-    const response = await GET(makeRequest("GET"))
+    const response = await GET(makeRequest("GET"), segmentData)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
       data: [
@@ -93,7 +100,7 @@ describe("admin account project binding route", () => {
       },
     ])
 
-    const response = await GET(makeRequest("GET"))
+    const response = await GET(makeRequest("GET"), segmentData)
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
       data: [
@@ -115,7 +122,7 @@ describe("admin account project binding route", () => {
       return project
     })
 
-    const response = await POST(makeRequest("POST", { userId: "user-1", projectId: "project-ai" }))
+    const response = await POST(makeRequest("POST", { userId: "user-1", projectId: "project-ai" }), segmentData)
     expect(response.status).toBe(200)
     expect(response.headers.get("x-request-id")).toBe("audit-1")
     await expect(response.json()).resolves.toEqual({ status: "bound", project })

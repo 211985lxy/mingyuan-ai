@@ -60,6 +60,13 @@ function jsonRequest(url: string, method: string, body?: Record<string, unknown>
   })
 }
 
+// The real `withAdminOnly` wrapper types the exported handlers as
+// (request, segmentData: { params: Promise<Record<string, string>> }).
+// The mocked wrapper injects its own admin context and ignores this argument,
+// so passing a resolved params object keeps the type contract without
+// changing runtime behavior.
+const segmentData = { params: Promise.resolve({ userId: "user-1" }) }
+
 describe("admin account project preview route", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -73,6 +80,7 @@ describe("admin account project preview route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/preview?projectId=project-b",
         "GET",
       ),
+      segmentData,
     )
 
     expect(response.status).toBe(200)
@@ -87,6 +95,7 @@ describe("admin account project preview route", () => {
   it("requires a target project id", async () => {
     const response = await previewGET(
       jsonRequest("http://localhost/api/admin/account-project-bindings/user-1/preview", "GET"),
+      segmentData,
     )
     expect(response.status).toBe(400)
     expect(getImpact).not.toHaveBeenCalled()
@@ -103,6 +112,7 @@ describe("admin account project preview route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/preview?projectId=project-paused",
         "GET",
       ),
+      segmentData,
     )
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({ code: "TARGET_NOT_ACTIVE" })
@@ -118,6 +128,7 @@ describe("admin account project preview route", () => {
         "POST",
         { projectId: "project-b", reason: "错误绑定修复", reactivate: false },
       ),
+      segmentData,
     )
 
     expect(response.status).toBe(200)
@@ -140,6 +151,7 @@ describe("admin account project preview route", () => {
         "POST",
         { projectId: "project-b", reactivate: false },
       ),
+      segmentData,
     )
     expect(response.status).toBe(400)
     expect(createToken).not.toHaveBeenCalled()
@@ -170,6 +182,7 @@ describe("admin account project repair route", () => {
 
     const response = await repairPOST(
       jsonRequest("http://localhost/api/admin/account-project-bindings/user-1/repair", "POST", { token: "token-1" }),
+      segmentData,
     )
 
     expect(response.status).toBe(400)
@@ -184,6 +197,7 @@ describe("admin account project repair route", () => {
         "POST",
         { reason: "错误绑定修复" },
       ),
+      segmentData,
     )
     expect(response.status).toBe(400)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -198,6 +212,7 @@ describe("admin account project repair route", () => {
         "POST",
         { token: "stale-token", reason: "错误绑定修复" },
       ),
+      segmentData,
     )
     expect(response.status).toBe(403)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -213,6 +228,7 @@ describe("admin account project repair route", () => {
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
       ),
+      segmentData,
     )
     expect(response.status).toBe(403)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -227,6 +243,7 @@ describe("admin account project repair route", () => {
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
       ),
+      segmentData,
     )
     expect(response.status).toBe(409)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -245,6 +262,7 @@ describe("admin account project repair route", () => {
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
       ),
+      segmentData,
     )
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({ code: "PROJECT_CONTEXT_MISMATCH" })
@@ -275,6 +293,7 @@ describe("admin account project repair route", () => {
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
       ),
+      segmentData,
     )
 
     expect(response.status).toBe(200)
@@ -321,6 +340,7 @@ describe("admin account project repair route", () => {
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
       ),
+      segmentData,
     )
 
     // 审计失败必须让整个修复报错（真实 DB 中该事务回滚），而不是返回成功。

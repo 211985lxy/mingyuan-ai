@@ -219,7 +219,9 @@ async function fitWithStructure(structureId: string) {
     }),
     headers: { "Content-Type": "application/json" },
   })
-  return fitTopic(request, ctx())
+  // 该测试将 withUserAuth mock 成直通：入参即内层 handler 的已解析 context，
+  // 而导出的 POST 类型是外层 wrapper 签名（params 为 Promise），故仅在类型上桥接。
+  return fitTopic(request, ctx() as unknown as Parameters<typeof fitTopic>[1])
 }
 
 describe("hot-topics fit — structure blueprint must belong to the bound project", () => {
