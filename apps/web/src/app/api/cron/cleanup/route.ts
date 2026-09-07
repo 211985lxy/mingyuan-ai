@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { validateCronSecret } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { purgeExpiredCodes } from "@/features/auth/sms-verification"
+import { sweepStaleAimGenerations } from "@/lib/aim/generation-attempt"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         errorMessage: "执行超时未结束，已自动标记失败",
       },
     })
+    const staleGenerations = await sweepStaleAimGenerations(now)
 
     const [hotItems, snapshots, expiredSmsCodes] = await Promise.all([
       prisma.douyinHotItem.deleteMany({
@@ -60,6 +62,7 @@ export async function GET(request: NextRequest) {
         expiredSmsCodes,
       },
       staleTraces: staleTraces?.count ?? 0,
+      staleGenerations,
     })
   } catch (error) {
     console.error("[cron/cleanup] failed:", error)

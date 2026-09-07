@@ -3,12 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 const mocks = vi.hoisted(() => ({
   aimSnapshots: vi.fn().mockResolvedValue({ count: 1 }),
   staleTraces: vi.fn().mockResolvedValue({ count: 4 }),
+  staleGenerations: vi.fn().mockResolvedValue(2),
   hotItems: vi.fn().mockResolvedValue({ count: 2 }),
   hotSnapshots: vi.fn().mockResolvedValue({ count: 3 }),
   smsCodes: vi.fn().mockResolvedValue({ count: 0 }),
 }))
 
 vi.mock("@/lib/admin-auth", () => ({ validateCronSecret: vi.fn().mockReturnValue(true) }))
+vi.mock("@/lib/aim/generation-attempt", () => ({
+  sweepStaleAimGenerations: mocks.staleGenerations,
+}))
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     aimRunSnapshot: { deleteMany: mocks.aimSnapshots },
@@ -52,5 +56,16 @@ describe("cleanup retention", () => {
         errorMessage: "执行超时未结束，已自动标记失败",
       },
     })
+  })
+
+  it("marks hanging generation tasks as STALE_EXECUTION without deleting them", async () => {
+    const now = new Date("2026-07-14T00:10:00.000Z")
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+    const response = await GET(new Request("https://example.com/api/cron/cleanup") as never)
+    const body = await response.json()
+    expect(response.status).toBe(200)
+    expect(mocks.staleGenerations).toHaveBeenCalledWith(now)
+    expect(body.staleGenerations).toBe(2)
   })
 })
