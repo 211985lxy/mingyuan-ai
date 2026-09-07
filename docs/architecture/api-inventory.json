@@ -4267,6 +4267,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/voice/history",
+      "file": "src/app/api/voice/history/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "voice",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "zod",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/voice/models",
       "file": "src/app/api/voice/models/route.ts",
       "methods": [
