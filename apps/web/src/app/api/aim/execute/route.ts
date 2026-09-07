@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     }))
     const agentId = parsed.executionAgentId || parsed.agentId || "content_producer"
     trace = await createAimTrace({
+      id: typeof parsed.traceId === "string" ? parsed.traceId.trim() || undefined : undefined,
       userId: user.id,
       projectId: parsed.projectId ?? null,
       agentId,

@@ -98,6 +98,8 @@ interface GenerateOptions {
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
   executionAgentId?: string
+  /** 客户端生成的追踪 ID：与占位消息上的 traceId 一致 */
+  traceId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
@@ -221,6 +223,7 @@ function buildGenerationRequest(
     useStyleProfileOverride: input.styleEnabled !== undefined ? input.styleEnabled : undefined,
     // 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入；未点技能则 undefined（服务端默认不注入）
     activeMethodologySignals: options.activeMethodologySignals?.length ? options.activeMethodologySignals : undefined,
+    traceId: options.traceId,
     executionAgentId: options.executionAgentId,
   }
 }
@@ -276,12 +279,12 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     : message))
   input.setIsGenerating(true)
   try {
-    const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, options)
+    const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId })
     // 创作台主生成（文案创作 content_producer）切到统一执行入口：
     // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
     const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
     if (useUnifiedEntry) {
-      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, options)
+      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId })
       const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
       if (controller.signal.aborted) {
         markGenerationStopped(input, assistantMessageId)

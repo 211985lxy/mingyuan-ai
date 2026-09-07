@@ -104,6 +104,7 @@ export const aimExecuteBodySchema = z.object({
   targetFormats: z.array(contentFormatSchema).min(1).max(8),
   methodologyProfileIds: methodologyProfileIdsSchema,
   activeMethodologySignals: activeMethodologySignalsSchema,
+  traceId: optionalId,
 }).strict()
 
 export const aimGenerateBodyObjectSchema = z.object({
