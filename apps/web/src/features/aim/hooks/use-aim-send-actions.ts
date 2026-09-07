@@ -33,6 +33,22 @@ interface UseAimSendActionsOptions {
   runWorkbenchCommand: (command: import("@/lib/aim-workbench-commands").AimWorkbenchCommand) => boolean
 }
 
+/** 判断当前工作台是否已有可写的素材（正文/编辑器/引用/附件/历史消息）。 */
+function hasWorkbenchMaterial(options: UseAimSendActionsOptions): boolean {
+  return Boolean(
+    options.input.trim()
+    || options.editorText.trim()
+    || options.draftSelection.text.trim()
+    || options.referenceSelection.text.trim()
+    || options.sourceOriginalText.trim()
+    || options.sourceAnalysisText.trim()
+    || options.sourceTopicTitle.trim()
+    || options.messages.length > 0
+    || options.imageAttachments.length > 0
+    || (options.fileAttachments?.length ?? 0) > 0,
+  )
+}
+
 /**
  * Send/generate/retry/skill actions for the AIM workbench page.
  *
@@ -58,6 +74,12 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       ? { prompt: nextInput.includes(skill.prompt) ? skill.prompt : nextInput, signals: methodologySignals }
       : null
     if (nextInput !== options.input) options.setInput(nextInput)
+
+    // 一键出稿门闩：有可写素材时点技能直接生成；否则只填指令，避免空点浪费一次生成。
+    if (!hasWorkbenchMaterial(options)) {
+      toast.success(`已填入「${skill.label}」`, { description: "补充素材后点右下角发送" })
+      return
+    }
 
     if (options.hasEditorSelection || options.imageAttachments.length > 0 || (options.fileAttachments?.length ?? 0) > 0) {
       void sendTextWith(nextInput)
