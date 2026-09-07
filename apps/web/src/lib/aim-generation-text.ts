@@ -24,7 +24,17 @@ export function splitGenerationReasoning(raw: string): ParsedGenerationContent {
     .replace(/^\[\[AIM_METHOD_NOTE\]\]/u, "")
     .replace(/\[\[\/AIM_METHOD_NOTE\]\]$/u, "")
     .trim()
-  return { content: deliveryBody(raw), reasoningSummary: inner || undefined }
+  return { content: deliveryBody(raw), reasoningSummary: sanitizeReasoningSummary(inner) }
+}
+
+const REASONING_DROP_LINE = /^(?:我先|让我|接下来我|逐步|写正文草稿|检查[“"「]|自检|系统提示|AIM_INTERNAL_|runtimeTask\s*=)/
+const REASONING_KEEP_LINE = /目标|来源|取舍|假设|风险|依据|证据|未核实/
+
+export function sanitizeReasoningSummary(raw: string): string | undefined {
+  const lines = raw.replace(/\r\n/g, "\n").split("\n").map((line) => line.trim()).filter(Boolean)
+  const kept = lines.filter((line) => !REASONING_DROP_LINE.test(line) && (REASONING_KEEP_LINE.test(line) || line.startsWith("-") || line.startsWith("###")))
+  const cleaned = kept.join("\n").trim()
+  return cleaned || undefined
 }
 
 export function deliveryBody(content: string): string {
