@@ -6,8 +6,8 @@
     300
   ],
   "functionLineLimit": 80,
-  "legacyFunctionBaseline": 197,
-  "legacyFunctionBaselineDate": "2026-09-03",
+  "legacyFunctionBaseline": 211,
+  "legacyFunctionBaselineDate": "2026-09-07",
   "legacyFiles": [
     {
       "path": "src/lib/aim-generation-prompts.ts",
@@ -18,6 +18,26 @@
       "path": "src/env.ts",
       "maxLines": 520,
       "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）"
+    },
+    {
+      "path": "src/lib/account-project-context.ts",
+      "maxLines": 974,
+      "target": "src/lib/account-project/（拆项目上下文解析、绑定、校验为多个域模块）"
+    },
+    {
+      "path": "src/lib/account-project-isolation-audit.ts",
+      "maxLines": 567,
+      "target": "src/lib/account-project/（拆审计查询与隔离校验）"
+    },
+    {
+      "path": "src/lib/api/admin-client.ts",
+      "maxLines": 629,
+      "target": "src/lib/api/admin/（按资源域拆分 client）"
+    },
+    {
+      "path": "src/app/admin/account-project-bindings/page.tsx",
+      "maxLines": 538,
+      "target": "src/app/admin/account-project-bindings/（拆列表/操作/筛选子组件）"
     }
   ]
 }

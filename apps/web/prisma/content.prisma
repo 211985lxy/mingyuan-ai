@@ -341,12 +341,10 @@ model AimConversation {
   updatedAt       DateTime @updatedAt
 
   messages AimConversationMessage[]
-
   @@unique([platform, externalAccountId, externalChatId, agentId], map: "AimConversation_platform_extAccountId_extChatId_agentId_key")
   @@index([userId, updatedAt])
   @@index([projectId, updatedAt])
 }
-
 /// A single turn in an AIM channel conversation (user message or assistant reply).
 model AimConversationMessage {
   id                 String   @id @default(cuid())
@@ -367,13 +365,10 @@ model AimConversationMessage {
   status             String   @default("completed") @db.VarChar(20) // completed | failed
   errorMessage       String?  @db.Text
   createdAt          DateTime @default(now())
-
   conversation AimConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
   @@index([conversationId, createdAt])
   @@index([agentId, createdAt])
 }
-
 /// Outbox table for async platform reply delivery.
 /// Decouples reply creation from reply sending, enabling retry, dead-letter handling,
 /// and unified delivery across Feishu, WeCom, and WorkBuddy platforms.
@@ -396,9 +391,7 @@ model ChannelReplyOutbox {
   sentAt            DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-
   inspiration Inspiration @relation(fields: [inspirationId], references: [id], onDelete: Cascade)
-
   @@index([status, createdAt])
   @@index([platform, status])
   @@index([status, claimExpiresAt])

@@ -353,14 +353,12 @@ model ContentOutcome {
   appointmentCount      Int?
   dealCount             Int?
   revenue               Decimal? @db.Decimal(14, 2)
-
   // 第二组：内容信号（nullable）
   views    Int?
   likes    Int?
   comments Int?
   saves    Int?
   shares   Int?
-
   // 第三组：用户反馈（自由文本备注 + 结构化判断码）
   audienceFeedback String? @db.Text
   /**
@@ -375,18 +373,14 @@ model ContentOutcome {
    * excellent|effective|neutral|ineffective|failed；缺省读取为 unknown
    */
   verdictCode      String? @db.VarChar(20)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   user       User          @relation(fields: [userId], references: [id])
   generation AimGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
-
   @@unique([userId, generationId, collectWindowDay])
   @@index([userId, collectedAt])
   @@index([generationId])
 }
-
 // 自定义技能：管理员在后台添加的 skill，运行时与内置 skill 合并。
 // id 冲突时自定义覆盖内置（实现"改默认 skill"的效果）。agentId 决定挂在哪个 agent 下。
 model AimCustomSkill {
@@ -401,7 +395,6 @@ model AimCustomSkill {
   group       String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   @@unique([agentId, skillId])
   @@index([agentId])
 }

@@ -497,6 +497,4 @@ async function buildContextTaskSpec(input: {
  * 的变更不会反映到 contextHash，导致编辑方法论后历史无法复现。现在把每类实际装配进
  * prompt 的 block 都记录一条，使 contextHash 真正反映本次运行的全部输入。
  */
-
-
 export { resolveAimRuntimeTask }
