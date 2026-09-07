@@ -164,6 +164,8 @@ export interface AimGeneration {
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
   /** 历史读取归一化：各格式的高层思考依据（内容列已剥离 METHOD_NOTE，只含可发布正文） */
   reasoningByFormat?: Partial<Record<ContentFormat, string>>
+  status?: string | null
+  errorMessage?: string | null
 }
 
 /**

@@ -15,9 +15,9 @@ function readErrorDetail(error: unknown, key: string): string | undefined {
 }
 
 export function shouldRetryTransiently(error: unknown): boolean {
-  if (readErrorDetail(error, "runId")) return false
+  if (readErrorDetail(error, "runId") || readErrorDetail(error, "generationId")) return false
   const code = readErrorDetail(error, "code") || ""
-  if (/^(MODEL_|GENERATION_|DELIVERY_|INSTRUCTION_|STALE_)/.test(code)) return false
+  if (/^(MODEL_|GENERATION_|DELIVERY_|INSTRUCTION_|STALE_|EMPTY_|PROVIDER_|INVALID_|BOUND_|USER_|INTERNAL_)/.test(code)) return false
   if (error instanceof ApiError && error.status === 422) return false
   if (!(error instanceof ApiError)) {
     return error instanceof TypeError || (error instanceof Error && /fetch failed|network|Failed to fetch/i.test(error.message))

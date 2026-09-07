@@ -14,9 +14,9 @@ import {
   extractBenchmarkAnalysisText,
   extractBenchmarkOriginalText,
   formatAnalysisResultForPrompt,
-  mapAimGenerationToDeliverables,
   nextAimWorkbenchId,
 } from "@/lib/aim/workbench-helpers"
+import { buildAimHistoryLoadMessages } from "@/lib/aim/history-load-messages"
 import type { AimWorkbenchMessage } from "@/lib/aim/workbench-types"
 
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -243,37 +243,7 @@ async function resolveHistoryLoadItem(input: {
 }
 
 function buildHistoryLoadMessages(item: AimGeneration, assistantId: string) {
-  const deliverables = mapAimGenerationToDeliverables(item)
-  const contents = deliverables.results
-  const newsroom = item.taskSpec && typeof item.taskSpec === "object" && !Array.isArray(item.taskSpec)
-    ? (item.taskSpec as { newsroom?: { stage?: string; sourceCount?: number; editorDiffSummary?: string } }).newsroom
-    : undefined
-  const stageHint = newsroom?.stage
-    ? `编辑室阶段：${newsroom.stage}${newsroom.sourceCount != null ? ` · 样本 ${newsroom.sourceCount}` : ""}`
-    : ""
-  const messages: AimWorkbenchMessage[] = [
-    { id: nextAimWorkbenchId(), role: "user", content: item.rawInput || "（历史素材）" },
-  ]
-  if (contents.length) {
-    messages.push({
-      id: assistantId,
-      role: "assistant",
-      content: [
-        `已加载历史记录${item.topicTitle ? `「${item.topicTitle}」` : ""}，可继续改写或追问。`,
-        stageHint,
-      ].filter(Boolean).join("\n"),
-      agentId: item.agentId ?? undefined,
-      deliverables,
-      editorDiffSummary: newsroom?.editorDiffSummary || null,
-    })
-  } else {
-    messages.push({
-      id: nextAimWorkbenchId(),
-      role: "assistant",
-      content: ["已加载历史素材，可直接让我改写。", stageHint].filter(Boolean).join("\n"),
-    })
-  }
-  return { messages, contents, deliverables }
+  return buildAimHistoryLoadMessages(item, assistantId)
 }
 
 /**

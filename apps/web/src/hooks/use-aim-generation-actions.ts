@@ -26,6 +26,7 @@ import {
   resolveFollowUpGenerationId,
 } from "@/hooks/aim-generation-delivery-flow"
 import { executeAimTurnWithTransientRetry, generateAimContentWithTransientRetry } from "@/hooks/aim-unified-turn-client"
+import { buildWebAttemptId, usesUnifiedAimExecuteEntry } from "@/lib/aim/unified-execute-entry"
 import {
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
@@ -278,15 +279,15 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
   input.setIsGenerating(true)
   try {
     const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, options)
-    // 创作台主生成（文案创作 content_producer）切到统一执行入口：
-    // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
-    const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
+    const attemptId = buildWebAttemptId(traceId)
+    const useUnifiedEntry = usesUnifiedAimExecuteEntry(options.executionAgentId || input.selectedAgentId)
     if (useUnifiedEntry) {
       const retrySource = options.retryMessageId
         ? input.messages.find((message) => message.id === options.retryMessageId)
         : undefined
       const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, {
         ...options,
+        attemptId,
         retryOfRunId: options.retryOfRunId || retrySource?.failure?.runId || retrySource?.runId || undefined,
       })
       const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
@@ -338,6 +339,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
               : item.runId,
           }
         : item))
+      void input.refreshHistory({ force: true })
     }
   } finally {
     stopProgressTicker()

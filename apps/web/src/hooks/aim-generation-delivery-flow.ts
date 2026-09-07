@@ -31,6 +31,7 @@ export interface AimExecuteTurnRequestOptions {
   startsNewTask?: boolean
   executionAgentId?: string
   retryOfRunId?: string
+  attemptId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
@@ -66,6 +67,7 @@ export function buildExecuteTurnRequest(
     methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
     activeMethodologySignals: options.activeMethodologySignals?.length ? options.activeMethodologySignals : undefined,
     retryOfRunId: options.retryOfRunId,
+    attemptId: options.attemptId,
   }
 }
 
@@ -116,6 +118,7 @@ export function applyExecuteTurnResponse(
     input.setMessages((messages) => messages.map((item) => item.id === assistantMessageId
       ? { ...item, content: response.question, pendingGeneration: false, failure: null }
       : item))
+    void input.refreshHistory({ force: true })
     return
   }
   if (response.kind === "reply") {
