@@ -10,6 +10,7 @@
 
 import { AIM_AGENTS_PROMPT_SEEDS } from "./seeds-aim-agents"
 import { AIM_SERVICES_PROMPT_SEEDS } from "./seeds-aim-services"
+import { API_ROUTES_PROMPT_SEEDS } from "./seeds-api-routes"
 import { QUALITY_GATE_PROMPT_SEEDS } from "./seeds-quality-gate"
 import { PROMPT_KEYS, type PromptSeed } from "./types"
 
@@ -178,4 +179,5 @@ export const PROMPT_SEEDS: PromptSeed[] = [
   ...AIM_AGENTS_PROMPT_SEEDS,
   ...AIM_SERVICES_PROMPT_SEEDS,
   ...QUALITY_GATE_PROMPT_SEEDS,
+  ...API_ROUTES_PROMPT_SEEDS,
 ]

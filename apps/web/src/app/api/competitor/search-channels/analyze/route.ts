@@ -2,6 +2,9 @@ import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { LLMClient } from "@/lib/llm"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import { searchWechatChannelsVideos, type WechatChannelsSearchVideo } from "@/lib/tikhub/search-wechat-channels-videos"
 import { z } from "zod"
 
@@ -9,12 +12,6 @@ const bodySchema = z.object({
   keyword: z.string().trim().min(1).max(200),
   count: z.number().int().min(5).max(50).default(20),
 }).strict()
-
-const TOPIC_ANALYSIS_PROMPT = `你是视频号选题分析专家。基于搜索结果数据，输出JSON格式的选题热度分析报告。
-
-输出JSON结构（不含其他文字）：
-{"heat_score":0-100,"heat_level":"高热|中热|低热|冷门","total_videos_analyzed":0,"analysis":{"content_format_distribution":[{"format":"口播|剧情|教程|vlog|混剪|其他","percentage":0}],"top_creators":[{"nickname":"","follower_hint":"","video_count_in_results":0}],"engagement_overview":{"avg_views":0,"avg_likes":0,"avg_comments":0,"avg_shares":0,"top_video_views":0},"trend_signals":[""],"differentiation_opportunities":[""],"recommended_angles":[""],"risk_notes":[""]},"summary":"一段话总结该选题在视频号的热度、竞争格局和切入建议"}
-每个字段值用中文，简洁精炼。`
 
 /**
  * POST /api/competitor/search-channels/analyze
@@ -60,10 +57,17 @@ export const POST = withUserAuth(async (request, { user: _user }) => {
     const llm = LLMClient.shared()
     const response = await llm.complete({
       messages: [
-        { role: 'system', content: TOPIC_ANALYSIS_PROMPT },
+        { role: 'system', content: promptRegistry.get(PROMPT_KEYS.competitorChannelsTopicAnalysis).content },
         {
           role: 'user',
-          content: `分析关键词「${body.keyword}」在视频号的选题热度。\n\n搜索结果（${videoSummaries.length}条视频）：\n${JSON.stringify(videoSummaries)}`,
+          content: fillPromptTemplate(
+            promptRegistry.get(PROMPT_KEYS.competitorChannelsTopicAnalysisUser).content,
+            {
+              keyword: body.keyword,
+              videoCount: String(videoSummaries.length),
+              videoSummariesJson: JSON.stringify(videoSummaries),
+            },
+          ),
         },
       ],
       temperature: 0.3,

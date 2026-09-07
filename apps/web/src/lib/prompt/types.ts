@@ -18,8 +18,9 @@ export type PromptStatus = "draft" | "qualified" | "active"
 export type PromptContent = string
 
 /**
- * 批0 六个 key + 批1 函数拼接型 24 个 key。新增 prompt 必须先在此登记。
- * 批1 的 function 型 seed 以 `{name}` 占位（配合 fillPromptTemplate 使用），
+ * 批0 六个 + 批1 函数拼接型 24 个 + 批2 API 路由内联 7 个 key。
+ * 新增 prompt 必须先在此登记。
+ * 批1/批2 的 function 型 seed 以 `{name}` 占位（配合 fillPromptTemplate 使用），
  * 占位符名只能用 ASCII `\w` 字符。
  */
 export const PROMPT_KEYS = {
@@ -60,6 +61,14 @@ export const PROMPT_KEYS = {
   qualityGateOralRewrite: "quality.gate.oral_rewrite",
   qualityGateLogicRewrite: "quality.gate.logic_rewrite",
   qualityGateEditorialRewrite: "quality.gate.editorial_rewrite",
+  // ── 批2：API 路由内联 ──
+  briefAiFillSystem: "brief.ai_fill.system",
+  briefAiFillUserInput: "brief.ai_fill.user_input",
+  briefAiFillUserNoInput: "brief.ai_fill.user_no_input",
+  knowledgeDistillSystem: "knowledge.distill.system",
+  knowledgeDistillUser: "knowledge.distill.user",
+  competitorChannelsTopicAnalysis: "competitor.search_channels.topic_analysis",
+  competitorChannelsTopicAnalysisUser: "competitor.search_channels.topic_analysis_user",
 } as const
 
 export type PromptKey = (typeof PROMPT_KEYS)[keyof typeof PROMPT_KEYS]
