@@ -7,6 +7,7 @@ import {
   ApiError,
   checkScriptQuality,
   generateAimContent,
+  type AimGenerateRequest,
   type AimGenerateResponse,
   type ContentFormat,
 } from "@/lib/api/client"
@@ -228,6 +229,29 @@ function buildGenerationRequest(
   }
 }
 
+/**
+ * 生成入口请求装配 seam（纯函数，供单测覆盖两处调用点的 traceId 接线与
+ * executionAgentId 剥离逻辑，防止重构悄悄丢掉 traceId 后回归 P0）：
+ * useUnifiedEntry → 统一执行入口 execute 请求；否则 → 旧 generate 请求
+ * （旧路径剥离 executionAgentId，agentId 回落为委托执行体，与调用点一致）。
+ */
+export function buildAimEntryRequest(
+  input: AimGenerationActionInput,
+  rawInput: string,
+  currentInput: string,
+  baseMessages: AimWorkbenchMessage[],
+  options: GenerateOptions,
+  useUnifiedEntry: boolean,
+  traceId: string,
+): { kind: "execute"; body: ReturnType<typeof buildExecuteTurnRequest> } | { kind: "generate"; body: AimGenerateRequest } {
+  if (useUnifiedEntry) {
+    return { kind: "execute", body: buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId }) }
+  }
+  const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId })
+  const { executionAgentId, ...generateBody } = request
+  return { kind: "generate", body: { ...generateBody, agentId: executionAgentId || generateBody.agentId } }
+}
+
 /** 统一执行入口的请求构建与响应应用已拆至 aim-generation-delivery-flow（保持模块 ≤500 行） */
 export { resolveFollowUpGenerationId } from "@/hooks/aim-generation-delivery-flow"
 
@@ -279,13 +303,12 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     : message))
   input.setIsGenerating(true)
   try {
-    const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId })
     // 创作台主生成（文案创作 content_producer）切到统一执行入口：
     // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
     const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
-    if (useUnifiedEntry) {
-      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId })
-      const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
+    const entry = buildAimEntryRequest(input, rawInput, currentInput, baseMessages, options, useUnifiedEntry, traceId)
+    if (entry.kind === "execute") {
+      const response = await executeAimTurnWithTransientRetry(entry.body, controller.signal)
       if (controller.signal.aborted) {
         markGenerationStopped(input, assistantMessageId)
         return
@@ -294,11 +317,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
       endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
       return
     }
-    const { executionAgentId, ...generateBody } = request
-    const response = await generateAimContentWithTransientRetry({
-      ...generateBody,
-      agentId: executionAgentId || generateBody.agentId,
-    }, controller.signal)
+    const response = await generateAimContentWithTransientRetry(entry.body, controller.signal)
     if (controller.signal.aborted) {
       markGenerationStopped(input, assistantMessageId)
       return
