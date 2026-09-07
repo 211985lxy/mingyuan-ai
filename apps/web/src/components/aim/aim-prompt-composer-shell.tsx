@@ -256,6 +256,10 @@ export interface ComposerPanelsAndBarProps {
   composerMode: AimComposerMode
   onComposerModeChange?: (mode: AimComposerMode) => void
   showPlanModeControl: boolean
+  /** 底栏显性「先确认再生成」开关 */
+  showPlanModeToggle?: boolean
+  planModeActive?: boolean
+  onTogglePlanMode?: () => void
   onAddImages?: (files: FileList) => void
   onAddFiles?: (files: File[]) => void
   showContentModeControl: boolean
@@ -299,6 +303,7 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
     showSkillQuick, skillQuickOpen, toggleSkillQuick,
     busy, isPlanMode, canUsePlanMode, composerMode,
     onComposerModeChange, showPlanModeControl, onAddImages, onAddFiles,
+    showPlanModeToggle, planModeActive, onTogglePlanMode,
     showContentModeControl, contentMode, contentModeLabel,
     contentModeExpanded, setContentModeExpanded, contentModeOptions,
     onContentModeChange, showSkills, skills, skillQuery, setSkillQuery,
@@ -364,6 +369,9 @@ export function ComposerPanelsAndBar(props: ComposerPanelsAndBarProps) {
         capabilities={capabilities}
         onToggleStyleEnabled={onToggleStyleEnabled}
         onOpenStyleAssets={onOpenStyleAssets}
+        showPlanModeToggle={showPlanModeToggle}
+        planModeActive={planModeActive}
+        onTogglePlanMode={onTogglePlanMode}
         onStartRecording={onStartRecording}
         onStopRecording={onStopRecording}
         onStop={onStop}

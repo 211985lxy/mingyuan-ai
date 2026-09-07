@@ -9,11 +9,8 @@ import { type AimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { splitPastedFiles } from "@/lib/aim/file-attachments"
 import { cn } from "@/lib/utils"
 
-/** 底部操作条（+按钮 / 我的风格 / 状态 pill / 语音 / 停止 / 发送）。
- *  拆分为 AimActionBarLeft + AimActionBarRight 两个子组件，
- *  确保单函数 ≤80 行（functionBaseline 护栏）。
- */
-export function AimActionBar(props: {
+/** 底部操作条（+按钮 / 我的风格 / 计划开关 / 语音 / 停止 / 发送）；拆分左右子组件守 ≤80 行护栏。 */
+interface AimActionBarProps {
   busy: boolean
   isRecording: boolean
   isTranscribing: boolean
@@ -31,6 +28,10 @@ export function AimActionBar(props: {
   styleEnabled: boolean
   styleAvailable: boolean
   capabilities: AimAgentCapabilities
+  /** 显性计划模式开关（先确认再生成）；showPlanModeControl && canUsePlanMode 时为 true */
+  showPlanModeToggle?: boolean
+  planModeActive?: boolean
+  onTogglePlanMode?: () => void
   onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   onStartRecording: () => void
@@ -40,12 +41,16 @@ export function AimActionBar(props: {
   fileInputRef: RefObject<HTMLInputElement | null>
   onAddImages?: (files: FileList) => void
   onAddFiles?: (files: File[]) => void
-}) {
+}
+
+export function AimActionBar(props: AimActionBarProps) {
   const {
     busy, isRecording, isTranscribing, isPlanMode, isGenerating, canSubmit, canStop,
     primaryActionLabel, showAddMenu, addMenuOpen, onToggleAddMenu,
     showSkillQuick, skillQuickOpen, onToggleSkillQuick,
-    styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets,
+    styleEnabled, styleAvailable, capabilities,
+    showPlanModeToggle, planModeActive, onTogglePlanMode,
+    onToggleStyleEnabled, onOpenStyleAssets,
     onStartRecording, onStopRecording, onStop, onGenerate,
     fileInputRef, onAddImages, onAddFiles,
   } = props
@@ -67,6 +72,9 @@ export function AimActionBar(props: {
         capabilities={capabilities}
         onToggleStyleEnabled={onToggleStyleEnabled}
         onOpenStyleAssets={onOpenStyleAssets}
+        showPlanModeToggle={showPlanModeToggle}
+        planModeActive={planModeActive}
+        onTogglePlanMode={onTogglePlanMode}
         isTranscribing={isTranscribing}
         isRecording={isRecording}
         isPlanMode={isPlanMode}
@@ -88,7 +96,7 @@ export function AimActionBar(props: {
   )
 }
 
-function ActionBarLeft(props: {
+interface ActionBarLeftProps {
   busy: boolean
   fileInputRef: RefObject<HTMLInputElement | null>
   onAddImages?: (files: FileList) => void
@@ -102,16 +110,22 @@ function ActionBarLeft(props: {
   styleEnabled: boolean
   styleAvailable: boolean
   capabilities: AimAgentCapabilities
+  showPlanModeToggle?: boolean
+  planModeActive?: boolean
+  onTogglePlanMode?: () => void
   onToggleStyleEnabled?: () => void
   onOpenStyleAssets?: () => void
   isTranscribing: boolean
   isRecording: boolean
   isPlanMode: boolean
-}) {
+}
+
+function ActionBarLeft(props: ActionBarLeftProps) {
   const {
     busy, fileInputRef, onAddImages, onAddFiles, showAddMenu, addMenuOpen,
     onToggleAddMenu, showSkillQuick, skillQuickOpen, onToggleSkillQuick,
     styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets,
+    showPlanModeToggle, planModeActive, onTogglePlanMode,
     isTranscribing, isRecording, isPlanMode,
   } = props
   return (
@@ -148,38 +162,15 @@ function ActionBarLeft(props: {
           disabled={busy}
         />
       ) : null}
-      {styleAvailable && capabilities.styleSample ? (
-        <div className="group inline-flex items-center">
-          <button
-            type="button"
-            onClick={onToggleStyleEnabled}
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-l-full border px-2.5 text-[11px] font-medium transition-all",
-              styleEnabled
-                ? "border-primary/15 bg-gradient-to-r from-primary/[0.07] to-amber-500/[0.04] text-primary/90 hover:border-primary/25 hover:from-primary/[0.1] hover:text-primary"
-                : "border-border/60 bg-card/40 text-muted-foreground hover:border-primary/20 hover:text-foreground",
-            )}
-            title={styleEnabled ? "点击关闭：本次生成不再应用我的表达风格" : "点击开启：生成内容将沿用你的表达风格"}
-          >
-            <StyleSparkles />
-            {styleEnabled ? "我的风格 · 已启用" : "我的风格 · 未启用"}
-          </button>
-          {onOpenStyleAssets ? (
-            <button
-              type="button"
-              onClick={onOpenStyleAssets}
-              className={cn(
-                "inline-flex h-8 items-center rounded-r-full border border-l-0 px-1.5 transition-all",
-                styleEnabled
-                  ? "border-primary/15 bg-gradient-to-r from-amber-500/[0.04] to-primary/[0.05] text-primary/70 hover:text-primary"
-                  : "border-border/60 bg-card/40 text-muted-foreground/70 hover:text-foreground",
-              )}
-              title="查看或管理风格档案"
-            >
-              <ExternalLink className="h-3 w-3" strokeWidth={2} />
-            </button>
-          ) : null}
-        </div>
+      <StylePillGroup
+        styleEnabled={styleEnabled}
+        styleAvailable={styleAvailable}
+        capabilities={capabilities}
+        onToggleStyleEnabled={onToggleStyleEnabled}
+        onOpenStyleAssets={onOpenStyleAssets}
+      />
+      {showPlanModeToggle ? (
+        <PlanModeToggle active={Boolean(planModeActive)} onToggle={onTogglePlanMode} />
       ) : null}
       <StatusPill
         isTranscribing={isTranscribing}
@@ -187,6 +178,76 @@ function ActionBarLeft(props: {
         isPlanMode={isPlanMode}
       />
     </div>
+  )
+}
+
+/** 「我的风格」开关 + 档案入口（右半圆按钮仅在可管理档案时出现）；不满足能力时不渲染。 */
+function StylePillGroup(props: {
+  styleEnabled: boolean
+  styleAvailable: boolean
+  capabilities: AimAgentCapabilities
+  onToggleStyleEnabled?: () => void
+  onOpenStyleAssets?: () => void
+}) {
+  const { styleEnabled, styleAvailable, capabilities, onToggleStyleEnabled, onOpenStyleAssets } = props
+  if (!styleAvailable || !capabilities.styleSample) return null
+  return (
+    <div className="group inline-flex items-center">
+      <button
+        type="button"
+        onClick={onToggleStyleEnabled}
+        className={cn(
+          "inline-flex h-8 items-center gap-1.5 rounded-l-full border px-2.5 text-[11px] font-medium transition-all",
+          styleEnabled
+            ? "border-primary/15 bg-gradient-to-r from-primary/[0.07] to-amber-500/[0.04] text-primary/90 hover:border-primary/25 hover:from-primary/[0.1] hover:text-primary"
+            : "border-border/60 bg-card/40 text-muted-foreground hover:border-primary/20 hover:text-foreground",
+        )}
+        title={styleEnabled ? "点击关闭：本次生成不再应用我的表达风格" : "点击开启：生成内容将沿用你的表达风格"}
+      >
+        <StyleSparkles />
+        {styleEnabled ? "我的风格 · 已启用" : "我的风格 · 未启用"}
+      </button>
+      {onOpenStyleAssets ? (
+        <button
+          type="button"
+          onClick={onOpenStyleAssets}
+          className={cn(
+            "inline-flex h-8 items-center rounded-r-full border border-l-0 px-1.5 transition-all",
+            styleEnabled
+              ? "border-primary/15 bg-gradient-to-r from-amber-500/[0.04] to-primary/[0.05] text-primary/70 hover:text-primary"
+              : "border-border/60 bg-card/40 text-muted-foreground/70 hover:text-foreground",
+          )}
+          title="查看或管理风格档案"
+        >
+          <ExternalLink className="h-3 w-3" strokeWidth={2} />
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+/** 显性「先确认再生成」开关：样式对齐旁边「我的风格」pill，激活态用 violet 呼应计划模式。 */
+function PlanModeToggle(props: {
+  active: boolean
+  onToggle?: () => void
+}) {
+  const { active, onToggle } = props
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition-all",
+        active
+          ? "border-violet-500/20 bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          : "border-border/60 bg-card/40 text-muted-foreground hover:border-primary/20 hover:text-foreground",
+      )}
+      title={active ? "点击关闭：直接生成，不再先出任务单" : "点击开启：先出任务单，你确认后再生成"}
+    >
+      <ListChecks className="h-3.5 w-3.5" strokeWidth={2} />
+      {active ? "先确认 · 已启用" : "先确认再生成"}
+    </button>
   )
 }
 
