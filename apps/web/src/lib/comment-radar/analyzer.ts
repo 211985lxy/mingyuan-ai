@@ -3,6 +3,8 @@
  */
 
 import { LLMClient } from '@/lib/llm'
+import { promptRegistry } from '@/lib/prompt/registry'
+import { PROMPT_KEYS } from '@/lib/prompt/types'
 import { AnalysisResultSchema, type AnalysisResult } from './schemas'
 
 const MAX_SAMPLE = 30
@@ -62,9 +64,6 @@ export function parseAnalysisResult(raw: string): AnalysisResult | null {
   }
 }
 
-const SYSTEM_PROMPT = `你是短视频评论洞察分析师。分析评论数据，提炼用户关注的话题、情感倾向和选题建议。
-输出严格 JSON 格式，不含其他文字。`
-
 function buildUserPrompt(comments: SampledComment[], total: number, platform: string): string {
   const compact = comments.map(c => ({ t: c.text, n: c.nickname ?? '', l: c.likes, top: c.isTop }))
   return `分析以下${platform}评论数据（共${total}条，已采样${comments.length}条）。
@@ -101,10 +100,11 @@ export async function analyzeComments(
   const sampled = sampleComments(comments)
   const llm = LLMClient.shared()
   const response = await llm.complete({
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserPrompt(sampled, total, platform) },
-    ],
+    // system prompt 已资产化（Prompt Registry）：DB 版本优先，兜底内置 seed v1（逐字原文）
+    messages: promptRegistry.getMessages(
+      PROMPT_KEYS.commentRadar,
+      buildUserPrompt(sampled, total, platform),
+    ),
     temperature: 0.3,
     maxTokens: 2000,
     responseFormat: { type: 'json_object' },
