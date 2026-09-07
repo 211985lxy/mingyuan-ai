@@ -10,19 +10,47 @@ const {
   executeVerifiedUnifiedReply,
   serializeAimGenerationRun,
   resolveBoundProject,
-} = vi.hoisted(() => ({
-  authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
-  authErrorResponse: vi.fn(() => null),
-  enforceDailyBetaLimit: vi.fn(async () => null),
-  understandAimContentTurnWithTrace: vi.fn(),
-  executeVerifiedUnifiedDelivery: vi.fn(),
-  executeVerifiedUnifiedReply: vi.fn(),
-  serializeAimGenerationRun: vi.fn(() => ({
-    id: "generation-1",
-    results: [{ format: "video_script", content: "成稿正文。", wordCount: 6 }],
-  })),
-  resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
-}))
+  startAimGenerationAttempt,
+  markAimGenerationRunning,
+  markAimGenerationAwaitingInput,
+  discardAimGenerationAttempt,
+  failAimGenerationAttempt,
+  AimGenerationAttemptError,
+} = vi.hoisted(() => {
+  class AimGenerationAttemptError extends Error {
+    code: string
+    generationId?: string
+    constructor(code: string, message: string, generationId?: string) {
+      super(message)
+      this.name = "AimGenerationAttemptError"
+      this.code = code
+      this.generationId = generationId
+    }
+  }
+  return {
+    authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
+    authErrorResponse: vi.fn(() => null),
+    enforceDailyBetaLimit: vi.fn(async () => null),
+    understandAimContentTurnWithTrace: vi.fn(),
+    executeVerifiedUnifiedDelivery: vi.fn(),
+    executeVerifiedUnifiedReply: vi.fn(),
+    serializeAimGenerationRun: vi.fn(() => ({
+      id: "generation-1",
+      results: [{ format: "video_script", content: "成稿正文。", wordCount: 6 }],
+    })),
+    resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
+    startAimGenerationAttempt: vi.fn(async () => ({
+      id: "generated-attempt",
+      created: true,
+      replay: "continue",
+    })),
+    markAimGenerationRunning: vi.fn(async () => undefined),
+    markAimGenerationAwaitingInput: vi.fn(async () => undefined),
+    discardAimGenerationAttempt: vi.fn(async () => undefined),
+    failAimGenerationAttempt: vi.fn(async () => undefined),
+    AimGenerationAttemptError,
+  }
+})
 
 vi.mock("@/lib/user-auth", () => ({
   authenticateRequest,
@@ -62,6 +90,15 @@ vi.mock("@/lib/aim/services/generate-request", () => ({
   serializeAimGenerationRun,
 }))
 
+vi.mock("@/lib/aim/generation-attempt", () => ({
+  startAimGenerationAttempt,
+  markAimGenerationRunning,
+  markAimGenerationAwaitingInput,
+  discardAimGenerationAttempt,
+  failAimGenerationAttempt,
+  AimGenerationAttemptError,
+}))
+
 import { POST } from "@/app/api/aim/execute/route"
 
 function executeRequest(body: unknown) {
@@ -88,6 +125,11 @@ function baseBody(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   resolveBoundProject.mockResolvedValue({ id: "project-1", name: "测试项目", status: "active" })
+  startAimGenerationAttempt.mockResolvedValue({
+    id: "generated-attempt",
+    created: true,
+    replay: "continue",
+  })
 })
 
 describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交付）", () => {
@@ -110,6 +152,13 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(data.question).not.toMatch(/篇幅|多长|字数/)
     // 关键缺口未确认不先生成
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
+    expect(startAimGenerationAttempt).toHaveBeenCalledOnce()
+    expect(markAimGenerationAwaitingInput).toHaveBeenCalledWith(expect.objectContaining({
+      id: "generated-attempt",
+      projectId: "project-1",
+    }))
+    expect(discardAimGenerationAttempt).not.toHaveBeenCalled()
+    expect(data.generationId).toBe("generated-attempt")
   })
 
   it("does not ask again when the user is answering a previous clarification", async () => {
@@ -133,6 +182,9 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
 
     expect(data.kind).toBe("deliverable")
     expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledOnce()
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      generationAttemptId: "generated-attempt",
+    }))
   })
 
   it("generates directly when a complete original draft covers volume and scope (894字场景)", async () => {
@@ -194,6 +246,7 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(data.kind).toBe("reply")
     expect(data.content).toContain("故事型")
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
+    expect(discardAimGenerationAttempt).toHaveBeenCalledOnce()
   })
 
   it("passes resolved polish intent into delivery for a full-draft refine", async () => {
@@ -300,5 +353,40 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(data.kind).toBe("reply")
     expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
     expect(executeVerifiedUnifiedReply).toHaveBeenCalledOnce()
+  })
+
+  it("keeps the task recoverable when semantic understanding fails before delivery", async () => {
+    understandAimContentTurnWithTrace.mockRejectedValue(new Error("模型暂时不可用"))
+
+    const response = await executeRequest(baseBody({
+      attemptId: "web_abcdef0123456789abcdef01",
+    }))
+
+    expect(response.status).toBe(500)
+    expect(startAimGenerationAttempt).toHaveBeenCalledOnce()
+    expect(failAimGenerationAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      id: "generated-attempt",
+      userId: "user-1",
+      projectId: "project-1",
+    }))
+    expect(discardAimGenerationAttempt).not.toHaveBeenCalled()
+    const data = await response.json()
+    expect(data.generationId).toBe("generated-attempt")
+  })
+
+  it("returns GENERATION_IN_PROGRESS for the same attempt without calling the model", async () => {
+    startAimGenerationAttempt.mockRejectedValueOnce(
+      new AimGenerationAttemptError("GENERATION_IN_PROGRESS", "同一生成任务仍在执行中", "web_0123456789abcdef01234567"),
+    )
+
+    const response = await executeRequest(baseBody({
+      attemptId: "web_0123456789abcdef01234567",
+    }))
+    const data = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(data.code).toBe("GENERATION_IN_PROGRESS")
+    expect(understandAimContentTurnWithTrace).not.toHaveBeenCalled()
+    expect(executeVerifiedUnifiedDelivery).not.toHaveBeenCalled()
   })
 })
