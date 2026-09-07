@@ -99,10 +99,16 @@ function detectGoal(text: string): AimContentGoal | undefined {
 
 function detectQuantity(text: string): number | undefined {
   const digit = text.match(/(?:生成|写|出|做|要|给|复刻)?\s*(\d{1,2})\s*[条个版](?:开头|文案|版本|新文案)?/)
-  if (digit) return Number(digit[1])
+  if (digit) {
+    const count = Number(digit[1])
+    return count >= 2 ? count : undefined
+  }
   const chinese = text.match(/(?:生成|写|出|做|要|给|复刻)?\s*([一二三四五六七八九十])\s*[条个版]/)
   const map: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 }
-  if (chinese) return map[chinese[1]]
+  if (chinese) {
+    const count = map[chinese[1]]
+    return count >= 2 ? count : undefined
+  }
   return undefined
 }
 
@@ -181,27 +187,29 @@ export function resolveUserIntentFromEnvelope(
   const taskKind = detectTaskKind(envelope)
   const isNewTask = NEW_TASK_SIGNAL_PATTERN.test(request)
     || (!FOLLOW_UP_REFERENCE_PATTERN.test(request) && taskKind === "new_draft" && !envelope.currentArtifact?.content?.trim())
+  const allowHistoryConstraints = !isNewTask || isClarificationAnswerTurn(envelope)
+  const confirmedForConstraints = allowHistoryConstraints ? confirmedText : ""
 
   const sources: ResolvedUserIntent["constraintSources"] = {}
   const audienceInRequest = AUDIENCE_PATTERN.test(request)
-  const audienceInConfirmed = !audienceInRequest && AUDIENCE_PATTERN.test(confirmedText)
+  const audienceInConfirmed = !audienceInRequest && AUDIENCE_PATTERN.test(confirmedForConstraints)
   const audience = audienceInRequest || audienceInConfirmed
-    ? (audienceInRequest ? request : confirmedText)
+    ? (audienceInRequest ? request : confirmedForConstraints)
     : undefined
   if (audienceInRequest) sources.audience = "user_current"
   else if (audienceInConfirmed) sources.audience = "task_confirmed"
 
   const goalInRequest = detectGoal(request)
-  const goalInConfirmed = goalInRequest ?? detectGoal(confirmedText)
-  const goal = goalInRequest ?? goalInConfirmed
+  const goalInConfirmed = goalInRequest ?? detectGoal(confirmedForConstraints)
+  const goal = goalInRequest ?? (allowHistoryConstraints ? goalInConfirmed : undefined)
   if (goalInRequest) sources.goal = "user_current"
   else if (goal) sources.goal = "task_confirmed"
 
-  const length = resolveLengthConstraint({ request, confirmedText, envelope, taskKind })
+  const length = resolveLengthConstraint({ request, confirmedText: confirmedForConstraints, envelope, taskKind })
   if (length.source) sources.length = length.source
 
   const quantityInRequest = detectQuantity(request)
-  const quantityInConfirmed = quantityInRequest ?? detectQuantity(confirmedText)
+  const quantityInConfirmed = quantityInRequest ?? detectQuantity(confirmedForConstraints)
   const quantity = quantityInRequest ?? quantityInConfirmed
   if (quantityInRequest) sources.quantity = "user_current"
   else if (quantity) sources.quantity = "task_confirmed"

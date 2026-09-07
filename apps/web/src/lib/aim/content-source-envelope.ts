@@ -29,6 +29,7 @@ export const contentSourceEnvelopeSchema = z.object({
     title: z.string().trim().min(1).max(120),
     content: longText,
   }).strict()).max(8).default([]),
+  methodologyNotes: longText.optional(),
 }).strict()
 
 export interface AimContentSourceEnvelope {
@@ -36,6 +37,7 @@ export interface AimContentSourceEnvelope {
   relevantConversation: Array<{ role: "user" | "assistant"; content: string }>
   currentArtifact?: { content: string; format?: ContentFormat; generationId?: string }
   referenceMaterials: Array<{ title: string; content: string }>
+  methodologyNotes?: string
 }
 
 const encoder = new TextEncoder()
@@ -71,12 +73,14 @@ export function buildAimContentSourceEnvelope(input: {
   currentArtifactFormat?: ContentFormat
   currentArtifactGenerationId?: string
   referenceMaterials: Array<{ title: string; content: string }>
+  methodologyNotes?: string
 }): AimContentSourceEnvelope {
   const relevantConversation = input.relevantConversation
     .slice(-12)
     .map((turn) => ({ role: turn.role, content: turn.content.trim() }))
     .filter((turn) => turn.content.length > 0)
   const artifact = input.currentArtifact?.trim()
+  const methodologyNotes = input.methodologyNotes?.trim()
   return {
     currentUserRequest: input.currentUserRequest.trim(),
     relevantConversation,
@@ -90,6 +94,7 @@ export function buildAimContentSourceEnvelope(input: {
     referenceMaterials: input.referenceMaterials
       .map((item) => ({ title: item.title.trim(), content: item.content.trim() }))
       .filter((item) => item.title.length > 0 && item.content.length > 0),
+    ...(methodologyNotes ? { methodologyNotes } : {}),
   }
 }
 
@@ -101,6 +106,7 @@ export function fitAimContentSourceEnvelopeToBudget(
     currentUserRequest: envelope.currentUserRequest,
     relevantConversation: [],
     referenceMaterials: [],
+    ...(envelope.methodologyNotes ? { methodologyNotes: envelope.methodologyNotes } : {}),
   }
   if (jsonBytes(requestOnly) > maxBytes) throw new Error("当前要求超出可处理大小")
 

@@ -198,4 +198,38 @@ describe("resolveUserIntentFromEnvelope", () => {
     expect(merged[0].question).toContain("写给谁")
     expect(merged.some((gap) => gap.field === "taskBoundary")).toBe(true)
   })
+
+  it("cuts previous duration, count, CTA and purpose when the current turn starts a new task", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "换个主题，写一篇朋友圈",
+      conversation: [
+        { role: "user", content: "写3条2分钟获客口播，结尾引导加微信" },
+        { role: "assistant", content: "已交付上一版口播。" },
+      ],
+    }))
+    expect(intent.isNewTask).toBe(true)
+    expect(intent.lengthPolicy).toBe("unset")
+    expect(intent.lengthText).toBeUndefined()
+    expect(intent.quantity).toBeUndefined()
+    expect(intent.goal).toBeUndefined()
+    expect(intent.constraintSources.length).toBeUndefined()
+    expect(intent.constraintSources.quantity).toBeUndefined()
+    expect(intent.constraintSources.goal).toBeUndefined()
+  })
+
+  it("does not treat reference-copy duration, shot count or product facts as this-task specs", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "参考这篇对标写一版口播",
+      materials: [{
+        title: "对标原文",
+        content: "这是一条2分钟口播，成片6分半，共22个镜头。产品是法拍房咨询，结尾引导加微信。",
+      }],
+    }))
+    expect(intent.lengthPolicy).toBe("unset")
+    expect(intent.lengthText).toBeUndefined()
+    expect(intent.quantity).toBeUndefined()
+    expect(intent.goal).toBeUndefined()
+    expect(intent.constraintSources.length).toBeUndefined()
+    expect(intent.constraintSources.quantity).toBeUndefined()
+  })
 })

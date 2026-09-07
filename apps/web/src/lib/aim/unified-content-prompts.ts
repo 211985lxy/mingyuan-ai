@@ -64,6 +64,7 @@ export function buildUnifiedProducerUserPrompt(context: AimGenerateContext, form
     conversation ? `【最近相关对话】\n${conversation}` : "",
     envelope.currentArtifact ? `【当前作品】\n${envelope.currentArtifact.content}` : "",
     ...references,
+    envelope.methodologyNotes ? `【方法论】\n${envelope.methodologyNotes}` : "",
     context.ipWikiBlock ? `【IP 档案】\n${context.ipWikiBlock}` : "",
     context.knowledgeBlock ? `【授权知识】\n${context.knowledgeBlock}` : "",
     context.selectedMethodologyBlock ? `【用户选定方法论】\n${context.selectedMethodologyBlock}` : "",
