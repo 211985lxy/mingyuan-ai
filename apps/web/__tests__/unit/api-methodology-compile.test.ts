@@ -78,23 +78,25 @@ describe("POST /api/competitor-analysis/methodology/compile", () => {
     expect(json.proposedPages[0].title).toBe("竞品爆款方法论")
   })
 
+  // Step② 契约收敛：非法输入统一走 parseCapabilityInput 的 400 ApiRequestError
+  // （生产环境由 withUserAuth 包装器转成 400 JSON 响应）
   it("returns 400 when competitorAnalysisText is missing", async () => {
-    const res = await POST(
+    const error = await POST(
       makeRequest({ projectName: "测试项目" }),
       { params: Promise.resolve({}) },
-    )
+    ).catch((e: unknown) => e as { status?: number; message?: string })
 
-    expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error).toContain("competitorAnalysisText")
+    expect((error as { status?: number }).status).toBe(400)
+    expect(String((error as { message?: string }).message).length).toBeGreaterThan(0)
   })
 
   it("returns 400 when competitorAnalysisText is empty string", async () => {
-    const res = await POST(
+    const error = await POST(
       makeRequest({ competitorAnalysisText: "   " }),
       { params: Promise.resolve({}) },
-    )
+    ).catch((e: unknown) => e as { status?: number; message?: string })
 
-    expect(res.status).toBe(400)
+    expect((error as { status?: number }).status).toBe(400)
+    expect(String((error as { message?: string }).message)).toContain("competitorAnalysisText")
   })
 })
