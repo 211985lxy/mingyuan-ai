@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef } from "react"
+import { useRef } from "react"
 import { toast } from "sonner"
 import {
   buildAimEditorContext,
@@ -44,13 +44,13 @@ interface UseAimSendActionsOptions {
  * @returns 无返回值
  */
 export function useAimSendActions(options: UseAimSendActionsOptions) {
-  // 技能按钮只把提示词填进输入框，真正发送发生在下一次点击。委托意图挂在
-  // 插入的那段提示词上：输入框里还留着它才算数，用户清空重写则自动失效。
+  // 一键出稿：点技能直接把指令填进输入框并立即生成/发送，不再要求二次点击。
+  // 委托意图挂在插入的那段提示词上，由本次调用的发送/生成路径就地消费。
   const pendingSkillDelegationRef = useRef<{ prompt: string; executionAgentId: string } | null>(null)
   // 方法论类技能信号同样挂在那段 prompt 上：输入框还留着才算本轮生效。
   const pendingMethodologySignalsRef = useRef<{ prompt: string; signals: AimMethodologySignal[] } | null>(null)
 
-  const handleUseSkill = useCallback((skill: AimWorkbenchSkill) => {
+  function handleUseSkill(skill: AimWorkbenchSkill) {
     // 内容目的（流量/获客/故事）互斥替换；其它技能前置拼接。用户正文原样保留。
     const { delegation, nextInput, methodologySignals } = planWorkbenchSkillApply(options, skill)
     pendingSkillDelegationRef.current = delegation
@@ -58,10 +58,14 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       ? { prompt: nextInput.includes(skill.prompt) ? skill.prompt : nextInput, signals: methodologySignals }
       : null
     if (nextInput !== options.input) options.setInput(nextInput)
-    toast.success(`已应用「${skill.label}」`, {
-      description: "指令已填入输入框，补充素材后点右下角发送",
-    })
-  }, [options])
+
+    if (options.hasEditorSelection || options.imageAttachments.length > 0 || (options.fileAttachments?.length ?? 0) > 0) {
+      void sendTextWith(nextInput)
+    } else {
+      void generateWith(nextInput)
+    }
+    toast.success(`已按「${skill.label}」开始生成`)
+  }
 
   /** 取出本次发送该用的委托引擎，并清掉一次性意图。 */
   function takeSkillDelegation(text: string): { executionAgentId?: string } {
@@ -93,8 +97,7 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
     return { activeMethodologySignals: pending.signals }
   }
 
-  async function handleSend() {
-    const text = options.input.trim()
+  async function sendTextWith(text: string) {
     const delegation = takeSkillDelegation(text)
     const methodologySignals = takeMethodologySignals(text)
     await options.sendText(text, options.hasEditorSelection ? {
@@ -113,18 +116,26 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
     } : { ...delegation, ...methodologySignals, images: options.imageAttachments, files: options.fileAttachments ?? [] })
   }
 
-  async function handleGenerate() {
-    if (options.hasEditorSelection || options.imageAttachments.length > 0 || (options.fileAttachments?.length ?? 0) > 0) {
-      await handleSend()
-      return
-    }
-    const currentInput = options.input.trim()
+  async function generateWith(text: string) {
+    const currentInput = text.trim()
     const startsNewTask = shouldIsolateWritingInstruction(currentInput, options.messages.length > 0)
     const workbenchCommand = detectAimWorkbenchCommand(currentInput)
     if (!startsNewTask && workbenchCommand && options.runWorkbenchCommand(workbenchCommand)) return
     const delegation = takeSkillDelegation(currentInput)
     const methodologySignals = takeMethodologySignals(currentInput)
     await options.generateWithInput(currentInput, { startsNewTask, ...delegation, ...methodologySignals })
+  }
+
+  async function handleSend() {
+    await sendTextWith(options.input)
+  }
+
+  async function handleGenerate() {
+    if (options.hasEditorSelection || options.imageAttachments.length > 0 || (options.fileAttachments?.length ?? 0) > 0) {
+      await handleSend()
+      return
+    }
+    await generateWith(options.input)
   }
 
   function retryFailedMessage(message: ChatMessage, busy: boolean) {
