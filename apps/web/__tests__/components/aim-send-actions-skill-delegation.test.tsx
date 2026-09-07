@@ -41,7 +41,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     hasEditorSelection: false,
     referenceSelection: { text: "", range: undefined },
     draftSelection: { text: "", range: undefined },
-    editorText: "",
+    editorText: "当前素材",
     sourceOriginalText: "",
     sourceAnalysisText: "",
     sourceTopicTitle: "",
@@ -149,5 +149,18 @@ describe("技能一键出稿：点技能 → 立即生成/发送", () => {
       await hook.result.current.handleSend()
     })
     expect(sendText.mock.calls[0][1]).not.toHaveProperty("executionAgentId")
+  })
+
+  it("无素材时点技能只填指令，不触发生成", async () => {
+    const { hook, generateWithInput, sendText, getInput } = setup({ editorText: "" })
+
+    await act(async () => {
+      hook.result.current.handleUseSkill(TITLE_REVIEW_SKILL)
+    })
+
+    expect(generateWithInput).not.toHaveBeenCalled()
+    expect(sendText).not.toHaveBeenCalled()
+    // 指令已填入输入框，等待用户补充素材后手动发送
+    expect(getInput()).toBe(TITLE_REVIEW_SKILL.prompt)
   })
 })
