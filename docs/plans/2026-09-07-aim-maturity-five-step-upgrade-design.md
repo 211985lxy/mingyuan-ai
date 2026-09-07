@@ -1,7 +1,7 @@
 # AIM「AI 原生成熟度」五步升级 · 设计总纲
 
 > 日期：2026-09-07
-> 状态：待评审（Codex 架构审查后排期）
+> 状态：①-⑤ 已全部实现首版（2026-09-08，feat/aim-workbench-experience-upgrade 分支，待 CI 门禁与合并评审）
 > 范围：mingyuan 主仓（apps/web）
 > 依据：2026-09-07 代码实证（非臆测，所有论断附文件路径）
 
@@ -152,3 +152,26 @@ interface PromptRegistry {
 - 明确 Git SHA + standalone 构建 + 回滚点；`origin/main` 唯一候选正本。
 - 每步独立 PR 序列，不跨步混合提交。
 - 凭据只存服务器环境文件，不进 Git/文档。
+
+---
+
+## 实现记录（2026-09-08 · Z-Code 全流程开发）
+
+| 步骤 | commit | 交付要点 | 回滚开关 |
+|---|---|---|---|
+| ① Prompt 资产化 | ffad9ab2 / d773d0a3+30de80ea / 5fa90d05+f5173156 | 批0 六常量 + 批1 廿四函数拼接型 + 批2 七路由内联 + 批3 扫尾 = **41 key 全量入册**；等价性由迁移前快照逐字节比对证明 | seed v1 逐字兜底，DB 不可用零退化 |
+| ② 能力 API 契约 | 2c03698a | `lib/api/contracts.ts` 契约注册表（domain/kind/orchestratable/zod）；inventory 266→267 路由全量 domain/kind 归类；4 个 LLM 能力路由 zod 拒错 | 契约注册表 additive |
+| ③ HITL 内联对话轴 | 963ebc7e / 1f534103 | `lib/aim/hitl-gate.ts`：对外发送/写知识库工具动作挂起等审批；对话内回复「批准/驳回」即决策；复用审批决策存储幂等落记录 | `AIM_HITL_INLINE_ENABLED` 默认 false（关闭时行为与迁移前一致） |
+| ④ 首屏即对话 | 3224c93f | /aim 默认直显对话工作台，显式入口参数不受影响 | `NEXT_PUBLIC_AIM_LANDING_DEFAULT="entry"` 回滚入口页 |
+| ⑤ 组织协同显性化 | fe7ca5d5 | 组织角色矩阵（业务决策/内容增长/AI 系统）+ orgRoleCan 权限前向判断 + 侧栏「组织协同」区块；org.prisma 按设计缓后 | additive，纯展示层 |
+| 附加：Fish Audio 落库 | f2265fa7 | VoiceSynthesisRecord 表 + 幂等迁移 + TTS 落记录 + GET /api/voice/history；落库失败不阻塞出声 | additive |
+
+### 验收（四层）
+- 代码层：全量单测 **3244 passed**（473 文件）；`tsc --noEmit` 零错误；改动文件 ESLint 零新增告警；架构/体积门禁（既有存量未新增超标文件）。
+- 构建层：`pnpm build` 生产构建通过（含 /aim 路由与 voice-studio）。
+- 集成层：本次为代码层+构建层完成；涉及 LLM/飞书/DB 的真实联调按纪律须另行验证后才能称业务完成。
+- 上线层：未部署。分支待推送 → CI 门禁 → 合并评审，发布决策按流程留给业务负责人。
+
+### 留后事项
+- 批3 后仍有零散 lib prompt（`buildPolishInstructions` 条件指令片段等，设计文档已注明保留理由）。
+- HITL 审批的飞书卡片通知、org 多用户后端建模（org.prisma）为 P1 候选。
