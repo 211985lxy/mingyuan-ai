@@ -71,7 +71,9 @@ export function inspectDeliveryContent(input: {
       violations.add("prompt_leak")
       leakedLines.push(trimmed)
     }
-    if (input.intent.lengthPolicy === "unset" && INVENTED_LENGTH_LINE.test(trimmed)) {
+    // 只有当前原话明确要求了这段长度信息，才允许它作为正文的一部分出现；
+    // 原稿/参考材料自带的“约2分钟、400-550字”标签不应被模型当成系统格式说明复述。
+    if (input.intent.lengthPolicy !== "user_explicit" && INVENTED_LENGTH_LINE.test(trimmed)) {
       violations.add("invented_length")
       leakedLines.push(trimmed)
     }

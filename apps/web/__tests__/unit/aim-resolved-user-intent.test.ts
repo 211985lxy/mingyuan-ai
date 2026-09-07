@@ -61,6 +61,16 @@ describe("resolveUserIntentFromEnvelope", () => {
     }))).toBe(true)
   })
 
+  it("recognizes a clarification answer after loading the task from history", () => {
+    expect(isClarificationAnswerTurn(envelope({
+      request: "写给实体店老板，目标是引流获客",
+      conversation: [
+        { role: "user", content: "帮我写个文案" },
+        { role: "assistant", content: "在动笔前先确认：还差几项确认才能交稿，直接补充后继续即可。" },
+      ],
+    }))).toBe(true)
+  })
+
   it("detects polish_existing and derives length from a complete original draft (894字场景)", () => {
     const original = "这是一篇完整的原始稿件。".repeat(60)
     const intent = resolveUserIntentFromEnvelope(envelope({

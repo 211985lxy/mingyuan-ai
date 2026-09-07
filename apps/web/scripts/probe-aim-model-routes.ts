@@ -20,12 +20,14 @@ function redact(value: string): string {
     .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
 }
 
-async function probeHop(name: string, model: string): Promise<AimProbeHop> {
+async function probeHop(name: string, model: string, timeoutMs?: number, maxRetries?: number): Promise<AimProbeHop> {
   const config = getProviderConfigs().find((item) => item.name === name)
   if (!config) return { name, model, status: "unconfigured" }
   const provider = new OpenAICompatibleProvider({
     ...config,
     ...(model ? { defaultModel: model } : {}),
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(maxRetries !== undefined ? { maxRetries } : {}),
   })
   if (!provider.isAvailable()) return { name, model, status: "unconfigured" }
   const startedAt = Date.now()
@@ -56,7 +58,7 @@ async function main(): Promise<void> {
   }
   const results: AimProbeHop[] = []
   for (const hop of hops) {
-    const result = await probeHop(hop.name, hop.model || hop.name)
+    const result = await probeHop(hop.name, hop.model || hop.name, hop.timeoutMs, hop.maxRetries)
     results.push(result)
     console.info("[llm-probe]", {
       name: result.name,

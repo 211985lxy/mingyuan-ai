@@ -13,9 +13,19 @@ export class AimDeadlineExceededError extends Error {
   }
 }
 
+export class AimExecutionAbortedError extends Error {
+  readonly code = "USER_ABORTED"
+
+  constructor(message = "用户停止了本次生成") {
+    super(message)
+    this.name = "AimExecutionAbortedError"
+  }
+}
+
 export interface AimExecutionDeadline {
   deadlineAt: number
   remainingMs(): number
+  signal: AbortSignal
 }
 
 const storage = new AsyncLocalStorage<AimExecutionDeadline>()
@@ -24,11 +34,14 @@ export function getAimExecutionDeadline(): AimExecutionDeadline | undefined {
   return storage.getStore()
 }
 
-function createStore(timeoutMs: number): AimExecutionDeadline {
+function createStore(timeoutMs: number): AimExecutionDeadline & { controller: AbortController } {
   const budget = Number.isFinite(timeoutMs) ? Math.max(0, Math.floor(timeoutMs)) : 0
   const deadlineAt = Date.now() + budget
+  const controller = new AbortController()
   return {
     deadlineAt,
+    controller,
+    signal: controller.signal,
     remainingMs() {
       return Math.max(0, deadlineAt - Date.now())
     },
@@ -38,10 +51,35 @@ function createStore(timeoutMs: number): AimExecutionDeadline {
 export async function runWithAimExecutionDeadline<T>(
   timeoutMs: number,
   fn: () => Promise<T>,
+  externalSignal?: AbortSignal,
 ): Promise<T> {
   const existing = storage.getStore()
   if (existing) return fn()
-  return storage.run(createStore(timeoutMs), fn)
+  const store = createStore(timeoutMs)
+  return storage.run(store, async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let onExternalAbort: (() => void) | undefined
+    let rejectForAbort: (() => void) | undefined
+    const abortError = new Promise<never>((_, reject) => {
+      rejectForAbort = () => {
+        reject(externalSignal?.aborted
+          ? new AimExecutionAbortedError()
+          : new AimDeadlineExceededError())
+      }
+      store.controller.signal.addEventListener("abort", rejectForAbort, { once: true })
+      onExternalAbort = () => store.controller.abort()
+      if (externalSignal?.aborted) onExternalAbort()
+      else externalSignal?.addEventListener("abort", onExternalAbort, { once: true })
+      timer = setTimeout(() => store.controller.abort(), Math.max(0, Math.floor(timeoutMs)))
+    })
+    try {
+      return await Promise.race([fn(), abortError])
+    } finally {
+      if (timer) clearTimeout(timer)
+      if (rejectForAbort) store.controller.signal.removeEventListener("abort", rejectForAbort)
+      if (onExternalAbort) externalSignal?.removeEventListener("abort", onExternalAbort)
+    }
+  })
 }
 
 export function resolveProviderTimeoutMs(routeTimeoutMs: number): number {

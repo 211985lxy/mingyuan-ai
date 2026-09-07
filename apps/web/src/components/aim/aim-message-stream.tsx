@@ -73,7 +73,9 @@ function RecoverableFailure({ message, busy, onRetry }: {
     <p className="font-semibold text-foreground">这次没有完成</p>
     <p className="mt-1 leading-6 text-muted-foreground">{detail}</p>
     {runId ? <p className="mt-1 text-xs text-muted-foreground">执行编号 {runId}</p> : null}
-    <Button size="sm" variant="outline" className="mt-3 h-8 px-3 text-sm" onClick={() => onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />再试一次</Button>
+    {message.failure?.recoverable !== false ? (
+      <Button size="sm" variant="outline" className="mt-3 h-8 px-3 text-sm" onClick={() => onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />再试一次</Button>
+    ) : null}
   </div>
 }
 

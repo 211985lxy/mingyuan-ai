@@ -25,6 +25,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/**
+ * 请求本身无效时必须立即返回；当前供应商的鉴权/配置故障则应熔断该供应商后
+ * 继续尝试独立备用线路，避免一把失效的 key 让整条内容生产链瘫痪。
+ */
+function shouldTryNextProvider(kind: ProviderErrorKind, retryable: boolean): boolean {
+  return retryable || kind === "auth" || kind === "config"
+}
+
 function normalizeInteger(value: unknown, fallback: number, min: number, max: number): number {
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return fallback
@@ -61,10 +69,12 @@ function reportStreamFailure(
 export class LLMClient {
   private providers: LLMProvider[]
   private maxAttempts?: number
+  private circuitScope?: string
 
-  constructor(providers: LLMProvider[], options: { maxAttempts?: number } = {}) {
+  constructor(providers: LLMProvider[], options: { maxAttempts?: number; circuitScope?: string } = {}) {
     this.providers = providers
     this.maxAttempts = options.maxAttempts
+    this.circuitScope = options.circuitScope
   }
 
   /** Get the singleton LLMClient, configured from environment variables. */
@@ -143,14 +153,14 @@ export class LLMClient {
         continue
       }
       const modelName = this.providerModel(provider, boundedOptions)
-      if (await isProviderCircuitOpen(provider.name, modelName)) continue
+      if (await isProviderCircuitOpen(provider.name, modelName, this.circuitScope)) continue
       requestedVendors.add(provider.name)
       const attemptIndex = actualRequests
       actualRequests += 1
       const startedAt = Date.now()
       try {
         const result = await provider.complete(boundedOptions)
-        await observeProviderCircuit(provider.name, modelName, { ok: true })
+        await observeProviderCircuit(provider.name, modelName, { ok: true }, this.circuitScope)
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
@@ -168,7 +178,7 @@ export class LLMClient {
         if (error instanceof AimDeadlineExceededError) throw error
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
-        await observeProviderCircuit(provider.name, modelName, { ok: false, kind: classified.kind, message: lastError.message })
+        await observeProviderCircuit(provider.name, modelName, { ok: false, kind: classified.kind, message: lastError.message }, this.circuitScope)
         reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, attemptIndex)
         console.warn(
           `[llm] Provider "${provider.name}" failed (${classified.kind}), trying next:`,
@@ -183,7 +193,7 @@ export class LLMClient {
               "该模型名应只发给认识它的聚合网关（见 createGatewayLLM / AGENT_ROUTES）。",
           )
         }
-        if (!classified.retryable) break
+        if (!shouldTryNextProvider(classified.kind, classified.retryable)) break
         const delay = backoffDelay(attemptIndex, classified.kind)
         if (delay > 0) await sleep(delay)
       }
@@ -241,7 +251,7 @@ export class LLMClient {
         continue
       }
       const modelName = this.providerModel(provider, boundedOptions)
-      if (await isProviderCircuitOpen(provider.name, modelName)) continue
+      if (await isProviderCircuitOpen(provider.name, modelName, this.circuitScope)) continue
 
       requestedVendors.add(provider.name)
       const attemptIndex = actualRequests
@@ -258,7 +268,7 @@ export class LLMClient {
             `[${provider.name}] Empty stream from model ${boundedOptions.model ?? provider.defaultModel}`,
           )
         }
-        await observeProviderCircuit(provider.name, modelName, { ok: true })
+        await observeProviderCircuit(provider.name, modelName, { ok: true }, this.circuitScope)
         reportProviderAttempt({
           provider: provider.name,
           model: boundedOptions.model ?? provider.defaultModel,
@@ -272,14 +282,14 @@ export class LLMClient {
         if (error instanceof AimDeadlineExceededError) throw error
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
-        await observeProviderCircuit(provider.name, modelName, { ok: false, kind: classified.kind, message: lastError.message })
+        await observeProviderCircuit(provider.name, modelName, { ok: false, kind: classified.kind, message: lastError.message }, this.circuitScope)
         reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, attemptIndex)
         if (emitted) throw lastError
         console.warn(
           `[llm] Provider "${provider.name}" stream failed (${classified.kind}), trying next:`,
           lastError.message
         )
-        if (!classified.retryable) break
+        if (!shouldTryNextProvider(classified.kind, classified.retryable)) break
         const delay = backoffDelay(attemptIndex, classified.kind)
         if (delay > 0) await sleep(delay)
       }

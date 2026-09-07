@@ -26,6 +26,8 @@ export type AimFailureResponse = {
   code: AimFailureCode
   recoverable: boolean
   runId?: string
+  generationId?: string
+  traceId?: string
   requestId: string
   retryAfterMs?: number
 }
@@ -110,8 +112,10 @@ export function classifyAimFailure(error: unknown, attempts: ProviderAttempt[] =
   if (last?.errorKind === "timeout") return "MODEL_TIMEOUT"
   if (last?.errorKind === "auth") return "PROVIDER_AUTH"
   if (last?.errorKind === "model_unavailable") return "PROVIDER_UNAVAILABLE"
-  if (last?.errorKind === "rate_limit" && /(balance|额度|余额|quota|credit|402)/i.test(last.error || "")) {
-    return "PROVIDER_QUOTA"
+  if (last?.errorKind === "rate_limit") {
+    return /(balance|额度|余额|quota|credit|billing|402)/i.test(last.error || "")
+      ? "PROVIDER_QUOTA"
+      : "PROVIDER_UNAVAILABLE"
   }
   if (/(empty response|empty completion|no output)/i.test(message) || last?.errorKind === "server" && /empty/i.test(last.error || "")) {
     return "EMPTY_OUTPUT"

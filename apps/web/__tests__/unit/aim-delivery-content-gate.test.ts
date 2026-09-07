@@ -64,10 +64,18 @@ ${CLEAN}
       intent,
     }).passed).toBe(true)
     expect(inspectDeliveryContent({
-      format: "article",
+      format: "wechat_article",
       content: "我们帮某店60天产出40条内容，线索从800元降到210元。",
       intent: unsetIntent,
     }).passed).toBe(true)
+  })
+
+  it("does not treat a reference draft's duration label as a current instruction", () => {
+    expect(inspectDeliveryContent({
+      format: "video_script",
+      content: `3. 这是一份口播脚本（约2分钟，400-550字）。\n\n${CLEAN}`,
+      intent: { ...unsetIntent, lengthPolicy: "material_derived" },
+    }).passed).toBe(false)
   })
 
   it("rejects task analysis in non-spoken formats", () => {

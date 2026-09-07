@@ -38,7 +38,7 @@ const {
     aimExecutionTrace: { create: vi.fn() },
   },
   logAimProjectContextRejection: vi.fn(async () => undefined),
-  createAimTrace: vi.fn(async () => undefined),
+  createAimTrace: vi.fn<() => Promise<{ id: string; startedAt: number } | undefined>>(async () => undefined),
   executeAimRun: vi.fn(),
 }))
 

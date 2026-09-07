@@ -251,11 +251,23 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
       return LLMClient.shared()
     }
     console.warn(
-      `[agent-router] No providers satisfy ${agentId} minimum capability "${policy.minimumCapability}"`
+      `[agent-router] No routed providers available for "${agentId}"; falling back to the configured provider chain`,
     )
+    // 路由模型未配置/不兼容时仍要尝试已配置的可用供应商；否则会在真正
+    // 发出任何模型请求前直接得到 “No AI providers configured”，表现为“模型没调用”。
+    const fallbackProviders = allConfigs
+      .map((config) => new OpenAICompatibleProvider(config))
+      .filter((provider) => provider.isAvailable())
+    return new LLMClient(fallbackProviders, {
+      maxAttempts: policy.maxProviderAttempts,
+      circuitScope: COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId,
+    })
   }
 
-  return new LLMClient(providers, { maxAttempts: policy?.maxProviderAttempts })
+  return new LLMClient(providers, {
+    maxAttempts: policy?.maxProviderAttempts,
+    circuitScope: COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId,
+  })
 }
 
 /**

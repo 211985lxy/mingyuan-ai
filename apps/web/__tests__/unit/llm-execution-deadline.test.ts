@@ -29,4 +29,8 @@ describe("AIM execution deadline", () => {
       resolveProviderTimeoutMs(20_000)
     })).rejects.toBeInstanceOf(AimDeadlineExceededError)
   })
+
+  it("aborts the whole execution when the shared deadline expires", async () => {
+    await expect(runWithAimExecutionDeadline(10, () => new Promise(() => undefined))).rejects.toBeInstanceOf(AimDeadlineExceededError)
+  })
 })

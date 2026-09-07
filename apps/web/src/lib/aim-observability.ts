@@ -274,7 +274,11 @@ export async function finishAimTrace(trace: AimTraceRecorder | undefined, update
  * @param trace - 跟踪记录器
  * @param error - 捕获的异常对象
  */
-export async function failAimTrace(trace: AimTraceRecorder | undefined, error: unknown) {
+export async function failAimTrace(
+  trace: AimTraceRecorder | undefined,
+  error: unknown,
+  extra?: { aimGenerationId?: string },
+) {
   if (!trace) return
   const { classifyAimFailure, mapAimFailureCodeToUserMessage, AimRunExecutionError } = await import("@/lib/aim-error-message")
   const runError = error instanceof AimRunExecutionError ? error : null
@@ -285,6 +289,7 @@ export async function failAimTrace(trace: AimTraceRecorder | undefined, error: u
     durationMs: Date.now() - trace.startedAt,
     errorMessage: summarizeText(mapAimFailureCodeToUserMessage(code)),
     errorCode: code,
+    ...(extra?.aimGenerationId ? { aimGenerationId: extra.aimGenerationId } : {}),
     runId: runError?.runId ?? null,
     provider: last?.provider ?? null,
     model: last?.responseModel ?? last?.model ?? null,

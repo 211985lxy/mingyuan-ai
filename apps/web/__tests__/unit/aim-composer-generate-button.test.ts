@@ -70,7 +70,7 @@ describe("AIM composer generate button", () => {
   it("allows long-running generation requests", () => {
     const generateClientBlock = aimApiSource.match(/export async function generateAimContent[\s\S]*?\n}/)?.[0] ?? ""
 
-    expect(generateClientBlock).toContain("timeout: 180000")
+    expect(generateClientBlock).toContain("timeout: AIM_GENERATION_CLIENT_TIMEOUT_MS")
   })
 
   it("aborts the previous in-flight request before starting a new generation", () => {
@@ -78,7 +78,7 @@ describe("AIM composer generate button", () => {
     expect(generationSource).toContain("requestAbortRef.current?.abort()")
     expect(generationSource).toContain("endExclusiveRequest")
     expect(generationSource).toContain("generateAimContentWithTransientRetry")
-    expect(unifiedTurnSource).toContain("isTransientGenerateFailure")
+    expect(unifiedTurnSource).toContain("shouldRetryTransiently")
   })
 
   it("does not clear busy when a newer request has taken over the abort ref", () => {

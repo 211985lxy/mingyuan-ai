@@ -144,7 +144,9 @@ async function persistFailedAimRun(
     provider: last?.provider ?? "unknown",
     model: last?.model ?? "unknown",
     fallbackIndex: last?.attemptIndex ?? 0,
-    degraded: true,
+    // 没有成功 provider 的失败运行不是“备用模型完成”；degraded 只表示
+    // 发生 fallback 后仍交付了正文，失败记录必须保持 false。
+    degraded: false,
     promptHash: error.promptHash ?? "",
     contextHash: error.contextHash ?? "",
     providerAttempts: error.providerAttempts,

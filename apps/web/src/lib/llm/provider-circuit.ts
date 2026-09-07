@@ -68,8 +68,9 @@ function withBudget<T>(task: Promise<T>, fallback: T): Promise<T> {
   })
 }
 
-function circuitKey(provider: string, model: string): string {
-  return `aim:llm:circuit:${provider}:${model}`
+function circuitKey(provider: string, model: string, scope?: string): string {
+  const safeScope = encodeURIComponent(scope?.trim() || "global")
+  return `aim:llm:circuit:${safeScope}:${provider}:${model}`
 }
 
 function logCircuit(event: Record<string, string | number | boolean | null>): void {
@@ -132,15 +133,15 @@ export function createProviderCircuit(opts?: {
   now?: () => number
   store?: ProviderCircuitStore
 }): {
-  isOpen(provider: string, model: string): Promise<boolean>
-  recordFailure(provider: string, model: string, kind: CircuitFailureKind): Promise<void>
-  recordSuccess(provider: string, model: string): Promise<void>
+  isOpen(provider: string, model: string, scope?: string): Promise<boolean>
+  recordFailure(provider: string, model: string, kind: CircuitFailureKind, scope?: string): Promise<void>
+  recordSuccess(provider: string, model: string, scope?: string): Promise<void>
 } {
   const now = opts?.now ?? Date.now
   const io = bindCircuitStorage(opts?.store)
   return {
-    async isOpen(provider, model) {
-      const key = circuitKey(provider, model)
+    async isOpen(provider, model, scope) {
+      const key = circuitKey(provider, model, scope)
       const state = await io.read(key)
       if (!state) return false
       const t = now()
@@ -152,14 +153,14 @@ export function createProviderCircuit(opts?: {
       }
       return false
     },
-    async recordFailure(provider, model, kind) {
-      const next = stateAfterFailure(await io.read(circuitKey(provider, model)), kind, now())
+    async recordFailure(provider, model, kind, scope) {
+      const next = stateAfterFailure(await io.read(circuitKey(provider, model, scope)), kind, now())
       if (!next) return
-      await io.write(circuitKey(provider, model), next)
-      logCircuit({ provider, model, kind, consecutiveFailures: next.consecutiveFailures, openedUntil: next.openedUntil })
+      await io.write(circuitKey(provider, model, scope), next)
+      logCircuit({ provider, model, scope: scope || "global", kind, consecutiveFailures: next.consecutiveFailures, openedUntil: next.openedUntil })
     },
-    async recordSuccess(provider, model) {
-      await io.write(circuitKey(provider, model), null)
+    async recordSuccess(provider, model, scope) {
+      await io.write(circuitKey(provider, model, scope), null)
     },
   }
 }
@@ -189,9 +190,9 @@ export function resetProviderCircuitForTests(): void {
   defaultCircuit = createProviderCircuit()
 }
 
-export async function isProviderCircuitOpen(provider: string, model: string): Promise<boolean> {
+export async function isProviderCircuitOpen(provider: string, model: string, scope?: string): Promise<boolean> {
   try {
-    return await defaultCircuit.isOpen(provider, model)
+    return await defaultCircuit.isOpen(provider, model, scope)
   } catch {
     return false
   }
@@ -201,17 +202,18 @@ export async function recordProviderCircuitFailure(
   provider: string,
   model: string,
   kind: CircuitFailureKind,
+  scope?: string,
 ): Promise<void> {
   try {
-    await defaultCircuit.recordFailure(provider, model, kind)
+    await defaultCircuit.recordFailure(provider, model, kind, scope)
   } catch {
     // Circuit bookkeeping must never block generation.
   }
 }
 
-export async function recordProviderCircuitSuccess(provider: string, model: string): Promise<void> {
+export async function recordProviderCircuitSuccess(provider: string, model: string, scope?: string): Promise<void> {
   try {
-    await defaultCircuit.recordSuccess(provider, model)
+    await defaultCircuit.recordSuccess(provider, model, scope)
   } catch {
     // Circuit bookkeeping must never block generation.
   }
@@ -239,15 +241,17 @@ export async function observeProviderCircuit(
   provider: string,
   model: string,
   outcome: { ok: true } | { ok: false; kind: ProviderErrorKind; message: string },
+  scope?: string,
 ): Promise<void> {
   if (outcome.ok) {
-    await recordProviderCircuitSuccess(provider, model)
+    await recordProviderCircuitSuccess(provider, model, scope)
     return
   }
   const kind = circuitKindFromProviderError(outcome.kind, outcome.message)
-  if (kind) await recordProviderCircuitFailure(provider, model, kind)
+  if (kind) await recordProviderCircuitFailure(provider, model, kind, scope)
 }
 
 export function summarizeAimRouteProbe(results: AimProbeHop[]): { ok: boolean } {
-  return { ok: results.slice(0, 3).every((hop) => hop.status === "healthy") }
+  const firstThree = results.slice(0, 3)
+  return { ok: firstThree.length === 3 && firstThree.every((hop) => hop.status === "healthy") }
 }

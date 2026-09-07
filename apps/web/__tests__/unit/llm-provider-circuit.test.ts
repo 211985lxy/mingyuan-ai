@@ -135,6 +135,14 @@ describe("provider circuit", () => {
     expect(calls).toEqual(["first", "second"])
     await recordProviderCircuitSuccess("second", "second-model")
   })
+
+  it("keeps circuit state isolated by route scope", async () => {
+    const circuit = createProviderCircuit({ now: () => 7_000_000, store: memoryStore() })
+    await circuit.recordFailure("zenmux", "claude", "auth", "content_producer")
+
+    expect(await circuit.isOpen("zenmux", "claude", "content_producer")).toBe(true)
+    expect(await circuit.isOpen("zenmux", "claude", "content_review")).toBe(false)
+  })
 })
 
 describe("aim route probe summary", () => {
@@ -155,5 +163,30 @@ describe("aim route probe summary", () => {
       { name: "apimart", model: "gpt-5.4", status: "healthy", durationMs: 10 },
       { name: "deepseek", model: "deepseek-v4-pro", status: "failed", durationMs: 4 },
     ]).ok).toBe(true)
+  })
+})
+
+describe("provider-local failures", () => {
+  it("continues to the next provider after a provider-local auth failure", async () => {
+    const first: LLMProvider = {
+      name: "broken-primary",
+      defaultModel: "primary-model",
+      isAvailable: () => true,
+      async complete() {
+        throw new Error("401 Unauthorized")
+      },
+    }
+    const backup: LLMProvider = {
+      name: "backup",
+      defaultModel: "backup-model",
+      isAvailable: () => true,
+      async complete() {
+        return { content: "ok", model: "backup-model", provider: "backup" }
+      },
+    }
+
+    await expect(new LLMClient([first, backup], { maxAttempts: 2 }).complete({
+      messages: [{ role: "user", content: "test" }],
+    })).resolves.toMatchObject({ provider: "backup" })
   })
 })

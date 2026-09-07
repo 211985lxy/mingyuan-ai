@@ -55,6 +55,30 @@ describe("AIM generation attempt lifecycle", () => {
 
     expect(result).toEqual({ id: baseInput.attemptId, created: false, replay: "continue" })
     expect(create).not.toHaveBeenCalled()
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: baseInput.attemptId, status: "pending" }),
+      data: expect.objectContaining({ status: "running" }),
+    }))
+  })
+
+  it("atomically reclaims a failed task for an explicit user retry", async () => {
+    findUnique.mockResolvedValue({
+      userId: baseInput.userId,
+      projectId: baseInput.projectId,
+      rawInput: baseInput.rawInput,
+      agentId: baseInput.agentId,
+      formatsRequested: baseInput.targetFormats,
+      status: "failed",
+      errorMessage: "MODEL_TIMEOUT: 已保留",
+    })
+
+    const result = await startAimGenerationAttempt({ ...baseInput, allowRetry: true })
+
+    expect(result).toEqual({ id: baseInput.attemptId, created: false, replay: "continue" })
+    expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: baseInput.attemptId, status: "failed" }),
+      data: expect.objectContaining({ status: "running", errorMessage: null }),
+    }))
   })
 
   it("rejects a task id that belongs to a different user, project or request body", async () => {
@@ -138,7 +162,7 @@ describe("AIM generation attempt lifecycle", () => {
       agentId: "ip_video",
     })
     expect(create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ agentId: "content_producer", status: "pending", projectId: "project-1" }),
+      data: expect.objectContaining({ agentId: "content_producer", status: "running", projectId: "project-1" }),
     }))
     expect(result.created).toBe(true)
   })
@@ -191,11 +215,12 @@ describe("AIM generation attempt lifecycle", () => {
     })
 
     expect(updateMany).toHaveBeenCalledWith({
-      where: {
+      where: expect.objectContaining({
         id: baseInput.attemptId,
         userId: baseInput.userId,
         projectId: baseInput.projectId,
-      },
+        status: { in: ["pending", "running", "awaiting_input"] },
+      }),
       data: expect.objectContaining({
         status: "failed",
         errorMessage: "PROVIDER_UNAVAILABLE: 模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
@@ -224,7 +249,7 @@ describe("AIM generation attempt lifecycle", () => {
       projectId: baseInput.projectId,
     })
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: { status: "running" },
+      data: expect.objectContaining({ status: "running" }),
     }))
   })
 })

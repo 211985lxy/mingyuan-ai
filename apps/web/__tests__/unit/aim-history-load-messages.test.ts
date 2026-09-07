@@ -38,7 +38,7 @@ describe("buildAimHistoryLoadMessages", () => {
         expect(assistant?.pendingGeneration).toBe(true)
       }
       if (status === "awaiting_input") {
-        expect(assistant?.content).toMatch(/补充|确认/)
+        expect(assistant?.content).toMatch(/^在动笔前先确认/)
       }
     }
   })

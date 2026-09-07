@@ -331,6 +331,7 @@ export function serializeAimGenerationRun(run: Awaited<ReturnType<typeof execute
   return {
     ...run.output,
     runId: run.metadata.runId,
+    traceId: run.traceId,
     degraded: run.metadata.degraded,
     provider: run.metadata.provider,
     model: run.metadata.model,

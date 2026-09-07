@@ -36,6 +36,9 @@ export interface AimWorkbenchMessage {
   editorDiffSummary?: string | null
   editorApply?: { range: TextSelectionRange } | null
   runId?: string | null
+  /** 当前生成任务 ID；澄清/失败后用于同任务续接或显式重试。 */
+  generationId?: string | null
+  generationStatus?: "awaiting_input" | null
   degraded?: boolean | null
   qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
   workflowStage?: AimWorkflowStage
@@ -44,6 +47,8 @@ export interface AimWorkbenchMessage {
     kind: "chat" | "generate"
     retryText: string
     code?: AimFailureCode
+    /** 服务端保留的生成任务 ID；显式重试时复用同一条任务记录。 */
+    generationId?: string
     runId?: string
     recoverable?: boolean
   } | null

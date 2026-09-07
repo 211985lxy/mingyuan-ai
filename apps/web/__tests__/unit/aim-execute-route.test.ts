@@ -39,7 +39,9 @@ const {
       results: [{ format: "video_script", content: "成稿正文。", wordCount: 6 }],
     })),
     resolveBoundProject: vi.fn(async () => ({ id: "project-1", name: "测试项目", status: "active" })),
-    startAimGenerationAttempt: vi.fn(async () => ({
+    startAimGenerationAttempt: vi.fn(async (): Promise<
+      import("@/lib/aim/generation-attempt").AimGenerationAttemptStart
+    > => ({
       id: "generated-attempt",
       created: true,
       replay: "continue",
@@ -163,6 +165,26 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     }))
     expect(discardAimGenerationAttempt).not.toHaveBeenCalled()
     expect(data.generationId).toBe("generated-attempt")
+  })
+
+  it("returns the harness run id separately from the internal trace id", async () => {
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "直接生成",
+    })
+    executeVerifiedUnifiedDelivery.mockResolvedValue({ output: {}, metadata: { runId: "run_real" }, spec: {} })
+
+    const response = await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "写一条讲AI提效的口播，写给实体店老板，目标是引流获客",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+    }))
+    const data = await response.json()
+
+    expect(data.runId).toBe("run_real")
+    expect(data.traceId).toBe("trace-1")
   })
 
   it("does not ask again when the user is answering a previous clarification", async () => {
