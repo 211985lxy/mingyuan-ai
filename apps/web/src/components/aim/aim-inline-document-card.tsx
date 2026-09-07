@@ -13,6 +13,8 @@ import {
   type InlineSelectionActionId,
 } from "@/lib/aim/inline-editor-session"
 import { AIM_SOFT_ACTION_CLASS } from "@/lib/aim/workbench-display"
+import { VOICE_MAX_TEXT_LENGTH } from "@/lib/api/voice"
+import { VoicePreviewButton } from "@/components/voice/voice-preview-button"
 import type { ContentFormat } from "@/lib/api/client"
 
 /** 底部悬浮输入框 + 安全边距，编辑框需铺满到其上方 */
@@ -183,6 +185,9 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
   }
 
   const selectionBarVisible = editing && selection.text.trim().length > 0
+  // 超长成稿服务端会拒收，直接隐藏入口，避免用户点了才报错
+  const voiceEnabled = (editing ? draft : props.content).trim().length > 0
+    && (editing ? draft : props.content).trim().length <= VOICE_MAX_TEXT_LENGTH
 
   const toolbar = (
     <div className="flex flex-wrap items-center justify-end gap-1">
@@ -197,6 +202,7 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
         ) : (
           <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={beginEdit}>编辑</Button>
         )}
+        {voiceEnabled ? <VoicePreviewButton text={editing ? draft : props.content} /> : null}
         <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} onClick={() => void copyText()}>
           {copied ? <Check className="h-3.5 w-3.5" /> : <Clipboard className="h-3.5 w-3.5" />}复制
         </Button>

@@ -1,6 +1,6 @@
 {
   "fileLineLimit": 500,
-  "prismaFileLineLimit": 400,
+  "prismaFileLimit": 400,
   "targetModuleLineRange": [
     100,
     300
@@ -16,8 +16,8 @@
     },
     {
       "path": "src/env.ts",
-      "maxLines": 520,
-      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）"
+      "maxLines": 523,
+      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 新增 4 个 provider 变量（schema+runtime 各 4 行）"
     },
     {
       "path": "src/lib/account-project-context.ts",

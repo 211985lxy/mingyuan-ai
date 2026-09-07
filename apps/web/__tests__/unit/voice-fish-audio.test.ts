@@ -1,0 +1,119 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+
+type FishAudioModule = typeof import("@/lib/voice/fish-audio")
+
+const ORIGINAL_KEY = process.env.FISH_AUDIO_API_KEY
+
+async function loadClient(): Promise<FishAudioModule> {
+  vi.resetModules()
+  return import("@/lib/voice/fish-audio")
+}
+
+function stubFetchOnce(impl: (input: string, init?: RequestInit) => Promise<Response>) {
+  const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+    impl(String(input), init),
+  )
+  vi.stubGlobal("fetch", spy as unknown as typeof fetch)
+  return spy
+}
+
+beforeEach(() => {
+  process.env.FISH_AUDIO_API_KEY = "test-key"
+  delete process.env.FISH_AUDIO_BASE_URL
+  delete process.env.FISH_AUDIO_MODEL
+  delete process.env.FISH_AUDIO_PROXY_URL
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  if (ORIGINAL_KEY === undefined) delete process.env.FISH_AUDIO_API_KEY
+  else process.env.FISH_AUDIO_API_KEY = ORIGINAL_KEY
+})
+
+describe("Fish Audio TTS 客户端", () => {
+  it("未配置密钥时直接拒绝，不发起外部请求", async () => {
+    delete process.env.FISH_AUDIO_API_KEY
+    const { synthesizeSpeech, FishAudioError } = await loadClient()
+    const spy = stubFetchOnce(async () => new Response("never", { status: 200 }))
+
+    await expect(synthesizeSpeech({ text: "你好" })).rejects.toMatchObject({ code: "NOT_CONFIGURED", status: 503 })
+    expect(spy).not.toHaveBeenCalled()
+    expect(FishAudioError).toBeDefined()
+  })
+
+  it("空文本与超长文本在本地被拦下", async () => {
+    const { synthesizeSpeech, FISH_AUDIO_MAX_TEXT_LENGTH } = await loadClient()
+    const spy = stubFetchOnce(async () => new Response("x", { status: 200 }))
+
+    await expect(synthesizeSpeech({ text: "   " })).rejects.toMatchObject({ code: "EMPTY_TEXT" })
+    await expect(synthesizeSpeech({ text: "啊".repeat(FISH_AUDIO_MAX_TEXT_LENGTH + 1) })).rejects.toMatchObject({
+      code: "TEXT_TOO_LONG",
+    })
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it("默认走免费档，并把档位与音色透传给上游", async () => {
+    const { synthesizeSpeech } = await loadClient()
+    const spy = stubFetchOnce(
+      async () => new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "Content-Type": "audio/mpeg" } }),
+    )
+
+    const result = await synthesizeSpeech({ text: "暖气片一半热一半凉", voiceId: "voice-1" })
+
+    expect(result.model).toBe("s2.1-pro-free")
+    expect(result.voiceId).toBe("voice-1")
+    expect(result.contentType).toBe("audio/mpeg")
+    expect(result.charCount).toBe(9)
+
+    const [, init] = spy.mock.calls[0]
+    expect(String(spy.mock.calls[0][0])).toBe("https://api.fish.audio/v1/tts")
+    expect((init?.headers as Record<string, string>).model).toBe("s2.1-pro-free")
+    expect(JSON.parse(String(init?.body))).toMatchObject({ text: "暖气片一半热一半凉", reference_id: "voice-1", format: "mp3" })
+  })
+
+  it("配置 FISH_AUDIO_PROXY_URL 时请求携带共享 dispatcher，未配置则直连", async () => {
+    process.env.FISH_AUDIO_PROXY_URL = "http://127.0.0.1:10808"
+    const { synthesizeSpeech } = await loadClient()
+    const spy = stubFetchOnce(async () => new Response(new Uint8Array([1]), { status: 200 }))
+
+    await synthesizeSpeech({ text: "你好" })
+
+    const [, init] = spy.mock.calls[0]
+    expect((init as RequestInit & { dispatcher?: unknown }).dispatcher).toBeDefined()
+
+    delete process.env.FISH_AUDIO_PROXY_URL
+    const direct = await loadClient()
+    const directSpy = stubFetchOnce(async () => new Response(new Uint8Array([1]), { status: 200 }))
+    await direct.synthesizeSpeech({ text: "你好" })
+    const [, directInit] = directSpy.mock.calls[0]
+    expect((directInit as RequestInit & { dispatcher?: unknown }).dispatcher).toBeUndefined()
+  })
+
+  it("上游鉴权失败被翻译成可行动提示，不泄漏原文", async () => {
+    const { synthesizeSpeech } = await loadClient()
+    stubFetchOnce(async () => new Response("secret leak detail", { status: 401 }))
+
+    await expect(synthesizeSpeech({ text: "你好" })).rejects.toMatchObject({ status: 401 })
+    await expect(synthesizeSpeech({ text: "你好" })).rejects.toThrow(/FISH_AUDIO_API_KEY/)
+  })
+
+  it("音色列表映射上游字段，上游失败时降级不抛错", async () => {
+    const { listVoiceModels } = await loadClient()
+    stubFetchOnce(
+      async () =>
+        new Response(
+          JSON.stringify({ items: [{ _id: "m1", title: "知性女声", languages: ["zh"] }, { _id: "", title: "无效" }] }),
+          { status: 200 },
+        ),
+    )
+    const ok = await listVoiceModels({ selfOnly: true })
+    expect(ok.degraded).toBe(false)
+    expect(ok.items).toEqual([{ id: "m1", title: "知性女声", description: undefined, languages: ["zh"] }])
+
+    stubFetchOnce(async () => new Response("boom", { status: 500 }))
+    const failed = await listVoiceModels()
+    expect(failed.items).toEqual([])
+    expect(failed.degraded).toBe(true)
+    expect(failed.reason).toContain("500")
+  })
+})
