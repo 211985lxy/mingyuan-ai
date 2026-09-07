@@ -44,6 +44,7 @@ vi.mock("@/lib/aim-observability", () => ({
   createAimTrace: vi.fn(async () => ({ id: "trace-1" })),
   addAimTraceStep: vi.fn(async () => undefined),
   failAimTrace: vi.fn(async () => undefined),
+  finishAimTrace: vi.fn(async () => undefined),
   runAimTraceStep: vi.fn(async (_trace, _key, _label, fn) => fn()),
   summarizeText: vi.fn((input: unknown) => String(input ?? "")),
 }))

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({
   aimSnapshots: vi.fn().mockResolvedValue({ count: 1 }),
+  staleTraces: vi.fn().mockResolvedValue({ count: 4 }),
   hotItems: vi.fn().mockResolvedValue({ count: 2 }),
   hotSnapshots: vi.fn().mockResolvedValue({ count: 3 }),
   smsCodes: vi.fn().mockResolvedValue({ count: 0 }),
@@ -11,6 +12,7 @@ vi.mock("@/lib/admin-auth", () => ({ validateCronSecret: vi.fn().mockReturnValue
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     aimRunSnapshot: { deleteMany: mocks.aimSnapshots },
+    aimExecutionTrace: { updateMany: mocks.staleTraces },
     douyinHotItem: { deleteMany: mocks.hotItems },
     douyinHotSnapshot: { deleteMany: mocks.hotSnapshots },
     smsVerificationCode: { deleteMany: mocks.smsCodes },
@@ -32,5 +34,23 @@ describe("cleanup retention", () => {
     expect(response.status).toBe(200)
     expect(mocks.aimSnapshots).toHaveBeenCalledWith({ where: { expiresAt: { lt: now } } })
     expect(mocks.smsCodes).toHaveBeenCalled()
+  })
+
+  it("marks traces still running after 10 minutes as STALE_EXECUTION without deleting them", async () => {
+    const now = new Date("2026-07-14T00:10:00.000Z")
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
+    const response = await GET(new Request("https://example.com/api/cron/cleanup") as never)
+    const body = await response.json()
+    expect(response.status).toBe(200)
+    expect(body.staleTraces).toBe(4)
+    expect(mocks.staleTraces).toHaveBeenCalledWith({
+      where: { status: "running", updatedAt: { lt: new Date(now.getTime() - 10 * 60 * 1000) } },
+      data: {
+        status: "failed",
+        errorCode: "STALE_EXECUTION",
+        errorMessage: "执行超时未结束，已自动标记失败",
+      },
+    })
   })
 })

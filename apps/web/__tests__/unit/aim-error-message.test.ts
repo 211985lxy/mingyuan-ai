@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
+import { classifyAimFailure, mapAimErrorToUserMessage, mapAimFailureCodeToUserMessage } from "@/lib/aim-error-message"
+import { AimDeadlineExceededError } from "@/lib/llm/execution-deadline"
+import { AimDeliveryContentError } from "@/lib/aim/delivery-content-gate"
 
 describe("mapAimErrorToUserMessage", () => {
   it("透传含中文的用户可读错误", () => {
@@ -34,5 +36,19 @@ describe("mapAimErrorToUserMessage", () => {
     expect(mapAimErrorToUserMessage(new Error(""), "兜底")).toBe("兜底")
     expect(mapAimErrorToUserMessage("plain string", "兜底")).toBe("兜底")
     expect(mapAimErrorToUserMessage(undefined, "兜底")).toBe("兜底")
+  })
+})
+
+describe("aim failure codes", () => {
+  it("maps timeout, deadline and delivery leak to distinct user actions", () => {
+    expect(classifyAimFailure(new AimDeadlineExceededError())).toBe("GENERATION_DEADLINE")
+    expect(classifyAimFailure(new AimDeliveryContentError(["reasoning_leak"]))).toBe("DELIVERY_REASONING_LEAK")
+    expect(classifyAimFailure(new Error("timeout"), [{
+      provider: "zenmux", status: "failed", attemptIndex: 0, errorKind: "timeout", error: "timed out",
+    }])).toBe("MODEL_TIMEOUT")
+    expect(mapAimFailureCodeToUserMessage("MODEL_TIMEOUT")).toContain("更换线路")
+    expect(mapAimFailureCodeToUserMessage("GENERATION_DEADLINE")).toContain("等待上限")
+    expect(mapAimFailureCodeToUserMessage("DELIVERY_REASONING_LEAK")).toContain("未作为正式成稿")
+    expect(mapAimFailureCodeToUserMessage("MODEL_TIMEOUT")).not.toContain("补充")
   })
 })

@@ -231,17 +231,16 @@ model AimExecutionTrace {
   inputSummary    String?  @db.Text
   outputSummary   String?  @db.Text
   errorMessage    String?  @db.Text
+  errorCode       String?  @db.VarChar(48)
   steps           Json     @default("[]")
   aimGenerationId String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
-  // ── aim-harness-v1 长期可观测字段（不随快照过期，长期保留） ──
-  runId             String?  @db.VarChar(40) // 对外执行编号，= AimRunSnapshot.runId
-  provider          String?  @db.VarChar(64) // 实际命中的 provider（与 model 分别记录）
-  fallbackIndex     Int? // 命中第几个 provider（0=首选）
+  runId             String?  @db.VarChar(40)
+  provider          String?  @db.VarChar(64)
+  fallbackIndex     Int?
   degraded          Boolean? // fallback 后继续交付则 true
-  harnessVersion    String?  @db.VarChar(40) // "aim-harness-v1"
+  harnessVersion    String?  @db.VarChar(40)
   runtimeTask       String?  @db.VarChar(32)
   conversationMode  String?  @db.VarChar(32)
   knowledgeStrategy String?  @db.VarChar(32)
@@ -257,6 +256,7 @@ model AimExecutionTrace {
   @@index([agentId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([runId])
+  @@index([errorCode])
   @@index([promptHash])
   @@index([qualityStatus])
 }

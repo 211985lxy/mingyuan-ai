@@ -31,6 +31,7 @@ import type {
 } from "./types"
 import { HARNESS_VERSION } from "./types"
 import { computeCostCny } from "./model-pricing"
+import { AimRunExecutionError, classifyAimFailure } from "@/lib/aim-error-message"
 
 export interface RunAimHarnessInput {
   plan: PlanRunInput
@@ -129,13 +130,29 @@ export async function runAimHarness(
   const providerAttempts: ProviderAttempt[] = []
   const invocations: LlmInvocation[] = []
   const deadlineMs = spec.modelPolicy.totalTimeoutMs ?? spec.executionPolicy.timeoutMs
-  const execution = await runWithLlmTelemetry(
-    {
-      onAttempt: (attempt) => providerAttempts.push(attempt),
-      onInvocation: (invocation) => invocations.push(invocation),
-    },
-    () => runWithAimExecutionDeadline(deadlineMs, () => input.execute(spec)),
-  )
+  let execution: Awaited<ReturnType<typeof input.execute>>
+  try {
+    execution = await runWithLlmTelemetry(
+      {
+        onAttempt: (attempt) => providerAttempts.push(attempt),
+        onInvocation: (invocation) => invocations.push(invocation),
+      },
+      () => runWithAimExecutionDeadline(deadlineMs, () => input.execute(spec)),
+    )
+  } catch (error) {
+    if (error instanceof AimRunExecutionError) throw error
+    const composed = invocations.map((invocation, index) =>
+      `=== LLM INVOCATION ${index + 1} ===\n${invocation.fullPrompt}`
+    ).join("\n\n")
+    throw new AimRunExecutionError({
+      code: classifyAimFailure(error, providerAttempts),
+      runId,
+      cause: error,
+      providerAttempts,
+      promptHash: hashPrompt(composed || spec.rawInput),
+      contextHash: hashContextManifest([]),
+    })
+  }
 
   const contextManifest = execution.contextManifest ?? []
   const composedPrompt = invocations.length > 0

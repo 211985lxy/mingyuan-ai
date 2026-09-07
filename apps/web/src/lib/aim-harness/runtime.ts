@@ -33,6 +33,7 @@ import type { AimRunSpec, AimContextSource, AimRunMetadata } from "./types"
 import { HARNESS_VERSION } from "./types"
 import { hashPrompt, hashContextManifest, sha256 } from "./hashing"
 import { persistAimRunSnapshot, applyRunMetadataToTrace } from "./snapshot"
+import { AimRunExecutionError } from "@/lib/aim-error-message"
 import { wrapLlmTelemetryIterable } from "@/lib/llm/telemetry"
 import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
 import { flagAimGenerationDegraded } from "./persistence"
@@ -128,6 +129,39 @@ export interface ExecuteAimRunAdapter<TOutput = unknown> {
  * @param execute - execute
  * @returns Promise<AimRunResult<TOutput>>
  */
+
+async function persistFailedAimRun(
+  request: AimRunRequest,
+  plan: PlanRunInput,
+  error: unknown,
+): Promise<void> {
+  if (!(error instanceof AimRunExecutionError)) return
+  const failedSpec = withSpecOverrides(planAimRun(plan), request)
+  const last = error.providerAttempts.at(-1)
+  const metadata = {
+    runId: error.runId,
+    harnessVersion: HARNESS_VERSION,
+    provider: last?.provider ?? "unknown",
+    model: last?.model ?? "unknown",
+    fallbackIndex: last?.attemptIndex ?? 0,
+    degraded: true,
+    promptHash: error.promptHash ?? "",
+    contextHash: error.contextHash ?? "",
+    providerAttempts: error.providerAttempts,
+  }
+  await persistAimRunSnapshot({
+    runSpec: failedSpec,
+    metadata,
+    contextManifest: [],
+    composedPrompt: "[failed]",
+    output: { error: error.code },
+    traceId: request.trace?.id,
+    userId: request.actorId,
+    projectId: request.projectId,
+  }).catch(() => undefined)
+  await applyRunMetadataToTrace(request.trace?.id, metadata, failedSpec, undefined, "fail")
+}
+
 export async function executeAimRun<TOutput = unknown>(
   request: AimRunRequest,
   execute: ExecuteAimRunAdapter<TOutput>,
@@ -143,20 +177,26 @@ export async function executeAimRun<TOutput = unknown>(
     qualityStatus?: "pass" | "warn" | "fail" | "skipped"
   }) | undefined
 
-  const execResult = await runAimHarness({
-    traceId: request.trace?.id,
-    plan,
-    execute: async (spec) => {
-      const adapted = await execute(spec)
-      // runAimHarness 只消费 output + contextManifest；其余字段通过闭包变量回传。
-      partial = adapted
-      return {
-        output: adapted.output,
-        contextManifest: adapted.contextManifest,
-        composedPrompt: adapted.composedPrompt,
-      }
-    },
-  })
+  let execResult: AimHarnessOutcome
+  try {
+    execResult = await runAimHarness({
+      traceId: request.trace?.id,
+      plan,
+      execute: async (spec) => {
+        const adapted = await execute(spec)
+        // runAimHarness 只消费 output + contextManifest；其余字段通过闭包变量回传。
+        partial = adapted
+        return {
+          output: adapted.output,
+          contextManifest: adapted.contextManifest,
+          composedPrompt: adapted.composedPrompt,
+        }
+      },
+    })
+  } catch (error) {
+    await persistFailedAimRun(request, plan, error)
+    throw error
+  }
 
   const spec = withSpecOverrides(execResult.spec, request)
 

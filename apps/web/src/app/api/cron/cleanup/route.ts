@@ -29,6 +29,18 @@ export async function GET(request: NextRequest) {
       where: { expiresAt: { lt: now } },
     })
 
+    const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000)
+    const staleTraces = await (prisma as typeof prisma & {
+      aimExecutionTrace?: { updateMany(args: unknown): Promise<{ count: number }> }
+    }).aimExecutionTrace?.updateMany({
+      where: { status: "running", updatedAt: { lt: tenMinutesAgo } },
+      data: {
+        status: "failed",
+        errorCode: "STALE_EXECUTION",
+        errorMessage: "执行超时未结束，已自动标记失败",
+      },
+    })
+
     const [hotItems, snapshots, expiredSmsCodes] = await Promise.all([
       prisma.douyinHotItem.deleteMany({
         where: { fetchedAt: { lt: thirtyDaysAgo } },
@@ -47,6 +59,7 @@ export async function GET(request: NextRequest) {
         aimSnapshots: aimSnapshots?.count ?? 0,
         expiredSmsCodes,
       },
+      staleTraces: staleTraces?.count ?? 0,
     })
   } catch (error) {
     console.error("[cron/cleanup] failed:", error)

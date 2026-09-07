@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { aimExecuteBodySchema } from "@/features/aim/contracts/api"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
-import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
+import { aimFailureHttpStatus, mapAimErrorToUserMessage, toAimFailureResponse } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
-import { createAimTrace, failAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
+import { createAimTrace, failAimTrace, finishAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
 import { understandAimContentTurnWithTrace } from "@/lib/aim/semantic-task-understanding"
 import { MOUNTED_RULE_BLOCK_LABELS } from "@/lib/aim/mounted-rule-blocks"
 import { resolveExecuteTurnGate } from "@/lib/aim/execute-turn-intent-gate"
@@ -44,7 +44,6 @@ export async function POST(request: NextRequest) {
       trace,
     })
 
-    // 意图门：意图解析 + 关键缺口 + 规则块挂载 + 追问组装（显性化，轨迹可见）
     const gate = resolveExecuteTurnGate({
       envelope: scopedParsed.sourceEnvelope,
       handling: understanding.handling,
@@ -70,6 +69,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (gate.clarification) {
+      await finishAimTrace(trace, { status: "success", outputSummary: "clarification" })
       return NextResponse.json({
         kind: "clarification",
         question: gate.clarification.question,
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     }
     if (gate.intent.taskKind === "answer_question" || understanding.handling === "respond") {
       const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed: scopedParsed, understanding, trace })
+      await finishAimTrace(trace, { status: "success", outputSummary: "reply" })
       return NextResponse.json({ kind: "reply", content, runId: trace?.id })
     }
     const run = await executeVerifiedUnifiedDelivery({
@@ -88,7 +89,8 @@ export async function POST(request: NextRequest) {
       intent: gate.intent,
       trace,
     })
-    return NextResponse.json({ kind: "deliverable", ...serializeAimGenerationRun(run) })
+    await finishAimTrace(trace, { status: "success" })
+    return NextResponse.json({ kind: "deliverable", ...serializeAimGenerationRun(run), runId: trace?.id })
   } catch (error) {
     if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
       const contextError = error as { message: string; code: string; status: number }
@@ -99,10 +101,13 @@ export async function POST(request: NextRequest) {
     const contractResponse = apiRequestErrorResponse(request, error)
     if (contractResponse) return contractResponse
     await failAimTrace(trace, error)
+    const requestId = request.headers.get("x-request-id") || crypto.randomUUID()
+    const failure = toAimFailureResponse(error, requestId)
+    if (!failure.runId && trace?.id) failure.runId = trace.id
     const message = error instanceof Error && error.message.includes("连续修正")
       ? error.message
-      : mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
-    return NextResponse.json({ error: message }, { status: error instanceof Error && error.message.includes("连续修正") ? 422 : 500 })
+      : mapAimErrorToUserMessage(error, failure.error)
+    return NextResponse.json({ ...failure, error: message }, { status: aimFailureHttpStatus(failure.code) })
   }
 }
 
