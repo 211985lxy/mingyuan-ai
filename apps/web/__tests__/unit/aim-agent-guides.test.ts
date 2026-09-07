@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { AIM_AGENT_OPTIONS, buildAimAgentHref, getAimAgent, listVisibleAimAgents } from "@/lib/aim-ui-config"
+import { AIM_AGENT_OPTIONS, buildAimAgentHref, getAimAgent, isValidAimAgent, listVisibleAimAgents, normalizeAimAgentId } from "@/lib/aim-ui-config"
 import {
   buildAimNextActionPrompt,
   getAimAgentGuide,
@@ -327,6 +327,35 @@ describe("aim agent guides", () => {
         if (skill.workbenchAction) continue
         const hasRef = CONTEXT_REFS.some((ref) => skill.prompt.includes(ref))
         expect(hasRef, `${agent.id}/${skill.id} lacks context ref`).toBe(true)
+      }
+    }
+  })
+
+  it("keeps the skill menu lean: no methodology toggles, one batch entry, two retro actions", () => {
+    // 2026-09-07 精简后收敛基线：方法论技能已删（方法论自动注入）、批量文案合并为一个入口、
+    // 数据复盘合并为两个动作。防止后续无意识把技能菜单重新撑大。
+    const producerSkills = getAimAgentGuide("content_producer").skills
+    expect(producerSkills.map((s) => s.group)).not.toContain("方法论")
+    expect(producerSkills.filter((s) => s.group === "内容目的")).toHaveLength(3)
+    const batch = producerSkills.filter((s) => s.group === "批量文案")
+    expect(batch.map((s) => s.id)).toEqual(["batch_script_studio"])
+    expect(batch[0]?.workbenchAction).toBe("open_batch_script_studio")
+
+    const retro = getAimAgentGuide("content_retro").skills
+    expect(retro.map((s) => s.id)).toEqual(["single_content_retro", "find_pattern_and_actions"])
+  })
+
+  it("every remaining skill's engine id is a valid wired agent (no silent fallback)", () => {
+    // 精简后逐条钉死：每个非面板类技能都必须声明一个合法 AimAgentId，
+    // 否则 resolveSkillExecutionAgentId 会静默不委托，点下去「看似能用其实串台/没反应」。
+    for (const agent of listVisibleAimAgents()) {
+      for (const skill of getAimAgentGuide(agent.id).skills) {
+        if (skill.workbenchAction) continue
+        expect(skill.agentId, `${agent.id}/${skill.id} missing agentId`).toBeTruthy()
+        expect(
+          isValidAimAgent(normalizeAimAgentId(skill.agentId!)),
+          `${agent.id}/${skill.id} engine "${skill.agentId}" is not a wired agent`,
+        ).toBe(true)
       }
     }
   })
