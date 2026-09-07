@@ -58,7 +58,9 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
       ? { prompt: nextInput.includes(skill.prompt) ? skill.prompt : nextInput, signals: methodologySignals }
       : null
     if (nextInput !== options.input) options.setInput(nextInput)
-    toast.success("技能指令已填入")
+    toast.success(`已应用「${skill.label}」`, {
+      description: "指令已填入输入框，补充素材后点右下角发送",
+    })
   }, [options])
 
   /** 取出本次发送该用的委托引擎，并清掉一次性意图。 */

@@ -31,7 +31,7 @@ export function AimSkillQuickPopover(props: {
             技能
           </p>
           <p className="mt-0.5 text-[10.5px] text-muted-foreground/70">
-            点一下按这个目的直接出稿
+            点一下填入写作指令，补充素材后发送出稿
           </p>
         </div>
         {onAddSkill ? (
