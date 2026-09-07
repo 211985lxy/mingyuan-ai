@@ -1,24 +1,24 @@
-import { parseJsonBody } from "@/lib/api-contract"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { LLMClient } from "@/lib/llm"
+import { parseCapabilityInput } from "@/lib/api/contracts"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
 import { searchWechatChannelsVideos, type WechatChannelsSearchVideo } from "@/lib/tikhub/search-wechat-channels-videos"
-import { z } from "zod"
+// api-inventory: domain=competitor
+// api-inventory: kind=capability
+// api-inventory: orchestratable=true
 
-const bodySchema = z.object({
-  keyword: z.string().trim().min(1).max(200),
-  count: z.number().int().min(5).max(50).default(20),
-}).strict()
 
 /**
  * POST /api/competitor/search-channels/analyze
  * 视频号选题热度分析（搜索 + AI 分析）
  */
 export const POST = withUserAuth(async (request, { user: _user }) => {
-  const body = await parseJsonBody(request, bodySchema, { maxBytes: 4 * 1024 })
+  const body = (await parseCapabilityInput("/api/competitor/search-channels/analyze", request, {
+    maxBytes: 4 * 1024,
+  })) as { keyword: string; count: number }
 
   let items: WechatChannelsSearchVideo[]
   try {

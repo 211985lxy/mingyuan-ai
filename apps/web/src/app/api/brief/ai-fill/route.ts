@@ -1,4 +1,4 @@
-import { parseJsonRecord } from "@/lib/api-contract"
+import { parseCapabilityInput } from "@/lib/api/contracts"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
@@ -7,18 +7,18 @@ import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
+// api-inventory: domain=brief
+// api-inventory: kind=capability
+// api-inventory: orchestratable=true
+
 
 export const POST = withUserAuth(async (request) => {
-  const body = await parseJsonRecord(request)
-  const templateId = typeof body.templateId === "string" ? body.templateId : ""
-  const userInput = typeof body.userInput === "string" ? body.userInput.trim() : ""
-
-  if (!templateId) {
-    return NextResponse.json(
-      { error: "templateId is required" },
-      { status: 400 },
-    )
+  const body = (await parseCapabilityInput("/api/brief/ai-fill", request)) as {
+    templateId: string
+    userInput: string
   }
+  const templateId = body.templateId
+  const userInput = body.userInput.trim()
 
   const template = await prisma.contentTemplate.findUnique({
     where: { id: templateId, status: "published" },

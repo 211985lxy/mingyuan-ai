@@ -1,4 +1,4 @@
-import { parseJsonRecord } from "@/lib/api-contract"
+import { parseCapabilityInput } from "@/lib/api/contracts"
 import { NextResponse } from "next/server"
 import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
@@ -6,14 +6,15 @@ import { LLMClient } from "@/lib/llm/client"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
+// api-inventory: domain=knowledge
+// api-inventory: kind=capability
+// api-inventory: orchestratable=false
+
 
 // 知识库蒸馏：用 DeepSeek 对指定知识条目做精炼/合并/分类建议
 export const POST = withAdminOrEditor(async (request) => {
-  const body = await parseJsonRecord(request)
-  const { ids } = body as { ids?: string[] }
-
-  if (!ids || ids.length === 0 || ids.length > 50) {
-    return NextResponse.json({ error: "ids 必填且最多 50 条" }, { status: 400 })
+  const { ids } = (await parseCapabilityInput("/api/admin/knowledge/distill", request)) as {
+    ids: string[]
   }
 
   const entries = await prisma.knowledgeEntry.findMany({

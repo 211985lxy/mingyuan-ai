@@ -7,6 +7,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -21,6 +24,9 @@
         "GET",
         "POST"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -35,6 +41,9 @@
         "DELETE",
         "PATCH"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -48,6 +57,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -62,6 +74,9 @@
         "GET",
         "POST"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -75,6 +90,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -89,6 +107,9 @@
         "GET",
         "POST"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "manual",
@@ -102,6 +123,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/activation-codes",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -115,6 +139,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/activation-codes",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -128,6 +155,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/activation-codes",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -141,6 +171,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/activation-codes",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -155,6 +188,9 @@
         "GET",
         "PUT"
       ],
+      "domain": "admin/agents",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -168,6 +204,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/agents",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -181,6 +220,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/agents",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -195,6 +237,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -209,6 +254,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -222,6 +270,9 @@
       "methods": [
         "PATCH"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -236,6 +287,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -249,6 +303,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -262,6 +319,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -275,6 +335,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -289,6 +352,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -302,6 +368,9 @@
       "methods": [
         "PATCH"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -316,6 +385,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -329,6 +401,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -342,6 +417,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -356,6 +434,9 @@
         "DELETE",
         "PATCH"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -370,6 +451,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/aim",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -384,6 +468,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/approval-decisions",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -397,6 +484,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/audit-logs",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -410,6 +500,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/auth",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "public",
       "input": "zod_json",
       "query": "none",
@@ -423,6 +516,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/auth",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -436,6 +532,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/auth",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -449,6 +548,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -463,6 +565,9 @@
         "DELETE",
         "PATCH"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -477,6 +582,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -492,6 +600,9 @@
         "GET",
         "PATCH"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -505,6 +616,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -518,6 +632,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "multipart",
       "query": "none",
@@ -531,6 +648,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -545,6 +665,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/benchmark-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -558,6 +681,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/benchmark-table",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -571,6 +697,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/channel-metrics",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -584,6 +713,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/dashboard",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -599,6 +731,9 @@
         "PATCH",
         "POST"
       ],
+      "domain": "admin/governance-assignments",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -613,6 +748,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/hot-sources",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -626,6 +764,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/hot-topics",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -639,6 +780,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/hot-topics",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -652,6 +796,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/jiekou",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -665,6 +812,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -678,8 +828,11 @@
       "methods": [
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "capability",
+      "orchestratable": false,
       "auth": "admin_session",
-      "input": "bounded_json_object",
+      "input": "none",
       "query": "none",
       "externalService": true,
       "cost": "high",
@@ -694,6 +847,9 @@
         "POST",
         "PUT"
       ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -707,6 +863,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -720,6 +879,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "multipart",
       "query": "none",
@@ -733,6 +895,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -746,6 +911,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -761,6 +929,9 @@
         "PATCH",
         "POST"
       ],
+      "domain": "admin/methodology-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -774,6 +945,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/methodology-profiles",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -788,6 +962,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/methodology",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "zod_json",
       "query": "none",
@@ -802,6 +979,9 @@
         "GET",
         "PUT"
       ],
+      "domain": "admin/methodology",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -815,6 +995,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/projects",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -828,6 +1011,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/seed-topic-engine",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -841,6 +1027,9 @@
       "methods": [
         "PUT"
       ],
+      "domain": "admin/settings",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -855,6 +1044,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/settings",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -868,6 +1060,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/settings",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -881,6 +1076,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -894,6 +1092,9 @@
       "methods": [
         "PUT"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -907,6 +1108,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -920,6 +1124,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -935,6 +1142,9 @@
         "GET",
         "PUT"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -948,6 +1158,9 @@
       "methods": [
         "PUT"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -962,6 +1175,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/templates",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -975,6 +1191,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/users",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -988,6 +1207,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/users",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
@@ -1001,6 +1223,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "admin/users",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "none",
       "query": "none",
@@ -1014,6 +1239,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "agent_key",
       "input": "bounded_json_object",
       "query": "none",
@@ -1027,6 +1255,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "bounded_json_object",
       "query": "none",
@@ -1040,6 +1271,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "none",
       "query": "none",
@@ -1053,6 +1287,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "none",
       "query": "none",
@@ -1066,6 +1303,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "zod_json",
       "query": "none",
@@ -1079,6 +1319,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "zod_json",
       "query": "none",
@@ -1092,6 +1335,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "zod_json",
       "query": "none",
@@ -1105,6 +1351,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "none",
       "query": "none",
@@ -1118,6 +1367,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "zod_json",
       "query": "none",
@@ -1131,6 +1383,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "zod_json",
       "query": "none",
@@ -1144,6 +1399,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "zod_json",
       "query": "none",
@@ -1157,6 +1415,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "agent",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "agent_key",
       "input": "none",
       "query": "none",
@@ -1170,6 +1431,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aihot-briefing",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1183,6 +1447,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aihot-briefing",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1197,6 +1464,9 @@
         "GET",
         "POST"
       ],
+      "domain": "aim-mcp",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -1210,6 +1480,9 @@
       "methods": [
         "PATCH"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1223,6 +1496,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1236,6 +1512,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "multipart",
       "query": "none",
@@ -1249,6 +1528,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1262,6 +1544,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1275,6 +1560,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1288,6 +1576,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1301,6 +1592,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -1314,6 +1608,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -1327,6 +1624,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1340,6 +1640,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1353,6 +1656,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1366,6 +1672,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1379,6 +1688,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1393,6 +1705,9 @@
         "GET",
         "PUT"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1406,6 +1721,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1421,6 +1739,9 @@
         "GET",
         "PATCH"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1434,6 +1755,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "zod",
@@ -1447,6 +1771,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1460,6 +1787,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1473,6 +1803,9 @@
       "methods": [
         "PUT"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1487,6 +1820,9 @@
         "GET",
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -1500,6 +1836,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1513,6 +1852,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1526,6 +1868,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1539,6 +1884,9 @@
       "methods": [
         "PATCH"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1552,6 +1900,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "multipart",
       "query": "none",
@@ -1565,6 +1916,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1578,6 +1932,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -1591,6 +1948,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1604,6 +1964,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "zod",
@@ -1617,6 +1980,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1630,6 +1996,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -1643,6 +2012,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -1656,6 +2028,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1670,6 +2045,9 @@
         "DELETE",
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1683,6 +2061,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1697,6 +2078,9 @@
         "GET",
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -1710,6 +2094,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -1723,6 +2110,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1736,6 +2126,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1749,6 +2142,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "multipart",
       "query": "manual",
@@ -1762,6 +2158,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -1775,6 +2174,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -1788,6 +2190,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "aim",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1801,6 +2206,9 @@
       "methods": [
         "DELETE"
       ],
+      "domain": "assets",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1815,6 +2223,9 @@
         "GET",
         "POST"
       ],
+      "domain": "assets",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -1828,6 +2239,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "assets",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1841,6 +2255,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "assets",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -1854,6 +2271,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "assets",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "multipart",
       "query": "none",
@@ -1867,6 +2287,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -1880,6 +2303,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -1893,6 +2319,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -1906,6 +2335,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "zod_json",
       "query": "none",
@@ -1919,6 +2351,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -1932,6 +2367,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "zod_json",
       "query": "none",
@@ -1945,6 +2383,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1958,6 +2399,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -1971,6 +2415,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "zod_json",
       "query": "none",
@@ -1984,6 +2431,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "zod_json",
       "query": "none",
@@ -1997,6 +2447,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "zod_json",
       "query": "none",
@@ -2010,8 +2463,11 @@
       "methods": [
         "POST"
       ],
+      "domain": "brief",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
-      "input": "bounded_json_object",
+      "input": "none",
       "query": "none",
       "externalService": true,
       "cost": "high",
@@ -2023,6 +2479,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "comment-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -2036,6 +2495,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "comment-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2049,6 +2511,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "comment-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2062,6 +2527,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "comment-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2075,6 +2543,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "comment-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2089,6 +2560,9 @@
         "GET",
         "POST"
       ],
+      "domain": "comment-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -2102,8 +2576,11 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
-      "input": "bounded_json_object",
+      "input": "none",
       "query": "none",
       "externalService": true,
       "cost": "high",
@@ -2116,6 +2593,9 @@
         "DELETE",
         "GET"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2129,6 +2609,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2142,6 +2625,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2155,6 +2641,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2168,6 +2657,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2181,6 +2673,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2194,6 +2689,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "zod",
@@ -2207,6 +2705,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2220,6 +2721,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2233,6 +2737,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2246,8 +2753,11 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
-      "input": "zod_json",
+      "input": "none",
       "query": "none",
       "externalService": true,
       "cost": "high",
@@ -2259,6 +2769,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2272,6 +2785,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2285,6 +2801,9 @@
       "methods": [
         "DELETE"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2298,6 +2817,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2311,6 +2833,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2325,6 +2850,9 @@
         "GET",
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2338,6 +2866,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2351,6 +2882,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "competitor",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2364,6 +2898,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "content-opportunities",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2377,6 +2914,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "content-opportunities",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2390,6 +2930,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "content-opportunities",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2403,6 +2946,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "content-opportunities",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2417,6 +2963,9 @@
         "DELETE",
         "GET"
       ],
+      "domain": "content-opportunities",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2431,6 +2980,9 @@
         "GET",
         "POST"
       ],
+      "domain": "content-opportunities",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "manual",
@@ -2444,6 +2996,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "content-opportunities",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2457,6 +3012,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "content-versions",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2471,6 +3029,9 @@
         "GET",
         "POST"
       ],
+      "domain": "content-versions",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -2484,6 +3045,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2497,6 +3061,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2510,6 +3077,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2523,6 +3093,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2536,6 +3109,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2549,6 +3125,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2562,6 +3141,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
@@ -2575,6 +3157,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "data-platform",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2588,6 +3173,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "douyin-hot",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -2601,6 +3189,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "healthz",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -2614,6 +3205,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "hot-decisions",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2628,6 +3222,9 @@
         "GET",
         "POST"
       ],
+      "domain": "hot-decisions",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2641,6 +3238,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "hot-topics",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -2654,6 +3254,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "hot-topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2667,6 +3270,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "hot-topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -2680,6 +3286,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "hot-topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -2693,6 +3302,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "hot-topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -2706,6 +3318,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "images",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -2719,6 +3334,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2732,6 +3350,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "inspiration",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -2745,6 +3366,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "inspiration",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2759,6 +3383,9 @@
         "GET",
         "POST"
       ],
+      "domain": "inspiration",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -2773,6 +3400,9 @@
         "DELETE",
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2786,6 +3416,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -2799,6 +3432,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2812,6 +3448,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2825,6 +3464,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "raw_body",
       "query": "none",
@@ -2838,6 +3480,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "signed_integration",
       "input": "raw_body",
       "query": "none",
@@ -2851,6 +3496,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
@@ -2864,6 +3512,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
@@ -2877,6 +3528,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
@@ -2890,6 +3544,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
@@ -2903,6 +3560,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
@@ -2917,6 +3577,9 @@
         "GET",
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "raw_body",
       "query": "manual",
@@ -2931,6 +3594,9 @@
         "GET",
         "POST"
       ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "raw_body",
       "query": "manual",
@@ -2944,6 +3610,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "internal",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "bounded_json_object",
       "query": "none",
@@ -2959,6 +3628,9 @@
         "GET",
         "PUT"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -2972,6 +3644,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -2985,6 +3660,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -2998,6 +3676,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3012,6 +3693,9 @@
         "GET",
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "zod",
@@ -3025,6 +3709,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3038,6 +3725,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "multipart",
       "query": "none",
@@ -3051,6 +3741,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "zod_json",
       "query": "none",
@@ -3064,6 +3757,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "knowledge",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3077,6 +3773,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "lark-base",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3090,6 +3789,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "lark-base",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3103,6 +3805,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "market-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3116,6 +3821,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "market-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -3129,6 +3837,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "market-insights",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3142,6 +3853,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "methodology-profiles",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3155,6 +3869,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "methodology-profiles",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3168,6 +3885,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "metrics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -3181,6 +3901,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "projects",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3195,6 +3918,9 @@
         "DELETE",
         "PATCH"
       ],
+      "domain": "projects",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -3209,6 +3935,9 @@
         "GET",
         "POST"
       ],
+      "domain": "projects",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -3222,6 +3951,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "proxy-image",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -3235,6 +3967,9 @@
       "methods": [
         "PATCH"
       ],
+      "domain": "scripts",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3248,6 +3983,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "scripts",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3261,6 +3999,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "scripts",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3274,6 +4015,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "scripts",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3287,6 +4031,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "structures",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3300,6 +4047,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "templates",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "bounded_json_object",
       "query": "none",
@@ -3313,6 +4063,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "templates",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "none",
       "query": "none",
@@ -3326,6 +4079,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "templates",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "public",
       "input": "query",
       "query": "manual",
@@ -3339,6 +4095,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -3352,6 +4111,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -3365,6 +4127,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3378,6 +4143,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3391,6 +4159,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "topics",
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
@@ -3404,6 +4175,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3417,6 +4191,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "topics",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -3430,6 +4207,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "trending",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3443,6 +4223,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "video-copy-extractions",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3456,6 +4239,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "video-copy-extractions",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "none",
       "query": "none",
@@ -3470,6 +4256,9 @@
         "GET",
         "POST"
       ],
+      "domain": "video-copy-extractions",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -3483,6 +4272,9 @@
       "methods": [
         "GET"
       ],
+      "domain": "voice",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "query",
       "query": "manual",
@@ -3497,6 +4289,9 @@
         "GET",
         "POST"
       ],
+      "domain": "voice",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "zod_json",
       "query": "zod",
@@ -3510,6 +4305,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "webhook",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "signed_integration",
       "input": "zod_json",
       "query": "none",
