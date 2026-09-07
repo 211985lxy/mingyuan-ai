@@ -96,6 +96,8 @@ export interface AimModelPolicy {
   minimumCapability: AimModelCapability
   /** per-run provider budget; streaming uses a smaller budget */
   maxProviderAttempts: number
+  /** 单次执行共享截止时间（毫秒）；内容创作/商业诊断为 115s */
+  totalTimeoutMs?: number
 }
 
 export type AimModelPolicyOverride = Readonly<Required<Pick<

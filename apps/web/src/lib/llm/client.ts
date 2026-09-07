@@ -8,6 +8,7 @@ import {
   type ProviderErrorKind,
 } from "./telemetry"
 import { env } from "@/env"
+import { AimDeadlineExceededError } from "./execution-deadline"
 
 let _instance: LLMClient | null = null
 
@@ -83,6 +84,23 @@ export class LLMClient {
     _instance = null
   }
 
+
+  /**
+   * 被熔断、未配置、模型不兼容、同一供应商已请求过的候选不消耗尝试次数。
+   */
+  private shouldSkipWithoutConsuming(
+    provider: LLMProvider,
+    model: string | undefined,
+    requestedVendors: Set<string>,
+    requireStream = false,
+  ): boolean {
+    if (requireStream && !provider.stream) return true
+    if (typeof provider.isAvailable === "function" && !provider.isAvailable()) return true
+    if (requestedVendors.has(provider.name)) return true
+    if (model && provider.supportsModel && !provider.supportsModel(model)) return true
+    return false
+  }
+
   /**
    * Run a chat completion through the provider chain.
    * Tries each provider in order; falls back on failure.
@@ -111,17 +129,17 @@ export class LLMClient {
     }
     reportLlmInvocation(boundedOptions, false)
     let lastError: Error | undefined
+    let actualRequests = 0
+    const requestedVendors = new Set<string>()
 
-    for (let index = 0; index < Math.min(this.providers.length, maxAttempts); index += 1) {
-      const provider = this.providers[index]
-      if (
-        boundedOptions.model
-        && provider.supportsModel
-        && !provider.supportsModel(boundedOptions.model)
-      ) {
-        // 模型名-供应商错配：跳过而不是发出去吃 400（400 不可重试会中断整链）
+    for (const provider of this.providers) {
+      if (actualRequests >= maxAttempts) break
+      if (this.shouldSkipWithoutConsuming(provider, boundedOptions.model, requestedVendors)) {
         continue
       }
+      requestedVendors.add(provider.name)
+      const attemptIndex = actualRequests
+      actualRequests += 1
       const startedAt = Date.now()
       try {
         const result = await provider.complete(boundedOptions)
@@ -131,7 +149,7 @@ export class LLMClient {
           capability: provider.capability,
           status: "success",
           durationMs: Date.now() - startedAt,
-          attemptIndex: index,
+          attemptIndex,
           responseModel: result.model,
           totalTokens: result.usage?.totalTokens,
           promptTokens: result.usage?.promptTokens,
@@ -139,9 +157,10 @@ export class LLMClient {
         })
         return result
       } catch (error) {
+        if (error instanceof AimDeadlineExceededError) throw error
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
-        reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, index)
+        reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, attemptIndex)
         console.warn(
           `[llm] Provider "${provider.name}" failed (${classified.kind}), trying next:`,
           lastError.message
@@ -155,10 +174,8 @@ export class LLMClient {
               "该模型名应只发给认识它的聚合网关（见 createGatewayLLM / AGENT_ROUTES）。",
           )
         }
-        // Non-retryable errors must not silently switch models.
         if (!classified.retryable) break
-        // 指数退避：rate_limit/server 错误后等待再尝试下一个 provider
-        const delay = backoffDelay(index, classified.kind)
+        const delay = backoffDelay(attemptIndex, classified.kind)
         if (delay > 0) await sleep(delay)
       }
     }
@@ -206,26 +223,25 @@ export class LLMClient {
     }
     reportLlmInvocation(boundedOptions, true)
     let lastError: Error | undefined
+    let actualRequests = 0
+    const requestedVendors = new Set<string>()
 
-    for (let index = 0; index < Math.min(this.providers.length, maxAttempts); index += 1) {
-      const provider = this.providers[index]
-      if (!provider.stream) continue
-      if (
-        boundedOptions.model
-        && provider.supportsModel
-        && !provider.supportsModel(boundedOptions.model)
-      ) {
+    for (const provider of this.providers) {
+      if (actualRequests >= maxAttempts) break
+      if (this.shouldSkipWithoutConsuming(provider, boundedOptions.model, requestedVendors, true)) {
         continue
       }
 
+      requestedVendors.add(provider.name)
+      const attemptIndex = actualRequests
+      actualRequests += 1
       const startedAt = Date.now()
       let emitted = false
       try {
-        for await (const chunk of provider.stream(boundedOptions)) {
+        for await (const chunk of provider.stream!(boundedOptions)) {
           emitted = true
           yield chunk
         }
-        // 空流算失败：否则前端以为「流式成功但没字」，表现为流式输出反复丢失。
         if (!emitted) {
           throw new Error(
             `[${provider.name}] Empty stream from model ${boundedOptions.model ?? provider.defaultModel}`,
@@ -237,20 +253,21 @@ export class LLMClient {
           capability: provider.capability,
           status: "success",
           durationMs: Date.now() - startedAt,
-          attemptIndex: index,
+          attemptIndex,
         })
         return
       } catch (error) {
+        if (error instanceof AimDeadlineExceededError) throw error
         lastError = error instanceof Error ? error : new Error(String(error))
         const classified = classifyProviderError(error)
-        reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, index)
+        reportStreamFailure(provider, boundedOptions, lastError, classified.kind, startedAt, attemptIndex)
         if (emitted) throw lastError
         console.warn(
           `[llm] Provider "${provider.name}" stream failed (${classified.kind}), trying next:`,
           lastError.message
         )
         if (!classified.retryable) break
-        const delay = backoffDelay(index, classified.kind)
+        const delay = backoffDelay(attemptIndex, classified.kind)
         if (delay > 0) await sleep(delay)
       }
     }

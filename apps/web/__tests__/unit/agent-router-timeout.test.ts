@@ -40,74 +40,83 @@ describe("agent router timeout overrides", () => {
     vi.resetModules()
   })
 
-  it("gives APIMart enough time for long diagnosis and caps later fallbacks", async () => {
-    const { getAgentLLM } = await import("@/lib/llm/agent-router")
+  it("gives content production and diagnosis the Claude → GLM → APIMart budget, with DeepSeek as emergency only", async () => {
+    const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     getAgentLLM("business_diagnosis")
-
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
-    const laterFallbacks = ctorArgs.filter((config) => config.baseURL !== "https://api.apimart.ai/v1")
-    expect(apimart?.timeout).toBe(60000)
-    expect(laterFallbacks.length).toBeGreaterThan(0)
-    expect(laterFallbacks.every((config) => config.timeout === 20000)).toBe(true)
+    const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
+    const glm = ctorArgs.find((config) => String(config.baseURL || "").includes("z.ai"))
+    expect(zenmux?.timeout).toBe(50_000)
+    expect(glm?.timeout).toBe(30_000)
+    expect(apimart?.timeout).toBe(25_000)
+    expect(getAgentLLM("business_diagnosis").providerNames.slice(0, 4)).toEqual([
+      "zenmux",
+      "glm",
+      "apimart",
+      "deepseek",
+    ])
+    expect(getAgentRecommendedModel("business_diagnosis")).toBe("anthropic/claude-sonnet-4.6")
   })
 
-  it("uses the verified APIMart route first for business diagnosis", async () => {
+  it("uses Claude first for business diagnosis, not APIMart", async () => {
     const { getAgentLLM } = await import("@/lib/llm/agent-router")
 
-    expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("apimart")
+    expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("zenmux")
   })
 
-  it("routes content_producer to Claude first with DeepSeek pro/flash fallback (2026-08-29 决策)", async () => {
+  it("routes content_producer Claude → GLM → APIMart gpt-5.4, with DeepSeek only as emergency", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     const llm = getAgentLLM("content_producer")
-    expect(llm.providerNames.slice(0, 3)).toEqual(["zenmux", "deepseek", "deepseek"])
+    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "glm", "apimart", "deepseek"])
     expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-sonnet-4.6")
-    expect(llm.providerNames).toContain("deepseek")
-    expect(llm.providerNames).toContain("apimart")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(zenmux?.timeout).toBe(20000)
-    expect(zenmux?.fetchOptions).toMatchObject({ dispatcher: expect.any(Object) })
+    const glm = ctorArgs.find((config) => String(config.baseURL || "").includes("z.ai"))
+    const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
+    expect(zenmux?.timeout).toBe(50_000)
+    expect(glm?.timeout).toBe(30_000)
+    expect(apimart?.timeout).toBe(25_000)
   })
 
-  it("routes fast spoken with Claude first and multi-provider fallback (DeepSeek 降级)", async () => {
+  it("routes fast spoken with Claude first and three distinct providers", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0
 
     const routeKey = "content_producer.fast_spoken"
     const llm = getAgentLLM(routeKey, {
       minimumCapability: "standard",
-      maxProviderAttempts: 2,
+      maxProviderAttempts: 3,
     })
 
-    expect(llm.providerNames.slice(0, 3)).toEqual(["zenmux", "deepseek", "deepseek"])
+    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "glm", "apimart", "deepseek"])
     expect(getAgentRecommendedModel(routeKey)).toBe("anthropic/claude-sonnet-4.6")
-    expect(llm.providerNames).toContain("glm")
 
-    const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(deepseek?.timeout).toBe(45000)
-    expect(zenmux?.timeout).toBe(20000)
+    const glm = ctorArgs.find((config) => String(config.baseURL || "").includes("z.ai"))
+    const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
+    const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
+    expect(zenmux?.timeout).toBe(50_000)
     expect(zenmux?.maxRetries).toBe(0)
+    expect(glm?.timeout).toBe(30_000)
+    expect(apimart?.timeout).toBe(25_000)
+    expect(deepseek?.timeout).toBe(20_000)
 
     await llm.complete({ messages: [{ role: "user", content: "写一条口播" }] })
     expect(completionArgs[0]).toMatchObject({ model: "anthropic/claude-sonnet-4.6" })
   })
 
-  it("routes business_system_diagnosis to the fast direct model before long-gateway fallbacks", async () => {
+  it("routes business_system_diagnosis on the same Claude-first quality chain", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0
 
     const llm = getAgentLLM("business_system_diagnosis")
-    expect(llm.providerNames.slice(0, 2)).toEqual(["deepseek", "zenmux"])
-    expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("deepseek-v4-flash")
-    expect(llm.providerNames).toContain("deepseek")
-    expect(llm.providerNames).toContain("apimart")
+    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "glm", "apimart", "deepseek"])
+    expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(zenmux?.timeout).toBe(45000)
+    expect(zenmux?.timeout).toBe(50_000)
   })
 
   it("attaches proxy dispatcher to ZenMux when APIMART_PROXY_URL is set", async () => {
@@ -207,7 +216,7 @@ describe("agent router timeout overrides", () => {
       targets.some((t) => t.provider === "zenmux" && t.model === "anthropic/claude-sonnet-4.6"),
     ).toBe(true)
     expect(
-      targets.some((t) => t.provider === "zenmux" && t.model === "anthropic/claude-opus-4.6"),
+      targets.some((t) => t.provider === "apimart" && t.model === "gpt-5.4"),
     ).toBe(true)
     expect(targets.some((t) => t.provider === "deepseek")).toBe(true)
   })

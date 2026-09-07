@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto"
 
 import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
 import { runWithLlmTelemetry } from "@/lib/llm/telemetry"
+import { runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
 
 import { hashContextManifest, hashPrompt } from "./hashing"
 import { planAimRun } from "./planner"
@@ -127,12 +128,13 @@ export async function runAimHarness(
   // Capture every provider attempt for this run via the LLM telemetry seam.
   const providerAttempts: ProviderAttempt[] = []
   const invocations: LlmInvocation[] = []
+  const deadlineMs = spec.modelPolicy.totalTimeoutMs ?? spec.executionPolicy.timeoutMs
   const execution = await runWithLlmTelemetry(
     {
       onAttempt: (attempt) => providerAttempts.push(attempt),
       onInvocation: (invocation) => invocations.push(invocation),
     },
-    () => input.execute(spec),
+    () => runWithAimExecutionDeadline(deadlineMs, () => input.execute(spec)),
   )
 
   const contextManifest = execution.contextManifest ?? []

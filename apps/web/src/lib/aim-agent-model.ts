@@ -1,5 +1,6 @@
 import type { AimModelPolicy } from "@/lib/aim-harness/types"
 import { getAgentLLM } from "@/lib/llm/agent-router"
+import { runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
 import type { ChatMessage } from "@/lib/llm/types"
 
 function hasImageContent(messages: ChatMessage[]): boolean {
@@ -90,14 +91,14 @@ export async function executeGenerateLLM(
   policy?: AimModelPolicy,
 ) {
   const llm = getAgentLLM(policy?.routeKey ?? agentId, policy)
-  return llm.complete({
+  const complete = () => llm.complete({
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
     temperature: policy?.temperature ?? 0.8,
-    // 推理模型（gpt-5 等）会先消耗 reasoning tokens 再产出正文，4000 预算在
-    // 复杂生成任务上可能只够推理、正文为空；与客户端默认上限 8192 对齐。
     maxTokens: policy?.maxTokens ?? 8192,
   })
+  if (!policy?.totalTimeoutMs) return complete()
+  return runWithAimExecutionDeadline(policy.totalTimeoutMs, complete)
 }

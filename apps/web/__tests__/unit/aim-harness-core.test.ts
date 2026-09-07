@@ -123,10 +123,10 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.stream).toBe(false)
     expect(spec.modelPolicy.targetCapability).toBe("advanced")
     expect(spec.modelPolicy.minimumCapability).toBe("standard")
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(2)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
     expect(spec.executionPolicy).toMatchObject({
       mode: "single_shot",
-      timeoutMs: 90000,
+      timeoutMs: 115000,
       maxAutoRetries: 0,
     })
     expect(spec.runLlmQuality).toBe(false)
@@ -164,7 +164,8 @@ describe("aim-harness planner", () => {
     })
 
     expect(spec.modelPolicy.maxTokens).toBe(4096)
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(2)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(spec.modelPolicy.totalTimeoutMs).toBe(115_000)
   })
 
   it("freezes modelPolicy for chat entrypoints (temp 0.7, no maxTokens)", () => {

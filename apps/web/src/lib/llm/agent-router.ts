@@ -78,23 +78,21 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
   advanced: 3,
 }
 
+const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
+  {
+    name: "zenmux",
+    model: "anthropic/claude-sonnet-4.6",
+    timeoutMs: 50_000,
+    maxRetries: 0,
+    capability: "advanced",
+  },
+  { name: "glm", model: "glm-5.1", timeoutMs: 30_000, capability: "standard" },
+  { name: "apimart", model: "gpt-5.4", timeoutMs: 25_000, capability: "advanced" },
+  { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 20_000, capability: "advanced" },
+]
+
 export const AGENT_ROUTES = freezeAgentRoutes({
-  [AIM_FAST_SPOKEN_ROUTE_KEY]: [
-    // 业务决策（2026-08-29）：文案尽量 Claude，不可用降级 DeepSeek pro → flash。
-    // ZenMux 首位必须短超时快失败（20s 经验值），避免流式「干等后失败」；
-    // 降级链保证通道故障时 20s 内切到 DeepSeek 继续出稿。
-    {
-      name: "zenmux",
-      model: "anthropic/claude-sonnet-4.6",
-      timeoutMs: 20_000,
-      maxRetries: 0,
-      capability: "advanced",
-    },
-    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 45_000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
-    { name: "apimart", timeoutMs: 45_000, capability: "advanced" },
-    { name: "glm", timeoutMs: 30_000, capability: "standard" },
-  ],
+  [AIM_FAST_SPOKEN_ROUTE_KEY]: [...QUALITY_PRIMARY_ROUTE],
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
     // 先快失败再换路：ZenMux/离火近年常超时或 503，超时预算要短于前端流式总超时
@@ -105,29 +103,10 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
     { name: "glm", timeoutMs: 30000, capability: "standard" },
   ],
-  business_diagnosis: [
-    // APIMart is the verified healthy advanced route; long diagnosis needs more than the generic 20s fallback budget.
-    { name: "apimart", timeoutMs: 60000, capability: "advanced" },
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000, capability: "advanced" },
-    { name: "openrouter", model: "z-ai/glm-5.2", timeoutMs: 20000, capability: "advanced" },
-    { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "deepseek", timeoutMs: 20000, capability: "standard" },
-    { name: "jiekou", timeoutMs: 20000, capability: "basic" },
-    { name: "therouter", timeoutMs: 20000, capability: "standard" },
-    { name: "glm", timeoutMs: 20000, capability: "standard" },
-  ],
+  business_diagnosis: [...QUALITY_PRIMARY_ROUTE],
 
-  // ── 内容创作：Claude 质量优先（业务决策 2026-08-29），DeepSeek 系降级保出稿 ──
-  // ZenMux 短超时快失败，通道故障 20s 内降级，避免流式干等。
-  content_producer: [
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20_000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 45_000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
-    { name: "apimart", timeoutMs: 60_000, capability: "advanced" },
-    { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
-  ],
+  // ── 内容创作：Claude 质量优先，GLM / APIMart gpt-5.4 独立备用，DeepSeek 仅应急 ──
+  content_producer: [...QUALITY_PRIMARY_ROUTE],
 
   // ── DeepSeek 组（质检 / 人设等日常分发，走官方直连）──
   free_copywriter: [
@@ -139,16 +118,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "zenmux", capability: "standard" },
     { name: "jiekou", capability: "basic" },
   ],
-  business_system_diagnosis: [
-    // 工作台等待上限为 180 秒；先走直连模型，避免网关长超时后才开始生成整份报告。
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45000, capability: "standard" },
-    { name: "zenmux", model: "anthropic/claude-opus-4.6", timeoutMs: 45000, capability: "advanced" },
-    { name: "apimart", capability: "advanced" },
-    { name: "openrouter", model: "deepseek/deepseek-v4-pro", capability: "advanced" },
-    { name: "openrouter", model: "z-ai/glm-5.2", capability: "advanced" },
-    { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
-  ],
+  business_system_diagnosis: [...QUALITY_PRIMARY_ROUTE],
   content_review: [
     { name: "deepseek", capability: "standard" },
     { name: "apimart", capability: "advanced" },
@@ -270,7 +240,9 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
       ...(route.maxRetries !== undefined ? { maxRetries: route.maxRetries } : {}),
       capability: route.capability,
     }
-    providers.push(new OpenAICompatibleProvider(mergedConfig))
+    const provider = new OpenAICompatibleProvider(mergedConfig)
+    if (!provider.isAvailable()) continue
+    providers.push(provider)
   }
 
   if (providers.length === 0) {
