@@ -49,6 +49,8 @@ import {
 } from "@/lib/aim-sidebar-history"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { normalizeAimWorkflowStatus } from "@/lib/aim/workflow-status"
+import { useOrg } from "@/components/org/org-provider"
+import { Users } from "lucide-react"
 import type { AimGeneration } from "@/lib/api/client"
 
 interface NavItem {
@@ -137,6 +139,48 @@ function NavList({ items, pathname, searchParams, onNavigate }: {
             )
           })}
         </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
+
+/**
+ * 组织协同区块（Step⑤）：显性化三个组织角色与职责边界。
+ * 展示层；服务端鉴权仍由路由 auth 包装器与 HITL gate 负责。
+ */
+function OrgNavSection() {
+  const { roles, currentRoleId } = useOrg()
+
+  return (
+    <SidebarGroup className="mt-3 p-0">
+      <SidebarGroupLabel className="mb-1.5 flex h-7 shrink-0 items-center gap-1 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
+        <Users className="h-3.5 w-3.5" />
+        组织协同
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <div className="space-y-1.5 px-1.5">
+          {roles.map((role) => (
+            <div
+              key={role.id}
+              title={role.summary}
+              className={
+                role.id === currentRoleId
+                  ? "rounded-md border border-primary/30 bg-primary/[0.06] px-2 py-1.5"
+                  : "rounded-md px-2 py-1.5"
+              }
+            >
+              <p className="flex items-center gap-1 text-xs font-medium text-foreground/85">
+                {role.title}
+                {role.id === currentRoleId ? (
+                  <span className="rounded-sm bg-primary/15 px-1 text-[10px] text-primary">我</span>
+                ) : null}
+              </p>
+              <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-muted-foreground" title={role.summary}>
+                {role.owner} · {role.summary}
+              </p>
+            </div>
+          ))}
+        </div>
       </SidebarGroupContent>
     </SidebarGroup>
   )
@@ -285,6 +329,7 @@ export function AppSidebar() {
         <NavList items={primaryNav} pathname={pathname} searchParams={searchParams} onNavigate={closeMobile} />
         <ToolboxNavSection pathname={pathname} searchParams={searchParams} onNavigate={closeMobile} />
 
+        <OrgNavSection />
         <SidebarGroup className="mt-3 flex min-h-0 flex-1 flex-col p-0">
           <SidebarGroupLabel className="mb-1.5 h-7 shrink-0 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             AIM 专家
