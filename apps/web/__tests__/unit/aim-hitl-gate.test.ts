@@ -7,10 +7,8 @@ import {
   isHitlInlineEnabled,
   settleHitlApproval,
 } from "@/lib/aim/hitl-gate"
-import type {
-  ApprovalDecisionRecord,
-  ApprovalDecisionStorePort,
-} from "@/lib/aim/approval-decision-store"
+import type { ApprovalDecisionStorePort } from "@/lib/aim/approval-decision-store"
+import type { ApprovalDecisionRecord } from "@/lib/aim/workflow-governance"
 
 /**
  * Step③ HITL 门闩链路测试（模拟全链路，不连真实 DB）：

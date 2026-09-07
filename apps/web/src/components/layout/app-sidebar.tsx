@@ -50,7 +50,6 @@ import {
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
 import { normalizeAimWorkflowStatus } from "@/lib/aim/workflow-status"
 import { useOrg } from "@/components/org/org-provider"
-import { Users } from "lucide-react"
 import type { AimGeneration } from "@/lib/api/client"
 
 interface NavItem {

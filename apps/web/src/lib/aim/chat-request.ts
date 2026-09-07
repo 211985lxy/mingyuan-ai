@@ -70,7 +70,7 @@ export async function runAimChatRequest(input: {
   traceId?: string
   /** 本轮委托执行引擎；缺省不写入请求体，保持普通发送零变化 */
   executionAgentId?: string
-}): Promise<{ hasContent: boolean }> {
+}): Promise<{ hasContent: boolean; approvalRequired?: HitlApprovalRequired }> {
   const options = {
     agentId: input.agentId,
     projectId: input.projectId,

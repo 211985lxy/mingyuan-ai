@@ -151,7 +151,7 @@ async function executeChatRequest(
       setAssistantMessage(input, assistantId, content)
     },
   })
-  if (chatResult.approvalRequired) {
+  if (chatResult.approvalRequired && toolAction) {
     // Step③ HITL：高风险动作被门闩拦截，对话内挂起等待批准/驳回
     input.onHitlSettled?.()
     input.onHitlApprovalRequired?.(

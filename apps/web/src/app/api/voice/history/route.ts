@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const user = await authenticateRequest(request, { requireActivation: false })
     if (!user) return NextResponse.json({ error: "登录状态已失效，请重新登录" }, { status: 401 })
 
-    const { page, pageSize } = parseQuery(request, historyQuerySchema)
+    const { page = 1, pageSize = 20 } = parseQuery(request, historyQuerySchema)
     const [items, total] = await Promise.all([
       prisma.voiceSynthesisRecord.findMany({
         where: { userId: user.id },

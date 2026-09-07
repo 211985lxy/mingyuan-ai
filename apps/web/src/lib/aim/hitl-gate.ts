@@ -13,9 +13,9 @@
 
 import {
   recordApprovalDecision,
-  type ApprovalDecisionRecord,
   type ApprovalDecisionStorePort,
 } from "@/lib/aim/approval-decision-store"
+import type { ApprovalDecisionRecord } from "@/lib/aim/workflow-governance"
 import { createPrismaApprovalDecisionStore } from "@/lib/aim/approval-decision-prisma"
 
 /** 对话轴的高风险工具动作清单：对外发送与写知识库两类。 */
