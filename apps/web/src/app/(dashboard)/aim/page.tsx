@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
+import { AimContextBar } from "@/components/aim/aim-context-bar"
 import { AimContextUsage } from "@/components/aim/aim-context-usage"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
@@ -302,10 +303,12 @@ export default function AimPage() {
           projectAccessError={w.projectAccessError}
         />
         {w.projectEnabled && w.selectedProjectId && !isLanding ? (
-          <AimKnowledgeAssetsRow projectId={w.selectedProjectId} onOpenIpProfile={() => setIpProfileOpen(true)} sourceOriginalText={w.sourceOriginalText} sourceAnalysisText={w.sourceAnalysisText} sourceTopicTitle={w.sourceTopicTitle} />
+          <AimContextBar summary={["IP 档案", "本周进展", w.currentWorkflowStage === "results" ? "经营复盘" : null].filter(Boolean).join(" · ")}>
+            <AimKnowledgeAssetsRow projectId={w.selectedProjectId} onOpenIpProfile={() => setIpProfileOpen(true)} sourceOriginalText={w.sourceOriginalText} sourceAnalysisText={w.sourceAnalysisText} sourceTopicTitle={w.sourceTopicTitle} />
+            <ProjectWeeklyContent projectId={w.selectedProjectId} />
+            {w.currentWorkflowStage === "results" ? <ProjectWeeklyBusinessReview projectId={w.selectedProjectId} /> : null}
+          </AimContextBar>
         ) : null}
-        {w.projectEnabled && w.selectedProjectId && !isLanding ? <ProjectWeeklyContent projectId={w.selectedProjectId} /> : null}
-        {w.currentWorkflowStage === "results" && w.selectedProjectId ? <ProjectWeeklyBusinessReview projectId={w.selectedProjectId} /> : null}
 
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}
