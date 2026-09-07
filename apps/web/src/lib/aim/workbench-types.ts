@@ -1,6 +1,7 @@
 import type { AimGenerateResponse, QualityCheckReport } from "@/lib/api/client"
 import type { TextSelectionRange } from "@/lib/aim-editor"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
+import type { AimFailureCode } from "@/lib/aim-error-message"
 
 export interface AimImageAttachment {
   id: string
@@ -39,7 +40,13 @@ export interface AimWorkbenchMessage {
   qualityStatus?: "pass" | "warn" | "fail" | "skipped" | null
   workflowStage?: AimWorkflowStage
   contentAction?: AimContentAction | null
-  failure?: { kind: "chat" | "generate"; retryText: string } | null
+  failure?: {
+    kind: "chat" | "generate"
+    retryText: string
+    code?: AimFailureCode
+    runId?: string
+    recoverable?: boolean
+  } | null
   traceId?: string | null
   traceType?: "chat" | "generate" | null
   /** 同线程重新生成中：保留旧交付物可见，避免闪断 */

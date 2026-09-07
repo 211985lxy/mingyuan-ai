@@ -113,6 +113,27 @@ describe("AIM message stream", () => {
     expect(html).toContain("这次没有完成")
     expect(html).toContain("已生成并保留的旧正文")
   })
+
+  it("shows the model failure reason instead of asking the user to add requirements", () => {
+    const html = renderToStaticMarkup(createElement(AimMessageStream, {
+      messages: [{
+        id: "message-timeout",
+        role: "assistant",
+        content: "fetch failed",
+        failure: { kind: "generate", retryText: "写口播", code: "MODEL_TIMEOUT", runId: "run_123", recoverable: true },
+      }],
+      busy: false,
+      agentIntro: "内容工作台",
+      workflowStage: "content",
+      selectedAgentId: "content_producer",
+      selectedProjectId: "project-1",
+      actions,
+    }))
+    expect(html).toContain("更换线路")
+    expect(html).toContain("执行编号 run_123")
+    expect(html).not.toContain("补充一句最关键的要求")
+    expect(html).not.toContain("fetch failed")
+  })
 })
 
 describe("extractAimChoiceGroups", () => {

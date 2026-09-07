@@ -18,6 +18,7 @@ import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-gr
 import { splitAimMethodNote } from "@/lib/aim/workbench-display"
 import { formatAimFileSize } from "@/lib/aim/file-attachments"
 import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
+import { mapAimFailureCodeToUserMessage } from "@/lib/aim-error-message"
 import type { ContentFormat } from "@/lib/api/client"
 import type { WorkflowRecordMode } from "@/components/aim/workflow-record-dialog"
 import type { FinalDisposition } from "@/lib/aim/run-outcome-telemetry"
@@ -63,9 +64,15 @@ function RecoverableFailure({ message, busy, onRetry }: {
   busy: boolean
   onRetry: (message: AimWorkbenchMessage) => void
 }) {
+  const code = message.failure?.code
+  const detail = code
+    ? mapAimFailureCodeToUserMessage(code)
+    : "当前内容已保留。你可以直接再试一次，或补充一句最关键的要求。"
+  const runId = message.failure?.runId || message.runId
   return <div className="max-w-2xl rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
     <p className="font-semibold text-foreground">这次没有完成</p>
-    <p className="mt-1 leading-6 text-muted-foreground">当前内容已保留。你可以直接再试一次，或补充一句最关键的要求。</p>
+    <p className="mt-1 leading-6 text-muted-foreground">{detail}</p>
+    {runId ? <p className="mt-1 text-xs text-muted-foreground">执行编号 {runId}</p> : null}
     <Button size="sm" variant="outline" className="mt-3 h-8 px-3 text-sm" onClick={() => onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />再试一次</Button>
   </div>
 }

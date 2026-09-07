@@ -30,6 +30,7 @@ export function resolveFollowUpGenerationId(
 export interface AimExecuteTurnRequestOptions {
   startsNewTask?: boolean
   executionAgentId?: string
+  retryOfRunId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
 }
@@ -64,6 +65,7 @@ export function buildExecuteTurnRequest(
     // 方法论是当前控件偏好，不是上一任务正文；新任务仍可带上用户已选卡片
     methodologyProfileIds: input.selectedMethodologyProfileIds?.length ? input.selectedMethodologyProfileIds : undefined,
     activeMethodologySignals: options.activeMethodologySignals?.length ? options.activeMethodologySignals : undefined,
+    retryOfRunId: options.retryOfRunId,
   }
 }
 

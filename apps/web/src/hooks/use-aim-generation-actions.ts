@@ -94,6 +94,7 @@ export interface AimGenerationActionInput {
 
 interface GenerateOptions {
   retryMessageId?: string
+  retryOfRunId?: string
   startsNewTask?: boolean
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
@@ -281,7 +282,13 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
     const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
     if (useUnifiedEntry) {
-      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, options)
+      const retrySource = options.retryMessageId
+        ? input.messages.find((message) => message.id === options.retryMessageId)
+        : undefined
+      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, {
+        ...options,
+        retryOfRunId: options.retryOfRunId || retrySource?.failure?.runId || retrySource?.runId || undefined,
+      })
       const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
       if (controller.signal.aborted) {
         markGenerationStopped(input, assistantMessageId)
@@ -315,7 +322,20 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
             content: message,
             regenerating: false,
             pendingGeneration: false,
-            failure: { kind: "generate" as const, retryText: currentInput },
+            failure: {
+              kind: "generate" as const,
+              retryText: currentInput,
+              code: error instanceof ApiError && typeof (error.details as { code?: unknown } | null)?.code === "string"
+                ? (error.details as { code: import("@/lib/aim-error-message").AimFailureCode }).code
+                : undefined,
+              runId: error instanceof ApiError && typeof (error.details as { runId?: unknown } | null)?.runId === "string"
+                ? (error.details as { runId: string }).runId
+                : undefined,
+              recoverable: !(error instanceof ApiError && error.status === 401),
+            },
+            runId: error instanceof ApiError && typeof (error.details as { runId?: unknown } | null)?.runId === "string"
+              ? (error.details as { runId: string }).runId
+              : item.runId,
           }
         : item))
     }
