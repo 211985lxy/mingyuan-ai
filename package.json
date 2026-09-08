@@ -47,7 +47,8 @@
       "browserslist": ">=4.28.7",
       "deepmerge-ts": "8.0.0",
       "mariadb": ">=3.4.6",
-      "urllib": "2.44.1"
+      "urllib": "2.44.1",
+      "mysql2": ">=3.22.0"
     },
     "patchedDependencies": {
       "minimatch@3.1.5": "patches/minimatch@3.1.5.patch"
