@@ -1,19 +1,12 @@
 import { env } from "@/env"
 import { createGatewayLLM } from "@/lib/llm/gateway-client"
 import { CROSS_GATEWAY_MODELS } from "@/lib/llm/models"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 
 const DEFAULT_MODEL = env.SCRIPT_GENERATION_MODEL || CROSS_GATEWAY_MODELS.claudeSonnet
 const DEFAULT_CHUNK_CHARS = 4500
 const MIN_SOURCE_CHARS = 8
-
-const SYSTEM_PROMPT = [
-  "你是中文语音/视频转写文本校对润色助手。",
-  "任务：",
-  "1. 修正错别字和明显的语音转写错误（同音字误识别、漏字、重复字）。",
-  "2. 理顺语句结构，必要时调整断句和标点，使表达更通顺易懂。",
-  "3. 保留原文核心语义和说话风格；不要过度改写，不要扩写，不要总结，不要添加原文没有的内容，不要加标题。",
-  "直接输出修正后的纯文本。",
-].join("\n")
 
 export interface PolishTranscriptOptions {
   /** 单次送入模型的最大字符数，超出则分块处理。默认 4500。 */
@@ -69,10 +62,8 @@ async function polishChunk(
   const maxTokens = Math.min(8000, Math.max(800, Math.ceil(chunk.length * 1.3) + 200))
   const result = await llm.complete({
     model,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: chunk },
-    ],
+    // system prompt 已资产化（Prompt Registry）：DB 版本优先，兜底内置 seed v1（逐字原文）
+    messages: promptRegistry.getMessages(PROMPT_KEYS.transcriptPolish, chunk),
     temperature: 0.1,
     maxTokens,
   })

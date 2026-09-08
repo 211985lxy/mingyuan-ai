@@ -1,4 +1,7 @@
 import type { CompiledWikiPage } from "@/lib/ip-wiki/compile"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 
 /**
  * 爆款方法论编译器
@@ -33,50 +36,15 @@ export function buildMethodologyCompilePrompt(
 ): string {
   const analysis = truncateInput(input.competitorAnalysisText)
 
-  return `你是一个「项目爆款策略」编译器。你的任务是把一份竞品分析文本编译成一份绑定当前客户项目的「项目爆款策略」文档，供该项目的内容生产官创作时参考。
-
-## 输入
-
-项目名称：${input.projectName ?? "（未提供）"}
-${input.sourceCompetitorId ? `竞品来源 ID：${input.sourceCompetitorId}` : ""}
-
-竞品分析全文：
-"""
-${analysis}
-"""
-
-## 输出要求
-
-请从竞品分析中提炼只服务当前项目的爆款策略，必须包含以下内容结构板块：
-
-1. **开头打法**：竞品如何在开头 3 秒内抓住注意力（钩子模式、痛点提问、数字吸引、悬念设置等）
-2. **中段推进**：中段如何维持观看/阅读（情绪曲线、案例穿插、节奏把控等）
-3. **结尾收束**：结尾如何推动转化或留存（号召关注、引导私域、激发分享等）
-4. **爆点迁移清单**：提炼 5-10 个可迁移到本项目的爆点要素（如「痛点迁移」「案例迁移」「情绪迁移」等）
-5. **适用场景标签**：该方法论适用于哪些内容类型或场景（如「教育类」「种草类」「知识分享类」等）
-
-## 规则
-
-- content 为凝练后的方法论正文，去 AI 味、干练实用
-- 只允许写当前项目可采用的策略，不得把它登记为全局公共方法论
-- frontmatter 按需放置结构化元数据（如 competitorSource）
-- sources 标注信息来源。来自竞品分析的写 { kind: "aim_generation", id: "${input.sourceCompetitorId ?? ""}", label: "竞品分析" }
-- links 用页 title 列表标注本页应交叉引用到的其它维基页
-
-## 输出格式（严格 JSON 数组，不要 markdown 代码块）
-
-[
-  {
-    "pageType": "viral_methodology",
-    "title": "爆款方法论标题",
-    "content": "## 开头打法\\n...\\n## 中段推进\\n...\\n## 结尾收束\\n...\\n## 爆点迁移清单\\n- ...\\n## 适用场景标签\\n...",
-    "frontmatter": {},
-    "sources": [{ "kind": "aim_generation", "id": "${input.sourceCompetitorId ?? ""}", "label": "竞品分析" }],
-    "links": []
-  }
-]
-
-若竞品分析信息不足以产出方法论，返回空数组 []。`
+  return fillPromptTemplate(
+    promptRegistry.get(PROMPT_KEYS.competitorMethodologyCompile).content,
+    {
+      projectName: input.projectName ?? "（未提供）",
+      sourceCompetitorBlock: input.sourceCompetitorId ? `竞品来源 ID：${input.sourceCompetitorId}` : "",
+      analysis,
+      sourceCompetitorId: input.sourceCompetitorId ?? "",
+    },
+  )
 }
 
 /**

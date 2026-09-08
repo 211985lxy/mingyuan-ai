@@ -6,6 +6,7 @@ import {
   parseJsonBody,
   parseQuery,
 } from "@/lib/api-contract"
+import { prisma } from "@/lib/prisma"
 import {
   FishAudioError,
   FISH_AUDIO_MAX_TEXT_LENGTH,
@@ -63,6 +64,24 @@ export async function POST(request: NextRequest) {
       speed: body.speed ?? undefined,
       volume: body.volume ?? undefined,
     })
+
+    try {
+      await prisma.voiceSynthesisRecord.create({
+        data: {
+          userId: user.id,
+          provider: "fish_audio",
+          model: result.model,
+          voiceId: body.voiceId ?? null,
+          format: (body.format ?? "mp3") as string,
+          textPreview: body.text.slice(0, 200),
+          charCount: result.charCount,
+          status: "succeeded",
+        },
+      })
+    } catch (dbError) {
+      // 落库失败不阻塞出声：记录仅用于历史与审计，音频已成功合成
+      console.warn("[api/voice/tts] 合成记录落库失败:", dbError instanceof Error ? dbError.message : dbError)
+    }
 
     return new NextResponse(result.audio, {
       status: 200,

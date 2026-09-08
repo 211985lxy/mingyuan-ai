@@ -1,0 +1,33 @@
+// Prompt Registry（Step①）：把 prompt 提升为一等版本化资产。
+// 批0 只建表，不接 UI / API；调用点通过 src/lib/prompt/registry.ts 读。
+
+/** prompt 模板（按 key 唯一，自身不含内容）。 */
+model PromptTemplate {
+  key         String          @id @db.VarChar(120)
+  domain      String          @db.VarChar(40)
+  description String?         @db.VarChar(500)
+  versions    PromptVersion[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([domain])
+}
+
+/** prompt 版本（内容真正所在；draft 不自动生效）。 */
+model PromptVersion {
+  id          String         @id @default(cuid())
+  templateKey String         @db.VarChar(120)
+  // ⚠️ MySQL 下 String 默认是 VARCHAR(191)，会截断数千字 prompt，必须显式 @db.Text
+  content     String         @db.Text
+  type        String         @db.VarChar(20) // system | function | inline
+  status      String         @default("draft") @db.VarChar(20) // draft | qualified | active
+  version     Int
+  fixtureKey  String?        @db.VarChar(120)
+  createdAt   DateTime       @default(now())
+
+  template PromptTemplate @relation(fields: [templateKey], references: [key], onDelete: Cascade)
+
+  @@unique([templateKey, version])
+  @@index([status])
+  @@index([fixtureKey])
+}

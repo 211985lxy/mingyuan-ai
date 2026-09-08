@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const scopedParsed = { ...parsed, projectId: boundProject.id }
     const agentId = scopedParsed.executionAgentId || scopedParsed.agentId || "content_producer"
     trace = await createAimTrace({
+      id: typeof parsed.traceId === "string" ? parsed.traceId.trim() || undefined : undefined,
       userId: user.id,
       projectId: boundProject.id,
       agentId,

@@ -7,6 +7,7 @@ import {
   type AimEditorContext,
 } from "@/lib/api/client"
 import type { CopyStudioModule } from "@/lib/copy-studio"
+import type { HitlApprovalRequired } from "@/lib/aim/hitl-gate"
 
 interface ChatImage {
   readUrl: string
@@ -57,6 +58,10 @@ export async function runAimChatRequest(input: {
   projectId?: string
   toolAction?: AimChatToolAction | null
   resultId?: string
+  /** Step③ HITL：对话内批准/驳回（仅 toolAction 请求携带） */
+  hitlDecision?: "approve" | "reject"
+  /** 高风险动作被门闩拦截，等待人工审批 */
+  onApprovalRequired?: (approval: HitlApprovalRequired) => void
   editorContext?: AimEditorContext
   signal: AbortSignal
   onContent: (content: string) => void
@@ -65,7 +70,7 @@ export async function runAimChatRequest(input: {
   traceId?: string
   /** 本轮委托执行引擎；缺省不写入请求体，保持普通发送零变化 */
   executionAgentId?: string
-}): Promise<{ hasContent: boolean }> {
+}): Promise<{ hasContent: boolean; approvalRequired?: HitlApprovalRequired }> {
   const options = {
     agentId: input.agentId,
     projectId: input.projectId,
@@ -77,11 +82,16 @@ export async function runAimChatRequest(input: {
     ...(input.executionAgentId ? { executionAgentId: input.executionAgentId } : {}),
   }
   if (input.toolAction) {
-    const { content } = await chatAim(input.messages, {
+    const { content, approvalRequired } = await chatAim(input.messages, {
       ...options,
       toolAction: input.toolAction,
       resultId: input.resultId,
+      ...(input.hitlDecision ? { hitlDecision: input.hitlDecision } : {}),
     })
+    if (approvalRequired) {
+      input.onApprovalRequired?.(approvalRequired)
+      return { hasContent: false, approvalRequired }
+    }
     input.onContent(content)
     return { hasContent: content.length > 0 }
   }

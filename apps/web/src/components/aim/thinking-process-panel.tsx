@@ -18,20 +18,11 @@ import {
   Zap,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { connectAimTraceStream, type TraceStep } from "@/components/aim/aim-trace-sse"
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
 
-export interface TraceStep {
-  key: string
-  label: string
-  status: "running" | "success" | "failed" | "skipped"
-  durationMs?: number
-  summary?: string
-  inputSummary?: string
-  outputSummary?: string
-  metadata?: Record<string, unknown>
-  error?: string
-}
+export type { TraceStep } from "@/components/aim/aim-trace-sse"
 
 export interface ThinkingProcessPanelProps {
   traceId: string | null
@@ -229,36 +220,6 @@ const TraceStepItem = memo(function TraceStepItem({
 
 // ── 主组件 ────────────────────────────────────────────────────────────────
 
-type SseHandlerContext = {
-  hangTimer: number
-  es: EventSource
-  onCompleteRef: React.MutableRefObject<((() => void) | undefined) | null>
-  setIsComplete: (v: boolean) => void
-  setIsFailed: (v: boolean) => void
-  setSteps: React.Dispatch<React.SetStateAction<TraceStep[]>>
-  eventSourceRef: React.RefObject<EventSource | null>
-}
-
-/** 处理 SSE 消息：step / done / error / timeout */
-function handleSseMessage(data: { type: string; status?: string; step?: TraceStep }, ctx: SseHandlerContext) {
-  if (data.type === "connected") return
-  if (data.type === "step") {
-    ctx.setSteps((prev) => {
-      const idx = prev.findIndex((s) => s.key === data.step?.key)
-      if (idx >= 0) { const next = [...prev]; next[idx] = data.step as TraceStep; return next }
-      return [...prev, data.step as TraceStep]
-    })
-    return
-  }
-  // done / error / timeout 共用收口逻辑
-  window.clearTimeout(ctx.hangTimer)
-  ctx.setIsComplete(true)
-  if (data.type === "done") { ctx.setIsFailed(data.status === "failed"); ctx.onCompleteRef.current?.() }
-  if (data.type === "error") ctx.setIsFailed(true)
-  ctx.es.close()
-  ctx.eventSourceRef.current = null
-}
-
 /**
  * 思考过程面板：通过 SSE 实时展示 AIM 智能体的处理步骤。
  *
@@ -282,60 +243,27 @@ export function ThinkingProcessPanel({
     onCompleteRef.current = onComplete
   }, [onComplete])
 
-  // 连接 SSE
+  // 连接 SSE：订阅可能先于服务端 trace 落库（该路由对未创建记录返回 404）。
+  // 连接/重连与守卫收口逻辑见 aim-trace-sse（有限重连 ~700ms/~1400ms ×2），
+  // 避免「订阅先于创建」时首次 onerror 即静默关闭面板。
   useEffect(() => {
     if (!traceId) return
-
-    let cancelled = false
-    const es = new EventSource(
-      `/api/aim/trace/${encodeURIComponent(traceId)}`,
-      { withCredentials: true },
-    )
-    eventSourceRef.current = es
-
-    // SSE 若迟迟收不到 done/error，前端强制收口，避免一直停在「正在思考…」
-    const hangTimer = window.setTimeout(() => {
-      if (cancelled) return
-      setIsComplete(true)
-      es.close()
-      eventSourceRef.current = null
-    }, 90_000)
-
-    es.onopen = () => {
-      if (!cancelled) setConnected(true)
-    }
-
-    es.onmessage = (event) => {
-      if (cancelled) return
-      try {
-        handleSseMessage(JSON.parse(event.data as string), {
-          hangTimer,
-          es,
-          onCompleteRef,
-          setIsComplete,
-          setIsFailed,
-          setSteps,
-          eventSourceRef,
-        })
-      } catch {
-        // 忽略解析错误
-      }
-    }
-
-    es.onerror = () => {
-      window.clearTimeout(hangTimer)
-      if (!cancelled) {
+    const dispose = connectAimTraceStream(traceId, {
+      eventSourceRef,
+      onOpen: () => setConnected(true),
+      onStep: (step) => setSteps((prev) => {
+        const idx = prev.findIndex((s) => s.key === step.key)
+        if (idx >= 0) { const next = [...prev]; next[idx] = step; return next }
+        return [...prev, step]
+      }),
+      onTerminal: (failed, completed) => {
         setIsComplete(true)
-      }
-      es.close()
-      eventSourceRef.current = null
-    }
-
+        if (failed) setIsFailed(true)
+        if (completed) onCompleteRef.current?.()
+      },
+    })
     return () => {
-      cancelled = true
-      window.clearTimeout(hangTimer)
-      es.close()
-      eventSourceRef.current = null
+      dispose()
       setConnected(false)
     }
   }, [traceId])

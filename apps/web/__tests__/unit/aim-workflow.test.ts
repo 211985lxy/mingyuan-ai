@@ -26,9 +26,15 @@ const baseSpec = buildTaskSpecSkeleton({
 
 describe("AIM workflow", () => {
   it("keeps legacy quick and agent deep links out of the entry chooser", () => {
-    expect(shouldShowAimEntrySwitch(new URLSearchParams())).toBe(true)
+    // Step④ 首屏即对话：默认直显对话工作台，不再弹入口选择页
+    expect(shouldShowAimEntrySwitch(new URLSearchParams())).toBe(false)
     expect(shouldShowAimEntrySwitch(new URLSearchParams("mode=quick"))).toBe(false)
     expect(shouldShowAimEntrySwitch(new URLSearchParams("agent=free_copywriter"))).toBe(false)
+    // 一键回滚：NEXT_PUBLIC_AIM_LANDING_DEFAULT="entry" 恢复入口选择页
+    process.env.NEXT_PUBLIC_AIM_LANDING_DEFAULT = "entry"
+    expect(shouldShowAimEntrySwitch(new URLSearchParams())).toBe(true)
+    expect(shouldShowAimEntrySwitch(new URLSearchParams("mode=quick"))).toBe(false)
+    delete process.env.NEXT_PUBLIC_AIM_LANDING_DEFAULT
   })
   it("exposes exactly four user-facing stages and three content actions", () => {
     expect(AIM_WORKFLOW_STAGES.map((item) => item.id)).toEqual(["direction", "content", "publish", "results"])

@@ -7,13 +7,11 @@ import type {
   CompetitorMetrics,
   CompetitorAnalysisResult,
 } from './types'
+import { promptRegistry } from '@/lib/prompt/registry'
+import { PROMPT_KEYS } from '@/lib/prompt/types'
 import { shanghaiWeekdayAndHour } from './shanghai-time'
 
-// ── System prompt ─────────────────────────────────────────────────────────────
-
-const SYSTEM_PROMPT = `你是专业的短视频账号分析师，擅长分析中国主流短视频平台（抖音/小红书/视频号/B站/快手）的创作者账号。
-你会基于账号数据生成结构化的竞品分析报告，包含6维评分和可操作建议。
-所有分析必须基于数据，不可臆测。输出严格按照 JSON Schema 格式。`
+// ── System prompt 已资产化（Prompt Registry）：DB 版本优先，兜底内置 seed v1（逐字原文） ──
 
 const PLATFORM_CONTEXT: Partial<Record<Platform, string>> = {
   wechat_channels: `\n\n## 平台特征（微信视频号）
@@ -183,10 +181,10 @@ export async function analyzeCompetitor(
   const stats = buildAnalysisStats(account, videos)
   const platformContext = PLATFORM_CONTEXT[platform] ?? ''
   const response = await llm.complete({
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildAnalysisPrompt(account, videos, comments, metrics) + platformContext },
-    ],
+    messages: promptRegistry.getMessages(
+      PROMPT_KEYS.competitorAnalysis,
+      buildAnalysisPrompt(account, videos, comments, metrics) + platformContext,
+    ),
     temperature: 0.3,
     maxTokens: 3500,
     responseFormat: { type: 'json_object' },

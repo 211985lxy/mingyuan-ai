@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useMemo, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { BrandLogo } from "@/components/branding/brand-logo"
 import { useBranding } from "@/components/providers/branding-provider"
 import {
   BriefcaseBusiness,
+  ChevronDown,
+  Layers,
   PenLine,
   FileText,
   Plus,
@@ -46,6 +48,9 @@ import {
   writeExpandedAgentsToStorage,
 } from "@/lib/aim-sidebar-history"
 import { useAimWorkspaceStore } from "@/lib/aim-workspace-store"
+import { normalizeAimWorkflowStatus } from "@/lib/aim/workflow-status"
+import { useOrg } from "@/components/org/org-provider"
+import type { AimGeneration } from "@/lib/api/client"
 
 interface NavItem {
   title: string
@@ -53,17 +58,29 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
 }
 
-/** 一级导航：创作台统一开工；爆款拆解保留高频入口 */
-const quickNav: NavItem[] = [
-  { title: "极简模式", href: "/lite", icon: Zap },
+/** 主线导航：创作 + 市场洞察/数据（核心经营环节）+ 项目 */
+const primaryNav: NavItem[] = [
   { title: "创作台", href: "/home", icon: PenLine },
-  { title: "爆款拆解", href: "/video-copy", icon: FileText },
-  { title: "语音工坊", href: "/voice-studio", icon: AudioLines },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "数据看板", href: "/data-platform", icon: BarChart3 },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
+]
+
+/** 工具箱：低频工具页，默认折叠 */
+const toolboxNav: NavItem[] = [
+  { title: "极简模式", href: "/lite", icon: Zap },
+  { title: "爆款拆解", href: "/video-copy", icon: FileText },
+  { title: "语音工坊", href: "/voice-studio", icon: AudioLines },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
 ]
+
+/** 「进行中」= 工作流未到终态（published/archived）的任务数 */
+function countInProgress(items: AimGeneration[]): number {
+  return items.filter((item) => {
+    const status = normalizeAimWorkflowStatus(item.workflowStatus)
+    return status !== "published" && status !== "archived"
+  }).length
+}
 
 /** AIM 专家：与创作台总览共用可见列表（按工作流排序） */
 const aimExpertAgentIds: AimAgentId[] = listVisibleAimAgents().map((agent) => agent.id)
@@ -85,6 +102,139 @@ function isNavActive(pathname: string, searchParams: URLSearchParams, href: stri
     if (searchParams.get(key) !== value) return false
   }
   return true
+}
+
+/**
+ * 导航条目列表（主线/工具箱共用）。
+ */
+function NavList({ items, pathname, searchParams, onNavigate }: {
+  items: NavItem[]
+  pathname: string
+  searchParams: URLSearchParams
+  onNavigate: () => void
+}) {
+  return (
+    <SidebarGroup className="p-0">
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-0.5">
+          {items.map((item) => {
+            const active = isNavActive(pathname, searchParams, item.href)
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  render={<Link href={item.href} onClick={onNavigate} />}
+                  isActive={active}
+                  className={cn(
+                    "h-10 w-full rounded-md px-2.5 text-sm font-normal md:h-9",
+                    active
+                      ? "bg-foreground/[0.07] font-medium text-foreground"
+                      : "text-foreground/75 hover:bg-foreground/[0.04] hover:text-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4 opacity-70" />
+                  <span className="truncate">{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
+
+/**
+ * 组织协同区块（Step⑤）：显性化三个组织角色与职责边界。
+ * 展示层；服务端鉴权仍由路由 auth 包装器与 HITL gate 负责。
+ */
+function OrgNavSection() {
+  const { roles, currentRoleId } = useOrg()
+
+  return (
+    <SidebarGroup className="mt-3 p-0">
+      <SidebarGroupLabel className="mb-1.5 flex h-7 shrink-0 items-center gap-1 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
+        <Users className="h-3.5 w-3.5" />
+        组织协同
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <div className="space-y-1.5 px-1.5">
+          {roles.map((role) => (
+            <div
+              key={role.id}
+              title={role.summary}
+              className={
+                role.id === currentRoleId
+                  ? "rounded-md border border-primary/30 bg-primary/[0.06] px-2 py-1.5"
+                  : "rounded-md px-2 py-1.5"
+              }
+            >
+              <p className="flex items-center gap-1 text-xs font-medium text-foreground/85">
+                {role.title}
+                {role.id === currentRoleId ? (
+                  <span className="rounded-sm bg-primary/15 px-1 text-[10px] text-primary">我</span>
+                ) : null}
+              </p>
+              <p className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-muted-foreground" title={role.summary}>
+                {role.owner} · {role.summary}
+              </p>
+            </div>
+          ))}
+        </div>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  )
+}
+
+const TOOLBOX_OPEN_STORAGE_KEY = "aim-sidebar-toolbox-open"
+
+/**
+ * 工具箱折叠组：低频工具页默认收起，展开状态记入 localStorage。
+ */
+function ToolboxNavSection({ pathname, searchParams, onNavigate }: {
+  pathname: string
+  searchParams: URLSearchParams
+  onNavigate: () => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      setOpen(window.localStorage.getItem(TOOLBOX_OPEN_STORAGE_KEY) === "1")
+    } catch {}
+  }, [])
+
+  function toggle() {
+    setOpen((prev) => {
+      const next = !prev
+      try {
+        window.localStorage.setItem(TOOLBOX_OPEN_STORAGE_KEY, next ? "1" : "0")
+      } catch {}
+      return next
+    })
+  }
+
+  return (
+    <SidebarGroup className="p-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
+        className="flex h-7 w-full shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Layers className="h-3.5 w-3.5" />
+        工具箱
+        <ChevronDown
+          className={cn("ml-auto h-3.5 w-3.5 transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      {open ? (
+        <SidebarGroupContent className="mt-0.5">
+          <NavList items={toolboxNav} pathname={pathname} searchParams={searchParams} onNavigate={onNavigate} />
+        </SidebarGroupContent>
+      ) : null}
+    </SidebarGroup>
+  )
 }
 
 /**
@@ -129,6 +279,8 @@ export function AppSidebar() {
     [history],
   )
 
+  const inProgressCount = useMemo(() => countInProgress(history), [history])
+
   function setExpertExpanded(agentId: AimAgentId, open: boolean) {
     writeExpandedAgentsToStorage({ ...expandedMap, [agentId]: open })
   }
@@ -161,37 +313,22 @@ export function AppSidebar() {
         >
           <Plus className="h-3.5 w-3.5" />
           新建任务
+          {inProgressCount > 0 ? (
+            <span
+              className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-black/15 px-1 text-[10px] font-semibold tabular-nums"
+              title={`${inProgressCount} 个任务进行中`}
+            >
+              {inProgressCount > 9 ? "9+" : inProgressCount}
+            </span>
+          ) : null}
         </button>
       </SidebarHeader>
 
       <SidebarContent className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2 pb-2">
-        <SidebarGroup className="p-0">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-0.5">
-              {quickNav.map((item) => {
-                const active = isNavActive(pathname, searchParams, item.href)
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      render={<Link href={item.href} onClick={closeMobile} />}
-                      isActive={active}
-                      className={cn(
-                        "h-10 w-full rounded-md px-2.5 text-sm font-normal md:h-9",
-                        active
-                          ? "bg-foreground/[0.07] font-medium text-foreground"
-                          : "text-foreground/75 hover:bg-foreground/[0.04] hover:text-foreground",
-                      )}
-                    >
-                      <item.icon className="h-4 w-4 opacity-70" />
-                      <span className="truncate">{item.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <NavList items={primaryNav} pathname={pathname} searchParams={searchParams} onNavigate={closeMobile} />
+        <ToolboxNavSection pathname={pathname} searchParams={searchParams} onNavigate={closeMobile} />
 
+        <OrgNavSection />
         <SidebarGroup className="mt-3 flex min-h-0 flex-1 flex-col p-0">
           <SidebarGroupLabel className="mb-1.5 h-7 shrink-0 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             AIM 专家

@@ -56,6 +56,8 @@ export type AimChatRequestBody = {
   projectId: string
   toolAction: string
   resultId: string
+  /** Step③ HITL：对话内批准/驳回决策（仅 toolAction 分支消费） */
+  hitlDecision?: "approve" | "reject"
   shouldStream: boolean
   editorContext?: AimEditorContext
   agentModule?: CopyStudioModule
@@ -106,6 +108,9 @@ export function parseAimChatBody(body: unknown): ParsedAimChatBody {
     projectId: typeof record.projectId === "string" ? (record.projectId as string).trim() : "",
     toolAction: typeof record.toolAction === "string" ? record.toolAction : "",
     resultId: typeof record.resultId === "string" ? (record.resultId as string).trim() : "",
+    hitlDecision: record.hitlDecision === "approve" || record.hitlDecision === "reject"
+      ? record.hitlDecision
+      : undefined,
     shouldStream: record.stream === true,
     editorContext: typeof record.editorContext === "object" && record.editorContext
       ? (record.editorContext as AimEditorContext)

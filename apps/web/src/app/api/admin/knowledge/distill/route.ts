@@ -1,16 +1,20 @@
-import { parseJsonRecord } from "@/lib/api-contract"
+import { parseCapabilityInput } from "@/lib/api/contracts"
 import { NextResponse } from "next/server"
 import { withAdminOrEditor } from "@/lib/admin-auth"
 import { prisma } from "@/lib/prisma"
 import { LLMClient } from "@/lib/llm/client"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
+// api-inventory: domain=knowledge
+// api-inventory: kind=capability
+// api-inventory: orchestratable=false
+
 
 // 知识库蒸馏：用 DeepSeek 对指定知识条目做精炼/合并/分类建议
 export const POST = withAdminOrEditor(async (request) => {
-  const body = await parseJsonRecord(request)
-  const { ids } = body as { ids?: string[] }
-
-  if (!ids || ids.length === 0 || ids.length > 50) {
-    return NextResponse.json({ error: "ids 必填且最多 50 条" }, { status: 400 })
+  const { ids } = (await parseCapabilityInput("/api/admin/knowledge/distill", request)) as {
+    ids: string[]
   }
 
   const entries = await prisma.knowledgeEntry.findMany({
@@ -35,19 +39,14 @@ export const POST = withAdminOrEditor(async (request) => {
     messages: [
       {
         role: "system",
-        content: `你是知识库管理专家。请分析以下知识条目，输出 JSON 格式的分析结果（不要 markdown 代码块标记）：
-
-{
-  "distilled": [  // 精炼后的条目（可以合并同类项、去重）
-    { "index": 1, "suggestedTitle": "更精炼的标题", "suggestedContent": "精简后的内容（200字以内）", "suggestedCategory": "建议的分类", "tags": ["标签1", "标签2"], "action": "keep|merge|archive" }
-  ],
-  "duplicates": [ [1, 3] ],  // 重复条目索引对
-  "suggestions": "对这个知识库的整体优化建议（100字以内）"
-}`,
+        content: promptRegistry.get(PROMPT_KEYS.knowledgeDistillSystem).content,
       },
       {
         role: "user",
-        content: `请分析以下 ${entries.length} 条知识条目：\n\n${contentBlock}`,
+        content: fillPromptTemplate(
+          promptRegistry.get(PROMPT_KEYS.knowledgeDistillUser).content,
+          { entryCount: String(entries.length), contentBlock },
+        ),
       },
     ],
     temperature: 0.3,

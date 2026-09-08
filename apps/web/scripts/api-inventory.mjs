@@ -58,13 +58,42 @@ function routeFromFile(file) {
   return `/api/${suffix}`
 }
 
+function domainOf(route, source) {
+  const declared = source.match(/api-inventory:\s*domain=([\w/-]+)\b/)?.[1]
+  if (declared) return declared
+  const parts = route.split("/").filter(Boolean) // ["api", ...]
+  if (parts[1] === "admin") return `admin/${parts[2] ?? "root"}`
+  return parts[1] ?? "root"
+}
+
+function kindOf(route, source, cost, methods, domain) {
+  const declared = source.match(/api-inventory:\s*kind=(capability|management|crud)\b/)?.[1]
+  if (declared) return declared
+  if (domain.startsWith("admin/")) return "management"
+  if (cost === "high" && methods.includes("POST")) return "capability"
+  return "crud"
+}
+
+function orchestratableOf(source, kind, domain) {
+  const declared = source.match(/api-inventory:\s*orchestratable=(true|false)\b/)?.[1]
+  if (declared) return declared === "true"
+  return kind === "capability" && !domain.startsWith("admin/")
+}
+
 const entries = walk(apiRoot).sort().map((file) => {
   const source = readFileSync(file, "utf8")
   const route = routeFromFile(file)
+  const cost = costOf(source)
+  const methods = methodsOf(source)
+  const domain = domainOf(route, source)
+  const kind = kindOf(route, source, cost, methods, domain)
   return {
     route,
     file: relative(root, file).replaceAll("\\", "/"),
-    methods: methodsOf(source),
+    methods,
+    domain,
+    kind,
+    orchestratable: orchestratableOf(source, kind, domain),
     auth: authOf(source, route),
     input: inputOf(source),
     query: source.includes("parseQuery(")
