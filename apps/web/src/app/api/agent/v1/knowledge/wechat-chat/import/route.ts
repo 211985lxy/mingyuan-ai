@@ -12,6 +12,7 @@ import { processChunksForSmartImport } from "@/lib/knowledge-auto-processor"
 import { prisma } from "@/lib/prisma"
 import { agentWechatImportBodySchema } from "@/features/aim/contracts/agent-api"
 import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
+import { recordAgentApiAudit } from "@/lib/audit-events"
 
 const MAX_WECHAT_CHAT_CHARS = 50_000
 
@@ -23,7 +24,7 @@ async function writeAgentLog(params: {
   errorMessage?: string
   durationMs?: number
 }) {
-  await prisma.agentApiCallLog.create({
+  const log = await prisma.agentApiCallLog.create({
     data: {
       apiKeyId: params.context.apiKeyId,
       userId: params.context.userId,
@@ -35,6 +36,14 @@ async function writeAgentLog(params: {
       errorMessage: params.errorMessage || null,
       durationMs: params.durationMs || null,
     },
+  })
+  void recordAgentApiAudit({
+    recordId: log.id,
+    userId: params.context.userId,
+    projectId: params.projectId,
+    action: "knowledge.wechat_chat.import.preview",
+    status: params.status,
+    durationMs: params.durationMs,
   })
 }
 

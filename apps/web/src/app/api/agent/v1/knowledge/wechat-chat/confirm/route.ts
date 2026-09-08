@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma"
 import { enforceKnowledgeBetaLimit } from "@/lib/internal-beta-limits"
 import { AGENT_SCOPE } from "@/lib/aim-remote/contracts"
 import { agentWechatConfirmBodySchema } from "@/features/aim/contracts/agent-api"
+import { recordAgentApiAudit } from "@/lib/audit-events"
 
 const ALLOWED_CATEGORIES = new Set([
   "boss_experience",
@@ -71,7 +72,7 @@ async function writeAgentLog(params: {
   errorMessage?: string
   durationMs?: number
 }) {
-  await prisma.agentApiCallLog.create({
+  const log = await prisma.agentApiCallLog.create({
     data: {
       apiKeyId: params.context.apiKeyId,
       userId: params.context.userId,
@@ -83,6 +84,14 @@ async function writeAgentLog(params: {
       errorMessage: params.errorMessage || null,
       durationMs: params.durationMs || null,
     },
+  })
+  void recordAgentApiAudit({
+    recordId: log.id,
+    userId: params.context.userId,
+    projectId: params.projectId,
+    action: "knowledge.wechat_chat.import.confirm",
+    status: params.status,
+    durationMs: params.durationMs,
   })
 }
 

@@ -2,6 +2,29 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+AUDIT_CORRELATION_ID="${AUDIT_CORRELATION_ID:-deploy-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+export AUDIT_CORRELATION_ID
+
+# 部署事件复用仓库外队列适配器；审计发送失败不能阻断已具备独立回滚门禁的发布流程。
+audit_event() {
+  if [ -f "$ROOT_DIR/scripts/audit-event.mjs" ]; then
+    node "$ROOT_DIR/scripts/audit-event.mjs" "$@" --repo-path "$ROOT_DIR" --source server --category deployment --correlation-id "$AUDIT_CORRELATION_ID" >/dev/null 2>&1 || true
+  fi
+}
+
+finish_audit() {
+  local exit_code=$?
+  if [ "$exit_code" -eq 0 ]; then
+    audit_event finish --action deploy.finish --summary "ECS deployment completed" --environment production
+  else
+    audit_event fail --action deploy.fail --summary "ECS deployment failed" --environment production
+  fi
+  return "$exit_code"
+}
+
+trap finish_audit EXIT
+audit_event start --action deploy.start --summary "ECS deployment started" --environment production
+
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/mingyuan_aliyun_deploy}"
 SSH_USER="${SSH_USER:-root}"
 SSH_HOST="${SSH_HOST:-120.25.106.146}"

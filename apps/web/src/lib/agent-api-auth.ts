@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { isValidAimAgent, normalizeAimAgentId, type AimAgentId } from "@/lib/aim-ui-config"
 import { AGENT_CLIENT_TYPES, type AgentClientType, type AgentScope } from "@/lib/aim-remote/contracts"
 import { areScopesEnforced } from "@/lib/aim-remote/feature-flags"
+import { recordAgentApiAudit } from "@/lib/audit-events"
 
 const KEY_PREFIX = "maim_"
 const AGENT_AIM_AGENT_ID_SET = new Set<string>(AGENT_AIM_AGENT_IDS)
@@ -45,7 +46,7 @@ export async function recordAgentApiCall(input: {
   errorMessage?: string
   durationMs?: number
 }) {
-  await prisma.$transaction([
+  const [, log] = await prisma.$transaction([
     prisma.agentApiKey.update({ where: { id: input.context.apiKeyId }, data: { lastUsedAt: new Date() } }),
     prisma.agentApiCallLog.create({
       data: {
@@ -61,6 +62,15 @@ export async function recordAgentApiCall(input: {
       },
     }),
   ])
+  const recordId = typeof log?.id === "string" ? log.id : `${input.context.apiKeyId}:${input.action}:${Date.now()}`
+  void recordAgentApiAudit({
+    recordId,
+    userId: input.context.userId,
+    projectId: input.projectId,
+    action: input.action,
+    status: input.status,
+    durationMs: input.durationMs,
+  })
 }
 
 function hashAgentApiKey(key: string) {

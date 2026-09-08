@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client"
 import { randomUUID } from "node:crypto"
+import { Buffer } from "node:buffer"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import {
@@ -88,6 +89,38 @@ export async function recordAuditEvent(
   }
 }
 
+/** Writes the redacted index event that corresponds to an AgentApiCallLog row. */
+export function recordAgentApiAudit(input: {
+  recordId: string
+  userId?: string | null
+  projectId?: string | null
+  agentId?: string | null
+  action: string
+  status: "success" | "failed"
+  durationMs?: number | null
+  correlationId?: string | null
+  traceId?: string | null
+}) {
+  return recordAuditEvent(specialistAuditInput({
+    source: "agent_api",
+    category: "model_call",
+    severity: input.status === "failed" ? "error" : "info",
+    status: input.status,
+    action: input.action,
+    summary: input.status === "failed" ? "Agent API call failed" : "Agent API call completed",
+    sourceRecordType: "AgentApiCallLog",
+    sourceRecordId: input.recordId,
+    actorType: "user",
+    actorId: input.userId || undefined,
+    targetType: input.agentId ? "agent" : "agent_api_call",
+    targetId: input.agentId || input.recordId,
+    projectId: input.projectId || undefined,
+    correlationId: input.correlationId || input.recordId,
+    traceId: input.traceId || undefined,
+    metadata: { durationMs: input.durationMs ?? undefined, agentId: input.agentId || undefined },
+  }))
+}
+
 export function specialistAuditInput(input: {
   source: AuditEventInput["source"]
   category: AuditEventInput["category"]
@@ -97,6 +130,7 @@ export function specialistAuditInput(input: {
   summary: string
   sourceRecordType: string
   sourceRecordId: string
+  idempotencyKey?: string
   occurredAt?: Date | string
   actorType?: string
   actorId?: string
@@ -113,7 +147,7 @@ export function specialistAuditInput(input: {
   return {
     ...input,
     severity: input.severity || (input.status === "failed" ? "error" : "info"),
-    idempotencyKey: buildAuditIdempotencyKey(input.source, input.sourceRecordType, input.sourceRecordId),
+    idempotencyKey: input.idempotencyKey || buildAuditIdempotencyKey(input.source, input.sourceRecordType, input.sourceRecordId),
   }
 }
 
@@ -131,9 +165,40 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
 
-/** Indexes a bounded recent window from the three existing specialist tables. */
-export async function reconcileAuditEvents(limit = 100): Promise<{ scanned: number; indexed: number }> {
+type ReconcileMarker = { createdAt: string; id: string }
+type ReconcileCursor = Partial<Record<"adminAuditLog" | "aimExecutionTrace" | "agentApiCallLog", ReconcileMarker>>
+
+function decodeReconcileCursor(value?: string): ReconcileCursor {
+  if (!value) return {}
+  try {
+    const decoded = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as unknown
+    if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) throw new Error("invalid cursor")
+    const allowed = ["adminAuditLog", "aimExecutionTrace", "agentApiCallLog"] as const
+    for (const key of allowed) {
+      const marker = (decoded as Record<string, unknown>)[key]
+      if (marker === undefined) continue
+      if (!marker || typeof marker !== "object" || Array.isArray(marker)) throw new Error("invalid marker")
+      const item = marker as Record<string, unknown>
+      if (typeof item.id !== "string" || !item.id || typeof item.createdAt !== "string" || Number.isNaN(new Date(item.createdAt).getTime())) {
+        throw new Error("invalid marker")
+      }
+    }
+    return decoded as ReconcileCursor
+  } catch {
+    throw new Error("Invalid audit reconciliation cursor")
+  }
+}
+
+function encodeReconcileCursor(value: ReconcileCursor): string {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url")
+}
+
+/** Indexes a bounded page from the three existing specialist tables. */
+export async function reconcileAuditEvents(limit = 100, cursorValue?: string): Promise<{ scanned: number; indexed: number; nextCursor: string | null }> {
   const boundedLimit = Math.min(200, Math.max(1, Math.trunc(limit)))
+  const cursor = decodeReconcileCursor(cursorValue)
+  const nextMarkers: ReconcileCursor = { ...cursor }
+  let hasMore = false
   const sources = [
     {
       delegate: getSpecialistDelegate("adminAuditLog"),
@@ -162,8 +227,25 @@ export async function reconcileAuditEvents(limit = 100): Promise<{ scanned: numb
   let indexed = 0
   for (const source of sources) {
     if (!source.delegate) continue
-    const rows = await source.delegate.findMany({ orderBy: { createdAt: "desc" }, take: boundedLimit, select: source.select })
+    const marker = cursor[source.sourceRecordType === "AdminAuditLog" ? "adminAuditLog" : source.sourceRecordType === "AimExecutionTrace" ? "aimExecutionTrace" : "agentApiCallLog"]
+    const where = marker
+      ? {
+          OR: [
+            { createdAt: { lt: new Date(marker.createdAt) } },
+            { createdAt: new Date(marker.createdAt), id: { lt: marker.id } },
+          ],
+        }
+      : undefined
+    const rows = await source.delegate.findMany({ ...(where ? { where } : {}), orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: boundedLimit, select: source.select })
     scanned += rows.length
+    if (rows.length === boundedLimit) hasMore = true
+    const last = rows[rows.length - 1]
+    const lastId = stringValue(last?.id)
+    const lastCreatedAt = last?.createdAt instanceof Date ? last.createdAt.toISOString() : stringValue(last?.createdAt)
+    if (lastId && lastCreatedAt) {
+      const key = source.sourceRecordType === "AdminAuditLog" ? "adminAuditLog" : source.sourceRecordType === "AimExecutionTrace" ? "aimExecutionTrace" : "agentApiCallLog"
+      nextMarkers[key] = { id: lastId, createdAt: lastCreatedAt }
+    }
     for (const row of rows) {
       const status = stringValue(row.status) === "failed" ? "failed" : "success"
       const result = await recordAuditEvent(specialistAuditInput({
@@ -185,6 +267,9 @@ export async function reconcileAuditEvents(limit = 100): Promise<{ scanned: numb
         traceId: source.source === "aim" ? String(row.id) : undefined,
         sourceRecordType: source.sourceRecordType,
         sourceRecordId: String(row.id),
+        idempotencyKey: source.source === "admin"
+          ? undefined
+          : `${source.source}:${source.sourceRecordType}:${String(row.id)}:${status}`,
         occurredAt: row.createdAt as Date | string | undefined,
         metadata: {
           agentId: stringValue(row.agentId),
@@ -199,5 +284,5 @@ export async function reconcileAuditEvents(limit = 100): Promise<{ scanned: numb
       if (result.ok) indexed += 1
     }
   }
-  return { scanned, indexed }
+  return { scanned, indexed, nextCursor: hasMore ? encodeReconcileCursor(nextMarkers) : null }
 }
