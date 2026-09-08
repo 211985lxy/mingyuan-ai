@@ -5,6 +5,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, randomUUID }
 import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
+import { pathToFileURL } from "node:url"
 
 const SOURCES = new Set(["user", "admin", "aim", "agent_api", "repo_agent", "server"])
 const CATEGORIES = new Set(["operation", "execution", "model_call", "repository_change", "deployment", "runtime"])
@@ -311,7 +312,7 @@ async function flushQueue(options) {
 
 export { buildPayload, decryptPayload, enqueuePayload, encryptPayload, flushQueue, postPayload, queueDirectory, submitPayload }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const { command, options } = parseArgs(process.argv.slice(2))
     if (command === "flush") {

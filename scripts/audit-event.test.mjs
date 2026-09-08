@@ -1,13 +1,18 @@
 import assert from "node:assert/strict"
+import { execFile } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { mkdtemp, readdir, readFile, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 import { afterEach, beforeEach, describe, test } from "node:test"
 
 import { buildPayload, decryptPayload, enqueuePayload, flushQueue } from "./audit-event.mjs"
 
 const originalEnv = {}
+const execFileAsync = promisify(execFile)
+const cliPath = fileURLToPath(new URL("./audit-event.mjs", import.meta.url))
 let queueDir
 
 beforeEach(async () => {
@@ -29,6 +34,16 @@ afterEach(() => {
 })
 
 describe("audit-event adapter", () => {
+  test("runs the CLI entrypoint from a URL-encoded workspace path", async () => {
+    const { stdout, stderr } = await execFileAsync(process.execPath, [cliPath, "flush"], {
+      cwd: process.cwd(),
+      env: { ...process.env },
+    })
+
+    assert.match(stdout, /audit queue flushed: sent=0 failed=0 pending=0/)
+    assert.equal(stderr, "")
+  })
+
   test("builds stable Git-confirmed payloads without raw prompt data", () => {
     const first = buildPayload("commit", { repo_path: process.cwd(), correlation_id: "corr-1", git_sha: "sha-1" })
     const second = buildPayload("commit", { repo_path: process.cwd(), correlation_id: "corr-1", git_sha: "sha-1" })
