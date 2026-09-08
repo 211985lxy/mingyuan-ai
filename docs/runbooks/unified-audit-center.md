@@ -43,9 +43,11 @@ node scripts/audit-event.mjs flush
 ```text
 ~/.mingyuan-audit/queue/
 ~/.mingyuan-audit/queue.key
+~/.mingyuan-audit/ingest.url
+~/.mingyuan-audit/ingest.secret
 ```
 
-目录权限为 `0700`，队列文件和密钥为 `0600`，队列内容使用 AES-256-GCM。适配器会用 `source + action + correlationId + gitSha/repositoryPath` 生成稳定幂等键。`start`、`finish`、`fail` 是智能体声明，`commit` 是 Git SHA 已确认事件；两者通过 `correlationId` 关联。
+目录权限为 `0700`，队列文件和密钥为 `0600`，队列内容使用 AES-256-GCM。适配器会用 `source + action + correlationId + gitSha/repositoryPath` 生成稳定幂等键。`start`、`finish`、`fail` 是智能体声明，`commit` 是 Git SHA 已确认事件；两者通过 `correlationId` 关联。适配器会优先读取进程环境变量，也支持从上述本机配置文件读取接收地址和密钥。
 
 仓库的 `post-commit` hook 会自动提交一条 Git 已确认事件。没有配置远端时只排队，不会阻塞提交。未接入该适配器的任意外部工具无法保证自动产生事件，这是当前边界。
 

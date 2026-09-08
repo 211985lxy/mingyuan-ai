@@ -11,6 +11,8 @@ const CATEGORIES = new Set(["operation", "execution", "model_call", "repository_
 const SEVERITIES = new Set(["info", "warning", "error", "critical"])
 const STATUSES = new Set(["started", "success", "failed"])
 const DEFAULT_QUEUE_ROOT = join(homedir(), ".mingyuan-audit")
+const INGEST_URL_FILE = join(DEFAULT_QUEUE_ROOT, "ingest.url")
+const INGEST_SECRET_FILE = join(DEFAULT_QUEUE_ROOT, "ingest.secret")
 const MAX_SUMMARY_LENGTH = 5000
 
 function parseArgs(argv) {
@@ -223,16 +225,29 @@ function signature(body, timestamp, secret) {
   return createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")
 }
 
-async function postPayload(payload, url = process.env.AUDIT_INGEST_URL, secret = process.env.AUDIT_INGEST_SECRET) {
-  if (!url || !secret) throw new Error("audit ingestion is not configured")
+async function readConfigValue(environmentName, filePath) {
+  const configured = process.env[environmentName]?.trim()
+  if (configured) return configured
+  try {
+    return (await readFile(filePath, "utf8")).trim()
+  } catch (error) {
+    if (error?.code === "ENOENT") return ""
+    throw error
+  }
+}
+
+async function postPayload(payload, url, secret) {
+  const ingestUrl = url || await readConfigValue("AUDIT_INGEST_URL", INGEST_URL_FILE)
+  const ingestSecret = secret || await readConfigValue("AUDIT_INGEST_SECRET", INGEST_SECRET_FILE)
+  if (!ingestUrl || !ingestSecret) throw new Error("audit ingestion is not configured")
   const body = JSON.stringify(payload)
   const timestamp = Math.floor(Date.now() / 1000)
-  const response = await fetch(url, {
+  const response = await fetch(ingestUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-audit-timestamp": String(timestamp),
-      "x-audit-signature": signature(body, timestamp, secret),
+      "x-audit-signature": signature(body, timestamp, ingestSecret),
     },
     body,
     signal: AbortSignal.timeout(Number(process.env.AUDIT_HTTP_TIMEOUT_MS || 5000)),
