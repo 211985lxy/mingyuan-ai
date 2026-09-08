@@ -161,6 +161,8 @@ describe("admin role entrypoints", () => {
       "src/app/api/admin/users/route.ts",
       "src/app/api/admin/settings/route.ts",
       "src/app/api/admin/audit-logs/route.ts",
+      "src/app/api/admin/audit-events/route.ts",
+      "src/app/api/admin/audit-events/[id]/route.ts",
       "src/app/api/admin/governance-assignments/route.ts",
       "src/app/api/admin/approval-decisions/route.ts",
       "src/app/api/admin/settings/seed/route.ts",

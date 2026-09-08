@@ -37,6 +37,8 @@ describe("sensitive admin audit metadata stays scrubbed", () => {
     "src/app/api/admin/aim/runs/[runId]/route.ts",
     "src/app/api/admin/agents/traces/route.ts",
     "src/app/api/admin/agents/traces/[id]/route.ts",
+    "src/app/api/admin/audit-events/route.ts",
+    "src/app/api/admin/audit-events/[id]/route.ts",
   ]
 
   it("records audit actions without embedding codes, prompts, emails, or body text", () => {
