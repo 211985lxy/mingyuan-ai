@@ -1,11 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { authenticateRequest } from "@/lib/user-auth"
+import { enforceUploadSizeLimit } from "@/lib/internal-beta-limits"
 import { cloneVoiceModel } from "@/lib/voice/fish-audio"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
-
-const MAX_AUDIO_BYTES = 20 * 1024 * 1024
 
 /**
  * @description 处理 POST 请求：接收用户录音/上传的音频，转发 Fish Audio 克隆私有音色
@@ -35,9 +34,8 @@ export async function POST(request: NextRequest) {
   if (!(file instanceof File) || file.size === 0) {
     return NextResponse.json({ error: "请先录制或上传一段音频" }, { status: 400 })
   }
-  if (file.size > MAX_AUDIO_BYTES) {
-    return NextResponse.json({ error: "音频不能超过 20MB，建议 10–60 秒的清晰朗读" }, { status: 400 })
-  }
+  const uploadLimitResponse = enforceUploadSizeLimit([file])
+  if (uploadLimitResponse) return uploadLimitResponse
 
   try {
     const { id } = await cloneVoiceModel({

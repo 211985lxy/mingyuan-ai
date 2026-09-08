@@ -4334,6 +4334,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/voice/clone",
+      "file": "src/app/api/voice/clone/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "voice",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "multipart",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/voice/history",
       "file": "src/app/api/voice/history/route.ts",
       "methods": [
