@@ -123,4 +123,23 @@ describe("audit event writer", () => {
     })
     expect(upsert).toHaveBeenCalledOnce()
   })
+
+  it("does not copy raw Agent API error messages into the audit index", async () => {
+    agentFindMany.mockResolvedValueOnce([{
+      id: "agent-log-failed",
+      userId: "user-1",
+      projectId: "project-1",
+      agentId: "copywriter",
+      action: "aim.generate",
+      status: "failed",
+      errorMessage: "provider response containing customer text",
+      durationMs: 42,
+      createdAt: new Date("2026-09-08T01:02:03.000Z"),
+    }])
+
+    await reconcileAuditEvents(10)
+
+    const args = upsert.mock.calls[0][0]
+    expect(args.create.metadata).not.toHaveProperty("error")
+  })
 })

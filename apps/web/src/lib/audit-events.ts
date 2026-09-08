@@ -278,7 +278,6 @@ export async function reconcileAuditEvents(limit = 100, cursorValue?: string): P
           durationMs: typeof row.durationMs === "number" ? row.durationMs : undefined,
           totalTokens: typeof row.totalTokens === "number" ? row.totalTokens : undefined,
           qualityStatus: stringValue(row.qualityStatus),
-          error: source.source === "agent_api" ? stringValue(row.errorMessage) : undefined,
         },
       }))
       if (result.ok) indexed += 1

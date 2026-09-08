@@ -3745,12 +3745,12 @@
       "domain": "internal",
       "kind": "crud",
       "orchestratable": false,
-      "auth": "public",
+      "auth": "signed_integration",
       "input": "raw_body",
       "query": "none",
       "externalService": false,
       "cost": "low",
-      "idempotency": false
+      "idempotency": true
     },
     {
       "route": "/api/knowledge/[id]",

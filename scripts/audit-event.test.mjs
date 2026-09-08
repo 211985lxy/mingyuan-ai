@@ -45,14 +45,25 @@ describe("audit-event adapter", () => {
   })
 
   test("builds stable Git-confirmed payloads without raw prompt data", () => {
-    const first = buildPayload("commit", { repo_path: process.cwd(), correlation_id: "corr-1", git_sha: "sha-1" })
-    const second = buildPayload("commit", { repo_path: process.cwd(), correlation_id: "corr-1", git_sha: "sha-1" })
+    const first = buildPayload("commit", { repo_path: process.cwd(), correlation_id: "corr-1" })
+    const second = buildPayload("commit", { repo_path: process.cwd(), correlation_id: "corr-1" })
 
     assert.equal(first.category, "repository_change")
     assert.equal(first.status, "success")
-    assert.equal(first.gitSha, "sha-1")
+    assert.match(first.gitSha, /^[a-f0-9]{40}$/)
     assert.equal(first.metadata.declaration, false)
     assert.deepEqual(first, second)
+  })
+
+  test("does not let callers override Git-confirmed SHA provenance", () => {
+    const payload = buildPayload("commit", {
+      repo_path: process.cwd(),
+      correlation_id: "corr-forged",
+      git_sha: "caller-chosen-sha",
+    })
+
+    assert.notEqual(payload.gitSha, "caller-chosen-sha")
+    assert.match(payload.gitSha, /^[a-f0-9]{40}$/)
   })
 
   test("writes encrypted queue records atomically with owner-only permissions", async () => {

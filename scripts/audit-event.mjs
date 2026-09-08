@@ -67,7 +67,7 @@ function repositoryContext(options) {
   if (!repositoryPath) return { repositoryPath: cwd, gitSha: "" }
   return {
     repositoryPath,
-    gitSha: option(options, "git_sha") || process.env.GIT_COMMIT || runGit(["rev-parse", "HEAD"], repositoryPath),
+    gitSha: runGit(["rev-parse", "HEAD"], repositoryPath),
   }
 }
 
