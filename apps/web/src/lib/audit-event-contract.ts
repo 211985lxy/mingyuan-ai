@@ -84,6 +84,7 @@ export function redactAuditValue(value: unknown, depth = 0): unknown {
   const result: Record<string, unknown> = {}
   for (const [key, child] of Object.entries(value)) {
     if (SENSITIVE_KEY.test(key)) continue
+    if (child === undefined || typeof child === "function" || typeof child === "symbol") continue
     result[key] = redactAuditValue(child, depth + 1)
   }
   return result
