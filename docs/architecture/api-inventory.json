@@ -124,6 +124,9 @@
         "GET",
         "POST"
       ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -138,6 +141,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/account-project-bindings",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "manual",
@@ -151,6 +157,9 @@
       "methods": [
         "POST"
       ],
+      "domain": "admin/account-project-bindings",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -165,6 +174,9 @@
         "GET",
         "POST"
       ],
+      "domain": "admin/account-project-bindings",
+      "kind": "management",
+      "orchestratable": false,
       "auth": "admin_session",
       "input": "bounded_json_object",
       "query": "none",
@@ -4317,33 +4329,6 @@
       "auth": "user_session",
       "input": "bounded_json_object",
       "query": "manual",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/voice/models",
-      "file": "src/app/api/voice/models/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "auth": "user_session",
-      "input": "query",
-      "query": "manual",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/voice/tts",
-      "file": "src/app/api/voice/tts/route.ts",
-      "methods": [
-        "GET",
-        "POST"
-      ],
-      "auth": "user_session",
-      "input": "zod_json",
-      "query": "zod",
       "externalService": false,
       "cost": "low",
       "idempotency": false
