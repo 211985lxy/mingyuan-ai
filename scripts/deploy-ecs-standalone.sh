@@ -87,6 +87,19 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && [ "${ALLOW_DIRTY_DEPLO
   fi
 fi
 
+# 模型链部署前门禁：在 ECS 上以生产 env 实测质量链各跳（跳表与
+# apps/web/src/lib/llm/agent-router.ts 的 QUALITY_PRIMARY_ROUTE 同步）。
+# 非末位跳确定性死配置（模型未开通/鉴权失败）直接中止发布——2026-09-08 事故
+# 即因本地 probe 假绿把 ModelNotOpen 死跳送上线、烧光重试预算。SKIP_MODEL_PROBE=1 可临时跳过。
+if [ "${SKIP_MODEL_PROBE:-0}" != "1" ]; then
+  if ! model_probe_output="$("${SSH[@]}" 'bash -s' < "$ROOT_DIR/scripts/probe-ecs-model-routes.sh" 2>&1)"; then
+    echo "$model_probe_output" >&2
+    echo "Model route probe gate FAILED — aborting before touching production." >&2
+    exit 1
+  fi
+  echo "$model_probe_output"
+fi
+
 CI=true corepack pnpm --dir apps/web exec prisma generate
 CI=true corepack pnpm --filter @mingyuan/web run typecheck
 CI=true corepack pnpm --filter @mingyuan/web run test:harness
