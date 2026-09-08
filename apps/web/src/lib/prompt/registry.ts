@@ -47,6 +47,8 @@ interface PrismaLike {
 
 /** 回源失败后的重试节流窗口（ms）：避免每个请求都打一次坏掉的 DB。 */
 const REFRESH_RETRY_INTERVAL_MS = 60_000
+/** 缓存 TTL（ms）：命中后超过该时长即触发后台回源（stale-while-revalidate），DB 改版最迟一个 TTL 生效。 */
+export const PROMPT_CACHE_TTL_MS = 5 * 60_000
 
 interface PromptRegistry {
   /** 同步。命中缓存返回；未命中立即返回 seed 并后台回源。永不抛错、永不 await。 */
@@ -63,6 +65,8 @@ interface PromptRegistry {
   refresh(key: string): Promise<void>
   /** 批量预热（可选，不强制接 instrumentation）。 */
   hydrate(keys?: string[]): Promise<void>
+  /** P1 手动热更：清缓存后全量回源（管理动作触发，失败回落 seed）。 */
+  reload(): Promise<void>
   /** 注册内置兜底 seed（同 key 覆盖）。 */
   registerSeed(seed: PromptSeed): void
   /** 仅测试用：清空全部进程内状态。 */
@@ -81,6 +85,8 @@ const warned = new Set<string>()
 const seeds = new Map<string, PromptSeed>()
 /** 回源失败时间戳，用于节流重试。 */
 const failedAt = new Map<string, number>()
+/** 成功回源时间戳：TTL 热更判定用。 */
+const fetchedAt = new Map<string, number>()
 let seedsLoaded = false
 
 // ── 内部工具 ──────────────────────────────────────────────────────────────
@@ -131,9 +137,22 @@ function fallbackRecord(key: string): PromptRecord {
   return { key, version: 0, content: "", type: "system", status: "draft", fromSeed: true }
 }
 
+let prismaModulePromise: Promise<unknown> | null = null
+
+/** 单次动态导入并缓存 promise：反复 import() 同一 mock 模块在测试运行器下会间歇挂起。 */
+async function loadPrismaModule(): Promise<{ prisma?: PrismaLike }> {
+  prismaModulePromise ??= import("@/lib/prisma")
+  try {
+    return (await prismaModulePromise) as { prisma?: PrismaLike }
+  } catch (error) {
+    prismaModulePromise = null
+    throw error
+  }
+}
+
 /** 拉 DB 版本并归一化为 PromptRecord[]。抛错由调用方处理。 */
 async function loadVersions(key: string): Promise<PromptRecord[]> {
-  const mod = (await import("@/lib/prisma")) as unknown as { prisma?: PrismaLike }
+  const mod = await loadPrismaModule()
   const client = mod?.prisma
   if (!client?.promptVersion?.findMany) {
     throw new Error("prisma.promptVersion 不可用（Prisma 客户端未生成或未迁移）")
@@ -158,7 +177,8 @@ async function loadVersions(key: string): Promise<PromptRecord[]> {
 async function runRefresh(key: string): Promise<void> {
   try {
     const versions = await loadVersions(key)
-    cache.set(key, versions)
+      cache.set(key, versions)
+    fetchedAt.set(key, Date.now())
     failedAt.delete(key)
   } catch (error) {
     failedAt.set(key, Date.now())
@@ -208,6 +228,11 @@ function get(key: string, opts?: GetOptions): PromptRecord {
     ensureSeeds()
     const versions = cache.get(key)
     if (versions && versions.length > 0) {
+      // P1 热更：命中超过 TTL 即后台回源，本请求仍返回当前值（stale-while-revalidate）
+      const fetched = fetchedAt.get(key) ?? 0
+      if (Date.now() - fetched > PROMPT_CACHE_TTL_MS && !inflight.has(key)) {
+        void startRefresh(key)
+      }
       const picked = selectVersion(versions, opts)
       if (picked) return picked
       return fallbackRecord(key)
@@ -289,7 +314,22 @@ function __resetForTest(): void {
   warned.clear()
   seeds.clear()
   failedAt.clear()
+  fetchedAt.clear()
   seedsLoaded = false
+}
+
+/**
+ * @description 手动热更：清空缓存并立即回源全部 seed key（P1 reload 开关）
+ * @returns Promise<void> 全部回源完成后 resolve；失败不抛（回落 seed）
+ */
+async function reload(): Promise<void> {
+  ensureSeeds()
+  cache.clear()
+  fetchedAt.clear()
+  failedAt.clear()
+  for (const key of seeds.keys()) {
+    await runRefresh(key)
+  }
 }
 
 export const promptRegistry: PromptRegistry = {
@@ -298,6 +338,7 @@ export const promptRegistry: PromptRegistry = {
   resolveForCompletion,
   refresh,
   hydrate,
+  reload,
   registerSeed,
   __resetForTest,
 }

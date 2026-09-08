@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
+import { VoiceCloneButton } from "@/components/voice/voice-clone-dialog"
 import { useVoiceSamplePreview, VoicePickerList } from "@/components/voice/voice-sample-preview"
 import {
   fetchVoiceModels,
@@ -136,6 +137,7 @@ export default function VoiceStudioPage() {
         loadingModels={studio.loadingModels}
         model={studio.tier}
         speed={studio.speed}
+        onCloned={() => void studio.reloadModels()}
       />
       <ModelSpeedCard
         models={studio.models}
@@ -221,6 +223,7 @@ function VoicePickerCard({
   loadingModels,
   model,
   speed,
+  onCloned,
 }: {
   scope: "all" | "mine"
   onScopeChange: (value: "all" | "mine") => void
@@ -230,6 +233,7 @@ function VoicePickerCard({
   loadingModels: boolean
   model: string
   speed: number
+  onCloned: () => void
 }) {
   const preview = useVoiceSamplePreview(model, speed)
   // 记住选中音色的名称：切换公共库/我的音色后，已选音色可能不在当前列表里，
@@ -283,6 +287,9 @@ function VoicePickerCard({
           >
             我的音色
           </Button>
+          {scope === "mine" ? (
+            <VoiceCloneButton onCloned={onCloned} />
+          ) : null}
         </div>
         {models?.degraded && models.voices.length === 0 ? (
           <p className="text-xs text-muted-foreground">音色列表暂不可用，仍可用默认音色试听。</p>

@@ -314,3 +314,42 @@ describe("P1 prompt 升级门禁与可观测", () => {
     vi.doUnmock("@/lib/llm/client")
   })
 })
+
+// ── P1 热更：TTL 到期后台回源 + reload 手动开关 ──────────────────────────
+
+describe("P1 缓存热更", () => {
+  it("reload 清缓存后全量回源，DB 新版本立即生效", async () => {
+    promptRegistry.__resetForTest()
+    findMany.mockResolvedValue([
+      { templateKey: PROMPT_KEYS.commentRadar, version: 2, content: "DB v2 内容", type: "system", status: "active" },
+    ])
+    console.log("probe: before reload, seeds loaded")
+    findMany.mockResolvedValue([])
+    await promptRegistry.hydrate([PROMPT_KEYS.commentRadar])
+    console.log("probe: hydrate 1 key ok")
+    const prismaMod = await import("@/lib/prisma")
+    console.log("probe: prisma module keys:", Object.keys(prismaMod.prisma ?? {}).slice(0, 4))
+    const allKeys = Object.values(PROMPT_KEYS)
+    for (let i = 1; i <= allKeys.length; i += 5) {
+      const batch = allKeys.slice(0, i)
+      const t0 = Date.now()
+      await promptRegistry.hydrate(batch)
+      console.log(`probe: hydrate ${batch.length} keys ok in ${Date.now() - t0}ms`)
+    }
+    console.log("probe: hydrate all ok")
+    findMany.mockResolvedValue([
+      { templateKey: PROMPT_KEYS.commentRadar, version: 2, content: "DB v2 内容", type: "system", status: "active" },
+    ])
+    await promptRegistry.reload()
+    console.log("probe: after reload")
+    expect(promptRegistry.get(PROMPT_KEYS.commentRadar).content).toBe("DB v2 内容")
+    expect(promptRegistry.get(PROMPT_KEYS.commentRadar).version).toBe(2)
+  })
+
+  it("reload 失败不抛错（回落 seed）", async () => {
+    promptRegistry.__resetForTest()
+    findMany.mockRejectedValue(new Error("db down"))
+    await expect(promptRegistry.reload()).resolves.toBeUndefined()
+    expect(promptRegistry.get(PROMPT_KEYS.commentRadar).fromSeed).toBe(true)
+  })
+})

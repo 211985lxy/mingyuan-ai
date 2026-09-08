@@ -199,6 +199,43 @@ export interface FishVoiceModel {
 }
 
 /**
+ * @description 提交声音克隆：把一段授权录音训练成私有音色模型（训练异步，数分钟后可用）
+ * @param input - 音色名与录音文件（10 秒以上安静环境朗读效果最佳）
+ * @returns Promise<{ id: string }> Fish Audio 返回的音色模型 id
+ */
+export async function cloneVoiceModel(input: {
+  title: string
+  audio: Blob
+  filename: string
+  description?: string
+}): Promise<{ id: string }> {
+  const config = getFishAudioConfig()
+  assertConfigured(config)
+
+  const form = new FormData()
+  form.set("title", input.title)
+  form.set("type", "tts")
+  form.set("visibility", "private")
+  if (input.description) form.set("descriptions", input.description)
+  form.append("voices", input.audio, input.filename)
+
+  const response = await voiceFetch(`${config.baseUrl}/model`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${config.apiKey}` },
+    body: form,
+    signal: AbortSignal.timeout(120_000),
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "")
+    throw new FishAudioError(summarizeUpstreamFailure(response.status, detail), response.status, "CLONE_FAILED")
+  }
+  const payload = (await response.json().catch(() => null)) as { _id?: string; id?: string } | null
+  const id = String(payload?._id ?? payload?.id ?? "")
+  if (!id) throw new FishAudioError("克隆请求已提交，但上游未返回音色 id", 502, "CLONE_NO_ID")
+  return { id }
+}
+
+/**
  * @description 读取可用音色列表；上游不可用时返回空列表并标记 degraded
  * @param input - 查询参数
  * @returns Promise<{ items: FishVoiceModel[]; degraded: boolean; reason?: string }>
