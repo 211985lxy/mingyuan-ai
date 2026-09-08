@@ -16,8 +16,8 @@
     },
     {
       "path": "src/env.ts",
-      "maxLines": 532,
-      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 变量 + Step③ HITL 门闩/通知 4 变量（schema+runtime 各半）+ 五步升级 NEXT_PUBLIC（ADMIN_EMAIL/AIM_LANDING_DEFAULT）"
+      "maxLines": 534,
+      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 变量 + Step③ HITL 门闩/通知 4 变量（schema+runtime 各半）+ 五步升级 NEXT_PUBLIC（ADMIN_EMAIL/AIM_LANDING_DEFAULT）+ unified audit ingest secret（schema+runtime）"
     },
     {
       "path": "src/app/(dashboard)/aim/page.tsx",

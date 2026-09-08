@@ -546,6 +546,38 @@
       "idempotency": true
     },
     {
+      "route": "/api/admin/audit-events/[id]",
+      "file": "src/app/api/admin/audit-events/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "admin/audit-events",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/audit-events",
+      "file": "src/app/api/admin/audit-events/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "admin/audit-events",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
+    },
+    {
       "route": "/api/admin/audit-logs",
       "file": "src/app/api/admin/audit-logs/route.ts",
       "methods": [
@@ -3123,6 +3155,23 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/audit-reconcile",
+      "file": "src/app/api/cron/audit-reconcile/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/cron/background-tasks",
       "file": "src/app/api/cron/background-tasks/route.ts",
       "methods": [
@@ -3682,6 +3731,22 @@
       "orchestratable": false,
       "auth": "public",
       "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/internal/audit-events",
+      "file": "src/app/api/internal/audit-events/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "internal",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "public",
+      "input": "raw_body",
       "query": "none",
       "externalService": false,
       "cost": "low",

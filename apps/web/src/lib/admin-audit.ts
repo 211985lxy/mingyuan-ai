@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server"
 import type { Prisma, PrismaClient } from "@/generated/prisma/client"
 import { generateRequestId } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
+import { recordAuditEvent, specialistAuditInput } from "@/lib/audit-events"
 
 /**
  * @description recordadminaudit
@@ -23,7 +24,7 @@ export async function recordAdminAudit(
   client: PrismaClient | Prisma.TransactionClient = prisma,
 ) {
   const requestId = input.request.headers.get("x-request-id") || generateRequestId()
-  await client.adminAuditLog.create({
+  const audit = await client.adminAuditLog.create({
     data: {
       adminId: input.adminId,
       action: input.action,
@@ -33,5 +34,21 @@ export async function recordAdminAudit(
       metadata: input.metadata,
     },
   })
+  void recordAuditEvent(specialistAuditInput({
+    source: "admin",
+    category: "operation",
+    status: "success",
+    action: input.action,
+    summary: `${input.action} ${input.targetType}`,
+    actorType: "admin",
+    actorId: input.adminId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    requestId,
+    correlationId: requestId,
+    sourceRecordType: "AdminAuditLog",
+    sourceRecordId: audit.id,
+    metadata: input.metadata,
+  }))
   return requestId
 }
