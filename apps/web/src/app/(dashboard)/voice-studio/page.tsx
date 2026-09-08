@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { AudioLines, Loader2, RefreshCw, Volume2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -224,6 +224,25 @@ function VoicePickerCard({
   models: VoiceModelsResponse | null
   loadingModels: boolean
 }) {
+  // 记住选中音色的名称：切换公共库/我的音色后，已选音色可能不在当前列表里，
+  // 不补回的话触发器会退化为显示原始模型 ID
+  const [picked, setPicked] = useState<{ id: string; title: string } | null>(null)
+  const voices = useMemo(() => models?.voices ?? [], [models])
+  const options = useMemo(() => {
+    if (!picked || voices.some((voice) => voice.id === picked.id)) return voices
+    return [picked, ...voices]
+  }, [picked, voices])
+
+  function onVoicePick(value: string) {
+    if (!value) {
+      setPicked(null)
+    } else {
+      const title = voices.find((voice) => voice.id === value)?.title
+      setPicked({ id: value, title: title || `音色 ${value.slice(0, 8)}…` })
+    }
+    onVoiceChange(value)
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -233,7 +252,7 @@ function VoicePickerCard({
       <CardContent className="space-y-3">
         <Select
           value={voiceId}
-          onValueChange={(value) => onVoiceChange(value ?? "")}
+          onValueChange={(value) => onVoicePick(value ?? "")}
           disabled={loadingModels || !models?.configured}
         >
           <SelectTrigger className="w-full">
@@ -241,7 +260,7 @@ function VoicePickerCard({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">平台默认音色</SelectItem>
-            {(models?.voices ?? []).map((voice) => (
+            {options.map((voice) => (
               <SelectItem key={voice.id} value={voice.id}>
                 {voice.title}
               </SelectItem>
