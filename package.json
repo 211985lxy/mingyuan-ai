@@ -14,6 +14,8 @@
     "release:dry-run": "release-it --dry-run",
     "release:context": "node scripts/check-release-context.mjs",
     "release:verify": "node scripts/release-verify.mjs",
+    "audit:event": "node scripts/audit-event.mjs",
+    "test:audit-event": "node --test scripts/audit-event.test.mjs",
     "security:audit": "node scripts/check-dependency-audit.mjs",
     "dev": "turbo dev --filter='./apps/*'",
     "build": "turbo build",
