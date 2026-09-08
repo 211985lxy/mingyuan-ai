@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { promptRegistry } from "@/lib/prompt/registry"
 import { PROMPT_SEEDS } from "@/lib/prompt/seeds"
-import { PROMPT_KEYS, type PromptStatus } from "@/lib/prompt/types"
+import { checkPromptPromotion, PROMPT_KEYS, type PromptStatus } from "@/lib/prompt/types"
 
 const { state, findMany } = vi.hoisted(() => ({
   state: { importThrows: false },
@@ -238,5 +238,75 @@ describe("prompt-registry 内置 seed（批0~批3 共四十一个）", () => {
     const polish = promptRegistry.get(PROMPT_KEYS.transcriptPolish).content
     expect(polish.split("\n")).toHaveLength(6)
     expect(polish.endsWith("直接输出修正后的纯文本。")).toBe(true)
+  })
+})
+
+// ── P1：fixtureKey 升级门禁 + promptMeta 可观测 ──────────────────────────
+
+describe("P1 prompt 升级门禁与可观测", () => {
+  it("draft → qualified 无 fixtureKey 拒绝，有 fixtureKey 放行", () => {
+    expect(checkPromptPromotion({ fromStatus: "draft", toStatus: "qualified" }).allowed).toBe(false)
+    expect(
+      checkPromptPromotion({ fromStatus: "draft", toStatus: "qualified", fixtureKey: "  " }).allowed,
+    ).toBe(false)
+    const ok = checkPromptPromotion({ fromStatus: "draft", toStatus: "qualified", fixtureKey: "eval.prompt.v2" })
+    expect(ok.allowed).toBe(true)
+  })
+
+  it("只有 qualified 可升 active；draft 直升 active 拒绝", () => {
+    expect(checkPromptPromotion({ fromStatus: "qualified", toStatus: "active" }).allowed).toBe(true)
+    const rejected = checkPromptPromotion({ fromStatus: "draft", toStatus: "active" })
+    expect(rejected.allowed).toBe(false)
+    expect(rejected.reason).toContain("qualified")
+  })
+
+  it("回落 draft 恒放行（回滚语义）；同状态拒绝", () => {
+    expect(checkPromptPromotion({ fromStatus: "active", toStatus: "draft" }).allowed).toBe(true)
+    expect(checkPromptPromotion({ fromStatus: "qualified", toStatus: "draft" }).allowed).toBe(true)
+    expect(checkPromptPromotion({ fromStatus: "draft", toStatus: "draft" }).allowed).toBe(false)
+  })
+
+  it("resolveForCompletion 返回 [system,user] 与 key+version 元数据", () => {
+    promptRegistry.__resetForTest()
+    const { messages, promptMeta } = promptRegistry.resolveForCompletion(
+      PROMPT_KEYS.commentRadar,
+      "评论样本……",
+    )
+    expect(messages).toHaveLength(2)
+    expect(messages[0].role).toBe("system")
+    expect(messages[0].content.length).toBeGreaterThan(0)
+    expect(messages[1]).toEqual({ role: "user", content: "评论样本……" })
+    expect(promptMeta.key).toBe(PROMPT_KEYS.commentRadar)
+    expect(promptMeta.version).toBe(1)
+  })
+
+  it("调用点把 promptMeta 传入 complete（可观测断言）", async () => {
+    promptRegistry.__resetForTest()
+    const complete = vi.fn(async () => ({
+      content: JSON.stringify({ summary: "测试摘要", topics: [], suggestedTopics: [] }),
+      model: "m",
+      provider: "p",
+    }))
+    vi.doMock("@/lib/llm/client", () => ({
+      LLMClient: { shared: () => ({ complete }), reset: vi.fn() },
+    }))
+    vi.doMock("@/lib/llm", () => ({
+      LLMClient: { shared: () => ({ complete }), reset: vi.fn() },
+    }))
+    const { analyzeComments } = await import("@/lib/comment-radar/analyzer")
+    await analyzeComments(
+      [{ id: "c1", text: "内容", nickname: "a", likes: 1, isTop: false }],
+      1,
+      "douyin",
+    )
+    const options = complete.mock.calls[0][0] as {
+      promptMeta?: { key: string; version: number }
+      messages: unknown[]
+    }
+    expect(options.promptMeta).toBeDefined()
+    expect(options.promptMeta?.key).toBe(PROMPT_KEYS.commentRadar)
+    expect(options.promptMeta?.version).toBe(1)
+    expect(options.messages).toHaveLength(2)
+    vi.doUnmock("@/lib/llm/client")
   })
 })

@@ -179,3 +179,55 @@ export function seedToRecord(seed: PromptSeed): PromptRecord {
     fromSeed: true,
   }
 }
+
+// ── P1 评估挂接：升级门禁 ─────────────────────────────────────────────────
+
+/** 升级请求：从某状态迁往某状态，携带该版本的 fixtureKey（若有）。 */
+export interface PromptPromotionInput {
+  fromStatus: PromptStatus
+  toStatus: PromptStatus
+  fixtureKey?: string | null
+}
+
+export interface PromptPromotionCheck {
+  allowed: boolean
+  reason?: string
+}
+
+/**
+ * 升级门禁纯函数（P1：无 fixtureKey 禁止升 qualified）。
+ *
+ * 规则：
+ * - → qualified：必须绑定评测 fixtureKey（PromptVersion.fixtureKey → EvalFixtureVersion），
+ *   「评测通过」是 qualified 的存在前提。
+ * - → active：只能从 qualified 升入（未经评测的版本不得直接生效）。
+ * - → draft：任意状态可回落（回滚语义）。
+ * - 同状态 / 未定义迁移：拒绝。
+ *
+ * 注：本函数只做规则判定；EvalFixtureVersion 是否真实存在由调用方
+ * （未来的管理接口/脚本）在落库前另行校验。
+ */
+export function checkPromptPromotion(input: PromptPromotionInput): PromptPromotionCheck {
+  if (input.fromStatus === input.toStatus) {
+    return { allowed: false, reason: "状态未变化" }
+  }
+  if (input.toStatus === "qualified") {
+    if (!input.fixtureKey || !input.fixtureKey.trim()) {
+      return {
+        allowed: false,
+        reason: "升 qualified 必须绑定评测 fixtureKey（EvalFixtureVersion），未评测的 prompt 不得转正式",
+      }
+    }
+    return { allowed: true }
+  }
+  if (input.toStatus === "active") {
+    if (input.fromStatus !== "qualified") {
+      return { allowed: false, reason: "只能从 qualified 升 active：未经评测的版本不得直接生效" }
+    }
+    return { allowed: true }
+  }
+  if (input.toStatus === "draft") {
+    return { allowed: true }
+  }
+  return { allowed: false, reason: "不支持的状态迁移" }
+}

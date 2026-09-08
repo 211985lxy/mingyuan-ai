@@ -99,12 +99,14 @@ export async function analyzeComments(
 ): Promise<AnalysisResult> {
   const sampled = sampleComments(comments)
   const llm = LLMClient.shared()
+  const completionInput = promptRegistry.resolveForCompletion(
+    PROMPT_KEYS.commentRadar,
+    buildUserPrompt(sampled, total, platform),
+  )
   const response = await llm.complete({
     // system prompt 已资产化（Prompt Registry）：DB 版本优先，兜底内置 seed v1（逐字原文）
-    messages: promptRegistry.getMessages(
-      PROMPT_KEYS.commentRadar,
-      buildUserPrompt(sampled, total, platform),
-    ),
+    promptMeta: completionInput.promptMeta,
+    messages: completionInput.messages,
     temperature: 0.3,
     maxTokens: 2000,
     responseFormat: { type: 'json_object' },

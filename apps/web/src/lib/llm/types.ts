@@ -17,6 +17,8 @@ export interface CompletionOptions {
   maxTokens?: number
   responseFormat?: { type: "json_object" } | { type: "text" }
   stream?: false
+  /** Step① P1 可观测：本次调用使用的 prompt 资产（key+version），供日志/评测关联，不参与请求体 */
+  promptMeta?: { key: string; version: number }
 }
 
 export interface CompletionResult {

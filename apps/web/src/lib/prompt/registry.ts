@@ -53,6 +53,12 @@ interface PromptRegistry {
   get(key: string, opts?: GetOptions): PromptRecord
   /** 同步。直接产出 CompletionOptions.messages 的 [system, user]。 */
   getMessages(key: string, userPrompt: string, opts?: GetOptions): ChatMessage[]
+  /** 同步。getMessages + promptMeta（key+version），供 complete 的可观测关联（P1）。 */
+  resolveForCompletion(
+    key: string,
+    userPrompt: string,
+    opts?: GetOptions,
+  ): { messages: ChatMessage[]; promptMeta: { key: string; version: number } }
   /** 异步回源；失败回落 seed 并 warn 一次。 */
   refresh(key: string): Promise<void>
   /** 批量预热（可选，不强制接 instrumentation）。 */
@@ -231,6 +237,28 @@ function getMessages(key: string, userPrompt: string, opts?: GetOptions): ChatMe
 }
 
 /**
+ * @description 解析completion输入（messages + prompt 资产元数据）
+ * @param key - key
+ * @param userPrompt - 用户提示词
+ * @param opts - 配置项
+ * @returns messages 与 promptMeta
+ */
+function resolveForCompletion(
+  key: string,
+  userPrompt: string,
+  opts?: GetOptions,
+): { messages: ChatMessage[]; promptMeta: { key: string; version: number } } {
+  const record = get(key, opts)
+  return {
+    messages: [
+      { role: "system", content: record.content },
+      { role: "user", content: userPrompt },
+    ],
+    promptMeta: { key: record.key, version: record.version },
+  }
+}
+
+/**
  * @description refresh
  * @param key - key
  * @returns Promise<void>
@@ -267,6 +295,7 @@ function __resetForTest(): void {
 export const promptRegistry: PromptRegistry = {
   get,
   getMessages,
+  resolveForCompletion,
   refresh,
   hydrate,
   registerSeed,

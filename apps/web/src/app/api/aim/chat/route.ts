@@ -28,6 +28,7 @@ import {
 } from "@/lib/account-project-context"
 import { resolveAimExecutionAgent } from "@/lib/aim/services/aim-execution-agent"
 import { evaluateHitlGate, settleHitlApproval } from "@/lib/aim/hitl-gate"
+import { notifyHitlApprovalRequired } from "@/lib/aim/feishu-hitl-notify"
 
 /** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
 export const maxDuration = 180
@@ -128,6 +129,8 @@ export async function POST(request: NextRequest) {
           metadata: { toolAction, approvalRequestId: gate.approval.approvalRequestId },
         })
         await finishAimTrace(trace, { outputSummary: "等待人工审批" })
+        // best-effort 飞书通知：负责人不守在控制台也能知道有审批挂着
+        notifyHitlApprovalRequired(gate.approval, { projectId })
         return NextResponse.json({ approvalRequired: gate.approval })
       }
       return handleToolActionBranch({ trace, toolAction, userId: user.id, projectId, resultId })
