@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
   }
 
   const selfOnly = request.nextUrl.searchParams.get("scope") === "mine"
-  const language = request.nextUrl.searchParams.get("language")?.trim() || undefined
+  // 公共库默认只出中文热门音色（按使用量排序）；显式传 language 可覆盖，「我的音色」不过滤
+  const language = request.nextUrl.searchParams.get("language")?.trim() || (selfOnly ? undefined : "zh")
   const result = await listVoiceModels({ selfOnly, language })
 
   return NextResponse.json({

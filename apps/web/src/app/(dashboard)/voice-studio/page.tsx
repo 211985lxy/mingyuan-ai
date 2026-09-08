@@ -247,7 +247,7 @@ function VoicePickerCard({
     <Card>
       <CardHeader>
         <CardTitle className="text-base">音色</CardTitle>
-        <CardDescription>平台默认音色优先；也可从公共库或你的音色里挑。</CardDescription>
+        <CardDescription>平台默认音色优先；公共库已按热度精选热门中文音色，也可切「我的音色」。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <Select
