@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+# Git 已确认的提交事件由共享适配器异步发送；网络不可用时由适配器在仓库外加密排队。
+set +e
+REPOSITORY_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+node "$REPOSITORY_ROOT/scripts/audit-event.mjs" commit --repo-path "$REPOSITORY_ROOT" >/dev/null 2>&1 || true

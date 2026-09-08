@@ -30,55 +30,55 @@
 
 **Files:** Prisma schema fragments, production schema contract, additive migration, `apps/web/src/lib/audit-events.ts`, unit tests.
 
-- [ ] Write failing tests covering source/category/severity/status validation, sensitive-key redaction, stable idempotency key generation, and metadata size limits.
-- [ ] Run the focused tests and confirm they fail before implementation.
-- [ ] Add `AuditEvent` with the fields and indexes defined in the approved design; use nullable links rather than foreign keys to specialist tables so imported external events remain valid.
-- [ ] Implement `normalizeAuditEvent()` and `recordAuditEvent()` with `source + idempotencyKey` upsert semantics, actor hashing, request/correlation propagation, and non-throwing best-effort mode.
-- [ ] Add `reconcileAuditEvents()` that pages through specialist tables by stable ID/time and writes deterministic index events.
-- [ ] Run focused tests, Prisma formatting/generation checks, and migration-integrity checks.
-- [ ] Commit the schema and contract as `feat(audit): add unified event index`.
+- [x] Write failing tests covering source/category/severity/status validation, sensitive-key redaction, stable idempotency key generation, and metadata size limits.
+- [x] Run the focused tests and confirm they fail before implementation.
+- [x] Add `AuditEvent` with the fields and indexes defined in the approved design; use nullable links rather than foreign keys to specialist tables so imported external events remain valid.
+- [x] Implement `normalizeAuditEvent()` and `recordAuditEvent()` with `source + idempotencyKey` upsert semantics, actor hashing, request/correlation propagation, and non-throwing best-effort mode.
+- [x] Add `reconcileAuditEvents()` that pages through specialist tables by stable ID/time and writes deterministic index events.
+- [x] Run focused tests, Prisma formatting/generation checks, and migration-integrity checks.
+- [x] Commit the schema and contract as `feat(audit): add unified event index`.
 
 ### Task 2: Wire existing server events and signed ingestion
 
 **Files:** existing admin audit/observability helpers, internal ingestion route, cron reconciliation route, environment contract, tests.
 
-- [ ] Add tests for admin-only reads, HMAC signature expiry/replay rejection, malformed event rejection, and successful idempotent ingestion.
-- [ ] Implement `POST /api/internal/audit-events` with `AUDIT_INGEST_SECRET`, timestamped HMAC body signing, constant-time verification, and bounded payloads.
-- [ ] Make existing admin, AIM, and Agent API writers emit an index event after their specialist write; preserve existing error behavior for required high-risk admin audit writes.
-- [ ] Add `POST /api/cron/audit-reconcile`, guarded by the existing cron secret, with bounded pages and a resumable cursor.
-- [ ] Add explicit deployment success/failure and health-check event calls to the deploy script without printing secrets.
-- [ ] Run focused tests and typecheck; commit as `feat(audit): ingest and reconcile audit events`.
+- [x] Add tests for admin-only reads, HMAC signature expiry/replay rejection, malformed event rejection, and successful idempotent ingestion.
+- [x] Implement `POST /api/internal/audit-events` with `AUDIT_INGEST_SECRET`, timestamped HMAC body signing, constant-time verification, and bounded payloads.
+- [x] Make existing admin, AIM, and Agent API writers emit an index event after their specialist write; preserve existing error behavior for required high-risk admin audit writes.
+- [x] Add `POST /api/cron/audit-reconcile`, guarded by the existing cron secret, with bounded pages and a resumable cursor.
+- [x] Add explicit deployment success/failure and health-check event calls to the deploy script without printing secrets.
+- [x] Run focused tests and typecheck; commit as `feat(audit): ingest and reconcile audit events`.
 
 ### Task 3: Add administrator query/detail APIs
 
 **Files:** admin query/detail routes, API inventory, route tests.
 
-- [ ] Write failing tests for default “today” window, cursor pagination, every supported filter, stable ordering, and correlation-chain lookup.
-- [ ] Implement `GET /api/admin/audit-events` with bounded limit, UTC storage/Asia-Shanghai date boundaries, filters for source/category/severity/status/actor/project/correlation ID, and redacted metadata.
-- [ ] Implement `GET /api/admin/audit-events/:id` with the event and related events sharing its correlation ID.
-- [ ] Guard both routes with `withAdminOnly`, add request IDs to responses, and record read access using the existing admin audit helper.
-- [ ] Update API inventory and run route/auth tests; commit as `feat(audit): expose unified audit query api`.
+- [x] Write failing tests for default “today” window, cursor pagination, every supported filter, stable ordering, and correlation-chain lookup.
+- [x] Implement `GET /api/admin/audit-events` with bounded limit, UTC storage/Asia-Shanghai date boundaries, filters for source/category/severity/status/actor/project/correlation ID, and redacted metadata.
+- [x] Implement `GET /api/admin/audit-events/:id` with the event and related events sharing its correlation ID.
+- [x] Guard both routes with `withAdminOnly`, add request IDs to responses, and record read access using the existing admin audit helper.
+- [x] Update API inventory and run route/auth tests; commit as `feat(audit): expose unified audit query api`.
 
 ### Task 4: Build the unified audit-center UI and compatibility links
 
 **Files:** new audit-center page, admin sidebar/layout, three legacy pages, component/e2e tests.
 
-- [ ] Add component tests for overview cards, filters, empty/error/loading states, timeline selection, and correlation detail display.
-- [ ] Build `/admin/audit-center` using existing admin shell/components; show today’s totals, unified timeline, filters, event detail, and related-chain view.
-- [ ] Keep `/admin/logs`, `/admin/agents`, and `/admin/usage` reachable but redirect them to `/admin/audit-center` with source/category query presets.
-- [ ] Change sidebar to use the unified entry as the primary log item while preserving legacy URLs for bookmarks.
-- [ ] Run component/e2e tests and accessibility/lint checks; commit as `feat(audit): add unified audit center ui`.
+- [x] Add component tests for overview cards, filters, empty/error/loading states, timeline selection, and correlation detail display.
+- [x] Build `/admin/audit-center` using existing admin shell/components; show today’s totals, unified timeline, filters, event detail, and related-chain view.
+- [x] Keep `/admin/logs`, `/admin/agents`, and `/admin/usage` reachable but redirect them to `/admin/audit-center` with source/category query presets.
+- [x] Change sidebar to use the unified entry as the primary log item while preserving legacy URLs for bookmarks.
+- [x] Run component tests and accessibility/lint checks; commit as `feat(audit): add unified audit center ui`.
 
 ### Task 5: Add external Agent/Git queue and rollout verification
 
 **Files:** repository-side audit CLI/hook adapter, external queue documentation, tests, release/runbook docs.
 
-- [ ] Test queue atomicity, `0600` permissions, encryption-at-rest, retry backoff, idempotent replay, and repository-path/Git-SHA capture.
-- [ ] Implement one shared CLI used by Claude/Codex/Cursor/Qoder/Trae adapters for `start`, `finish`, `fail`, and `commit`; store the queue outside the repository.
-- [ ] Add a post-commit adapter that submits Git-confirmed events and marks Agent-declared events as declarations until a matching SHA exists.
-- [ ] Document the adapter contract and the limitation that arbitrary tools bypassing the adapter cannot be guaranteed to emit an event.
-- [ ] Run full relevant unit tests, typecheck, lint, API inventory, architecture-size checks, production build, and a local end-to-end audit write/query/replay smoke test.
-- [ ] Commit as `feat(audit): add offline agent audit queue`.
+- [x] Test queue atomicity, `0600` permissions, encryption-at-rest, retry backoff, idempotent replay, and repository-path/Git-SHA capture.
+- [x] Implement one shared CLI used by Claude/Codex/Cursor/Qoder/Trae adapters for `start`, `finish`, `fail`, and `commit`; store the queue outside the repository.
+- [x] Add a post-commit adapter that submits Git-confirmed events and marks Agent-declared events as declarations until a matching SHA exists.
+- [x] Document the adapter contract and the limitation that arbitrary tools bypassing the adapter cannot be guaranteed to emit an event.
+- [x] Run full relevant unit tests, typecheck, lint, API inventory, architecture-size checks, production build, and a local queue write/replay smoke test.
+- [x] Commit as `feat(audit): add offline agent audit queue`.
 
 ### Task 6: Finish rollout and cleanup
 
