@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { aimExecuteBodySchema } from "@/features/aim/contracts/api"
-import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
-import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
+import { apiRequestErrorResponse, parseJsonRecord, ApiRequestError } from "@/lib/api-contract"
+import { aimFailureHttpStatus, mapAimErrorToUserMessage, toAimFailureResponse } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
-import { createAimTrace, failAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
+import { createAimTrace, failAimTrace, finishAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
 import { understandAimContentTurnWithTrace } from "@/lib/aim/semantic-task-understanding"
 import { MOUNTED_RULE_BLOCK_LABELS } from "@/lib/aim/mounted-rule-blocks"
 import { resolveExecuteTurnGate } from "@/lib/aim/execute-turn-intent-gate"
@@ -13,11 +13,25 @@ import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
+import { AIM_EXECUTION_DEADLINE_MS, runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
+import {
+  AimGenerationAttemptError,
+  completeAimGenerationAttempt,
+  discardAimGenerationAttempt,
+  failAimGenerationAttempt,
+  markAimGenerationAwaitingInput,
+  markAimGenerationRunning,
+  startAimGenerationAttempt,
+  buildAimAttemptReplayResponse,
+} from "@/lib/aim/generation-attempt"
 
 export const maxDuration = 180
 
+type GenerationAttempt = { id: string; userId: string; projectId?: string; created: boolean }
+
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
+  let attempt: GenerationAttempt | undefined
   try {
     const user = await authenticateRequest(request)
     const quotaResponse = await enforceDailyBetaLimit(user.id, "aim_generate")
@@ -31,73 +45,145 @@ export async function POST(request: NextRequest) {
     })
     const scopedParsed = { ...parsed, projectId: boundProject.id }
     const agentId = scopedParsed.executionAgentId || scopedParsed.agentId || "content_producer"
-    trace = await createAimTrace({
-      id: typeof parsed.traceId === "string" ? parsed.traceId.trim() || undefined : undefined,
+    if (
+      scopedParsed.retryGenerationId
+      && scopedParsed.attemptId
+      && scopedParsed.retryGenerationId !== scopedParsed.attemptId
+    ) {
+      throw new AimGenerationAttemptError("INVALID_REQUEST", "重试任务标识不一致")
+    }
+    const attemptId = scopedParsed.retryGenerationId || scopedParsed.attemptId
+    const started = await startAimGenerationAttempt({
+      attemptId,
       userId: user.id,
       projectId: boundProject.id,
       agentId,
-      action: "generate",
-      inputSummary: scopedParsed.sourceEnvelope.currentUserRequest,
+      rawInput: scopedParsed.sourceEnvelope.currentUserRequest,
+      targetFormats: scopedParsed.targetFormats,
+      allowRetry: Boolean(scopedParsed.retryGenerationId),
     })
-    const understanding = await understandAimContentTurnWithTrace({
-      envelope: scopedParsed.sourceEnvelope,
-      agentId,
-      trace,
-    })
-
-    // 意图门：意图解析 + 关键缺口 + 规则块挂载 + 追问组装（显性化，轨迹可见）
-    const gate = resolveExecuteTurnGate({
-      envelope: scopedParsed.sourceEnvelope,
-      handling: understanding.handling,
-      llmQuestions: understanding.clarificationQuestions,
-      formats: scopedParsed.targetFormats,
-    })
-    const mountedSummary = gate.mountedRuleBlocks.length
-      ? `｜挂载 ${gate.mountedRuleBlocks.map((id) => MOUNTED_RULE_BLOCK_LABELS[id]).join("、")}`
-      : ""
-    await addAimTraceStep(trace, {
-      key: "resolve_user_intent",
-      label: "意图约束解析",
-      status: "success",
-      summary: `${gate.intent.taskKind}｜${gate.intent.isNewTask ? "新任务" : "延续任务"}｜缺口 ${gate.deterministicGaps.length} 项${mountedSummary}`,
-      metadata: {
-        taskKind: gate.intent.taskKind,
-        isNewTask: gate.intent.isNewTask,
-        lengthPolicy: gate.intent.lengthPolicy,
-        constraintSources: gate.intent.constraintSources,
-        gaps: gate.deterministicGaps.map((gap) => gap.field),
-        mountedRuleBlocks: gate.mountedRuleBlocks,
-      },
-    })
-
-    if (gate.clarification) {
-      return NextResponse.json({
-        kind: "clarification",
-        question: gate.clarification.question,
-        questions: gate.clarification.questions,
-        runId: trace?.id,
+    attempt = { id: started.id, created: started.created, userId: user.id, projectId: boundProject.id }
+    const replayed = buildAimAttemptReplayResponse(started)
+    if (replayed) return NextResponse.json(replayed.body, { status: replayed.status })
+    return await runWithAimExecutionDeadline(AIM_EXECUTION_DEADLINE_MS, async () => {
+      await markAimGenerationRunning(attempt!)
+      trace = await createAimTrace({
+        id: scopedParsed.traceId,
+        userId: user.id,
+        projectId: boundProject.id,
+        agentId,
+        action: "generate",
+        inputSummary: scopedParsed.sourceEnvelope.currentUserRequest,
       })
-    }
-    if (understanding.handling === "respond") {
-      const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed: scopedParsed, understanding, trace })
-      return NextResponse.json({ kind: "reply", content, runId: trace?.id })
-    }
-    const run = await executeVerifiedUnifiedDelivery({ userId: user.id, parsed: scopedParsed, understanding, trace })
-    return NextResponse.json({ kind: "deliverable", ...serializeAimGenerationRun(run) })
+      const understanding = await understandAimContentTurnWithTrace({
+        envelope: scopedParsed.sourceEnvelope,
+        agentId,
+        trace,
+      })
+
+      const gate = resolveExecuteTurnGate({
+        envelope: scopedParsed.sourceEnvelope,
+        handling: understanding.handling,
+        llmQuestions: understanding.clarificationQuestions,
+        formats: scopedParsed.targetFormats,
+      })
+      const mountedSummary = gate.mountedRuleBlocks.length
+        ? `｜挂载 ${gate.mountedRuleBlocks.map((id) => MOUNTED_RULE_BLOCK_LABELS[id]).join("、")}`
+        : ""
+      await addAimTraceStep(trace, {
+        key: "resolve_user_intent",
+        label: "意图约束解析",
+        status: "success",
+        summary: `${gate.intent.taskKind}｜${gate.intent.isNewTask ? "新任务" : "延续任务"}｜缺口 ${gate.deterministicGaps.length} 项${mountedSummary}`,
+        metadata: {
+          taskKind: gate.intent.taskKind,
+          isNewTask: gate.intent.isNewTask,
+          lengthPolicy: gate.intent.lengthPolicy,
+          constraintSources: gate.intent.constraintSources,
+          gaps: gate.deterministicGaps.map((gap) => gap.field),
+          mountedRuleBlocks: gate.mountedRuleBlocks,
+        },
+      })
+
+      if (gate.clarification) {
+        await markAimGenerationAwaitingInput(attempt!)
+        await finishAimTrace(trace, { status: "success", outputSummary: "clarification", aimGenerationId: attempt!.id })
+        return NextResponse.json({
+          kind: "clarification",
+          question: gate.clarification.question,
+          questions: gate.clarification.questions,
+          traceId: trace?.id,
+          generationId: attempt!.id,
+        })
+      }
+      if (gate.intent.taskKind === "answer_question" || understanding.handling === "respond") {
+        const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed: scopedParsed, understanding, trace })
+        if (attempt!.created) await discardAimGenerationAttempt(attempt!)
+        else await completeAimGenerationAttempt(attempt!)
+        await finishAimTrace(trace, { status: "success", outputSummary: "reply", aimGenerationId: attempt!.id })
+        return NextResponse.json({ kind: "reply", content, traceId: trace?.id })
+      }
+      const run = await executeVerifiedUnifiedDelivery({
+        userId: user.id,
+        parsed: scopedParsed,
+        understanding,
+        intent: gate.intent,
+        trace,
+        generationAttemptId: attempt!.id,
+      })
+      await finishAimTrace(trace, { status: "success", aimGenerationId: attempt!.id })
+      const serialized = serializeAimGenerationRun(run)
+      const runId = serialized.runId ?? run.metadata?.runId
+      return NextResponse.json({
+        kind: "deliverable",
+        ...serialized,
+        // runId 是 Harness 对外执行编号；traceId 仅用于实时思考面板与内部追踪。
+        runId,
+        traceId: run.traceId ?? trace?.id,
+        generationId: attempt!.id,
+      })
+    }, request.signal)
   } catch (error) {
+    if (error instanceof AimGenerationAttemptError) {
+      return NextResponse.json({
+        error: error.message,
+        code: error.code,
+        generationId: error.generationId,
+      }, { status: error.code === "GENERATION_IN_PROGRESS" ? 409 : 400 })
+    }
+    const requestId = request.headers.get("x-request-id") || crypto.randomUUID()
+    const failure = toAimFailureResponse(error, requestId)
+    if (attempt) {
+      await failAimGenerationAttempt({ ...attempt, error, code: failure.code }).catch(() => undefined)
+      await failAimTrace(trace, error, { aimGenerationId: attempt.id })
+      failure.generationId = attempt.id
+      if (trace?.id) failure.traceId = trace.id
+    }
     if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
       const contextError = error as { message: string; code: string; status: number }
-      return NextResponse.json({ error: contextError.message, code: contextError.code }, { status: contextError.status })
+      return NextResponse.json({
+        ...failure,
+        error: contextError.message,
+        code: contextError.code,
+        ...(attempt ? { generationId: attempt.id } : {}),
+      }, { status: contextError.status })
     }
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse
     const contractResponse = apiRequestErrorResponse(request, error)
-    if (contractResponse) return contractResponse
-    await failAimTrace(trace, error)
+    if (contractResponse && !attempt) return contractResponse
+    const contractError = error instanceof ApiRequestError ? error : undefined
     const message = error instanceof Error && error.message.includes("连续修正")
       ? error.message
-      : mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
-    return NextResponse.json({ error: message }, { status: error instanceof Error && error.message.includes("连续修正") ? 422 : 500 })
+      : mapAimErrorToUserMessage(error, failure.error)
+    return NextResponse.json({
+      ...failure,
+      error: message,
+      ...(contractResponse && error instanceof Error ? { field: (error as { field?: string }).field } : {}),
+    }, {
+      status: contractError?.status ?? aimFailureHttpStatus(failure.code),
+      headers: { "x-request-id": requestId },
+    })
   }
 }
 

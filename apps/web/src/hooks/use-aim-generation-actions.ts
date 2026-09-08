@@ -5,16 +5,12 @@ import { toast } from "sonner"
 
 import {
   ApiError,
-  checkScriptQuality,
-  generateAimContent,
   type AimGenerateRequest,
-  type AimGenerateResponse,
   type ContentFormat,
 } from "@/lib/api/client"
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
-import { mapAimErrorToUserMessage } from "@/lib/aim-error-message"
 import {
   buildAimRawInput,
   nextAimWorkbenchId,
@@ -22,11 +18,15 @@ import {
 import { buildGenerationSourceEnvelope } from "@/hooks/aim-generation-source-envelope"
 import {
   applyExecuteTurnResponse,
+  applyGenerationFailure,
   applyGenerationResponse,
   buildExecuteTurnRequest,
+  resolveGenerationAttemptId,
   resolveFollowUpGenerationId,
 } from "@/hooks/aim-generation-delivery-flow"
+import { checkDeliverableQuality } from "@/hooks/aim-generation-quality-flow"
 import { executeAimTurnWithTransientRetry, generateAimContentWithTransientRetry } from "@/hooks/aim-unified-turn-client"
+import { usesUnifiedAimExecuteEntry } from "@/lib/aim/unified-execute-entry"
 import {
   resolveAimWorkflowBriefForRequest,
   shouldKeepAimFollowUpContext,
@@ -95,6 +95,7 @@ export interface AimGenerationActionInput {
 
 interface GenerateOptions {
   retryMessageId?: string
+  retryOfRunId?: string
   startsNewTask?: boolean
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
@@ -103,6 +104,9 @@ interface GenerateOptions {
   traceId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
+  /** 澄清回答或主动重试时复用的服务端生成任务 ID。 */
+  attemptId?: string
+  retryGenerationId?: string
 }
 
 /**
@@ -121,7 +125,7 @@ const GENERATION_PROGRESS_STAGES = [
   { afterMs: 12_000, message: (actionLabel: string) => `正在理解你的要求，随后${actionLabel}…` },
   { afterMs: 28_000, message: () => "正在读取项目资料并匹配知识库…" },
   { afterMs: 55_000, message: (actionLabel: string) => `正在连接模型${actionLabel}，请稍候…` },
-  { afterMs: 95_000, message: () => "生成仍在进行，复杂任务可能需要 2–3 分钟；也可点停止后重试。" },
+  { afterMs: 95_000, message: () => "生成仍在进行，系统会在约 2 分钟内给出结果；也可点停止后重试。" },
 ] as const
 
 function startGenerationProgressTicker(
@@ -149,12 +153,19 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
     : options.retryMessageId
       ? input.messages.filter((message) => message.id !== options.retryMessageId)
       : input.messages
+  const clearAwaitingMarker = (message: AimWorkbenchMessage) =>
+    message.generationStatus === "awaiting_input" ? { ...message, generationStatus: null } : message
+  const clearedBaseMessages = baseMessages.map(clearAwaitingMarker)
   if (options.startsNewTask) {
     input.clearCurrentTaskContext()
     input.onIsolateTaskSession?.()
   }
   input.setMessages((messages) => [
-    ...(options.startsNewTask ? [] : options.retryMessageId ? messages.filter((message) => message.id !== options.retryMessageId) : messages),
+    ...(options.startsNewTask
+      ? []
+      : options.retryMessageId
+        ? messages.filter((message) => message.id !== options.retryMessageId).map(clearAwaitingMarker)
+        : messages.map(clearAwaitingMarker)),
     ...(currentInput && !options.retryMessageId ? [{ id: nextAimWorkbenchId(), role: "user" as const, content: currentInput }] : []),
     {
       id: assistantMessageId,
@@ -166,7 +177,7 @@ function appendPendingGeneration(input: AimGenerationActionInput, currentInput: 
     },
   ])
   if (currentInput) input.setInput("")
-  return { assistantMessageId, baseMessages }
+  return { assistantMessageId, baseMessages: clearedBaseMessages }
 }
 
 function buildGenerationRequest(
@@ -302,11 +313,27 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     ? { ...message, traceId, traceType: "generate" as const }
     : message))
   input.setIsGenerating(true)
+  let generationAttemptId: string | undefined
   try {
-    // 创作台主生成（文案创作 content_producer）切到统一执行入口：
+    // 创作台统一执行入口（content_producer / 商业诊断组）：
     // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
-    const useUnifiedEntry = (options.executionAgentId || input.selectedAgentId) === "content_producer"
-    const entry = buildAimEntryRequest(input, rawInput, currentInput, baseMessages, options, useUnifiedEntry, traceId)
+    const resolved = resolveGenerationAttemptId({
+      options,
+      messages: input.messages,
+      baseMessages,
+      startsNewTask: options.startsNewTask,
+      traceId,
+    })
+    const { retryGenerationId, retrySource } = resolved
+    const attemptId = resolved.attemptId
+    generationAttemptId = attemptId
+    const useUnifiedEntry = usesUnifiedAimExecuteEntry(options.executionAgentId || input.selectedAgentId)
+    const entry = buildAimEntryRequest(input, rawInput, currentInput, baseMessages, {
+      ...options,
+      attemptId,
+      retryGenerationId,
+      retryOfRunId: options.retryOfRunId || retrySource?.failure?.runId || retrySource?.runId || undefined,
+    }, useUnifiedEntry, traceId)
     if (entry.kind === "execute") {
       const response = await executeAimTurnWithTransientRetry(entry.body, controller.signal)
       if (controller.signal.aborted) {
@@ -329,17 +356,13 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     if (stopped) {
       markGenerationStopped(input, assistantMessageId)
     } else {
-      const message = mapAimErrorToUserMessage(error, "生成失败，请稍后重试")
-      toast.error(message)
-      input.setMessages((messages) => messages.map((item) => item.id === assistantMessageId
-        ? {
-            ...item,
-            content: message,
-            regenerating: false,
-            pendingGeneration: false,
-            failure: { kind: "generate" as const, retryText: currentInput },
-          }
-        : item))
+      applyGenerationFailure(input, {
+        assistantMessageId,
+        currentInput,
+        error,
+        traceId,
+        generationAttemptId,
+      })
     }
   } finally {
     stopProgressTicker()
@@ -352,102 +375,6 @@ async function generateWithInput(input: AimGenerationActionInput, currentInput: 
   if (!rawInput) return toast.error("请先在对话框里说点素材或需求")
   if (input.projectEnabled && !input.selectedProjectId) return toast.error("你的 IP 营销全案还在配置中")
   await executeGeneration(input, currentInput, rawInput, options)
-}
-
-async function checkDeliverableQuality(input: AimGenerationActionInput, messageId: string) {
-  const message = input.messages.find((item) => item.id === messageId)
-  const deliverables = message?.deliverables
-  const mainFormat = deliverables?.results.find((result) => result.format === "video_script")
-    || deliverables?.results.find((result) => result.format === "koubo_script")
-    || deliverables?.results.find((result) => result.format === "raw_copy")
-  const mainContent = mainFormat?.content
-  if (!mainContent || !deliverables) return
-
-  input.setIsQualityChecking(true)
-  try {
-    // 主编改稿闸门：默认 editor_revise，成功后替换 deliverable
-    const revised = await generateAimContent({
-      agentId: "content_review",
-      rawInput: mainContent,
-      targetFormats: ["raw_copy"],
-      taskType: "quality_check",
-      reviewMode: "editor_revise",
-      existingGenerationId: deliverables.id,
-      projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,
-    })
-
-    const revisedRaw = revised.results[0]?.content || ""
-    const diffMatch = revisedRaw.match(/\[\[AIM_EDITOR_DIFF\]\]([\s\S]*?)\[\[\/AIM_EDITOR_DIFF\]\]/)
-    const diffSummary = (diffMatch?.[1] || "").trim()
-    const finalBody = revisedRaw
-      .replace(/\[\[AIM_EDITOR_DIFF\]\][\s\S]*?\[\[\/AIM_EDITOR_DIFF\]\]/g, "")
-      .trim()
-
-    if (!finalBody || /打回重写/.test(revisedRaw)) {
-      toast.message("主编建议打回重写", { description: diffSummary || "请根据修订说明调整后再生成" })
-      input.setMessages((messages) => messages.map((item) => item.id === messageId
-        ? {
-            ...item,
-            qualityReport: {
-              editorial: { score: 40, passed: false, feedback: diffSummary || "需重写" },
-              aiTaste: { score: 50, passed: true, feedback: "—" },
-              attraction: { score: 40, passed: false, feedback: "—" },
-              logic: { score: 40, passed: false, feedback: "—" },
-              overall: { score: 40, passed: false, needsRewrite: true },
-              rewriteCount: 1,
-            },
-          }
-        : item))
-      return
-    }
-
-    const nextFormat = mainFormat.format === "koubo_script" ? "koubo_script" : mainFormat.format
-    const nextResults = deliverables.results.map((result) =>
-      result.format === mainFormat.format
-        ? { ...result, content: finalBody, wordCount: finalBody.length }
-        : result,
-    )
-
-    input.setMessages((messages) => messages.map((item) => item.id === messageId
-      ? {
-          ...item,
-          deliverables: {
-            ...deliverables,
-            results: nextResults,
-            qualityStatus: "pass",
-          },
-          qualityReport: {
-            editorial: { score: 85, passed: true, feedback: diffSummary || "主编已修订" },
-            aiTaste: { score: 80, passed: true, feedback: "已去AI腔" },
-            attraction: { score: 80, passed: true, feedback: "钩子已强化" },
-            logic: { score: 80, passed: true, feedback: "结构已理顺" },
-            overall: { score: 82, passed: true, needsRewrite: false },
-            rewriteCount: 1,
-          },
-          editorDiffSummary: diffSummary,
-        }
-      : item))
-
-    input.openEditorFromResult(messageId, nextFormat, finalBody)
-    toast.success("主编已修订终稿", { description: diffSummary.slice(0, 120) || "可直接用于发布" })
-  } catch (error) {
-    // 改稿失败时回退只读质检，不阻断用户
-    try {
-      const report = await checkScriptQuality({
-        content: mainContent,
-        persona: input.agent.defaultInstruction,
-        publishPlatform: "douyin",
-      })
-      input.setMessages((messages) => messages.map((item) =>
-        item.id === messageId ? { ...item, qualityReport: report } : item,
-      ))
-      toast.success("发布前自查完成（改稿暂不可用，已出报告）")
-    } catch {
-      toast.error(error instanceof Error ? error.message : "质检失败")
-    }
-  } finally {
-    input.setIsQualityChecking(false)
-  }
 }
 
 /** 模块级助手：中止并复位请求控制器（跨函数边界变更 ref，避开 hook 参数直接变异的编译器规则） */

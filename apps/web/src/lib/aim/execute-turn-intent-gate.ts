@@ -1,4 +1,6 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import { LOCAL_EDIT_PART_WORDS } from "@/lib/aim-intent-boundaries"
+import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import {
   buildNumberedClarification,
   collectIntentClarificationGaps,
@@ -22,6 +24,33 @@ export interface ExecuteTurnGateResult {
   mountedRuleBlocks: MountedRuleBlockId[]
   /** 关键缺口未确认时的合并追问；可生成/可直接回复时为 null */
   clarification: { question: string; questions: string[] } | null
+}
+
+const LOCAL_SCOPE_EXTRA = /第[一二三四五六七八九十\d]+段|某[一段句]|这段|这段话|选区/
+const FULL_SCOPE = /整篇|整稿|全文|通篇|终稿/
+
+function isLocalModificationScope(scope?: string): boolean {
+  if (!scope) return false
+  if (FULL_SCOPE.test(scope)) return false
+  if (LOCAL_EDIT_PART_WORDS.some((word) => scope.includes(word))) return true
+  return LOCAL_SCOPE_EXTRA.test(scope)
+}
+
+export function mapResolvedIntentToRuntimeTask(intent: ResolvedUserIntent): AimRuntimeTask {
+  switch (intent.taskKind) {
+    case "new_draft":
+    case "batch_replicate":
+      return "new_copy"
+    case "benchmark_rewrite":
+    case "imitation_rewrite":
+      return "rewrite_copy"
+    case "polish_existing":
+      return isLocalModificationScope(intent.modificationScope) ? "light_edit" : "rewrite_copy"
+    case "opener_optimize":
+      return "light_edit"
+    case "answer_question":
+      throw new Error("answer_question 不得进入 generate")
+  }
 }
 
 export function resolveExecuteTurnGate(input: {

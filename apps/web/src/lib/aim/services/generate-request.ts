@@ -13,6 +13,7 @@ import {
 } from "@/lib/aim-observability"
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import { mapResolvedIntentToRuntimeTask } from "@/lib/aim/execute-turn-intent-gate"
 import {
   AccountProjectContextError,
   resolveBoundProject,
@@ -26,6 +27,23 @@ import { prisma } from "@/lib/prisma"
  * “没有旧稿”继续生成，避免跨项目引用。
  */
 export const EXISTING_GENERATION_NOT_IN_BOUND_PROJECT = "EXISTING_GENERATION_NOT_IN_BOUND_PROJECT"
+
+function resolveUnifiedRuntimeInput(
+  parsedRawInput: string,
+  execution: NonNullable<import("@/lib/aim-harness/contracts").AimRunRequest["unifiedContentExecution"]>,
+) {
+  if (parsedRawInput !== execution.envelope.currentUserRequest.trim()) {
+    return { ok: false as const, validationError: "统一入口 rawInput 必须等于当前用户原话" }
+  }
+  if (!execution.intent) {
+    return { ok: false as const, validationError: "统一入口缺少结构化用户意图" }
+  }
+  return {
+    ok: true as const,
+    rawInput: parsedRawInput,
+    runtimeTask: mapResolvedIntentToRuntimeTask(execution.intent),
+  }
+}
 
 /**
  * @description prepareaimgeneraterequest
@@ -113,13 +131,20 @@ export async function prepareAimGenerateRequest(
   const workflowBrief = scopedParsed.workflow
     ? await buildWorkflowBrief({ userId, ...scopedParsed.workflow, projectId: boundProject.id })
     : undefined
-  const preparedInput = internal?.unifiedContentExecution
-    ? {
-        rawInput: parsed.rawInput,
-        // 仅用于兼容尚未移除的 Harness 类型；统一入口的语义和执行边界
-        // 只读取 unifiedContentExecution，不再从用户原话映射旧动作分类。
-        runtimeTask: "new_copy" as const,
-      }
+  const unifiedRuntime = internal?.unifiedContentExecution
+    ? resolveUnifiedRuntimeInput(parsed.rawInput, internal.unifiedContentExecution)
+    : undefined
+  if (unifiedRuntime && !unifiedRuntime.ok) {
+    return {
+      ok: false as const,
+      trace,
+      validationError: unifiedRuntime.validationError,
+      status: 400 as const,
+      errorCode: "INVALID_REQUEST" as const,
+    }
+  }
+  const preparedInput = unifiedRuntime
+    ? { rawInput: unifiedRuntime.rawInput, runtimeTask: unifiedRuntime.runtimeTask }
     : await prepareAimGenerateInput({
         userId,
         agentId: scopedParsed.agentId,
@@ -306,6 +331,7 @@ export function serializeAimGenerationRun(run: Awaited<ReturnType<typeof execute
   return {
     ...run.output,
     runId: run.metadata.runId,
+    traceId: run.traceId,
     degraded: run.metadata.degraded,
     provider: run.metadata.provider,
     model: run.metadata.model,

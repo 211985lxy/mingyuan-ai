@@ -55,7 +55,7 @@ describe("AIM fast spoken generation budget", () => {
       "user",
       context(AIM_FAST_SPOKEN_ROUTE_KEY),
       ["video_script"],
-    )).rejects.toThrow("已停止交付")
+    )).rejects.toThrow("生成结果被截断或正文过短")
     expect(mocks.execute).toHaveBeenCalledTimes(2)
   })
 
@@ -132,7 +132,7 @@ describe("AIM fast spoken generation budget", () => {
       "user",
       strictContext,
       ["video_script"],
-    )).rejects.toThrow("已停止交付")
+    )).rejects.toThrow("生成结果没有满足你当前的要求")
     expect(mocks.execute).toHaveBeenCalledTimes(2)
     expect(mocks.execute.mock.calls[0]?.[2]).toContain("正文只能使用用户原文已有的数字表达")
   })
@@ -243,7 +243,7 @@ describe("AIM fast spoken generation budget", () => {
         rawInput: "围绕内容获客写口播，不得编造其他数字",
       },
       ["video_script"],
-    )).rejects.toThrow("已停止交付")
+    )).rejects.toThrow("生成结果没有满足你当前的要求")
     expect(mocks.execute).toHaveBeenCalledTimes(2)
   })
 

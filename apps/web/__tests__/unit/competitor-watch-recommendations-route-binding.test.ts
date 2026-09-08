@@ -54,6 +54,8 @@ function postHandler(body?: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
   })
+  // mock 的 withUserAuth 直通 wrapper 只消费 request；这里补上 Next 16 的
+  // segmentData 仅满足导出 POST 的外层签名，运行时被 mock 忽略。
   return POST(request, { params: Promise.resolve({}) }) as Promise<Response>
 }
 

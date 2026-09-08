@@ -19,6 +19,25 @@ describe("content source envelope", () => {
     expect(envelope.referenceMaterials[0].content).toContain("只改开头")
   })
 
+  it("splits current request, current material, references, history and methodology into labeled layers", () => {
+    const envelope = buildAimContentSourceEnvelope({
+      currentUserRequest: "写一篇新稿",
+      relevantConversation: [{ role: "user", content: "上次说写2分钟、3条获客口播" }],
+      currentArtifact: "旧稿正文",
+      referenceMaterials: [{ title: "对标", content: "6分半成片，22个镜头" }],
+      methodologyNotes: "口播方法论：先冲突后判断",
+    })
+
+    expect(envelope.currentUserRequest).toBe("写一篇新稿")
+    expect(envelope.currentArtifact?.content).toBe("旧稿正文")
+    expect(envelope.referenceMaterials[0].content).toContain("22个镜头")
+    expect(envelope.relevantConversation[0].content).toContain("2分钟")
+    expect(envelope.methodologyNotes).toBe("口播方法论：先冲突后判断")
+    expect(envelope.currentUserRequest).not.toContain("方法论")
+    expect(envelope.currentUserRequest).not.toContain("22个镜头")
+    expect(envelope.currentUserRequest).not.toContain("2分钟")
+  })
+
   it("drops oldest conversation before touching the current request", () => {
     const currentUserRequest = "这句必须完整保留".repeat(100)
     const fitted = fitAimContentSourceEnvelopeToBudget({

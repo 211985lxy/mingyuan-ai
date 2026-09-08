@@ -78,23 +78,22 @@ const CAPABILITY_RANK: Record<ModelCapability, number> = {
   advanced: 3,
 }
 
+const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
+  {
+    name: "zenmux",
+    model: "anthropic/claude-sonnet-4.6",
+    timeoutMs: 50_000,
+    maxRetries: 0,
+    capability: "advanced",
+  },
+  // 质量链第二跳：火山方舟豆包旗舰，国内直连低延迟；模型未开通时快速失败并被熔断跳过
+  { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 30_000, capability: "standard" },
+  { name: "apimart", model: "gpt-5.4", timeoutMs: 25_000, capability: "advanced" },
+  { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 20_000, capability: "advanced" },
+]
+
 export const AGENT_ROUTES = freezeAgentRoutes({
-  [AIM_FAST_SPOKEN_ROUTE_KEY]: [
-    // 业务决策（2026-08-29）：文案尽量 Claude，不可用降级 DeepSeek pro → flash。
-    // ZenMux 首位必须短超时快失败（20s 经验值），避免流式「干等后失败」；
-    // 降级链保证通道故障时 20s 内切到 DeepSeek 继续出稿。
-    {
-      name: "zenmux",
-      model: "anthropic/claude-sonnet-4.6",
-      timeoutMs: 20_000,
-      maxRetries: 0,
-      capability: "advanced",
-    },
-    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 45_000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
-    { name: "apimart", timeoutMs: 45_000, capability: "advanced" },
-    { name: "glm", timeoutMs: 30_000, capability: "standard" },
-  ],
+  [AIM_FAST_SPOKEN_ROUTE_KEY]: [...QUALITY_PRIMARY_ROUTE],
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
     // 先快失败再换路：ZenMux/离火近年常超时或 503，超时预算要短于前端流式总超时
@@ -103,52 +102,24 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "deepseek", timeoutMs: 30000, capability: "standard" },
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 45000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "glm", timeoutMs: 30000, capability: "standard" },
+    { name: "doubao", timeoutMs: 30000, capability: "standard" },
   ],
-  business_diagnosis: [
-    // APIMart is the verified healthy advanced route; long diagnosis needs more than the generic 20s fallback budget.
-    { name: "apimart", timeoutMs: 60000, capability: "advanced" },
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "openrouter", model: "deepseek/deepseek-v4-pro", timeoutMs: 20000, capability: "advanced" },
-    { name: "openrouter", model: "z-ai/glm-5.2", timeoutMs: 20000, capability: "advanced" },
-    { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "deepseek", timeoutMs: 20000, capability: "standard" },
-    { name: "jiekou", timeoutMs: 20000, capability: "basic" },
-    { name: "therouter", timeoutMs: 20000, capability: "standard" },
-    { name: "glm", timeoutMs: 20000, capability: "standard" },
-  ],
+  business_diagnosis: [...QUALITY_PRIMARY_ROUTE],
 
-  // ── 内容创作：Claude 质量优先（业务决策 2026-08-29），DeepSeek 系降级保出稿 ──
-  // ZenMux 短超时快失败，通道故障 20s 内降级，避免流式干等。
-  content_producer: [
-    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 20_000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 45_000, capability: "advanced" },
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
-    { name: "apimart", timeoutMs: 60_000, capability: "advanced" },
-    { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
-  ],
+  // ── 内容创作：Claude 质量优先，Doubao / APIMart gpt-5.4 独立备用，DeepSeek 仅应急 ──
+  content_producer: [...QUALITY_PRIMARY_ROUTE],
 
   // ── DeepSeek 组（质检 / 人设等日常分发，走官方直连）──
   free_copywriter: [
     // 自由创作首选文心一言：中文语感、本土表达、创意生成最强，国内端点低延迟
     { name: "qianfan", model: "ernie-5.1", capability: "advanced" },
     { name: "deepseek", capability: "standard" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
     { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "jiekou", capability: "basic" },
   ],
-  business_system_diagnosis: [
-    // 工作台等待上限为 180 秒；先走直连模型，避免网关长超时后才开始生成整份报告。
-    { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45000, capability: "standard" },
-    { name: "zenmux", model: "anthropic/claude-opus-4.6", timeoutMs: 45000, capability: "advanced" },
-    { name: "apimart", capability: "advanced" },
-    { name: "openrouter", model: "deepseek/deepseek-v4-pro", capability: "advanced" },
-    { name: "openrouter", model: "z-ai/glm-5.2", capability: "advanced" },
-    { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
-  ],
+  business_system_diagnosis: [...QUALITY_PRIMARY_ROUTE],
   content_review: [
     { name: "deepseek", capability: "standard" },
     { name: "apimart", capability: "advanced" },
@@ -156,7 +127,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
     { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
   ],
   content_retro: [
     { name: "deepseek", capability: "standard" },
@@ -165,7 +136,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
     { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
   ],
   vision_analysis: [
     { name: "openrouter", model: "qwen/qwen3-vl-8b-instruct", capability: "standard" },
@@ -179,7 +150,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 60000, capability: "advanced" },
     { name: "deepseek", capability: "standard" },
     { name: "apimart", capability: "advanced" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
     { name: "jiekou", capability: "basic" },
   ],
 })
@@ -270,7 +241,9 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
       ...(route.maxRetries !== undefined ? { maxRetries: route.maxRetries } : {}),
       capability: route.capability,
     }
-    providers.push(new OpenAICompatibleProvider(mergedConfig))
+    const provider = new OpenAICompatibleProvider(mergedConfig)
+    if (!provider.isAvailable()) continue
+    providers.push(provider)
   }
 
   if (providers.length === 0) {
@@ -279,11 +252,23 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
       return LLMClient.shared()
     }
     console.warn(
-      `[agent-router] No providers satisfy ${agentId} minimum capability "${policy.minimumCapability}"`
+      `[agent-router] No routed providers available for "${agentId}"; falling back to the configured provider chain`,
     )
+    // 路由模型未配置/不兼容时仍要尝试已配置的可用供应商；否则会在真正
+    // 发出任何模型请求前直接得到 “No AI providers configured”，表现为“模型没调用”。
+    const fallbackProviders = allConfigs
+      .map((config) => new OpenAICompatibleProvider(config))
+      .filter((provider) => provider.isAvailable())
+    return new LLMClient(fallbackProviders, {
+      maxAttempts: policy.maxProviderAttempts,
+      circuitScope: COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId,
+    })
   }
 
-  return new LLMClient(providers, { maxAttempts: policy?.maxProviderAttempts })
+  return new LLMClient(providers, {
+    maxAttempts: policy?.maxProviderAttempts,
+    circuitScope: COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId,
+  })
 }
 
 /**

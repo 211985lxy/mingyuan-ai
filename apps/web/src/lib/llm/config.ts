@@ -138,7 +138,7 @@ export function getProviderConfigs(): LLMProviderConfig[] {
     })
   }
 
-  // Direct: Z.AI / GLM — OpenAI-compatible API
+  // Direct: Z.AI / GLM — OpenAI-compatible API（质量链已改用 doubao，保留注册便于独立启用）
   const glmApiKey = env.GLM_API_KEY || env.ZAI_API_KEY
   if (glmApiKey) {
     configs.push({
@@ -147,6 +147,19 @@ export function getProviderConfigs(): LLMProviderConfig[] {
       baseURL: env.GLM_BASE_URL || env.ZAI_BASE_URL || "https://api.z.ai/api/paas/v4/",
       defaultModel: env.GLM_MODEL || env.ZAI_MODEL || "glm-5.1",
       ownModelPrefixes: ["glm", "zai"],
+    })
+  }
+
+  // Doubao（火山方舟）— OpenAI-compatible；国内直连低延迟，质量链第二跳。
+  // 模型需先在方舟控制台开通（激活后以 /models 与真实探测为准）。
+  const doubaoApiKey = env.DOUBAO_API_KEY
+  if (doubaoApiKey) {
+    configs.push({
+      name: "doubao",
+      apiKey: doubaoApiKey,
+      baseURL: env.DOUBAO_BASE_URL || "https://ark.cn-beijing.volces.com/api/v3",
+      defaultModel: env.DOUBAO_MODEL || "doubao-seed-2-1-pro-260628",
+      ownModelPrefixes: ["doubao"],
     })
   }
 

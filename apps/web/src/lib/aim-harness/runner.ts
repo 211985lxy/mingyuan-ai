@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto"
 
 import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
 import { runWithLlmTelemetry } from "@/lib/llm/telemetry"
+import { runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
 
 import { hashContextManifest, hashPrompt } from "./hashing"
 import { planAimRun } from "./planner"
@@ -30,6 +31,7 @@ import type {
 } from "./types"
 import { HARNESS_VERSION } from "./types"
 import { computeCostCny } from "./model-pricing"
+import { AimRunExecutionError, classifyAimFailure } from "@/lib/aim-error-message"
 
 export interface RunAimHarnessInput {
   plan: PlanRunInput
@@ -127,13 +129,30 @@ export async function runAimHarness(
   // Capture every provider attempt for this run via the LLM telemetry seam.
   const providerAttempts: ProviderAttempt[] = []
   const invocations: LlmInvocation[] = []
-  const execution = await runWithLlmTelemetry(
-    {
-      onAttempt: (attempt) => providerAttempts.push(attempt),
-      onInvocation: (invocation) => invocations.push(invocation),
-    },
-    () => input.execute(spec),
-  )
+  const deadlineMs = spec.modelPolicy.totalTimeoutMs ?? spec.executionPolicy.timeoutMs
+  let execution: Awaited<ReturnType<typeof input.execute>>
+  try {
+    execution = await runWithLlmTelemetry(
+      {
+        onAttempt: (attempt) => providerAttempts.push(attempt),
+        onInvocation: (invocation) => invocations.push(invocation),
+      },
+      () => runWithAimExecutionDeadline(deadlineMs, () => input.execute(spec)),
+    )
+  } catch (error) {
+    if (error instanceof AimRunExecutionError) throw error
+    const composed = invocations.map((invocation, index) =>
+      `=== LLM INVOCATION ${index + 1} ===\n${invocation.fullPrompt}`
+    ).join("\n\n")
+    throw new AimRunExecutionError({
+      code: classifyAimFailure(error, providerAttempts),
+      runId,
+      cause: error,
+      providerAttempts,
+      promptHash: hashPrompt(composed || spec.rawInput),
+      contextHash: hashContextManifest([]),
+    })
+  }
 
   const contextManifest = execution.contextManifest ?? []
   const composedPrompt = invocations.length > 0

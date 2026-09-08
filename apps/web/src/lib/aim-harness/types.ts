@@ -17,15 +17,14 @@ import type {
   ResolvedKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
-import type { AimAgentId, AimEntrypoint } from "./contracts"
+import type { AimAgentId, AimEntrypoint, UnifiedContentExecution } from "./contracts"
 import type { ModelCapability } from "@/lib/llm/types"
-import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 export const HARNESS_VERSION = "aim-harness-v1" as const
 
 // AimAgentId / AimEntrypoint 的唯一事实源在 ./contracts.ts，这里仅 re-export
 // 以保持现有 import 路径（@/lib/aim-harness/types）向后兼容。
-export type { AimAgentId, AimEntrypoint }
+export type { AimAgentId, AimEntrypoint, UnifiedContentExecution }
 
 /**
  * Harness 执行模式（14 周正本阶段 1/3）。
@@ -97,6 +96,8 @@ export interface AimModelPolicy {
   minimumCapability: AimModelCapability
   /** per-run provider budget; streaming uses a smaller budget */
   maxProviderAttempts: number
+  /** 单次执行共享截止时间（毫秒）；内容创作/商业诊断为 115s */
+  totalTimeoutMs?: number
 }
 
 export type AimModelPolicyOverride = Readonly<Required<Pick<
@@ -166,7 +167,7 @@ export interface AimRunSpec {
   executionMode: AimExecutionMode
   /** 冻结执行策略；未传入口一律 single_shot。 */
   executionPolicy: AimExecutionPolicy
-  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
+  unifiedContentExecution?: UnifiedContentExecution
 }
 
 /** 冻结后的命名方法论策略（ADR-002）。 */

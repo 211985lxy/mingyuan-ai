@@ -61,6 +61,16 @@ describe("resolveUserIntentFromEnvelope", () => {
     }))).toBe(true)
   })
 
+  it("recognizes a clarification answer after loading the task from history", () => {
+    expect(isClarificationAnswerTurn(envelope({
+      request: "写给实体店老板，目标是引流获客",
+      conversation: [
+        { role: "user", content: "帮我写个文案" },
+        { role: "assistant", content: "在动笔前先确认：还差几项确认才能交稿，直接补充后继续即可。" },
+      ],
+    }))).toBe(true)
+  })
+
   it("detects polish_existing and derives length from a complete original draft (894字场景)", () => {
     const original = "这是一篇完整的原始稿件。".repeat(60)
     const intent = resolveUserIntentFromEnvelope(envelope({
@@ -140,6 +150,34 @@ describe("resolveUserIntentFromEnvelope", () => {
     expect(gaps.some((gap) => /CTA|行动引导/.test(gap.question))).toBe(false)
   })
 
+  it("does not inherit a previous task's length when the current turn only says 重写这篇", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "重写这篇",
+      currentArtifact: "当前编辑器里的成稿正文，长度足够。".repeat(10),
+      conversation: [
+        { role: "user", content: "写一条2分钟、400-550字口播" },
+        { role: "assistant", content: "已交付上一版口播。" },
+      ],
+    }))
+    expect(intent.lengthPolicy).toBe("unset")
+    expect(intent.lengthText).toBeUndefined()
+    expect(intent.constraintSources.length).toBeUndefined()
+  })
+
+  it("inherits previous length only when the current turn explicitly keeps it", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "保持上一版2分钟，重写这篇",
+      currentArtifact: "当前编辑器里的成稿正文，长度足够。".repeat(10),
+      conversation: [
+        { role: "user", content: "写一条2分钟、400-550字口播" },
+        { role: "assistant", content: "已交付上一版口播。" },
+      ],
+    }))
+    expect(intent.lengthPolicy).toBe("user_explicit")
+    expect(intent.lengthText).toMatch(/2\s*分钟/)
+    expect(intent.constraintSources.length).toBe("user_current")
+  })
+
   it("keeps a follow-up reference (继续改这篇) out of new-task isolation", () => {
     const intent = resolveUserIntentFromEnvelope(envelope({
       request: "继续改这篇，把结尾承接再收紧一点",
@@ -169,5 +207,39 @@ describe("resolveUserIntentFromEnvelope", () => {
     // LLM 的问题优先保留，确定性缺口按字段去重后补位
     expect(merged[0].question).toContain("写给谁")
     expect(merged.some((gap) => gap.field === "taskBoundary")).toBe(true)
+  })
+
+  it("cuts previous duration, count, CTA and purpose when the current turn starts a new task", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "换个主题，写一篇朋友圈",
+      conversation: [
+        { role: "user", content: "写3条2分钟获客口播，结尾引导加微信" },
+        { role: "assistant", content: "已交付上一版口播。" },
+      ],
+    }))
+    expect(intent.isNewTask).toBe(true)
+    expect(intent.lengthPolicy).toBe("unset")
+    expect(intent.lengthText).toBeUndefined()
+    expect(intent.quantity).toBeUndefined()
+    expect(intent.goal).toBeUndefined()
+    expect(intent.constraintSources.length).toBeUndefined()
+    expect(intent.constraintSources.quantity).toBeUndefined()
+    expect(intent.constraintSources.goal).toBeUndefined()
+  })
+
+  it("does not treat reference-copy duration, shot count or product facts as this-task specs", () => {
+    const intent = resolveUserIntentFromEnvelope(envelope({
+      request: "参考这篇对标写一版口播",
+      materials: [{
+        title: "对标原文",
+        content: "这是一条2分钟口播，成片6分半，共22个镜头。产品是法拍房咨询，结尾引导加微信。",
+      }],
+    }))
+    expect(intent.lengthPolicy).toBe("unset")
+    expect(intent.lengthText).toBeUndefined()
+    expect(intent.quantity).toBeUndefined()
+    expect(intent.goal).toBeUndefined()
+    expect(intent.constraintSources.length).toBeUndefined()
+    expect(intent.constraintSources.quantity).toBeUndefined()
   })
 })

@@ -99,6 +99,9 @@ const contentFormatSchema = z.enum([
 ])
 
 export const aimExecuteBodySchema = z.object({
+  attemptId: z.string().regex(/^web_[a-f0-9]{24}$/).optional(),
+  retryGenerationId: z.string().regex(/^web_[a-f0-9]{24}$/).optional(),
+  traceId: optionalId,
   agentId: z.string().max(80).optional(),
   executionAgentId: z.string().max(80).optional(),
   projectId: optionalId,
@@ -106,7 +109,7 @@ export const aimExecuteBodySchema = z.object({
   targetFormats: z.array(contentFormatSchema).min(1).max(8),
   methodologyProfileIds: methodologyProfileIdsSchema,
   activeMethodologySignals: activeMethodologySignalsSchema,
-  traceId: optionalId,
+  retryOfRunId: z.string().trim().max(40).optional(),
 }).strict()
 
 export const aimGenerateBodyObjectSchema = z.object({

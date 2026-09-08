@@ -79,7 +79,7 @@ describe("admin account project preview route", () => {
       jsonRequest(
         "http://localhost/api/admin/account-project-bindings/user-1/preview?projectId=project-b",
         "GET",
-      ),
+      )
     )
 
     expect(response.status).toBe(200)
@@ -93,7 +93,7 @@ describe("admin account project preview route", () => {
 
   it("requires a target project id", async () => {
     const response = await previewGET(
-      jsonRequest("http://localhost/api/admin/account-project-bindings/user-1/preview", "GET"),
+      jsonRequest("http://localhost/api/admin/account-project-bindings/user-1/preview", "GET")
     )
     expect(response.status).toBe(400)
     expect(getImpact).not.toHaveBeenCalled()
@@ -109,7 +109,7 @@ describe("admin account project preview route", () => {
       jsonRequest(
         "http://localhost/api/admin/account-project-bindings/user-1/preview?projectId=project-paused",
         "GET",
-      ),
+      )
     )
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({ code: "TARGET_NOT_ACTIVE" })
@@ -124,7 +124,7 @@ describe("admin account project preview route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/preview",
         "POST",
         { projectId: "project-b", reason: "错误绑定修复", reactivate: false },
-      ),
+      )
     )
 
     expect(response.status).toBe(200)
@@ -146,7 +146,7 @@ describe("admin account project preview route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/preview",
         "POST",
         { projectId: "project-b", reactivate: false },
-      ),
+      )
     )
     expect(response.status).toBe(400)
     expect(createToken).not.toHaveBeenCalled()
@@ -176,7 +176,7 @@ describe("admin account project repair route", () => {
     verifyToken.mockReturnValue(validPayload())
 
     const response = await repairPOST(
-      jsonRequest("http://localhost/api/admin/account-project-bindings/user-1/repair", "POST", { token: "token-1" }),
+      jsonRequest("http://localhost/api/admin/account-project-bindings/user-1/repair", "POST", { token: "token-1" })
     )
 
     expect(response.status).toBe(400)
@@ -190,7 +190,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { reason: "错误绑定修复" },
-      ),
+      )
     )
     expect(response.status).toBe(400)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -204,7 +204,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { token: "stale-token", reason: "错误绑定修复" },
-      ),
+      )
     )
     expect(response.status).toBe(403)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -219,7 +219,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
-      ),
+      )
     )
     expect(response.status).toBe(403)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -233,7 +233,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
-      ),
+      )
     )
     expect(response.status).toBe(409)
     expect(repairBinding).not.toHaveBeenCalled()
@@ -251,7 +251,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
-      ),
+      )
     )
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toMatchObject({ code: "PROJECT_CONTEXT_MISMATCH" })
@@ -281,7 +281,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
-      ),
+      )
     )
 
     expect(response.status).toBe(200)
@@ -327,7 +327,7 @@ describe("admin account project repair route", () => {
         "http://localhost/api/admin/account-project-bindings/user-1/repair",
         "POST",
         { token: "token-1", reason: "错误绑定修复" },
-      ),
+      )
     )
 
     // 审计失败必须让整个修复报错（真实 DB 中该事务回滚），而不是返回成功。

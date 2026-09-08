@@ -1,6 +1,6 @@
 {
   "routeLineLimit": 250,
-  "legacyDeadline": "2026-08-31",
+  "legacyDeadline": "2026-10-31",
   "legacyRoutes": [
     {
       "path": "src/app/api/scripts/generate/route.ts",

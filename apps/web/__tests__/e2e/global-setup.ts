@@ -16,7 +16,9 @@ process.env.CRON_SECRET = "test-e2e-cron-secret-at-least-32-bytes"
 
 for (const key of [
   "APIMART_API_KEY",
+  "ARK_API_KEY",
   "DEEPSEEK_API_KEY",
+  "DOUBAO_API_KEY",
   "GLM_API_KEY",
   "JIEKOU_API_KEY",
   "LIHUO_API_KEY",

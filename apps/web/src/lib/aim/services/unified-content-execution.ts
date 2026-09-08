@@ -1,6 +1,7 @@
 import type { AimExecuteBody } from "@/features/aim/contracts/api"
 import { prepareAimGenerateRequest, executePreparedAimGeneration } from "@/lib/aim/services/generate-request"
 import type { AimSemanticTaskUnderstanding } from "@/lib/aim/semantic-task-understanding"
+import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import { inspectAimDeliveryCandidate, parseStrictMultiFormatResponse } from "@/lib/aim/output-delivery-gate"
@@ -58,11 +59,14 @@ export async function executeVerifiedUnifiedDelivery(input: {
   userId: string
   parsed: AimExecuteBody
   understanding: AimSemanticTaskUnderstanding
+  intent: ResolvedUserIntent
   trace?: AimTraceRecorder
+  generationAttemptId?: string
 }) {
   const unifiedContentExecution = {
     envelope: input.parsed.sourceEnvelope,
     brief: input.understanding.brief,
+    intent: input.intent,
   }
   const prepared = await prepareAimGenerateRequest(input.userId, {
     agentId: input.parsed.executionAgentId || input.parsed.agentId || "content_producer",
@@ -72,6 +76,7 @@ export async function executeVerifiedUnifiedDelivery(input: {
     targetFormats: input.parsed.targetFormats,
     methodologyProfileIds: input.parsed.methodologyProfileIds,
     activeMethodologySignals: input.parsed.activeMethodologySignals,
+    existingGenerationId: input.generationAttemptId,
   }, {
     trace: input.trace,
     unifiedContentExecution,

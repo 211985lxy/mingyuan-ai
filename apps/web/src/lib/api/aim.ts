@@ -34,9 +34,11 @@ export type AimTaskType =
 
 export type AimGenerateRequest = AimGenerateBody
 export type AimExecuteRequest = AimExecuteBody
+/** 服务端总预算 115 秒，客户端多留 5 秒接收错误与 Trace 收尾。 */
+export const AIM_GENERATION_CLIENT_TIMEOUT_MS = 120_000
 export type AimExecuteResponse =
   | ({ kind: "deliverable" } & AimGenerateResponse)
-  | { kind: "reply"; content: string; runId?: string }
+  | { kind: "reply"; content: string; runId?: string; traceId?: string }
   | {
     kind: "clarification"
     /** 完整追问文本（含编号），旧字段保持兼容 */
@@ -44,6 +46,8 @@ export type AimExecuteResponse =
     /** 编号追问列表（一次最多 3 个） */
     questions?: string[]
     runId?: string
+    traceId?: string
+    generationId?: string
   }
 
 export interface AimWorkflowBriefResponse {
@@ -77,8 +81,10 @@ export interface AimGenerateResponse {
   knowledgeStrategy?: string
   // ── aim-harness-v1 additive diagnostics (optional; always present from the
   // generate/inspiration entrypoints). Existing consumers ignore these. ──
-  /** 对外执行编号（仅在结果详情/低分/降级时向用户展示） */
+    /** 对外执行编号（仅在结果详情/低分/降级时向用户展示） */
   runId?: string
+  /** 服务端实时 Trace 编号（与 runId 分离） */
+  traceId?: string
   /** 是否发生了 provider fallback 后继续交付 */
   degraded?: boolean
   /** 实际命中的 provider / 模型（降级或排查时展示） */
@@ -164,6 +170,8 @@ export interface AimGeneration {
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
   /** 历史读取归一化：各格式的高层思考依据（内容列已剥离 METHOD_NOTE，只含可发布正文） */
   reasoningByFormat?: Partial<Record<ContentFormat, string>>
+  status?: string | null
+  errorMessage?: string | null
 }
 
 /**
@@ -176,7 +184,7 @@ export async function generateAimContent(data: AimGenerateRequest, signal?: Abor
   return request<AimGenerateResponse>("/api/aim/generate", {
     method: "POST",
     body: serializeAimGenerateRequestBody(data),
-    timeout: 180000,
+    timeout: AIM_GENERATION_CLIENT_TIMEOUT_MS,
     signal,
   })
 }
@@ -185,7 +193,7 @@ export async function executeAimTurn(data: AimExecuteRequest, signal?: AbortSign
   return request<AimExecuteResponse>("/api/aim/execute", {
     method: "POST",
     body: serializeAimExecuteRequestBody(data),
-    timeout: 180000,
+    timeout: AIM_GENERATION_CLIENT_TIMEOUT_MS,
     signal,
   })
 }

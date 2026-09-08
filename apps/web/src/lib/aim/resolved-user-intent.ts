@@ -99,10 +99,16 @@ function detectGoal(text: string): AimContentGoal | undefined {
 
 function detectQuantity(text: string): number | undefined {
   const digit = text.match(/(?:生成|写|出|做|要|给|复刻)?\s*(\d{1,2})\s*[条个版](?:开头|文案|版本|新文案)?/)
-  if (digit) return Number(digit[1])
+  if (digit) {
+    const count = Number(digit[1])
+    return count >= 2 ? count : undefined
+  }
   const chinese = text.match(/(?:生成|写|出|做|要|给|复刻)?\s*([一二三四五六七八九十])\s*[条个版]/)
   const map: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 }
-  if (chinese) return map[chinese[1]]
+  if (chinese) {
+    const count = map[chinese[1]]
+    return count >= 2 ? count : undefined
+  }
   return undefined
 }
 
@@ -123,6 +129,49 @@ function detectTaskKind(envelope: AimContentSourceEnvelope): AimIntentTaskKind {
   return "new_draft"
 }
 
+function resolveLengthConstraint(input: {
+  request: string
+  confirmedText: string
+  envelope: AimContentSourceEnvelope
+  taskKind: AimIntentTaskKind
+}): {
+  lengthPolicy: ResolvedUserIntent["lengthPolicy"]
+  lengthText?: string
+  source?: IntentConstraintSource
+} {
+  const explicitInRequest = LENGTH_EXPLICIT_PATTERN.test(input.request)
+  const keepOriginalInRequest = LENGTH_KEEP_ORIGINAL_PATTERN.test(input.request)
+  // 历史任务里的时长/字数不是本轮已确认要求。只有正在回答本轮追问时，才允许从最近用户回答里取长度。
+  const answeringClarification = isClarificationAnswerTurn(input.envelope)
+  const explicitInConfirmed = answeringClarification
+    && !explicitInRequest
+    && LENGTH_EXPLICIT_PATTERN.test(input.confirmedText)
+  const keepOriginalInConfirmed = answeringClarification
+    && !keepOriginalInRequest
+    && LENGTH_KEEP_ORIGINAL_PATTERN.test(input.confirmedText)
+  const materialDerivesLength = input.taskKind === "polish_existing"
+    && Boolean(
+      input.envelope.referenceMaterials.some((item) => item.content.trim().length >= 120)
+        || (input.envelope.currentArtifact?.content?.trim().length ?? 0) >= 120,
+    )
+  const lengthPolicy: ResolvedUserIntent["lengthPolicy"] = explicitInRequest || explicitInConfirmed
+    ? "user_explicit"
+    : keepOriginalInRequest || keepOriginalInConfirmed
+      ? "keep_original"
+      : materialDerivesLength
+        ? "material_derived"
+        : "unset"
+  return {
+    lengthPolicy,
+    lengthText: lengthPolicy === "user_explicit"
+      ? (input.request.match(LENGTH_EXPLICIT_PATTERN)?.[0] ?? input.confirmedText.match(LENGTH_EXPLICIT_PATTERN)?.[0])
+      : undefined,
+    source: explicitInRequest || explicitInConfirmed
+      ? (explicitInRequest ? "user_current" : "task_confirmed")
+      : undefined,
+  }
+}
+
 /**
  * 从信封确定性解析当前意图（规则可测；LLM 语义理解负责模糊语义，二者互补）。
  * 「本任务已确认要求」= 追问后用户的最近回答（recentUserText）。
@@ -134,48 +183,33 @@ export function resolveUserIntentFromEnvelope(
   const request = envelope.currentUserRequest
   // 确定性字段同时扫描：当前原话（最高优先）+ 最近用户回答（本任务已确认）
   const confirmedText = recentUserText(envelope)
-  const combinedText = [request, confirmedText].filter(Boolean).join("\n")
 
   const taskKind = detectTaskKind(envelope)
   const isNewTask = NEW_TASK_SIGNAL_PATTERN.test(request)
     || (!FOLLOW_UP_REFERENCE_PATTERN.test(request) && taskKind === "new_draft" && !envelope.currentArtifact?.content?.trim())
+  const allowHistoryConstraints = !isNewTask || isClarificationAnswerTurn(envelope)
+  const confirmedForConstraints = allowHistoryConstraints ? confirmedText : ""
 
   const sources: ResolvedUserIntent["constraintSources"] = {}
   const audienceInRequest = AUDIENCE_PATTERN.test(request)
-  const audienceInConfirmed = !audienceInRequest && AUDIENCE_PATTERN.test(confirmedText)
+  const audienceInConfirmed = !audienceInRequest && AUDIENCE_PATTERN.test(confirmedForConstraints)
   const audience = audienceInRequest || audienceInConfirmed
-    ? (audienceInRequest ? request : confirmedText)
+    ? (audienceInRequest ? request : confirmedForConstraints)
     : undefined
   if (audienceInRequest) sources.audience = "user_current"
   else if (audienceInConfirmed) sources.audience = "task_confirmed"
 
   const goalInRequest = detectGoal(request)
-  const goalInConfirmed = goalInRequest ?? detectGoal(confirmedText)
-  const goal = goalInRequest ?? goalInConfirmed
+  const goalInConfirmed = goalInRequest ?? detectGoal(confirmedForConstraints)
+  const goal = goalInRequest ?? (allowHistoryConstraints ? goalInConfirmed : undefined)
   if (goalInRequest) sources.goal = "user_current"
   else if (goal) sources.goal = "task_confirmed"
 
-  const explicitLengthInRequest = LENGTH_EXPLICIT_PATTERN.test(request)
-  const keepOriginalInRequest = LENGTH_KEEP_ORIGINAL_PATTERN.test(request)
-  const explicitLengthInConfirmed = !explicitLengthInRequest && LENGTH_EXPLICIT_PATTERN.test(confirmedText)
-  const keepOriginalInConfirmed = !keepOriginalInRequest && LENGTH_KEEP_ORIGINAL_PATTERN.test(confirmedText)
-  // 只有润色完整原稿才允许从素材推导体量；对标改写必须由用户选长度策略（保持/自定义/自由）
-  const materialDerivesLength = taskKind === "polish_existing"
-    && Boolean(
-      envelope.referenceMaterials.some((item) => item.content.trim().length >= 120)
-        || (envelope.currentArtifact?.content?.trim().length ?? 0) >= 120,
-    )
-  const lengthPolicy: ResolvedUserIntent["lengthPolicy"] = explicitLengthInRequest || explicitLengthInConfirmed
-    ? "user_explicit"
-    : keepOriginalInRequest || keepOriginalInConfirmed
-      ? "keep_original"
-      : materialDerivesLength
-        ? "material_derived"
-        : "unset"
-  if (explicitLengthInRequest || explicitLengthInConfirmed) sources.length = explicitLengthInRequest ? "user_current" : "task_confirmed"
+  const length = resolveLengthConstraint({ request, confirmedText: confirmedForConstraints, envelope, taskKind })
+  if (length.source) sources.length = length.source
 
   const quantityInRequest = detectQuantity(request)
-  const quantityInConfirmed = quantityInRequest ?? detectQuantity(confirmedText)
+  const quantityInConfirmed = quantityInRequest ?? detectQuantity(confirmedForConstraints)
   const quantity = quantityInRequest ?? quantityInConfirmed
   if (quantityInRequest) sources.quantity = "user_current"
   else if (quantity) sources.quantity = "task_confirmed"
@@ -194,10 +228,8 @@ export function resolveUserIntentFromEnvelope(
     topic: GENERIC_TOPICLESS_REQUEST.test(request.trim()) ? undefined : request.trim().slice(0, 120) || undefined,
     audience,
     goal,
-    lengthPolicy,
-    lengthText: lengthPolicy === "user_explicit"
-      ? (request.match(LENGTH_EXPLICIT_PATTERN)?.[0] ?? confirmedText.match(LENGTH_EXPLICIT_PATTERN)?.[0])
-      : undefined,
+    lengthPolicy: length.lengthPolicy,
+    lengthText: length.lengthText,
     quantity,
     formats,
     isNewTask,

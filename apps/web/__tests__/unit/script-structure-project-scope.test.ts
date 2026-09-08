@@ -151,7 +151,7 @@ beforeEach(() => {
 })
 
 function ctx() {
-  return { user: { id: "user-1", email: "u@test.com" } }
+  return { user: { id: "user-1", email: "u@test.com" }, params: Promise.resolve({}) }
 }
 
 // ---------------------------------------------------------------------------

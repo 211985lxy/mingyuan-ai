@@ -444,7 +444,18 @@ describe("repairAccountProjectBinding", () => {
       return { db, isCommitted: () => committed }
     }
 
-    function repairWithAudit(withinTransaction: (tx: { adminAuditLog: { create: (args: unknown) => Promise<unknown> } }) => Promise<void>) {
+    /**
+     * Narrow structural view of the transaction client the mocked
+     * `$transaction` actually hands to the hook — only the audit delegate the
+     * assertions touch. Cast to the service's full
+     * `(tx: Prisma.TransactionClient, outcome: AccountProjectRepairResult) => Promise<void>`
+     * signature at the call boundary below.
+     */
+    type AuditTx = {
+      adminAuditLog: { create: (args: { data: Record<string, unknown> }) => Promise<unknown> }
+    }
+
+    function repairWithAudit(withinTransaction: (tx: AuditTx) => Promise<void>) {
       return repairAccountProjectBinding({
         userId: "user-1",
         previousProjectId: "project-a",

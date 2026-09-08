@@ -8,7 +8,17 @@ import {
   type AimGenerateResponse,
 } from "@/lib/api/client"
 
-function isTransientGenerateFailure(error: unknown): boolean {
+function readErrorDetail(error: unknown, key: string): string | undefined {
+  if (!(error instanceof ApiError) || !error.details || typeof error.details !== "object") return undefined
+  const value = (error.details as Record<string, unknown>)[key]
+  return typeof value === "string" ? value : undefined
+}
+
+export function shouldRetryTransiently(error: unknown): boolean {
+  if (readErrorDetail(error, "runId") || readErrorDetail(error, "generationId")) return false
+  const code = readErrorDetail(error, "code") || ""
+  if (/^(MODEL_|GENERATION_|DELIVERY_|INSTRUCTION_|STALE_|EMPTY_|PROVIDER_|INVALID_|BOUND_|USER_|INTERNAL_)/.test(code)) return false
+  if (error instanceof ApiError && error.status === 422) return false
   if (!(error instanceof ApiError)) {
     return error instanceof TypeError || (error instanceof Error && /fetch failed|network|Failed to fetch/i.test(error.message))
   }
@@ -22,7 +32,7 @@ async function withTransientRetry<T>(run: () => Promise<T>, signal: AbortSignal)
       return await run()
     } catch (error) {
       lastError = error
-      if (signal.aborted || attempt === 1 || !isTransientGenerateFailure(error)) throw error
+      if (signal.aborted || attempt === 1 || !shouldRetryTransiently(error)) throw error
       await new Promise((resolve) => setTimeout(resolve, 600))
     }
   }

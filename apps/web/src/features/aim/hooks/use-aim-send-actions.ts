@@ -149,6 +149,19 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
   }
 
   async function handleSend() {
+    const text = options.input.trim()
+    const canContinueGeneration = Boolean(
+      text
+      && options.imageAttachments.length === 0
+      && (options.fileAttachments?.length ?? 0) === 0
+      && [...options.messages].reverse().some((message) =>
+        message.generationStatus === "awaiting_input" && Boolean(message.generationId),
+      ),
+    )
+    if (canContinueGeneration) {
+      await options.generateWithInput(text)
+      return
+    }
     await sendTextWith(options.input)
   }
 
@@ -163,7 +176,10 @@ export function useAimSendActions(options: UseAimSendActionsOptions) {
   function retryFailedMessage(message: ChatMessage, busy: boolean) {
     if (!message.failure || busy) return
     if (message.failure.kind === "generate") {
-      void options.generateWithInput(message.failure.retryText, { retryMessageId: message.id })
+      void options.generateWithInput(message.failure.retryText, {
+        retryMessageId: message.id,
+        ...(message.failure.generationId ? { retryGenerationId: message.failure.generationId } : {}),
+      })
       return
     }
     void options.sendText(message.failure.retryText, { retryMessageId: message.id })

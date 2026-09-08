@@ -19,6 +19,7 @@ let user: { id: string; email: string }
 let token: string
 let templateId: string
 let structureId: string
+let boundProjectId: string
 
 function userReq(url: string, opts: { method?: string; body?: unknown } = {}) {
   return req(url, {
@@ -48,6 +49,17 @@ describe("Script Generation E2E", () => {
       process.env.JWT_SECRET!,
       { expiresIn: "1h" }
     )
+
+    // 账号注册流程会绑定唯一默认项目（ensure-default-account-project）；
+    // 生成链路的项目隔离校验（resolveBoundProject）依赖该绑定。
+    const boundProject = await prisma.clientProject.create({
+      data: { userId: user.id, name: "脚本生成全案", status: "active" },
+    })
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { boundProjectId: boundProject.id },
+    })
+    boundProjectId = boundProject.id
 
     const admin = await createAdminUser({
       email: "script-admin@e2e.com",
@@ -148,13 +160,10 @@ describe("Script Generation E2E", () => {
         isActive: true,
       },
     })
-    const project = await prisma.clientProject.create({
-      data: { userId: user.id, name: "项目型 IP 全案", status: "active" },
-    })
     await prisma.knowledgeEntry.create({
       data: {
         userId: user.id,
-        projectId: project.id,
+        projectId: boundProjectId,
         category: "positioning_material",
         title: "核心定位",
         content: "帮助老板把经验沉淀为可成交的个人 IP 内容资产。",
@@ -167,7 +176,7 @@ describe("Script Generation E2E", () => {
         body: {
           templateId,
           structureId,
-          projectId: project.id,
+          projectId: boundProjectId,
           inputs: { city: "深圳", propertyType: "改善型三房", highlight: "地铁口+学区" },
         },
       }),
@@ -189,9 +198,6 @@ describe("Script Generation E2E", () => {
         isActive: false,
       },
     })
-    const project = await prisma.clientProject.create({
-      data: { userId: user.id, name: "已停用 IP 全案", status: "active" },
-    })
 
     const res = await GENERATE_SCRIPTS(
       userReq("/api/scripts/generate", {
@@ -199,7 +205,7 @@ describe("Script Generation E2E", () => {
         body: {
           templateId,
           structureId,
-          projectId: project.id,
+          projectId: boundProjectId,
           inputs: { city: "深圳", propertyType: "改善型三房", highlight: "地铁口+学区" },
         },
       }),

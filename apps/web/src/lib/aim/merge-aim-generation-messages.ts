@@ -16,6 +16,8 @@ export function mergeAimGenerationIntoMessages(
     agentId: patch.agentId,
     deliverables: patch.deliverables,
     runId: patch.runId ?? null,
+    generationId: patch.generationId ?? null,
+    generationStatus: patch.generationStatus ?? null,
     degraded: patch.degraded ?? null,
     qualityStatus: patch.qualityStatus ?? null,
     workflowStage: patch.workflowStage,

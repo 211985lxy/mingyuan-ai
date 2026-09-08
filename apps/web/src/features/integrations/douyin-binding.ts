@@ -42,6 +42,7 @@ export async function claimDouyinLoginIdentity(userId: string, token: DouyinToke
   const legacyRows = await prisma.douyinAccountBinding.findMany({
     where: { openId: token.openId },
     select: { userId: true },
+    take: 100,
   }) ?? []
   const legacyOwners = new Set(legacyRows.map((row) => row.userId))
   if (legacyOwners.size > 0 && (legacyOwners.size > 1 || !legacyOwners.has(userId))) {
@@ -119,6 +120,7 @@ export async function listDouyinBindings(userId: string): Promise<DouyinBindingV
   const rows = await prisma.douyinAccountBinding.findMany({
     where: { userId },
     orderBy: { createdAt: "asc" },
+    take: 100,
   })
   return rows.map(toView)
 }

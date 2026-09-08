@@ -2,6 +2,7 @@ import { env } from "@/env"
 import OpenAI, { type ClientOptions } from "openai"
 import { type ChatCompletionMessageParam } from "openai/resources/chat/completions"
 import { ProxyAgent } from "undici"
+import { getAimExecutionDeadline, resolveProviderTimeoutMs } from "./execution-deadline"
 import type {
   CompletionOptions,
   CompletionResult,
@@ -54,6 +55,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   private client: OpenAI
   readonly defaultModel: string
   private apiKey: string
+  private routeTimeoutMs: number
 
   private config: LLMProviderConfig
 
@@ -63,6 +65,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
     this.capability = config.capability
     this.apiKey = config.apiKey
     this.defaultModel = config.defaultModel
+    this.routeTimeoutMs = config.timeoutMs ?? Number(env.LLM_TIMEOUT_MS || 60000)
     const fetchOptions = config.proxyURL
       ? ({ dispatcher: getSharedProxyAgent(config.proxyURL) } as ClientOptions["fetchOptions"])
       : undefined
@@ -71,7 +74,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       baseURL: config.baseURL,
       defaultHeaders: config.defaultHeaders,
       fetchOptions,
-      timeout: config.timeoutMs ?? Number(env.LLM_TIMEOUT_MS || 60000),
+      timeout: this.routeTimeoutMs,
       maxRetries: config.maxRetries,
     })
   }
@@ -97,6 +100,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
   async complete(options: CompletionOptions): Promise<CompletionResult> {
     const model = options.model || this.defaultModel
+    const timeout = resolveProviderTimeoutMs(this.routeTimeoutMs)
 
     const response = await this.client.chat.completions.create({
       model,
@@ -105,7 +109,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       max_tokens: options.maxTokens,
       response_format: options.responseFormat,
       stream: false,
-    })
+    }, { timeout, signal: getAimExecutionDeadline()?.signal })
 
     const choice = response.choices[0]
     const content = extractAssistantText(choice?.message)
@@ -130,6 +134,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
 
   async *stream(options: CompletionOptions): AsyncIterable<string> {
     const model = options.model || this.defaultModel
+    const timeout = resolveProviderTimeoutMs(this.routeTimeoutMs)
 
     const response = await this.client.chat.completions.create({
       model,
@@ -138,7 +143,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       max_tokens: options.maxTokens,
       response_format: options.responseFormat,
       stream: true,
-    })
+    }, { timeout, signal: getAimExecutionDeadline()?.signal })
 
     // 推理模型的 reasoning_content 是内部思维链，绝不能成为用户可见内容：只透传 content 增量；
     // 整段流结束仍无正文时抛错，让模型路由切换到下一个 provider（宁可见的失败，不可见的思维链泄漏）。

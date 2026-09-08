@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest"
 
 // ---------------------------------------------------------------------------
 // Prisma mock — shared across all tests. The account-project guard reads the
@@ -167,7 +167,9 @@ function wasTaskRetryWaiting() {
   })
 }
 
-let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+// Concrete procedure type so `mock.calls` is `unknown[][]` (the generic
+// `ReturnType<typeof vi.spyOn>` degrades to a non-inferrable mock type).
+let consoleErrorSpy: MockInstance<(...args: unknown[]) => void>
 
 beforeEach(() => {
   vi.clearAllMocks()

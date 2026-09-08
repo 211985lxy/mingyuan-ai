@@ -37,6 +37,7 @@ interface PromptVersionDelegate {
   findMany(args: {
     where: { templateKey: string }
     orderBy?: { version: "asc" | "desc" }
+    take?: number
   }): Promise<PromptVersionRow[]>
 }
 
@@ -134,6 +135,8 @@ async function loadVersions(key: string): Promise<PromptRecord[]> {
   const rows = await client.promptVersion.findMany({
     where: { templateKey: key },
     orderBy: { version: "desc" },
+    // 单个模板 key 的版本数天然有限，封顶防异常数据拖垮全量查询
+    take: 50,
   })
   return (rows ?? []).map((row) => ({
     key: typeof row.templateKey === "string" && row.templateKey ? row.templateKey : key,

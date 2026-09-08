@@ -42,6 +42,7 @@ import {
 } from "@/lib/aim-generation-guardrails"
 import { buildGenerationNumericEvidence, scrubLeakedLightEditFeedback, withoutMethodNote } from "@/lib/aim-generation-text"
 import { applySpokenCotFinalExtraction, buildSpokenCotLeakRetryPrompt, collectSpokenCotLeakHits } from "@/lib/aim/spoken-cot-leakage-gate"
+import { applyDeliveryContentGate } from "@/lib/aim/delivery-content-gate"
 import {
   buildIpWikiComplianceRewritePrompt,
   verifyIpWikiCompliance,
@@ -258,6 +259,8 @@ export async function executeGenerateLLMWithBenchmarkRetry(
         parsed[format] = cleanSpokenDeliveryArtifacts(parsed[format] || "")
       }
     }
+    const contentDeliveryGate = applyDeliveryContentGate({ parsed, targetFormats, intent: context.unifiedContentExecution?.intent, attempt, maxAttempts, originalPrompt: userPrompt })
+    if (!contentDeliveryGate.ok) { activePrompt = contentDeliveryGate.retryPrompt; continue }
     const cotLeakHits = collectSpokenCotLeakHits(parsed, targetFormats, attempt + 1)
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
     // 完整性重试只针对截断/半句话；字数永远不是验收口径（用户给长度只进提示词）

@@ -20,7 +20,6 @@ import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowle
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
 import type { ContentScenario } from "@/lib/content-scenario-config"
 import type { CopyStudioModule } from "@/lib/copy-studio"
-import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 import { resolveExecutionPolicy } from "./execution-mode"
 import type {
@@ -32,14 +31,15 @@ import type {
   AimModelPolicy,
   AimModelPolicyOverride,
   AimRunSpec,
+  UnifiedContentExecution,
 } from "./types"
 import {
   AIM_FAST_SPOKEN_MAX_TOKENS,
   AIM_FAST_SPOKEN_ROUTE_KEY,
-  AIM_FAST_SPOKEN_TOTAL_BUDGET_MS,
   isAimFastSpokenRun,
 } from "./fast-spoken-policy"
 import { resolveLlmQuality } from "./llm-quality-policy"
+import { AIM_EXECUTION_DEADLINE_MS } from "@/lib/llm/execution-deadline"
 
 export interface PlanRunInput {
   entrypoint: AimEntrypoint
@@ -78,7 +78,7 @@ export interface PlanRunInput {
   executionMode?: AimExecutionMode
   /** 完整执行策略覆盖；未传则按 mode 默认冻结。 */
   executionPolicy?: Partial<AimExecutionPolicy>
-  unifiedContentExecution?: { envelope: AimContentSourceEnvelope; brief: string }
+  unifiedContentExecution?: UnifiedContentExecution
 }
 
 function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
@@ -160,6 +160,20 @@ function buildContextPolicy(
  * agent 维度目前无差异（所有 agent 共享上述按入口的默认值）；后续若按 agent
  * 差异化，从这里改即可，handler 执行函数改为读 spec.modelPolicy。
  */
+function usesAimGenerationDeadline(
+  agentId: AimAgentId,
+  entrypoint: AimEntrypoint,
+  fastSpoken: boolean,
+): boolean {
+  if (fastSpoken) return true
+  if (entrypoint === "chat") return false
+  return (
+    agentId === "content_producer" ||
+    agentId === "business_diagnosis" ||
+    agentId === "business_system_diagnosis"
+  )
+}
+
 function buildModelPolicy(
   agentId: AimAgentId,
   entrypoint: AimEntrypoint,
@@ -213,7 +227,10 @@ function buildModelPolicy(
     ...(maxTokens ? { maxTokens } : {}),
     targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
-    maxProviderAttempts: fastSpoken || stream || isBusinessSystemDiagnosis ? 2 : 3,
+    maxProviderAttempts: usesAimGenerationDeadline(agentId, entrypoint, fastSpoken) ? 3 : stream ? 2 : 3,
+    ...(usesAimGenerationDeadline(agentId, entrypoint, fastSpoken)
+      ? { totalTimeoutMs: AIM_EXECUTION_DEADLINE_MS }
+      : {}),
   }
 }
 
@@ -279,14 +296,14 @@ export function planAimRun(input: PlanRunInput): AimRunSpec {
     input.writerModule,
   )
   const modelPolicy = applyModelPolicyOverride(defaults, input.modelPolicy)
+  const generationDeadline = usesAimGenerationDeadline(input.agentId, input.entrypoint, fastSpoken)
   const executionPolicy = resolveExecutionPolicy({
     requested: fastSpoken ? "single_shot" : input.executionMode,
-    policy: fastSpoken
+    policy: fastSpoken || generationDeadline
       ? {
           ...input.executionPolicy,
-          mode: "single_shot",
-          timeoutMs: AIM_FAST_SPOKEN_TOTAL_BUDGET_MS,
-          maxAutoRetries: 0,
+          ...(fastSpoken ? { mode: "single_shot", maxAutoRetries: 0 } : {}),
+          timeoutMs: AIM_EXECUTION_DEADLINE_MS,
         }
       : input.executionPolicy,
     agentId: input.agentId,

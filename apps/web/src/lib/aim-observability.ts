@@ -51,7 +51,11 @@ type TraceUpdate = {
   totalTokens?: number | null
   outputSummary?: string | null
   errorMessage?: string | null
+  errorCode?: string | null
   aimGenerationId?: string | null
+  runId?: string | null
+  provider?: string | null
+  fallbackIndex?: number | null
 }
 
 const TRACE_CHANNEL_PREFIX = "aim:trace:"
@@ -270,13 +274,26 @@ export async function finishAimTrace(trace: AimTraceRecorder | undefined, update
  * @param trace - 跟踪记录器
  * @param error - 捕获的异常对象
  */
-export async function failAimTrace(trace: AimTraceRecorder | undefined, error: unknown) {
+export async function failAimTrace(
+  trace: AimTraceRecorder | undefined,
+  error: unknown,
+  extra?: { aimGenerationId?: string },
+) {
   if (!trace) return
-  const message = error instanceof Error ? error.message : String(error)
+  const { classifyAimFailure, mapAimFailureCodeToUserMessage, AimRunExecutionError } = await import("@/lib/aim-error-message")
+  const runError = error instanceof AimRunExecutionError ? error : null
+  const code = runError?.code ?? classifyAimFailure(error, runError?.providerAttempts ?? [])
+  const last = runError?.providerAttempts.at(-1)
   await safeUpdateTrace(trace.id, {
     status: "failed",
     durationMs: Date.now() - trace.startedAt,
-    errorMessage: summarizeText(message),
+    errorMessage: summarizeText(mapAimFailureCodeToUserMessage(code)),
+    errorCode: code,
+    ...(extra?.aimGenerationId ? { aimGenerationId: extra.aimGenerationId } : {}),
+    runId: runError?.runId ?? null,
+    provider: last?.provider ?? null,
+    model: last?.responseModel ?? last?.model ?? null,
+    fallbackIndex: last?.attemptIndex ?? null,
   })
   publishTraceEvent(trace.id, { type: "done", status: "failed" })
 }

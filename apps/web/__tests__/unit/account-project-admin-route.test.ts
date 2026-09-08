@@ -47,6 +47,13 @@ function makeRequest(method: string, body?: Record<string, unknown>) {
   })
 }
 
+// The real `withAdminOnly` wrapper types the exported handlers as
+// (request, segmentData: { params: Promise<Record<string, string>> }).
+// The mocked wrapper injects its own admin context and ignores this argument,
+// so passing a resolved (empty) params object keeps the type contract without
+// changing runtime behavior.
+const segmentData = { params: Promise.resolve({}) }
+
 describe("admin account project binding route", () => {
   beforeEach(() => {
     vi.clearAllMocks()
