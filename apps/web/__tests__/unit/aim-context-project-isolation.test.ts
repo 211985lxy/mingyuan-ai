@@ -290,13 +290,13 @@ describe("chat context loaders — competitor context uses the bound project", (
       query: "帮我看一下对标账号最近的作品",
       conversationIntent: {
         mode: "chat",
-        confidence: 1,
-        reason: "test",
-        targetSummary: "",
+        confidence: 0.9,
+        reason: "unit-test",
+        targetSummary: "查看对标账号",
         useKnowledge: true,
-        useMethodology: false,
         useStyleProfile: false,
         useLongTermMemory: false,
+        useMethodology: false,
       },
       runtimeTask: "quality_review",
     })

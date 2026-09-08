@@ -127,6 +127,7 @@ export interface AimExecuteTurnRequestOptions {
   retryOfRunId?: string
   attemptId?: string
   retryGenerationId?: string
+  /** 客户端生成的追踪 ID：与占位消息上的 traceId 一致，供思考过程面板 SSE 订阅 */
   traceId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]

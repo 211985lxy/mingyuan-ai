@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import {
   buildFilteredSkills,
+  derivePlanModeToggle,
   useContentModeOptions,
   type AimComposerMode,
 } from "@/components/aim/aim-prompt-shared"
@@ -106,7 +107,7 @@ function useComposerAllState(props: AimPromptComposerProps) {
     value, busy, isRecording, canGenerate, onStop,
     composerMode = "direct", pastedCopy = null, onPastedCopyChange, onStyleSampleRequest,
     imageAttachments = [], fileAttachments = [], capabilities: capabilitiesProp, isPlanSessionActive = false,
-    onComposerModeChange, showContentMode = false, showSkills = false, onAddImages, onAddFiles,
+    canUsePlanMode = false, onComposerModeChange, showContentMode = false, showSkills = false, onAddImages, onAddFiles,
     onAddSkill, onEditSkill,
   } = props
   const state = useComposerDerivedState({
@@ -115,17 +116,19 @@ function useComposerAllState(props: AimPromptComposerProps) {
     canGenerate: canGenerate || false, onStop,
     composerMode, pastedCopy, onPastedCopyChange, onStyleSampleRequest,
     imageAttachments, fileAttachments, capabilitiesProp, isPlanSessionActive,
-    onComposerModeChange, showContentMode, showSkills, onAddImages, onAddFiles,
+    canUsePlanMode, onComposerModeChange, showContentMode, showSkills, onAddImages, onAddFiles,
   })
   const { capabilities, isPlanMode, applyUsage, handlePaste, handleDroppedFiles, allowedUsages, pasteEnabled,
-    canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel } = state
+    canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel,
+    planModeActive, showPlanModeToggle, onTogglePlanMode } = state
   const local = useComposerLocalState({ value, skills: props.skills || [] })
   const contentModeLabel =
     props.contentMode === undefined ? "智能选择" : COPY_STUDIO_MODULE_LABELS[props.contentMode]
   const contentModeOptions = useContentModeOptions()
   return {
     state: { capabilities, isPlanMode, applyUsage, handlePaste, handleDroppedFiles, allowedUsages, pasteEnabled,
-      canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel },
+      canSubmit, canStop, showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel,
+      planModeActive, showPlanModeToggle, onTogglePlanMode },
     local,
     extra: { contentModeLabel, contentModeOptions },
   }
@@ -163,6 +166,9 @@ interface AimPromptComposerViewProps {
   composerMode: AimComposerMode
   onComposerModeChange?: (mode: AimComposerMode) => void
   showPlanModeControl: boolean
+  /** 底栏显性「先确认再生成」开关 */
+  showPlanModeToggle?: boolean; planModeActive?: boolean
+  onTogglePlanMode?: () => void
   onAddImages?: (files: FileList) => void
   showContentModeControl: boolean
   contentMode?: CopyStudioModule
@@ -246,6 +252,9 @@ function AimPromptComposerView(p: AimPromptComposerViewProps) {
         composerMode={p.composerMode}
         onComposerModeChange={p.onComposerModeChange}
         showPlanModeControl={p.showPlanModeControl}
+        showPlanModeToggle={p.showPlanModeToggle}
+        planModeActive={p.planModeActive}
+        onTogglePlanMode={p.onTogglePlanMode}
         onAddImages={p.onAddImages}
         onAddFiles={p.onAddFiles}
         showContentModeControl={p.showContentModeControl}
@@ -301,6 +310,7 @@ interface UseComposerDerivedStateInput {
   fileAttachments: AimFileAttachment[]
   capabilitiesProp?: AimAgentCapabilities
   isPlanSessionActive: boolean
+  canUsePlanMode: boolean
   onComposerModeChange?: (mode: AimComposerMode) => void
   showContentMode: boolean
   showSkills: boolean
@@ -313,10 +323,12 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
     value, busy, isRecording, isTranscribing, canGenerate, onStop,
     composerMode, pastedCopy, onPastedCopyChange, onStyleSampleRequest,
     imageAttachments, fileAttachments, capabilitiesProp, isPlanSessionActive,
-    onComposerModeChange, showContentMode, showSkills, onAddImages, onAddFiles,
+    canUsePlanMode, onComposerModeChange, showContentMode, showSkills, onAddImages, onAddFiles,
   } = input
   const capabilities = capabilitiesProp ?? getAimAgentCapabilities("content_producer")
-  const isPlanMode = composerMode === "plan"
+  const showPlanModeControl = !isPlanSessionActive && Boolean(onComposerModeChange)
+  const { planModeActive: isPlanMode, showPlanModeToggle, onTogglePlanMode } =
+    derivePlanModeToggle({ composerMode, canUsePlanMode, showPlanModeControl, onComposerModeChange })
   const { applyUsage, handlePaste: handleCopyPaste, allowedUsages, pasteEnabled } = useAimPasteCopyAttachment({
     value,
     pastedCopy,
@@ -368,7 +380,6 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
     (!pastedCopy || Boolean(effectivePasteUsage && effectivePasteUsage !== "style_sample"))
   const canStop = busy && !isRecording && Boolean(onStop)
   const showContentModeControl = showContentMode && capabilities.contentModeSelector
-  const showPlanModeControl = !isPlanSessionActive && Boolean(onComposerModeChange)
   const showAddMenu =
     Boolean(onAddImages) || showPlanModeControl || showContentModeControl || showSkills
   const showSkillQuick = showSkills
@@ -382,9 +393,9 @@ function useComposerDerivedState(input: UseComposerDerivedStateInput) {
           : undefined
   return {
     capabilities, isPlanMode, applyUsage, handlePaste, handleDroppedFiles,
-    allowedUsages: allowedUsages as PasteUsage[],
-    pasteEnabled, effectivePasteUsage, canSubmit, canStop,
+    allowedUsages: allowedUsages as PasteUsage[], pasteEnabled, effectivePasteUsage, canSubmit, canStop,
     showContentModeControl, showPlanModeControl, showAddMenu, showSkillQuick, autoUsageLabel,
+    planModeActive: isPlanMode, showPlanModeToggle, onTogglePlanMode,
   }
 }
 

@@ -48,3 +48,19 @@ export function buildFilteredSkills(
   }
   return groups
 }
+
+/** 底栏显性「先确认再生成」开关的派生状态：受 canUsePlanMode 与计划会话状态双重门控。 */
+export function derivePlanModeToggle(input: {
+  composerMode: AimComposerMode
+  canUsePlanMode: boolean
+  showPlanModeControl: boolean
+  onComposerModeChange?: (mode: AimComposerMode) => void
+}) {
+  const { composerMode, canUsePlanMode, showPlanModeControl, onComposerModeChange } = input
+  const planModeActive = composerMode === "plan"
+  const showPlanModeToggle = showPlanModeControl && canUsePlanMode
+  const onTogglePlanMode = onComposerModeChange
+    ? () => onComposerModeChange(planModeActive ? "direct" : "plan")
+    : undefined
+  return { planModeActive, showPlanModeToggle, onTogglePlanMode }
+}

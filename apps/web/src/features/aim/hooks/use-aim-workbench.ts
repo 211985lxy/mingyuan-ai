@@ -11,7 +11,7 @@ import {
   type ConfirmedWorkflowBrief,
 } from "@/lib/aim-workflow"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
-import { useAimChatActions } from "@/hooks/use-aim-chat-actions"
+import { useAimChatActions, type AimHitlPending } from "@/hooks/use-aim-chat-actions"
 import { useAimProjectWorkspace } from "@/hooks/use-aim-project-workspace"
 import { useAimWorkflowRecords } from "@/hooks/use-aim-workflow-records"
 import { useAimEditorActions } from "@/hooks/use-aim-editor-actions"
@@ -337,12 +337,18 @@ export function useAimWorkbench(options?: { styleEnabled?: boolean }) {
     handleReviseCurrentDraft, handleOptimizeOpening, rememberWorkbenchPreference,
   })
 
+  // ---- Step③ HITL：对话内高风险动作审批挂起态 ----
+  const [hitlPending, setHitlPending] = useState<AimHitlPending | null>(null)
+
   // ---- Chat actions ----
   const { sendText } = useAimChatActions({
     messages, setMessages, setInput, setIsThinking,
     selectedAgentId, selectedProjectId, projectEnabled, agentModule,
     requestAbortRef, clearCurrentTaskContext, clearImages, clearFiles,
     onIsolateTaskSession: isolateTaskSessionExtras, runWorkbenchCommand,
+    hitlPending,
+    onHitlApprovalRequired: (pending) => setHitlPending(pending),
+    onHitlSettled: () => setHitlPending(null),
   })
 
   const {

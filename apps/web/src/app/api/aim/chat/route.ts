@@ -27,6 +27,7 @@ import {
   resolveBoundProject,
 } from "@/lib/account-project-context"
 import { resolveAimExecutionAgent } from "@/lib/aim/services/aim-execution-agent"
+import { evaluateHitlGate, settleHitlApproval } from "@/lib/aim/hitl-gate"
 
 /** 流式对话可能较长；与 Nginx /api proxy_read_timeout(300s) 对齐 */
 export const maxDuration = 180
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.validationError }, { status: parsed.status })
     }
-    const { messages, agentId, projectId: requestedProjectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds, activeMethodologySignals } = parsed
+    const { messages, agentId, projectId: requestedProjectId, toolAction, resultId, shouldStream, editorContext, agentModule, writerModule, traceId, methodologyProfileIds, activeMethodologySignals, hitlDecision } = parsed
     let projectId: string
     try {
       projectId = (await resolveBoundProject({
@@ -98,6 +99,37 @@ export async function POST(request: NextRequest) {
 
     // ── 飞书工具动作（委托给共享模块）──
     if (toolAction) {
+      // Step③ HITL：对外发送/写知识库先落人工决策，批准才放行（开关默认关，关闭时零介入）
+      if (hitlDecision) {
+        const settle = await settleHitlApproval({
+          userId: user.id,
+          projectId,
+          toolAction,
+          resultId: resultId || undefined,
+          decision: hitlDecision,
+        })
+        if (!settle.proceed) {
+          await finishAimTrace(trace, { outputSummary: "HITL 驳回，未执行" })
+          return NextResponse.json({ content: "已按你的指令驳回该操作，未执行。" })
+        }
+      }
+      const gate = await evaluateHitlGate({
+        userId: user.id,
+        projectId,
+        toolAction,
+        resultId: resultId || undefined,
+      })
+      if (gate.gated && gate.approval.status === "pending") {
+        await addAimTraceStep(trace, {
+          key: "hitl_gate",
+          label: "高风险动作人工审批",
+          status: "success",
+          summary: gate.approval.label,
+          metadata: { toolAction, approvalRequestId: gate.approval.approvalRequestId },
+        })
+        await finishAimTrace(trace, { outputSummary: "等待人工审批" })
+        return NextResponse.json({ approvalRequired: gate.approval })
+      }
       return handleToolActionBranch({ trace, toolAction, userId: user.id, projectId, resultId })
     }
 

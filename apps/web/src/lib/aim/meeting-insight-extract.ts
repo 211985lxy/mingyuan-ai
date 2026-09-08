@@ -20,6 +20,8 @@ import type { MeetingInsightInput } from "@/lib/aim/meeting-insight"
 import type { AimModelPolicy } from "@/lib/aim-harness/types"
 import { getRegisteredLoop } from "@/lib/aim/loops/registry"
 import { isMeetingEvidenceKind, type MeetingEvidence } from "@/lib/aim/sales-diagnosis/evidence"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 
 /** 模型名（可选，未配置走 provider 默认 + 降级链）。不硬编码。 */
 export const MEETING_INSIGHT_MODEL: string | undefined = env.MEETING_INSIGHT_MODEL?.trim() || undefined
@@ -48,35 +50,9 @@ export type CompleteFn = (options: {
   responseFormat: { type: "json_object" }
 }) => Promise<CompletionResult>
 
-const SYSTEM_PROMPT = [
-  "你是客户会后洞察抽取器。从会议原文中抽取结构化洞察，供销售/咨询团队跟进。",
-  "只输出**纯 JSON**（不要 markdown 代码块、不要解释、不要前后缀），结构如下：",
-  "{",
-  '  "pains": ["客户痛点/诉求"],',
-  '  "goals": ["客户目标/想达成的结果"],',
-  '  "budgets": ["预算表述，如：种子轮1500万、第三方服务费约20万；没有就留空数组"],',
-  '  "decisionStage": "决策阶段，必须是以下之一：初步接触 / 需求确认 / 方案比较 / 决策中 / 已成交 / 暂搁置；无法判断留空串",',
-  '  "objections": ["异议/顾虑/卡点"],',
-  '  "followUps": ["下一步跟进建议"],',
-  '  "diagnosisQuestions": ["需进一步澄清的诊断问题"],',
-  '  "topicCandidates": ["可转成短视频的真实选题（基于客户原话）"],',
-  '  "deliveryTasks": [{"title": "交付任务", "owner": "负责人（未指明则省略 owner）"}],',
-  '  "evidence": [{"kind": "pain | goal | budget | objection | commitment | task", "statement": "对应判断", "quote": "从会议原文逐字复制的短句"}]',
-  "}",
-  "铁律：",
-  "- 宁缺毋滥：原文没有的信息不要编造，对应字段留空数组或空串。",
-  "- 不要补造预算金额、负责人、决策阶段或客户承诺。",
-  "- decisionStage 只有在原文逐字出现上述某个标准阶段词时才能填写；仅凭语境推断一律留空串。",
-  "- evidence.quote 必须是从会议原文连续逐字复制、完整且可直接检索的短句，不得改写、纠错、拼接或省略中间文字。",
-  "- 输出前逐条自检：每个 evidence.quote 去除空白后必须仍能在原文中定位；无法定位的证据整条删除。",
-  "- 没有可引用原文的判断不要输出。",
-  "- 跟进建议不是客户承诺。只有客户明确表示会采取某动作时，才可输出 commitment 证据。",
-  "- commitment 的 statement 必须逐字摘自 quote 中对应的承诺内容，不得概括或改写。",
-  "- 全部字段为中文。pains/goals/objections/followUps/diagnosisQuestions/topicCandidates 为字符串数组；deliveryTasks 和 evidence 为对象数组。",
-].join("\n")
-
 /**
  * 构造抽取 prompt（纯函数）。transcript 截断以防超长输入。
+ * system prompt 已资产化（Prompt Registry）：DB 版本优先，兜底内置 seed v1（逐字原文）。
  */
 /**
  * @description 构建extractionprompt
@@ -85,7 +61,7 @@ const SYSTEM_PROMPT = [
  */
 export function buildExtractionPrompt(transcript: string): { system: string; user: string } {
   return {
-    system: SYSTEM_PROMPT,
+    system: promptRegistry.get(PROMPT_KEYS.meetingInsight).content,
     user: `会议标题：${""}\n客户：${""}\n\n请抽取以下会议原文的结构化洞察：\n\n${transcript.slice(0, 12000)}`,
   }
 }

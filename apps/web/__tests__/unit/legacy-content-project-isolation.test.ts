@@ -181,11 +181,9 @@ vi.mock("@/lib/prisma", () => ({ prisma: DB.prisma }))
 // Route handlers wrap their inner handler with withUserAuth; pass straight through.
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth: (handler: (request: unknown, context: { user: { id: string }; params?: Record<string, string> }) => unknown) =>
-    async (request: unknown, segmentData: { user: { id: string }; params?: Promise<Record<string, string>> }) =>
-      handler(request, {
-        ...segmentData,
-        params: segmentData.params ? await segmentData.params : undefined,
-      }),
+    // 与生产包装器对齐：解包 segmentData.params 后再交给 handler
+    async (request: unknown, segmentData?: { params: Promise<Record<string, string>> }) =>
+      handler(request, { user: { id: "user-1" }, params: await segmentData?.params }),
 }))
 
 // Server-authoritative binding resolver for route tests.
@@ -217,10 +215,8 @@ beforeEach(() => {
 })
 
 function ctx() {
-  return { user: { id: "user-1", email: "u@test.com" }, params: Promise.resolve<Record<string, string>>({}) }
-}
-function ctxWithParams(params: Record<string, string>) {
-  return { ...ctx(), params: Promise.resolve(params) }
+  // 与包装器二参签名对齐：user 由 mock 的鉴权层注入，params 为路由段（此处无动态段）
+  return { user: { id: "user-1", email: "u@test.com" }, params: Promise.resolve({}) }
 }
 function makeRequest(url: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
   return new NextRequest(url, init)
@@ -294,7 +290,7 @@ describe("watched competitor accounts", () => {
   it("delete route 404s a same-user account from project-b", async () => {
     const response = await deleteWatchAccount(
       makeRequest("http://localhost/api/competitor/watch-accounts/wa-b"),
-      ctxWithParams({ id: "wa-b" }),
+      { ...ctx(), params: Promise.resolve({ id: "wa-b" }) },
     )
     expect(response.status).toBe(404)
   })
@@ -302,7 +298,7 @@ describe("watched competitor accounts", () => {
   it("delete route removes a same-user account from the bound project", async () => {
     const response = await deleteWatchAccount(
       makeRequest("http://localhost/api/competitor/watch-accounts/wa-a"),
-      ctxWithParams({ id: "wa-a" }),
+      { ...ctx(), params: Promise.resolve({ id: "wa-a" }) },
     )
     expect(response.status).toBe(200)
   })
@@ -322,7 +318,7 @@ describe("competitor analyses — list + detail scoped to bound project", () => 
   it("detail route returns 404 for a same-user analysis from project-b", async () => {
     const response = await getCompetitorAnalysis(
       makeRequest("http://localhost/api/competitor/ca-b"),
-      ctxWithParams({ id: "ca-b" }),
+      { ...ctx(), params: Promise.resolve({ id: "ca-b" }) },
     )
     expect(response.status).toBe(404)
   })
@@ -330,7 +326,7 @@ describe("competitor analyses — list + detail scoped to bound project", () => 
   it("detail route returns the bound-project analysis", async () => {
     const response = await getCompetitorAnalysis(
       makeRequest("http://localhost/api/competitor/ca-a"),
-      ctxWithParams({ id: "ca-a" }),
+      { ...ctx(), params: Promise.resolve({ id: "ca-a" }) },
     )
     expect(response.status).toBe(200)
   })

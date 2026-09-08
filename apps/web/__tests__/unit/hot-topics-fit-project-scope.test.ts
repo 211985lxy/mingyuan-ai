@@ -128,7 +128,9 @@ vi.mock("@/lib/prisma", () => ({ prisma: DB.prisma }))
 // Route handlers wrap their inner handler with withUserAuth; pass straight through.
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth: (handler: (request: unknown, context: { user: { id: string }; params?: Record<string, string> }) => unknown) =>
-    handler,
+    // 与生产包装器对齐：解包 segmentData.params 后再交给 handler
+    async (request: unknown, segmentData?: { params: Promise<Record<string, string>> }) =>
+      handler(request, { user: { id: "user-1" }, params: await segmentData?.params }),
 }))
 
 vi.mock("@/lib/account-project-context", () => ({
@@ -219,9 +221,7 @@ async function fitWithStructure(structureId: string) {
     }),
     headers: { "Content-Type": "application/json" },
   })
-  // 该测试将 withUserAuth mock 成直通：入参即内层 handler 的已解析 context，
-  // 而导出的 POST 类型是外层 wrapper 签名（params 为 Promise），故仅在类型上桥接。
-  return fitTopic(request, ctx() as unknown as Parameters<typeof fitTopic>[1])
+  return fitTopic(request, { ...ctx(), params: Promise.resolve({ id: "topic-1" }) })
 }
 
 describe("hot-topics fit — structure blueprint must belong to the bound project", () => {

@@ -1,4 +1,7 @@
 import type { ChatMessage } from "@/lib/llm"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 
 export const FORBIDDEN_TERMS =
   "赋能、闭环、抓手、颗粒度、对齐、拉通、打通、沉淀、复盘、迭代、链路、触达、心智、赛道"
@@ -18,36 +21,25 @@ export function buildImitateMessages(input: {
   return [
     {
       role: "system",
-      content: [
-        "你是一个「爆款文案仿写专家」。你的任务是把一条对标爆款文案的底层结构逻辑，迁移到当前 IP 所在的行业，输出可直接使用的新稿。",
-        "",
-        input.contextBlock,
-        "",
-        "仿写规则：",
-        "1. 先分析对标爆款的钩子类型、中段推进节奏、结尾收束方式。",
-        "2. 保留爆款的钩子力度、情绪节奏和信息推进顺序，内容完全替换成当前 IP 行业的。",
-        "3. 必须用上方企业知识库里的产品卖点、客户痛点、老板经验填充新内容；知识库没有的，基于草稿和 IP 人设合理补全，不要编造不存在的数据。",
-        "4. 场景和细节必须是当前 IP 行业的真实场景，保持爆点力度。",
-        "5. 严格贴合上方写作风格档案——仿写稿要像这个 IP 本人在说话，而不是通用的爆款腔。",
-        `6. 禁止保留对标原文的行业特定词汇，全部替换；禁止使用：${FORBIDDEN_TERMS}。`,
-        "7. 直接输出仿写成稿纯文本，不要解释分析过程，不要加格式标记。",
-        input.styleOverrideBlock,
-      ].join("\n"),
+      content: fillPromptTemplate(
+        promptRegistry.get(PROMPT_KEYS.scriptPolishImitateSystem).content,
+        {
+          contextBlock: input.contextBlock,
+          styleOverrideBlock: input.styleOverrideBlock,
+          forbiddenTerms: FORBIDDEN_TERMS,
+        },
+      ),
     },
     {
       role: "user",
-      content: [
-        "请把以下对标爆款的结构逻辑迁移到当前 IP，重写我的草稿：",
-        "",
-        "【对标爆款原文】",
-        input.viralSourceText,
-        "",
-        "【我的草稿（行业/方向参考）】",
-        input.content,
-        ...(input.topicTitle ? [`\n选题方向：${input.topicTitle}`] : []),
-        "",
-        "直接输出仿写后的成稿：",
-      ].join("\n"),
+      content: fillPromptTemplate(
+        promptRegistry.get(PROMPT_KEYS.scriptPolishImitateUser).content,
+        {
+          viralSourceText: input.viralSourceText,
+          content: input.content,
+          topicTitleBlock: input.topicTitle ? `\n选题方向：${input.topicTitle}\n` : "",
+        },
+      ),
     },
   ]
 }
@@ -61,16 +53,14 @@ export function buildProofreadMessages(content: string): ChatMessage[] {
   return [
     {
       role: "system",
-      content: [
-        "你是一位中文文案校对编辑。",
-        "只修正错别字、标点、明显语病、重复字词和不通顺的小问题。",
-        "必须保持原文意思、结构、段落顺序、语气和表达风格不变。",
-        "不要扩写，不要改标题，不要增加解释，不要输出修改说明。",
-      ].join("\n"),
+      content: promptRegistry.get(PROMPT_KEYS.scriptPolishProofreadSystem).content,
     },
     {
       role: "user",
-      content: ["请轻量校对以下文案，直接输出校对后的纯文本：", "", content].join("\n"),
+      content: fillPromptTemplate(
+        promptRegistry.get(PROMPT_KEYS.scriptPolishProofreadUser).content,
+        { content },
+      ),
     },
   ]
 }
@@ -138,28 +128,20 @@ export function buildPolishMessages(input: {
   return [
     {
       role: "system",
-      content: [
-        "你是一位短视频文案润色专家。你的任务是对用户给出的口播文案进行精准润色。",
-        "",
-        "核心原则：",
-        "- 保持原文的核心意思和信息点不变",
-        "- 保持原文的整体结构和段落顺序不变",
-        "- 只修改需要优化的部分，不要全量重写",
-        "- 润色后的文案必须可以直接朗读，像真人在跟镜头说话",
-        "- 禁止添加任何解释、注释或结构标签",
-        "",
-        ...input.polishInstructions,
-      ].join("\n"),
+      content: fillPromptTemplate(
+        promptRegistry.get(PROMPT_KEYS.scriptPolishPolishSystem).content,
+        { polishInstructionsBlock: input.polishInstructions.join("\n") },
+      ),
     },
     {
       role: "user",
-      content: [
-        input.contextSection ? `${input.contextSection}\n` : "",
-        "请润色以下文案：\n",
-        input.content,
-        "",
-        "直接输出润色后的文案纯文本，不要输出任何其他内容。",
-      ].join("\n"),
+      content: fillPromptTemplate(
+        promptRegistry.get(PROMPT_KEYS.scriptPolishPolishUser).content,
+        {
+          contextSectionBlock: input.contextSection ? `${input.contextSection}\n` : "",
+          content: input.content,
+        },
+      ),
     },
   ]
 }

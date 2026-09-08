@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { IpWikiDialog } from "./ip-wiki-dialog"
 import { AimPromptComposer } from "@/components/aim/aim-prompt-composer"
+import { AimContextBar } from "@/components/aim/aim-context-bar"
 import { AimContextUsage } from "@/components/aim/aim-context-usage"
 import { AimMessageStream } from "@/components/aim/aim-message-stream"
 import { AimEvolutionSuggestions, AimProjectNotices, AimWorkbenchHeader } from "@/components/aim/aim-workbench-chrome"
@@ -25,7 +26,7 @@ import type { BatchTab } from "@/components/aim/batch-script-studio-sections"
 import { useAimVideoCopyInput } from "@/features/aim/hooks/use-aim-video-copy-input"
 import { useAimWorkbench } from "@/features/aim/hooks/use-aim-workbench"
 import { useAimWorkbenchSkills } from "@/features/aim/hooks/use-aim-workbench-skills"
-import { type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import { getAimAgentGuide, type AimWorkbenchSkill } from "@/lib/aim-agent-guides"
 import { getAimAgentCapabilities } from "@/lib/aim/agent-capabilities"
 import { AIM_CONTEXT_CAPACITY_TOKENS, estimateContextUsageBreakdown } from "@/lib/aim-context-usage"
 import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
@@ -304,10 +305,12 @@ export default function AimPage() {
           projectAccessError={w.projectAccessError}
         />
         {w.projectEnabled && w.selectedProjectId && !isLanding ? (
-          <AimKnowledgeAssetsRow projectId={w.selectedProjectId} onOpenIpProfile={() => setIpProfileOpen(true)} sourceOriginalText={w.sourceOriginalText} sourceAnalysisText={w.sourceAnalysisText} sourceTopicTitle={w.sourceTopicTitle} />
+          <AimContextBar summary={["IP 档案", "本周进展", w.currentWorkflowStage === "results" ? "经营复盘" : null].filter(Boolean).join(" · ")}>
+            <AimKnowledgeAssetsRow projectId={w.selectedProjectId} onOpenIpProfile={() => setIpProfileOpen(true)} sourceOriginalText={w.sourceOriginalText} sourceAnalysisText={w.sourceAnalysisText} sourceTopicTitle={w.sourceTopicTitle} />
+            <ProjectWeeklyContent projectId={w.selectedProjectId} />
+            {w.currentWorkflowStage === "results" ? <ProjectWeeklyBusinessReview projectId={w.selectedProjectId} /> : null}
+          </AimContextBar>
         ) : null}
-        {w.projectEnabled && w.selectedProjectId && !isLanding ? <ProjectWeeklyContent projectId={w.selectedProjectId} /> : null}
-        {w.currentWorkflowStage === "results" && w.selectedProjectId ? <ProjectWeeklyBusinessReview projectId={w.selectedProjectId} /> : null}
 
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}
@@ -366,6 +369,7 @@ export default function AimPage() {
               selectedAgentId={w.selectedAgentId}
               selectedProjectId={w.selectedProjectId}
               latestDeliverableMessageId={w.latestDeliverableMessageId}
+              quickPrompts={getAimAgentGuide(w.selectedAgentId).quickPrompts}
               actions={{
                 // 澄清选项回答必须回到统一生成入口，复用 awaiting_input 的任务 ID；
                 // 走普通 chat 会丢失原任务状态，导致模型重新理解甚至再次追问。

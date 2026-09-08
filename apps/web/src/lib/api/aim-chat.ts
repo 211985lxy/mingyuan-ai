@@ -6,6 +6,7 @@ import type { KnowledgeEntry } from "./knowledge"
 import type { HotTopic } from "@/types/content-template"
 import type { StyleGuideId } from "@/lib/style-guide-config"
 import type { AimChatBody } from "@/features/aim/contracts/api"
+import type { HitlApprovalRequired } from "@/lib/aim/hitl-gate"
 import type { CopyStudioModule } from "@/lib/copy-studio"
 import { serializeAimChatRequestBody } from "@/lib/aim/chat-payload-budget"
 import type {
@@ -100,6 +101,8 @@ export async function chatAim(
     projectId?: string
     toolAction?: AimChatToolAction
     resultId?: string
+    /** Step③ HITL：对话内批准/驳回（仅 toolAction 分支消费） */
+    hitlDecision?: "approve" | "reject"
     editorContext?: AimEditorContext
     agentModule?: CopyStudioModule
     writerModule?: CopyStudioModule
@@ -107,9 +110,9 @@ export async function chatAim(
     /** 本轮委托执行引擎；与会话 agentId 平级，缺省不写入请求体 */
     executionAgentId?: string
   },
-): Promise<{ content: string; toolResult?: unknown }> {
+): Promise<{ content: string; toolResult?: unknown; approvalRequired?: HitlApprovalRequired }> {
   const { signal, ...bodyOptions } = options ?? {}
-  return request<{ content: string; toolResult?: unknown }>("/api/aim/chat", {
+  return request<{ content: string; toolResult?: unknown; approvalRequired?: HitlApprovalRequired }>("/api/aim/chat", {
     method: "POST",
     body: serializeAimChatRequestBody({ messages, ...bodyOptions }),
     timeout: 30000,

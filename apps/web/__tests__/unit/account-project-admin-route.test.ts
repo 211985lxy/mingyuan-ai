@@ -27,7 +27,15 @@ vi.mock("@/lib/account-project-context", () => ({
 vi.mock("@/lib/admin-audit", () => ({ recordAdminAudit }))
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findMany: userFindMany } } }))
 
-import { GET, POST } from "@/app/api/admin/account-project-bindings/route"
+import { GET as GETHandler, POST as POSTHandler } from "@/app/api/admin/account-project-bindings/route"
+
+// withAdminOnly 返回双参签名（request + segmentData.params）；测试统一注入空路由参数。
+const withAdminContext = <R>(
+  handler: (req: NextRequest, segmentData: { params: Promise<Record<string, string>> }) => R,
+) =>
+  (req: NextRequest): R => handler(req, { params: Promise.resolve({}) })
+const GET = withAdminContext(GETHandler)
+const POST = withAdminContext(POSTHandler)
 
 function makeRequest(method: string, body?: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/admin/account-project-bindings", {
@@ -73,7 +81,7 @@ describe("admin account project binding route", () => {
       },
     ])
 
-    const response = await GET(makeRequest("GET"), segmentData)
+    const response = await GET(makeRequest("GET"))
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
       data: [
@@ -100,7 +108,7 @@ describe("admin account project binding route", () => {
       },
     ])
 
-    const response = await GET(makeRequest("GET"), segmentData)
+    const response = await GET(makeRequest("GET"))
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
       data: [
@@ -122,7 +130,7 @@ describe("admin account project binding route", () => {
       return project
     })
 
-    const response = await POST(makeRequest("POST", { userId: "user-1", projectId: "project-ai" }), segmentData)
+    const response = await POST(makeRequest("POST", { userId: "user-1", projectId: "project-ai" }))
     expect(response.status).toBe(200)
     expect(response.headers.get("x-request-id")).toBe("audit-1")
     await expect(response.json()).resolves.toEqual({ status: "bound", project })

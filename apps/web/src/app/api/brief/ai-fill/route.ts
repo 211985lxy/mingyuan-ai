@@ -1,21 +1,24 @@
-import { parseJsonRecord } from "@/lib/api-contract"
+import { parseCapabilityInput } from "@/lib/api/contracts"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { LLMClient } from "@/lib/llm/client"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import type { ExpressionBlueprint, TemplateVariable } from "@/types/content-template"
+// api-inventory: domain=brief
+// api-inventory: kind=capability
+// api-inventory: orchestratable=true
+
 
 export const POST = withUserAuth(async (request) => {
-  const body = await parseJsonRecord(request)
-  const templateId = typeof body.templateId === "string" ? body.templateId : ""
-  const userInput = typeof body.userInput === "string" ? body.userInput.trim() : ""
-
-  if (!templateId) {
-    return NextResponse.json(
-      { error: "templateId is required" },
-      { status: 400 },
-    )
+  const body = (await parseCapabilityInput("/api/brief/ai-fill", request)) as {
+    templateId: string
+    userInput: string
   }
+  const templateId = body.templateId
+  const userInput = body.userInput.trim()
 
   const template = await prisma.contentTemplate.findUnique({
     where: { id: templateId, status: "published" },
@@ -51,31 +54,22 @@ export const POST = withUserAuth(async (request) => {
 
   const expressionBlueprint = template.expressionBlueprint as ExpressionBlueprint | null
 
-  const systemPrompt = `你是一个营销文案助手。用户正在填写一个视频创作的 Brief 表单。
-你需要根据用户提供的简要描述和 IP 档案信息，智能推测并填写表单中的各个字段。
-
-表达模板：${template.displayName}
-${template.description ? `模板描述：${template.description}` : ""}
-${expressionBlueprint ? `表达蓝图：论证模式=${expressionBlueprint.argumentPattern}；证据要求=${expressionBlueprint.proofBurden}；CTA=${expressionBlueprint.ctaStyle}` : ""}
-
-IP 档案信息：
-${ipContext}
-
-需要填写的字段：
-${variableDescriptions}
-
-规则：
-1. 行业身份只来自 IP 档案，不要把“行业”当成 Brief 字段去凭空补充
-2. 根据用户输入和 IP 档案信息，尽可能合理地填写每个字段
-3. 如果用户输入中明确提到了某个字段的值，直接使用
-4. 如果没有明确提到，根据 IP 档案和上下文推测一个合理的值
-5. 文案要简洁有力，符合营销短视频风格
-6. 必须返回 JSON 格式，key 为字段 key，value 为填写的内容
-7. 只返回 JSON，不要任何其他内容`
+  const systemPrompt = fillPromptTemplate(
+    promptRegistry.get(PROMPT_KEYS.briefAiFillSystem).content,
+    {
+      templateName: template.displayName,
+      templateDescriptionBlock: template.description ? `模板描述：${template.description}` : "",
+      expressionBlueprintBlock: expressionBlueprint
+        ? `表达蓝图：论证模式=${expressionBlueprint.argumentPattern}；证据要求=${expressionBlueprint.proofBurden}；CTA=${expressionBlueprint.ctaStyle}`
+        : "",
+      ipContext,
+      variableDescriptions,
+    },
+  )
 
   const userPrompt = userInput
-    ? `用户描述了本条视频想讲的内容：\n\n"${userInput}"\n\n请据此填写 Brief 表单各字段。`
-    : "用户未提供本条视频的具体描述，请根据 IP 档案信息和表达模板推测并填写 Brief 表单各字段。"
+    ? fillPromptTemplate(promptRegistry.get(PROMPT_KEYS.briefAiFillUserInput).content, { userInput })
+    : promptRegistry.get(PROMPT_KEYS.briefAiFillUserNoInput).content
 
   const llm = LLMClient.shared()
   if (!llm.available) {

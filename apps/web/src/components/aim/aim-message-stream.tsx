@@ -186,13 +186,32 @@ function AimMessageCard({ message, busy, selectedAgentId, selectedProjectId, lat
   </div>
 }
 
-function EmptyMessageState({ agentIntro }: {
+function EmptyMessageState({ agentIntro, quickPrompts, onQuickPrompt }: {
   agentIntro: string
+  quickPrompts?: string[]
+  onQuickPrompt?: (text: string) => void
 }) {
+  const prompts = quickPrompts?.slice(0, 3) ?? []
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col py-6">
       <div className="max-w-2xl text-left">
         <p className="line-clamp-3 text-base leading-7 text-muted-foreground">{agentIntro}</p>
+        {prompts.length && onQuickPrompt ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {prompts.map((prompt) => (
+              <Button
+                key={prompt}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-auto whitespace-normal rounded-full px-3.5 py-2 text-left text-sm"
+                onClick={() => onQuickPrompt(prompt)}
+              >
+                {prompt}
+              </Button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   )
@@ -206,6 +225,7 @@ interface AimMessageStreamProps {
   selectedAgentId: AimAgentId
   selectedProjectId: string
   latestDeliverableMessageId?: string
+  quickPrompts?: string[]
   actions: MessageActions
 }
 
@@ -226,7 +246,11 @@ export const AimMessageStream = forwardRef<HTMLDivElement, AimMessageStreamProps
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={setScrollRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5">
         {props.messages.length === 0 ? (
-          <EmptyMessageState agentIntro={props.agentIntro} />
+          <EmptyMessageState
+            agentIntro={props.agentIntro}
+            quickPrompts={props.quickPrompts}
+            onQuickPrompt={props.actions.onSubmitChoice}
+          />
         ) : (
           <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 xl:max-w-7xl">
             {props.messages.map((message) => (

@@ -46,8 +46,7 @@ const outcomeRow = {
 
 describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
   it("未配置 LARK_OUTCOME_TABLE_ID 时显式报错，不落通用结果表", async () => {
-    const env: Record<string, string | undefined> = { ...BASE_ENV }
-    delete env.LARK_OUTCOME_TABLE_ID
+    const env = { ...BASE_ENV, LARK_OUTCOME_TABLE_ID: undefined }
     await expect(
       exportLarkBaseResult({
         userId: "user-1",
@@ -76,7 +75,7 @@ describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
   })
 
   it("写出字段：行级唯一键=outcome.id，未回填指标不列入内容", async () => {
-    const runCommand = vi.fn(async (_command: string, _args: string[]) => ({ ok: true }))
+    const runCommand = vi.fn<(command: string, args: string[]) => Promise<{ ok: boolean }>>(async () => ({ ok: true }))
     const result = await exportLarkBaseResult({
       userId: "user-1",
       projectId: "proj-1",
@@ -88,7 +87,7 @@ describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
     })
     expect(result.ok).toBe(true)
     expect(runCommand).toHaveBeenCalledTimes(1)
-    const [command, args] = runCommand.mock.calls[0]
+    const [command, args] = runCommand.mock.calls[0] ?? []
     expect(command).toBe("+record-upsert")
     expect(args).toContain("--table-id")
     expect(args[args.indexOf("--table-id") + 1]).toBe("tbl-outcome")
@@ -106,7 +105,7 @@ describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
   })
 
   it("全空指标记录仍可导出，内容显式说明无数据", async () => {
-    const runCommand = vi.fn(async (_command: string, _args: string[]) => ({}))
+    const runCommand = vi.fn<(command: string, args: string[]) => Promise<Record<string, unknown>>>(async () => ({}))
     await exportLarkBaseResult({
       userId: "user-1",
       projectId: "proj-1",
@@ -116,7 +115,7 @@ describe("exportLarkBaseResult outcome（复盘记录写出飞书）", () => {
       db: buildDb({ ...outcomeRow, views: null, dmCount: null, dealCount: null, revenue: null, verdictCode: null }),
       runCommand,
     })
-    const args = runCommand.mock.calls[0][1]
+    const args = runCommand.mock.calls[0]?.[1] ?? []
     const fields = JSON.parse(args[args.indexOf("--json") + 1]) as Record<string, unknown>
     expect(fields["内容"]).toContain("暂无已回填指标")
     expect(fields["状态"]).toBe("已回填")

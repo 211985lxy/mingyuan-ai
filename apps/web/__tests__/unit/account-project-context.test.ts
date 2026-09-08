@@ -461,6 +461,7 @@ describe("repairAccountProjectBinding", () => {
         previousProjectId: "project-a",
         nextProjectId: "project-b",
         reactivateNext: false,
+        // 测试只关心 adminAuditLog.create；真实签名是 Prisma.TransactionClient，这里收窄断言
         withinTransaction: withinTransaction as unknown as NonNullable<
           Parameters<typeof repairAccountProjectBinding>[0]["withinTransaction"]
         >,

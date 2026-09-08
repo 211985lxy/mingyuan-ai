@@ -29,8 +29,8 @@ vi.mock("@/lib/oss/upload-reservation", () => ({
 }))
 vi.mock("@/lib/user-auth", () => ({
   withUserAuth: (handler: (request: NextRequest, ctx: { user: { id: string }; params?: unknown }) => Promise<Response>) =>
-    async (request: NextRequest, ctx?: { params?: Promise<Record<string, string>> }) =>
-      handler(request, { user: { id: "user-1" }, params: ctx?.params ? await ctx.params : undefined }),
+    async (request: NextRequest, ctx?: { params?: unknown }) =>
+      handler(request, { user: { id: "user-1" }, params: await ctx?.params }),
 }))
 
 import { POST } from "@/app/api/assets/uploads/[uploadId]/put/route"

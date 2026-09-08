@@ -18,6 +18,8 @@ import {
   reportAimChatRevision,
 } from "@/lib/aim/workbench-helpers"
 import type { AimImageAttachment, AimFileAttachment, AimWorkbenchMessage } from "@/lib/aim/workbench-types"
+import type { AimChatToolAction } from "@/lib/api/client"
+import type { HitlApprovalRequired } from "@/lib/aim/hitl-gate"
 import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
 import { persistContentRetroAfterChat } from "@/lib/aim/persist-content-retro"
 import { toast } from "sonner"
@@ -50,10 +52,30 @@ interface AimChatActionInput {
   onIsolateTaskSession?: () => void
   runWorkbenchCommand: (command: AimWorkbenchCommand) => boolean | void
   agentModule?: CopyStudioModule
+  /** Step③ HITL：待审批的高风险动作（对话内回复「批准 / 驳回」即决策） */
+  hitlPending?: AimHitlPending | null
+  /** 服务端返回 approval_required 时记录待审批上下文 */
+  onHitlApprovalRequired?: (pending: AimHitlPending, approval: HitlApprovalRequired) => void
+  onHitlSettled?: () => void
+}
+
+/** 对话内 HITL 决策词识别：批准/同意 → approve；驳回/拒绝 → reject。 */
+function detectHitlDecision(text: string): "approve" | "reject" | undefined {
+  const trimmed = text.trim()
+  if (/^(批准|同意|通过)[。!！.~\s]*$/.test(trimmed)) return "approve"
+  if (/^(驳回|拒绝|不同意|先不要|别发)[。!！.~\s]*$/.test(trimmed)) return "reject"
+  return undefined
 }
 
 function setAssistantMessage(input: AimChatActionInput, assistantId: string, content: string) {
   input.setMessages((messages) => messages.map((message) => message.id === assistantId ? { ...message, content } : message))
+}
+
+/** Step③ HITL：前端侧的待审批动作上下文（工具动作被服务端门闩拦截时记录）。 */
+export interface AimHitlPending {
+  toolAction: string
+  resultId?: string
+  label: string
 }
 
 async function executeChatRequest(
@@ -65,6 +87,33 @@ async function executeChatRequest(
   thread: AimWorkbenchMessage[],
   traceId?: string,
 ) {
+  // Step③ HITL：有待审批动作且用户回复批准/驳回 → 作为决策发送，不走普通对话
+  const hitlReply = detectHitlDecision(text)
+  if (hitlReply && input.hitlPending) {
+    const pending = input.hitlPending
+    const { approvalRequired } = await runAimChatRequest({
+      messages: buildAimChatMessages(thread.map((message) => ({
+        role: message.role,
+        content: formatAimMessageContentForModel(message),
+      }))),
+      agentId: input.selectedAgentId,
+      projectId: input.projectEnabled ? input.selectedProjectId || undefined : undefined,
+      toolAction: pending.toolAction as AimChatToolAction,
+      resultId: pending.resultId,
+      hitlDecision: hitlReply,
+      signal: controller.signal,
+      onContent: (content) => setAssistantMessage(input, assistantId, content),
+      onApprovalRequired: (approval) => {
+        input.onHitlSettled?.()
+        setAssistantMessage(input, assistantId,
+          approval.status === "rejected"
+            ? "该操作此前已被驳回，如需执行请重新发起。"
+            : "仍在等待人工审批。")
+      },
+    })
+    if (!approvalRequired) input.onHitlSettled?.()
+    return
+  }
   const toolAction = detectAimLarkToolAction(text)
   if (toolAction && input.projectEnabled && !input.selectedProjectId) {
     setAssistantMessage(input, assistantId, "需要先选择 IP 营销全案，才能执行这个飞书同步动作。")
@@ -81,7 +130,7 @@ async function executeChatRequest(
     ? (options.resultId?.trim() || findLatestAimDeliverableId(input.messages) || undefined)
     : undefined
   let latestContent = ""
-  const { hasContent } = await runAimChatRequest({
+  const chatResult = await runAimChatRequest({
     messages: buildAimChatMessages(thread.map((message) => ({
       role: message.role,
       content: appendAimFileAttachmentsToContent(formatAimMessageContentForModel(message), message.files),
@@ -102,7 +151,19 @@ async function executeChatRequest(
       setAssistantMessage(input, assistantId, content)
     },
   })
-  if (!hasContent) {
+  if (chatResult.approvalRequired && toolAction) {
+    // Step③ HITL：高风险动作被门闩拦截，对话内挂起等待批准/驳回
+    input.onHitlSettled?.()
+    input.onHitlApprovalRequired?.(
+      { toolAction, resultId: resultId || undefined, label: chatResult.approvalRequired.label },
+      chatResult.approvalRequired,
+    )
+    setAssistantMessage(input, assistantId,
+      `【需人工审批】${chatResult.approvalRequired.label}。\n纪律要求：这类对外/入库动作必须有人确认。\n回复「批准」执行，或回复「驳回」取消。`)
+    return
+  }
+  if (input.hitlPending) input.onHitlSettled?.()
+  if (!chatResult.hasContent) {
     input.setMessages((messages) => messages.map((message) => message.id === assistantId
       ? { ...message, content: "没有收到模型回复。", failure: { kind: "chat", retryText: text } }
       : message))

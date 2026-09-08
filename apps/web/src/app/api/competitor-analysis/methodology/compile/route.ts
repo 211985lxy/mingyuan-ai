@@ -1,24 +1,22 @@
-import { parseJsonRecord } from "@/lib/api-contract"
+import { parseCapabilityInput } from "@/lib/api/contracts"
 import { NextResponse } from "next/server"
 import { withUserAuth } from "@/lib/user-auth"
 import { LLMClient } from "@/lib/llm/client"
 import {
+// api-inventory: domain=competitor
+// api-inventory: kind=capability
+// api-inventory: orchestratable=true
+
   buildMethodologyCompilePrompt,
   parseMethodologyCompileResponse,
   type MethodologyCompileInput,
 } from "@/lib/viral-methodology-compiler"
 
 export const POST = withUserAuth(async (request) => {
-  const body = await parseJsonRecord(request)
-  const { competitorAnalysisText, projectName, sourceCompetitorId } =
-    body as MethodologyCompileInput
-
-  if (!competitorAnalysisText?.trim()) {
-    return NextResponse.json(
-      { error: "competitorAnalysisText is required" },
-      { status: 400 }
-    )
-  }
+  const { competitorAnalysisText, projectName, sourceCompetitorId } = (await parseCapabilityInput(
+    "/api/competitor-analysis/methodology/compile",
+    request
+  )) as MethodologyCompileInput
 
   const prompt = buildMethodologyCompilePrompt({
     competitorAnalysisText,

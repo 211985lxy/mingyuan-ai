@@ -98,7 +98,7 @@ describe("POST /api/aim/generate — cross-project isolation", () => {
     authErrorResponse.mockReturnValue(null)
     enforceDailyBetaLimit.mockResolvedValue(null)
     resolveBoundProject.mockResolvedValue(boundProjectA)
-    createAimTrace.mockResolvedValue({ id: "trace-x", startedAt: Date.now() })
+    createAimTrace.mockResolvedValue({ id: "trace-x" } as never)
   })
 
   it("Test A: rejects an existingGenerationId that belongs to the same user under a different project", async () => {

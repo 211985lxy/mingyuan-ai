@@ -11,6 +11,10 @@ const source = readFileSync(
 ) + readFileSync(
   join(process.cwd(), "src/lib/aim/services/script-polish-prompts.ts"),
   "utf8"
+) + readFileSync(
+  // 批1 prompt 资产化后，imitate 规则正本迁入 registry seed（prompt 文案在此文件）
+  join(process.cwd(), "src/lib/prompt/seeds-aim-services.ts"),
+  "utf8"
 )
 
 // imitate（跨行业爆款仿写）从废弃的 aim-agents/script-agent.ts 迁移到活路径

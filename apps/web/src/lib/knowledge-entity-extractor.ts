@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { LLMClient } from "@/lib/llm/client"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 
 // ─── 类型 ──────────────────────────────────────────────────
 
@@ -50,38 +52,6 @@ export interface ExtractionResult {
 
 // ─── 1. Prompt 构造（纯函数，可单测） ──────────────────────
 
-const SYSTEM_PROMPT = `你是知识图谱抽取器。从给定的企业知识文本中抽取「实体」和「实体间关系」，用于构建可检索的知识图谱。
-
-抽取规则：
-1. 只抽取明确出现、对 IP 营销有价值的实体，不要凭空臆造。
-2. 实体名归一化（同一对象只保留一个标准名，其余作为 aliases）。
-3. 关系只保留语义明确的三元组，模糊的不抽。
-
-实体类型（type）取值之一：
-- person（人物：创始人/老板/客户/KOL）
-- product（产品/服务/卖点载体）
-- brand（品牌/公司）
-- concept（行业概念/方法论/理念）
-- pain（痛点/诉求）
-- channel（渠道/平台/私域场景）
-- audience（目标人群/用户画像）
-
-关系类型（type）取值之一：
-- sells（A 卖 B）
-- targets（A 面向 B）
-- mentions（A 提及 B，泛化关联）
-- solves（A 解决 B）
-- competes_with（A 竞争 B）
-- part_of（A 属于 B）
-
-输出纯 JSON（不要 markdown 代码块），结构如下：
-{"entities":[{"name":"标准名","type":"person","aliases":["别名1"]},{"name":"美白精华","type":"product"}],"relations":[{"from":"创始人老王","to":"美白精华","type":"sells","evidence":"老王直播间主推美白精华"}]}
-
-注意：
-- relations 里的 from/to 必须出现在 entities 的 name 中。
-- 实体名长度 2-30 字，过短或过长的不要抽。
-- 一条知识通常抽取 1-8 个实体，0-6 条关系即可，宁缺毋滥。`
-
 /**
  * 构造实体抽取 prompt（纯函数）。
  */
@@ -93,7 +63,8 @@ const SYSTEM_PROMPT = `你是知识图谱抽取器。从给定的企业知识文
 export function buildExtractionPrompt(content: string): { system: string; user: string } {
   const trimmed = content.slice(0, 3000)
   return {
-    system: SYSTEM_PROMPT,
+    // system prompt 已资产化（Prompt Registry）：DB 版本优先，兜底内置 seed v1（逐字原文）
+    system: promptRegistry.get(PROMPT_KEYS.knowledgeEntityExtract).content,
     user: `请抽取以下知识文本中的实体与关系：\n\n${trimmed}`,
   }
 }

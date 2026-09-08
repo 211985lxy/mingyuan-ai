@@ -76,6 +76,8 @@ export const aimChatBodySchema = z.object({
     "export_lark_generation",
   ]).optional(),
   resultId: optionalId,
+  /** Step③ HITL：对话内对高风险工具动作的人工决策；缺省不改变原行为 */
+  hitlDecision: z.enum(["approve", "reject"]).optional(),
   stream: z.boolean().optional(),
   editorContext: editorContextSchema.optional(),
   agentModule: z.enum(["social", "longform", "free", "moments"]).optional(),

@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import {
   ApiError,
+  type AimGenerateRequest,
   type ContentFormat,
 } from "@/lib/api/client"
 import { AIM_CONTENT_ACTIONS, type AimContentAction, type AimWorkflowStage, type ConfirmedWorkflowBrief } from "@/lib/aim-workflow"
@@ -99,6 +100,8 @@ interface GenerateOptions {
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
   executionAgentId?: string
+  /** 客户端生成的追踪 ID：与占位消息上的 traceId 一致 */
+  traceId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
   /** 澄清回答或主动重试时复用的服务端生成任务 ID。 */
@@ -232,8 +235,32 @@ function buildGenerationRequest(
     useStyleProfileOverride: input.styleEnabled !== undefined ? input.styleEnabled : undefined,
     // 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入；未点技能则 undefined（服务端默认不注入）
     activeMethodologySignals: options.activeMethodologySignals?.length ? options.activeMethodologySignals : undefined,
+    traceId: options.traceId,
     executionAgentId: options.executionAgentId,
   }
+}
+
+/**
+ * 生成入口请求装配 seam（纯函数，供单测覆盖两处调用点的 traceId 接线与
+ * executionAgentId 剥离逻辑，防止重构悄悄丢掉 traceId 后回归 P0）：
+ * useUnifiedEntry → 统一执行入口 execute 请求；否则 → 旧 generate 请求
+ * （旧路径剥离 executionAgentId，agentId 回落为委托执行体，与调用点一致）。
+ */
+export function buildAimEntryRequest(
+  input: AimGenerationActionInput,
+  rawInput: string,
+  currentInput: string,
+  baseMessages: AimWorkbenchMessage[],
+  options: GenerateOptions,
+  useUnifiedEntry: boolean,
+  traceId: string,
+): { kind: "execute"; body: ReturnType<typeof buildExecuteTurnRequest> } | { kind: "generate"; body: AimGenerateRequest } {
+  if (useUnifiedEntry) {
+    return { kind: "execute", body: buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId }) }
+  }
+  const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, { ...options, traceId })
+  const { executionAgentId, ...generateBody } = request
+  return { kind: "generate", body: { ...generateBody, agentId: executionAgentId || generateBody.agentId } }
 }
 
 /** 统一执行入口的请求构建与响应应用已拆至 aim-generation-delivery-flow（保持模块 ≤500 行） */
@@ -288,7 +315,8 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
   input.setIsGenerating(true)
   let generationAttemptId: string | undefined
   try {
-    const request = buildGenerationRequest(input, rawInput, currentInput, baseMessages, options)
+    // 创作台统一执行入口（content_producer / 商业诊断组）：
+    // 语义理解 → 关键缺口一次性追问（≤3）→ 交付；其他智能体暂留旧 generate 入口
     const resolved = resolveGenerationAttemptId({
       options,
       messages: input.messages,
@@ -300,15 +328,14 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
     const attemptId = resolved.attemptId
     generationAttemptId = attemptId
     const useUnifiedEntry = usesUnifiedAimExecuteEntry(options.executionAgentId || input.selectedAgentId)
-    if (useUnifiedEntry) {
-      const executeBody = buildExecuteTurnRequest(input, rawInput, currentInput, baseMessages, {
-        ...options,
-        attemptId,
-        retryGenerationId,
-        traceId,
-        retryOfRunId: options.retryOfRunId || retrySource?.failure?.runId || retrySource?.runId || undefined,
-      })
-      const response = await executeAimTurnWithTransientRetry(executeBody, controller.signal)
+    const entry = buildAimEntryRequest(input, rawInput, currentInput, baseMessages, {
+      ...options,
+      attemptId,
+      retryGenerationId,
+      retryOfRunId: options.retryOfRunId || retrySource?.failure?.runId || retrySource?.runId || undefined,
+    }, useUnifiedEntry, traceId)
+    if (entry.kind === "execute") {
+      const response = await executeAimTurnWithTransientRetry(entry.body, controller.signal)
       if (controller.signal.aborted) {
         markGenerationStopped(input, assistantMessageId)
         return
@@ -317,11 +344,7 @@ async function executeGeneration(input: AimGenerationActionInput, currentInput: 
       endExclusiveRequest(input.requestAbortRef, controller, () => input.setIsGenerating(false))
       return
     }
-    const { executionAgentId, ...generateBody } = request
-    const response = await generateAimContentWithTransientRetry({
-      ...generateBody,
-      agentId: executionAgentId || generateBody.agentId,
-    }, controller.signal)
+    const response = await generateAimContentWithTransientRetry(entry.body, controller.signal)
     if (controller.signal.aborted) {
       markGenerationStopped(input, assistantMessageId)
       return

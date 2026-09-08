@@ -174,7 +174,7 @@ describe("computeTaskAttributionInsights", () => {
         }),
       }),
     )
-    const args = store.outcomeAttribution.findMany.mock.calls[0][0] as { where: Record<string, unknown> }
+    const args = (store.outcomeAttribution.findMany.mock.calls[0] as unknown as [{ where: Record<string, unknown> }])[0]
     expect(args.where.occurredAt).toBeUndefined()
   })
 

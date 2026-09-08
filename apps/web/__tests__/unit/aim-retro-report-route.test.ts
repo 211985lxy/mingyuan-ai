@@ -3,8 +3,8 @@ import { NextRequest } from "next/server"
 
 const { findFirst, outcomeFindMany, attributionFindMany, authenticateRequest, authErrorResponse, resolveBoundProject } = vi.hoisted(() => ({
   findFirst: vi.fn(),
-  outcomeFindMany: vi.fn<(...args: unknown[]) => Promise<unknown[]>>(async () => []),
-  attributionFindMany: vi.fn<(...args: unknown[]) => Promise<unknown[]>>(async () => []),
+  outcomeFindMany: vi.fn(async (): Promise<unknown[]> => []),
+  attributionFindMany: vi.fn(async () => []),
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   resolveBoundProject: vi.fn(async () => ({ id: "proj-1" })),
