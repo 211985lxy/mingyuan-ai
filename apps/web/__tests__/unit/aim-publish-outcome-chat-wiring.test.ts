@@ -29,7 +29,7 @@ const {
   shouldUseMarketViralContextForTask,
 } = vi.hoisted(() => ({
   findFirst: vi.fn(),
-  findAttributions: vi.fn(async () => []),
+  findAttributions: vi.fn(async (): Promise<unknown[]> => []),
   resolveAimConversationIntent: vi.fn(async () => ({
     mode: "chat",
     reason: "test",

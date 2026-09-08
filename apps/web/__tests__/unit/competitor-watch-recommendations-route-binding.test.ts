@@ -54,7 +54,7 @@ function postHandler(body?: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
   })
-  return POST(request) as Promise<Response>
+  return POST(request, { params: Promise.resolve({}) }) as Promise<Response>
 }
 
 beforeEach(() => {

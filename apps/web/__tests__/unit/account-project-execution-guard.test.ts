@@ -288,7 +288,7 @@ describe("remote invocation worker", () => {
 
     await executeRemoteInvocationBackgroundTask("task-1")
 
-    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    const entries = consoleErrorSpy.mock.calls.map((c: unknown[]) => c[1] as Record<string, unknown>)
     expect(entries.length).toBe(1)
     expect(entries[0]).toMatchObject({
       source: "remote",
@@ -392,7 +392,7 @@ describe("newsroom pipeline worker", () => {
     expect(taskFailCallData()?.lastError).toContain(ACCOUNT_PROJECT_CONTEXT_STALE)
     expect(wasTaskRetryWaiting()).toBe(false)
     // Safe, content-free log: source + task id + user id + stable code only.
-    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    const entries = consoleErrorSpy.mock.calls.map((c: unknown[]) => c[1] as Record<string, unknown>)
     expect(entries[0]).toEqual({
       source: "newsroom",
       taskId: "task-1",
@@ -434,7 +434,7 @@ describe("inspiration background worker", () => {
     expect(taskFailCallData()?.status).toBe("failed")
     expect(taskFailCallData()?.lastError).toContain(ACCOUNT_PROJECT_CONTEXT_STALE)
     expect(wasTaskRetryWaiting()).toBe(false)
-    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    const entries = consoleErrorSpy.mock.calls.map((c: unknown[]) => c[1] as Record<string, unknown>)
     expect(entries[0]).toEqual({
       source: "inspiration",
       taskId: "task-1",
@@ -484,7 +484,7 @@ describe("inspiration pipeline background worker", () => {
     expect(taskFailCallData()?.status).toBe("failed")
     expect(taskFailCallData()?.lastError).toContain(ACCOUNT_PROJECT_CONTEXT_STALE)
     expect(wasTaskRetryWaiting()).toBe(false)
-    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    const entries = consoleErrorSpy.mock.calls.map((c: unknown[]) => c[1] as Record<string, unknown>)
     expect(entries[0]).toEqual({
       source: "inspiration",
       taskId: "task-1",

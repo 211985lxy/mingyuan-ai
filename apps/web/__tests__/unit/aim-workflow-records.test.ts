@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const { updateAimWorkflowStatus, registerAimLeadAttribution, toast } = vi.hoisted(() => ({
-  updateAimWorkflowStatus: vi.fn(async () => ({})),
+  updateAimWorkflowStatus: vi.fn(async (_id: string, _patch: Record<string, unknown>) => ({})),
   registerAimLeadAttribution: vi.fn(async () => ({ created: true })),
   toast: { success: vi.fn(), error: vi.fn() },
 }))

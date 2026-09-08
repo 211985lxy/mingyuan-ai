@@ -47,8 +47,15 @@ vi.mock("@/lib/account-project-context", async (importActual) => {
   }
 })
 
-import { GET as previewGET, POST as previewPOST } from "@/app/api/admin/account-project-bindings/[userId]/preview/route"
-import { POST as repairPOST } from "@/app/api/admin/account-project-bindings/[userId]/repair/route"
+import { GET as previewGETHandler, POST as previewPOSTHandler } from "@/app/api/admin/account-project-bindings/[userId]/preview/route"
+import { POST as repairPOSTHandler } from "@/app/api/admin/account-project-bindings/[userId]/repair/route"
+
+// withAdminOnly 处理器签名为双参（request + 路由上下文）；测试统一注入本文件使用的 userId。
+const withRouteParams = <P, R>(handler: (req: NextRequest, ctx: { params: Promise<P> }) => R, params: P) =>
+  (req: NextRequest): R => handler(req, { params: Promise.resolve(params) })
+const previewGET = withRouteParams(previewGETHandler, { userId: "user-1" })
+const previewPOST = withRouteParams(previewPOSTHandler, { userId: "user-1" })
+const repairPOST = withRouteParams(repairPOSTHandler, { userId: "user-1" })
 
 function jsonRequest(url: string, method: string, body?: Record<string, unknown>) {
   return new NextRequest(url, {

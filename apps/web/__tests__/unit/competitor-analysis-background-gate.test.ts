@@ -179,7 +179,7 @@ describe("executeCompetitorAnalysisBackgroundTask — account-project gate", () 
 
     await executeCompetitorAnalysisBackgroundTask("task-1")
 
-    const entries = consoleErrorSpy.mock.calls.map((c) => c[1] as Record<string, unknown>)
+    const entries = consoleErrorSpy.mock.calls.map((c: unknown[]) => c[1] as Record<string, unknown>)
     expect(entries.length).toBe(1)
     expect(entries[0]).toMatchObject({
       source: "background",

@@ -1,4 +1,5 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { NextRequest } from "next/server"
 import { dirname, resolve } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -67,8 +68,8 @@ function observe(name: string, value: unknown) {
   observed[name] = typeof value === "string" ? value : JSON.stringify(value)
 }
 
-function jsonRequest(url: string, body: unknown): Request {
-  return new Request(url, {
+function jsonRequest(url: string, body: unknown): NextRequest {
+  return new NextRequest(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -102,7 +103,7 @@ async function snapAiFill() {
   await aiFillPOST(jsonRequest("http://localhost/api/brief/ai-fill", {
     templateId: "tpl-1",
     userInput: "想讲北方新房供暖改造的坑",
-  }))
+  }), { params: Promise.resolve({}) })
   observeLastCompletion("briefAiFill.full")
 
   mocks.findTemplate.mockResolvedValue({
@@ -116,7 +117,7 @@ async function snapAiFill() {
   await aiFillPOST(jsonRequest("http://localhost/api/brief/ai-fill", {
     templateId: "tpl-2",
     userInput: "",
-  }))
+  }), { params: Promise.resolve({}) })
   observeLastCompletion("briefAiFill.minimal")
 }
 
@@ -130,7 +131,7 @@ async function snapDistill() {
   mocks.complete.mockReset().mockResolvedValue({ content: '{"distilled":[]}' })
   await distillPOST(jsonRequest("http://localhost/api/admin/knowledge/distill", {
     ids: ["e1", "e2"],
-  }))
+  }), { params: Promise.resolve({}) })
   observeLastCompletion("knowledgeDistill.default")
 }
 
@@ -146,7 +147,7 @@ async function snapChannelsAnalyze() {
   mocks.complete.mockReset().mockResolvedValue({ content: '{"heat_score":80}' })
   await analyzePOST(
     jsonRequest("http://localhost/api/competitor/search-channels/analyze", { keyword: "供暖改造", count: 5 }),
-    { user: { id: "u1" } },
+    { params: Promise.resolve({}) },
   )
   observeLastCompletion("competitorChannels.default")
 }

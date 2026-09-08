@@ -289,11 +289,16 @@ describe("chat context loaders — competitor context uses the bound project", (
       agentId: "business_diagnosis",
       query: "帮我看一下对标账号最近的作品",
       conversationIntent: {
+        mode: "chat",
+        confidence: 0.9,
+        reason: "unit-test",
+        targetSummary: "查看对标账号",
         useKnowledge: true,
         useStyleProfile: false,
         useLongTermMemory: false,
+        useMethodology: false,
       },
-      runtimeTask: "review_account",
+      runtimeTask: "quality_review",
     })
     expect(blocks.competitorWatchBlock).toContain("对标A")
     expect(blocks.competitorWatchBlock).not.toContain("B项目账号")

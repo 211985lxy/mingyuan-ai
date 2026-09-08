@@ -203,7 +203,7 @@ async function generateWithStructure(structureId: string) {
       }),
       headers: { "Content-Type": "application/json" },
     }),
-    ctx(),
+    { ...ctx(), params: Promise.resolve({}) },
   )
 }
 

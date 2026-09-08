@@ -444,13 +444,16 @@ describe("repairAccountProjectBinding", () => {
       return { db, isCommitted: () => committed }
     }
 
-    function repairWithAudit(withinTransaction: (tx: { adminAuditLog: { create: ReturnType<typeof vi.fn> } }) => Promise<void>) {
+    function repairWithAudit(withinTransaction: (tx: { adminAuditLog: { create: (args: unknown) => Promise<unknown> } }) => Promise<void>) {
       return repairAccountProjectBinding({
         userId: "user-1",
         previousProjectId: "project-a",
         nextProjectId: "project-b",
         reactivateNext: false,
-        withinTransaction,
+        // 测试只关心 adminAuditLog.create；真实签名是 Prisma.TransactionClient，这里收窄断言
+        withinTransaction: withinTransaction as unknown as NonNullable<
+          Parameters<typeof repairAccountProjectBinding>[0]["withinTransaction"]
+        >,
       })
     }
 

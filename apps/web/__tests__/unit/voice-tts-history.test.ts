@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { NextRequest } from "next/server"
 
 /**
  * 语音工坊落库（Fish Audio MVP「不落库」缺口补全）：
@@ -41,8 +42,8 @@ vi.mock("@/lib/prisma", () => ({
 const { POST: ttsPOST } = await import("@/app/api/voice/tts/route")
 const { GET: historyGET } = await import("@/app/api/voice/history/route")
 
-function jsonRequest(url: string, body: unknown): Request {
-  return new Request(url, {
+function jsonRequest(url: string, body: unknown): NextRequest {
+  return new NextRequest(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -97,7 +98,7 @@ describe("语音合成记录落库", () => {
     ])
     mocks.count.mockResolvedValue(1)
 
-    const response = await historyGET(new Request("http://localhost/api/voice/history?page=1&pageSize=20"))
+    const response = await historyGET(new NextRequest("http://localhost/api/voice/history?page=1&pageSize=20"))
     const payload = await response.json()
     expect(response.status).toBe(200)
     expect(payload.data.total).toBe(1)
@@ -108,7 +109,7 @@ describe("语音合成记录落库", () => {
 
   it("未登录访问历史接口返回 401", async () => {
     mocks.authenticate.mockResolvedValue(null)
-    const response = await historyGET(new Request("http://localhost/api/voice/history"))
+    const response = await historyGET(new NextRequest("http://localhost/api/voice/history"))
     expect(response.status).toBe(401)
   })
 })
