@@ -16,8 +16,8 @@
     },
     {
       "path": "src/env.ts",
-      "maxLines": 525,
-      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 个 provider + 五步升级合并新增（schema+runtime 各若干行）"
+      "maxLines": 529,
+      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 个 provider + 五步升级合并新增（含 NEXT_PUBLIC ADMIN_EMAIL/AIM_LANDING_DEFAULT）"
     },
     {
       "path": "src/app/(dashboard)/aim/page.tsx",

@@ -185,6 +185,9 @@ function OrgNavSection() {
   )
 }
 
+/** 组织协同入口开关（Step⑤）：暂时隐藏，恢复时置回 true 即可。 */
+const SHOW_ORG_NAV_SECTION = false
+
 const TOOLBOX_OPEN_STORAGE_KEY = "aim-sidebar-toolbox-open"
 
 /**
@@ -328,7 +331,7 @@ export function AppSidebar() {
         <NavList items={primaryNav} pathname={pathname} searchParams={searchParams} onNavigate={closeMobile} />
         <ToolboxNavSection pathname={pathname} searchParams={searchParams} onNavigate={closeMobile} />
 
-        <OrgNavSection />
+        {SHOW_ORG_NAV_SECTION ? <OrgNavSection /> : null}
         <SidebarGroup className="mt-3 flex min-h-0 flex-1 flex-col p-0">
           <SidebarGroupLabel className="mb-1.5 h-7 shrink-0 px-2.5 text-xs font-medium tracking-wide text-muted-foreground">
             AIM 专家

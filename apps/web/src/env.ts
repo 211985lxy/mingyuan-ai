@@ -251,6 +251,8 @@ export const env = createEnv({
   client: {
     NEXT_PUBLIC_APP_URL: z.string().optional(),
     NEXT_PUBLIC_SITE_URL: z.string().optional(),
+    NEXT_PUBLIC_ADMIN_EMAIL: z.string().optional(),
+    NEXT_PUBLIC_AIM_LANDING_DEFAULT: z.enum(["entry", "conversation"]).optional(),
   },
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -433,6 +435,8 @@ export const env = createEnv({
     MYSQLDUMP_BIN: process.env.MYSQLDUMP_BIN,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+    NEXT_PUBLIC_ADMIN_EMAIL: process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+    NEXT_PUBLIC_AIM_LANDING_DEFAULT: process.env.NEXT_PUBLIC_AIM_LANDING_DEFAULT,
     OBSIDIAN_EXPORT_ENABLED: process.env.OBSIDIAN_EXPORT_ENABLED,
     OBSIDIAN_SYNC_USER_ID: process.env.OBSIDIAN_SYNC_USER_ID,
     OBSIDIAN_SYNC_TOKEN: process.env.OBSIDIAN_SYNC_TOKEN,
