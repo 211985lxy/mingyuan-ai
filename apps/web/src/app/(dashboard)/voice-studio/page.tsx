@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { AudioLines, RefreshCw } from "lucide-react"
+import { AudioLines, Loader2, RefreshCw, Volume2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,8 +15,15 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
-import { VoiceStudioPlayButton } from "@/components/voice/voice-preview-button"
-import { fetchVoiceModels, VOICE_MAX_TEXT_LENGTH, type VoiceModelsResponse } from "@/lib/api/voice"
+import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
+import {
+  fetchVoiceModels,
+  importVoiceHistory,
+  synthesizeVoiceAudio,
+  VOICE_MAX_TOTAL_LENGTH,
+  type VoiceModelsResponse,
+} from "@/lib/api/voice"
+import { splitTextForSynthesis } from "@/lib/voice/segment-text"
 
 interface SynthesizedInfo {
   charCount: number | null
@@ -34,6 +41,7 @@ function useVoiceStudio() {
   const [speed, setSpeed] = useState(1)
   const [playerUrl, setPlayerUrl] = useState<string | null>(null)
   const [lastInfo, setLastInfo] = useState<SynthesizedInfo | null>(null)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
 
   const reloadModels = useCallback(async () => {
     setLoadingModels(true)
@@ -61,11 +69,17 @@ function useVoiceStudio() {
     setLastInfo({ charCount: payload.charCount, at: new Date().toLocaleTimeString("zh-CN") })
   }, [])
 
+  const onImported = useCallback(() => {
+    setHistoryRefresh((current) => current + 1)
+  }, [])
+
   return {
+    historyRefresh,
     lastInfo,
     loadingModels,
     models,
     modelsError,
+    onImported,
     onSynthesized,
     playerUrl,
     reloadModels,
@@ -136,7 +150,9 @@ export default function VoiceStudioPage() {
         playerUrl={studio.playerUrl}
         lastInfo={studio.lastInfo}
         onSynthesized={studio.onSynthesized}
+        onImported={studio.onImported}
       />
+      <VoiceHistoryCard refreshKey={studio.historyRefresh} />
     </div>
   )
 }
@@ -156,7 +172,8 @@ function UnconfiguredNotice({ message }: { message: string | null }) {
 
 function ScriptInputCard({ text, onChange }: { text: string; onChange: (value: string) => void }) {
   const charCount = text.trim().length
-  const tooLong = charCount > VOICE_MAX_TEXT_LENGTH
+  const tooLong = charCount > VOICE_MAX_TOTAL_LENGTH
+  const plannedSegments = splitTextForSynthesis(text).length
 
   return (
     <Card>
@@ -166,7 +183,7 @@ function ScriptInputCard({ text, onChange }: { text: string; onChange: (value: s
           输入文案
         </CardTitle>
         <CardDescription>
-          支持 [括号] 情绪提示（如 [轻松地]、[停顿]），单段上限 {VOICE_MAX_TEXT_LENGTH} 字。
+          支持 [括号] 情绪提示（如 [轻松地]、[停顿]）；超过 1200 字自动按断句分段合成，上限 {VOICE_MAX_TOTAL_LENGTH} 字。
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -178,7 +195,8 @@ function ScriptInputCard({ text, onChange }: { text: string; onChange: (value: s
         />
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className={tooLong ? "text-destructive" : ""}>
-            {charCount} / {VOICE_MAX_TEXT_LENGTH} 字
+            {charCount} / {VOICE_MAX_TOTAL_LENGTH} 字
+            {plannedSegments > 1 && !tooLong ? ` · 将自动分 ${plannedSegments} 段合成` : ""}
           </span>
           {text ? (
             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange("")}>
@@ -315,6 +333,67 @@ function ModelSpeedCard({
   )
 }
 
+type SynthesisPhase = "idle" | "synthesizing" | "saving"
+
+interface SynthesisHandlers {
+  onDone: (payload: { objectUrl: string; charCount: number | null }) => void
+  onSaved: () => void
+}
+
+/** 逐段合成全文并在浏览器内拼接：免费档长文较慢（约 12.5 字/秒），进度可见、不占服务端长连接。 */
+function useSegmentedSynthesis(handlers: SynthesisHandlers) {
+  const { onDone, onSaved } = handlers
+  const [phase, setPhase] = useState<SynthesisPhase>("idle")
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [error, setError] = useState<string | null>(null)
+
+  const generate = useCallback(
+    async (input: { text: string; voiceId: string | null; model: string | null; speed: number }) => {
+      const trimmed = input.text.trim()
+      if (!trimmed || phase !== "idle") return
+      setError(null)
+      setPhase("synthesizing")
+      try {
+        const segments = splitTextForSynthesis(trimmed)
+        setProgress({ done: 0, total: segments.length })
+        const parts: Blob[] = []
+        for (let i = 0; i < segments.length; i++) {
+          setProgress({ done: i, total: segments.length })
+          const result = await synthesizeVoiceAudio({
+            text: segments[i],
+            voiceId: input.voiceId,
+            model: input.model,
+            speed: input.speed,
+          })
+          parts.push(result.blob)
+          URL.revokeObjectURL(result.objectUrl)
+        }
+        setProgress({ done: segments.length, total: segments.length })
+        const combined = new Blob(parts, { type: "audio/mpeg" })
+        const objectUrl = URL.createObjectURL(combined)
+        onDone({ objectUrl, charCount: trimmed.length })
+
+        setPhase("saving")
+        await importVoiceHistory({
+          text: trimmed,
+          model: input.model || "s2.1-pro-free",
+          voiceId: input.voiceId,
+          segments: segments.length,
+          audio: combined,
+        })
+        onSaved()
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "配音失败，请稍后重试")
+      } finally {
+        setPhase("idle")
+      }
+    },
+    [onDone, onSaved, phase],
+  )
+
+  return { phase, progress, error, generate }
+}
+
 function ActionCard({
   text,
   voiceId,
@@ -324,6 +403,7 @@ function ActionCard({
   playerUrl,
   lastInfo,
   onSynthesized,
+  onImported,
 }: {
   text: string
   voiceId: string
@@ -333,26 +413,46 @@ function ActionCard({
   playerUrl: string | null
   lastInfo: SynthesizedInfo | null
   onSynthesized: (payload: { objectUrl: string; charCount: number | null }) => void
+  onImported: () => void
 }) {
+  const { phase, progress, error, generate } = useSegmentedSynthesis({
+    onDone: onSynthesized,
+    onSaved: onImported,
+  })
   const charCount = text.trim().length
-  const tooLong = charCount > VOICE_MAX_TEXT_LENGTH
-  const canSynthesize = configured && charCount > 0 && !tooLong
+  const tooLong = charCount > VOICE_MAX_TOTAL_LENGTH
+  const canSynthesize = configured && charCount > 0 && !tooLong && phase === "idle"
   const hint =
-    charCount === 0 ? "先输入文案" : tooLong ? `超出 ${VOICE_MAX_TEXT_LENGTH} 字，请分段` : "等待音色列表就绪"
+    charCount === 0
+      ? "先输入文案"
+      : tooLong
+        ? `超出 ${VOICE_MAX_TOTAL_LENGTH} 字，请拆分后再试`
+        : "等待音色列表就绪"
+  const segments = splitTextForSynthesis(text).length
 
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 py-5">
         <div className="flex flex-wrap items-center gap-3">
-          <VoiceStudioPlayButton
-            text={tooLong ? "" : text}
-            voiceId={voiceId || null}
-            model={model || null}
-            speed={speed}
-            autoplay={false}
-            onSynthesized={onSynthesized}
-          />
-          {!canSynthesize ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+          <Button
+            size="sm"
+            className="h-9 gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            disabled={!canSynthesize}
+            onClick={() => void generate({ text, voiceId: voiceId || null, model: model || null, speed })}
+          >
+            {phase !== "idle" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+            {phase === "synthesizing"
+              ? `合成中 ${progress.done}/${progress.total} 段`
+              : phase === "saving"
+                ? "保存中…"
+                : "生成并试听"}
+          </Button>
+          {!canSynthesize && phase === "idle" ? (
+            <span className="text-xs text-muted-foreground">{hint}</span>
+          ) : null}
+          {phase === "synthesizing" ? (
+            <span className="text-xs text-muted-foreground">免费档较慢（约 12.5 字/秒），合成期间请勿关闭页面</span>
+          ) : null}
           {lastInfo ? (
             <span className="text-xs text-muted-foreground">
               上次生成 {lastInfo.at}
@@ -360,6 +460,11 @@ function ActionCard({
             </span>
           ) : null}
         </div>
+        {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+        <p className="text-xs text-muted-foreground">
+          {segments > 1 ? `本文将分 ${segments} 段顺序合成后自动拼接，` : ""}
+          生成完成会自动存入「配音历史」，可随时回听、下载或删除。
+        </p>
         {playerUrl ? (
           <audio controls src={playerUrl} className="w-full" preload="metadata">
             <track kind="captions" />

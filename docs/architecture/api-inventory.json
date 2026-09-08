@@ -4337,13 +4337,15 @@
       "route": "/api/voice/history",
       "file": "src/app/api/voice/history/route.ts",
       "methods": [
-        "GET"
+        "DELETE",
+        "GET",
+        "POST"
       ],
       "domain": "voice",
       "kind": "crud",
       "orchestratable": false,
       "auth": "user_session",
-      "input": "none",
+      "input": "zod_json",
       "query": "zod",
       "externalService": false,
       "cost": "low",
