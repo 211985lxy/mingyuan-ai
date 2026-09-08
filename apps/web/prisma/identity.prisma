@@ -87,6 +87,46 @@ model AdminAuditLog {
   @@index([requestId])
 }
 
+/// Cross-source append-only index used by the administrator audit center.
+/// Specialist records remain in their source tables; this table stores only
+/// normalized, redacted metadata and correlation links.
+model AuditEvent {
+  id               String   @id @default(cuid())
+  occurredAt       DateTime
+  ingestedAt       DateTime @default(now())
+  source           String   @db.VarChar(32)
+  category         String   @db.VarChar(32)
+  severity         String   @db.VarChar(16)
+  status           String   @db.VarChar(16)
+  action           String   @db.VarChar(120)
+  summary          String   @db.Text
+  actorType        String?  @db.VarChar(32)
+  actorIdHash      String?  @db.VarChar(32)
+  targetType       String?  @db.VarChar(80)
+  targetId         String?  @db.VarChar(191)
+  projectId        String?  @db.VarChar(191)
+  environment      String?  @db.VarChar(32)
+  correlationId    String?  @db.VarChar(80)
+  requestId        String?  @db.VarChar(80)
+  traceId          String?  @db.VarChar(80)
+  gitSha           String?  @db.VarChar(64)
+  sourceRecordType String?  @db.VarChar(80)
+  sourceRecordId   String?  @db.VarChar(191)
+  idempotencyKey   String   @db.VarChar(191)
+  metadata         Json?
+  externalLogUrl   String?  @db.Text
+
+  @@unique([source, idempotencyKey])
+  @@index([occurredAt(sort: Desc)])
+  @@index([source, occurredAt(sort: Desc)])
+  @@index([category, occurredAt(sort: Desc)])
+  @@index([severity, occurredAt(sort: Desc)])
+  @@index([status, occurredAt(sort: Desc)])
+  @@index([correlationId, occurredAt(sort: Desc)])
+  @@index([actorIdHash, occurredAt(sort: Desc)])
+  @@index([projectId, occurredAt(sort: Desc)])
+}
+
 model ActivationCode {
   id           String    @id @default(cuid())
   code         String    @unique

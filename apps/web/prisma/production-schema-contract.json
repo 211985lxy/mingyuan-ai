@@ -603,6 +603,35 @@
         "status",
         "createdAt"
       ]
+    },
+    {
+      "name": "AuditEvent",
+      "columns": [
+        "id",
+        "occurredAt",
+        "ingestedAt",
+        "source",
+        "category",
+        "severity",
+        "status",
+        "action",
+        "summary",
+        "actorType",
+        "actorIdHash",
+        "targetType",
+        "targetId",
+        "projectId",
+        "environment",
+        "correlationId",
+        "requestId",
+        "traceId",
+        "gitSha",
+        "sourceRecordType",
+        "sourceRecordId",
+        "idempotencyKey",
+        "metadata",
+        "externalLogUrl"
+      ]
     }
   ]
 }
