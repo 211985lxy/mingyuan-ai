@@ -6,7 +6,6 @@ import {
   parseJsonBody,
   parseQuery,
 } from "@/lib/api-contract"
-import { prisma } from "@/lib/prisma"
 import {
   FishAudioError,
   FISH_AUDIO_MAX_TEXT_LENGTH,
@@ -15,14 +14,15 @@ import {
 } from "@/lib/voice/fish-audio"
 
 export const runtime = "nodejs"
-export const maxDuration = 120
+export const maxDuration = 300
 
+// 单次调用只合成一段（客户端长文会拆成 ≤1200 字的段逐段调用）
 const ttsBodySchema = z.object({
   text: z
     .string()
     .trim()
     .min(1, "请先输入要配音的文案")
-    .max(FISH_AUDIO_MAX_TEXT_LENGTH, `单次配音最多 ${FISH_AUDIO_MAX_TEXT_LENGTH} 字，请分段后再试`),
+    .max(FISH_AUDIO_MAX_TEXT_LENGTH, `单段配音最多 ${FISH_AUDIO_MAX_TEXT_LENGTH} 字`),
   voiceId: z.string().trim().max(64).nullish(),
   model: z.string().trim().max(64).nullish(),
   format: z.enum(["mp3", "wav", "pcm", "opus"]).nullish(),
@@ -33,7 +33,7 @@ const ttsBodySchema = z.object({
 const ttsQuerySchema = z.object({})
 
 /**
- * @description 处理 POST 请求：把文案合成为语音字节流返回
+ * @description 处理 POST 请求：把一段文案合成为语音字节流返回
  * @param request - 请求对象
  * @returns Promise<NextResponse>
  */
@@ -64,24 +64,6 @@ export async function POST(request: NextRequest) {
       speed: body.speed ?? undefined,
       volume: body.volume ?? undefined,
     })
-
-    try {
-      await prisma.voiceSynthesisRecord.create({
-        data: {
-          userId: user.id,
-          provider: "fish_audio",
-          model: result.model,
-          voiceId: body.voiceId ?? null,
-          format: (body.format ?? "mp3") as string,
-          textPreview: body.text.slice(0, 200),
-          charCount: result.charCount,
-          status: "succeeded",
-        },
-      })
-    } catch (dbError) {
-      // 落库失败不阻塞出声：记录仅用于历史与审计，音频已成功合成
-      console.warn("[api/voice/tts] 合成记录落库失败:", dbError instanceof Error ? dbError.message : dbError)
-    }
 
     return new NextResponse(result.audio, {
       status: 200,

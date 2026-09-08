@@ -29,40 +29,52 @@ interface AudioCache {
   url: string
 }
 
-interface VoicePreviewController {
-  audioRef: React.RefObject<HTMLAudioElement | null>
-  audioBindings: {
-    onError: () => void
-    onEnded: () => void
-    onPause: () => void
-    onPlay: () => void
+type VoiceErrorState = { key: string; message: string } | null
+
+function triggerDownload(url: string, filename: string) {
+  const link = document.createElement("a")
+  link.href = url
+  link.download = filename
+  link.click()
+}
+
+function createAudioBindings(
+  cacheKey: string,
+  setPlaying: (value: boolean) => void,
+  setError: (key: string, message: string) => void,
+) {
+  return {
+    onPlay: () => setPlaying(true),
+    onPause: () => setPlaying(false),
+    onEnded: () => setPlaying(false),
+    onError: () => {
+      setPlaying(false)
+      setError(cacheKey, "音频播放失败，请重新生成")
+    },
   }
-  download: () => void
-  error: string | null
-  loading: boolean
-  objectUrl: string | null
-  play: () => Promise<void>
-  playing: boolean
 }
 
 /**
- * 配音试听控制器：合成并缓存音频（内存级、不落库），驱动 <audio> 播放/停止。
+ * 配音试听控制器：合成并缓存音频（内存级、不落库除非 persist），驱动 <audio> 播放/停止。
  * 与展示层分离，保证单一函数不超过 80 行。
  */
 export function useVoicePreview(props: VoicePreviewButtonProps): VoicePreviewController {
   const { text, voiceId, model, speed, autoplay = true, onSynthesized } = props
   const [loading, setLoading] = useState(false)
   const [playing, setPlaying] = useState(false)
-  const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null)
+  const [errorState, setErrorState] = useState<VoiceErrorState>(null)
   const [cache, setCache] = useState<AudioCache | null>(null)
   const [playRequest, setPlayRequest] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const trimmed = text.trim()
+  // 正文/音色/档位/语速一变，旧音频立即失效，避免播放与当前文案不一致
   const cacheKey = `${model ?? ""}|${voiceId ?? ""}|${speed ?? 1}|${trimmed}`
   const objectUrl = cache && cache.key === cacheKey ? cache.url : null
   const error = errorState && errorState.key === cacheKey ? errorState.message : null
+
+  const setError = useCallback((key: string, message: string) => setErrorState({ key, message }), [])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -72,14 +84,11 @@ export function useVoicePreview(props: VoicePreviewButtonProps): VoicePreviewCon
     }
   }, [])
 
+  // 每次播放请求（新音频或重播）落到 <audio> 上，事件回调负责同步播放态
   useEffect(() => {
     if (playRequest === 0 || !objectUrl) return
-    const element = audioRef.current
-    if (!element) return
-    void element.play().catch(() => {
-      setErrorState({ key: cacheKey, message: "浏览器拦截了自动播放，请再点一次" })
-    })
-  }, [cacheKey, objectUrl, playRequest])
+    void audioRef.current?.play().catch(() => setError(cacheKey, "浏览器拦截了自动播放，请再点一次"))
+  }, [cacheKey, objectUrl, playRequest, setError])
 
   const play = useCallback(async () => {
     if (playing) {
@@ -108,34 +117,19 @@ export function useVoicePreview(props: VoicePreviewButtonProps): VoicePreviewCon
       onSynthesized?.({ objectUrl: result.objectUrl, charCount: result.charCount })
     } catch (caught) {
       if (caught instanceof Error && caught.name === "AbortError") return
-      setErrorState({
-        key: cacheKey,
-        message: caught instanceof Error ? caught.message : "配音失败，请稍后重试",
-      })
+      setError(cacheKey, caught instanceof Error ? caught.message : "配音失败，请稍后重试")
     } finally {
       setLoading(false)
     }
-  }, [autoplay, cacheKey, model, objectUrl, onSynthesized, playing, speed, trimmed, voiceId])
+  }, [autoplay, cacheKey, model, objectUrl, onSynthesized, playing, setError, speed, trimmed, voiceId])
 
   function download() {
-    if (!objectUrl) return
-    const link = document.createElement("a")
-    link.href = objectUrl
-    link.download = `voice-${Date.now()}.mp3`
-    link.click()
+    if (objectUrl) triggerDownload(objectUrl, `voice-${Date.now()}.mp3`)
   }
 
   return {
     audioRef,
-    audioBindings: {
-      onPlay: () => setPlaying(true),
-      onPause: () => setPlaying(false),
-      onEnded: () => setPlaying(false),
-      onError: () => {
-        setPlaying(false)
-        setErrorState({ key: cacheKey, message: "音频播放失败，请重新生成" })
-      },
-    },
+    audioBindings: createAudioBindings(cacheKey, setPlaying, setError),
     download,
     error,
     loading,
@@ -143,6 +137,22 @@ export function useVoicePreview(props: VoicePreviewButtonProps): VoicePreviewCon
     play,
     playing,
   }
+}
+
+interface VoicePreviewController {
+  audioRef: React.RefObject<HTMLAudioElement | null>
+  audioBindings: {
+    onError: () => void
+    onEnded: () => void
+    onPause: () => void
+    onPlay: () => void
+  }
+  download: () => void
+  error: string | null
+  loading: boolean
+  objectUrl: string | null
+  play: () => Promise<void>
+  playing: boolean
 }
 
 /** 配音试听按钮：合成后播放/停止，成功后可下载这段 mp3。 */
@@ -182,16 +192,5 @@ export function VoicePreviewButton(props: VoicePreviewButtonProps) {
         </span>
       ) : null}
     </span>
-  )
-}
-
-/** 工坊页用的主按钮形态 */
-export function VoiceStudioPlayButton(props: VoicePreviewButtonProps) {
-  return (
-    <VoicePreviewButton
-      {...props}
-      label={props.label ?? "生成并试听"}
-      className="h-9 gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-    />
   )
 }

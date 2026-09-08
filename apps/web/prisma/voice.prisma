@@ -1,6 +1,6 @@
 // 语音工坊（Fish Audio TTS）——合成记录落库（补 MVP「不落库」缺口，additive）。
 
-/** 一次语音合成的元数据记录；音频本身不落库，仅记录可审计的合成事实。 */
+/** 一次语音合成的记录；音频转存 OSS，全文留档供历史回放与重新生成。 */
 model VoiceSynthesisRecord {
   id          String   @id @default(cuid())
   userId      String   @db.VarChar(64)
@@ -9,6 +9,9 @@ model VoiceSynthesisRecord {
   voiceId     String?  @db.VarChar(64)
   format      String   @db.VarChar(8) // mp3 | wav | pcm | opus
   textPreview String   @db.VarChar(200)
+  textContent String?  @db.Text // 合成全文；供历史回放与重新生成
+  audioUrl    String?  @db.VarChar(512) // OSS 对象 URL；未配置 OSS 时为空
+  segments    Int      @default(1) // 长文分段合成时的段数
   charCount   Int
   status      String   @default("succeeded") @db.VarChar(16)
   createdAt   DateTime @default(now())

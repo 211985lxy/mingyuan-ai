@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { splitTextForSynthesis } from "@/lib/voice/segment-text"
 
 type FishAudioModule = typeof import("@/lib/voice/fish-audio")
 
@@ -115,5 +116,35 @@ describe("Fish Audio TTS 客户端", () => {
     expect(failed.items).toEqual([])
     expect(failed.degraded).toBe(true)
     expect(failed.reason).toContain("500")
+  })
+})
+
+describe("长文分段切分 splitTextForSynthesis", () => {
+  it("短文与空文本直通", () => {
+    expect(splitTextForSynthesis("")).toEqual([])
+    expect(splitTextForSynthesis("   ")).toEqual([])
+    expect(splitTextForSynthesis("大家好，今天聊聊暖气片。")).toEqual(["大家好，今天聊聊暖气片。"])
+  })
+
+  it("按句子边界切分且不丢字、不超上限", async () => {
+    const { FISH_AUDIO_MAX_TEXT_LENGTH } = await loadClient()
+    const sentence = "暖气片一半热一半凉，到底是为什么？"
+    const text = sentence.repeat(300) // 5100 字，必然超单段上限
+    const segments = splitTextForSynthesis(text)
+    expect(segments.length).toBeGreaterThan(1)
+    for (const segment of segments) {
+      expect(segment.length).toBeLessThanOrEqual(1200)
+    }
+    expect(segments.join("")).toBe(text)
+    expect(text.length).toBeGreaterThan(FISH_AUDIO_MAX_TEXT_LENGTH)
+  })
+
+  it("无断句符的超长单句按硬上限兜底切分", () => {
+    const text = "啊".repeat(5000)
+    const segments = splitTextForSynthesis(text)
+    expect(segments.length).toBe(5)
+    expect(segments.slice(0, 4).map((segment) => segment.length)).toEqual([1200, 1200, 1200, 1200])
+    expect(segments[4].length).toBe(200)
+    expect(segments.join("")).toBe(text)
   })
 })

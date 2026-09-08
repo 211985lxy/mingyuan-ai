@@ -19,7 +19,7 @@ export const FISH_AUDIO_DEFAULT_BASE_URL = "https://api.fish.audio"
 /** 默认走免费开发档：与 s2.1-pro 同权重，无 TTFA / DPA 保障，适合试听与原型 */
 export const FISH_AUDIO_DEFAULT_MODEL = "s2.1-pro-free"
 const DEFAULT_TIMEOUT_MS = 60_000
-/** 单次合成文本上限：试听场景足够，超长文案应在上层分段 */
+/** 单次合成文本上限：超过由客户端分段后逐段调用（见 lib/voice/segment-text.ts） */
 export const FISH_AUDIO_MAX_TEXT_LENGTH = 4000
 
 export type FishAudioFormat = "mp3" | "wav" | "pcm" | "opus"
@@ -151,6 +151,8 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
   const model = input.model?.trim() || config.model
   const voiceId = input.voiceId?.trim() || null
 
+  // 免费档实测约 12.5 字/秒：按文本量动态放宽超时，短文保底 60s、长文上限 240s
+  const timeoutMs = Math.min(240_000, Math.max(DEFAULT_TIMEOUT_MS, 45_000 + text.length * 120))
   const response = await voiceFetch(`${config.baseUrl}/v1/tts`, {
     method: "POST",
     headers: {
@@ -172,7 +174,7 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
           }
         : {}),
     }),
-    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   })
 
   if (!response.ok) {

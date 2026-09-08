@@ -585,6 +585,24 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    {
+      "name": "VoiceSynthesisRecord",
+      "columns": [
+        "id",
+        "userId",
+        "provider",
+        "model",
+        "voiceId",
+        "format",
+        "textPreview",
+        "textContent",
+        "audioUrl",
+        "segments",
+        "charCount",
+        "status",
+        "createdAt"
+      ]
     }
   ]
 }
