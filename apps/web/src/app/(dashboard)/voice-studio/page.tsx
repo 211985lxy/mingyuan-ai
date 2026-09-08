@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
+import { useVoiceSamplePreview, VoicePickerList } from "@/components/voice/voice-sample-preview"
 import {
   fetchVoiceModels,
   importVoiceHistory,
@@ -133,6 +134,8 @@ export default function VoiceStudioPage() {
         onVoiceChange={studio.setVoiceId}
         models={studio.models}
         loadingModels={studio.loadingModels}
+        model={studio.tier}
+        speed={studio.speed}
       />
       <ModelSpeedCard
         models={studio.models}
@@ -216,6 +219,8 @@ function VoicePickerCard({
   onVoiceChange,
   models,
   loadingModels,
+  model,
+  speed,
 }: {
   scope: "all" | "mine"
   onScopeChange: (value: "all" | "mine") => void
@@ -223,7 +228,10 @@ function VoicePickerCard({
   onVoiceChange: (value: string) => void
   models: VoiceModelsResponse | null
   loadingModels: boolean
+  model: string
+  speed: number
 }) {
+  const preview = useVoiceSamplePreview(model, speed)
   // 记住选中音色的名称：切换公共库/我的音色后，已选音色可能不在当前列表里，
   // 不补回的话触发器会退化为显示原始模型 ID
   const [picked, setPicked] = useState<{ id: string; title: string } | null>(null)
@@ -250,23 +258,13 @@ function VoicePickerCard({
         <CardDescription>平台默认音色优先；公共库已按热度精选热门中文音色，也可切「我的音色」。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Select
-          value={voiceId}
-          onValueChange={(value) => onVoicePick(value ?? "")}
+        <VoicePickerList
+          options={options}
+          voiceId={voiceId}
+          onVoicePick={onVoicePick}
+          preview={preview}
           disabled={loadingModels || !models?.configured}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={loadingModels ? "加载中…" : "平台默认音色"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">平台默认音色</SelectItem>
-            {options.map((voice) => (
-              <SelectItem key={voice.id} value={voice.id}>
-                {voice.title}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>音色范围</span>
           <Button
