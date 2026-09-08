@@ -6,8 +6,8 @@
     300
   ],
   "functionLineLimit": 80,
-  "legacyFunctionBaseline": 211,
-  "legacyFunctionBaselineDate": "2026-09-07",
+  "legacyFunctionBaseline": 213,
+  "legacyFunctionBaselineDate": "2026-09-08",
   "legacyFiles": [
     {
       "path": "src/lib/aim-generation-prompts.ts",
@@ -16,8 +16,13 @@
     },
     {
       "path": "src/env.ts",
-      "maxLines": 523,
-      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 新增 4 个 provider 变量（schema+runtime 各 4 行）"
+      "maxLines": 525,
+      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 个 provider + 五步升级合并新增（schema+runtime 各若干行）"
+    },
+    {
+      "path": "src/app/(dashboard)/aim/page.tsx",
+      "maxLines": 501,
+      "target": "拆 AimPage 装配区与对话框群为子模块（合并后 501 行，含五步升级 HITL 挂载）"
     },
     {
       "path": "src/lib/account-project-context.ts",
