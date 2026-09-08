@@ -86,12 +86,11 @@ const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
     maxRetries: 0,
     capability: "advanced",
   },
+  // 质量链第二跳：火山方舟豆包旗舰，国内直连低延迟。
+  // key 来源：DOUBAO_API_KEY（已开通账号）优先，回落 ARK_API_KEY（生产账号未开通 seed 模型，勿单独启用）。
+  { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 30_000, capability: "standard" },
   { name: "apimart", model: "gpt-5.4", timeoutMs: 25_000, capability: "advanced" },
   { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 20_000, capability: "advanced" },
-  // 质量链备选：火山方舟豆包旗舰。生产 ARK 账号尚未开通该模型（ModelNotOpen 404），
-  // 2026-09-08 上午它作为第二跳每次必失败，白吃 attempt 预算并触发熔断，压垮了整条链。
-  // 在方舟控制台开通模型后，如需恢复其质量优先级，再把它移回第二跳。
-  { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 30_000, capability: "standard" },
 ]
 
 export const AGENT_ROUTES = freezeAgentRoutes({
