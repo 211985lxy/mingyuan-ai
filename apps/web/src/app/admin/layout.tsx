@@ -23,6 +23,7 @@ const MODULE_INFO: Record<string, { module: string; description: string }> = {
   "/admin/usage": { module: "运营管理", description: "使用记录" },
   "/admin/settings": { module: "系统", description: "系统设置" },
   "/admin/governance": { module: "系统", description: "治理责任" },
+  "/admin/audit-center": { module: "系统", description: "统一审计中心" },
   "/admin/logs": { module: "系统", description: "操作日志" },
 }
 

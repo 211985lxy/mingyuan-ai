@@ -102,7 +102,7 @@ const navGroups: NavGroup[] = [
     items: [
       { title: "系统设置", titleEn: "Settings", href: "/admin/settings", icon: Settings },
       { title: "治理责任", titleEn: "Governance", href: "/admin/governance", icon: ShieldCheck },
-      { title: "操作日志", titleEn: "Audit Log", href: "/admin/logs", icon: ScrollText },
+      { title: "统一审计中心", titleEn: "Audit Center", href: "/admin/audit-center", icon: ScrollText },
     ],
   },
 ]
