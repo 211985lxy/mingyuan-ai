@@ -201,7 +201,12 @@ export async function failAimGenerationAttempt(input: {
   code?: string
 }) {
   const code = input.code || classifyAimFailure(input.error)
-  const errorMessage = `${code}: ${mapAimFailureCodeToUserMessage(code)}`
+  // 落库必须带真实错误摘要：只存用户文案会让失败记录无法排障。
+  const rawMessage = input.error instanceof Error ? input.error.message : String(input.error ?? "")
+  const userMessage = mapAimFailureCodeToUserMessage(code)
+  const errorMessage = rawMessage && rawMessage !== userMessage
+    ? `${code}: ${userMessage}｜root-cause: ${rawMessage}`
+    : `${code}: ${userMessage}`
   await prisma.aimGeneration.updateMany({
     where: {
       ...attemptWhere(input.id, input.userId, input.projectId),

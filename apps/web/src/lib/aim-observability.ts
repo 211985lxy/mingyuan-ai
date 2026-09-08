@@ -337,10 +337,19 @@ export async function failAimTrace(
   const runError = error instanceof AimRunExecutionError ? error : null
   const code = runError?.code ?? classifyAimFailure(error, runError?.providerAttempts ?? [])
   const last = runError?.providerAttempts.at(-1)
+  // errorMessage 必须带真实根因摘要：只存映射后的用户文案会让 trace 表失去排障价值。
+  const userMessage = mapAimFailureCodeToUserMessage(code)
+  const rootCause = runError?.cause instanceof Error
+    ? runError.cause.message
+    : error instanceof Error ? error.message : ""
   await safeUpdateTrace(trace.id, {
     status: "failed",
     durationMs: Date.now() - trace.startedAt,
-    errorMessage: summarizeText(mapAimFailureCodeToUserMessage(code)),
+    errorMessage: summarizeText(
+      rootCause && rootCause !== userMessage
+        ? `${userMessage}｜root-cause: ${rootCause}`
+        : userMessage,
+    ),
     errorCode: code,
     ...(extra?.aimGenerationId ? { aimGenerationId: extra.aimGenerationId } : {}),
     runId: runError?.runId ?? null,

@@ -145,6 +145,7 @@ export class LLMClient {
     reportLlmInvocation(boundedOptions, false)
     let lastError: Error | undefined
     let actualRequests = 0
+    let circuitSkipped = 0
     const requestedVendors = new Set<string>()
 
     for (const provider of this.providers) {
@@ -153,7 +154,10 @@ export class LLMClient {
         continue
       }
       const modelName = this.providerModel(provider, boundedOptions)
-      if (await isProviderCircuitOpen(provider.name, modelName, this.circuitScope)) continue
+      if (await isProviderCircuitOpen(provider.name, modelName, this.circuitScope)) {
+        circuitSkipped += 1
+        continue
+      }
       requestedVendors.add(provider.name)
       const attemptIndex = actualRequests
       actualRequests += 1
@@ -211,6 +215,13 @@ export class LLMClient {
           "请检查模型名拼写或改走聚合网关（createGatewayLLM）。",
       )
     }
+    if (!lastError && circuitSkipped > 0) {
+      // 全部候选线路都在熔断保护中：给出可分类、可恢复的明确错误，
+      // 而不是落进 "[llm] All providers failed" → INTERNAL_ERROR 的黑洞。
+      throw new Error(
+        `全部模型线路均处于熔断保护中（${circuitSkipped} 条跳过），请稍后重试`,
+      )
+    }
     throw lastError ?? new Error("[llm] All providers failed")
   }
 
@@ -243,6 +254,7 @@ export class LLMClient {
     reportLlmInvocation(boundedOptions, true)
     let lastError: Error | undefined
     let actualRequests = 0
+    let circuitSkipped = 0
     const requestedVendors = new Set<string>()
 
     for (const provider of this.providers) {
@@ -251,7 +263,10 @@ export class LLMClient {
         continue
       }
       const modelName = this.providerModel(provider, boundedOptions)
-      if (await isProviderCircuitOpen(provider.name, modelName, this.circuitScope)) continue
+      if (await isProviderCircuitOpen(provider.name, modelName, this.circuitScope)) {
+        circuitSkipped += 1
+        continue
+      }
 
       requestedVendors.add(provider.name)
       const attemptIndex = actualRequests
@@ -305,6 +320,11 @@ export class LLMClient {
       throw new Error(
         `[llm-config] 模型名 "${boundedOptions.model}" 不被任何已配置供应商认识（${this.providers.map((p) => p.name).join(", ")}）。` +
           "请检查模型名拼写或改走聚合网关（createGatewayLLM）。",
+      )
+    }
+    if (!lastError && circuitSkipped > 0) {
+      throw new Error(
+        `全部模型线路均处于熔断保护中（${circuitSkipped} 条跳过），请稍后重试`,
       )
     }
     throw lastError ?? new Error("[llm] No streaming providers available")

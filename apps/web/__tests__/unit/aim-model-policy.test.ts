@@ -42,6 +42,20 @@ describe("AIM model capability policy", () => {
     })
   })
 
+  it("treats Ark ModelNotOpen and SDK connection errors as fallback-able, not chain-breaking", () => {
+    // 2026-09-08 事故：生产 ARK 账号未开通 doubao 模型（ModelNotOpen 404），
+    // 之前按 4xx client 错误处理会中断整条降级链而不是换下一跳。
+    expect(classifyProviderError(new Error(
+      '404 {"error":{"code":"ModelNotOpen","message":"Your account has not activated the model doubao-seed-2-1-pro-260628."}}',
+    ))).toEqual({ kind: "model_unavailable", retryable: true })
+
+    // OpenAI 兼容 SDK 连接层错误的统一文案，必须归为 network（此前落 unknown → INTERNAL_ERROR）
+    expect(classifyProviderError(new Error("Connection error."))).toEqual({
+      kind: "network",
+      retryable: true,
+    })
+  })
+
   it("treats provider balance exhaustion as retryable and falls back", async () => {
     expect(classifyProviderError(new Error("402 Insufficient Balance"))).toEqual({
       kind: "rate_limit",

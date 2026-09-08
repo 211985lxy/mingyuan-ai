@@ -223,7 +223,10 @@ describe("AIM generation attempt lifecycle", () => {
       }),
       data: expect.objectContaining({
         status: "failed",
-        errorMessage: "PROVIDER_UNAVAILABLE: 模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
+        // 落库文案带真实根因摘要（2026-09-08 排障整改），不再是纯用户文案
+        errorMessage: expect.stringContaining(
+          "PROVIDER_UNAVAILABLE: 模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。｜root-cause: 模型暂时不可用",
+        ),
       }),
     })
   })

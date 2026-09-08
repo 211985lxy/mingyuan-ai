@@ -191,7 +191,10 @@ export function classifyProviderError(error: unknown): {
     const modelUnavailable =
       /model.{0,40}(not found|unavailable|not available|unsupported|does not exist|invalid)/.test(lower) ||
       /(unsupported|invalid).{0,20}model/.test(lower) ||
-      /not available in your region/.test(lower)
+      /not available in your region/.test(lower) ||
+      // 火山方舟：账号未开通该模型（ModelNotOpen / has not activated the model），
+      // 属于配置级死跳，必须可降级到下一跳而不是按 4xx 客户端错误中断整条链。
+      /modelnotopen|has not activated the model/.test(lower)
     if (modelUnavailable && (status === 400 || status === 403 || status === 404)) {
       return { kind: "model_unavailable", retryable: true }
     }
@@ -223,7 +226,9 @@ export function classifyProviderError(error: unknown): {
   if (/(no providers configured|missing.*key|api[_ ]?key|baseurl|config)/.test(lower)) {
     return { kind: "config", retryable: false }
   }
-  if (/(econnrefused|econnreset|enotfound|epipe|fetch failed|network|socket|getaddrinfo)/.test(lower)) {
+  // OpenAI 兼容 SDK 的连接层错误统一文案是 "Connection error."（含代理故障/ECONNREFUSED 等），
+  // 必须归为网络错误以触发降级与线路熔断，而不是落进 unknown 最终表现为 INTERNAL_ERROR。
+  if (/(econnrefused|econnreset|enotfound|epipe|fetch failed|network|socket|getaddrinfo|connection error)/.test(lower)) {
     return { kind: "network", retryable: true }
   }
 

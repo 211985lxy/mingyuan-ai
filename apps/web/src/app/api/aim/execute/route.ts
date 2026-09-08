@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { aimExecuteBodySchema } from "@/features/aim/contracts/api"
 import { apiRequestErrorResponse, parseJsonRecord, ApiRequestError } from "@/lib/api-contract"
-import { aimFailureHttpStatus, mapAimErrorToUserMessage, toAimFailureResponse } from "@/lib/aim-error-message"
+import { aimFailureHttpStatus, mapAimErrorToUserMessage, toAimFailureResponse, AimRunExecutionError } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
 import { createAimTrace, failAimTrace, finishAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
 import { understandAimContentTurnWithTrace } from "@/lib/aim/semantic-task-understanding"
@@ -144,6 +144,17 @@ export async function POST(request: NextRequest) {
       })
     }, request.signal)
   } catch (error) {
+    // 失败必须留服务端痕迹：此前整条 catch 链零日志，生产排障只能看到
+    // 「生成失败，请稍后重试」，无法定位是哪条线路、什么原因（2026-09-08 上午全量失败无迹可查）。
+    const rawMessage = error instanceof Error ? error.message : String(error ?? "")
+    const rootCause = error instanceof AimRunExecutionError && error.cause instanceof Error
+      ? error.cause.message
+      : rawMessage
+    console.error(
+      `[aim-execute] generation failed: code=${(error as { code?: string }).code ?? "UNKNOWN"}`
+        + ` message=${JSON.stringify(rawMessage.slice(0, 300))}`
+        + ` rootCause=${JSON.stringify(rootCause.slice(0, 300))}`,
+    )
     if (error instanceof AimGenerationAttemptError) {
       return NextResponse.json({
         error: error.message,

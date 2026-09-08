@@ -108,10 +108,21 @@ export function classifyAimFailure(error: unknown, attempts: ProviderAttempt[] =
   if (INTERNAL_AIM_ERROR_PATTERN.test(message) || message.includes("连续修正后仍未完成当前要求")) {
     return "DELIVERY_CONSTRAINT_VIOLATION"
   }
+  // 供应商全被熔断跳过 / 全链失败时抛出的占位错误，必须可恢复而不是 INTERNAL_ERROR
+  if (/(all providers failed|全部模型线路.*熔断|线路.*熔断保护)/i.test(message)) {
+    return "PROVIDER_UNAVAILABLE"
+  }
+  // 连接层错误（OpenAI 兼容 SDK 统一文案 "Connection error."、fetch failed 等）
+  if (/(connection error|fetch failed|econnrefused|econnreset|enotfound|epipe|getaddrinfo)/i.test(message)) {
+    return "PROVIDER_UNAVAILABLE"
+  }
   const last = [...attempts].reverse().find((attempt) => attempt.status === "failed")
   if (last?.errorKind === "timeout") return "MODEL_TIMEOUT"
   if (last?.errorKind === "auth") return "PROVIDER_AUTH"
   if (last?.errorKind === "model_unavailable") return "PROVIDER_UNAVAILABLE"
+  if (last?.errorKind === "network" || last?.errorKind === "unknown") {
+    return "PROVIDER_UNAVAILABLE"
+  }
   if (last?.errorKind === "rate_limit") {
     return /(balance|额度|余额|quota|credit|billing|402)/i.test(last.error || "")
       ? "PROVIDER_QUOTA"
@@ -119,6 +130,10 @@ export function classifyAimFailure(error: unknown, attempts: ProviderAttempt[] =
   }
   if (/(empty response|empty completion|no output)/i.test(message) || last?.errorKind === "server" && /empty/i.test(last.error || "")) {
     return "EMPTY_OUTPUT"
+  }
+  // 供应商侧 5xx / 未分类瞬时错误：可恢复，换线路重试（此前落 INTERNAL_ERROR 的黑洞）
+  if (last?.errorKind === "server") {
+    return "PROVIDER_UNAVAILABLE"
   }
   if (/(timeout|timed out|deadline)/i.test(message)) return "MODEL_TIMEOUT"
   if (/aborted|用户停止|已停止本次生成/i.test(message)) return "USER_ABORTED"

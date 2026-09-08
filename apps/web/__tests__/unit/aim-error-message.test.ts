@@ -12,8 +12,9 @@ describe("mapAimErrorToUserMessage", () => {
   })
 
   it("英文/技术错误回落到友好文案（不外泄）", () => {
+    // 连接层错误自 2026-09-08 整改起映射为可恢复的「更换线路」文案，不再落泛化兜底
     expect(mapAimErrorToUserMessage(new Error("fetch failed: ECONNRESET"), "生成失败，请稍后重试"))
-      .toBe("生成失败，请稍后重试")
+      .toBe("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
     expect(mapAimErrorToUserMessage(new Error("Internal Server Error"), "生成失败，请稍后重试"))
       .toBe("生成失败，请稍后重试")
     expect(mapAimErrorToUserMessage(new Error("Unexpected token < in JSON"), "生成失败，请稍后重试"))
@@ -54,5 +55,32 @@ describe("aim failure codes", () => {
     expect(mapAimFailureCodeToUserMessage("DELIVERY_CONSTRAINT_VIOLATION")).toContain("未作为正式成稿")
     expect(mapAimFailureCodeToUserMessage("MODEL_TIMEOUT")).not.toContain("补充")
     expect(mapAimFailureCodeToUserMessage("PROVIDER_QUOTA")).not.toContain("补充")
+  })
+
+  // 2026-09-08 生产事故回归：当晨代理故障 zenmux/apimart 全部 "Connection error."，
+  // 被归为 INTERNAL_ERROR →「生成失败，请稍后重试」，且熔断全跳时零 attempt 可查。
+  it("classifies connection/server and circuit-blackout failures as recoverable PROVIDER_UNAVAILABLE", () => {
+    const networkAttempts = [{
+      provider: "zenmux", status: "failed" as const, attemptIndex: 0,
+      errorKind: "network" as const, error: "Connection error.",
+    }]
+    expect(classifyAimFailure(new Error("Connection error."), networkAttempts))
+      .toBe("PROVIDER_UNAVAILABLE")
+
+    const serverAttempts = [{
+      provider: "apimart", status: "failed" as const, attemptIndex: 1,
+      errorKind: "server" as const, error: "500 get_channel_failed",
+    }]
+    expect(classifyAimFailure(new Error("Internal Server Error"), serverAttempts))
+      .toBe("PROVIDER_UNAVAILABLE")
+
+    expect(classifyAimFailure(new Error("[llm] All providers failed")))
+      .toBe("PROVIDER_UNAVAILABLE")
+    expect(classifyAimFailure(new Error("全部模型线路均处于熔断保护中（4 条跳过），请稍后重试")))
+      .toBe("PROVIDER_UNAVAILABLE")
+
+    // 分类结果必须指向可恢复的用户动作（自动换线路重试），而不是泛化的「请稍后重试」
+    const code = classifyAimFailure(new Error("Connection error."))
+    expect(mapAimFailureCodeToUserMessage(code)).toContain("更换线路")
   })
 })
