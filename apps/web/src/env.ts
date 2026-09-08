@@ -61,6 +61,9 @@ export const env = createEnv({
     DEEPSEEK_API_KEY: z.string().optional(),
     DEEPSEEK_BASE_URL: z.string().optional(),
     DEEPSEEK_MODEL: z.string().optional(),
+    DOUBAO_API_KEY: z.string().optional(),
+    DOUBAO_BASE_URL: z.string().optional(),
+    DOUBAO_MODEL: z.string().optional(),
     DOUYIN_HOT_FALLBACK_URL: z.string().optional(),
     DOUYIN_HOT_PRIMARY_URL: z.string().optional(),
     DOUYIN_CLIENT_KEY: z.string().optional(),
@@ -305,6 +308,9 @@ export const env = createEnv({
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL,
     DEEPSEEK_MODEL: process.env.DEEPSEEK_MODEL,
+    DOUBAO_API_KEY: process.env.DOUBAO_API_KEY ?? process.env.ARK_API_KEY,
+    DOUBAO_BASE_URL: process.env.DOUBAO_BASE_URL,
+    DOUBAO_MODEL: process.env.DOUBAO_MODEL,
     DOUYIN_HOT_FALLBACK_URL: process.env.DOUYIN_HOT_FALLBACK_URL,
     DOUYIN_HOT_PRIMARY_URL: process.env.DOUYIN_HOT_PRIMARY_URL,
     DOUYIN_CLIENT_KEY: process.env.DOUYIN_CLIENT_KEY,
@@ -496,20 +502,13 @@ export const env = createEnv({
 
 // Provider key pools and child-process inheritance need dynamic names or the
 // complete process map. Keep those two escape hatches centralized here.
-/**
- * @description 获取索引化的环境变量值
- * @param prefix - 环境变量前缀
- * @param index - 索引序号
- * @returns 环境变量值或 undefined
- */
+
+/** 按前缀+序号读取索引化环境变量值（如 PROVIDER_1、PROVIDER_2）。 */
 export function getIndexedEnvironmentValue(prefix: string, index: number): string | undefined {
   return process.env[`${prefix}_${index}`]?.trim() || undefined
 }
 
-/**
- * @description 获取完整的进程环境变量映射
- * @returns 进程环境变量对象
- */
+/** 返回完整进程环境变量映射（子进程继承用）。 */
 export function getProcessEnvironment(): NodeJS.ProcessEnv {
   return process.env
 }

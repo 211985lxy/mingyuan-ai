@@ -34,25 +34,25 @@ describe("agent router timeout overrides", () => {
     process.env.DEEPSEEK_API_KEY = "test-deepseek"
     process.env.JIEKOU_API_KEY = "test-jiekou"
     process.env.THEROUTER_API_KEY = "test-therouter"
-    process.env.GLM_API_KEY = "test-glm"
+    process.env.DOUBAO_API_KEY = "test-doubao"
     process.env.ZENMUX_API_KEY = "test-zenmux"
     process.env.LLM_TIMEOUT_MS = "60000"
     vi.resetModules()
   })
 
-  it("gives content production and diagnosis the Claude → GLM → APIMart budget, with DeepSeek as emergency only", async () => {
+  it("gives content production and diagnosis the Claude → Doubao → APIMart budget, with DeepSeek as emergency only", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     getAgentLLM("business_diagnosis")
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    const glm = ctorArgs.find((config) => String(config.baseURL || "").includes("z.ai"))
+    const doubao = ctorArgs.find((config) => String(config.baseURL || "").includes("ark.cn-beijing"))
     expect(zenmux?.timeout).toBe(50_000)
-    expect(glm?.timeout).toBe(30_000)
+    expect(doubao?.timeout).toBe(30_000)
     expect(apimart?.timeout).toBe(25_000)
     expect(getAgentLLM("business_diagnosis").providerNames.slice(0, 4)).toEqual([
       "zenmux",
-      "glm",
+      "doubao",
       "apimart",
       "deepseek",
     ])
@@ -65,18 +65,18 @@ describe("agent router timeout overrides", () => {
     expect(getAgentLLM("business_diagnosis").providerNames[0]).toBe("zenmux")
   })
 
-  it("routes content_producer Claude → GLM → APIMart gpt-5.4, with DeepSeek only as emergency", async () => {
+  it("routes content_producer Claude → Doubao → APIMart gpt-5.4, with DeepSeek only as emergency", async () => {
     const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
 
     const llm = getAgentLLM("content_producer")
-    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "glm", "apimart", "deepseek"])
+    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "doubao", "apimart", "deepseek"])
     expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    const glm = ctorArgs.find((config) => String(config.baseURL || "").includes("z.ai"))
+    const doubao = ctorArgs.find((config) => String(config.baseURL || "").includes("ark.cn-beijing"))
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
     expect(zenmux?.timeout).toBe(50_000)
-    expect(glm?.timeout).toBe(30_000)
+    expect(doubao?.timeout).toBe(30_000)
     expect(apimart?.timeout).toBe(25_000)
   })
 
@@ -90,16 +90,16 @@ describe("agent router timeout overrides", () => {
       maxProviderAttempts: 3,
     })
 
-    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "glm", "apimart", "deepseek"])
+    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "doubao", "apimart", "deepseek"])
     expect(getAgentRecommendedModel(routeKey)).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    const glm = ctorArgs.find((config) => String(config.baseURL || "").includes("z.ai"))
+    const doubao = ctorArgs.find((config) => String(config.baseURL || "").includes("ark.cn-beijing"))
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
     const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
     expect(zenmux?.timeout).toBe(50_000)
     expect(zenmux?.maxRetries).toBe(0)
-    expect(glm?.timeout).toBe(30_000)
+    expect(doubao?.timeout).toBe(30_000)
     expect(apimart?.timeout).toBe(25_000)
     expect(deepseek?.timeout).toBe(20_000)
 
@@ -112,7 +112,7 @@ describe("agent router timeout overrides", () => {
     ctorArgs.length = 0
 
     const llm = getAgentLLM("business_system_diagnosis")
-    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "glm", "apimart", "deepseek"])
+    expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "doubao", "apimart", "deepseek"])
     expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))

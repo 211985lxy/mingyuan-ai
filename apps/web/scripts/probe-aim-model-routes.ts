@@ -59,8 +59,12 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   const results: AimProbeHop[] = []
+  const providerConfigs = getProviderConfigs()
   for (const hop of hops) {
-    const result = await probeHop(hop.name, hop.model || hop.name, hop.timeoutMs, hop.maxRetries)
+    // hop 未显式指定模型时回落到 provider 默认模型，而不是把 provider 名当模型名
+    const config = providerConfigs.find((item) => item.name === hop.name)
+    const model = hop.model || config?.defaultModel || hop.name
+    const result = await probeHop(hop.name, model, hop.timeoutMs, hop.maxRetries)
     results.push(result)
     console.info("[llm-probe]", {
       name: result.name,

@@ -86,7 +86,8 @@ const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
     maxRetries: 0,
     capability: "advanced",
   },
-  { name: "glm", model: "glm-5.1", timeoutMs: 30_000, capability: "standard" },
+  // 质量链第二跳：火山方舟豆包旗舰，国内直连低延迟；模型未开通时快速失败并被熔断跳过
+  { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 30_000, capability: "standard" },
   { name: "apimart", model: "gpt-5.4", timeoutMs: 25_000, capability: "advanced" },
   { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 20_000, capability: "advanced" },
 ]
@@ -101,11 +102,11 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "deepseek", timeoutMs: 30000, capability: "standard" },
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 45000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
-    { name: "glm", timeoutMs: 30000, capability: "standard" },
+    { name: "doubao", timeoutMs: 30000, capability: "standard" },
   ],
   business_diagnosis: [...QUALITY_PRIMARY_ROUTE],
 
-  // ── 内容创作：Claude 质量优先，GLM / APIMart gpt-5.4 独立备用，DeepSeek 仅应急 ──
+  // ── 内容创作：Claude 质量优先，Doubao / APIMart gpt-5.4 独立备用，DeepSeek 仅应急 ──
   content_producer: [...QUALITY_PRIMARY_ROUTE],
 
   // ── DeepSeek 组（质检 / 人设等日常分发，走官方直连）──
@@ -113,7 +114,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     // 自由创作首选文心一言：中文语感、本土表达、创意生成最强，国内端点低延迟
     { name: "qianfan", model: "ernie-5.1", capability: "advanced" },
     { name: "deepseek", capability: "standard" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
     { name: "apimart", capability: "advanced" },
     { name: "zenmux", capability: "standard" },
     { name: "jiekou", capability: "basic" },
@@ -126,7 +127,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
     { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
   ],
   content_retro: [
     { name: "deepseek", capability: "standard" },
@@ -135,7 +136,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "openrouter", model: "deepseek/deepseek-v4-flash", capability: "basic" },
     { name: "openrouter", model: "bytedance-seed/seed-1.6-flash", capability: "basic" },
     { name: "jiekou", capability: "basic" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
   ],
   vision_analysis: [
     { name: "openrouter", model: "qwen/qwen3-vl-8b-instruct", capability: "standard" },
@@ -149,7 +150,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 60000, capability: "advanced" },
     { name: "deepseek", capability: "standard" },
     { name: "apimart", capability: "advanced" },
-    { name: "glm", capability: "standard" },
+    { name: "doubao", capability: "standard" },
     { name: "jiekou", capability: "basic" },
   ],
 })
