@@ -94,6 +94,12 @@ describe("AppSidebar 导航收敛", () => {
     expect(badge.textContent).toBe("1")
   })
 
+  it("组织协同区块暂时隐藏（SHOW_ORG_NAV_SECTION=false）", () => {
+    // 契约：有意恢复（置 true）时本用例会失败——届时请同步改本用例与开关。
+    renderSidebar()
+    expect(screen.queryByText("组织协同")).toBeNull()
+  })
+
   it("无进行中任务时不渲染徽标", () => {
     useAimWorkspaceStore.setState({
       history: [fakeGeneration({ id: "g-done", workflowStatus: "published" })],
