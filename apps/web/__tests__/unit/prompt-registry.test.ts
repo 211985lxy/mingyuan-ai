@@ -282,10 +282,14 @@ describe("P1 prompt 升级门禁与可观测", () => {
 
   it("调用点把 promptMeta 传入 complete（可观测断言）", async () => {
     promptRegistry.__resetForTest()
-    const complete = vi.fn(async () => ({
+    const complete = vi.fn(async (options: {
+      promptMeta?: { key: string; version: number }
+      messages: unknown[]
+    }) => ({
       content: JSON.stringify({ summary: "测试摘要", topics: [], suggestedTopics: [] }),
       model: "m",
       provider: "p",
+      echoedMeta: options.promptMeta,
     }))
     vi.doMock("@/lib/llm/client", () => ({
       LLMClient: { shared: () => ({ complete }), reset: vi.fn() },
