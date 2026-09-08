@@ -22,6 +22,7 @@ import {
 } from "@/lib/agent-api-contract"
 import type { AgentApiContext } from "@/lib/agent-api-auth"
 import { prisma } from "@/lib/prisma"
+import { recordAgentApiAudit } from "@/lib/audit-events"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
 
@@ -42,7 +43,7 @@ export async function writeAgentLog(params: {
   durationMs?: number
   aimGenerationId?: string
 }) {
-  await prisma.agentApiCallLog.create({
+  const log = await prisma.agentApiCallLog.create({
     data: {
       apiKeyId: params.context.apiKeyId,
       userId: params.context.userId,
@@ -56,6 +57,17 @@ export async function writeAgentLog(params: {
       durationMs: params.durationMs || null,
       aimGenerationId: params.aimGenerationId || null,
     },
+  })
+  void recordAgentApiAudit({
+    recordId: log.id,
+    userId: params.context.userId,
+    projectId: params.projectId,
+    agentId: params.agentId,
+    action: "aim.generate",
+    status: params.status,
+    durationMs: params.durationMs,
+    correlationId: params.aimGenerationId,
+    traceId: params.aimGenerationId,
   })
 }
 

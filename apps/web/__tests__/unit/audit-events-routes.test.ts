@@ -23,6 +23,8 @@ function request(url: string) {
   return new NextRequest(url, { method: "GET" })
 }
 
+const routeContext = { params: Promise.resolve({}) }
+
 describe("audit event admin routes", () => {
   beforeEach(() => {
     findMany.mockReset()
@@ -37,7 +39,7 @@ describe("audit event admin routes", () => {
   })
 
   it("defaults to today's Shanghai window and returns a cursor", async () => {
-    const response = await listEvents(request("http://localhost/api/admin/audit-events?limit=1"))
+    const response = await listEvents(request("http://localhost/api/admin/audit-events?limit=1"), routeContext)
     const body = await response.json()
     const args = findMany.mock.calls[0][0]
 
@@ -50,7 +52,7 @@ describe("audit event admin routes", () => {
   })
 
   it("passes filters and an opaque cursor to Prisma", async () => {
-    await listEvents(request("http://localhost/api/admin/audit-events?date=2026-09-01&source=admin&severity=error&action=delete&cursor=event-9"))
+    await listEvents(request("http://localhost/api/admin/audit-events?date=2026-09-01&source=admin&severity=error&action=delete&cursor=event-9"), routeContext)
     const args = findMany.mock.calls[0][0]
     expect(args.where.source).toBe("admin")
     expect(args.where.severity).toBe("error")

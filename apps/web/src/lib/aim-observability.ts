@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
 import { redis } from "@/lib/redis"
+import { recordAuditEvent, specialistAuditInput } from "@/lib/audit-events"
 
 export type AimTraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -21,6 +22,10 @@ export interface AimTraceStep {
 export interface AimTraceRecorder {
   id: string
   startedAt: number
+  userId?: string | null
+  projectId?: string | null
+  agentId?: string | null
+  action?: CreateAimTraceInput["action"]
 }
 
 interface CreateAimTraceInput {
@@ -111,6 +116,33 @@ async function appendStep(trace: AimTraceRecorder | undefined, step: AimTraceSte
   publishTraceEvent(trace.id, { type: "step", step })
 }
 
+function emitAimAudit(trace: AimTraceRecorder, status: "started" | "success" | "failed", update: TraceUpdate = {}) {
+  void recordAuditEvent(specialistAuditInput({
+    source: "aim",
+    category: "execution",
+    severity: status === "failed" ? "error" : "info",
+    status,
+    action: trace.action ? `aim.${trace.action}` : "aim.execute",
+    summary: status === "started" ? "AIM execution started" : status === "failed" ? "AIM execution failed" : "AIM execution completed",
+    sourceRecordType: "AimExecutionTrace",
+    sourceRecordId: trace.id,
+    idempotencyKey: `aim:AimExecutionTrace:${trace.id}:${status}`,
+    actorType: trace.userId ? "user" : "system",
+    actorId: trace.userId || undefined,
+    targetType: "aim_execution_trace",
+    targetId: trace.id,
+    projectId: trace.projectId || undefined,
+    correlationId: trace.id,
+    traceId: trace.id,
+    metadata: {
+      agentId: trace.agentId || undefined,
+      durationMs: update.durationMs,
+      model: update.model,
+      totalTokens: update.totalTokens,
+    },
+  }))
+}
+
 /**
  * @description 创建 AIM 执行跟踪记录（用于可观测性链路追踪）
  * @param input - 跟踪创建输入（用户 ID、项目 ID、Agent ID、操作类型等）
@@ -133,7 +165,16 @@ export async function createAimTrace(input: CreateAimTraceInput): Promise<AimTra
       },
       select: { id: true },
     })
-    return { id: record.id, startedAt: Date.now() }
+    const trace = {
+      id: record.id,
+      startedAt: Date.now(),
+      userId: input.userId,
+      projectId: input.projectId,
+      agentId: input.agentId,
+      action: input.action,
+    }
+    emitAimAudit(trace, "started")
+    return trace
   } catch (error) {
     logger.warn({ error }, "[aim-trace] create failed")
     return undefined
@@ -166,7 +207,16 @@ export async function claimAimTrace(input: ClaimAimTraceInput): Promise<ClaimAim
       },
       select: { id: true },
     })
-    return { acquired: true, trace: { id: input.id, startedAt: Date.now() } }
+    const trace = {
+      id: input.id,
+      startedAt: Date.now(),
+      userId: input.userId,
+      projectId: input.projectId,
+      agentId: input.agentId,
+      action: input.action,
+    }
+    emitAimAudit(trace, "started")
+    return { acquired: true, trace }
   } catch (error) {
     if (isUniqueConstraintError(error)) return { acquired: false, reason: "duplicate" }
     throw error
@@ -253,12 +303,15 @@ export async function addAimTraceStep(
  */
 export async function finishAimTrace(trace: AimTraceRecorder | undefined, update: TraceUpdate = {}) {
   if (!trace) return
+  const status = update.status === "failed" ? "failed" : "success"
+  const durationMs = Date.now() - trace.startedAt
   await safeUpdateTrace(trace.id, {
     ...update,
     status: update.status || "success",
-    durationMs: Date.now() - trace.startedAt,
+    durationMs,
   })
-  publishTraceEvent(trace.id, { type: "done", status: "success" })
+  emitAimAudit(trace, status, { ...update, durationMs })
+  publishTraceEvent(trace.id, { type: "done", status })
 }
 
 /**
@@ -274,5 +327,6 @@ export async function failAimTrace(trace: AimTraceRecorder | undefined, error: u
     durationMs: Date.now() - trace.startedAt,
     errorMessage: summarizeText(message),
   })
+  emitAimAudit(trace, "failed", { durationMs: Date.now() - trace.startedAt })
   publishTraceEvent(trace.id, { type: "done", status: "failed" })
 }
