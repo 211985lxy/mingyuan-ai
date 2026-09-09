@@ -39,7 +39,16 @@ export function resolveSemanticUnderstandingFastPath(
   const normalizedRequest = request.replace(/\s+/g, "")
   if (!normalizedRequest) return null
 
-  if (CONTENT_ANALYSIS_QUESTION_PATTERN.test(normalizedRequest)) {
+  // 问句快径防误判（2026-09-09 生产事故：对标原文长粘贴满是「为什么/是否」类
+  // 反问钩子，被整段匹配成 respond，对标改写 5 连败）。三重门槛：
+  //   1) 问句模式命中且（请求很短，或以问号结尾——真问题通常这么收尾）；
+  //   2) 不含对标粘贴的结构标记（「对标标题：/对标原文：」带冒号的段落头）——
+  //      这是素材粘贴，不是提问；口头提到「对标文案」不带冒号不算；
+  //   3) 不满足则落到下方长文本 deliver 分支或 LLM 慢路径。
+  const BENCHMARK_PASTE_PATTERN = /对标标题[：:]|对标原文[：:]|对标文案[：:]/
+  const looksLikeQuestion = CONTENT_ANALYSIS_QUESTION_PATTERN.test(normalizedRequest)
+    && (request.length <= 80 || /[？?]$/.test(normalizedRequest))
+  if (looksLikeQuestion && !BENCHMARK_PASTE_PATTERN.test(normalizedRequest)) {
     return { handling: "respond", brief: request }
   }
 
