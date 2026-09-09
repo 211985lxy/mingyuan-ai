@@ -57,6 +57,32 @@ const LEGACY_FAILURE_CODE: Record<string, AimFailureCode> = {
   UNKNOWN: "INTERNAL_ERROR",
 }
 
+/**
+ * 错误码短数字映射：报障时口述/截图用（「错误码 4」），字符串码仍是机器契约。
+ * 编号规则：只增不改不复用——新增码追加新号，废弃码保留编号不回收。
+ */
+export const AIM_FAILURE_CODE_NUMBERS: Record<AimFailureCode, number> = {
+  INVALID_REQUEST: 1,
+  BOUND_PROJECT_UNAVAILABLE: 2,
+  MODEL_TIMEOUT: 3,
+  PROVIDER_UNAVAILABLE: 4,
+  PROVIDER_AUTH: 5,
+  PROVIDER_QUOTA: 6,
+  EMPTY_OUTPUT: 7,
+  DELIVERY_CONSTRAINT_VIOLATION: 8,
+  GENERATION_IN_PROGRESS: 9,
+  STALE_EXECUTION: 10,
+  USER_ABORTED: 11,
+  INTERNAL_ERROR: 12,
+}
+
+/** 用户可见的错误码徽标文案：「4·PROVIDER_UNAVAILABLE」；未知码原样返回。 */
+export function formatAimFailureCodeBadge(code: string): string {
+  const normalized = normalizeAimFailureCode(code)
+  const number = normalized ? AIM_FAILURE_CODE_NUMBERS[normalized] : undefined
+  return number !== undefined ? `${number}·${normalized}` : code
+}
+
 const NON_RECOVERABLE: ReadonlySet<AimFailureCode> = new Set([
   "PROVIDER_AUTH",
   "INVALID_REQUEST",

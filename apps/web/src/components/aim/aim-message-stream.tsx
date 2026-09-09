@@ -18,7 +18,7 @@ import { extractAimChoiceGroups, type AimChoiceGroup } from "@/lib/aim/choice-gr
 import { splitAimMethodNote } from "@/lib/aim/workbench-display"
 import { formatAimFileSize } from "@/lib/aim/file-attachments"
 import type { AimWorkbenchMessage, IpWikiDialogContext } from "@/lib/aim/workbench-types"
-import { mapAimFailureCodeToUserMessage } from "@/lib/aim-error-message"
+import { formatAimFailureCodeBadge, mapAimFailureCodeToUserMessage } from "@/lib/aim-error-message"
 import type { ContentFormat } from "@/lib/api/client"
 import type { WorkflowRecordMode } from "@/components/aim/workflow-record-dialog"
 import type { FinalDisposition } from "@/lib/aim/run-outcome-telemetry"
@@ -73,7 +73,7 @@ function RecoverableFailure({ message, busy, onRetry }: {
     <p className="font-semibold text-foreground">这次没有完成</p>
     <p className="mt-1 leading-6 text-muted-foreground">{detail}</p>
     <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      {code ? <span className="rounded bg-amber-100/80 px-1.5 py-0.5 font-mono text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" data-testid="aim-failure-code">错误码 {code}</span> : null}
+      {code ? <span className="rounded bg-amber-100/80 px-1.5 py-0.5 font-mono text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" data-testid="aim-failure-code">错误码 {formatAimFailureCodeBadge(code)}</span> : null}
       {runId ? <span>执行编号 {runId}</span> : null}
     </p>
     {message.failure?.recoverable !== false ? (

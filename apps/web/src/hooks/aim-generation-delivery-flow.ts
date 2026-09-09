@@ -13,7 +13,7 @@ import {
 } from "@/lib/aim/workbench-helpers"
 import { startRunOutcomeActivity } from "@/lib/aim/run-outcome-client"
 import { buildWebAttemptId } from "@/lib/aim/unified-execute-entry"
-import { mapAimErrorToUserMessage, type AimFailureCode } from "@/lib/aim-error-message"
+import { formatAimFailureCodeBadge, mapAimErrorToUserMessage, type AimFailureCode } from "@/lib/aim-error-message"
 import { ApiError, type AimExecuteResponse, type AimGenerateResponse } from "@/lib/api/client"
 
 /**
@@ -91,7 +91,7 @@ export function applyGenerationFailure(
   const failureRunId = typeof details?.runId === "string" ? details.runId : undefined
   const failureTraceId = typeof details?.traceId === "string" ? details.traceId : traceId
   // toast 带错误码：用户截图/报障时能直接引用，无需查库定位
-  toast.error(failureCode ? `${message}（${failureCode}）` : message)
+  toast.error(failureCode ? `${message}（错误码 ${formatAimFailureCodeBadge(failureCode)}）` : message)
   input.setMessages((messages) => messages.map((item) => item.id === assistantMessageId
     ? {
         ...item,

@@ -83,4 +83,17 @@ describe("aim failure codes", () => {
     const code = classifyAimFailure(new Error("Connection error."))
     expect(mapAimFailureCodeToUserMessage(code)).toContain("更换线路")
   })
+
+  it("错误码短数字映射稳定且徽标格式统一（编号只增不改）", async () => {
+    const mod = await import("@/lib/aim-error-message")
+    const numbers = Object.values(mod.AIM_FAILURE_CODE_NUMBERS)
+    expect(new Set(numbers).size).toBe(numbers.length) // 无重复编号
+    for (const value of numbers) expect(value).toBeGreaterThan(0)
+    expect(mod.formatAimFailureCodeBadge("PROVIDER_UNAVAILABLE")).toBe("4·PROVIDER_UNAVAILABLE")
+    expect(mod.formatAimFailureCodeBadge("INTERNAL_ERROR")).toBe("12·INTERNAL_ERROR")
+    // 旧版码归一化后同样拿到编号
+    expect(mod.formatAimFailureCodeBadge("MODEL_UNAVAILABLE")).toBe("4·PROVIDER_UNAVAILABLE")
+    // 未知码原样返回，不崩
+    expect(mod.formatAimFailureCodeBadge("SOMETHING_NEW")).toBe("SOMETHING_NEW")
+  })
 })

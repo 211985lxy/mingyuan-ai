@@ -221,7 +221,7 @@ describe("RunDiagnostics quality status", () => {
       selectedProjectId: "project-1",
       actions: actions as never,
     }))
-    expect(html).toContain("错误码 PROVIDER_UNAVAILABLE")
+    expect(html).toContain("错误码 4·PROVIDER_UNAVAILABLE")
     expect(html).toContain("run_abc123")
   })
 })
