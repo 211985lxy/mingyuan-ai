@@ -223,7 +223,13 @@ export function enrichTaskSpecFromRawInput(
   const text = (rawInput || "").trim()
   if (!text && !opts?.platformHint && !opts?.outputFormatHint) return spec
 
-  const next: TaskSpec = { ...spec, unknowns: [...spec.unknowns], assumptions: [...spec.assumptions] }
+  // 存量 DB 行 / 执行标记等来源可能缺 unknowns/assumptions 字段（2026-09-09 生产事故：
+  // attempt 行的 taskSpec 是 {"execution":{...}}，[...spec.unknowns] 直接 TypeError）。
+  const next: TaskSpec = {
+    ...spec,
+    unknowns: [...(spec.unknowns ?? [])],
+    assumptions: [...(spec.assumptions ?? [])],
+  }
 
   if (!next.contentTask) {
     const inferred = matchRule(text, CONTENT_TASK_RULES.map((r) => ({ words: r.words, value: r.task })))
@@ -294,6 +300,20 @@ export const COLLABORATION_MODE_LABELS: Record<CollaborationMode, string> = {
   assumption_delivery: "按假设交付",
   feedback_iteration: "反馈迭代",
   discovery_exploration: "探索补资料",
+}
+
+/**
+ * 判断存量 JSON 是否为可采纳的 TaskSpec。
+ * execute-attempt 流程建行时会把执行状态标记 {"execution":{"phase":...}} 写进 taskSpec 列
+ * （2026-09-09 生产事故：该标记被当作 TaskSpec 加载，[...spec.unknowns] 抛
+ * "unknowns is not iterable"，统一入口交付全量失败）。只有带核心字段的真 TaskSpec 才可采纳。
+ */
+export function isTaskSpecLike(value: unknown): value is TaskSpec {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return Array.isArray(record.unknowns)
+    || Array.isArray(record.assumptions)
+    || typeof record.goal === "string"
 }
 
 /**

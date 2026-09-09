@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest"
 import {
   buildTaskSpecSkeleton,
+  enrichTaskSpecFromRawInput,
+  isTaskSpecLike,
   RISK_KEYWORDS_HIGH,
   inferRiskLevel,
   inferMode,
   getTaskSpecCopyStudioModule,
   sanitizeLLMRefinement,
   type TaskSpecInput,
+  type TaskSpec,
   withCopyStudioExecution,
 } from "@/lib/task-spec"
 import { refineTaskSpec, type LLMRefineClient } from "@/lib/task-spec-llm"
@@ -146,5 +149,39 @@ describe("refineTaskSpec 降级行为", () => {
     const result = await refineTaskSpec(skeleton, { client, enabled: true })
     expect(result.classifiedBy).toBe("llm")
     expect(result.unknowns).toContain("客户客单价区间")
+  })
+})
+
+
+// 2026-09-09 生产事故回归：execute-attempt 建行时把 {"execution":{...}} 写进 taskSpec 列，
+// 该标记被当作 TaskSpec 采纳后 [...spec.unknowns] 抛 "unknowns is not iterable"，
+// 统一入口交付全量失败（~300ms 确定性崩溃、零模型调用）。
+describe("isTaskSpecLike / 存量 taskSpec 采纳守卫", () => {
+  it("拒绝执行状态标记与非对象", () => {
+    expect(isTaskSpecLike({ execution: { phase: "running", source: "execute" } })).toBe(false)
+    expect(isTaskSpecLike(null)).toBe(false)
+    expect(isTaskSpecLike([])).toBe(false)
+    expect(isTaskSpecLike("text")).toBe(false)
+    expect(isTaskSpecLike(undefined)).toBe(false)
+  })
+
+  it("接受带核心字段的真 TaskSpec（含缺 unknowns 的旧版结构）", () => {
+    const skeleton = buildTaskSpecSkeleton(baseInput)
+    expect(isTaskSpecLike(skeleton)).toBe(true)
+    // 旧版存量行可能缺 unknowns，但有 goal 等核心字段——应可采纳
+    expect(isTaskSpecLike({ goal: "获客", knownFacts: [] })).toBe(true)
+    expect(isTaskSpecLike({ assumptions: [] })).toBe(true)
+  })
+})
+
+describe("enrichTaskSpecFromRawInput 容错", () => {
+  it("spec 缺 unknowns/assumptions 时不抛错并补齐数组", () => {
+    const malformed = { goal: "获客" } as unknown as TaskSpec
+    const enriched = enrichTaskSpecFromRawInput(malformed, "写一条口播文案，痛点是获客难", {
+      outputFormatHint: "口播脚本",
+    })
+    expect(Array.isArray(enriched.unknowns)).toBe(true)
+    expect(Array.isArray(enriched.assumptions)).toBe(true)
+    expect(enriched.outputFormat).toBe("口播脚本")
   })
 })

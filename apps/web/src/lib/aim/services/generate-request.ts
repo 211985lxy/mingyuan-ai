@@ -14,6 +14,7 @@ import {
 import { buildWorkflowBrief } from "@/lib/aim-workflow-brief"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 import { mapResolvedIntentToRuntimeTask } from "@/lib/aim/execute-turn-intent-gate"
+import { isTaskSpecLike } from "@/lib/task-spec"
 import {
   AccountProjectContextError,
   resolveBoundProject,
@@ -210,8 +211,8 @@ export async function executePreparedAimGeneration(prepared: UnifiedPreparedRequ
         "已有作品不属于当前账号的绑定项目，无法复用",
       )
     }
-    if (existing.taskSpec && typeof existing.taskSpec === "object" && !Array.isArray(existing.taskSpec)) {
-      taskSpec = existing.taskSpec as unknown as import("@/lib/task-spec").TaskSpec
+    if (isTaskSpecLike(existing.taskSpec)) {
+      taskSpec = existing.taskSpec
     }
   }
 
