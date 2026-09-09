@@ -205,4 +205,23 @@ describe("RunDiagnostics quality status", () => {
     expect(html).not.toContain("执行编号")
     expect(html).not.toContain("免质检")
   })
+
+  it("失败卡片显示错误码徽标与执行编号（报障可直接引用）", () => {
+    const html = renderToStaticMarkup(createElement(AimMessageStream, {
+      messages: [{
+        id: "message-code",
+        role: "assistant",
+        content: "",
+        failure: { kind: "generate", retryText: "写口播", code: "PROVIDER_UNAVAILABLE", runId: "run_abc123", recoverable: true },
+      } as AimWorkbenchMessage],
+      busy: false,
+      agentIntro: "intro",
+      workflowStage: "content",
+      selectedAgentId: "content_producer",
+      selectedProjectId: "project-1",
+      actions: actions as never,
+    }))
+    expect(html).toContain("错误码 PROVIDER_UNAVAILABLE")
+    expect(html).toContain("run_abc123")
+  })
 })

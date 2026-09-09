@@ -72,7 +72,10 @@ function RecoverableFailure({ message, busy, onRetry }: {
   return <div className="max-w-2xl rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
     <p className="font-semibold text-foreground">这次没有完成</p>
     <p className="mt-1 leading-6 text-muted-foreground">{detail}</p>
-    {runId ? <p className="mt-1 text-xs text-muted-foreground">执行编号 {runId}</p> : null}
+    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      {code ? <span className="rounded bg-amber-100/80 px-1.5 py-0.5 font-mono text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" data-testid="aim-failure-code">错误码 {code}</span> : null}
+      {runId ? <span>执行编号 {runId}</span> : null}
+    </p>
     {message.failure?.recoverable !== false ? (
       <Button size="sm" variant="outline" className="mt-3 h-8 px-3 text-sm" onClick={() => onRetry(message)} disabled={busy}><ArrowRight className="mr-1 h-3.5 w-3.5" />再试一次</Button>
     ) : null}

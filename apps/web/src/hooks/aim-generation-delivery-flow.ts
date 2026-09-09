@@ -90,7 +90,8 @@ export function applyGenerationFailure(
   const failureGenerationId = typeof details?.generationId === "string" ? details.generationId : params.generationAttemptId
   const failureRunId = typeof details?.runId === "string" ? details.runId : undefined
   const failureTraceId = typeof details?.traceId === "string" ? details.traceId : traceId
-  toast.error(message)
+  // toast 带错误码：用户截图/报障时能直接引用，无需查库定位
+  toast.error(failureCode ? `${message}（${failureCode}）` : message)
   input.setMessages((messages) => messages.map((item) => item.id === assistantMessageId
     ? {
         ...item,
