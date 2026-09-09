@@ -255,16 +255,22 @@ export async function listVoiceModels(input: {
   if (input.selfOnly) url.searchParams.set("self", "true")
   if (input.language) url.searchParams.set("language", input.language)
 
-  // 网络抖动（fetch failed）与上游错误码同等对待：降级返回空列表，绝不让路由 500
-  let response: Response
-  try {
-    response = await voiceFetch(url, {
-      headers: { Authorization: `Bearer ${config.apiKey}` },
-      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-    })
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : "network error"
-    return { items: [], degraded: true, reason: `音色列表网络异常：${reason}` }
+  // 网络抖动先静默重试一次（GET 幂等，等 800ms）；仍失败才降级返回空列表，绝不让路由 500
+  let response: Response | null = null
+  let lastReason = ""
+  for (let attempt = 0; attempt < 2 && !response; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 800))
+    try {
+      response = await voiceFetch(url, {
+        headers: { Authorization: `Bearer ${config.apiKey}` },
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      })
+    } catch (error) {
+      lastReason = error instanceof Error ? error.message : "network error"
+    }
+  }
+  if (!response) {
+    return { items: [], degraded: true, reason: `音色列表网络异常：${lastReason}` }
   }
   if (!response.ok) {
     const detail = await response.text().catch(() => "")

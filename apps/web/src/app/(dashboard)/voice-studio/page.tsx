@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
 import { VoiceCloneButton } from "@/components/voice/voice-clone-dialog"
+import { VoiceServiceNotice } from "@/components/voice/voice-service-notice"
 import { useVoiceSamplePreview, VoicePickerList } from "@/components/voice/voice-sample-preview"
 import {
   fetchVoiceModels,
@@ -124,8 +125,10 @@ export default function VoiceStudioPage() {
           </Button>
         }
       />
-      {unconfigured || studio.modelsError ? (
-        <UnconfiguredNotice message={studio.modelsError ?? studio.models?.reason ?? null} />
+      {unconfigured ? (
+        <VoiceServiceNotice kind="unconfigured" message={studio.models?.reason ?? null} onRetry={() => void studio.reloadModels()} />
+      ) : studio.modelsError ? (
+        <VoiceServiceNotice kind="error" message={studio.modelsError} onRetry={() => void studio.reloadModels()} />
       ) : null}
       <ScriptInputCard text={studio.text} onChange={studio.setText} />
       <VoicePickerCard
@@ -159,19 +162,6 @@ export default function VoiceStudioPage() {
       />
       <VoiceHistoryCard refreshKey={studio.historyRefresh} />
     </div>
-  )
-}
-
-function UnconfiguredNotice({ message }: { message: string | null }) {
-  return (
-    <Card className="border-amber-300/60 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/30">
-      <CardContent className="py-4 text-sm text-amber-900 dark:text-amber-200">
-        {message ?? "配音服务不可用"}
-        <div className="mt-1 text-xs opacity-80">
-          需要在服务端环境变量配置 FISH_AUDIO_API_KEY（免费档默认 s2.1-pro-free），配置后点「刷新音色」。
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 
