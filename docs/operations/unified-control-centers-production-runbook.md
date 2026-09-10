@@ -43,3 +43,21 @@
 2. 保留已写入的专用来源日志、`AuditEvent`、日指标和告警数据。
 3. 回滚应用到前一个已验证 commit；不要删除新表或回滚已执行的增量迁移。
 4. Metrics 未授权请求仍必须返回 401；若抓取配置未同步，暂时暂停抓取而不是开放匿名访问。
+
+## 本地冒烟记录（2026-09-10，Task 9 Step 4）
+
+代码版本：`codex/unified-control-centers` @ `4bec9e1b`（本地 dev server，端口 3000）。
+
+已验证：
+
+- `GET /api/metrics` 无 Authorization 返回 401；伪造 Bearer 返回 401。
+- 匿名访问 `/admin/statistics`、`/admin/audit-center` 均 307 跳转 `/admin/login`。
+- `/admin/login` 渲染 200。
+- 非管理员会话访问 `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts` 均被拒绝（401），管理员边界生效。
+
+待本地管理员凭据就绪后补测（不阻塞生产审批门）：
+
+- 管理员会话下两个中心的汇总数字、分页与详情抽屉。
+- 告警确认/解决/重开状态流转（写操作，验证时使用本地库）。
+
+以下写操作一律留到生产审批之后：真实留存删除、告警流转演练在生产库执行、SLS 资源创建与 LoongCollector 安装。
