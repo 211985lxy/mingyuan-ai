@@ -529,6 +529,38 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/alerts/[id]",
+      "file": "src/app/api/admin/alerts/[id]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "domain": "admin/alerts",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/alerts",
+      "file": "src/app/api/admin/alerts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "admin/alerts",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/approval-decisions",
       "file": "src/app/api/admin/approval-decisions/route.ts",
       "methods": [
@@ -3362,6 +3394,22 @@
       "query": "none",
       "externalService": false,
       "cost": "medium",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/operational-alerts",
+      "file": "src/app/api/cron/operational-alerts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
