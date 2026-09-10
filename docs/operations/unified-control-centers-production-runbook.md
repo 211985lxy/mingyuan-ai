@@ -20,6 +20,12 @@
 - 边界验证：`/api/metrics` 匿名 401；`/admin/statistics`、`/admin/audit-center` 匿名 307 跳登录
 - 后续 7 天：留存保持 report-only，每天核对 `totalExpired` 后再人工审批真实删除
 
+### 部署后补记（2026-09-10 23:55 CST）
+
+- `METRICS_SCRAPE_SECRET` 已在生产 env 配置（48 位随机值，仅存于服务器 `/etc/mingyuan/mingyuan.env`）：无凭证 401、带密钥 200。Prometheus 抓取端需配置同一 Bearer 值（服务器上 `grep METRICS_SCRAPE_SECRET /etc/mingyuan/mingyuan.env` 获取）。
+- 管理员会话下生产只读验证通过：统计中心 overview（近 7 天运营 67 次执行、成功率 53.6%、新鲜度分源展示、缺失源为 null）、审计汇总（221 条、4 源、failed=29）、审计事件 cursor 分页（limit=3 返回 3 条且有 nextCursor）、告警收件箱空、两个页面均 200。审计索引实时记录了本次验证产生的 API 读取事件。
+- SLS/LoongCollector：ECS 位于 `cn-shenzhen`，服务器 aliyun CLI 未配置凭据；创建 Project `mingyuan-prod-observability` 与 Logstore `app-journal`/`nginx-access`（30 天留存）需先提供阿里云凭据或控制台手工创建，之后按 canary 清单安装。
+
 ## 发布前检查
 
 1. 使用干净 commit 执行 `pnpm --filter @mingyuan/web run typecheck`、`lint`、`api:contracts`、`db:bounds`、`schema:migration-integrity`。

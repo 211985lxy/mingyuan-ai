@@ -15,13 +15,16 @@ export interface AimKnowledgeUsedRef {
   categoryLabel?: string
   /** 正文前缀摘要，供列表预览；历史数据可能缺失 */
   snippet?: string
+  /** 飞书文档外链；有则打开飞书，不走知识库原文弹窗 */
+  url?: string
 }
 
 type CiteSourceEntry = {
   id: string
   title: string
-  category: string
+  category?: string
   content?: string | null
+  url?: string | null
 }
 
 function clipSnippet(content: string | null | undefined, max = KNOWLEDGE_CITE_SNIPPET_CHARS): string {
@@ -44,13 +47,16 @@ export function mapEntriesToKnowledgeUsed(entries: CiteSourceEntry[]): AimKnowle
   for (const entry of entries) {
     if (!entry?.id || seen.has(entry.id)) continue
     seen.add(entry.id)
+    const category = entry.category ?? ""
     const snippet = clipSnippet(entry.content)
+    const url = typeof entry.url === "string" && entry.url.trim() ? entry.url.trim() : undefined
     result.push({
       id: entry.id,
       title: entry.title,
-      category: entry.category,
-      categoryLabel: knowledgeCategoryLabel(entry.category),
+      category,
+      categoryLabel: category === "feishu" ? "飞书" : knowledgeCategoryLabel(category),
       ...(snippet ? { snippet } : {}),
+      ...(url ? { url } : {}),
     })
   }
   return result
@@ -73,12 +79,14 @@ export function normalizeKnowledgeUsed(raw: unknown): AimKnowledgeUsedRef[] {
         ? record.categoryLabel.trim()
         : knowledgeCategoryLabel(category)
     const snippet = typeof record.snippet === "string" ? clipSnippet(record.snippet) : undefined
+    const url = typeof record.url === "string" && record.url.trim() ? record.url.trim() : undefined
     result.push({
       id: record.id,
       title,
       category,
-      categoryLabel,
+      categoryLabel: category === "feishu" ? "飞书" : categoryLabel,
       ...(snippet ? { snippet } : {}),
+      ...(url ? { url } : {}),
     })
   }
   return result
@@ -99,7 +107,7 @@ export function buildKnowledgeCitationMarkdown(
     const key = entry.id || `${entry.category}:${entry.title}`
     if (seen.has(key)) continue
     seen.add(key)
-    const label = knowledgeCategoryLabel(entry.category)
+    const label = knowledgeCategoryLabel(entry.category ?? "")
     lines.push(`- 相关原文见 《${entry.title.trim()}》（${label}）`)
     if (lines.length >= max) break
   }

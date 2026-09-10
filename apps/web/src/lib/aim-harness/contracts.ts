@@ -239,8 +239,8 @@ export interface PreparedAimContext {
   taskSpec?: TaskSpec
   /** IP 方法论动态选卡计划（与 taskSpec.methodologyPlan 同步） */
   methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
-  /** RAG 命中的知识条目（含 id，用于引用校验与 manifest） */
-  retrievedEntries?: Array<{ id: string; title: string; category?: string }>
+  /** RAG 命中的知识条目（含 id，用于引用校验与 manifest）；飞书来源带 url */
+  retrievedEntries?: Array<{ id: string; title: string; category?: string; url?: string; content?: string }>
   retrievedSource?: string
   /** 声明式来源清单（每个被装配件同步 push 一条），用于 contextHash + 快照 */
   contextManifest: AimContextSource[]

@@ -11,8 +11,14 @@ import type { ChatMessage } from "@/lib/llm/types"
 import type { AimAgentId } from "@/lib/aim-harness/contracts"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
 import {
+  collectFeishuKnowledgeSources,
+  recordFeishuKnowledgeSearchAudit,
+  type FeishuKnowledgeSource,
+} from "@/lib/integrations/feishu-knowledge-cite"
+import {
   BOUND_TOOL_LOOP_TOOL_NAMES,
   executeBoundToolLoopTool,
+  listActiveBoundToolLoopToolNames,
   type BoundToolLoopToolName,
   type BoundToolLoopToolContext,
 } from "./tool-loop-tools"
@@ -53,20 +59,8 @@ export interface BoundToolLoopResult {
     | "tool_unauthorized"
     | "tool_failed"
   toolFailureCount: number
+  feishuSources: FeishuKnowledgeSource[]
 }
-
-const SYSTEM = `你是 AIM 的有界检索助手。在写正文之前，先判断是否需要查阅项目知识或记忆。
-你可以调用工具，也可以直接结束。
-
-每轮只输出一个 JSON 对象，不要 markdown：
-{"action":"tool","tool":"search_project_knowledge"|"get_project_memories"|"read_aim_generation"|"read_work_item"|"request_human_review","args":{...},"reason":"..."}
-或
-{"action":"finish","notes":"给后续写作者的要点（可空）","reason":"..."}
-
-规则：
-- 资料已足够时立刻 finish。
-- 信息明显不足且无法靠检索补齐时，调用 request_human_review。
-- 只读当前项目；不要编造客户事实；notes 只写检索到的要点。`
 
 function parseJsonObject(raw: string): Record<string, unknown> | null {
   const text = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "")
@@ -93,6 +87,32 @@ function isToolName(value: unknown): value is BoundToolLoopToolName {
   return typeof value === "string" && (BOUND_TOOL_LOOP_TOOL_NAMES as readonly string[]).includes(value)
 }
 
+function buildToolLoopSystemPrompt(toolNames: readonly string[]) {
+  const toolUnion = toolNames.map((name) => `"${name}"`).join("|")
+  const hasFeishu = toolNames.includes("feishu_knowledge_search")
+  const intro = hasFeishu
+    ? "你是 AIM 的有界检索助手。在写正文之前，先判断是否需要查阅项目知识、记忆或已授权的飞书知识库。"
+    : "你是 AIM 的有界检索助手。在写正文之前，先判断是否需要查阅项目知识或记忆。"
+  const feishuRule = hasFeishu
+    ? "- 问到公司方法、飞书文档或知识库里的定义时，先调 feishu_knowledge_search，需要正文再调 feishu_doc_read。\n"
+    : ""
+  const scopeRule = hasFeishu
+    ? "- 只读当前项目与已授权飞书范围；不要编造客户事实；notes 只写检索到的要点。"
+    : "- 只读当前项目；不要编造客户事实；notes 只写检索到的要点。"
+  return `${intro}
+你可以调用工具，也可以直接结束。
+
+每轮只输出一个 JSON 对象，不要 markdown：
+{"action":"tool","tool":${toolUnion},"args":{...},"reason":"..."}
+或
+{"action":"finish","notes":"给后续写作者的要点（可空）","reason":"..."}
+
+规则：
+- 资料已足够时立刻 finish。
+${feishuRule}- 信息明显不足且无法靠检索补齐时，调用 request_human_review。
+${scopeRule}`
+}
+
 function summarizeNotes(steps: BoundToolLoopStep[]): string {
   const lines = steps
     .filter((step) => step.observation)
@@ -100,20 +120,40 @@ function summarizeNotes(steps: BoundToolLoopStep[]): string {
   return lines.join("\n\n").slice(0, 4000)
 }
 
+async function withFeishuCite(
+  input: BoundToolLoopInput,
+  result: Omit<BoundToolLoopResult, "feishuSources">,
+): Promise<BoundToolLoopResult> {
+  const digest = collectFeishuKnowledgeSources(result.steps)
+  await recordFeishuKnowledgeSearchAudit({
+    userId: input.userId,
+    projectId: input.projectId,
+    digest,
+  })
+  return { ...result, feishuSources: digest.sources }
+}
+
 /**
  * @description 运行有界工具环，返回可并入上下文的 notes
  */
 export async function runBoundedToolLoop(input: BoundToolLoopInput): Promise<BoundToolLoopResult> {
+  return withFeishuCite(input, await runBoundedToolLoopBody(input))
+}
+
+async function runBoundedToolLoopBody(
+  input: BoundToolLoopInput,
+): Promise<Omit<BoundToolLoopResult, "feishuSources">> {
   const maxSteps = input.maxSteps ?? DEFAULT_TOOL_LOOP_MAX_STEPS
   const timeoutMs = input.timeoutMs ?? DEFAULT_TOOL_LOOP_TIMEOUT_MS
   const started = Date.now()
   const steps: BoundToolLoopStep[] = []
   let toolFailureCount = 0
+  const activeTools = listActiveBoundToolLoopToolNames()
   const toolCtx: BoundToolLoopToolContext = {
     userId: input.userId,
     projectId: input.projectId,
     rawInput: input.rawInput,
-    allowedToolNames: BOUND_TOOL_LOOP_TOOL_NAMES,
+    allowedToolNames: activeTools,
   }
 
   const complete =
@@ -128,14 +168,14 @@ export async function runBoundedToolLoop(input: BoundToolLoopInput): Promise<Bou
     })
 
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM },
+    { role: "system", content: buildToolLoopSystemPrompt(activeTools) },
     {
       role: "user",
       content: [
         `agent=${input.agentId}`,
         `runtimeTask=${input.runtimeTask}`,
         `projectId=${input.projectId ?? "无"}`,
-        "可用工具：search_project_knowledge / get_project_memories / read_aim_generation / read_work_item / request_human_review",
+        `可用工具：${activeTools.join(" / ")}`,
         "",
         "用户任务：",
         input.rawInput.slice(0, 4000),

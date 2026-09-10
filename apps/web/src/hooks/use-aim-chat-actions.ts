@@ -67,8 +67,17 @@ function detectHitlDecision(text: string): "approve" | "reject" | undefined {
   return undefined
 }
 
-function setAssistantMessage(input: AimChatActionInput, assistantId: string, content: string) {
-  input.setMessages((messages) => messages.map((message) => message.id === assistantId ? { ...message, content } : message))
+function setAssistantMessage(
+  input: AimChatActionInput,
+  assistantId: string,
+  content: string,
+  extra?: { feishuSources?: Array<{ title: string; url: string }> },
+) {
+  input.setMessages((messages) => messages.map((message) => (
+    message.id === assistantId
+      ? { ...message, content, ...(extra?.feishuSources ? { feishuSources: extra.feishuSources } : {}) }
+      : message
+  )))
 }
 
 /** Step③ HITL：前端侧的待审批动作上下文（工具动作被服务端门闩拦截时记录）。 */
@@ -149,6 +158,9 @@ async function executeChatRequest(
     onContent: (content) => {
       latestContent = content
       setAssistantMessage(input, assistantId, content)
+    },
+    onFeishuSources: (sources) => {
+      setAssistantMessage(input, assistantId, latestContent, { feishuSources: sources })
     },
   })
   if (chatResult.approvalRequired && toolAction) {

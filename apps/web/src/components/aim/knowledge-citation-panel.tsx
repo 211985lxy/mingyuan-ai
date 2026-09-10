@@ -35,34 +35,65 @@ export function KnowledgeCitationPanel({
 }: KnowledgeCitationPanelProps) {
   const refs = useMemo(() => normalizeKnowledgeUsed(knowledgeUsed), [knowledgeUsed])
   const [activeId, setActiveId] = useState<string | null>(null)
-  const active = refs.find((item) => item.id === activeId) ?? null
+  const feishuRefs = refs.filter((item) => item.category === "feishu" || Boolean(item.url))
+  const localRefs = refs.filter((item) => item.category !== "feishu" && !item.url)
+  const active = localRefs.find((item) => item.id === activeId) ?? null
 
   if (refs.length === 0) return null
 
   return (
     <div className={className ?? (compact ? "text-xs" : "mb-2 rounded-md border border-border/70 bg-muted/20 px-2.5 py-1.5")}>
-      {!compact ? (
-        <p className="mb-1 text-[11px] font-medium text-foreground/80">相关原文</p>
+      {feishuRefs.length > 0 ? (
+        <div className={localRefs.length ? "mb-2" : ""}>
+          {!compact ? (
+            <p className="mb-1 text-[11px] font-medium text-foreground/80">内容来自你的飞书</p>
+          ) : null}
+          <ul className="space-y-0.5 text-xs leading-relaxed">
+            {feishuRefs.map((item) => (
+              <li key={item.id}>
+                {item.url ? (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    {item.title}
+                  </a>
+                ) : (
+                  <span>{item.title}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
-      <ul className="space-y-0.5 text-xs leading-relaxed text-muted-foreground">
-        {refs.map((item) => {
-          const label = item.categoryLabel || knowledgeCategoryLabel(item.category)
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                className="max-w-full text-left text-primary underline-offset-2 hover:underline"
-                onClick={() => setActiveId(item.id)}
-              >
-                相关原文见 《{item.title}》（{label}）
-              </button>
-              {!compact && item.snippet ? (
-                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground/90">{item.snippet}</p>
-              ) : null}
-            </li>
-          )
-        })}
-      </ul>
+      {localRefs.length > 0 ? (
+        <>
+          {!compact ? (
+            <p className="mb-1 text-[11px] font-medium text-foreground/80">相关原文</p>
+          ) : null}
+          <ul className="space-y-0.5 text-xs leading-relaxed text-muted-foreground">
+            {localRefs.map((item) => {
+              const label = item.categoryLabel || knowledgeCategoryLabel(item.category)
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className="max-w-full text-left text-primary underline-offset-2 hover:underline"
+                    onClick={() => setActiveId(item.id)}
+                  >
+                    相关原文见 《{item.title}》（{label}）
+                  </button>
+                  {!compact && item.snippet ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground/90">{item.snippet}</p>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      ) : null}
       <KnowledgeCitationPreviewDialog
         entryRef={active}
         open={Boolean(active)}

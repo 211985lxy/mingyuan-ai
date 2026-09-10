@@ -24,6 +24,7 @@ import type { AimAgentId } from "./contracts"
 import type { AimRunSpec, AimContextSource, AimMethodologyPolicy } from "./types"
 import type { PreparedAimContext } from "./contracts"
 import type { AimGenerationContextOverride } from "@/lib/aim-agent-handlers"
+import { sanitizeUntrustedContextText } from "./context-trust"
 import { AIM_FACT_PRIORITY_VERSION, withAimFactPriorityRule } from "@/lib/aim-context-priority"
 import { sha256 } from "./hashing"
 import { buildContextManifest } from "./context-manifest"
@@ -32,8 +33,8 @@ import {
   buildMethodologyProfileBlock,
   type MethodologyPolicy,
 } from "@/lib/methodology-profile-store"
-import { runBoundedToolLoop } from "./tool-loop"
-import { sanitizeUntrustedContextText } from "./context-trust"
+import { applyBoundedToolLoopToKnowledge } from "./context/apply-bounded-tool-loop"
+import { FEISHU_KNOWLEDGE_CATEGORY } from "@/lib/integrations/feishu-knowledge-cite"
 import { buildAimSkillBlock, loadAimSkills } from "./skill-loader"
 import { env } from "@/env"
 import { loadGenerationContextBlocks } from "./context/load-generation-blocks"
@@ -159,42 +160,20 @@ export async function prepareAimContext(
   })
 
   // 3.2 有界工具环：先查再写（仅 executionPolicy.mode=bounded_tool_loop；eval override 跳过）
-  let knowledgeBlock = mergeStyleIntoKnowledgeBlock(
-    knowledgeCtx.knowledgeBlock,
-    styleBlock,
-  )
-  if (spec.executionPolicy.mode === "bounded_tool_loop" && !params.contextOverride) {
-    const loopResult = await runAimTraceStep(
-      trace,
-      "bounded_tool_loop",
-      "有界检索",
-      () =>
-        runBoundedToolLoop({
-          agentId,
-          runtimeTask,
-          rawInput: spec.rawInput,
-          userId: params.userId,
-          projectId: spec.projectId,
-          maxSteps: spec.executionPolicy.maxSteps,
-          timeoutMs: spec.executionPolicy.timeoutMs,
-        }),
-      (result) => ({
-        summary: result.stopReason,
-        metadata: {
-          steps: result.steps.length,
-          stopReason: result.stopReason,
-          toolStepCount: result.steps.length,
-          toolFailureCount: result.toolFailureCount,
-        },
-      }),
-    )
-    if (loopResult.notes.trim()) {
-      const notes = sanitizeUntrustedContextText(loopResult.notes, {
-        label: "bounded_tool_loop",
-      })
-      knowledgeBlock = `【有界检索笔记】\n${notes}\n\n${knowledgeBlock}`
-    }
-  }
+  const looped = await applyBoundedToolLoopToKnowledge({
+    enabled: spec.executionPolicy.mode === "bounded_tool_loop" && !params.contextOverride,
+    knowledgeBlock: mergeStyleIntoKnowledgeBlock(knowledgeCtx.knowledgeBlock, styleBlock),
+    agentId,
+    runtimeTask,
+    rawInput: spec.rawInput,
+    userId: params.userId,
+    projectId: spec.projectId,
+    maxSteps: spec.executionPolicy.maxSteps,
+    timeoutMs: spec.executionPolicy.timeoutMs,
+    trace,
+  })
+  const knowledgeBlock = looped.knowledgeBlock
+  const feishuSources = looped.feishuSources
 
   // 3.3 Skill 岗位手册按需加载（默认开；AIM_SKILL_LOADING_ENABLED=false 关闭）
   // 方法论类 skill 受信号门控：只有用户点了对应技能才加载，默认不自动挂
@@ -296,11 +275,20 @@ export async function prepareAimContext(
     },
     taskSpec: taskSpecWithPlan,
     methodologyPlan,
-    retrievedEntries: (knowledgeCtx.entries ?? []).map((e: { id: string; title: string; category?: string }) => ({
-      id: e.id,
-      title: e.title,
-      ...(e.category ? { category: e.category } : {}),
-    })),
+    retrievedEntries: [
+      ...(knowledgeCtx.entries ?? []).map((e: { id: string; title: string; category?: string }) => ({
+        id: e.id,
+        title: e.title,
+        ...(e.category ? { category: e.category } : {}),
+      })),
+      ...feishuSources.map((source) => ({
+        id: source.token,
+        title: source.title,
+        category: FEISHU_KNOWLEDGE_CATEGORY,
+        url: source.url,
+        content: source.snippet,
+      })),
+    ],
     retrievedSource: knowledgeCtx.source,
     contextManifest,
     budgetApplied: true,

@@ -301,3 +301,18 @@ model SmsVerificationCode {
   @@index([phone, createdAt])
   @@index([expiresAt])
 }
+
+// 飞书知识检索运营者授权（WP-2a 单运营者）。refresh/access token 均为加密串，禁止写日志。
+model FeishuKnowledgeOperatorCredential {
+  id                    String    @id @default(cuid())
+  label                 String    @unique @db.VarChar(32)
+  openId                String?   @db.VarChar(128)
+  encryptedAccessToken  String    @db.Text
+  encryptedRefreshToken String    @db.Text
+  accessTokenExpiresAt  DateTime
+  refreshTokenExpiresAt DateTime?
+  scope                 String    @db.VarChar(500)
+  status                String    @default("active") @db.VarChar(20)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}

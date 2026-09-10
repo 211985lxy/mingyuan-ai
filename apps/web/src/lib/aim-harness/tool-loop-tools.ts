@@ -1,20 +1,39 @@
 /**
  * BoundedToolLoop L0 感知工具（只读 / 请求人工）。
- * 正本首批：search_project_knowledge / get_project_memories /
- * read_aim_generation / read_work_item / request_human_review。
+ * 正本：项目知识 / 记忆 / 生成稿 / 经营事项 / 转人工；
+ * 灰度：FEISHU_KNOWLEDGE_ENABLED 打开后加入飞书知识检索与文档阅读。
  */
 
+import { env } from "@/env"
 import { prisma } from "@/lib/prisma"
 import { buildAimKnowledgeContext } from "@/lib/aim-knowledge-context"
 import { retrieveAimMemory } from "@/lib/aim-memory"
+import {
+  isFeishuKnowledgeEnabled,
+  parseWikiSpaceIds,
+} from "@/lib/integrations/feishu-knowledge-client"
+import {
+  executeFeishuKnowledgeTool,
+  type FeishuKnowledgeToolConfig,
+} from "@/lib/integrations/feishu-knowledge-tool"
 import { assertToolAllowedInToolLoop } from "./tool-registry"
 
-export const BOUND_TOOL_LOOP_TOOL_NAMES = [
+export const CORE_BOUND_TOOL_LOOP_TOOL_NAMES = [
   "search_project_knowledge",
   "get_project_memories",
   "read_aim_generation",
   "read_work_item",
   "request_human_review",
+] as const
+
+export const FEISHU_KNOWLEDGE_TOOL_NAMES = [
+  "feishu_knowledge_search",
+  "feishu_doc_read",
+] as const
+
+export const BOUND_TOOL_LOOP_TOOL_NAMES = [
+  ...CORE_BOUND_TOOL_LOOP_TOOL_NAMES,
+  ...FEISHU_KNOWLEDGE_TOOL_NAMES,
 ] as const
 
 export type BoundToolLoopToolName = (typeof BOUND_TOOL_LOOP_TOOL_NAMES)[number]
@@ -24,6 +43,13 @@ export interface BoundToolLoopToolContext {
   projectId?: string
   rawInput: string
   allowedToolNames?: readonly string[]
+  feishuKnowledge?: FeishuKnowledgeToolConfig
+}
+
+export function listActiveBoundToolLoopToolNames(
+  enabled = isFeishuKnowledgeEnabled(env.FEISHU_KNOWLEDGE_ENABLED),
+): readonly BoundToolLoopToolName[] {
+  return enabled ? BOUND_TOOL_LOOP_TOOL_NAMES : CORE_BOUND_TOOL_LOOP_TOOL_NAMES
 }
 
 async function withToolTimeout<T>(promise: Promise<T>, timeoutMs: number, name: string): Promise<T> {
@@ -48,7 +74,7 @@ export async function executeBoundToolLoopTool(
   args: Record<string, unknown>,
   ctx: BoundToolLoopToolContext,
 ): Promise<string> {
-  const def = assertToolAllowedInToolLoop(name, ctx.allowedToolNames ?? BOUND_TOOL_LOOP_TOOL_NAMES)
+  const def = assertToolAllowedInToolLoop(name, ctx.allowedToolNames ?? listActiveBoundToolLoopToolNames())
   return withToolTimeout(executeToolBody(name, args, ctx), def.timeoutMs, name)
 }
 
@@ -147,7 +173,20 @@ async function executeToolBody(
           : "信息不足，需要人工补充。"
       return `已请求人工审核：${reason}`
     }
+    case "feishu_knowledge_search":
+    case "feishu_doc_read":
+      return executeFeishuKnowledgeTool(name, args, ctx.feishuKnowledge ?? feishuKnowledgeConfigFromEnv())
     default:
       return `未知工具：${String(name)}`
+  }
+}
+
+function feishuKnowledgeConfigFromEnv(): FeishuKnowledgeToolConfig {
+  return {
+    enabled: isFeishuKnowledgeEnabled(env.FEISHU_KNOWLEDGE_ENABLED),
+    appId: env.FEISHU_APP_ID,
+    appSecret: env.FEISHU_APP_SECRET,
+    wikiSpaceIds: parseWikiSpaceIds(env.FEISHU_KNOWLEDGE_WIKI_SPACE_IDS),
+    encryptionKey: env.FEISHU_TOKEN_ENCRYPTION_KEY,
   }
 }

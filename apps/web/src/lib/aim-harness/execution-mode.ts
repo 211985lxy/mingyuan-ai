@@ -12,7 +12,7 @@ import type {
   AimExecutionMode,
   AimExecutionPolicy,
 } from "./types"
-import { BOUND_TOOL_LOOP_TOOL_NAMES } from "./tool-loop-tools"
+import { BOUND_TOOL_LOOP_TOOL_NAMES, listActiveBoundToolLoopToolNames } from "./tool-loop-tools"
 
 export const DEFAULT_EXECUTION_MAX_STEPS = 6
 export const DEFAULT_EXECUTION_TIMEOUT_MS = 60_000
@@ -100,7 +100,7 @@ export function resolveExecutionPolicy(input: {
 
   const allowedToolNames =
     mode === "bounded_tool_loop"
-      ? [...(input.policy?.allowedToolNames ?? BOUND_TOOL_LOOP_TOOL_NAMES)]
+      ? [...(input.policy?.allowedToolNames ?? listActiveBoundToolLoopToolNames())]
       : []
 
   if (mode === "bounded_tool_loop") {

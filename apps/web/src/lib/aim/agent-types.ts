@@ -93,7 +93,13 @@ export interface AimGenerateContext {
   ipWikiBlock: string
   /** ADR-002：本次指定命名方法论（独立预算块，未选择时为空串） */
   selectedMethodologyBlock: string
-  retrievedEntries: any[]
+  retrievedEntries: Array<{
+    id: string
+    title: string
+    category?: string
+    url?: string
+    content?: string
+  }>
   retrievedSource: string
   /** 本次实际生效的知识调用策略（解析后回传，供 UI 反馈） */
   knowledgeStrategy: ResolvedKnowledgeStrategy
@@ -158,6 +164,7 @@ export interface AimGenerateResponse {
     category: string
     categoryLabel?: string
     snippet?: string
+    url?: string
   }>
   conversationMode?: AimConversationMode
   /** 本次实际生效的知识调用策略（由 buildAimGeneration 解析后注入，供 UI 反馈） */

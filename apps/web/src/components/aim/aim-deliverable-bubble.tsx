@@ -4,6 +4,7 @@ import { memo, useMemo, useState } from "react"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { KnowledgeCitationPanel } from "@/components/aim/knowledge-citation-panel"
 import type { AimNextAction } from "@/lib/aim-agent-guides"
 import { AIM_FORMAT_LABELS, AIM_SOFT_ACTION_CLASS, splitAimMethodNote } from "@/lib/aim/workbench-display"
 import { SAFETY_WARNING_MARKER } from "@/lib/aim-content-creation-trace"
@@ -235,6 +236,7 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         <p className="text-xs text-muted-foreground">正在重出一版…</p>
       </div>
     ) : null}
+    <KnowledgeCitationPanel knowledgeUsed={deliverables.knowledgeUsed} />
     <DeliverableTabs
       results={deliverables.results}
       activeFormat={activeFormat}
