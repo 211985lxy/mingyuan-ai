@@ -11,6 +11,15 @@
 - `execute=true&confirm=DELETE-180-DAY-ROWS` 的真实留存删除
 - 从已验证 commit 部署到生产
 
+## 部署记录（2026-09-10 23:36 CST）
+
+- 发布版本：`main` @ `89d7df594646d199febabae52ebec84895636a3a`（healthz 回读一致）
+- 生产迁移：`20260910100000_unified_control_centers` 已应用（`prisma migrate deploy`，SSH 隧道），`production-schema-contract-ok tables=40`
+- 调度上线：`mingyuan-cron-audit-reconcile.timer`、`mingyuan-cron-operational-alerts.timer`（每 5 分钟，已首跑成功）；`mingyuan-cron-channel-metrics-rollup.timer`（每日 00:10）；`mingyuan-cron-control-center-retention.timer`（每日 03:30，report-only）
+- 首跑结果：留存预览 `auditEventExpired=0, channelMetricDailyExpired=0, execute=false`；对账 3 个源 checkpoint 建立、0 失败；告警检查 `created=0`
+- 边界验证：`/api/metrics` 匿名 401；`/admin/statistics`、`/admin/audit-center` 匿名 307 跳登录
+- 后续 7 天：留存保持 report-only，每天核对 `totalExpired` 后再人工审批真实删除
+
 ## 发布前检查
 
 1. 使用干净 commit 执行 `pnpm --filter @mingyuan/web run typecheck`、`lint`、`api:contracts`、`db:bounds`、`schema:migration-integrity`。
