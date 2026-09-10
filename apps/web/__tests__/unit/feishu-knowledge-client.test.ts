@@ -88,9 +88,9 @@ describe("feishu knowledge client", () => {
     expect(calls.filter((url) => url.includes("tenant_access_token"))).toHaveLength(1)
   })
 
-  it("把 search v2 结果裁成标题、摘要和链接，并去掉高亮标签", async () => {
+  it("user 身份把 search v2 结果裁成标题、摘要和链接，并去掉高亮标签", async () => {
     const { fetchImpl } = createQueuedFetch([
-      () => tokenReply(),
+      // user 身份直接带 user_access_token 请求，不先取 tenant token
       () =>
         jsonResponse({
           code: 0,
@@ -114,6 +114,7 @@ describe("feishu knowledge client", () => {
     ])
     const client = createFeishuKnowledgeClient({
       ...APP,
+      userAccessToken: "u-1",
       wikiSpaceIds: ["space_1"],
       fetchImpl,
     })
@@ -131,13 +132,14 @@ describe("feishu knowledge client", () => {
     ])
   })
 
-  it("无权限时给出可行动错误，且错误信息不含 token 明文", async () => {
+  it("user 身份 search v2 无权限时给出可行动错误，且错误信息不含 token 明文", async () => {
     const { fetchImpl } = createQueuedFetch([
-      () => tokenReply(),
+      // user 身份直接带 user_access_token 请求，不先取 tenant token
       () => jsonResponse({ code: 131006, msg: "permission denied" }, false),
     ])
     const client = createFeishuKnowledgeClient({
       ...APP,
+      userAccessToken: "u-1",
       wikiSpaceIds: ["space_1"],
       fetchImpl,
     })
@@ -190,10 +192,9 @@ describe("feishu knowledge client", () => {
     expect(calls.some((url) => url.includes("get_node"))).toBe(true)
   })
 
-  it("search v2 不接受 tenant 身份时，降级为 wiki 节点标题匹配", async () => {
-    const { fetchImpl } = createQueuedFetch([
+  it("bot 身份直接走 wiki 节点标题匹配，不请求 search v2", async () => {
+    const { fetchImpl, calls } = createQueuedFetch([
       () => tokenReply(),
-      () => jsonResponse({ code: 1274011, msg: "user_access_token is invalid or expired" }, false),
       () =>
         jsonResponse({
           code: 0,
@@ -232,6 +233,22 @@ describe("feishu knowledge client", () => {
         entityType: "WIKI",
       }),
     ])
+    expect(calls.some((url) => url.includes("search/v2/doc_wiki/search"))).toBe(false)
+  })
+
+  it("多空间遍历时单空间失败跳过，全部失败才报 permission_denied", async () => {
+    const { fetchImpl } = createQueuedFetch([
+      () => tokenReply(),
+      () => jsonResponse({ code: 131006, msg: "permission denied" }, false),
+      () => jsonResponse({ code: 131006, msg: "permission denied" }, false),
+    ])
+    const client = createFeishuKnowledgeClient({
+      ...APP,
+      wikiSpaceIds: ["space_1", "space_2"],
+      fetchImpl,
+    })
+
+    await expect(client.search("爆款选题")).rejects.toMatchObject({ kind: "permission_denied" })
   })
 })
 

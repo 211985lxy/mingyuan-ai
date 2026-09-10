@@ -214,6 +214,7 @@ describe("POST /api/aim/chat", () => {
       degraded: false,
       provider: "test-provider",
       model: "test-model",
+      feishuSources: [],
     })
 
     // 非流式 + projectId + agentId → fire-and-forget 沉淀记忆
