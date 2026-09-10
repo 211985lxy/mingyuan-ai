@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   ScrollText,
   LogOut,
+  WandSparkles,
 } from "lucide-react"
 import {
   Sidebar,
@@ -84,6 +85,7 @@ const navGroups: NavGroup[] = [
       { title: "系统方法论", titleEn: "System Methodology", href: "/admin/methodology", icon: Compass },
       { title: "命名方法论", titleEn: "Named Methodology", href: "/admin/methodology-profiles", icon: BookOpen },
       { title: "检索测试", titleEn: "Retrieval Test", href: "/admin/retrieval-test", icon: FlaskConical },
+      { title: "Prompt 资产", titleEn: "Prompts", href: "/admin/prompts", icon: WandSparkles },
     ],
   },
   {

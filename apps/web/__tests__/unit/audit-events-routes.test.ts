@@ -47,8 +47,19 @@ describe("audit event admin routes", () => {
     expect(body.data).toHaveLength(1)
     expect(body.nextCursor).toBe("event-3")
     expect(args.take).toBe(2)
-    expect(args.where.occurredAt.gte.toISOString()).toBe("2026-09-07T16:00:00.000Z")
-    expect(args.where.occurredAt.lt.toISOString()).toBe("2026-09-08T16:00:00.000Z")
+    // 「今天」按 Asia/Shanghai 随钟计算（原硬编码日期随日历翻页即红）
+    const shanghaiToday = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date())
+    expect(args.where.occurredAt.gte.toISOString()).toBe(
+      new Date(`${shanghaiToday}T00:00:00+08:00`).toISOString(),
+    )
+    expect(args.where.occurredAt.lt.toISOString()).toBe(
+      new Date(new Date(`${shanghaiToday}T00:00:00+08:00`).getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    )
   })
 
   it("passes filters and an opaque cursor to Prisma", async () => {

@@ -1,5 +1,6 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 import type { ContentFormat } from "@/lib/api/client"
+import { AIM_BENCHMARK_MATERIAL_PATTERN, extractAimInstructionText } from "@/lib/aim-current-user-input"
 
 /**
  * 用户指令唯一真源 —— 意图解析与关键缺口检查。
@@ -113,17 +114,28 @@ function detectQuantity(text: string): number | undefined {
 }
 
 function detectTaskKind(envelope: AimContentSourceEnvelope): AimIntentTaskKind {
-  const request = envelope.currentUserRequest
+  // 指令/素材分离：字面匹配只对指令部分生效；对标材料用带冒号的结构标记在全文识别
+  // （2026-09 系列事故：素材里的「开头/为什么/仿写」曾劫持整段判定的根治点）
+  const instruction = extractAimInstructionText(envelope.currentUserRequest)
   const hasOriginalMaterial = envelope.referenceMaterials.length > 0
     || Boolean(envelope.currentArtifact?.content?.trim())
-  if (/(批量复刻|一次复刻|多条复刻)/.test(request)) return "batch_replicate"
-  if (/仿写/.test(request)) return "imitation_rewrite"
-  if (/开头/.test(request) && /(优化|改写|重写|推荐|建议|备选)/.test(request)) return "opener_optimize"
-  const hasBenchmarkMaterial = /对标原文|对标文案/.test(request)
+  if (/(批量复刻|一次复刻|多条复刻)/.test(instruction)) return "batch_replicate"
+  if (/仿写/.test(instruction)) return "imitation_rewrite"
+  if (/开头/.test(instruction) && /(优化|改写|重写|推荐|建议|备选)/.test(instruction)) return "opener_optimize"
+  const hasBenchmarkMaterial = AIM_BENCHMARK_MATERIAL_PATTERN.test(envelope.currentUserRequest)
     || envelope.referenceMaterials.some((item) => /对标|爆款/.test(item.title))
-  if (hasBenchmarkMaterial && /(改写|重写|复刻|按|参考)/.test(request)) return "benchmark_rewrite"
-  if (/(优化|修改|润色|调整|精修|改一下|改改|帮我改)/.test(request) && hasOriginalMaterial) return "polish_existing"
-  if (QUESTION_INTENT_PATTERN.test(request.trim()) && !/(写|生成|出).{0,8}(文案|口播|文章|脚本)/.test(request)) {
+  // 纯对标粘贴（无指令）也按对标改写：素材本身即任务对象，不再当「新稿」追问受众
+  if (hasBenchmarkMaterial && (!instruction || /(改写|重写|复刻|按|参考|仿写)/.test(instruction))) {
+    return "benchmark_rewrite"
+  }
+  if (/(优化|修改|润色|调整|精修|改一下|改改|帮我改)/.test(instruction) && hasOriginalMaterial) {
+    return "polish_existing"
+  }
+  if (
+    instruction
+    && QUESTION_INTENT_PATTERN.test(instruction.trim())
+    && !/(写|生成|出).{0,8}(文案|口播|文章|脚本)/.test(instruction)
+  ) {
     return "answer_question"
   }
   return "new_draft"
@@ -180,7 +192,9 @@ export function resolveUserIntentFromEnvelope(
   envelope: AimContentSourceEnvelope,
   formats?: ContentFormat[],
 ): ResolvedUserIntent {
-  const request = envelope.currentUserRequest
+  // 指令/素材分离：请求侧字段只从「用户指令」解析；素材只作为参考材料喂给模型，
+  // 素材里的「适合宝妈/品牌/3条/开头/接下来写」不再成为硬约束或触发追问误判。
+  const request = extractAimInstructionText(envelope.currentUserRequest)
   // 确定性字段同时扫描：当前原话（最高优先）+ 最近用户回答（本任务已确认）
   const confirmedText = recentUserText(envelope)
 

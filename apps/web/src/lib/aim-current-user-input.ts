@@ -1,5 +1,57 @@
 const AIM_GENERATE_INPUT_MARKER = "【本次生成输入】"
 
+/**
+ * 素材段落结构标记：出现在任一标记之前的内容视为「用户指令」，之后视为「粘贴素材」。
+ * 指令/素材分离的单一真源（2026-09 系列事故根治）：所有入口层规则只对指令部分
+ * 做字面匹配，素材里的词（反问钩子/「开头」/「这段」/#tag）不再冒充用户意图。
+ */
+export const AIM_MATERIAL_SECTION_MARKERS = [
+  "对标标题：",
+  "对标原文：",
+  "对标文案：",
+  "已有拆解：",
+  "结构化拆解：",
+  "改写原则：",
+  "创作原则：",
+  "【待修改原文】",
+  "【待质检原文】",
+  "【发布数据原文】",
+  "【参考材料：",
+  "【当前作品】",
+  "【最近对话】",
+  "【对话摘要】",
+  "【有界检索笔记】",
+] as const
+
+/** 对标粘贴的结构标记（带冒号的段落头）；口头提到「对标文案」不带冒号不算 */
+export const AIM_BENCHMARK_MATERIAL_PATTERN = /对标标题[：:]|对标原文[：:]|对标文案[：:]/
+
+/**
+ * 从含粘贴素材的原始输入中抽取「用户指令」部分。
+ * 取最早出现的素材标记位置截断；纯粘贴（无指令）返回空串——调用方按「无指令」
+ * 处理而不是回退整段，否则分离失效。
+ */
+export function extractAimInstructionText(raw: string): string {
+  const text = (raw || "").trim()
+  if (!text) return ""
+
+  let cut = -1
+  for (const marker of AIM_MATERIAL_SECTION_MARKERS) {
+    const index = text.indexOf(marker)
+    if (index >= 0 && (cut < 0 || index < cut)) cut = index
+  }
+  if (cut < 0) return text
+  return text.slice(0, cut).trim()
+}
+
+/** 素材字符量（用于可观测与快径门控） */
+export function countAimMaterialChars(raw: string): number {
+  const text = (raw || "").trim()
+  if (!text) return 0
+  const instruction = extractAimInstructionText(raw)
+  return text.length - instruction.length
+}
+
 const DIRECT_DRAFT_PATTERNS = [
   "直接生成文案",
   "直接生成长文",
@@ -82,6 +134,6 @@ const WECHAT_DRAFT_PATTERNS = [
  * @returns 有微信草稿意图返回 true
  */
 export function hasWechatDraftIntent(raw: string): boolean {
-  const text = normalizeForMatch(raw)
+  const text = normalizeForMatch(extractAimInstructionText(raw))
   return WECHAT_DRAFT_PATTERNS.some((pattern) => text.includes(pattern))
 }

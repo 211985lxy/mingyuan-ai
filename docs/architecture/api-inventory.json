@@ -1105,6 +1105,54 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/prompts/[key]/promote",
+      "file": "src/app/api/admin/prompts/[key]/promote/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "prompt",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/prompts/[key]/versions",
+      "file": "src/app/api/admin/prompts/[key]/versions/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "prompt",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "zod_json",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/prompts",
+      "file": "src/app/api/admin/prompts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "prompt",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/seed-topic-engine",
       "file": "src/app/api/admin/seed-topic-engine/route.ts",
       "methods": [

@@ -9,6 +9,8 @@
  * 后续第二步（待办）：由语义理解判定挂载意图，替代关键词匹配。
  */
 
+import { AIM_BENCHMARK_MATERIAL_PATTERN, extractAimInstructionText } from "@/lib/aim-current-user-input"
+
 export type MountedRuleBlockId =
   | "publish_package"
   | "benchmark_guardrail"
@@ -49,12 +51,15 @@ export function resolveMountedRuleBlocks(input: {
   forGenerate?: boolean
   contentAction?: string | null
 }): MountedRuleBlockId[] {
-  const text = input.request
+  // 指令/素材分离：关键词触发只看用户指令；对标防抄袭例外——对标是素材属性，
+  // 用带冒号的结构标记在全文识别（素材里有「改写/文案结构」不该挂规则，但
+  // 只要真是对标改写就必须挂防抄袭，不能因分离而丢保护）。
+  const instruction = extractAimInstructionText(input.request)
   const blocks: MountedRuleBlockId[] = []
 
   const contentAction = String(input.contentAction || "").toLowerCase()
   if (
-    PUBLISH_PACKAGE_TRIGGER_PATTERN.test(text)
+    PUBLISH_PACKAGE_TRIGGER_PATTERN.test(instruction)
     || contentAction.includes("publish")
     || contentAction === "publish_package"
   ) {
@@ -64,15 +69,16 @@ export function resolveMountedRuleBlocks(input: {
   // 互斥硬约束：light_edit 语义是「保留原文、只改局部」，与「整篇至少 30% 重写」
   // 「交付验证区块」互斥；绝不能同时注入，否则模型收到相反指令。
   if (input.runtimeTask === "light_edit") {
-    if (VIRAL_TOOLKIT_TRIGGER_PATTERN.test(text)) blocks.push("viral_toolkit")
+    if (VIRAL_TOOLKIT_TRIGGER_PATTERN.test(instruction)) blocks.push("viral_toolkit")
     return blocks
   }
 
   if (
     Boolean(input.hasBenchmarkText)
+    || AIM_BENCHMARK_MATERIAL_PATTERN.test(input.request)
     || input.runtimeTask === "rewrite_copy"
     || input.knowledgeStrategy === "rewrite"
-    || BENCHMARK_TRIGGER_PATTERN.test(text)
+    || BENCHMARK_TRIGGER_PATTERN.test(instruction)
   ) {
     blocks.push("benchmark_guardrail")
   }
@@ -81,11 +87,11 @@ export function resolveMountedRuleBlocks(input: {
     ? Boolean(input.runtimeTask && FORMAL_DELIVERY_TASKS.has(input.runtimeTask))
       || input.runtimeTask == null
     : input.runtimeTask === "quality_review"
-      || HIGH_RISK_CHAT_TRIGGER_PATTERN.test(text)
+      || HIGH_RISK_CHAT_TRIGGER_PATTERN.test(instruction)
   if (highRisk) blocks.push("high_risk_loop")
 
   if (
-    VIRAL_TOOLKIT_TRIGGER_PATTERN.test(text)
+    VIRAL_TOOLKIT_TRIGGER_PATTERN.test(instruction)
     || input.runtimeTask === "rewrite_copy"
     || input.runtimeTask === "quality_review"
     || input.knowledgeStrategy === "rewrite"
