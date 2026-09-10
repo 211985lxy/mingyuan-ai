@@ -285,6 +285,17 @@
       ]
     },
     {
+      "name": "ProjectMember",
+      "columns": [
+        "id",
+        "projectId",
+        "userId",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
       "name": "AdminUser",
       "columns": [
         "id",
