@@ -142,10 +142,21 @@ async function main() {
       prisma.user.count({ where: { boundProjectId: source.id } }),
     ])
     const memberIds = [...new Set([
+      target.userId,
       source.userId,
       ...source.members.map((member) => member.userId),
       ...source.boundAccounts.map((account) => account.id),
     ])]
+    const conflictingBindings = await prisma.user.findMany({
+      where: {
+        id: { in: memberIds },
+        boundProjectId: { not: null, notIn: [source.id, target.id] },
+      },
+      select: { id: true },
+    })
+    if (conflictingBindings.length > 0) {
+      throw new Error("a source or target member is already bound to another project")
+    }
     console.log(JSON.stringify({
       mode: apply ? "apply" : "dry-run",
       source: { id: source.id, name: source.name, status: source.status },
@@ -172,7 +183,14 @@ async function main() {
         })
       }
       await tx.user.updateMany({
-        where: { boundProjectId: source.id },
+        where: {
+          id: { in: memberIds },
+          OR: [
+            { boundProjectId: null },
+            { boundProjectId: source.id },
+            { boundProjectId: target.id },
+          ],
+        },
         data: {
           boundProjectId: target.id,
           projectBoundAt: new Date(),

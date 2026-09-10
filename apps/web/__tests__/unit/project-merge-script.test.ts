@@ -25,6 +25,8 @@ describe("project merge script safety contract", () => {
     expect(source).toContain("knowledgeEntry")
     expect(source).toContain("aimGeneration")
     expect(source).toContain("projectMember.upsert")
+    expect(source).toContain("target.userId")
+    expect(source).toContain("id: { in: memberIds }")
     expect(source).toContain('data: { status: "archived" }')
     expect(source).not.toContain("clientProject.delete")
   })
