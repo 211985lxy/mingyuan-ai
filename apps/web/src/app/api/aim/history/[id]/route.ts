@@ -28,7 +28,7 @@ export async function GET(
     const { id } = await params
     const boundProject = await resolveBoundProject({ userId: user.id })
     const record = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id, projectId: boundProject.id },
+      where: { id, projectId: boundProject.id },
     })
     if (!record) {
       return NextResponse.json({ error: "生成记录不存在" }, { status: 404 })
@@ -71,8 +71,14 @@ export async function PATCH(
     const body = await parseJsonRecord(request)
 
     const existing = await prisma.aimGeneration.findFirst({
-      // 允许把历史 quick 记录首次归档到绑定项目；已有其他项目记录仍不可见。
-      where: { id, userId: user.id },
+      // 允许把本人 quick 记录首次归档到绑定项目；已有其他项目记录仍不可见。
+      where: {
+        id,
+        OR: [
+          { projectId: boundProject.id },
+          { projectId: null, userId: user.id },
+        ],
+      },
       select: {
         id: true,
         retroSnapshots: true,
@@ -195,7 +201,7 @@ export async function DELETE(
     const boundProject = await resolveBoundProject({ userId: user.id })
 
     const existing = await prisma.aimGeneration.findFirst({
-      where: { id, userId: user.id, projectId: boundProject.id },
+      where: { id, projectId: boundProject.id },
       select: { id: true },
     })
     if (!existing) {

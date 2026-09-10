@@ -52,13 +52,13 @@ describe("knowledge account binding", () => {
     enforceKnowledgeBetaLimit.mockResolvedValue(null)
   })
 
-  it("reads only the account-bound project's knowledge", async () => {
+  it("reads only the account-bound project, including other authorized members' knowledge", async () => {
     const response = await GET(makeRequest("GET", undefined, "http://localhost/api/knowledge?projectId=project-other"))
     expect(response.status).toBe(200)
     expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-other" })
-    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ userId: "user-1", projectId: "project-ai" }),
-    }))
+    const where = findMany.mock.calls[0][0].where
+    expect(where).toMatchObject({ projectId: "project-ai" })
+    expect(where).not.toHaveProperty("userId")
   })
 
   it("automatically assigns new knowledge to the bound project", async () => {

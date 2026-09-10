@@ -209,7 +209,17 @@ export async function assertAgentProjectAccess(context: AgentApiContext, project
     where: { id: projectId, userId: context.userId, status: "active" },
     select: { id: true },
   })
-  if (!project) throw new Error("AGENT_PROJECT_FORBIDDEN")
+  if (project) return
+
+  const membership = await prisma.projectMember.findFirst({
+    where: {
+      projectId,
+      userId: context.userId,
+      project: { is: { status: "active" } },
+    },
+    select: { id: true },
+  })
+  if (!membership) throw new Error("AGENT_PROJECT_FORBIDDEN")
 }
 
 /**

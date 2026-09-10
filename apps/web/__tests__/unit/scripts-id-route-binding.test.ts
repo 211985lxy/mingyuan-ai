@@ -92,7 +92,7 @@ describe("PATCH /api/scripts/[id] account-project scope", () => {
 
     expect(response.status).toBe(404)
     expect(findFirst).toHaveBeenCalledWith({
-      where: { id: "script-cross-project", userId: "user-1", projectId: "project-ai" },
+      where: { id: "script-cross-project", projectId: "project-ai" },
     })
     expect(transaction).not.toHaveBeenCalled()
   })
@@ -105,10 +105,10 @@ describe("PATCH /api/scripts/[id] account-project scope", () => {
 
     expect(response.status).toBe(200)
     expect(findFirst).toHaveBeenCalledWith({
-      where: { id: "script-1", userId: "user-1", projectId: "project-ai" },
+      where: { id: "script-1", projectId: "project-ai" },
     })
     expect(update).toHaveBeenCalledWith({
-      where: { id: "script-1", userId: "user-1", projectId: "project-ai" },
+      where: { id: "script-1" },
       data: expect.objectContaining({ content: "新内容" }),
     })
     await expect(response.json()).resolves.toEqual({ data: { ...scriptRow, content: "新内容" } })
@@ -124,7 +124,6 @@ describe("PATCH /api/scripts/[id] account-project scope", () => {
     expect(response.status).toBe(200)
     expect(updateMany).toHaveBeenCalledWith({
       where: {
-        userId: "user-1",
         projectId: "project-ai",
         generationRunId: "run-1",
         status: "selected",

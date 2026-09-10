@@ -39,7 +39,7 @@ describe("AIM history account binding", () => {
     expect(response.status).toBe(200)
     expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-other" })
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ userId: "user-1", projectId: "project-ai" }),
+      where: expect.objectContaining({ projectId: "project-ai" }),
     }))
   })
 

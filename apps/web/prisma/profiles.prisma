@@ -83,7 +83,8 @@ model ClientProject {
   updatedAt      DateTime @updatedAt
 
   user                   User                        @relation("ProjectOwner", fields: [userId], references: [id])
-  boundAccount           User?                       @relation("AccountBoundProject")
+  boundAccounts          User[]                      @relation("AccountBoundProject")
+  members                ProjectMember[]
   aimGenerations         AimGeneration[]
   knowledgeEntries       KnowledgeEntry[]
   knowledgeEntities      KnowledgeEntity[]
@@ -106,4 +107,19 @@ model ClientProject {
   @@index([userId, status])
   @@index([userId, createdAt])
   @@index([userId, status, updatedAt(sort: Desc)])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String   @default("member") @db.VarChar(24) // owner | member
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project ClientProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId, projectId])
 }

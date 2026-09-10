@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { transaction, userFindUnique, projectFindUnique, userUpdateMany } = vi.hoisted(() => ({
+const { transaction, userFindUnique, projectFindUnique, userUpdateMany, projectMemberUpsert } = vi.hoisted(() => ({
   transaction: vi.fn(),
   userFindUnique: vi.fn(),
   projectFindUnique: vi.fn(),
   userUpdateMany: vi.fn(),
+  projectMemberUpsert: vi.fn(),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -24,6 +25,7 @@ describe("admin account project binding", () => {
     transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => callback({
       user: { findUnique: userFindUnique, updateMany: userUpdateMany },
       clientProject: { findUnique: projectFindUnique },
+      projectMember: { upsert: projectMemberUpsert },
     }))
   })
 
@@ -47,13 +49,17 @@ describe("admin account project binding", () => {
     }))
   })
 
-  it("rejects binding a project owned by another account", async () => {
+  it("allows binding an active project owned by another account as a member", async () => {
     userFindUnique.mockResolvedValue({ boundProjectId: null })
     projectFindUnique.mockResolvedValue({ id: "project-other", userId: "user-2", name: "他人项目", status: "active" })
 
+    userUpdateMany.mockResolvedValue({ count: 1 })
+
     await expect(bindAccountProject({ userId: "user-1", projectId: "project-other" }))
-      .rejects.toMatchObject({ code: "PROJECT_CONTEXT_MISMATCH", status: 409 })
-    expect(userUpdateMany).not.toHaveBeenCalled()
+      .resolves.toMatchObject({ id: "project-other" })
+    expect(projectMemberUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: { projectId: "project-other", userId: "user-1", role: "member" },
+    }))
   })
 
   it("does not replace an already bound project", async () => {

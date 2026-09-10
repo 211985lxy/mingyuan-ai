@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { findFirst, userFindUnique } = vi.hoisted(() => ({
+const { findFirst, userFindUnique, memberFindFirst } = vi.hoisted(() => ({
   findFirst: vi.fn(),
   userFindUnique: vi.fn(),
+  memberFindFirst: vi.fn(),
 }))
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { user: { findUnique: userFindUnique }, clientProject: { findFirst } },
+  prisma: {
+    user: { findUnique: userFindUnique },
+    clientProject: { findFirst },
+    projectMember: { findFirst: memberFindFirst },
+  },
 }))
 
 import { ownsActiveProject } from "@/lib/resource-ownership"
@@ -15,6 +20,7 @@ describe("resource ownership", () => {
   beforeEach(() => {
     findFirst.mockReset()
     userFindUnique.mockReset()
+    memberFindFirst.mockReset()
   })
 
   it("queries the project with owner and active status", async () => {
@@ -63,6 +69,22 @@ describe("resource ownership", () => {
     await expect(ownsActiveProject("user-1", "project-1")).resolves.toBe(false)
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: "project-1", userId: "user-1", status: "active" },
+      select: { id: true },
+    })
+  })
+
+  it("accepts a bound project where the account is an active member", async () => {
+    userFindUnique.mockResolvedValueOnce({ boundProjectId: "project-1" })
+    findFirst.mockResolvedValueOnce(null)
+    memberFindFirst.mockResolvedValueOnce({ id: "membership-1" })
+
+    await expect(ownsActiveProject("user-1", "project-1")).resolves.toBe(true)
+    expect(memberFindFirst).toHaveBeenCalledWith({
+      where: {
+        projectId: "project-1",
+        userId: "user-1",
+        project: { is: { status: "active" } },
+      },
       select: { id: true },
     })
   })

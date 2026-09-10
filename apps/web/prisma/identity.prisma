@@ -11,8 +11,8 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  // 一个 AIM 登录账号只绑定一个 IP/客户项目；项目本身仍可作为知识与生成的隔离边界。
-  boundProjectId       String?   @unique
+  // 一个 AIM 登录账号选定一个当前项目；同一项目可由多个已授权账号共同使用。
+  boundProjectId       String?
   projectBoundAt       DateTime?
   projectBindingSource String?   @db.VarChar(24)
 
@@ -34,6 +34,7 @@ model User {
   aimMemories             AimMemory[]
   clientProjects          ClientProject[]          @relation("ProjectOwner")
   boundProject            ClientProject?           @relation("AccountBoundProject", fields: [boundProjectId], references: [id], onDelete: SetNull)
+  projectMemberships      ProjectMember[]
   ipWikiPages             IpWikiPage[]
   benchmarkProfiles       BenchmarkProfile[]
   inspirations            Inspiration[]

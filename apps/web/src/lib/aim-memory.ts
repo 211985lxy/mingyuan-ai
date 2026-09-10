@@ -341,12 +341,14 @@ export async function retrieveAimMemory(input: {
   const { userId, projectId, agentId } = input
   const topK = input.topK ?? 6
   const now = new Date()
+  // Project memory is shared by authorized project members. Quick-mode memory
+  // has no project and remains personal to its author.
+  const memoryScope = projectId ? { projectId } : { userId, projectId: null }
 
   try {
     const rows = await prisma.aimMemory.findMany({
       where: {
-        userId,
-        projectId: projectId ?? null,
+        ...memoryScope,
         // 仅召回已批准且未过期；candidate / rejected / superseded 不得进入生产上下文
         status: "active",
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],

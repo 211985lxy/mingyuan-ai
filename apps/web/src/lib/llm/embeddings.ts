@@ -286,6 +286,11 @@ export async function retrieveRelevantKnowledge(input: {
   const topK = input.topK ?? 12
   const prefilter = input.prefilter
   const projectScope = resolveKnowledgeProjectScope(input.projectId)
+  // A real project is the tenant boundary. `userId` remains the actor/audit
+  // field, while unbound quick-mode knowledge stays personal.
+  const knowledgeScope = projectScope.projectId
+    ? projectScope
+    : { userId: input.userId, ...projectScope }
 
   // Build the query text: combine input + topic context for richer embedding
   const queryParts = [input.query]
@@ -305,9 +310,8 @@ export async function retrieveRelevantKnowledge(input: {
         where: {
           status: "completed",
           entry: {
-            userId: input.userId,
             status: "active",
-            ...projectScope,
+            ...knowledgeScope,
             ...(hasCategoryFilter ? { category: { in: prefilter!.categories } } : {}),
             ...(hasGradeFilter ? { valueGrade: { in: prefilter!.valueGrades } } : {}),
           },
@@ -358,9 +362,8 @@ export async function retrieveRelevantKnowledge(input: {
   const [coreEntries, otherEntries] = await Promise.all([
     prisma.knowledgeEntry.findMany({
       where: {
-        userId: input.userId,
         status: "active",
-        ...projectScope,
+        ...knowledgeScope,
         category: { in: CORE_FALLBACK_CATEGORIES },
       },
       orderBy: { sortOrder: "asc" },
@@ -369,9 +372,8 @@ export async function retrieveRelevantKnowledge(input: {
     }),
     prisma.knowledgeEntry.findMany({
       where: {
-        userId: input.userId,
         status: "active",
-        ...projectScope,
+        ...knowledgeScope,
         category: { notIn: CORE_FALLBACK_CATEGORIES },
       },
       orderBy: { sortOrder: "asc" },

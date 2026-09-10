@@ -74,13 +74,13 @@ describe("customer knowledge API ownership", () => {
     mocks.resolveBoundProject.mockResolvedValue({ id: "project-a", name: "当前项目", status: "active" })
   })
 
-  it("lists only the current user's entries", async () => {
+  it("lists entries of the current project, including other authorized members' entries", async () => {
     mocks.findMany.mockResolvedValueOnce([{ id: "k1", userId: "user-a", title: "我的资料" }])
     const response = await listKnowledge(jsonRequest("http://localhost/api/knowledge?status=active"))
     expect(response.status).toBe(200)
-    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ userId: "user-a", projectId: "project-a", status: "active" }),
-    }))
+    const where = mocks.findMany.mock.calls[0][0].where
+    expect(where).toMatchObject({ projectId: "project-a", status: "active" })
+    expect(where).not.toHaveProperty("userId")
   })
 
   it("returns 401 when unauthenticated", async () => {
@@ -92,7 +92,7 @@ describe("customer knowledge API ownership", () => {
     expect(response.status).toBe(401)
   })
 
-  it("cannot read another user's knowledge id", async () => {
+  it("cannot read knowledge from another project", async () => {
     mocks.findFirst.mockResolvedValueOnce(null)
     const response = await getKnowledge(
       jsonRequest("http://localhost/api/knowledge/kb-b"),
@@ -100,11 +100,11 @@ describe("customer knowledge API ownership", () => {
     )
     expect(response.status).toBe(404)
     expect(mocks.findFirst).toHaveBeenCalledWith({
-      where: { id: "kb-b", userId: "user-a", projectId: "project-a" },
+      where: { id: "kb-b", projectId: "project-a" },
     })
   })
 
-  it("cannot edit another user's knowledge id", async () => {
+  it("cannot edit knowledge from another project", async () => {
     mocks.findFirst.mockResolvedValueOnce(null)
     const response = await updateKnowledge(
       jsonRequest("http://localhost/api/knowledge/kb-b", {
@@ -118,7 +118,7 @@ describe("customer knowledge API ownership", () => {
     expect(mocks.update).not.toHaveBeenCalled()
   })
 
-  it("cannot archive another user's knowledge id", async () => {
+  it("cannot archive knowledge from another project", async () => {
     mocks.findFirst.mockResolvedValueOnce(null)
     const response = await archiveKnowledge(
       jsonRequest("http://localhost/api/knowledge/kb-b", { method: "DELETE" }),
@@ -137,7 +137,7 @@ describe("customer knowledge API ownership", () => {
     )
     expect(response.status).toBe(200)
     expect(mocks.update).toHaveBeenCalledWith({
-      where: { id: "kb-a", userId: "user-a" },
+      where: { id: "kb-a" },
       data: { status: "archived" },
     })
   })

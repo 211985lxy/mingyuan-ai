@@ -22,7 +22,7 @@ export async function GET(
     const { id } = await params
     const boundProject = await resolveBoundProject({ userId: user.id })
     const entry = await prisma.knowledgeEntry.findFirst({
-      where: { id, userId: user.id, projectId: boundProject.id },
+      where: { id, projectId: boundProject.id },
     })
     if (!entry) {
       return NextResponse.json({ error: "不存在" }, { status: 404 })
@@ -57,7 +57,7 @@ export async function PUT(
     const body = await parseJsonBody(request, knowledgeUpdateBodySchema, { maxBytes: 64 * 1024 })
 
     const entry = await prisma.knowledgeEntry.findFirst({
-      where: { id, userId: user.id, projectId: boundProject.id },
+      where: { id, projectId: boundProject.id },
     })
     if (!entry) {
       return NextResponse.json({ error: "不存在" }, { status: 404 })
@@ -77,7 +77,7 @@ export async function PUT(
     }
 
     const updated = await prisma.knowledgeEntry.update({
-      where: { id, userId: user.id },
+      where: { id },
       data: {
         ...(body.title !== undefined ? { title: body.title } : {}),
         ...(body.content !== undefined ? { content: body.content } : {}),
@@ -125,14 +125,14 @@ export async function DELETE(
     const boundProject = await resolveBoundProject({ userId: user.id })
 
     const entry = await prisma.knowledgeEntry.findFirst({
-      where: { id, userId: user.id, projectId: boundProject.id },
+      where: { id, projectId: boundProject.id },
     })
     if (!entry) {
       return NextResponse.json({ error: "不存在" }, { status: 404 })
     }
 
     await prisma.knowledgeEntry.update({
-      where: { id, userId: user.id },
+      where: { id },
       data: { status: "archived" },
     })
 
