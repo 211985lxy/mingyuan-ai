@@ -174,7 +174,7 @@ export async function transitionOperationalAlert(input: {
 async function checkReconcileLag(now: Date): Promise<number> {
   const delegate = (prisma as unknown as { auditReconcileCheckpoint?: { findMany(args: unknown): Promise<Array<{ source: string; lastSuccessAt: Date | null }>> } }).auditReconcileCheckpoint
   if (!delegate) return 0
-  const checkpoints = await delegate.findMany({ select: { source: true, lastSuccessAt: true } })
+  const checkpoints = await delegate.findMany({ select: { source: true, lastSuccessAt: true }, take: 100 })
   let created = 0
   for (const checkpoint of checkpoints) {
     if (checkpoint.lastSuccessAt && now.getTime() - checkpoint.lastSuccessAt.getTime() <= 10 * 60 * 1000) continue
