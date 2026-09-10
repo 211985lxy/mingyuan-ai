@@ -63,52 +63,60 @@ type SummaryResponse =
   | { status: "ok"; accounts: PlatformAccount[]; recentVideos: PlatformVideo[]; fetchedAt: string }
 
 function formatCount(value?: number | null): string {
-  if (value == null) return "—"
+  if (value == null) return "暂无"
   if (value >= 10000) return `${(value / 10000).toFixed(1)}万`
   return value.toLocaleString("zh-CN")
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) return "—"
+  if (!value) return "暂无"
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString("zh-CN", { hour12: false })
 }
 
+/** 指标四联格：分隔线布局，空值显示「暂无」。 */
+function MetricGrid({ metrics }: { metrics: Array<{ label: string; value?: number | null }> }) {
+  return (
+    <div className="grid grid-cols-2 gap-y-3 text-sm sm:grid-cols-4 sm:divide-x sm:divide-border/60">
+      {metrics.map((metric) => (
+        <div key={metric.label} className="sm:px-3 sm:first:pl-0">
+          <div className="text-xs text-muted-foreground">{metric.label}</div>
+          <div className="mt-0.5 font-semibold tabular-nums">{formatCount(metric.value)}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AccountCard({ account }: { account: PlatformAccount }) {
+  const displayName = account.nickname?.trim() || "未命名账号"
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span className="text-2xl leading-none">{account.platform}</span>
-            <span className="truncate">{account.nickname}</span>
-          </CardTitle>
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-base font-semibold text-primary">
+            {displayName.slice(0, 1)}
+          </div>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="truncate text-base">{displayName}</CardTitle>
+            <CardDescription className="mt-0.5 truncate">
+              {account.platform || "未知平台"}
+              {account.accessType ? ` · ${account.accessType}` : ""}
+            </CardDescription>
+          </div>
           {account.accountStatus ? <Badge variant="secondary">{account.accountStatus}</Badge> : null}
         </div>
-        {account.accessType ? (
-          <CardDescription>接入方式：{account.accessType}</CardDescription>
-        ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-          <div>
-            <div className="text-muted-foreground">粉丝</div>
-            <div className="font-medium">{formatCount(account.fansCount)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">获赞收藏</div>
-            <div className="font-medium">{formatCount(account.likeCount)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">作品</div>
-            <div className="font-medium">{formatCount(account.workCount)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">关注</div>
-            <div className="font-medium">{formatCount(account.followCount)}</div>
-          </div>
-        </div>
+        <MetricGrid
+          metrics={[
+            { label: "粉丝", value: account.fansCount },
+            { label: "获赞收藏", value: account.likeCount },
+            { label: "作品", value: account.workCount },
+            { label: "关注", value: account.followCount },
+          ]}
+        />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {account.authStatus ? <span>认证：{account.authStatus}</span> : null}
           {account.expireAt ? <span>授权至：{account.expireAt}</span> : null}
@@ -119,7 +127,7 @@ function AccountCard({ account }: { account: PlatformAccount }) {
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-primary hover:underline"
             >
-              主页 <ExternalLink className="h-3 w-3" />
+              查看主页 <ExternalLink className="h-3 w-3" />
             </a>
           ) : null}
         </div>
@@ -137,7 +145,12 @@ function AccountsSection({ accounts }: { accounts: PlatformAccount[] }) {
         账号总览（{accounts.length}）
       </h2>
       {accounts.length === 0 ? (
-        <p className="text-sm text-muted-foreground">账号表中暂无数据，用社媒助手同步达人数据后会出现在这里。</p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+            <p className="text-sm text-muted-foreground">账号表中暂无数据</p>
+            <p className="text-xs text-muted-foreground">用社媒助手同步达人数据后会出现在这里</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {accounts.map((account) => (
@@ -150,14 +163,19 @@ function AccountsSection({ accounts }: { accounts: PlatformAccount[] }) {
 }
 
 /** 近期作品表（从页面主体拆出，保持函数体 ≤80 行门禁）。 */
-function RecentVideosTable({ videos }: { videos: PlatformVideo[] }) {
+function RecentVideosSection({ videos }: { videos: PlatformVideo[] }) {
   return (
     <section className="space-y-3">
       <h2 className="text-sm font-medium text-muted-foreground">近期作品（{videos.length}）</h2>
       {videos.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          作品表暂无数据。在社媒助手中开启作品采集并同步飞书后，配置 LARK_PLATFORM_VIDEO_TABLE_ID 即可展示。
-        </p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-1.5 py-8 text-center">
+            <p className="text-sm text-muted-foreground">作品表暂无数据</p>
+            <p className="text-xs text-muted-foreground">
+              在社媒助手中开启作品采集并同步飞书后，这里会展示播放、点赞、评论等明细
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <Card>
           <CardContent className="pt-2">
@@ -182,11 +200,11 @@ function RecentVideosTable({ videos }: { videos: PlatformVideo[] }) {
                     <TableCell className="text-right text-muted-foreground">
                       {formatDateTime(video.publishedAt)}
                     </TableCell>
-                    <TableCell className="text-right">{formatCount(video.playCount)}</TableCell>
-                    <TableCell className="text-right">{formatCount(video.likeCount)}</TableCell>
-                    <TableCell className="text-right">{formatCount(video.commentCount)}</TableCell>
-                    <TableCell className="text-right">{formatCount(video.favoriteCount)}</TableCell>
-                    <TableCell className="text-right">{formatCount(video.shareCount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCount(video.playCount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCount(video.likeCount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCount(video.commentCount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCount(video.favoriteCount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCount(video.shareCount)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -217,12 +235,23 @@ export default function DataPlatformPage() {
   }
 
   useEffect(() => {
+    // 首屏拉取：同步置 loading 属预期首屏行为（仓库惯例 warn 放行）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [])
 
+  const fetchedAt = data?.status === "ok" ? formatDateTime(data.fetchedAt) : null
+
   return (
     <div className="space-y-6">
-      <PageHeader title="多平台数据看板" subtitle="社媒助手同步的账号与作品数据，来自飞书多维表格数据仓库">
+      <PageHeader
+        title="多平台数据看板"
+        subtitle={
+          fetchedAt
+            ? `社媒助手同步的账号与作品数据 · 更新于 ${fetchedAt}`
+            : "社媒助手同步的账号与作品数据，来自飞书多维表格数据仓库"
+        }
+      >
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           刷新
@@ -265,9 +294,7 @@ export default function DataPlatformPage() {
         <>
           <AccountsSection accounts={data.accounts} />
 
-          <RecentVideosTable videos={data.recentVideos} />
-
-          <p className="text-xs text-muted-foreground">数据更新时间：{formatDateTime(data.fetchedAt)}</p>
+          <RecentVideosSection videos={data.recentVideos} />
         </>
       ) : null}
     </div>

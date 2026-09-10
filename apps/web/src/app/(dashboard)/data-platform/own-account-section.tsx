@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart3, Eye } from "lucide-react"
+import { AlertCircle, BarChart3, Eye, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,23 +21,23 @@ import {
 } from "@/lib/api/creator-metrics"
 
 function formatCount(value?: number | null): string {
-  if (value == null) return "—"
-  return value >= 10000 ? `${(value / 10000).toFixed(1)}w` : value.toLocaleString("zh-CN")
+  if (value == null) return "暂无"
+  return value >= 10000 ? `${(value / 10000).toFixed(1)}万` : value.toLocaleString("zh-CN")
 }
 
 function formatPct(value?: number | null): string {
-  if (value == null || Number.isNaN(value)) return "—"
+  if (value == null || Number.isNaN(value)) return "暂无"
   return `${(value * 100).toFixed(1)}%`
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return "—"
+  if (!value) return "暂无"
   return value.slice(0, 10)
 }
 
 /** 质量指标上游可能存 0-1 小数或百分数，统一按小数展示。 */
 function pickRate(value?: number | null): string {
-  if (value == null || Number.isNaN(value)) return "—"
+  if (value == null || Number.isNaN(value)) return "暂无"
   return formatPct(value > 1 ? value / 100 : value)
 }
 
@@ -76,11 +78,11 @@ function PlatformTotalsCards({ totals }: { totals: PlatformTotal[] }) {
           <CardContent className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
             <div>
               <p className="text-xs text-muted-foreground">总播放</p>
-              <p className="text-lg font-semibold">{p.views == null ? "—" : formatCount(p.views)}</p>
+              <p className="text-lg font-semibold tabular-nums">{p.views == null ? "暂无" : formatCount(p.views)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">点赞</p>
-              <p className="text-lg font-semibold">{p.likes == null ? "—" : formatCount(p.likes)}</p>
+              <p className="text-lg font-semibold tabular-nums">{p.likes == null ? "暂无" : formatCount(p.likes)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">评论</p>
@@ -148,22 +150,36 @@ function RecentOwnPosts({ posts }: { posts: OwnPost[] }) {
 /** 我的账号表现（创作者数据总线：数据雷达 → 飞书 → AIM），与对标账号形成对比视图。 */
 export function OwnAccountSection() {
   const [metrics, setMetrics] = useState<CreatorMetricsResult | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [reloading, setReloading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+    // 进入区块即拉取数据：同步置 loading 态属于预期的首屏行为（仓库惯例 warn 放行）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReloading(true)
     const end = new Date()
     const start = new Date(end.getTime() - 365 * 24 * 3600 * 1000)
     fetchCreatorMetrics({ start: start.toISOString(), end: end.toISOString() })
       .then((v) => {
         if (!cancelled) setMetrics(v)
       })
-      .catch(() => {
-        if (!cancelled) setMetrics({ status: "error", message: "读取失败" })
+      .catch((error: unknown) => {
+        // 保留服务端真实原因（如「账号尚未绑定项目」），给用户可行动的信息
+        const message = error instanceof Error && error.message ? error.message : "读取失败"
+        if (!cancelled) setMetrics({ status: "error", message })
+      })
+      .finally(() => {
+        if (!cancelled) setReloading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloadKey])
+
+  function retry() {
+    setReloadKey((key) => key + 1)
+  }
 
   const heading = (
     <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -172,13 +188,27 @@ export function OwnAccountSection() {
     </h2>
   )
 
-  if (!metrics) {
+  if (!metrics || reloading) {
     return (
       <section className="space-y-3" aria-label="我的账号表现">
         {heading}
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground">加载中…</CardContent>
-        </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((index) => (
+            <Card key={index}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                {[0, 1, 2, 3, 4].map((slot) => (
+                  <div key={slot} className="space-y-1">
+                    <Skeleton className="h-3 w-10" />
+                    <Skeleton className="h-5 w-14" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </section>
     )
   }
@@ -187,11 +217,18 @@ export function OwnAccountSection() {
     return (
       <section className="space-y-3" aria-label="我的账号表现">
         {heading}
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            {metrics.status === "not_configured"
-              ? "尚未配置创作者数据总线（LARK_CREATOR_METRICS_*）。在本机「明动数据雷达」同步后即可展示。"
-              : metrics.message}
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-start gap-2 py-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              {metrics.status === "not_configured"
+                ? "尚未配置创作者数据总线（LARK_CREATOR_METRICS_*）。在本机「明动数据雷达」同步后即可展示。"
+                : metrics.message}
+            </div>
+            <Button variant="outline" size="sm" onClick={retry}>
+              <RefreshCw className="mr-2 h-3.5 w-3.5" />
+              重试
+            </Button>
           </CardContent>
         </Card>
       </section>
