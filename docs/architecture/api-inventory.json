@@ -1250,6 +1250,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/statistics/overview",
+      "file": "src/app/api/admin/statistics/overview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "admin/statistics",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/templates/[id]/archive",
       "file": "src/app/api/admin/templates/[id]/archive/route.ts",
       "methods": [
@@ -3263,6 +3279,23 @@
       "auth": "cron_secret",
       "input": "none",
       "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/channel-metrics-rollup",
+      "file": "src/app/api/cron/channel-metrics-rollup/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "query",
+      "query": "manual",
       "externalService": false,
       "cost": "low",
       "idempotency": false

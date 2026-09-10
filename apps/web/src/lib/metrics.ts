@@ -73,3 +73,17 @@ export const auditReconcileLagMs = new Gauge({
   help: "Audit reconciliation lag in milliseconds",
   registers: [metricsRegistry],
 })
+
+export const statisticsQueryFailuresTotal = new Counter({
+  name: "mingyuan_statistics_query_failures_total",
+  help: "Statistics center query failures",
+  labelNames: ["source"] as const,
+  registers: [metricsRegistry],
+})
+
+export const channelMetricRollupFailuresTotal = new Counter({
+  name: "mingyuan_channel_metric_rollup_failures_total",
+  help: "Durable channel metric rollup failures",
+  labelNames: ["platform", "metric"] as const,
+  registers: [metricsRegistry],
+})
