@@ -1,16 +1,15 @@
+import {
+  resolveAndTraceTurnGate,
+  resolveUnderstandingWithDegradation,
+} from "@/lib/aim/services/execute-turn"
+
 import { NextRequest, NextResponse } from "next/server"
 
 import { aimExecuteBodySchema } from "@/features/aim/contracts/api"
 import { apiRequestErrorResponse, parseJsonRecord, ApiRequestError } from "@/lib/api-contract"
 import { aimFailureHttpStatus, mapAimErrorToUserMessage, toAimFailureResponse, AimRunExecutionError } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
-import { createAimTrace, failAimTrace, finishAimTrace, addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
-import { understandAimContentTurnWithTrace } from "@/lib/aim/semantic-task-understanding"
-import { MOUNTED_RULE_BLOCK_LABELS } from "@/lib/aim/mounted-rule-blocks"
-import { resolveExecuteTurnGate } from "@/lib/aim/execute-turn-intent-gate"
-import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
-import type { ContentFormat } from "@/lib/api/client"
-import { countAimMaterialChars, extractAimInstructionText } from "@/lib/aim-current-user-input"
+import { createAimTrace, failAimTrace, finishAimTrace, type AimTraceRecorder } from "@/lib/aim-observability"
 import { executeVerifiedUnifiedDelivery, executeVerifiedUnifiedReply } from "@/lib/aim/services/unified-content-execution"
 import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
@@ -33,80 +32,6 @@ export const maxDuration = 180
 type GenerationAttempt = { id: string; userId: string; projectId?: string; created: boolean }
 
 /** 意图门解析 + resolve_user_intent trace 步骤（分歧/指令字符量可观测） */
-async function resolveAndTraceTurnGate(input: {
-  scopedParsed: { sourceEnvelope: AimContentSourceEnvelope; targetFormats: ContentFormat[] }
-  understanding: Awaited<ReturnType<typeof understandAimContentTurnWithTrace>>
-  trace?: AimTraceRecorder
-}) {
-  const { scopedParsed, understanding, trace } = input
-  const gate = resolveExecuteTurnGate({
-    envelope: scopedParsed.sourceEnvelope,
-    handling: understanding.handling,
-    llmQuestions: understanding.clarificationQuestions,
-    formats: scopedParsed.targetFormats,
-    llmIntent: understanding.intent,
-  })
-  const mountedSummary = gate.mountedRuleBlocks.length
-    ? `｜挂载 ${gate.mountedRuleBlocks.map((id) => MOUNTED_RULE_BLOCK_LABELS[id]).join("、")}`
-    : ""
-  await addAimTraceStep(trace, {
-    key: "resolve_user_intent",
-    label: "意图约束解析",
-    status: "success",
-    summary: `${gate.intent.taskKind}｜${gate.intent.isNewTask ? "新任务" : "延续任务"}｜缺口 ${gate.deterministicGaps.length} 项${mountedSummary}`,
-    metadata: {
-      taskKind: gate.intent.taskKind,
-      isNewTask: gate.intent.isNewTask,
-      lengthPolicy: gate.intent.lengthPolicy,
-      constraintSources: gate.intent.constraintSources,
-      gaps: gate.deterministicGaps.map((gap) => gap.field),
-      mountedRuleBlocks: gate.mountedRuleBlocks,
-      understandingDegraded: understanding.degraded ?? false,
-      // 指令/素材分离可观测：本轮指令多长、素材多大
-      instructionChars: extractAimInstructionText(scopedParsed.sourceEnvelope.currentUserRequest).length,
-      materialChars: countAimMaterialChars(scopedParsed.sourceEnvelope.currentUserRequest),
-      // LLM/规则分歧可观测：LLM 说了什么、规则说了什么、最终谁赢
-      intentArbitration: gate.intentProvenance
-        ? {
-            ruleTaskKind: gate.intentProvenance.ruleTaskKind,
-            finalTaskKind: gate.intentProvenance.finalTaskKind,
-            conflicts: gate.intentProvenance.conflicts,
-            llmConfidence: gate.intentProvenance.llm.confidence ?? null,
-          }
-        : null,
-    },
-  })
-  return gate
-}
-
-/**
- * 语义理解（带降级）：LLM 理解失败不整轮 500，按规则意图继续并打降级标记。
- */
-async function resolveUnderstandingWithDegradation(input: {
-  envelope: Parameters<typeof understandAimContentTurnWithTrace>[0]["envelope"]
-  agentId: string
-  trace?: AimTraceRecorder
-}) {
-  try {
-    return await understandAimContentTurnWithTrace(input)
-  } catch (understandingError) {
-    await addAimTraceStep(input.trace, {
-      key: "semantic_understanding_degraded",
-      label: "语义理解降级",
-      status: "failed",
-      summary: "LLM 理解失败，本轮按规则意图继续",
-      metadata: {
-        reason: understandingError instanceof Error ? understandingError.message.slice(0, 200) : String(understandingError),
-      },
-    })
-    return {
-      handling: "deliver" as const,
-      brief: input.envelope.currentUserRequest.slice(0, 200),
-      degraded: true as const,
-    }
-  }
-}
-
 export async function POST(request: NextRequest) {
   let trace: AimTraceRecorder | undefined
   let attempt: GenerationAttempt | undefined
