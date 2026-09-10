@@ -31,7 +31,9 @@ export function nextAimWorkbenchId(prefix = "m") {
  */
 export function buildAimRawInput(messages: AimWorkbenchMessage[], extra?: string) {
   const userTexts = messages.filter((message) => message.role === "user").map((message) => message.content)
-  if (extra) userTexts.push(extra)
+  // 本轮输入带标记：服务端 extractLatestAimUserIntentText / extractAimInstructionText
+  // 依赖它把「本轮指令」从历史拼接中分离，规则不再被历史/素材里的词污染
+  if (extra) userTexts.push(`【本次生成输入】\n${extra}`)
   return userTexts.filter(Boolean).join("\n\n")
 }
 

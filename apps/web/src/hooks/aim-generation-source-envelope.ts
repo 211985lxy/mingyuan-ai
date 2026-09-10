@@ -11,6 +11,8 @@ export function buildGenerationSourceEnvelope(input: {
   existingGenerationId?: string
   sourceOriginalText: string
   sourceAnalysisText: string
+  /** 粘贴附件素材（指令/素材分离）：进 referenceMaterials 而不是压进 currentUserRequest */
+  extraReferenceMaterials?: Array<{ title: string; content: string }>
 }) {
   return buildAimContentSourceEnvelope({
     currentUserRequest: input.currentUserRequest,
@@ -25,6 +27,7 @@ export function buildGenerationSourceEnvelope(input: {
       ...(input.sourceAnalysisText.trim()
         ? [{ title: "用户参考分析", content: input.sourceAnalysisText }]
         : []),
+      ...(input.extraReferenceMaterials?.filter((item) => item.content.trim()) ?? []),
     ],
   })
 }

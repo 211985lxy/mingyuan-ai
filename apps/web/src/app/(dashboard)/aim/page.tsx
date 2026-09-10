@@ -33,7 +33,7 @@ import { appendAimFileAttachmentsToContent } from "@/lib/aim/file-attachments"
 import { buildContentProducerVideoCopyHref, resolveContentProducerVideoUrl } from "@/lib/aim/video-copy-input"
 import { formatAimMessageContentForModel } from "@/lib/aim/workbench-helpers"
 import {
-  assemblePasteUsageInput,
+  buildPasteUsageRequest,
   isBatchReplicateCandidate,
   PASTE_COMPOSER_PLACEHOLDER,
   type PastedCopyAttachment,
@@ -206,14 +206,17 @@ export default function AimPage() {
       return
     }
     if (activePaste?.usage) {
-      const assembled = assemblePasteUsageInput({
+      // 指令/素材分离：素材走结构化 referenceMaterial，不再压平进输入文本
+      const request = buildPasteUsageRequest({
         instruction: w.input,
         attachment: activePaste,
       })
-      if (assembled) {
+      if (request) {
         setPastedCopy(null)
         w.setInput("")
-        void w.generateWithInput(assembled)
+        void w.generateWithInput(request.instruction, {
+          pasteReferenceMaterial: request.referenceMaterial,
+        })
         return
       }
     }

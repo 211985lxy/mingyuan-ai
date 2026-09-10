@@ -21,6 +21,7 @@ import {
   applyGenerationFailure,
   applyGenerationResponse,
   buildExecuteTurnRequest,
+  latestUserMessageText,
   resolveGenerationAttemptId,
   resolveFollowUpGenerationId,
 } from "@/hooks/aim-generation-delivery-flow"
@@ -97,6 +98,8 @@ interface GenerateOptions {
   retryMessageId?: string
   retryOfRunId?: string
   startsNewTask?: boolean
+  /** 粘贴附件的素材走结构化字段（指令/素材分离），不再压平进输入文本 */
+  pasteReferenceMaterial?: { title: string; content: string }
   /** 计划模式确认后的任务单显式传递，避免依赖 React 状态异步更新 */
   workflowBriefOverride?: AimWorkflowBriefState | null
   executionAgentId?: string
@@ -198,13 +201,17 @@ function buildGenerationRequest(
     override: options.workflowBriefOverride,
   })
   const sourceEnvelope = buildGenerationSourceEnvelope({
-    currentUserRequest: currentInput || rawInput,
+    // 与统一入口一致：currentUserRequest 只承载本轮指令，空输入轮回落最近一条用户消息
+    currentUserRequest: currentInput || latestUserMessageText(baseMessages) || rawInput,
     messages: baseMessages,
     editorText: input.editorText,
     editorFormat: input.editorFormat,
     existingGenerationId,
     sourceOriginalText: input.sourceOriginalText,
     sourceAnalysisText: input.sourceAnalysisText,
+    extraReferenceMaterials: options.pasteReferenceMaterial
+      ? [options.pasteReferenceMaterial]
+      : undefined,
   })
   return {
     agentId: input.selectedAgentId,

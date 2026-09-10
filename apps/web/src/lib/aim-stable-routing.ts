@@ -16,6 +16,7 @@ import {
   type ResolvedKnowledgeStrategy,
 } from "@/lib/aim-knowledge-strategy"
 import type { AimConversationMode } from "@/lib/aim-conversation-intent"
+import { extractAimInstructionText } from "@/lib/aim-current-user-input"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimRunSpec } from "@/lib/aim-harness/types"
 import type { PlanRunInput } from "@/lib/aim-harness/planner"
@@ -85,7 +86,8 @@ export function resolveAimSessionPhase(input: {
   conversationMode?: AimConversationMode
   runtimeTask?: AimRuntimeTask
 }): AimSessionPhase {
-  const text = input.rawInput || ""
+  // 指令/素材分离：会话阶段判定只看指令部分，素材里的「标题/开头/这篇」不再误判 editing
+  const text = extractAimInstructionText(input.rawInput || "")
   const hasAssistant = (input.messages ?? []).some((m) => m.role === "assistant")
   if (
     input.conversationMode === "clarify_task_boundary"
@@ -112,7 +114,7 @@ export function scoreRuleRoutingConfidence(input: {
   taskType?: string
   targetFormats?: ContentFormat[]
 }): number {
-  const text = input.rawInput || ""
+  const text = extractAimInstructionText(input.rawInput || "")
   if (input.runtimeTask === "quality_review" || input.taskType === "quality_check") return 0.98
   if (input.runtimeTask === "light_edit" && LOCAL_PART_WORDS.some((w) => text.includes(w))) return 0.93
   if (input.runtimeTask === "new_copy" && (input.targetFormats?.length || /写一篇|写一版|种草|帮我写/.test(text))) {
@@ -249,11 +251,13 @@ export async function resolveStableAimRouting(input: {
   })
 
   // 会话纠偏：editing + 局部部位 → 强制 light_edit（在 LLM 之前先收紧）
+  // 只对指令部分匹配：素材里的「开头/钩子」不再把整篇重写压成局部改
+  const correctionText = extractAimInstructionText(input.rawInput || "")
   let runtimeTask = ruleTask
   if (
     sessionPhase === "editing"
-    && LOCAL_PART_WORDS.some((w) => input.rawInput.includes(w))
-    && !/重写|改写|重做|整篇/.test(input.rawInput)
+    && LOCAL_PART_WORDS.some((w) => correctionText.includes(w))
+    && !/重写|改写|重做|整篇/.test(correctionText)
   ) {
     runtimeTask = "light_edit"
   }
@@ -357,7 +361,10 @@ export async function resolveStableAimRouting(input: {
     if (llm.outputFormats?.length) outputFormats = llm.outputFormats
   }
 
-  // LLM 之后再套一次会话硬边界，防止模型把「改开头」抬成 rewrite
+  // LLM 之后再套一次会话硬边界，防止模型把「改开头」抬成 rewrite。
+  // 铁律（阶段三）：正则纠偏不得覆盖 LLM 的判定——仅当本轮未走 LLM 分类时才允许收紧；
+  // 且只对指令部分匹配。
+  const postCorrectionText = extractAimInstructionText(input.rawInput || "")
   sessionPhase = resolveAimSessionPhase({
     rawInput: input.rawInput,
     messages: input.messages,
@@ -365,9 +372,10 @@ export async function resolveStableAimRouting(input: {
     runtimeTask,
   })
   if (
-    sessionPhase === "editing"
-    && LOCAL_PART_WORDS.some((w) => input.rawInput.includes(w))
-    && !/重写|改写|重做|整篇/.test(input.rawInput)
+    classifiedBy !== "llm"
+    && sessionPhase === "editing"
+    && LOCAL_PART_WORDS.some((w) => postCorrectionText.includes(w))
+    && !/重写|改写|重做|整篇/.test(postCorrectionText)
     && runtimeTask !== "light_edit"
   ) {
     runtimeTask = "light_edit"

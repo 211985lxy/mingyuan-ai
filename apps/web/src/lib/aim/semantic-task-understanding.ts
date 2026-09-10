@@ -2,6 +2,7 @@ import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import { runAimTraceStep, summarizeText, type AimTraceRecorder } from "@/lib/aim-observability"
 import type { AimModelPolicy } from "@/lib/aim-harness/types"
+import { AIM_BENCHMARK_MATERIAL_PATTERN } from "@/lib/aim-current-user-input"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
 
@@ -45,10 +46,9 @@ export function resolveSemanticUnderstandingFastPath(
   //   2) 不含对标粘贴的结构标记（「对标标题：/对标原文：」带冒号的段落头）——
   //      这是素材粘贴，不是提问；口头提到「对标文案」不带冒号不算；
   //   3) 不满足则落到下方长文本 deliver 分支或 LLM 慢路径。
-  const BENCHMARK_PASTE_PATTERN = /对标标题[：:]|对标原文[：:]|对标文案[：:]/
   const looksLikeQuestion = CONTENT_ANALYSIS_QUESTION_PATTERN.test(normalizedRequest)
     && (request.length <= 80 || /[？?]$/.test(normalizedRequest))
-  if (looksLikeQuestion && !BENCHMARK_PASTE_PATTERN.test(normalizedRequest)) {
+  if (looksLikeQuestion && !AIM_BENCHMARK_MATERIAL_PATTERN.test(normalizedRequest)) {
     return { handling: "respond", brief: request }
   }
 

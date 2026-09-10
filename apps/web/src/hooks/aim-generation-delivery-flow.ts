@@ -21,6 +21,14 @@ import { ApiError, type AimExecuteResponse, type AimGenerateResponse } from "@/l
  * 保持单向依赖：hook → 本模块；本模块只以类型引用 hook 的输入结构）。
  */
 
+export function latestUserMessageText(messages: AimWorkbenchMessage[]): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message.role === "user" && message.content.trim()) return message.content.trim()
+  }
+  return ""
+}
+
 export function resolveFollowUpGenerationId(
   startsNewTask: boolean | undefined,
   messages: AimWorkbenchMessage[],
@@ -128,6 +136,8 @@ export interface AimExecuteTurnRequestOptions {
   retryOfRunId?: string
   attemptId?: string
   retryGenerationId?: string
+  /** 粘贴附件素材（指令/素材分离）：进 referenceMaterials 而不是压平进输入 */
+  pasteReferenceMaterial?: { title: string; content: string }
   /** 客户端生成的追踪 ID：与占位消息上的 traceId 一致，供思考过程面板 SSE 订阅 */
   traceId?: string
   /** 方法论类技能一次性透传：本轮触发对应方法论/爆款结构注入 */
@@ -147,13 +157,19 @@ export function buildExecuteTurnRequest(
     baseMessages,
   )
   const sourceEnvelope = buildGenerationSourceEnvelope({
-    currentUserRequest: currentInput || rawInput,
+    // 历史折叠修复：currentUserRequest 只承载本轮指令；追问/重生成等空输入轮
+    // 回落到「最近一条用户消息」，不再把全历史拼接折进「用户原话」
+    // （历史已在 relevantConversation，折叠会让规则被旧消息污染）。
+    currentUserRequest: currentInput || latestUserMessageText(baseMessages) || rawInput,
     messages: baseMessages,
     editorText: input.editorText,
     editorFormat: input.editorFormat,
     existingGenerationId,
     sourceOriginalText: input.sourceOriginalText,
     sourceAnalysisText: input.sourceAnalysisText,
+    extraReferenceMaterials: options.pasteReferenceMaterial
+      ? [options.pasteReferenceMaterial]
+      : undefined,
   })
   return {
     agentId: input.selectedAgentId,

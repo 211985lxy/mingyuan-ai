@@ -27,21 +27,23 @@ export const AIM_MATERIAL_SECTION_MARKERS = [
 export const AIM_BENCHMARK_MATERIAL_PATTERN = /对标标题[：:]|对标原文[：:]|对标文案[：:]/
 
 /**
- * 从含粘贴素材的原始输入中抽取「用户指令」部分。
- * 取最早出现的素材标记位置截断；纯粘贴（无指令）返回空串——调用方按「无指令」
+ * 从含粘贴素材/历史拼接的原始输入中抽取「用户指令」部分。
+ * 组合两步：先取最新指令段（【本次生成输入】标记 / 最后一条「用户：」行 / 整段），
+ * 再在指令段内按素材标记截断。纯粘贴（无指令）返回空串——调用方按「无指令」
  * 处理而不是回退整段，否则分离失效。
  */
 export function extractAimInstructionText(raw: string): string {
   const text = (raw || "").trim()
   if (!text) return ""
 
+  const latest = extractLatestAimUserIntentText(text)
   let cut = -1
   for (const marker of AIM_MATERIAL_SECTION_MARKERS) {
-    const index = text.indexOf(marker)
+    const index = latest.indexOf(marker)
     if (index >= 0 && (cut < 0 || index < cut)) cut = index
   }
-  if (cut < 0) return text
-  return text.slice(0, cut).trim()
+  if (cut < 0) return latest
+  return latest.slice(0, cut).trim()
 }
 
 /** 素材字符量（用于可观测与快径门控） */

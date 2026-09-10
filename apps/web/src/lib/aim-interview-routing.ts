@@ -7,6 +7,8 @@
 
 import type { AimTurnIntent } from "@/lib/aim-turn-intent-types"
 
+import { extractAimInstructionText } from "@/lib/aim-current-user-input"
+
 export interface InterviewTranscriptFlags {
   /** transcribe route 返回的 readyForInterviewSkill 标志 —— 逐字稿已准备好进入老板说明书采访技能 */
   readyForInterviewSkill?: boolean
@@ -52,7 +54,10 @@ export function tryResolveInterviewIntent(input: {
   }
 
   // 【最高优先级】采访/画像建档触发词：命中即直接锁定 action+scope
-  const isInterviewRequest = INTERVIEW_TRIGGER_WORDS.some((w) => input.text.includes(w))
+  // 指令/素材分离：素材里出现「采访」二字不再劫持整轮
+  const instruction = extractAimInstructionText(input.text)
+  const isInterviewRequest = Boolean(instruction)
+    && INTERVIEW_TRIGGER_WORDS.some((w) => instruction.includes(w))
   if (isInterviewRequest) {
     return {
       summary: "本轮意图：老板说明书采访建档——通过结构化 30 分钟六维问答采集 IP 画像信息，最终输出 JSON 摘要。",

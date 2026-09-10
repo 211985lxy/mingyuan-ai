@@ -1,6 +1,7 @@
+import { extractAimInstructionText } from "@/lib/aim-current-user-input"
+
 export type AimWorkbenchCommandId =
-  | "integrate_editor"
-  | "fill_reference"
+  | "integrate_editor"  | "fill_reference"
   | "open_editor"
   | "close_editor"
   | "save_editor"
@@ -32,7 +33,8 @@ const NEW_TASK_PATTERNS = [
  * @returns 有新任务意图返回 true
  */
 export function hasExplicitNewTaskIntent(text: string): boolean {
-  const input = text.trim().replace(/\s+/g, "")
+  // 指令/素材分离：素材里的「换个话题/接下来写」不再触发新任务判定
+  const input = extractAimInstructionText(text).trim().replace(/\s+/g, "")
   return input.length > 0 && NEW_TASK_PATTERNS.some((pattern) => pattern.test(input))
 }
 

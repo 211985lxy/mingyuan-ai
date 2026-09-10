@@ -56,7 +56,11 @@ describe("AIM workbench helpers", () => {
       { id: "2", role: "assistant" as const, content: "回复" },
       { id: "3", role: "user" as const, content: "第二条素材" },
     ]
-    expect(buildAimRawInput(messages, "本次要求")).toBe("第一条素材\n\n第二条素材\n\n本次要求")
+    // 本轮输入自带【本次生成输入】标记：服务端指令抽取器据此把本轮指令
+    // 从历史拼接中分离（指令/素材分离整改）
+    expect(buildAimRawInput(messages, "本次要求")).toBe(
+      "第一条素材\n\n第二条素材\n\n【本次生成输入】\n本次要求",
+    )
   })
 
   it("routes explicit Lark actions without treating generic mentions as tools", () => {

@@ -1,11 +1,13 @@
 import type { ContentFormat } from "@/lib/aim-generator"
+import { extractAimInstructionText } from "@/lib/aim-current-user-input"
 
 /**
  * 从自然语言推断目标内容格式。
  * 仅在调用方未显式指定 targetFormats 时使用，避免覆盖 UI 选择。
+ * 只对用户指令部分推断：粘贴素材提到「公众号/分镜」不再混入输出格式。
  */
 export function inferContentFormatsFromRawInput(rawInput: string): ContentFormat[] {
-  const text = (rawInput || "").trim()
+  const text = extractAimInstructionText(rawInput).trim()
   if (!text) return []
 
   const formats: ContentFormat[] = []

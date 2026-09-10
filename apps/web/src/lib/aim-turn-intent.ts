@@ -5,6 +5,7 @@
  * 再映射到 runtimeTask / 知识策略。任务类型 LLM 调优等有用量后再做。
  */
 
+import { extractAimInstructionText } from "@/lib/aim-current-user-input"
 import { formatLabelForTaskSpec, inferContentFormatsFromRawInput } from "@/lib/aim-format-inference"
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
@@ -256,7 +257,9 @@ export function resolveAimTurnIntent(input: {
   /** 兼容字段：readyForInterviewSkill 扁平写法 */
   readyForInterviewSkill?: boolean
 }): AimTurnIntent {
-  const text = `${input.rawInput || ""} ${input.polishInstruction || ""}`.trim()
+  // 指令/素材分离：意图判定只对指令部分 + 润色指令做字面匹配，
+  // rawInput 里拼接的素材/历史（「这段/开头/为什么」类词高密度出现）不再劫持 action。
+  const text = `${extractAimInstructionText(input.rawInput || "")} ${input.polishInstruction || ""}`.trim()
   const deliverable = resolveDeliverable(input.rawInput || "", input.targetFormats)
   let scope = resolveScope(text)
 

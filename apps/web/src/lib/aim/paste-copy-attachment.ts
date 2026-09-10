@@ -141,6 +141,47 @@ export function assemblePasteUsageInput(input: {
   return null
 }
 
+/**
+ * 结构化粘贴请求（指令/素材分离的发送端）：指令留在输入文本，
+ * 素材作为 referenceMaterial 走信封结构化字段，不再压平成一个大字符串。
+ * 与 assemblePasteUsageInput 的默认 lead 保持一致。
+ */
+export function buildPasteUsageRequest(input: {
+  instruction: string
+  attachment: PastedCopyAttachment
+}): { instruction: string; referenceMaterial: { title: string; content: string } } | null {
+  const { instruction, attachment } = input
+  const usage = attachment.usage
+  if (!usage) return null
+  const body = attachment.content.trim()
+  if (!body) return null
+
+  const leads: Record<Exclude<PasteUsage, "style_sample">, { lead: string; title: string }> = {
+    benchmark: {
+      lead: "请按对标原文重新生成一版文案，直接输出最终稿。",
+      title: "对标原文",
+    },
+    edit: {
+      lead: "请优化修改下面这篇文案，直接给出可发布终稿。",
+      title: "待修改原文",
+    },
+    review: {
+      lead: "请对下面文案做发布质检，只指出风险和最小修改建议，不要整篇重写。",
+      title: "待质检原文",
+    },
+    analytics: {
+      lead: "请基于下面这份已登记的发布数据做内容数据复盘。",
+      title: "发布数据原文",
+    },
+  }
+  const config = leads[usage as Exclude<PasteUsage, "style_sample">]
+  if (!config) return null
+  return {
+    instruction: instruction.trim() || config.lead,
+    referenceMaterial: { title: config.title, content: body },
+  }
+}
+
 export function canSubmitWithPasteAttachment(input: {
   text: string
   attachment: PastedCopyAttachment | null
