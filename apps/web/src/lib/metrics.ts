@@ -60,3 +60,16 @@ export const redisConnectionStatus = new Gauge({
   help: "Redis connection status (1=connected, 0=disconnected)",
   registers: [metricsRegistry],
 })
+
+export const auditReconcileFailuresTotal = new Counter({
+  name: "mingyuan_audit_reconcile_failures_total",
+  help: "Audit reconciliation failures by specialist source",
+  labelNames: ["source"] as const,
+  registers: [metricsRegistry],
+})
+
+export const auditReconcileLagMs = new Gauge({
+  name: "mingyuan_audit_reconcile_lag_ms",
+  help: "Audit reconciliation lag in milliseconds",
+  registers: [metricsRegistry],
+})

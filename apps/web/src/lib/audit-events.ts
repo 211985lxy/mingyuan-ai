@@ -186,6 +186,7 @@ export function specialistAuditInput(input: {
 }
 
 type SpecialistRow = Record<string, unknown>
+export type ReconcileSourceKey = "adminAuditLog" | "aimExecutionTrace" | "agentApiCallLog"
 
 function getSpecialistDelegate(name: "adminAuditLog" | "aimExecutionTrace" | "agentApiCallLog") {
   const value = (prisma as unknown as Record<string, unknown>)[name]
@@ -200,7 +201,7 @@ function stringValue(value: unknown): string | undefined {
 }
 
 type ReconcileMarker = { createdAt: string; id: string }
-type ReconcileCursor = Partial<Record<"adminAuditLog" | "aimExecutionTrace" | "agentApiCallLog", ReconcileMarker>>
+type ReconcileCursor = Partial<Record<ReconcileSourceKey, ReconcileMarker>>
 
 function decodeReconcileCursor(value?: string): ReconcileCursor {
   if (!value) return {}
@@ -227,8 +228,27 @@ function encodeReconcileCursor(value: ReconcileCursor): string {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64url")
 }
 
+function reconcileStatus(value: unknown, source: "admin" | "aim" | "agent_api"): "started" | "success" | "failed" | undefined {
+  const status = stringValue(value)
+  if (!status && source === "admin") return "success" // legacy AdminAuditLog rows predate status.
+  if (status === "running") return "started"
+  if (status === "success") return "success"
+  if (status === "failed") return "failed"
+  return undefined
+}
+
+function reconcileSeverity(status: "started" | "success" | "failed"): "info" | "warning" | "error" {
+  if (status === "failed") return "error"
+  if (status === "started") return "warning"
+  return "info"
+}
+
 /** Indexes a bounded page from the three existing specialist tables. */
-export async function reconcileAuditEvents(limit = 100, cursorValue?: string): Promise<{ scanned: number; indexed: number; nextCursor: string | null }> {
+export async function reconcileAuditEvents(
+  limit = 100,
+  cursorValue?: string,
+  sourceFilter?: ReconcileSourceKey,
+): Promise<{ scanned: number; indexed: number; skipped: number; nextCursor: string | null }> {
   const boundedLimit = Math.min(200, Math.max(1, Math.trunc(limit)))
   const cursor = decodeReconcileCursor(cursorValue)
   const nextMarkers: ReconcileCursor = { ...cursor }
@@ -237,13 +257,15 @@ export async function reconcileAuditEvents(limit = 100, cursorValue?: string): P
     {
       delegate: getSpecialistDelegate("adminAuditLog"),
       source: "admin" as const,
+      key: "adminAuditLog" as const,
       category: "operation" as const,
       sourceRecordType: "AdminAuditLog",
-      select: { id: true, adminId: true, action: true, targetType: true, targetId: true, requestId: true, createdAt: true, metadata: true },
+      select: { id: true, adminId: true, action: true, targetType: true, targetId: true, requestId: true, correlationId: true, status: true, severity: true, createdAt: true, metadata: true },
     },
     {
       delegate: getSpecialistDelegate("aimExecutionTrace"),
       source: "aim" as const,
+      key: "aimExecutionTrace" as const,
       category: "execution" as const,
       sourceRecordType: "AimExecutionTrace",
       select: { id: true, userId: true, projectId: true, agentId: true, action: true, status: true, runId: true, model: true, provider: true, durationMs: true, totalTokens: true, qualityStatus: true, createdAt: true },
@@ -251,17 +273,19 @@ export async function reconcileAuditEvents(limit = 100, cursorValue?: string): P
     {
       delegate: getSpecialistDelegate("agentApiCallLog"),
       source: "agent_api" as const,
+      key: "agentApiCallLog" as const,
       category: "model_call" as const,
       sourceRecordType: "AgentApiCallLog",
       select: { id: true, userId: true, projectId: true, agentId: true, action: true, status: true, errorMessage: true, durationMs: true, createdAt: true },
     },
-  ]
+  ].filter((source) => !sourceFilter || source.key === sourceFilter)
 
   let scanned = 0
   let indexed = 0
+  let skipped = 0
   for (const source of sources) {
     if (!source.delegate) continue
-    const marker = cursor[source.sourceRecordType === "AdminAuditLog" ? "adminAuditLog" : source.sourceRecordType === "AimExecutionTrace" ? "aimExecutionTrace" : "agentApiCallLog"]
+    const marker = cursor[source.key]
     const where = marker
       ? {
           OR: [
@@ -277,15 +301,20 @@ export async function reconcileAuditEvents(limit = 100, cursorValue?: string): P
     const lastId = stringValue(last?.id)
     const lastCreatedAt = last?.createdAt instanceof Date ? last.createdAt.toISOString() : stringValue(last?.createdAt)
     if (lastId && lastCreatedAt) {
-      const key = source.sourceRecordType === "AdminAuditLog" ? "adminAuditLog" : source.sourceRecordType === "AimExecutionTrace" ? "aimExecutionTrace" : "agentApiCallLog"
-      nextMarkers[key] = { id: lastId, createdAt: lastCreatedAt }
+      nextMarkers[source.key] = { id: lastId, createdAt: lastCreatedAt }
     }
     for (const row of rows) {
-      const status = stringValue(row.status) === "failed" ? "failed" : "success"
+      const status = reconcileStatus(row.status, source.source)
+      if (!status) {
+        skipped += 1
+        continue
+      }
       const result = await recordAuditEvent(specialistAuditInput({
         source: source.source,
         category: source.category,
-        severity: status === "failed" ? "error" : "info",
+        severity: source.source === "admin" && stringValue(row.severity) === "critical"
+          ? "critical"
+          : reconcileSeverity(status),
         status,
         action: stringValue(row.action) || "unknown",
         summary: source.source === "admin"
@@ -296,7 +325,7 @@ export async function reconcileAuditEvents(limit = 100, cursorValue?: string): P
         targetType: stringValue(row.targetType),
         targetId: stringValue(row.targetId),
         projectId: stringValue(row.projectId),
-        correlationId: stringValue(row.runId) || stringValue(row.requestId) || String(row.id),
+        correlationId: stringValue(row.correlationId) || stringValue(row.runId) || stringValue(row.requestId) || String(row.id),
         requestId: stringValue(row.requestId),
         traceId: source.source === "aim" ? String(row.id) : undefined,
         sourceRecordType: source.sourceRecordType,
@@ -315,7 +344,8 @@ export async function reconcileAuditEvents(limit = 100, cursorValue?: string): P
         },
       }))
       if (result.ok) indexed += 1
+      else if (result.conflict || !result.ok) skipped += 1
     }
   }
-  return { scanned, indexed, nextCursor: hasMore ? encodeReconcileCursor(nextMarkers) : null }
+  return { scanned, indexed, skipped, nextCursor: hasMore ? encodeReconcileCursor(nextMarkers) : null }
 }

@@ -4,6 +4,16 @@ import { generateRequestId } from "@/lib/logger"
 import { prisma } from "@/lib/prisma"
 import { recordAuditEvent, specialistAuditInput } from "@/lib/audit-events"
 
+const auditedRequests = new WeakSet<object>()
+
+export function wasRequestAudited(request: object): boolean {
+  return auditedRequests.has(request)
+}
+
+function markRequestAudited(request: object) {
+  auditedRequests.add(request)
+}
+
 /**
  * @description recordadminaudit
  * @param input - 输入数据
@@ -43,6 +53,7 @@ export async function recordAdminAudit(
       metadata: input.metadata,
     },
   })
+  markRequestAudited(input.request)
   void recordAuditEvent(specialistAuditInput({
     source: "admin",
     category: "operation",

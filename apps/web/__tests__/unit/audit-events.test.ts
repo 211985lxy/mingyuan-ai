@@ -182,4 +182,23 @@ describe("audit event writer", () => {
     const args = upsert.mock.calls[0][0]
     expect(args.create.metadata).not.toHaveProperty("error")
   })
+
+  it("maps a running specialist row to started instead of success", async () => {
+    aimFindMany.mockResolvedValueOnce([{
+      id: "trace-running",
+      userId: "user-1",
+      projectId: "project-1",
+      agentId: "copywriter",
+      action: "aim.generate",
+      status: "running",
+      runId: "run-1",
+      createdAt: new Date("2026-09-08T01:02:03.000Z"),
+    }])
+
+    await reconcileAuditEvents(10)
+
+    const args = upsert.mock.calls[0][0]
+    expect(args.create.status).toBe("started")
+    expect(args.create.severity).toBe("warning")
+  })
 })
