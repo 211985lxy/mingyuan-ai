@@ -162,7 +162,47 @@ function AccountsSection({ accounts }: { accounts: PlatformAccount[] }) {
   )
 }
 
-/** 近期作品表（从页面主体拆出，保持函数体 ≤80 行门禁）。 */
+/** 作品明细表。 */
+function RecentVideosTable({ videos }: { videos: PlatformVideo[] }) {
+  return (
+    <Card>
+      <CardContent className="pt-2">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>作品</TableHead>
+              <TableHead>平台</TableHead>
+              <TableHead className="text-right">发布时间</TableHead>
+              <TableHead className="text-right">播放</TableHead>
+              <TableHead className="text-right">点赞</TableHead>
+              <TableHead className="text-right">评论</TableHead>
+              <TableHead className="text-right">收藏</TableHead>
+              <TableHead className="text-right">转发</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {videos.map((video) => (
+              <TableRow key={video.id}>
+                <TableCell className="max-w-[240px] truncate font-medium">{video.title}</TableCell>
+                <TableCell>{video.platform}</TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {formatDateTime(video.publishedAt)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(video.playCount)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(video.likeCount)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(video.commentCount)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(video.favoriteCount)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCount(video.shareCount)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 近期作品区（从页面主体拆出，保持函数体 ≤80 行门禁）。 */
 function RecentVideosSection({ videos }: { videos: PlatformVideo[] }) {
   return (
     <section className="space-y-3">
@@ -177,40 +217,7 @@ function RecentVideosSection({ videos }: { videos: PlatformVideo[] }) {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardContent className="pt-2">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>作品</TableHead>
-                  <TableHead>平台</TableHead>
-                  <TableHead className="text-right">发布时间</TableHead>
-                  <TableHead className="text-right">播放</TableHead>
-                  <TableHead className="text-right">点赞</TableHead>
-                  <TableHead className="text-right">评论</TableHead>
-                  <TableHead className="text-right">收藏</TableHead>
-                  <TableHead className="text-right">转发</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {videos.map((video) => (
-                  <TableRow key={video.id}>
-                    <TableCell className="max-w-[240px] truncate font-medium">{video.title}</TableCell>
-                    <TableCell>{video.platform}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {formatDateTime(video.publishedAt)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCount(video.playCount)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCount(video.likeCount)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCount(video.commentCount)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCount(video.favoriteCount)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCount(video.shareCount)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <RecentVideosTable videos={videos} />
       )}
     </section>
   )

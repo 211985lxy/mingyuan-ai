@@ -147,6 +147,50 @@ function RecentOwnPosts({ posts }: { posts: OwnPost[] }) {
   )
 }
 
+/** 区块标题（数据源徽章 + 最近同步时间）。 */
+function OwnAccountHeading({ metrics }: { metrics: Extract<CreatorMetricsResult, { status: "ok" }> }) {
+  return (
+    <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+      <BarChart3 className="h-4 w-4" />
+      我的账号表现
+      <Badge variant="secondary" className="text-xs">
+        数据源：明动数据雷达
+      </Badge>
+      {metrics.lastSyncedAt ? (
+        <span className="text-xs font-normal">同步于 {formatDate(metrics.lastSyncedAt)}</span>
+      ) : null}
+    </h2>
+  )
+}
+
+/** 错误态卡片（保留服务端真实原因 + 重试）。 */
+function OwnAccountErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-col items-start gap-2 py-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          {message}
+        </div>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw className="mr-2 h-3.5 w-3.5" />
+          重试
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** 已加载视图：平台总览卡 + 近期作品表。 */
+function OwnAccountLoadedView({ metrics }: { metrics: Extract<CreatorMetricsResult, { status: "ok" }> }) {
+  return (
+    <>
+      <PlatformTotalsCards totals={metrics.platformTotals} />
+      <RecentOwnPosts posts={metrics.posts.slice(0, 8)} />
+    </>
+  )
+}
+
 /** 我的账号表现（创作者数据总线：数据雷达 → 飞书 → AIM），与对标账号形成对比视图。 */
 export function OwnAccountSection() {
   const [metrics, setMetrics] = useState<CreatorMetricsResult | null>(null)
@@ -217,38 +261,22 @@ export function OwnAccountSection() {
     return (
       <section className="space-y-3" aria-label="我的账号表现">
         {heading}
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-start gap-2 py-6 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {metrics.status === "not_configured"
-                ? "尚未配置创作者数据总线（LARK_CREATOR_METRICS_*）。在本机「明动数据雷达」同步后即可展示。"
-                : metrics.message}
-            </div>
-            <Button variant="outline" size="sm" onClick={retry}>
-              <RefreshCw className="mr-2 h-3.5 w-3.5" />
-              重试
-            </Button>
-          </CardContent>
-        </Card>
+        <OwnAccountErrorCard
+          message={
+            metrics.status === "not_configured"
+              ? "尚未配置创作者数据总线（LARK_CREATOR_METRICS_*）。在本机「明动数据雷达」同步后即可展示。"
+              : metrics.message
+          }
+          onRetry={retry}
+        />
       </section>
     )
   }
 
   return (
     <section className="space-y-3" aria-label="我的账号表现">
-      <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        <BarChart3 className="h-4 w-4" />
-        我的账号表现
-        <Badge variant="secondary" className="text-xs">
-          数据源：明动数据雷达
-        </Badge>
-        {metrics.lastSyncedAt ? (
-          <span className="text-xs font-normal">同步于 {formatDate(metrics.lastSyncedAt)}</span>
-        ) : null}
-      </h2>
-      <PlatformTotalsCards totals={metrics.platformTotals} />
-      <RecentOwnPosts posts={metrics.posts.slice(0, 8)} />
+      <OwnAccountHeading metrics={metrics} />
+      <OwnAccountLoadedView metrics={metrics} />
     </section>
   )
 }
