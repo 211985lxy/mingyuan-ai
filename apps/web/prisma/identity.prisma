@@ -77,6 +77,9 @@ model AdminAuditLog {
   targetType String   @db.VarChar(80)
   targetId   String?  @db.VarChar(191)
   requestId  String   @db.VarChar(80)
+  correlationId String? @db.VarChar(80)
+  status     String   @default("success") @db.VarChar(16)
+  severity   String   @default("info") @db.VarChar(16)
   metadata   Json?
   createdAt  DateTime @default(now())
 
@@ -85,6 +88,8 @@ model AdminAuditLog {
   @@index([adminId, createdAt])
   @@index([targetType, targetId])
   @@index([requestId])
+  @@index([status, createdAt])
+  @@index([correlationId, createdAt])
 }
 
 /// Cross-source append-only index used by the administrator audit center.
@@ -113,6 +118,7 @@ model AuditEvent {
   sourceRecordType String?  @db.VarChar(80)
   sourceRecordId   String?  @db.VarChar(191)
   idempotencyKey   String   @db.VarChar(191)
+  payloadHash      String   @db.VarChar(64)
   metadata         Json?
   externalLogUrl   String?  @db.Text
 
@@ -125,6 +131,67 @@ model AuditEvent {
   @@index([correlationId, occurredAt(sort: Desc)])
   @@index([actorIdHash, occurredAt(sort: Desc)])
   @@index([projectId, occurredAt(sort: Desc)])
+}
+
+/// Durable cursor for cross-source audit indexing and historical backfill.
+model AuditReconcileCheckpoint {
+  id             String   @id @default(cuid())
+  source         String   @unique @db.VarChar(32)
+  highWatermarkAt DateTime?
+  highWatermarkId String?  @db.VarChar(191)
+  backfillCursor String?   @db.Text
+  lastSuccessAt  DateTime?
+  lastError      String?   @db.Text
+  scanned        Int      @default(0)
+  indexed        Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([lastSuccessAt])
+  @@index([source, updatedAt])
+}
+
+/// Backend alert inbox state. The fingerprint is the deduplication boundary.
+model OperationalAlert {
+  id              String   @id @default(cuid())
+  fingerprint     String   @unique @db.VarChar(191)
+  rule            String   @db.VarChar(80)
+  severity        String   @db.VarChar(16)
+  status          String   @default("open") @db.VarChar(20)
+  summary         String   @db.Text
+  source          String   @db.VarChar(40)
+  correlationId   String?  @db.VarChar(80)
+  metadata        Json?
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime
+  occurrenceCount Int      @default(1)
+  lastNotifiedAt  DateTime?
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?  @db.VarChar(191)
+  resolvedAt      DateTime?
+  resolvedBy      String?  @db.VarChar(191)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status, severity, lastSeenAt])
+  @@index([rule, lastSeenAt])
+  @@index([source, lastSeenAt])
+  @@index([correlationId, lastSeenAt])
+}
+
+/// Durable low-cardinality daily channel counters used by admin reporting.
+model ChannelMetricDaily {
+  id        String   @id @default(cuid())
+  day       String   @db.VarChar(10) // Shanghai calendar date: YYYY-MM-DD
+  platform  String   @db.VarChar(40)
+  metric    String   @db.VarChar(64)
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([day, platform, metric])
+  @@index([day, platform])
+  @@index([metric, day])
 }
 
 model ActivationCode {
