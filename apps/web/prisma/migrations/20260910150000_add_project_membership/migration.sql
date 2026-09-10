@@ -1,9 +1,18 @@
 -- Let multiple login accounts select the same active client project.
 -- Existing owner and account bindings are preserved as explicit memberships.
 
+-- MySQL requires the foreign key to be detached before replacing its supporting
+-- unique index with a non-unique lookup index.
+ALTER TABLE `User` DROP FOREIGN KEY `User_boundProjectId_fkey`;
+
 DROP INDEX `User_boundProjectId_key` ON `User`;
 
 CREATE INDEX `User_boundProjectId_idx` ON `User`(`boundProjectId`);
+
+ALTER TABLE `User`
+  ADD CONSTRAINT `User_boundProjectId_fkey`
+  FOREIGN KEY (`boundProjectId`) REFERENCES `ClientProject`(`id`)
+  ON DELETE SET NULL ON UPDATE CASCADE;
 
 CREATE TABLE `ProjectMember` (
   `id` VARCHAR(191) NOT NULL,

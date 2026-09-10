@@ -24,6 +24,11 @@ describe("shared project membership schema", () => {
     )
 
     expect(migration).toContain("DROP INDEX `User_boundProjectId_key` ON `User`")
+    expect(migration).toContain("DROP FOREIGN KEY `User_boundProjectId_fkey`")
+    expect(migration.indexOf("DROP FOREIGN KEY `User_boundProjectId_fkey`")).toBeLessThan(
+      migration.indexOf("DROP INDEX `User_boundProjectId_key` ON `User`"),
+    )
+    expect(migration).toContain("ADD CONSTRAINT `User_boundProjectId_fkey`")
     expect(migration).toContain("CREATE TABLE `ProjectMember`")
     expect(migration).toContain("INSERT IGNORE INTO `ProjectMember`")
   })
