@@ -95,6 +95,13 @@ const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
 
 export const AGENT_ROUTES = freezeAgentRoutes({
   [AIM_FAST_SPOKEN_ROUTE_KEY]: [...QUALITY_PRIMARY_ROUTE],
+  // 语义理解/意图判定专用：判断题要快+协议稳。Claude 无思考链、协议遵循最好放首跳；
+  // 豆包旗舰是思考型模型（实测理解任务 ~20s+）降为直连第二跳兜底（代理故障时仍可用）。
+  "aim.understanding": [
+    { name: "zenmux", model: "anthropic/claude-sonnet-4.6", timeoutMs: 15_000, maxRetries: 0, capability: "advanced" },
+    { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 20_000, maxRetries: 0, capability: "standard" },
+    { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 15_000, capability: "advanced" },
+  ],
   // ── 高质量写作 / 选题策划组 ──
   work_editor: [
     // 先快失败再换路：ZenMux/离火近年常超时或 503，超时预算要短于前端流式总超时

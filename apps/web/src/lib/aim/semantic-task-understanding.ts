@@ -13,6 +13,25 @@ export interface AimSemanticTaskUnderstanding {
   clarificationQuestion?: string
   /** 一次最多 3 个编号追问（用户指令唯一真源：关键缺口一次问完，不用隐藏默认值顶替） */
   clarificationQuestions?: string[]
+  /**
+   * LLM 结构化意图（协议 v2，仅在 LLM 慢路径产出；快径无此字段）。
+   * 仲裁层据此让 AI 理解覆盖规则判定（confidence≥0.7 时）。
+   */
+  intent?: AimSemanticIntent
+  /** 理解降级：LLM 理解失败后按规则继续（不再整轮 500） */
+  degraded?: boolean
+}
+
+/** LLM 结构化意图（协议 v2）：字段全部可选，未提供的字段由规则意图补位 */
+export interface AimSemanticIntent {
+  taskKind?: "new_draft" | "polish_existing" | "benchmark_rewrite" | "batch_replicate" | "imitation_rewrite" | "opener_optimize" | "answer_question"
+  goal?: "traffic" | "lead" | "convert" | "trust" | "brand"
+  audience?: string
+  topic?: string
+  modificationScope?: string
+  isNewTask?: boolean
+  /** 0-1；≥0.7 才允许覆盖规则判定 */
+  confidence?: number
 }
 
 type CompletePort = (systemPrompt: string, userPrompt: string) => Promise<{ content: string }>
@@ -87,12 +106,44 @@ export function parseSemanticTaskUnderstanding(text: string): AimSemanticTaskUnd
   if (handling === "clarify" && parsedQuestions.length > 3) throw new Error("澄清协议最多包含三个问题")
   if (handling !== "clarify" && blocks.length > 0) throw new Error("非澄清响应不得包含澄清问题")
   const questions = parsedQuestions.slice(0, 3)
+  const intent = parseAimIntentJsonBlock(text)
 
   return {
     handling,
     brief,
     ...(questions.length ? { clarificationQuestions: questions, clarificationQuestion: questions.join("\n") } : {}),
+    ...(intent ? { intent } : {}),
   }
+}
+
+const TASK_KINDS = new Set([
+  "new_draft", "polish_existing", "benchmark_rewrite", "batch_replicate",
+  "imitation_rewrite", "opener_optimize", "answer_question",
+])
+const GOALS = new Set(["traffic", "lead", "convert", "trust", "brand"])
+
+/** 协议 v2：解析 [[AIM_INTENT_JSON]] 块；字段级校验，坏值整字段忽略，块级错误静默丢弃（回退规则意图） */
+function parseAimIntentJsonBlock(text: string): AimSemanticIntent | undefined {
+  const match = text.match(/\[\[AIM_INTENT_JSON\]\]([\s\S]*?)\[\[\/AIM_INTENT_JSON\]\]/)
+  if (!match?.[1]?.trim()) return undefined
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(match[1].trim())
+  } catch {
+    return undefined
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined
+  const record = parsed as Record<string, unknown>
+  const intent: AimSemanticIntent = {}
+  if (typeof record.taskKind === "string" && TASK_KINDS.has(record.taskKind)) intent.taskKind = record.taskKind as AimSemanticIntent["taskKind"]
+  if (typeof record.goal === "string" && GOALS.has(record.goal)) intent.goal = record.goal as AimSemanticIntent["goal"]
+  if (typeof record.audience === "string" && record.audience.trim()) intent.audience = record.audience.trim().slice(0, 80)
+  if (typeof record.topic === "string" && record.topic.trim()) intent.topic = record.topic.trim().slice(0, 120)
+  if (typeof record.modificationScope === "string" && record.modificationScope.trim()) intent.modificationScope = record.modificationScope.trim().slice(0, 40)
+  if (typeof record.isNewTask === "boolean") intent.isNewTask = record.isNewTask
+  const confidence = Number(record.confidence)
+  if (Number.isFinite(confidence)) intent.confidence = Math.max(0, Math.min(1, confidence))
+  return Object.keys(intent).length ? intent : undefined
 }
 
 function renderEnvelopeForUnderstanding(envelope: AimContentSourceEnvelope) {
@@ -117,9 +168,27 @@ export async function understandAimContentTurn(input: {
   const fastPath = resolveSemanticUnderstandingFastPath(input.envelope)
   if (fastPath) return fastPath
 
+  // 协议 v2 附录（代码级版本化，git 可审计；后续可迁移 PromptVersion）：
+  // 在用户消息里追加结构化意图输出要求，system prompt（seed v1）保持不动。
+  const v2Appendix = [
+    "",
+    "【补充输出要求】在完成上述协议输出之外，请再输出一个结构化意图块（单独一行起）：",
+    "[[AIM_INTENT_JSON]]",
+    JSON.stringify({
+      taskKind: "new_draft|polish_existing|benchmark_rewrite|batch_replicate|imitation_rewrite|opener_optimize|answer_question 之一",
+      goal: "traffic|lead|convert|trust|brand 之一（判断不出则省略）",
+      audience: "目标人群（判断不出则省略）",
+      topic: "内容主题（判断不出则省略）",
+      modificationScope: "修改范围：开头/标题/结尾/某段/整篇（仅修改类任务，判断不出则省略）",
+      isNewTask: true,
+      confidence: 0.9,
+    }),
+    "[[/AIM_INTENT_JSON]]",
+    "规则：以上字段按用户指令判断，参考素材不算用户意图；判断不出的字段直接省略，不要编造；confidence 为 0-1 的判断把握。",
+  ].join("\n")
   const completion = await input.complete(
     promptRegistry.get(PROMPT_KEYS.semanticTaskUnderstanding).content,
-    renderEnvelopeForUnderstanding(input.envelope),
+    `${renderEnvelopeForUnderstanding(input.envelope)}${v2Appendix}`,
   )
   try {
     return parseSemanticTaskUnderstanding(completion.content)
@@ -143,6 +212,19 @@ export async function understandAimContentTurn(input: {
   }
 }
 
+/** 理解专用快路由 key（agent-router 同名注册）：判断题走直连快线 + 温度 0，不用生成配置 */
+export const AIM_UNDERSTANDING_ROUTE_KEY = "aim.understanding"
+
+const AIM_UNDERSTANDING_MODEL_POLICY: AimModelPolicy = {
+  routeKey: AIM_UNDERSTANDING_ROUTE_KEY,
+  // getAgentLLM 会把本策略同时当路由过滤条件：capability 过滤必须显式给出，
+  // 否则 CAPACITY_RANK[undefined] 把全部候选过滤掉、静默回退共享链
+  minimumCapability: "basic",
+  temperature: 0,
+  maxTokens: 2048,
+  maxProviderAttempts: 2,
+} as AimModelPolicy
+
 export async function understandAimContentTurnWithTrace(input: {
   envelope: AimContentSourceEnvelope
   agentId: string
@@ -159,7 +241,7 @@ export async function understandAimContentTurnWithTrace(input: {
         input.agentId,
         systemPrompt,
         userPrompt,
-        input.modelPolicy,
+        input.modelPolicy ?? AIM_UNDERSTANDING_MODEL_POLICY,
       ),
     }),
     (result) => ({

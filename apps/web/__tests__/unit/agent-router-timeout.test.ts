@@ -125,6 +125,14 @@ describe("agent router timeout overrides", () => {
     expect(zenmux?.proxyURL).toBe("http://127.0.0.1:10808")
   })
 
+  it("registers the dedicated understanding route: doubao first, direct and fast", async () => {
+    const { getAgentLLM, getAgentRecommendedModel } = await import("@/lib/llm/agent-router")
+
+    const llm = getAgentLLM("aim.understanding")
+    expect(llm.providerNames).toEqual(["zenmux", "doubao", "deepseek"])
+    expect(getAgentRecommendedModel("aim.understanding")).toBe("anthropic/claude-sonnet-4.6")
+  })
+
   it("keeps non-Claude-primary agents on the default provider timeout", async () => {
     const { getAgentLLM } = await import("@/lib/llm/agent-router")
     ctorArgs.length = 0

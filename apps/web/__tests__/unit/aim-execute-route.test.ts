@@ -105,6 +105,7 @@ vi.mock("@/lib/aim/generation-attempt", async (importOriginal) => {
   }
 })
 
+import { addAimTraceStep } from "@/lib/aim-observability"
 import { POST } from "@/app/api/aim/execute/route"
 
 function executeRequest(body: unknown) {
@@ -381,23 +382,32 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
     expect(executeVerifiedUnifiedReply).toHaveBeenCalledOnce()
   })
 
-  it("keeps the task recoverable when semantic understanding fails before delivery", async () => {
+  it("degrades to rule-based intent when semantic understanding fails (no more 500)", async () => {
     understandAimContentTurnWithTrace.mockRejectedValue(new Error("模型暂时不可用"))
+    executeVerifiedUnifiedDelivery.mockResolvedValue({
+      output: { id: "gen-1", results: [{ format: "video_script", content: "成稿正文", wordCount: 4 }] },
+      metadata: { runId: "run_degraded" },
+      spec: {},
+    })
 
+    // 用零缺口输入（对标改写不追问），降级后应直接进入交付
     const response = await executeRequest(baseBody({
       attemptId: "web_abcdef0123456789abcdef01",
+      sourceEnvelope: {
+        currentUserRequest: "按对标原文改写一版",
+        relevantConversation: [],
+        referenceMaterials: [{ title: "对标原文", content: "为什么穷人越忙越穷？因为…" }],
+      },
     }))
 
-    expect(response.status).toBe(500)
-    expect(startAimGenerationAttempt).toHaveBeenCalledOnce()
-    expect(failAimGenerationAttempt).toHaveBeenCalledWith(expect.objectContaining({
-      id: "generated-attempt",
-      userId: "user-1",
-      projectId: "project-1",
-    }))
-    expect(discardAimGenerationAttempt).not.toHaveBeenCalled()
-    const data = await response.json()
-    expect(data.generationId).toBe("generated-attempt")
+    // 理解降级：LLM 失败不再整轮 500，按规则意图继续交付
+    expect(response.status).toBe(200)
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledOnce()
+    expect(failAimGenerationAttempt).not.toHaveBeenCalled()
+    expect(addAimTraceStep).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ key: "semantic_understanding_degraded", status: "failed" }),
+    )
   })
 
   it("replays a completed attempt with the stored copy and does not call the model", async () => {

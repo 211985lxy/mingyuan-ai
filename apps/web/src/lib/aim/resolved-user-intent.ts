@@ -228,8 +228,10 @@ export function resolveUserIntentFromEnvelope(
   if (quantityInRequest) sources.quantity = "user_current"
   else if (quantity) sources.quantity = "task_confirmed"
 
-  const scopeMatch = request.match(SCOPE_PATTERN)
-  const modificationScope = scopeMatch?.[0]
+  // 指令内「最后一个」范围命中生效：指令通常在素材之后（素材里残留的范围词在前），
+  // 首命中会被素材污染（2026-09 事故形态之一）
+  const scopeMatches = request.match(new RegExp(SCOPE_PATTERN.source, "g"))
+  const modificationScope = scopeMatches?.at(-1)
 
   return {
     taskKind,
