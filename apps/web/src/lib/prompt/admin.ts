@@ -33,6 +33,7 @@ export interface PromptAdminPrisma {
     findMany(args: {
       include: { versions: { orderBy: { version: "desc" } } }
       orderBy: { createdAt: "asc" }
+      take: number
     }): Promise<PromptTemplateRow[]>
   }
   promptVersion: {
@@ -97,6 +98,7 @@ export async function listPromptTemplates(
   return prismaClient.promptTemplate.findMany({
     include: { versions: { orderBy: { version: "desc" } } },
     orderBy: { createdAt: "asc" },
+    take: 200,
   })
 }
 
