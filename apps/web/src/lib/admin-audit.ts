@@ -19,11 +19,17 @@ export async function recordAdminAudit(
     action: string
     targetType: string
     targetId?: string
+    status?: "started" | "success" | "failed"
+    severity?: "info" | "warning" | "error" | "critical"
+    correlationId?: string
     metadata?: Prisma.InputJsonValue
   },
   client: PrismaClient | Prisma.TransactionClient = prisma,
 ) {
   const requestId = input.request.headers.get("x-request-id") || generateRequestId()
+  const correlationId = input.correlationId || input.request.headers.get("x-correlation-id") || requestId
+  const status = input.status || "success"
+  const severity = input.severity || (status === "failed" ? "error" : "info")
   const audit = await client.adminAuditLog.create({
     data: {
       adminId: input.adminId,
@@ -31,21 +37,25 @@ export async function recordAdminAudit(
       targetType: input.targetType,
       targetId: input.targetId,
       requestId,
+      correlationId,
+      status,
+      severity,
       metadata: input.metadata,
     },
   })
   void recordAuditEvent(specialistAuditInput({
     source: "admin",
     category: "operation",
-    status: "success",
+    status,
+    severity,
     action: input.action,
-    summary: `${input.action} ${input.targetType}`,
+    summary: status === "failed" ? `${input.action} failed` : `${input.action} ${input.targetType}`,
     actorType: "admin",
     actorId: input.adminId,
     targetType: input.targetType,
     targetId: input.targetId,
     requestId,
-    correlationId: requestId,
+    correlationId,
     sourceRecordType: "AdminAuditLog",
     sourceRecordId: audit.id,
     metadata: input.metadata,

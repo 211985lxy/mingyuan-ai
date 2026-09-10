@@ -56,12 +56,23 @@ export interface NormalizedAuditEvent extends Omit<AuditEventInput, "actorId" | 
   actorIdHash?: string
   metadata?: Record<string, unknown> | unknown[]
   occurredAt: Date
+  payloadHash: string
 }
 
 const SENSITIVE_KEY = /(?:token|secret|password|authorization|cookie|prompt|raw.?input|output.?summary|input.?summary|database.?url|api.?key|private.?key|email)/i
-const MAX_SUMMARY_LENGTH = 5000
+const MAX_SUMMARY_LENGTH = 2000
 const MAX_METADATA_STRING_LENGTH = 2000
 const MAX_METADATA_DEPTH = 6
+const SAFE_METADATA_KEYS = new Set([
+  "action", "actorType", "agentId", "approvalId", "attempt", "batchId", "binding",
+  "category", "channel", "chars", "code", "count", "coverage", "createdCount", "decision",
+  "degraded", "duration", "durationMs", "errorCode", "fallbackIndex", "factPriority", "from",
+  "gitSha", "idempotent", "indexed", "inputTokens", "itemCount", "limit", "metric", "model",
+  "notificationType", "page", "pageSize", "platform", "projectId", "provider", "qualityStatus",
+  "quantity", "reasonCode", "relatedCount", "requestId", "resultCount", "role", "route", "runId",
+  "sampleSize", "scopeId", "scopeType", "source", "status", "targetCount", "targetFormats", "targetId",
+  "targetType", "to", "total", "totalTokens", "traceId", "type", "updatedCount", "validFrom", "workflowId",
+])
 
 function assertEnum<T extends string>(value: string, allowed: readonly T[], label: string): asserts value is T {
   if (!allowed.includes(value as T)) throw new Error(`Invalid audit event ${label}`)
@@ -71,7 +82,7 @@ function hashActorId(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 16)
 }
 
-export function redactAuditValue(value: unknown, depth = 0): unknown {
+export function redactAuditValue(value: unknown, depth = 0, enforceAllowlist = false): unknown {
   if (depth > MAX_METADATA_DEPTH) return "[truncated]"
   if (typeof value === "string") {
     return value.length > MAX_METADATA_STRING_LENGTH
@@ -84,10 +95,50 @@ export function redactAuditValue(value: unknown, depth = 0): unknown {
   const result: Record<string, unknown> = {}
   for (const [key, child] of Object.entries(value)) {
     if (SENSITIVE_KEY.test(key)) continue
+    if (enforceAllowlist && !SAFE_METADATA_KEYS.has(key) && (!child || typeof child !== "object")) continue
     if (child === undefined || typeof child === "function" || typeof child === "symbol") continue
-    result[key] = redactAuditValue(child, depth + 1)
+    result[key] = redactAuditValue(child, depth + 1, enforceAllowlist)
   }
   return result
+}
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue)
+  if (!value || typeof value !== "object") return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, stableValue(child)]),
+  )
+}
+
+function buildPayloadHash(input: {
+  source: AuditSource
+  category: AuditCategory
+  severity: AuditSeverity
+  status: AuditStatus
+  action: string
+  summary: string
+  actorIdHash?: string
+  targetType?: string
+  targetId?: string
+  projectId?: string
+  environment?: string
+  correlationId?: string
+  requestId?: string
+  traceId?: string
+  gitSha?: string
+  sourceRecordType?: string
+  sourceRecordId?: string
+  metadata?: Record<string, unknown> | unknown[]
+  externalLogUrl?: string
+  occurredAt: Date
+}): string {
+  const canonical = stableValue({
+    ...input,
+    occurredAt: input.occurredAt.toISOString(),
+  })
+  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
 
 export function buildAuditIdempotencyKey(source: string, sourceRecordType: string, sourceRecordId: string): string {
@@ -108,15 +159,24 @@ export function normalizeAuditEvent(input: AuditEventInput): NormalizedAuditEven
   const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date()
   if (Number.isNaN(occurredAt.getTime())) throw new Error("Audit event occurredAt is invalid")
 
-  const metadata = input.metadata === undefined ? undefined : redactAuditValue(input.metadata)
-  return {
+  const metadata = input.metadata === undefined ? undefined : redactAuditValue(input.metadata, 0, true)
+  const actorIdHash = input.actorIdHash || (input.actorId ? hashActorId(input.actorId) : undefined)
+  if (actorIdHash && !/^[a-f0-9]{16,64}$/i.test(actorIdHash)) throw new Error("Audit actorIdHash is invalid")
+  const correlationId = input.correlationId || randomUUID()
+  const normalized = {
     ...input,
     action,
     summary,
-    actorIdHash: input.actorIdHash || (input.actorId ? hashActorId(input.actorId) : undefined),
-    correlationId: input.correlationId || randomUUID(),
-    idempotencyKey: input.idempotencyKey || randomUUID(),
+    actorIdHash,
+    correlationId,
     metadata: metadata as Record<string, unknown> | unknown[] | undefined,
     occurredAt,
+  }
+  return {
+    ...normalized,
+    // Correlation IDs generated for an otherwise identical event are transport
+    // context, not payload identity. Only caller-supplied IDs participate in
+    // the hash so retries can be deduplicated.
+    payloadHash: buildPayloadHash({ ...normalized, correlationId: input.correlationId }),
   }
 }

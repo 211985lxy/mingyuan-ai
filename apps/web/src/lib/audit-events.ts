@@ -13,10 +13,21 @@ export interface AuditWriteResult {
   ok: boolean
   id?: string
   inserted: boolean
+  conflict?: boolean
 }
 
 type AuditEventDelegate = {
   upsert(args: Prisma.AuditEventUpsertArgs): Promise<{ id: string }>
+  findUnique?: (args: Prisma.AuditEventFindUniqueArgs) => Promise<{ id: string; payloadHash: string } | null>
+}
+
+export class AuditIdempotencyConflictError extends Error {
+  readonly code = "AUDIT_IDEMPOTENCY_CONFLICT"
+
+  constructor(readonly source: string, readonly idempotencyKey: string, readonly existingId?: string) {
+    super(`Audit idempotency key conflicts with an existing payload: ${source}:${idempotencyKey}`)
+    this.name = "AuditIdempotencyConflictError"
+  }
 }
 
 function getAuditEventDelegate(): AuditEventDelegate | undefined {
@@ -45,7 +56,12 @@ export async function recordAuditEvent(
   }
 
   try {
-    const event = normalizeAuditEvent(input)
+    const stableKey = input.idempotencyKey || (
+      input.sourceRecordType && input.sourceRecordId
+        ? buildAuditIdempotencyKey(input.source, input.sourceRecordType, input.sourceRecordId)
+        : undefined
+    )
+    const event = normalizeAuditEvent({ ...input, idempotencyKey: stableKey })
     const idempotencyKey = event.idempotencyKey || (
       event.sourceRecordType && event.sourceRecordId
         ? buildAuditIdempotencyKey(event.source, event.sourceRecordType, event.sourceRecordId)
@@ -72,8 +88,21 @@ export async function recordAuditEvent(
       sourceRecordType: event.sourceRecordType,
       sourceRecordId: event.sourceRecordId,
       idempotencyKey,
+      payloadHash: event.payloadHash,
       metadata: toJsonValue(event.metadata),
       externalLogUrl: event.externalLogUrl,
+    }
+    if (delegate.findUnique) {
+      const existing = await delegate.findUnique({
+        where: { source_idempotencyKey: { source: event.source, idempotencyKey } },
+        select: { id: true, payloadHash: true },
+      })
+      if (existing) {
+        if (existing.payloadHash === event.payloadHash) {
+          return { ok: true, id: existing.id, inserted: false }
+        }
+        throw new AuditIdempotencyConflictError(event.source, idempotencyKey, existing.id)
+      }
     }
     const row = await delegate.upsert({
       where: { source_idempotencyKey: { source: event.source, idempotencyKey } },
@@ -83,6 +112,11 @@ export async function recordAuditEvent(
     })
     return { ok: true, id: row.id, inserted: true }
   } catch (error) {
+    if (error instanceof AuditIdempotencyConflictError) {
+      if (options.strict) throw error
+      logger.error({ source: error.source, idempotencyKey: error.idempotencyKey }, "audit idempotency conflict")
+      return { ok: false, inserted: false, conflict: true }
+    }
     if (options.strict) throw error
     logger.error({ err: error, action: input.action, source: input.source }, "audit event write failed")
     return { ok: false, inserted: false }
