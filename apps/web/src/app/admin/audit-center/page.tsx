@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   ChevronRight,
   CircleDot,
+  ExternalLink,
   GitBranch,
   RefreshCw,
   Server,
@@ -50,6 +51,7 @@ interface AuditEvent {
   sourceRecordType: string | null
   sourceRecordId: string | null
   idempotencyKey: string
+  payloadHash?: string | null
   metadata: unknown
   externalLogUrl: string | null
 }
@@ -174,6 +176,7 @@ function SelectFilter({
 export default function AuditCenterPage() {
   const searchParams = useSearchParams() ?? new URLSearchParams()
   const [date, setDate] = React.useState(searchParams.get("date") || shanghaiDateInput())
+  const [toDate, setToDate] = React.useState(searchParams.get("to") || searchParams.get("date") || shanghaiDateInput())
   const [source, setSource] = React.useState(searchParams.get("source") || "")
   const [category, setCategory] = React.useState(searchParams.get("category") || "")
   const [severity, setSeverity] = React.useState(searchParams.get("severity") || "")
@@ -182,6 +185,7 @@ export default function AuditCenterPage() {
   const [correlationId, setCorrelationId] = React.useState("")
   const [events, setEvents] = React.useState<AuditEvent[]>([])
   const [total, setTotal] = React.useState(0)
+  const [summary, setSummary] = React.useState<{ failed: number | null; critical: number | null; sourceCount: number | null }>({ failed: null, critical: null, sourceCount: null })
   const [nextCursor, setNextCursor] = React.useState<string | null>(null)
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [detail, setDetail] = React.useState<AuditEventDetail | null>(null)
@@ -190,7 +194,7 @@ export default function AuditCenterPage() {
   const [error, setError] = React.useState<string | null>(null)
   const requestSerial = React.useRef(0)
 
-  const query = React.useMemo(() => ({ date, source, category, severity, status, action, correlationId }), [date, source, category, severity, status, action, correlationId])
+  const query = React.useMemo(() => ({ from: date, to: toDate, source, category, severity, status, action, correlationId }), [date, toDate, source, category, severity, status, action, correlationId])
 
   const loadEvents = React.useCallback(async (cursor?: string, append = false) => {
     const serial = ++requestSerial.current
@@ -200,20 +204,34 @@ export default function AuditCenterPage() {
       setSelectedId(null)
       setDetail(null)
     }
-    const params = new URLSearchParams({ date: query.date, limit: "50" })
+    const params = new URLSearchParams({ from: query.from, to: query.to, limit: "50" })
     for (const [key, value] of Object.entries(query)) {
-      if (key !== "date" && value) params.set(key, value)
+      if (key !== "from" && key !== "to" && value) params.set(key, value)
     }
     if (cursor) params.set("cursor", cursor)
     try {
-      const response = await fetch(`/api/admin/audit-events?${params.toString()}`)
+      const summaryParams = new URLSearchParams(params)
+      summaryParams.delete("limit")
+      summaryParams.delete("cursor")
+      const [response, summaryResponse] = await Promise.all([
+        fetch(`/api/admin/audit-events?${params.toString()}`),
+        fetch(`/api/admin/audit-events/summary?${summaryParams.toString()}`),
+      ])
       if (!response.ok) throw new Error(`审计事件加载失败 (${response.status})`)
       const payload = await response.json() as { data?: AuditEvent[]; total?: number; nextCursor?: string | null }
+      const summaryPayload = summaryResponse.ok
+        ? await summaryResponse.json() as { failed?: number; critical?: number; sourceCount?: number }
+        : null
       if (serial !== requestSerial.current) return
       const rows = Array.isArray(payload.data) ? payload.data : []
       setEvents((previous) => append ? [...previous, ...rows] : rows)
       setTotal(typeof payload.total === "number" ? payload.total : rows.length)
       setNextCursor(payload.nextCursor || null)
+      setSummary({
+        failed: typeof summaryPayload?.failed === "number" ? summaryPayload.failed : null,
+        critical: typeof summaryPayload?.critical === "number" ? summaryPayload.critical : null,
+        sourceCount: typeof summaryPayload?.sourceCount === "number" ? summaryPayload.sourceCount : null,
+      })
     } catch (reason) {
       if (serial !== requestSerial.current) return
       const message = reason instanceof Error ? reason.message : "审计事件加载失败"
@@ -221,6 +239,7 @@ export default function AuditCenterPage() {
       setEvents([])
       setTotal(0)
       setNextCursor(null)
+      setSummary({ failed: null, critical: null, sourceCount: null })
       toast.error(message)
     } finally {
       if (serial === requestSerial.current) setLoading(false)
@@ -248,10 +267,6 @@ export default function AuditCenterPage() {
     }
   }, [])
 
-  const visibleFailures = events.filter((event) => event.status === "failed" || event.severity === "error" || event.severity === "critical").length
-  const criticalCount = events.filter((event) => event.severity === "critical").length
-  const sourceCount = new Set(events.map((event) => event.source)).size
-
   return (
     <AdminPageShell
       title="统一审计中心"
@@ -265,9 +280,9 @@ export default function AuditCenterPage() {
       stats={
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="筛选结果" value={total} icon={Activity} />
-          <StatCard label="已发现异常" value={visibleFailures} icon={AlertTriangle} tone="warning" />
-          <StatCard label="严重事件" value={criticalCount} icon={CircleDot} tone="danger" />
-          <StatCard label="事件来源" value={sourceCount} icon={GitBranch} />
+          <StatCard label="失败事件" value={summary.failed} icon={AlertTriangle} tone="warning" />
+          <StatCard label="严重事件" value={summary.critical} icon={CircleDot} tone="danger" />
+          <StatCard label="事件来源" value={summary.sourceCount} icon={GitBranch} />
         </div>
       }
       filter={
@@ -275,6 +290,10 @@ export default function AuditCenterPage() {
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="sr-only">事件日期</span>
             <Input aria-label="事件日期" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="w-[148px]" />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="sr-only">结束日期</span>
+            <Input aria-label="结束日期" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className="w-[148px]" />
           </label>
           <SelectFilter label="事件来源" value={source} options={sourceOptions} onChange={setSource} />
           <SelectFilter label="事件类别" value={category} options={categoryOptions} onChange={setCategory} />
@@ -350,7 +369,7 @@ function StatCard({
   tone = "default",
 }: {
   label: string
-  value: number
+  value: number | null
   icon: React.ComponentType<{ className?: string }>
   tone?: "default" | "warning" | "danger"
 }) {
@@ -361,7 +380,7 @@ function StatCard({
         <Icon className={`h-5 w-5 ${color}`} />
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="mt-0.5 text-xl font-semibold tabular-nums">{value.toLocaleString("zh-CN")}</p>
+          <p className="mt-0.5 text-xl font-semibold tabular-nums">{value === null ? "—" : value.toLocaleString("zh-CN")}</p>
         </div>
       </CardContent>
     </Card>
@@ -401,6 +420,9 @@ function AuditDetailPanel({ detail, loading }: { detail: AuditEventDetail | null
           <DetailRow label="追踪 ID" value={event.traceId || "—"} mono />
           <DetailRow label="提交" value={event.gitSha ? shortId(event.gitSha, 14) : "—"} mono />
           <DetailRow label="关联 ID" value={event.correlationId || "—"} mono />
+          <DetailRow label="来源记录" value={event.sourceRecordType ? `${event.sourceRecordType}${event.sourceRecordId ? ` / ${event.sourceRecordId}` : ""}` : "—"} mono />
+          <DetailRow label="幂等键" value={event.idempotencyKey || "—"} mono />
+          <DetailRow label="载荷哈希" value={event.payloadHash || "—"} mono />
         </dl>
         {event.metadata !== null && event.metadata !== undefined && (
           <div>
@@ -414,7 +436,7 @@ function AuditDetailPanel({ detail, loading }: { detail: AuditEventDetail | null
             <span className="text-[11px] text-muted-foreground">{related.length} 条</span>
           </div>
           <div className="space-y-1.5">
-            {related.slice(0, 8).map((item) => (
+            {related.map((item) => (
               <div key={item.id} className="flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs">
                 <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${item.status === "failed" ? "text-destructive" : "text-muted-foreground"}`} />
                 <span className="min-w-0 flex-1 truncate">{item.summary || item.action}</span>
@@ -424,6 +446,11 @@ function AuditDetailPanel({ detail, loading }: { detail: AuditEventDetail | null
             {related.length === 0 && <p className="text-xs text-muted-foreground">暂无关联事件</p>}
           </div>
         </div>
+        {event.externalLogUrl && (
+          <a className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline" href={event.externalLogUrl} target="_blank" rel="noreferrer">
+            在 SLS 中查看原始日志 <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        )}
       </CardContent>
     </Card>
   )

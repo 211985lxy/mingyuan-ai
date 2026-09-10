@@ -546,6 +546,22 @@
       "idempotency": true
     },
     {
+      "route": "/api/admin/audit-events/[id]/related",
+      "file": "src/app/api/admin/audit-events/[id]/related/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "admin/audit-events",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/audit-events/[id]",
       "file": "src/app/api/admin/audit-events/[id]/route.ts",
       "methods": [
@@ -575,7 +591,23 @@
       "query": "manual",
       "externalService": false,
       "cost": "high",
-      "idempotency": true
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/audit-events/summary",
+      "file": "src/app/api/admin/audit-events/summary/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "admin/audit-events",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
     },
     {
       "route": "/api/admin/audit-logs",
