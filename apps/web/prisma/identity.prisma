@@ -37,7 +37,7 @@ model User {
   aimMemories             AimMemory[]
   clientProjects          ClientProject[]          @relation("ProjectOwner")
   boundProject            ClientProject?           @relation("AccountBoundProject", fields: [boundProjectId], references: [id], onDelete: SetNull)
-  projectMembers          ProjectMember[]
+  projectMemberships      ProjectMember[]
   ipWikiPages             IpWikiPage[]
   benchmarkProfiles       BenchmarkProfile[]
   inspirations            Inspiration[]
