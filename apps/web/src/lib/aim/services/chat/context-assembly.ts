@@ -16,6 +16,10 @@ import type { AimEditorContext } from "@/lib/aim-editor"
 import type { AimMemoryMessage } from "@/lib/aim-memory"
 import { retrieveChatContextBlocks, type RetrievedChatContextBlocks } from "./context-loaders"
 import { extractTextContent, normalizeMemoryMessages } from "./request"
+import { applyBoundedToolLoopToKnowledge } from "@/lib/aim-harness/context/apply-bounded-tool-loop"
+import { shouldAutoEnableBoundedToolLoop } from "@/lib/aim-harness/execution-mode"
+import { isValidAimAgent, normalizeAimAgentId } from "@/lib/aim-harness/contracts"
+import type { FeishuKnowledgeSource } from "@/lib/integrations/feishu-knowledge-cite"
 
 export type AssembledAimChatContext = {
   runtimeTask: AimRuntimeTask
@@ -32,6 +36,8 @@ export type AssembledAimChatContext = {
   methodologyPolicy: import("@/lib/methodology-profile-store").MethodologyPolicy
   /** 数据复盘专用：已格式化发布结果；非复盘或无目标时为 undefined。 */
   publishOutcomeBlock?: string
+  /** 本轮飞书知识检索命中的文档（供回答来源卡片） */
+  feishuSources: FeishuKnowledgeSource[]
 }
 
 /**
@@ -141,34 +147,20 @@ async function resolveChatIntentAndTask(input: {
   }
 }
 
-/**
- * @description 组装aimchatcontext
- * @param input - 输入数据
- * @returns Promise<AssembledAimChatContext>
- */
-export async function assembleAimChatContext(input: {
+export type AssembleAimChatContextInput = {
   userId: string
   projectId: string
   agentId: string
-  /**
-   * 本轮执行引擎（技能跨引擎委托）。缺省等于 agentId。
-   * 运行时任务、对话意图、知识策略与知识分类都按它分流，
-   * 保证委托执行拿到的是目标引擎自己的配置，而不是会话智能体的。
-   */
   executionAgentId?: string
   messages: unknown[]
   editorContext?: AimEditorContext
   trace?: AimTraceRecorder
-  /** ADR-002：显式选择的命名方法论 profile id。 */
   methodologyProfileIds?: string[]
-  /** 方法论类技能一次性透传：本轮按需注入对应方法论/爆款结构（与 generate 路径对称）。 */
   activeMethodologySignals?: import("@/lib/aim-agent-guides").AimMethodologySignal[]
-  /**
-   * 目标内容 AimGeneration id（请求体 resultId）。
-   * 仅 content_retro 执行轮用于发布数据召回。
-   */
   targetGenerationId?: string
-}): Promise<AssembledAimChatContext> {
+}
+
+export async function assembleAimChatContext(input: AssembleAimChatContextInput): Promise<AssembledAimChatContext> {
   const { userId, projectId, agentId, messages, editorContext, trace } = input
   const executionAgentId = input.executionAgentId ?? agentId
   const lastMessage = messages[messages.length - 1] as { content?: unknown } | undefined
@@ -181,8 +173,6 @@ export async function assembleAimChatContext(input: {
     trace,
   })
 
-  // 方法论类技能信号接管 useMethodology（与 generate 路径 prepareAimContext 对称）：
-  // 默认不提取方法论/爆款，只有点了对应技能才注入。缺省时回落到文本意图推断值。
   const activeMethodologySignals = input.activeMethodologySignals ?? []
   const resolvedConversationIntent = activeMethodologySignals.length > 0
     ? { ...conversationIntent, useMethodology: true }
@@ -208,14 +198,21 @@ export async function assembleAimChatContext(input: {
   const normalizedMessages = isolatesCurrentTurn
     ? allNormalizedMessages.slice(-1)
     : allNormalizedMessages
-
-  const contextManifest = buildChatContextManifest({ query, blocks, normalizedMessages })
+  const looped = await applyChatFeishuToolLoop({
+    executionAgentId,
+    runtimeTask,
+    knowledgeBlock: blocks.knowledgeBlock,
+    query,
+    userId,
+    projectId,
+    trace,
+  })
 
   return {
     runtimeTask,
     conversationIntent,
-    knowledgeBlock: blocks.knowledgeBlock,
-    contextManifest,
+    knowledgeBlock: looped.knowledgeBlock,
+    contextManifest: buildChatContextManifest({ query, blocks, normalizedMessages }),
     normalizedMessages,
     query,
     knowledgeEntries: blocks.knowledgeContext.entries.length,
@@ -223,5 +220,28 @@ export async function assembleAimChatContext(input: {
     selectedMethodologyBlock: blocks.selectedMethodologyBlock,
     methodologyPolicy: blocks.methodologyPolicy,
     publishOutcomeBlock: blocks.publishOutcomeBlock,
+    feishuSources: looped.feishuSources,
   }
+}
+
+async function applyChatFeishuToolLoop(input: {
+  executionAgentId: string
+  runtimeTask: AimRuntimeTask
+  knowledgeBlock: string
+  query: string
+  userId: string
+  projectId: string
+  trace?: AimTraceRecorder
+}) {
+  const agentIdForLoop = normalizeAimAgentId(input.executionAgentId)
+  return applyBoundedToolLoopToKnowledge({
+    enabled: isValidAimAgent(agentIdForLoop) && shouldAutoEnableBoundedToolLoop(agentIdForLoop, input.runtimeTask),
+    knowledgeBlock: input.knowledgeBlock,
+    agentId: isValidAimAgent(agentIdForLoop) ? agentIdForLoop : "content_producer",
+    runtimeTask: input.runtimeTask,
+    rawInput: input.query,
+    userId: input.userId,
+    projectId: input.projectId,
+    trace: input.trace,
+  })
 }

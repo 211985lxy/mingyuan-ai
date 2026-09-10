@@ -65,6 +65,7 @@ export async function runAimChatRequest(input: {
   editorContext?: AimEditorContext
   signal: AbortSignal
   onContent: (content: string) => void
+  onFeishuSources?: (sources: Array<{ title: string; url: string }>) => void
   agentModule?: CopyStudioModule
   writerModule?: CopyStudioModule
   traceId?: string
@@ -102,6 +103,7 @@ export async function runAimChatRequest(input: {
       hasContent = content.length > 0
       input.onContent(content)
     },
+    onFeishuSources: input.onFeishuSources,
   })
   return { hasContent }
 }

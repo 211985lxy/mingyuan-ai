@@ -75,6 +75,7 @@ export interface AimGenerateResponse {
     category: string
     categoryLabel?: string
     snippet?: string
+    url?: string
   }>
   conversationMode?: string
   /** 本次实际生效的知识调用策略（由服务端解析，供 UI 反馈） */
@@ -150,6 +151,7 @@ export interface AimGeneration {
     category: string
     categoryLabel?: string
     snippet?: string
+    url?: string
   }>
   createdAt: string
   updatedAt?: string

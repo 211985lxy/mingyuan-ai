@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     if (shouldStream) {
       const streamRun = await streamAimRun(exec.streamRequest)
       exec.persistMemory()
-      return buildAimChatStreamResponse(streamRun, exec.chatParams, trace)
+      return buildAimChatStreamResponse(streamRun, exec.chatParams, trace, context.feishuSources)
     }
 
     const chatRun = await executeAimRun(
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
     await finishAimTrace(trace, { outputSummary: summarizeText(chatRun.output) })
     exec.persistMemory()
 
-    return buildAimChatJsonResponse(chatRun)
+    return buildAimChatJsonResponse({ ...chatRun, feishuSources: context.feishuSources })
   } catch (error) {
     const authResponse = authErrorResponse(error)
     if (authResponse) return authResponse

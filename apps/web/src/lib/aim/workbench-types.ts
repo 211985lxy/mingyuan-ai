@@ -58,6 +58,8 @@ export interface AimWorkbenchMessage {
   regenerating?: boolean
   /** 生成中的占位气泡：不写入草稿，避免刷新后看到永远停在「生成中」的消息 */
   pendingGeneration?: boolean
+  /** 对话检索到的飞书文档来源（生成交付物走 knowledgeUsed） */
+  feishuSources?: Array<{ title: string; url: string }>
   /** 批量复刻交付物：由 runBatchReplicateSend 产出，不走标准生成链路。
    *  在聊天流内以批量卡片形式展示 N 条生成的文案。 */
   batchDeliverables?: BatchDeliverableResult | null

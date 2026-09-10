@@ -13,7 +13,7 @@ import {
   resolveExecutionMode,
   resolveExecutionPolicy,
 } from "@/lib/aim-harness/execution-mode"
-import { BOUND_TOOL_LOOP_TOOL_NAMES } from "@/lib/aim-harness/tool-loop-tools"
+import { BOUND_TOOL_LOOP_TOOL_NAMES, listActiveBoundToolLoopToolNames } from "@/lib/aim-harness/tool-loop-tools"
 import { planAimRun } from "@/lib/aim-harness/planner"
 import { buildEvalCandidateFromRunSummary } from "@/lib/aim-harness/eval-candidate-from-trace"
 import { selectAimSkills, buildAimSkillBlock } from "@/lib/aim-harness/skill-loader"
@@ -68,7 +68,8 @@ describe("executionPolicy (阶段 1)", () => {
       runtimeTask: "positioning_topic",
     })
     expect(policy.mode).toBe("bounded_tool_loop")
-    expect(policy.allowedToolNames).toEqual([...BOUND_TOOL_LOOP_TOOL_NAMES])
+    expect(policy.allowedToolNames).toEqual([...listActiveBoundToolLoopToolNames()])
+    expect(policy.allowedToolNames).not.toContain("feishu_knowledge_search")
     expect(policy.maxSteps).toBe(6)
   })
   it("content-growth-v1 已注册且禁止外发", () => {

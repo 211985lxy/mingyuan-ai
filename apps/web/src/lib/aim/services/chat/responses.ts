@@ -13,6 +13,12 @@ import {
 } from "@/lib/aim-observability"
 import { NextResponse } from "next/server"
 import { streamAimChatDomain } from "@/lib/aim-harness/domain-executor"
+import {
+  encodeFeishuSourceHeader,
+  FEISHU_SOURCE_HEADER,
+  toFeishuSourceCards,
+  type FeishuKnowledgeSource,
+} from "@/lib/integrations/feishu-knowledge-cite"
 
 /** Wrap an async iterable of text chunks into a streaming Response. */
 /**
@@ -25,7 +31,11 @@ import { streamAimChatDomain } from "@/lib/aim-harness/domain-executor"
 export function streamChatContent(
   chunks: AsyncIterable<string>,
   trace?: AimTraceRecorder,
-  options?: { runId?: string; finalize?: (output: string, ok: boolean) => Promise<void> },
+  options?: {
+    runId?: string
+    finalize?: (output: string, ok: boolean) => Promise<void>
+    feishuSources?: FeishuKnowledgeSource[]
+  },
 ) {
   const encoder = new TextEncoder()
   return new Response(
@@ -78,6 +88,9 @@ export function streamChatContent(
         "Cache-Control": "no-cache, no-transform",
         "X-Accel-Buffering": "no",
         ...(options?.runId ? { "X-AIM-Run-Id": options.runId } : {}),
+        ...(options?.feishuSources?.length
+          ? { [FEISHU_SOURCE_HEADER]: encodeFeishuSourceHeader(toFeishuSourceCards(options.feishuSources)) }
+          : {}),
       },
     },
   )
@@ -103,11 +116,12 @@ export function buildAimChatStreamResponse(
   },
   chatParams: unknown,
   trace?: AimTraceRecorder,
+  feishuSources?: FeishuKnowledgeSource[],
 ) {
   return streamChatContent(
     streamRun.stream(streamAimChatDomain(streamRun.spec as never, chatParams as never)),
     trace,
-    { runId: streamRun.runId, finalize: streamRun.finalize },
+    { runId: streamRun.runId, finalize: streamRun.finalize, feishuSources },
   )
 }
 
@@ -120,6 +134,7 @@ export function buildAimChatStreamResponse(
 export function buildAimChatJsonResponse(chatRun: {
   output: string
   metadata: { runId: string; degraded: boolean; provider: string; model: string }
+  feishuSources?: FeishuKnowledgeSource[]
 }) {
   return NextResponse.json({
     content: chatRun.output,
@@ -127,5 +142,6 @@ export function buildAimChatJsonResponse(chatRun: {
     degraded: chatRun.metadata.degraded,
     provider: chatRun.metadata.provider,
     model: chatRun.metadata.model,
+    feishuSources: toFeishuSourceCards(chatRun.feishuSources ?? []),
   })
 }

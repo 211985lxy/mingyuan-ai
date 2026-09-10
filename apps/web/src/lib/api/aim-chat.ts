@@ -9,6 +9,10 @@ import type { AimChatBody } from "@/features/aim/contracts/api"
 import type { HitlApprovalRequired } from "@/lib/aim/hitl-gate"
 import type { CopyStudioModule } from "@/lib/copy-studio"
 import { serializeAimChatRequestBody } from "@/lib/aim/chat-payload-budget"
+import {
+  decodeFeishuSourceHeader,
+  FEISHU_SOURCE_HEADER,
+} from "@/lib/integrations/feishu-knowledge-source"
 import type {
   ApiAsset, ApiContentGenerationRun, ApiHotTopicFit, ApiHotTopicInsight,
   ApiTopicRecommendationMode, ApiScript, ApiUser,
@@ -142,6 +146,7 @@ export async function chatAimStream(
     writerModule?: CopyStudioModule
     signal?: AbortSignal
     onDelta: (delta: string, content: string) => void
+    onFeishuSources?: (sources: Array<{ title: string; url: string }>) => void
     traceId?: string
     /** 本轮委托执行引擎；与会话 agentId 平级，缺省不写入请求体 */
     executionAgentId?: string
@@ -149,7 +154,7 @@ export async function chatAimStream(
     timeoutMs?: number
   },
 ): Promise<{ content: string }> {
-  const { signal, onDelta, traceId, timeoutMs = AIM_CHAT_STREAM_TIMEOUT_MS, ...bodyOptions } = options
+  const { signal, onDelta, onFeishuSources, traceId, timeoutMs = AIM_CHAT_STREAM_TIMEOUT_MS, ...bodyOptions } = options
   const timeoutController = new AbortController()
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs)
   const onExternalAbort = () => timeoutController.abort()
@@ -207,6 +212,9 @@ export async function chatAimStream(
       payload
     )
   }
+
+  const headerSources = decodeFeishuSourceHeader(response.headers.get(FEISHU_SOURCE_HEADER))
+  if (headerSources.length) onFeishuSources?.(headerSources)
 
   if (!response.body) {
     clearTimeout(timeoutId)
