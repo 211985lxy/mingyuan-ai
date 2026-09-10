@@ -81,8 +81,12 @@ describe("HITL 飞书通知", () => {
     expect(url).toContain("receive_id_type=chat_id")
     const body = JSON.parse(String(init.body))
     expect(body.receive_id).toBe("chat-1")
-    expect(body.msg_type).toBe("text")
-    expect(body.content).toContain("需人工审批")
+    expect(body.msg_type).toBe("interactive")
+    const card = JSON.parse(body.content)
+    expect(card.header.title.content).toContain("需人工审批")
+    const actions = card.elements.find((el: { tag: string }) => el.tag === "action")
+    expect(actions.actions.map((b: { value: { hitl_action: string } }) => b.value.hitl_action)).toEqual(["approve", "reject"])
+    expect(actions.actions[0].value.hitl_request_id).toContain("hitl:u1:")
   })
 
   it("飞书返回非 0 code 时抛错（由调用方兜底）", async () => {

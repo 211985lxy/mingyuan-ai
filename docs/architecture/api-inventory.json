@@ -3687,6 +3687,22 @@
       "idempotency": true
     },
     {
+      "route": "/api/integrations/feishu/hitl-card-actions",
+      "file": "src/app/api/integrations/feishu/hitl-card-actions/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/integrations/feishu/run-outcomes",
       "file": "src/app/api/integrations/feishu/run-outcomes/route.ts",
       "methods": [

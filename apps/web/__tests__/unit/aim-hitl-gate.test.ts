@@ -6,6 +6,7 @@ import {
   hitlRequestId,
   isHitlInlineEnabled,
   settleHitlApproval,
+  settleHitlApprovalForCard,
 } from "@/lib/aim/hitl-gate"
 import type { ApprovalDecisionStorePort } from "@/lib/aim/approval-decision-store"
 import type { ApprovalDecisionRecord } from "@/lib/aim/workflow-governance"
@@ -130,5 +131,56 @@ describe("HITL 门闩（Step③）", () => {
     const risks = new Set(Object.values(HITL_HIGH_RISK_TOOL_ACTIONS).map((a) => a.risk))
     expect(risks.has("external_send")).toBe(true)
     expect(risks.has("write_knowledge_base")).toBe(true)
+  })
+})
+
+// ── P1 交互卡片：按原 requestId 结算（飞书审批人维度） ────────────────────
+
+describe("HITL 飞书卡片结算", () => {
+  it("settleHitlApprovalForCard 按原 requestId 落记录，门禁扫描即放行", async () => {
+    process.env.AIM_HITL_INLINE_ENABLED = "true"
+    try {
+      const store = makeStore()
+      const requestId = hitlRequestId(BASE) // hitl:u1:export_lark_generation:p1:gen-1
+
+      const settle = await settleHitlApprovalForCard(
+        { requestId, reviewerId: "ou_feishu_1", decision: "approve" },
+        store,
+      )
+      expect(settle.proceed).toBe(true)
+
+      const record = store.records.get(`${requestId}:feishu:ou_feishu_1`)
+      expect(record?.decision).toBe("approve")
+      expect(record?.externalReviewerId).toBe("ou_feishu_1")
+      expect(record?.source).toBe("feishu_card")
+
+      const decision = await evaluateHitlGate(BASE, store)
+      expect(decision).toEqual({ gated: false })
+    } finally {
+      process.env.AIM_HITL_INLINE_ENABLED = "false"
+    }
+  })
+
+  it("非法 requestId 抛错；无 resultId 的动作 subject 用 chat:userId 前缀", async () => {
+    const store = makeStore()
+    await expect(
+      settleHitlApprovalForCard(
+        { requestId: "bogus", reviewerId: "ou_x", decision: "approve" },
+        store,
+      ),
+    ).rejects.toThrow("HITL requestId 格式不合法")
+
+    process.env.AIM_HITL_INLINE_ENABLED = "true"
+    try {
+      await settleHitlApprovalForCard(
+        { requestId: hitlRequestId({ userId: "u1", toolAction: "import_lark_topics" }), reviewerId: "ou_x", decision: "approve" },
+        store,
+      )
+      const record = [...store.records.values()][0]
+      expect(record?.subjectType).toBe("workflow_change")
+      expect(record?.subjectId).toBe("chat:u1:import_lark_topics")
+    } finally {
+      process.env.AIM_HITL_INLINE_ENABLED = "false"
+    }
   })
 })

@@ -149,3 +149,69 @@ export async function settleHitlApproval(
   })
   return { proceed: input.decision === "approve", record }
 }
+
+
+// ── 飞书卡片审批（Step③ P1 交互卡片）─────────────────────────────────────
+
+export interface FeishuCardSettleInput {
+  /** 卡片 value 里带回的原审批请求 ID（hitl:{userId}:{toolAction}:{projectId}:{resultId}，自含全部上下文） */
+  requestId: string
+  /** 飞书审批人身份（open_id 或 user_id） */
+  reviewerId: string
+  decision: HitlDecisionCode
+}
+
+/**
+ * @description 结算飞书卡片上的审批：按卡片带回的原 requestId 落决策记录。
+ * 幂等键追加 `:feishu:{reviewerId}`，与控制台对话内审批互不覆盖；
+ * evaluateHitlGate 按 subject 前缀扫描，任一 approve 记录即放行。
+ */
+export interface HitlRequestContext {
+  userId: string
+  toolAction: string
+  projectId?: string
+  resultId?: string
+}
+
+/** @description 从 hitl:… requestId 反解上下文（段位即 hitlRequestId 的构造序）。 */
+export function parseHitlRequestId(requestId: string): HitlRequestContext | null {
+  const parts = requestId.split(":")
+  if (parts.length !== 6 || parts[0] !== "hitl") return null
+  const [prefix, userId, toolAction, projectId, resultId] = parts
+  if (prefix !== "hitl") return null
+  return {
+    userId,
+    toolAction,
+    projectId: projectId === "-" ? undefined : projectId,
+    resultId: resultId === "-" ? undefined : resultId,
+  }
+}
+
+export async function settleHitlApprovalForCard(
+  input: FeishuCardSettleInput,
+  store: ApprovalDecisionStorePort = defaultStore(),
+): Promise<{ proceed: boolean; record: ApprovalDecisionRecord }> {
+  const context = parseHitlRequestId(input.requestId)
+  if (!context) {
+    throw new Error(`HITL requestId 格式不合法：${input.requestId}`)
+  }
+  const { subjectType, subjectId } = subjectOf({
+    userId: context.userId,
+    resultId: context.resultId,
+    toolAction: context.toolAction,
+  })
+  const { record } = await recordApprovalDecision(store, {
+    subjectType,
+    subjectId,
+    decision: input.decision,
+    reviewerUserId: null,
+    externalReviewerId: input.reviewerId,
+    roleSnapshot: "owner",
+    reason: "飞书卡片人工审批（HITL gate）",
+    source: "feishu_card",
+    requestId: `${input.requestId}:feishu:${input.reviewerId}`,
+    projectId: context.projectId || null,
+  })
+  return { proceed: input.decision === "approve", record }
+}
+

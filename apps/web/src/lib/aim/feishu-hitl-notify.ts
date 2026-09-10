@@ -64,7 +64,58 @@ export function formatHitlApprovalNotification(
 }
 
 /**
- * @description 发送 HITL 审批通知（配置关闭时静默跳过）
+ * @description 构建交互审批卡片内容（批准/驳回按钮回调到 hitl-card-actions）
+ */
+export function buildHitlApprovalCard(
+  approval: HitlApprovalRequired,
+  context: { projectId?: string } = {},
+): Record<string, unknown> {
+  const buttonValue = {
+    hitl_request_id: approval.approvalRequestId,
+    hitl_project_id: context.projectId ?? "",
+  }
+  return {
+    config: { wide_screen_mode: true },
+    header: {
+      title: { tag: "plain_text", content: "AIM 需人工审批" },
+      template: "red",
+    },
+    elements: [
+      {
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: [
+            `**事项**：${approval.label}`,
+            `**风险类型**：${approval.risk === "external_send" ? "对外发送" : "写知识库"}`,
+            context.projectId ? `**项目**：${context.projectId}` : "",
+            "未批准前该操作不会执行。批准/驳回记录计入飞书审批人。",
+          ].filter(Boolean).join("\n"),
+        },
+      },
+      {
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "批准" },
+            type: "primary",
+            value: { ...buttonValue, hitl_action: "approve" },
+          },
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "驳回" },
+            type: "danger",
+            value: { ...buttonValue, hitl_action: "reject" },
+          },
+        ],
+      },
+    ],
+  }
+}
+
+/**
+ * @description 发送 HITL 审批通知（交互卡片；配置关闭时静默跳过）
  */
 export async function sendHitlApprovalNotification(input: {
   config: HitlNotifyConfig
@@ -89,10 +140,8 @@ export async function sendHitlApprovalNotification(input: {
       },
       body: JSON.stringify({
         receive_id: input.config.chatId,
-        msg_type: "text",
-        content: JSON.stringify({
-          text: formatHitlApprovalNotification(input.approval, input.context),
-        }),
+        msg_type: "interactive",
+        content: JSON.stringify(buildHitlApprovalCard(input.approval, input.context)),
       }),
     },
   )
