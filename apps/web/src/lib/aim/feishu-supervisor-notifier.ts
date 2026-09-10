@@ -10,6 +10,7 @@ export type SupervisorNotificationType =
   | "human_judgment"
   | "manual_takeover"
   | "execution_timeout"
+  | "system_alert"
 
 export interface SupervisorNotification {
   type: SupervisorNotificationType
@@ -19,6 +20,9 @@ export interface SupervisorNotification {
   summary: string
   nextAction: string
   resultLink?: string
+  fingerprint?: string
+  severity?: "warning" | "error" | "critical"
+  correlationId?: string
 }
 
 export type SupervisorNotificationConfig =
@@ -70,6 +74,7 @@ function notificationTitle(type: SupervisorNotificationType): string {
   if (type === "review_required") return "AIM 待人工审核"
   if (type === "human_judgment") return "AIM 需人工判断"
   if (type === "execution_timeout") return "AIM 执行超时"
+  if (type === "system_alert") return "明动系统告警"
   return "AIM 需人工接管"
 }
 
@@ -105,6 +110,15 @@ export function supervisedFailureSummary(stopReason: string): string {
  * @returns string
  */
 export function formatSupervisorNotification(input: SupervisorNotification): string {
+  if (input.type === "system_alert") {
+    return [
+      `【${notificationTitle(input.type)} · ${(input.severity || "error").toUpperCase()}】`,
+      `规则：${sanitizeSupervisorText(input.fingerprint || "unknown")}`,
+      `摘要：${sanitizeSupervisorText(input.summary)}`,
+      input.correlationId ? `关联 ID：${sanitizeSupervisorText(input.correlationId)}` : "",
+      input.nextAction ? `下一步：${sanitizeSupervisorText(input.nextAction)}` : "",
+    ].filter(Boolean).join("\n")
+  }
   return [
     `【${notificationTitle(input.type)}】`,
     `经营事项：${input.recordId}`,
@@ -114,6 +128,30 @@ export function formatSupervisorNotification(input: SupervisorNotification): str
     `下一步：${sanitizeSupervisorText(input.nextAction)}`,
     input.resultLink ? `结果：${input.resultLink}` : "",
   ].filter(Boolean).join("\n")
+}
+
+export async function sendFeishuSystemAlert(input: {
+  config: SupervisorNotificationConfig
+  fingerprint: string
+  severity: "warning" | "error" | "critical"
+  summary: string
+  correlationId?: string
+  fetchImpl?: typeof fetch
+}): Promise<void> {
+  return sendFeishuSupervisorNotification({
+    config: input.config,
+    fetchImpl: input.fetchImpl,
+    notification: {
+      type: "system_alert",
+      recordId: input.fingerprint,
+      loopId: "control-center",
+      fingerprint: input.fingerprint,
+      severity: input.severity,
+      correlationId: input.correlationId,
+      summary: input.summary,
+      nextAction: "请打开统一统计/审计中心处理。",
+    },
+  })
 }
 
 /**

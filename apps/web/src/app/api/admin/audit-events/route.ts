@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { withAdminOnly } from "@/lib/admin-auth"
 import { recordAdminAudit } from "@/lib/admin-audit"
 import { prisma } from "@/lib/prisma"
+import { auditEventCursor, AUDIT_EVENT_SELECT, encodeAuditEventCursor, parseAuditEventQuery } from "@/lib/audit-event-query"
 
 type AuditDelegate = {
   findMany(args: unknown): Promise<Array<Record<string, unknown>>>
@@ -12,86 +13,37 @@ function getDelegate(): AuditDelegate | undefined {
   return (prisma as typeof prisma & { auditEvent?: AuditDelegate }).auditEvent
 }
 
-function shanghaiTodayBounds(now = new Date()): { start: Date; end: Date } {
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now)
-  return {
-    start: new Date(`${date}T00:00:00+08:00`),
-    end: new Date(new Date(`${date}T00:00:00+08:00`).getTime() + 24 * 60 * 60 * 1000),
-  }
-}
-
-function parseDateBounds(value: string | null): { start: Date; end: Date } {
-  if (!value) return shanghaiTodayBounds()
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("date must be YYYY-MM-DD")
-  const start = new Date(`${value}T00:00:00+08:00`)
-  if (Number.isNaN(start.getTime())) throw new Error("date is invalid")
-  return { start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) }
-}
-
 export const GET = withAdminOnly(async (request: NextRequest, { admin }) => {
   const delegate = getDelegate()
   if (!delegate) return NextResponse.json({ error: "AuditEvent client is not generated" }, { status: 503 })
 
   const url = new URL(request.url)
-  let bounds: { start: Date; end: Date }
+  const parsed = parseAuditEventQuery(url.searchParams)
+  if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
+  const { where, limit, cursor } = parsed
+  let cursorWhere: Record<string, unknown> | undefined
   try {
-    bounds = parseDateBounds(url.searchParams.get("date"))
+    cursorWhere = auditEventCursor(cursor)
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid date" }, { status: 400 })
+    return NextResponse.json({ error: error instanceof Error ? error.message : "cursor 无效" }, { status: 400 })
   }
-
-  const requestedLimit = Number(url.searchParams.get("limit") || "50")
-  const limit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, Math.trunc(requestedLimit))) : 50
-  const where: Record<string, unknown> = {
-    occurredAt: { gte: bounds.start, lt: bounds.end },
-  }
-  for (const key of ["source", "category", "severity", "status", "projectId", "correlationId", "actorIdHash"] as const) {
-    const value = url.searchParams.get(key)
-    if (value) where[key] = value
-  }
-  const action = url.searchParams.get("action")
-  if (action) where.action = { contains: action }
-
-  const cursor = url.searchParams.get("cursor")
+  const listWhere = cursorWhere?.occurredAt
+    ? { ...where, AND: [{ OR: [{ occurredAt: { lt: cursorWhere.occurredAt } }, { occurredAt: cursorWhere.occurredAt, id: { lt: cursorWhere.id } }] }] }
+    : where
+  const legacyCursor = cursorWhere && !cursorWhere.occurredAt ? { cursor: { id: cursorWhere.id }, skip: 1 } : {}
   const rows = await delegate.findMany({
-    where,
+    where: listWhere,
     orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    select: {
-      id: true,
-      occurredAt: true,
-      source: true,
-      category: true,
-      severity: true,
-      status: true,
-      action: true,
-      summary: true,
-      actorType: true,
-      actorIdHash: true,
-      targetType: true,
-      targetId: true,
-      projectId: true,
-      environment: true,
-      correlationId: true,
-      requestId: true,
-      traceId: true,
-      gitSha: true,
-      sourceRecordType: true,
-      sourceRecordId: true,
-      idempotencyKey: true,
-      metadata: true,
-      externalLogUrl: true,
-    },
+    ...legacyCursor,
+    select: AUDIT_EVENT_SELECT,
   })
   const hasMore = rows.length > limit
   const data = hasMore ? rows.slice(0, limit) : rows
-  const nextCursor = hasMore ? String(data[data.length - 1]?.id || "") : null
+  const last = data[data.length - 1]
+  const nextCursor = hasMore && last?.id && last.occurredAt instanceof Date
+    ? encodeAuditEventCursor({ id: String(last.id), occurredAt: last.occurredAt })
+    : null
   const total = await delegate.count({ where })
   const requestId = await recordAdminAudit({
     request,

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { upsert, error, adminFindMany, aimFindMany, agentFindMany } = vi.hoisted(() => ({
+const { upsert, findUnique, error, adminFindMany, aimFindMany, agentFindMany } = vi.hoisted(() => ({
   upsert: vi.fn(),
+  findUnique: vi.fn(),
   error: vi.fn(),
   adminFindMany: vi.fn(),
   aimFindMany: vi.fn(),
@@ -10,7 +11,7 @@ const { upsert, error, adminFindMany, aimFindMany, agentFindMany } = vi.hoisted(
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    auditEvent: { upsert },
+    auditEvent: { upsert, findUnique },
     adminAuditLog: { findMany: adminFindMany },
     aimExecutionTrace: { findMany: aimFindMany },
     agentApiCallLog: { findMany: agentFindMany },
@@ -23,11 +24,13 @@ import { reconcileAuditEvents, recordAgentApiAudit, recordAuditEvent, specialist
 describe("audit event writer", () => {
   beforeEach(() => {
     upsert.mockReset()
+    findUnique.mockReset()
     error.mockReset()
     adminFindMany.mockReset()
     aimFindMany.mockReset()
     agentFindMany.mockReset()
     upsert.mockResolvedValue({ id: "event-1" })
+    findUnique.mockResolvedValue(null)
     adminFindMany.mockResolvedValue([])
     aimFindMany.mockResolvedValue([])
     agentFindMany.mockResolvedValue([])
@@ -54,6 +57,7 @@ describe("audit event writer", () => {
     })
     expect(args.create.metadata).toEqual({ count: 1 })
     expect(args.create.actorIdHash).toHaveLength(16)
+    expect(args.create.payloadHash).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it("does not throw when the index is unavailable in best-effort mode", async () => {
@@ -101,6 +105,42 @@ describe("audit event writer", () => {
     }, { strict: true })).rejects.toThrow("database unavailable")
   })
 
+  it("returns a duplicate for the same key and payload", async () => {
+    const input = specialistAuditInput({
+      source: "server",
+      category: "runtime",
+      severity: "info",
+      status: "success",
+      action: "health.check",
+      summary: "health check",
+      sourceRecordType: "HealthCheck",
+      sourceRecordId: "hc-1",
+    })
+    await recordAuditEvent(input)
+    const payloadHash = upsert.mock.calls[0][0].create.payloadHash
+    upsert.mockClear()
+    findUnique.mockResolvedValueOnce({ id: "existing", payloadHash })
+    const result = await recordAuditEvent(input)
+    expect(result).toEqual({ ok: true, id: "existing", inserted: false })
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it("reports a conflict when the same key carries a different payload", async () => {
+    findUnique.mockResolvedValueOnce({ id: "existing", payloadHash: "different" })
+    const result = await recordAuditEvent(specialistAuditInput({
+      source: "server",
+      category: "runtime",
+      severity: "info",
+      status: "success",
+      action: "health.check",
+      summary: "health check",
+      sourceRecordType: "HealthCheck",
+      sourceRecordId: "hc-1",
+    }))
+    expect(result).toEqual({ ok: false, inserted: false, conflict: true })
+    expect(error).toHaveBeenCalledOnce()
+  })
+
   it("returns a resumable cursor after a bounded reconciliation page", async () => {
     adminFindMany.mockResolvedValueOnce([{
       id: "audit-2",
@@ -141,5 +181,24 @@ describe("audit event writer", () => {
 
     const args = upsert.mock.calls[0][0]
     expect(args.create.metadata).not.toHaveProperty("error")
+  })
+
+  it("maps a running specialist row to started instead of success", async () => {
+    aimFindMany.mockResolvedValueOnce([{
+      id: "trace-running",
+      userId: "user-1",
+      projectId: "project-1",
+      agentId: "copywriter",
+      action: "aim.generate",
+      status: "running",
+      runId: "run-1",
+      createdAt: new Date("2026-09-08T01:02:03.000Z"),
+    }])
+
+    await reconcileAuditEvents(10)
+
+    const args = upsert.mock.calls[0][0]
+    expect(args.create.status).toBe("started")
+    expect(args.create.severity).toBe("warning")
   })
 })

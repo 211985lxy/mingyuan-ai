@@ -30,8 +30,10 @@ export const GET = withAdminOnly(async () => {
     // Recent new users (last 7 days)
     recentUsers,
 
-    // Recent audit logs
+    // Recent normalized audit events.
     recentLogs,
+
+    openAlertCount,
 
     // Activation code stats
     codeTotal,
@@ -76,10 +78,14 @@ export const GET = withAdminOnly(async () => {
     }),
 
     // Recent audit logs
-    prisma.adminAuditLog.findMany({
-      select: { id: true, action: true, targetType: true, targetId: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
+    prisma.auditEvent.findMany({
+      select: { id: true, action: true, targetType: true, targetId: true, occurredAt: true },
+      orderBy: { occurredAt: "desc" },
       take: 10,
+    }),
+
+    prisma.operationalAlert.count({
+      where: { status: { in: ["open", "acknowledged"] }, severity: { in: ["error", "critical"] } },
     }),
 
     // Activation code stats
@@ -123,12 +129,13 @@ export const GET = withAdminOnly(async () => {
         plan: u.plan,
         createdAt: u.createdAt.toISOString(),
       })),
+      openAlertCount,
       recentLogs: recentLogs.map((l) => ({
         id: l.id,
         action: l.action,
         targetType: l.targetType,
         targetId: l.targetId,
-        createdAt: l.createdAt.toISOString(),
+        createdAt: l.occurredAt.toISOString(),
       })),
     },
   })

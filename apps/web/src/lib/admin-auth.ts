@@ -8,6 +8,7 @@ import { isCsrfSafe, readSessionToken } from "@/lib/auth-session"
 import { apiRequestErrorResponse } from "@/lib/api-contract"
 import { createRequestLogger, generateRequestId, hashLogIdentifier } from "@/lib/logger"
 import { safeSecretEqual } from "@/lib/aim/work-item-api-auth"
+import { recordAdminAudit, wasRequestAudited } from "@/lib/admin-audit"
 
 const ADMIN_JWT_SECRET = env.ADMIN_JWT_SECRET
 
@@ -68,6 +69,40 @@ export function verifyAdminToken(token: string): AdminPayload | null {
   }
 }
 
+async function recordAutomaticAdminAudit(input: {
+  request: NextRequest
+  adminId: string
+  status: "success" | "failed"
+  responseStatus?: number
+  error?: unknown
+}) {
+  if (wasRequestAudited(input.request)) return
+  const routeKey = input.request.nextUrl.pathname
+    .replace(/^\/api\/admin\//, "")
+    .replace(/[^a-zA-Z0-9_.:-]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+  const method = input.request.method.toLowerCase()
+  const action = `admin.route.${method}.${routeKey || "root"}`.slice(0, 100)
+  const errorCode = input.error && typeof input.error === "object" && typeof (input.error as { name?: unknown }).name === "string"
+    ? String((input.error as { name: string }).name).slice(0, 64)
+    : undefined
+  await recordAdminAudit({
+    request: input.request,
+    adminId: input.adminId,
+    action,
+    targetType: "admin_route",
+    targetId: input.request.nextUrl.pathname,
+    status: input.status,
+    severity: input.status === "failed" || (input.responseStatus ?? 200) >= 400 ? "error" : "info",
+    metadata: {
+      method,
+      route: input.request.nextUrl.pathname,
+      status: input.responseStatus,
+      errorCode,
+    },
+  })
+}
+
 function createAdminAuthWrapper(
   handler: AdminRouteHandler,
   allowedRoles: readonly AdminRole[],
@@ -114,11 +149,18 @@ function createAdminAuthWrapper(
       userIdHash: hashLogIdentifier(admin.id),
       path: request.nextUrl.pathname,
     })
+    const mutationMethod = /^(POST|PUT|PATCH|DELETE)$/i.test(request.method)
     try {
       const response = await handler(request, { admin, params })
+      if (mutationMethod) await recordAutomaticAdminAudit({ request, adminId: admin.id, status: response.status >= 400 ? "failed" : "success", responseStatus: response.status })
       response.headers.set("x-request-id", requestId)
       return response
     } catch (error) {
+      try {
+        if (mutationMethod) await recordAutomaticAdminAudit({ request, adminId: admin.id, status: "failed", responseStatus: 500, error })
+      } catch (auditError) {
+        log.error({ err: auditError }, "automatic admin audit failed")
+      }
       const contractResponse = apiRequestErrorResponse(request, error)
       if (contractResponse) return contractResponse
       log.error({ err: error }, "admin request failed")

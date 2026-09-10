@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan control center retention cron (report-only)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-control-center-retention.service
+
+[Install]
+WantedBy=timers.target

@@ -3,6 +3,7 @@ import {
   formatSupervisorNotification,
   readSupervisorNotificationConfig,
   sanitizeSupervisorText,
+  sendFeishuSystemAlert,
   sendFeishuSupervisorNotification,
 } from "@/lib/aim/feishu-supervisor-notifier"
 
@@ -96,5 +97,20 @@ describe("feishu supervisor notifier", () => {
     expect(sanitized).not.toContain("private")
     expect(sanitized).not.toContain("hidden")
     expect(sanitized).not.toContain("1234567890abcdef")
+  })
+
+  it("复用同一发送通道发送系统告警", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, tenant_access_token: "tenant_1" }))
+      .mockResolvedValueOnce(jsonResponse({ code: 0 }))
+    await sendFeishuSystemAlert({
+      config: { enabled: true, appId: "app_1", appSecret: "secret_1", chatId: "oc_1" },
+      fingerprint: "audit-reconcile-lag:aim",
+      severity: "critical",
+      summary: "对账延迟",
+      correlationId: "corr-1",
+      fetchImpl,
+    })
+    expect(JSON.parse(fetchImpl.mock.calls[1]?.[1]?.body as string).content).toContain("明动系统告警")
   })
 })

@@ -35,6 +35,14 @@ SERVICE_NAME="${SERVICE_NAME:-mingyuan-web}"
 BACKGROUND_TASK_SERVICE="${BACKGROUND_TASK_SERVICE:-mingyuan-background-tasks.service}"
 BACKGROUND_TASK_TIMER="${BACKGROUND_TASK_TIMER:-mingyuan-background-tasks.timer}"
 HEALTH_URL="${HEALTH_URL:-https://mingyuan-ai.cn/api/healthz}"
+# 统计/审计控制中心 cron（cadence 见 docs/operations/unified-control-centers-production-runbook.md）
+CONTROL_CENTER_CRON_UNITS=(
+  mingyuan-cron-audit-reconcile
+  mingyuan-cron-operational-alerts
+  mingyuan-cron-channel-metrics-rollup
+  mingyuan-cron-control-center-retention
+)
+CONTROL_CENTER_CRON_TIMER_LIST="${CONTROL_CENTER_CRON_UNITS[*]/%/.timer}"
 
 SSH=(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10 "$SSH_USER@$SSH_HOST")
 RSYNC=(rsync -az --partial --delete -e "ssh -i $SSH_KEY -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ServerAliveCountMax=10")
@@ -132,6 +140,10 @@ retry_transfer "${RSYNC[@]}" apps/web/scripts/apply-production-schema-patches.mj
 retry_transfer "${RSYNC[@]}" apps/web/prisma/production-schema-contract.json "$SSH_USER@$SSH_HOST:$REMOTE_INCOMING_DIR/ops/"
 retry_transfer "${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.service "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_SERVICE"
 retry_transfer "${RSYNC[@]}" ops/systemd/mingyuan-background-tasks.timer "$SSH_USER@$SSH_HOST:/etc/systemd/system/$BACKGROUND_TASK_TIMER"
+for cron_unit in "${CONTROL_CENTER_CRON_UNITS[@]}"; do
+  retry_transfer "${RSYNC[@]}" "ops/systemd/$cron_unit.service" "$SSH_USER@$SSH_HOST:/etc/systemd/system/$cron_unit.service"
+  retry_transfer "${RSYNC[@]}" "ops/systemd/$cron_unit.timer" "$SSH_USER@$SSH_HOST:/etc/systemd/system/$cron_unit.timer"
+done
 
 "${SSH[@]}" "cd '$REMOTE_INCOMING_DIR/apps/web' && /usr/bin/node -e \"const { createRequire } = require('node:module'); const { resolve } = require('node:path'); const appRequire = createRequire(resolve('server.js')); ['next','styled-jsx/package.json','@next/env','react','react-dom','pino'].forEach((id)=>appRequire.resolve(id)); console.log('remote-standalone-deps-ok')\""
 "${SSH[@]}" "set -a; . /etc/mingyuan/mingyuan.env; set +a; /usr/bin/node '$REMOTE_INCOMING_DIR/ops/apply-production-schema-patches.mjs'"
@@ -155,7 +167,7 @@ if [ "$healthy" -ne 1 ]; then
   exit 1
 fi
 
-"${SSH[@]}" "set -e; if grep -q '^BACKGROUND_TASKS_ENABLED=' /etc/mingyuan/mingyuan.env; then sed -i 's/^BACKGROUND_TASKS_ENABLED=.*/BACKGROUND_TASKS_ENABLED=true/' /etc/mingyuan/mingyuan.env; else printf '\nBACKGROUND_TASKS_ENABLED=true\n' >> /etc/mingyuan/mingyuan.env; fi; chmod 600 /etc/mingyuan/mingyuan.env; systemctl daemon-reload; systemctl enable --now '$BACKGROUND_TASK_TIMER'; systemctl restart '$SERVICE_NAME'; systemctl is-active '$SERVICE_NAME'; ready=0; for attempt in {1..30}; do if /usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/api/healthz >/dev/null; then ready=1; break; fi; sleep 1; done; if [ \"\$ready\" -ne 1 ]; then exit 1; fi; systemctl start '$BACKGROUND_TASK_SERVICE'; systemctl is-active '$BACKGROUND_TASK_TIMER'"
+"${SSH[@]}" "set -e; if grep -q '^BACKGROUND_TASKS_ENABLED=' /etc/mingyuan/mingyuan.env; then sed -i 's/^BACKGROUND_TASKS_ENABLED=.*/BACKGROUND_TASKS_ENABLED=true/' /etc/mingyuan/mingyuan.env; else printf '\nBACKGROUND_TASKS_ENABLED=true\n' >> /etc/mingyuan/mingyuan.env; fi; chmod 600 /etc/mingyuan/mingyuan.env; systemctl daemon-reload; systemctl enable --now '$BACKGROUND_TASK_TIMER'; for t in $CONTROL_CENTER_CRON_TIMER_LIST; do systemctl enable --now "\$t"; done; systemctl restart '$SERVICE_NAME'; systemctl is-active '$SERVICE_NAME'; ready=0; for attempt in {1..30}; do if /usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/api/healthz >/dev/null; then ready=1; break; fi; sleep 1; done; if [ \"\$ready\" -ne 1 ]; then exit 1; fi; systemctl start '$BACKGROUND_TASK_SERVICE'; systemctl is-active '$BACKGROUND_TASK_TIMER'"
 
 # 回读线上发布事实：releaseSha 必须等于本地 HEAD（经 SSH 内网，不依赖本机 DNS）。
 LIVE_SHA="$("${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 5 http://127.0.0.1:3000/api/healthz" | node -e "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).releaseSha??'unknown')}catch{console.log('unknown')}})")"

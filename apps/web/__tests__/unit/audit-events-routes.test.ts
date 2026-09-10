@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
-const { findMany, findUnique, count, recordAdminAudit } = vi.hoisted(() => ({
+const { findMany, findUnique, count, groupBy, recordAdminAudit } = vi.hoisted(() => ({
   findMany: vi.fn(),
   findUnique: vi.fn(),
   count: vi.fn(),
+  groupBy: vi.fn(),
   recordAdminAudit: vi.fn(async () => "request-audit-1"),
 }))
 
-vi.mock("@/lib/prisma", () => ({ prisma: { auditEvent: { findMany, findUnique, count } } }))
+vi.mock("@/lib/prisma", () => ({ prisma: { auditEvent: { findMany, findUnique, count, groupBy } } }))
 vi.mock("@/lib/admin-audit", () => ({ recordAdminAudit }))
 vi.mock("@/lib/admin-auth", () => ({
   withAdminOnly: (handler: (request: NextRequest, context: { admin: { id: string }, params?: Record<string, string> }) => unknown) =>
@@ -30,8 +31,10 @@ describe("audit event admin routes", () => {
     findMany.mockReset()
     findUnique.mockReset()
     count.mockReset()
+    groupBy.mockReset()
     recordAdminAudit.mockClear()
     count.mockResolvedValue(3)
+    groupBy.mockResolvedValue([{ source: "aim" }, { source: "admin" }])
     findMany.mockResolvedValue([
       { id: "event-3", occurredAt: new Date("2026-09-08T02:00:00Z"), source: "aim" },
       { id: "event-2", occurredAt: new Date("2026-09-08T01:00:00Z"), source: "admin" },
@@ -45,7 +48,7 @@ describe("audit event admin routes", () => {
 
     expect(response.status).toBe(200)
     expect(body.data).toHaveLength(1)
-    expect(body.nextCursor).toBe("event-3")
+    expect(body.nextCursor).toBeTruthy()
     expect(args.take).toBe(2)
     // 「今天」按 Asia/Shanghai 随钟计算（原硬编码日期随日历翻页即红）
     const shanghaiToday = new Intl.DateTimeFormat("en-CA", {
@@ -54,8 +57,10 @@ describe("audit event admin routes", () => {
       month: "2-digit",
       day: "2-digit",
     }).format(new Date())
+    const start = new Date(`${shanghaiToday}T00:00:00+08:00`)
+    start.setUTCDate(start.getUTCDate() - 6)
     expect(args.where.occurredAt.gte.toISOString()).toBe(
-      new Date(`${shanghaiToday}T00:00:00+08:00`).toISOString(),
+      start.toISOString(),
     )
     expect(args.where.occurredAt.lt.toISOString()).toBe(
       new Date(new Date(`${shanghaiToday}T00:00:00+08:00`).getTime() + 24 * 60 * 60 * 1000).toISOString(),
@@ -94,5 +99,17 @@ describe("audit event admin routes", () => {
       params: Promise.resolve({ id: "missing" }),
     })
     expect(response.status).toBe(404)
+  })
+
+  it("returns full-filter summary counts independent of the page size", async () => {
+    const { GET: getSummary } = await import("@/app/api/admin/audit-events/summary/route")
+    count.mockReset()
+    count.mockResolvedValueOnce(101).mockResolvedValueOnce(7).mockResolvedValueOnce(2)
+    groupBy.mockResolvedValue([{ source: "aim" }, { source: "server" }, { source: "admin" }])
+    const response = await getSummary(request("http://localhost/api/admin/audit-events/summary?from=2026-09-01&to=2026-09-07"), routeContext)
+    const body = await response.json()
+    expect(response.status).toBe(200)
+    expect(body).toEqual(expect.objectContaining({ total: 101, failed: 7, critical: 2, sourceCount: 3, from: "2026-09-01", to: "2026-09-07" }))
+    expect(groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ["source"] }))
   })
 })

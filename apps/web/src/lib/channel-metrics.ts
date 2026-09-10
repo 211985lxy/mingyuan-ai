@@ -10,6 +10,8 @@
 
 import { redis } from "@/lib/redis"
 import { prisma } from "@/lib/prisma"
+import { shanghaiDateText } from "@/lib/shanghai-time"
+import { channelMetricRollupFailuresTotal } from "@/lib/metrics"
 import {
   countShadowSamples,
   emptyShadowSampleCount,
@@ -19,7 +21,7 @@ import {
 const KEY_PREFIX = "aim:metrics"
 const SHADOW_SAMPLE_QUERY_LIMIT = 10_000
 
-type MetricName =
+export type ChannelMetricName =
   | "received"
   | "duplicate"
   | "rate_limited"
@@ -29,6 +31,37 @@ type MetricName =
   | "pipeline_failed"
   | "reply_sent"
   | "reply_dead_letter"
+
+const CHANNEL_METRIC_NAMES: ChannelMetricName[] = [
+  "received", "duplicate", "rate_limited", "ingress_rejected",
+  "pipeline_started", "pipeline_completed", "pipeline_failed",
+  "reply_sent", "reply_dead_letter",
+]
+
+type MetricName = ChannelMetricName
+
+type DailyMetricDelegate = {
+  upsert(args: unknown): Promise<unknown>
+  findMany(args: unknown): Promise<Array<Record<string, unknown>>>
+}
+
+function getDailyMetricDelegate(): DailyMetricDelegate | undefined {
+  const delegate = (prisma as unknown as { channelMetricDaily?: unknown }).channelMetricDaily
+  if (!delegate || typeof delegate !== "object") return undefined
+  const candidate = delegate as Partial<DailyMetricDelegate>
+  if (typeof candidate.upsert !== "function" || typeof candidate.findMany !== "function") return undefined
+  return candidate as DailyMetricDelegate
+}
+
+async function persistDailyChannelMetric(input: { day: string; platform: string; metric: ChannelMetricName }) {
+  const delegate = getDailyMetricDelegate()
+  if (!delegate) return
+  await delegate.upsert({
+    where: { day_platform_metric: { day: input.day, platform: input.platform, metric: input.metric } },
+    create: { day: input.day, platform: input.platform, metric: input.metric, count: 1 },
+    update: { count: { increment: 1 } },
+  })
+}
 
 /**
  * Increment a channel metric counter.
@@ -46,9 +79,14 @@ export async function recordChannelMetric(input: {
   externalChatId?: string
   timestamp?: Date
 }): Promise<void> {
+  const ts = input.timestamp ?? new Date()
+  const date = shanghaiDateText(ts)
   try {
-    const ts = input.timestamp ?? new Date()
-    const date = ts.toISOString().slice(0, 10) // YYYY-MM-DD
+    await persistDailyChannelMetric({ day: date, platform: input.platform, metric: input.metric })
+  } catch {
+    channelMetricRollupFailuresTotal.inc({ platform: input.platform, metric: input.metric })
+  }
+  try {
     const accountId = input.externalAccountId || "default"
     const parts = [KEY_PREFIX, input.metric, input.platform, accountId, date]
     if (input.externalChatId) parts.push(input.externalChatId)
@@ -72,6 +110,41 @@ export async function recordChannelMetric(input: {
   } catch {
     // Redis unavailable — metrics are optional, don't throw
   }
+}
+
+const DEFAULT_CHANNEL_PLATFORMS = ["feishu", "web", "api", "douyin", "xiaohongshu", "wechat_channels", "bilibili", "kuaishou"]
+
+/** Reconcile one Shanghai day from Redis into the durable daily table. */
+export async function rollupChannelMetricDay(day: string, platform?: string): Promise<{ written: number; failed: number }> {
+  const delegate = getDailyMetricDelegate()
+  if (!delegate) return { written: 0, failed: 1 }
+  const platforms = platform ? [platform] : DEFAULT_CHANNEL_PLATFORMS
+  const keys = platforms.flatMap((item) => CHANNEL_METRIC_NAMES.map((metric) => [KEY_PREFIX, metric, item, day].join(":")))
+  let values: Array<string | null>
+  try {
+    values = await redis.mget(...keys) as Array<string | null>
+  } catch {
+    return { written: 0, failed: keys.length }
+  }
+  let written = 0
+  let failed = 0
+  for (let index = 0; index < keys.length; index += 1) {
+    const item = platforms[Math.floor(index / CHANNEL_METRIC_NAMES.length)]
+    const metric = CHANNEL_METRIC_NAMES[index % CHANNEL_METRIC_NAMES.length]
+    const count = Number.parseInt(values[index] || "0", 10)
+    try {
+      await delegate.upsert({
+        where: { day_platform_metric: { day, platform: item, metric } },
+        create: { day, platform: item, metric, count: Number.isFinite(count) ? Math.max(0, count) : 0 },
+        update: { count: Number.isFinite(count) ? Math.max(0, count) : 0 },
+      })
+      written += 1
+    } catch {
+      failed += 1
+      channelMetricRollupFailuresTotal.inc({ platform: item, metric })
+    }
+  }
+  return { written, failed }
 }
 
 const EMPTY_REDIS_TOTAL: ChannelMetricsSummary["total"] = {

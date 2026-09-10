@@ -49,6 +49,7 @@ interface DashboardData {
   failedEmbeddingCount: number
   pendingProfilesCount: number
   recentFailedTraces: number
+  openAlertCount: number
   codeStats: {
     total: number
     unused: number
@@ -110,7 +111,8 @@ export default function AdminDashboardPage() {
   const pendingCount = (data?.pendingKnowledgeCount ?? 0) +
     (data?.failedEmbeddingCount ?? 0) +
     (data?.pendingProfilesCount ?? 0) +
-    (data?.recentFailedTraces ?? 0)
+    (data?.recentFailedTraces ?? 0) +
+    (data?.openAlertCount ?? 0)
 
   return (
     <div className="space-y-6">
