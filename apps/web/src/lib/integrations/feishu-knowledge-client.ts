@@ -103,6 +103,10 @@ async function searchKnowledge(input: {
   const token = await resolveRequestToken(input.config, input.fetcher, input.now)
   const query = input.query.slice(0, SEARCH_QUERY_MAX)
   const usingUser = Boolean(input.config.userAccessToken?.trim())
+  // bot 身份统一搜索（search v2）仅支持用户身份，直接走知识库空间遍历降级
+  if (!usingUser && input.wikiSpaceIds.length > 0) {
+    return searchWikiNodes(input, token, query)
+  }
   const payload = await feishuJson(input.fetcher, SEARCH_URL, {
     method: "POST",
     token,
