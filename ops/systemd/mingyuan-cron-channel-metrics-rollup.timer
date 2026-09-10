@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan channel metrics daily rollup cron
+
+[Timer]
+OnCalendar=*-*-* 00:10:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-channel-metrics-rollup.service
+
+[Install]
+WantedBy=timers.target

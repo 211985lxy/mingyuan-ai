@@ -1,0 +1,12 @@
+[Unit]
+Description=Mingyuan control center retention cron (report-only)
+After=network-online.target mingyuan-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/mingyuan/mingyuan.env
+TimeoutStartSec=180
+ExecStartPre=/bin/sh -c 'for attempt in 1 2 3 4 5 6 7 8 9 10; do /usr/bin/curl --noproxy "*" --fail --silent --max-time 2 http://127.0.0.1:3000/api/healthz >/dev/null && exit 0; /usr/bin/sleep 1; done; exit 1'
+# report-only：不带 execute/confirm 参数，仅输出过期计数；真实删除须按 runbook 人工审批后手动调用。
+ExecStart=/bin/sh -c 'exec /usr/bin/curl --noproxy "*" --fail --silent --show-error --max-time 160 -w "\nstatus=%{http_code}\n" -H "Authorization: Bearer ${CRON_SECRET}" "http://127.0.0.1:3000/api/cron/control-center-retention"'
