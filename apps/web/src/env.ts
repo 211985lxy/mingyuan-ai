@@ -121,6 +121,10 @@ export const env = createEnv({
     FEISHU_TOPIC_CHAT_ID: z.string().optional(),
     FEISHU_TOPIC_CHAT_USER_ID: z.string().optional(),
     FEISHU_VERIFICATION_TOKEN: z.string().optional(),
+    FEISHU_KNOWLEDGE_ENABLED: z.string().optional(),
+    FEISHU_KNOWLEDGE_WIKI_SPACE_IDS: z.string().optional(),
+    FEISHU_KNOWLEDGE_OAUTH_REDIRECT_URI: z.string().optional(),
+    FEISHU_TOKEN_ENCRYPTION_KEY: z.string().optional(),
     FISH_AUDIO_API_KEY: z.string().optional(),
     FISH_AUDIO_BASE_URL: z.string().optional(),
     FISH_AUDIO_MODEL: z.string().optional(),
@@ -277,8 +281,7 @@ export const env = createEnv({
     ALIYUN_VIAPI_ACCESS_KEY_SECRET: process.env.ALIYUN_VIAPI_ACCESS_KEY_SECRET,
     AIM_LOOP_NOTIFICATIONS_ENABLED: process.env.AIM_LOOP_NOTIFICATIONS_ENABLED,
     AIM_BUSINESS_LOOPS_ENABLED: process.env.AIM_BUSINESS_LOOPS_ENABLED,
-    AIM_DAILY_EVAL_ARTIFACT_SECRET:
-      process.env.AIM_DAILY_EVAL_ARTIFACT_SECRET,
+    AIM_DAILY_EVAL_ARTIFACT_SECRET: process.env.AIM_DAILY_EVAL_ARTIFACT_SECRET,
     AIM_LOOP_PILOT_PROJECT_IDS: process.env.AIM_LOOP_PILOT_PROJECT_IDS,
     AIM_LOOP_SHADOW_MODE: process.env.AIM_LOOP_SHADOW_MODE,
     AIM_WEEKLY_NARRATIVE_ENABLED: process.env.AIM_WEEKLY_NARRATIVE_ENABLED,
@@ -378,6 +381,10 @@ export const env = createEnv({
     FEISHU_TOPIC_CHAT_ID: process.env.FEISHU_TOPIC_CHAT_ID,
     FEISHU_TOPIC_CHAT_USER_ID: process.env.FEISHU_TOPIC_CHAT_USER_ID,
     FEISHU_VERIFICATION_TOKEN: process.env.FEISHU_VERIFICATION_TOKEN,
+    FEISHU_KNOWLEDGE_ENABLED: process.env.FEISHU_KNOWLEDGE_ENABLED,
+    FEISHU_KNOWLEDGE_WIKI_SPACE_IDS: process.env.FEISHU_KNOWLEDGE_WIKI_SPACE_IDS,
+    FEISHU_KNOWLEDGE_OAUTH_REDIRECT_URI: process.env.FEISHU_KNOWLEDGE_OAUTH_REDIRECT_URI,
+    FEISHU_TOKEN_ENCRYPTION_KEY: process.env.FEISHU_TOKEN_ENCRYPTION_KEY,
     FISH_AUDIO_API_KEY: process.env.FISH_AUDIO_API_KEY,
     FISH_AUDIO_BASE_URL: process.env.FISH_AUDIO_BASE_URL,
     FISH_AUDIO_MODEL: process.env.FISH_AUDIO_MODEL,
@@ -413,10 +420,8 @@ export const env = createEnv({
     LARK_CREATOR_METRICS_DETAIL_TABLE_ID: process.env.LARK_CREATOR_METRICS_DETAIL_TABLE_ID,
     LARK_CREATOR_METRICS_SYNC_LOG_TABLE_ID: process.env.LARK_CREATOR_METRICS_SYNC_LOG_TABLE_ID,
     LARK_DELIVERY_TABLE_ID: process.env.LARK_DELIVERY_TABLE_ID,
-    LARK_BUSINESS_ATTRIBUTION_TABLE_ID:
-      process.env.LARK_BUSINESS_ATTRIBUTION_TABLE_ID,
-    LARK_CUSTOMER_OUTCOME_TABLE_ID:
-      process.env.LARK_CUSTOMER_OUTCOME_TABLE_ID,
+    LARK_BUSINESS_ATTRIBUTION_TABLE_ID: process.env.LARK_BUSINESS_ATTRIBUTION_TABLE_ID,
+    LARK_CUSTOMER_OUTCOME_TABLE_ID: process.env.LARK_CUSTOMER_OUTCOME_TABLE_ID,
     LARK_ASSET_DEFAULT_EDITOR_OPEN_ID: process.env.LARK_ASSET_DEFAULT_EDITOR_OPEN_ID,
     LARK_PLATFORM_DATA_BASE_TOKEN: process.env.LARK_PLATFORM_DATA_BASE_TOKEN,
     LARK_PLATFORM_ACCOUNT_TABLE_ID: process.env.LARK_PLATFORM_ACCOUNT_TABLE_ID,
@@ -520,15 +525,10 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
 })
 
-// Provider key pools and child-process inheritance need dynamic names or the
-// complete process map. Keep those two escape hatches centralized here.
-
-/** 按前缀+序号读取索引化环境变量值（如 PROVIDER_1、PROVIDER_2）。 */
 export function getIndexedEnvironmentValue(prefix: string, index: number): string | undefined {
   return process.env[`${prefix}_${index}`]?.trim() || undefined
 }
 
-/** 返回完整进程环境变量映射（子进程继承用）。 */
 export function getProcessEnvironment(): NodeJS.ProcessEnv {
   return process.env
 }

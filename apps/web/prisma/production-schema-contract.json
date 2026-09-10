@@ -632,6 +632,22 @@
         "metadata",
         "externalLogUrl"
       ]
+    },
+    {
+      "name": "FeishuKnowledgeOperatorCredential",
+      "columns": [
+        "id",
+        "label",
+        "openId",
+        "encryptedAccessToken",
+        "encryptedRefreshToken",
+        "accessTokenExpiresAt",
+        "refreshTokenExpiresAt",
+        "scope",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   ]
 }
