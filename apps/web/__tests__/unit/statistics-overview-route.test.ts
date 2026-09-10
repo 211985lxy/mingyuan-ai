@@ -18,7 +18,10 @@ import { GET } from "@/app/api/admin/statistics/overview/route"
 describe("statistics overview route", () => {
   it("passes bounded filters to the domain loader", async () => {
     loadStatisticsOverview.mockResolvedValue({ operations: { runCount: 1 }, business: null, degradedSources: [] })
-    const response = await GET(new NextRequest("http://localhost/api/admin/statistics/overview?from=2026-09-01&to=2026-09-07&projectId=p1&channel=feishu"))
+    const response = await GET(
+      new NextRequest("http://localhost/api/admin/statistics/overview?from=2026-09-01&to=2026-09-07&projectId=p1&channel=feishu"),
+      { params: Promise.resolve({}) },
+    )
     expect(response.status).toBe(200)
     expect(loadStatisticsOverview).toHaveBeenCalledWith(expect.objectContaining({ filters: expect.objectContaining({ projectId: "p1", channel: "feishu" }) }))
     expect(recordAdminAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "statistics.overview.read" }))
