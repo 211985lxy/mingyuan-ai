@@ -49,7 +49,7 @@ describe("aim history route", () => {
     expect(authenticateRequest).toHaveBeenCalled()
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        userId: "user-1",
+        projectId: "project-1",
         agentId: { in: ["content_producer", "ip_video"] },
       }),
       orderBy: { updatedAt: "desc" },
@@ -78,7 +78,7 @@ describe("aim history route", () => {
 
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        userId: "user-1",
+        projectId: "project-1",
         agentId: { in: ["work_editor", "deep_copywriter"] },
       }),
     }))

@@ -129,6 +129,9 @@ describe("style profile project scope", () => {
     expect(projectOnly).toContain("项目专属风格")
     expect(projectOnly).not.toContain("回退")
     expect(findMany).toHaveBeenCalledTimes(1)
+    const where = findMany.mock.calls[0][0].where
+    expect(where).toMatchObject({ projectId: "project-1", status: "active" })
+    expect(where).not.toHaveProperty("userId")
   })
 
   it("快速出稿（无项目）只读全局档案", async () => {

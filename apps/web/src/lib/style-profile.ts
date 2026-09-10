@@ -28,11 +28,11 @@ async function loadStyleEntries(
   userId: string,
   projectId: string | null,
 ): Promise<StyleEntryRow[]> {
+  const scope = projectId ? { projectId } : { userId, projectId: null }
   return prisma.knowledgeEntry.findMany({
     where: {
-      userId,
       category: STYLE_PROFILE_CATEGORY,
-      projectId,
+      ...scope,
       status: "active",
     },
     orderBy: [{ updatedAt: "desc" }],
@@ -101,7 +101,6 @@ export async function hasActiveStyleProfile(
   if (effectiveProjectId) {
     const projectCount = await prisma.knowledgeEntry.count({
       where: {
-        userId,
         category: STYLE_PROFILE_CATEGORY,
         projectId: effectiveProjectId,
         status: "active",

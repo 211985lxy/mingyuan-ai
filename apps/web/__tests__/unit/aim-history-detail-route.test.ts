@@ -49,12 +49,12 @@ describe("aim history detail route", () => {
     mocks.outcomeUpsert.mockResolvedValue({ id: "outcome-1" })
   })
 
-  it("loads only the current user's generation and normalizes the legacy agent id", async () => {
+  it("loads a generation from the current project and normalizes the legacy agent id", async () => {
     mocks.generationFindFirst.mockResolvedValueOnce({ id: "generation-1", agentId: "ip_video" })
 
     const response = await GET(new NextRequest("http://localhost/api/aim/history/generation-1"), params)
 
-    expect(mocks.generationFindFirst).toHaveBeenCalledWith({ where: { id: "generation-1", userId: "user-1", projectId: "project-1" } })
+    expect(mocks.generationFindFirst).toHaveBeenCalledWith({ where: { id: "generation-1", projectId: "project-1" } })
     expect(await response.json()).toEqual({ id: "generation-1", agentId: "content_producer", reasoningByFormat: {} })
   })
 

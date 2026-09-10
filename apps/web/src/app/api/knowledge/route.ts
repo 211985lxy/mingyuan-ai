@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
 
     const entries = await prisma.knowledgeEntry.findMany({
       where: {
-        userId: user.id,
         projectId: boundProject.id,
         status,
         ...(category ? { category } : {}),
