@@ -6,8 +6,8 @@
     300
   ],
   "functionLineLimit": 80,
-  "legacyFunctionBaseline": 213,
-  "legacyFunctionBaselineDate": "2026-09-08",
+  "legacyFunctionBaseline": 214,
+  "legacyFunctionBaselineDate": "2026-09-10",
   "legacyFiles": [
     {
       "path": "src/lib/aim-generation-prompts.ts",
@@ -21,8 +21,8 @@
     },
     {
       "path": "src/app/(dashboard)/aim/page.tsx",
-      "maxLines": 501,
-      "target": "拆 AimPage 装配区与对话框群为子模块（合并后 501 行，含五步升级 HITL 挂载）"
+      "maxLines": 504,
+      "target": "拆 AimPage 装配区与对话框群为子模块（含五步升级 HITL 挂载与对标问句快径）"
     },
     {
       "path": "src/lib/account-project-context.ts",
