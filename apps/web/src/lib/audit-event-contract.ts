@@ -132,11 +132,11 @@ function buildPayloadHash(input: {
   sourceRecordId?: string
   metadata?: Record<string, unknown> | unknown[]
   externalLogUrl?: string
-  occurredAt: Date
+  occurredAt: Date | null
 }): string {
   const canonical = stableValue({
     ...input,
-    occurredAt: input.occurredAt.toISOString(),
+    occurredAt: input.occurredAt?.toISOString() ?? null,
   })
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
@@ -177,6 +177,10 @@ export function normalizeAuditEvent(input: AuditEventInput): NormalizedAuditEven
     // Correlation IDs generated for an otherwise identical event are transport
     // context, not payload identity. Only caller-supplied IDs participate in
     // the hash so retries can be deduplicated.
-    payloadHash: buildPayloadHash({ ...normalized, correlationId: input.correlationId }),
+    payloadHash: buildPayloadHash({
+      ...normalized,
+      correlationId: input.correlationId,
+      occurredAt: input.occurredAt ? occurredAt : null,
+    }),
   }
 }

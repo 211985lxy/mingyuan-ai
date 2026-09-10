@@ -11,6 +11,7 @@ export const env = createEnv({
     ADMIN_JWT_SECRET: z.string().optional(),
     ADMIN_PASSWORD: z.string().optional(),
     AUDIT_INGEST_SECRET: z.string().optional(),
+    METRICS_SCRAPE_SECRET: z.string().optional(),
     APIMART_API_KEY: z.string().optional(),
     APIMART_BASE_URL: z.string().optional(),
     APIMART_MODEL: z.string().optional(),
@@ -267,6 +268,7 @@ export const env = createEnv({
     ADMIN_JWT_SECRET: process.env.ADMIN_JWT_SECRET,
     ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
     AUDIT_INGEST_SECRET: process.env.AUDIT_INGEST_SECRET,
+    METRICS_SCRAPE_SECRET: process.env.METRICS_SCRAPE_SECRET,
     APIMART_API_KEY: process.env.APIMART_API_KEY,
     APIMART_BASE_URL: process.env.APIMART_BASE_URL,
     APIMART_MODEL: process.env.APIMART_MODEL,
@@ -519,10 +521,8 @@ export const env = createEnv({
   },
   emptyStringAsUndefined: true,
 })
-
 // Provider key pools and child-process inheritance need dynamic names or the
 // complete process map. Keep those two escape hatches centralized here.
-
 /** 按前缀+序号读取索引化环境变量值（如 PROVIDER_1、PROVIDER_2）。 */
 export function getIndexedEnvironmentValue(prefix: string, index: number): string | undefined {
   return process.env[`${prefix}_${index}`]?.trim() || undefined

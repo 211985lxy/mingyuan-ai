@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { Buffer } from "node:buffer"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
+import { auditIdempotencyConflictsTotal, auditIndexFailuresTotal } from "@/lib/metrics"
 import {
   buildAuditIdempotencyKey,
   normalizeAuditEvent,
@@ -113,10 +114,12 @@ export async function recordAuditEvent(
     return { ok: true, id: row.id, inserted: true }
   } catch (error) {
     if (error instanceof AuditIdempotencyConflictError) {
+      auditIdempotencyConflictsTotal.inc({ source: error.source })
       if (options.strict) throw error
       logger.error({ source: error.source, idempotencyKey: error.idempotencyKey }, "audit idempotency conflict")
       return { ok: false, inserted: false, conflict: true }
     }
+    auditIndexFailuresTotal.inc({ source: input.source })
     if (options.strict) throw error
     logger.error({ err: error, action: input.action, source: input.source }, "audit event write failed")
     return { ok: false, inserted: false }
