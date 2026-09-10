@@ -154,8 +154,15 @@ async function searchWikiNodes(
   }
   const needle = query.toLowerCase()
   const hits: FeishuKnowledgeHit[] = []
+  const inaccessibleSpaces: string[] = []
   for (const spaceId of input.wikiSpaceIds) {
-    const nodes = await listWikiNodes(input.fetcher, token, spaceId)
+    let nodes: Awaited<ReturnType<typeof listWikiNodes>>
+    try {
+      nodes = await listWikiNodes(input.fetcher, token, spaceId)
+    } catch {
+      inaccessibleSpaces.push(spaceId)
+      continue
+    }
     for (const node of nodes) {
       if (!node.title.toLowerCase().includes(needle)) continue
       hits.push({
@@ -169,6 +176,13 @@ async function searchWikiNodes(
     }
   }
   if (hits.length === 0) {
+    if (inaccessibleSpaces.length === input.wikiSpaceIds.length) {
+      throw new FeishuKnowledgeError(
+        "permission_denied",
+        `全部 ${inaccessibleSpaces.length} 个授权 wiki 空间都无访问权限。`,
+        "把应用添加为知识库空间成员，或检查 FEISHU_KNOWLEDGE_WIKI_SPACE_IDS 配置。",
+      )
+    }
     throw new FeishuKnowledgeError(
       "empty",
       "授权 wiki 空间里没有标题匹配的文档。",
