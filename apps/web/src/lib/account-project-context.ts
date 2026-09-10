@@ -7,6 +7,7 @@ import {
   cancelStaleProjectBackgroundTask,
 } from "@/lib/background-tasks"
 import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
+import { findBoundProjectForAccount, upsertProjectMembership } from "@/lib/project-membership"
 
 export type AccountProjectContextStatus =
   | "bound"
@@ -118,12 +119,6 @@ export type AccountProjectExecutionContextSource =
   | "inspiration"
   | "background"
 
-const projectSelect = {
-  id: true,
-  name: true,
-  status: true,
-} as const
-
 type ProjectCountDb = Pick<PrismaClient, "clientProject">
 
 async function getUserBinding(userId: string): Promise<string | null> {
@@ -161,10 +156,7 @@ export async function getAccountProjectContext(
   const boundProjectId = await getUserBinding(userId)
 
   if (boundProjectId) {
-    const project = await prisma.clientProject.findFirst({
-      where: { id: boundProjectId, userId, status: "active" },
-      select: projectSelect,
-    })
+    const project = await findBoundProjectForAccount(prisma, { userId, projectId: boundProjectId })
 
     if (!project) {
       throw new AccountProjectContextError(
@@ -216,10 +208,7 @@ export async function resolveBoundProject(options: {
     )
   }
 
-  const project = await prisma.clientProject.findFirst({
-    where: { id: boundProjectId, userId: options.userId, status: "active" },
-    select: projectSelect,
-  })
+  const project = await findBoundProjectForAccount(prisma, { userId: options.userId, projectId: boundProjectId })
 
   if (!project) {
     throw new AccountProjectContextError(
@@ -408,6 +397,8 @@ export async function createInitialAccountProject(
       )
     }
 
+    await upsertProjectMembership(tx, { projectId: project.id, userId, role: "owner" })
+
     return project
   })
 }
@@ -445,11 +436,8 @@ export async function bindAccountProject(options: {
       select: { id: true, userId: true, name: true, status: true },
     })
 
-    if (!project || project.userId !== options.userId) {
-      throw new AccountProjectContextError(
-        "PROJECT_CONTEXT_MISMATCH",
-        "项目不属于当前账号",
-      )
+    if (!project) {
+      throw new AccountProjectContextError("PROJECT_NOT_FOUND", "目标项目不存在", 404)
     }
     if (project.status !== "active") {
       throw new AccountProjectContextError(
@@ -458,7 +446,14 @@ export async function bindAccountProject(options: {
       )
     }
 
+    const membership = {
+      projectId: project.id,
+      userId: options.userId,
+      role: project.userId === options.userId ? "owner" as const : "member" as const,
+    }
+
     if (user.boundProjectId === project.id) {
+      await upsertProjectMembership(tx, membership)
       await options.withinTransaction?.(tx)
       return project
     }
@@ -477,6 +472,8 @@ export async function bindAccountProject(options: {
         "账号已经绑定其他项目，不能替换",
       )
     }
+
+    await upsertProjectMembership(tx, membership)
 
     // Audit write is part of the same transaction — a failure here rolls the
     // binding change back so a repair/bind never persists un-audited.

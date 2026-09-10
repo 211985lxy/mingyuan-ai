@@ -19,5 +19,15 @@ export async function ownsActiveProject(userId: string, projectId: string): Prom
     where: { id: projectId, userId, status: "active" },
     select: { id: true },
   })
-  return Boolean(project)
+  if (project) return true
+
+  const membership = await prisma.projectMember.findFirst({
+    where: {
+      projectId,
+      userId,
+      project: { is: { status: "active" } },
+    },
+    select: { id: true },
+  })
+  return Boolean(membership)
 }
