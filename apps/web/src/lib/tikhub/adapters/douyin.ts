@@ -9,6 +9,7 @@ import type {
 } from '../types'
 import { fetchFromLocalCrawler, LocalCrawlerResult } from '../../competitor-analysis/local-crawler'
 import { logger } from '@/lib/logger'
+import { resolveDouyinShortUrl } from '@/lib/douyin-short-url'
 
 const adapterLog = logger.child({ component: 'DouyinAdapter' })
 
@@ -117,26 +118,7 @@ export class DouyinAdapter implements PlatformAdapter {
    * 探测抖音短链并重定向获取真实主页 URL
    */
   private async resolveShortUrl(url: string): Promise<string> {
-    if (!url.includes('v.douyin.com')) {
-      return url
-    }
-    try {
-      adapterLog.info({ url }, '检测到抖音分享短链，正在进行 302 物理探测...')
-      const res = await fetch(url, {
-        redirect: 'manual',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-        }
-      })
-      const location = res.headers.get('location')
-      if (location) {
-        adapterLog.info({ location }, '抖音短链 302 探测成功，获取到真实长链')
-        return location
-      }
-    } catch (err) {
-      adapterLog.warn({ err, url }, '抖音短链 302 探测异常，将采用直接返回原链兜底')
-    }
-    return url
+    return resolveDouyinShortUrl(url)
   }
 
   /**
