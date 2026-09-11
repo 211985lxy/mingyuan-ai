@@ -4,6 +4,11 @@ import { generateTopicCards } from "@/lib/topic-generation"
 import type { RecommendationMode } from "@/lib/topic-generation"
 import type { TopicCard } from "@/lib/topic-validation"
 import {
+  evaluateTopicCards,
+  selectTopCompetitorEvidence,
+  type TopicEditorReviewer,
+} from "@/lib/topic-editor-review"
+import {
   buildBenchmarkAccountSources,
   buildProjectSource,
   buildTopicSources,
@@ -34,6 +39,8 @@ export interface TopicSelectionGenerationInput {
   recommendationMode: RecommendationMode
   refreshCount?: number
   requestId: string
+  /** 单测可注入主编评审替身；生产默认走真实 LLM，失败由评审函数静默降级。 */
+  reviewer?: TopicEditorReviewer
 }
 
 export type TopicSelectionGenerationResult =
@@ -183,6 +190,43 @@ async function loadValidatedContext(input: TopicSelectionGenerationInput) {
   }
 }
 
+/** 独立主编评审后落库；评审失败时卡片原样入库，不阻断生成。 */
+async function reviewAndPersistSelection(input: {
+  userId: string
+  projectId: string
+  projectName: string
+  ipProfileId: string
+  watchAccounts: WatchAccountRecord[]
+  result: Extract<Awaited<ReturnType<typeof generateCardsWithFallback>>, { success: true }>
+  topicSources: TopicSource[]
+  recommendationMode: RecommendationMode
+  reviewer?: TopicEditorReviewer
+  requestId: string
+}) {
+  const cards = await evaluateTopicCards(
+    input.result.cards,
+    {
+      projectName: input.projectName,
+      competitorEvidence: selectTopCompetitorEvidence(input.watchAccounts),
+    },
+    input.reviewer,
+  )
+  const sourceHighlights = input.topicSources.slice(0, 16)
+  const selectionId = await persistTopicSelection({
+    userId: input.userId,
+    projectId: input.projectId,
+    ipProfileId: input.ipProfileId,
+    elementCodes: input.result.elementCodes,
+    cards,
+    sourceHighlights,
+    promptText: input.result.promptText,
+    model: input.result.model,
+    recommendationMode: input.recommendationMode,
+  })
+  console.log(`[${input.requestId}] TopicSelection created: ${selectionId}, strategy=${input.result.strategy}`)
+  return { selectionId, cards, sourceHighlights }
+}
+
 /**
  * @description 生成一批选题并落库为 TopicSelection
  * @param input - 生成入参（用户、项目、知识条目、元素、推荐模式）
@@ -240,26 +284,23 @@ export async function generateAndStoreTopicSelection(
     return { ok: false, status: 500, error: result.error }
   }
 
-  const sourceHighlights = bundle.topicSources.slice(0, 16)
-  const selectionId = await persistTopicSelection({
+  const stored = await reviewAndPersistSelection({
     userId,
     projectId,
+    projectName: project.name,
     ipProfileId: ipProfileRecord.id,
-    elementCodes: result.elementCodes,
-    cards: result.cards,
-    sourceHighlights,
-    promptText: result.promptText,
-    model: result.model,
+    watchAccounts,
+    result,
+    topicSources: bundle.topicSources,
     recommendationMode,
+    reviewer: input.reviewer,
+    requestId: input.requestId,
   })
-  console.log(`[${input.requestId}] TopicSelection created: ${selectionId}, strategy=${result.strategy}`)
 
   return {
     ok: true,
-    selectionId,
-    cards: result.cards,
+    ...stored,
     elementCodes: result.elementCodes,
     strategy: result.strategy,
-    sourceHighlights,
   }
 }

@@ -54,6 +54,34 @@ describe("topic review card", () => {
     expect(buttons).toHaveLength(TOPIC_REVIEW_CARD_LIMIT + 2)
   })
 
+  it("AI 主推跟主编评分走，并写出主编结论", () => {
+    const card = buildTopicReviewCard({
+      selectionId: SELECTION_ID,
+      cards: [
+        {
+          ...topicCard("自评分更高", 99),
+          editorReview: { editorScore: 60, editorVerdict: "usable", editorReason: "能发但钩子弱。" },
+        },
+        {
+          ...topicCard("主编主推", 70),
+          editorReview: { editorScore: 92, editorVerdict: "strong", editorReason: "对应对标账号甲的母题（1.2万赞）。" },
+        },
+      ],
+      sources: [],
+    })
+    const markdown = (card.elements as Array<{ tag: string; text?: { content?: string } }>)
+      .filter((element) => element.tag === "div")
+      .map((element) => element.text?.content ?? "")
+      .join("\n")
+
+    const selfLine = markdown.split("\n").find((line) => line.includes("**1. 自评分更高**")) ?? ""
+    const editorLine = markdown.split("\n").find((line) => line.includes("**2. 主编主推**")) ?? ""
+    expect(editorLine).toContain("AI 主推")
+    expect(selfLine).not.toContain("AI 主推")
+    expect(markdown).toContain("对应对标账号甲的母题（1.2万赞）")
+    expect(markdown).toContain("主编 92")
+  })
+
   it("把 AI 评分与主推结论写进卡片正文", () => {
     const card = buildTopicReviewCard({
       selectionId: SELECTION_ID,

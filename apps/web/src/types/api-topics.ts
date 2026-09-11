@@ -46,6 +46,11 @@ export interface ApiTopicCard {
     note?: string;
     advice?: string;
   };
+  editorReview?: {
+    editorScore: number;
+    editorVerdict: "strong" | "usable" | "observe" | "revise";
+    editorReason: string;
+  };
 }
 
 export interface ApiTopicGenerateResponse {

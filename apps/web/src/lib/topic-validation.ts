@@ -52,6 +52,12 @@ export const TopicScoreBreakdownSchema = z.object({
   feasibility: z.number().min(0).max(100).nullable().optional(),
 })
 
+export const TopicEditorReviewSchema = z.object({
+  editorScore: z.number().min(0).max(100),
+  editorVerdict: z.enum(REVIEW_VERDICTS),
+  editorReason: z.string().min(2).max(200),
+})
+
 export const TopicCreativeTraceSchema = z.object({
   stylePositioning: z.string().min(2).max(120),
   logicSteps: z.array(z.string().min(2).max(160)).min(2).max(5),
@@ -97,6 +103,7 @@ export const TopicCardSchema = z.object({
       advice: z.string().min(2).max(200).optional(),
     })
     .optional(),
+  editorReview: TopicEditorReviewSchema.optional(),
 })
 
 export const TopicCardsSchema = z

@@ -26,6 +26,19 @@ function scoreLabel(card: TopicCard) {
   return typeof card.score === "number" ? `｜${card.score} 分` : ""
 }
 
+const EDITOR_VERDICT_LABEL: Record<NonNullable<TopicCard["editorReview"]>["editorVerdict"], string> = {
+  strong: "建议主推",
+  usable: "可用",
+  observe: "观察",
+  revise: "建议改",
+}
+
+function editorMark(card: TopicCard) {
+  const review = card.editorReview
+  if (!review) return ""
+  return `｜主编 ${review.editorScore}分｜${EDITOR_VERDICT_LABEL[review.editorVerdict]}`
+}
+
 /**
  * 生成产物是归一化后的 zod TopicCard，日报渲染器吃的是 API DTO。
  * 两者运行时同构（normalizeScoreBreakdown 保证五维分数为数字），差异只在静态类型，
@@ -41,8 +54,8 @@ function buildCandidateLines(cards: TopicCard[], leadTitle: string | undefined) 
     .slice(0, TOPIC_REVIEW_CARD_LIMIT)
     .map((card, index) => {
       const mark = card.title === leadTitle ? "｜AI 主推" : ""
-      const why = card.scoreReason || card.rationale || ""
-      return `**${index + 1}. ${card.title}**${scoreLabel(card)}${mark}\n${why}`
+      const why = card.editorReview?.editorReason || card.scoreReason || card.rationale || ""
+      return `**${index + 1}. ${card.title}**${scoreLabel(card)}${mark}${editorMark(card)}\n${why}`
     })
     .join("\n\n")
 }
@@ -104,6 +117,9 @@ export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string
           content: [
             input.projectName ? `**项目**：${input.projectName}` : "",
             `**AI 结论**：${report.conclusion}`,
+            report.leadCard?.editorReview?.editorReason
+              ? `**主编结论**：${report.leadCard.editorReview.editorReason}`
+              : "",
             `**判断理由**：${report.reason}`,
           ].filter(Boolean).join("\n"),
         },

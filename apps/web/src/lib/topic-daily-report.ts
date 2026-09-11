@@ -38,15 +38,27 @@ function scoreOf(card: ApiTopicCard): number | null {
   return typeof card.score === "number" ? card.score : null
 }
 
-function getLeadCard(cards: ApiTopicCard[]) {
-  return [...cards].sort((a, b) => {
-    const sa = scoreOf(a)
-    const sb = scoreOf(b)
-    if (sa === null && sb === null) return 0
-    if (sa === null) return 1
-    if (sb === null) return -1
-    return sb - sa
-  })[0] ?? null
+function editorScoreOf(card: ApiTopicCard): number | null {
+  const score = card.editorReview?.editorScore
+  return typeof score === "number" ? score : null
+}
+
+function isEditorEligible(card: ApiTopicCard): boolean {
+  return editorScoreOf(card) !== null && card.editorReview?.editorVerdict !== "revise"
+}
+
+function compareDesc(left: number | null, right: number | null): number {
+  if (left === null && right === null) return 0
+  if (left === null) return 1
+  if (right === null) return -1
+  return right - left
+}
+
+export function getLeadCard(cards: ApiTopicCard[]) {
+  const eligible = cards.filter(isEditorEligible)
+  const pool = eligible.length > 0 ? eligible : cards
+  const takeScore = eligible.length > 0 ? editorScoreOf : scoreOf
+  return [...pool].sort((a, b) => compareDesc(takeScore(a), takeScore(b)))[0] ?? null
 }
 
 function fallbackHook(card: ApiTopicCard) {
@@ -70,6 +82,9 @@ const SCORE_LABELS: Record<keyof NonNullable<ApiTopicCard["scoreBreakdown"]>, st
 }
 
 function scoreDecisionReason(card: ApiTopicCard | null) {
+  if (card?.editorReview) {
+    return `主编 ${card.editorReview.editorScore} 分（${card.editorReview.editorVerdict}）。${card.editorReview.editorReason}`
+  }
   if (!card?.scoreBreakdown) return card?.rationale || card?.scoreReason || "这条和当前项目资料、内容目的和执行条件最匹配。"
   const entries = (Object.keys(card.scoreBreakdown) as Array<keyof NonNullable<ApiTopicCard["scoreBreakdown"]>>)
     .map((key) => ({ key, value: card.scoreBreakdown![key] }))

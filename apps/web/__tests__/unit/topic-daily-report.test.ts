@@ -89,6 +89,35 @@ describe("buildTopicDailyReport", () => {
     expect(report.evidenceGroups[0].items[0].content).toContain("反差开头")
   })
 
+  it("prefers the highest editorScore that is not revise", () => {
+    const report = buildTopicDailyReport([
+      { ...cards[0], score: 99, editorReview: { editorScore: 95, editorVerdict: "revise", editorReason: "钩子空。" } },
+      {
+        ...cards[1],
+        score: 70,
+        editorReview: { editorScore: 88, editorVerdict: "strong", editorReason: "对标母题可追溯。" },
+      },
+    ], [], "daily")
+
+    expect(report.leadCard?.title).toBe("AI工具先看流程")
+    expect(report.reason).toContain("主编 88")
+    expect(report.reason).toContain("对标母题可追溯")
+  })
+
+  it("falls back to model self-score when editorReview is missing", () => {
+    const report = buildTopicDailyReport(cards, [], "daily")
+    expect(report.leadCard?.title).toBe("AI工具先看流程")
+  })
+
+  it("falls back to self-score when every editorVerdict is revise", () => {
+    const report = buildTopicDailyReport([
+      { ...cards[0], score: 72, editorReview: { editorScore: 90, editorVerdict: "revise", editorReason: "改钩子。" } },
+      { ...cards[1], score: 91, editorReview: { editorScore: 40, editorVerdict: "revise", editorReason: "对不上对标。" } },
+    ], [], "daily")
+
+    expect(report.leadCard?.title).toBe("AI工具先看流程")
+  })
+
   it("explains lead decision with score breakdown when available", () => {
     const report = buildTopicDailyReport([
       {
