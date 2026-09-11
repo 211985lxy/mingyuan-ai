@@ -216,6 +216,9 @@ export async function cloneVoiceModel(input: {
   form.set("title", input.title)
   form.set("type", "tts")
   form.set("visibility", "private")
+  // Fish Audio 服务端现在强制要求 train_mode（2026-09-09 起 422 "Field required"）；
+  // 当前仅支持 fast（异步快速训练，几分钟可用），与克隆弹窗文案一致。
+  form.set("train_mode", "fast")
   if (input.description) form.set("descriptions", input.description)
   form.append("voices", input.audio, input.filename)
 

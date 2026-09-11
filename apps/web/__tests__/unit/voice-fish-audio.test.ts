@@ -148,3 +148,27 @@ describe("长文分段切分 splitTextForSynthesis", () => {
     expect(segments.join("")).toBe(text)
   })
 })
+
+describe("Fish Audio 声音克隆", () => {
+  it("克隆请求必须携带 train_mode=fast（上游 422 Field required 回归）", async () => {
+    process.env.FISH_AUDIO_API_KEY = "test-fish-key"
+    vi.resetModules()
+    const { cloneVoiceModel } = await import("@/lib/voice/fish-audio")
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ _id: "model-1" }), { status: 200 }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await cloneVoiceModel({
+      title: "我的音色",
+      audio: new Blob([new Uint8Array([1, 2, 3])], { type: "audio/mpeg" }),
+      filename: "sample.mp3",
+    })
+
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/model"))
+    expect(call).toBeDefined()
+    const form = call![1].body as FormData
+    expect(form.get("train_mode")).toBe("fast")
+    expect(form.get("type")).toBe("tts")
+    expect(form.get("visibility")).toBe("private")
+    vi.unstubAllGlobals()
+  })
+})
