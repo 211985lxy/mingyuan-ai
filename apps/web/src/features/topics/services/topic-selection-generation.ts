@@ -51,6 +51,10 @@ export type TopicSelectionGenerationResult =
       elementCodes: string[]
       strategy: string
       sourceHighlights: TopicSource[]
+      /** true = 模型链全败，cards 是降级模板，前端必须提示重新生成 */
+      degraded: boolean
+      /** 实际使用的模型标签；降级时以 ":fallback" 结尾 */
+      model?: string
     }
   | { ok: false; status: number; error: string }
 
@@ -224,7 +228,13 @@ async function reviewAndPersistSelection(input: {
     recommendationMode: input.recommendationMode,
   })
   console.log(`[${input.requestId}] TopicSelection created: ${selectionId}, strategy=${input.result.strategy}`)
-  return { selectionId, cards, sourceHighlights }
+  return {
+    selectionId,
+    cards,
+    sourceHighlights,
+    degraded: input.result.degraded === true,
+    model: input.result.model,
+  }
 }
 
 /**
