@@ -194,7 +194,7 @@ export async function extractEntities(content: string): Promise<ExtractionResult
         { role: "user", content: prompt.user },
       ],
       temperature: 0.2,
-      maxTokens: 2000,
+      maxTokens: 8192,
       responseFormat: { type: "json_object" },
     })
     return parseExtractionResult(result.content)

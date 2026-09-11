@@ -21,7 +21,7 @@ export async function generateMetaPrompt(
     model: META_MODEL,
     messages: buildMetaPromptMessages(contextBlock, params),
     temperature: 0.4,
-    maxTokens: 1500,
+    maxTokens: 8192,
     responseFormat: { type: "json_object" },
   })
 
@@ -76,7 +76,7 @@ export async function generateScriptsWithPrompt(
         },
       ],
       temperature: attempt === 0 ? 0.85 : 0.55,
-      maxTokens: 3200,
+      maxTokens: 8192,
       responseFormat: { type: "json_object" },
     })
 
@@ -126,7 +126,7 @@ export async function generateScriptsDirectly(
         },
       ],
       temperature: attempt === 0 ? 0.7 : 0.45,
-      maxTokens: 3200,
+      maxTokens: 8192,
       responseFormat: { type: "json_object" },
     })
 
