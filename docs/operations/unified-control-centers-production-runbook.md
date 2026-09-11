@@ -108,3 +108,14 @@
 - 相关审计、统计与组件测试已通过；随后重新完成全量单测、组件测试和生产构建。
 
 本轮仍未执行生产迁移、管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装。
+
+## 最新构建 HTTP 冒烟（2026-09-11）
+
+以当前构建产物启动临时本地服务（端口 3102）并在验证后关闭：
+
+- `/api/healthz`：200。
+- `/api/metrics`：未认证 401。
+- `/admin/statistics`、`/admin/audit-center`：匿名 307 跳转 `/admin/login`。
+- `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts`：匿名 401。
+
+该冒烟只验证匿名边界与健康检查；管理员数据、告警写操作和生产 SLS 仍需审批后的专门演练。
