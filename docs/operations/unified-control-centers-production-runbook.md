@@ -125,3 +125,12 @@
 - `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts`：匿名 401。
 
 该冒烟只验证匿名边界与健康检查；管理员数据、告警写操作和生产 SLS 仍需审批后的专门演练。
+
+## 合并与推送记录（2026-09-11）
+
+- `codex/unified-control-centers` 已以非快进方式合并到 `main`，合并提交：`289e7127`。
+- `git push origin main` 已成功；随后校验本地 `main` 与 `origin/main` 均为 `289e7127`。
+- 已删除已合并的本地功能分支；其他工作树未改动，远端功能分支保留作历史参考。
+- `pnpm release:context` 在合并后通过：候选分支为 `main`、工作树干净、远端备份已配置。
+
+该合并提交只代表代码已进入远端 `main`，不代表当前增强已部署到生产；生产发布仍需从该 SHA 走独立审批与部署验证。
