@@ -70,3 +70,15 @@
 - 告警确认/解决/重开状态流转（写操作，验证时使用本地库）。
 
 以下写操作一律留到生产审批之后：真实留存删除、告警流转演练在生产库执行、SLS 资源创建与 LoongCollector 安装。
+
+## 当前提交构建冒烟记录（2026-09-11，Task 9 Step 4 复核）
+
+代码版本：`codex/unified-control-centers` @ `99ab4078`，使用当前提交构建产物在本地 3101 端口短时启动验证。`/api/healthz` 返回 200，数据库与 Redis 检查均为 `ok=true`；本地未注入发布清单，因此 `releaseSha`/`version` 显示 `unknown`，不作为生产版本证据。
+
+已验证：
+
+- `/api/metrics` 无认证返回 401。
+- `/admin/statistics`、`/admin/audit-center` 匿名访问均 307 跳转 `/admin/login`。
+- `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts` 匿名访问均 401。
+
+本轮未执行管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装。
