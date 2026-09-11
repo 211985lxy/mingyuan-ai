@@ -139,6 +139,7 @@ export function buildTopicSystemPrompt(
 
 输出要求：
 - 严格返回 JSON 格式，结构为 {"topics": [card1, card2, card3, card4]}
+- 只输出 json 本身，不要输出解释文字、不要包裹代码块（部分 OpenAI 兼容网关要求消息中出现小写 json 关键字才会启用 json_object 模式）
 - 每张卡片包含：title (选题标题，2-20字), elementCodes (使用的元素代码数组), openingTypeCode (推荐开场类型代码), structureCode (推荐文案结构代码), rationale (一句话理由，20-60字), topicType, sourceType, score, scoreReason, scoreBreakdown, reviewVerdict, revisionAdvice, creativeTrace
 - topicType 必须从以下选择：${VALID_TOPIC_TYPES.join("、")}
 - sourceType 必须从以下选择：${VALID_TOPIC_SOURCE_TYPES.join("、")}

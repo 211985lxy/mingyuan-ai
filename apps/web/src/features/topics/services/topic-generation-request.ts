@@ -31,15 +31,22 @@ export function parseRecommendationMode(value: unknown): RecommendationMode | nu
  */
 const HOT_SOURCE_LIMITS = { douyin: 6, market: 4, aihot: 4 } as const
 
-/** 把已通过热度决策的热点条目渲染成选题来源行，带上评分与判断理由供选题阶段借势。 */
+/** 单条热点摘要进 prompt 的字符上限：热点是借势入口，过长会挤占项目与对标信号。 */
+const HOT_SOURCE_SUMMARY_MAX = 80
+
+function truncateHotText(value: string) {
+  const text = value.replace(/\s+/g, " ").trim()
+  return text.length > HOT_SOURCE_SUMMARY_MAX ? `${text.slice(0, HOT_SOURCE_SUMMARY_MAX)}…` : text
+}
+
+/** 把已通过热度决策的热点条目渲染成选题来源行：来源、热度判断、短摘要与出处。 */
 function hotDecisionToSource(item: HotDecisionItem): TopicSource {
   return {
     category: "industry_hot",
     title: item.title,
     content: [
       `${item.sourceName || item.platform}｜热度 ${item.score} 分｜${item.verdictLabel}`,
-      item.summary,
-      item.reason,
+      truncateHotText(item.summary),
       item.url,
     ].filter(Boolean).join("｜"),
   }
