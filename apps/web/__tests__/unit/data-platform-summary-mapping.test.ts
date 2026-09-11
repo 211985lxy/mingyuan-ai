@@ -89,6 +89,19 @@ describe("toPlatformAccount", () => {
     expect(account.workCount).toBe(742)
     expect(account.homeLink).toBe("https://www.douyin.com/user/MS4wLjABAAAAsample")
     expect(account.authStatus).toBe("某节能科技有限公司")
+    // 该行「平台」列为空，但填了「抖音号」→ 判定为抖音
+    expect(account.platform).toBe("抖音")
+  })
+
+  it("无显式平台字段时按抖音号推断平台", () => {
+    expect(toPlatformAccount({ recordId: "r1", fields: { 抖音号: "abc" } }).platform).toBe("抖音")
+    expect(toPlatformAccount({ recordId: "r2", fields: { 达人昵称: "无号账号" } }).platform).toBe("其他")
+  })
+
+  it("显式平台字段优先于推断", () => {
+    const account = toPlatformAccount({ recordId: "r3", fields: { 平台: "视频号", 抖音号: "abc" } })
+
+    expect(account.platform).toBe("视频号")
   })
 
   it("官方绑定字段照常映射", () => {

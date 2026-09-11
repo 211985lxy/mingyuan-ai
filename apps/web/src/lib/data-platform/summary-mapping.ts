@@ -70,13 +70,23 @@ export function splitTags(v: unknown): string[] | null {
   return null
 }
 
+/**
+ * 采集来源常不写「平台」列（该列为空），但有「抖音号」即可判定为抖音账号。
+ * 仅在无显式平台字段时启用，不做更激进的推断。
+ */
+function inferPlatform(fields: Record<string, unknown>): string {
+  const explicit = pickText(fields, ["平台", "platform", "来源"])
+  if (explicit) return explicit
+  return pickText(fields, ["抖音号"]) ? "抖音" : "其他"
+}
+
 export function toPlatformAccount(item: LarkRecordLike): PlatformAccount {
   const fields = item.fields
   return {
     id:
       pickText(fields, ["平台账号ID", "账号ID", "open_id", "openId", "id", "达人UID", "达人加密UID"]) ||
       item.recordId,
-    platform: pickText(fields, ["平台", "platform", "来源"]) || "其他",
+    platform: inferPlatform(fields),
     nickname: pickText(fields, ["账号昵称", "昵称", "name", "nickname", "达人昵称"]) || "未命名账号",
     avatarUrl: pickText(fields, ["头像URL", "头像", "头像链接", "avatar", "avatarUrl"]),
     fansCount: pickNumber(fields, ["粉丝总数", "粉丝数", "fansCount", "fans", "followers"]),
