@@ -46,8 +46,9 @@ interface StoreOpts {
   admin?: { userId: string; status: "active" | "inactive" }
   failAt?: "writeAudit"
   rebindCount?: number
-  remapCount?: number
   archiveCount?: number
+  /** Override the count the store reports from remapApiKeys. */
+  remapCount?: number
 }
 
 function defaultSource(): ProjectInfo {
@@ -86,24 +87,27 @@ function buildSnapshot(opts: StoreOpts): ProjectMergeSnapshot {
     ],
     activeWork: opts.activeWork ?? { invocations: 0, traces: 0 },
     participants: participantList,
-    admin: opts.admin ?? { userId: "source-owner", status: "active" },
+    // Admin is a separate active administrator, NOT required to own either project.
+    admin: opts.admin ?? { userId: "admin-1", status: "active" },
   }
 }
 
 interface TestStore extends ProjectMergeStore {
   calls: string[]
   committedWrites: WriteOp[]
+  /** Last userIds passed to remapApiKeys (for asserting sorted participants). */
+  lastRemapUserIds: string[] | null
 }
 
 function makeStore(opts: StoreOpts = {}): TestStore {
   const calls: string[] = []
   const committedWrites: WriteOp[] = []
+  let lastRemapUserIds: string[] | null = null
   const snapshot = buildSnapshot(opts)
 
   const expectedRebind = snapshot.participants.filter(
     (p) => p.boundProjectId === snapshot.source.projectId,
   ).length
-  const expectedRemap = snapshot.source.boundAccounts.length
   const expectedArchive = 1
 
   const tx: ProjectMergeTransaction = {
@@ -118,9 +122,11 @@ function makeStore(opts: StoreOpts = {}): TestStore {
       calls.push("rebindParticipants")
       return opts.rebindCount ?? expectedRebind
     },
-    remapApiKeys: async () => {
+    remapApiKeys: async (_source, _target, userIds) => {
       calls.push("remapApiKeys")
-      return opts.remapCount ?? expectedRemap
+      lastRemapUserIds = userIds
+      // Store reports its own count; service records it without predicting.
+      return opts.remapCount ?? userIds.length
     },
     moveRows: async (table) => {
       calls.push("moveRows")
@@ -144,6 +150,9 @@ function makeStore(opts: StoreOpts = {}): TestStore {
   const store: TestStore = {
     calls,
     committedWrites,
+    get lastRemapUserIds() {
+      return lastRemapUserIds
+    },
     inspect: async () => {
       calls.push("inspect")
       return snapshot
@@ -191,10 +200,14 @@ function makeStore(opts: StoreOpts = {}): TestStore {
   return store
 }
 
+// Admin is a distinct active administrator; expected owners match the projects.
 const validInput: ProjectMergeInput = {
   sourceProjectId: "source",
   targetProjectId: "target",
-  adminUserId: "source-owner",
+  adminUserId: "admin-1",
+  expectedSourceOwnerId: "source-owner",
+  expectedTargetOwnerId: "target-owner",
+  requestId: "req-1",
   confirmation: "source->target",
   reason: "consolidating duplicate workspace",
 }
@@ -216,6 +229,13 @@ describe("project merge service", () => {
       "target-member",
       "target-owner",
     ])
+  })
+
+  it("succeeds when admin is active but not an owner of either project", async () => {
+    const store = makeStore()
+    const result = await applyProjectMerge(validInput, store)
+    expect(result.auditId).toBe("audit-id")
+    expect(store.committedWrites.length).toBeGreaterThan(0)
   })
 
   it("rolls back before mutation when a participant is bound to a third project", async () => {
@@ -263,11 +283,28 @@ describe("project merge service", () => {
     expect(store.calls).not.toContain("lockAndInspect")
   })
 
-  it("rejects owner mismatch", async () => {
+  it("rejects when source and target are the same project", async () => {
     const store = makeStore()
     await expect(
-      applyProjectMerge({ ...validInput, adminUserId: "someone-else" }, store),
-    ).rejects.toThrow("owner")
+      applyProjectMerge(
+        { ...validInput, sourceProjectId: "same", targetProjectId: "same", confirmation: "same->same" },
+        store,
+      ),
+    ).rejects.toThrow("must differ")
+  })
+
+  it("rejects source owner mismatch", async () => {
+    const store = makeStore()
+    await expect(
+      applyProjectMerge({ ...validInput, expectedSourceOwnerId: "someone-else" }, store),
+    ).rejects.toThrow("owner mismatch")
+  })
+
+  it("rejects target owner mismatch", async () => {
+    const store = makeStore()
+    await expect(
+      applyProjectMerge({ ...validInput, expectedTargetOwnerId: "someone-else" }, store),
+    ).rejects.toThrow("owner mismatch")
   })
 
   it("rejects inactive target", async () => {
@@ -284,8 +321,8 @@ describe("project merge service", () => {
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("archived")
   })
 
-  it("rejects inactive admin", async () => {
-    const store = makeStore({ admin: { userId: "source-owner", status: "inactive" } })
+  it("rejects inactive admin independent of project owners", async () => {
+    const store = makeStore({ admin: { userId: "admin-1", status: "inactive" } })
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("admin")
   })
 
@@ -295,16 +332,26 @@ describe("project merge service", () => {
     expect(store.committedWrites).toEqual([])
   })
 
-  it("rejects remap-count mismatch", async () => {
-    const store = makeStore({ remapCount: 99 })
-    await expect(applyProjectMerge(validInput, store)).rejects.toThrow("remap")
-    expect(store.committedWrites).toEqual([])
-  })
-
   it("rejects archive-count mismatch", async () => {
     const store = makeStore({ archiveCount: 0 })
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("archive")
     expect(store.committedWrites).toEqual([])
+  })
+
+  it("remaps API keys for all sorted participants and records store-reported count", async () => {
+    const store = makeStore({ remapCount: 7 })
+    const result = await applyProjectMerge(validInput, store)
+    // remapApiKeys receives the sorted participant union, not just source.boundAccounts.
+    expect(store.lastRemapUserIds).toEqual([
+      "source-bound",
+      "source-member",
+      "source-owner",
+      "target-bound",
+      "target-member",
+      "target-owner",
+    ])
+    // Service records whatever the store reports, without predicting it.
+    expect(result.remapCount).toBe(7)
   })
 
   it("writes success audit last in order", async () => {

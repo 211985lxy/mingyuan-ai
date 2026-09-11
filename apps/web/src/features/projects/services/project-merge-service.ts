@@ -22,7 +22,14 @@ export interface ProjectMergeIdentity {
 }
 
 export interface ProjectMergeInput extends ProjectMergeIdentity {
+  /** Active administrator performing the merge. Not required to own either project. */
   adminUserId: string
+  /** Locked-in expected owner of the source project; must match snapshot. */
+  expectedSourceOwnerId: string
+  /** Locked-in expected owner of the target project; must match snapshot. */
+  expectedTargetOwnerId: string
+  /** Idempotency / traceability key for this merge request. */
+  requestId: string
   /** Must equal `${sourceProjectId}->${targetProjectId}`. */
   confirmation: string
   /** Non-empty human-readable reason for the merge. */
@@ -164,6 +171,12 @@ export async function applyProjectMerge(
     throw new Error("reason required")
   }
 
+  // Source and target must be different projects.
+  if (input.sourceProjectId === input.targetProjectId) {
+    await store.writeFailedAudit({ input, reason: "source and target must differ" })
+    throw new Error("source and target must differ")
+  }
+
   try {
     return await store.transaction((tx) => runMergeTransaction(input, tx))
   } catch (error) {
@@ -207,14 +220,14 @@ async function runMergeTransaction(
   )
   assertExact(rebindCount, expectedRebind, "rebind")
 
-  // Remap API keys bound to source accounts. Assert exact count.
-  const expectedRemap = snapshot.source.boundAccounts.length
+  // Remap API keys for ALL participating accounts (sorted). The store reports
+  // the count it actually rewrote; we record it rather than predicting it from
+  // source.boundAccounts, since several authorized accounts may share a project.
   const remapCount = await tx.remapApiKeys(
     snapshot.source.projectId,
     snapshot.target.projectId,
-    snapshot.source.boundAccounts,
+    participantIds,
   )
-  assertExact(remapCount, expectedRemap, "remap")
 
   // Move rows sequentially (no Promise.all of writes).
   for (const table of moveTableList) {
@@ -256,15 +269,21 @@ function validateSnapshot(
   input: ProjectMergeInput,
   snapshot: ProjectMergeSnapshot,
 ): void {
-  // Admin must be active.
+  // Admin must be active. Admin is a separate administrator and is NOT
+  // required to own either project.
   if (snapshot.admin.status !== "active") {
     throw new Error(`admin is not active: ${snapshot.admin.userId}`)
   }
 
-  // Admin must own the source project.
-  if (snapshot.source.ownerId !== input.adminUserId) {
+  // Expected owners must match the locked projects' actual owners.
+  if (snapshot.source.ownerId !== input.expectedSourceOwnerId) {
     throw new Error(
-      `owner mismatch: admin ${input.adminUserId} is not owner of ${snapshot.source.projectId}`,
+      `owner mismatch: source expected ${input.expectedSourceOwnerId}, got ${snapshot.source.ownerId}`,
+    )
+  }
+  if (snapshot.target.ownerId !== input.expectedTargetOwnerId) {
+    throw new Error(
+      `owner mismatch: target expected ${input.expectedTargetOwnerId}, got ${snapshot.target.ownerId}`,
     )
   }
 
