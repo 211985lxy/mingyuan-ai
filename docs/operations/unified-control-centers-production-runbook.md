@@ -82,3 +82,19 @@
 - `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts` 匿名访问均 401。
 
 本轮未执行管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装。
+
+## 当前提交构建与全量回归记录（2026-09-11，告警恢复通知）
+
+代码版本：`codex/unified-control-centers` @ `55950ca7`。本轮仅在本地验证，未部署生产。
+
+已验证：
+
+- 全量单测：531 个测试文件通过、1 个跳过；3655 个测试通过、2 个跳过。
+- 组件测试：25 个测试文件、84 个测试全部通过。
+- 生产构建：Next.js 编译、TypeScript 检查和 180 个静态页面生成通过。
+- 告警状态流：首次解决会发送一次“告警已恢复”通知；重复解决不会重复发送。
+- 提交前门禁：`typecheck`、`arch:size`、`api:contracts`、`env:check` 全部通过。
+
+构建仍有既有 Turbopack 动态文件追踪警告及 middleware 命名弃用提示；不影响本次构建退出码，但应在后续性能/框架升级批次单独处理。
+
+本轮未执行管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装；当前提交不能作为生产已部署版本证明。
