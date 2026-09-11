@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Mingyuan Douyin hot list fetch hourly
+
+[Timer]
+OnBootSec=3m
+OnUnitActiveSec=1h
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-douyin-hot.service
+
+[Install]
+WantedBy=timers.target

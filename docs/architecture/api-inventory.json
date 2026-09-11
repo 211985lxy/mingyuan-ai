@@ -3446,6 +3446,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/topic-daily",
+      "file": "src/app/api/cron/topic-daily/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/data-platform/summary",
       "file": "src/app/api/data-platform/summary/route.ts",
       "methods": [
@@ -3879,6 +3895,22 @@
       "externalService": false,
       "cost": "low",
       "idempotency": false
+    },
+    {
+      "route": "/api/integrations/feishu/topic-card-actions",
+      "file": "src/app/api/integrations/feishu/topic-card-actions/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "integrations",
+      "kind": "capability",
+      "orchestratable": true,
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
     },
     {
       "route": "/api/integrations/feishu/work-items/execute",

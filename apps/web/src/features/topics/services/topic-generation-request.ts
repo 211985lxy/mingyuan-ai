@@ -6,6 +6,10 @@ import type { TopicCard } from "@/lib/topic-validation"
 import { hasConflict } from "@/lib/topic-element-logic"
 import type { ContentTheme } from "@/types/api"
 import { TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS } from "@/features/topics/contracts/api"
+import { getLatestHotList } from "@/lib/douyin-hot"
+import { decideDouyinItems, decideLast30DaysItems, type HotDecisionItem } from "@/lib/hot-decisions"
+import { getLatestMarketHotSnapshot } from "@/lib/market-insights/market-hotlist"
+import type { TopicSource } from "@/lib/topic-source-builders"
 
 /**
  * topics/generate 路由的请求准备逻辑（从 route.ts 抽出，保持路由文件薄）：
@@ -21,18 +25,63 @@ export function parseRecommendationMode(value: unknown): RecommendationMode | nu
     : null
 }
 
-export async function getHotTopicSources() {
-  try {
-    const briefing = await getTodayAiHotBriefing()
-    return briefing.items.slice(0, 4).map((item) => ({
-      category: "industry_hot",
-      title: item.title,
-      content: `${item.categoryLabel}｜${item.summary}｜${item.url}`,
-    }))
-  } catch (error) {
-    console.warn("[topic-gen] AIHOT briefing unavailable:", error)
-    return []
+/**
+ * 各热点来源进入选题生成的条数上限。
+ * 抖音热榜是实时榜（借势价值最高）给最多，市场热榜与 AI 简报作为补充，避免 prompt 无限膨胀。
+ */
+const HOT_SOURCE_LIMITS = { douyin: 6, market: 4, aihot: 4 } as const
+
+/** 把已通过热度决策的热点条目渲染成选题来源行，带上评分与判断理由供选题阶段借势。 */
+function hotDecisionToSource(item: HotDecisionItem): TopicSource {
+  return {
+    category: "industry_hot",
+    title: item.title,
+    content: [
+      `${item.sourceName || item.platform}｜热度 ${item.score} 分｜${item.verdictLabel}`,
+      item.summary,
+      item.reason,
+      item.url,
+    ].filter(Boolean).join("｜"),
   }
+}
+
+/**
+ * @description 取当日热点作为选题的「借势」来源：抖音热榜 + 市场热榜 + AI 简报
+ *  - 抖音与市场两条先过 hot-decisions 的准入判断（评分与避雷），避免无关娱乐热搜污染选题
+ *  - 单一来源失败只降级该来源，不阻断整体生成
+ * @returns Promise<TopicSource[]>
+ */
+export async function getHotTopicSources(): Promise<TopicSource[]> {
+  const [douyin, market, aihot] = await Promise.all([
+    getLatestHotList()
+      .then((items) => decideDouyinItems(items).slice(0, HOT_SOURCE_LIMITS.douyin).map(hotDecisionToSource))
+      .catch((error) => {
+        console.warn("[topic-gen] douyin hot unavailable:", error)
+        return [] as TopicSource[]
+      }),
+    getLatestMarketHotSnapshot()
+      .then((snapshot) =>
+        decideLast30DaysItems(snapshot.items).slice(0, HOT_SOURCE_LIMITS.market).map(hotDecisionToSource),
+      )
+      .catch((error) => {
+        console.warn("[topic-gen] market hot unavailable:", error)
+        return [] as TopicSource[]
+      }),
+    getTodayAiHotBriefing()
+      .then((briefing) =>
+        briefing.items.slice(0, HOT_SOURCE_LIMITS.aihot).map((item) => ({
+          category: "industry_hot",
+          title: item.title,
+          content: `${item.categoryLabel}｜${item.summary}｜${item.url}`,
+        })),
+      )
+      .catch((error) => {
+        console.warn("[topic-gen] AIHOT briefing unavailable:", error)
+        return [] as TopicSource[]
+      }),
+  ])
+
+  return [...douyin, ...market, ...aihot]
 }
 
 export type ForcedElementCodesResult =
@@ -70,7 +119,7 @@ function listWatchAccounts(userId: string, projectId: string, requestId: string)
   return prisma.watchAccount.findMany({
     where: { userId, projectId },
     orderBy: { lastRefreshedAt: "desc" },
-    take: 6,
+    take: 12,
     select: {
       nickname: true,
       targetUrl: true,

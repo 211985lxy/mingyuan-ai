@@ -7,8 +7,10 @@ export const INTERNAL_BETA_LIMITS = {
   aimGenerateDaily: 30,
   videoCopyExtractionDaily: 10,
   competitorAnalysisDaily: 3,
-  watchAccounts: 3,
-  watchRefreshDaily: 3,
+  /** 对标账号：放开到 10，支持"十个对标账号共同参与选题"的运营方式 */
+  watchAccounts: 10,
+  /** 与账号上限对齐：10 个账号需要能各自刷新一次 */
+  watchRefreshDaily: 10,
   clientProjects: 3,
   knowledgeEntriesPerProject: 100,
   uploadBytes: 10 * 1024 * 1024,

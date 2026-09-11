@@ -1,5 +1,9 @@
 export type TopicSource = { category: string; title: string; content: string }
 const SUPPLEMENTAL_KNOWLEDGE_LIMIT = 4
+/** 对标账号进选题的上限：支持「十个对标账号共同参与选题」的运营方式 */
+const BENCHMARK_ACCOUNT_LIMIT = 10
+/** 对标文案拆解进选题的上限（每条带结构化拆解，体积较大，独立于账号上限） */
+const VIDEO_COPY_LIMIT = 6
 
 function partitionBenchmarkKnowledge(sources: TopicSource[]) {
   const benchmark: TopicSource[] = []
@@ -79,7 +83,7 @@ export function buildBenchmarkAccountSources(
         }),
       ].join("\n"),
     }]
-  }).slice(0, 4)
+  }).slice(0, BENCHMARK_ACCOUNT_LIMIT)
 }
 
 function truncateText(value: string | null | undefined, limit = 180) {
@@ -109,7 +113,7 @@ export function buildVideoCopyExtractionSources(
         `来源：${record.sourceUrl}`,
       ].filter(Boolean).join("\n"),
     }]
-  }).slice(0, 4)
+  }).slice(0, VIDEO_COPY_LIMIT)
 }
 
 /**

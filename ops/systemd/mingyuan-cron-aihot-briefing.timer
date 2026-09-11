@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan AI HOT daily briefing at 09:00
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-aihot-briefing.service
+
+[Install]
+WantedBy=timers.target

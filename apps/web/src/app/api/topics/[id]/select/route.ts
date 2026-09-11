@@ -40,6 +40,11 @@ export const POST = withUserAuth(async (request, { user, params }) => {
       data: {
         selectedIndex,
         status: "selected",
+        // 控制台采用同样是「人工裁决」，与飞书卡片路径记录同一组字段，便于统一回看与校准
+        reviewStatus: "adopted",
+        reviewedAt: new Date(),
+        reviewedBy: user.id,
+        reviewedVia: "console",
       },
     })
 

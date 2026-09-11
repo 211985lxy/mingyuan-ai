@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan market hotlist daily refresh
+
+[Timer]
+OnCalendar=*-*-* 08:30:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-market-hotlist.service
+
+[Install]
+WantedBy=timers.target

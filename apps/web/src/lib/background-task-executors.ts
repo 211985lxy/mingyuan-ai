@@ -8,6 +8,7 @@ import { AIM_CHANNEL_GENERATE_TASK_KIND, executeAimChannelGenerateBackgroundTask
 import { AGENT_REMOTE_GENERATE_TASK_KIND, executeRemoteInvocationBackgroundTask } from "@/lib/aim/services/remote-invocation-task"
 import { OPPORTUNITY_ANALYZE_TASK_KIND, executeOpportunityAnalyzeBackgroundTask } from "@/features/opportunities/services/analyze-background-task"
 import { NEWSROOM_PIPELINE_TASK_KIND, executeNewsroomPipelineBackgroundTask } from "@/features/newsroom/services/newsroom-pipeline-task"
+import { TOPIC_REGENERATE_TASK_KIND, executeTopicRegenerateBackgroundTask } from "@/features/topics/services/topic-regenerate-background-task"
 
 const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [COMPETITOR_ANALYSIS_TASK_KIND]: executeCompetitorAnalysisBackgroundTask,
@@ -18,6 +19,7 @@ const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [AGENT_REMOTE_GENERATE_TASK_KIND]: executeRemoteInvocationBackgroundTask,
   [OPPORTUNITY_ANALYZE_TASK_KIND]: executeOpportunityAnalyzeBackgroundTask,
   [NEWSROOM_PIPELINE_TASK_KIND]: executeNewsroomPipelineBackgroundTask,
+  [TOPIC_REGENERATE_TASK_KIND]: executeTopicRegenerateBackgroundTask,
 }
 
 export const BACKGROUND_TASK_KINDS = Object.keys(executors)

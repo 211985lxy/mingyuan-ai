@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan daily topic review push at 09:10
+
+[Timer]
+OnCalendar=*-*-* 09:10:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-topic-daily.service
+
+[Install]
+WantedBy=timers.target

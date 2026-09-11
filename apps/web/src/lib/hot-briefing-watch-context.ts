@@ -57,7 +57,7 @@ export async function buildWatchAccountDigest(
   const accounts = await prisma.watchAccount.findMany({
     where: { userId, projectId: scope },
     orderBy: [{ lastRefreshedAt: "desc" }, { createdAt: "desc" }],
-    take: 5,
+    take: 10,
     select: {
       nickname: true,
       platform: true,

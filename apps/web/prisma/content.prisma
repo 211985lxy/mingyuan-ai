@@ -203,12 +203,20 @@ model TopicSelection {
   status             String   @default("pending")
   recommendationMode String?  @db.VarChar(20) // normal | daily | weekly，用于判断"今天的每日推荐"
   recommendedDate    String?  @db.VarChar(10) // YYYY-MM-DD，生成当天日期，便于按天查重
+  // ─── 人工判断（选题定生死：AI 提案，人裁决）───
+  reviewStatus       String   @default("pending") @db.VarChar(20) // pending | adopted | regenerated | archived
+  reviewedAt         DateTime?
+  reviewedBy         String?  @db.VarChar(128) // 飞书 open_id 或控制台用户 ID
+  reviewedVia        String?  @db.VarChar(20) // feishu | console，决策来源可追溯
+  reviewNote         String?  @db.Text // 人工备注：为什么采用、为什么都不行
+  pushedAt           DateTime? // 推送时刻，保证同一天不重复推送
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user      User      @relation(fields: [userId], references: [id])
   ipProfile IpProfile @relation(fields: [ipProfileId], references: [id])
   project   ClientProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   @@index([userId, status])
+  @@index([userId, reviewStatus])
   @@index([userId, createdAt(sort: Desc)])
   @@index([ipProfileId])
   @@index([userId, recommendationMode, recommendedDate])

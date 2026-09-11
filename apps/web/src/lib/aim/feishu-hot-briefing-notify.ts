@@ -10,7 +10,12 @@ import { sendCardAsBot } from "@/lib/feishu-bot-identity"
 
 const HOT_BRIEFING_BOT_ID = "business_diagnosis"
 
-function readHotBriefingPushConfig():
+/**
+ * 每日推送通道配置。热点简报与每日选题裁决卡共用同一开关与目标群：
+ * 二者同属「每天早上推给运营者」的一件事，复用可避免再增环境变量
+ * （env.ts 已到体积上限，见 architecture-size-policy 登记）。
+ */
+export function readHotBriefingPushConfig():
   | { enabled: false }
   | { enabled: true; chatId: string } {
   if (env.AIM_HOT_BRIEFING_PUSH_ENABLED?.trim().toLowerCase() !== "true") {
