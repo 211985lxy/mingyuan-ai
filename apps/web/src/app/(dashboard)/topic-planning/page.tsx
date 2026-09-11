@@ -102,6 +102,7 @@ export default function TopicPlanningPage() {
                 selectedKnowledgeLabels={w.selectedKnowledgeLabels}
                 knowledgeCount={w.knowledgeEntries.length}
                 autoGenerating={w.autoGenerating}
+                degraded={w.topicGenerationDegraded}
                 onSelect={w.handleSelectTopic}
                 onWrite={w.jumpToAim}
               />

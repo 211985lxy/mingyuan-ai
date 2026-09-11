@@ -90,6 +90,22 @@ describe("topic planning components", () => {
     expect(html).toContain("日常灵感 · 客户原话")
   })
 
+  it("marks degraded fallback cards and blocks select", () => {
+    const html = renderToStaticMarkup(createElement(TopicCandidatesPanel, {
+      cards: [card("降级占位选题")],
+      selectedIndex: null,
+      selectedKnowledgeLabels: [],
+      knowledgeCount: 0,
+      autoGenerating: false,
+      degraded: true,
+      onSelect: () => {},
+      onWrite: () => {},
+    }))
+    expect(html).toContain("降级模板")
+    expect(html).toContain("请重新生成")
+    expect(html).not.toContain("采用这个选题")
+  })
+
   it("renders a temporary idea reply", () => {
     const html = renderToStaticMarkup(createElement(TopicChatCard, {
       value: "客户为什么觉得报价高",

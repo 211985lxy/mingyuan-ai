@@ -123,10 +123,11 @@ function TopicCreativeTrace({ card }: { card: ApiTopicCard }) {
   )
 }
 
-function TopicCardItem({ card, index, selectedIndex, onSelect, onWrite }: {
+function TopicCardItem({ card, index, selectedIndex, degraded, onSelect, onWrite }: {
   card: ApiTopicCard
   index: number
   selectedIndex: number | null
+  degraded?: boolean
   onSelect: (card: ApiTopicCard, index: number) => void
   onWrite: (card: ApiTopicCard, index: number) => void
 }) {
@@ -138,6 +139,7 @@ function TopicCardItem({ card, index, selectedIndex, onSelect, onWrite }: {
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">#{index + 1}</Badge>
             {isSelected && <Badge>已采用</Badge>}
+            {degraded && <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">降级模板</Badge>}
             <Badge variant="outline">{getTopicDisplayLabel(card)}</Badge>
             {typeof card.score === "number" && <Badge variant="outline">{card.score}分</Badge>}
             {card.reviewVerdict && <Badge variant="outline" className={VERDICT_META[card.reviewVerdict].className}>{VERDICT_META[card.reviewVerdict].label}</Badge>}
@@ -155,7 +157,7 @@ function TopicCardItem({ card, index, selectedIndex, onSelect, onWrite }: {
           </div>
         </div>
         <div className="flex flex-col gap-2 lg:w-40">
-          {isSelected ? <Button className="w-full" onClick={() => onWrite(card, index)}><Send className="mr-1 h-4 w-4" />去 AIM 写文案</Button> : <Button className="w-full" variant="outline" onClick={() => onSelect(card, index)} disabled={selectedIndex !== null}><Check className="mr-1 h-4 w-4" />采用这个选题</Button>}
+          {isSelected ? <Button className="w-full" onClick={() => onWrite(card, index)} disabled={degraded}><Send className="mr-1 h-4 w-4" />去 AIM 写文案</Button> : <Button className="w-full" variant="outline" onClick={() => onSelect(card, index)} disabled={selectedIndex !== null || degraded}><Check className="mr-1 h-4 w-4" />{degraded ? "请重新生成" : "采用这个选题"}</Button>}
         </div>
       </div>
       <TopicScoreBreakdown card={card} />
@@ -171,6 +173,7 @@ interface TopicCandidatesPanelProps {
   selectedKnowledgeLabels: string[]
   knowledgeCount: number
   autoGenerating: boolean
+  degraded?: boolean
   onSelect: (card: ApiTopicCard, index: number) => void
   onWrite: (card: ApiTopicCard, index: number) => void
 }
@@ -180,7 +183,7 @@ interface TopicCandidatesPanelProps {
  * @param options - 配置选项
  * @returns 无返回值
  */
-export function TopicCandidatesPanel({ cards, selectedIndex, selectedKnowledgeLabels, knowledgeCount, autoGenerating, onSelect, onWrite }: TopicCandidatesPanelProps) {
+export function TopicCandidatesPanel({ cards, selectedIndex, selectedKnowledgeLabels, knowledgeCount, autoGenerating, degraded, onSelect, onWrite }: TopicCandidatesPanelProps) {
   return (
     <AiResultPanel title="备选选题" icon={<Sparkles className="h-4 w-4 text-primary" />} meta={<span>今天这条不拍，再从这里换。选中后直接去 AIM 写文案。</span>} flat>
       <div className="flex flex-wrap gap-2">
@@ -188,7 +191,7 @@ export function TopicCandidatesPanel({ cards, selectedIndex, selectedKnowledgeLa
       </div>
       {autoGenerating ? <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />正在整理今日备选选题…</div> : cards.length === 0 ? <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">暂无备选选题。</div> : (
         <div className="space-y-5">
-          {categorizeTopicCards(cards).map((group) => <div key={group.key}><div className="mb-2 flex items-center gap-2"><span className="text-sm font-medium text-foreground">{group.label}</span><Badge variant="secondary" className="text-[11px]">{group.cards.length}</Badge></div><div className="grid gap-3">{group.cards.map((card) => { const index = cards.indexOf(card); return <TopicCardItem key={`${card.title}-${index}`} card={card} index={index} selectedIndex={selectedIndex} onSelect={onSelect} onWrite={onWrite} /> })}</div></div>)}
+          {categorizeTopicCards(cards).map((group) => <div key={group.key}><div className="mb-2 flex items-center gap-2"><span className="text-sm font-medium text-foreground">{group.label}</span><Badge variant="secondary" className="text-[11px]">{group.cards.length}</Badge></div><div className="grid gap-3">{group.cards.map((card) => { const index = cards.indexOf(card); return <TopicCardItem key={`${card.title}-${index}`} card={card} index={index} selectedIndex={selectedIndex} degraded={degraded} onSelect={onSelect} onWrite={onWrite} /> })}</div></div>)}
         </div>
       )}
     </AiResultPanel>

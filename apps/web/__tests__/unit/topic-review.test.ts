@@ -46,6 +46,20 @@ describe("topic review decision", () => {
     })
   })
 
+  it("拒绝采用降级模板批次", () => {
+    const plan = planTopicReviewDecision({
+      action: "adopt",
+      candidateCount: 4,
+      rawIndex: 0,
+      reviewedBy: REVIEWER,
+      reviewedVia: "feishu",
+      degraded: true,
+    })
+    expect(plan.ok).toBe(false)
+    if (plan.ok) return
+    expect(plan.error).toContain("重新生成")
+  })
+
   it("采用序号越界或缺失时拒绝，不产生 selectedIndex", () => {
     for (const rawIndex of [-1, 4, 99, "x", undefined, null, 1.5]) {
       const plan = planTopicReviewDecision({

@@ -20,6 +20,7 @@ import {
   type TopicReviewAction,
 } from "@/lib/topic-review"
 import { TOPIC_REGENERATE_TASK_KIND } from "@/features/topics/services/topic-regenerate-background-task"
+import { isDegradedTopicModel } from "@/lib/topic-degradation"
 
 export const dynamic = "force-dynamic"
 
@@ -69,7 +70,7 @@ async function settleTopicReview(input: {
 }): Promise<SettleOutcome> {
   const selection = await prisma.topicSelection.findUnique({
     where: { id: input.selectionId },
-    select: { candidates: true },
+    select: { candidates: true, model: true },
   })
   if (!selection) return { ok: false, message: "该批选题已不存在" }
 
@@ -82,6 +83,7 @@ async function settleTopicReview(input: {
     rawIndex: input.rawIndex,
     reviewedBy: input.reviewerId,
     reviewedVia: "feishu",
+    degraded: isDegradedTopicModel(selection.model),
   })
   if (!plan.ok) return { ok: false, message: plan.error }
 

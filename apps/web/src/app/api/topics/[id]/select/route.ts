@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { topicSelectBodySchema } from "@/features/topics/contracts/api"
 import { resolveBoundProject } from "@/lib/account-project-context"
+import { DEGRADED_TOPIC_SELECT_MESSAGE, isDegradedTopicModel } from "@/lib/topic-degradation"
 
 export const POST = withUserAuth(async (request, { user, params }) => {
   const topicSelectionId = params?.id
@@ -25,6 +26,20 @@ export const POST = withUserAuth(async (request, { user, params }) => {
       { error: "selectedIndex must be 0, 1, 2, or 3" },
       { status: 400 },
     )
+  }
+
+  const existing = await prisma.topicSelection.findFirst({
+    where: { id: topicSelectionId, userId: user.id, projectId: project.id },
+    select: { status: true, model: true },
+  })
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Topic selection not found or already confirmed" },
+      { status: 409 },
+    )
+  }
+  if (isDegradedTopicModel(existing.model)) {
+    return NextResponse.json({ error: DEGRADED_TOPIC_SELECT_MESSAGE }, { status: 409 })
   }
 
   // Atomic status transition: only update if still "pending"

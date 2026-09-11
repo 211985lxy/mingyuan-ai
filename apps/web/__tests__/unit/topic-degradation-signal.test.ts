@@ -134,6 +134,7 @@ describe("/api/topics/today 缓存降级推导", () => {
     const body = await res.json()
     expect(body.mode).toBe("cached")
     expect(body.degraded).toBe(true)
+    expect(body.model).toBe("business_diagnosis-route:fallback")
   })
 
   it("正常记录（model 无后缀）→ degraded=false", async () => {
