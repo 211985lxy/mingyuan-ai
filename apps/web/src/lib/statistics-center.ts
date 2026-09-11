@@ -140,6 +140,21 @@ function summarizeOperations(traces: TraceRow[], now: Date) {
   }
 }
 
+function unavailableOperations(reason: string) {
+  return {
+    runCount: null,
+    successCount: null,
+    failedCount: null,
+    staleRunningCount: null,
+    successRate: null,
+    p50DurationMs: null,
+    p95DurationMs: null,
+    totalTokens: null,
+    totalCostCny: null,
+    coverage: { available: null, total: null, ratio: null, reason },
+  }
+}
+
 function listShanghaiDays(range: ShanghaiDateRange): string[] {
   const days: string[] = []
   let day = range.from
@@ -202,8 +217,8 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
   const now = input.now ?? new Date()
   const previous = previousRange(input.range)
   const degradedSources: string[] = []
-  let traces: TraceRow[] = []
-  let previousTraces: TraceRow[] = []
+  let traces: TraceRow[] | null = null
+  let previousTraces: TraceRow[] | null = null
   try {
     traces = await loadTraces(input)
     previousTraces = await loadTraces({ ...input, range: previous })
@@ -222,8 +237,8 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
   }
   const channels = await loadChannels(input)
   if (channels.degraded) degradedSources.push("channel_metric_daily")
-  const operations = summarizeOperations(traces, now)
-  const previousOperations = summarizeOperations(previousTraces, input.range.start)
+  const operations = traces ? summarizeOperations(traces, now) : unavailableOperations("执行记录查询失败")
+  const previousOperations = previousTraces ? summarizeOperations(previousTraces, input.range.start) : unavailableOperations("执行记录查询失败")
   const comparison = {
     runCount: compareMetric(operations.runCount, previousOperations.runCount),
     successRate: compareMetric(operations.successRate, previousOperations.successRate),
@@ -232,7 +247,7 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
     paymentCount: compareMetric(business?.paymentCount ?? null, previousBusiness?.paymentCount ?? null),
   }
   const freshness: ControlCenterFreshness[] = [
-    { source: "aim_execution_trace", lastUpdatedAt: traces.length ? traces[traces.length - 1].updatedAt.toISOString() : null, lagMs: traces.length ? Math.max(0, now.getTime() - traces[traces.length - 1].updatedAt.getTime()) : null, degraded: degradedSources.includes("aim_execution_trace"), reason: degradedSources.includes("aim_execution_trace") ? "执行记录查询失败" : undefined },
+    { source: "aim_execution_trace", lastUpdatedAt: traces?.length ? traces[traces.length - 1].updatedAt.toISOString() : null, lagMs: traces?.length ? Math.max(0, now.getTime() - traces[traces.length - 1].updatedAt.getTime()) : null, degraded: degradedSources.includes("aim_execution_trace"), reason: degradedSources.includes("aim_execution_trace") ? "执行记录查询失败" : undefined },
     { source: "review_metrics", lastUpdatedAt: business ? now.toISOString() : null, lagMs: business ? 0 : null, degraded: degradedSources.includes("review_metrics"), reason: degradedSources.includes("review_metrics") ? "业务指标查询失败" : undefined },
     { source: "channel_metric_daily", lastUpdatedAt: channels.degraded ? null : now.toISOString(), lagMs: channels.degraded ? null : 0, degraded: channels.degraded, reason: channels.reason },
   ]

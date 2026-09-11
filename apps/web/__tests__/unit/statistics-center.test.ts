@@ -64,7 +64,7 @@ describe("statistics center", () => {
     loadReviewMetricsSnapshot.mockRejectedValue(new Error("metrics down"))
     const result = await loadStatisticsOverview({ range, filters: { from: range.from, to: range.to } })
     expect(result.degradedSources).toEqual(expect.arrayContaining(["aim_execution_trace", "review_metrics"]))
-    expect(result.operations.runCount).toBe(0)
+    expect(result.operations).toMatchObject({ runCount: null, successCount: null, failedCount: null, coverage: { available: null, total: null, ratio: null } })
     expect(result.business).toBeNull()
   })
 })
