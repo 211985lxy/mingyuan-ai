@@ -306,7 +306,7 @@ export function buildTopicUserPrompt(
 - 如果某张选题来自会议纪要，请在 rationale 或 angle 中点明对应的会议问题或原话。`
     : ""
 
-  return `${profileSection ? profileSection + "\n\n" : ""}${contentThemeSection ? contentThemeSection + "\n\n" : ""}${sourceSection ? sourceSection + "\n\n" : ""}${projectBaselineInstruction ? projectBaselineInstruction + "\n\n" : ""}${sourcePriorityInstruction ? sourcePriorityInstruction + "\n\n" : ""}${benchmarkRewriteInstruction ? benchmarkRewriteInstruction + "\n\n" : ""}${meetingMinutesInstruction ? meetingMinutesInstruction + "\n\n" : ""}${elementSection}\n\n请基于以上${profileSection ? " IP 档案、" : ""}${sourceSection ? "选题素材和" : ""}营销元素，生成4个差异化的短视频选题卡片。每个选题都要巧妙融入指定的营销元素，并推荐最匹配的开场类型和文案结构。${modeInstruction}`
+  return `${profileSection ? profileSection + "\n\n" : ""}${contentThemeSection ? contentThemeSection + "\n\n" : ""}${sourceSection ? sourceSection + "\n\n" : ""}${projectBaselineInstruction ? projectBaselineInstruction + "\n\n" : ""}${sourcePriorityInstruction ? sourcePriorityInstruction + "\n\n" : ""}${benchmarkRewriteInstruction ? benchmarkRewriteInstruction + "\n\n" : ""}${meetingMinutesInstruction ? meetingMinutesInstruction + "\n\n" : ""}${elementSection}\n\n请基于以上${profileSection ? " IP 档案、" : ""}${sourceSection ? "选题素材和" : ""}营销元素，生成4个差异化的短视频选题卡片。每个选题都要巧妙融入指定的营销元素，并推荐最匹配的开场类型和文案结构。${modeInstruction}\n\n请只输出 json，不要代码块、不要解释文字。`
 }
 
 function selectTopicElements(input: TopicGenerationInput) {

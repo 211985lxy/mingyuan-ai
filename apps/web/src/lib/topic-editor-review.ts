@@ -133,6 +133,8 @@ export function buildEditorReviewUserPrompt(
     "",
     "待评审候选：",
     ...cards.map((card, index) => formatCardForReview(card, index)),
+    "",
+    "请只输出 json，不要代码块、不要解释文字。",
   ].join("\n")
 }
 
