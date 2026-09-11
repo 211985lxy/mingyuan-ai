@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { env } from "@/env"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { buildFeishuKnowledgeAuthorizeUrl, resolveFeishuKnowledgeOAuthRedirectUri } from "@/lib/integrations/feishu-knowledge-auth"
+import { buildFeishuKnowledgeAuthorizeUrl, rememberFeishuOAuthState, resolveFeishuKnowledgeOAuthRedirectUri } from "@/lib/integrations/feishu-knowledge-auth"
 
 export const runtime = "nodejs"
 
@@ -12,8 +12,9 @@ const STATE_COOKIE = "feishu_knowledge_oauth_state"
 const COOKIE_MAX_AGE = 10 * 60
 
 export async function GET(request: NextRequest) {
+  let user
   try {
-    await authenticateRequest(request)
+    user = await authenticateRequest(request)
   } catch (err) {
     return authErrorResponse(err)
   }
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
   }
 
   const state = randomBytes(16).toString("hex")
+  rememberFeishuOAuthState(user.id, state)
   const redirectUri = resolveFeishuKnowledgeOAuthRedirectUri(
     request.nextUrl.origin,
     env.FEISHU_KNOWLEDGE_OAUTH_REDIRECT_URI,

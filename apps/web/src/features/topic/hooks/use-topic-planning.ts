@@ -63,6 +63,8 @@ export function useTopicPlanning() {
   const [topicRefreshCount, setTopicRefreshCount] = useState(0)
   const [autoGenerating, setAutoGenerating] = useState(false)
   const [autoGenerateError, setAutoGenerateError] = useState("")
+  /** 最近一次选题生成是否为降级模板（模型链全部失败），true 时页面要提示重新生成 */
+  const [topicGenerationDegraded, setTopicGenerationDegraded] = useState(false)
   const [topicChatInput, setTopicChatInput] = useState("")
   const [topicChatLoading, setTopicChatLoading] = useState(false)
   const [topicChatReply, setTopicChatReply] = useState<TopicChatResponse | null>(null)
@@ -139,6 +141,7 @@ export function useTopicPlanning() {
         setKnowledgeEntries([]); setSelectedKnowledgeIds([]); setKnowledgeLoadedProjectId(null)
         setTopicCards([]); setDailyBriefingItems([]); setDailyReportSources([])
         setTopicSelectionId(null); setSelectedTopicIndex(null); setTopicRefreshCount(0)
+        setTopicGenerationDegraded(false)
       })
       return
     }
@@ -149,6 +152,7 @@ export function useTopicPlanning() {
         setKnowledgeLoadedProjectId(selectedProjectId)
         setTopicCards([]); setDailyBriefingItems([]); setDailyReportSources([])
         setTopicSelectionId(null); setSelectedTopicIndex(null); setTopicRefreshCount(0)
+        setTopicGenerationDegraded(false)
       })
       .catch(() => toast.error("项目素材读取失败，请稍后重试"))
       .finally(() => setLoadingKnowledge(false))
@@ -170,8 +174,13 @@ export function useTopicPlanning() {
           setTopicCards(result.cards); setDailyReportSources(result.sourceHighlights ?? [])
           setTopicSelectionId(result.topicSelectionId); setSelectedTopicIndex(null)
           setTopicRefreshCount((c) => c + 1)
+          setTopicGenerationDegraded(result.degraded === true)
+          if (result.degraded === true) {
+            toast.error("今日缓存是降级模板选题，请点击重新生成")
+          } else {
+            toast.success("已加载今日备选选题")
+          }
           getTodayAiHotBriefing().then((b) => { if (!cancelled) setDailyBriefingItems(b.items) }).catch(() => {})
-          toast.success("已加载今日备选选题")
           return
         }
         return generateTopics({ projectId: selectedProjectId, knowledgeEntryIds: knowledgeEntries.map((e) => e.id), refreshCount: 0, recommendationMode: "daily" })
@@ -182,7 +191,12 @@ export function useTopicPlanning() {
         setDailyReportSources(genResult.sourceHighlights ?? [])
         setTopicSelectionId(genResult.topicSelectionId); setSelectedTopicIndex(null)
         setTopicRefreshCount((c) => c + 1)
-        toast.success("已自动生成今日备选选题")
+        setTopicGenerationDegraded(genResult.degraded === true)
+        if (genResult.degraded === true) {
+          toast.error("模型服务不稳定，今日备选是降级模板，请稍后重新生成")
+        } else {
+          toast.success("已自动生成今日备选选题")
+        }
       })
       .catch((err) => {
         if (cancelled) return
@@ -248,6 +262,7 @@ export function useTopicPlanning() {
       const result = await generateTopics({ projectId: selectedProjectId, knowledgeEntryIds: generationKnowledgeIds, refreshCount: topicRefreshCount, recommendationMode })
       setTopicCards(result.cards); setAutoGenerateError("")
       setDailyReportSources(result.sourceHighlights ?? [])
+      setTopicGenerationDegraded(result.degraded === true)
       if (recommendationMode === "daily") {
         const briefing = await getTodayAiHotBriefing().catch(() => null)
         setDailyBriefingItems(briefing?.items ?? [])
@@ -256,7 +271,11 @@ export function useTopicPlanning() {
       }
       setTopicSelectionId(result.topicSelectionId); setSelectedTopicIndex(null)
       setTopicRefreshCount((c) => c + 1)
-      toast.success(`已生成 4 个${MODE_META[recommendationMode].label}`)
+      if (result.degraded === true) {
+        toast.error("模型服务不稳定，本次是降级模板选题，请稍后重新生成")
+      } else {
+        toast.success(`已生成 4 个${MODE_META[recommendationMode].label}`)
+      }
     } catch (error) { toast.error(error instanceof Error ? error.message : "选题生成失败") }
     finally { topicGenerationInFlightRef.current = false; setIsGenerating(false) }
   }
@@ -289,6 +308,7 @@ export function useTopicPlanning() {
     setRecommendationMode(mode)
     setTopicCards([]); setDailyBriefingItems([]); setDailyReportSources([])
     setTopicSelectionId(null); setSelectedTopicIndex(null)
+    setTopicGenerationDegraded(false)
   }
 
   function jumpToAim(card: ApiTopicCard, index: number) {
@@ -317,7 +337,7 @@ export function useTopicPlanning() {
     savingCategory, isGenerating, recommendationMode, setRecommendationMode,
     topicCards, dailyBriefingItems, dailyReportSources,
     topicSelectionId, selectedTopicIndex, topicRefreshCount,
-    autoGenerating, autoGenerateError,
+    autoGenerating, autoGenerateError, topicGenerationDegraded,
     topicChatInput, setTopicChatInput, topicChatLoading, topicChatReply,
     forms,
     // derived

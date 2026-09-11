@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import type { AimEvolutionSuggestion } from "@/lib/api/client"
+import { FeishuKnowledgeOauthNotice } from "@/components/aim/feishu-knowledge-oauth-notice"
 
 export { AimWorkbenchHeader } from "@/components/aim/aim-workbench-header"
 export type { AimWorkbenchHeaderProps } from "@/components/aim/aim-workbench-header"
@@ -24,6 +25,7 @@ export function AimProjectNotices({
 }) {
   return (
     <>
+      <FeishuKnowledgeOauthNotice />
       {projectEnabled && projectsCount === 0 ? (
         <div className="border-b bg-muted/30 px-3 py-1 text-[11px] text-muted-foreground">
           还没有项目，

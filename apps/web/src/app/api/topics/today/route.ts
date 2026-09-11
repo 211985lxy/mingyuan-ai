@@ -33,6 +33,7 @@ export const GET = withUserAuth(async (request, { user }) => {
       id: true,
       candidates: true,
       sourceHighlights: true,
+      model: true,
       createdAt: true,
     },
   })
@@ -48,6 +49,9 @@ export const GET = withUserAuth(async (request, { user }) => {
     topicSelectionId: selection.id,
     cards,
     sourceHighlights,
+    // 生成时模型链全败的记录 model 以 ":fallback" 结尾；缓存命中也要把降级状态带给前端，
+    // 否则降级模板会以"今日推荐"的名义被反复展示。
+    degraded: typeof selection.model === "string" && selection.model.endsWith(":fallback"),
     createdAt: selection.createdAt,
   })
 })

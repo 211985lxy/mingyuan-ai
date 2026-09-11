@@ -108,6 +108,18 @@ if [ "${SKIP_MODEL_PROBE:-0}" != "1" ]; then
   echo "$model_probe_output"
 fi
 
+# Fish Audio 集成契约探针（list+tts+克隆往返）：上游接口漂移当场暴露，
+# 不再等用户点克隆时才看到 422（2026-09-11 train_mode 事故）。
+# 声音是辅助功能：契约漂移以显著告警呈现，不阻断核心发布；SKIP_FISH_PROBE=1 可跳过。
+if [ "${SKIP_FISH_PROBE:-0}" != "1" ]; then
+  if ! fish_probe_output="$("${SSH[@]}" 'bash -s' < "$ROOT_DIR/scripts/probe-fish-audio-contract.sh" 2>&1)"; then
+    echo "$fish_probe_output"
+    echo "WARNING: Fish Audio contract probe FAILED — 语音克隆/合成将不可用（不阻断本次发布）" >&2
+  else
+    echo "$fish_probe_output"
+  fi
+fi
+
 CI=true corepack pnpm --dir apps/web exec prisma generate
 CI=true corepack pnpm --filter @mingyuan/web run typecheck
 CI=true corepack pnpm --filter @mingyuan/web run test:harness

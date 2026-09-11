@@ -23,6 +23,8 @@ export interface TopicExtractionResult {
   strategy?: string
   /** 选型记录 ID（写入 DB 后） */
   topicSelectionId?: string
+  /** true = 模型链全败，cards 是降级模板（model 以 ":fallback" 结尾），调用方必须向用户提示 */
+  degraded?: boolean
   /** 错误信息 */
   error?: string
 }
@@ -148,6 +150,7 @@ export async function extractTopicsFromVideo(
       cards: result.cards,
       strategy: result.strategy,
       topicSelectionId: selection.id,
+      degraded: result.degraded === true,
     }
   } catch (error) {
     return {

@@ -100,6 +100,45 @@ function summarizeUpstreamFailure(status: number, body: string): string {
   return `Fish Audio 返回 ${status}${snippet ? `：${snippet}` : ""}`
 }
 
+/**
+ * 上游契约漂移的统一处置（2026-09-11 train_mode 422 事故根治层）：
+ * 1. 服务端 console.error 全量原文——根因保全，排障不再依赖用户截图；
+ * 2. 422 校验错误翻译成人话 + 稳定错误码 UPSTREAM_CONTRACT——用户不再看到
+ *    英文 JSON 原文，报障只需引用错误码。
+ */
+function translateUpstreamRejection(status: number, body: string, action: "clone" | "tts" | "list"): FishAudioError {
+  // 根因保全：全量原文只进服务端日志
+  console.error(`[fish-audio] upstream ${action} rejected: status=${status} body=${body.slice(0, 800)}`)
+
+  if (status === 401 || status === 403) return new FishAudioError("声音服务密钥无效或无权访问，请联系管理员检查配置", status, "UPSTREAM_AUTH")
+  if (status === 429) return new FishAudioError("声音服务触发限流，请稍后重试", status, "UPSTREAM_RATE_LIMIT")
+  if (status === 402 || status === 406) return new FishAudioError("声音服务账户额度不足，请联系管理员充值", status, "UPSTREAM_QUOTA")
+
+  // FastAPI 风格 422 校验错误：解析缺失/非法字段，翻译成人话
+  if (status === 422) {
+    let fields: string[] = []
+    try {
+      const parsed = JSON.parse(body) as Array<{ loc?: string[] }>
+      if (Array.isArray(parsed)) {
+        fields = parsed.map((item) => item?.loc?.filter(Boolean).slice(-1)[0]).filter((v): v is string => Boolean(v))
+      }
+    } catch {
+      // 非 JSON 结构走通用兜底
+    }
+    if (fields.length) {
+      return new FishAudioError(
+        `声音服务接口已变更（缺少参数 ${fields.join("、")}），我们已记录并会尽快适配；请稍后重试`,
+        status,
+        "UPSTREAM_CONTRACT",
+      )
+    }
+    return new FishAudioError("声音服务接口校验失败（可能已变更），我们已记录并会尽快适配；请稍后重试", status, "UPSTREAM_CONTRACT")
+  }
+
+  const actionLabel = action === "clone" ? "声音克隆" : action === "tts" ? "语音合成" : "音色列表"
+  return new FishAudioError(`${actionLabel}失败：${summarizeUpstreamFailure(status, body)}`, status, "UPSTREAM_FAILED")
+}
+
 /** 统一出站通道：配置了 FISH_AUDIO_PROXY_URL 时复用进程级 ProxyAgent，否则直连 */
 function voiceFetch(url: string | URL, init: RequestInit = {}): Promise<Response> {
   const proxyURL = resolveLlmProxyUrl(env.FISH_AUDIO_PROXY_URL)
@@ -179,7 +218,7 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "")
-    throw new FishAudioError(summarizeUpstreamFailure(response.status, detail), response.status, "UPSTREAM_FAILED")
+    throw translateUpstreamRejection(response.status, detail, "tts")
   }
 
   return {
@@ -230,7 +269,7 @@ export async function cloneVoiceModel(input: {
   })
   if (!response.ok) {
     const detail = await response.text().catch(() => "")
-    throw new FishAudioError(summarizeUpstreamFailure(response.status, detail), response.status, "CLONE_FAILED")
+    throw translateUpstreamRejection(response.status, detail, "clone")
   }
   const payload = (await response.json().catch(() => null)) as { _id?: string; id?: string } | null
   const id = String(payload?._id ?? payload?.id ?? "")

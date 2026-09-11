@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ExternalLink, Sparkles, Target } from "lucide-react"
+import { AlertTriangle, ExternalLink, Sparkles, Target } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -86,6 +86,15 @@ export default function TopicPlanningPage() {
                   </Button>
                 </div>
               </AiResultPanel>
+
+              {w.topicGenerationDegraded && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    模型服务不稳定，以下选题是降级模板，仅作占位参考；请点击「重新生成」，或稍后再试。
+                  </p>
+                </div>
+              )}
 
               <TopicCandidatesPanel
                 cards={w.topicCards}

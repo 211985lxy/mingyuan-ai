@@ -28,6 +28,41 @@ export function feishuOAuthStatesMatch(saved?: string | null, incoming?: string 
   return secretsMatch(saved, incoming)
 }
 
+const PENDING_OAUTH_MS = 10 * 60 * 1000
+const pendingOAuthByUser = new Map<string, { state: string; expiresAt: number }>()
+
+export function rememberFeishuOAuthState(userId: string, state: string, now = Date.now()) {
+  const id = userId.trim()
+  if (!id || !state) return
+  pendingOAuthByUser.set(id, { state, expiresAt: now + PENDING_OAUTH_MS })
+}
+
+export function clearFeishuOAuthState(userId?: string) {
+  if (userId) {
+    pendingOAuthByUser.delete(userId)
+    return
+  }
+  pendingOAuthByUser.clear()
+}
+
+/** Cookie 或服务端记下的门票，有一张对上就算过。避免扫码后跳到另一个浏览器窗口把 cookie 弄丢。 */
+export function consumeFeishuOAuthState(input: {
+  userId: string
+  incoming?: string | null
+  cookieState?: string | null
+  now?: number
+}): boolean {
+  const now = input.now ?? Date.now()
+  const pending = pendingOAuthByUser.get(input.userId)
+  if (pending && pending.expiresAt <= now) pendingOAuthByUser.delete(input.userId)
+  const saved = pending && pending.expiresAt > now ? pending.state : null
+  const ok =
+    feishuOAuthStatesMatch(saved, input.incoming) ||
+    feishuOAuthStatesMatch(input.cookieState, input.incoming)
+  if (ok) pendingOAuthByUser.delete(input.userId)
+  return ok
+}
+
 type JsonRecord = Record<string, unknown>
 type CachedToken = { token: string; expiresAt: number }
 

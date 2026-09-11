@@ -24,6 +24,7 @@ import { polishTranscript } from "@/lib/transcript-polish"
 import {
   upsertContentItem,
   createPendingContentItem,
+  readContentStoreConfig,
   type ContentItemRecord,
   type ContentStoreConfig,
 } from "./lark-content-store"
@@ -98,33 +99,49 @@ function getLlmModel(): string {
 export async function processVideo(input: VideoProcessingInput): Promise<VideoProcessingResult> {
   const startTime = Date.now()
 
+  // 飞书内容素材库是可选集成：未配置 token/table 时降级跳过写入，不阻断 5a-5e 主流程。
+  // 显式传入 storeConfig（测试/内部通道）时优先使用，不走环境变量降级。
+  let contentStore: ContentStoreConfig | null = null
+  try {
+    contentStore = input.storeConfig ?? readContentStoreConfig()
+  } catch {
+    console.warn(
+      "[video-processor] 飞书内容素材库未配置（LARK_CONTENT_BASE_TOKEN / LARK_CONTENT_TABLE_ID），本次跳过飞书写入",
+    )
+  }
+
   try {
     // ① 验证链接
     const validatedUrl = assertSupportedVideoUrl(input.videoUrl)
     const platform = detectVideoPlatform(validatedUrl)
 
-    // ② 飞书 Base 占位
-    const pending = await createPendingContentItem(validatedUrl, input.source, input.storeConfig)
-    const recordId = pending.recordId
+    // ② 飞书 Base 占位（未配置时降级，recordId 为空）
+    let recordId: string | undefined
+    if (contentStore) {
+      const pending = await createPendingContentItem(validatedUrl, input.source, contentStore)
+      recordId = pending.recordId
+    }
 
     // ─── 5a：轻抖 API 文案提取 ────────────────────────────────
     const extraction = await extractVideoTranscript(validatedUrl, platform)
 
     if (input.skipAiProcessing) {
       // 仅提取模式：写入飞书后直接返回
-      await upsertContentItem(
-        {
-          视频标题: extraction.title || "未知标题",
-          原始链接: validatedUrl,
-          来源: input.source,
-          转录文本: extraction.transcript || "",
-          AI总结: "",
-          关键要点: "",
-          处理状态: "已完成",
-          处理时间: new Date().toISOString().slice(0, 10),
-        },
-        input.storeConfig,
-      )
+      if (contentStore) {
+        await upsertContentItem(
+          {
+            视频标题: extraction.title || "未知标题",
+            原始链接: validatedUrl,
+            来源: input.source,
+            转录文本: extraction.transcript || "",
+            AI总结: "",
+            关键要点: "",
+            处理状态: "已完成",
+            处理时间: new Date().toISOString().slice(0, 10),
+          },
+          contentStore,
+        )
+      }
       return {
         success: true,
         recordId,
@@ -164,8 +181,9 @@ export async function processVideo(input: VideoProcessingInput): Promise<VideoPr
     // ─── 5d：竞品分析标记 ──────────────────────────────────────
     let competitorMatch: CompetitorMatchResult | undefined
     if (!input.skipCompetitorCheck) {
+      // 文案提取服务不返回作者昵称，不能拿视频标题冒充作者名做精确匹配（会误判竞品）；
+      // 作者匹配留给策略 4（targetUrl 域名）等其他策略。
       competitorMatch = await checkCompetitorMatch({
-        authorName: extraction.title,
         platform,
         videoUrl: validatedUrl,
         userId: input.userId,
@@ -220,7 +238,9 @@ export async function processVideo(input: VideoProcessingInput): Promise<VideoPr
       处理时间: now,
     }
 
-    const writeResult = await upsertContentItem(finalRecord, input.storeConfig)
+    const writeResult = contentStore
+      ? await upsertContentItem(finalRecord, contentStore)
+      : { ok: false as const }
 
     return {
       success: true,
@@ -235,22 +255,24 @@ export async function processVideo(input: VideoProcessingInput): Promise<VideoPr
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
 
-    try {
-      await upsertContentItem(
-        {
-          视频标题: "处理失败",
-          原始链接: input.videoUrl,
-          来源: input.source,
-          转录文本: "",
-          AI总结: "",
-          关键要点: "",
-          处理状态: "失败",
-          处理时间: new Date().toISOString().slice(0, 10),
-        },
-        input.storeConfig,
-      )
-    } catch {
-      // ignore
+    if (contentStore) {
+      try {
+        await upsertContentItem(
+          {
+            视频标题: "处理失败",
+            原始链接: input.videoUrl,
+            来源: input.source,
+            转录文本: "",
+            AI总结: "",
+            关键要点: "",
+            处理状态: "失败",
+            处理时间: new Date().toISOString().slice(0, 10),
+          },
+          contentStore,
+        )
+      } catch {
+        // ignore
+      }
     }
 
     return {

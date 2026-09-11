@@ -86,11 +86,16 @@ const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
     maxRetries: 0,
     capability: "advanced",
   },
-  // 质量链第二跳：火山方舟豆包旗舰，国内直连低延迟。
-  // key 来源：DOUBAO_API_KEY（已开通账号）优先，回落 ARK_API_KEY（生产账号未开通 seed 模型，勿单独启用）。
-  { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 30_000, capability: "standard" },
+  // 质量链第二跳：DeepSeek flash 直连。2026-09-11 实测（真实选题 prompt ~8K 字 + 4 张卡输出）：
+  //   - deepseek-v4-pro：思维链失控，72s+ 仍无正文（reasoning 吃满 completion）
+  //   - doubao-seed-2-1-pro：生成任务 120s+ 不可用（理解类 ~20s，生成类远超预算）
+  //   - deepseek-v4-flash：28s 输出 4 张完整卡（reasoning ~3K + 正文 ~3K）
+  // 故 flash 升为第二跳，豆包旗舰降为末跳兜底。
+  { name: "deepseek", model: "deepseek-v4-flash", timeoutMs: 45_000, capability: "standard" },
   { name: "apimart", model: "gpt-5.4", timeoutMs: 25_000, capability: "advanced" },
-  { name: "deepseek", model: "deepseek-v4-pro", timeoutMs: 20_000, capability: "advanced" },
+  // 末跳兜底：seed 是思考型模型，长 prompt 生成任务实测 120s+，仅作极端降级。
+  // key 来源：DOUBAO_API_KEY（已开通账号）优先，回落 ARK_API_KEY（生产账号未开通 seed 模型，勿单独启用）。
+  { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 60_000, capability: "standard" },
 ]
 
 export const AGENT_ROUTES = freezeAgentRoutes({

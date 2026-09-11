@@ -194,7 +194,9 @@ export async function analyzeVideoCopy(
   const result = await provider.complete({
     messages: buildVideoCopyAnalysisMessages(input),
     temperature: 0.2,
-    maxTokens: 3200,
+    // 四维拆解是长输出（实测正文 ~4K 字）且默认链首跳是思考型模型（reasoning ~3K
+    // 计入 completion）：3200 必然截断/空正文，然后静默落入模板拆解。给足预算。
+    maxTokens: 8192,
   })
 
   try {

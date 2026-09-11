@@ -25,7 +25,7 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
-  allowedDevOrigins: ["172.31.2.187"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", "172.31.2.187", "192.168.104.200"],
   turbopack: {
     root: path.join(__dirname, "../.."),
   },

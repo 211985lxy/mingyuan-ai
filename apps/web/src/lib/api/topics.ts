@@ -135,6 +135,8 @@ export interface TodayTopicsResult {
   mode: "cached" | "missing"
   topicSelectionId?: string
   cards?: ApiTopicCard[]
+  /** true = 缓存的这条记录生成时模型链全败（model 以 ":fallback" 结尾），cards 是降级模板 */
+  degraded?: boolean
   sourceHighlights?: Array<{
     category: string
     title: string

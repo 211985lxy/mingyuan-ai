@@ -57,6 +57,10 @@ export interface ApiTopicGenerateResponse {
   topicSelectionId: string;
   cards: ApiTopicCard[];
   elementCodes: string[];
+  /** true = 模型链全部失败，cards 是降级模板，建议用户重新生成 */
+  degraded?: boolean;
+  /** 实际使用的模型标签；降级时以 ":fallback" 结尾 */
+  model?: string;
   sourceHighlights?: Array<{
     category: string;
     title: string;

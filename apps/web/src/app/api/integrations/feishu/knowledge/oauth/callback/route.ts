@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { env } from "@/env"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { exchangeFeishuAuthorizationCode, feishuOAuthStatesMatch, resolveFeishuKnowledgeOAuthRedirectUri } from "@/lib/integrations/feishu-knowledge-auth"
+import { consumeFeishuOAuthState, exchangeFeishuAuthorizationCode, resolveFeishuKnowledgeOAuthRedirectUri } from "@/lib/integrations/feishu-knowledge-auth"
 import { toEncryptedOperatorRecord } from "@/lib/integrations/feishu-knowledge-credentials"
 import { createPrismaFeishuOperatorCredentialStore } from "@/lib/integrations/feishu-knowledge-credential-store"
 
@@ -11,8 +11,9 @@ export const runtime = "nodejs"
 const STATE_COOKIE = "feishu_knowledge_oauth_state"
 
 export async function GET(request: NextRequest) {
+  let user
   try {
-    await authenticateRequest(request)
+    user = await authenticateRequest(request)
   } catch (err) {
     return authErrorResponse(err)
   }
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state")
   const savedState = request.cookies.get(STATE_COOKIE)?.value
 
-  if (!code || !feishuOAuthStatesMatch(savedState, state)) {
+  if (!code || !consumeFeishuOAuthState({ userId: user.id, incoming: state, cookieState: savedState })) {
     aim.searchParams.set("feishu_knowledge_error", "授权状态校验失败，请重新发起飞书知识授权。")
     return clearState(NextResponse.redirect(aim, { status: 302 }))
   }

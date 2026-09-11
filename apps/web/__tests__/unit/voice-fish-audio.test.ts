@@ -94,8 +94,10 @@ describe("Fish Audio TTS 客户端", () => {
     const { synthesizeSpeech } = await loadClient()
     stubFetchOnce(async () => new Response("secret leak detail", { status: 401 }))
 
-    await expect(synthesizeSpeech({ text: "你好" })).rejects.toMatchObject({ status: 401 })
-    await expect(synthesizeSpeech({ text: "你好" })).rejects.toThrow(/FISH_AUDIO_API_KEY/)
+    await expect(synthesizeSpeech({ text: "你好" })).rejects.toMatchObject({ status: 401, code: "UPSTREAM_AUTH" })
+    // 用户文案给可行动指引；环境变量名属于内部细节，只在服务端日志出现
+    await expect(synthesizeSpeech({ text: "你好" })).rejects.toThrow(/请联系管理员检查配置/)
+    await expect(synthesizeSpeech({ text: "你好" })).rejects.not.toThrow(/FISH_AUDIO_API_KEY/)
   })
 
   it("音色列表映射上游字段，上游失败时降级不抛错", async () => {
@@ -171,4 +173,33 @@ describe("Fish Audio 声音克隆", () => {
     expect(form.get("visibility")).toBe("private")
     vi.unstubAllGlobals()
   })
+
+
+describe("上游契约漂移翻译层", () => {
+  it("422 校验错误翻译成人话 + UPSTREAM_CONTRACT 码，全量原文进服务端日志", async () => {
+    process.env.FISH_AUDIO_API_KEY = "test-fish-key"
+    vi.resetModules()
+    const errLog = vi.spyOn(console, "error").mockImplementation(() => {})
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify([{ type: "missing", loc: ["train_mode"], msg: "Field required" }]),
+      { status: 422 },
+    ))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const { cloneVoiceModel, FishAudioError } = await import("@/lib/voice/fish-audio")
+    const error = await cloneVoiceModel({
+      title: "t",
+      audio: new Blob([new Uint8Array([1])], { type: "audio/mpeg" }),
+      filename: "s.mp3",
+    }).catch((e) => e)
+
+    expect(error).toBeInstanceOf(FishAudioError)
+    expect((error as Error).message).toContain("声音服务接口已变更")
+    expect((error as Error).message).toContain("train_mode")
+    expect((error as { code?: string }).code).toBe("UPSTREAM_CONTRACT")
+    expect(errLog).toHaveBeenCalledWith(expect.stringContaining("train_mode"))
+    errLog.mockRestore()
+    vi.unstubAllGlobals()
+  })
+})
 })

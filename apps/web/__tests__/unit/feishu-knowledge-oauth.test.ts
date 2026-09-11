@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest"
 
 import {
   buildFeishuKnowledgeAuthorizeUrl,
+  clearFeishuOAuthState,
+  consumeFeishuOAuthState,
   exchangeFeishuAuthorizationCode,
   feishuOAuthStatesMatch,
   isFeishuUserTokenRevoked,
   refreshFeishuUserAccessToken,
+  rememberFeishuOAuthState,
   resolveFeishuKnowledgeOAuthRedirectUri,
 } from "@/lib/integrations/feishu-knowledge-auth"
 import { createFeishuKnowledgeClient } from "@/lib/integrations/feishu-knowledge-client"
@@ -82,6 +85,18 @@ describe("feishu knowledge oauth", () => {
     expect(feishuOAuthStatesMatch("abc123", "abc124")).toBe(false)
     expect(feishuOAuthStatesMatch("abc123", null)).toBe(false)
     expect(feishuOAuthStatesMatch(undefined, "abc123")).toBe(false)
+  })
+
+  it("服务端记下的门票在 cookie 丢失时仍能通过", () => {
+    clearFeishuOAuthState()
+    rememberFeishuOAuthState("user-1", "ticket-a")
+    expect(consumeFeishuOAuthState({ userId: "user-1", incoming: "ticket-a", cookieState: null })).toBe(true)
+    expect(consumeFeishuOAuthState({ userId: "user-1", incoming: "ticket-a", cookieState: null })).toBe(false)
+  })
+
+  it("只有 cookie 对上也算过", () => {
+    clearFeishuOAuthState()
+    expect(consumeFeishuOAuthState({ userId: "user-2", incoming: "ticket-b", cookieState: "ticket-b" })).toBe(true)
   })
 
   it("授权码换票成功后只在内存里拿 access/refresh", async () => {

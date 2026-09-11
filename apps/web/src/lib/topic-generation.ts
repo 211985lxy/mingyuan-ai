@@ -401,7 +401,9 @@ export async function generateTopicCards(
           { role: "user", content: userPrompt },
         ],
         temperature: temperatures[attempt],
-        maxTokens: 2048,
+        // 思考型模型的 reasoning 计入 completion tokens（实测 deepseek-v4-flash：
+        // reasoning ~3K + 4 张完整卡正文 ~3K），2048 会被思维链吃光导致正文截断/为空。
+        maxTokens: 8192,
         responseFormat: { type: "json_object" },
       })
 
