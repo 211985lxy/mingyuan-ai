@@ -16,14 +16,16 @@ describe("project merge script safety contract", () => {
     expect(source).toContain("--confirm must equal --target-project")
   })
 
-  it("moves shared content, preserves source membership history, and archives rather than deletes", () => {
+  it("moves shared content from only deployed project tables, preserves source membership history, and archives rather than deletes", () => {
     const source = readFileSync(
       path.resolve(__dirname, "../../scripts/merge-account-projects.ts"),
       "utf8",
     )
 
-    expect(source).toContain("knowledgeEntry")
-    expect(source).toContain("aimGeneration")
+    expect(source).toContain("KnowledgeEntry")
+    expect(source).toContain("AimGeneration")
+    expect(source).toContain("information_schema.tables")
+    expect(source).toContain("existingProjectTables")
     expect(source).toContain("projectMember.upsert")
     expect(source).toContain("target.userId")
     expect(source).toContain("id: { in: memberIds }")

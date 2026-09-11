@@ -29,73 +29,45 @@ function createPrismaClient() {
   })
 }
 
-async function summarizeProject(prisma: PrismaClient, projectId: string) {
-  const [
-    aimGenerations,
-    aimMemories,
-    knowledgeEntries,
-    knowledgeEntities,
-    scripts,
-    contentGenerationRuns,
-    topicSelections,
-    inspirations,
-    ipWikiPages,
-    competitorAnalyses,
-    watchAccounts,
-    videoCopyExtractions,
-    benchmarkProfiles,
-    assetCandidates,
-    opportunityCollections,
-    userQuestionCards,
-    channelBindings,
-    aimConversations,
-    contentOutcomes,
-    customerOutcomes,
-  ] = await Promise.all([
-    prisma.aimGeneration.count({ where: { projectId } }),
-    prisma.aimMemory.count({ where: { projectId } }),
-    prisma.knowledgeEntry.count({ where: { projectId } }),
-    prisma.knowledgeEntity.count({ where: { projectId } }),
-    prisma.script.count({ where: { projectId } }),
-    prisma.contentGenerationRun.count({ where: { projectId } }),
-    prisma.topicSelection.count({ where: { projectId } }),
-    prisma.inspiration.count({ where: { projectId } }),
-    prisma.ipWikiPage.count({ where: { projectId } }),
-    prisma.competitorAnalysis.count({ where: { projectId } }),
-    prisma.watchAccount.count({ where: { projectId } }),
-    prisma.videoCopyExtraction.count({ where: { projectId } }),
-    prisma.benchmarkProfile.count({ where: { projectId } }),
-    prisma.assetCandidate.count({ where: { projectId } }),
-    prisma.opportunityCollection.count({ where: { projectId } }),
-    prisma.userQuestionCard.count({ where: { projectId } }),
-    prisma.channelBinding.count({ where: { projectId } }),
-    prisma.aimConversation.count({ where: { projectId } }),
-    prisma.contentOutcome.count({ where: { projectId } }),
-    prisma.customerOutcomeProjection.count({ where: { projectId } }),
-  ])
+const PROJECT_TABLES = [
+  "AimGeneration", "AimMemory", "KnowledgeEntry", "KnowledgeEntity", "Script",
+  "ContentGenerationRun", "TopicSelection", "Inspiration", "IpWikiPage",
+  "CompetitorAnalysis", "WatchAccount", "VideoCopyExtraction", "BenchmarkProfile",
+  "AssetCandidate", "OpportunityCollection", "UserQuestionCard", "ChannelBinding",
+  "AimConversation", "ContentOutcome", "CustomerOutcomeProjection",
+] as const
 
-  return {
-    aimGenerations,
-    aimMemories,
-    knowledgeEntries,
-    knowledgeEntities,
-    scripts,
-    contentGenerationRuns,
-    topicSelections,
-    inspirations,
-    ipWikiPages,
-    competitorAnalyses,
-    watchAccounts,
-    videoCopyExtractions,
-    benchmarkProfiles,
-    assetCandidates,
-    opportunityCollections,
-    userQuestionCards,
-    channelBindings,
-    aimConversations,
-    contentOutcomes,
-    customerOutcomes,
-  }
+type ProjectTable = (typeof PROJECT_TABLES)[number]
+
+async function existingProjectTables(prisma: PrismaClient): Promise<ProjectTable[]> {
+  const tableNames = PROJECT_TABLES.map((table) => `'${table}'`).join(", ")
+  const rows = await prisma.$queryRawUnsafe<Array<{ tableName: string }>>(
+    `SELECT tables.TABLE_NAME AS tableName
+       FROM information_schema.tables AS tables
+       INNER JOIN information_schema.columns AS columns
+         ON columns.table_schema = tables.table_schema
+        AND columns.table_name = tables.table_name
+      WHERE tables.table_schema = DATABASE()
+        AND tables.table_name IN (${tableNames})
+        AND columns.column_name = 'projectId'`,
+  )
+  const existing = new Set(rows.map((row) => row.tableName))
+  return PROJECT_TABLES.filter((table) => existing.has(table))
+}
+
+async function summarizeProject(
+  prisma: PrismaClient,
+  projectId: string,
+  projectTables: ProjectTable[],
+) {
+  const counts = await Promise.all(projectTables.map(async (table) => {
+    const [result] = await prisma.$queryRawUnsafe<Array<{ count: bigint | number }>>(
+      `SELECT COUNT(*) AS count FROM \`${table}\` WHERE \`projectId\` = ?`,
+      projectId,
+    )
+    return [table, Number(result?.count ?? 0)] as const
+  }))
+  return Object.fromEntries(counts)
 }
 
 async function main() {
@@ -137,10 +109,11 @@ async function main() {
     if (target.status !== "active") throw new Error("target project must be active")
     if (source.status === "archived") throw new Error("source project is already archived")
 
-    const [contentCounts, boundAccountCount] = await Promise.all([
-      summarizeProject(prisma, source.id),
+    const [projectTables, boundAccountCount] = await Promise.all([
+      existingProjectTables(prisma),
       prisma.user.count({ where: { boundProjectId: source.id } }),
     ])
+    const contentCounts = await summarizeProject(prisma, source.id, projectTables)
     const memberIds = [...new Set([
       target.userId,
       source.userId,
@@ -197,28 +170,11 @@ async function main() {
           projectBindingSource: "project_merge",
         },
       })
-      await Promise.all([
-        tx.aimGeneration.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.aimMemory.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.knowledgeEntry.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.knowledgeEntity.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.script.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.contentGenerationRun.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.topicSelection.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.inspiration.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.ipWikiPage.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.competitorAnalysis.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.watchAccount.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.videoCopyExtraction.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.benchmarkProfile.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.assetCandidate.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.opportunityCollection.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.userQuestionCard.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.channelBinding.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.aimConversation.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.contentOutcome.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-        tx.customerOutcomeProjection.updateMany({ where: { projectId: source.id }, data: { projectId: target.id } }),
-      ])
+      await Promise.all(projectTables.map((table) => tx.$executeRawUnsafe(
+        `UPDATE \`${table}\` SET \`projectId\` = ? WHERE \`projectId\` = ?`,
+        target.id,
+        source.id,
+      )))
       await tx.clientProject.update({ where: { id: source.id }, data: { status: "archived" } })
     })
     console.log("project merge applied; source project archived and no records deleted")
