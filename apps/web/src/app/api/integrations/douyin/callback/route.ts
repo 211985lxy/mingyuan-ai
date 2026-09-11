@@ -70,10 +70,10 @@ export async function GET(request: NextRequest) {
     }
 
     /* 4. 并行拉取：用户信息、最近 20 条视频、粉丝画像 */
-    const [profile, videos] = await Promise.all([
+    const [profile, videos, fans] = await Promise.all([
       fetchDouyinUserProfile(token),
       fetchDouyinRecentVideos(token, 20),
-      fetchDouyinFansProfile(token).catch(() => null), // 没申请到 profile scope 忽略
+      fetchDouyinFansProfile(token).catch(() => null), // 未获批 fans.data.bind 时为 null
     ])
     if (!profile) {
       throw new Error("抖音用户信息读取失败，可能是 user_info scope 未审核通过。")
@@ -83,10 +83,10 @@ export async function GET(request: NextRequest) {
     await claimDouyinLoginIdentity(auth.id, token)
     await upsertDouyinBinding({ userId: auth.id, token, profile })
 
-    /* 5. 写入飞书 Base（账号表 + 视频数据表） */
+    /* 5. 写入飞书 Base（账号表 + 视频数据表 + 粉丝画像分布列） */
     let syncResult: { accounts: number; videos: number; fansWritten: boolean } | null = null
     if (env.LARK_PLATFORM_DATA_BASE_TOKEN) {
-      syncResult = await syncDouyinDataToLarkBase({ profile, videos, token })
+      syncResult = await syncDouyinDataToLarkBase({ profile, videos, token, fans })
     }
 
     applySuccessParams(resultRedirect, profile, videos.length, syncResult)

@@ -9,6 +9,12 @@
  * 采集来的账号会显示成「未命名账号」）。
  */
 
+import {
+  FANS_DISTRIBUTION_FIELDS,
+  parseFansDistribution,
+  type FansDistributionItem,
+} from "@/lib/data-platform/fans-distribution"
+
 export type PlatformAccount = {
   id: string
   platform: string
@@ -23,6 +29,10 @@ export type PlatformAccount = {
   accountStatus?: string | null
   expireAt?: string | null
   homeLink?: string | null
+  /** 粉丝画像分布（scope fans.data.bind 未获批时为 null） */
+  fansGender?: FansDistributionItem[] | null
+  fansAges?: FansDistributionItem[] | null
+  fansRegions?: FansDistributionItem[] | null
 }
 
 export type PlatformVideo = {
@@ -106,6 +116,9 @@ export function toPlatformAccount(item: LarkRecordLike): PlatformAccount {
     accountStatus: pickText(fields, ["账号状态", "状态", "accountStatus"]),
     expireAt: pickText(fields, ["授权有效期至", "授权到期", "expireAt", "expiresAt"]),
     homeLink: pickText(fields, ["主页链接", "主页", "homeLink", "link", "url", "达人链接"]),
+    fansGender: parseFansDistribution(fields[FANS_DISTRIBUTION_FIELDS.gender]),
+    fansAges: parseFansDistribution(fields[FANS_DISTRIBUTION_FIELDS.ages]),
+    fansRegions: parseFansDistribution(fields[FANS_DISTRIBUTION_FIELDS.regions]),
   }
 }
 

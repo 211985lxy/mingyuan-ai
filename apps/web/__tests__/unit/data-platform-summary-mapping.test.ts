@@ -125,6 +125,33 @@ describe("toPlatformAccount", () => {
     expect(account.fansCount).toBe(1)
   })
 
+  it("解析账号表里的粉丝画像分布列", () => {
+    const account = toPlatformAccount({
+      recordId: "fans-1",
+      fields: {
+        账号昵称: "有画像的号",
+        粉丝性别分布: '[{"value":"男","percent":0.62},{"value":"女","percent":0.38}]',
+        粉丝年龄分布: '[{"value":"24-30","percent":0.31}]',
+        粉丝地域分布: "不是 JSON",
+      },
+    })
+
+    expect(account.fansGender).toEqual([
+      { value: "男", percent: 0.62 },
+      { value: "女", percent: 0.38 },
+    ])
+    expect(account.fansAges).toEqual([{ value: "24-30", percent: 0.31 }])
+    expect(account.fansRegions).toBeNull()
+  })
+
+  it("未获批粉丝画像时三个分布字段均为 null（看板据此不渲染该块）", () => {
+    const account = toPlatformAccount(OAUTH_ROW)
+
+    expect(account.fansGender).toBeNull()
+    expect(account.fansAges).toBeNull()
+    expect(account.fansRegions).toBeNull()
+  })
+
   it("两套字段都缺时回退到 recordId 与占位昵称", () => {
     const account = toPlatformAccount({ recordId: "rec-9", fields: {} })
 

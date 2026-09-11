@@ -5,9 +5,30 @@
  */
 import { env } from "@/env"
 import { updateLarkBaseRecord, listLarkBaseRecords } from "@/lib/lark-base"
-import type { DouyinToken, DouyinUserProfile, DouyinVideo } from "@/lib/douyin-openapi"
+import type { DouyinFansProfile, DouyinToken, DouyinUserProfile, DouyinVideo } from "@/lib/douyin-openapi"
+import {
+  FANS_DISTRIBUTION_FIELDS,
+  serializeFansDistribution,
+} from "@/lib/data-platform/fans-distribution"
 
-type SyncToLarkInput = { baseToken: string; profile: DouyinUserProfile; token: DouyinToken; identity: "user" | "bot" }
+type SyncToLarkInput = {
+  baseToken: string
+  profile: DouyinUserProfile
+  token: DouyinToken
+  identity: "user" | "bot"
+  /** 粉丝画像。scope `fans.data.bind` 未获批时为 null —— 此时不写画像列，也不清空既有值。 */
+  fans?: DouyinFansProfile | null
+}
+
+/** 仅当本次确实取到画像时才写这 3 列，避免未获批时把已有值清空。 */
+function buildFansFields(fans?: DouyinFansProfile | null): Record<string, unknown> {
+  if (!fans) return {}
+  return {
+    [FANS_DISTRIBUTION_FIELDS.gender]: serializeFansDistribution(fans.gender),
+    [FANS_DISTRIBUTION_FIELDS.ages]: serializeFansDistribution(fans.ages),
+    [FANS_DISTRIBUTION_FIELDS.regions]: serializeFansDistribution(fans.provinces),
+  }
+}
 
 async function upsertDouyinAccountRow(accountTableId: string, input: SyncToLarkInput): Promise<number> {
   const fields: Record<string, unknown> = {
@@ -25,6 +46,7 @@ async function upsertDouyinAccountRow(accountTableId: string, input: SyncToLarkI
     主页链接: input.profile.nickname
       ? `https://www.douyin.com/search/${encodeURIComponent(input.profile.nickname)}`
       : "",
+    ...buildFansFields(input.fans),
   }
   try {
     const existing = await listLarkBaseRecords({ baseToken: input.baseToken, tableId: accountTableId, limit: 5, identity: input.identity }).catch(() => [])
@@ -66,7 +88,7 @@ async function writeDouyinVideoRow(videoTableId: string, video: DouyinVideo, inp
 }
 
 /**
- * 把抖音拉到的账号/视频数据写入飞书多维表格的账号总表和视频数据表。
+ * 把抖音拉到的账号/视频/粉丝画像数据写入飞书多维表格的账号总表和视频数据表。
  * 用账号 open_id / 视频 itemId 当唯一键，重复写入时自动更新（upsert 语义）。
  */
 export async function syncDouyinDataToLarkBase(input: {
@@ -74,6 +96,7 @@ export async function syncDouyinDataToLarkBase(input: {
   videos: DouyinVideo[]
   token: DouyinToken
   identity?: "user" | "bot"
+  fans?: DouyinFansProfile | null
 }): Promise<{ accounts: number; videos: number; fansWritten: boolean }> {
   const baseToken = env.LARK_PLATFORM_DATA_BASE_TOKEN?.trim()
   const accountTableId = env.LARK_PLATFORM_ACCOUNT_TABLE_ID?.trim()
@@ -81,7 +104,8 @@ export async function syncDouyinDataToLarkBase(input: {
   if (!baseToken) throw new Error("未配置 LARK_PLATFORM_DATA_BASE_TOKEN，无法把抖音数据写入飞书 Base。")
 
   const identity = input.identity ?? "bot"
-  const larkInput: SyncToLarkInput = { baseToken, profile: input.profile, token: input.token, identity }
+  const fans = input.fans ?? null
+  const larkInput: SyncToLarkInput = { baseToken, profile: input.profile, token: input.token, identity, fans }
   const writtenAccounts = accountTableId ? await upsertDouyinAccountRow(accountTableId, larkInput) : 0
 
   let writtenVideos = 0
@@ -91,5 +115,5 @@ export async function syncDouyinDataToLarkBase(input: {
       await new Promise((r) => setTimeout(r, 500))
     }
   }
-  return { accounts: writtenAccounts, videos: writtenVideos, fansWritten: true }
+  return { accounts: writtenAccounts, videos: writtenVideos, fansWritten: Boolean(fans) }
 }

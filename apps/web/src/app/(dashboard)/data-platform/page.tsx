@@ -27,6 +27,11 @@ import {
   useDouyinSyncAlert,
 } from "@/features/integrations/components/douyin-sync-alert"
 import { request } from "@/lib/api/client"
+import {
+  formatDistributionValue,
+  toBarRatio,
+  type FansDistributionItem,
+} from "@/lib/data-platform/fans-distribution"
 
 type PlatformAccount = {
   id: string
@@ -42,6 +47,9 @@ type PlatformAccount = {
   accountStatus?: string | null
   expireAt?: string | null
   homeLink?: string | null
+  fansGender?: FansDistributionItem[] | null
+  fansAges?: FansDistributionItem[] | null
+  fansRegions?: FansDistributionItem[] | null
 }
 
 type PlatformVideo = {
@@ -111,6 +119,49 @@ function MetricGrid({ metrics }: { metrics: Array<{ label: string; value?: numbe
   )
 }
 
+/** 单条分布：标签 + 归一化条形 + 数值。 */
+function DistributionRow({ item, items }: { item: FansDistributionItem; items: FansDistributionItem[] }) {
+  const ratio = toBarRatio(item.percent, items)
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-16 shrink-0 truncate text-muted-foreground" title={item.value}>
+        {item.value}
+      </span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.round(ratio * 100)}%` }} />
+      </div>
+      <span className="w-12 shrink-0 text-right tabular-nums">{formatDistributionValue(item.percent)}</span>
+    </div>
+  )
+}
+
+/**
+ * 粉丝画像：性别/年龄/地域分布。
+ * 需要抖音「粉丝画像数据」能力（scope fans.data.bind）；未获批时三列均为空，整块不渲染。
+ */
+function FansProfileBlock({ account }: { account: PlatformAccount }) {
+  const groups = [
+    { label: "性别", items: account.fansGender },
+    { label: "年龄", items: account.fansAges },
+    { label: "地域", items: account.fansRegions },
+  ].filter((g): g is { label: string; items: FansDistributionItem[] } => Boolean(g.items?.length))
+  if (groups.length === 0) return null
+
+  return (
+    <div className="space-y-3 rounded-md bg-muted/40 p-3">
+      <p className="text-xs font-medium text-muted-foreground">粉丝画像</p>
+      {groups.map((group) => (
+        <div key={group.label} className="space-y-1">
+          <p className="text-xs text-muted-foreground">{group.label}</p>
+          {group.items.map((item) => (
+            <DistributionRow key={`${group.label}-${item.value}`} item={item} items={group.items} />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AccountCard({ account }: { account: PlatformAccount }) {
   const displayName = account.nickname?.trim() || "未命名账号"
   return (
@@ -139,6 +190,7 @@ function AccountCard({ account }: { account: PlatformAccount }) {
             { label: "关注", value: account.followCount },
           ]}
         />
+        <FansProfileBlock account={account} />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {account.authStatus ? <span>认证：{account.authStatus}</span> : null}
           {account.expireAt ? <span>授权至：{account.expireAt}</span> : null}
