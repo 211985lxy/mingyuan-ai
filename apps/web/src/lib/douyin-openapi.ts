@@ -22,11 +22,11 @@ const DOUYIN_USERINFO_URL = `${DOUYIN_OPEN_HOST}/oauth/userinfo/`
 /** 视频列表（含互动指标：点赞、评论、分享、收藏）。scope: video.list */
 const DOUYIN_VIDEO_LIST_URL = `${DOUYIN_OPEN_HOST}/api/douyin/v1/video/list/`
 
-/** 粉丝画像数据（性别/年龄/地域分布等）。scope: fans.profile 或 fans.basic */
-const DOUYIN_FANS_PROFILE_URL = `${DOUYIN_OPEN_HOST}/fans/data/get/`
+/** 粉丝画像数据（性别/年龄/地域/活跃/设备分布）。scope: fans.data.bind */
+const DOUYIN_FANS_PROFILE_URL = `${DOUYIN_OPEN_HOST}/api/douyin/v1/user/fans_data/`
 
-/** 默认申请的权限——覆盖账号信息 + 视频列表 + 粉丝基础画像 */
-const DEFAULT_SCOPE = "user_info,video.list,fans.basic,fans.profile"
+/** 默认申请的权限——覆盖账号信息 + 视频列表 + 粉丝画像 */
+const DEFAULT_SCOPE = "user_info,video.list,fans.data.bind"
 
 export type DouyinToken = {
   accessToken: string
@@ -74,19 +74,29 @@ export type DouyinVideo = {
   } | null
 }
 
+/** 粉丝分布项：官方返回 { item, value }（value 为该维度的占比） */
+export type DouyinDistributionItem = { value: string; percent: number }
+
+/**
+ * 粉丝画像。
+ * 对应能力「粉丝画像数据」（scope `fans.data.bind`）。
+ * 粉丝来源、粉丝喜好属另外两个能力（`data.external.fans_source` / `data.external.fans_favourite`），不在本类型内。
+ */
 export type DouyinFansProfile = {
   /** 分性别比例 */
-  gender?: Array<{ value: string; percent: number }> | null
+  gender?: DouyinDistributionItem[] | null
   /** 分年龄段比例 */
-  ages?: Array<{ value: string; percent: number }> | null
-  /** 分省份/城市比例 */
-  provinces?: Array<{ value: string; percent: number }> | null
-  /** 粉丝兴趣热词（如果有） */
-  interests?: Array<{ value: string; percent: number }> | null
-  /** 粉丝来源分布 */
-  sources?: Array<{ value: string; percent: number }> | null
-  /** 粉丝热评（如果有） */
-  hotComments?: Array<{ content: string; count?: number }> | null
+  ages?: DouyinDistributionItem[] | null
+  /** 分地域（省/城市）比例 */
+  provinces?: DouyinDistributionItem[] | null
+  /** 粉丝兴趣分布 */
+  interests?: DouyinDistributionItem[] | null
+  /** 活跃天数分布 */
+  activeDays?: DouyinDistributionItem[] | null
+  /** 设备分布 */
+  devices?: DouyinDistributionItem[] | null
+  /** 粉丝总数 */
+  allFansNum?: number | null
 }
 
 /* =========================================================
@@ -393,44 +403,60 @@ export async function fetchDouyinRecentVideos(
   return results
 }
 
+/** 官方 /user/fans_data/ 的响应结构（见 docs: get-user-fans-data） */
+type DouyinFansDistribution = Array<{ item?: string; value?: number }>
+
+type DouyinFansDataPayload = {
+  data?: {
+    fans_data?: {
+      gender_distributions?: DouyinFansDistribution
+      age_distributions?: DouyinFansDistribution
+      geographical_distributions?: DouyinFansDistribution
+      interest_distributions?: DouyinFansDistribution
+      active_days_distributions?: DouyinFansDistribution
+      device_distributions?: DouyinFansDistribution
+      all_fans_num?: number
+    }
+    error_code?: number | string
+    description?: string
+  }
+}
+
+/** 把官方的 { item, value } 分布数组转成 { value, percent }。 */
+function toDistribution(items?: DouyinFansDistribution): DouyinDistributionItem[] | null {
+  if (!Array.isArray(items) || items.length === 0) return null
+  return items.map((x) => ({
+    value: x.item || "未知",
+    percent: typeof x.value === "number" ? Number(x.value.toFixed(4)) : 0,
+  }))
+}
+
 /**
- * 粉丝画像：性别/年龄/地域/兴趣分布。
- * 对应 scope: fans.profile 或 fans.basic，未申请到时返回 null。
+ * 粉丝画像：性别/年龄/地域/兴趣/活跃/设备分布。
+ * 官方接口 /api/douyin/v1/user/fans_data/，scope: fans.data.bind；未申请到该能力时返回 null。
+ * 数据约束：仅粉丝数 > 100 的账号有数据，且首次授权后需间隔 2 天才产生完整数据。
  */
 export async function fetchDouyinFansProfile(token: DouyinToken): Promise<DouyinFansProfile | null> {
-  const payload = await safeFetchJson<{
-    data?: {
-      result_list?: Array<{
-        fans_province?: Array<{ keyword?: string; keyword_value?: number }>
-        fans_genders?: Array<{ keyword?: string; keyword_value?: number }>
-        fans_ages?: Array<{ keyword?: string; keyword_value?: number }>
-        fans_interests?: Array<{ keyword?: string; keyword_value?: number }>
-        fans_sources?: Array<{ keyword?: string; keyword_value?: number }>
-        fans_hot_comments?: Array<{ content?: string; show_cnt?: number }>
-      }>
-      error_code?: number
-      description?: string
-    }
-  }>(
-    `${DOUYIN_FANS_PROFILE_URL}?${new URLSearchParams({
-      open_id: token.openId,
-      access_token: token.accessToken,
-      data_type: "user_profile",
-    }).toString()}`,
-    undefined,
+  const payload = await safeFetchJson<DouyinFansDataPayload>(
+    `${DOUYIN_FANS_PROFILE_URL}?${new URLSearchParams({ open_id: token.openId }).toString()}`,
+    {
+      headers: {
+        "content-type": "application/json",
+        "access-token": token.accessToken,
+      },
+    },
     "fans-profile",
   )
-  const list = payload?.data?.result_list || []
-  const first = list[0]
-  if (!first) return null
-  const toPct = (v?: number) => (typeof v === "number" ? Number((v).toFixed(4)) : 0)
+  const fans = payload?.data?.fans_data
+  if (!fans) return null
   return {
-    gender: first.fans_genders?.map((x) => ({ value: x.keyword || "未知", percent: toPct(x.keyword_value) })),
-    ages: first.fans_ages?.map((x) => ({ value: x.keyword || "未知", percent: toPct(x.keyword_value) })),
-    provinces: first.fans_province?.map((x) => ({ value: x.keyword || "未知", percent: toPct(x.keyword_value) })),
-    interests: first.fans_interests?.map((x) => ({ value: x.keyword || "未知", percent: toPct(x.keyword_value) })),
-    sources: first.fans_sources?.map((x) => ({ value: x.keyword || "未知", percent: toPct(x.keyword_value) })),
-    hotComments: first.fans_hot_comments?.map((x) => ({ content: x.content || "", count: x.show_cnt })),
+    gender: toDistribution(fans.gender_distributions),
+    ages: toDistribution(fans.age_distributions),
+    provinces: toDistribution(fans.geographical_distributions),
+    interests: toDistribution(fans.interest_distributions),
+    activeDays: toDistribution(fans.active_days_distributions),
+    devices: toDistribution(fans.device_distributions),
+    allFansNum: typeof fans.all_fans_num === "number" ? fans.all_fans_num : null,
   }
 }
 
