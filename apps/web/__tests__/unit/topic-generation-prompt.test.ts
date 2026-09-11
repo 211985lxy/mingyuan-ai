@@ -20,6 +20,9 @@ describe("buildTopicUserPrompt", () => {
     expect(prompt).toContain("八字")
     expect(prompt).toContain("紫微")
     expect(prompt).toContain("未提供/待补充")
+    expect(prompt).toContain("hook、angle 为必填")
+    expect(prompt).toContain("hook 是开头钩子")
+    expect(prompt).toContain("angle 是展开角度")
   })
 
   it("requires benchmark rewrites to follow the current IP profile", () => {

@@ -140,7 +140,8 @@ export function buildTopicSystemPrompt(
 输出要求：
 - 严格返回 JSON 格式，结构为 {"topics": [card1, card2, card3, card4]}
 - 只输出 json 本身，不要输出解释文字、不要包裹代码块（部分 OpenAI 兼容网关要求消息中出现小写 json 关键字才会启用 json_object 模式）
-- 每张卡片包含：title (选题标题，2-20字), elementCodes (使用的元素代码数组), openingTypeCode (推荐开场类型代码), structureCode (推荐文案结构代码), rationale (一句话理由，20-60字), topicType, sourceType, score, scoreReason, scoreBreakdown, reviewVerdict, revisionAdvice, creativeTrace
+- 每张卡片包含：title (选题标题，2-20字), elementCodes (使用的元素代码数组), openingTypeCode (推荐开场类型代码), structureCode (推荐文案结构代码), rationale (一句话理由，20-60字), topicType, sourceType, score, scoreReason, scoreBreakdown, reviewVerdict, revisionAdvice, creativeTrace, hook, angle, cta
+- hook、angle 为必填：hook 是开头钩子（8-40字），angle 是展开角度（10-60字）；cta 是结尾行动，建议填写
 - topicType 必须从以下选择：${VALID_TOPIC_TYPES.join("、")}
 - sourceType 必须从以下选择：${VALID_TOPIC_SOURCE_TYPES.join("、")}
 - scoreBreakdown 必须包含五个 0-100 整数：projectFit(客户/项目匹配度，权重25), contentValue(内容价值，权重25), viralHook(传播钩子，权重20), conversionFit(成交关联，权重15), feasibility(执行可行性，权重15)
@@ -207,7 +208,7 @@ export function buildTopicSystemPrompt(
   let prompt = basePrompt + strategyInstructions[strategy]
 
   if (recommendationMode === "daily") {
-    prompt += `\n\n【今日推荐模式】推荐优先级固定为：当前账号资料/资料库 > 对标账号/对标文案 > 行业热点/AI HOT。只把最近 24 小时热点作为时效线索，热点只能作为行业线索和时效角度，不要让通用 AI 热点覆盖账号本身的行业、客户和产品。评分维度固定为：账号适配度、转化价值、流量潜力、素材支撑、执行难度。每张卡片优先补充 hook（开头钩子）、angle（展开角度）、cta（结尾行动），并按热点类、人设类、问题解答类、观点类的口径组织。`
+    prompt += `\n\n【今日推荐模式】推荐优先级固定为：当前账号资料/资料库 > 对标账号/对标文案 > 行业热点/AI HOT。只把最近 24 小时热点作为时效线索，热点只能作为行业线索和时效角度，不要让通用 AI 热点覆盖账号本身的行业、客户和产品。评分维度固定为：账号适配度、转化价值、流量潜力、素材支撑、执行难度。每张卡片必须输出 hook（开头钩子）、angle（展开角度）、cta（结尾行动），缺少 hook 或 angle 视为不合格，并按热点类、人设类、问题解答类、观点类的口径组织。`
   } else if (recommendationMode === "weekly") {
     prompt += `\n\n【本周选题模式】生成一组适合作为本周内容池的选题，账号资料、对标账号、对标文案和资料库内容优先，热点只作为角度参考，不要过度依赖单日新闻。评分维度固定为：账号适配度、转化价值、流量潜力、素材支撑、执行难度，并按热点类、人设类、问题解答类、观点类的口径组织。`
   }
