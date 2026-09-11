@@ -14,6 +14,9 @@ export function placeholderEmailForPhone(phone: string): string {
   return `${phone}@phone.local`
 }
 
+/** 手机号验证通过自动开通的试用天数（权限门控只看 expiresAt，有值且未过期即 active） */
+export const SMS_LOGIN_TRIAL_DAYS = 7
+
 /**
  * POST /api/auth/sms/login — 手机号验证码登录
  * 未注册手机号验码通过后自动注册（随机不可用密码，后续可自行设置）。
@@ -52,14 +55,19 @@ export async function POST(request: NextRequest) {
   let user = await prisma.user.findUnique({ where: { phone } })
 
   if (!user) {
-    // 自动注册：随机密码（不可用于登录，bcrypt 加密），占位邮箱
+    // 自动注册：随机密码（不可用于登录，bcrypt 加密），占位邮箱。
+    // 验证通过即送试用：权限门控只看 expiresAt（有值且未过期即 active），
+    // 给新账号开一个试用窗口，登录即可用，到期后再用激活码续。
     const randomPassword = randomBytes(24).toString("hex")
+    const trialExpiresAt = new Date()
+    trialExpiresAt.setDate(trialExpiresAt.getDate() + SMS_LOGIN_TRIAL_DAYS)
     user = await prisma.user.create({
       data: {
         phone,
         email: placeholderEmailForPhone(phone),
         password: await hashPassword(randomPassword),
         name: `用户${phone.slice(-4)}`,
+        expiresAt: trialExpiresAt,
       },
     })
   }

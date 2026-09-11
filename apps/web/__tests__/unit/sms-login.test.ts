@@ -128,7 +128,7 @@ describe("POST /api/auth/sms/login", () => {
     expect(res.headers.getSetCookie?.().join(",") ?? "").toContain("mingyuan_user_session")
   })
 
-  it("auto-registers a new phone user", async () => {
+  it("auto-registers a new phone user with a trial window", async () => {
     prismaMocks.smsCodeFindFirst.mockResolvedValue(validCodeRecord("654321"))
     prismaMocks.userFindUnique.mockResolvedValue(null)
     prismaMocks.userCreate.mockResolvedValue({
@@ -138,13 +138,15 @@ describe("POST /api/auth/sms/login", () => {
 
     const res = await smsLogin(req("http://localhost/api/auth/sms/login", { phone: PHONE, code: "654321" }))
     expect(res.status).toBe(200)
-    expect(prismaMocks.userCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        phone: PHONE,
-        email: `${PHONE}@phone.local`,
-        name: `用户${PHONE.slice(-4)}`,
-      }),
+    const createArg = prismaMocks.userCreate.mock.calls[0][0]
+    expect(createArg.data).toMatchObject({
+      phone: PHONE,
+      email: `${PHONE}@phone.local`,
+      name: `用户${PHONE.slice(-4)}`,
     })
+    // 验证通过即送试用：新账号自动获得一个未过期的 expiresAt 窗口
+    expect(createArg.data.expiresAt).toBeInstanceOf(Date)
+    expect(createArg.data.expiresAt.getTime()).toBeGreaterThan(Date.now())
   })
 
   it("rejects a wrong code and increments attempts", async () => {
