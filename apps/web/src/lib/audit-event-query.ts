@@ -97,7 +97,9 @@ export function buildAuditEventWhere(filters: AuditEventFilters): Record<string,
   return where
 }
 
-export function auditEventCursor(cursor: string | null): Record<string, unknown> | undefined {
+export type AuditEventCursor = { id: string; occurredAt?: Date }
+
+export function auditEventCursor(cursor: string | null): AuditEventCursor | undefined {
   if (!cursor) return undefined
   try {
     const parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as unknown

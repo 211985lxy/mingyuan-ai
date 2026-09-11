@@ -54,5 +54,12 @@ describe("operational alerts", () => {
     const result = await transitionOperationalAlert({ id: "alert-1", transition: "resolved", adminId: "admin-1" })
     expect(result).toEqual(row)
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "resolved", resolvedBy: "admin-1" }) }))
+    expect(sendAlert).toHaveBeenCalledWith(expect.objectContaining({ summary: "告警已恢复：失败率过高" }))
+  })
+
+  it("does not send a second recovery notification for an already resolved alert", async () => {
+    findUnique.mockResolvedValue({ ...row, status: "resolved" })
+    await transitionOperationalAlert({ id: "alert-1", transition: "resolved", adminId: "admin-1" })
+    expect(sendAlert).not.toHaveBeenCalled()
   })
 })

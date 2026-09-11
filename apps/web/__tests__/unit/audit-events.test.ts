@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { upsert, findUnique, error, adminFindMany, aimFindMany, agentFindMany } = vi.hoisted(() => ({
+const { upsert, findUnique, error, adminFindMany, aimFindMany, agentFindMany, upsertOperationalAlert } = vi.hoisted(() => ({
   upsert: vi.fn(),
   findUnique: vi.fn(),
   error: vi.fn(),
   adminFindMany: vi.fn(),
   aimFindMany: vi.fn(),
   agentFindMany: vi.fn(),
+  upsertOperationalAlert: vi.fn(),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -18,6 +19,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("@/lib/logger", () => ({ logger: { error } }))
+vi.mock("@/lib/operational-alerts", () => ({ upsertOperationalAlert }))
 
 import { reconcileAuditEvents, recordAgentApiAudit, recordAuditEvent, specialistAuditInput } from "@/lib/audit-events"
 
@@ -29,6 +31,7 @@ describe("audit event writer", () => {
     adminFindMany.mockReset()
     aimFindMany.mockReset()
     agentFindMany.mockReset()
+    upsertOperationalAlert.mockReset()
     upsert.mockResolvedValue({ id: "event-1" })
     findUnique.mockResolvedValue(null)
     adminFindMany.mockResolvedValue([])
@@ -125,6 +128,25 @@ describe("audit event writer", () => {
     expect(upsert).not.toHaveBeenCalled()
   })
 
+  it("backfills a missing payload hash on legacy index rows", async () => {
+    const input = specialistAuditInput({
+      source: "server",
+      category: "runtime",
+      severity: "info",
+      status: "success",
+      action: "health.check",
+      summary: "health check",
+      sourceRecordType: "HealthCheck",
+      sourceRecordId: "legacy-hc-1",
+    })
+    findUnique.mockResolvedValueOnce({ id: "legacy-event", payloadHash: "" })
+    const result = await recordAuditEvent(input)
+    expect(result).toEqual({ ok: true, id: "event-1", inserted: false })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({ payloadHash: expect.stringMatching(/^[a-f0-9]{64}$/) }),
+    }))
+  })
+
   it("reports a conflict when the same key carries a different payload", async () => {
     findUnique.mockResolvedValueOnce({ id: "existing", payloadHash: "different" })
     const result = await recordAuditEvent(specialistAuditInput({
@@ -138,6 +160,12 @@ describe("audit event writer", () => {
       sourceRecordId: "hc-1",
     }))
     expect(result).toEqual({ ok: false, inserted: false, conflict: true })
+    expect(upsertOperationalAlert).toHaveBeenCalledWith(expect.objectContaining({
+      rule: "audit_idempotency_conflict",
+      severity: "critical",
+      source: "audit_index",
+      fingerprint: expect.stringMatching(/^audit-idempotency-conflict:server:[a-f0-9]{16}$/),
+    }))
     expect(error).toHaveBeenCalledOnce()
   })
 

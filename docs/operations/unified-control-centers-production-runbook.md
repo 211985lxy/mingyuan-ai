@@ -76,3 +76,52 @@
 - 告警确认/解决/重开状态流转（写操作，验证时使用本地库）。
 
 以下写操作一律留到生产审批之后：真实留存删除、告警流转演练在生产库执行、SLS 资源创建与 LoongCollector 安装。
+
+## 当前提交构建冒烟记录（2026-09-11，Task 9 Step 4 复核）
+
+代码版本：`codex/unified-control-centers` @ `99ab4078`，使用当前提交构建产物在本地 3101 端口短时启动验证。`/api/healthz` 返回 200，数据库与 Redis 检查均为 `ok=true`；本地未注入发布清单，因此 `releaseSha`/`version` 显示 `unknown`，不作为生产版本证据。
+
+已验证：
+
+- `/api/metrics` 无认证返回 401。
+- `/admin/statistics`、`/admin/audit-center` 匿名访问均 307 跳转 `/admin/login`。
+- `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts` 匿名访问均 401。
+
+本轮未执行管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装。
+
+## 当前提交构建与全量回归记录（2026-09-11，告警恢复通知）
+
+代码版本：`codex/unified-control-centers` @ `55950ca7`。本轮仅在本地验证，未部署生产。
+
+已验证：
+
+- 全量单测：531 个测试文件通过、1 个跳过；3655 个测试通过、2 个跳过。
+- 组件测试：25 个测试文件、84 个测试全部通过。
+- 生产构建：Next.js 编译、TypeScript 检查和 180 个静态页面生成通过。
+- 告警状态流：首次解决会发送一次“告警已恢复”通知；重复解决不会重复发送。
+- 提交前门禁：`typecheck`、`arch:size`、`api:contracts`、`env:check` 全部通过。
+
+构建仍有既有 Turbopack 动态文件追踪警告及 middleware 命名弃用提示；不影响本次构建退出码，但应在后续性能/框架升级批次单独处理。
+
+本轮未执行管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装；当前提交不能作为生产已部署版本证明。
+
+## 最新增量回归记录（2026-09-11，日趋势与幂等冲突告警）
+
+实现提交：`d306a8f3`、`24584170`。最新文档提交前的实现内容为：
+
+- 审计幂等键不同载荷会创建 `critical` 告警；告警元数据只保留来源、错误码和已有记录标识，不写入原始幂等键。
+- 统计概览新增统一上海日期桶 `dailyTrend`，展示执行、成功、失败、成功率和渠道指标；执行源不可用时对应值保持 `null`。
+- 相关审计、统计与组件测试已通过；随后重新完成全量单测、组件测试和生产构建。
+
+本轮仍未执行生产迁移、管理员写操作、真实留存删除、SLS 资源创建或 LoongCollector 安装。
+
+## 最新构建 HTTP 冒烟（2026-09-11）
+
+以当前构建产物启动临时本地服务（端口 3102）并在验证后关闭：
+
+- `/api/healthz`：200。
+- `/api/metrics`：未认证 401。
+- `/admin/statistics`、`/admin/audit-center`：匿名 307 跳转 `/admin/login`。
+- `/api/admin/statistics/overview`、`/api/admin/audit-events`、`/api/admin/alerts`：匿名 401。
+
+该冒烟只验证匿名边界与健康检查；管理员数据、告警写操作和生产 SLS 仍需审批后的专门演练。

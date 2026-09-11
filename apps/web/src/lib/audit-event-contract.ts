@@ -63,6 +63,8 @@ const SENSITIVE_KEY = /(?:token|secret|password|authorization|cookie|prompt|raw.
 const MAX_SUMMARY_LENGTH = 2000
 const MAX_METADATA_STRING_LENGTH = 2000
 const MAX_METADATA_DEPTH = 6
+const MAX_EXTERNAL_LOG_URL_LENGTH = 2048
+const TRUSTED_LOG_HOSTS = new Set(["sls.console.aliyun.com", "sls4service.console.aliyun.com"])
 const SAFE_METADATA_KEYS = new Set([
   "action", "actorType", "agentId", "approvalId", "attempt", "batchId", "binding",
   "category", "channel", "chars", "code", "count", "coverage", "createdCount", "decision",
@@ -141,6 +143,19 @@ function buildPayloadHash(input: {
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex")
 }
 
+function normalizeExternalLogUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined
+  const candidate = value.trim()
+  if (candidate.length === 0 || candidate.length > MAX_EXTERNAL_LOG_URL_LENGTH) return undefined
+  try {
+    const url = new URL(candidate)
+    if (url.protocol !== "https:" || !TRUSTED_LOG_HOSTS.has(url.hostname.toLowerCase())) return undefined
+    return url.toString()
+  } catch {
+    return undefined
+  }
+}
+
 export function buildAuditIdempotencyKey(source: string, sourceRecordType: string, sourceRecordId: string): string {
   return `${source}:${sourceRecordType}:${sourceRecordId}`
 }
@@ -167,6 +182,7 @@ export function normalizeAuditEvent(input: AuditEventInput): NormalizedAuditEven
     ...input,
     action,
     summary,
+    externalLogUrl: normalizeExternalLogUrl(input.externalLogUrl),
     actorIdHash,
     correlationId,
     metadata: metadata as Record<string, unknown> | unknown[] | undefined,

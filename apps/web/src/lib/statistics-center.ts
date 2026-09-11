@@ -6,10 +6,6 @@ import { parseShanghaiDateRange, type ShanghaiDateRange } from "@/lib/shanghai-t
 import type { ControlCenterFilters, ControlCenterFreshness, CoverageSummary } from "@/lib/control-center-contracts"
 
 const TRACE_LIMIT = 10_000
-const CHANNEL_METRICS = [
-  "received", "duplicate", "rate_limited", "ingress_rejected",
-  "pipeline_started", "pipeline_completed", "pipeline_failed", "reply_sent", "reply_dead_letter",
-] as const
 
 interface TraceRow {
   id: string
@@ -30,6 +26,17 @@ interface DailyChannelRow {
   platform: string
   metric: string
   count: number
+}
+
+export interface StatisticsDailyTrendPoint {
+  day: string
+  operations: {
+    runCount: number | null
+    successCount: number | null
+    failedCount: number | null
+    successRate: number | null
+  }
+  channels: Record<string, number> | null
 }
 
 export interface StatisticsOverviewInput {
@@ -57,6 +64,7 @@ export interface StatisticsOverviewResponse {
   business: ReviewMetricsSnapshot | null
   previousBusiness: ReviewMetricsSnapshot | null
   channels: { days: Array<Record<string, number | string>>; total: Record<string, number>; degraded: boolean; reason?: string }
+  dailyTrend: StatisticsDailyTrendPoint[]
   comparison: Record<string, { current: number | null; previous: number | null; delta: number | null; rate: number | null }>
   degradedSources: string[]
 }
@@ -140,6 +148,21 @@ function summarizeOperations(traces: TraceRow[], now: Date) {
   }
 }
 
+function unavailableOperations(reason: string) {
+  return {
+    runCount: null,
+    successCount: null,
+    failedCount: null,
+    staleRunningCount: null,
+    successRate: null,
+    p50DurationMs: null,
+    p95DurationMs: null,
+    totalTokens: null,
+    totalCostCny: null,
+    coverage: { available: null, total: null, ratio: null, reason },
+  }
+}
+
 function listShanghaiDays(range: ShanghaiDateRange): string[] {
   const days: string[] = []
   let day = range.from
@@ -172,6 +195,43 @@ async function loadChannels(input: StatisticsOverviewInput): Promise<StatisticsO
   }
 }
 
+function buildDailyTrend(
+  range: ShanghaiDateRange,
+  traces: TraceRow[] | null,
+  channels: StatisticsOverviewResponse["channels"],
+): StatisticsDailyTrendPoint[] {
+  const byDay = new Map<string, StatisticsDailyTrendPoint>()
+  for (const day of listShanghaiDays(range)) {
+    byDay.set(day, {
+      day,
+      operations: traces
+        ? { runCount: 0, successCount: 0, failedCount: 0, successRate: null }
+        : { runCount: null, successCount: null, failedCount: null, successRate: null },
+      channels: channels.degraded ? null : {},
+    })
+  }
+  for (const trace of traces || []) {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(trace.createdAt)
+    const bucket = byDay.get(day)
+    if (!bucket || bucket.operations.runCount == null) continue
+    bucket.operations.runCount += 1
+    if (trace.status === "success") bucket.operations.successCount = (bucket.operations.successCount ?? 0) + 1
+    if (trace.status === "failed") bucket.operations.failedCount = (bucket.operations.failedCount ?? 0) + 1
+    const terminal = (bucket.operations.successCount ?? 0) + (bucket.operations.failedCount ?? 0)
+    bucket.operations.successRate = ratio(bucket.operations.successCount ?? 0, terminal)
+  }
+  if (!channels.degraded) {
+    for (const day of channels.days) {
+      const bucket = byDay.get(String(day.day))
+      if (!bucket || bucket.channels == null) continue
+      for (const [key, value] of Object.entries(day)) {
+        if (key !== "day" && typeof value === "number") bucket.channels[key] = value
+      }
+    }
+  }
+  return [...byDay.values()]
+}
+
 function previousRange(range: ShanghaiDateRange): ShanghaiDateRange {
   const duration = range.end.getTime() - range.start.getTime()
   const start = new Date(range.start.getTime() - duration)
@@ -202,8 +262,8 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
   const now = input.now ?? new Date()
   const previous = previousRange(input.range)
   const degradedSources: string[] = []
-  let traces: TraceRow[] = []
-  let previousTraces: TraceRow[] = []
+  let traces: TraceRow[] | null = null
+  let previousTraces: TraceRow[] | null = null
   try {
     traces = await loadTraces(input)
     previousTraces = await loadTraces({ ...input, range: previous })
@@ -222,8 +282,8 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
   }
   const channels = await loadChannels(input)
   if (channels.degraded) degradedSources.push("channel_metric_daily")
-  const operations = summarizeOperations(traces, now)
-  const previousOperations = summarizeOperations(previousTraces, input.range.start)
+  const operations = traces ? summarizeOperations(traces, now) : unavailableOperations("执行记录查询失败")
+  const previousOperations = previousTraces ? summarizeOperations(previousTraces, input.range.start) : unavailableOperations("执行记录查询失败")
   const comparison = {
     runCount: compareMetric(operations.runCount, previousOperations.runCount),
     successRate: compareMetric(operations.successRate, previousOperations.successRate),
@@ -232,10 +292,11 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
     paymentCount: compareMetric(business?.paymentCount ?? null, previousBusiness?.paymentCount ?? null),
   }
   const freshness: ControlCenterFreshness[] = [
-    { source: "aim_execution_trace", lastUpdatedAt: traces.length ? traces[traces.length - 1].updatedAt.toISOString() : null, lagMs: traces.length ? Math.max(0, now.getTime() - traces[traces.length - 1].updatedAt.getTime()) : null, degraded: degradedSources.includes("aim_execution_trace"), reason: degradedSources.includes("aim_execution_trace") ? "执行记录查询失败" : undefined },
+    { source: "aim_execution_trace", lastUpdatedAt: traces?.length ? traces[traces.length - 1].updatedAt.toISOString() : null, lagMs: traces?.length ? Math.max(0, now.getTime() - traces[traces.length - 1].updatedAt.getTime()) : null, degraded: degradedSources.includes("aim_execution_trace"), reason: degradedSources.includes("aim_execution_trace") ? "执行记录查询失败" : undefined },
     { source: "review_metrics", lastUpdatedAt: business ? now.toISOString() : null, lagMs: business ? 0 : null, degraded: degradedSources.includes("review_metrics"), reason: degradedSources.includes("review_metrics") ? "业务指标查询失败" : undefined },
     { source: "channel_metric_daily", lastUpdatedAt: channels.degraded ? null : now.toISOString(), lagMs: channels.degraded ? null : 0, degraded: channels.degraded, reason: channels.reason },
   ]
+  const dailyTrend = buildDailyTrend(input.range, traces, channels)
   return {
     period: { from: input.range.from, to: input.range.to, timezone: "Asia/Shanghai", previousFrom: previous.from, previousTo: previous.to },
     freshness,
@@ -243,6 +304,7 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
     business,
     previousBusiness,
     channels,
+    dailyTrend,
     comparison,
     degradedSources,
   }

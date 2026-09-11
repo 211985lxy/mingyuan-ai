@@ -23,8 +23,8 @@ export interface ControlCenterFreshness {
 }
 
 export interface CoverageSummary {
-  available: number
-  total: number
+  available: number | null
+  total: number | null
   ratio: number | null
   reason?: string
 }

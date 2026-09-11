@@ -101,4 +101,27 @@ describe("audit event contract", () => {
     })
     expect(first.payloadHash).toBe(second.payloadHash)
   })
+
+  it("keeps only trusted SLS HTTPS links", () => {
+    const trusted = normalizeAuditEvent({
+      source: "server",
+      category: "runtime",
+      severity: "info",
+      status: "success",
+      action: "health.check",
+      summary: "ok",
+      externalLogUrl: "https://sls.console.aliyun.com/lognext/project/demo/logsearch",
+    })
+    const untrusted = normalizeAuditEvent({
+      source: "server",
+      category: "runtime",
+      severity: "info",
+      status: "success",
+      action: "health.check",
+      summary: "ok",
+      externalLogUrl: "javascript:alert(1)",
+    })
+    expect(trusted.externalLogUrl).toContain("https://sls.console.aliyun.com/")
+    expect(untrusted.externalLogUrl).toBeUndefined()
+  })
 })
