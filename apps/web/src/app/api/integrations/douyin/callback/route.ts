@@ -7,7 +7,6 @@ import {
   fetchDouyinRecentVideos,
   fetchDouyinUserProfile,
   syncDouyinDataToLarkBase,
-  type DouyinToken,
 } from "@/lib/douyin-openapi"
 import { env } from "@/env"
 import {
@@ -15,13 +14,16 @@ import {
   upsertDouyinBinding,
 } from "@/features/integrations/douyin-binding"
 import { resolveBoundProject } from "@/lib/account-project-context"
+import { DOUYIN_RETURN_COOKIE, readDouyinReturnPath } from "@/lib/douyin-oauth-return"
 
 export const runtime = "nodejs"
 
 /**
  * 抖音授权回调。
  * 流程：校验 state（防 CSRF）→ code 换 token → 拉用户/视频/粉丝数据
- *         → 写入飞书 Base → 302 回 Dashboard（带上结果状态）
+ *         → 写入飞书 Base → 302 回发起页（带上结果状态）
+ * 回跳目标取自发起授权时写入的 douyin_oauth_return Cookie，用户在哪发起就回哪，
+ * 保证该页的提示组件能读到 douyin_ok / douyin_error。
  */
 export async function GET(request: NextRequest) {
   let auth: { id: string; email: string }
@@ -39,31 +41,30 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get("error") || searchParams.get("errorCode") || searchParams.get("error_code")
   const errorMsg = searchParams.get("error_description") || searchParams.get("description") || "用户取消授权"
 
-  const homeRedirect = new URL("/home", origin)
+  const resultRedirect = new URL(readDouyinReturnPath(request), origin)
 
   /* 1. 抖音返回错误（用户拒绝、超时、scope 不足） */
   if (error || !code) {
-    homeRedirect.searchParams.set(
+    resultRedirect.searchParams.set(
       "douyin_error",
       encodeURIComponent(error ? `抖音授权失败：${error} ${errorMsg}`.trim() : "抖音未返回授权 code，请重试。"),
     )
-    return NextResponse.redirect(homeRedirect, { status: 302 })
+    return NextResponse.redirect(resultRedirect, { status: 302 })
   }
 
   /* 2. state 校验（和 Cookie 里保存的一致） */
   const savedState = request.cookies.get("douyin_oauth_state")?.value
   if (!savedState || savedState !== state) {
-    homeRedirect.searchParams.set("douyin_error", encodeURIComponent("授权状态校验失败（CSRF），请重新发起绑定。"))
-    const r = NextResponse.redirect(homeRedirect, { status: 302 })
+    resultRedirect.searchParams.set("douyin_error", encodeURIComponent("授权状态校验失败（CSRF），请重新发起绑定。"))
+    const r = NextResponse.redirect(resultRedirect, { status: 302 })
     r.cookies.delete("douyin_oauth_state")
+    r.cookies.delete(DOUYIN_RETURN_COOKIE)
     return r
   }
 
-  let token: DouyinToken | null = null
-
   try {
     /* 3. code 换 access_token / open_id */
-    token = await exchangeDouyinCodeForToken(code)
+    const token = await exchangeDouyinCodeForToken(code)
     if (!token) {
       throw new Error("授权码（code）换令牌失败，请确认抖音后台回调地址与 DOUYIN_REDIRECT_URI 完全一致。")
     }
@@ -88,34 +89,35 @@ export async function GET(request: NextRequest) {
       syncResult = await syncDouyinDataToLarkBase({ profile, videos, token })
     }
 
-    applySuccessParams(homeRedirect, profile, videos.length, syncResult)
-    return redirectWithStateCookieCleared(homeRedirect)
+    applySuccessParams(resultRedirect, profile, videos.length, syncResult)
+    return redirectWithOauthCookiesCleared(resultRedirect)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error("[douyin-callback] 失败:", message)
-    homeRedirect.searchParams.set("douyin_error", encodeURIComponent(message))
-    return redirectWithStateCookieCleared(homeRedirect)
+    resultRedirect.searchParams.set("douyin_error", encodeURIComponent(message))
+    return redirectWithOauthCookiesCleared(resultRedirect)
   }
 }
 
 function applySuccessParams(
-  homeRedirect: URL,
+  resultRedirect: URL,
   profile: { nickname: string; followers?: number | null },
   videoCount: number,
   syncResult: { accounts: number; videos: number } | null,
 ) {
-  homeRedirect.searchParams.set("douyin_ok", "1")
-  homeRedirect.searchParams.set("nickname", encodeURIComponent(profile.nickname))
-  homeRedirect.searchParams.set("fans", String(profile.followers ?? 0))
-  homeRedirect.searchParams.set("videos_count", String(videoCount))
+  resultRedirect.searchParams.set("douyin_ok", "1")
+  resultRedirect.searchParams.set("nickname", encodeURIComponent(profile.nickname))
+  resultRedirect.searchParams.set("fans", String(profile.followers ?? 0))
+  resultRedirect.searchParams.set("videos_count", String(videoCount))
   if (syncResult) {
-    homeRedirect.searchParams.set("lark_accounts", String(syncResult.accounts))
-    homeRedirect.searchParams.set("lark_videos", String(syncResult.videos))
+    resultRedirect.searchParams.set("lark_accounts", String(syncResult.accounts))
+    resultRedirect.searchParams.set("lark_videos", String(syncResult.videos))
   }
 }
 
-function redirectWithStateCookieCleared(target: URL) {
+function redirectWithOauthCookiesCleared(target: URL) {
   const resp = NextResponse.redirect(target, { status: 302 })
   resp.cookies.delete("douyin_oauth_state")
+  resp.cookies.delete(DOUYIN_RETURN_COOKIE)
   return resp
 }

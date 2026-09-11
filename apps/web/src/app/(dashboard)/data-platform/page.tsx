@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 
 import { OwnAccountSection } from "@/app/(dashboard)/data-platform/own-account-section"
-import { AlertCircle, BarChart3, DatabaseZap, ExternalLink, RefreshCw } from "lucide-react"
+import { AlertCircle, BarChart3, DatabaseZap, ExternalLink, Link2, RefreshCw } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  DouyinSyncAlert,
+  useDouyinSyncAlert,
+} from "@/features/integrations/components/douyin-sync-alert"
 import { request } from "@/lib/api/client"
 
 type PlatformAccount = {
@@ -73,6 +77,24 @@ function formatDateTime(value?: string | null): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString("zh-CN", { hour12: false })
+}
+
+/**
+ * 绑定入口就在本页：本页的账号/作品数据正是抖音扫码绑定后写入飞书 Base 的，
+ * 此前入口只在 /account，看板只说"去用社媒助手"，闭环断在用户找不到地方扫码。
+ */
+function BindDouyinButton() {
+  return (
+    <Button
+      size="sm"
+      onClick={() => {
+        window.location.href = `/api/integrations/douyin/auth?return=${encodeURIComponent("/data-platform")}`
+      }}
+    >
+      <Link2 className="mr-2 h-4 w-4" />
+      绑定抖音账号
+    </Button>
+  )
 }
 
 /** 指标四联格：分隔线布局，空值显示「暂无」。 */
@@ -148,7 +170,9 @@ function AccountsSection({ accounts }: { accounts: PlatformAccount[] }) {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
             <p className="text-sm text-muted-foreground">账号表中暂无数据</p>
-            <p className="text-xs text-muted-foreground">用社媒助手同步达人数据后会出现在这里</p>
+            <p className="text-xs text-muted-foreground">
+              点上方「绑定抖音账号」扫码同步，或用社媒助手同步达人数据后写入飞书表
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -212,7 +236,7 @@ function RecentVideosSection({ videos }: { videos: PlatformVideo[] }) {
           <CardContent className="flex flex-col items-center gap-1.5 py-8 text-center">
             <p className="text-sm text-muted-foreground">作品表暂无数据</p>
             <p className="text-xs text-muted-foreground">
-              在社媒助手中开启作品采集并同步飞书后，这里会展示播放、点赞、评论等明细
+              绑定抖音账号后会自动同步作品；其他平台可在社媒助手开启采集并同步飞书
             </p>
           </CardContent>
         </Card>
@@ -223,10 +247,48 @@ function RecentVideosSection({ videos }: { videos: PlatformVideo[] }) {
   )
 }
 
+/** 数据源状态提示（请求失败 / 未配置仓库 / 服务端错误）。 */
+function StatusNotices({ errorMsg, data }: { errorMsg: string | null; data: SummaryResponse | null }) {
+  return (
+    <>
+      {errorMsg ? (
+        <Card>
+          <CardContent className="flex items-center gap-2 pt-6 text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {errorMsg}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {data?.status === "not_configured" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <DatabaseZap className="h-5 w-5" />
+              尚未配置数据仓库
+            </CardTitle>
+            <CardDescription>{data.message}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
+
+      {data?.status === "error" ? (
+        <Card>
+          <CardContent className="flex items-center gap-2 pt-6 text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            {data.message}
+          </CardContent>
+        </Card>
+      ) : null}
+    </>
+  )
+}
+
 export default function DataPlatformPage() {
   const [data, setData] = useState<SummaryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const { okState, errorMsg: bindError } = useDouyinSyncAlert()
 
   async function load() {
     setLoading(true)
@@ -259,43 +321,18 @@ export default function DataPlatformPage() {
             : "社媒助手同步的账号与作品数据，来自飞书多维表格数据仓库"
         }
       >
+        <BindDouyinButton />
         <Button variant="outline" size="sm" onClick={load} disabled={loading}>
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           刷新
         </Button>
       </PageHeader>
 
+      <DouyinSyncAlert okState={okState} errorMsg={bindError} />
+
       <OwnAccountSection />
 
-      {errorMsg ? (
-        <Card>
-          <CardContent className="flex items-center gap-2 pt-6 text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            {errorMsg}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {data?.status === "not_configured" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <DatabaseZap className="h-5 w-5" />
-              尚未配置数据仓库
-            </CardTitle>
-            <CardDescription>{data.message}</CardDescription>
-          </CardHeader>
-        </Card>
-      ) : null}
-
-      {data?.status === "error" ? (
-        <Card>
-          <CardContent className="flex items-center gap-2 pt-6 text-destructive">
-            <AlertCircle className="h-4 w-4" />
-            {data.message}
-          </CardContent>
-        </Card>
-      ) : null}
+      <StatusNotices errorMsg={errorMsg} data={data} />
 
       {data?.status === "ok" ? (
         <>
