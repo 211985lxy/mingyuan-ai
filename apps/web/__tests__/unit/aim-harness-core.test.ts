@@ -123,7 +123,7 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.stream).toBe(false)
     expect(spec.modelPolicy.targetCapability).toBe("advanced")
     expect(spec.modelPolicy.minimumCapability).toBe("standard")
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(4)
     expect(spec.executionPolicy).toMatchObject({
       mode: "single_shot",
       timeoutMs: 115000,
@@ -150,9 +150,9 @@ describe("aim-harness planner", () => {
 
     expect(multi.modelPolicy.routeKey).toBeUndefined()
     expect(multi.modelPolicy.maxTokens).toBe(8192)
-    expect(multi.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(multi.modelPolicy.maxProviderAttempts).toBe(4)
     expect(edit.modelPolicy.routeKey).toBeUndefined()
-    expect(edit.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(edit.modelPolicy.maxProviderAttempts).toBe(4)
   })
 
   it("bounds business_system_diagnosis reports to the workbench response budget", () => {
@@ -164,7 +164,7 @@ describe("aim-harness planner", () => {
     })
 
     expect(spec.modelPolicy.maxTokens).toBe(4096)
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(4)
     expect(spec.modelPolicy.totalTimeoutMs).toBe(115_000)
   })
 
@@ -181,7 +181,7 @@ describe("aim-harness planner", () => {
     expect(spec.modelPolicy.maxTokens).toBeUndefined()
     expect(spec.modelPolicy.targetCapability).toBe("advanced")
     expect(spec.modelPolicy.minimumCapability).toBe("standard")
-    expect(spec.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(spec.modelPolicy.maxProviderAttempts).toBe(4)
   })
 
   it("agent_api / inspiration 冻结为生成入口参数（与 generate 同）", () => {
@@ -221,7 +221,7 @@ describe("aim-harness planner", () => {
   it.each([
     { temperature: -0.1, maxTokens: 3000, maxProviderAttempts: 1 },
     { temperature: 0.2, maxTokens: 255, maxProviderAttempts: 1 },
-    { temperature: 0.2, maxTokens: 3000, maxProviderAttempts: 4 },
+    { temperature: 0.2, maxTokens: 3000, maxProviderAttempts: 5 },
   ])("拒绝非法 modelPolicy override: $temperature/$maxTokens/$maxProviderAttempts", (modelPolicy) => {
     expect(() => planAimRun({
       entrypoint: "generate",

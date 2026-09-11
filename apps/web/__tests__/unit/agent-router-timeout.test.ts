@@ -47,7 +47,7 @@ describe("agent router timeout overrides", () => {
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
     const doubao = ctorArgs.find((config) => String(config.baseURL || "").includes("ark.cn-beijing"))
-    expect(zenmux?.timeout).toBe(50_000)
+    expect(zenmux?.timeout).toBe(30_000)
     expect(doubao?.timeout).toBe(60_000)
     expect(apimart?.timeout).toBe(25_000)
     expect(getAgentLLM("business_diagnosis").providerNames.slice(0, 4)).toEqual([
@@ -75,7 +75,7 @@ describe("agent router timeout overrides", () => {
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
     const doubao = ctorArgs.find((config) => String(config.baseURL || "").includes("ark.cn-beijing"))
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
-    expect(zenmux?.timeout).toBe(50_000)
+    expect(zenmux?.timeout).toBe(30_000)
     expect(doubao?.timeout).toBe(60_000)
     expect(apimart?.timeout).toBe(25_000)
   })
@@ -97,7 +97,7 @@ describe("agent router timeout overrides", () => {
     const doubao = ctorArgs.find((config) => String(config.baseURL || "").includes("ark.cn-beijing"))
     const apimart = ctorArgs.find((config) => config.baseURL === "https://api.apimart.ai/v1")
     const deepseek = ctorArgs.find((config) => String(config.baseURL || "").includes("deepseek"))
-    expect(zenmux?.timeout).toBe(50_000)
+    expect(zenmux?.timeout).toBe(30_000)
     expect(zenmux?.maxRetries).toBe(0)
     expect(doubao?.timeout).toBe(60_000)
     expect(apimart?.timeout).toBe(25_000)
@@ -116,7 +116,7 @@ describe("agent router timeout overrides", () => {
     expect(getAgentRecommendedModel("business_system_diagnosis")).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
-    expect(zenmux?.timeout).toBe(50_000)
+    expect(zenmux?.timeout).toBe(30_000)
   })
 
   it("attaches proxy dispatcher to ZenMux when APIMART_PROXY_URL is set", async () => {

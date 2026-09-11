@@ -133,7 +133,7 @@ export class LLMClient {
 
     const maxAttempts = normalizeInteger(
       this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
-      3,
+      4,
       1,
       5,
     )
@@ -242,7 +242,7 @@ export class LLMClient {
 
     const maxAttempts = normalizeInteger(
       this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
-      3,
+      4,
       1,
       5,
     )
