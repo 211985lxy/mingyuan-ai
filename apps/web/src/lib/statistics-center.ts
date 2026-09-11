@@ -6,10 +6,6 @@ import { parseShanghaiDateRange, type ShanghaiDateRange } from "@/lib/shanghai-t
 import type { ControlCenterFilters, ControlCenterFreshness, CoverageSummary } from "@/lib/control-center-contracts"
 
 const TRACE_LIMIT = 10_000
-const CHANNEL_METRICS = [
-  "received", "duplicate", "rate_limited", "ingress_rejected",
-  "pipeline_started", "pipeline_completed", "pipeline_failed", "reply_sent", "reply_dead_letter",
-] as const
 
 interface TraceRow {
   id: string
