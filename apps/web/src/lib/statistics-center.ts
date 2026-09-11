@@ -28,6 +28,17 @@ interface DailyChannelRow {
   count: number
 }
 
+export interface StatisticsDailyTrendPoint {
+  day: string
+  operations: {
+    runCount: number | null
+    successCount: number | null
+    failedCount: number | null
+    successRate: number | null
+  }
+  channels: Record<string, number> | null
+}
+
 export interface StatisticsOverviewInput {
   range: ShanghaiDateRange
   filters: ControlCenterFilters
@@ -53,6 +64,7 @@ export interface StatisticsOverviewResponse {
   business: ReviewMetricsSnapshot | null
   previousBusiness: ReviewMetricsSnapshot | null
   channels: { days: Array<Record<string, number | string>>; total: Record<string, number>; degraded: boolean; reason?: string }
+  dailyTrend: StatisticsDailyTrendPoint[]
   comparison: Record<string, { current: number | null; previous: number | null; delta: number | null; rate: number | null }>
   degradedSources: string[]
 }
@@ -183,6 +195,43 @@ async function loadChannels(input: StatisticsOverviewInput): Promise<StatisticsO
   }
 }
 
+function buildDailyTrend(
+  range: ShanghaiDateRange,
+  traces: TraceRow[] | null,
+  channels: StatisticsOverviewResponse["channels"],
+): StatisticsDailyTrendPoint[] {
+  const byDay = new Map<string, StatisticsDailyTrendPoint>()
+  for (const day of listShanghaiDays(range)) {
+    byDay.set(day, {
+      day,
+      operations: traces
+        ? { runCount: 0, successCount: 0, failedCount: 0, successRate: null }
+        : { runCount: null, successCount: null, failedCount: null, successRate: null },
+      channels: channels.degraded ? null : {},
+    })
+  }
+  for (const trace of traces || []) {
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(trace.createdAt)
+    const bucket = byDay.get(day)
+    if (!bucket || bucket.operations.runCount == null) continue
+    bucket.operations.runCount += 1
+    if (trace.status === "success") bucket.operations.successCount = (bucket.operations.successCount ?? 0) + 1
+    if (trace.status === "failed") bucket.operations.failedCount = (bucket.operations.failedCount ?? 0) + 1
+    const terminal = (bucket.operations.successCount ?? 0) + (bucket.operations.failedCount ?? 0)
+    bucket.operations.successRate = ratio(bucket.operations.successCount ?? 0, terminal)
+  }
+  if (!channels.degraded) {
+    for (const day of channels.days) {
+      const bucket = byDay.get(String(day.day))
+      if (!bucket || bucket.channels == null) continue
+      for (const [key, value] of Object.entries(day)) {
+        if (key !== "day" && typeof value === "number") bucket.channels[key] = value
+      }
+    }
+  }
+  return [...byDay.values()]
+}
+
 function previousRange(range: ShanghaiDateRange): ShanghaiDateRange {
   const duration = range.end.getTime() - range.start.getTime()
   const start = new Date(range.start.getTime() - duration)
@@ -247,6 +296,7 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
     { source: "review_metrics", lastUpdatedAt: business ? now.toISOString() : null, lagMs: business ? 0 : null, degraded: degradedSources.includes("review_metrics"), reason: degradedSources.includes("review_metrics") ? "业务指标查询失败" : undefined },
     { source: "channel_metric_daily", lastUpdatedAt: channels.degraded ? null : now.toISOString(), lagMs: channels.degraded ? null : 0, degraded: channels.degraded, reason: channels.reason },
   ]
+  const dailyTrend = buildDailyTrend(input.range, traces, channels)
   return {
     period: { from: input.range.from, to: input.range.to, timezone: "Asia/Shanghai", previousFrom: previous.from, previousTo: previous.to },
     freshness,
@@ -254,6 +304,7 @@ export async function loadStatisticsOverview(input: StatisticsOverviewInput): Pr
     business,
     previousBusiness,
     channels,
+    dailyTrend,
     comparison,
     degradedSources,
   }

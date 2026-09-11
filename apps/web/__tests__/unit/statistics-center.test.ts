@@ -56,6 +56,10 @@ describe("statistics center", () => {
     expect(result.business).toEqual(snapshot)
     expect(result.channels.total["feishu.received"]).toBe(4)
     expect(result.channels.days.map((day) => day.day)).toEqual(["2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07"])
+    expect(result.dailyTrend.find((day) => day.day === "2026-09-02")).toMatchObject({
+      operations: { runCount: 1, successCount: 1, failedCount: 0, successRate: 1 },
+    })
+    expect(result.dailyTrend.find((day) => day.day === "2026-09-02")?.channels).toEqual({ "feishu.received": 4 })
     expect(result.comparison.dealCount).toMatchObject({ current: 1, previous: 1, delta: 0, rate: 0 })
   })
 
@@ -66,5 +70,6 @@ describe("statistics center", () => {
     expect(result.degradedSources).toEqual(expect.arrayContaining(["aim_execution_trace", "review_metrics"]))
     expect(result.operations).toMatchObject({ runCount: null, successCount: null, failedCount: null, coverage: { available: null, total: null, ratio: null } })
     expect(result.business).toBeNull()
+    expect(result.dailyTrend.every((day) => day.operations.runCount === null)).toBe(true)
   })
 })
