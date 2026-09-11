@@ -1,5 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { Buffer } from "node:buffer"
 import { prisma } from "@/lib/prisma"
 import { logger } from "@/lib/logger"
@@ -33,6 +33,27 @@ export class AuditIdempotencyConflictError extends Error {
 
 function getAuditEventDelegate(): AuditEventDelegate | undefined {
   return (prisma as typeof prisma & { auditEvent?: AuditEventDelegate }).auditEvent
+}
+
+async function raiseIdempotencyConflictAlert(error: AuditIdempotencyConflictError): Promise<void> {
+  try {
+    const { upsertOperationalAlert } = await import("@/lib/operational-alerts")
+    const keyHash = createHash("sha256").update(error.idempotencyKey).digest("hex").slice(0, 16)
+    await upsertOperationalAlert({
+      fingerprint: `audit-idempotency-conflict:${error.source}:${keyHash}`,
+      rule: "audit_idempotency_conflict",
+      severity: "critical",
+      summary: `审计幂等载荷冲突（来源 ${error.source}）`,
+      source: "audit_index",
+      metadata: {
+        source: error.source,
+        errorCode: error.code,
+        targetId: error.existingId,
+      },
+    })
+  } catch (alertError) {
+    logger.error({ err: alertError, source: error.source }, "audit idempotency conflict alert failed")
+  }
 }
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
@@ -131,6 +152,7 @@ export async function recordAuditEvent(
   } catch (error) {
     if (error instanceof AuditIdempotencyConflictError) {
       auditIdempotencyConflictsTotal.inc({ source: error.source })
+      await raiseIdempotencyConflictAlert(error)
       if (options.strict) throw error
       logger.error({ source: error.source, idempotencyKey: error.idempotencyKey }, "audit idempotency conflict")
       return { ok: false, inserted: false, conflict: true }
