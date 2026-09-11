@@ -111,7 +111,7 @@ function makeStore(opts: StoreOpts = {}): TestStore {
   const expectedArchive = 1
 
   const tx: ProjectMergeTransaction = {
-    lockAndInspect: async () => {
+    lockAndInspect: async (_input) => {
       calls.push("lockAndInspect")
       return snapshot
     },
@@ -324,6 +324,21 @@ describe("project merge service", () => {
   it("rejects inactive admin independent of project owners", async () => {
     const store = makeStore({ admin: { userId: "admin-1", status: "inactive" } })
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("admin")
+    await expect(applyProjectMerge(validInput, store)).rejects.not.toThrow(/mismatch/)
+  })
+
+  it("rejects when snapshot admin is active but not the invoking admin", async () => {
+    const store = makeStore({
+      admin: { userId: "other-active-admin", status: "active" },
+    })
+    await expect(applyProjectMerge(validInput, store)).rejects.toThrow("admin mismatch")
+    expect(store.committedWrites).toEqual([])
+  })
+
+  it("succeeds when snapshot admin userId matches invoking adminUserId", async () => {
+    const store = makeStore({ admin: { userId: "admin-1", status: "active" } })
+    const result = await applyProjectMerge(validInput, store)
+    expect(result.auditId).toBe("audit-id")
   })
 
   it("rejects exact rebind-count mismatch", async () => {

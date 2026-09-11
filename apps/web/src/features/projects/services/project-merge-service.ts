@@ -82,8 +82,12 @@ export interface ProjectMergeResult {
 
 // ----- store boundary ----------------------------------------------------
 
+export type ProjectMergeLockInput = ProjectMergeIdentity & {
+  adminUserId: string
+}
+
 export interface ProjectMergeTransaction {
-  lockAndInspect(input: ProjectMergeIdentity): Promise<ProjectMergeSnapshot>
+  lockAndInspect(input: ProjectMergeLockInput): Promise<ProjectMergeSnapshot>
   upsertTargetMembers(
     targetProjectId: string,
     targetOwnerId: string,
@@ -273,6 +277,11 @@ function validateSnapshot(
   // required to own either project.
   if (snapshot.admin.status !== "active") {
     throw new Error(`admin is not active: ${snapshot.admin.userId}`)
+  }
+  if (snapshot.admin.userId !== input.adminUserId) {
+    throw new Error(
+      `admin mismatch: expected ${input.adminUserId}, got ${snapshot.admin.userId}`,
+    )
   }
 
   // Expected owners must match the locked projects' actual owners.
