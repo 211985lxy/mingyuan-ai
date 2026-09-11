@@ -159,16 +159,28 @@ export async function transitionOperationalAlert(input: {
   transition: "acknowledged" | "resolved" | "reopened"
   adminId: string
   now?: Date
+  fetchImpl?: typeof fetch
 }): Promise<OperationalAlert> {
   const delegate = getAlertDelegate()
   if (!delegate) throw new Error("OperationalAlert client is not generated")
   const now = input.now ?? new Date()
+  const existing = await delegate.findUnique({ where: { id: input.id } })
+  if (!existing) throw new Error("Operational alert not found")
   const data = input.transition === "acknowledged"
     ? { status: "acknowledged", acknowledgedAt: now, acknowledgedBy: input.adminId }
     : input.transition === "resolved"
       ? { status: "resolved", resolvedAt: now, resolvedBy: input.adminId }
       : { status: "open", acknowledgedAt: null, acknowledgedBy: null, resolvedAt: null, resolvedBy: null }
-  return delegate.update({ where: { id: input.id }, data })
+  const row = await delegate.update({ where: { id: input.id }, data })
+  if (input.transition === "resolved" && existing.status !== "resolved") {
+    await maybeNotify(
+      { ...row, summary: `告警已恢复：${row.summary}` },
+      now,
+      true,
+      input.fetchImpl,
+    )
+  }
+  return row
 }
 
 async function checkReconcileLag(now: Date): Promise<number> {
