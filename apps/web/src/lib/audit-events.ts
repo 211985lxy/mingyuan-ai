@@ -40,6 +40,14 @@ function toJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
   return value as Prisma.InputJsonValue
 }
 
+async function backfillLegacyPayloadHash(
+  delegate: AuditEventDelegate,
+  args: Prisma.AuditEventUpsertArgs,
+): Promise<AuditWriteResult> {
+  const row = await delegate.upsert(args)
+  return { ok: true, id: row.id, inserted: false }
+}
+
 /**
  * Writes one normalized event to the cross-source audit index. The default is
  * best-effort so an audit-index outage cannot take down ordinary product work.
@@ -101,6 +109,14 @@ export async function recordAuditEvent(
       if (existing) {
         if (existing.payloadHash === event.payloadHash) {
           return { ok: true, id: existing.id, inserted: false }
+        }
+        if (!existing.payloadHash) {
+          return backfillLegacyPayloadHash(delegate, {
+            where: { source_idempotencyKey: { source: event.source, idempotencyKey } },
+            create: data,
+            update: { payloadHash: event.payloadHash },
+            select: { id: true },
+          })
         }
         throw new AuditIdempotencyConflictError(event.source, idempotencyKey, existing.id)
       }

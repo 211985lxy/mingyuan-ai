@@ -19,6 +19,7 @@ vi.mock("@/lib/admin-auth", () => ({
 
 import { GET as listEvents } from "@/app/api/admin/audit-events/route"
 import { GET as getEvent } from "@/app/api/admin/audit-events/[id]/route"
+import { GET as getRelatedEvents } from "@/app/api/admin/audit-events/[id]/related/route"
 
 function request(url: string) {
   return new NextRequest(url, { method: "GET" })
@@ -111,5 +112,26 @@ describe("audit event admin routes", () => {
     expect(response.status).toBe(200)
     expect(body).toEqual(expect.objectContaining({ total: 101, failed: 7, critical: 2, sourceCount: 3, from: "2026-09-01", to: "2026-09-07" }))
     expect(groupBy).toHaveBeenCalledWith(expect.objectContaining({ by: ["source"] }))
+  })
+
+  it("uses a stable timestamp and id cursor for related events", async () => {
+    findUnique.mockResolvedValue({ correlationId: "corr-1" })
+    findMany.mockResolvedValue([
+      { id: "event-2", occurredAt: new Date("2026-09-08T01:00:00.000Z"), correlationId: "corr-1" },
+      { id: "event-3", occurredAt: new Date("2026-09-08T02:00:00.000Z"), correlationId: "corr-1" },
+    ])
+    const cursor = Buffer.from(JSON.stringify({ id: "event-1", occurredAt: "2026-09-08T00:00:00.000Z" }), "utf8").toString("base64url")
+    const response = await getRelatedEvents(request(`http://localhost/api/admin/audit-events/event-1/related?limit=1&cursor=${cursor}`), {
+      params: Promise.resolve({ id: "event-1" }),
+    })
+    const body = await response.json()
+    const args = findMany.mock.calls[0][0]
+    expect(response.status).toBe(200)
+    expect(args.where.AND[0].OR).toEqual([
+      { occurredAt: { gt: new Date("2026-09-08T00:00:00.000Z") } },
+      { occurredAt: new Date("2026-09-08T00:00:00.000Z"), id: { gt: "event-1" } },
+    ])
+    expect(body.data).toHaveLength(1)
+    expect(body.nextCursor).toBeTruthy()
   })
 })

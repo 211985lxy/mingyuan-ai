@@ -46,7 +46,7 @@ interface Overview {
     p95DurationMs: Metric
     totalTokens: Metric
     totalCostCny: Metric
-    coverage: { available: number; total: number; ratio: number | null; reason?: string }
+    coverage: { available: number | null; total: number | null; ratio: number | null; reason?: string }
   }
   business: Snapshot | null
   channels: { days: Array<Record<string, number | string>>; total: Record<string, number>; degraded: boolean; reason?: string }
