@@ -3398,6 +3398,22 @@
       "idempotency": true
     },
     {
+      "route": "/api/cron/integration-probe",
+      "file": "src/app/api/cron/integration-probe/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
       "route": "/api/cron/market-hotlist",
       "file": "src/app/api/cron/market-hotlist/route.ts",
       "methods": [
