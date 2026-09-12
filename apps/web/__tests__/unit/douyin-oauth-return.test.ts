@@ -107,9 +107,9 @@ describe("readDouyinReturnPath", () => {
 
 describe("GET /api/integrations/douyin/auth", () => {
   it("stores the requested return path for the callback", async () => {
-    const res = await startDouyinAuth(
+    const res = (await startDouyinAuth(
       req("http://localhost/api/integrations/douyin/auth?return=/data-platform"),
-    )
+    ))!
 
     expect(res.status).toBe(302)
     expect(res.headers.get("location")).toBe("https://open.douyin.com/platform/oauth/connect")
@@ -119,9 +119,9 @@ describe("GET /api/integrations/douyin/auth", () => {
   })
 
   it("falls back to the default page for an unsafe return path", async () => {
-    const res = await startDouyinAuth(
+    const res = (await startDouyinAuth(
       req("http://localhost/api/integrations/douyin/auth?return=//evil.com"),
-    )
+    ))!
 
     expect(setCookieHeader(res)).toContain(
       `${DOUYIN_RETURN_COOKIE}=${encodeURIComponent(DEFAULT_DOUYIN_RETURN_PATH)}`,
@@ -133,9 +133,9 @@ describe("GET /api/integrations/douyin/auth", () => {
       throw new Error("授权发起失败")
     })
 
-    const res = await startDouyinAuth(
+    const res = (await startDouyinAuth(
       req("http://localhost/api/integrations/douyin/auth?return=/data-platform"),
-    )
+    ))!
 
     const location = res.headers.get("location") ?? ""
     expect(res.status).toBe(302)
@@ -146,12 +146,12 @@ describe("GET /api/integrations/douyin/auth", () => {
 
 describe("GET /api/integrations/douyin/callback", () => {
   it("redirects to the page that started the binding", async () => {
-    const res = await douyinCallback(
+    const res = (await douyinCallback(
       req("http://localhost/api/integrations/douyin/callback?error=access_denied", {
         [DOUYIN_RETURN_COOKIE]: "/data-platform",
         douyin_oauth_state: "s1",
       }),
-    )
+    ))!
 
     const location = res.headers.get("location") ?? ""
     expect(res.status).toBe(302)
@@ -160,19 +160,19 @@ describe("GET /api/integrations/douyin/callback", () => {
   })
 
   it("falls back to the default page without a return cookie", async () => {
-    const res = await douyinCallback(
+    const res = (await douyinCallback(
       req("http://localhost/api/integrations/douyin/callback?error=access_denied"),
-    )
+    ))!
 
     expect(res.headers.get("location")).toContain(DEFAULT_DOUYIN_RETURN_PATH)
   })
 
   it("ignores an unsafe return cookie", async () => {
-    const res = await douyinCallback(
+    const res = (await douyinCallback(
       req("http://localhost/api/integrations/douyin/callback?error=access_denied", {
         [DOUYIN_RETURN_COOKIE]: "//evil.com",
       }),
-    )
+    ))!
 
     const location = res.headers.get("location") ?? ""
     expect(location).toContain(DEFAULT_DOUYIN_RETURN_PATH)
@@ -180,12 +180,12 @@ describe("GET /api/integrations/douyin/callback", () => {
   })
 
   it("clears the return cookie on a CSRF state mismatch", async () => {
-    const res = await douyinCallback(
+    const res = (await douyinCallback(
       req("http://localhost/api/integrations/douyin/callback?code=c1&state=wrong", {
         [DOUYIN_RETURN_COOKIE]: "/data-platform",
         douyin_oauth_state: "s1",
       }),
-    )
+    ))!
 
     expect(res.status).toBe(302)
     expect(setCookieHeader(res)).toContain(`${DOUYIN_RETURN_COOKIE}=;`)
