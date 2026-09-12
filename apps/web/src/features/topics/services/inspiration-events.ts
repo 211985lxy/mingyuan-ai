@@ -13,6 +13,7 @@ import { recordChannelMetric } from "@/lib/channel-metrics"
 import { isReplySuppressed, isExecutionMode, resolveExecutionMode, type ExecutionMode } from "@/lib/execution-mode"
 import { evaluateIngressPolicy } from "@/lib/ingress-policy"
 import { enqueueReply as enqueueReplyOutbox, type EnqueueReplyInput } from "@/features/topics/services/reply-outbox"
+import { INSPIRATION_CAPTURE_ACK_REPLY } from "@/features/topics/services/inspiration-reply"
 import type { inspirationEventBodySchema } from "@/features/knowledge/contracts/api"
 import type { z } from "zod"
 
@@ -29,6 +30,18 @@ export type InspirationEventResult = {
   processingStage: string | null
   statusUrl: string
   shadowMode: boolean
+}
+
+/**
+ * capture_only/evaluate 默认抑制一切回群（影子纪律）；开启 INSPIRATION_CAPTURE_ACK_ENABLED 后
+ * 允许一条轻量「已记录」回执，让投递者确认链接已被捕获——不承诺生成选题。
+ */
+export function shouldSendCaptureAck(
+  replySuppressed: boolean,
+  ackEnabled: string | undefined,
+  hasReplyContext: boolean,
+): boolean {
+  return replySuppressed && ackEnabled === "true" && hasReplyContext
 }
 
 function sourceToStoredSource(platform: InspirationEventInput["platform"]) {
@@ -299,6 +312,11 @@ export async function ingestInspirationEvent(
   const proposedId = randomUUID()
   const replySuppressed = isReplySuppressed(executionMode)
   const shouldEnqueueAcceptedReply = !replySuppressed && !!options?.acceptedReplyContext
+  const shouldEnqueueCaptureAck = shouldSendCaptureAck(
+    replySuppressed,
+    env.INSPIRATION_CAPTURE_ACK_ENABLED,
+    !!options?.acceptedReplyContext,
+  )
   const inspiration = await prisma.$transaction(async (tx) => {
     const record = await tx.inspiration.upsert({
       where: { dedupeKey },
@@ -319,7 +337,7 @@ export async function ingestInspirationEvent(
         sourceUrl,
         canonicalSourceKey,
         executionModeSnapshot: executionMode,
-        replyStatus: replySuppressed ? "suppressed" : "pending",
+        replyStatus: replySuppressed && !shouldEnqueueCaptureAck ? "suppressed" : "pending",
       },
       update: {},
       select: { id: true, aiStatus: true, processingStage: true },
@@ -332,7 +350,7 @@ export async function ingestInspirationEvent(
       maxAttempts: 12,
     })
     // Enqueue accepted reply inside the same transaction for atomicity
-    if (record.id === proposedId && shouldEnqueueAcceptedReply && options?.acceptedReplyContext) {
+    if (record.id === proposedId && (shouldEnqueueAcceptedReply || shouldEnqueueCaptureAck) && options?.acceptedReplyContext) {
       await enqueueReplyOutbox(
         {
           inspirationId: record.id,
@@ -340,6 +358,7 @@ export async function ingestInspirationEvent(
           platform: input.platform,
           externalAccountId: input.externalAccountId,
           ...options.acceptedReplyContext,
+          replyText: shouldEnqueueCaptureAck ? INSPIRATION_CAPTURE_ACK_REPLY : options.acceptedReplyContext.replyText,
         },
         tx as never,
       )

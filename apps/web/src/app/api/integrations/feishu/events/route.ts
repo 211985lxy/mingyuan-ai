@@ -1,4 +1,3 @@
-// @ts-nocheck — CONTENT_PIPELINE_ENABLED env 待注册，临时跳过
 import { createHash } from "node:crypto"
 import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
@@ -104,9 +103,10 @@ export async function POST(request: Request) {
 
       const captureFromAimChat = shouldPrioritizeInspirationCapture(binding.routeTarget,
         isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords))
+      const linkDetection = detectVideoLinks(event.text)
       // ─── 视频链接分流：显式收选题优先进入影子采集，其余视频走原内容流水线 ───
-      if (env.CONTENT_PIPELINE_ENABLED !== "false" && !captureFromAimChat) {
-        const detection = detectVideoLinks(event.text)
+      if (env.CONTENT_PIPELINE_ENABLED !== "false" && !captureFromAimChat && linkDetection.hasLinks) {
+        const detection = linkDetection
         if (detection.hasLinks) {
           const firstLink = detection.links[0]
           const platformLabel =
@@ -140,8 +140,8 @@ export async function POST(request: Request) {
         }
       }
 
-      // AIM 群保留日常对话；只有明确的"收集关键词 + 视频链接"绕到灵感入库。
-      if (binding.routeTarget === "aim" && !captureFromAimChat) {
+      // AIM 群保留日常对话；视频链接不进对话——落到灵感采集记录链接与出处。
+      if (binding.routeTarget === "aim" && !captureFromAimChat && !linkDetection.hasLinks) {
         const ingested = await ingestAimChannelMessage({
           platform: "feishu",
           externalMessageId: event.messageId,
