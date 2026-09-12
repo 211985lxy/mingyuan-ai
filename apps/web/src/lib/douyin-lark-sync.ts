@@ -10,6 +10,7 @@ import {
   FANS_DISTRIBUTION_FIELDS,
   serializeFansDistribution,
 } from "@/lib/data-platform/fans-distribution"
+import { ROW_OWNERSHIP_FIELD } from "@/lib/data-platform/row-ownership"
 
 type SyncToLarkInput = {
   baseToken: string
@@ -18,6 +19,8 @@ type SyncToLarkInput = {
   identity: "user" | "bot"
   /** 粉丝画像。scope `fans.data.bind` 未获批时为 null —— 此时不写画像列，也不清空既有值。 */
   fans?: DouyinFansProfile | null
+  /** 归属项目 id。写入后该行仅此项目可见；为空则视为共享数据（所有人可见）。 */
+  projectId?: string | null
 }
 
 /** 仅当本次确实取到画像时才写这 3 列，避免未获批时把已有值清空。 */
@@ -46,6 +49,7 @@ async function upsertDouyinAccountRow(accountTableId: string, input: SyncToLarkI
     主页链接: input.profile.nickname
       ? `https://www.douyin.com/search/${encodeURIComponent(input.profile.nickname)}`
       : "",
+    [ROW_OWNERSHIP_FIELD]: input.projectId ?? "",
     ...buildFansFields(input.fans),
   }
   try {
@@ -75,6 +79,7 @@ async function writeDouyinVideoRow(videoTableId: string, video: DouyinVideo, inp
     评论数: video.statistics?.commentCount ?? 0,
     收藏数: video.statistics?.collectCount ?? 0,
     转发数: video.statistics?.shareCount ?? 0,
+    [ROW_OWNERSHIP_FIELD]: input.projectId ?? "",
   }
   try {
     const existing = await listLarkBaseRecords({ baseToken: input.baseToken, tableId: videoTableId, limit: 5, identity: input.identity }).catch(() => [])
@@ -90,6 +95,7 @@ async function writeDouyinVideoRow(videoTableId: string, video: DouyinVideo, inp
 /**
  * 把抖音拉到的账号/视频/粉丝画像数据写入飞书多维表格的账号总表和视频数据表。
  * 用账号 open_id / 视频 itemId 当唯一键，重复写入时自动更新（upsert 语义）。
+ * 同时写入归属项目，使这些自有数据在数据看板上只对该项目可见（见 row-ownership.ts）。
  */
 export async function syncDouyinDataToLarkBase(input: {
   profile: DouyinUserProfile
@@ -97,6 +103,7 @@ export async function syncDouyinDataToLarkBase(input: {
   token: DouyinToken
   identity?: "user" | "bot"
   fans?: DouyinFansProfile | null
+  projectId?: string | null
 }): Promise<{ accounts: number; videos: number; fansWritten: boolean }> {
   const baseToken = env.LARK_PLATFORM_DATA_BASE_TOKEN?.trim()
   const accountTableId = env.LARK_PLATFORM_ACCOUNT_TABLE_ID?.trim()
@@ -105,7 +112,8 @@ export async function syncDouyinDataToLarkBase(input: {
 
   const identity = input.identity ?? "bot"
   const fans = input.fans ?? null
-  const larkInput: SyncToLarkInput = { baseToken, profile: input.profile, token: input.token, identity, fans }
+  const projectId = input.projectId ?? null
+  const larkInput: SyncToLarkInput = { baseToken, profile: input.profile, token: input.token, identity, fans, projectId }
   const writtenAccounts = accountTableId ? await upsertDouyinAccountRow(accountTableId, larkInput) : 0
 
   let writtenVideos = 0

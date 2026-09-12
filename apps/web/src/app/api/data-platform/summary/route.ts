@@ -3,12 +3,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { env } from "@/env"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { listLarkBaseRecords } from "@/lib/lark-base"
+import { resolveBoundProject } from "@/lib/account-project-context"
 import {
   toPlatformAccount,
   toPlatformVideo,
   type PlatformAccount,
   type PlatformVideo,
 } from "@/lib/data-platform/summary-mapping"
+import { isRowVisibleToProject } from "@/lib/data-platform/row-ownership"
 
 export type { PlatformAccount, PlatformVideo } from "@/lib/data-platform/summary-mapping"
 
@@ -79,11 +81,14 @@ async function fetchTableMapped<T>(input: {
   baseToken: string
   tableId: string
   tableLabel: string
+  /** 调用者归属项目：用于行级隔离；为 null（未绑定项目）时只看得到共享行 */
+  projectId: string | null
   mapRow: (row: LarkRow) => T
 }): Promise<{ mapped: T[]; failure?: LarkFailure }> {
   try {
     const rows = await fetchTableRows(input.baseToken, input.tableId)
-    return { mapped: rows.map(input.mapRow) }
+    const visible = rows.filter((row) => isRowVisibleToProject(row.fields, input.projectId))
+    return { mapped: visible.map(input.mapRow) }
   } catch (err) {
     return {
       mapped: [],
@@ -92,15 +97,32 @@ async function fetchTableMapped<T>(input: {
   }
 }
 
-function buildLarkFetchTasks(baseToken: string, accountTableId?: string, videoTableId?: string) {
+function buildLarkFetchTasks(
+  baseToken: string,
+  projectId: string | null,
+  accountTableId?: string,
+  videoTableId?: string,
+) {
   const tasks: Array<Promise<{ mapped: Array<PlatformAccount | PlatformVideo>; failure?: LarkFailure }>> = []
   if (accountTableId) {
-    tasks.push(fetchTableMapped({ baseToken, tableId: accountTableId, tableLabel: "账号表", mapRow: toPlatformAccount }))
+    tasks.push(fetchTableMapped({ baseToken, projectId, tableId: accountTableId, tableLabel: "账号表", mapRow: toPlatformAccount }))
   } else { tasks.push(Promise.resolve({ mapped: [] })) }
   if (videoTableId) {
-    tasks.push(fetchTableMapped({ baseToken, tableId: videoTableId, tableLabel: "视频表", mapRow: toPlatformVideo }))
+    tasks.push(fetchTableMapped({ baseToken, projectId, tableId: videoTableId, tableLabel: "视频表", mapRow: toPlatformVideo }))
   } else { tasks.push(Promise.resolve({ mapped: [] })) }
   return tasks
+}
+
+/**
+ * 取调用者的归属项目 id，用于行级隔离。
+ * 未绑定项目时返回 null（而非报错）——否则所有未绑定账号的看板都会直接不可用。
+ */
+async function resolveCallerProjectId(userId: string): Promise<string | null> {
+  try {
+    return (await resolveBoundProject({ userId })).id
+  } catch {
+    return null
+  }
 }
 
 function buildSummaryResponse(
@@ -134,18 +156,21 @@ function buildPlatformErrorResponse(err: unknown) {
 
 /**
  * 多平台数据看板摘要：账号总览 + 近期作品数据
+ * 行级隔离：只看得到「共享行」+「归属本项目的行」。
  * 如果未配置 LARK_PLATFORM_DATA_BASE_TOKEN，返回 not_configured，前端显示空态引导。
  */
 export async function GET(request: NextRequest) {
-  try { await authenticateRequest(request) } catch (err) { return authErrorResponse(err) }
+  let user: { id: string; email: string }
+  try { user = await authenticateRequest(request) } catch (err) { return authErrorResponse(err) }
 
+  const projectId = await resolveCallerProjectId(user.id)
   const baseToken = env.LARK_PLATFORM_DATA_BASE_TOKEN?.trim()
   const accountTableId = env.LARK_PLATFORM_ACCOUNT_TABLE_ID?.trim()
   const videoTableId = env.LARK_PLATFORM_VIDEO_TABLE_ID?.trim()
   if (!baseToken || (!accountTableId && !videoTableId)) return buildNotConfiguredResponse()
 
   try {
-    const tasks = buildLarkFetchTasks(baseToken, accountTableId, videoTableId)
+    const tasks = buildLarkFetchTasks(baseToken, projectId, accountTableId, videoTableId)
     const results = await Promise.all(tasks)
     const failures = results.map((r) => r.failure).filter(Boolean) as LarkFailure[]
     return buildSummaryResponse(results[0].mapped as PlatformAccount[], results[1].mapped as PlatformVideo[], failures)
