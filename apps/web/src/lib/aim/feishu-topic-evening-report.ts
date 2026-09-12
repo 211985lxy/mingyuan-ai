@@ -5,19 +5,19 @@
 //   3. 数据采集健康度（热榜快照是否停摆——38 天停摆教训的巡检位）
 // 纯读取零 LLM 成本；空天也推（确认系统活着，比沉默可靠）。
 
-import { prisma } from "@/lib/prisma"
 import { readHotBriefingPushConfig } from "@/lib/aim/feishu-hot-briefing-notify"
+import {
+  candidateTitle,
+  loadDailyTopicSnapshot,
+  type DailySelectionSummary,
+} from "@/lib/aim/daily-topic-snapshot"
 import { resolveBotById } from "@/lib/feishu-agent-registry"
 import { sendCardAsBot } from "@/lib/feishu-bot-identity"
 
 const TOPIC_REVIEW_BOT_ID = "business_diagnosis"
 
-export interface EveningSelectionSummary {
-  selectionId: string
-  reviewStatus: string
-  selectedIndex: number | null
-  candidates: unknown
-}
+/** 兼容既有导出名：与共享快照的批次结构同源。 */
+export type EveningSelectionSummary = DailySelectionSummary
 
 export interface EveningReportData {
   selections: EveningSelectionSummary[]
@@ -25,13 +25,6 @@ export interface EveningReportData {
   inspirationExtracted: number
   inspirationFailed: number
   hotSnapshotAt: Date | null
-}
-
-function candidateTitle(candidates: unknown, index: number | null): string | null {
-  if (index === null) return null
-  if (!Array.isArray(candidates)) return null
-  const card = candidates[index] as { title?: unknown } | undefined
-  return typeof card?.title === "string" ? card.title : null
 }
 
 function reviewLabel(status: string): string {
@@ -125,39 +118,5 @@ export async function sendEveningReportToFeishu(
   return { sent: true }
 }
 
-export async function loadEveningReportData(userId: string): Promise<EveningReportData> {
-  const dayStart = new Date()
-  dayStart.setHours(0, 0, 0, 0)
-  const todayKey = new Date().toISOString().split("T")[0]
-
-  const [selectionRows, inspirations, hotSnapshot] = await Promise.all([
-    prisma.topicSelection.findMany({
-      where: { userId, recommendationMode: "daily", recommendedDate: todayKey },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, reviewStatus: true, selectedIndex: true, candidates: true },
-    }),
-    prisma.inspiration.findMany({
-      where: { userId, createdAt: { gte: dayStart } },
-      select: { aiStatus: true },
-    }),
-    prisma.douyinHotSnapshot.findFirst({
-      orderBy: { fetchedAt: "desc" },
-      select: { fetchedAt: true },
-    }),
-  ])
-
-  const selections: EveningSelectionSummary[] = selectionRows.map((row) => ({
-    selectionId: row.id,
-    reviewStatus: row.reviewStatus,
-    selectedIndex: row.selectedIndex,
-    candidates: row.candidates as unknown,
-  }))
-
-  return {
-    selections,
-    inspirationCount: inspirations.length,
-    inspirationExtracted: inspirations.filter((item) => item.aiStatus === "completed").length,
-    inspirationFailed: inspirations.filter((item) => item.aiStatus === "failed").length,
-    hotSnapshotAt: hotSnapshot?.fetchedAt ?? null,
-  }
-}
+/** 晚报数据 = 当日共享快照（读取逻辑集中在 daily-topic-snapshot）。 */
+export const loadEveningReportData = loadDailyTopicSnapshot

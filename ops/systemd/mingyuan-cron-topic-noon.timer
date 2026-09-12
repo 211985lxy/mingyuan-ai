@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan topic noon report at 12:30
+
+[Timer]
+OnCalendar=*-*-* 12:30:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-topic-noon.service
+
+[Install]
+WantedBy=timers.target
