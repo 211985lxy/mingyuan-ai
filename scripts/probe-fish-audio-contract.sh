@@ -46,7 +46,7 @@ fi
 # 2) TTS 最小合成（合成契约；消耗 ~2 字符额度）。
 #    402=API 额度耗尽：契约本身正常（请求形状被接受），单独告警不计契约失败。
 body='{"text":"探针","format":"mp3"}'
-code="$(curl "${curl_args[@]}" -o /tmp/fish-probe-tts.mp3 -w '%{http_code}' -X POST "$BASE/v1/tts" -H 'Content-Type: application/json' -H 'model: speech-1.6' -d "$body" 2>/dev/null)" || code=000
+code="$(curl "${curl_args[@]}" -o /tmp/fish-probe-tts.mp3 -w '%{http_code}' -X POST "$BASE/v1/tts" -H 'Content-Type: application/json' -H "model: ${FISH_AUDIO_MODEL:-s2.1-pro-free}" -d "$body" 2>/dev/null)" || code=000
 size=$(wc -c < /tmp/fish-probe-tts.mp3 2>/dev/null || echo 0)
 if [ "$code" = "200" ] && [ "$size" -gt 1000 ]; then
   echo "[fish-probe] tts: healthy (200, ${size}B)"
