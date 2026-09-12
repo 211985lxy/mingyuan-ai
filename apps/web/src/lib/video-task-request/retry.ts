@@ -40,7 +40,13 @@ export function buildRetryPayload(
     if (sp.speakerExtra) payload.speakerExtra = sp.speakerExtra;
     if (sp.processRules) payload.processRules = sp.processRules;
     if (sp.aspectRatio === "16:9" || sp.aspectRatio === "9:16") payload.aspectRatio = sp.aspectRatio;
-    if (sp.audioType === "audio" && sp.ownVoiceAudioUrl) {
+
+    // 落库的 payload 是供应商返回的那份，own-voice 标记可能出现在两处形状：
+    // 顶层 audioType（服务端构造）或 provider 的 audio.type（蝉镜 audio 型）。
+    const audio = sp.audio as { type?: unknown } | undefined;
+    const isOwnVoice = sp.audioType === "audio" || audio?.type === "audio";
+    const hasAudioSource = Boolean(sp.ownVoiceAudioUrl) || Boolean(audio?.type === "audio");
+    if (isOwnVoice && hasAudioSource) {
       payload.voiceSource = "own_voice";
       if (typeof sp.ownVoiceVoiceId === "string") payload.voiceId = sp.ownVoiceVoiceId;
     }

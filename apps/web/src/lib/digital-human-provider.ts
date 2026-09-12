@@ -312,13 +312,26 @@ export async function submitVideoToProvider(
         ? payload.ownVoiceAudioUrl
         : null
       if (ownVoiceAudioUrl) {
-        return await createDigitalHumanVideoFromAudio({
+        const submitted = await createDigitalHumanVideoFromAudio({
           wavUrl: ownVoiceAudioUrl,
           personId,
           figureType: typeof payload.figureType === "string" ? payload.figureType : "whole_body",
           personWidth: width,
           personHeight: height,
         })
+        // 落库的是本函数返回的 payload（而非调用方构造的那份），重试需要据此还原音源，
+        // 因此把 own-voice 快照标记并入返回载荷。
+        return {
+          ...submitted,
+          payload: {
+            ...submitted.payload,
+            audioType: "audio",
+            ownVoiceAudioUrl,
+            ...(typeof payload.ownVoiceVoiceId === "string"
+              ? { ownVoiceVoiceId: payload.ownVoiceVoiceId }
+              : {}),
+          },
+        }
       }
 
       const audioManId = typeof payload.speakerId === "string" ? payload.speakerId : null
