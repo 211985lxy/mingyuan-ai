@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { lockClientProjects } from "@/features/projects/services/project-row-lock"
+import { lockClientProjects, lockUsers } from "@/features/projects/services/project-row-lock"
 
 describe("lockClientProjects", () => {
   it("dedupes, sorts, and locks with one parameterized statement", async () => {
@@ -26,5 +26,19 @@ describe("lockClientProjects", () => {
     await lockClientProjects({ $queryRawUnsafe: queryRawUnsafe } as never, [])
 
     expect(queryRawUnsafe).not.toHaveBeenCalled()
+  })
+})
+
+describe("lockUsers", () => {
+  it("locks every participant by stable user id including unbound accounts", async () => {
+    const queryRawUnsafe = vi.fn().mockResolvedValue([])
+
+    await lockUsers({ $queryRawUnsafe: queryRawUnsafe } as never, ["user-z", "user-a", "user-z"])
+
+    expect(queryRawUnsafe).toHaveBeenCalledWith(
+      "SELECT `id` FROM `User` WHERE `id` IN (?, ?) ORDER BY `id` FOR UPDATE",
+      "user-a",
+      "user-z",
+    )
   })
 })

@@ -25,13 +25,13 @@
         "POST"
       ],
       "domain": "account",
-      "kind": "crud",
-      "orchestratable": false,
+      "kind": "capability",
+      "orchestratable": true,
       "auth": "user_session",
       "input": "zod_json",
       "query": "none",
       "externalService": false,
-      "cost": "low",
+      "cost": "high",
       "idempotency": false
     },
     {

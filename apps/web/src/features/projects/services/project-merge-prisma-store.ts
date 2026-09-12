@@ -1,7 +1,7 @@
 import { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import { MOVE_PROJECT_TABLES } from "@/features/projects/services/project-merge-policy"
-import { lockClientProjects } from "@/features/projects/services/project-row-lock"
+import { lockClientProjects, lockUsers } from "@/features/projects/services/project-row-lock"
 import {
   remapAllowedProjects,
   type MoveProjectTable,
@@ -55,16 +55,12 @@ function toProjectInfo(
   }
 }
 
-async function lockRelatedRows(tx: Prisma.TransactionClient, projectIds: string[]) {
+async function lockProjectMembers(tx: Prisma.TransactionClient, projectIds: string[]) {
   const ids = [...new Set(projectIds)].sort()
   if (ids.length === 0) return
   const placeholders = ids.map(() => "?").join(", ")
   await tx.$queryRawUnsafe(
     `SELECT \`id\` FROM \`ProjectMember\` WHERE \`projectId\` IN (${placeholders}) ORDER BY \`id\` FOR UPDATE`,
-    ...ids,
-  )
-  await tx.$queryRawUnsafe(
-    `SELECT \`id\` FROM \`User\` WHERE \`boundProjectId\` IN (${placeholders}) ORDER BY \`id\` FOR UPDATE`,
     ...ids,
   )
 }
@@ -162,24 +158,20 @@ async function loadSnapshot(
   input: ProjectMergeIdentity,
   adminUserId: string | null,
 ): Promise<ProjectMergeSnapshot> {
-  const [sourceRow, targetRow, deployedTables, admin] = await Promise.all([
-    readProject(db, input.sourceProjectId, "source"),
-    readProject(db, input.targetProjectId, "target"),
-    listDeployedProjectIdTables(db),
-    loadAdmin(db, adminUserId),
-  ])
+  const sourceRow = await readProject(db, input.sourceProjectId, "source")
+  const targetRow = await readProject(db, input.targetProjectId, "target")
+  const deployedTables = await listDeployedProjectIdTables(db)
+  const admin = await loadAdmin(db, adminUserId)
   const source = toProjectInfo(sourceRow)
   const target = toProjectInfo(targetRow)
-  const [sourceRowCounts, invocations, traces, participants] = await Promise.all([
-    countSourceRowsByMoveTable(db, source.projectId, deployedTables),
-    db.agentInvocation.count({
-      where: { projectId: source.projectId, status: { in: ["queued", "running"] } },
-    }),
-    db.aimExecutionTrace.count({
-      where: { projectId: source.projectId, status: "running" },
-    }),
-    loadParticipants(db, source, target),
-  ])
+  const sourceRowCounts = await countSourceRowsByMoveTable(db, source.projectId, deployedTables)
+  const invocations = await db.agentInvocation.count({
+    where: { projectId: source.projectId, status: { in: ["queued", "running"] } },
+  })
+  const traces = await db.aimExecutionTrace.count({
+    where: { projectId: source.projectId, status: "running" },
+  })
+  const participants = await loadParticipants(db, source, target)
   return {
     source,
     target,
@@ -191,12 +183,23 @@ async function loadSnapshot(
   }
 }
 
-async function lockAndInspect(
+export async function lockAndInspectProjectMerge(
   tx: Prisma.TransactionClient,
   input: ProjectMergeLockInput,
 ): Promise<ProjectMergeSnapshot> {
   await lockClientProjects(tx, [input.sourceProjectId, input.targetProjectId])
-  await lockRelatedRows(tx, [input.sourceProjectId, input.targetProjectId])
+  const initialSource = toProjectInfo(await readProject(tx, input.sourceProjectId, "source"))
+  const initialTarget = toProjectInfo(await readProject(tx, input.targetProjectId, "target"))
+  await lockProjectMembers(tx, [input.sourceProjectId, input.targetProjectId])
+  const participantIds = [...new Set([
+    initialSource.ownerId,
+    initialTarget.ownerId,
+    ...initialSource.members,
+    ...initialTarget.members,
+    ...initialSource.boundAccounts,
+    ...initialTarget.boundAccounts,
+  ])].sort()
+  await lockUsers(tx, participantIds)
   return loadSnapshot(tx, input, input.adminUserId)
 }
 
@@ -226,11 +229,15 @@ async function rebindParticipants(
   participants: ProjectMergeParticipant[],
 ): Promise<number> {
   const userIds = participants
-    .filter((participant) => participant.boundProjectId === sourceProjectId)
+    .filter((participant) =>
+      participant.boundProjectId === null || participant.boundProjectId === sourceProjectId)
     .map((participant) => participant.userId)
   if (userIds.length === 0) return 0
   const updated = await tx.user.updateMany({
-    where: { id: { in: userIds }, boundProjectId: sourceProjectId },
+    where: {
+      id: { in: userIds },
+      OR: [{ boundProjectId: null }, { boundProjectId: sourceProjectId }],
+    },
     data: {
       boundProjectId: targetProjectId,
       projectBoundAt: new Date(),
@@ -319,7 +326,7 @@ async function writeSuccessAudit(
 
 function createMergeTransaction(tx: Prisma.TransactionClient): ProjectMergeTransaction {
   return {
-    lockAndInspect: (input) => lockAndInspect(tx, input),
+    lockAndInspect: (input) => lockAndInspectProjectMerge(tx, input),
     upsertTargetMembers: (targetProjectId, targetOwnerId, userIds) =>
       upsertTargetMembers(tx, targetProjectId, targetOwnerId, userIds),
     rebindParticipants: (sourceProjectId, targetProjectId, participants) =>

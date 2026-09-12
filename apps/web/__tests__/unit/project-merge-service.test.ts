@@ -42,7 +42,7 @@ interface StoreOpts {
   target?: ProjectInfo
   deployedTables?: readonly string[]
   activeWork?: { invocations: number; traces: number }
-  bindings?: Record<string, string>
+  bindings?: Record<string, string | null>
   admin?: { userId: string; status: "active" | "inactive" }
   failAt?: "writeAudit"
   rebindCount?: number
@@ -72,7 +72,9 @@ function buildSnapshot(opts: StoreOpts): ProjectMergeSnapshot {
   const addParticipant = (userId: string, fallbackProjectId: string) => {
     participantById.set(userId, {
       userId,
-      boundProjectId: bindings[userId] ?? fallbackProjectId,
+      boundProjectId: Object.prototype.hasOwnProperty.call(bindings, userId)
+        ? bindings[userId]!
+        : fallbackProjectId,
     })
   }
   addParticipant(source.ownerId, source.projectId)
@@ -115,12 +117,12 @@ function makeStore(opts: StoreOpts = {}): TestStore {
   const snapshot = buildSnapshot(opts)
 
   const expectedRebind = snapshot.participants.filter(
-    (p) => p.boundProjectId === snapshot.source.projectId,
+    (p) => p.boundProjectId === null || p.boundProjectId === snapshot.source.projectId,
   ).length
   const expectedArchive = 1
 
   const tx: ProjectMergeTransaction = {
-    lockAndInspect: async (_input) => {
+    lockAndInspect: async () => {
       calls.push("lockAndInspect")
       return snapshot
     },
@@ -399,6 +401,15 @@ describe("project merge service", () => {
     const store = makeStore({ rebindCount: 99 })
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("rebind")
     expect(store.committedWrites).toEqual([])
+  })
+
+  it("binds unbound participants to the target and includes them in the exact count", async () => {
+    const store = makeStore({
+      bindings: { "source-member": null },
+      rebindCount: 3,
+    })
+    const result = await applyProjectMerge(validInput, store)
+    expect(result.rebindCount).toBe(3)
   })
 
   it("rejects archive-count mismatch", async () => {

@@ -235,8 +235,10 @@ async function runMergeTransaction(
     participantIds,
   )
 
-  // Rebind participants bound to source onto target. Assert exact count.
-  const expectedRebind = countBoundTo(snapshot, snapshot.source.projectId)
+  // Bind unbound participants and rebind source participants onto target.
+  // Accounts already bound to target need no write; third-project bindings
+  // were rejected by validateSnapshot above.
+  const expectedRebind = countRequiringTargetBinding(snapshot)
   const rebindCount = await tx.rebindParticipants(
     snapshot.source.projectId,
     snapshot.target.projectId,
@@ -294,11 +296,12 @@ async function runMergeTransaction(
   }
 }
 
-function countBoundTo(
-  snapshot: ProjectMergeSnapshot,
-  projectId: string,
-): number {
-  return snapshot.participants.filter((p) => p.boundProjectId === projectId).length
+function countRequiringTargetBinding(snapshot: ProjectMergeSnapshot): number {
+  return snapshot.participants.filter(
+    (participant) =>
+      participant.boundProjectId === null ||
+      participant.boundProjectId === snapshot.source.projectId,
+  ).length
 }
 
 function assertExact(actual: number, expected: number, label: string): void {

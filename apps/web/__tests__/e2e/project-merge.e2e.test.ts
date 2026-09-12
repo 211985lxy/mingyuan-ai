@@ -39,6 +39,7 @@ function fingerprint(value: string): string {
 }
 
 async function cleanupMergeFixtures() {
+  await prisma.knowledgeEntity.deleteMany({ where: { id: { startsWith: "merge-e2e-" } } })
   await prisma.agentInvocation.deleteMany({ where: { id: { startsWith: "merge-e2e-" } } })
   await prisma.agentApiKey.deleteMany({ where: { id: { startsWith: "merge-e2e-" } } })
   await prisma.aimExecutionTrace.deleteMany({ where: { id: { startsWith: "merge-e2e-" } } })
@@ -91,7 +92,7 @@ async function addMember(projectId: string, userId: string, role: "owner" | "mem
   })
 }
 
-async function seedAccountsAndProjects(options?: { includeThird?: boolean }) {
+async function seedAccountsAndProjects(options?: { includeThird?: boolean; unboundSourceMember?: boolean }) {
   const admin = await createAdminUser({
     email: "merge-e2e-admin@test.com",
     name: "Merge E2E Admin",
@@ -113,7 +114,7 @@ async function seedAccountsAndProjects(options?: { includeThird?: boolean }) {
   await addMember(TARGET_ID, TARGET_MEMBER, "member")
 
   await bindUser(SOURCE_OWNER, SOURCE_ID)
-  await bindUser(SOURCE_MEMBER, SOURCE_ID)
+  if (!options?.unboundSourceMember) await bindUser(SOURCE_MEMBER, SOURCE_ID)
   await bindUser(TARGET_OWNER, TARGET_ID)
   await bindUser(TARGET_MEMBER, TARGET_ID)
 
@@ -126,6 +127,15 @@ async function seedAccountsAndProjects(options?: { includeThird?: boolean }) {
   }
 
   return admin
+}
+
+async function seedMoveConflict() {
+  await prisma.knowledgeEntity.createMany({
+    data: [
+      { id: "merge-e2e-entity-source", userId: SOURCE_OWNER, projectId: SOURCE_ID, name: "same", type: "person" },
+      { id: "merge-e2e-entity-target", userId: SOURCE_OWNER, projectId: TARGET_ID, name: "same", type: "person" },
+    ],
+  })
 }
 
 async function seedHappyPathContent() {
@@ -258,6 +268,11 @@ async function snapshotMergeState() {
       select: { id: true, projectId: true },
       orderBy: { id: "asc" },
     }),
+    entities: await prisma.knowledgeEntity.findMany({
+      where: { id: { startsWith: "merge-e2e-" } },
+      select: { id: true, projectId: true, name: true },
+      orderBy: { id: "asc" },
+    }),
     structures: await prisma.videoStructure.findMany({
       where: { id: { startsWith: "merge-e2e-" } },
       select: { id: true, projectId: true },
@@ -324,7 +339,7 @@ describe("project merge e2e", () => {
   })
 
   it("moves source content onto the target, keeps retain rows, and writes a success audit", async () => {
-    const admin = await seedAccountsAndProjects()
+    const admin = await seedAccountsAndProjects({ unboundSourceMember: true })
     await seedHappyPathContent()
 
     const result = await applyProjectMerge(mergeInput(admin.id), prismaProjectMergeStore)
@@ -356,6 +371,7 @@ describe("project merge e2e", () => {
       select: { boundProjectId: true },
     })
     expect(rebound.every((row) => row.boundProjectId === TARGET_ID)).toBe(true)
+    expect(result.rebindCount).toBe(2)
 
     const key = await prisma.agentApiKey.findUniqueOrThrow({
       where: { id: TARGET_KEY_ID },
@@ -415,5 +431,36 @@ describe("project merge e2e", () => {
       where: { action: "account.project_merge", targetId: TARGET_ID, status: "success" },
     })).toBe(0)
     await expectSingleFailedMergeAudit(admin.id, /active work/)
+  })
+
+  it("rolls back every mutation when a middle table move violates a database constraint", async () => {
+    const admin = await seedAccountsAndProjects({ unboundSourceMember: true })
+    await seedHappyPathContent()
+    await seedMoveConflict()
+    const before = await snapshotMergeState()
+
+    await expect(applyProjectMerge(mergeInput(admin.id), prismaProjectMergeStore)).rejects.toThrow()
+
+    expect(await snapshotMergeState()).toEqual(before)
+    expect(await prisma.adminAuditLog.count({
+      where: { action: "account.project_merge", targetId: TARGET_ID, status: "success" },
+    })).toBe(0)
+    await expectSingleFailedMergeAudit(admin.id, /./)
+  })
+
+  it("rejects a second apply after archival without duplicate success audit or members", async () => {
+    const admin = await seedAccountsAndProjects()
+    await seedHappyPathContent()
+    await applyProjectMerge(mergeInput(admin.id), prismaProjectMergeStore)
+    const memberCount = await prisma.projectMember.count({ where: { projectId: TARGET_ID } })
+
+    await expect(applyProjectMerge(mergeInput(admin.id), prismaProjectMergeStore))
+      .rejects.toThrow("source project is archived")
+
+    expect(await prisma.projectMember.count({ where: { projectId: TARGET_ID } })).toBe(memberCount)
+    expect(await prisma.adminAuditLog.count({
+      where: { action: "account.project_merge", targetId: TARGET_ID, status: "success" },
+    })).toBe(1)
+    await expectSingleFailedMergeAudit(admin.id, /source project is archived/)
   })
 })

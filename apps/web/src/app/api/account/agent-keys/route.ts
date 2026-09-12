@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createHash, randomBytes } from "node:crypto"
 import { z } from "zod"
+import type { Prisma } from "@/generated/prisma/client"
 
 import { authErrorResponse, authenticateRequest } from "@/lib/user-auth"
 import { parseJsonBody } from "@/lib/api-contract"
@@ -11,7 +12,12 @@ import {
   defaultScopesForClientType,
   type AgentClientType,
 } from "@/lib/aim-remote/contracts"
-import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
+import {
+  AccountProjectContextError,
+  resolveBoundProject,
+  type BoundProject,
+} from "@/lib/account-project-context"
+import { lockClientProjects, lockUsers } from "@/features/projects/services/project-row-lock"
 
 export const AGENT_AGENT_ALLOWLIST: readonly string[] = Object.freeze([
   "business_system_diagnosis",
@@ -39,6 +45,50 @@ const createSchema = z.object({
 
 function hashKey(key: string) {
   return createHash("sha256").update(key).digest("hex")
+}
+
+async function withLockedBoundProject<T>(
+  userId: string,
+  project: BoundProject,
+  run: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await lockClientProjects(tx, [project.id])
+    await lockUsers(tx, [userId])
+    const lockedUser = await tx.user.findUnique({
+      where: { id: userId },
+      select: { id: true, boundProjectId: true },
+    })
+    if (!lockedUser) {
+      throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
+    }
+    if (lockedUser.boundProjectId !== project.id) {
+      throw new AccountProjectContextError(
+        "ACCOUNT_BINDING_CHANGED",
+        "账号项目绑定已变化，请重试",
+      )
+    }
+    const lockedProject = await tx.clientProject.findUnique({
+      where: { id: project.id },
+      select: {
+        id: true,
+        status: true,
+        userId: true,
+        members: { where: { userId }, select: { userId: true } },
+      },
+    })
+    if (
+      !lockedProject ||
+      lockedProject.status !== "active" ||
+      (lockedProject.userId !== userId && lockedProject.members.length === 0)
+    ) {
+      throw new AccountProjectContextError(
+        "BOUND_PROJECT_UNAVAILABLE",
+        "账号绑定的项目不可用",
+      )
+    }
+    return run(tx)
+  })
 }
 
 /**
@@ -145,24 +195,26 @@ export async function POST(request: NextRequest) {
     }
 
     const plainKey = `maim_${randomBytes(24).toString("base64url")}`
-    const created = await prisma.agentApiKey.create({
-      data: {
-        userId: user.id,
-        name: body.name,
-        keyPrefix: plainKey.slice(0, 14),
-        keyHash: hashKey(plainKey),
-        allowedProjects: [boundProject.id],
-        allowedAgents: agents,
-        dailyLimit: body.dailyLimit,
-        clientType: body.clientType,
-        allowedScopes: scopes,
-        minuteLimit: body.minuteLimit,
-        dailyTokenLimit: body.dailyTokenLimit ?? null,
-        maxInputChars: body.maxInputChars,
-        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-      },
-      select: { id: true },
-    })
+    const created = await withLockedBoundProject(user.id, boundProject, (tx) =>
+      tx.agentApiKey.create({
+        data: {
+          userId: user.id,
+          name: body.name,
+          keyPrefix: plainKey.slice(0, 14),
+          keyHash: hashKey(plainKey),
+          allowedProjects: [boundProject.id],
+          allowedAgents: agents,
+          dailyLimit: body.dailyLimit,
+          clientType: body.clientType,
+          allowedScopes: scopes,
+          minuteLimit: body.minuteLimit,
+          dailyTokenLimit: body.dailyTokenLimit ?? null,
+          maxInputChars: body.maxInputChars,
+          expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+        },
+        select: { id: true },
+      }),
+    )
 
     // Plaintext key returned exactly once — never persisted, never re-shown.
     return NextResponse.json({
