@@ -29,17 +29,17 @@ export interface TopicReviewCardInput {
 }
 
 const EDITOR_VERDICT_LABEL: Record<NonNullable<TopicCard["editorReview"]>["editorVerdict"], string> = {
-  strong: "建议主推",
-  usable: "可用",
-  observe: "观察",
-  revise: "建议改",
+  strong: "值得拍",
+  usable: "能拍",
+  observe: "再想想",
+  revise: "得改改",
 }
 
-/** 候选的元数据行：主编结论为主，分歧显著时附模型自评。 */
+/** 候选的元数据行：主编意见为主，分歧显著时附模型自评。 */
 function candidateMeta(card: TopicCard): string {
   const review = card.editorReview
   if (!review) {
-    return typeof card.score === "number" ? `模型 ${card.score}` : "未评审"
+    return typeof card.score === "number" ? `模型 ${card.score}` : "还没评"
   }
   const parts = [`主编 ${review.editorScore} · ${EDITOR_VERDICT_LABEL[review.editorVerdict]}`]
   if (typeof card.score === "number" && Math.abs(card.score - review.editorScore) >= SCORE_DIVERGENCE_THRESHOLD) {
@@ -57,24 +57,24 @@ function toApiCards(cards: TopicCard[]): ApiTopicCard[] {
   return cards as unknown as ApiTopicCard[]
 }
 
-/** 候选区：标题 → 主编判定 → 理由三行一组，标题加粗作视觉锚点。 */
+/** 候选区：标题 → 主编意见 → 理由三行一组，标题加粗作视觉锚点。 */
 function buildCandidateLines(cards: TopicCard[], leadTitle: string | undefined) {
   return cards
     .slice(0, TOPIC_REVIEW_CARD_LIMIT)
     .map((card, index) => {
-      const mark = card.title === leadTitle ? "　★主推" : ""
+      const mark = card.title === leadTitle ? "　★首推" : ""
       const why = card.editorReview?.editorReason || card.scoreReason || card.rationale || ""
       return `**${index + 1}. ${card.title}**${mark}\n${candidateMeta(card)}\n${why}`
     })
     .join("\n\n")
 }
 
-/** 概要区：主推结论一行 + 项目一行，替代原来四行的结论块。 */
+/** 概要区：最推荐一行 + 项目一行，替代原来四行的结论块。 */
 function buildSummaryLine(report: TopicDailyReport, projectName?: string | null) {
   const lead = report.leadCard
   const head = lead
-    ? `**主编主推**：${lead.title}`
-    : "**主编主推**：本批无合格主推"
+    ? `**最推荐**：${lead.title}`
+    : "**最推荐**：这批没挑出合适的"
   return [head, projectName ? `项目：${projectName}` : ""].filter(Boolean).join("\n")
 }
 
@@ -153,12 +153,12 @@ function buildCollapsiblePanel(title: string, blocks: string[]): Record<string, 
   }
 }
 
-/** 采用按钮按候选序号铺开，另加「换一批」与「都不行」。 */
+/** 选片按钮按候选序号铺开，另加「换一批」与「都不行」。 */
 function buildActionButtons(selectionId: string, candidateCount: number) {
   const base = { topic_selection_id: selectionId }
   const adoptButtons = Array.from({ length: candidateCount }, (_, index) => ({
     tag: "button",
-    text: { tag: "plain_text", content: `采用 ${index + 1}` },
+    text: { tag: "plain_text", content: `选 ${index + 1}` },
     type: "primary",
     value: { ...base, topic_action: "adopt", topic_index: index },
   }))
@@ -179,33 +179,33 @@ function buildActionButtons(selectionId: string, candidateCount: number) {
   ]
 }
 
-/** 结论面板：AI 结论、主编结论、判断理由。 */
+/** 结论面板：AI 的想法、主编点评、打分时怎么想的。 */
 function buildConclusionPanel(report: TopicDailyReport): Record<string, unknown> | null {
   const leadReview = report.leadCard?.editorReview
-  return buildCollapsiblePanel("AI 与主编的完整结论", [
-    `**AI 结论**：${report.conclusion}`,
-    leadReview ? `**主编结论**：${leadReview.editorReason}` : "",
-    `**判断理由**：${report.reason}`,
+  return buildCollapsiblePanel("为什么推这个", [
+    `**AI 的想法**：${report.conclusion}`,
+    leadReview ? `**主编点评**：${leadReview.editorReason}` : "",
+    `**打分依据**：${report.reason}`,
   ])
 }
 
-/** 依据面板：判断依据 + 参考素材（可点开的原视频与账号主页）。 */
+/** 依据面板：参考来源 + 可点开的对标原片与账号主页。 */
 function buildEvidencePanel(
   report: TopicDailyReport,
   referenceLinks: ReferenceLink[],
 ): Record<string, unknown> | null {
   const evidenceLines = buildEvidenceLines(report)
   const referenceBlock = referenceLinks.length > 0
-    ? `**参考素材**（点开对照）\n${referenceLinks.map((link) => `- [${link.label}](${link.url})`).join("\n")}`
+    ? `**可以点开看看**\n${referenceLinks.map((link) => `- [${link.label}](${link.url})`).join("\n")}`
     : ""
-  return buildCollapsiblePanel("判断依据与参考素材", [
+  return buildCollapsiblePanel("参考了什么", [
     evidenceLines.length > 0 ? evidenceLines.join("\n") : "",
     referenceBlock,
   ])
 }
 
 /**
- * @description 构建选题裁决卡（概要 + 候选 + 裁决按钮，次要信息折叠）
+ * @description 构建选题卡（概要 + 候选 + 选择按钮，次要信息折叠）
  * @param input - 选题记录 ID、候选卡、来源快照、热门条目、项目名
  * @returns 飞书交互卡片对象
  */
@@ -220,7 +220,7 @@ export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: "plain_text", content: "今日选题 · 请你裁决" },
+      title: { tag: "plain_text", content: "今日选题 · 你挑一个" },
       template: "blue",
     },
     elements: [
@@ -240,7 +240,7 @@ export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string
         elements: [
           {
             tag: "plain_text",
-            content: "AI 只做提案与评分；采用哪张由你决定。「都不行」进观察池，候选不会丢。",
+            content: "AI 只负责出主意，拍哪个你说了算。点「都不行」也不会丢，先帮你存着。",
           },
         ],
       },

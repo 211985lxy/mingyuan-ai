@@ -40,13 +40,13 @@ describe("evening report selection lines", () => {
       selection({ reviewStatus: "adopted", selectedIndex: 1 }),
       selection(),
     ])
-    expect(lines[0]).toContain("已采用｜采用「候选二」")
-    expect(lines[1]).toContain("未裁决")
+    expect(lines[0]).toContain("挑了｜选了「候选二」")
+    expect(lines[1]).toContain("还没挑")
     expect(lines[1]).not.toContain("候选")
   })
 
   it("空天提示没有生成批次", () => {
-    expect(formatSelectionLines([])).toEqual(["今日没有生成选题批次。"])
+    expect(formatSelectionLines([])).toEqual(["今天还没生成选题。"])
   })
 
   it("都不行与换一批状态正确映射", () => {
@@ -54,8 +54,8 @@ describe("evening report selection lines", () => {
       selection({ reviewStatus: "archived" }),
       selection({ reviewStatus: "regenerated" }),
     ])
-    expect(lines[0]).toContain("都不行（观察池）")
-    expect(lines[1]).toContain("已换一批")
+    expect(lines[0]).toContain("都不要，先存着")
+    expect(lines[1]).toContain("换过了")
   })
 })
 
@@ -73,9 +73,9 @@ describe("evening report card", () => {
     )
     const text = markdown(card)
     expect(text).toContain("明动远见｜相宇个人IP")
-    expect(text).toContain("已采用｜采用「候选一」")
-    expect(text).toContain("今日灵感：3 条（已提取 2｜失败 0）")
-    expect(text).toContain("热点采集：正常")
+    expect(text).toContain("挑了｜选了「候选一」")
+    expect(text).toContain("今天记的灵感：3 条（扒好 2｜没扒到 0）")
+    expect(text).toContain("热点数据：正常")
   })
 
   it("热榜停摆时给出警告而不是静默", () => {
@@ -90,8 +90,8 @@ describe("evening report card", () => {
       null,
     )
     const text = markdown(card)
-    expect(text).toContain("⚠️ 无快照")
-    expect(text).toContain("今日没有生成选题批次")
+    expect(text).toContain("⚠️ 断了")
+    expect(text).toContain("今天还没生成选题")
   })
 })
 

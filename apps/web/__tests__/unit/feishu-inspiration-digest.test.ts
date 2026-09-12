@@ -34,12 +34,12 @@ function markdown(card: Record<string, unknown>): string {
 }
 
 describe("inspiration digest entry line", () => {
-  it("评述剥掉链接、带时间与状态、附原链接", () => {
+  it("评述剥掉链接、带时间与状态、附原片", () => {
     const line = formatDigestEntryLine(entry())
-    // 评述部分不含 URL（URL 只出现在末尾的原链接 markdown 里）
+    // 评述部分不含 URL（URL 只出现在末尾的原片 markdown 里）
     expect(line.startsWith("- 这个视频讲获客型视频的结构，值得抄｜")).toBe(true)
-    expect(line).toContain("[原链接](https://v.douyin.com/abc/)")
-    expect(line).toContain("已提取")
+    expect(line).toContain("[原片](https://v.douyin.com/abc/)")
+    expect(line).toContain("文案扒好了")
     expect(line).toContain("9月12日 09:30")
   })
 
@@ -48,12 +48,12 @@ describe("inspiration digest entry line", () => {
     expect(long).toContain("…")
 
     const linkOnly = formatDigestEntryLine(entry({ content: "https://v.douyin.com/only/" }))
-    expect(linkOnly).toContain("（无文字，仅链接）")
+    expect(linkOnly).toContain("只丢了个链接")
   })
 
   it("失败状态映射为人话", () => {
-    expect(formatDigestEntryLine(entry({ aiStatus: "failed", processingStage: null }))).toContain("提取失败")
-    expect(formatDigestEntryLine(entry({ aiStatus: "pending", processingStage: "queued" }))).toContain("提取中")
+    expect(formatDigestEntryLine(entry({ aiStatus: "failed", processingStage: null }))).toContain("没扒到文案")
+    expect(formatDigestEntryLine(entry({ aiStatus: "pending", processingStage: "queued" }))).toContain("正在扒文案")
   })
 })
 
@@ -62,8 +62,8 @@ describe("inspiration digest card", () => {
     const card = buildInspirationDigestCard([entry()])
     expect(card).not.toBeNull()
     const text = markdown(card!)
-    expect(text).toContain("记了 1 条灵感")
-    expect(text).toContain("选题素材")
+    expect(text).toContain("随手记了 1 条")
+    expect(text).toContain("写选题的素材")
   })
 
   it("空列表不返回卡片（不推空卡）", () => {
@@ -75,7 +75,7 @@ describe("inspiration digest card", () => {
       entry({ id: `insp_${index}`, content: `灵感 ${index}` }),
     )
     const text = markdown(buildInspirationDigestCard(entries)!)
-    expect(text).toContain(`记了 ${INSPIRATION_DIGEST_LIMIT + 3} 条灵感`)
+    expect(text).toContain(`随手记了 ${INSPIRATION_DIGEST_LIMIT + 3} 条`)
     expect(text).toContain("还有 3 条")
   })
 })

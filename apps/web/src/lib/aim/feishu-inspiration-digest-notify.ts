@@ -30,9 +30,9 @@ function stripUrls(text: string): string {
 
 function stageLabel(entry: InspirationDigestEntry): string {
   const stage = entry.processingStage || entry.aiStatus
-  if (entry.aiStatus === "failed") return "提取失败"
-  if (stage === "captured" || entry.aiStatus === "completed") return "已提取"
-  if (stage === "queued" || stage === "pending" || stage === "deferred") return "提取中"
+  if (entry.aiStatus === "failed") return "没扒到文案"
+  if (stage === "captured" || entry.aiStatus === "completed") return "文案扒好了"
+  if (stage === "queued" || stage === "pending" || stage === "deferred") return "正在扒文案"
   return stage || "处理中"
 }
 
@@ -40,12 +40,12 @@ function formatEntryTime(date: Date): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
 }
 
-/** 单条回顾行：灵感点（剥链接后的评述）+ 时间 + 状态 + 原链接。 */
+/** 单条回顾行：灵感点（剥链接后的评述）+ 时间 + 状态 + 原片链接。 */
 export function formatDigestEntryLine(entry: InspirationDigestEntry): string {
   const note = stripUrls(entry.content)
   const preview = note.length > NOTE_PREVIEW_MAX ? `${note.slice(0, NOTE_PREVIEW_MAX)}…` : note
-  const link = entry.sourceUrl ? `｜[原链接](${entry.sourceUrl})` : ""
-  return `- ${preview || "（无文字，仅链接）"}｜${formatEntryTime(entry.createdAt)}｜${stageLabel(entry)}${link}`
+  const link = entry.sourceUrl ? `｜[原片](${entry.sourceUrl})` : ""
+  return `- ${preview || "只丢了个链接"}｜${formatEntryTime(entry.createdAt)}｜${stageLabel(entry)}${link}`
 }
 
 /** 无灵感时不推卡；有则返回完整卡片 JSON 对象。 */
@@ -54,24 +54,24 @@ export function buildInspirationDigestCard(entries: InspirationDigestEntry[]): R
   const shown = entries.slice(0, INSPIRATION_DIGEST_LIMIT)
   const overflow = entries.length - shown.length
   const lines = shown.map(formatDigestEntryLine)
-  if (overflow > 0) lines.push(`- …还有 ${overflow} 条，详见 AIM 灵感库`)
+  if (overflow > 0) lines.push(`- …还有 ${overflow} 条，在 AIM 里都能看到`)
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: "plain_text", content: "你的灵感回顾 · 最近 24 小时" },
+      title: { tag: "plain_text", content: "灵感小账本 · 昨天记的" },
       template: "turquoise",
     },
     elements: [
       {
         tag: "div",
-        text: { tag: "lark_md", content: `**昨天你在群里记了 ${entries.length} 条灵感**\n${lines.join("\n")}` },
+        text: { tag: "lark_md", content: `**昨天你在群里随手记了 ${entries.length} 条，都收好了**\n${lines.join("\n")}` },
       },
       {
         tag: "note",
         elements: [
           {
             tag: "plain_text",
-            content: "这些记录会作为选题素材参与生成；继续往群里发链接+想法即可收录。",
+            content: "这些都会变成写选题的素材。继续往群里丢链接+想法就行。",
           },
         ],
       },

@@ -35,18 +35,18 @@ function candidateTitle(candidates: unknown, index: number | null): string | nul
 }
 
 function reviewLabel(status: string): string {
-  if (status === "adopted") return "已采用"
-  if (status === "archived") return "都不行（观察池）"
-  if (status === "regenerated") return "已换一批"
-  return "未裁决"
+  if (status === "adopted") return "挑了"
+  if (status === "archived") return "都不要，先存着"
+  if (status === "regenerated") return "换过了"
+  return "还没挑"
 }
 
-/** 选题区：每批一行裁决结果；采用了的带选题标题。 */
+/** 选题区：每批一行结果；挑了的带选题标题。 */
 export function formatSelectionLines(selections: EveningSelectionSummary[]): string[] {
-  if (selections.length === 0) return ["今日没有生成选题批次。"]
+  if (selections.length === 0) return ["今天还没生成选题。"]
   return selections.map((selection) => {
     const title = candidateTitle(selection.candidates, selection.selectedIndex)
-    const adopted = title ? `｜采用「${title}」` : ""
+    const adopted = title ? `｜选了「${title}」` : ""
     return `- 批次 ${selection.selectionId.slice(-6)}｜${reviewLabel(selection.reviewStatus)}${adopted}`
   })
 }
@@ -54,13 +54,13 @@ export function formatSelectionLines(selections: EveningSelectionSummary[]): str
 /** 灵感与健康度区。 */
 export function formatStatusLines(data: Pick<EveningReportData, "inspirationCount" | "inspirationExtracted" | "inspirationFailed" | "hotSnapshotAt">): string[] {
   const lines = [
-    `- 今日灵感：${data.inspirationCount} 条（已提取 ${data.inspirationExtracted}｜失败 ${data.inspirationFailed}）`,
+    `- 今天记的灵感：${data.inspirationCount} 条（扒好 ${data.inspirationExtracted}｜没扒到 ${data.inspirationFailed}）`,
   ]
   if (data.hotSnapshotAt) {
     const ageHours = Math.floor((Date.now() - data.hotSnapshotAt.getTime()) / 3_600_000)
-    lines.push(`- 热点采集：正常（最近快照 ${ageHours} 小时前）`)
+    lines.push(`- 热点数据：正常（${ageHours} 小时前更新）`)
   } else {
-    lines.push("- 热点采集：⚠️ 无快照，热点选题质量会受影响")
+    lines.push("- 热点数据：⚠️ 断了，选题会少点时效感")
   }
   return lines
 }
@@ -70,7 +70,7 @@ export function buildEveningReportCard(data: EveningReportData, projectName: str
   return {
     config: { wide_screen_mode: true },
     header: {
-      title: { tag: "plain_text", content: "今日选题晚报" },
+      title: { tag: "plain_text", content: "今日小结" },
       template: "indigo",
     },
     elements: [
@@ -80,8 +80,8 @@ export function buildEveningReportCard(data: EveningReportData, projectName: str
           tag: "lark_md",
           content: [
             projectName ? `**项目**：${projectName}` : "",
-            `**今日选题**\n${formatSelectionLines(data.selections).join("\n")}`,
-            `**今日动态**\n${formatStatusLines(data).join("\n")}`,
+            `**今天的选题**\n${formatSelectionLines(data.selections).join("\n")}`,
+            `**今天的动态**\n${formatStatusLines(data).join("\n")}`,
           ].filter(Boolean).join("\n\n"),
         },
       },
@@ -90,7 +90,7 @@ export function buildEveningReportCard(data: EveningReportData, projectName: str
         elements: [
           {
             tag: "plain_text",
-            content: "早报提案、晚报对账；未裁决的批次明天仍可在控制台处理。",
+            content: "早上出主意、晚上对个账。还没挑的明天接着挑就行。",
           },
         ],
       },
