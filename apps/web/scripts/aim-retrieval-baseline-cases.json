@@ -1,0 +1,46 @@
+{
+  "description": "检索质量基线用例（WP-A5）。smoke 用例不依赖具体租户数据（关键词口径），标注 tenantCase 的用例需各项目按自己的真实知识条目补 relevantEntryIds 后才有 id 口径结论。",
+  "topK": 12,
+  "cases": [
+    {
+      "id": "smoke-boss-experience",
+      "query": "老板对交付质量的底线要求是什么",
+      "mustIncludeKeywords": ["交付"]
+    },
+    {
+      "id": "smoke-product-usp",
+      "query": "我们的产品和同行比核心差异在哪",
+      "mustIncludeKeywords": ["产品"]
+    },
+    {
+      "id": "smoke-customer-pain",
+      "query": "客户最常抱怨的问题是什么",
+      "mustIncludeKeywords": ["客户"]
+    },
+    {
+      "id": "smoke-project-case",
+      "query": "有没有拿得出手的项目案例可以讲",
+      "mustIncludeKeywords": ["案例"]
+    },
+    {
+      "id": "smoke-customer-qa",
+      "query": "客户问价格太贵了应该怎么回答",
+      "mustIncludeKeywords": ["价格"]
+    },
+    {
+      "id": "smoke-topic-hook",
+      "query": "短视频开头三秒怎么抓住人",
+      "mustIncludeKeywords": ["开头"]
+    },
+    {
+      "id": "tenantCase-1",
+      "query": "（租户用例模板：换成你项目的真实问题）",
+      "mustIncludeKeywords": []
+    },
+    {
+      "id": "tenantCase-2",
+      "query": "（租户用例模板：换成你项目的真实问题）",
+      "mustIncludeKeywords": []
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Mingyuan prediction reconcile daily
+
+[Timer]
+OnBootSec=5m
+OnCalendar=*-*-* 21:30:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-prediction-reconcile.service
+
+[Install]
+WantedBy=timers.target

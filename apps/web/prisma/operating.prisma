@@ -200,3 +200,28 @@ model EvalFixtureVersion {
   @@unique([fixtureKey, version])
   @@index([status, createdAt])
 }
+
+// 发布前预测（WP-A3）：学习闭环的最轻执行臂——发布登记时系统先表态，回流后对账可证伪。
+// 只预测自动回流可得的内容信号（播放口径）；商业结果不猜。
+model PublishPrediction {
+  id              String    @id @default(cuid())
+  userId          String
+  projectId       String?
+  generationId    String    @db.VarChar(30)
+  windowDay       Int // 7 | 14 | 30
+  predictedLow    Int // 播放区间下界
+  predictedHigh   Int // 播放区间上界
+  confidence      String    @db.VarChar(16) // low | medium | high（按基线样本量）
+  rationaleDigest String?   @db.Text // 预测依据摘要（账号基线 + 样本量），人可读
+  baselineHash    String?   @db.VarChar(64) // 基线摘要哈希（溯源账号历史快照）
+  verdict         String?   @db.VarChar(16) // within | over | under（对账后回填）
+  deviationRatio  Decimal?  @db.Decimal(10, 4) // 实际/预测中位
+  actualViews     Int?
+  reconciledAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([generationId, windowDay])
+  @@index([userId, reconciledAt])
+  @@index([projectId, windowDay])
+}
