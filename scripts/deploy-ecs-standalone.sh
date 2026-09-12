@@ -12,8 +12,41 @@ audit_event() {
   fi
 }
 
+# ── 部署互斥锁：同一时刻只允许一个部署。两个会话并发部署会在服务器
+#    standalone-new.incoming 目录互踩，一方失败于 rm 步骤（2026-09-12 实测）。
+#    用 mkdir 原子锁 + PID 残留回收：flock 在 macOS（部署发起端）不可用。 ──
+DEPLOY_LOCK_DIR="${TMPDIR:-/tmp}/mingyuan-deploy.lock"
+
+release_deploy_lock() {
+  # 只回收自己持有的锁；acquire 失败时不误删别人的锁。
+  if [ -f "$DEPLOY_LOCK_DIR/pid" ] && [ "$(cat "$DEPLOY_LOCK_DIR/pid" 2>/dev/null)" = "$$" ]; then
+    rm -rf "$DEPLOY_LOCK_DIR" 2>/dev/null || true
+  fi
+}
+
+acquire_deploy_lock() {
+  if mkdir "$DEPLOY_LOCK_DIR" 2>/dev/null; then
+    echo $$ > "$DEPLOY_LOCK_DIR/pid"
+    return 0
+  fi
+  local lock_pid
+  lock_pid="$(cat "$DEPLOY_LOCK_DIR/pid" 2>/dev/null || true)"
+  if [ -n "$lock_pid" ] && ! kill -0 "$lock_pid" 2>/dev/null; then
+    echo "⚠️ 发现残留部署锁（持有者 PID $lock_pid 已退出），回收后继续" >&2
+    rm -rf "$DEPLOY_LOCK_DIR"
+    if mkdir "$DEPLOY_LOCK_DIR" 2>/dev/null; then
+      echo $$ > "$DEPLOY_LOCK_DIR/pid"
+      return 0
+    fi
+  fi
+  echo "❌ 另一个部署正在进行（锁: $DEPLOY_LOCK_DIR，持有者 PID ${lock_pid:-未知}）。" >&2
+  echo "   确认无部署在跑后，删除该目录即可解锁。" >&2
+  return 1
+}
+
 finish_audit() {
   local exit_code=$?
+  release_deploy_lock
   if [ "$exit_code" -eq 0 ]; then
     audit_event finish --action deploy.finish --summary "ECS deployment completed" --environment production
   else
@@ -24,6 +57,8 @@ finish_audit() {
 
 trap finish_audit EXIT
 audit_event start --action deploy.start --summary "ECS deployment started" --environment production
+
+acquire_deploy_lock || exit 1
 
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/mingyuan_aliyun_deploy}"
 SSH_USER="${SSH_USER:-root}"
