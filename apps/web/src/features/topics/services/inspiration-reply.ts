@@ -35,6 +35,9 @@ export function buildInspirationReplyText(input: { generatedTopics: unknown; top
 
 export const INSPIRATION_ACCEPTED_REPLY = "已收录，正在提取视频文案并生成选题。"
 
+/** capture_only/evaluate 模式的轻量回执：只确认已记录，不承诺生成选题。 */
+export const INSPIRATION_CAPTURE_ACK_REPLY = "已记录灵感 ✅（含视频链接，文案会在后台提取）。当前为仅记录模式，不自动生成选题。"
+
 function buildTopicSelectionUrl(topicSelectionId: string) {
   const baseUrl = (env.NEXT_PUBLIC_APP_URL || env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "")
   return baseUrl ? `${baseUrl}/topic-planning?selectionId=${encodeURIComponent(topicSelectionId)}` : topicSelectionId
