@@ -205,6 +205,7 @@ async function probeAliyunSms() {
     SignatureMethod: "HMAC-SHA1",
     SignatureNonce: crypto.randomUUID(),
     SignatureVersion: "1.0",
+    SignName: signName,
     Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
     Version: "2017-05-25",
   }
