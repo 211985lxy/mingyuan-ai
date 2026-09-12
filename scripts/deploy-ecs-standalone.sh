@@ -41,6 +41,7 @@ CONTROL_CENTER_CRON_UNITS=(
   mingyuan-cron-operational-alerts
   mingyuan-cron-channel-metrics-rollup
   mingyuan-cron-control-center-retention
+  mingyuan-cron-integration-probe
 )
 CONTROL_CENTER_CRON_TIMER_LIST="${CONTROL_CENTER_CRON_UNITS[*]/%/.timer}"
 
@@ -180,6 +181,12 @@ if [ "$healthy" -ne 1 ]; then
 fi
 
 "${SSH[@]}" "set -e; if grep -q '^BACKGROUND_TASKS_ENABLED=' /etc/mingyuan/mingyuan.env; then sed -i 's/^BACKGROUND_TASKS_ENABLED=.*/BACKGROUND_TASKS_ENABLED=true/' /etc/mingyuan/mingyuan.env; else printf '\nBACKGROUND_TASKS_ENABLED=true\n' >> /etc/mingyuan/mingyuan.env; fi; chmod 600 /etc/mingyuan/mingyuan.env; systemctl daemon-reload; systemctl enable --now '$BACKGROUND_TASK_TIMER'; for t in $CONTROL_CENTER_CRON_TIMER_LIST; do systemctl enable --now "\$t"; done; systemctl restart '$SERVICE_NAME'; systemctl is-active '$SERVICE_NAME'; ready=0; for attempt in {1..30}; do if /usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 2 http://127.0.0.1:3000/api/healthz >/dev/null; then ready=1; break; fi; sleep 1; done; if [ \"\$ready\" -ne 1 ]; then exit 1; fi; systemctl start '$BACKGROUND_TASK_SERVICE'; systemctl is-active '$BACKGROUND_TASK_TIMER'"
+
+# 发布后外部集成探针：一次 curl 拉起全量集成探测（结果落 OperationalAlert + 飞书）。
+# 失败只告警不回滚——声音/数据类集成故障不阻断核心生成链。
+if [ "${SKIP_FISH_PROBE:-0}" != "1" ]; then
+  "${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 120 -H 'Authorization: Bearer \$(grep ^CRON_SECRET= /etc/mingyuan/mingyuan.env | cut -d= -f2)' http://127.0.0.1:3000/api/cron/integration-probe"     | tail -c 1200 || echo "WARNING: integration probe after deploy failed (非阻断)" >&2
+fi
 
 # 回读线上发布事实：releaseSha 必须等于本地 HEAD（经 SSH 内网，不依赖本机 DNS）。
 LIVE_SHA="$("${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 5 http://127.0.0.1:3000/api/healthz" | node -e "let d='';process.stdin.on('data',(c)=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).releaseSha??'unknown')}catch{console.log('unknown')}})")"
