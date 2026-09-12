@@ -25,16 +25,16 @@ export const assetFilters: { value: AssetFilter; label: string }[] = [
 
 export const ASSET_FLOW_CARDS = [
   {
-    title: "企业资料",
-    desc: "营业资料、项目介绍、产品手册先沉淀到资产库。",
+    title: "数字人分身",
+    desc: "上传授权视频和本人素材，克隆出可口播的数字人。",
   },
   {
     title: "证据素材",
     desc: "案例图片、过程视频、客户反馈作为文案的可信证据。",
   },
   {
-    title: "成片包装",
-    desc: "创作页会围绕最终文案调用素材和包装能力。",
+    title: "作品出片",
+    desc: "作品编辑成稿后，选数字人即可生成口播视频。",
   },
 ] as const;
 

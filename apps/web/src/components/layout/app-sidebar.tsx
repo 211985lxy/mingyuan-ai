@@ -9,6 +9,8 @@ import {
   BriefcaseBusiness,
   ChevronDown,
   Layers,
+  Clapperboard,
+  FolderOpen,
   PenLine,
   FileText,
   Plus,
@@ -71,6 +73,8 @@ const toolboxNav: NavItem[] = [
   { title: "极简模式", href: "/lite", icon: Zap },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "语音工坊", href: "/voice-studio", icon: AudioLines },
+  { title: "资产库", href: "/assets", icon: FolderOpen },
+  { title: "我的成片", href: "/videos", icon: Clapperboard },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
 ]
 

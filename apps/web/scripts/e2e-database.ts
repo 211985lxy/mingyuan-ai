@@ -83,11 +83,14 @@ async function verifySchemaContract(databaseUrl: string): Promise<void> {
       }
     }
 
-    const [retiredTables] = await connection.query<RowDataPacket[]>(
+    const [digitalHumanTables] = await connection.query<RowDataPacket[]>(
       "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('VideoTask', 'VideoProductionPlan', 'VideoPackagingTemplate', 'Avatar')",
     )
-    if (retiredTables.length > 0) {
-      throw new Error(`Retired media tables remain: ${retiredTables.map((row) => row.TABLE_NAME).join(", ")}`)
+    const present = new Set(digitalHumanTables.map((row) => String(row.TABLE_NAME)))
+    for (const required of ["VideoTask", "VideoProductionPlan", "VideoPackagingTemplate", "Avatar"]) {
+      if (!present.has(required)) {
+        throw new Error(`Digital-human schema missing required table ${required}`)
+      }
     }
   } finally {
     await connection.end()

@@ -47,13 +47,13 @@ describe("migration integrity policy", () => {
     ).toContain("baseline migrations must be an ordered prefix of the migration history")
   })
 
-  it("rejects retired columns in the production schema contract", () => {
+  it("allows restored digital-human columns in the production schema contract", () => {
     expect(
       findMigrationIntegrityViolations({
         baselineMigrations: [],
         migrationDirectories: [],
         schemaContract: { tables: [{ name: "User", columns: ["authVideoUrl"] }] },
       }),
-    ).toContain("production schema contract requires retired column User.authVideoUrl")
+    ).toEqual([])
   })
 })

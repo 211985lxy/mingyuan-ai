@@ -146,6 +146,8 @@ function switchToTargetAgent(
 async function handleAimNextAction(input: AimWorkflowActionInput, action: AimNextAction, content: string, generationId: string) {
   const cleanContent = content.trim()
   if (!cleanContent) return
+  // Digital-human generation is handled inside AimDeliverableBubble dialog.
+  if (action.workbenchAction === "generate_digital_human_video") return
   if (action.id === "save_knowledge") return void await saveNextActionKnowledge(input, action, cleanContent, generationId)
   if (action.targetAgentId && action.targetAgentId !== input.selectedAgentId) {
     if (action.targetAgentId === "content_producer" && getWorkflowStageForAgent(input.selectedAgentId) === "direction") {

@@ -12,6 +12,7 @@ import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
 import type { AimGenerateResponse, AimGenerateResult, ContentFormat } from "@/lib/api/client"
 import { AimInlineDocumentCard } from "@/components/aim/aim-inline-document-card"
+import { DigitalHumanVideoDialog } from "@/components/aim/digital-human-video-dialog"
 import type { TextSelectionRange } from "@/lib/aim-editor"
 import type { TaskSpec } from "@/lib/task-spec"
 
@@ -224,9 +225,26 @@ function WorkflowRecordActions({ onOpenDecision, onOpenPublish, onOpenRetro, onO
  * @returns 无返回值
  */
 export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
-  const { deliverables, regenerating = false } = props
+  const { deliverables, regenerating = false, nextActions = [], onNextAction, isBusy } = props
+  const digitalHumanActions = nextActions.filter(
+    (action) => action.workbenchAction === "generate_digital_human_video",
+  )
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
+  const [digitalHumanOpen, setDigitalHumanOpen] = useState(false)
   const activeFormat = deliverables.results.some((item) => item.format === activeTab) ? activeTab : deliverables.results[0]?.format || "raw_copy"
+  const activeContent = useMemo(() => {
+    const item = deliverables.results.find((row) => row.format === activeFormat) || deliverables.results[0]
+    return splitAimMethodNote(item?.content || "").result
+  }, [activeFormat, deliverables.results])
+
+  function handleNextAction(action: AimNextAction) {
+    if (action.workbenchAction === "generate_digital_human_video") {
+      setDigitalHumanOpen(true)
+      return
+    }
+    onNextAction?.(action, activeContent, deliverables.id)
+  }
+
   return <div className={`mt-2 w-full transition-opacity duration-300 ${regenerating ? "opacity-55" : "opacity-100"}`}>
     {regenerating ? (
       <div className="mb-2 space-y-1.5" aria-live="polite">
@@ -258,6 +276,29 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
       onOpenRetro={props.onOpenRetro}
       onOpenLead={props.onOpenLead}
       reportHref={`/api/aim/history/${deliverables.id}/retro-report`}
+    />
+    {digitalHumanActions.length > 0 && !regenerating ? (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {digitalHumanActions.map((action) => (
+          <Button
+            key={action.id}
+            type="button"
+            size="sm"
+            variant={action.workbenchAction === "generate_digital_human_video" ? "default" : "outline"}
+            disabled={isBusy}
+            onClick={() => handleNextAction(action)}
+          >
+            {action.label}
+          </Button>
+        ))}
+      </div>
+    ) : null}
+    <DigitalHumanVideoDialog
+      open={digitalHumanOpen}
+      onOpenChange={setDigitalHumanOpen}
+      initialScript={activeContent}
+      projectId={props.projectId}
+      aimGenerationId={deliverables.id}
     />
   </div>
 }

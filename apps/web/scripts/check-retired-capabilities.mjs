@@ -4,6 +4,19 @@ import { fileURLToPath } from "node:url"
 
 const webRoot = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const repoRoot = resolve(webRoot, "../..")
+
+/**
+ * 2026-09-12 数字人/视频成片域恢复（codex/aim-digital-human-implementation 合并）。
+ *
+ * 门禁重划边界（非整体放开）：
+ * - 放行：VideoTask / VideoProductionPlan / VideoPackagingTemplate / Avatar 模型、
+ *   SHANJIAN_*（管理员手动备用链路）、PACKAGING_MATERIAL_PLAN_MODEL、
+ *   worker:task-recovery、api/{tasks,production-plans,packaging-templates}、
+ *   cron/{poll-tasks,backfill-delivery,poll-enhancements}。
+ * - 继续拦截（仍处退役态，恢复前先评审）：Pexels / Pixabay / Volcengine TTS、
+ *   PublicAvatarPreview、packaging-material-suggestions、cron/pexels-transfer、
+ *   mingyuan-worker。
+ */
 const scanRoots = [
   resolve(webRoot, "src"),
   resolve(webRoot, "prisma"),
@@ -36,22 +49,16 @@ const ignoredFiles = new Set([
   resolve(repoRoot, "docs/plans/2026-07-13-aim-repository-reliability-master-plan.md"),
 ])
 const retiredPatterns = [
-  /\bVideoTask\b/,
-  /\bVideoProductionPlan\b/,
-  /\bVideoPackagingTemplate\b/,
   /\bPexelsMedia\b/,
   /\bPexelsQueryCache\b/,
   /\bPublicAvatarPreview/,
-  /\bSHANJIAN_/,
   /\bPEXELS_/,
   /\bPIXABAY_/,
   /\bVOLC_(?:SPEECH|TTS)_/,
-  /\bPACKAGING_MATERIAL_PLAN_MODEL\b/,
-  /\bworker:task-recovery\b/,
   /\bmingyuan-worker\b/,
-  /\/api\/(?:tasks|production-plans|packaging-templates|packaging-material-suggestions|pexels)(?:\/|\b)/,
-  /\/api\/cron\/(?:poll-tasks|pexels-transfer|backfill-delivery|poll-enhancements)(?:\/|\b)/,
-  /@\/lib\/(?:shanjian|task-recovery|video-task|aliyun-enhancement|packaging-material)/,
+  /\/api\/(?:packaging-material-suggestions|pexels)(?:\/|\b)/,
+  /\/api\/cron\/pexels-transfer(?:\/|\b)/,
+  /@\/lib\/(?:pexels|pixabay|volcengine-tts|public-avatar-preview)/,
 ]
 
 function walk(directory) {
@@ -97,4 +104,4 @@ if (violations.length > 0) {
   process.exit(1)
 }
 
-console.log(`retired-capability-guard-ok files=${new Set(files).size} asr=retained`)
+console.log(`retired-capability-guard-ok files=${new Set(files).size} asr=retained mode=digital-human-restored`)

@@ -107,18 +107,47 @@ export interface GeneratePositioningError {
   error: string
 }
 
+export interface ApiAvatar {
+  id: string
+  userId: string
+  projectId: string | null
+  name: string
+  status: string
+  provider: "chanjing" | "shanjian" | string
+  authorizationText: string | null
+  authorizationConfirmedAt: string | null
+  coverUrl: string | null
+  sourceVideoUrl: string | null
+  previewUrl: string | null
+  thumbnailUrl: string | null
+  externalTaskId: string | null
+  externalVirtualmanId: string | null
+  externalSpeakerId: string | null
+  speakerName: string | null
+  demoVideoUrl: string | null
+  errorCode: string | null
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ApiAsset {
-  id: string;
-  userId: string;
-  name: string;
-  assetType: string;
-  url: string;
-  size: number | null;
-  status: string;
-  errorCode: string | null;
-  errorMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  userId: string
+  sourceAvatarId?: string | null
+  name: string
+  assetType: string
+  url: string
+  size: number | null
+  status: string
+  externalTaskId?: string | null
+  externalSpeakerId?: string | null
+  voiceModel?: string | null
+  demoAudioUrl?: string | null
+  errorCode: string | null
+  errorMessage: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface ApiScript {

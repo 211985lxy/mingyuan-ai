@@ -10,8 +10,10 @@ import { ASSET_FLOW_CARDS } from "@/features/assets/asset-page-shared";
  */
 export function AssetFlowOverview({
   assetCount,
+  readyAvatarCount = 0,
 }: {
   assetCount: number;
+  readyAvatarCount?: number;
 }) {
   return (
     <Card className="border-primary/15 bg-primary/[0.02]">
@@ -30,6 +32,7 @@ export function AssetFlowOverview({
           ))}
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
+          <Badge variant="secondary">可用数字人 {readyAvatarCount}</Badge>
           <Badge variant="secondary">已沉淀素材 {assetCount}</Badge>
         </div>
       </CardContent>
