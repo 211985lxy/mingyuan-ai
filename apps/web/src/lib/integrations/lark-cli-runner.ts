@@ -117,6 +117,8 @@ export function sanitizeCliLog(value: string): string {
   return value
     .replace(/authorization\s*[:=]\s*bearer\s+\S+/gi, "Authorization: [REDACTED]")
     .replace(/\b(api[_-]?key|token|secret|password|app_secret)\s*[:=]\s*\S+/gi, "$1=[REDACTED]")
+    // 空格分隔的 CLI 旗标（--base-token S6uHb…）：生产日志曾因此泄露 base token
+    .replace(/(--(?:base[-_]?token|token|secret)\s+)(?!\[REDACTED\])\S+/gi, "$1[REDACTED]")
     .replace(/\bsk-[a-z0-9_-]{8,}\b/gi, "[REDACTED]")
     .replace(/\bt-[a-zA-Z0-9]{20,}\b/g, "[TOKEN_REDACTED]")
     .slice(0, 1000)

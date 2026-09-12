@@ -211,4 +211,13 @@ describe("lark-cli-runner", () => {
       expect(commands).not.toContain("+table-delete")
     })
   })
+
+  it("sanitizeCliLog 脱敏空格分隔的 CLI 旗标（--base-token 曾泄入生产日志）", async () => {
+    const { sanitizeCliLog } = await import("@/lib/integrations/lark-cli-runner")
+    const raw = "base +record-list --base-token S6uHb1olXaqtNbsnA00cAoW1nrf --table-id tblBqFWSZffk5uNw"
+    const out = sanitizeCliLog(raw)
+    expect(out).not.toContain("S6uHb1olXaqtNbsnA00cAoW1nrf")
+    expect(out).toContain("--base-token [REDACTED]")
+    expect(out).toContain("--table-id tblBqFWSZffk5uNw") // 非 token 旗标不受影响
+  })
 })
