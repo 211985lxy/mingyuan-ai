@@ -72,11 +72,18 @@ describe("集成探针框架", () => {
     expect(findByName(results, "tikhub")?.status).toBe("quota_blocked")
   })
 
-  it("TikHub 200 归为 healthy", async () => {
+  it("TikHub 校验性 422 归为 healthy（业务端点+鉴权链健在）", async () => {
     const { runIntegrationProbes } = await loadProbesWithEnv({ TIKHUB_API_KEY: "test-key" })
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ balance: 10 }), { status: 200 })))
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ detail: [] }), { status: 422 })))
     const results = await runIntegrationProbes()
     expect(findByName(results, "tikhub")?.status).toBe("healthy")
+  })
+
+  it("TikHub 业务端点 404 判为 failed（上游下线，2026-09-12 实测）", async () => {
+    const { runIntegrationProbes } = await loadProbesWithEnv({ TIKHUB_API_KEY: "test-key" })
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("Not Found", { status: 404 })))
+    const results = await runIntegrationProbes()
+    expect(findByName(results, "tikhub")?.status).toBe("failed")
   })
 
   it("qingdou：业务性「任务不存在」响应判定为 healthy（端点与 key 健在）", async () => {

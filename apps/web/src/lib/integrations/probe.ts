@@ -75,13 +75,18 @@ async function probeAliyunOss() {
 
 async function probeTikhub() {
   if (!env.TIKHUB_API_KEY) return { status: "unconfigured" as const, detail: "TIKHUB_API_KEY 未配置" }
-  const response = await fetch("https://api.tikhub.io/api/v1/users/me", {
-    headers: { Authorization: `Bearer ${env.TIKHUB_API_KEY}` },
+  // 业务形态探针：/users/me 已被上游下线（2026-09-12 实测 404，与鉴权无关），
+  // 改打应用真实在用的搜索端点，故意发非法极简 body——FastAPI 422 = 端点+栈+鉴权链活着
+  const response = await fetch("https://api.tikhub.io/api/v1/wechat_search/v2/fetch_search", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.TIKHUB_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ probe: true }),
     signal: AbortSignal.timeout(20_000),
   })
+  if (response.status === 422) return { status: "healthy" as const, detail: "端点与鉴权链健在（校验性 422）" }
   if (response.status === 402) return { status: "quota_blocked" as const, detail: "TikHub 余额不足，竞对/选题数据将 502" }
-  if (!response.ok) return { status: "failed" as const, detail: `HTTP ${response.status}` }
-  return { status: "healthy" as const }
+  if (response.status === 404) return { status: "failed" as const, detail: "业务端点 404（上游已下线/迁移）" }
+  return { status: "failed" as const, detail: `HTTP ${response.status}` }
 }
 
 // ── 青豆视频文案提取：核心工作流入口；假 batchId 探测区分「key 失效 vs 端点挂」 ──
@@ -139,8 +144,12 @@ async function probeSiliconflow() {
   if (env.EMBEDDING_ENABLED !== "true" || !apiKey) {
     return { status: "unconfigured" as const, detail: "EMBEDDING_ENABLED 未开启或 key 未配置（知识检索处于非语义模式）" }
   }
-  const response = await fetch("https://api.siliconflow.cn/v1/user/info", {
-    headers: { Authorization: `Bearer ${apiKey}` },
+  // 业务形态探针：/v1/user/info 已 410 下线（2026-09-12 实测），
+  // 改打应用真实在用的 embeddings 端点（成本可忽略，且能验证模型名仍有效）
+  const response = await fetch("https://api.siliconflow.cn/v1/embeddings", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "BAAI/bge-large-zh-v1.5", input: ["探针"] }),
     signal: AbortSignal.timeout(20_000),
   })
   if (!response.ok) return { status: "failed" as const, detail: `HTTP ${response.status}` }
