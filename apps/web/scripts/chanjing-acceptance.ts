@@ -16,8 +16,10 @@ import { fileURLToPath } from "node:url"
 // ─── 先加载 .env.local，再动态引入客户端（客户端在模块加载期读 env）───
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 for (const line of readFileSync(resolve(WEB_ROOT, ".env.local"), "utf8").split("\n")) {
-  const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-  if (match && !process.env[match[1]]) process.env[match[1]] = match[2]
+  const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
+  if (!match || process.env[match[1]]) continue
+  // 去掉 .env 包裹引号：否则 NODE_ENV="development" 会被 env 校验判为非法
+  process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2")
 }
 
 // ─── fetch 拦截：仅记录路径 / code / trace_id / 耗时，绝不记录凭证 ───

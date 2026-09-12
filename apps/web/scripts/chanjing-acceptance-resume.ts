@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url"
 
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 for (const line of readFileSync(resolve(WEB_ROOT, ".env.local"), "utf8").split("\n")) {
-  const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
-  if (match && !process.env[match[1]]) process.env[match[1]] = match[2]
+  const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/)
+  if (!match || process.env[match[1]]) continue
+  // 去掉 .env 包裹引号：否则 NODE_ENV="development" 会被 env 校验判为非法
+  process.env[match[1]] = match[2].replace(/^(['"])(.*)\1$/, "$2")
 }
 
 const [videoTaskId, audioUrl, audioDurationRaw] = process.argv.slice(2)
