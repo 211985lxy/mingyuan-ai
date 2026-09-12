@@ -39,6 +39,10 @@ export type CreateVideoTaskInput = {
   avatarName?: string;
   processRules?: unknown;
   speakerExtra?: unknown;
+  /** 音频来源：tts=数字人自带音色（默认）；own_voice=自有语音 API（Fish Audio）合成后驱动口型 */
+  voiceSource?: "tts" | "own_voice";
+  /** 自有语音的音色 id（Fish Audio reference_id）；留空用平台默认音色 */
+  voiceId?: string;
   [key: string]: unknown;
 };
 

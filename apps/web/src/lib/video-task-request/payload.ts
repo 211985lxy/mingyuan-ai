@@ -20,9 +20,11 @@ export function buildShanjianSubmitPayload(input: {
   avatar: ResolvedAvatar | null;
   scriptContent: string;
   aspectRatio?: "9:16" | "16:9";
+  /** 自有语音路径：蝉镜可抓取的签名音频 URL（audio 型下单用） */
+  ownVoiceAudioUrl?: string;
 }): Record<string, unknown> {
-  const { body, plan, videoType, avatar, scriptContent, aspectRatio = "9:16" } = input;
-  const { type, avatarId, scriptId, scriptContent: _, sourceTemplateId, styleId, productionPlanId, ...rest } = body;
+  const { body, plan, videoType, avatar, scriptContent, aspectRatio = "9:16", ownVoiceAudioUrl } = input;
+  const { type, avatarId, scriptId, scriptContent: _, sourceTemplateId, styleId, productionPlanId, voiceSource, voiceId, ...rest } = body;
   const resolved = resolveUpstreamPackaging(plan);
   const planMaterials = resolved.materials ? toMaterialItems(resolved.materials) : undefined;
   const planPackRules = plan ? mergePackRules(plan.packRules, resolved.backgroundMusic ?? null) : undefined;
@@ -42,6 +44,7 @@ export function buildShanjianSubmitPayload(input: {
     speakerExtra,
     processRules,
     aspectRatio,
+    ...(ownVoiceAudioUrl ? { ownVoiceAudioUrl, audioType: "audio" } : {}),
     ...(planMaterials ? { materials: planMaterials } : {}),
     ...(planPackRules ? { packRules: planPackRules } : {}),
     ...(videoType === "custom_virtualman_broadcast" && plan

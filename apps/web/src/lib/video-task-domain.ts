@@ -49,6 +49,7 @@ export function buildVideoTaskIdempotencyKey(input: {
   aspectRatio: "9:16" | "16:9";
   provider: "chanjing" | "shanjian";
   actionId?: string | null;
+  voiceSource?: string | null;
 }): string {
   const canonical = JSON.stringify({
     userId: input.userId,
@@ -59,6 +60,7 @@ export function buildVideoTaskIdempotencyKey(input: {
     aspectRatio: input.aspectRatio,
     provider: input.provider,
     actionId: input.actionId ?? null,
+    voiceSource: input.voiceSource ?? "tts",
   });
   return createHash("sha256").update(canonical).digest("hex");
 }

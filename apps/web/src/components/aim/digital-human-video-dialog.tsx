@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { createVideoTask, getVideoTask, listAvatars } from "@/lib/api/client"
+import { fetchVoiceModels, type VoiceModelOption } from "@/lib/api/voice"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ApiAvatar, ApiVideoTask } from "@/types/api"
 
@@ -50,6 +51,10 @@ export function DigitalHumanVideoDialog({
   const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("")
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16")
+  const [voiceSource, setVoiceSource] = useState<"tts" | "own_voice">("tts")
+  const [fishVoices, setFishVoices] = useState<VoiceModelOption[]>([])
+  const [loadingFishVoices, setLoadingFishVoices] = useState(false)
+  const [fishVoiceId, setFishVoiceId] = useState<string>("default")
   const [script, setScript] = useState(initialScript)
   const [submitting, setSubmitting] = useState(false)
   const [task, setTask] = useState<ApiVideoTask | null>(null)
@@ -67,6 +72,8 @@ export function DigitalHumanVideoDialog({
     setTask(null)
     setSelectedAvatarId("")
     setAspectRatio("9:16")
+    setVoiceSource("tts")
+    setFishVoiceId("default")
     if (!projectId) {
       setAvatars([])
       setLoadingAvatars(false)
@@ -98,6 +105,17 @@ export function DigitalHumanVideoDialog({
     return () => window.clearInterval(timer)
   }, [task])
 
+  useEffect(() => {
+    if (!open || voiceSource !== "own_voice" || fishVoices.length > 0) return
+    setLoadingFishVoices(true)
+    void fetchVoiceModels("mine")
+      .then((res) => setFishVoices(res.voices ?? []))
+      .catch(() => {
+        /* 音色列表失败不阻塞：提交时用平台默认音色 */
+      })
+      .finally(() => setLoadingFishVoices(false))
+  }, [open, voiceSource, fishVoices.length])
+
   async function handleSubmit() {
     const cleaned = script.trim()
     if (!cleaned) {
@@ -126,6 +144,9 @@ export function DigitalHumanVideoDialog({
         avatarId: selectedAvatarId,
         scriptContent: cleaned,
         aspectRatio,
+        ...(voiceSource === "own_voice"
+          ? { voiceSource, voiceId: fishVoiceId === "default" ? undefined : fishVoiceId }
+          : {}),
       })
       setTask(created)
       toast.success("已提交生成，成片会自动刷新状态")
@@ -200,6 +221,37 @@ export function DigitalHumanVideoDialog({
                 <SelectItem value="16:9">16:9 横屏（1920×1080）</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">声音来源</p>
+            <Select value={voiceSource} onValueChange={(value) => value && setVoiceSource(value as "tts" | "own_voice")}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tts">数字人自带音色</SelectItem>
+                <SelectItem value="own_voice">我的音色（语音工坊，口型对齐）</SelectItem>
+              </SelectContent>
+            </Select>
+            {voiceSource === "own_voice" ? (
+              <div className="space-y-1.5">
+                <Select value={fishVoiceId} onValueChange={(value) => value && setFishVoiceId(value)}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">平台默认音色</SelectItem>
+                    {fishVoices.map((voice) => (
+                      <SelectItem key={voice.id} value={voice.id}>{voice.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {loadingFishVoices
+                    ? "音色加载中…"
+                    : fishVoices.length === 0
+                      ? "暂无克隆音色，将使用平台默认音色；可在语音工坊克隆自己的声音。"
+                      : "提交时会先用所选音色合成音频，再驱动数字人对口型。"}
+                </p>
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-2">

@@ -31,4 +31,11 @@ describe("video task idempotency", () => {
     const original = buildVideoTaskIdempotencyKey(baseInput)
     expect(buildVideoTaskIdempotencyKey({ ...baseInput, actionId: "retry-1" })).not.toBe(original)
   })
+
+  it("distinguishes own-voice from provider tts delivery", () => {
+    const original = buildVideoTaskIdempotencyKey(baseInput)
+    expect(buildVideoTaskIdempotencyKey({ ...baseInput, voiceSource: "own_voice" })).not.toBe(original)
+    // 未声明 voiceSource 与显式 tts 等价（默认值归一）
+    expect(buildVideoTaskIdempotencyKey({ ...baseInput, voiceSource: "tts" })).toBe(original)
+  })
 })

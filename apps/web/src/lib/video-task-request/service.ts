@@ -5,11 +5,16 @@ import {
   type DigitalHumanProvider,
 } from "@/lib/digital-human-provider";
 import { prisma } from "@/lib/prisma";
+import {
+  DigitalHumanVoiceBridgeError,
+  synthesizeOwnVoiceToOss,
+} from "@/lib/digital-human-voice-bridge";
 import { buildVideoTaskIdempotencyKey } from "@/lib/video-task-domain";
 import {
   AVATAR_REQUIRING_TYPES,
   type CreateVideoTaskInput,
   type ResolvedPlan,
+  type VideoTaskType,
   VideoTaskRequestError,
 } from "./contracts";
 import { resolveVideoTaskAvatar } from "./avatar";
@@ -44,23 +49,17 @@ export async function createVideoTask(
   const aspectRatio = resolveAspectRatio(body.aspectRatio);
   const avatar = await resolveVideoTaskAvatar({ userId, projectId, videoType, body });
   const resolvedScript = await resolveVideoTaskScript({ userId, body, plan, videoType });
-  const idempotencyKey = buildVideoTaskIdempotencyKey({
+  const { idempotencyKey, shanjianPayload } = await prepareSubmissionInputs({
     userId,
-    projectId,
-    aimGenerationId,
-    avatarId: avatar?.id === "public" ? null : avatar?.id ?? null,
-    scriptContent: resolvedScript.content,
-    aspectRatio,
-    provider,
-    actionId: body.actionId,
-  });
-  const shanjianPayload = buildShanjianSubmitPayload({
     body,
     plan,
     videoType,
     avatar,
-    scriptContent: resolvedScript.content,
+    projectId,
+    aimGenerationId,
+    provider,
     aspectRatio,
+    scriptContent: resolvedScript.content,
   });
 
   let reservation: VideoTaskReservation | null = null;
@@ -104,6 +103,81 @@ export async function createVideoTask(
       });
     }
     return recoverOrThrow(error, reservation, plan);
+  }
+}
+
+/** 幂等键与上游载荷统一在此构造：voiceSource 参与 idempotency，own_voice 音频 URL 进入载荷。 */
+async function prepareSubmissionInputs(input: {
+  userId: string;
+  body: CreateVideoTaskInput;
+  plan: ResolvedPlan | null;
+  videoType: VideoTaskType;
+  avatar: Awaited<ReturnType<typeof resolveVideoTaskAvatar>>;
+  projectId: string | null;
+  aimGenerationId: string | null;
+  provider: DigitalHumanProvider;
+  aspectRatio: "9:16" | "16:9";
+  scriptContent: string;
+}): Promise<{ idempotencyKey: string; shanjianPayload: Record<string, unknown> }> {
+  const voiceSource = input.body.voiceSource === "own_voice" ? "own_voice" : "tts";
+  const ownVoiceAudioUrl = await synthesizeOwnVoiceIfRequested({
+    userId: input.userId,
+    provider: input.provider,
+    voiceSource,
+    voiceId: typeof input.body.voiceId === "string" ? input.body.voiceId : null,
+    scriptContent: input.scriptContent,
+  });
+  const idempotencyKey = buildVideoTaskIdempotencyKey({
+    userId: input.userId,
+    projectId: input.projectId,
+    aimGenerationId: input.aimGenerationId,
+    avatarId: input.avatar?.id === "public" ? null : input.avatar?.id ?? null,
+    scriptContent: input.scriptContent,
+    aspectRatio: input.aspectRatio,
+    provider: input.provider,
+    actionId: input.body.actionId,
+    voiceSource,
+  });
+  const shanjianPayload = buildShanjianSubmitPayload({
+    body: input.body,
+    plan: input.plan,
+    videoType: input.videoType,
+    avatar: input.avatar,
+    scriptContent: input.scriptContent,
+    aspectRatio: input.aspectRatio,
+    ownVoiceAudioUrl,
+  });
+  return { idempotencyKey, shanjianPayload };
+}
+
+/**
+ * own_voice：在预约前完成自有语音合成——失败即整个请求失败，不产生需补偿的任务记录。
+ * 桥接层错误按语义映射：文案超限等用户错误 422，服务未配置等环境错误 502。
+ */
+async function synthesizeOwnVoiceIfRequested(input: {
+  userId: string;
+  provider: DigitalHumanProvider;
+  voiceSource: "tts" | "own_voice";
+  voiceId: string | null;
+  scriptContent: string;
+}): Promise<string | undefined> {
+  if (input.voiceSource !== "own_voice") return undefined;
+  if (input.provider !== "chanjing") {
+    throw new VideoTaskRequestError("own_voice 仅支持蝉镜供应商", 422, { field: "voiceSource" });
+  }
+  try {
+    const synthesis = await synthesizeOwnVoiceToOss({
+      userId: input.userId,
+      text: input.scriptContent,
+      voiceId: input.voiceId,
+    });
+    return synthesis.signedUrl;
+  } catch (error) {
+    if (error instanceof DigitalHumanVoiceBridgeError) {
+      const userFault = error.code === "TEXT_TOO_LONG" || error.code === "AUDIO_TOO_LARGE";
+      throw new VideoTaskRequestError(error.message, userFault ? 422 : 502, { code: error.code });
+    }
+    throw error;
   }
 }
 

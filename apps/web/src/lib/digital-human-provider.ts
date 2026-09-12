@@ -7,6 +7,7 @@ import {
   isChanjingConfigured,
   ChanjingError,
 } from "@/lib/chanjing"
+import { createDigitalHumanVideoFromAudio } from "@/lib/chanjing-audio"
 import {
   cloneFastAvatar as cloneShanjianFastAvatar,
   cloneImageAvatar as cloneShanjianImageAvatar,
@@ -296,25 +297,48 @@ export async function submitVideoToProvider(
         )
       }
       const personId = typeof payload.virtualmanId === "string" ? payload.virtualmanId : null
+      if (!personId) {
+        throw new DigitalHumanProviderError(
+          "MISSING_VIDEO_INPUT",
+          "缺少数字人形象，无法提交蝉镜出片任务",
+        )
+      }
+      const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
+      const width = aspectRatio === "16:9" ? 1920 : 1080
+      const height = aspectRatio === "16:9" ? 1080 : 1920
+
+      // 自有语音路径：外部音频驱动口型（audio 型），不需要蝉镜音色与文案
+      const ownVoiceAudioUrl = typeof payload.ownVoiceAudioUrl === "string"
+        ? payload.ownVoiceAudioUrl
+        : null
+      if (ownVoiceAudioUrl) {
+        return await createDigitalHumanVideoFromAudio({
+          wavUrl: ownVoiceAudioUrl,
+          personId,
+          figureType: typeof payload.figureType === "string" ? payload.figureType : "whole_body",
+          personWidth: width,
+          personHeight: height,
+        })
+      }
+
       const audioManId = typeof payload.speakerId === "string" ? payload.speakerId : null
       const text = typeof payload.text === "string"
         ? payload.text
         : typeof payload.content === "string"
           ? payload.content
           : null
-      if (!personId || !audioManId || !text) {
+      if (!audioManId || !text) {
         throw new DigitalHumanProviderError(
           "MISSING_VIDEO_INPUT",
-          "缺少数字人、音色或口播文案，无法提交蝉镜出片任务",
+          "缺少音色或口播文案，无法提交蝉镜出片任务",
         )
       }
-      const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
       return await createDigitalHumanVideo({
         personId,
         audioManId,
         text,
-        width: aspectRatio === "16:9" ? 1920 : 1080,
-        height: aspectRatio === "16:9" ? 1080 : 1920,
+        width,
+        height,
       })
     }
 
