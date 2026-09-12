@@ -255,5 +255,46 @@ describe("裁决卡回调加密体处理", () => {
     expect(logged).not.toContain("super-secret-token-value")
     warn.mockRestore()
   })
+
+  it("重复投递（批次已被处理过）返回成功型 toast 而非报错", async () => {
+    planTopicReviewDecision.mockReturnValue({
+      ok: false,
+      error: "这一批已被处理过（可能已在控制台采用）",
+    })
+
+    const encrypted = feishuEncrypt(BOT_ENCRYPT_KEY, {
+      token: BOT_VERIFY_TOKEN,
+      open_id: "ou_double_delivery",
+      action: { tag: "button", value: { topic_action: "adopt", topic_selection_id: "sel-dup", topic_index: 1 } },
+    })
+
+    const res = await post({ encrypt: encrypted })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.toast?.type).toBe("success")
+    expect(body.toast?.content).toContain("已被处理过")
+  })
+
+  it("扁平形状（顶层 app_id + token + action，v1 实测形状）鉴权与分发正常", async () => {
+    planTopicReviewDecision.mockReturnValue({
+      ok: true,
+      atomicOnPendingStatus: true,
+      patch: { status: "selected", selectedIndex: 2 },
+    })
+
+    // 只有 app_id（模拟 token 过期场景）
+    const encrypted = feishuEncrypt(BOT_ENCRYPT_KEY, {
+      app_id: BOT_APP_ID,
+      open_id: "ou_flat_shape",
+      action: { tag: "button", value: { topic_action: "adopt", topic_selection_id: "sel-12", topic_index: 2 } },
+    })
+
+    const res = await post({ encrypt: encrypted })
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ toast: { type: "success" } })
+    expect(planTopicReviewDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "adopt", reviewedBy: "ou_flat_shape" }),
+    )
+  })
 })
 

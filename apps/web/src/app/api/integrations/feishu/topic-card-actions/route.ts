@@ -14,7 +14,7 @@ import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
-import { loadAgentBotRegistry, resolveBotByAppId, resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
+import { loadAgentBotRegistry, resolveBotByAppId, resolveBotByVerificationToken, type FeishuAgentBotConfig } from "@/lib/feishu-agent-registry"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import {
   TOPIC_REVIEW_ACTIONS,
@@ -40,6 +40,8 @@ interface TopicCardCallbackBody {
   type?: string
   challenge?: string
   encrypt?: string
+  /** card.action.trigger_v1（扁平形状）在顶层带 app_id */
+  app_id?: string
   action?: {
     value?: TopicCardActionValue
     tag?: string
@@ -62,6 +64,12 @@ interface TopicCardCallbackBody {
       tag?: string
     }
   }
+}
+
+/** 解密结果：载荷 + 用哪把 bot 密钥解开的（加密体解密成功本身即鉴权凭据；明文体为 null） */
+interface DecryptedCallback {
+  payload: TopicCardCallbackBody
+  bot: FeishuAgentBotConfig | null
 }
 
 /**
@@ -106,14 +114,20 @@ export function describeShape(value: unknown, depth = 0): unknown {
  * 应用配置了 Encrypt Key 时，飞书把回调体加密为 {"encrypt": "..."}。
  * 逐个尝试已注册 bot 的 encrypt key 解密（裁决卡由 topic planner 发出，
  * 但路由保持通用）；没有任何 key 能解开时返回 null。
+ *
+ * 安全语义：AES 密文只有持有 encrypt key 的一方才能构造，因此「用某把
+ * 已注册密钥成功解密」本身即完成该 bot 的身份鉴权——比 verification token
+ * 更强（token 只证明「来自飞书」，不证明「属于哪个应用」）。
  */
-function decryptCallbackBody(body: TopicCardCallbackBody): TopicCardCallbackBody | null {
-  if (typeof body.encrypt !== "string" || !body.encrypt) return body
+function decryptCallbackBody(body: TopicCardCallbackBody): DecryptedCallback | null {
+  if (typeof body.encrypt !== "string" || !body.encrypt) return body ? { payload: body, bot: null } : null
   for (const bot of loadAgentBotRegistry()) {
     if (!bot.encryptKey) continue
     try {
       const decrypted = JSON.parse(new lark.AESCipher(bot.encryptKey).decrypt(body.encrypt))
-      if (decrypted && typeof decrypted === "object") return decrypted as TopicCardCallbackBody
+      if (decrypted && typeof decrypted === "object") {
+        return { payload: decrypted as TopicCardCallbackBody, bot }
+      }
     } catch {
       // 不是这个 bot 的 key，换下一个
     }
@@ -196,22 +210,30 @@ export async function POST(request: Request) {
   // 加密回调体先解密；解不开时明确报错而不是落进 404，方便在控制台侧定位
   const decrypted = decryptCallbackBody(body)
   if (!decrypted) return toast("回调解密失败：encrypt 内容无法用已注册 bot 的密钥解开", "error")
+  const { payload: rawPayload, bot: decryptedByBot } = decrypted
   // 新版/经典两种信封归一化后再做校验与分发
-  const payload = normalizeCallbackBody(decrypted)
+  const payload = normalizeCallbackBody(rawPayload)
 
   // 飞书卡片回调的 URL 校验挑战原样返回
   if (payload.type === "url_verification" && payload.challenge) {
     return NextResponse.json({ challenge: payload.challenge })
   }
 
-  // 鉴权：优先 verification token；token 缺失或不匹配时回退 header.app_id
-  // （新版 schema 2.0 回调在 header 里带 app_id，而 token 不一定下发）。
+  // 鉴权（三层，强到弱）：
+  //   1. 加密体被某把已注册 bot 密钥成功解开 → 已完成该 bot 身份鉴权（密钥即凭据）；
+  //   2. 明文体：verification token 匹配；
+  //   3. 明文体兜底：app_id 匹配（header.app_id 或顶层 app_id；token 可能因
+  //      控制台重置而与 env 不一致，见 2026-09-12 骨架日志）。
+  const explicitAppId =
+    (typeof payload.header?.app_id === "string" ? payload.header.app_id : "") ||
+    (typeof payload.app_id === "string" ? payload.app_id : "")
   const bot =
+    decryptedByBot ??
     resolveBotByVerificationToken(typeof payload.token === "string" ? payload.token : "") ??
-    resolveBotByAppId(typeof payload.header?.app_id === "string" ? payload.header.app_id : "")
+    resolveBotByAppId(explicitAppId)
   if (!bot) {
     // 只记录字段结构（不含任何值），用于定位飞书真实信封形状
-    console.warn("[feishu-topic-card-actions] 鉴权失败，回调字段结构:", describeShape(decrypted))
+    console.warn("[feishu-topic-card-actions] 鉴权失败，回调字段结构:", describeShape(rawPayload))
     return NextResponse.json({ error: "Unknown agent bot" }, { status: 404 })
   }
 
@@ -230,7 +252,12 @@ export async function POST(request: Request) {
     rawIndex: actionValue?.topic_index,
     reviewerId,
   })
-  if (!settled.ok) return toast(settled.message, "error")
+  if (!settled.ok) {
+    // 「已被处理过」不是失败：同一批次会被 v2/v1 两种回调各投递一次（后台订阅了
+    // 两种回传交互），也可能与控制台并发撞车。用成功型 toast 避免用户看到假报错。
+    const duplicate = settled.message.includes("已被处理过")
+    return toast(settled.message, duplicate ? "success" : "error")
+  }
 
   if (action === "regenerate") {
     try {
