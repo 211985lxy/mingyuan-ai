@@ -6,12 +6,15 @@
 // 「换一批」生成要走 LLM，卡片回调必须秒回，故入队后台任务异步重生成后再推新卡。
 //
 // 鉴权：bot verification token（与 hitl-card-actions 同一机制）。
-// api-inventory: auth=signed_integration
+// 应用配置了 Encrypt Key 时，飞书把校验与按钮回调整体加密为 {"encrypt": "..."}，
+// 必须先解密再识别 challenge / token（2026-09-12：未解密导致控制台保存回调地址
+// 报「Challenge code没有返回」）。api-inventory: auth=signed_integration
 
+import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
-import { resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
+import { loadAgentBotRegistry, resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import {
   TOPIC_REVIEW_ACTIONS,
@@ -36,10 +39,30 @@ interface TopicCardCallbackBody {
   token?: string
   type?: string
   challenge?: string
+  encrypt?: string
   action?: {
     value?: TopicCardActionValue
     tag?: string
   }
+}
+
+/**
+ * 应用配置了 Encrypt Key 时，飞书把回调体加密为 {"encrypt": "..."}。
+ * 逐个尝试已注册 bot 的 encrypt key 解密（裁决卡由 topic planner 发出，
+ * 但路由保持通用）；没有任何 key 能解开时返回 null。
+ */
+function decryptCallbackBody(body: TopicCardCallbackBody): TopicCardCallbackBody | null {
+  if (typeof body.encrypt !== "string" || !body.encrypt) return body
+  for (const bot of loadAgentBotRegistry()) {
+    if (!bot.encryptKey) continue
+    try {
+      const decrypted = JSON.parse(new lark.AESCipher(bot.encryptKey).decrypt(body.encrypt))
+      if (decrypted && typeof decrypted === "object") return decrypted as TopicCardCallbackBody
+    } catch {
+      // 不是这个 bot 的 key，换下一个
+    }
+  }
+  return null
 }
 
 function toast(content: string, type: "success" | "error" = "success") {
@@ -114,18 +137,22 @@ export async function POST(request: Request) {
   }
   if (!body) return toast("请求体不可解析", "error")
 
+  // 加密回调体先解密；解不开时明确报错而不是落进 404，方便在控制台侧定位
+  const payload = decryptCallbackBody(body)
+  if (!payload) return toast("回调解密失败：encrypt 内容无法用已注册 bot 的密钥解开", "error")
+
   // 飞书卡片回调的 URL 校验挑战原样返回
-  if (body.type === "url_verification" && body.challenge) {
-    return NextResponse.json({ challenge: body.challenge })
+  if (payload.type === "url_verification" && payload.challenge) {
+    return NextResponse.json({ challenge: payload.challenge })
   }
-  if (!resolveBotByVerificationToken(typeof body.token === "string" ? body.token : "")) {
+  if (!resolveBotByVerificationToken(typeof payload.token === "string" ? payload.token : "")) {
     return NextResponse.json({ error: "Unknown agent bot" }, { status: 404 })
   }
 
-  const actionValue = body.action?.value
+  const actionValue = payload.action?.value
   const action = parseTopicReviewAction(actionValue?.topic_action)
   const selectionId = actionValue?.topic_selection_id?.trim() || ""
-  const reviewerId = resolveReviewerId(body)
+  const reviewerId = resolveReviewerId(payload)
 
   if (!selectionId) return toast("缺少选题批次 ID", "error")
   if (!action) return toast(`未知操作（仅支持 ${TOPIC_REVIEW_ACTIONS.join(" / ")}）`, "error")
