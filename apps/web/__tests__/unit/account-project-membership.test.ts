@@ -5,7 +5,8 @@ const m = vi.hoisted(() => {
   const clientProject = { findFirst: vi.fn(), findUnique: vi.fn() }
   const projectMember = { findFirst: vi.fn(), findMany: vi.fn(), upsert: vi.fn() }
   const transaction = vi.fn()
-  return { user, clientProject, projectMember, transaction }
+  const queryRawUnsafe = vi.fn()
+  return { user, clientProject, projectMember, transaction, queryRawUnsafe }
 })
 
 vi.mock("@/lib/prisma", () => ({
@@ -30,6 +31,7 @@ describe("shared account project membership", () => {
       user: m.user,
       clientProject: m.clientProject,
       projectMember: m.projectMember,
+      $queryRawUnsafe: m.queryRawUnsafe,
     }))
   })
 

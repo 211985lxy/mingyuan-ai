@@ -15,6 +15,8 @@ const m = vi.hoisted(() => {
   const agentInvocation = { findMany: vi.fn(), updateMany: vi.fn() }
   const backgroundTask = { findMany: vi.fn(), updateMany: vi.fn() }
   const transaction = vi.fn()
+  const queryRawUnsafe = vi.fn()
+  const lockClientProjects = vi.fn()
   const prisma = {
     $transaction: transaction,
     user,
@@ -34,11 +36,17 @@ const m = vi.hoisted(() => {
     agentInvocation,
     backgroundTask,
     transaction,
+    queryRawUnsafe,
+    lockClientProjects,
     prisma,
   }
 })
 
 vi.mock("@/lib/prisma", () => ({ prisma: m.prisma }))
+
+vi.mock("@/features/projects/services/project-row-lock", () => ({
+  lockClientProjects: m.lockClientProjects,
+}))
 
 import {
   getAccountProjectContext,
@@ -53,6 +61,8 @@ import {
 } from "@/lib/account-project-context"
 
 function installTransaction() {
+  m.queryRawUnsafe.mockResolvedValue([])
+  m.lockClientProjects.mockResolvedValue(undefined)
   m.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
     callback({
       user: m.user,
@@ -62,6 +72,7 @@ function installTransaction() {
       aimGeneration: m.aimGeneration,
       agentInvocation: m.agentInvocation,
       backgroundTask: m.backgroundTask,
+      $queryRawUnsafe: m.queryRawUnsafe,
     }),
   )
 }
@@ -278,6 +289,64 @@ describe("repairAccountProjectBinding", () => {
     installTransaction()
   })
 
+  it("locks known project ids before reading status or updating the user", async () => {
+    const callOrder: string[] = []
+    m.lockClientProjects.mockImplementation(async () => {
+      callOrder.push("lockClientProjects")
+    })
+    m.clientProject.findUnique.mockImplementation(async () => {
+      callOrder.push("clientProject.findUnique")
+      return { id: "project-b", userId: "user-1", name: "项目B", status: "active" }
+    })
+    m.user.findUnique.mockImplementation(async () => {
+      callOrder.push("user.findUnique")
+      return { boundProjectId: "project-a" }
+    })
+    m.user.updateMany.mockImplementation(async () => {
+      callOrder.push("user.updateMany")
+      return { count: 1 }
+    })
+    m.aimGeneration.count.mockResolvedValue(0)
+    m.agentInvocation.findMany.mockResolvedValue([])
+
+    await repairAccountProjectBinding({
+      userId: "user-1",
+      previousProjectId: "project-a",
+      nextProjectId: "project-b",
+      reactivateNext: false,
+    })
+
+    expect(m.lockClientProjects).toHaveBeenCalledWith(expect.anything(), ["project-b", "project-a"])
+    expect(callOrder.slice(0, 4)).toEqual([
+      "lockClientProjects",
+      "clientProject.findUnique",
+      "user.findUnique",
+      "user.updateMany",
+    ])
+  })
+
+  it("rejects repair when the next project is archived while waiting for the lock", async () => {
+    m.lockClientProjects.mockImplementation(async () => undefined)
+    m.clientProject.findUnique.mockResolvedValue({
+      id: "project-b",
+      userId: "user-1",
+      name: "项目B",
+      status: "archived",
+    })
+    m.user.findUnique.mockResolvedValue({ boundProjectId: "project-a" })
+
+    await expect(
+      repairAccountProjectBinding({
+        userId: "user-1",
+        previousProjectId: "project-a",
+        nextProjectId: "project-b",
+        reactivateNext: false,
+      }),
+    ).rejects.toMatchObject({ code: "TARGET_NOT_ACTIVE", status: 409 })
+    expect(m.lockClientProjects).toHaveBeenCalled()
+    expect(m.user.updateMany).not.toHaveBeenCalled()
+  })
+
   it("repairs an active rebind atomically and quarantines the old project", async () => {
     m.user.findUnique.mockResolvedValue({ boundProjectId: "project-a" })
     m.clientProject.findUnique.mockResolvedValue({ id: "project-b", userId: "user-1", name: "项目B", status: "active" })
@@ -333,6 +402,7 @@ describe("repairAccountProjectBinding", () => {
 
   it("rejects when the binding moved since the preview", async () => {
     m.user.findUnique.mockResolvedValue({ boundProjectId: "project-changed" })
+    m.clientProject.findUnique.mockResolvedValue({ id: "project-b", userId: "user-1", name: "项目B", status: "active" })
 
     await expect(
       repairAccountProjectBinding({
@@ -342,6 +412,7 @@ describe("repairAccountProjectBinding", () => {
         reactivateNext: false,
       }),
     ).rejects.toMatchObject({ code: "ACCOUNT_BINDING_CHANGED", status: 409 })
+    expect(m.lockClientProjects).toHaveBeenCalled()
     expect(m.user.updateMany).not.toHaveBeenCalled()
   })
 
@@ -431,6 +502,7 @@ describe("repairAccountProjectBinding", () => {
           agentInvocation: m.agentInvocation,
           backgroundTask: m.backgroundTask,
           adminAuditLog: { create: adminAuditLogCreate },
+          $queryRawUnsafe: m.queryRawUnsafe,
         }
         try {
           const outcome = await callback(tx)
