@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/client"
 import { registerAimLeadAttribution } from "@/lib/api/lead-attribution"
 import { importOutcomeFile } from "@/lib/api/outcome-import"
+import { isValidPublishedWorkKey } from "@/lib/aim/platform-post-id"
 import { isValidAimAgent, type AimAgentId } from "@/lib/aim-ui-config"
 import {
   reportWebFinalDisposition,
@@ -75,6 +76,9 @@ export async function savePublishRecord(
   const publishUrl = form.publishUrl.trim()
   // 强制点①：进入已发布必须挂作品键（链接或作品 ID），否则经营归因链断裂
   if (!publishUrl) throw new Error("请填写作品链接或作品 ID（用于经营归因）")
+  if (!isValidPublishedWorkKey(publishPlatform, publishUrl)) {
+    throw new Error("登记抖音已发布时必须填写可解析的作品链接或 aweme_id")
+  }
   // 先进入待发布（状态机合法路径），再登记已发布
   try {
     await updateAimWorkflowStatus(generationId, { workflowStatus: "ready_to_publish" })

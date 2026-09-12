@@ -25,7 +25,7 @@ function DecisionFields({ form, onChange }: { form: AimDecisionSnapshot; onChang
 function PublishFields({ form, onChange }: { form: PublishRecordForm; onChange: (form: PublishRecordForm) => void }) {
   return <div className="space-y-3">
     <div className="space-y-1.5"><p className="text-sm font-medium">发布平台</p><Input value={form.publishPlatform} onChange={(event) => onChange({ ...form, publishPlatform: event.target.value })} placeholder="抖音 / 小红书 / 视频号" /></div>
-    <div className="space-y-1.5"><p className="text-sm font-medium">作品链接或作品 ID（必填）</p><Input value={form.publishUrl} onChange={(event) => onChange({ ...form, publishUrl: event.target.value })} placeholder="粘贴发布后的链接或作品 ID，用于经营归因" /></div>
+    <div className="space-y-1.5"><p className="text-sm font-medium">作品链接或作品 ID（必填）</p><Input value={form.publishUrl} onChange={(event) => onChange({ ...form, publishUrl: event.target.value })} placeholder="抖音请贴分享链接或 aweme_id，其它平台贴作品链接" /></div>
   </div>
 }
 
@@ -141,7 +141,7 @@ function RetroFields({ form, rule, outcome, outcomeWindow, onChange, onRuleChang
 
 const DIALOG_COPY = {
   decision: { title: "发布前判断", description: "把这条为什么发、准备打到谁、想验证什么先记下来。" },
-  publish: { title: "登记发布", description: "记录发到哪个平台、作品链接在哪；没有链接就先别标记已发布。" },
+  publish: { title: "登记发布", description: "记录发到哪个平台、作品链接或 aweme_id 在哪；抖音链接要能解析出作品 ID，没有就先别标记已发布。" },
   retro: { title: "填写复盘", description: "只写结果判断和下次同类内容的判断规则。" },
   lead: { title: "登记线索", description: "把新加微/进线的线索挂到本条内容做经营归因。" },
 }

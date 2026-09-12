@@ -146,6 +146,8 @@ export interface AimGenerationContextOverride {
   eventStorytellingBlock?: string
   /** Eval-only：冻结写作风格档案；缺省则 generate 不注入风格 */
   styleProfileBlock?: string
+  /** Eval-only：已批准学习约束；缺省则 generate 不查学习候选 */
+  learnings?: Array<{ id: string; targetType: string; constraint: string }>
 }
 
 export interface AimGenerateResponse {

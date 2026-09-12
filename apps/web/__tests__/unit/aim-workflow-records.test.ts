@@ -40,6 +40,13 @@ describe("WP-A 强制点①：发布登记必须挂作品键", () => {
     expect(updateAimWorkflowStatus).not.toHaveBeenCalled()
   })
 
+  it("rejects Douyin publish with an unparseable work key before any API call", async () => {
+    await expect(
+      savePublishRecord("gen-1", { publishPlatform: "抖音", publishUrl: "dy_123" }),
+    ).rejects.toThrow("登记抖音已发布时必须填写可解析的作品链接或 aweme_id")
+    expect(updateAimWorkflowStatus).not.toHaveBeenCalled()
+  })
+
   it("registers published with platform and 作品键 after entering ready_to_publish", async () => {
     await savePublishRecord("gen-1", { publishPlatform: " 小红书 ", publishUrl: " https://xhs.link/abc " })
 
@@ -54,12 +61,12 @@ describe("WP-A 强制点①：发布登记必须挂作品键", () => {
   it("still publishes when ready_to_publish step fails（已在更后状态）", async () => {
     updateAimWorkflowStatus.mockRejectedValueOnce(new Error("非法跳转"))
 
-    await savePublishRecord("gen-1", { publishPlatform: "抖音", publishUrl: "dy_123" })
+    await savePublishRecord("gen-1", { publishPlatform: "抖音", publishUrl: "7123456789012345678" })
 
     expect(updateAimWorkflowStatus).toHaveBeenCalledTimes(2)
     expect(updateAimWorkflowStatus.mock.calls[1][1]).toMatchObject({
       workflowStatus: "published",
-      publishUrl: "dy_123",
+      publishUrl: "7123456789012345678",
     })
   })
 })

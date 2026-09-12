@@ -8,6 +8,9 @@ import {
 } from "@/lib/aim-generation-prompts"
 import { splitGenerationReasoning } from "@/lib/aim-generation-text"
 import { AIM_NORTH_STAR_GOAL, LIGHT_EDIT_OUTPUT_BOUNDARY } from "@/lib/aim-intent-boundaries"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import type { ContentFormat } from "./aim-generator"
 import type {
   AimAgentHandler,
@@ -48,23 +51,17 @@ export class FreeCopywriterHandler implements AimAgentHandler {
     const lightEditBoundary = params.runtimeTask === "light_edit"
       ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}`
       : ""
-    return `你是一个交货型文案写手，只负责听懂用户当前要求，并把文案直接交出来。
-
-北极星目标：${AIM_NORTH_STAR_GOAL}
-
-${backgroundSection}
-${params.ipWikiBlock ? `\n${params.ipWikiBlock}` : ""}
-${compactTask ? `\n${compactTask}` : ""}
-${lightEditBoundary}
-
-规则：
-1. 用户怎么要求就怎么写；用户的指令优先级高于模板、方法论、默认字数和系统习惯。
-2. 用户要长就写长，用户要短就写短；没有明确字数时按内容自然长度写。
-3. 不强制套爆款结构、开头库、结尾库、框架确认、观点池、95%-105% 字数规则或多平台拆分。
-4. 不反问、不讲方法论、不输出分析报告；除非用户明确要求，只给一版可直接用的文案。
-5. 保留人的语气，少用宣传腔、排比句和空泛总结。
-6. 本轮意图与已知事实不得违背；信息不足时写「未提供/待补充」，禁止编造第一人称案例。
-${includeCreationTrace ? `\n${CONTENT_CREATION_TRACE_RULE}` : ""}`
+    return fillPromptTemplate(
+      promptRegistry.get(PROMPT_KEYS.freeCopywriterSystem).content,
+      {
+        northStarGoal: AIM_NORTH_STAR_GOAL,
+        backgroundSection,
+        ipWikiBlock: params.ipWikiBlock ? `\n${params.ipWikiBlock}` : "",
+        compactTask: compactTask ? `\n${compactTask}` : "",
+        lightEditBoundary,
+        creationTrace: includeCreationTrace ? `\n${CONTENT_CREATION_TRACE_RULE}` : "",
+      },
+    )
   }
 
   async chat(params: AimChatParams): Promise<AimChatResponse> {
@@ -105,10 +102,14 @@ ${includeCreationTrace ? `\n${CONTENT_CREATION_TRACE_RULE}` : ""}`
       runtimeTask: context.runtimeTask,
       confirmedTurnIntent: context.confirmedTurnIntent,
     })
-    const userPrompt = `请直接按用户要求写一版文案：
-"${context.rawInput}"
-${context.polishInstruction ? `修改要求：${context.polishInstruction}` : ""}
-${compactTask ? `\n${compactTask}` : ""}`
+    const userPrompt = fillPromptTemplate(
+      promptRegistry.get(PROMPT_KEYS.freeCopywriterGenerateUser).content,
+      {
+        rawInput: context.rawInput,
+        polishLine: context.polishInstruction ? `修改要求：${context.polishInstruction}` : "",
+        compactTask: compactTask ? `\n${compactTask}` : "",
+      },
+    )
     const { completion, parsed, safetyWarning } = await executeGenerateLLMWithBenchmarkRetry(
       this.agentId,
       systemPrompt,

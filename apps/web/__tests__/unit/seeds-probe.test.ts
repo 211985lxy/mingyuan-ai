@@ -12,6 +12,6 @@ describe("seeds probe", () => {
     console.log("services:", AIM_SERVICES_PROMPT_SEEDS.length)
     console.log("quality:", QUALITY_GATE_PROMPT_SEEDS.length)
     console.log("api:", API_ROUTES_PROMPT_SEEDS.length)
-    expect(PROMPT_SEEDS.length).toBe(41)
+    expect(PROMPT_SEEDS.length).toBe(58)
   })
 })

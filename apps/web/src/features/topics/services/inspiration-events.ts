@@ -8,6 +8,7 @@ import { extractFirstPublicUrl, extractVideoUrlFromText } from "@/lib/video-text
 import { resolveCanonicalSourceKey } from "@/lib/video-canonical-key"
 import { allowChannelMessage } from "@/lib/channel-rate-limiter"
 import { InspirationPipelineError } from "@/lib/inspiration-pipeline-error"
+import { maybeRecordInspirationL0AutoPass } from "@/lib/aim/autonomy-l0-store"
 import { afterInspirationCreatedProcessQuestion } from "./user-question-normalize"
 import { recordChannelMetric } from "@/lib/channel-metrics"
 import { isReplySuppressed, isExecutionMode, resolveExecutionMode, type ExecutionMode } from "@/lib/execution-mode"
@@ -284,11 +285,18 @@ export async function ingestInspirationEvent(
       })
       if (contentDup) {
         recordChannelMetric({ metric: "duplicate", platform: input.platform, externalChatId: input.externalChatId, externalAccountId: input.externalAccountId }).catch(() => {})
+        const l0 = await maybeRecordInspirationL0AutoPass({
+          userId,
+          inspirationId: contentDup.id,
+          projectId: input.projectId,
+          duplicate: true,
+          hasCanonicalUrl: true,
+        })
         return {
           id: contentDup.id,
           duplicate: true,
-          status: contentDup.processingStage || contentDup.aiStatus,
-          processingStage: contentDup.processingStage,
+          status: l0.autoPass ? "processed" : contentDup.processingStage || contentDup.aiStatus,
+          processingStage: l0.autoPass ? "processed" : contentDup.processingStage,
           statusUrl: `/api/agent/v1/inspiration/events/${contentDup.id}`,
           shadowMode: isReplySuppressed(executionMode),
         }
@@ -299,11 +307,18 @@ export async function ingestInspirationEvent(
   const existing = await prisma.inspiration.findUnique({ where: { dedupeKey }, select: { id: true, aiStatus: true, processingStage: true } })
   if (existing) {
     recordChannelMetric({ metric: "duplicate", platform: input.platform, externalChatId: input.externalChatId, externalAccountId: input.externalAccountId }).catch(() => {})
+    const l0 = await maybeRecordInspirationL0AutoPass({
+      userId,
+      inspirationId: existing.id,
+      projectId: input.projectId,
+      duplicate: true,
+      hasCanonicalUrl: Boolean(canonicalSourceKey),
+    })
     return {
       id: existing.id,
       duplicate: true,
-      status: existing.processingStage || existing.aiStatus,
-      processingStage: existing.processingStage,
+      status: l0.autoPass ? "processed" : existing.processingStage || existing.aiStatus,
+      processingStage: l0.autoPass ? "processed" : existing.processingStage,
       statusUrl: `/api/agent/v1/inspiration/events/${existing.id}`,
       shadowMode: isReplySuppressed(executionMode),
     }

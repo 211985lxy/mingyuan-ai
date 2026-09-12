@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan outcome autofetch daily at 03:00
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+AccuracySec=5m
+Persistent=true
+Unit=mingyuan-cron-outcome-autofetch.service
+
+[Install]
+WantedBy=timers.target

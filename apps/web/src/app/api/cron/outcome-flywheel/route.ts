@@ -26,8 +26,8 @@ export const maxDuration = 60
  *   2. 对每个用户运行 outcome-evaluator（优秀结果 → pending AssetCandidate，不直写 KnowledgeEntry）
  *   3. 对每个用户运行 outcome-reminders（发布后第 7 / 14 / 30 天到期未回填提醒）
  *
- * 注意：平台 API 自动拉取（抖音/小红书互动数据）需要平台开放 API 凭据，
- * 当前仅触发评估和提醒。手动录入走 /api/aim/history/[id]/outcome PUT 路由。
+ * 注意：平台互动数据由 `/api/cron/outcome-autofetch` 写入 ContentOutcome 内容信号。
+ * 本路由只做评估和到期提醒，不代替自动回流。
  */
 /**
  * @description 处理 GET 请求

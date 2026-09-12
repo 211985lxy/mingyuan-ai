@@ -14,7 +14,7 @@ import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
-import { loadAgentBotRegistry, resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
+import { loadAgentBotRegistry, resolveBotByAppId, resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import {
   TOPIC_REVIEW_ACTIONS,
@@ -49,6 +49,7 @@ interface TopicCardCallbackBody {
   header?: {
     token?: string
     event_type?: string
+    app_id?: string
   }
   event?: {
     token?: string
@@ -84,6 +85,21 @@ function normalizeCallbackBody(body: TopicCardCallbackBody): TopicCardCallbackBo
     user_id: body.user_id ?? operator?.user_id,
     action: body.action ?? eventAction,
   }
+}
+
+/**
+ * 生成载荷的"字段骨架"（键名 + 类型，不含任何值），仅用于鉴权失败时定位
+ * 飞书真实信封形状。绝不记录 token / open_id 等敏感值。
+ */
+export function describeShape(value: unknown, depth = 0): unknown {
+  if (depth > 2) return typeof value
+  if (Array.isArray(value)) return `array(${value.length})`
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value as Record<string, unknown>).map((key) => [key, describeShape((value as Record<string, unknown>)[key], depth + 1)]),
+    )
+  }
+  return typeof value
 }
 
 /**
@@ -187,7 +203,15 @@ export async function POST(request: Request) {
   if (payload.type === "url_verification" && payload.challenge) {
     return NextResponse.json({ challenge: payload.challenge })
   }
-  if (!resolveBotByVerificationToken(typeof payload.token === "string" ? payload.token : "")) {
+
+  // 鉴权：优先 verification token；token 缺失或不匹配时回退 header.app_id
+  // （新版 schema 2.0 回调在 header 里带 app_id，而 token 不一定下发）。
+  const bot =
+    resolveBotByVerificationToken(typeof payload.token === "string" ? payload.token : "") ??
+    resolveBotByAppId(typeof payload.header?.app_id === "string" ? payload.header.app_id : "")
+  if (!bot) {
+    // 只记录字段结构（不含任何值），用于定位飞书真实信封形状
+    console.warn("[feishu-topic-card-actions] 鉴权失败，回调字段结构:", describeShape(decrypted))
     return NextResponse.json({ error: "Unknown agent bot" }, { status: 404 })
   }
 
