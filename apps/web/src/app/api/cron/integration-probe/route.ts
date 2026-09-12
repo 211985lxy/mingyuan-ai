@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 async function reportProblems(results: IntegrationProbeResult[]): Promise<void> {
   const problems = results.filter((r) => r.status === "failed" || r.status === "degraded" || r.status === "quota_blocked")
   for (const problem of problems) {
-    const severity = problem.status === "failed" ? "error" : "warn"
+    const severity = problem.status === "failed" ? "error" : "warning"
     await upsertOperationalAlert({
       fingerprint: `integration-probe:${problem.name}:${problem.status}`,
       rule: "integration_contract_probe",
