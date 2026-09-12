@@ -39,7 +39,7 @@ acquire_deploy_lock() {
       return 0
     fi
   fi
-  echo "❌ 另一个部署正在进行（锁: $DEPLOY_LOCK_DIR，持有者 PID ${lock_pid:-未知}）。" >&2
+  echo "❌ 另一个部署正在进行（锁: ${DEPLOY_LOCK_DIR}，持有者 PID ${lock_pid:-未知}）。" >&2
   echo "   确认无部署在跑后，删除该目录即可解锁。" >&2
   return 1
 }

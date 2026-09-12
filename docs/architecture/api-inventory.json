@@ -3577,6 +3577,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/topic-evening",
+      "file": "src/app/api/cron/topic-evening/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/data-platform/summary",
       "file": "src/app/api/data-platform/summary/route.ts",
       "methods": [

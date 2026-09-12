@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const BOT_ENCRYPT_KEY = "unit-test-encrypt-key"
 const BOT_VERIFY_TOKEN = "unit-test-verify-token"
+const BOT_APP_ID = "cli_unit_test_app"
 
 /** 与飞书一致的加密实现，用于构造测试输入 */
 function feishuEncrypt(encryptKey: string, payload: unknown): string {
@@ -43,6 +44,21 @@ const registry = vi.hoisted(() => ({
           botId: "business_diagnosis",
           displayName: "选题策划官",
           appId: "cli_test",
+          appSecret: "s",
+          verificationToken: BOT_VERIFY_TOKEN,
+          encryptKey: BOT_ENCRYPT_KEY,
+          workflowId: "wf",
+          defaultAgentId: "business_diagnosis",
+          allowedAgentIds: ["business_diagnosis"],
+        }
+      : null,
+  ),
+  resolveBotByAppId: vi.fn((appId: string) =>
+    appId === BOT_APP_ID
+      ? {
+          botId: "business_diagnosis",
+          displayName: "选题策划官",
+          appId: BOT_APP_ID,
           appSecret: "s",
           verificationToken: BOT_VERIFY_TOKEN,
           encryptKey: BOT_ENCRYPT_KEY,
@@ -160,4 +176,84 @@ describe("裁决卡回调加密体处理", () => {
     expect(body.toast?.type).toBe("error")
     expect(body.toast?.content).toContain("解密失败")
   })
+
+  // 2026-09-12 线上实测：订阅 card.action.trigger 后飞书发的是新版信封，
+  // token 嵌在 header/event 里，旧解析只读顶层 → 404 → 客户端报 200671。
+  it("新版信封（header.token + event.operator + event.action）能被识别", async () => {
+    planTopicReviewDecision.mockReturnValue({
+      ok: true,
+      atomicOnPendingStatus: true,
+      patch: { status: "selected", selectedIndex: 0 },
+    })
+
+    const res = await post({
+      schema: "2.0",
+      header: { token: BOT_VERIFY_TOKEN, event_type: "card.action.trigger" },
+      event: {
+        operator: { open_id: "ou_new_envelope_user" },
+        action: { tag: "button", value: { topic_action: "adopt", topic_selection_id: "sel-9", topic_index: 0 } },
+      },
+    })
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.toast?.type).toBe("success")
+    expect(planTopicReviewDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "adopt", rawIndex: 0, reviewedBy: "ou_new_envelope_user" }),
+    )
+  })
+
+  it("新版信封且加密时同样能解密并识别", async () => {
+    planTopicReviewDecision.mockReturnValue({
+      ok: true,
+      atomicOnPendingStatus: true,
+      patch: { status: "selected", selectedIndex: 1 },
+    })
+
+    const encrypted = feishuEncrypt(BOT_ENCRYPT_KEY, {
+      schema: "2.0",
+      header: { token: BOT_VERIFY_TOKEN, event_type: "card.action.trigger" },
+      event: {
+        operator: { open_id: "ou_enc_new" },
+        action: { tag: "button", value: { topic_action: "adopt", topic_selection_id: "sel-10", topic_index: 1 } },
+      },
+    })
+
+    const res = await post({ encrypt: encrypted })
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ toast: { type: "success" } })
+  })
+
+  it("token 缺失但带 header.app_id 时仍能鉴权（新版信封兜底）", async () => {
+    planTopicReviewDecision.mockReturnValue({
+      ok: true,
+      atomicOnPendingStatus: true,
+      patch: { status: "selected", selectedIndex: 3 },
+    })
+
+    const res = await post({
+      schema: "2.0",
+      header: { app_id: BOT_APP_ID, event_type: "card.action.trigger" },
+      event: {
+        operator: { open_id: "ou_by_appid" },
+        action: { tag: "button", value: { topic_action: "adopt", topic_selection_id: "sel-11", topic_index: 3 } },
+      },
+    })
+
+    expect(res.status).toBe(200)
+    await expect(res.json()).resolves.toMatchObject({ toast: { type: "success" } })
+  })
+
+  it("鉴权彻底失败时只打印字段骨架，不泄露任何值", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const res = await post({ token: "wrong-token", secretValue: "super-secret-token-value" })
+
+    expect(res.status).toBe(404)
+    const logged = warn.mock.calls.map((c) => JSON.stringify(c)).join(" ")
+    expect(logged).toContain("secretValue")
+    expect(logged).toContain("string")
+    expect(logged).not.toContain("super-secret-token-value")
+    warn.mockRestore()
+  })
 })
+

@@ -152,6 +152,18 @@ export function resolveBotById(botId: FeishuAgentBotId): FeishuAgentBotConfig | 
 }
 
 /**
+ * 根据应用 app_id 查找 bot。
+ * 新版回调信封（schema 2.0 的 card.action.trigger）在 header.app_id 里带应用身份，
+ * 而 verification token 不一定随回调下发——token 查不到时用 app_id 兜底鉴权。
+ */
+export function resolveBotByAppId(appId: string): FeishuAgentBotConfig | null {
+  const target = appId.trim()
+  if (!target) return null
+  const registry = loadAgentBotRegistry()
+  return registry.find((bot) => bot.appId === target) ?? null
+}
+
+/**
  * 根据工作流 ID 查找对应的 bot（用于执行结果回推）。
  */
 export function resolveBotByWorkflowId(workflowId: string): FeishuAgentBotConfig | null {
