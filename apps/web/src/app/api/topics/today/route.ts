@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withUserAuth } from "@/lib/user-auth"
 import { resolveBoundProject } from "@/lib/account-project-context"
+import { isDegradedTopicModel } from "@/lib/topic-degradation"
 
 /**
  * GET /api/topics/today?mode=daily
@@ -49,9 +50,10 @@ export const GET = withUserAuth(async (request, { user }) => {
     topicSelectionId: selection.id,
     cards,
     sourceHighlights,
+    model: selection.model ?? undefined,
     // 生成时模型链全败的记录 model 以 ":fallback" 结尾；缓存命中也要把降级状态带给前端，
     // 否则降级模板会以"今日推荐"的名义被反复展示。
-    degraded: typeof selection.model === "string" && selection.model.endsWith(":fallback"),
+    degraded: isDegradedTopicModel(selection.model),
     createdAt: selection.createdAt,
   })
 })

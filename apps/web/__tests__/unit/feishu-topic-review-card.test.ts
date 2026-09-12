@@ -22,6 +22,37 @@ function actionButtons(card: Record<string, unknown>) {
   return (action?.actions ?? []) as Array<{ text: { content: string }; value: Record<string, unknown> }>
 }
 
+/** 递归收集卡片所有可见/折叠文本（含折叠面板内部）。 */
+function collectText(node: unknown, acc: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    for (const item of node) collectText(item, acc)
+    return acc
+  }
+  if (!node || typeof node !== "object") return acc
+  const record = node as Record<string, unknown>
+  const text = record.text as { content?: string } | undefined
+  const header = record.header as { title?: { content?: string } } | undefined
+  if (typeof text?.content === "string") acc.push(text.content)
+  if (typeof header?.title?.content === "string") acc.push(header.title.content)
+  for (const value of Object.values(record)) collectText(value, acc)
+  return acc
+}
+
+/** 顶层默认可见文本（不含折叠面板内部）。 */
+function visibleText(card: Record<string, unknown>): string {
+  const elements = card.elements as Array<Record<string, unknown>>
+  return elements
+    .filter((element) => element.tag === "div")
+    .map((element) => (element.text as { content?: string } | undefined)?.content ?? "")
+    .join("\n")
+}
+
+function panelTitles(card: Record<string, unknown>): string[] {
+  return (card.elements as Array<Record<string, unknown>>)
+    .filter((element) => element.tag === "collapsible_panel")
+    .map((element) => (element.header as { title?: { content?: string } } | undefined)?.title?.content ?? "")
+}
+
 describe("topic review card", () => {
   it("按候选铺开采用按钮，并附加换一批与都不行", () => {
     const card = buildTopicReviewCard({
@@ -69,41 +100,108 @@ describe("topic review card", () => {
       ],
       sources: [],
     })
-    const markdown = (card.elements as Array<{ tag: string; text?: { content?: string } }>)
-      .filter((element) => element.tag === "div")
-      .map((element) => element.text?.content ?? "")
-      .join("\n")
+    const markdown = visibleText(card)
 
     const selfLine = markdown.split("\n").find((line) => line.includes("**1. 自评分更高**")) ?? ""
     const editorLine = markdown.split("\n").find((line) => line.includes("**2. 主编主推**")) ?? ""
-    expect(editorLine).toContain("AI 主推")
-    expect(selfLine).not.toContain("AI 主推")
+    expect(editorLine).toContain("★主推")
+    expect(selfLine).not.toContain("★主推")
     expect(markdown).toContain("对应对标账号甲的母题（1.2万赞）")
     expect(markdown).toContain("主编 92")
   })
 
-  it("把 AI 评分与主推结论写进卡片正文", () => {
+  it("把项目名与主推结论写进默认可见区", () => {
     const card = buildTopicReviewCard({
       selectionId: SELECTION_ID,
       cards: [topicCard("领跑选题", 93), topicCard("备选选题", 71)],
       sources: [{ category: "benchmark_reference", title: "对标账号A", content: "爆款作品" }],
       projectName: "中汝达AI数字供暖",
     })
-    const elements = card.elements as Array<{ tag: string; text?: { content?: string } }>
-    const markdown = elements
-      .filter((element) => element.tag === "div")
-      .map((element) => element.text?.content ?? "")
-      .join("\n")
+    const markdown = visibleText(card)
 
     expect(markdown).toContain("中汝达AI数字供暖")
     expect(markdown).toContain("领跑选题")
-    expect(markdown).toContain("93 分")
-    expect(markdown).toContain("对标账号A")
-    expect(markdown).toContain("AI 主推")
+    expect(markdown).toContain("主编主推")
+  })
+
+  it("次要信息收进折叠面板且默认合上，默认可见区不含依据与参考素材", () => {
+    const card = buildTopicReviewCard({
+      selectionId: SELECTION_ID,
+      cards: [topicCard("选题A", 90)],
+      sources: [
+        { category: "benchmark_reference", title: "对标账号A", content: "爆款作品\n来源账号：https://example.com/a" },
+      ],
+    })
+
+    expect(panelTitles(card)).toEqual(["AI 与主编的完整结论", "判断依据与参考素材"])
+    const panels = (card.elements as Array<Record<string, unknown>>).filter(
+      (element) => element.tag === "collapsible_panel",
+    )
+    for (const panel of panels) expect(panel.expanded).toBe(false)
+
+    // 默认可见区只留候选与概要，不重复堆依据
+    expect(visibleText(card)).not.toContain("参考素材")
+    // 折叠面板内部仍可检索到依据与链接
+    const allText = collectText(card.elements).join("\n")
+    expect(allText).toContain("参考素材")
+    expect(allText).toContain("example.com/a")
+  })
+
+  it("无候选且无来源时不渲染依据与参考素材面板", () => {
+    const card = buildTopicReviewCard({ selectionId: SELECTION_ID, cards: [], sources: [] })
+    expect(panelTitles(card)).not.toContain("判断依据与参考素材")
   })
 
   it("候选为空时不铺采用按钮，只留换一批与都不行", () => {
     const buttons = actionButtons(buildTopicReviewCard({ selectionId: SELECTION_ID, cards: [], sources: [] }))
     expect(buttons.map((button) => button.text.content)).toEqual(["换一批", "都不行"])
+  })
+
+  it("参考素材区：列出拆解原视频与对标账号主页，去重限量", () => {
+    const card = buildTopicReviewCard({
+      selectionId: SELECTION_ID,
+      cards: [topicCard("选题A", 90)],
+      sources: [
+        {
+          category: "benchmark_reference",
+          title: "拆解｜获客型视频",
+          content: "对标文案拆解信号\n来源：https://v.douyin.com/abc/",
+        },
+        {
+          category: "benchmark_reference",
+          title: "对标账号甲",
+          content: "已验证内容信号\n来源账号：https://example.com/jia\n1. 爆款｜赞1｜原片：https://www.douyin.com/video/vid1",
+        },
+        {
+          category: "benchmark_reference",
+          title: "拆解｜获客型视频",
+          content: "重复来源\n来源：https://v.douyin.com/abc/",
+        },
+        { category: "industry_hot", title: "热点不算参考素材", content: "来源：https://example.com/hot" },
+      ],
+    })
+    const markdown = collectText(card.elements).join("\n")
+
+    expect(markdown).toContain("参考素材")
+    expect(markdown).toContain("[拆解｜获客型视频](https://v.douyin.com/abc/)")
+    expect(markdown).toContain("[对标账号甲｜爆款原片](https://www.douyin.com/video/vid1)")
+    expect(markdown).toContain("[对标账号甲｜账号主页](https://example.com/jia)")
+    // 重复链接只出现一次
+    expect(markdown.split("v.douyin.com/abc/").length - 1).toBe(1)
+    // 非对标来源不进参考素材
+    expect(markdown).not.toContain("example.com/hot")
+  })
+
+  it("无对标来源时不渲染参考素材链接", () => {
+    const card = buildTopicReviewCard({
+      selectionId: SELECTION_ID,
+      cards: [topicCard("选题A", 90)],
+      sources: [{ category: "industry_hot", title: "热点", content: "热点内容" }],
+    })
+    const markdown = collectText(card.elements).join("\n")
+
+    // 面板标题固定含「参考素材」四字，这里断言的是参考素材「内容」缺席：无 markdown 链接
+    expect(markdown).not.toContain("点开对照")
+    expect(markdown).not.toContain("](")
   })
 })

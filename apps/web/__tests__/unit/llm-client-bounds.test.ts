@@ -84,4 +84,45 @@ describe("LLM client bounds", () => {
     expect(calls).toEqual(["empty", "fallback"])
     expect(chunks.join("")).toBe("成稿")
   })
+
+  it("defaults to 4 provider attempts so a 4-hop quality route can reach the last hop", async () => {
+    delete process.env.LLM_MAX_PROVIDER_ATTEMPTS
+    vi.resetModules()
+    const { LLMClient } = await import("@/lib/llm/client")
+    const calls: string[] = []
+    const fail = (name: string): LLMProvider => ({
+      name,
+      defaultModel: `${name}-model`,
+      isAvailable: () => true,
+      async complete() {
+        calls.push(name)
+        throw new Error("503 unavailable")
+      },
+    })
+    const last: LLMProvider = {
+      name: "fourth",
+      defaultModel: "fourth-model",
+      isAvailable: () => true,
+      async complete() {
+        calls.push("fourth")
+        return { content: "ok", model: "fourth-model", provider: "fourth" }
+      },
+    }
+    const unused: LLMProvider = {
+      name: "fifth",
+      defaultModel: "fifth-model",
+      isAvailable: () => true,
+      async complete() {
+        calls.push("fifth")
+        return { content: "unused", model: "fifth-model", provider: "fifth" }
+      },
+    }
+
+    const result = await new LLMClient([fail("first"), fail("second"), fail("third"), last, unused]).complete({
+      messages: [{ role: "user", content: "test" }],
+    })
+
+    expect(result.provider).toBe("fourth")
+    expect(calls).toEqual(["first", "second", "third", "fourth"])
+  })
 })

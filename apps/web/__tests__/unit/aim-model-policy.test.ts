@@ -142,7 +142,7 @@ describe("AIM model capability policy", () => {
       targetFormats: ["video_script"],
       runtimeTask: "new_copy",
     })
-    expect(spoken.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(spoken.modelPolicy.maxProviderAttempts).toBe(4)
     expect(spoken.modelPolicy.totalTimeoutMs).toBe(115_000)
     expect(spoken.executionPolicy.timeoutMs).toBe(115_000)
 
@@ -152,7 +152,7 @@ describe("AIM model capability policy", () => {
       rawInput: "诊断一下当前获客链路",
       targetFormats: ["raw_copy"],
     })
-    expect(diagnosis.modelPolicy.maxProviderAttempts).toBe(3)
+    expect(diagnosis.modelPolicy.maxProviderAttempts).toBe(4)
     expect(diagnosis.modelPolicy.totalTimeoutMs).toBe(115_000)
   })
 

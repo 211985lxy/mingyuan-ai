@@ -32,6 +32,7 @@ import { detectVideoLinks } from "./video-link-detector"
 import { extractTopicsFromVideo, type TopicExtractionResult } from "./topic-bridge"
 import { checkCompetitorMatch, type CompetitorMatchResult } from "./competitor-bridge"
 import { generateCopyInspiration, type CopyInspirationResult } from "./copy-inspiration-bridge"
+import { getAgentLLM } from "@/lib/llm/agent-router"
 
 // ─── 类型定义 ──────────────────────────────────────────────────────
 
@@ -74,21 +75,19 @@ export interface AiSummaryResult {
   keyPoints: string[]
 }
 
-// ─── 环境变量 ──────────────────────────────────────────────────────
+const VIDEO_SUMMARY_MAX_TOKENS = 8192
 
-function getLlmBaseUrl(): string {
-  return process.env.LLM_SUMMARY_BASE_URL?.trim() || "https://api.deepseek.com/v1"
-}
-
-function getLlmApiKey(): string {
-  const key = process.env.LLM_SUMMARY_API_KEY?.trim()
-  if (!key) throw new Error("缺少 LLM_SUMMARY_API_KEY")
-  return key
-}
-
-function getLlmModel(): string {
-  // 2026-07-31 起 deepseek-v4-flash 正式版上线，旧 deepseek-chat 已停用
-  return process.env.LLM_SUMMARY_MODEL?.trim() || "deepseek-v4-flash"
+/** 兼容期仍读取 LLM_SUMMARY_*，但不再用来直连；下一版本删除。 */
+function warnDeprecatedSummaryEnv() {
+  if (
+    process.env.LLM_SUMMARY_API_KEY ||
+    process.env.LLM_SUMMARY_BASE_URL ||
+    process.env.LLM_SUMMARY_MODEL
+  ) {
+    console.warn(
+      "[video-processor] LLM_SUMMARY_* 已废弃，5b 已改走共享模型路由链；请改配 DEEPSEEK_API_KEY / ZENMUX_API_KEY 等路由密钥",
+    )
+  }
 }
 
 // ─── 核心流水线 ─────────────────────────────────────────────────────
@@ -330,61 +329,12 @@ interface AiSummaryInput {
   contextText?: string
 }
 
-async function generateAiSummary(input: AiSummaryInput): Promise<AiSummaryResult> {
-  const baseUrl = getLlmBaseUrl()
-  const apiKey = getLlmApiKey()
-  const model = getLlmModel()
-
-  const transcript = input.transcript.slice(0, 8000)
-
-  const systemPrompt = `你是一个专业的内容分析助手。用户会给你一段短视频的转录文本，你需要：
-1. 生成一个简洁的标题（不超过30字）
-2. 写一段200-300字的内容摘要
-3. 提取3-5个关键要点
-
-请严格按以下 JSON 格式输出，不要输出其他内容：
-{"title": "...", "summary": "...", "key_points": ["...", "...", "..."]}
-
-视频时长：${input.duration || "未知"}
-视频平台：${input.platform}
-${input.contextText ? `用户附带的描述：${input.contextText}` : ""}`
-
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: transcript },
-      ],
-      temperature: 0.3,
-      max_tokens: 1024,
-    }),
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`AI 总结生成失败: ${response.status} ${text}`)
-  }
-
-  const data = (await response.json()) as {
-    choices: Array<{ message: { content: string } }>
-  }
-  const content = data.choices?.[0]?.message?.content || ""
-
+function parseAiSummary(content: string, fallbackTitle?: string): AiSummaryResult {
+  const fallbackTitleSafe = fallbackTitle || "未知视频"
   const jsonMatch = content.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
-    return {
-      title: input.title || "未知视频",
-      summary: content.slice(0, 300),
-      keyPoints: [],
-    }
+    return { title: fallbackTitleSafe, summary: content.slice(0, 300), keyPoints: [] }
   }
-
   try {
     const parsed = JSON.parse(jsonMatch[0]) as {
       title?: string
@@ -392,17 +342,41 @@ ${input.contextText ? `用户附带的描述：${input.contextText}` : ""}`
       key_points?: string[]
     }
     return {
-      title: parsed.title || input.title || "未知视频",
+      title: parsed.title || fallbackTitleSafe,
       summary: parsed.summary || "",
       keyPoints: Array.isArray(parsed.key_points) ? parsed.key_points : [],
     }
   } catch {
-    return {
-      title: input.title || "未知视频",
-      summary: content.slice(0, 300),
-      keyPoints: [],
-    }
+    return { title: fallbackTitleSafe, summary: content.slice(0, 300), keyPoints: [] }
   }
+}
+
+async function generateAiSummary(input: AiSummaryInput): Promise<AiSummaryResult> {
+  warnDeprecatedSummaryEnv()
+  const transcript = input.transcript.slice(0, 8000)
+  const systemPrompt = `你是一个专业的内容分析助手。用户会给你一段短视频的转录文本，你需要：
+1. 生成一个简洁的标题（不超过30字）
+2. 写一段200-300字的内容摘要
+3. 提取3-5个关键要点
+
+请严格按以下 json 格式输出，不要输出其他内容：
+{"title": "...", "summary": "...", "key_points": ["...", "...", "..."]}
+
+视频时长：${input.duration || "未知"}
+视频平台：${input.platform}
+${input.contextText ? `用户附带的描述：${input.contextText}` : ""}`
+
+  const result = await getAgentLLM("business_diagnosis").complete({
+    model: "default",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: transcript },
+    ],
+    temperature: 0.3,
+    maxTokens: VIDEO_SUMMARY_MAX_TOKENS,
+    responseFormat: { type: "json_object" },
+  })
+  return parseAiSummary(result.content || "", input.title)
 }
 
 // ─── 辅助函数 ──────────────────────────────────────────────────────

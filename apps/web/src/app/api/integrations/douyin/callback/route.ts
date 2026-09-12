@@ -27,9 +27,11 @@ export const runtime = "nodejs"
  */
 export async function GET(request: NextRequest) {
   let auth: { id: string; email: string }
+  // 归属项目：写入飞书时打标，使自有数据只对该项目可见（见 row-ownership.ts）
+  let projectId = ""
   try {
     auth = await authenticateRequest(request)
-    await resolveBoundProject({ userId: auth.id })
+    projectId = (await resolveBoundProject({ userId: auth.id })).id
   } catch (err) {
     return authErrorResponse(err)
   }
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
     /* 5. 写入飞书 Base（账号表 + 视频数据表 + 粉丝画像分布列） */
     let syncResult: { accounts: number; videos: number; fansWritten: boolean } | null = null
     if (env.LARK_PLATFORM_DATA_BASE_TOKEN) {
-      syncResult = await syncDouyinDataToLarkBase({ profile, videos, token, fans })
+      syncResult = await syncDouyinDataToLarkBase({ profile, videos, token, fans, projectId })
     }
 
     applySuccessParams(resultRedirect, profile, videos.length, syncResult)

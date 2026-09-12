@@ -11,8 +11,8 @@ import {
 } from "@/lib/video-text-extractor"
 import { getAdapter } from "@/lib/tikhub/adapters/index"
 import type { Platform } from "@/lib/tikhub/types"
-import { parseUrl } from "@/lib/tikhub/url-parser"
 import type { NormalizedComment } from "@/lib/tikhub/types"
+import { resolveDouyinAwemeId, extractDouyinAwemeId } from "@/lib/douyin-short-url"
 import {
   assertFallbackResultLimits,
   fetchFallbackVideoExtraction,
@@ -81,19 +81,7 @@ export interface TopCommentEntry {
 
 function extractVideoId(platform: string, url: string): string | null {
   if (platform === "douyin") {
-    const parsed = parseUrl(url)
-    if (!parsed) return null
-
-    // douyin 视频/分享链接提取 videoId: /video/<id> 或短链接经过 resolveUrl 后解析
-    const lower = url.toLowerCase()
-    const videoMatch = lower.match(/\/video\/(\d+)/)
-    if (videoMatch) return videoMatch[1]
-
-    // 短链无法直接提取 id，记录 platform 等 resolveUrl 完成后再补提
-    const shortLink = /\/(share|v\.douyin\.com)/i.test(url)
-    if (shortLink) return null
-
-    return null
+    return extractDouyinAwemeId(url)
   }
 
   if (platform === "channels" || platform === "wechat_channels") {
@@ -109,11 +97,22 @@ function extractVideoId(platform: string, url: string): string | null {
   return null
 }
 
+async function resolveVideoId(platform: string, url: string): Promise<string | null> {
+  if (platform === "douyin") {
+    try {
+      return await resolveDouyinAwemeId(url)
+    } catch {
+      return extractDouyinAwemeId(url)
+    }
+  }
+  return extractVideoId(platform, url)
+}
+
 async function fetchTopComments(
   platform: string,
   sourceUrl: string,
 ): Promise<TopCommentEntry[]> {
-  const videoId = extractVideoId(platform, sourceUrl)
+  const videoId = await resolveVideoId(platform, sourceUrl)
   if (!videoId) return []
 
   // 支持 douyin/xiaohongshu/wechat_channels 的 fetchComments
@@ -134,6 +133,26 @@ async function fetchTopComments(
       }))
   } catch {
     return []
+  }
+}
+
+async function fetchVideoStatistics(platform: string, sourceUrl: string) {
+  if (platform !== "douyin") return null
+  try {
+    const videoId = await resolveVideoId(platform, sourceUrl)
+    if (!videoId) return null
+    const stats = await getAdapter("douyin").fetchVideoStats([videoId])
+    const row = stats.get(videoId)
+    if (!row) return null
+    return {
+      views: row.views,
+      likes: row.likes,
+      comments: row.comments,
+      shares: row.shares,
+      collects: row.collects,
+    }
+  } catch {
+    return null
   }
 }
 
@@ -405,12 +424,16 @@ export async function syncVideoCopyExtraction(
 
     // 分析完成后，抓取热评一并存进 analysisResult JSON
     const comments = await fetchTopComments(latest.platform, latest.sourceUrl)
+    const statistics = await fetchVideoStatistics(latest.platform, latest.sourceUrl)
     const newAnalysisResult: Record<string, unknown> = {
       markdown: analysis.markdown,
       analysisVersion: VIDEO_COPY_ANALYSIS_VERSION,
     }
     if (comments.length > 0) {
       newAnalysisResult.topComments = comments
+    }
+    if (statistics) {
+      newAnalysisResult.statistics = statistics
     }
 
     return prisma.videoCopyExtraction.update({

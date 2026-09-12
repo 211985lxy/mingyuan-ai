@@ -18,6 +18,14 @@ const CLEAN_ENV = {
   EMBEDDING_API_KEY: undefined as string | undefined,
   SILICONFLOW_API_KEY: undefined as string | undefined,
   FISH_AUDIO_API_KEY: undefined as string | undefined,
+  ALIYUN_SMS_ACCESS_KEY_ID: undefined as string | undefined,
+  ALIYUN_SMS_ACCESS_KEY_SECRET: undefined as string | undefined,
+  SMS_SIGN_NAME: undefined as string | undefined,
+  FEISHU_APP_ID: undefined as string | undefined,
+  FEISHU_APP_SECRET: undefined as string | undefined,
+  FEISHU_BOT_CONTENT_PRODUCER_APP_ID: undefined as string | undefined,
+  FEISHU_BOT_CONTENT_PRODUCER_APP_SECRET: undefined as string | undefined,
+  BACKGROUND_TASKS_ENABLED: undefined as string | undefined,
 }
 
 async function loadProbesWithEnv(extra: Record<string, string | undefined>) {
@@ -43,7 +51,7 @@ describe("集成探针框架", () => {
   it("全部 key 缺失时探针返回 unconfigured 而不是 failed", async () => {
     const { runIntegrationProbes } = await loadProbesWithEnv({})
     const results = await runIntegrationProbes()
-    for (const name of ["ali-oss", "tikhub", "qingdou-video-extract", "aliyun-nls", "redfox", "siliconflow-embedding", "fish-audio"]) {
+    for (const name of ["ali-oss", "tikhub", "qingdou-video-extract", "aliyun-nls", "redfox", "siliconflow-embedding", "fish-audio", "aliyun-sms", "feishu-bots"]) {
       expect(findByName(results, name)?.status, name).toBe("unconfigured")
     }
   })
@@ -112,7 +120,7 @@ describe("集成探针框架", () => {
   it("critical 标记存在且探针数量稳定（防误删）", async () => {
     const { INTEGRATION_PROBES } = await loadProbesWithEnv({})
     const names = INTEGRATION_PROBES.map((p) => p.name)
-    for (const name of ["ali-oss", "tikhub", "qingdou-video-extract", "aliyun-nls", "redfox", "siliconflow-embedding", "llm-env-drift", "fish-audio"]) {
+    for (const name of ["ali-oss", "tikhub", "qingdou-video-extract", "aliyun-nls", "redfox", "siliconflow-embedding", "llm-env-drift", "fish-audio", "aliyun-sms", "feishu-bots"]) {
       expect(names, name).toContain(name)
     }
     expect(INTEGRATION_PROBES.every((p) => typeof p.critical === "boolean")).toBe(true)

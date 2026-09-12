@@ -297,7 +297,7 @@ export async function runQualityGateWithRewrite(
     const rewritePrompt = buildTargetedRewritePrompt(input, currentContent, report)
 
     // 长文案（>=1000字）需要更多 token 避免截断，短文案保持 800
-    const rewriteMaxTokens = currentContent.length >= 1000 ? 4000 : 800
+    const rewriteMaxTokens = currentContent.length >= 1000 ? 8192 : 800
 
     const rewriteResult = await llm.complete({
       messages: [

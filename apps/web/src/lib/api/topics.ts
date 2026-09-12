@@ -137,6 +137,8 @@ export interface TodayTopicsResult {
   cards?: ApiTopicCard[]
   /** true = 缓存的这条记录生成时模型链全败（model 以 ":fallback" 结尾），cards 是降级模板 */
   degraded?: boolean
+  /** 实际使用的模型标签；降级时以 ":fallback" 结尾 */
+  model?: string
   sourceHighlights?: Array<{
     category: string
     title: string

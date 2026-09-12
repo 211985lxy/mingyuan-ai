@@ -12,7 +12,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }))
 vi.mock("@/lib/background-tasks", () => ({ enqueueBackgroundTask: vi.fn() }))
 vi.mock("@/lib/background-task-runtime", () => ({ areBackgroundTasksEnabled: () => true }))
 
-import { buildInspirationDedupeKey, isExplicitInspirationCaptureMessage, isInspirationPlatformEnabled, isInspirationShadowMode } from "@/features/topics/services/inspiration-events"
+import { buildInspirationDedupeKey, isExplicitInspirationCaptureMessage, isInspirationPlatformEnabled, isInspirationShadowMode, shouldSendCaptureAck } from "@/features/topics/services/inspiration-events"
 
 describe("inspiration event contract", () => {
   beforeEach(() => {
@@ -78,5 +78,21 @@ describe("inspiration event contract", () => {
       ["收选题"],
     )).toBe(false)
     expect(isExplicitInspirationCaptureMessage("@助手 收选题：报价为什么高", ["收选题"])).toBe(false)
+  })
+})
+
+describe("capture ack gate", () => {
+  it("capture_only/evaluate 抑制回执时，开关开启且有上下文才发轻量 ack", () => {
+    expect(shouldSendCaptureAck(true, "true", true)).toBe(true)
+    expect(shouldSendCaptureAck(true, "false", true)).toBe(false)
+    expect(shouldSendCaptureAck(true, undefined, true)).toBe(false)
+  })
+
+  it("live 模式不抑制，走正常 accepted 回执，不发 ack", () => {
+    expect(shouldSendCaptureAck(false, "true", true)).toBe(false)
+  })
+
+  it("没有回执上下文（如 API 直接调用）时不发 ack", () => {
+    expect(shouldSendCaptureAck(true, "true", false)).toBe(false)
   })
 })

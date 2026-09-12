@@ -32,6 +32,7 @@
   "longfn:baseline": "tsx --tsconfig tsconfig.json scripts/count-long-functions.ts --write-baseline",
   "longfn:check": "tsx --tsconfig tsconfig.json scripts/count-long-functions.ts --enforce",
   "longfn:report": "tsx --tsconfig tsconfig.json scripts/count-long-functions.ts",
+  "preflight:env": "tsx --tsconfig tsconfig.json scripts/preflight-env.ts",
   "schema:migration-integrity": "node scripts/check-migration-integrity.mjs",
   "schema:migration-status": "prisma migrate status",
   "schema:retired-media-preflight": "node scripts/check-retired-media-data.mjs",

@@ -6,6 +6,8 @@
  * （reviewStatus=archived，候选正文仍留在 candidates 里供日后回看），不删除任何候选。
  */
 
+import { DEGRADED_TOPIC_SELECT_MESSAGE } from "@/lib/topic-degradation"
+
 export const TOPIC_REVIEW_ACTIONS = ["adopt", "regenerate", "reject"] as const
 export type TopicReviewAction = (typeof TOPIC_REVIEW_ACTIONS)[number]
 
@@ -72,6 +74,8 @@ export function planTopicReviewDecision(input: {
   reviewedVia: string
   note?: string
   now?: Date
+  /** 降级模板批次不得被采用，换一批 / 都不行仍允许 */
+  degraded?: boolean
 }): TopicReviewPlan {
   const note = input.note?.trim()
   const base = {
@@ -79,6 +83,10 @@ export function planTopicReviewDecision(input: {
     reviewedBy: input.reviewedBy,
     reviewedVia: input.reviewedVia,
     ...(note ? { reviewNote: note } : {}),
+  }
+
+  if (input.action === "adopt" && input.degraded) {
+    return { ok: false, error: DEGRADED_TOPIC_SELECT_MESSAGE }
   }
 
   if (input.action === "regenerate") {

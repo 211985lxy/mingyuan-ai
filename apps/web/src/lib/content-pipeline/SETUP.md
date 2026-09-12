@@ -27,12 +27,10 @@ src/app/api/integrations/feishu/events/route.ts         — 新增视频链接�
 
 ```bash
 # ─── 新增（必须） ───────────────────────────────
-LARK_CONTENT_BASE_TOKEN="app_xxx"             # 飞书 Base token
+LARK_CONTENT_BASE_TOKEN="app_xxx"             # 飞书 Base token（可选；未配则跳过飞书写入）
 LARK_CONTENT_TABLE_ID="tbl_xxx"              # 飞书 Base table ID
-LLM_SUMMARY_BASE_URL="https://api.deepseek.com/v1"  # 5b LLM 地址
-LLM_SUMMARY_API_KEY="sk-xxx"                        # 5b LLM 密钥
-LLM_SUMMARY_MODEL="deepseek-v4-flash"              # 5b 模型名（2026-07-31 正式版）
 CONTENT_PIPELINE_USER_ID="user_xxx"             # 流水线默认用户（5c/5e 需要）
+# 5b 摘要走共享模型路由链（与选题生成同一套密钥），不要再配 LLM_SUMMARY_*
 
 # ─── 新增（路由二） ───────────────────────────────
 WECHAT_MP_TOKEN="your_token"                     # 公众号 Token

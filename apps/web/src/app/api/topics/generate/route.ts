@@ -67,6 +67,9 @@ export const POST = withUserAuth(async (request, { user }) => {
       elementCodes: result.elementCodes,
       strategy: result.strategy,
       sourceHighlights: result.sourceHighlights,
+      // degraded=true 表示模型链全部失败、返回的是降级模板卡，前端必须提示用户重新生成
+      degraded: result.degraded === true,
+      model: result.model,
     },
   })
 })

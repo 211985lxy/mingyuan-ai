@@ -88,8 +88,8 @@ function validateModelPolicyOverride(policy: AimModelPolicyOverride): void {
   if (!Number.isInteger(policy.maxTokens) || policy.maxTokens < 256 || policy.maxTokens > 16_384) {
     throw new Error("modelPolicy.maxTokens must be an integer between 256 and 16384")
   }
-  if (!Number.isInteger(policy.maxProviderAttempts) || policy.maxProviderAttempts < 1 || policy.maxProviderAttempts > 3) {
-    throw new Error("modelPolicy.maxProviderAttempts must be an integer between 1 and 3")
+  if (!Number.isInteger(policy.maxProviderAttempts) || policy.maxProviderAttempts < 1 || policy.maxProviderAttempts > 4) {
+    throw new Error("modelPolicy.maxProviderAttempts must be an integer between 1 and 4")
   }
 }
 
@@ -227,7 +227,7 @@ function buildModelPolicy(
     ...(maxTokens ? { maxTokens } : {}),
     targetCapability: needsAdvancedReasoning ? "advanced" : "standard",
     minimumCapability: requiresStandardFloor ? "standard" : "basic",
-    maxProviderAttempts: usesAimGenerationDeadline(agentId, entrypoint, fastSpoken) ? 3 : stream ? 2 : 3,
+    maxProviderAttempts: usesAimGenerationDeadline(agentId, entrypoint, fastSpoken) ? 4 : stream ? 2 : 4,
     ...(usesAimGenerationDeadline(agentId, entrypoint, fastSpoken)
       ? { totalTimeoutMs: AIM_EXECUTION_DEADLINE_MS }
       : {}),

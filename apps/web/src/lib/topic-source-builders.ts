@@ -78,8 +78,13 @@ export function buildBenchmarkAccountSources(
         "对标账号已验证内容信号：优先学习选题母题、开头钩子、用户痛点和互动结构，不照搬标题。",
         `来源账号：${account.targetUrl}`,
         ...videos.map((video, index) => {
-          const item = video as { title?: string; likes?: number; comments?: number; shares?: number; collects?: number }
-          return `${index + 1}. ${item.title || "无标题"}｜赞${item.likes ?? 0} 评${item.comments ?? 0} 转${item.shares ?? 0} 藏${item.collects ?? 0}`
+          const item = video as { videoId?: string; title?: string; likes?: number; comments?: number; shares?: number; collects?: number }
+          // 每账号只给热度最高的一条拼原视频链接：人工裁决时要能点开原片参考，
+          // 但全量拼链接会让 prompt 无谓膨胀。
+          const link = index === 0 && item.videoId
+            ? `｜原片：https://www.douyin.com/video/${item.videoId}`
+            : ""
+          return `${index + 1}. ${item.title || "无标题"}｜赞${item.likes ?? 0} 评${item.comments ?? 0} 转${item.shares ?? 0} 藏${item.collects ?? 0}${link}`
         }),
       ].join("\n"),
     }]

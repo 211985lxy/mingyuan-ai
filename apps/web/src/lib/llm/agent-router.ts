@@ -82,7 +82,7 @@ const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
   {
     name: "zenmux",
     model: "anthropic/claude-sonnet-4.6",
-    timeoutMs: 50_000,
+    timeoutMs: 30_000,
     maxRetries: 0,
     capability: "advanced",
   },

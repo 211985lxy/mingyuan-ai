@@ -133,7 +133,7 @@ export class LLMClient {
 
     const maxAttempts = normalizeInteger(
       this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
-      3,
+      4,
       1,
       5,
     )
@@ -144,6 +144,8 @@ export class LLMClient {
     }
     reportLlmInvocation(boundedOptions, false)
     let lastError: Error | undefined
+    /** 被 length 截断的候选：所有线路都截断时兜底返回，避免从"部分可用"退化成硬失败 */
+    let truncatedFallback: CompletionResult | undefined
     let actualRequests = 0
     let circuitSkipped = 0
     const requestedVendors = new Set<string>()
@@ -164,6 +166,29 @@ export class LLMClient {
       const startedAt = Date.now()
       try {
         const result = await provider.complete(boundedOptions)
+        if (result.finishReason === "length") {
+          // 输出被预算截断（思考型模型 reasoning 计入 completion 时高发）：
+          // 不能当成功返回，否则半截正文会被静默落库（实测：拆解只剩第一章）。
+          // 留作兜底候选并继续换路，由后面的 provider 给出完整输出。
+          // 注意：截断是"模型+预算"错配而非供应商故障，故不开熔断，只记遥测+换路。
+          truncatedFallback ??= result
+          reportProviderAttempt({
+            provider: provider.name,
+            model: boundedOptions.model ?? provider.defaultModel,
+            capability: provider.capability,
+            status: "failed",
+            durationMs: Date.now() - startedAt,
+            attemptIndex,
+            responseModel: result.model,
+            totalTokens: result.usage?.totalTokens,
+            promptTokens: result.usage?.promptTokens,
+            completionTokens: result.usage?.completionTokens,
+          })
+          console.warn(
+            `[llm] Provider "${provider.name}" 输出被 length 截断（${result.usage?.completionTokens ?? "?"} completion tokens），尝试下一个`,
+          )
+          continue
+        }
         await observeProviderCircuit(provider.name, modelName, { ok: true }, this.circuitScope)
         reportProviderAttempt({
           provider: provider.name,
@@ -222,6 +247,12 @@ export class LLMClient {
         `全部模型线路均处于熔断保护中（${circuitSkipped} 条跳过），请稍后重试`,
       )
     }
+    // 所有线路都只是"截断"（无硬错误）时返回最长的截断结果：
+    // 保底不破坏既有调用方，同时上方 warn 已留痕便于排查。
+    if (!lastError && truncatedFallback) {
+      console.warn("[llm] 所有线路输出均被 length 截断，返回截断结果兜底")
+      return truncatedFallback
+    }
     throw lastError ?? new Error("[llm] All providers failed")
   }
 
@@ -242,7 +273,7 @@ export class LLMClient {
 
     const maxAttempts = normalizeInteger(
       this.maxAttempts ?? env.LLM_MAX_PROVIDER_ATTEMPTS,
-      3,
+      4,
       1,
       5,
     )
