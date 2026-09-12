@@ -107,7 +107,7 @@ export type AimModelPolicyOverride = Readonly<Required<Pick<
 
 /** A single context source loaded for the run, for the manifest + hash. */
 export interface AimContextSource {
-  kind: "request" | "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history" | "workflow_brief" | "skill" | "system"
+  kind: "request" | "knowledge" | "ip_wiki" | "methodology" | "market_viral" | "competitor_watch" | "video_copy" | "memory" | "history" | "workflow_brief" | "skill" | "system" | "learnings"
   /** source id (knowledge entry id, wiki page id, …) or stable label */
   id: string
   /** when the source was last updated (ISO), if known */
@@ -197,6 +197,8 @@ export interface AimRunMetadata {
   promptHash: string
   /** SHA-256 of the context manifest */
   contextHash: string
+  /** SHA-256 of injected learning candidate ids（无注入时为全 0 哈希的 none） */
+  learningsHash?: string
   inputTokens?: number
   outputTokens?: number
   cachedTokens?: number

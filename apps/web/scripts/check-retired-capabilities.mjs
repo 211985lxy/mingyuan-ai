@@ -34,6 +34,8 @@ const allowedExtensions = new Set([
 const ignoredSegments = ["/generated/", "/migrations/", "/baseline/"]
 const ignoredFiles = new Set([
   resolve(repoRoot, "docs/plans/2026-07-13-aim-repository-reliability-master-plan.md"),
+  // 数字人收编决策：点名退休域是为了禁止 merge，不是为了恢复它们。
+  resolve(repoRoot, "docs/plans/2026-09-12-aim-digital-human-chanjing-delivery-plan.md"),
 ])
 const retiredPatterns = [
   /\bVideoTask\b/,

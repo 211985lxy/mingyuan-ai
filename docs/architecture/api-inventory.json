@@ -3446,8 +3446,40 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/outcome-autofetch",
+      "file": "src/app/api/cron/outcome-autofetch/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
       "route": "/api/cron/outcome-flywheel",
       "file": "src/app/api/cron/outcome-flywheel/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/publish-reminder",
+      "file": "src/app/api/cron/publish-reminder/route.ts",
       "methods": [
         "GET"
       ],
@@ -3956,7 +3988,7 @@
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
-      "externalService": true,
+      "externalService": false,
       "cost": "high",
       "idempotency": true
     },

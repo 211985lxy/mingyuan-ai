@@ -43,6 +43,12 @@ export interface MonthlyOperatingReport {
   backfilledCount: number
   business: MonthlyBusinessTotals
   attribution: { traceableLeadCount: number; unknownLeadCount: number }
+  metricLayer: {
+    source: "metric-layer"
+    publishedCount: number
+    traceableLeadCount: number
+    unknownLeadCount: number
+  }
   taskInsights: TaskAttributionInsight[]
   dataNotes: string[]
 }
@@ -187,6 +193,12 @@ export async function computeMonthlyOperatingReport(input: {
     backfilledCount: snapshots.size,
     business,
     attribution: { traceableLeadCount, unknownLeadCount },
+    metricLayer: {
+      source: "metric-layer" as const,
+      publishedCount: generations.length,
+      traceableLeadCount,
+      unknownLeadCount,
+    },
     taskInsights,
     dataNotes,
   }

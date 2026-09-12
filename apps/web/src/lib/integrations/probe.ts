@@ -278,6 +278,31 @@ async function probeFeishuBots() {
   }
 }
 
+// ── 效果回流：开放平台应用凭证 + 绑定 token 是否过期（过期=degraded，不阻断其它探针）──
+
+async function probeOutcomeAutofetch() {
+  if (!env.DOUYIN_CLIENT_KEY || !env.DOUYIN_CLIENT_SECRET) {
+    return { status: "unconfigured" as const, detail: "DOUYIN_CLIENT_KEY/SECRET 未配置，无法回流抖音作品数据" }
+  }
+  try {
+    const { prisma } = await import("@/lib/prisma")
+    const expired = await prisma.douyinAccountBinding.count({
+      where: {
+        OR: [{ syncStatus: "expired" }, { accessExpiresAt: { lt: new Date() } }],
+      },
+    })
+    if (expired > 0) {
+      return {
+        status: "degraded" as const,
+        detail: `${expired} 个抖音绑定已过期，效果回流会跳过这些账号`,
+      }
+    }
+    return { status: "healthy" as const }
+  } catch {
+    return { status: "degraded" as const, detail: "无法读取抖音绑定状态" }
+  }
+}
+
 export const INTEGRATION_PROBES: IntegrationProbe[] = [
   { name: "ali-oss", critical: true, run: probeAliyunOss },
   { name: "tikhub", critical: true, run: probeTikhub },
@@ -289,6 +314,7 @@ export const INTEGRATION_PROBES: IntegrationProbe[] = [
   { name: "fish-audio", critical: true, run: probeFishAudio },
   { name: "aliyun-sms", critical: false, run: probeAliyunSms },
   { name: "feishu-bots", critical: true, run: probeFeishuBots },
+  { name: "outcome-autofetch", critical: false, run: probeOutcomeAutofetch },
 ]
 
 export async function runIntegrationProbes(): Promise<IntegrationProbeResult[]> {

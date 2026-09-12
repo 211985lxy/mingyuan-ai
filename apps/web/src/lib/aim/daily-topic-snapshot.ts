@@ -38,21 +38,23 @@ export async function loadDailyTopicSnapshot(userId: string): Promise<DailyTopic
   dayStart.setHours(0, 0, 0, 0)
   const todayKey = new Date().toISOString().split("T")[0]
 
-  const [selectionRows, inspirations, hotSnapshot] = await Promise.all([
-    prisma.topicSelection.findMany({
-      where: { userId, recommendationMode: "daily", recommendedDate: todayKey },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, reviewStatus: true, selectedIndex: true, candidates: true },
-    }),
-    prisma.inspiration.findMany({
-      where: { userId, createdAt: { gte: dayStart } },
-      select: { aiStatus: true },
-    }),
-    prisma.douyinHotSnapshot.findFirst({
-      orderBy: { fetchedAt: "desc" },
-      select: { fetchedAt: true },
-    }),
-  ])
+  const inspirationWhere = { userId, createdAt: { gte: dayStart } }
+  const [selectionRows, inspirationCount, inspirationExtracted, inspirationFailed, hotSnapshot] =
+    await Promise.all([
+      prisma.topicSelection.findMany({
+        where: { userId, recommendationMode: "daily", recommendedDate: todayKey },
+        orderBy: { createdAt: "asc" },
+        select: { id: true, reviewStatus: true, selectedIndex: true, candidates: true },
+        take: 50,
+      }),
+      prisma.inspiration.count({ where: inspirationWhere }),
+      prisma.inspiration.count({ where: { ...inspirationWhere, aiStatus: "completed" } }),
+      prisma.inspiration.count({ where: { ...inspirationWhere, aiStatus: "failed" } }),
+      prisma.douyinHotSnapshot.findFirst({
+        orderBy: { fetchedAt: "desc" },
+        select: { fetchedAt: true },
+      }),
+    ])
 
   return {
     selections: selectionRows.map((row) => ({
@@ -61,9 +63,9 @@ export async function loadDailyTopicSnapshot(userId: string): Promise<DailyTopic
       selectedIndex: row.selectedIndex,
       candidates: row.candidates as unknown,
     })),
-    inspirationCount: inspirations.length,
-    inspirationExtracted: inspirations.filter((item) => item.aiStatus === "completed").length,
-    inspirationFailed: inspirations.filter((item) => item.aiStatus === "failed").length,
+    inspirationCount,
+    inspirationExtracted,
+    inspirationFailed,
     hotSnapshotAt: hotSnapshot?.fetchedAt ?? null,
   }
 }

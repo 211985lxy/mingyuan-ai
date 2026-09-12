@@ -8,8 +8,9 @@ export interface AimContextBlocks {
   viralStructureBlock: string
   eventStorytellingBlock: string
   ipWikiBlock: string
-  /** ADR-002：本次指定命名方法论（独立预算块，不与系统方法论争预算）。 */
   selectedMethodologyBlock: string
+  /** WP-2.2：已批准历史教训，缺省空串 */
+  learningsBlock?: string
 }
 
 type AimContextBlockKey = keyof AimContextBlocks
@@ -24,6 +25,7 @@ const DEFAULT_PRIORITY: AimContextBlockKey[] = [
   "conversationBlock",
   "ipWikiBlock",
   "selectedMethodologyBlock",
+  "learningsBlock",
   "methodologyBlock",
   "knowledgeBlock",
   "businessDiagnosisBlock",
@@ -38,6 +40,7 @@ export const AIM_UNIFIED_CONTENT_CONTEXT_PROFILE: AimContextBudgetProfile = {
     conversationBlock: 2_000,
     ipWikiBlock: 3_000,
     selectedMethodologyBlock: 2_000,
+    learningsBlock: 1_200,
     methodologyBlock: 3_000,
     knowledgeBlock: 4_000,
     businessDiagnosisBlock: 1_000,

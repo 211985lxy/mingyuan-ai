@@ -22,6 +22,7 @@ export function resolveDefaultTrustLevel(
     case "memory":
     case "skill":
     case "system":
+    case "learnings":
       return "system_trusted"
     case "request":
     case "history":

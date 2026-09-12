@@ -76,6 +76,8 @@ export interface FrozenContext {
   marketViralBlock?: string
   /** conversation history for chat/revision cases */
   history?: Array<{ role: "user" | "assistant"; content: string }>
+  /** 已批准学习约束（WP-2.2）；deterministic grader 校验注入不破坏格式 */
+  learnings?: Array<{ id: string; targetType: string; constraint: string }>
 }
 
 /**

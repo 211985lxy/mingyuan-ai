@@ -43,6 +43,8 @@ import {
   mergeStyleIntoKnowledgeBlock,
 } from "./context/load-style-profile"
 import { resolveMethodologyInjectionForGenerate } from "./context/resolve-methodology-injection"
+import { loadLearningsForAimContext } from "@/lib/aim/learning-injection-store"
+import { formatLearningsBlock, mergeLearningsIntoKnowledge } from "@/lib/aim/learning-injection"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -226,18 +228,28 @@ export async function prepareAimContext(
       trace,
     })
 
+  const injectedLearnings = await loadLearningsForAimContext({
+    userId: params.userId,
+    projectId: spec.projectId,
+    useOverride: Boolean(params.contextOverride),
+    override: params.contextOverride?.learnings,
+  })
+  const learningsBlock = formatLearningsBlock(injectedLearnings)
+  const knowledgeWithLearnings = mergeLearningsIntoKnowledge(knowledgeBlock, learningsBlock)
+
   // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致；selectedMethodologyBlock 作为独立预算块）
   const budgeted = await compressAndBudgetGenerationInput({
     agentId,
     spec,
     runtimeTask,
-    knowledgeBlock,
+    knowledgeBlock: knowledgeWithLearnings,
     methodologyBlock: methodologyWithSkills,
     businessDiagnosisBlock,
     viralStructureBlock,
     eventStorytellingBlock,
     ipWikiBlock,
     selectedMethodologyBlock,
+    learningsBlock,
     trace,
   })
 
@@ -257,6 +269,8 @@ export async function prepareAimContext(
     styleProfileBlock: styleBlock,
     skills,
     taskSpec: taskSpecWithPlan,
+    learnings: injectedLearnings,
+    learningsBlock,
   })
 
   return {
@@ -270,8 +284,8 @@ export async function prepareAimContext(
       eventStorytelling: budgeted.blocks.eventStorytellingBlock,
       ipWiki: budgeted.blocks.ipWikiBlock,
       selectedMethodology: budgeted.blocks.selectedMethodologyBlock,
-      // generate 路径此前不注入对话记忆；阶段 2 预留，暂为空
       memory: "",
+      learnings: budgeted.blocks.learningsBlock ?? learningsBlock,
     },
     taskSpec: taskSpecWithPlan,
     methodologyPlan,
@@ -379,6 +393,7 @@ async function compressAndBudgetGenerationInput(input: {
   eventStorytellingBlock: string
   ipWikiBlock: string
   selectedMethodologyBlock: string
+  learningsBlock?: string
   trace?: AimTraceRecorder
 }) {
   const { agentId, spec, runtimeTask, knowledgeBlock, trace } = input
@@ -408,6 +423,7 @@ async function compressAndBudgetGenerationInput(input: {
     eventStorytellingBlock: input.eventStorytellingBlock,
     ipWikiBlock: input.ipWikiBlock,
     selectedMethodologyBlock: input.selectedMethodologyBlock,
+    learningsBlock: input.learningsBlock ?? "",
   }
   const budgeted = spec.unifiedContentExecution
     ? applyAimContextProfile(contextBlocks, AIM_UNIFIED_CONTENT_CONTEXT_PROFILE)
@@ -478,11 +494,4 @@ async function buildContextTaskSpec(input: {
   return enrichTaskSpecFromRawInput(base, spec.rawInput, { outputFormatHint })
 }
 
-/**
- * 装配阶段的声明式来源清单（取代 harness 事后反查）。
- *
- * ADR-002 连带修复：此前只记 knowledge + request，系统方法论 / IP Wiki / 爆款结构
- * 的变更不会反映到 contextHash，导致编辑方法论后历史无法复现。现在把每类实际装配进
- * prompt 的 block 都记录一条，使 contextHash 真正反映本次运行的全部输入。
- */
 export { resolveAimRuntimeTask }

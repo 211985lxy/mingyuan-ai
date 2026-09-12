@@ -21,6 +21,7 @@ import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
 import { runWithLlmTelemetry } from "@/lib/llm/telemetry"
 import { runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
 
+import { hashLearningsFromManifest } from "@/lib/aim/learning-injection"
 import { hashContextManifest, hashPrompt } from "./hashing"
 import { planAimRun } from "./planner"
 import type { PlanRunInput } from "./planner"
@@ -184,6 +185,7 @@ export async function runAimHarness(
     degraded,
     promptHash: hashPrompt(composedPrompt),
     contextHash: hashContextManifest(contextManifest),
+    learningsHash: hashLearningsFromManifest(contextManifest),
     inputTokens,
     outputTokens,
     cachedTokens,
