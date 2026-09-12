@@ -44,6 +44,46 @@ interface TopicCardCallbackBody {
     value?: TopicCardActionValue
     tag?: string
   }
+  /** 新版 card.action.trigger 外层信封 */
+  schema?: string
+  header?: {
+    token?: string
+    event_type?: string
+  }
+  event?: {
+    token?: string
+    operator?: {
+      open_id?: string
+      user_id?: string
+    }
+    action?: {
+      value?: TopicCardActionValue
+      tag?: string
+    }
+  }
+}
+
+/**
+ * 归一化两种回调信封为同一结构：
+ *   - 经典（card.action.trigger_v1）：token / open_id / action.value 都在顶层；
+ *   - 新版（card.action.trigger）：token 在 header.token 或 event.token，
+ *     操作人在 event.operator，动作在 event.action。
+ * 2026-09-12：只读顶层导致新版回调被判 404 Unknown agent bot，飞书客户端报 200671。
+ */
+function normalizeCallbackBody(body: TopicCardCallbackBody): TopicCardCallbackBody {
+  const headerToken = body.header?.token
+  const eventToken = body.event?.token
+  const operator = body.event?.operator
+  const eventAction = body.event?.action
+  if (!headerToken && !eventToken && !operator && !eventAction) return body
+
+  return {
+    ...body,
+    token: body.token ?? eventToken ?? headerToken,
+    open_id: body.open_id ?? operator?.open_id,
+    user_id: body.user_id ?? operator?.user_id,
+    action: body.action ?? eventAction,
+  }
 }
 
 /**
@@ -138,8 +178,10 @@ export async function POST(request: Request) {
   if (!body) return toast("请求体不可解析", "error")
 
   // 加密回调体先解密；解不开时明确报错而不是落进 404，方便在控制台侧定位
-  const payload = decryptCallbackBody(body)
-  if (!payload) return toast("回调解密失败：encrypt 内容无法用已注册 bot 的密钥解开", "error")
+  const decrypted = decryptCallbackBody(body)
+  if (!decrypted) return toast("回调解密失败：encrypt 内容无法用已注册 bot 的密钥解开", "error")
+  // 新版/经典两种信封归一化后再做校验与分发
+  const payload = normalizeCallbackBody(decrypted)
 
   // 飞书卡片回调的 URL 校验挑战原样返回
   if (payload.type === "url_verification" && payload.challenge) {
