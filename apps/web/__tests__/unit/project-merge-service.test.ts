@@ -49,6 +49,10 @@ interface StoreOpts {
   archiveCount?: number
   /** Override the count the store reports from remapApiKeys. */
   remapCount?: number
+  moveCounts?: Partial<Record<(typeof MOVE_PROJECT_TABLES)[number], number>>
+  sourceRowCounts?: Partial<Record<(typeof MOVE_PROJECT_TABLES)[number], number>>
+  participants?: ProjectMergeParticipant[]
+  failFailedAudit?: boolean
 }
 
 function defaultSource(): ProjectInfo {
@@ -64,9 +68,9 @@ function buildSnapshot(opts: StoreOpts): ProjectMergeSnapshot {
   const target = opts.target ?? defaultTarget()
   const bindings = opts.bindings ?? {}
 
-  const participantList: ProjectMergeParticipant[] = []
+  const participantById = new Map<string, ProjectMergeParticipant>()
   const addParticipant = (userId: string, fallbackProjectId: string) => {
-    participantList.push({
+    participantById.set(userId, {
       userId,
       boundProjectId: bindings[userId] ?? fallbackProjectId,
     })
@@ -86,7 +90,10 @@ function buildSnapshot(opts: StoreOpts): ProjectMergeSnapshot {
       ...RETAIN_PROJECT_TABLES,
     ],
     activeWork: opts.activeWork ?? { invocations: 0, traces: 0 },
-    participants: participantList,
+    participants: opts.participants ?? [...participantById.values()],
+    sourceRowCounts: Object.fromEntries(
+      MOVE_PROJECT_TABLES.map((table) => [table, opts.sourceRowCounts?.[table] ?? 0]),
+    ) as ProjectMergeSnapshot["sourceRowCounts"],
     // Admin is a separate active administrator, NOT required to own either project.
     admin: opts.admin ?? { userId: "admin-1", status: "active" },
   }
@@ -97,12 +104,14 @@ interface TestStore extends ProjectMergeStore {
   committedWrites: WriteOp[]
   /** Last userIds passed to remapApiKeys (for asserting sorted participants). */
   lastRemapUserIds: string[] | null
+  lastSuccessAudit: Parameters<ProjectMergeTransaction["writeSuccessAudit"]>[0] | null
 }
 
 function makeStore(opts: StoreOpts = {}): TestStore {
   const calls: string[] = []
   const committedWrites: WriteOp[] = []
   let lastRemapUserIds: string[] | null = null
+  let lastSuccessAudit: Parameters<ProjectMergeTransaction["writeSuccessAudit"]>[0] | null = null
   const snapshot = buildSnapshot(opts)
 
   const expectedRebind = snapshot.participants.filter(
@@ -130,14 +139,15 @@ function makeStore(opts: StoreOpts = {}): TestStore {
     },
     moveRows: async (table) => {
       calls.push("moveRows")
-      return 0
+      return opts.moveCounts?.[table] ?? 0
     },
     archiveSource: async () => {
       calls.push("archiveSource")
       return opts.archiveCount ?? expectedArchive
     },
-    writeSuccessAudit: async () => {
+    writeSuccessAudit: async (input) => {
       calls.push("writeSuccessAudit")
+      lastSuccessAudit = input
       if (opts.failAt === "writeAudit") {
         throw new Error("audit write failed")
       }
@@ -152,6 +162,9 @@ function makeStore(opts: StoreOpts = {}): TestStore {
     committedWrites,
     get lastRemapUserIds() {
       return lastRemapUserIds
+    },
+    get lastSuccessAudit() {
+      return lastSuccessAudit
     },
     inspect: async () => {
       calls.push("inspect")
@@ -194,6 +207,7 @@ function makeStore(opts: StoreOpts = {}): TestStore {
     },
     writeFailedAudit: async () => {
       calls.push("writeFailedAudit")
+      if (opts.failFailedAudit) throw new Error("failure audit unavailable")
     },
   }
 
@@ -244,6 +258,31 @@ describe("project merge service", () => {
     expect(store.committedWrites).toEqual([])
   })
 
+  it("rejects a snapshot that omits a target member", async () => {
+    const complete = buildSnapshot({}).participants
+    const store = makeStore({
+      participants: complete.filter((participant) => participant.userId !== "target-member"),
+    })
+    await expect(applyProjectMerge(validInput, store)).rejects.toThrow("participant snapshot mismatch")
+    expect(store.committedWrites).toEqual([])
+  })
+
+  it("rejects a snapshot that omits a target bound account", async () => {
+    const complete = buildSnapshot({}).participants
+    const store = makeStore({
+      participants: complete.filter((participant) => participant.userId !== "target-bound"),
+    })
+    await expect(applyProjectMerge(validInput, store)).rejects.toThrow("participant snapshot mismatch")
+    expect(store.committedWrites).toEqual([])
+  })
+
+  it("rejects duplicate binding snapshots for one participant", async () => {
+    const complete = buildSnapshot({}).participants
+    const store = makeStore({ participants: [...complete, complete[0]!] })
+    await expect(applyProjectMerge(validInput, store)).rejects.toThrow("duplicate participant binding")
+    expect(store.committedWrites).toEqual([])
+  })
+
   it("rejects unknown deployed project tables", async () => {
     const store = makeStore({ deployedTables: ["AimGeneration", "UnreviewedTable"] })
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("UnreviewedTable")
@@ -266,6 +305,21 @@ describe("project merge service", () => {
     const store = makeStore({ failAt: "writeAudit" })
     await expect(applyProjectMerge(validInput, store)).rejects.toThrow("audit")
     expect(store.committedWrites).toEqual([])
+  })
+
+  it("preserves the original merge error when failure audit writing also fails", async () => {
+    const store = makeStore({
+      activeWork: { invocations: 1, traces: 0 },
+      failFailedAudit: true,
+    })
+    await expect(applyProjectMerge(validInput, store)).rejects.toThrow("active work")
+  })
+
+  it("preserves a precondition error when failure audit writing fails", async () => {
+    const store = makeStore({ failFailedAudit: true })
+    await expect(
+      applyProjectMerge({ ...validInput, confirmation: "target->source" }, store),
+    ).rejects.toThrow("confirmation mismatch")
   })
 
   it("rejects wrong direction confirmation", async () => {
@@ -385,6 +439,30 @@ describe("project merge service", () => {
     expect(moves.length).toBe(MOVE_PROJECT_TABLES.length)
     // tables appear in MOVE_PROJECT_TABLES order
     expect(moves.map((w) => w.table)).toEqual([...MOVE_PROJECT_TABLES])
+  })
+
+  it("returns and audits each table move count", async () => {
+    const store = makeStore({
+      moveCounts: { AimGeneration: 3, KnowledgeEntry: 10 },
+      sourceRowCounts: { AimGeneration: 3, KnowledgeEntry: 10 },
+    })
+    const result = await applyProjectMerge(validInput, store)
+    expect(result.moveCounts.AimGeneration).toBe(3)
+    expect(result.moveCounts.KnowledgeEntry).toBe(10)
+    expect(result.movedRows).toBe(13)
+    expect(store.lastSuccessAudit?.moveCounts.AimGeneration).toBe(3)
+    expect(store.lastSuccessAudit?.movedRows).toBe(13)
+  })
+
+  it("rolls back when a table update count differs from its locked snapshot", async () => {
+    const store = makeStore({
+      sourceRowCounts: { AimGeneration: 2 },
+      moveCounts: { AimGeneration: 1 },
+    })
+    await expect(applyProjectMerge(validInput, store)).rejects.toThrow(
+      "AimGeneration move count mismatch",
+    )
+    expect(store.committedWrites).toEqual([])
   })
 
   it("preview does not call write methods on the store", async () => {

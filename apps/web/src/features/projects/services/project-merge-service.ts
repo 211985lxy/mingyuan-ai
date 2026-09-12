@@ -55,15 +55,22 @@ export interface ProjectMergeSnapshot {
   target: ProjectMergeProjectInfo
   deployedTables: readonly string[]
   activeWork: { invocations: number; traces: number }
+  /** One locked binding row per owner/member/bound account in both projects. */
   participants: ProjectMergeParticipant[]
+  /** Locked pre-update row count for every reviewed move table. */
+  sourceRowCounts: Record<MoveProjectTable, number>
   admin: { userId: string; status: "active" | "inactive" }
 }
+
+export type ProjectMergeMoveCounts = Record<MoveProjectTable, number>
 
 export interface ProjectMergeSuccessAudit {
   input: ProjectMergeInput
   participantIds: string[]
   rebindCount: number
   remapCount: number
+  moveCounts: ProjectMergeMoveCounts
+  movedRows: number
   archiveCount: number
 }
 
@@ -76,6 +83,8 @@ export interface ProjectMergeResult {
   participantIds: string[]
   rebindCount: number
   remapCount: number
+  moveCounts: ProjectMergeMoveCounts
+  movedRows: number
   archiveCount: number
   auditId: string
 }
@@ -162,7 +171,7 @@ export async function applyProjectMerge(
   // 1. Validate confirmation + reason BEFORE opening the transaction.
   const expectedConfirmation = `${input.sourceProjectId}->${input.targetProjectId}`
   if (input.confirmation !== expectedConfirmation) {
-    await store.writeFailedAudit({
+    await safeWriteFailedAudit(store, {
       input,
       reason: `confirmation mismatch: expected ${expectedConfirmation}`,
     })
@@ -171,13 +180,13 @@ export async function applyProjectMerge(
     )
   }
   if (input.reason.trim() === "") {
-    await store.writeFailedAudit({ input, reason: "reason required" })
+    await safeWriteFailedAudit(store, { input, reason: "reason required" })
     throw new Error("reason required")
   }
 
   // Source and target must be different projects.
   if (input.sourceProjectId === input.targetProjectId) {
-    await store.writeFailedAudit({ input, reason: "source and target must differ" })
+    await safeWriteFailedAudit(store, { input, reason: "source and target must differ" })
     throw new Error("source and target must differ")
   }
 
@@ -187,11 +196,22 @@ export async function applyProjectMerge(
     // Transaction rolled back (committedWrites stays empty). Record the
     // failure audit OUTSIDE the rolled-back transaction, without replacing
     // the original error.
-    await store.writeFailedAudit({
+    await safeWriteFailedAudit(store, {
       input,
       reason: error instanceof Error ? error.message : "merge failed",
     })
     throw error
+  }
+}
+
+async function safeWriteFailedAudit(
+  store: ProjectMergeStore,
+  audit: ProjectMergeFailureAudit,
+): Promise<void> {
+  try {
+    await store.writeFailedAudit(audit)
+  } catch {
+    // Audit availability must never change the failure observed by the caller.
   }
 }
 
@@ -234,9 +254,19 @@ async function runMergeTransaction(
   )
 
   // Move rows sequentially (no Promise.all of writes).
+  const moveCounts = Object.fromEntries(
+    MOVE_PROJECT_TABLES.map((table) => [table, 0]),
+  ) as ProjectMergeMoveCounts
   for (const table of moveTableList) {
-    await tx.moveRows(table, snapshot.source.projectId, snapshot.target.projectId)
+    const count = await tx.moveRows(
+      table,
+      snapshot.source.projectId,
+      snapshot.target.projectId,
+    )
+    assertExact(count, snapshot.sourceRowCounts[table], `${table} move`)
+    moveCounts[table] = count
   }
+  const movedRows = Object.values(moveCounts).reduce((total, count) => total + count, 0)
 
   // Archive source. Assert exact archive count.
   const archiveCount = await tx.archiveSource(snapshot.source.projectId)
@@ -248,10 +278,20 @@ async function runMergeTransaction(
     participantIds,
     rebindCount,
     remapCount,
+    moveCounts,
+    movedRows,
     archiveCount,
   })
 
-  return { participantIds, rebindCount, remapCount, archiveCount, auditId }
+  return {
+    participantIds,
+    rebindCount,
+    remapCount,
+    moveCounts,
+    movedRows,
+    archiveCount,
+    auditId,
+  }
 }
 
 function countBoundTo(
@@ -321,6 +361,9 @@ function validateSnapshot(
     )
   }
 
+  validateParticipantSnapshot(snapshot)
+  validateSourceRowCounts(snapshot)
+
   // No participant may be bound to a third project.
   for (const p of snapshot.participants) {
     if (
@@ -331,6 +374,39 @@ function validateSnapshot(
       throw new Error(
         `participant ${p.userId} is bound to a third project: ${p.boundProjectId}`,
       )
+    }
+  }
+}
+
+function validateParticipantSnapshot(snapshot: ProjectMergeSnapshot): void {
+  const expected = sortedUniqueIds([
+    snapshot.source.ownerId,
+    ...snapshot.source.members,
+    ...snapshot.source.boundAccounts,
+    snapshot.target.ownerId,
+    ...snapshot.target.members,
+    ...snapshot.target.boundAccounts,
+  ])
+  const actual = snapshot.participants.map((participant) => participant.userId)
+  if (new Set(actual).size !== actual.length) {
+    throw new Error("duplicate participant binding snapshot")
+  }
+  const sortedActual = [...actual].sort()
+  if (
+    expected.length !== sortedActual.length ||
+    expected.some((userId, index) => userId !== sortedActual[index])
+  ) {
+    throw new Error(
+      `participant snapshot mismatch: expected ${expected.join(",")}, got ${sortedActual.join(",")}`,
+    )
+  }
+}
+
+function validateSourceRowCounts(snapshot: ProjectMergeSnapshot): void {
+  for (const table of MOVE_PROJECT_TABLES) {
+    const count = snapshot.sourceRowCounts[table]
+    if (!Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`invalid source row count for ${table}: ${String(count)}`)
     }
   }
 }
