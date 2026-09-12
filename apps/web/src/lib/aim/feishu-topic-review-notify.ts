@@ -2,6 +2,10 @@
 // 复用「选题策划官」(business_diagnosis) 身份与每日推送通道（与热点简报同一开关/群）。
 // 交互按钮回调到 /api/integrations/feishu/topic-card-actions。
 // 设计前提：选题定生死 —— 卡片只负责把 AI 的提案、评分与依据摆清楚，采用权在人手里。
+//
+// 排版原则（避免一屏半的密文字）：
+//   默认可见 = 概要一行 + 4 个候选（标题/主编判定/理由）+ 按钮
+//   折叠收起 = 结论与理由全文、判断依据、参考素材
 
 import { buildTopicDailyReport, type TopicDailyReport, type TopicDailyReportSource } from "@/lib/topic-daily-report"
 import { readHotBriefingPushConfig } from "@/lib/aim/feishu-hot-briefing-notify"
@@ -13,6 +17,8 @@ import type { ApiAiHotBriefingItem, ApiTopicCard } from "@/types/api"
 const TOPIC_REVIEW_BOT_ID = "business_diagnosis"
 /** 卡片上最多列几张候选，与生成批次一致；多出的仍留在记录里 */
 export const TOPIC_REVIEW_CARD_LIMIT = 4
+/** 主编分与模型自评分岔超过该阈值时把模型分也标出来——真实分歧值得人注意 */
+const SCORE_DIVERGENCE_THRESHOLD = 15
 
 export interface TopicReviewCardInput {
   selectionId: string
@@ -22,10 +28,6 @@ export interface TopicReviewCardInput {
   projectName?: string | null
 }
 
-function scoreLabel(card: TopicCard) {
-  return typeof card.score === "number" ? `｜${card.score} 分` : ""
-}
-
 const EDITOR_VERDICT_LABEL: Record<NonNullable<TopicCard["editorReview"]>["editorVerdict"], string> = {
   strong: "建议主推",
   usable: "可用",
@@ -33,10 +35,17 @@ const EDITOR_VERDICT_LABEL: Record<NonNullable<TopicCard["editorReview"]>["edito
   revise: "建议改",
 }
 
-function editorMark(card: TopicCard) {
+/** 候选的元数据行：主编结论为主，分歧显著时附模型自评。 */
+function candidateMeta(card: TopicCard): string {
   const review = card.editorReview
-  if (!review) return ""
-  return `｜主编 ${review.editorScore}分｜${EDITOR_VERDICT_LABEL[review.editorVerdict]}`
+  if (!review) {
+    return typeof card.score === "number" ? `模型 ${card.score}` : "未评审"
+  }
+  const parts = [`主编 ${review.editorScore} · ${EDITOR_VERDICT_LABEL[review.editorVerdict]}`]
+  if (typeof card.score === "number" && Math.abs(card.score - review.editorScore) >= SCORE_DIVERGENCE_THRESHOLD) {
+    parts.push(`模型 ${card.score}`)
+  }
+  return parts.join("　")
 }
 
 /**
@@ -48,19 +57,28 @@ function toApiCards(cards: TopicCard[]): ApiTopicCard[] {
   return cards as unknown as ApiTopicCard[]
 }
 
-/** 候选区：编号 + 标题 + 评分 + AI 主推标记 + 一句理由，便于人快速比较。 */
+/** 候选区：标题 → 主编判定 → 理由三行一组，标题加粗作视觉锚点。 */
 function buildCandidateLines(cards: TopicCard[], leadTitle: string | undefined) {
   return cards
     .slice(0, TOPIC_REVIEW_CARD_LIMIT)
     .map((card, index) => {
-      const mark = card.title === leadTitle ? "｜AI 主推" : ""
+      const mark = card.title === leadTitle ? "　★主推" : ""
       const why = card.editorReview?.editorReason || card.scoreReason || card.rationale || ""
-      return `**${index + 1}. ${card.title}**${scoreLabel(card)}${mark}${editorMark(card)}\n${why}`
+      return `**${index + 1}. ${card.title}**${mark}\n${candidateMeta(card)}\n${why}`
     })
     .join("\n\n")
 }
 
-/** 依据区：按项目/客户/对标/热点分组，只列标题，说明「AI 为什么这么提」。 */
+/** 概要区：主推结论一行 + 项目一行，替代原来四行的结论块。 */
+function buildSummaryLine(report: TopicDailyReport, projectName?: string | null) {
+  const lead = report.leadCard
+  const head = lead
+    ? `**主编主推**：${lead.title}`
+    : "**主编主推**：本批无合格主推"
+  return [head, projectName ? `项目：${projectName}` : ""].filter(Boolean).join("\n")
+}
+
+/** 判断依据：按项目/客户/对标/热点分组，只列标题。 */
 function buildEvidenceLines(report: TopicDailyReport) {
   return report.evidenceGroups
     .slice(0, 3)
@@ -111,12 +129,27 @@ export function extractReferenceLinks(sources: TopicDailyReportSource[]): Refere
   return links.slice(0, 8)
 }
 
-function buildReferenceSection(links: ReferenceLink[]): Record<string, unknown> | null {
-  if (links.length === 0) return null
-  const lines = links.map((link) => `- [${link.label}](${link.url})`).join("\n")
+/**
+ * 折叠面板：把次要信息收起，卡片默认只留裁决所需内容。
+ * expanded=false 让面板默认合上；点标题才展开。
+ */
+function buildCollapsiblePanel(title: string, blocks: string[]): Record<string, unknown> | null {
+  const content = blocks.filter(Boolean)
+  if (content.length === 0) return null
   return {
-    tag: "div",
-    text: { tag: "lark_md", content: `**参考素材**（点开原视频对照）\n${lines}` },
+    tag: "collapsible_panel",
+    expanded: false,
+    header: {
+      title: { tag: "plain_text", content: title },
+      vertical_align: "center",
+      icon: { tag: "standard_icon", token: "down-small-ccm_outlined", size: "16px 16px" },
+      icon_position: "right",
+      icon_expanded_angle: -180,
+    },
+    elements: content.map((text) => ({
+      tag: "div",
+      text: { tag: "lark_md", content: text },
+    })),
   }
 }
 
@@ -146,17 +179,43 @@ function buildActionButtons(selectionId: string, candidateCount: number) {
   ]
 }
 
+/** 结论面板：AI 结论、主编结论、判断理由。 */
+function buildConclusionPanel(report: TopicDailyReport): Record<string, unknown> | null {
+  const leadReview = report.leadCard?.editorReview
+  return buildCollapsiblePanel("AI 与主编的完整结论", [
+    `**AI 结论**：${report.conclusion}`,
+    leadReview ? `**主编结论**：${leadReview.editorReason}` : "",
+    `**判断理由**：${report.reason}`,
+  ])
+}
+
+/** 依据面板：判断依据 + 参考素材（可点开的原视频与账号主页）。 */
+function buildEvidencePanel(
+  report: TopicDailyReport,
+  referenceLinks: ReferenceLink[],
+): Record<string, unknown> | null {
+  const evidenceLines = buildEvidenceLines(report)
+  const referenceBlock = referenceLinks.length > 0
+    ? `**参考素材**（点开对照）\n${referenceLinks.map((link) => `- [${link.label}](${link.url})`).join("\n")}`
+    : ""
+  return buildCollapsiblePanel("判断依据与参考素材", [
+    evidenceLines.length > 0 ? evidenceLines.join("\n") : "",
+    referenceBlock,
+  ])
+}
+
 /**
- * @description 构建选题裁决卡（AI 提案 + 评分理由 + 依据 + 人工裁决按钮）
+ * @description 构建选题裁决卡（概要 + 候选 + 裁决按钮，次要信息折叠）
  * @param input - 选题记录 ID、候选卡、来源快照、热门条目、项目名
  * @returns 飞书交互卡片对象
  */
 export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string, unknown> {
   const cards = input.cards.slice(0, TOPIC_REVIEW_CARD_LIMIT)
   const report = buildTopicDailyReport(toApiCards(input.cards), input.briefingItems ?? [], "daily", input.sources)
-  const evidenceLines = buildEvidenceLines(report)
-  const referenceLinks = extractReferenceLinks(input.sources)
-  const referenceSection = buildReferenceSection(referenceLinks)
+  const panels = [
+    buildConclusionPanel(report),
+    buildEvidencePanel(report, extractReferenceLinks(input.sources)),
+  ].filter((panel): panel is Record<string, unknown> => panel !== null)
 
   return {
     config: { wide_screen_mode: true },
@@ -167,34 +226,15 @@ export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string
     elements: [
       {
         tag: "div",
-        text: {
-          tag: "lark_md",
-          content: [
-            input.projectName ? `**项目**：${input.projectName}` : "",
-            `**AI 结论**：${report.conclusion}`,
-            report.leadCard?.editorReview?.editorReason
-              ? `**主编结论**：${report.leadCard.editorReview.editorReason}`
-              : "",
-            `**判断理由**：${report.reason}`,
-          ].filter(Boolean).join("\n"),
-        },
+        text: { tag: "lark_md", content: buildSummaryLine(report, input.projectName) },
       },
       { tag: "hr" },
       {
         tag: "div",
         text: { tag: "lark_md", content: buildCandidateLines(cards, report.leadCard?.title) },
       },
-      ...(evidenceLines.length > 0
-        ? [
-            { tag: "hr" },
-            {
-              tag: "div",
-              text: { tag: "lark_md", content: `**判断依据**\n${evidenceLines.join("\n")}` },
-            },
-          ]
-        : []),
-      ...(referenceSection ? [{ tag: "hr" }, referenceSection] : []),
       { tag: "action", actions: buildActionButtons(input.selectionId, cards.length) },
+      ...panels,
       {
         tag: "note",
         elements: [
