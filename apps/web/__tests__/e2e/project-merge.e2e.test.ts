@@ -235,6 +235,8 @@ function mergeInput(adminUserId: string) {
 }
 
 async function snapshotMergeState() {
+  // Intentionally excludes AdminAuditLog: rejected merges write one failure audit
+  // outside the rolled-back transaction, and these tests assert it separately.
   return {
     users: await prisma.user.findMany({
       where: { id: { startsWith: "merge-e2e-" } },
@@ -287,6 +289,28 @@ async function snapshotMergeState() {
       orderBy: { id: "asc" },
     }),
   }
+}
+
+async function expectSingleFailedMergeAudit(adminId: string, reasonPattern: RegExp) {
+  const audits = await prisma.adminAuditLog.findMany({
+    where: {
+      action: "account.project_merge",
+      targetId: TARGET_ID,
+      requestId: REQUEST_ID,
+      status: "failed",
+    },
+    orderBy: { createdAt: "asc" },
+  })
+  expect(audits).toHaveLength(1)
+  const audit = audits[0]!
+  expect(audit.adminId).toBe(adminId)
+  expect(audit.targetType).toBe("ClientProject")
+  expect(audit.severity).toBe("warning")
+  expect(audit.correlationId).toBe(REQUEST_ID)
+  const metadata = (audit.metadata ?? {}) as Record<string, unknown>
+  expect(metadata.source).toBe(SOURCE_ID)
+  expect(metadata.target).toBe(TARGET_ID)
+  expect(metadata.reason).toEqual(expect.stringMatching(reasonPattern))
 }
 
 describe("project merge e2e", () => {
@@ -374,6 +398,7 @@ describe("project merge e2e", () => {
     expect(await prisma.adminAuditLog.count({
       where: { action: "account.project_merge", targetId: TARGET_ID, status: "success" },
     })).toBe(0)
+    await expectSingleFailedMergeAudit(admin.id, /third project/)
   })
 
   it("rolls back active source invocation with zero committed writes", async () => {
@@ -389,5 +414,6 @@ describe("project merge e2e", () => {
     expect(await prisma.adminAuditLog.count({
       where: { action: "account.project_merge", targetId: TARGET_ID, status: "success" },
     })).toBe(0)
+    await expectSingleFailedMergeAudit(admin.id, /active work/)
   })
 })
