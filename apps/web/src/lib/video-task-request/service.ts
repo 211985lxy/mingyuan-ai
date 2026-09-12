@@ -120,11 +120,12 @@ async function prepareSubmissionInputs(input: {
   scriptContent: string;
 }): Promise<{ idempotencyKey: string; shanjianPayload: Record<string, unknown> }> {
   const voiceSource = input.body.voiceSource === "own_voice" ? "own_voice" : "tts";
+  const ownVoiceVoiceId = typeof input.body.voiceId === "string" ? input.body.voiceId : null;
   const ownVoiceAudioUrl = await synthesizeOwnVoiceIfRequested({
     userId: input.userId,
     provider: input.provider,
     voiceSource,
-    voiceId: typeof input.body.voiceId === "string" ? input.body.voiceId : null,
+    voiceId: ownVoiceVoiceId,
     scriptContent: input.scriptContent,
   });
   const idempotencyKey = buildVideoTaskIdempotencyKey({
@@ -146,6 +147,7 @@ async function prepareSubmissionInputs(input: {
     scriptContent: input.scriptContent,
     aspectRatio: input.aspectRatio,
     ownVoiceAudioUrl,
+    ownVoiceVoiceId,
   });
   return { idempotencyKey, shanjianPayload };
 }

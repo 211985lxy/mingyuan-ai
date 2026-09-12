@@ -4,6 +4,7 @@ import { redis } from "@/lib/redis"
 import { withUserAuth } from "@/lib/user-auth"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { createVideoTask } from "@/lib/video-task-request/service"
+import { buildRetryPayload } from "@/lib/video-task-request/retry"
 import { VideoTaskRequestError } from "@/lib/video-task-request/contracts"
 import { normalizeDigitalHumanProvider } from "@/lib/digital-human-provider"
 
@@ -48,30 +49,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   // Rebuild from the immutable snapshot. Do not pass scriptId: a retry must
   // use the exact text that was originally submitted, even if the source
   // script has since been edited.
-  const retryPayload: Record<string, unknown> = {
-    type: task.videoType,
-    scriptContent: task.scriptContent,
-    avatarName: task.avatarName,
-    projectId: task.projectId ?? undefined,
-    aimGenerationId: task.aimGenerationId ?? undefined,
-    actionId: `retry:${task.id}:${Date.now()}`,
-    retryOfTaskId: task.id,
-  }
-
-  if (task.avatarId) {
-    retryPayload.avatarId = task.avatarId
-  }
-
-  // Re-use the recorded payload only for provider-neutral optional inputs.
-  if (task.shanjianPayload && typeof task.shanjianPayload === "object") {
-    const sp = task.shanjianPayload as Record<string, unknown>
-    if (sp.virtualmanId) retryPayload.virtualmanId = sp.virtualmanId
-    if (sp.speakerId) retryPayload.speakerId = sp.speakerId
-    if (sp.styleId) retryPayload.styleId = sp.styleId
-    if (sp.speakerExtra) retryPayload.speakerExtra = sp.speakerExtra
-    if (sp.processRules) retryPayload.processRules = sp.processRules
-    if (sp.aspectRatio === "16:9" || sp.aspectRatio === "9:16") retryPayload.aspectRatio = sp.aspectRatio
-  }
+  const retryPayload = buildRetryPayload(task)
 
   try {
     const result = await createVideoTask(
