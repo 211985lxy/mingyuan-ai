@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan integration contract probe every 6 hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00
+AccuracySec=5m
+Persistent=true
+Unit=mingyuan-cron-integration-probe.service
+
+[Install]
+WantedBy=timers.target

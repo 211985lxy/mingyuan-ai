@@ -80,3 +80,9 @@ jobs:
         run: pnpm --dir apps/web run db:bounds
       - name: Deterministic harness
         run: pnpm --dir apps/web run test:harness
+      # 构建门禁：push 到 main 时跑与 deploy-ecs-standalone.sh 同参的 production build，
+      # 堵住「悬空引用/类型坏点进 main 导致无法发版」（2026-09-11 feishu-knowledge 组件悬空引用事故）。
+      # PR 上跳过以控制时长（PR 阶段已有全量 tsc/test/arch 门禁）。
+      - name: Production build gate (main only)
+        if: github.event_name == 'push'
+        run: pnpm --dir apps/web exec next build --webpack
