@@ -198,6 +198,10 @@ async function probeAliyunSms() {
     Action: "QuerySmsSign",
     Format: "JSON",
     RegionId: "cn-hangzhou",
+    // QuerySmsSign 的 SignName 是必填项：漏传时阿里云返回
+    // 「MissingSignName SignName is mandatory for this action」，
+    // 会被下面判成 failed（而发送路径其实是好的）。
+    SignName: signName,
     SignatureMethod: "HMAC-SHA1",
     SignatureNonce: crypto.randomUUID(),
     SignatureVersion: "1.0",
