@@ -8,6 +8,7 @@ import {
 } from "@/lib/background-tasks"
 import { incrementIsolationMetric } from "@/lib/account-project-isolation-metrics"
 import { findBoundProjectForAccount, upsertProjectMembership } from "@/lib/project-membership"
+import { lockClientProjects } from "@/features/projects/services/project-row-lock"
 
 export type AccountProjectContextStatus =
   | "bound"
@@ -415,21 +416,7 @@ export async function bindAccountProject(options: {
   withinTransaction?: (tx: Prisma.TransactionClient) => Promise<void>
 }) {
   return prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({
-      where: { id: options.userId },
-      select: { boundProjectId: true },
-    })
-
-    if (!user) {
-      throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
-    }
-
-    if (user.boundProjectId && user.boundProjectId !== options.projectId) {
-      throw new AccountProjectContextError(
-        "ACCOUNT_ALREADY_BOUND",
-        "账号已经绑定其他项目，不能替换",
-      )
-    }
+    await lockClientProjects(tx, [options.projectId])
 
     const project = await tx.clientProject.findUnique({
       where: { id: options.projectId },
@@ -443,6 +430,22 @@ export async function bindAccountProject(options: {
       throw new AccountProjectContextError(
         "BOUND_PROJECT_UNAVAILABLE",
         "只能绑定 active 项目",
+      )
+    }
+
+    const user = await tx.user.findUnique({
+      where: { id: options.userId },
+      select: { boundProjectId: true },
+    })
+
+    if (!user) {
+      throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
+    }
+
+    if (user.boundProjectId && user.boundProjectId !== options.projectId) {
+      throw new AccountProjectContextError(
+        "ACCOUNT_ALREADY_BOUND",
+        "账号已经绑定其他项目，不能替换",
       )
     }
 
@@ -749,20 +752,7 @@ export async function repairAccountProjectBinding(options: {
   ) => Promise<void>
 }): Promise<AccountProjectRepairResult> {
   return prisma.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({
-      where: { id: options.userId },
-      select: { boundProjectId: true },
-    })
-    if (!user) {
-      throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
-    }
-    if (user.boundProjectId !== options.previousProjectId) {
-      throw new AccountProjectContextError(
-        "ACCOUNT_BINDING_CHANGED",
-        "账号绑定已变化，请重新预览后再执行",
-      )
-    }
-
+    await lockClientProjects(tx, [options.nextProjectId, ...(options.previousProjectId ? [options.previousProjectId] : [])])
     const target = await tx.clientProject.findUnique({
       where: { id: options.nextProjectId },
       select: { id: true, userId: true, name: true, status: true },
@@ -774,6 +764,20 @@ export async function repairAccountProjectBinding(options: {
       throw new AccountProjectContextError(
         "PROJECT_CONTEXT_MISMATCH",
         "项目不属于当前账号",
+      )
+    }
+
+    const user = await tx.user.findUnique({
+      where: { id: options.userId },
+      select: { boundProjectId: true },
+    })
+    if (!user) {
+      throw new AccountProjectContextError("ACCOUNT_NOT_FOUND", "账号不存在", 404)
+    }
+    if (user.boundProjectId !== options.previousProjectId) {
+      throw new AccountProjectContextError(
+        "ACCOUNT_BINDING_CHANGED",
+        "账号绑定已变化，请重新预览后再执行",
       )
     }
 
