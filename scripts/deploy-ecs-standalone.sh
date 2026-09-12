@@ -184,8 +184,11 @@ fi
 
 # 发布后外部集成探针：一次 curl 拉起全量集成探测（结果落 OperationalAlert + 飞书）。
 # 失败只告警不回滚——声音/数据类集成故障不阻断核心生成链。
+# 注意这里有两处取值坑，任一都会让探针恒定 403、再被下面的「非阻断」吞掉而静默失效：
+#   1) header 用单引号会阻止远端展开 $(...)，等于把字面量 `$(grep …)` 当 token 发出去；
+#   2) `cut -d= -f2` 会在密钥自带的 `=` 处截断（实测截掉 1 字符），必须用 `-f2-` 取到行尾。
 if [ "${SKIP_FISH_PROBE:-0}" != "1" ]; then
-  "${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 120 -H 'Authorization: Bearer \$(grep ^CRON_SECRET= /etc/mingyuan/mingyuan.env | cut -d= -f2)' http://127.0.0.1:3000/api/cron/integration-probe"     | tail -c 1200 || echo "WARNING: integration probe after deploy failed (非阻断)" >&2
+  "${SSH[@]}" "/usr/bin/curl --noproxy '*' --fail --silent --show-error --max-time 120 -H \"Authorization: Bearer \$(grep ^CRON_SECRET= /etc/mingyuan/mingyuan.env | cut -d= -f2-)\" http://127.0.0.1:3000/api/cron/integration-probe"     | tail -c 1200 || echo "WARNING: integration probe after deploy failed (非阻断)" >&2
 fi
 
 # 回读线上发布事实：releaseSha 必须等于本地 HEAD（经 SSH 内网，不依赖本机 DNS）。
