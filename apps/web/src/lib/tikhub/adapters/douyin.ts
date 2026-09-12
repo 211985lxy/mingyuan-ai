@@ -78,11 +78,24 @@ interface DouyinPostVideosData {
 
 interface DouyinVideoStatItem {
   aweme_id: string
-  statistics: DouyinVideoStatistics
+  /**
+   * fetch_multi_video_statistics 把计数放在条目**顶层**（实测 2026-09-11：
+   * { digg_count, play_count, share_count, download_count, aweme_id }），
+   * 不嵌套在 statistics 里；此处同时声明两种形状以便兼容不同响应版本。
+   */
+  digg_count?: number
+  play_count?: number
+  comment_count?: number
+  share_count?: number
+  collect_count?: number
+  statistics?: DouyinVideoStatistics
 }
 
 interface DouyinMultiVideoStatsData {
-  aweme_details: DouyinVideoStatItem[]
+  /** 实测字段名（2026-09-11 用真实 key 调 /api/v1/douyin/app/v3/fetch_multi_video_statistics 确认） */
+  statistics_list?: DouyinVideoStatItem[]
+  /** 兼容旧响应形状 */
+  aweme_details?: DouyinVideoStatItem[]
 }
 
 interface DouyinCommentItem {
@@ -299,13 +312,16 @@ export class DouyinAdapter implements PlatformAdapter {
             { aweme_ids: chunk.join(',') },
           )
 
-          for (const item of data.aweme_details ?? []) {
+          // statistics_list 是实测字段名；计数在条目顶层，statistics 嵌套为旧形状兼容。
+          const items = data.statistics_list ?? data.aweme_details ?? []
+          for (const item of items) {
+            const nested = item.statistics
             statsMap.set(item.aweme_id, {
-              views: item.statistics?.play_count ?? 0,
-              likes: item.statistics?.digg_count ?? 0,
-              comments: item.statistics?.comment_count ?? 0,
-              shares: item.statistics?.share_count ?? 0,
-              collects: item.statistics?.collect_count ?? 0,
+              views: item.play_count ?? nested?.play_count ?? 0,
+              likes: item.digg_count ?? nested?.digg_count ?? 0,
+              comments: item.comment_count ?? nested?.comment_count ?? 0,
+              shares: item.share_count ?? nested?.share_count ?? 0,
+              collects: item.collect_count ?? nested?.collect_count ?? 0,
             })
           }
         }
