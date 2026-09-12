@@ -20,6 +20,10 @@ export type PlatformSummaryResponse =
       accounts: PlatformAccount[]
       recentVideos: PlatformVideo[]
       fetchedAt: string
+      /** true=部分表读取失败（对应数组为空是「读不到」而非「没数据」），前端应提示而非空态误导 */
+      degraded?: boolean
+      /** 读取失败的表与原因摘要（stderr 根因，已脱敏） */
+      degradedReasons?: string[]
     }
 
 export const runtime = "nodejs"
@@ -33,30 +37,89 @@ function buildNotConfiguredResponse() {
   return NextResponse.json(response as unknown)
 }
 
-function buildLarkFetchTasks(baseToken: string, accountTableId?: string, videoTableId?: string) {
-  const t: Array<Promise<PlatformAccount[] | PlatformVideo[]>> = []
-  if (accountTableId) {
-    t.push(listLarkBaseRecords({ baseToken, tableId: accountTableId, limit: 20, offset: 0, identity: "bot" })
-      .then((rows) => rows.map(toPlatformAccount))
-      .catch((err) => { console.error("[data-platform] 账号表读取失败:", err?.message || err); return [] as PlatformAccount[] }),
-    )
-  } else { t.push(Promise.resolve([] as PlatformAccount[])) }
-  if (videoTableId) {
-    t.push(listLarkBaseRecords({ baseToken, tableId: videoTableId, limit: 20, offset: 0, identity: "bot" })
-      .then((rows) => rows.map(toPlatformVideo))
-      .catch((err) => { console.error("[data-platform] 视频表读取失败:", err?.message || err); return [] as PlatformVideo[] }),
-    )
-  } else { t.push(Promise.resolve([] as PlatformVideo[])) }
-  return t
+type LarkFailure = { table: string; code?: string; reason: string }
+type LarkRow = Awaited<ReturnType<typeof listLarkBaseRecords>>[number]
+
+/**
+ * 单表读取，失败重试一次（生产观测：飞书侧存在成簇的瞬时失败，2026-09-10/11
+ * 三天 18 次、当时连发复现 6/6 成功——一次退避重试可吸收绝大部分瞬断）。
+ * 失败必须落全量根因：LarkCliError.stderr 是唯一真实原因（此前只打 message=
+ * "Command failed"，18 次失败零诊断价值）。
+ */
+async function fetchTableRows(baseToken: string, tableId: string): Promise<LarkRow[]> {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await listLarkBaseRecords({ baseToken, tableId, limit: 20, offset: 0, identity: "bot" })
+    } catch (err) {
+      const code = (err as { code?: string }).code
+      const stderr = (err as { stderr?: string }).stderr
+      console.error(
+        `[data-platform] 飞书表读取失败(第${attempt}次): code=${code ?? "UNKNOWN"}`
+          + ` stderr=${JSON.stringify((stderr || "").slice(0, 400))}`,
+      )
+      if (attempt === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        continue
+      }
+      throw err
+    }
+  }
+  throw new Error("unreachable")
 }
 
-function buildSummaryResponse(accounts: PlatformAccount[], recentVideos: PlatformVideo[]) {
+function summarizeLarkFailure(err: unknown): string {
+  if (!(err instanceof Error)) return String(err).slice(0, 200)
+  // message 形如「飞书 base +record-list 执行失败：Command failed: …」，剥离无效前缀；
+  // stderr 才是真实原因（飞书 JSON 错误体）
+  const stderr = (err as { stderr?: string }).stderr?.replace(/\s+/g, " ").trim()
+  return (stderr || err.message.replace(/^.*执行失败：/, "")).slice(0, 200)
+}
+
+async function fetchTableMapped<T>(input: {
+  baseToken: string
+  tableId: string
+  tableLabel: string
+  mapRow: (row: LarkRow) => T
+}): Promise<{ mapped: T[]; failure?: LarkFailure }> {
+  try {
+    const rows = await fetchTableRows(input.baseToken, input.tableId)
+    return { mapped: rows.map(input.mapRow) }
+  } catch (err) {
+    return {
+      mapped: [],
+      failure: { table: input.tableLabel, code: (err as { code?: string }).code, reason: summarizeLarkFailure(err) },
+    }
+  }
+}
+
+function buildLarkFetchTasks(baseToken: string, accountTableId?: string, videoTableId?: string) {
+  const tasks: Array<Promise<{ mapped: Array<PlatformAccount | PlatformVideo>; failure?: LarkFailure }>> = []
+  if (accountTableId) {
+    tasks.push(fetchTableMapped({ baseToken, tableId: accountTableId, tableLabel: "账号表", mapRow: toPlatformAccount }))
+  } else { tasks.push(Promise.resolve({ mapped: [] })) }
+  if (videoTableId) {
+    tasks.push(fetchTableMapped({ baseToken, tableId: videoTableId, tableLabel: "视频表", mapRow: toPlatformVideo }))
+  } else { tasks.push(Promise.resolve({ mapped: [] })) }
+  return tasks
+}
+
+function buildSummaryResponse(
+  accounts: PlatformAccount[],
+  recentVideos: PlatformVideo[],
+  failures: LarkFailure[],
+) {
   const sorted = [...recentVideos].sort((a, b) => {
     const at = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
     const bt = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
     return bt - at
   })
-  const response: PlatformSummaryResponse = { status: "ok", accounts, recentVideos: sorted, fetchedAt: new Date().toISOString() }
+  const response: PlatformSummaryResponse = {
+    status: "ok",
+    accounts,
+    recentVideos: sorted,
+    fetchedAt: new Date().toISOString(),
+    ...(failures.length ? { degraded: true, degradedReasons: failures.map((f) => `${f.table}: ${f.reason}`) } : {}),
+  }
   return NextResponse.json(response as unknown)
 }
 
@@ -83,7 +146,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const tasks = buildLarkFetchTasks(baseToken, accountTableId, videoTableId)
-    const [accounts, recentVideos] = (await Promise.all(tasks)) as [PlatformAccount[], PlatformVideo[]]
-    return buildSummaryResponse(accounts, recentVideos)
+    const results = await Promise.all(tasks)
+    const failures = results.map((r) => r.failure).filter(Boolean) as LarkFailure[]
+    return buildSummaryResponse(results[0].mapped as PlatformAccount[], results[1].mapped as PlatformVideo[], failures)
   } catch (err) { return buildPlatformErrorResponse(err) }
 }
