@@ -106,4 +106,56 @@ describe("topic review card", () => {
     const buttons = actionButtons(buildTopicReviewCard({ selectionId: SELECTION_ID, cards: [], sources: [] }))
     expect(buttons.map((button) => button.text.content)).toEqual(["换一批", "都不行"])
   })
+
+  it("参考素材区：列出拆解原视频与对标账号主页，去重限量", () => {
+    const card = buildTopicReviewCard({
+      selectionId: SELECTION_ID,
+      cards: [topicCard("选题A", 90)],
+      sources: [
+        {
+          category: "benchmark_reference",
+          title: "拆解｜获客型视频",
+          content: "对标文案拆解信号\n来源：https://v.douyin.com/abc/",
+        },
+        {
+          category: "benchmark_reference",
+          title: "对标账号甲",
+          content: "已验证内容信号\n来源账号：https://example.com/jia\n1. 爆款｜赞1｜原片：https://www.douyin.com/video/vid1",
+        },
+        {
+          category: "benchmark_reference",
+          title: "拆解｜获客型视频",
+          content: "重复来源\n来源：https://v.douyin.com/abc/",
+        },
+        { category: "industry_hot", title: "热点不算参考素材", content: "来源：https://example.com/hot" },
+      ],
+    })
+    const markdown = (card.elements as Array<{ tag: string; text?: { content?: string } }>)
+      .filter((element) => element.tag === "div")
+      .map((element) => element.text?.content ?? "")
+      .join("\n")
+
+    expect(markdown).toContain("参考素材")
+    expect(markdown).toContain("[拆解｜获客型视频](https://v.douyin.com/abc/)")
+    expect(markdown).toContain("[对标账号甲｜爆款原片](https://www.douyin.com/video/vid1)")
+    expect(markdown).toContain("[对标账号甲｜账号主页](https://example.com/jia)")
+    // 重复链接只出现一次
+    expect(markdown.split("v.douyin.com/abc/").length - 1).toBe(1)
+    // 非对标来源不进参考素材
+    expect(markdown).not.toContain("example.com/hot")
+  })
+
+  it("无对标来源时不渲染参考素材区块", () => {
+    const card = buildTopicReviewCard({
+      selectionId: SELECTION_ID,
+      cards: [topicCard("选题A", 90)],
+      sources: [{ category: "industry_hot", title: "热点", content: "热点内容" }],
+    })
+    const markdown = (card.elements as Array<{ tag: string; text?: { content?: string } }>)
+      .filter((element) => element.tag === "div")
+      .map((element) => element.text?.content ?? "")
+      .join("\n")
+
+    expect(markdown).not.toContain("参考素材")
+  })
 })

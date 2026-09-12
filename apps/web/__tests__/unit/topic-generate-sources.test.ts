@@ -44,6 +44,33 @@ describe("topic generate sources", () => {
     expect(sources[0].content).toContain("来源账号：https://example.com/u")
   })
 
+  it("给热度最高的对标视频拼原片链接，其余不加", () => {
+    const sources = buildBenchmarkAccountSources([
+      {
+        nickname: "对标账号",
+        targetUrl: "https://example.com/u",
+        viralVideos: [{ videoId: "vid_hot", title: "爆款标题", likes: 100 }],
+        latestVideos: [{ videoId: "vid_new", title: "近期标题", likes: 10 }],
+      },
+    ])
+
+    expect(sources[0].content).toContain("原片：https://www.douyin.com/video/vid_hot")
+    expect(sources[0].content).not.toContain("vid_new")
+  })
+
+  it("无 videoId 时不拼链接（不产出死链）", () => {
+    const sources = buildBenchmarkAccountSources([
+      {
+        nickname: "对标账号",
+        targetUrl: "https://example.com/u",
+        viralVideos: [{ title: "无ID爆款", likes: 100 }],
+        latestVideos: [],
+      },
+    ])
+
+    expect(sources[0].content).not.toContain("原片：")
+  })
+
   it("builds benchmark sources from extracted copy analysis", () => {
     const sources = buildVideoCopyExtractionSources([
       {

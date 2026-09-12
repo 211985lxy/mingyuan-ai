@@ -67,6 +67,59 @@ function buildEvidenceLines(report: TopicDailyReport) {
     .map((group) => `**${group.label}**：${group.items.map((item) => item.title).join("、")}`)
 }
 
+export interface ReferenceLink {
+  label: string
+  url: string
+}
+
+/** 从来源文本里抓 `来源：URL` / `来源账号：URL` / `原片：URL` 行。 */
+function extractUrlLine(content: string, marker: string): string | null {
+  const match = content.match(new RegExp(`${marker}(https?://\\S+)`))
+  return match ? match[1] : null
+}
+
+/**
+ * 参考素材区：本批选题借鉴的原视频与对标账号，让人能点开原片对照。
+ * - 拆解文案的 `来源：URL` 是真实的对标原视频（最相关，排前）
+ * - 对标账号的 `来源账号：URL` 是账号主页；`原片：URL` 是其热度最高的作品
+ * 每类去重、限量，防止卡片无限拉长。
+ */
+export function extractReferenceLinks(sources: TopicDailyReportSource[]): ReferenceLink[] {
+  const links: ReferenceLink[] = []
+  const seen = new Set<string>()
+
+  for (const source of sources) {
+    if (source.category !== "benchmark_reference") continue
+    const original = extractUrlLine(source.content, "来源：")
+    if (original && !seen.has(original)) {
+      seen.add(original)
+      links.push({ label: source.title, url: original })
+    }
+  }
+  for (const source of sources) {
+    if (source.category !== "benchmark_reference") continue
+    for (const marker of ["原片：", "来源账号："] as const) {
+      const url = extractUrlLine(source.content, marker)
+      if (!url || seen.has(url)) continue
+      seen.add(url)
+      const label = marker === "原片："
+        ? `${source.title}｜爆款原片`
+        : `${source.title}｜账号主页`
+      links.push({ label, url })
+    }
+  }
+  return links.slice(0, 8)
+}
+
+function buildReferenceSection(links: ReferenceLink[]): Record<string, unknown> | null {
+  if (links.length === 0) return null
+  const lines = links.map((link) => `- [${link.label}](${link.url})`).join("\n")
+  return {
+    tag: "div",
+    text: { tag: "lark_md", content: `**参考素材**（点开原视频对照）\n${lines}` },
+  }
+}
+
 /** 采用按钮按候选序号铺开，另加「换一批」与「都不行」。 */
 function buildActionButtons(selectionId: string, candidateCount: number) {
   const base = { topic_selection_id: selectionId }
@@ -102,6 +155,8 @@ export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string
   const cards = input.cards.slice(0, TOPIC_REVIEW_CARD_LIMIT)
   const report = buildTopicDailyReport(toApiCards(input.cards), input.briefingItems ?? [], "daily", input.sources)
   const evidenceLines = buildEvidenceLines(report)
+  const referenceLinks = extractReferenceLinks(input.sources)
+  const referenceSection = buildReferenceSection(referenceLinks)
 
   return {
     config: { wide_screen_mode: true },
@@ -138,6 +193,7 @@ export function buildTopicReviewCard(input: TopicReviewCardInput): Record<string
             },
           ]
         : []),
+      ...(referenceSection ? [{ tag: "hr" }, referenceSection] : []),
       { tag: "action", actions: buildActionButtons(input.selectionId, cards.length) },
       {
         tag: "note",
