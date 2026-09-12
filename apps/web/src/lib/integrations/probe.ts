@@ -10,6 +10,7 @@
  */
 
 import { env } from "@/env"
+import { createHmac } from "node:crypto"
 import { getProviderConfigs } from "@/lib/llm/config"
 import { listRoutedModelTargets } from "@/lib/llm/agent-router"
 import { getAliyunNlsToken } from "@/lib/aliyun-asr"
@@ -181,6 +182,98 @@ async function probeFishAudio() {
   return { status: "healthy" as const }
 }
 
+// ── 阿里云短信：QuerySmsSign 只读探测（不发短信、不计费）。
+//    RAM 当前只授了 SendSms——未授权 QuerySmsSign 时报「待授权」而非故障，
+//    实际发送路径（SendSms 已授权）不受影响。 ──
+
+async function probeAliyunSms() {
+  const accessKeyId = env.ALIYUN_SMS_ACCESS_KEY_ID
+  const accessKeySecret = env.ALIYUN_SMS_ACCESS_KEY_SECRET
+  const signName = env.SMS_SIGN_NAME
+  if (!accessKeyId || !accessKeySecret || !signName) {
+    return { status: "unconfigured" as const, detail: "ALIYUN_SMS_* / SMS_SIGN_NAME 未配置" }
+  }
+  const params: Record<string, string> = {
+    AccessKeyId: accessKeyId,
+    Action: "QuerySmsSign",
+    Format: "JSON",
+    RegionId: "cn-hangzhou",
+    SignatureMethod: "HMAC-SHA1",
+    SignatureNonce: crypto.randomUUID(),
+    SignatureVersion: "1.0",
+    Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    Version: "2017-05-25",
+  }
+  const canonicalized = Object.keys(params).sort()
+    .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(params[key]!)}`)
+    .join("&")
+  params.Signature = createHmac("sha1", `${accessKeySecret}&`)
+    .update(`POST&${encodeURIComponent("/")}&${encodeURIComponent(canonicalized)}`, "utf8")
+    .digest("base64")
+  const body = Object.entries(params)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v!)}`)
+    .join("&")
+  const response = await fetch("https://dysmsapi.aliyuncs.com", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    signal: AbortSignal.timeout(20_000),
+  })
+  const result = (await response.json().catch(() => null)) as { Code?: string; Message?: string } | null
+  if (response.ok && result?.Code === "OK") return { status: "healthy" as const }
+  const code = result?.Code ?? `HTTP ${response.status}`
+  if (/forbidden|denied|nopermission|not.?authorized|isnotexist/i.test(code)) {
+    return {
+      status: "degraded" as const,
+      detail: `RAM 尚未授权 QuerySmsSign 只读权限（${code}）——探针待授权；实际发码路径（SendSms）不受影响`,
+    }
+  }
+  return { status: "failed" as const, detail: `${code} ${result?.Message ?? ""}`.trim().slice(0, 160) }
+}
+
+// ── 飞书多 bot：逐个验证 tenant_access_token（零成本）；联动报告后台任务开关 ──
+
+async function probeFeishuBots() {
+  const apps: Array<{ label: string; appId?: string; secret?: string }> = [
+    { label: "主应用", appId: env.FEISHU_APP_ID, secret: env.FEISHU_APP_SECRET },
+    { label: "content_producer", appId: env.FEISHU_BOT_CONTENT_PRODUCER_APP_ID, secret: env.FEISHU_BOT_CONTENT_PRODUCER_APP_SECRET },
+    { label: "work_editor", appId: env.FEISHU_BOT_WORK_EDITOR_APP_ID, secret: env.FEISHU_BOT_WORK_EDITOR_APP_SECRET },
+    { label: "biz_diagnosis", appId: env.FEISHU_BOT_BIZ_DIAGNOSIS_APP_ID, secret: env.FEISHU_BOT_BIZ_DIAGNOSIS_APP_SECRET },
+    { label: "topic_planner", appId: env.FEISHU_BOT_TOPIC_PLANNER_APP_ID, secret: env.FEISHU_BOT_TOPIC_PLANNER_APP_SECRET },
+    { label: "content_review", appId: env.FEISHU_BOT_CONTENT_REVIEW_APP_ID, secret: env.FEISHU_BOT_CONTENT_REVIEW_APP_SECRET },
+  ]
+  const configured = apps.filter((app) => app.appId && app.secret)
+  if (!configured.length) return { status: "unconfigured" as const, detail: "未配置任何飞书应用凭证" }
+
+  const verdicts = await Promise.all(configured.map(async (app) => {
+    try {
+      const response = await fetch("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ app_id: app.appId, app_secret: app.secret }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      const body = (await response.json().catch(() => null)) as { code?: number; msg?: string } | null
+      return { label: app.label, ok: response.ok && body?.code === 0, detail: `code=${body?.code ?? response.status}` }
+    } catch (error) {
+      return { label: app.label, ok: false, detail: error instanceof Error ? error.message.slice(0, 80) : "network" }
+    }
+  }))
+  const broken = verdicts.filter((v) => !v.ok)
+  const backgroundTasks = env.BACKGROUND_TASKS_ENABLED === "true"
+  if (broken.length) {
+    return {
+      status: "failed" as const,
+      detail: `bot 凭证失效：${broken.map((v) => `${v.label}(${v.detail})`).join("、")}`
+        + `；BACKGROUND_TASKS_ENABLED=${backgroundTasks}`,
+    }
+  }
+  return {
+    status: "healthy" as const,
+    detail: `${verdicts.length} 个应用凭证全部有效；BACKGROUND_TASKS_ENABLED=${backgroundTasks}`,
+  }
+}
+
 export const INTEGRATION_PROBES: IntegrationProbe[] = [
   { name: "ali-oss", critical: true, run: probeAliyunOss },
   { name: "tikhub", critical: true, run: probeTikhub },
@@ -190,6 +283,8 @@ export const INTEGRATION_PROBES: IntegrationProbe[] = [
   { name: "siliconflow-embedding", critical: false, run: probeSiliconflow },
   { name: "llm-env-drift", critical: true, run: probeLlmEnvDrift },
   { name: "fish-audio", critical: true, run: probeFishAudio },
+  { name: "aliyun-sms", critical: false, run: probeAliyunSms },
+  { name: "feishu-bots", critical: true, run: probeFeishuBots },
 ]
 
 export async function runIntegrationProbes(): Promise<IntegrationProbeResult[]> {
