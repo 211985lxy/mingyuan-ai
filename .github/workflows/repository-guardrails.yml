@@ -14,6 +14,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# 分工（2026-09-13 用量排查后调整）：
+#   PR  → 全量：单测/覆盖、DB E2E、构件与契约门禁（合并前必须全绿）
+#   main→ 快速完整性 + 生产构建门禁：
+#         保留 install/prisma/lint/typecheck/env:check/api:contracts/arch:*/db:bounds
+#         以及 main 独有的 production build（堵 2026-09-11 飞书组件悬空引用无法发版事故）
+#         跳过 test:coverage / test:e2e：同一 tree 已在 PR 阶段跑过，属重复计费
+#   手动触发(workflow_dispatch)按全量跑：测试 + 构建都执行
+#   代价（已知并接受才启用）：直接推 main 的提交、以及基线过期后再合并的 tree，
+#   将不再跑单测与 E2E，仅由 typecheck/arch/契约与生产构建兜底。
+
 jobs:
   quality:
     name: Lint, types, tests, architecture, and harness
@@ -60,6 +70,7 @@ jobs:
       - name: Validate Prisma schema
         run: pnpm --dir apps/web exec prisma validate
       - name: Prepare test database
+        if: github.event_name != 'push'  # 仅 main 推送时跳过：同一 tree 已在 PR 阶段全量跑过
         run: pnpm --dir apps/web run test:e2e:prepare
       - name: Lint
         run: pnpm --dir apps/web exec eslint --quiet .
@@ -68,9 +79,10 @@ jobs:
       - name: Typecheck tests
         run: pnpm --dir apps/web run typecheck:tests
       - name: Unit and evaluation tests
+        if: github.event_name != 'push'  # 仅 main 推送时跳过：同一 tree 已在 PR 阶段全量跑过
         run: pnpm --dir apps/web run test:coverage
       - name: Upload unit coverage baseline
-        if: always()
+        if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
           name: unit-coverage
@@ -78,6 +90,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
       - name: Database E2E tests
+        if: github.event_name != 'push'  # 仅 main 推送时跳过：同一 tree 已在 PR 阶段全量跑过
         run: pnpm --dir apps/web run test:e2e
       - name: Environment contract
         run: pnpm --dir apps/web run env:check
@@ -99,5 +112,5 @@ jobs:
       # 堵住「悬空引用/类型坏点进 main 导致无法发版」（2026-09-11 feishu-knowledge 组件悬空引用事故）。
       # PR 上跳过以控制时长（PR 阶段已有全量 tsc/test/arch 门禁）。
       - name: Production build gate (main only)
-        if: github.event_name == 'push'
+        if: github.event_name != 'pull_request'
         run: pnpm --dir apps/web exec next build --webpack
