@@ -1,4 +1,5 @@
-import { retrieveRelevantKnowledge, ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
+import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
+import { retrieveKnowledgeWithGraph } from "@/lib/aim/knowledge-graph-retrieval"
 import type { ScoredKnowledgeEntry } from "@/lib/llm/embeddings"
 import { parseKnowledgeTags, normalizeValueGrade } from "@/lib/knowledge-tags"
 import {
@@ -163,8 +164,10 @@ export async function buildAimKnowledgeContext(
   // 把策略加权的类别转成检索预过滤白名单，下推到 SQL 缩窄候选
   const boostCategories = categoriesFromBoost(profile.categoryBoost)
 
-  // 1. 语义检索
-  const retrieved = await retrieveRelevantKnowledge({
+  // 1. 语义检索 +（灰度开启时）知识图谱一跳扩展
+  //    图谱扩展默认关（AIM_KNOWLEDGE_GRAPH_ENABLED）：先用基线 CLI 量化提升幅度，
+  //    达标（hitRate@k 相对提升 ≥10%）再开会放量——见 docs/plans 的 A5 设计记录。
+  const retrieved = await retrieveKnowledgeWithGraph({
     userId,
     projectId,
     query,

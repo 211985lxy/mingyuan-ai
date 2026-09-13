@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs"
 import { join } from "node:path"
 
-import { retrieveRelevantKnowledge } from "../src/lib/llm/embeddings"
+import { retrieveKnowledgeWithGraph } from "../src/lib/aim/knowledge-graph-retrieval"
 import { prisma } from "../src/lib/prisma"
 import {
   runRetrievalEval,
@@ -23,7 +23,7 @@ interface CasesFile {
   cases: RetrievalCase[]
 }
 
-function readArgs(): { userId: string; projectId: string; out: string } {
+function readArgs(): { userId: string; projectId: string; out: string; graph: boolean } {
   const args = process.argv.slice(2)
   function readFlag(name: string): string | undefined {
     const index = args.indexOf(`--${name}`)
@@ -32,19 +32,20 @@ function readArgs(): { userId: string; projectId: string; out: string } {
   const userId = readFlag("userId")
   const projectId = readFlag("projectId")
   if (!userId || !projectId) {
-    console.error("用法：tsx scripts/aim-retrieval-baseline.ts --userId <uid> --projectId <pid> [--out docs/reports]")
+    console.error("用法：tsx scripts/aim-retrieval-baseline.ts --userId <uid> --projectId <pid> [--out docs/reports] [--graph]")
     process.exit(1)
   }
-  return { userId, projectId, out: readFlag("out") ?? "docs/reports" }
+  return { userId, projectId, out: readFlag("out") ?? "docs/reports", graph: args.includes("--graph") }
 }
 
-function renderReport(args: { userId: string; projectId: string }, aggregate: RetrievalEvalAggregate, topK: number): string {
+function renderReport(args: { userId: string; projectId: string }, aggregate: RetrievalEvalAggregate, topK: number, graphEnabled: boolean): string {
   const lines: string[] = []
   lines.push("# AIM 检索质量基线报告（WP-A5）")
   lines.push("")
   lines.push(`- 运行时间：${new Date().toISOString()}`)
   lines.push(`- 范围：userId=${args.userId} projectId=${args.projectId}（含全局知识）`)
   lines.push(`- topK：${topK}`)
+  lines.push(`- 知识图谱扩展：${graphEnabled ? "开（A5 第二步）" : "关（纯向量基线）"}`)
   lines.push("")
   lines.push("| 指标 | 数值 |")
   lines.push("| --- | --- |")
@@ -87,12 +88,18 @@ async function main(): Promise<void> {
   }
 
   const aggregate = await runRetrievalEval(cases, parsed.topK, (query, topK) =>
-    retrieveRelevantKnowledge({ userId: args.userId, projectId: args.projectId, query, topK }).then((result) =>
+    retrieveKnowledgeWithGraph({
+      userId: args.userId,
+      projectId: args.projectId,
+      query,
+      topK,
+      graphEnabled: args.graph,
+    }).then((result) =>
       result.entries.map((entry) => ({ id: entry.id, title: entry.title, content: entry.content })),
     ),
   )
 
-  const markdown = renderReport(args, aggregate, parsed.topK)
+  const markdown = renderReport(args, aggregate, parsed.topK, args.graph)
   process.stdout.write(`${markdown}\n`)
   if (existsSync(args.out)) {
     const filename = `aim-retrieval-baseline-${new Date().toISOString().slice(0, 10)}.md`
