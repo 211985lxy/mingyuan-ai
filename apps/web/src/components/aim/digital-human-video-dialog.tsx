@@ -15,6 +15,12 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { createVideoTask, getVideoTask, listAvatars } from "@/lib/api/client"
+import {
+  listPublicDigitalPersons,
+  type PublicDigitalPersonList,
+  type PublicDigitalPersonOption,
+} from "@/lib/api/digital-human"
+import { AvatarPicker, PublicPersonPicker } from "@/components/aim/digital-human-person-pickers"
 import { fetchVoiceModels, type VoiceModelOption } from "@/lib/api/voice"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ApiAvatar, ApiVideoTask } from "@/types/api"
@@ -50,6 +56,10 @@ export function DigitalHumanVideoDialog({
   const [avatars, setAvatars] = useState<ApiAvatar[]>([])
   const [loadingAvatars, setLoadingAvatars] = useState(false)
   const [selectedAvatarId, setSelectedAvatarId] = useState<string>("")
+  const [avatarSource, setAvatarSource] = useState<"mine" | "public">("mine")
+  const [publicPersons, setPublicPersons] = useState<PublicDigitalPersonList | null>(null)
+  const [loadingPublic, setLoadingPublic] = useState(false)
+  const [selectedPublic, setSelectedPublic] = useState<PublicDigitalPersonOption | null>(null)
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16")
   const [voiceSource, setVoiceSource] = useState<"tts" | "own_voice">("tts")
   const [fishVoices, setFishVoices] = useState<VoiceModelOption[]>([])
@@ -63,6 +73,9 @@ export function DigitalHumanVideoDialog({
     () => avatars.filter((item) => item.status === "ready"),
     [avatars],
   )
+  const publicVoiceId =
+    selectedPublic?.defaultVoiceId
+    ?? (publicPersons?.status === "ok" ? publicPersons.fallbackVoiceId : null)
   const speechSeconds = estimateSpeechSeconds(script)
   const tooLong = script.replace(/\s+/g, "").length > MAX_SCRIPT_CHARS
 
@@ -74,6 +87,8 @@ export function DigitalHumanVideoDialog({
     setAspectRatio("9:16")
     setVoiceSource("tts")
     setFishVoiceId("default")
+    setAvatarSource("mine")
+    setSelectedPublic(null)
     if (!projectId) {
       setAvatars([])
       setLoadingAvatars(false)
@@ -85,6 +100,8 @@ export function DigitalHumanVideoDialog({
         setAvatars(rows)
         const firstReady = rows.find((item) => item.status === "ready")
         if (firstReady) setSelectedAvatarId(firstReady.id)
+        // 没有自建数字人时直接引导到公共数字人，避免用户卡在「先去克隆」
+        else setAvatarSource("public")
       })
       .catch((error) => {
         toast.error(error instanceof Error ? error.message : "数字人列表加载失败")
@@ -92,6 +109,22 @@ export function DigitalHumanVideoDialog({
       })
       .finally(() => setLoadingAvatars(false))
   }, [open, initialScript, projectId])
+
+  useEffect(() => {
+    if (!open || avatarSource !== "public" || publicPersons) return
+    // 切到公共数字人时置加载态：与上方列表同属预期的首屏行为（仓库惯例 warn 放行）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoadingPublic(true)
+    void listPublicDigitalPersons()
+      .then(setPublicPersons)
+      .catch((error: unknown) =>
+        setPublicPersons({
+          status: "error",
+          message: error instanceof Error ? error.message : "读取公共数字人失败",
+        }),
+      )
+      .finally(() => setLoadingPublic(false))
+  }, [open, avatarSource, publicPersons])
 
   useEffect(() => {
     if (!task || !["pending", "processing"].includes(task.status)) return
@@ -122,7 +155,16 @@ export function DigitalHumanVideoDialog({
       toast.error("请先确认口播文案")
       return
     }
-    if (!selectedAvatarId) {
+    if (avatarSource === "public") {
+      if (!selectedPublic) {
+        toast.error("请选择一个公共数字人")
+        return
+      }
+      if (!publicVoiceId) {
+        toast.error("该形象暂无可用音色，请稍后重试或换一个形象")
+        return
+      }
+    } else if (!selectedAvatarId) {
       toast.error("请选择一个可用数字人")
       return
     }
@@ -141,7 +183,10 @@ export function DigitalHumanVideoDialog({
         type: "virtualman_broadcast",
         projectId,
         aimGenerationId: aimGenerationId ?? undefined,
-        avatarId: selectedAvatarId,
+        // 公共数字人直接带供应商的形象与音色 id；自建数字人走 avatarId
+        ...(avatarSource === "public"
+          ? { virtualmanId: selectedPublic!.id, speakerId: publicVoiceId!, avatarName: selectedPublic!.name }
+          : { avatarId: selectedAvatarId }),
         scriptContent: cleaned,
         aspectRatio,
         ...(voiceSource === "own_voice"
@@ -175,40 +220,39 @@ export function DigitalHumanVideoDialog({
           ) : null}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">选择数字人</p>
-              <Link href="/assets" className="text-xs text-primary underline-offset-2 hover:underline">
-                去资产库创建
-              </Link>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">数字人来源</p>
+                {avatarSource === "mine" ? (
+                  <Link href="/assets" className="text-xs text-primary underline-offset-2 hover:underline">
+                    去资产库创建
+                  </Link>
+                ) : null}
+              </div>
             </div>
-            {loadingAvatars ? (
-              <p className="text-sm text-muted-foreground">加载中…</p>
-            ) : readyAvatars.length === 0 ? (
-              <div className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                还没有可用数字人。请先到资产库完成克隆（状态为「可用」）。
-              </div>
+            <Select
+              value={avatarSource}
+              onValueChange={(value) => value && setAvatarSource(value as "mine" | "public")}
+            >
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mine">我的数字人（需先在资产库克隆）</SelectItem>
+                <SelectItem value="public">公共数字人（无需克隆，可直接出片）</SelectItem>
+              </SelectContent>
+            </Select>
+            {avatarSource === "public" ? (
+              <PublicPersonPicker
+                state={publicPersons}
+                loading={loadingPublic}
+                selectedId={selectedPublic?.id ?? ""}
+                onSelect={setSelectedPublic}
+              />
             ) : (
-              <div className="grid max-h-40 gap-2 overflow-y-auto sm:grid-cols-2">
-                {readyAvatars.map((avatar) => {
-                  const selected = avatar.id === selectedAvatarId
-                  return (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      onClick={() => setSelectedAvatarId(avatar.id)}
-                      className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
-                        selected
-                          ? "border-primary bg-primary/5"
-                          : "hover:border-primary/40"
-                      }`}
-                    >
-                      <p className="font-medium">{avatar.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {avatar.speakerName || "已绑定声音"}
-                      </p>
-                    </button>
-                  )
-                })}
-              </div>
+              <AvatarPicker
+                avatars={readyAvatars}
+                loading={loadingAvatars}
+                selectedId={selectedAvatarId}
+                onSelect={setSelectedAvatarId}
+              />
             )}
           </div>
 

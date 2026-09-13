@@ -50,6 +50,8 @@ export function buildVideoTaskIdempotencyKey(input: {
   provider: "chanjing" | "shanjian";
   actionId?: string | null;
   voiceSource?: string | null;
+  /** 公共数字人无 DB 记录，用供应商形象 id 参与去重；缺省不参与，保持既有键不变 */
+  publicPersonId?: string | null;
 }): string {
   const canonical = JSON.stringify({
     userId: input.userId,
@@ -61,6 +63,8 @@ export function buildVideoTaskIdempotencyKey(input: {
     provider: input.provider,
     actionId: input.actionId ?? null,
     voiceSource: input.voiceSource ?? "tts",
+    // 仅公共数字人追加该字段：不加进无条件项，避免改变既有任务的幂等键
+    ...(input.publicPersonId ? { publicPersonId: input.publicPersonId } : {}),
   });
   return createHash("sha256").update(canonical).digest("hex");
 }

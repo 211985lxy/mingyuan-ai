@@ -133,6 +133,8 @@ async function prepareSubmissionInputs(input: {
     projectId: input.projectId,
     aimGenerationId: input.aimGenerationId,
     avatarId: input.avatar?.id === "public" ? null : input.avatar?.id ?? null,
+    // 公共数字人靠供应商形象 id 区分，否则换形象会被判成同一单
+    publicPersonId: input.avatar?.id === "public" ? input.avatar.externalVirtualmanId : null,
     scriptContent: input.scriptContent,
     aspectRatio: input.aspectRatio,
     provider: input.provider,

@@ -3721,6 +3721,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/digital-human/public-persons",
+      "file": "src/app/api/digital-human/public-persons/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "digital-human",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/douyin-hot",
       "file": "src/app/api/douyin-hot/route.ts",
       "methods": [
