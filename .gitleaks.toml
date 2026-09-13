@@ -1,0 +1,39 @@
+# gitleaks 配置
+#
+# 用途：豁免**已逐条核实为假阳性**的既有命中。不针对任何真实密钥放宽检测。
+#
+# 背景：2026-09-13 PR #53 的密钥扫描命中 3 处，全部为假阳性：
+#   1) apps/web/__tests__/e2e/chanjing-live-fire.test.ts
+#      进程内假蝉镜服务器的固定夹具值（前缀 e2e-，不连任何真实供应商）
+#   2) apps/web/.env.example
+#      CHANJING_WEBHOOK_SECRET="" —— 值为空字符串的占位声明
+#
+# ⚠️ 刻意只使用 regexTarget="match" 的**字面量正则**，不使用 paths 条件：
+# gitleaks 的 allowlist 各条件之间是「或」语义，一旦按路径豁免，
+# 该路径下的**真实密钥也会被一并放过**（已实测确认）。
+# 因此豁免粒度必须落到具体字符串，不能落到文件。
+#
+# 复核方式（每次改动本文件后请重跑）：
+#   1) 确认原 3 处命中消失；
+#   2) 在 chan_jing 测试文件内植入一枚形似真实密钥的字符串，确认**仍被拦截**。
+[extend]
+useDefault = true
+
+[allowlist]
+description = "已验证的假阳性：e2e 假供应商夹具值；.env 示例中的空值占位"
+regexTarget = "match"
+regexes = [
+  # e2e 假供应商夹具值（仅供进程内 fake vendor 使用）
+  '''e2e-chanjing-secret''',
+  '''e2e-chanjing-app''',
+  '''e2e-chanjing-webhook-secret''',
+  '''e2e-ownvoice-secret''',
+  '''e2e-ownvoice-app''',
+  # .env / .env.example 中值为空的占位声明：KEY="" 或 KEY=''
+  # 不带锚点：generic-api-key 在空值场景下会把**变量名**当作 secret 上报，
+  # 锚定行首行尾会失配（已实测）。
+  # 注意引号：TOML 字面串用 ''' 定界，串内不能再出现 '''；
+  # 含双引号的正则用单引号定界，含单引号的正则用双引号定界。
+  '[A-Z][A-Z0-9_]+=""',
+  "[A-Z][A-Z0-9_]+=''",
+]
