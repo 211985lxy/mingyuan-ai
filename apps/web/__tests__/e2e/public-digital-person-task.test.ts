@@ -131,7 +131,10 @@ describe("公共数字人下单（不走克隆，无需授权文案）", () => {
   it("切换公共形象即视为不同订单", async () => {
     const first = await POST(userReq("/api/tasks", { method: "POST", body: publicBody() }), undefined as never)
     const firstId = (await json(first)).data.id
-    // 首个任务会占用供应商并发槽，且无 webhook 释放（生产由回调/校准回收）
+    // 计划级并发上限按「在途任务」计算：把首单置为完成，才允许提交第二单
+    // （生产中等同于首个视频已出片；仓库既有 e2e 亦用同一手法）
+    await prisma.videoTask.update({ where: { id: firstId }, data: { status: "completed" } })
+    // 供应商并发槽也不会自动释放（无 webhook），生产由回调/校准回收
     await releaseProviderSlot("chanjing")
 
     const second = await POST(
