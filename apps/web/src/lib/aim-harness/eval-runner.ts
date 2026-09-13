@@ -126,7 +126,7 @@ export interface EvalRunReport {
 }
 
 const RUBRIC_PASS_THRESHOLD = 70
-const PROVIDER_EMPTY_BODY = /未能返回完整正文|模型服务暂时未能返回/
+const PROVIDER_EMPTY_BODY = /未能返回完整正文|模型服务暂时未能返回|没有满足你当前的要求，未作为正式成稿/
 
 function isRetryableEvalError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)

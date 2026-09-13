@@ -1,6 +1,6 @@
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
-import { inspectAimDeliveryCandidate } from "@/lib/aim/output-delivery-gate"
+import { collectDeliveryMetaLeakLines, inspectAimDeliveryCandidate } from "@/lib/aim/output-delivery-gate"
 import {
   detectSpokenChainOfThoughtLeakage,
   extractSpokenFinalDraft,
@@ -61,7 +61,10 @@ export function inspectDeliveryContent(input: {
   const protocol = inspectAimDeliveryCandidate({ contents: { [input.format]: body } })
   if (!protocol.passed) {
     if (protocol.code === "empty_final_content") violations.add("missing_final_content")
-    else violations.add("prompt_leak")
+    else {
+      violations.add("prompt_leak")
+      leakedLines.push(...collectDeliveryMetaLeakLines(body))
+    }
   }
 
   for (const line of body.split(/\r?\n/)) {

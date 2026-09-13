@@ -71,6 +71,31 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(report.results[0]?.error).toBeUndefined()
   })
 
+  it("retries a real-model case once when delivery is rejected as unfinished", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          throw new Error("生成结果没有满足你当前的要求，未作为正式成稿交付。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "重试后交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_delivery_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+  })
+
   it("reports 100% contract pass rate across all fixtures (no model)", async () => {
     const report = await runEvalSuite(ALL_FIXTURES, createFrozenContextAdapter(), {
       skipRubric: true,

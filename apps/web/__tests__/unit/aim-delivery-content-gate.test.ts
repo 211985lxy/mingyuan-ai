@@ -88,6 +88,21 @@ ${CLEAN}
       expect(result.passed, format).toBe(false)
     }
   })
+
+  it("puts analysis-plan lines into leakedLines so retry can name the fake script", () => {
+    const result = inspectDeliveryContent({
+      format: "video_script",
+      content: "本轮输入只锁定了结构，缺口位置已如实标注。\n1. 目标判定\n- businessGoal：lead\n\n这里没有可拍的口播。",
+      intent: unsetIntent,
+    })
+    expect(result.passed).toBe(false)
+    if (!result.passed) {
+      expect(result.violations).toContain("prompt_leak")
+      expect(result.leakedLines.some((line) => line.includes("只锁定了结构"))).toBe(true)
+      expect(result.leakedLines.some((line) => line.includes("目标判定"))).toBe(true)
+      expect(result.leakedLines.some((line) => line.includes("businessGoal"))).toBe(true)
+    }
+  })
 })
 
 describe("applyDeliveryContentGate", () => {
