@@ -92,9 +92,14 @@ export interface OutcomeAutofetchStore {
   getBoundProjectId?(userId: string): Promise<string | null>
 }
 
+/**
+ * 当前该写入哪一个采集窗口。
+ * T+1 起（稿件发布时间已过）写入 7 日窗口，每天覆盖更新到满 14 天；
+ * 满 14 天改写 14 日行，满 30 天改写 30 日行。后期快照不回填进更早窗口。
+ */
 export function resolveCollectWindowDay(publishedAt: Date, now: Date): CollectWindowDay | null {
+  if (publishedAt.getTime() > now.getTime()) return null
   const ageDays = Math.floor((now.getTime() - publishedAt.getTime()) / DAY_MS)
-  if (ageDays < 7) return null
   if (ageDays < 14) return 7
   if (ageDays < 30) return 14
   return 30

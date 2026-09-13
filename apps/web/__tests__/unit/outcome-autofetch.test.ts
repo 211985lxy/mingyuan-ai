@@ -101,8 +101,11 @@ describe("classifyPublishedWorkKey", () => {
 })
 
 describe("resolveCollectWindowDay", () => {
-  it("returns null before day 7, then 7 / 14 / 30 without backfilling a later snapshot into an earlier window", () => {
-    expect(resolveCollectWindowDay(new Date(NOW.getTime() - 6 * DAY), NOW)).toBeNull()
+  it("writes the 7-day window from T+1, then 14 / 30, without backfilling a later snapshot into an earlier window", () => {
+    expect(resolveCollectWindowDay(new Date(NOW.getTime() + DAY), NOW)).toBeNull()
+    expect(resolveCollectWindowDay(NOW, NOW)).toBe(7)
+    expect(resolveCollectWindowDay(new Date(NOW.getTime() - 1 * DAY), NOW)).toBe(7)
+    expect(resolveCollectWindowDay(new Date(NOW.getTime() - 6 * DAY), NOW)).toBe(7)
     expect(resolveCollectWindowDay(new Date(NOW.getTime() - 7 * DAY), NOW)).toBe(7)
     expect(resolveCollectWindowDay(new Date(NOW.getTime() - 13 * DAY), NOW)).toBe(7)
     expect(resolveCollectWindowDay(new Date(NOW.getTime() - 14 * DAY), NOW)).toBe(14)
@@ -133,10 +136,22 @@ describe("runOutcomeAutofetch", () => {
     expect(store.upserts[0]).not.toHaveProperty("revenue")
   })
 
-  it("skips generations younger than 7 days", async () => {
+  it("upserts the 7-day window for posts published yesterday", async () => {
     const store = createStore({
       listPublishedGenerations: async () => [
-        gen({ id: "g-new", publishedAt: new Date(NOW.getTime() - 2 * DAY) }),
+        gen({ id: "g-new", publishedAt: new Date(NOW.getTime() - 1 * DAY) }),
+      ],
+    })
+    const summary = await runOutcomeAutofetch({ store, now: NOW, resolveShortUrl: async (url) => url })
+    expect(summary.upserted).toBe(1)
+    expect(summary.tooEarly).toBe(0)
+    expect(store.upserts[0]).toMatchObject({ generationId: "g-new", collectWindowDay: 7 })
+  })
+
+  it("skips generations dated in the future", async () => {
+    const store = createStore({
+      listPublishedGenerations: async () => [
+        gen({ id: "g-future", publishedAt: new Date(NOW.getTime() + DAY) }),
       ],
     })
     const summary = await runOutcomeAutofetch({ store, now: NOW, resolveShortUrl: async (url) => url })
