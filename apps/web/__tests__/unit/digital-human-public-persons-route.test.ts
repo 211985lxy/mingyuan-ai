@@ -8,6 +8,9 @@ const m = vi.hoisted(() => ({
   getDigitalHumanProvider: vi.fn(() => "chanjing"),
   listCommonDigitalPersons: vi.fn(),
   listCommonAudio: vi.fn(),
+  isHeygenConfigured: vi.fn(() => true),
+  listAvatars: vi.fn(),
+  listVoices: vi.fn(),
 }))
 
 vi.mock("@/lib/user-auth", () => ({
@@ -21,6 +24,11 @@ vi.mock("@/lib/digital-human-provider", () => ({
 vi.mock("@/lib/chanjing-audio", () => ({
   listCommonDigitalPersons: m.listCommonDigitalPersons,
   listCommonAudio: m.listCommonAudio,
+}))
+vi.mock("@/lib/heygen", () => ({
+  isHeygenConfigured: m.isHeygenConfigured,
+  listAvatars: m.listAvatars,
+  listVoices: m.listVoices,
 }))
 
 import { GET } from "@/app/api/digital-human/public-persons/route"
@@ -36,6 +44,9 @@ beforeEach(() => {
   m.getDigitalHumanProvider.mockReturnValue("chanjing")
   m.listCommonAudio.mockResolvedValue([{ id: "voice-fallback", name: "公共音色" }])
   m.listCommonDigitalPersons.mockResolvedValue([])
+  m.isHeygenConfigured.mockReturnValue(true)
+  m.listAvatars.mockResolvedValue([])
+  m.listVoices.mockResolvedValue([])
 })
 
 describe("公共数字人列表路由", () => {
@@ -110,5 +121,72 @@ describe("公共数字人列表路由", () => {
   it("分页参数做上界钳制，避免请求超量数据", async () => {
     await GET(req("?page=0&size=9999"))
     expect(m.listCommonDigitalPersons).toHaveBeenCalledWith(1, 50)
+  })
+
+  // ─── HeyGen 分支 ────────────────────────────────────────
+
+  describe("供应商为 HeyGen", () => {
+    beforeEach(() => {
+      m.getDigitalHumanProvider.mockReturnValue("heygen")
+    })
+
+    it("列出 HeyGen 形象并带出默认音色名，形态留空（HeyGen 按比例下单）", async () => {
+      m.listAvatars.mockResolvedValue([
+        { id: "hg-1", name: " 商务主持 ", gender: "male", default_voice_id: "hv-1", consent_status: "approved" },
+      ])
+      m.listVoices.mockResolvedValue([{ voice_id: "hv-1", name: "普通话女声" }])
+
+      const body = await (await GET(req())).json()
+      expect(body.status).toBe("ok")
+      expect(body.persons).toHaveLength(1)
+      expect(body.persons[0]).toMatchObject({
+        id: "hg-1",
+        name: "商务主持",
+        defaultVoiceId: "hv-1",
+        voiceName: "普通话女声",
+        figures: [],
+      })
+      expect(body.fallbackVoiceId).toBe("hv-1")
+      expect(m.listCommonDigitalPersons).not.toHaveBeenCalled()
+    })
+
+    it("剔除尚未授权的形象（consent_status=pending）", async () => {
+      m.listAvatars.mockResolvedValue([
+        { id: "hg-ok", name: "已授权", consent_status: "approved" },
+        { id: "hg-pending", name: "待授权", consent_status: "pending" },
+        { id: "hg-rejected", name: "已拒绝", consent_status: "rejected" },
+      ])
+      const body = await (await GET(req())).json()
+      expect(body.persons.map((p: { id: string }) => p.id)).toEqual(["hg-ok"])
+    })
+
+    it("consent_status 为 null/缺失表示不需要授权，应当保留", async () => {
+      m.listAvatars.mockResolvedValue([
+        { id: "hg-null", name: "照片形象", consent_status: null },
+        { id: "hg-missing", name: "公共形象" },
+      ])
+      const body = await (await GET(req())).json()
+      expect(body.persons.map((p: { id: string }) => p.id)).toEqual(["hg-null", "hg-missing"])
+    })
+
+    it("HeyGen 未配置时返回 not_configured", async () => {
+      m.isHeygenConfigured.mockReturnValue(false)
+      const body = await (await GET(req())).json()
+      expect(body.status).toBe("not_configured")
+      expect(m.listAvatars).not.toHaveBeenCalled()
+    })
+  })
+})
+
+// 导出便于直接单测授权判定
+describe("isHeygenConsentUsable", () => {
+  it("只在明确非 approved 时拒绝", async () => {
+    const { isHeygenConsentUsable } = await import("@/app/api/digital-human/public-persons/route")
+    for (const ok of [null, undefined, "", "approved", "APPROVED", " approved "]) {
+      expect(isHeygenConsentUsable(ok as string | null | undefined)).toBe(true)
+    }
+    for (const bad of ["pending", "rejected", "expired", "revoked"]) {
+      expect(isHeygenConsentUsable(bad)).toBe(false)
+    }
   })
 })
