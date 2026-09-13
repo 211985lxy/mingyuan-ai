@@ -1,4 +1,6 @@
 import { LLMClient } from "@/lib/llm"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import type { CandidateScore, GenerateScriptCandidatesParams } from "./contracts"
 import { SCORE_MODEL } from "./models"
 import { buildScoringPrompt } from "./scoring-context"
@@ -57,7 +59,7 @@ export async function scoreWithAI(
       messages: [
         {
           role: "system",
-          content: "你是一位严格的短视频文案质量审核专家。只输出纯 JSON，不添加任何说明。",
+          content: promptRegistry.get(PROMPT_KEYS.scriptGenerationScoringSystem).content,
         },
         { role: "user", content: buildScoringPrompt(candidates, params, resolveScriptScoringFields(params.ipProfile)) },
       ],
