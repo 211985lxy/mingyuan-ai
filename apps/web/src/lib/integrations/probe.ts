@@ -303,6 +303,28 @@ async function probeOutcomeAutofetch() {
   }
 }
 
+/**
+ * 账号作品数据通道（WP-A1）：抖音官方作品列表能力已下线，改走 TikHub/红狐。
+ * 探针只做配置体检（不查库，保持探针轻量可离线测试）：
+ * 两条通道都未配置 → failed（账号历史与效果回流会全空）。
+ * 单个账号是否缺 sec_user_id / 取数成败，由 account-works-sync cron 的
+ * source/fallbackUsed/error 字段与自动化台账页呈现。
+ */
+async function probeAccountWorksChannel() {
+  const tikhubReady = Boolean(env.TIKHUB_API_KEY)
+  const redfoxReady = Boolean(env.REDFOX_API_KEY)
+  if (!tikhubReady && !redfoxReady) {
+    return {
+      status: "failed" as const,
+      detail: "TikHub 与红狐均未配置，账号作品数据通道不可用（账号历史与效果回流会全空）",
+    }
+  }
+  return {
+    status: "healthy" as const,
+    detail: `作品数据通道就绪：TikHub ${tikhubReady ? "已配置（主）" : "未配置"} / 红狐 ${redfoxReady ? "已配置（备）" : "未配置"}`,
+  }
+}
+
 export const INTEGRATION_PROBES: IntegrationProbe[] = [
   { name: "ali-oss", critical: true, run: probeAliyunOss },
   { name: "tikhub", critical: true, run: probeTikhub },
@@ -315,6 +337,7 @@ export const INTEGRATION_PROBES: IntegrationProbe[] = [
   { name: "aliyun-sms", critical: false, run: probeAliyunSms },
   { name: "feishu-bots", critical: true, run: probeFeishuBots },
   { name: "outcome-autofetch", critical: false, run: probeOutcomeAutofetch },
+  { name: "account-works-channel", critical: true, run: probeAccountWorksChannel },
 ]
 
 export async function runIntegrationProbes(): Promise<IntegrationProbeResult[]> {

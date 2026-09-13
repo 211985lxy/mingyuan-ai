@@ -259,6 +259,14 @@ model DouyinAccountBinding {
   lastSyncedAt    DateTime?
   syncStatus      String    @default("ok") @db.VarChar(20) // ok | expired | failed
 
+  /**
+   * WP-A1 作品数据通道：抖音开放平台的「授权账号作品列表」能力已下线（实测错误码 28001056），
+   * 故改走第三方公开数据通道（TikHub 主 / 红狐备），二者均以 sec_user_id 定位账号。
+   * 由用户一次性粘贴抖音主页链接，经 TikHub get_sec_user_id 解析后落库。
+   */
+  secUserId  String? @db.VarChar(200)
+  profileUrl String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

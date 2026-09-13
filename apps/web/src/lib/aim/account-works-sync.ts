@@ -13,6 +13,9 @@ import {
   readWorkStats,
   type AccountWorkLike,
 } from "@/lib/aim/account-work-assets"
+import type { AccountWorksFetchResult } from "@/lib/aim/account-works-source"
+
+export type { AccountWorksFetchResult }
 
 export interface SyncedWorkItem {
   externalWorkId: string
@@ -24,7 +27,7 @@ export interface SyncedWorkItem {
 
 export interface AccountWorksSyncStorePort {
   listBindings(): Promise<Array<{ id: string; userId: string; projectId: string | null }>>
-  fetchWorks(binding: { id: string; userId: string }): Promise<SyncedWorkItem[]>
+  fetchWorks(binding: { id: string; userId: string }): Promise<AccountWorksFetchResult>
   loadExisting(bindingId: string): Promise<AccountWorkLike[]>
   saveMerged(input: {
     bindingId: string
@@ -44,6 +47,11 @@ export interface BindingSyncSummary {
   withinWindow: number
   transcriptPlanCount: number
   digestHash: string
+  /** 实际取数的通道；失败为 null */
+  source: "tikhub" | "redfox" | null
+  /** 主通道失败回落备通道时为 true */
+  fallbackUsed: boolean
+  fallbackReason: string | null
   error: string | null
 }
 
@@ -80,7 +88,7 @@ export async function runAccountWorksSync(
   for (const binding of bindings) {
     try {
       const fetched = await store.fetchWorks(binding)
-      const incoming = fetched.map(toAccountWork)
+      const incoming = fetched.items.map(toAccountWork)
       const existing = await store.loadExisting(binding.id)
       const merged = dedupeAndMergeWorks(existing, incoming)
       const { upserted } = await store.saveMerged({
@@ -95,12 +103,15 @@ export async function runAccountWorksSync(
         bindingId: binding.id,
         userId: binding.userId,
         projectId: binding.projectId,
-        fetched: fetched.length,
+        fetched: fetched.items.length,
         totalWorks: digest.totalWorks,
         upserted,
         withinWindow: digest.publishedWithinWindow,
         transcriptPlanCount: plan.length,
         digestHash: digest.hash,
+        source: fetched.source,
+        fallbackUsed: fetched.fallbackUsed,
+        fallbackReason: fetched.fallbackReason,
         error: null,
       })
     } catch (error) {
@@ -114,6 +125,9 @@ export async function runAccountWorksSync(
         withinWindow: 0,
         transcriptPlanCount: 0,
         digestHash: "",
+        source: null,
+        fallbackUsed: false,
+        fallbackReason: null,
         error: error instanceof Error ? error.message : "同步失败",
       })
     }

@@ -23,7 +23,7 @@ function item(overrides: Partial<SyncedWorkItem> = {}): SyncedWorkItem {
 function makeStore(overrides: Partial<AccountWorksSyncStorePort> = {}): AccountWorksSyncStorePort {
   return {
     listBindings: async () => [{ id: "b1", userId: "u1", projectId: "p1" }],
-    fetchWorks: async () => [item()],
+    fetchWorks: async () => ({ items: [item()], source: "tikhub" as const, fallbackUsed: false, fallbackReason: null }),
     loadExisting: async () => [],
     saveMerged: async () => ({ upserted: 1 }),
     ...overrides,
@@ -75,8 +75,8 @@ describe("runAccountWorksSync", () => {
           { id: "good", userId: "u2", projectId: "p2" },
         ],
         fetchWorks: async (binding) => {
-          if (binding.id === "bad") throw new Error("token expired")
-          return [item({ externalWorkId: "ok" })]
+          if (binding.id === "bad") throw new Error("作品数据通道均未取到数据（TikHub: 401；红狐: 未配置）")
+          return { items: [item({ externalWorkId: "ok" })], source: "tikhub" as const, fallbackUsed: false, fallbackReason: null }
         },
         saveMerged: async (input) => ({ upserted: input.works.length }),
       }),
@@ -84,7 +84,7 @@ describe("runAccountWorksSync", () => {
     )
     expect(summary.failedCount).toBe(1)
     expect(summary.okCount).toBe(1)
-    expect(summary.bindings[0]?.error).toBe("token expired")
+    expect(summary.bindings[0]?.error).toContain("作品数据通道均未取到数据")
     expect(summary.bindings[1]?.error).toBeNull()
   })
 
@@ -98,7 +98,7 @@ describe("runAccountWorksSync", () => {
         ],
         fetchWorks: async (binding) => {
           fetched.push(binding.id)
-          return []
+          return { items: [], source: "redfox" as const, fallbackUsed: true, fallbackReason: "TikHub: 无 sec_user_id" }
         },
       }),
       { bindingId: "b2", now: NOW },
