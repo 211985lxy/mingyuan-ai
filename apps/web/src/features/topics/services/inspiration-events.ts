@@ -352,7 +352,11 @@ export async function ingestInspirationEvent(
         sourceUrl,
         canonicalSourceKey,
         executionModeSnapshot: executionMode,
-        replyStatus: replySuppressed && !shouldEnqueueCaptureAck ? "suppressed" : "pending",
+        // 采集入口是 replyStatus 的唯一写入方：suppressed=不回，ack_only=只回轻量「已记录」，
+        // pending=完整回复已入队。投递真相在 ChannelReplyOutbox，不在这里回写。
+        replyStatus: replySuppressed
+          ? (shouldEnqueueCaptureAck ? "ack_only" : "suppressed")
+          : "pending",
       },
       update: {},
       select: { id: true, aiStatus: true, processingStage: true },

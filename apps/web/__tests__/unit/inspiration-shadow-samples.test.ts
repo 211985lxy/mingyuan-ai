@@ -101,6 +101,32 @@ describe("judgeInspirationShadowSample", () => {
     expect(judged.isShadowSample).toBe(false)
     expect(judged.replyViolation).toBe(true)
   })
+
+  // 采集回执（ack_only）是影子纪律里唯一被认可的外发，不能算违规——
+  // 否则开了 INSPIRATION_CAPTURE_ACK_ENABLED 之后每条真实样本都会被误判。
+  it("accepts ack_only as sanctioned shadow reply", () => {
+    const judged = judgeInspirationShadowSample({
+      id: "9",
+      source: "feishu",
+      externalMessageId: "om_9",
+      executionModeSnapshot: "capture_only",
+      replyStatus: "ack_only",
+    })
+    expect(judged.isShadowSample).toBe(true)
+    expect(judged.replyViolation).toBe(false)
+  })
+
+  it("still rejects full replies beyond the sanctioned ack", () => {
+    const judged = judgeInspirationShadowSample({
+      id: "10",
+      source: "feishu",
+      externalMessageId: "om_10",
+      executionModeSnapshot: "capture_only",
+      replyStatus: "sent",
+    })
+    expect(judged.isShadowSample).toBe(false)
+    expect(judged.replyViolation).toBe(true)
+  })
 })
 
 describe("countShadowSamples", () => {

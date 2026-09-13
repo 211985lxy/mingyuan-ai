@@ -150,10 +150,12 @@ export async function processInspirationPipeline(inspirationId: string): Promise
   }
 
   // --- capture_only: record and extract only, no AI generation ---
+  // replyStatus 由采集入口一次性定稿（suppressed / ack_only / pending），流水线不回写，
+  // 否则会把「已排队回执」误标成 suppressed，污染影子纪律审计。
   if (isCaptureOnly(mode)) {
     await prisma.inspiration.update({
       where: { id: inspiration.id },
-      data: { aiStatus: "completed", processingStage: "captured", replyStatus: "suppressed", errorMessage: null },
+      data: { aiStatus: "completed", processingStage: "captured", errorMessage: null },
     })
     return { outcome: "completed" }
   }
@@ -195,7 +197,6 @@ export async function processInspirationPipeline(inspirationId: string): Promise
               aiStatus: "completed",
               processingStage: processingStageHint ?? "shadow_completed",
               generatedTopics: genResult.cards as unknown as Prisma.InputJsonValue,
-              replyStatus: "suppressed",
               errorMessage: verificationNote,
             },
           })
@@ -205,7 +206,7 @@ export async function processInspirationPipeline(inspirationId: string): Promise
       // Fallback: no project context or generation failed
       await prisma.inspiration.update({
         where: { id: inspiration.id },
-        data: { aiStatus: "completed", processingStage: "shadow_completed", replyStatus: "suppressed", errorMessage: null },
+        data: { aiStatus: "completed", processingStage: "shadow_completed", errorMessage: null },
       })
       return { outcome: "completed" }
     } catch (evalError) {
@@ -213,7 +214,7 @@ export async function processInspirationPipeline(inspirationId: string): Promise
       // Evaluate mode should not hard-fail — record the error but mark as shadow_completed
       await prisma.inspiration.update({
         where: { id: inspiration.id },
-        data: { aiStatus: "completed", processingStage: "shadow_completed", replyStatus: "suppressed", errorMessage: evalMsg },
+        data: { aiStatus: "completed", processingStage: "shadow_completed", errorMessage: evalMsg },
       })
       return { outcome: "completed" }
     }

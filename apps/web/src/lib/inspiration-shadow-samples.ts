@@ -89,15 +89,23 @@ function isShadowMode(mode: ExecutionMode | null): mode is ShadowExecutionMode {
 }
 
 /**
+ * 影子纪律下被认可的外发只有一种：采集回执（ack_only）。
+ * suppressed 之外的一切外发都算违规，ack_only 是显式豁免。
+ */
+function isSanctionedShadowReply(replyStatus: string | null | undefined): boolean {
+  return replyStatus === "suppressed" || replyStatus === "ack_only"
+}
+
+/**
  * 一条 Inspiration 是否计为「真实影子样本」。
- * 要求：显式影子档 + 真实渠道痕迹 + 无正式选题 + replyStatus=suppressed。
+ * 要求：显式影子档 + 真实渠道痕迹 + 无正式选题 + 无未认可外发（suppressed / ack_only）。
  */
 export function judgeInspirationShadowSample(row: InspirationShadowRow): ShadowSampleJudgement {
   const reasons: string[] = []
   const mode = resolveShadowExecutionMode(row.executionModeSnapshot)
   const realIngress = hasRealChannelIngress(row)
   const formalWriteViolation = Boolean(row.topicSelectionId)
-  const replyViolation = row.replyStatus !== "suppressed"
+  const replyViolation = !isSanctionedShadowReply(row.replyStatus)
 
   if (!mode) {
     if (realIngress) {
@@ -133,7 +141,7 @@ export function judgeInspirationShadowSample(row: InspirationShadowRow): ShadowS
   }
 
   if (replyViolation) {
-    reasons.push("影子行 replyStatus 非 suppressed（外发违规）")
+    reasons.push("影子行 replyStatus 非 suppressed / ack_only（外发违规）")
   }
 
   const isShadowSample =

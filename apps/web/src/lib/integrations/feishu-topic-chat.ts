@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto"
+
 type JsonRecord = Record<string, unknown>
 type FeishuTopicReply = {
   reply: {
@@ -170,6 +172,20 @@ export async function getFeishuTenantAccessToken(input: {
   return payload.tenant_access_token
 }
 
+// 飞书 reply 接口 uuid 上限 50 字符；超长会整条请求被拒（返回 field validation failed），
+// 消息一条都发不出去。调用方传的是「前缀 + 消息 ID」这类可读键，很容易压线，故统一在此收口。
+const FEISHU_REPLY_UUID_MAX_LENGTH = 50
+
+/**
+ * 把调用方的幂等键收敛成飞书可接受的 uuid。
+ * 未超长时原样透传（保留可读性）；超长时退化为定长摘要，仍满足去重语义。
+ */
+export function toFeishuReplyUuid(idempotencyKey: string | undefined): string | undefined {
+  if (!idempotencyKey) return undefined
+  if (idempotencyKey.length <= FEISHU_REPLY_UUID_MAX_LENGTH) return idempotencyKey
+  return createHash("sha256").update(idempotencyKey).digest("hex").slice(0, FEISHU_REPLY_UUID_MAX_LENGTH)
+}
+
 /**
  * @description replyfeishutextmessage
  * @param input - 输入数据
@@ -194,7 +210,7 @@ export async function replyFeishuTextMessage(input: {
       body: JSON.stringify({
         msg_type: "text",
         content: JSON.stringify({ text: input.text }),
-        uuid: input.idempotencyKey,
+        uuid: toFeishuReplyUuid(input.idempotencyKey),
       }),
     },
   )
