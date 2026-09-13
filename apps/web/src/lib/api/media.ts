@@ -61,7 +61,7 @@ export async function deleteAvatar(id: string): Promise<void> {
  * @description 保存授权视频地址（创建数字人前需要）
  */
 export async function getAuthVideoRequirements(): Promise<{
-  provider: "chanjing" | "shanjian"
+  provider: "chanjing" | "shanjian" | "heygen"
   authorizationText: string
 }> {
   return request("/api/auth/auth-video")

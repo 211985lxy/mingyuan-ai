@@ -47,7 +47,7 @@ export function buildVideoTaskIdempotencyKey(input: {
   avatarId: string | null;
   scriptContent: string;
   aspectRatio: "9:16" | "16:9";
-  provider: "chanjing" | "shanjian";
+  provider: "chanjing" | "shanjian" | "heygen";
   actionId?: string | null;
   voiceSource?: string | null;
 }): string {

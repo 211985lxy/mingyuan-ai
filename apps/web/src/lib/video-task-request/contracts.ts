@@ -27,7 +27,7 @@ export type CreateVideoTaskInput = {
   aspectRatio?: "9:16" | "16:9";
   actionId?: string;
   retryOfTaskId?: string;
-  provider?: "chanjing" | "shanjian";
+  provider?: "chanjing" | "shanjian" | "heygen";
   avatarId?: string;
   scriptId?: string;
   scriptContent?: string;

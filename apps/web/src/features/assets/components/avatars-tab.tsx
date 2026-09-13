@@ -213,7 +213,7 @@ function CreateAvatarDialog({
   const [authFile, setAuthFile] = useState<File | null>(null)
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [authorizationText, setAuthorizationText] = useState("")
-  const [provider, setProvider] = useState<"chanjing" | "shanjian">("chanjing")
+  const [provider, setProvider] = useState<"chanjing" | "shanjian" | "heygen">("chanjing")
   const [authConfirmed, setAuthConfirmed] = useState(false)
   const [requirementsLoading, setRequirementsLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
