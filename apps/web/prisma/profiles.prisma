@@ -103,6 +103,8 @@ model ClientProject {
   opportunityCollections OpportunityCollection[]
   userQuestionCards      UserQuestionCard[]
   customerOutcomes       CustomerOutcomeProjection[]
+  accountWorkAssets      AccountWorkAsset[]
+  publishPredictions     PublishPrediction[]
 
   @@index([userId, status])
   @@index([userId, createdAt])

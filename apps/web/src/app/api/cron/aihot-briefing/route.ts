@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { generateAndStoreAiHotBriefing } from "@/lib/aihot-briefing"
 import { env } from "@/env"
 import { buildWatchAccountDigest } from "@/lib/hot-briefing-watch-context"
@@ -17,9 +17,8 @@ export const maxDuration = 30
  * @returns 生成结果 + 推送结果
  */
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = await authorizeCronJob(request, "aihot-briefing")
+  if (denied) return denied
 
   try {
     const briefing = await generateAndStoreAiHotBriefing()

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { deleteExpiredControlCenterRows } from "@/lib/control-center-retention"
 
 export const runtime = "nodejs"
@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
 }
 
 async function run(request: NextRequest) {
-  if (!validateCronSecret(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const denied = await authorizeCronJob(request, "control-center-retention")
+  if (denied) return denied
   const params = new URL(request.url).searchParams
   const execute = params.get("execute") === "true"
   if (execute && params.get("confirm") !== "DELETE-180-DAY-ROWS") {

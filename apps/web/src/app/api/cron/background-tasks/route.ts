@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { reclaimExpiredBackgroundTaskLeases } from "@/lib/background-tasks"
 import { prisma } from "@/lib/prisma"
 import { BACKGROUND_TASK_KINDS, executeBackgroundTaskBatch } from "@/lib/background-task-executors"
@@ -14,7 +14,8 @@ export const maxDuration = 300
  * @returns 无返回值
  */
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const denied = await authorizeCronJob(request, "background-tasks")
+  if (denied) return denied
 
   try {
     // 真实 systemd 调度命中的是 background-tasks 入口；在这里回收

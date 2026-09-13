@@ -57,6 +57,8 @@ model User {
   opportunitySearchRuns   OpportunitySearchRun[]
   opportunityCollections  OpportunityCollection[]
   userQuestionCards       UserQuestionCard[]
+  accountWorkAssets       AccountWorkAsset[]
+  publishPredictions      PublishPrediction[]
 }
 
 model AdminUser {
@@ -253,6 +255,8 @@ model DouyinAccountBinding {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  workAssets AccountWorkAsset[]
 
   @@unique([userId, openId])
   @@index([openId])

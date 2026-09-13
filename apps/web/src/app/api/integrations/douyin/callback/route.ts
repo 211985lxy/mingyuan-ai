@@ -83,7 +83,11 @@ export async function GET(request: NextRequest) {
 
     /* 4.5 绑定关系落库（AIM 侧持久化，供后续免扫码读取/刷新） */
     await claimDouyinLoginIdentity(auth.id, token)
-    await upsertDouyinBinding({ userId: auth.id, token, profile })
+    const binding = await upsertDouyinBinding({ userId: auth.id, token, profile })
+    const { enqueueAccountWorkInit } = await import("@/lib/aim/account-work-sync")
+    await enqueueAccountWorkInit({ userId: auth.id, projectId, accountId: binding.id }).catch((error) => {
+      console.warn("[douyin-callback] 账号历史回补入队失败:", error instanceof Error ? error.message : error)
+    })
 
     /* 5. 写入飞书 Base（账号表 + 视频数据表 + 粉丝画像分布列） */
     let syncResult: { accounts: number; videos: number; fansWritten: boolean } | null = null

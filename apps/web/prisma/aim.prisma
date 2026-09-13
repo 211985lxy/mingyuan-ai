@@ -42,6 +42,7 @@ model AimGeneration {
   project             ClientProject?       @relation(fields: [projectId], references: [id])
   contentOutcomes     ContentOutcome[]
   outcomeAttributions OutcomeAttribution[]
+  publishPredictions  PublishPrediction[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, projectId, createdAt(sort: Desc)])

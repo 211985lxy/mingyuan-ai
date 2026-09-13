@@ -221,10 +221,13 @@ export async function retrieveChatContextBlocks(input: {
           })
           // 方案 A：自有账号平台表现（抖音官方 API）并入复盘块；未绑定/失败时模块自带显式降级文案
           const ownAccount = await loadOwnAccountPlatformContext({ userId })
-          if (!ownAccount.hasData) return baseBlock
-          return baseBlock
-            ? `${baseBlock}\n\n${ownAccount.block}`
-            : ownAccount.block
+          const { loadPredictionRetroBlock } = await import("@/lib/aim/publish-prediction-store")
+          const predictionBlock = input.targetGenerationId
+            ? await loadPredictionRetroBlock(input.targetGenerationId)
+            : ""
+          return [baseBlock, ownAccount.hasData ? ownAccount.block : "", predictionBlock]
+            .filter(Boolean)
+            .join("\n\n")
         },
         (block) => ({
           summary: block ? "已注入发布数据" : "未注入发布数据",

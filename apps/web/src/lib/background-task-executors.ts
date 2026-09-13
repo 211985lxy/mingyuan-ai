@@ -9,6 +9,8 @@ import { AGENT_REMOTE_GENERATE_TASK_KIND, executeRemoteInvocationBackgroundTask 
 import { OPPORTUNITY_ANALYZE_TASK_KIND, executeOpportunityAnalyzeBackgroundTask } from "@/features/opportunities/services/analyze-background-task"
 import { NEWSROOM_PIPELINE_TASK_KIND, executeNewsroomPipelineBackgroundTask } from "@/features/newsroom/services/newsroom-pipeline-task"
 import { TOPIC_REGENERATE_TASK_KIND, executeTopicRegenerateBackgroundTask } from "@/features/topics/services/topic-regenerate-background-task"
+import { ACCOUNT_WORK_INIT_KIND, executeAccountWorkInitTask, executeAccountWorkTranscriptTask } from "@/lib/aim/account-work-task"
+import { TRANSCRIPT_LAZY_KIND } from "@/lib/aim/account-work-asset"
 
 const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [COMPETITOR_ANALYSIS_TASK_KIND]: executeCompetitorAnalysisBackgroundTask,
@@ -20,6 +22,8 @@ const executors: Record<string, (taskId: string) => Promise<boolean>> = {
   [OPPORTUNITY_ANALYZE_TASK_KIND]: executeOpportunityAnalyzeBackgroundTask,
   [NEWSROOM_PIPELINE_TASK_KIND]: executeNewsroomPipelineBackgroundTask,
   [TOPIC_REGENERATE_TASK_KIND]: executeTopicRegenerateBackgroundTask,
+  [ACCOUNT_WORK_INIT_KIND]: executeAccountWorkInitTask,
+  [TRANSCRIPT_LAZY_KIND]: executeAccountWorkTranscriptTask,
 }
 
 export const BACKGROUND_TASK_KINDS = Object.keys(executors)

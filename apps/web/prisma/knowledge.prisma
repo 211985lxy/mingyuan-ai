@@ -58,6 +58,7 @@ model KnowledgeEntry {
 
   embedding KnowledgeEmbedding?
   relations KnowledgeRelation[]
+  atoms     KnowledgeAtom[]
 
   @@index([userId, category])
   @@index([userId, status])
@@ -123,4 +124,22 @@ model KnowledgeRelation {
   @@unique([fromEntityId, toEntityId, entryId, type])
   @@index([fromEntityId, type])
   @@index([entryId])
+}
+
+/// 知识原子：观点/金句/事实/方法。蒸馏自 KnowledgeEntry，幂等去重。
+model KnowledgeAtom {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String?
+  entryId     String
+  kind        String   @db.VarChar(20)
+  content     String   @db.Text
+  valueGrade  String?  @db.VarChar(2)
+  contentHash String   @db.VarChar(64)
+  createdAt   DateTime @default(now())
+
+  entry KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, contentHash])
+  @@index([userId, projectId, kind])
 }

@@ -16,6 +16,7 @@ import {
   BookOpen,
   BarChart3,
   AudioLines,
+  Clock3,
   Zap,
 } from "lucide-react"
 import {
@@ -72,6 +73,7 @@ const toolboxNav: NavItem[] = [
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "语音工坊", href: "/voice-studio", icon: AudioLines },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
+  { title: "自动化台账", href: "/scheduled-tasks", icon: Clock3 },
 ]
 
 /** 「进行中」= 工作流未到终态（published/archived）的任务数 */

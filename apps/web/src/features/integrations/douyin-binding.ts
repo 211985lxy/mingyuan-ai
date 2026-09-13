@@ -87,9 +87,9 @@ export async function upsertDouyinBinding(input: {
   userId: string
   token: DouyinToken
   profile: DouyinUserProfile
-}): Promise<void> {
+}): Promise<{ id: string }> {
   const accessExpiresAt = new Date(Date.now() + input.token.expiresIn * 1000)
-  await prisma.douyinAccountBinding.upsert({
+  const row = await prisma.douyinAccountBinding.upsert({
     where: { userId_openId: { userId: input.userId, openId: input.token.openId } },
     create: {
       userId: input.userId,
@@ -114,6 +114,7 @@ export async function upsertDouyinBinding(input: {
       syncStatus: "ok",
     },
   })
+  return { id: row.id }
 }
 
 export async function listDouyinBindings(userId: string): Promise<DouyinBindingView[]> {

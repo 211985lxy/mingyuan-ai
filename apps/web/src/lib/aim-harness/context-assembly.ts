@@ -42,7 +42,7 @@ import {
   loadStyleProfileForGenerate,
   mergeStyleIntoKnowledgeBlock,
 } from "./context/load-style-profile"
-import { resolveMethodologyInjectionForGenerate } from "./context/resolve-methodology-injection"
+import { loadAccountHistoryContext } from "@/lib/aim/account-work-context"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
 export interface PrepareAimContextInput {
@@ -172,7 +172,12 @@ export async function prepareAimContext(
     timeoutMs: spec.executionPolicy.timeoutMs,
     trace,
   })
-  const knowledgeBlock = looped.knowledgeBlock
+  const accountHistory = params.contextOverride
+    ? { block: "", hash: "", count: 0 }
+    : await loadAccountHistoryContext({ userId: params.userId, projectId: spec.projectId })
+  const knowledgeBlock = accountHistory.block
+    ? `${looped.knowledgeBlock}\n\n${accountHistory.block}`
+    : looped.knowledgeBlock
   const feishuSources = looped.feishuSources
 
   // 3.3 Skill 岗位手册按需加载（默认开；AIM_SKILL_LOADING_ENABLED=false 关闭）
@@ -257,6 +262,7 @@ export async function prepareAimContext(
     styleProfileBlock: styleBlock,
     skills,
     taskSpec: taskSpecWithPlan,
+    accountHistoryBlock: accountHistory.block,
   })
 
   return {

@@ -9,6 +9,7 @@ import {
   Moon,
   Monitor,
   Check,
+  ShieldCheck,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -86,6 +87,15 @@ export function SidebarAccountMenu({
         >
           <Settings className="h-4 w-4" />
           账户设置
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => {
+            onNavigate()
+            router.push("/account/your-data")
+          }}
+        >
+          <ShieldCheck className="h-4 w-4" />
+          你的数据
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {

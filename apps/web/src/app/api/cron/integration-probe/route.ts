@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { upsertOperationalAlert } from "@/lib/operational-alerts"
 import { runIntegrationProbes, type IntegrationProbeResult } from "@/lib/integrations/probe"
 
@@ -12,9 +12,8 @@ export const maxDuration = 120
  * 失败/降级落 OperationalAlert（fingerprint 去重 + 抑制窗口，critical 发飞书）。
  */
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 403 })
-  }
+  const denied = await authorizeCronJob(request, "integration-probe")
+  if (denied) return denied
 
   const results = await runIntegrationProbes()
   const summary = {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Bot, BookOpen, CalendarDays, Copy, KeyRound, Link2, LogIn, LogOut, Video } from "lucide-react"
+import { Bot, BookOpen, CalendarDays, Copy, KeyRound, Link2, LogIn, LogOut, ShieldCheck, Video } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -261,6 +261,19 @@ export default function AccountPage() {
               Coming Soon
             </Badge>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="account-your-data-entry">
+        <CardHeader>
+          <CardTitle>你的数据</CardTitle>
+          <CardDescription>当前项目可以一键导出带走。数据归你，退出也能带走。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => router.push("/account/your-data")}>
+            <ShieldCheck className="mr-1.5 h-4 w-4" />
+            打开你的数据
+          </Button>
         </CardContent>
       </Card>
 

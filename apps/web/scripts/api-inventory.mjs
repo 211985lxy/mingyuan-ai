@@ -29,7 +29,7 @@ function authOf(source, route) {
   if (source.includes("withAdminOnly") || source.includes("withAdminOrEditor") || source.includes("withAdminAuth")) return "admin_session"
   if (source.includes("authenticateAgentRequest")) return "agent_key"
   if (source.includes("withUserAuth") || source.includes("authenticateRequest")) return "user_session"
-  if (source.includes("validateCronSecret")) return "cron_secret"
+  if (source.includes("validateCronSecret") || source.includes("authorizeCronJob")) return "cron_secret"
   if (source.includes("checkApiSecret") && source.includes("AIM_WORK_ITEM_API_SECRET")) return "signed_integration"
   if (/WEBHOOK_SECRET|WEBHOOK_TOKEN|VERIFICATION_TOKEN|x-obsidian-token/i.test(source)) return "signed_integration"
   if (route.startsWith("/api/webhook/") || route.startsWith("/api/integrations/")) return "integration_unverified"

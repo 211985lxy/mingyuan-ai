@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { env } from "@/env"
 import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 import { generateAndPushDailyTopics } from "@/features/topics/services/daily-topic-push"
@@ -15,9 +15,8 @@ export const maxDuration = 60
  * @returns 生成与推送结果
  */
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = await authorizeCronJob(request, "topic-daily")
+  if (denied) return denied
 
   const userId = env.AIM_HOT_BRIEFING_USER_ID?.trim()
   if (!userId) {

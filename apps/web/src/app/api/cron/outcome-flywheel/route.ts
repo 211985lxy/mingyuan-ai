@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { prisma } from "@/lib/prisma"
 import {
   evaluateOutcomes,
@@ -35,9 +35,8 @@ export const maxDuration = 60
  * @returns 无返回值
  */
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = await authorizeCronJob(request, "outcome-flywheel")
+  if (denied) return denied
 
   try {
     // 1. 找出所有有已发布内容的用户

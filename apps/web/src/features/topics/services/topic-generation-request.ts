@@ -9,7 +9,7 @@ import { TOPIC_GENERATE_MAX_KNOWLEDGE_ENTRY_IDS } from "@/features/topics/contra
 import { getLatestHotList } from "@/lib/douyin-hot"
 import { decideDouyinItems, decideLast30DaysItems, type HotDecisionItem } from "@/lib/hot-decisions"
 import { getLatestMarketHotSnapshot } from "@/lib/market-insights/market-hotlist"
-import type { TopicSource } from "@/lib/topic-source-builders"
+import { loadAccountHistoryContext } from "@/lib/aim/account-work-context"
 
 /**
  * topics/generate 路由的请求准备逻辑（从 route.ts 抽出，保持路由文件薄）：
@@ -226,6 +226,10 @@ export function loadTopicGenerationContext(input: {
     }).catch(() => null),
     listWatchAccounts(userId, projectId, requestId),
     listCompletedVideoCopyExtractions(userId, projectId, requestId),
+    loadAccountHistoryContext({ userId, projectId }).catch((error) => {
+      console.warn(`[${requestId}] account history unavailable:`, error)
+      return { block: "", hash: "", count: 0 }
+    }),
   ])
 }
 

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { runOperationalAlertChecks } from "@/lib/operational-alerts"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
 
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const denied = await authorizeCronJob(request, "operational-alerts")
+  if (denied) return denied
   try {
     const result = await runOperationalAlertChecks()
     return NextResponse.json({ ok: true, ...result })

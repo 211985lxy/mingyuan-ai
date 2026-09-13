@@ -172,6 +172,34 @@ export async function PATCH(
       return updated
     })
 
+    if (input.data.workflowStatus === "published" && (input.data.publishUrl || existing.publishUrl)) {
+      const { createPublishPredictions } = await import("@/lib/aim/publish-prediction-store")
+      void createPublishPredictions({
+        userId: user.id,
+        projectId: projectId ?? existing.projectId,
+        generationId: id,
+        topicTitle: record.topicTitle,
+      }).catch((error) => {
+        console.warn("[history] 发布预测失败:", error instanceof Error ? error.message : error)
+      })
+    }
+    if (retroOutcome) {
+      const { reconcilePredictionWithOutcome } = await import("@/lib/aim/publish-prediction-store")
+      void reconcilePredictionWithOutcome({
+        generationId: id,
+        windowDays: retroOutcome.sanitized.collectWindowDay,
+        actual: {
+          views: retroOutcome.sanitized.views,
+          likes: retroOutcome.sanitized.likes,
+          comments: retroOutcome.sanitized.comments,
+          saves: retroOutcome.sanitized.saves,
+          shares: retroOutcome.sanitized.shares,
+        },
+      }).catch((error) => {
+        console.warn("[history] 预测对账失败:", error instanceof Error ? error.message : error)
+      })
+    }
+
     return NextResponse.json(record)
   } catch (error) {
     if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {

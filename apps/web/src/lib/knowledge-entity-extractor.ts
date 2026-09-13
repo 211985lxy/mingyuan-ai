@@ -320,6 +320,17 @@ export async function extractAndPersistForEntry(
 ): Promise<void> {
   const extracted = await extractEntities(content)
   await persistEntitiesAndRelations(entryId, extracted, ctx)
+  const { persistKnowledgeAtomsForEntry } = await import("@/lib/aim/knowledge-atom-store")
+  await persistKnowledgeAtomsForEntry({
+    userId: ctx.userId,
+    projectId: ctx.projectId,
+    entryId,
+    title: "",
+    content,
+    valueGrade: null,
+  }).catch((error) => {
+    console.warn("[entity-extract] atomize failed:", error)
+  })
 }
 
 // ─── 5. 检索补充召回 ───────────────────────────────────────

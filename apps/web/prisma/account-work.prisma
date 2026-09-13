@@ -1,0 +1,68 @@
+// 账号历史作品投影（WP-A1）与发布预测（WP-A3）。
+// 飞书 Base 仍是采集正本；这里只做生成上下文投影，不进 ContentOutcome。
+
+model AccountWorkAsset {
+  id               String    @id @default(cuid())
+  userId           String
+  projectId        String
+  accountId        String
+  platform         String    @default("douyin") @db.VarChar(24)
+  awemeId          String    @db.VarChar(64)
+  title            String    @db.VarChar(500)
+  publishedAt      DateTime?
+  coverUrl         String?   @db.VarChar(1000)
+  shareUrl         String?   @db.VarChar(1000)
+  signalSnapshot   Json?
+  transcript       String?   @db.MediumText
+  transcriptStatus String    @default("pending") @db.VarChar(20)
+  transcriptHash   String?   @db.VarChar(64)
+  syncedAt         DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project ClientProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  account DouyinAccountBinding @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, awemeId])
+  @@index([projectId, publishedAt])
+  @@index([userId, projectId])
+  @@index([transcriptStatus])
+}
+
+model PublishPrediction {
+  id                  String    @id @default(cuid())
+  userId              String
+  projectId           String?
+  generationId        String
+  windowDays          Int
+  viewsMin            Int
+  viewsMax            Int
+  likesMin            Int
+  likesMax            Int
+  commentsMin         Int
+  commentsMax         Int
+  savesMin            Int
+  savesMax            Int
+  sharesMin           Int
+  sharesMax           Int
+  confidence          Float
+  rationale           String    @db.Text
+  accountHistoryHash  String?   @db.VarChar(64)
+  createdAt           DateTime  @default(now())
+  reconciledAt        DateTime?
+  verdict             String?   @db.VarChar(16)
+  actualViews         Int?
+  actualLikes         Int?
+  actualComments      Int?
+  actualSaves         Int?
+  actualShares        Int?
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project    ClientProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  generation AimGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([generationId, windowDays])
+  @@index([userId, createdAt])
+  @@index([verdict])
+}

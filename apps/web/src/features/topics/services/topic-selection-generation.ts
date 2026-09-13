@@ -166,7 +166,7 @@ async function generateCardsWithFallback(input: {
 
 /** 加载生成上下文并做前置校验；不满足条件时直接返回可上抛的错误结果。 */
 async function loadValidatedContext(input: TopicSelectionGenerationInput) {
-  const [project, elements, recentSelections, selectedKnowledge, ipProfile, watchAccounts, videoCopyExtractions] =
+  const [project, elements, recentSelections, selectedKnowledge, ipProfile, watchAccounts, videoCopyExtractions, accountHistory] =
     await loadTopicGenerationContext({
       userId: input.userId,
       projectId: input.projectId,
@@ -191,6 +191,7 @@ async function loadValidatedContext(input: TopicSelectionGenerationInput) {
     ipProfile,
     watchAccounts,
     videoCopyExtractions,
+    accountHistory,
   }
 }
 
@@ -237,6 +238,21 @@ async function reviewAndPersistSelection(input: {
   }
 }
 
+function prependAccountHistorySource(
+  bundle: { topicSources: Array<{ category: string; title: string; content: string }> },
+  block: string,
+) {
+  if (!block) return
+  bundle.topicSources = [
+    {
+      category: "account_history",
+      title: "账号真实发布历史",
+      content: block.slice(0, 1200),
+    },
+    ...bundle.topicSources,
+  ]
+}
+
 /**
  * @description 生成一批选题并落库为 TopicSelection
  * @param input - 生成入参（用户、项目、知识条目、元素、推荐模式）
@@ -251,7 +267,7 @@ export async function generateAndStoreTopicSelection(
   const context = await loadValidatedContext(input)
   if (!context.ok) return context
   const { project, elements, recentSelections, selectedKnowledge } = context
-  const { ipProfile, watchAccounts, videoCopyExtractions } = context
+  const { ipProfile, watchAccounts, videoCopyExtractions, accountHistory } = context
 
   const recentElementSets = deriveRecentElementSets(recentSelections)
   const recentTitles = deriveRecentTitles(recentSelections)
@@ -261,6 +277,7 @@ export async function generateAndStoreTopicSelection(
     watchAccounts,
     videoCopyExtractions,
   })
+  prependAccountHistorySource(bundle, accountHistory.block)
   const { ipProfileRecord, contentThemes, topicIpProfile } = await ensureTopicIpProfile({
     userId,
     project,

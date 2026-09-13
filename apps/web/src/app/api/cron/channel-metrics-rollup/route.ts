@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { rollupChannelMetricDay } from "@/lib/channel-metrics"
 import { shanghaiDateText } from "@/lib/shanghai-time"
 
@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
 }
 
 async function run(request: NextRequest) {
-  if (!validateCronSecret(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const denied = await authorizeCronJob(request, "channel-metrics-rollup")
+  if (denied) return denied
   const params = new URL(request.url).searchParams
   const day = params.get("day")?.trim() || shanghaiDateText(new Date(Date.now() - 24 * 60 * 60 * 1000))
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return NextResponse.json({ error: "day 必须是 YYYY-MM-DD" }, { status: 400 })

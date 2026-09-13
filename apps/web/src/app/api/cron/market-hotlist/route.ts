@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateCronSecret } from "@/lib/admin-auth"
+import { authorizeCronJob } from "@/lib/aim/cron-job-guard"
 import { refreshMarketHotSnapshot } from "@/lib/market-insights/market-hotlist"
 
 export const runtime = "nodejs"
@@ -11,9 +11,8 @@ export const maxDuration = 180
  * @returns 无返回值
  */
 export async function GET(request: NextRequest) {
-  if (!validateCronSecret(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = await authorizeCronJob(request, "market-hotlist")
+  if (denied) return denied
 
   try {
     const snapshot = await refreshMarketHotSnapshot()

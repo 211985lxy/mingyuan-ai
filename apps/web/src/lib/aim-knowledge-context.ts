@@ -7,6 +7,11 @@ import {
 } from "@/lib/aim-knowledge-strategy"
 import { formatKnowledgeEntryAnchor } from "@/lib/aim-knowledge-cite"
 import { CATEGORY_LABELS } from "@/lib/knowledge-categories"
+import {
+  loadGraphHopEntries,
+  mergeVectorWithGraphHop,
+  toScoredKnowledge,
+} from "@/lib/aim/knowledge-graph-hop"
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
@@ -175,6 +180,12 @@ export async function buildAimKnowledgeContext(
   })
 
   let entries = retrieved.entries
+  const graphHits = await loadGraphHopEntries({
+    projectId,
+    query,
+    topK: Math.max(4, Math.floor(profile.topK / 2)),
+  })
+  entries = mergeVectorWithGraphHop(entries, graphHits.map(toScoredKnowledge), profile.topK + 4)
 
   // 2. 按智能体分类优先级、策略分类权重和清洗标签重排（仅影响排序，不过滤）
   entries = rankKnowledgeEntriesForAgent(agentId, entries, profile.categoryBoost)

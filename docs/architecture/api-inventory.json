@@ -85,6 +85,22 @@
       "idempotency": true
     },
     {
+      "route": "/api/account/data-export",
+      "file": "src/app/api/account/data-export/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "account",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "query",
+      "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/account/hot-sources",
       "file": "src/app/api/account/hot-sources/route.ts",
       "methods": [
@@ -175,6 +191,22 @@
         "POST"
       ],
       "domain": "admin/account-project-bindings",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/account-work/backfill",
+      "file": "src/app/api/admin/account-work/backfill/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "admin/account-work",
       "kind": "management",
       "orchestratable": false,
       "auth": "admin_session",
@@ -706,6 +738,38 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/automation-ledger/flags",
+      "file": "src/app/api/admin/automation-ledger/flags/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "domain": "admin/automation-ledger",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/automation-ledger/run",
+      "file": "src/app/api/admin/automation-ledger/run/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "admin/automation-ledger",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/benchmark-profiles/[id]/import-analysis",
       "file": "src/app/api/admin/benchmark-profiles/[id]/import-analysis/route.ts",
       "methods": [
@@ -981,6 +1045,22 @@
       "auth": "admin_session",
       "input": "query",
       "query": "manual",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/admin/knowledge/atoms/backfill",
+      "file": "src/app/api/admin/knowledge/atoms/backfill/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "admin/knowledge",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
       "externalService": false,
       "cost": "low",
       "idempotency": false
@@ -1763,6 +1843,22 @@
       "query": "none",
       "externalService": false,
       "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/aim/automation-ledger",
+      "file": "src/app/api/aim/automation-ledger/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "aim",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -3924,7 +4020,7 @@
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
-      "externalService": false,
+      "externalService": true,
       "cost": "high",
       "idempotency": true
     },
