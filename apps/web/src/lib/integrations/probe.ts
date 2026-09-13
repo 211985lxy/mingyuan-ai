@@ -305,9 +305,10 @@ async function probeOutcomeAutofetch() {
 
 /**
  * 账号作品数据通道（WP-A1）：抖音官方作品列表能力已下线，改走 TikHub/红狐。
- * 探针只做"配置 + 采集覆盖"体检：没有任何通道已配置 → failed；
- * 有绑定账号但都缺 sec_user_id（作品数据永远取不到）→ degraded。
- * 真实取数成败由 account-works-sync cron 的 source/error 字段呈现。
+ * 探针只做配置体检（不查库，保持探针轻量可离线测试）：
+ * 两条通道都未配置 → failed（账号历史与效果回流会全空）。
+ * 单个账号是否缺 sec_user_id / 取数成败，由 account-works-sync cron 的
+ * source/fallbackUsed/error 字段与自动化台账页呈现。
  */
 async function probeAccountWorksChannel() {
   const tikhubReady = Boolean(env.TIKHUB_API_KEY)
@@ -318,24 +319,9 @@ async function probeAccountWorksChannel() {
       detail: "TikHub 与红狐均未配置，账号作品数据通道不可用（账号历史与效果回流会全空）",
     }
   }
-  try {
-    const { prisma } = await import("@/lib/prisma")
-    const [total, withSecUserId] = await Promise.all([
-      prisma.douyinAccountBinding.count(),
-      prisma.douyinAccountBinding.count({ where: { secUserId: { not: null } } }),
-    ])
-    if (total > 0 && withSecUserId === 0) {
-      return {
-        status: "degraded" as const,
-        detail: `${total} 个抖音绑定均未采集主页链接（sec_user_id），作品数据无法取数；请先在绑定处粘贴主页链接`,
-      }
-    }
-    return {
-      status: "healthy" as const,
-      detail: `通道就绪（TikHub ${tikhubReady ? "已配置" : "未配置"} / 红狐 ${redfoxReady ? "已配置" : "未配置"}）；${withSecUserId}/${total} 个绑定已采集主页链接`,
-    }
-  } catch {
-    return { status: "degraded" as const, detail: "无法读取抖音绑定状态" }
+  return {
+    status: "healthy" as const,
+    detail: `作品数据通道就绪：TikHub ${tikhubReady ? "已配置（主）" : "未配置"} / 红狐 ${redfoxReady ? "已配置（备）" : "未配置"}`,
   }
 }
 
