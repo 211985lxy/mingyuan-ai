@@ -100,6 +100,12 @@ retry_transfer() {
 # 数据库迁移：服务器无 prisma CLI，经 SSH 隧道用本地 CLI 对生产库执行 prisma migrate deploy。
 # 在补丁脚本之后、契约校验与代码切换之前运行；失败即中止发布，旧版本继续服务。
 # 紧急情况下可 SKIP_MIGRATIONS=1 跳过（须自行确认 schema 已到位）。
+#
+# 迁移后跑漂移门禁（check-migration-drift.mjs）：prisma migrate deploy 只保证
+# 迁移记录齐全，不校验 DDL 真的生效——2026-09-08 有迁移被 resolve --applied
+# 标记完成但一条 SQL 都没跑，外键缺失五天无人发现。门禁把 schema 目录合并成
+# 单文件再 diff（绕开 Prisma 7.8 加载 schema 目录时关系合并出错的 bug），只拦截
+# 「真缺失」，发现即中止发布。紧急情况下可 SKIP_DRIFT_GUARD=1 跳过门禁。
 run_migrations() {
   if [ "${SKIP_MIGRATIONS:-0}" = "1" ]; then
     echo "SKIP_MIGRATIONS=1 — prisma migrate deploy 已跳过。" >&2
@@ -118,7 +124,15 @@ run_migrations() {
     echo "prisma migrate deploy 失败 — 已在切换新代码之前中止发布。" >&2
     return 1
   fi
+  local drift_ok=1
+  if [ "${SKIP_DRIFT_GUARD:-0}" = "1" ]; then
+    echo "SKIP_DRIFT_GUARD=1 — 迁移后漂移门禁已跳过。" >&2
+  elif ! (cd apps/web && DATABASE_URL="$mod_url" node "$ROOT_DIR/scripts/check-migration-drift.mjs" check --web-dir .); then
+    echo "迁移后漂移门禁未通过 — 已在切换新代码之前中止发布（旧版本继续服务）。" >&2
+    drift_ok=0
+  fi
   lsof -ti ":$port" | xargs kill 2>/dev/null || true
+  [ "$drift_ok" = "1" ]
 }
 
 cd "$ROOT_DIR"

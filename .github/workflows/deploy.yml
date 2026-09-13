@@ -237,7 +237,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         working-directory: apps/web
-        run: pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma --exit-code
+        run: node ../../scripts/check-migration-drift.mjs check --web-dir .
 
   deploy:
     needs: migrate
