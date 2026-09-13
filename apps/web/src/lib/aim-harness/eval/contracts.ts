@@ -129,6 +129,11 @@ export interface EvalFixture {
   expectations: EvalExpectations
   /** short human description for reports */
   description: string
+  /**
+   * Contract-only regression. Kept in the full deterministic suite, but skipped
+   * when daily/full sampling a subset so adding it cannot reshuffle coverage.
+   */
+  contractRegressionOnly?: boolean
 }
 
 /**

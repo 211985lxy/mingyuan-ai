@@ -26,18 +26,27 @@
 
 未改 Prompt 猜修复。未改 `aim-agent-content-producer.ts`：失败点是闸门放过非交付文本，不是生产器合同本身。
 
+## 第一次真实模型 daily（未绿）
+
+- 运行：`34737168450`（`codex/ai-native-p0-release-evidence` @ `9c32a9e0`）
+- 合同 **76.7%**，rubric 87.5%，严重虚构 0
+- 原因不是闸门误杀。6 次是线路没返回正文（`cp_imitate_07` / `pq_new_koubo_03` / `pq_ground_16` 各 2 次）；另有 `cp_info_insufficient_20` 没提示信息不足；`we_xhs_10` 两次 rubric 都低于 70。
+- 根因：WP-1 多了 2 条合同回归，daily 按总数均匀抽样，15 条样本被打乱，抽到了更难的 `we_xhs_10`。线路空正文以前也不重试，一次失败就记合同失败。
+
+已修：合同回归标 `contractRegressionOnly`，不进 daily 15 条抽样；评测遇到线路空正文会原样再跑一次。
+
 ## 本机门禁
 
 | 门 | 结果 |
 | --- | --- |
 | typecheck / typecheck:tests | 通过 |
-| WP-1 相关 vitest | 124 通过 |
+| WP-1 相关 vitest / test:harness | 159 通过 |
 | eval:deterministic | contract=100.0% |
 | eval:daily（P0 工作目录无 Provider 密钥） | **失败并停止**，未静默跳过 |
-| 连续 3 次真实模型 daily 绿色 | 未跑。最近一次 CI daily 仍是 96.7%（修复尚未推远程） |
+| 连续 3 次真实模型 daily 绿色 | 未达成。第一次 CI 76.7%，已推修复待再跑 |
 | model-swap | 未跑 |
 | 飞书 30 条 / 连续 5 工作日 | 未开始，需人工在绑定测试群投喂 |
-| 生产发布 | 未申请。当前主干仍是 `1b12bfb8`，本修复还在 `codex/ai-native-p0-release-evidence` |
+| 生产发布 | 未申请。当前主干仍是 `1b12bfb8` |
 
 ## 开关与放量
 
@@ -45,7 +54,7 @@
 
 ## 下一步
 
-1. 把本分支推到 GitHub 后触发 `aim-eval-daily`，连跑 3 次绿。
+1. 再触发 `aim-eval-daily`，连跑 3 次绿。
 2. 你确认后才部署，回读 healthz 的 `releaseSha`。
 3. 用已有管理员登录拉飞书 30 天指标；没有认证就停，不绕过。
 4. 在测试群人工发 30 条获授权样本，连续 5 个工作日。

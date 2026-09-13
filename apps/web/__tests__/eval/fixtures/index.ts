@@ -1,7 +1,7 @@
 /**
  * Registry of all versioned eval fixtures.
  *
- *   content_producer  : 51  (既有 49 + WP-1 正文缺失/分析方案 2)
+ *   content_producer  : 51  (既有 49 + WP-1 正文缺失/分析方案 2，后 2 条只进确定性合同，不进 daily 抽样)
  *   work_editor       : 15  (润色/排版/图文/局部改/追改；深度长文新写已归 content_producer)
  *   business_diagnosis: 15
  *   free_copywriter   : 5   (4 + 1 prompt_quality)

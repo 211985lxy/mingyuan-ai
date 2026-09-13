@@ -35,6 +35,42 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(a).toHaveLength(15)
   })
 
+  it("does not let WP-1 contract regressions shuffle the daily 15-case sample", () => {
+    expect(
+      ALL_FIXTURES.filter((fixture) => fixture.contractRegressionOnly).map((fixture) => fixture.id).sort(),
+    ).toEqual(["wp1_analysis_not_script_01", "wp1_missing_body_01"])
+    const daily = sampleFixtures(ALL_FIXTURES, 15).map((fixture) => fixture.id)
+    const baseline = ALL_FIXTURES.filter((fixture) => !fixture.id.startsWith("wp1_"))
+    expect(baseline).toHaveLength(ALL_FIXTURES.length - 2)
+    expect(sampleFixtures(baseline, 15).map((fixture) => fixture.id)).toEqual(daily)
+  })
+
+  it("retries a real-model case once when the provider returns an empty-body error", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          throw new Error("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "重试后交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
+  })
+
   it("reports 100% contract pass rate across all fixtures (no model)", async () => {
     const report = await runEvalSuite(ALL_FIXTURES, createFrozenContextAdapter(), {
       skipRubric: true,

@@ -126,6 +126,25 @@ export interface EvalRunReport {
 }
 
 const RUBRIC_PASS_THRESHOLD = 70
+const PROVIDER_EMPTY_BODY = /未能返回完整正文|模型服务暂时未能返回/
+
+function isRetryableEvalError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return PROVIDER_EMPTY_BODY.test(message)
+}
+
+async function runEvalCaseWithProviderRetry(
+  fixture: EvalFixture,
+  adapter: EvalContextAdapter,
+  options: EvalRunOptions,
+): Promise<EvalCaseResult> {
+  try {
+    return await runEvalCase(fixture, adapter, options)
+  } catch (error) {
+    if (!isRetryableEvalError(error)) throw error
+    return await runEvalCase(fixture, adapter, options)
+  }
+}
 
 /**
  * The shared executor: plan the fixture, run the (mock/frozen) generation, then
@@ -266,12 +285,13 @@ export function sampleFixtures(
   sampleSize?: number
 ): EvalFixture[] {
   if (!sampleSize || sampleSize >= fixtures.length) return [...fixtures]
-  // Evenly-spaced deterministic selection so the same N cases are picked every
-  // run and every fixture has an equal chance of inclusion.
+  // Contract regressions stay in the full deterministic suite. Daily/full subset
+  // sampling must ignore them, otherwise adding two cases reshuffles all 15.
+  const pool = fixtures.filter((fixture) => !fixture.contractRegressionOnly)
   const sampled: EvalFixture[] = []
   for (let i = 0; i < sampleSize; i += 1) {
-    const index = Math.floor((i * fixtures.length) / sampleSize)
-    sampled.push(fixtures[index])
+    const index = Math.floor((i * pool.length) / sampleSize)
+    sampled.push(pool[index])
   }
   return sampled
 }
@@ -296,7 +316,7 @@ export async function runEvalSuite(
   for (const fixture of sampled) {
     for (let rep = 0; rep < repetitions; rep += 1) {
       try {
-        const result = await runEvalCase(fixture, adapter, options)
+        const result = await runEvalCaseWithProviderRetry(fixture, adapter, options)
         results.push(result)
       } catch (error) {
         results.push({

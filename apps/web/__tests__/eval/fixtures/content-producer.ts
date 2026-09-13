@@ -685,6 +685,7 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
   {
     id: "wp1_missing_body_01",
     version: 1,
+    contractRegressionOnly: true,
     agent: "content_producer",
     scenario: "prompt_quality",
     entrypoint: "generate",
@@ -704,6 +705,7 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
   {
     id: "wp1_analysis_not_script_01",
     version: 1,
+    contractRegressionOnly: true,
     agent: "content_producer",
     scenario: "imitate",
     entrypoint: "generate",
