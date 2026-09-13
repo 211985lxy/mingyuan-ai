@@ -44,6 +44,7 @@ import {
 } from "./context/load-style-profile"
 import { resolveMethodologyInjectionForGenerate } from "./context/resolve-methodology-injection"
 import { loadLearningsForAimContext } from "@/lib/aim/learning-injection-store"
+import { prepareAccountHistoryForKnowledge } from "@/lib/aim/account-history-injection"
 import { formatLearningsBlock, mergeLearningsIntoKnowledge } from "@/lib/aim/learning-injection"
 
 /** prepareAimContext 的入参：spec 之外、装配仍需的请求级字段。 */
@@ -237,12 +238,16 @@ export async function prepareAimContext(
   const learningsBlock = formatLearningsBlock(injectedLearnings)
   const knowledgeWithLearnings = mergeLearningsIntoKnowledge(knowledgeBlock, learningsBlock)
 
+  // 账号历史发布事实（WP-A1）：绑定账号真实作品摘要进知识通道；无账号历史则原样返回。
+  const { text: knowledgeWithAccountHistory, hash: accountHistoryHash } =
+    await prepareAccountHistoryForKnowledge(knowledgeWithLearnings, spec.projectId)
+
   // 4. 压缩 + 上下文预算（与 buildAimGeneration:1607 一致；selectedMethodologyBlock 作为独立预算块）
   const budgeted = await compressAndBudgetGenerationInput({
     agentId,
     spec,
     runtimeTask,
-    knowledgeBlock: knowledgeWithLearnings,
+    knowledgeBlock: knowledgeWithAccountHistory,
     methodologyBlock: methodologyWithSkills,
     businessDiagnosisBlock,
     viralStructureBlock,
@@ -286,6 +291,7 @@ export async function prepareAimContext(
       selectedMethodology: budgeted.blocks.selectedMethodologyBlock,
       memory: "",
       learnings: budgeted.blocks.learningsBlock ?? learningsBlock,
+      accountHistoryHash,
     },
     taskSpec: taskSpecWithPlan,
     methodologyPlan,

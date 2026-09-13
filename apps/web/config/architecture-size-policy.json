@@ -43,6 +43,11 @@
       "path": "src/app/admin/account-project-bindings/page.tsx",
       "maxLines": 538,
       "target": "src/app/admin/account-project-bindings/（拆列表/操作/筛选子组件）"
+    },
+    {
+      "path": "src/lib/aim-harness/context-assembly.ts",
+      "maxLines": 520,
+      "target": "src/lib/aim-harness/context-assembly/（拆装配通道为子模块：knowledge/methodology/learnings/accountHistory 各自成文件）；2026-09-12 WP-A1 accountHistory 第五路注入"
     }
   ]
 }

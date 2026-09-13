@@ -1,0 +1,12 @@
+[Unit]
+Description=Schedule Mingyuan account works sync daily
+
+[Timer]
+OnBootSec=5m
+OnCalendar=*-*-* 05:40:00
+AccuracySec=1m
+Persistent=true
+Unit=mingyuan-cron-account-works-sync.service
+
+[Install]
+WantedBy=timers.target

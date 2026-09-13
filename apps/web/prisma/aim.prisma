@@ -398,3 +398,27 @@ model AimCustomSkill {
   @@unique([agentId, skillId])
   @@index([agentId])
 }
+
+// 账号历史作品资产（WP-A1）：账号接入即全量初始化的投影。
+// 正本仍是飞书 Base 的作品表；本表只做"成为智能体上下文"的投影，幂等键 binding+work。
+model AccountWorkAsset {
+  id                 String    @id @default(cuid())
+  bindingId          String    @db.VarChar(191) // DouyinAccountBinding.id
+  projectId          String?
+  platform           String    @db.VarChar(40) // douyin
+  externalWorkId     String    @db.VarChar(64) // 平台作品 ID（抖音 aweme_id）
+  title              String    @db.Text
+  coverUrl           String?   @db.Text
+  publishedAt        DateTime?
+  stats              Json      @default("{}") // {views,likes,comments,saves,shares} 最近一次快照
+  transcript         String?   @db.MediumText // 完整逐字稿（懒提取：近 90 天 + 互动 Top N 优先）
+  transcriptStatus   String    @default("none") @db.VarChar(20) // none | pending | ready | failed
+  transcriptAttempts Int       @default(0)
+  lastSyncedAt       DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([bindingId, externalWorkId])
+  @@index([projectId, publishedAt])
+  @@index([transcriptStatus])
+}

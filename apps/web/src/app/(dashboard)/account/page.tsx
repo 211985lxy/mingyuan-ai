@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Bot, BookOpen, CalendarDays, Copy, KeyRound, Link2, LogIn, LogOut, Video } from "lucide-react"
 import {
   Card,
@@ -230,6 +231,19 @@ export default function AccountPage() {
       <PlatformIntegrationsCard />
 
       <ChannelBindingsPanel />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>数据主权</CardTitle>
+          <CardDescription>数据归属、隔离方式与退出带走承诺，支持一键导出绑定项目的全部数据。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" nativeButton={false} render={<Link href="/account/data-ownership" />}>
+            <KeyRound className="h-4 w-4" />
+            查看数据主权与导出
+          </Button>
+        </CardContent>
+      </Card>
 
       <AgentKeysPanel />
 

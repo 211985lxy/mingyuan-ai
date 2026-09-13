@@ -234,6 +234,8 @@ export interface PreparedAimContext {
     learnings?: string
     /** chat 场景的对话上下文块 */
     conversation?: string
+    /** 账号历史发布事实摘要哈希（WP-A1，空为 null） */
+    accountHistoryHash?: string | null
     /** 竞品监控（chat 专有） */
     competitorWatch?: string
   }

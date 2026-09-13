@@ -23,6 +23,14 @@
     {
       "path": "/api/cron/outcome-flywheel",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/prediction-reconcile",
+      "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/cron/account-works-sync",
+      "schedule": "40 21 * * *"
     }
   ]
 }
