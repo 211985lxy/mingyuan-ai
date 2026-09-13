@@ -15,12 +15,12 @@ import {
   UploadReservationError,
 } from "@/lib/oss"
 
-function authorizationTextResponse() {
+function authorizationTextResponse(name: string | null) {
   const provider = getDigitalHumanProvider()
   try {
     return NextResponse.json({
       provider,
-      authorizationText: getDigitalHumanAuthorizationText(provider),
+      authorizationText: getDigitalHumanAuthorizationText(provider, name),
     })
   } catch (error) {
     if (error instanceof DigitalHumanProviderError && error.code === "AUTH_TEXT_NOT_CONFIGURED") {
@@ -33,8 +33,14 @@ function authorizationTextResponse() {
   }
 }
 
-/** 返回当前供应商要求逐字朗读的授权原文。 */
-export const GET = withUserAuth(async () => authorizationTextResponse())
+/** 返回当前供应商要求逐字朗读的授权原文（按当前登录用户姓名实例化）。 */
+export const GET = withUserAuth(async (_request, { user }) => {
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { name: true },
+  })
+  return authorizationTextResponse(dbUser?.name ?? null)
+})
 
 export const POST = withUserAuth(async (request, { user }) => {
   const body = await parseJsonRecord(request)
@@ -50,20 +56,35 @@ export const POST = withUserAuth(async (request, { user }) => {
     )
   }
 
+  // 授权原文按声明人姓名实例化，姓名是校验的一部分而非装饰
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { name: true },
+  })
+  const declaredName = dbUser?.name ?? null
+
   let authorizationText: string
   try {
-    authorizationText = getDigitalHumanAuthorizationText(provider)
+    authorizationText = getDigitalHumanAuthorizationText(provider, declaredName)
   } catch (error) {
-    if (error instanceof DigitalHumanProviderError && error.code === "AUTH_TEXT_NOT_CONFIGURED") {
-      return NextResponse.json(
-        { error: error.message, code: error.code, provider },
-        { status: 503 },
-      )
+    if (error instanceof DigitalHumanProviderError) {
+      if (error.code === "AUTH_TEXT_NOT_CONFIGURED") {
+        return NextResponse.json(
+          { error: error.message, code: error.code, provider },
+          { status: 503 },
+        )
+      }
+      if (error.code === "AUTH_NAME_REQUIRED") {
+        return NextResponse.json(
+          { error: error.message, code: error.code, provider },
+          { status: 422 },
+        )
+      }
     }
     throw error
   }
 
-  if (!hasExactDigitalHumanAuthorizationText(providedText, provider)) {
+  if (!hasExactDigitalHumanAuthorizationText(providedText, provider, declaredName)) {
     return NextResponse.json(
       {
         error: "授权视频必须按页面显示的原文逐字朗读",
