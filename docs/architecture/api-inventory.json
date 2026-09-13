@@ -5080,6 +5080,22 @@
       "idempotency": true
     },
     {
+      "route": "/api/webhook/heygen",
+      "file": "src/app/api/webhook/heygen/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "webhook",
+      "kind": "capability",
+      "orchestratable": true,
+      "auth": "signed_integration",
+      "input": "raw_body",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
+    },
+    {
       "route": "/api/webhook/inspiration",
       "file": "src/app/api/webhook/inspiration/route.ts",
       "methods": [
