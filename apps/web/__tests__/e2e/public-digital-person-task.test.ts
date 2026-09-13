@@ -17,6 +17,7 @@ vi.mock("@/lib/chanjing", async (importOriginal) => {
 
 import { prisma, cleanDatabase, disconnectAll, cleanRedis, req, json } from "./helpers"
 import { POST } from "@/app/api/tasks/route"
+import { releaseProviderSlot } from "@/lib/digital-human-semaphore"
 import jwt from "jsonwebtoken"
 
 let user: { id: string; email: string }
@@ -120,11 +121,20 @@ describe("公共数字人下单（不走克隆，无需授权文案）", () => {
   })
 
   it("切换公共形象即视为不同订单", async () => {
-    await POST(userReq("/api/tasks", { method: "POST", body: publicBody() }), undefined as never)
-    await POST(
+    const first = await POST(userReq("/api/tasks", { method: "POST", body: publicBody() }), undefined as never)
+    const firstId = (await json(first)).data.id
+    // 首个任务会占用供应商并发槽，且无 webhook 释放（生产由回调/校准回收）
+    await releaseProviderSlot("chanjing")
+
+    const second = await POST(
       userReq("/api/tasks", { method: "POST", body: publicBody({ virtualmanId: "dp-public-2" }) }),
       undefined as never,
     )
+    const secondId = (await json(second)).data.id
+
+    // 意图断言：不同公共形象必须产生不同任务，而非命中上一条
+    expect(secondId).not.toBe(firstId)
+    expect(second.status).toBe(201)
     expect(mockCreateDigitalHumanVideo).toHaveBeenCalledTimes(2)
   })
 })
