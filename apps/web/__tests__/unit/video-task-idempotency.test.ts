@@ -32,6 +32,22 @@ describe("video task idempotency", () => {
     expect(buildVideoTaskIdempotencyKey({ ...baseInput, actionId: "retry-1" })).not.toBe(original)
   })
 
+  it("distinguishes different public digital persons with the same script", () => {
+    // 公共数字人没有 DB 记录：若不带供应商形象 id，换个形象会被判成同一单
+    const a = buildVideoTaskIdempotencyKey({ ...baseInput, avatarId: null, publicPersonId: "dp-1" })
+    const b = buildVideoTaskIdempotencyKey({ ...baseInput, avatarId: null, publicPersonId: "dp-2" })
+    expect(a).not.toBe(b)
+    // 同一形象仍去重
+    expect(buildVideoTaskIdempotencyKey({ ...baseInput, avatarId: null, publicPersonId: "dp-1" })).toBe(a)
+  })
+
+  it("keeps existing keys stable when no public person is involved", () => {
+    // publicPersonId 缺省不参与键计算，避免改变既有任务的幂等键
+    expect(buildVideoTaskIdempotencyKey({ ...baseInput, publicPersonId: null })).toBe(
+      buildVideoTaskIdempotencyKey(baseInput),
+    )
+  })
+
   it("distinguishes own-voice from provider tts delivery", () => {
     const original = buildVideoTaskIdempotencyKey(baseInput)
     expect(buildVideoTaskIdempotencyKey({ ...baseInput, voiceSource: "own_voice" })).not.toBe(original)
