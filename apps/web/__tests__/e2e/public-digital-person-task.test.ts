@@ -138,7 +138,12 @@ describe("公共数字人下单（不走克隆，无需授权文案）", () => {
       userReq("/api/tasks", { method: "POST", body: publicBody({ virtualmanId: "dp-public-2" }) }),
       undefined as never,
     )
-    const secondId = (await json(second)).data.id
+    const secondBody = await json(second)
+    expect(
+      secondBody.data,
+      `第二次提交应成功；status=${second.status} 响应=${JSON.stringify(secondBody)}`,
+    ).toBeDefined()
+    const secondId = secondBody.data.id
 
     // 意图断言：不同公共形象必须产生不同任务，而非命中上一条
     expect(secondId).not.toBe(firstId)
