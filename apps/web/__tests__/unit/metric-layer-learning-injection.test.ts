@@ -67,6 +67,19 @@ describe("学习注入映射", () => {
     expect(stripLearningsPrefix("【历史教训】禁止赋能\n\n正文知识")).toBe("正文知识")
     expect(stripLearningsPrefix("普通知识")).toBe("普通知识")
   })
+
+  it("puts knowledge facts before learnings and names already-given numbers as usable", () => {
+    const knowledge = "【现场账单】(case)\n去年冬天这户电费从 1800 降到 1100。"
+    const learnings = formatLearningsBlock([
+      { id: "lc_hallucination", targetType: "methodology_revision", constraint: "禁止编造未给出的数字和客户原话" },
+    ])
+    const merged = mergeLearningsIntoKnowledge(knowledge, learnings)
+    expect(merged.indexOf("1800")).toBeGreaterThan(-1)
+    expect(merged.indexOf("1800")).toBeLessThan(merged.indexOf("禁止编造未给出的数字"))
+    expect(merged).toContain("不算编造")
+    expect(merged).toContain("必须写进成稿")
+    expect(merged).toMatch(/1800.*1100|1100.*1800/)
+  })
 })
 
 describe("经营账本指标层", () => {

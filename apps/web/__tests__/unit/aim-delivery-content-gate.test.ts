@@ -140,6 +140,22 @@ describe("applyDeliveryContentGate", () => {
       originalPrompt: "写口播",
     })).toThrow(AimDeliveryContentError)
   })
+
+  it("tells a retry to use knowledge numbers instead of handing in an analysis plan", () => {
+    const first = applyDeliveryContentGate({
+      parsed: { video_script: "本轮输入只锁定了结构。\n1. 目标判定\n太短" },
+      targetFormats: ["video_script"],
+      intent: unsetIntent,
+      attempt: 0,
+      maxAttempts: 3,
+      originalPrompt: "根据知识库写口播",
+    })
+    expect(first.ok).toBe(false)
+    if (!first.ok) {
+      expect(first.retryPrompt).toContain("知识库里已经给出的数字必须写进成稿")
+      expect(first.retryPrompt).toContain("不能改交分析方案")
+    }
+  })
 })
 
 describe("sanitizeReasoningSummary", () => {

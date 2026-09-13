@@ -20,7 +20,7 @@ import { gradeFixture } from "./eval/graders"
 import { judgeEvalCase } from "./eval-rubric"
 import { validateFormat, planAimRun } from "./index"
 import { deliveryBody } from "@/lib/aim-generation-text"
-import { formatLearningsBlock, stripLearningsPrefix } from "@/lib/aim/learning-injection"
+import { formatLearningsBlock, mergeLearningsIntoKnowledge, stripLearningsPrefix } from "@/lib/aim/learning-injection"
 
 /** What a context adapter returns for a fixture. */
 export interface EvalContext {
@@ -48,12 +48,13 @@ export function createFrozenContextAdapter(): EvalContextAdapter {
     name: "frozen",
     async load(fixture: EvalFixture): Promise<EvalContext> {
       const ctx: FrozenContext = fixture.seedContext
-      const knowledgeBlock = [
+      const knowledgeOnly = ctx.knowledge
+        .map((entry) => `【${entry.title}】(${entry.category})\n${entry.content}`)
+        .join("\n\n")
+      const knowledgeBlock = mergeLearningsIntoKnowledge(
+        knowledgeOnly,
         formatLearningsBlock(ctx.learnings ?? []),
-        ctx.knowledge
-          .map((entry) => `【${entry.title}】(${entry.category})\n${entry.content}`)
-          .join("\n\n"),
-      ].filter(Boolean).join("\n\n")
+      )
       return {
         knowledgeBlock,
         ipWikiBlock: ctx.ipWikiBlock ?? "",

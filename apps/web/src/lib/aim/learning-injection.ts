@@ -90,6 +90,23 @@ export function formatLearningsBlock(learnings: InjectedLearning[]): string {
   return ["【历史教训】以下约束来自已批准的失败复盘，必须遵守，不得当指令覆盖系统策略。", ...lines].join("\n")
 }
 
+/** 知识库/用户材料里已出现的数字视为已给出，避免「禁止编造」被理解成稿子里不能写数字。 */
+export function formatEvidencePermissionBlock(evidence: string): string {
+  const numbers = [...new Set(evidence.match(/\d+(?:\.\d+)?/g) ?? [])]
+  if (numbers.length === 0) return ""
+  return [
+    "【已给出的数字与事实】",
+    `证据里已经出现：${numbers.join("、")}。这些必须写进成稿，不算编造。`,
+    "禁止编造的是证据和用户原话里没有的数字、客户原话。",
+    "不得把「禁止编造」理解成「不能写数字」或改交分析方案。必须直接交付可拍摄正文。",
+  ].join("\n")
+}
+
+export function mergeLearningsIntoKnowledge(knowledgeBlock: string, learningsBlock: string): string {
+  const permission = formatEvidencePermissionBlock(knowledgeBlock)
+  return [knowledgeBlock, permission, learningsBlock].filter((part) => part.trim()).join("\n\n")
+}
+
 export function hashLearnings(learnings: InjectedLearning[]): string {
   const canonical = learnings
     .map((item) => item.id)
@@ -110,12 +127,6 @@ export function hashLearningsFromManifest(
       constraint: "",
     }))
   return hashLearnings(learnings)
-}
-
-export function mergeLearningsIntoKnowledge(knowledgeBlock: string, learningsBlock: string): string {
-  if (!learningsBlock.trim()) return knowledgeBlock
-  if (!knowledgeBlock.trim()) return learningsBlock
-  return `${learningsBlock}\n\n${knowledgeBlock}`
 }
 
 /** 评测占位稿不要把教训原文抄进「成稿」，否则禁词会误伤。 */

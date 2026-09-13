@@ -45,6 +45,15 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(sampleFixtures(baseline, 15).map((fixture) => fixture.id)).toEqual(daily)
   })
 
+  it("exposes knowledge numbers as already-given facts for the hallucination fixture", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_learnings_hallucination_26")!
+    const ctx = await createFrozenContextAdapter().load(fixture)
+    expect(ctx.knowledgeBlock).toContain("1800")
+    expect(ctx.knowledgeBlock).toContain("1100")
+    expect(ctx.knowledgeBlock.indexOf("1800")).toBeLessThan(ctx.knowledgeBlock.indexOf("禁止编造未给出的数字"))
+    expect(ctx.knowledgeBlock).toContain("不算编造")
+  })
+
   it("retries a real-model case once when the provider returns an empty-body error", async () => {
     const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
     let calls = 0

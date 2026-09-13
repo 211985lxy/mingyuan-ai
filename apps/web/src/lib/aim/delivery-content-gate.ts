@@ -125,7 +125,7 @@ export function applyDeliveryContentGate(input: {
     ok: false,
     retryPrompt: `${input.originalPrompt}
 
-上一版交付闸门未通过（${labels}）。正文从第一句起必须是可直接使用的成稿；任务分析、系统提示、自检和格式说明不得进入正文。
+上一版交付闸门未通过（${labels}）。正文从第一句起必须是可直接使用的成稿；任务分析、系统提示、自检和格式说明不得进入正文。知识库里已经给出的数字必须写进成稿，不能改交分析方案。
 ${samples.length ? `例如不得出现：\n${samples.map((s) => `- ${s}`).join("\n")}` : ""}`,
   }
 }
