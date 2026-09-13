@@ -1,8 +1,10 @@
 import { env } from "@/env"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
+import type { DigitalHumanProvider } from "@/lib/digital-human-provider"
 
-export type DigitalHumanProvider = "chanjing" | "shanjian"
+// 供应商类型以 digital-human-provider 为单一来源：两处各自声明会在新增供应商时分叉
+export type { DigitalHumanProvider }
 
 const ACQUIRE_SCRIPT = `
   local current = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -29,7 +31,9 @@ export function providerSemaphoreKey(provider: DigitalHumanProvider): string {
 export function providerMaxConcurrent(provider: DigitalHumanProvider): number {
   const configured = provider === "chanjing"
     ? env.CHANJING_MAX_CONCURRENT
-    : env.SHANJIAN_MAX_CONCURRENT
+    : provider === "heygen"
+      ? env.HEYGEN_MAX_CONCURRENT
+      : env.SHANJIAN_MAX_CONCURRENT
   const parsed = Number.parseInt(configured ?? "1", 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
 }

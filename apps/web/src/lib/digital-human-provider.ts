@@ -9,6 +9,13 @@ import {
 } from "@/lib/chanjing"
 import { createDigitalHumanVideoFromAudio } from "@/lib/chanjing-audio"
 import {
+  createVideo as createHeygenVideo,
+  getVideo as getHeygenVideo,
+  isHeygenConfigured,
+  mapHeygenVideoToTaskResult,
+  HeygenError,
+} from "@/lib/heygen"
+import {
   cloneFastAvatar as cloneShanjianFastAvatar,
   cloneImageAvatar as cloneShanjianImageAvatar,
   cloneProfessionalAvatar as cloneShanjianProfessionalAvatar,
@@ -20,14 +27,15 @@ import {
 } from "@/lib/shanjian"
 import { env } from "@/env"
 
-export type DigitalHumanProvider = "chanjing" | "shanjian"
+export type DigitalHumanProvider = "chanjing" | "shanjian" | "heygen"
 
 export function isDigitalHumanProvider(value: unknown): value is DigitalHumanProvider {
-  return value === "chanjing" || value === "shanjian"
+  return value === "chanjing" || value === "shanjian" || value === "heygen"
 }
 
 export function normalizeDigitalHumanProvider(value: unknown): DigitalHumanProvider {
-  return value === "shanjian" ? "shanjian" : "chanjing"
+  if (value === "shanjian" || value === "heygen") return value
+  return "chanjing"
 }
 
 export class DigitalHumanProviderError extends Error {
@@ -43,7 +51,7 @@ export class DigitalHumanProviderError extends Error {
 
 export function getDigitalHumanProvider(): DigitalHumanProvider {
   const configured = env.DIGITAL_HUMAN_PROVIDER
-  if (configured === "chanjing" || configured === "shanjian") return configured
+  if (configured === "chanjing" || configured === "shanjian" || configured === "heygen") return configured
   return "chanjing"
 }
 
@@ -131,12 +139,13 @@ export function hasExactDigitalHumanAuthorizationText(
 export function isDigitalHumanConfigured(): boolean {
   const provider = getDigitalHumanProvider()
   if (provider === "chanjing") return isChanjingConfigured()
+  if (provider === "heygen") return isHeygenConfigured()
   return Boolean(env.SHANJIAN_APP_KEY)
 }
 
 function wrapError(error: unknown): DigitalHumanProviderError {
   if (error instanceof DigitalHumanProviderError) return error
-  if (error instanceof ChanjingError || error instanceof ShanjianError) {
+  if (error instanceof ChanjingError || error instanceof ShanjianError || error instanceof HeygenError) {
     return new DigitalHumanProviderError(error.code, error.message, error.requestId)
   }
   if (error instanceof Error) {
@@ -284,6 +293,9 @@ export async function getVideoTaskStatusForProvider(
     if (provider === "chanjing") {
       return await getVideoTaskInfo(taskId)
     }
+    if (provider === "heygen") {
+      return mapHeygenVideoToTaskResult(await getHeygenVideo(taskId))
+    }
     return await getShanjianTaskInfo(taskId)
   } catch (error) {
     throw wrapError(error)
@@ -325,75 +337,153 @@ export async function submitVideoToProvider(
   payload: Record<string, unknown>,
 ): Promise<ShanjianSubmitResult> {
   try {
-    if (provider === "chanjing") {
-      if (!CHANJING_VIDEO_TYPES.has(videoType)) {
-        throw new DigitalHumanProviderError(
-          "UNSUPPORTED_VIDEO_TYPE",
-          `蝉镜暂不支持 ${videoType} 类型出片`,
-        )
-      }
-      const personId = typeof payload.virtualmanId === "string" ? payload.virtualmanId : null
-      if (!personId) {
-        throw new DigitalHumanProviderError(
-          "MISSING_VIDEO_INPUT",
-          "缺少数字人形象，无法提交蝉镜出片任务",
-        )
-      }
-      const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
-      const width = aspectRatio === "16:9" ? 1920 : 1080
-      const height = aspectRatio === "16:9" ? 1080 : 1920
-
-      // 自有语音路径：外部音频驱动口型（audio 型），不需要蝉镜音色与文案
-      const ownVoiceAudioUrl = typeof payload.ownVoiceAudioUrl === "string"
-        ? payload.ownVoiceAudioUrl
-        : null
-      if (ownVoiceAudioUrl) {
-        const submitted = await createDigitalHumanVideoFromAudio({
-          wavUrl: ownVoiceAudioUrl,
-          personId,
-          figureType: typeof payload.figureType === "string" ? payload.figureType : "whole_body",
-          personWidth: width,
-          personHeight: height,
-        })
-        // 落库的是本函数返回的 payload（而非调用方构造的那份），重试需要据此还原音源，
-        // 因此把 own-voice 快照标记并入返回载荷。
-        return {
-          ...submitted,
-          payload: {
-            ...submitted.payload,
-            audioType: "audio",
-            ownVoiceAudioUrl,
-            ...(typeof payload.ownVoiceVoiceId === "string"
-              ? { ownVoiceVoiceId: payload.ownVoiceVoiceId }
-              : {}),
-          },
-        }
-      }
-
-      const audioManId = typeof payload.speakerId === "string" ? payload.speakerId : null
-      const text = typeof payload.text === "string"
-        ? payload.text
-        : typeof payload.content === "string"
-          ? payload.content
-          : null
-      if (!audioManId || !text) {
-        throw new DigitalHumanProviderError(
-          "MISSING_VIDEO_INPUT",
-          "缺少音色或口播文案，无法提交蝉镜出片任务",
-        )
-      }
-      return await createDigitalHumanVideo({
-        personId,
-        audioManId,
-        text,
-        width,
-        height,
-      })
+    if (provider === "heygen") {
+      return await submitHeygenVideo(videoType, payload)
     }
-
+    if (provider === "chanjing") {
+      return await submitChanjingVideo(videoType, payload)
+    }
     const { submitToShanjian } = await import("@/lib/shanjian-submit")
     return await submitToShanjian(videoType, payload)
   } catch (error) {
     throw wrapError(error)
+  }
+}
+
+/**
+ * 蝉镜出片提交。
+ *
+ * 两种驱动二选一：
+ * - 音频驱动（自有语音）：传 wav_url，不需要蝉镜音色与文案
+ * - 脚本驱动：传 tts 文本 + 蝉镜音色
+ */
+async function submitChanjingVideo(
+  videoType: string,
+  payload: Record<string, unknown>,
+): Promise<ShanjianSubmitResult> {
+  if (!CHANJING_VIDEO_TYPES.has(videoType)) {
+    throw new DigitalHumanProviderError(
+      "UNSUPPORTED_VIDEO_TYPE",
+      `蝉镜暂不支持 ${videoType} 类型出片`,
+    )
+  }
+  const personId = typeof payload.virtualmanId === "string" ? payload.virtualmanId : null
+  if (!personId) {
+    throw new DigitalHumanProviderError(
+      "MISSING_VIDEO_INPUT",
+      "缺少数字人形象，无法提交蝉镜出片任务",
+    )
+  }
+  const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
+  const width = aspectRatio === "16:9" ? 1920 : 1080
+  const height = aspectRatio === "16:9" ? 1080 : 1920
+
+  const ownVoiceAudioUrl = typeof payload.ownVoiceAudioUrl === "string"
+    ? payload.ownVoiceAudioUrl
+    : null
+  if (ownVoiceAudioUrl) {
+    const submitted = await createDigitalHumanVideoFromAudio({
+      wavUrl: ownVoiceAudioUrl,
+      personId,
+      figureType: typeof payload.figureType === "string" ? payload.figureType : "whole_body",
+      personWidth: width,
+      personHeight: height,
+    })
+    // 落库的是本函数返回的 payload（而非调用方构造的那份），重试需要据此还原音源，
+    // 因此把 own-voice 快照标记并入返回载荷。
+    return {
+      ...submitted,
+      payload: {
+        ...submitted.payload,
+        audioType: "audio",
+        ownVoiceAudioUrl,
+        ...(typeof payload.ownVoiceVoiceId === "string"
+          ? { ownVoiceVoiceId: payload.ownVoiceVoiceId }
+          : {}),
+      },
+    }
+  }
+
+  const audioManId = typeof payload.speakerId === "string" ? payload.speakerId : null
+  const text = typeof payload.text === "string"
+    ? payload.text
+    : typeof payload.content === "string"
+      ? payload.content
+      : null
+  if (!audioManId || !text) {
+    throw new DigitalHumanProviderError(
+      "MISSING_VIDEO_INPUT",
+      "缺少音色或口播文案，无法提交蝉镜出片任务",
+    )
+  }
+  return await createDigitalHumanVideo({ personId, audioManId, text, width, height })
+}
+
+const HEYGEN_VIDEO_TYPES = new Set([
+  "virtualman_broadcast",
+  "virtualman_video",
+  "custom_virtualman_broadcast",
+])
+
+/**
+ * HeyGen v3 出片提交。
+ *
+ * 两种驱动二选一（与 /v3/videos 的契约一致）：
+ * - 音频驱动：载荷里有 ownVoiceAudioUrl 时传 audio_url，脚本不参与（口型跟音频）
+ * - 脚本驱动：传 script + voice_id，由 HeyGen 侧 TTS
+ * avatar_id 必填；缺失或类型不支持时 fail-closed，不提交半个任务。
+ */
+async function submitHeygenVideo(
+  videoType: string,
+  payload: Record<string, unknown>,
+): Promise<ShanjianSubmitResult> {
+  if (!HEYGEN_VIDEO_TYPES.has(videoType)) {
+    throw new DigitalHumanProviderError(
+      "UNSUPPORTED_VIDEO_TYPE",
+      `HeyGen 暂不支持 ${videoType} 类型出片`,
+    )
+  }
+  const avatarId = typeof payload.virtualmanId === "string" ? payload.virtualmanId : null
+  if (!avatarId) {
+    throw new DigitalHumanProviderError(
+      "MISSING_VIDEO_INPUT",
+      "缺少数字人形象，无法提交 HeyGen 出片任务",
+    )
+  }
+
+  const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
+  const script = typeof payload.text === "string"
+    ? payload.text
+    : typeof payload.content === "string"
+      ? payload.content
+      : null
+  const audioUrl = typeof payload.ownVoiceAudioUrl === "string" ? payload.ownVoiceAudioUrl : null
+  const voiceId = typeof payload.speakerId === "string" ? payload.speakerId : null
+
+  if (!audioUrl && (!script || !voiceId)) {
+    throw new DigitalHumanProviderError(
+      "MISSING_VIDEO_INPUT",
+      "缺少音色或口播文案，无法提交 HeyGen 出片任务",
+    )
+  }
+
+  const submitted = await createHeygenVideo({
+    type: "avatar",
+    avatar_id: avatarId,
+    ...(audioUrl ? { audio_url: audioUrl } : { script: script!, voice_id: voiceId! }),
+    aspect_ratio: aspectRatio,
+    ...(typeof payload.title === "string" ? { title: payload.title } : {}),
+  })
+
+  return {
+    ...submitted,
+    payload: {
+      ...submitted.payload,
+      // 与蝉镜分支一致：把 own-voice 快照标记并入返回载荷，供重试还原音源
+      ...(audioUrl ? { audioType: "audio", ownVoiceAudioUrl: audioUrl } : {}),
+      ...(audioUrl && typeof payload.ownVoiceVoiceId === "string"
+        ? { ownVoiceVoiceId: payload.ownVoiceVoiceId }
+        : {}),
+    },
   }
 }

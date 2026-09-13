@@ -22,7 +22,7 @@ export async function reserveVideoTask(input: {
   shanjianPayload: Record<string, unknown>;
   projectId: string | null;
   aimGenerationId: string | null;
-  provider: "chanjing" | "shanjian";
+  provider: "chanjing" | "shanjian" | "heygen";
   idempotencyKey: string;
   retryOfTaskId?: string | null;
 }): Promise<VideoTaskReservation> {

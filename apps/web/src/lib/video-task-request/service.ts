@@ -164,8 +164,9 @@ async function synthesizeOwnVoiceIfRequested(input: {
   scriptContent: string;
 }): Promise<string | undefined> {
   if (input.voiceSource !== "own_voice") return undefined;
-  if (input.provider !== "chanjing") {
-    throw new VideoTaskRequestError("own_voice 仅支持蝉镜供应商", 422, { field: "voiceSource" });
+  // HeyGen 的 /v3/videos 支持 audio_url 原生音频驱动；闪剪无音频链路，仅它能用自带音色
+  if (input.provider === "shanjian") {
+    throw new VideoTaskRequestError("own_voice 暂不支持闪剪供应商", 422, { field: "voiceSource" });
   }
   try {
     const synthesis = await synthesizeOwnVoiceToOss({
