@@ -107,6 +107,33 @@ export const AIM_TOOL_REGISTRY: readonly AimToolDefinition[] = Object.freeze([
     timeoutMs: 15_000,
     idempotent: true,
   },
+  {
+    name: "feishu_draft_write",
+    purpose: "把 AIM 草稿写入飞书文档（须 HITL 门闩）",
+    forbiddenWhen: "无 HITL 批准、对外发送客户、写知识库正本",
+    permission: "write",
+    allowInToolLoop: true,
+    timeoutMs: 20_000,
+    idempotent: true,
+  },
+  {
+    name: "mark_inspiration_processed",
+    purpose: "标记灵感已处理（幂等，可撤销）",
+    forbiddenWhen: "删除灵感、改他人项目、无 HITL 批准",
+    permission: "write",
+    allowInToolLoop: true,
+    timeoutMs: 5_000,
+    idempotent: true,
+  },
+  {
+    name: "review_attribution_loop",
+    purpose: "消费指标层产出周复盘初稿",
+    forbiddenWhen: "自动外发、跳过人工终审、正式模式未开",
+    permission: "write",
+    allowInToolLoop: false,
+    timeoutMs: 60_000,
+    idempotent: true,
+  },
 ])
 
 const BY_NAME = new Map(AIM_TOOL_REGISTRY.map((tool) => [tool.name, tool]))

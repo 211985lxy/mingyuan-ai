@@ -12,6 +12,13 @@ export default defineConfig({
     setupFiles: ["./__tests__/unit/setup-env.ts"],
     sequence: { concurrent: false },
     fileParallelism: false,
+    coverage: {
+      provider: "v8",
+      reporter: ["text-summary", "json-summary", "lcov"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/generated/**", "**/*.d.ts"],
+    },
   },
   resolve: {
     alias: {

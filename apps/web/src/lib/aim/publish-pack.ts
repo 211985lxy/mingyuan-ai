@@ -174,6 +174,47 @@ export function buildPublishPackSections(input: PublishPackInput): PublishPackSe
 /**
  * @description 拼成可复制的纯文本发布包
  */
+export interface PublishPackPayload {
+  generationId: string
+  title: string
+  topics: string[]
+  coverGuidance: string
+  /** 作品 ID 预留位，登记后由 WP-1.1 回流消费 */
+  awemeIdSlot: string | null
+  publishPlatform: string | null
+  publishUrl: string | null
+  /** 一键打开抖音创作者发布页（web），不自动外发 */
+  creatorIntentUrl: string
+}
+
+export const DOUYIN_CREATOR_UPLOAD_URL =
+  "https://creator.douyin.com/creator-micro/content/upload"
+
+export function buildPublishPackPayload(input: PublishPackInput): PublishPackPayload {
+  const sections = buildPublishPackSections(input)
+  const titleLine =
+    input.topicTitle?.trim() ||
+    sections.find((item) => item.key === "meta")?.body.split("\n")[1]?.replace("标题/封面建议：", "").trim() ||
+    "未命名内容"
+  const shooting = input.results.find((item) => item.format === "shooting_brief")?.content.trim()
+  const topics = [
+    input.topicTitle?.trim(),
+    ...(input.taskSpec && typeof input.taskSpec === "object"
+      ? [String((input.taskSpec as { contentTask?: unknown }).contentTask ?? "")].filter(Boolean)
+      : []),
+  ].filter((item): item is string => Boolean(item))
+  return {
+    generationId: input.generationId,
+    title: titleLine,
+    topics: [...new Set(topics)],
+    coverGuidance: shooting?.split("\n").find(Boolean)?.slice(0, 80) || titleLine,
+    awemeIdSlot: null,
+    publishPlatform: input.publishPlatform?.trim() || null,
+    publishUrl: input.publishUrl?.trim() || null,
+    creatorIntentUrl: DOUYIN_CREATOR_UPLOAD_URL,
+  }
+}
+
 export function formatPublishPackText(input: PublishPackInput): string {
   const sections = buildPublishPackSections(input)
   return sections.map((section) => `【${section.title}】\n${section.body}`).join("\n\n")

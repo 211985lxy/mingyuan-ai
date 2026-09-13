@@ -9,14 +9,14 @@ import {
 } from "@/lib/aim-agent-prompts"
 import { METHODOLOGY_INJECTION_PREFACE } from "@/lib/methodology/methodology-injection-preface"
 import { resolveContentProducerProgressiveFlags } from "@/lib/aim/progressive-prompt-flags"
+import { composeLayeredAimPrompt } from "@/lib/aim/layered-prompt"
 import {
-  AIM_INTERNAL_INTENT_GATE,
-  AIM_NORTH_STAR_GOAL,
   AIM_SESSION_PRIORITY_RULES,
-  LIGHT_EDIT_OUTPUT_BOUNDARY,
   LIGHT_EDIT_USER_INSTRUCTION,
-  RUNTIME_TASK_LABELS,
 } from "@/lib/aim-intent-boundaries"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import { buildPromptFewshotBlock } from "@/lib/aim-prompt-fewshots"
 import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
 import { continuationDirectiveBlockIfApplicable, formatAimTurnIntentBlock, looksLikePassagePolish, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
@@ -179,36 +179,7 @@ export function buildCompactWorkflowContext(
   return `${intentBlock}\n\n本次任务约束（听指令优先，但不得违背以下已确认事实）：\n${lines.join("\n")}`
 }
 
-export interface LayeredAimPromptInput {
-  roleBlock: string
-  runtimeTask?: string
-  taskConstraintExtra?: string
-  contextBlocks: string[]
-  formatBlock?: string
-  qualityRedlines: string[]
-}
-
-/**
- * 统一分层 Prompt：系统角色 → 任务约束 → 上下文素材 → 输出格式 → 质量红线。
- */
-export function composeLayeredAimPrompt(input: LayeredAimPromptInput): string {
-  const taskLabel = input.runtimeTask
-    ? (RUNTIME_TASK_LABELS[input.runtimeTask] || input.runtimeTask)
-    : "未标注"
-  const sections = [
-    `【系统角色】\n北极星目标：${AIM_NORTH_STAR_GOAL}\n\n${input.roleBlock}`,
-    [
-      `【任务约束】\n【任务类型: ${taskLabel}】`,
-      input.runtimeTask === "light_edit" ? LIGHT_EDIT_OUTPUT_BOUNDARY : null,
-      AIM_INTERNAL_INTENT_GATE,
-      input.taskConstraintExtra || null,
-    ].filter(Boolean).join("\n"),
-    `【上下文素材】\n${input.contextBlocks.filter(Boolean).join("\n\n") || "（无额外上下文）"}`,
-    input.formatBlock ? `【输出格式】\n${input.formatBlock}` : null,
-    `【质量红线】\n${input.qualityRedlines.filter(Boolean).join("\n")}`,
-  ]
-  return sections.filter(Boolean).join("\n\n")
-}
+export { composeLayeredAimPrompt, type LayeredAimPromptInput } from "@/lib/aim/layered-prompt"
 
 export async function executeGenerateLLMWithBenchmarkRetry(
   agentId: string,
@@ -498,18 +469,18 @@ ${includeBenchmarkGuardrail ? `- ${BENCHMARK_REWRITE_GUARDRAIL}` : ""}`
     ? `【待润色原文与要求】（只在此基础上润色，保持相近篇幅，禁止另起长口播/长文）\n"${context.rawInput}"`
     : `用户输入的原始内容：\n"${context.rawInput}"`
 
-  return `${rawInputBlock}
-
-${workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : ""}
-
-${contextInstruction}
-
-${topicLockBlock}
-
-${formatBlocks}
-
-${explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n` : ""}
-
-输出格式要求：
-${context.targetFormats.map((format) => `===FORMAT:${format}===\n（在这里输出${format}的内容）`).join("\n\n")}`
+  return fillPromptTemplate(
+    promptRegistry.get(PROMPT_KEYS.contentProducerGenerateUser).content,
+    {
+      rawInputBlock,
+      workflowSection: workflowContext ? `工作流上下文：\n${workflowContext}\n\n` : "",
+      contextInstruction,
+      topicLockBlock,
+      formatBlocks,
+      wordCountSection: explicitWordCountRule ? `字数冲突处理：${explicitWordCountRule}\n` : "",
+      formatMarkers: context.targetFormats
+        .map((format) => `===FORMAT:${format}===\n（在这里输出${format}的内容）`)
+        .join("\n\n"),
+    },
+  )
 }

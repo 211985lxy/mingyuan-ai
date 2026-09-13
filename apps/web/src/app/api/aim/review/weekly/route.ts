@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { env } from "@/env"
-import { computeWeeklyReview } from "@/lib/aim/weekly-review"
+import { computeOperatingLedger } from "@/lib/aim/metric-layer"
 import { computeTaskAttributionInsights, type AttributionInsightsStorePort } from "@/lib/aim/attribution-insights"
 import { generateWeeklyNarrative } from "@/lib/aim/weekly-review-narrative"
 import { fetchCreatorMetrics, type CreatorMetricsResponse } from "@/lib/aim/creator-metrics"
@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 平台表现与经营复盘并行读取；总线失败不拖垮复盘（error/not_configured 显式下传）
-    const [review, platformMetrics, taskInsights] = await Promise.all([
-      computeWeeklyReview({
+    const [ledger, platformMetrics, taskInsights] = await Promise.all([
+      computeOperatingLedger({
         userId: user.id,
         projectId,
         start,
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
         store: prisma as unknown as AttributionInsightsStorePort,
       }),
     ])
+    const review = ledger.weekly
     // 四段式周报长文：默认关（AIM_WEEKLY_NARRATIVE_ENABLED=true 且 ?narrative=1 才生成）
     let narrative: Record<string, unknown> | undefined
     if (params.get("narrative") === "1") {
@@ -77,7 +78,13 @@ export async function GET(request: NextRequest) {
         ? { enabled: true, ...(await generateWeeklyNarrative({ review, taskInsights })) }
         : { enabled: false }
     }
-    return NextResponse.json({ review, platformMetrics, taskInsights, ...(narrative ? { narrative } : {}) })
+    return NextResponse.json({
+      review,
+      metricLayer: ledger,
+      platformMetrics,
+      taskInsights,
+      ...(narrative ? { narrative } : {}),
+    })
   } catch (error) {
     if (error instanceof AccountProjectContextError || isAccountProjectContextError(error)) {
       const contextError = error as { message: string; code: string; status: number }

@@ -63,6 +63,8 @@ export function buildContextManifest(input: {
   /** 加载过的 skills；仅当预算后 methodologyBlock 仍含其片段才记入 manifest */
   skills?: LoadedAimSkill[]
   taskSpec?: import("@/lib/task-spec").TaskSpec | null
+  learnings?: Array<{ id: string; constraint: string }>
+  learningsBlock?: string
 }): AimContextSource[] {
   const { spec, knowledgeEntries, includedChars } = input
   const sources: AimContextSource[] = []
@@ -92,6 +94,16 @@ export function buildContextManifest(input: {
   pushBlockSource(sources, "market_viral", "viral_structure", input.viralStructureBlock)
   // 与 chat context-assembly 一致：kind=methodology, id=style_profile
   pushBlockSource(sources, "methodology", "style_profile", input.styleProfileBlock ?? "")
+  for (const learning of input.learnings ?? []) {
+    sources.push(withDefaultTrustLevel({
+      kind: "learnings",
+      id: `learning:${learning.id}`,
+      charCount: learning.constraint.length,
+      contentHash: sha256(learning.constraint),
+      trustLevel: "system_trusted",
+    }))
+  }
+  pushBlockSource(sources, "learnings", "learnings:block", input.learningsBlock ?? "")
 
   for (const skill of extractSkillsFromBudgetedBlock(
     input.methodologyBlock,

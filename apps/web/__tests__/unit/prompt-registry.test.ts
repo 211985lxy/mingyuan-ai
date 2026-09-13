@@ -210,9 +210,9 @@ describe("prompt-registry seed 与缓存", () => {
   })
 })
 
-describe("prompt-registry 内置 seed（批0~批3 共四十一个）", () => {
+describe("prompt-registry 内置 seed（批0~批4 主创作链）", () => {
   it("全部 key 注册且内容非空、key 唯一", () => {
-    expect(PROMPT_SEEDS).toHaveLength(41)
+    expect(PROMPT_SEEDS).toHaveLength(58)
     const seedKeys = PROMPT_SEEDS.map((seed) => seed.key)
     expect(new Set(seedKeys).size).toBe(seedKeys.length)
     for (const key of Object.values(PROMPT_KEYS)) {

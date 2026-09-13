@@ -18,7 +18,7 @@ export type PromptStatus = "draft" | "qualified" | "active"
 export type PromptContent = string
 
 /**
- * 批0 六个 + 批1 函数拼接型 24 个 + 批2 API 路由内联 7 个 key。
+ * 批0 六个 + 批1/批2/批3 + 批4 主创作链。
  * 新增 prompt 必须先在此登记。
  * 批1/批2 的 function 型 seed 以 `{name}` 占位（配合 fillPromptTemplate 使用），
  * 占位符名只能用 ASCII `\w` 字符。
@@ -74,6 +74,24 @@ export const PROMPT_KEYS = {
   contentRetroOutcomeMissing: "aim.content_retro.outcome_missing",
   contentRetroOutcomePresent: "aim.content_retro.outcome_present",
   workEditorKnowledgeFallback: "aim.work_editor.knowledge_fallback",
+  // ── 批4：主创作链（WP-1.2）──
+  freeCopywriterSystem: "aim.free_copywriter.system",
+  freeCopywriterGenerateUser: "aim.free_copywriter.generate_user",
+  businessSystemDiagnosisChat: "aim.business_system_diagnosis.chat",
+  businessSystemDiagnosisGenerate: "aim.business_system_diagnosis.generate",
+  businessSystemDiagnosisGenerateUser: "aim.business_system_diagnosis.generate_user",
+  businessDiagnosisChat: "aim.business_diagnosis.chat",
+  businessDiagnosisGenerate: "aim.business_diagnosis.generate",
+  businessDiagnosisGenerateUser: "aim.business_diagnosis.generate_user",
+  contentProducerChat: "aim.content_producer.chat",
+  contentProducerGenerateUser: "aim.content_producer.generate_user",
+  generationLayeredSystem: "aim.generation.layered_system",
+  unifiedProducerSystem: "aim.unified_content.producer_system",
+  unifiedProducerUser: "aim.unified_content.producer_user",
+  scriptGenerationMetaSystem: "aim.script_generation.meta_system",
+  scriptGenerationMetaUser: "aim.script_generation.meta_user",
+  scriptGenerationDirect: "aim.script_generation.direct",
+  scriptGenerationMetaText: "aim.script_generation.meta_text",
 } as const
 
 export type PromptKey = (typeof PROMPT_KEYS)[keyof typeof PROMPT_KEYS]

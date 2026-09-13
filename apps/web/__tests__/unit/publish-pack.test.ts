@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { formatPublishPackText } from "@/lib/aim/publish-pack"
+import { buildPublishPackPayload, DOUYIN_CREATOR_UPLOAD_URL, formatPublishPackText } from "@/lib/aim/publish-pack"
 import type { TaskSpec } from "@/lib/task-spec"
 
 const taskSpec = {
@@ -66,5 +66,26 @@ describe("formatPublishPackText", () => {
     expect(text).toContain("景别：近景")
     expect(text).toContain("生产方式：人工交接")
     expect(text).toContain("未产生可交付视频")
+  })
+
+  it("结构化载荷带标题、话题、封面指引和创作者页，不自动外发", () => {
+    const payload = buildPublishPackPayload({
+      generationId: "gen_1",
+      topicTitle: "案例拆解",
+      taskSpec,
+      results: [
+        { format: "video_script", content: "口播正文第一行\n第二行" },
+        { format: "shooting_brief", content: "景别：近景\n光线：自然光" },
+      ],
+      publishPlatform: "抖音",
+      publishUrl: "",
+    })
+    expect(payload.generationId).toBe("gen_1")
+    expect(payload.title).toContain("案例拆解")
+    expect(payload.topics).toContain("案例拆解")
+    expect(payload.coverGuidance).toContain("景别")
+    expect(payload.awemeIdSlot).toBeNull()
+    expect(payload.creatorIntentUrl).toBe(DOUYIN_CREATOR_UPLOAD_URL)
+    expect(payload.creatorIntentUrl).toContain("creator.douyin.com")
   })
 })

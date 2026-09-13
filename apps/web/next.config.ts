@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
@@ -46,4 +47,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+const composed = withNextIntl(nextConfig);
+
+// 没配 AUTH_TOKEN 时不包 webpack 插件，避免 CI / 本地 next build 去碰 Sentry。
+// DSN 是运行时开关：instrumentation 里 init，没 DSN 等于没接。
+export default process.env.SENTRY_AUTH_TOKEN
+  ? withSentryConfig(composed, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: true,
+      disableLogger: true,
+      automaticVercelMonitors: false,
+      widenClientFileUpload: false,
+    })
+  : composed;

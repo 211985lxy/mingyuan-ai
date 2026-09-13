@@ -13,6 +13,14 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/outcome-autofetch",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/publish-reminder",
+      "schedule": "0 10 * * *"
+    },
+    {
       "path": "/api/cron/outcome-flywheel",
       "schedule": "0 4 * * *"
     },

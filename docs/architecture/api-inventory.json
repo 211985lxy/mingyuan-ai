@@ -706,22 +706,6 @@
       "idempotency": false
     },
     {
-      "route": "/api/admin/automation-ledger",
-      "file": "src/app/api/admin/automation-ledger/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "domain": "admin/automation-ledger",
-      "kind": "management",
-      "orchestratable": false,
-      "auth": "admin_session",
-      "input": "none",
-      "query": "none",
-      "externalService": false,
-      "cost": "low",
-      "idempotency": false
-    },
-    {
       "route": "/api/admin/benchmark-profiles/[id]/import-analysis",
       "file": "src/app/api/admin/benchmark-profiles/[id]/import-analysis/route.ts",
       "methods": [
@@ -1827,22 +1811,6 @@
       "query": "manual",
       "externalService": false,
       "cost": "low",
-      "idempotency": false
-    },
-    {
-      "route": "/api/aim/data-export",
-      "file": "src/app/api/aim/data-export/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "domain": "aim",
-      "kind": "crud",
-      "orchestratable": false,
-      "auth": "user_session",
-      "input": "query",
-      "query": "manual",
-      "externalService": false,
-      "cost": "medium",
       "idempotency": false
     },
     {
@@ -3478,6 +3446,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/cron/outcome-autofetch",
+      "file": "src/app/api/cron/outcome-autofetch/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": false
+    },
+    {
       "route": "/api/cron/outcome-flywheel",
       "file": "src/app/api/cron/outcome-flywheel/route.ts",
       "methods": [
@@ -3494,8 +3478,8 @@
       "idempotency": false
     },
     {
-      "route": "/api/cron/prediction-reconcile",
-      "file": "src/app/api/cron/prediction-reconcile/route.ts",
+      "route": "/api/cron/publish-reminder",
+      "file": "src/app/api/cron/publish-reminder/route.ts",
       "methods": [
         "GET"
       ],
@@ -3506,7 +3490,7 @@
       "input": "none",
       "query": "none",
       "externalService": false,
-      "cost": "medium",
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -3523,6 +3507,38 @@
       "query": "none",
       "externalService": false,
       "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/topic-evening",
+      "file": "src/app/api/cron/topic-evening/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/topic-noon",
+      "file": "src/app/api/cron/topic-noon/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
       "idempotency": false
     },
     {
@@ -3972,7 +3988,7 @@
       "auth": "signed_integration",
       "input": "bounded_json_object",
       "query": "none",
-      "externalService": true,
+      "externalService": false,
       "cost": "high",
       "idempotency": true
     },

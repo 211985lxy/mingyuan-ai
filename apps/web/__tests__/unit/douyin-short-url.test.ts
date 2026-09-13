@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   extractDouyinAwemeId,
+  normalizeDouyinAwemeId,
   resolveDouyinAwemeId,
   resolveDouyinShortUrl,
 } from "@/lib/douyin-short-url"
@@ -14,6 +15,12 @@ describe("抖音短链解析", () => {
     expect(extractDouyinAwemeId("https://www.douyin.com/video/7123456789012345678")).toBe("7123456789012345678")
     expect(extractDouyinAwemeId("https://www.iesdouyin.com/share/video/7123456789012345678/")).toBe("7123456789012345678")
     expect(extractDouyinAwemeId("https://v.douyin.com/AbCdEf/")).toBeNull()
+  })
+
+  it("normalize 接受纯数字作品 ID 和 modal_id", () => {
+    expect(normalizeDouyinAwemeId("7123456789012345678")).toBe("7123456789012345678")
+    expect(normalizeDouyinAwemeId("https://www.douyin.com/discover?modal_id=7123456789012345678")).toBe("7123456789012345678")
+    expect(normalizeDouyinAwemeId("dy_123")).toBeNull()
   })
 
   it("短链 302 成功后解析出 aweme_id", async () => {

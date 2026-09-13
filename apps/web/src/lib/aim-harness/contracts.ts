@@ -230,6 +230,8 @@ export interface PreparedAimContext {
     selectedMethodology: string
     /** 对话记忆（generate 路径此前未接入，阶段 2 接入） */
     memory?: string
+    /** 已批准学习约束（WP-2.2 第五路） */
+    learnings?: string
     /** chat 场景的对话上下文块 */
     conversation?: string
     /** 竞品监控（chat 专有） */

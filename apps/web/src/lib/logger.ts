@@ -1,3 +1,4 @@
+import { bindRequestIdToSentry } from "@/lib/observability/sentry-scope"
 import { env } from "@/env"
 import pino from "pino"
 import { createHash, randomUUID } from "node:crypto"
@@ -30,6 +31,7 @@ export function createRequestLogger(context: {
   userIdHash?: string
   path?: string
 }) {
+  bindRequestIdToSentry(context.requestId)
   return logger.child(context)
 }
 

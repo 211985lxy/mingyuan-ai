@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule Mingyuan publish reminder daily at 10:00
+
+[Timer]
+OnCalendar=*-*-* 10:00:00
+AccuracySec=5m
+Persistent=true
+Unit=mingyuan-cron-publish-reminder.service
+
+[Install]
+WantedBy=timers.target

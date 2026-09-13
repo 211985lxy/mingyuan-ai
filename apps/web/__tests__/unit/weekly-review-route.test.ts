@@ -3,24 +3,40 @@ import { NextRequest } from "next/server"
 
 // 每周经营复盘路由测试（90 天计划 3.3）。
 
-const { authenticateRequest, authErrorResponse, computeWeeklyReview, computeTaskAttributionInsights, fetchCreatorMetrics, projectFindFirst, resolveBoundProject } = vi.hoisted(() => ({
+const { authenticateRequest, authErrorResponse, computeOperatingLedger, computeTaskAttributionInsights, fetchCreatorMetrics, projectFindFirst, resolveBoundProject } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(async () => ({ id: "user-1" })),
   authErrorResponse: vi.fn(() => null),
   fetchCreatorMetrics: vi.fn(async (_input: { start: Date; end: Date }) => ({
     status: "not_configured",
     message: "未配置创作者数据总线的飞书 Base",
   })),
-  computeWeeklyReview: vi.fn(async (_input: { userId: string; start: Date; end: Date }) => ({
+  computeOperatingLedger: vi.fn(async (_input: { userId: string; start: Date; end: Date }) => ({
     periodStart: "2026-07-11T00:00:00.000Z",
     periodEnd: "2026-07-18T00:00:00.000Z",
-    publishedCount: 3,
-    qualifiedLeadCount: 5,
-    appointmentCount: 2,
-    dealCount: 1,
-    revenue: 9800,
-    referencedAssetCount: 4,
-    reusedAssetCount: 2,
-    day7Backfill: { due: 3, filled: 2 },
+    source: "metric-layer",
+    weekly: {
+      periodStart: "2026-07-11T00:00:00.000Z",
+      periodEnd: "2026-07-18T00:00:00.000Z",
+      publishedCount: 3,
+      qualifiedLeadCount: 5,
+      appointmentCount: 2,
+      dealCount: 1,
+      revenue: 9800,
+      referencedAssetCount: 4,
+      reusedAssetCount: 2,
+      day7Backfill: { due: 3, filled: 2 },
+    },
+    canonical: {
+      publishedCount: 3,
+      traceableLeadCount: 2,
+      unknownLeadCount: 1,
+      appointmentCount: 0,
+      dealCount: 1,
+      revenue: 9800,
+      referencedAssetCount: 4,
+      reusedAssetCount: 2,
+      day7Backfill: { due: 3, filled: 2 },
+    },
   })),
   computeTaskAttributionInsights: vi.fn(async (_input: { userId: string; start: Date; end: Date }) => [
     {
@@ -37,7 +53,7 @@ const { authenticateRequest, authErrorResponse, computeWeeklyReview, computeTask
 }))
 
 vi.mock("@/lib/user-auth", () => ({ authenticateRequest, authErrorResponse }))
-vi.mock("@/lib/aim/weekly-review", () => ({ computeWeeklyReview }))
+vi.mock("@/lib/aim/metric-layer", () => ({ computeOperatingLedger }))
 vi.mock("@/lib/aim/attribution-insights", () => ({ computeTaskAttributionInsights }))
 vi.mock("@/lib/aim/creator-metrics", () => ({ fetchCreatorMetrics }))
 vi.mock("@/lib/prisma", () => ({ prisma: { clientProject: { findFirst: projectFindFirst } } }))
@@ -60,7 +76,8 @@ describe("GET /api/aim/review/weekly", () => {
     const body = await res.json()
     expect(body.review.publishedCount).toBe(3)
     expect(body.review.day7Backfill).toEqual({ due: 3, filled: 2 })
-    expect(computeWeeklyReview).toHaveBeenCalledWith(
+    expect(body.metricLayer.source).toBe("metric-layer")
+    expect(computeOperatingLedger).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user-1" }),
     )
   })
@@ -92,7 +109,7 @@ describe("GET /api/aim/review/weekly", () => {
       new NextRequest("http://localhost/api/aim/review/weekly?start=2026-07-06&end=2026-07-13"),
     )
     expect(res.status).toBe(200)
-    const call = computeWeeklyReview.mock.calls[0][0]
+    const call = computeOperatingLedger.mock.calls[0][0]
     expect(call.start.toISOString()).toContain("2026-07-06")
     expect(call.end.toISOString()).toContain("2026-07-13")
   })
@@ -101,7 +118,7 @@ describe("GET /api/aim/review/weekly", () => {
     const res = await GET(new NextRequest("http://localhost/api/aim/review/weekly?projectId=project-1"))
     expect(res.status).toBe(200)
     expect(resolveBoundProject).toHaveBeenCalledWith({ userId: "user-1", requestedProjectId: "project-1" })
-    expect(computeWeeklyReview).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project-1" }))
+    expect(computeOperatingLedger).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project-1" }))
   })
 
   it("拒绝其他用户的项目", async () => {

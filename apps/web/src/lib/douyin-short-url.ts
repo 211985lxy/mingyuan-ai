@@ -6,6 +6,23 @@ export function extractDouyinAwemeId(url: string): string | null {
   return match?.[1] ?? null
 }
 
+/** 作品链接、modal_id 或纯数字作品 ID → aweme_id；解析不了就返回 null，不猜测。 */
+export function normalizeDouyinAwemeId(urlOrId: string): string | null {
+  const trimmed = urlOrId.trim()
+  if (!trimmed) return null
+  if (/^\d{5,}$/.test(trimmed)) return trimmed
+  const fromPath = extractDouyinAwemeId(trimmed)
+  if (fromPath) return fromPath
+  try {
+    const parsed = new URL(trimmed)
+    const fromQuery = parsed.searchParams.get("modal_id") || parsed.searchParams.get("aweme_id")
+    if (fromQuery && /^\d{5,}$/.test(fromQuery)) return fromQuery
+  } catch {
+    // 不是 URL
+  }
+  return null
+}
+
 export function isDouyinShortUrl(url: string): boolean {
   return /v\.douyin\.com/i.test(url)
 }
@@ -27,8 +44,8 @@ export async function resolveDouyinShortUrl(url: string): Promise<string> {
 }
 
 export async function resolveDouyinAwemeId(url: string): Promise<string | null> {
-  const direct = extractDouyinAwemeId(url)
+  const direct = normalizeDouyinAwemeId(url)
   if (direct) return direct
   if (!isDouyinShortUrl(url)) return null
-  return extractDouyinAwemeId(await resolveDouyinShortUrl(url))
+  return normalizeDouyinAwemeId(await resolveDouyinShortUrl(url))
 }

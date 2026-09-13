@@ -11,6 +11,8 @@ import {
   type PlatformVideo,
 } from "@/lib/data-platform/summary-mapping"
 import { isRowVisibleToProject } from "@/lib/data-platform/row-ownership"
+import { computeOperatingLedger } from "@/lib/aim/metric-layer"
+import { prisma } from "@/lib/prisma"
 
 export type { PlatformAccount, PlatformVideo } from "@/lib/data-platform/summary-mapping"
 
@@ -22,6 +24,8 @@ export type PlatformSummaryResponse =
       accounts: PlatformAccount[]
       recentVideos: PlatformVideo[]
       fetchedAt: string
+      /** 指标层并行数据源（WP-2.1）；飞书 Base 仍是采集正本 */
+      metricLayer?: unknown
       /** true=部分表读取失败（对应数组为空是「读不到」而非「没数据」），前端应提示而非空态误导 */
       degraded?: boolean
       /** 读取失败的表与原因摘要（stderr 根因，已脱敏） */
@@ -129,6 +133,7 @@ function buildSummaryResponse(
   accounts: PlatformAccount[],
   recentVideos: PlatformVideo[],
   failures: LarkFailure[],
+  metricLayer?: unknown,
 ) {
   const sorted = [...recentVideos].sort((a, b) => {
     const at = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
@@ -140,6 +145,7 @@ function buildSummaryResponse(
     accounts,
     recentVideos: sorted,
     fetchedAt: new Date().toISOString(),
+    ...(metricLayer ? { metricLayer } : {}),
     ...(failures.length ? { degraded: true, degradedReasons: failures.map((f) => `${f.table}: ${f.reason}`) } : {}),
   }
   return NextResponse.json(response as unknown)
@@ -171,8 +177,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const tasks = buildLarkFetchTasks(baseToken, projectId, accountTableId, videoTableId)
-    const results = await Promise.all(tasks)
+    const end = new Date()
+    const start = new Date(end.getTime() - 7 * 24 * 3600 * 1000)
+    const [results, metricLayer] = await Promise.all([
+      Promise.all(tasks),
+      computeOperatingLedger({
+        userId: user.id,
+        ...(projectId ? { projectId } : {}),
+        start,
+        end,
+        store: prisma as unknown as Parameters<typeof computeOperatingLedger>[0]["store"],
+      }).catch(() => ({ status: "unavailable" as const, message: "指标层暂不可用" })),
+    ])
     const failures = results.map((r) => r.failure).filter(Boolean) as LarkFailure[]
-    return buildSummaryResponse(results[0].mapped as PlatformAccount[], results[1].mapped as PlatformVideo[], failures)
+    return buildSummaryResponse(results[0].mapped as PlatformAccount[], results[1].mapped as PlatformVideo[], failures, metricLayer)
   } catch (err) { return buildPlatformErrorResponse(err) }
 }
