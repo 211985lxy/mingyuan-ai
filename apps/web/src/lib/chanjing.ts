@@ -44,6 +44,28 @@ function assertConfigured(): void {
   }
 }
 
+/**
+ * 规范化 access_token 的有效期。
+ *
+ * 规范仅注明 expire_in 为「过期时间（整数秒）」，实测供应商返回的是**绝对 Unix
+ * 秒级时间戳**（如 1789382258 ≈ 24 小时后），而非相对时长。若按相对时长缓存，
+ * 有效期会被算成数十年，导致永不主动刷新（仅靠 10400 重试兜底）。
+ * 这里按数量级判别三种形态，并对异常远期值设上限，避免缓存“永久”令牌。
+ */
+const ACCESS_TOKEN_MAX_TTL_MS = 6 * 60 * 60 * 1000
+
+export function resolveAccessTokenExpiry(expireIn: number | null | undefined, now = Date.now()): number {
+  if (typeof expireIn !== "number" || !Number.isFinite(expireIn) || expireIn <= 0) {
+    return now + 5 * 60 * 1000
+  }
+  const absoluteMs = expireIn >= 1e12
+    ? expireIn               // 毫秒时间戳
+    : expireIn >= 1e9
+      ? expireIn * 1000      // 秒级绝对时间戳（实测形态）
+      : now + expireIn * 1000 // 相对秒数
+  return Math.min(Math.max(absoluteMs, now + 60_000), now + ACCESS_TOKEN_MAX_TTL_MS)
+}
+
 async function getAccessToken(forceRefresh = false): Promise<string> {
   assertConfigured()
   if (
@@ -70,7 +92,7 @@ async function getAccessToken(forceRefresh = false): Promise<string> {
 
   cachedToken = {
     token: json.data.access_token,
-    expiresAt: Date.now() + Math.max(json.data.expire_in, 300) * 1000,
+    expiresAt: resolveAccessTokenExpiry(json.data.expire_in),
   }
   return cachedToken.token
 }
