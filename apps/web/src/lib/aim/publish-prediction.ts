@@ -38,6 +38,7 @@ export function buildBaselinePrediction(
   baseline: AccountBaseline,
   windowDay: number,
   hashInput: string,
+  metricLabel = "播放",
 ): PredictionRange {
   const factor = WINDOW_FACTORS[windowDay] ?? 1
   const low = Math.max(0, Math.floor(baseline.p25Views * factor))
@@ -45,9 +46,12 @@ export function buildBaselinePrediction(
   const confidence: PredictionConfidence =
     baseline.sampleSize >= 10 ? "high" : baseline.sampleSize >= 5 ? "medium" : "low"
   const digest = [
-    `账号基线：最近 ${baseline.sampleSize} 条作品的播放四分位 P25=${baseline.p25Views} / 中位=${baseline.medianViews} / P75=${baseline.p75Views}。`,
+    `账号基线：最近 ${baseline.sampleSize} 条作品的${metricLabel}四分位 P25=${baseline.p25Views} / 中位=${baseline.medianViews} / P75=${baseline.p75Views}。`,
     `${windowDay} 天窗口预测区间 [${low}, ${high}]（置信度 ${confidence}）：区间来自账号真实历史，不是拍脑袋。`,
-  ].join("\n")
+    metricLabel === "点赞" ? "注：抖音不对外公开播放量，本预测按点赞口径。" : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
   return { low, high, confidence, rationaleDigest: digest, baselineHash: sha256Hex(`${hashInput}:${digest}`) }
 }
 

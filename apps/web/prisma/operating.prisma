@@ -214,6 +214,11 @@ model PublishPrediction {
   confidence      String    @db.VarChar(16) // low | medium | high（按基线样本量）
   rationaleDigest String?   @db.Text // 预测依据摘要（账号基线 + 样本量），人可读
   baselineHash    String?   @db.VarChar(64) // 基线摘要哈希（溯源账号历史快照）
+  /**
+   * 预测与对账所用的指标：抖音不对外公开播放量（第三方通道 play_count 恒为 0），
+   * 播放无信号时回落 likes，避免"预测 0 vs 实际 0"的空转。
+   */
+  metric          String    @default("views") @db.VarChar(16) // views | likes
   verdict         String?   @db.VarChar(16) // within | over | under（对账后回填）
   deviationRatio  Decimal?  @db.Decimal(10, 4) // 实际/预测中位
   actualViews     Int?

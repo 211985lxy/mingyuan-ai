@@ -9,6 +9,13 @@
 
 import { prisma } from "@/lib/prisma"
 import {
+  readMetricValue,
+  readWorkStats,
+  resolveEngagementMetric,
+  type EngagementMetric,
+  type WorkStats,
+} from "@/lib/aim/account-work-assets"
+import {
   buildBaselinePrediction,
   type AccountBaseline,
 } from "@/lib/aim/publish-prediction"
@@ -22,19 +29,32 @@ export interface PublishPredictionTriggerResult {
   detail?: string
 }
 
-export function buildBaselineFromSortedViews(views: number[]): AccountBaseline | null {
-  if (views.length < BASELINE_MIN_SAMPLE) return null
+export function buildBaselineFromSortedValues(values: number[]): AccountBaseline | null {
+  if (values.length < BASELINE_MIN_SAMPLE) return null
   const pick = (ratio: number): number => {
-    const index = Math.min(views.length - 1, Math.floor(ratio * views.length))
-    return views[index]
+    const index = Math.min(values.length - 1, Math.floor(ratio * values.length))
+    return values[index]
   }
-  const mid = Math.floor(views.length / 2)
+  const mid = Math.floor(values.length / 2)
   const median =
-    views.length % 2 === 1 ? views[mid] : Math.round((views[mid - 1] + views[mid]) / 2)
-  return { sampleSize: views.length, p25Views: pick(0.25), medianViews: median, p75Views: pick(0.75) }
+    values.length % 2 === 1 ? values[mid] : Math.round((values[mid - 1] + values[mid]) / 2)
+  return { sampleSize: values.length, p25Views: pick(0.25), medianViews: median, p75Views: pick(0.75) }
 }
 
-export async function computeAccountBaseline(projectId: string): Promise<AccountBaseline | null> {
+export interface AccountBaselineResult {
+  baseline: AccountBaseline
+  metric: EngagementMetric
+  metricLabel: string
+}
+
+/**
+ * 取账号基线：抖音不对外公开播放量（第三方通道 play_count 恒为 0），
+ * 播放无信号时按点赞算基线，并把所用指标返回给调用方落库
+ * ——否则会得到"预测 0 vs 实际 0"的空转预测。
+ */
+export async function computeAccountBaselineDetailed(
+  projectId: string,
+): Promise<AccountBaselineResult | null> {
   const since = new Date(Date.now() - BASELINE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
   const rows = await prisma.accountWorkAsset.findMany({
     where: { projectId, platform: "douyin", publishedAt: { gte: since } },
@@ -42,15 +62,18 @@ export async function computeAccountBaseline(projectId: string): Promise<Account
     orderBy: { publishedAt: "desc" },
     take: 100,
   })
-  const views = rows
-    .map((row) => {
-      const stats = row.stats as Record<string, unknown> | null
-      const value = stats?.views
-      return typeof value === "number" && Number.isFinite(value) ? value : null
-    })
-    .filter((value): value is number => value !== null)
+  const statsList = rows
+    .map((row) => readWorkStats(row.stats))
+    .filter((stats) => Object.keys(stats).length > 0)
+  if (statsList.length === 0) return null
+
+  const { metric, label } = resolveEngagementMetric(statsList.map((stats) => ({ stats })))
+  const values = statsList
+    .map((stats) => readMetricValue(stats, metric))
     .sort((a, b) => a - b)
-  return buildBaselineFromSortedViews(views)
+  const baseline = buildBaselineFromSortedValues(values)
+  if (!baseline) return null
+  return { baseline, metric, metricLabel: label }
 }
 
 export async function createPublishPredictionOnRegister(input: {
@@ -66,10 +89,15 @@ export async function createPublishPredictionOnRegister(input: {
     })
     if (existing) return { created: false, reason: "already_exists" }
 
-    const baseline = await computeAccountBaseline(input.projectId)
-    if (!baseline) return { created: false, reason: "no_baseline", detail: "近 90 天作品不足 3 条" }
+    const baselineResult = await computeAccountBaselineDetailed(input.projectId)
+    if (!baselineResult) return { created: false, reason: "no_baseline", detail: "近 90 天作品不足 3 条" }
 
-    const prediction = buildBaselinePrediction(baseline, 7, input.projectId)
+    const prediction = buildBaselinePrediction(
+      baselineResult.baseline,
+      7,
+      input.projectId,
+      baselineResult.metricLabel,
+    )
     await prisma.publishPrediction.create({
       data: {
         userId: input.userId,
@@ -81,6 +109,7 @@ export async function createPublishPredictionOnRegister(input: {
         confidence: prediction.confidence,
         rationaleDigest: prediction.rationaleDigest,
         baselineHash: prediction.baselineHash,
+        metric: baselineResult.metric,
       },
     })
     return { created: true, reason: "created" }

@@ -5,7 +5,9 @@ import {
   buildAccountHistoryDigest,
   dedupeAndMergeWorks,
   planTranscriptExtraction,
+  readMetricValue,
   readWorkStats,
+  resolveEngagementMetric,
   type AccountWorkLike,
 } from "@/lib/aim/account-work-assets"
 
@@ -92,9 +94,11 @@ describe("buildAccountHistoryDigest", () => {
     expect(first.hash).toBe(second.hash)
     expect(first.totalWorks).toBe(2)
     expect(first.publishedWithinWindow).toBe(1)
-    expect(first.topWorks[0]?.title).toBe("老作品B") // 按播放排序，不看窗口
+    expect(first.topWorks[0]?.title).toBe("老作品B") // 按互指标排序，不看窗口
+    expect(first.metric).toBe("views") // 有播放信号时用播放
     expect(first.digest).toContain("共 2 条作品")
     expect(first.digest).toContain("爆款A")
+    expect(first.digest).toContain("按播放")
   })
 
   it("空账号也给可注入的摘要", () => {
@@ -110,5 +114,35 @@ describe("readWorkStats", () => {
     expect(readWorkStats({ views: 10, likes: "x", comments: NaN, saves: 2 })).toEqual({ views: 10, saves: 2 })
     expect(readWorkStats(null)).toEqual({})
     expect(readWorkStats("junk")).toEqual({})
+  })
+})
+
+describe("resolveEngagementMetric（抖音不公开播放量时回落点赞）", () => {
+  it("播放有信号时用播放", () => {
+    const result = resolveEngagementMetric([
+      { stats: { views: 100, likes: 5 } },
+      { stats: { views: 0, likes: 900 } },
+    ])
+    expect(result.metric).toBe("views")
+    expect(result.label).toBe("播放")
+  })
+
+  it("播放全为 0（第三方通道实测情形）时回落点赞", () => {
+    const works = [
+      { externalWorkId: "w1", title: "爆款", coverUrl: null, publishedAt: "2026-09-10T00:00:00.000Z", stats: { views: 0, likes: 8546 }, transcript: null, transcriptStatus: "none" as const, transcriptAttempts: 0 },
+      { externalWorkId: "w2", title: "普通", coverUrl: null, publishedAt: "2026-09-01T00:00:00.000Z", stats: { views: 0, likes: 12 }, transcript: null, transcriptStatus: "none" as const, transcriptAttempts: 0 },
+    ]
+    const digest = buildAccountHistoryDigest(works, { now: NOW })
+    expect(digest.metric).toBe("likes")
+    expect(digest.digest).toContain("按点赞")
+    expect(digest.digest).toContain("点赞 8546")
+    expect(digest.digest).toContain("抖音不对外公开播放量")
+    expect(digest.topWorks[0]?.title).toBe("爆款")
+  })
+
+  it("readMetricValue 按指标取值", () => {
+    expect(readMetricValue({ views: 10, likes: 3 }, "views")).toBe(10)
+    expect(readMetricValue({ views: 10, likes: 3 }, "likes")).toBe(3)
+    expect(readMetricValue({}, "views")).toBe(0)
   })
 })

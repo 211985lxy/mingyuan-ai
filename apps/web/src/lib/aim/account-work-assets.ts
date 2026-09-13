@@ -129,9 +129,31 @@ export function planTranscriptExtraction(
 export interface AccountHistoryDigest {
   totalWorks: number
   publishedWithinWindow: number
-  topWorks: Array<{ title: string; views: number }>
+  topWorks: Array<{ title: string; value: number; metric: EngagementMetric }>
+  /** 实际用于排序的指标（抖音不对外公开播放量时回落为点赞） */
+  metric: EngagementMetric
+  metricLabel: string
   digest: string
   hash: string
+}
+
+export type EngagementMetric = "views" | "likes"
+
+/**
+ * 选择有效互指标：抖音已不对外公开播放量（第三方通道 play_count 恒为 0，
+ * 2026-09-13 生产实测 23/23 条为 0），若播放全为 0 则回落点赞，
+ * 避免把"播放 0"当成事实喂给模型或作为预测基线。
+ */
+export function resolveEngagementMetric(works: Array<{ stats: WorkStats }>): {
+  metric: EngagementMetric
+  label: string
+} {
+  const hasViewSignal = works.some((work) => (work.stats.views ?? 0) > 0)
+  return hasViewSignal ? { metric: "views", label: "播放" } : { metric: "likes", label: "点赞" }
+}
+
+export function readMetricValue(stats: WorkStats, metric: EngagementMetric): number {
+  return metric === "views" ? (stats.views ?? 0) : (stats.likes ?? 0)
 }
 
 /**
@@ -153,18 +175,27 @@ export function buildAccountHistoryDigest(
     return time !== null && nowTime - time <= windowDays * 24 * 60 * 60 * 1000
   })
 
+  const { metric, label } = resolveEngagementMetric(sorted)
+
   const topWorks = sorted
     .slice()
-    .sort((a, b) => (b.stats.views ?? 0) - (a.stats.views ?? 0))
+    .sort((a, b) => readMetricValue(b.stats, metric) - readMetricValue(a.stats, metric))
     .slice(0, 5)
-    .map((work) => ({ title: work.title, views: work.stats.views ?? 0 }))
+    .map((work) => ({
+      title: work.title,
+      value: readMetricValue(work.stats, metric),
+      metric,
+    }))
 
   const lines: string[] = []
   lines.push(`账号历史发布：共 ${sorted.length} 条作品，近 ${windowDays} 天 ${withinWindow.length} 条。`)
   if (topWorks.length > 0) {
-    lines.push("历史表现最好的作品（按播放）：")
+    lines.push(`历史表现最好的作品（按${label}）：`)
     for (const [index, item] of topWorks.entries()) {
-      lines.push(`${index + 1}. ${item.title}（播放 ${item.views}）`)
+      lines.push(`${index + 1}. ${item.title}（${label} ${item.value}）`)
+    }
+    if (metric === "likes") {
+      lines.push("注：抖音不对外公开播放量，以上按点赞排序。")
     }
   }
 
@@ -174,6 +205,8 @@ export function buildAccountHistoryDigest(
     totalWorks: sorted.length,
     publishedWithinWindow: withinWindow.length,
     topWorks,
+    metric,
+    metricLabel: label,
     digest,
     hash,
   }
