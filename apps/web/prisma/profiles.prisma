@@ -86,6 +86,8 @@ model ClientProject {
   boundAccounts          User[]                      @relation("AccountBoundProject")
   members                ProjectMember[]
   aimGenerations         AimGeneration[]
+  avatars                Avatar[]
+  videoTasks             VideoTask[]
   knowledgeEntries       KnowledgeEntry[]
   knowledgeEntities      KnowledgeEntity[]
   assetCandidates        AssetCandidate[]

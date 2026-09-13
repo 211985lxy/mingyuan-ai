@@ -156,7 +156,7 @@ describe("Fish Audio 声音克隆", () => {
     process.env.FISH_AUDIO_API_KEY = "test-fish-key"
     vi.resetModules()
     const { cloneVoiceModel } = await import("@/lib/voice/fish-audio")
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ _id: "model-1" }), { status: 200 }))
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ _id: "model-1" }), { status: 200 }))
     vi.stubGlobal("fetch", fetchMock)
 
     await cloneVoiceModel({

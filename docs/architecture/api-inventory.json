@@ -1298,6 +1298,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/tasks/[id]/retry",
+      "file": "src/app/api/admin/tasks/[id]/retry/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "admin/tasks",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/admin/templates/[id]/archive",
       "file": "src/app/api/admin/templates/[id]/archive/route.ts",
       "methods": [
@@ -2525,6 +2541,23 @@
       "idempotency": false
     },
     {
+      "route": "/api/auth/auth-video",
+      "file": "src/app/api/auth/auth-video/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "domain": "auth",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/auth/dev-login",
       "file": "src/app/api/auth/dev-login/route.ts",
       "methods": [
@@ -2682,6 +2715,56 @@
       "query": "none",
       "externalService": false,
       "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/avatars/[id]/retry",
+      "file": "src/app/api/avatars/[id]/retry/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "avatars",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
+      "route": "/api/avatars/[id]",
+      "file": "src/app/api/avatars/[id]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "domain": "avatars",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/avatars",
+      "file": "src/app/api/avatars/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "domain": "avatars",
+      "kind": "capability",
+      "orchestratable": true,
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
       "idempotency": false
     },
     {
@@ -3464,6 +3547,22 @@
     {
       "route": "/api/cron/outcome-flywheel",
       "file": "src/app/api/cron/outcome-flywheel/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "cron",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "cron_secret",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/cron/poll-tasks",
+      "file": "src/app/api/cron/poll-tasks/route.ts",
       "methods": [
         "GET"
       ],
@@ -4512,6 +4611,71 @@
       "idempotency": false
     },
     {
+      "route": "/api/tasks/[id]/retry-transfer",
+      "file": "src/app/api/tasks/[id]/retry-transfer/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "tasks",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
+      "route": "/api/tasks/[id]/retry",
+      "file": "src/app/api/tasks/[id]/retry/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "tasks",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": false,
+      "cost": "low",
+      "idempotency": true
+    },
+    {
+      "route": "/api/tasks/[id]",
+      "file": "src/app/api/tasks/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "domain": "tasks",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "none",
+      "query": "none",
+      "externalService": true,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
+      "route": "/api/tasks",
+      "file": "src/app/api/tasks/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "domain": "tasks",
+      "kind": "capability",
+      "orchestratable": true,
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "manual",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": false
+    },
+    {
       "route": "/api/templates/[id]/generate",
       "file": "src/app/api/templates/[id]/generate/route.ts",
       "methods": [
@@ -4804,6 +4968,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/webhook/chanjing",
+      "file": "src/app/api/webhook/chanjing/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "webhook",
+      "kind": "capability",
+      "orchestratable": true,
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
+    },
+    {
       "route": "/api/webhook/inspiration",
       "file": "src/app/api/webhook/inspiration/route.ts",
       "methods": [
@@ -4818,6 +4998,22 @@
       "externalService": false,
       "cost": "low",
       "idempotency": false
+    },
+    {
+      "route": "/api/webhook/shanjian",
+      "file": "src/app/api/webhook/shanjian/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "webhook",
+      "kind": "capability",
+      "orchestratable": true,
+      "auth": "signed_integration",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": false,
+      "cost": "high",
+      "idempotency": true
     }
   ]
 }

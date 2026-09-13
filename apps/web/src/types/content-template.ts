@@ -86,3 +86,16 @@ export const TEMPLATE_TRANSITIONS: Record<TemplateStatus, TemplateStatus[]> = {
   published: ["archived"],
   archived: ["published"],
 }
+
+
+export type VideoType =
+  | "virtualman_broadcast"
+  | "realman_broadcast"
+  | "broadcast_mixcut"
+  | "news_mixcut"
+
+export const PLAN_CONCURRENCY_LIMITS: Record<string, number> = {
+  free: 1,
+  basic: 3,
+  pro: 5,
+}

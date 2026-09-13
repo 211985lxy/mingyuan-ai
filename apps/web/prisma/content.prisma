@@ -32,6 +32,7 @@ model Script {
   ipProfile     IpProfile?            @relation(fields: [ipProfileId], references: [id])
   structure     VideoStructure?       @relation(fields: [structureId], references: [id])
   project       ClientProject?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  videoTasks    VideoTask[]
 
   @@index([userId])
   @@index([userId, status])
@@ -41,7 +42,6 @@ model Script {
   @@index([topicSelectionId])
   @@index([userId, projectId, createdAt(sort: Desc)])
 }
-
 model ContentGenerationRun {
   id                String   @id @default(cuid())
   userId            String
@@ -83,7 +83,6 @@ model ContentGenerationRun {
   @@index([topicSelectionId])
   @@index([userId, projectId, createdAt(sort: Desc)])
 }
-
 model HotTopicFitCache {
   id          String   @id @default(cuid())
   cacheKey    String   @unique
@@ -99,7 +98,6 @@ model HotTopicFitCache {
   @@index([topicId, templateId, structureId])
   @@index([ipProfileId, updatedAt])
 }
-
 model VideoStructure {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -123,12 +121,13 @@ model VideoStructure {
 
   scripts               Script[]
   contentGenerationRuns ContentGenerationRun[]
+  videoTasks            VideoTask[]
+  productionPlans       VideoProductionPlan[]
 
   @@index([status, sortOrder])
   @@index([origin, status])
   @@index([userId, createdAt(sort: Desc)])
 }
-
 model TopicElement {
   id            String   @id @default(cuid())
   code          String   @unique
@@ -143,7 +142,6 @@ model TopicElement {
 
   @@index([status, sortOrder])
 }
-
 model OpeningType {
   id          String   @id @default(cuid())
   code        String   @unique
@@ -158,7 +156,6 @@ model OpeningType {
 
   @@index([status, sortOrder])
 }
-
 model CopyStructure {
   id          String   @id @default(cuid())
   code        String   @unique
@@ -173,7 +170,6 @@ model CopyStructure {
 
   @@index([status, sortOrder])
 }
-
 model EndingType {
   id          String   @id @default(cuid())
   code        String   @unique
@@ -237,6 +233,10 @@ model ContentTemplate {
   tags                Json      @default("[]") // JSON array of display tags
   hotTopicKeywords    Json      @default("[]") // JSON array for hot topic matching
   seasonalEvents      Json      @default("[]") // JSON array of {id, startDate, endDate}
+  shanjianStyleId     String?
+  videoType           String    @default("virtualman_broadcast")
+  packRulesJson       Json?
+  processRulesJson    Json?
   status              String    @default("draft") // draft | published | archived
   sortOrder           Int       @default(0)
   featured            Boolean   @default(false)
