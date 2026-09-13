@@ -16,7 +16,7 @@ async function reconcilePendingPredictions(now: Date): Promise<{ scanned: number
     where: { reconciledAt: null },
     orderBy: { createdAt: "asc" },
     take: 200,
-    select: { id: true, userId: true, projectId: true, generationId: true, windowDay: true, predictedLow: true, predictedHigh: true },
+    select: { id: true, userId: true, projectId: true, generationId: true, windowDay: true, predictedLow: true, predictedHigh: true, metric: true },
   })
 
   let reconciled = 0
@@ -30,19 +30,25 @@ async function reconcilePendingPredictions(now: Date): Promise<{ scanned: number
           collectWindowDay: prediction.windowDay,
         },
       },
-      select: { views: true },
+      select: { views: true, likes: true },
     })
-    if (!outcome || outcome.views === null || outcome.views === undefined) {
+    if (!outcome) {
       awaitingData += 1
       continue
     }
-    const result = reconcilePrediction({ low: prediction.predictedLow, high: prediction.predictedHigh }, outcome.views)
+    // 按预测所用指标取实际值：抖音不公开播放量时预测按点赞口径，对账必须同口径。
+    const actual = prediction.metric === "likes" ? outcome.likes : outcome.views
+    if (actual === null || actual === undefined) {
+      awaitingData += 1
+      continue
+    }
+    const result = reconcilePrediction({ low: prediction.predictedLow, high: prediction.predictedHigh }, actual)
     await prisma.publishPrediction.update({
       where: { id: prediction.id },
       data: {
         verdict: result.verdict,
         deviationRatio: result.deviationRatio,
-        actualViews: outcome.views,
+        actualViews: actual,
         reconciledAt: now,
       },
     })
