@@ -10,6 +10,13 @@ on:
     #   - "src/**/*.js"
     #   - "src/**/*.jsx"
 
+concurrency:
+  # 同一分支/workflow 只保留最新一次运行：被后续推送取代的旧运行直接取消。
+  # 不加 event_name 是有意的——否则手动重跑会与推送并行，等于多跑一份。
+  # 参考 2026-09-13 用量排查：约 20% 的 Action 分钟花在被取代的旧运行上。
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     # Optional: Filter by PR author
