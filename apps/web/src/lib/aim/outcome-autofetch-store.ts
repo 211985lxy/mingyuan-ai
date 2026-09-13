@@ -1,78 +1,78 @@
 import { prisma } from "@/lib/prisma"
 import { upsertOperationalAlert } from "@/lib/operational-alerts"
-import {
-  fetchDouyinRecentVideos,
-  refreshDouyinAccessToken,
-  type DouyinToken,
-} from "@/lib/douyin-openapi"
+import { fetchAccountWorks } from "@/lib/aim/account-works-source"
+import { readWorkStats } from "@/lib/aim/account-work-assets"
 import {
   runOutcomeAutofetch,
   type OutcomeAutofetchStore,
   type OutcomeAutofetchSummary,
 } from "@/lib/aim/outcome-autofetch"
 
-const EXPIRY_GRACE_MS = 60 * 1000
 const VIDEO_FETCH_MAX = 50
 
-async function resolveBindingToken(binding: {
-  userId: string
-  openId: string
-  accessToken: string
-  refreshToken: string
-  accessExpiresAt: Date
-  scope: string
-}): Promise<DouyinToken | null> {
-  if (binding.accessExpiresAt.getTime() - EXPIRY_GRACE_MS > Date.now()) {
+/**
+ * 取该绑定账号的作品列表（WP-1.1 数据源）。
+ *
+ * 抖音开放平台的「授权账号作品列表」能力已下线（实测 28001056），故与 WP-A1 共用
+ * 同一套第三方公开数据通道（TikHub 主 / 红狐备）。通道全部失败时抛错，不返回空数组
+ * ——否则"API 挂了但 cron 报成功"的假绿会重演。
+ *
+ * 播放量口径：抖音不对外公开播放量（第三方通道 play_count 恒为 0），因此**不写 0**
+ * （0 是假事实），留 undefined 由下游写 null 表示"未知"，避免报表与预测把 0 当真实值。
+ */
+/**
+ * 归一化作品 → 回流所需的视频行（纯函数，便于单测）。
+ * 播放量口径：抖音不对外公开播放量，play_count 恒为 0；此处**不写 0**（0 是假事实），
+ * 留 undefined 由下游写 null 表示"未知"，避免报表与预测把 0 当真实值。
+ */
+export function toAutofetchVideoRows(
+  items: Array<{ externalWorkId: string; stats: Record<string, unknown> }>,
+) {
+  return items.map((item) => {
+    const stats = readWorkStats(item.stats)
+    const plays = typeof stats.views === "number" && stats.views > 0 ? stats.views : undefined
     return {
-      accessToken: binding.accessToken,
-      refreshToken: binding.refreshToken,
-      openId: binding.openId,
-      expiresIn: Math.max(0, Math.floor((binding.accessExpiresAt.getTime() - Date.now()) / 1000)),
-      scope: binding.scope,
+      itemId: item.externalWorkId,
+      videoId: item.externalWorkId,
+      shareUrl: null,
+      statistics: {
+        playCount: plays,
+        diggCount: stats.likes,
+        commentCount: stats.comments,
+        collectCount: stats.saves,
+        shareCount: stats.shares,
+      },
     }
-  }
-  const refreshed = await refreshDouyinAccessToken(binding.refreshToken).catch(() => null)
-  if (!refreshed) return null
-  await prisma.douyinAccountBinding.update({
-    where: { userId_openId: { userId: binding.userId, openId: binding.openId } },
-    data: {
-      accessToken: refreshed.accessToken,
-      refreshToken: refreshed.refreshToken || binding.refreshToken,
-      accessExpiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
-      syncStatus: "ok",
-    },
-  }).catch(() => undefined)
-  return {
-    accessToken: refreshed.accessToken,
-    refreshToken: refreshed.refreshToken || binding.refreshToken,
-    openId: binding.openId,
-    expiresIn: refreshed.expiresIn,
-    scope: refreshed.scope || binding.scope,
-  }
+  })
 }
 
 async function fetchVideosForBinding(binding: { id: string; userId: string }) {
   const row = await prisma.douyinAccountBinding.findFirst({
     where: { id: binding.id, userId: binding.userId },
+    select: { id: true, secUserId: true, profileUrl: true },
   })
-  if (!row) throw Object.assign(new Error("token expired"), { code: "expired" })
-  const token = await resolveBindingToken(row)
-  if (!token) throw Object.assign(new Error("token expired"), { code: "expired" })
-  const videos = await fetchDouyinRecentVideos(token, VIDEO_FETCH_MAX)
-  return videos.map((video) => ({
-    itemId: video.itemId,
-    videoId: video.videoId ?? null,
-    shareUrl: video.shareUrl ?? null,
-    statistics: video.statistics
-      ? {
-          playCount: video.statistics.playCount,
-          diggCount: video.statistics.diggCount,
-          commentCount: video.statistics.commentCount,
-          collectCount: video.statistics.collectCount,
-          shareCount: video.statistics.shareCount,
-        }
-      : null,
-  }))
+  if (!row) throw new Error("绑定不存在")
+  try {
+    const { items } = await fetchAccountWorks({
+      secUserId: row.secUserId,
+      profileUrl: row.profileUrl,
+      count: VIDEO_FETCH_MAX,
+    })
+    return toAutofetchVideoRows(items)
+  } catch (error) {
+    // 失败不静默：落一条带处置建议的告警，运维/用户能一眼知道下一步做什么。
+    const missingLink = !row.secUserId || !row.profileUrl
+    await upsertOperationalAlert({
+      fingerprint: `outcome-autofetch-works:${binding.id}`,
+      rule: "outcome_autofetch_works_channel",
+      severity: "warning",
+      summary: missingLink
+        ? `抖音绑定 ${binding.id} 缺主页链接，作品数据无法取数（抖音官方作品列表能力已下线）；请在账号设置 → 抖音绑定处「补充主页链接」`
+        : `抖音绑定 ${binding.id} 作品数据取数失败：${error instanceof Error ? error.message : "未知错误"}`,
+      source: "outcome-autofetch",
+    }).catch(() => undefined)
+    throw error
+  }
 }
 
 async function upsertContentSignals(input: Parameters<OutcomeAutofetchStore["upsertContentSignals"]>[0]) {
