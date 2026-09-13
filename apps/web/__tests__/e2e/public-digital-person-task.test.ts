@@ -69,7 +69,13 @@ describe("公共数字人下单（不走克隆，无需授权文案）", () => {
 
   beforeEach(async () => {
     mockCreateDigitalHumanVideo.mockReset()
-    mockCreateDigitalHumanVideo.mockResolvedValue({ taskId: "cj-public-1", payload: {} })
+    // 每次下单返回**唯一**的供应商任务号：返回固定值会让第二个任务落库时
+    // 撞 VideoTask.externalTaskId 唯一约束（夹具问题，非产品缺陷）
+    let seq = 0
+    mockCreateDigitalHumanVideo.mockImplementation(async () => ({
+      taskId: `cj-public-${(seq += 1)}`,
+      payload: {},
+    }))
     await cleanRedis()
     await prisma.videoTask.deleteMany()
   })
@@ -115,7 +121,9 @@ describe("公共数字人下单（不走克隆，无需授权文案）", () => {
     expect(first.status).toBe(201)
     expect(second.status).toBeLessThan(300)
     const firstId = (await json(first)).data.id
-    const secondId = (await json(second)).data.id
+    const secondBody = await json(second)
+    expect(secondBody.data, `第二次提交应成功，实际响应：${JSON.stringify(secondBody)}`).toBeDefined()
+    const secondId = secondBody.data.id
     expect(secondId).toBe(firstId)
     expect(mockCreateDigitalHumanVideo).toHaveBeenCalledTimes(1)
   })
