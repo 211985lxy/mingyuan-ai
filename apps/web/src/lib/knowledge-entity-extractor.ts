@@ -338,43 +338,60 @@ export interface EntityContextEntry {
  * 按查询文本命中实体，反向找出关联的知识条目。
  * 作为向量检索的「补充召回」，不替换向量 topK。
  * 实现：把 query 切词，匹配实体名/别名，取命中实体的关系对端的 entryId。
+ *
+ * 隔离：必须传 userId 或 projectId。绑定了项目的账号按 projectId 作用域检索；
+ * 未绑定项目（快速模式）只查该项目为 null 的个人知识——**绝不跨项目捞实体**
+ * （此前 projectId 为空时不加任何租户条件，会命中全部项目的实体）。
  */
 /**
  * @description retrieveentitycontext
  * @param input - 输入数据
  * @returns Promise<EntityContextEntry[]>
  */
+/** aliases 以 Json 存字符串数组，读取时做防御性归一。 */
+function readAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === "string")
+}
+
 export async function retrieveEntityContext(input: {
+  userId?: string | null
   projectId?: string | null
   query: string
   topK?: number
 }): Promise<EntityContextEntry[]> {
-  const { projectId, query } = input
+  const { projectId, userId, query } = input
   const topK = input.topK ?? 4
   if (!query.trim()) return []
 
-  // 抽取查询中的候选关键词（中文按字数过滤，>=2 字）
-  const tokens = query
-    .replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length >= 2)
-    .slice(0, 12)
-  if (tokens.length === 0) return []
+  const scope = projectId
+    ? { projectId }
+    : userId
+      ? { userId, projectId: null }
+      : null
+  if (!scope) return []
 
   try {
-    const entities = await prisma.knowledgeEntity.findMany({
-      where: {
-        ...(projectId ? { projectId } : {}),
-        status: "active",
-        OR: tokens.flatMap((t) => [
-          { name: { contains: t } },
-          // JSON contains 在 MariaDB 上对字符串数组可行
-          { aliases: { string_contains: t } },
-        ]),
-      },
-      select: { id: true, name: true },
-      take: 30,
+    // 中文没有空格，按空白切句会把整句当成一个词，`name contains 整句`永远匹配不到实体
+    // （2026-09-13 实测：图谱扩展零增益即由此缺陷导致）。改为**反查包含**：
+    // 取作用域内的实体（有界），判断实体名/别名是否出现在查询文本里。
+    // 生产实体量级为百级，内存过滤成本可忽略。
+    const candidates = await prisma.knowledgeEntity.findMany({
+      where: { ...scope, status: "active" },
+      select: { id: true, name: true, aliases: true },
+      orderBy: { updatedAt: "desc" },
+      take: 500,
     })
+    const normalizedQuery = query.toLowerCase()
+    const entities = candidates
+      .filter((entity) => {
+        const names = [entity.name, ...readAliases(entity.aliases)]
+        return names.some((name) => {
+          const value = name.trim().toLowerCase()
+          return value.length >= 2 && normalizedQuery.includes(value)
+        })
+      })
+      .slice(0, 30)
     if (entities.length === 0) return []
 
     const entityIds = entities.map((e) => e.id)

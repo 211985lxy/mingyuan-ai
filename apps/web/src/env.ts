@@ -46,6 +46,8 @@ export const env = createEnv({
     AIM_NAMED_METHODOLOGY_ENABLED: z.string().optional(),
     AIM_STABLE_ROUTING: z.string().optional(),
     AIM_HITL_INLINE_ENABLED: z.string().optional(),
+    /** WP-A5 知识图谱扩展检索：默认关，达标后放量 */
+    AIM_KNOWLEDGE_GRAPH_ENABLED: z.string().optional(),
     AIM_HITL_NOTIFY_ENABLED: z.string().optional(),
     AIM_HITL_NOTIFY_CHAT_ID: z.string().optional(),
     AIM_WEEKLY_NARRATIVE_ENABLED: z.string().optional(),
@@ -338,6 +340,7 @@ export const env = createEnv({
     AIM_NAMED_METHODOLOGY_ENABLED: process.env.AIM_NAMED_METHODOLOGY_ENABLED,
     AIM_STABLE_ROUTING: process.env.AIM_STABLE_ROUTING,
     AIM_HITL_INLINE_ENABLED: process.env.AIM_HITL_INLINE_ENABLED,
+    AIM_KNOWLEDGE_GRAPH_ENABLED: process.env.AIM_KNOWLEDGE_GRAPH_ENABLED,
     AIM_HITL_NOTIFY_ENABLED: process.env.AIM_HITL_NOTIFY_ENABLED,
     AIM_HITL_NOTIFY_CHAT_ID: process.env.AIM_HITL_NOTIFY_CHAT_ID,
     AFU_BRIDGE_TOKEN: process.env.AFU_BRIDGE_TOKEN,
