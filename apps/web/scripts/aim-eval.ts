@@ -82,6 +82,8 @@ async function main() {
 
   if (opts.mode !== "deterministic") {
     assertRealModelProvidersConfigured(`eval:${opts.mode}`)
+    process.env.AIM_EVAL_DISABLE_CIRCUIT = "1"
+    process.stderr.write("[aim-eval] 评测关闭线路熔断，避免一道超时把后续同模型题目全部拖死\n")
   }
 
   process.stderr.write(`[aim-eval] mode=${opts.mode} adapter=${adapter.name}\n`)

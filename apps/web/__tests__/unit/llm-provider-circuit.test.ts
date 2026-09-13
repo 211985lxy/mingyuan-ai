@@ -143,6 +143,18 @@ describe("provider circuit", () => {
     expect(await circuit.isOpen("zenmux", "claude", "content_producer")).toBe(true)
     expect(await circuit.isOpen("zenmux", "claude", "content_review")).toBe(false)
   })
+
+  it("does not trip the default circuit during eval runs", async () => {
+    const previous = process.env.AIM_EVAL_DISABLE_CIRCUIT
+    process.env.AIM_EVAL_DISABLE_CIRCUIT = "1"
+    try {
+      await recordProviderCircuitFailure("blocked", "blocked-model", "auth")
+      expect(await isProviderCircuitOpen("blocked", "blocked-model")).toBe(false)
+    } finally {
+      if (previous === undefined) delete process.env.AIM_EVAL_DISABLE_CIRCUIT
+      else process.env.AIM_EVAL_DISABLE_CIRCUIT = previous
+    }
+  })
 })
 
 describe("aim route probe summary", () => {
