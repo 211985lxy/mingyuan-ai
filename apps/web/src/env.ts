@@ -81,7 +81,7 @@ export const env = createEnv({
     CHANJING_WEBHOOK_SECRET: z.string().optional(),
     CHANJING_AUTH_TEXT: z.string().optional(),
     CHANJING_MAX_CONCURRENT: z.string().optional(),
-    DIGITAL_HUMAN_PROVIDER: z.enum(["chanjing", "shanjian"]).optional(),
+    DIGITAL_HUMAN_PROVIDER: z.enum(["chanjing", "shanjian", "heygen"]).optional(),
     TASK_RECOVERY_HEARTBEAT_FILE: z.string().optional(), TASK_RECOVERY_INTERVAL_MS: z.string().optional(), TASK_RECOVERY_STARTUP_DELAY_MS: z.string().optional(), ALIYUN_VIAPI_ENDPOINT: z.string().optional(), ALIYUN_ENHANCEMENT_WEBHOOK_SECRET: z.string().optional(),
     DATABASE_URL: z.string().optional(),
     DEEPSEEK_API_KEY: z.string().optional(),

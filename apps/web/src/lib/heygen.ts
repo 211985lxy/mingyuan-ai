@@ -154,12 +154,11 @@ export type HeygenAvatar = {
 }
 
 export async function listAvatars(input?: { limit?: number; token?: string }): Promise<HeygenAvatar[]> {
-  const data = await request<{ data: HeygenAvatar[]; has_more?: boolean; next_token?: string | null }>(
-    "GET",
-    "/v3/avatars",
-    { params: { limit: input?.limit ? String(input.limit) : "50", token: input?.token ?? "" }, timeoutMs: 20_000 },
-  )
-  return data.data ?? []
+  const data = await request<HeygenAvatar[]>("GET", "/v3/avatars", {
+    params: { limit: input?.limit ? String(input.limit) : "50", token: input?.token ?? "" },
+    timeoutMs: 20_000,
+  })
+  return data ?? []
 }
 
 export type HeygenAvatarLook = {
@@ -172,14 +171,14 @@ export type HeygenAvatarLook = {
 }
 
 export async function listAvatarLooks(input?: { groupId?: string; limit?: number }): Promise<HeygenAvatarLook[]> {
-  const data = await request<{ data: HeygenAvatarLook[] }>("GET", "/v3/avatars/looks", {
+  const data = await request<HeygenAvatarLook[]>("GET", "/v3/avatars/looks", {
     params: {
       group_id: input?.groupId ?? "",
       limit: input?.limit ? String(input.limit) : "50",
     },
     timeoutMs: 20_000,
   })
-  return data.data ?? []
+  return data ?? []
 }
 
 // ─── 声音（voices）────────────────────────────────────────
@@ -196,11 +195,11 @@ export type HeygenVoice = {
 }
 
 export async function listVoices(input?: { limit?: number; token?: string }): Promise<HeygenVoice[]> {
-  const data = await request<{ data: HeygenVoice[] }>("GET", "/v3/voices", {
+  const data = await request<HeygenVoice[]>("GET", "/v3/voices", {
     params: { limit: input?.limit ? String(input.limit) : "50", token: input?.token ?? "" },
     timeoutMs: 20_000,
   })
-  return data.data ?? []
+  return data ?? []
 }
 
 // ─── 视频出片 ────────────────────────────────────────────
