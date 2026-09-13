@@ -30,6 +30,7 @@ model Script {
   generationRun ContentGenerationRun? @relation(fields: [generationRunId], references: [id])
   ipProfile     IpProfile?            @relation(fields: [ipProfileId], references: [id])
   structure     VideoStructure?       @relation(fields: [structureId], references: [id])
+  videoTasks    VideoTask[]
 
   @@index([userId])
   @@index([userId, status])
@@ -117,6 +118,8 @@ model VideoStructure {
 
   scripts               Script[]
   contentGenerationRuns ContentGenerationRun[]
+  videoTasks            VideoTask[]
+  productionPlans       VideoProductionPlan[]
 
   @@index([status, sortOrder])
   @@index([origin, status])
@@ -223,6 +226,10 @@ model ContentTemplate {
   tags                Json      @default("[]") // JSON array of display tags
   hotTopicKeywords    Json      @default("[]") // JSON array for hot topic matching
   seasonalEvents      Json      @default("[]") // JSON array of {id, startDate, endDate}
+  shanjianStyleId     String?
+  videoType           String    @default("virtualman_broadcast")
+  packRulesJson       Json?
+  processRulesJson    Json?
   status              String    @default("draft") // draft | published | archived
   sortOrder           Int       @default(0)
   featured            Boolean   @default(false)

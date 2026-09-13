@@ -257,8 +257,9 @@
     {
       "name": "User",
       "columns": [
-        "id",
-        "email"
+        "authVideoUrl",
+        "email",
+        "id"
       ]
     },
     {
@@ -483,6 +484,49 @@
         "completedAt",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    {
+      "name": "Avatar",
+      "columns": [
+        "id",
+        "userId",
+        "name",
+        "status",
+        "externalTaskId",
+        "externalVirtualmanId"
+      ]
+    },
+    {
+      "name": "VideoTask",
+      "columns": [
+        "id",
+        "userId",
+        "status",
+        "scriptContent",
+        "avatarName",
+        "externalTaskId",
+        "deliveryStatus"
+      ]
+    },
+    {
+      "name": "VideoPackagingTemplate",
+      "columns": [
+        "id",
+        "shanjianId",
+        "name",
+        "scene",
+        "status"
+      ]
+    },
+    {
+      "name": "VideoProductionPlan",
+      "columns": [
+        "id",
+        "userId",
+        "scriptId",
+        "styleId",
+        "status"
       ]
     }
   ]

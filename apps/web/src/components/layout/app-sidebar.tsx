@@ -7,6 +7,8 @@ import { BrandLogo } from "@/components/branding/brand-logo"
 import { useBranding } from "@/components/providers/branding-provider"
 import {
   BriefcaseBusiness,
+  Clapperboard,
+  FolderOpen,
   PenLine,
   FileText,
   Plus,
@@ -58,6 +60,8 @@ const quickNav: NavItem[] = [
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
+  { title: "资产库", href: "/assets", icon: FolderOpen },
+  { title: "我的成片", href: "/videos", icon: Clapperboard },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
 ]
 
