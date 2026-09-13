@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react"
 
 import { OwnAccountSection } from "@/app/(dashboard)/data-platform/own-account-section"
-import { AlertCircle, BarChart3, DatabaseZap, ExternalLink, Link2, RefreshCw } from "lucide-react"
+import { RecentVideosTable, type PlatformVideo } from "@/app/(dashboard)/data-platform/recent-videos-table"
+import {
+  AlertCircle,
+  BarChart3,
+  DatabaseZap,
+  ExternalLink,
+  Link2,
+  RefreshCw,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,6 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { PageHeader } from "@/components/ui/page-header"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -52,45 +61,24 @@ type PlatformAccount = {
   fansRegions?: FansDistributionItem[] | null
 }
 
-type PlatformVideo = {
-  id: string
-  platform: string
-  title: string
-  coverUrl?: string | null
-  publishedAt?: string | null
-  playCount?: number | null
-  likeCount?: number | null
-  commentCount?: number | null
-  favoriteCount?: number | null
-  shareCount?: number | null
-  completionRate?: number | null
-  tags?: string[] | null
-  aimSuggestion?: string | null
-  trafficSource?: string | null
-}
-
 type SummaryResponse =
   | { status: "not_configured"; message: string }
   | { status: "error"; message: string; error?: unknown }
   | { status: "ok"; accounts: PlatformAccount[]; recentVideos: PlatformVideo[]; fetchedAt: string }
 
 function formatCount(value?: number | null): string {
-  if (value == null) return "暂无"
+  if (value == null) return "—"
   if (value >= 10000) return `${(value / 10000).toFixed(1)}万`
   return value.toLocaleString("zh-CN")
 }
 
 function formatDateTime(value?: string | null): string {
-  if (!value) return "暂无"
+  if (!value) return "—"
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString("zh-CN", { hour12: false })
 }
 
-/**
- * 绑定入口就在本页：本页的账号/作品数据正是抖音扫码绑定后写入飞书 Base 的，
- * 此前入口只在 /account，看板只说"去用社媒助手"，闭环断在用户找不到地方扫码。
- */
 function BindDouyinButton() {
   return (
     <Button
@@ -228,53 +216,13 @@ function AccountsSection({ accounts }: { accounts: PlatformAccount[] }) {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
           {accounts.map((account) => (
             <AccountCard key={account.id} account={account} />
           ))}
         </div>
       )}
     </section>
-  )
-}
-
-/** 作品明细表。 */
-function RecentVideosTable({ videos }: { videos: PlatformVideo[] }) {
-  return (
-    <Card>
-      <CardContent className="pt-2">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>作品</TableHead>
-              <TableHead>平台</TableHead>
-              <TableHead className="text-right">发布时间</TableHead>
-              <TableHead className="text-right">播放</TableHead>
-              <TableHead className="text-right">点赞</TableHead>
-              <TableHead className="text-right">评论</TableHead>
-              <TableHead className="text-right">收藏</TableHead>
-              <TableHead className="text-right">转发</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {videos.map((video) => (
-              <TableRow key={video.id}>
-                <TableCell className="max-w-[240px] truncate font-medium">{video.title}</TableCell>
-                <TableCell>{video.platform}</TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {formatDateTime(video.publishedAt)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(video.playCount)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(video.likeCount)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(video.commentCount)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(video.favoriteCount)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCount(video.shareCount)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
   )
 }
 
@@ -296,6 +244,39 @@ function RecentVideosSection({ videos }: { videos: PlatformVideo[] }) {
         <RecentVideosTable videos={videos} />
       )}
     </section>
+  )
+}
+
+/** 首屏数据未返回时的占位骨架（账号卡 + 作品表两段）。 */
+function DataSectionsSkeleton() {
+  return (
+    <div className="space-y-6" aria-hidden>
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
+        {[0, 1].map((index) => (
+          <Card key={index}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-10 rounded-full" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-12 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <CardContent className="space-y-3 pt-6">
+          {[0, 1, 2, 3, 4].map((index) => (
+            <Skeleton key={index} className="h-9 w-full" />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -385,6 +366,8 @@ export default function DataPlatformPage() {
       <OwnAccountSection />
 
       <StatusNotices errorMsg={errorMsg} data={data} />
+
+      {loading && !data && !errorMsg ? <DataSectionsSkeleton /> : null}
 
       {data?.status === "ok" ? (
         <>
