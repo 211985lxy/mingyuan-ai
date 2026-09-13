@@ -133,7 +133,15 @@ function BoundAccountsSection() {
           <Loader2 className="size-3 animate-spin" /> 正在加载已绑账号…
         </div>
       ) : (
-        <DouyinBoundAccounts accounts={accounts} pendingId={pendingId} onRefresh={onRefresh} onRemove={onRemove} />
+        <DouyinBoundAccounts
+          accounts={accounts}
+          pendingId={pendingId}
+          onRefresh={onRefresh}
+          onRemove={onRemove}
+          onProfileUrlSaved={() => {
+            void reloadAccounts()
+          }}
+        />
       )}
       {accountError ? <p className="text-xs text-destructive">{accountError}</p> : null}
     </div>
