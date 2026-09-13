@@ -1,4 +1,5 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import { inspectAimDeliveryCandidate } from "@/lib/aim/output-delivery-gate"
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import type { AimModelPolicy } from "@/lib/aim-harness/types"
 
@@ -33,6 +34,15 @@ export function parseAimSemanticDeliveryVerdict(text: string): AimSemanticDelive
   return { passed: false, gaps: gaps.length ? gaps : ["验收器未返回可解析结论"] }
 }
 
+function deterministicDeliveryGaps(candidate: string): string[] {
+  const inspection = inspectAimDeliveryCandidate({ contents: { raw_copy: candidate } })
+  if (inspection.passed) return []
+  if (inspection.code === "empty_final_content") {
+    return ["候选没有完整正文，不能把线路失败说明当成交付"]
+  }
+  return ["候选是分析方案或任务复述，不是可直接使用的脚本正文"]
+}
+
 export async function verifyAimDelivery(input: {
   envelope: AimContentSourceEnvelope
   candidate: string
@@ -40,6 +50,9 @@ export async function verifyAimDelivery(input: {
   modelPolicy?: AimModelPolicy
   complete?: (systemPrompt: string, userPrompt: string) => Promise<{ content: string }>
 }): Promise<AimSemanticDeliveryVerdict> {
+  const closedGaps = deterministicDeliveryGaps(input.candidate)
+  if (closedGaps.length) return { passed: false, gaps: closedGaps }
+
   const conversation = input.envelope.relevantConversation
     .map((turn) => `${turn.role === "user" ? "用户" : "助手"}：${turn.content}`)
     .join("\n\n")

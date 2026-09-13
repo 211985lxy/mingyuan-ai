@@ -28,6 +28,7 @@ import {
 } from "@/lib/task-spec"
 
 import type { ContentFormat } from "@/lib/aim-generator"
+import { inspectAimDeliveryCandidate } from "@/lib/aim/output-delivery-gate"
 
 import type {
   EvalFixture,
@@ -280,7 +281,17 @@ export function gradeFixture(graderInput: GraderInput): GraderResult {
     })
   }
 
-  // 9. prompt_quality — output scope (opening_only vs full_draft)
+  // 9. Real drafts cannot be provider-error stubs or analysis plans.
+  if (graderInput.draftText !== undefined) {
+    const inspection = inspectAimDeliveryCandidate({ contents: { raw_copy: graderInput.draftText } })
+    assertions.push({
+      name: "delivery_body",
+      passed: inspection.passed,
+      detail: inspection.passed ? "ok" : inspection.code,
+    })
+  }
+
+  // 10. prompt_quality — output scope (opening_only vs full_draft)
   if (fixture.expectations.maxScope === "opening_only" && graderInput.draftText) {
     const draft = graderInput.draftText
     const tooLong = draft.length > 400

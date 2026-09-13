@@ -682,4 +682,46 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
       mustWarnInsufficientInfo: true,
     },
   },
+  {
+    id: "wp1_missing_body_01",
+    version: 1,
+    agent: "content_producer",
+    scenario: "prompt_quality",
+    entrypoint: "generate",
+    description: "WP-1 回归：daily 样本 pq_new_koubo_04——必须交出完整口播正文，禁止把线路失败文案当交付",
+    input: {
+      rawInput: "出一版抖音口播，1分钟，讲内容获客痛点。",
+      agentId: "content_producer",
+      targetFormats: ["koubo_script"],
+    },
+    seedContext: { knowledge: [] },
+    expectations: {
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: ["koubo_script"],
+    },
+  },
+  {
+    id: "wp1_analysis_not_script_01",
+    version: 1,
+    agent: "content_producer",
+    scenario: "imitate",
+    entrypoint: "generate",
+    description: "WP-1 回归：daily 样本 cp_imitate_07——仿写必须交出脚本，禁止用目标判定/分析方案代替正文",
+    input: {
+      rawInput: "参考这条对标爆款的结构，帮我仿写一条同主题脚本。",
+      agentId: "content_producer",
+      taskType: "write_script",
+      targetFormats: ["video_script"],
+    },
+    seedContext: {
+      knowledge: [],
+      videoCopyBlock: "对标爆款：3秒抛冲突→身份认同→解决方案→CTA。",
+    },
+    expectations: {
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: ["video_script"],
+    },
+  },
 ]

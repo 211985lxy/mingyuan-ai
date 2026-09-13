@@ -1,13 +1,13 @@
 /**
- * Registry of all versioned eval fixtures (92 cases).
+ * Registry of all versioned eval fixtures.
  *
- *   content_producer  : 49  (24 + 21 prompt_quality + 4 learnings)
+ *   content_producer  : 51  (既有 49 + WP-1 正文缺失/分析方案 2)
  *   work_editor       : 15  (润色/排版/图文/局部改/追改；深度长文新写已归 content_producer)
  *   business_diagnosis: 15
  *   free_copywriter   : 5   (4 + 1 prompt_quality)
  *   content_retro     : 4   (复盘边界：缺数据不编造、不越界写稿)
  *   remaining 2 agents: 8
- *   total             : 96
+ *   total             : 98
  */
 import type { EvalFixture, EvalScenario } from "@/lib/aim-harness/eval/contracts"
 import { CONTENT_PRODUCER_FIXTURES } from "./content-producer"
@@ -40,7 +40,7 @@ export const FULL_EVAL_FIXTURES: EvalFixture[] = ALL_FIXTURES
 
 /** Expected per-agent counts — asserted by the registry test. */
 export const EXPECTED_AGENT_COUNTS = {
-  content_producer: 49,
+  content_producer: 51,
   work_editor: 15,
   business_diagnosis: 15,
   free_copywriter: 5,

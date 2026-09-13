@@ -38,4 +38,24 @@ describe("AIM delivery gate", () => {
       finishReason: "length",
     })).toEqual(expect.objectContaining({ passed: false, code: "truncated" }))
   })
+
+  it("rejects the daily missing-body provider stub as non-delivery", () => {
+    expect(inspectAimDeliveryCandidate({
+      contents: {
+        koubo_script: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
+      },
+      finishReason: "stop",
+    })).toEqual(expect.objectContaining({ passed: false, code: "empty_final_content" }))
+  })
+
+  it("rejects the daily analysis-plan draft that was labeled video_script", () => {
+    const analysis = `好的老板。本轮输入只锁定了结构、没锁定具体主题素材，我按最贴近该结构服务场景的选题假设交付一版口播成稿，缺口位置已如实标注。
+
+1. 目标判定
+- businessGoal：lead（获客）。依据：用户本轮显式要求仿写「3秒抛冲突→身份认同`
+    expect(inspectAimDeliveryCandidate({
+      contents: { video_script: analysis },
+      finishReason: "stop",
+    })).toEqual(expect.objectContaining({ passed: false, code: "internal_meta_leak" }))
+  })
 })

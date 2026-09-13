@@ -54,8 +54,10 @@ const INTERNAL_META_LINES = [
   /^\[\[(SYSTEM|DEBUG|THOUGHT|PROMPT)/i,
 ]
 
-const PROTOCOL_META_LINE = /^(?:runtimeTask\s*[=:]|businessGoal\s*[=:]|AIM_INTERNAL_|\[\[(?:SYSTEM|DEBUG|THOUGHT|PROMPT))/i
+const PROTOCOL_META_LINE = /^(?:[-*]\s*)?(?:runtimeTask\s*[=：:]|businessGoal\s*[=：:]|AIM_INTERNAL_|\[\[(?:SYSTEM|DEBUG|THOUGHT|PROMPT))/i
 const ACCIDENT_META_LINE = /^(好的)?老板[，,]?我先(?:把)?这轮任务在内部复述|^(好的)?老板[，,]?我先在内部复述/
+const PROVIDER_ERROR_STUB = /未能返回完整正文|模型服务暂时未能返回/
+const ANALYSIS_PLAN_LINE = /本轮输入只锁定了结构|缺口位置已如实标注|^(?:\d+[\.．、]\s*)?目标判定/
 
 export function inspectAimDeliveryCandidate(input: {
   contents: Partial<Record<ContentFormat, string>>
@@ -68,9 +70,15 @@ export function inspectAimDeliveryCandidate(input: {
   if (bodies.length === 0 || bodies.some((body) => body.trim().length === 0)) {
     return { passed: false, code: "empty_final_content" }
   }
+  if (bodies.some((body) => PROVIDER_ERROR_STUB.test(body))) {
+    return { passed: false, code: "empty_final_content" }
+  }
   const lines = bodies.flatMap((body) => body.split(/\r?\n/).map((line) => line.trim()).filter(Boolean))
   const matches = lines.filter((line) => INTERNAL_META_LINES.some((pattern) => pattern.test(line)))
-  if (matches.length >= 2 || lines.some((line) => PROTOCOL_META_LINE.test(line) || ACCIDENT_META_LINE.test(line))) {
+  if (
+    matches.length >= 2
+    || lines.some((line) => PROTOCOL_META_LINE.test(line) || ACCIDENT_META_LINE.test(line) || ANALYSIS_PLAN_LINE.test(line))
+  ) {
     return { passed: false, code: "internal_meta_leak" }
   }
   return { passed: true }

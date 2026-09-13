@@ -63,7 +63,7 @@ describe("aim harness fixture registry", () => {
   })
 })
 
-describe("aim harness deterministic grading (planner contract, 96 cases)", () => {
+describe("aim harness deterministic grading (planner contract, 98 cases)", () => {
   // One it() per fixture so a failure pinpoints the exact case.
   for (const fixture of ALL_FIXTURES) {
     it(`${fixture.id}: routing/format/context contract`, () => {

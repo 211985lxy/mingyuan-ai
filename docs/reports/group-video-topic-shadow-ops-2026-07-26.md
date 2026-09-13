@@ -50,6 +50,12 @@
 3. 查 `shadowSamples.total` 应递增；违规计数保持 0。
 4. 满 30 条且连续 5 工作日无 P0/P1 后再谈 evaluate/live。
 
+## 2026-09-13 WP-1 进度
+
+- 主干候选仍是 `1b12bfb8`。合同回归已在 `codex/ai-native-p0-release-evidence`：拒绝「未能返回完整正文」失败说明、拒绝分析方案冒充脚本。
+- 影子样本计数**未开始新的 5 日计时**。仍保持 `capture_only`，不升 `live`。
+- 详见 `docs/reports/ai-native-p0-release-evidence.md`。
+
 ## 回滚
 
 停入口：`FEISHU_TOPIC_PIPELINE_ENABLED=false`  
