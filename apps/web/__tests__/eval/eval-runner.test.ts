@@ -71,6 +71,31 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(report.results[0]?.error).toBeUndefined()
   })
 
+  it("retries a real-model case twice when the provider keeps returning an empty body", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls < 3) {
+          throw new Error("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "第三次才交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_third_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(3)
+    expect(report.contractPassRate).toBe(1)
+  })
+
   it("retries a real-model case once when delivery is rejected as unfinished", async () => {
     const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
     let calls = 0
@@ -224,6 +249,9 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     ])).toBe(true)
     expect(warnedInsufficientInfo([
       { content: "你还没填发布数据，所以现在没法做真正的复盘，所有硬指标全是空的。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "你想写什么主题？先把产品和对象告诉我，我才能写。" },
     ])).toBe(true)
   })
 

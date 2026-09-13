@@ -42,7 +42,15 @@
 - `cp_learnings_hallucination_26` / `pq_new_koubo_03` / `pq_ground_16` 线路空正文，重试一次仍空
 - `cp_info_insufficient_20` 两次里有一次没提示信息不足
 
-已再修：分析方案的原句写进重试提示；评测对「未作为正式成稿」也再跑一轮。
+## 第三次真实模型 daily（未绿）
+
+- 运行：`34738742914`（@ `bcef589b`）
+- 合同 **86.7%**，rubric **100%**，严重虚构 0
+- `cp_imitate_07` 两次都 88 分，分析方案拦+重试已经能写出脚本
+- `pq_new_koubo_03` 两次通过
+- 还剩 4 次合同失败：`cp_info_insufficient_20` 一次没认出「缺主题」；`cp_learnings_hallucination_26` 两次未成稿/空正文；`pq_ground_16` 一次空正文
+
+已再修：把「想写什么主题」算作信息不足提示；线路失败最多再试两轮（共 3 次）。
 
 ## 本机门禁
 
@@ -52,7 +60,7 @@
 | WP-1 相关 vitest / test:harness | 159 通过 |
 | eval:deterministic | contract=100.0% |
 | eval:daily（P0 工作目录无 Provider 密钥） | **失败并停止**，未静默跳过 |
-| 连续 3 次真实模型 daily 绿色 | 未达成。第一次 76.7%，第二次 70.0% |
+| 连续 3 次真实模型 daily 绿色 | 未达成。三次分别 76.7% / 70.0% / 86.7% |
 | model-swap | 未跑 |
 | 飞书 30 条 / 连续 5 工作日 | 未开始，需人工在绑定测试群投喂 |
 | 生产发布 | 未申请。当前主干仍是 `1b12bfb8` |

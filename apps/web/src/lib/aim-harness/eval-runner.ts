@@ -138,12 +138,17 @@ async function runEvalCaseWithProviderRetry(
   adapter: EvalContextAdapter,
   options: EvalRunOptions,
 ): Promise<EvalCaseResult> {
-  try {
-    return await runEvalCase(fixture, adapter, options)
-  } catch (error) {
-    if (!isRetryableEvalError(error)) throw error
-    return await runEvalCase(fixture, adapter, options)
+  const maxAttempts = 3
+  let lastError: unknown
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await runEvalCase(fixture, adapter, options)
+    } catch (error) {
+      lastError = error
+      if (!isRetryableEvalError(error) || attempt === maxAttempts - 1) throw error
+    }
   }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
 
 /**
