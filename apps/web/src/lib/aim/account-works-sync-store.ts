@@ -11,7 +11,7 @@ import {
   type AccountWorksSyncSummary,
   type SyncedWorkItem,
 } from "@/lib/aim/account-works-sync"
-import { readWorkStats } from "@/lib/aim/account-work-assets"
+import { readWorkStats, type AccountWorkLike } from "@/lib/aim/account-work-assets"
 
 const EXPIRY_GRACE_MS = 60 * 1000
 const VIDEO_FETCH_MAX = 50
@@ -80,89 +80,101 @@ async function fetchWorks(binding: { id: string; userId: string }): Promise<Sync
   }))
 }
 
+async function listBindingsWithProject(): Promise<Array<{ id: string; userId: string; projectId: string | null }>> {
+  const rows = await prisma.douyinAccountBinding.findMany({
+    select: { id: true, userId: true },
+    orderBy: { createdAt: "asc" },
+    take: 100,
+  })
+  // 项目归属以账号绑定为准（row-ownership：一个 AIM 账号绑定一个 IP 项目）。
+  const projectByUser = new Map<string, string | null>()
+  for (const binding of rows) {
+    if (projectByUser.has(binding.userId)) continue
+    const user = await prisma.user.findUnique({
+      where: { id: binding.userId },
+      select: { boundProjectId: true },
+    })
+    projectByUser.set(binding.userId, user?.boundProjectId ?? null)
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    userId: row.userId,
+    projectId: projectByUser.get(row.userId) ?? null,
+  }))
+}
+
+async function loadExistingWorks(bindingId: string) {
+  const rows = await prisma.accountWorkAsset.findMany({
+    where: { bindingId },
+    select: {
+      externalWorkId: true,
+      title: true,
+      coverUrl: true,
+      publishedAt: true,
+      stats: true,
+      transcript: true,
+      transcriptStatus: true,
+      transcriptAttempts: true,
+    },
+    take: 500,
+  })
+  return rows.map((row) => ({
+    externalWorkId: row.externalWorkId,
+    title: row.title,
+    coverUrl: row.coverUrl,
+    publishedAt: row.publishedAt?.toISOString() ?? null,
+    stats: readWorkStats(row.stats),
+    transcript: row.transcript,
+    transcriptStatus: (row.transcriptStatus as "none" | "pending" | "ready" | "failed") ?? "none",
+    transcriptAttempts: row.transcriptAttempts,
+  }))
+}
+
+async function saveMergedWorks(input: {
+  bindingId: string
+  projectId: string | null
+  works: AccountWorkLike[]
+}): Promise<{ upserted: number }> {
+  let upserted = 0
+  for (const work of input.works) {
+    await prisma.accountWorkAsset.upsert({
+      where: {
+        bindingId_externalWorkId: { bindingId: input.bindingId, externalWorkId: work.externalWorkId },
+      },
+      create: {
+        bindingId: input.bindingId,
+        projectId: input.projectId,
+        platform: "douyin",
+        externalWorkId: work.externalWorkId,
+        title: work.title,
+        coverUrl: work.coverUrl,
+        publishedAt: work.publishedAt ? new Date(work.publishedAt) : null,
+        stats: work.stats as unknown as Prisma.InputJsonValue,
+        transcript: work.transcript,
+        transcriptStatus: work.transcriptStatus,
+        transcriptAttempts: work.transcriptAttempts,
+        lastSyncedAt: new Date(),
+      },
+      update: {
+        projectId: input.projectId,
+        title: work.title,
+        coverUrl: work.coverUrl,
+        publishedAt: work.publishedAt ? new Date(work.publishedAt) : null,
+        stats: work.stats as unknown as Prisma.InputJsonValue,
+        lastSyncedAt: new Date(),
+      },
+    })
+    upserted += 1
+  }
+  return { upserted }
+}
+
 export function createPrismaAccountWorksSyncStore(): AccountWorksSyncStorePort {
   return {
-    listBindings: async () => {
-      const rows = await prisma.douyinAccountBinding.findMany({
-        select: { id: true, userId: true },
-        orderBy: { createdAt: "asc" },
-        take: 100,
-      })
-      // 项目归属以账号绑定为准（row-ownership：一个 AIM 账号绑定一个 IP 项目）。
-      const projectByUser = new Map<string, string | null>()
-      for (const binding of rows) {
-        if (projectByUser.has(binding.userId)) continue
-        const user = await prisma.user.findUnique({
-          where: { id: binding.userId },
-          select: { boundProjectId: true },
-        })
-        projectByUser.set(binding.userId, user?.boundProjectId ?? null)
-      }
-      return rows.map((row) => ({
-        id: row.id,
-        userId: row.userId,
-        projectId: projectByUser.get(row.userId) ?? null,
-      }))
-    },
+    listBindings: listBindingsWithProject,
     fetchWorks,
-    loadExisting: async (bindingId) => {
-      const rows = await prisma.accountWorkAsset.findMany({
-        where: { bindingId },
-        select: {
-          externalWorkId: true,
-          title: true,
-          coverUrl: true,
-          publishedAt: true,
-          stats: true,
-          transcript: true,
-          transcriptStatus: true,
-          transcriptAttempts: true,
-        },
-        take: 500,
-      })
-      return rows.map((row) => ({
-        externalWorkId: row.externalWorkId,
-        title: row.title,
-        coverUrl: row.coverUrl,
-        publishedAt: row.publishedAt?.toISOString() ?? null,
-        stats: readWorkStats(row.stats),
-        transcript: row.transcript,
-        transcriptStatus: (row.transcriptStatus as "none" | "pending" | "ready" | "failed") ?? "none",
-        transcriptAttempts: row.transcriptAttempts,
-      }))
-    },
-    saveMerged: async ({ bindingId, userId, projectId, works }) => {
-      let upserted = 0
-      for (const work of works) {
-        await prisma.accountWorkAsset.upsert({
-          where: { bindingId_externalWorkId: { bindingId, externalWorkId: work.externalWorkId } },
-          create: {
-            bindingId,
-            projectId,
-            platform: "douyin",
-            externalWorkId: work.externalWorkId,
-            title: work.title,
-            coverUrl: work.coverUrl,
-            publishedAt: work.publishedAt ? new Date(work.publishedAt) : null,
-            stats: work.stats as unknown as Prisma.InputJsonValue,
-            transcript: work.transcript,
-            transcriptStatus: work.transcriptStatus,
-            transcriptAttempts: work.transcriptAttempts,
-            lastSyncedAt: new Date(),
-          },
-          update: {
-            projectId,
-            title: work.title,
-            coverUrl: work.coverUrl,
-            publishedAt: work.publishedAt ? new Date(work.publishedAt) : null,
-            stats: work.stats as unknown as Prisma.InputJsonValue,
-            lastSyncedAt: new Date(),
-          },
-        })
-        upserted += 1
-      }
-      return { upserted }
-    },
+    loadExisting: loadExistingWorks,
+    saveMerged: saveMergedWorks,
   }
 }
 

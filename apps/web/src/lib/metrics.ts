@@ -2,6 +2,7 @@ import {
   Registry,
   Counter,
   Gauge,
+  Histogram,
   collectDefaultMetrics,
 } from "prom-client"
 
@@ -9,6 +10,23 @@ export const metricsRegistry = new Registry()
 
 metricsRegistry.setDefaultLabels({ service: "mingyuan-web" })
 collectDefaultMetrics({ register: metricsRegistry })
+
+// ─── External API（供应商调用统一观测：蝉镜/闪剪等）──────
+
+export const externalApiRequestsTotal = new Counter({
+  name: "mingyuan_external_api_requests_total",
+  help: "Total external API requests",
+  labelNames: ["service", "endpoint", "status"] as const,
+  registers: [metricsRegistry],
+})
+
+export const externalApiDuration = new Histogram({
+  name: "mingyuan_external_api_duration_seconds",
+  help: "External API request duration in seconds",
+  labelNames: ["service", "endpoint"] as const,
+  buckets: [0.5, 1, 2, 5, 10, 30, 60],
+  registers: [metricsRegistry],
+})
 
 // ─── Database & Redis Health ────────────────────────────
 
@@ -62,5 +80,20 @@ export const auditIdempotencyConflictsTotal = new Counter({
   name: "mingyuan_audit_idempotency_conflicts_total",
   help: "Audit events rejected because a key carried a different payload",
   labelNames: ["source"] as const,
+  registers: [metricsRegistry],
+})
+
+export const webhookTotal = new Counter({
+  name: "mingyuan_webhook_total",
+  help: "Total webhook callbacks processed",
+  labelNames: ["type", "status"] as const,
+  registers: [metricsRegistry],
+})
+
+/** Digital-human lifecycle counters. Labels never contain customer text or media URLs. */
+export const digitalHumanEventsTotal = new Counter({
+  name: "mingyuan_digital_human_events_total",
+  help: "Digital-human provider lifecycle events",
+  labelNames: ["provider", "event", "status"] as const,
   registers: [metricsRegistry],
 })

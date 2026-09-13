@@ -8,9 +8,10 @@
 
 - 抖音已发布必须能解析出 aweme_id（长链 / 纯数字 ID / `v.douyin.com` 短链）。其它平台仍只需非空作品链接。
 - 新服务 `outcome-autofetch`：按账号拉 `fetchDouyinRecentVideos`，用 aweme_id 对上 generation，按 7/14/30 天窗口 upsert 内容信号。
+- 采集窗口：发布时间已过即写 7 日窗口（对齐计划 T+1）；满 14/30 天改写对应行，不把后期快照塞回 7 日窗口。
 - 新 cron `/api/cron/outcome-autofetch`（每天 03:00，赶在 outcome-flywheel 04:00 评估之前）。
 - 探针 `outcome-autofetch`：开放平台凭证未配 → unconfigured；绑定过期 → degraded。
-- systemd 单元对已入库，**未在生产安装**（需审批后 `systemctl enable --now`）。
+- systemd 单元对已入库；生产 timer 已于 2026-09-13 安装。
 - 存量回填脚本默认只打印解不出 ID 的清单，不改库。
 
 ## 2. 不做
@@ -18,7 +19,7 @@
 - 不写线索/预约/成交/判断码。
 - 不猜对不上的作品。
 - 不把 14/30 天快照回填进 7 天窗口。
-- 本次不装生产 timer、不改 K8s。
+- 不改 K8s；发布提醒 / L0 / Sentry 仍默认关。
 
 ## 3. 验收（代码层）
 

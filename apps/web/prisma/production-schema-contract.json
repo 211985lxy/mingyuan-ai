@@ -281,7 +281,10 @@
         "email",
         "boundProjectId",
         "projectBoundAt",
-        "projectBindingSource"
+        "projectBindingSource",
+        "authVideoUrl",
+        "authVideoText",
+        "authVideoConfirmedAt"
       ]
     },
     {
@@ -658,6 +661,59 @@
         "status",
         "createdAt",
         "updatedAt"
+      ]
+    },
+    {
+      "name": "Avatar",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "name",
+        "status",
+        "provider",
+        "authorizationText",
+        "authorizationConfirmedAt",
+        "externalTaskId",
+        "externalVirtualmanId"
+      ]
+    },
+    {
+      "name": "VideoTask",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "aimGenerationId",
+        "status",
+        "provider",
+        "idempotencyKey",
+        "retryOfTaskId",
+        "providerAttempts",
+        "scriptContent",
+        "avatarName",
+        "externalTaskId",
+        "deliveryStatus"
+      ]
+    },
+    {
+      "name": "VideoPackagingTemplate",
+      "columns": [
+        "id",
+        "shanjianId",
+        "name",
+        "scene",
+        "status"
+      ]
+    },
+    {
+      "name": "VideoProductionPlan",
+      "columns": [
+        "id",
+        "userId",
+        "scriptId",
+        "styleId",
+        "status"
       ]
     }
   ]

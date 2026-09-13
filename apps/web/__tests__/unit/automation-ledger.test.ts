@@ -102,6 +102,7 @@ describe("buildAutomationLedger", () => {
         { kind: "inspiration_process", queued: 0, failedRecent: 0, completedRecent: 3, lastCompletedAt: NOW },
         { kind: "topic_regenerate", queued: 25, failedRecent: 0, completedRecent: 0, lastCompletedAt: null },
       ],
+      NOW,
     )
     expect(ledger.summary.failing).toBe(1) // topic-daily（error 告警）
     expect(ledger.summary.degraded).toBe(1) // topic_regenerate 排队 25
