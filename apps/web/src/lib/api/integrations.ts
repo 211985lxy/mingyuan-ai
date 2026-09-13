@@ -19,6 +19,9 @@ export type DouyinBoundAccountApi = {
   lastSyncedAt: string | null
   accessExpiresAt: string
   createdAt: string
+  /** WP-A1：作品数据通道定位账号所需；为空表示尚未采集主页链接 */
+  secUserId?: string | null
+  profileUrl?: string | null
 }
 
 /** 已绑定的抖音账号列表（安全视图，不含 token） */

@@ -17,6 +17,9 @@ export type DouyinBindingView = {
   lastSyncedAt: string | null
   syncStatus: string
   createdAt: string
+  /** WP-A1：作品数据通道定位账号所需；为空表示尚未采集主页链接 */
+  secUserId: string | null
+  profileUrl: string | null
 }
 
 export class DouyinIdentityConflictError extends Error {
@@ -68,6 +71,8 @@ function toView(row: {
   lastSyncedAt: Date | null
   syncStatus: string
   createdAt: Date
+  secUserId: string | null
+  profileUrl: string | null
 }): DouyinBindingView {
   return {
     id: row.id,
@@ -79,6 +84,8 @@ function toView(row: {
     lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null,
     syncStatus: row.syncStatus,
     createdAt: row.createdAt.toISOString(),
+    secUserId: row.secUserId,
+    profileUrl: row.profileUrl,
   }
 }
 
