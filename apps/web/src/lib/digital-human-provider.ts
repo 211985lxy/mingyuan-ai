@@ -60,13 +60,48 @@ export function matchesDigitalHumanAuthorizationText(
 }
 
 /**
- * 返回当前供应商要求用户在授权视频中逐字朗读的原文。
+ * 授权文案中的声明人姓名占位符。
+ *
+ * 供应商的授权话术要求声明人念自己的**真实姓名**（如「我 XXX 特此声明，授权…」），
+ * 因此文案对每个人不同，不能在全平台写死一段。配置里以 `{name}` 标注该位置。
+ */
+export const DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER = "{name}"
+
+/**
+ * 把配置的授权文案模板实例化为某一位声明人的原文。
+ *
+ * 未包含占位符时原样返回（兼容「仅账号持有人本人克隆」的单一文案形态）；
+ * 包含占位符但拿不到姓名时 fail-closed——宁可不放行，也不能让用户念一段
+ * 写着别人姓名的声明。
+ */
+export function buildDigitalHumanAuthorizationText(
+  template: string,
+  userName?: string | null,
+): string {
+  const normalized = normalizeDigitalHumanAuthorizationText(template)
+  if (!normalized.includes(DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER)) return normalized
+
+  const name = typeof userName === "string" ? userName.replace(/\s+/g, " ").trim() : ""
+  if (!name) {
+    throw new DigitalHumanProviderError(
+      "AUTH_NAME_REQUIRED",
+      "授权文案含 {name} 占位符，需先完善账号姓名后才能生成授权原文",
+    )
+  }
+  return normalizeDigitalHumanAuthorizationText(
+    normalized.replaceAll(DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER, name),
+  )
+}
+
+/**
+ * 返回当前供应商要求用户在授权视频中逐字朗读的原文（按声明人实例化）。
  *
  * 这段文字是供应商账户配置的一部分，不能从品牌名、用户输入或前端
  * 拼接得到。未配置时直接阻止授权视频提交，避免将错误文案送到供应商。
  */
 export function getDigitalHumanAuthorizationText(
   provider: DigitalHumanProvider = getDigitalHumanProvider(),
+  userName?: string | null,
 ): string {
   const configured = provider === "chanjing"
     ? env.CHANJING_AUTH_TEXT
@@ -78,15 +113,16 @@ export function getDigitalHumanAuthorizationText(
       `${provider === "chanjing" ? "蝉镜" : "闪剪"}授权文案暂未配置，请联系管理员`,
     )
   }
-  return text
+  return buildDigitalHumanAuthorizationText(text, userName)
 }
 
 export function hasExactDigitalHumanAuthorizationText(
   provided: unknown,
   provider: DigitalHumanProvider = getDigitalHumanProvider(),
+  userName?: string | null,
 ): boolean {
   try {
-    return matchesDigitalHumanAuthorizationText(provided, getDigitalHumanAuthorizationText(provider))
+    return matchesDigitalHumanAuthorizationText(provided, getDigitalHumanAuthorizationText(provider, userName))
   } catch {
     return false
   }

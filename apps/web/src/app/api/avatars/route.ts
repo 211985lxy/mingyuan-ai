@@ -6,10 +6,9 @@ import {
   cloneFastAvatar,
   cloneProfessionalAvatar,
   cloneImageAvatar,
-  getDigitalHumanAuthorizationText,
   getDigitalHumanProvider,
-  DigitalHumanProviderError,
 } from "@/lib/digital-human-provider"
+import { resolveAuthorizedAuthText } from "@/lib/digital-human-auth-video"
 import { generateSignedUrl, generateVideoThumbnailUrl, isManagedOssUrl, signOssUrls } from "@/lib/oss"
 import {
   AssetReadabilityError,
@@ -57,18 +56,6 @@ export const POST = withUserAuth(async (request, { user }) => {
     return NextResponse.json({ error: "imageUrl is required for image clone" }, { status: 400 })
   }
   const provider = getDigitalHumanProvider()
-  let authText: string
-  try {
-    authText = getDigitalHumanAuthorizationText(provider)
-  } catch (error) {
-    if (error instanceof DigitalHumanProviderError && error.code === "AUTH_TEXT_NOT_CONFIGURED") {
-      return NextResponse.json(
-        { error: error.message, code: error.code, provider },
-        { status: 503 },
-      )
-    }
-    throw error
-  }
   if (provider === "chanjing" && cloneType !== "fast") {
     return NextResponse.json(
       { error: "蝉镜当前仅支持极速视频克隆，请上传本人训练视频", code: "UNSUPPORTED_CLONE_TYPE" },
@@ -78,14 +65,24 @@ export const POST = withUserAuth(async (request, { user }) => {
   const limitResponse = await enforceCountBetaLimit({ userId: user.id, kind: "avatar" })
   if (limitResponse) return limitResponse
 
+  // 授权原文按声明人姓名实例化：姓名先于文案取出，二者共同参与校验
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
+      name: true,
       authVideoUrl: true,
       authVideoText: true,
       authVideoConfirmedAt: true,
     },
   })
+  const resolvedAuth = resolveAuthorizedAuthText(provider, dbUser?.name ?? null)
+  if (!resolvedAuth.ok) {
+    return NextResponse.json(
+      { error: resolvedAuth.message, code: resolvedAuth.code, provider },
+      { status: resolvedAuth.status },
+    )
+  }
+  const authText = resolvedAuth.authText
   const authVideoUrl = dbUser?.authVideoUrl
   if (!authVideoUrl || !dbUser?.authVideoConfirmedAt || dbUser.authVideoText !== authText) {
     return NextResponse.json(

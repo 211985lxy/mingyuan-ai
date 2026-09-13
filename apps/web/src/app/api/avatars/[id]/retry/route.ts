@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
+import { resolveAuthorizedAuthText } from "@/lib/digital-human-auth-video"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
 import { withUserAuth } from "@/lib/user-auth"
 import {
   cloneFastAvatarForProvider,
   cloneImageAvatarForProvider,
-  getDigitalHumanAuthorizationText,
   normalizeDigitalHumanProvider,
-  DigitalHumanProviderError,
 } from "@/lib/digital-human-provider"
 import {
   AssetReadabilityError,
@@ -82,10 +81,11 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   const isImage = /\.(jpg|jpeg|png|webp)(\?|$)/i.test(avatar.sourceVideoUrl)
   const cloneType = isImage ? "image" : "fast"
 
-  // Resolve auth video
+  // Resolve auth video（姓名与授权文案一同取出：文案按声明人实例化）
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
+      name: true,
       authVideoUrl: true,
       authVideoText: true,
       authVideoConfirmedAt: true,
@@ -93,18 +93,14 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   })
 
   const authVideoUrl = dbUser?.authVideoUrl
-  let authText: string
-  try {
-    authText = getDigitalHumanAuthorizationText(provider)
-  } catch (error) {
-    if (error instanceof DigitalHumanProviderError && error.code === "AUTH_TEXT_NOT_CONFIGURED") {
-      return NextResponse.json(
-        { error: error.message, code: error.code, provider },
-        { status: 503 },
-      )
-    }
-    throw error
+  const resolvedAuth = resolveAuthorizedAuthText(provider, dbUser?.name ?? null)
+  if (!resolvedAuth.ok) {
+    return NextResponse.json(
+      { error: resolvedAuth.message, code: resolvedAuth.code, provider },
+      { status: resolvedAuth.status },
+    )
   }
+  const authText = resolvedAuth.authText
 
   if (!authVideoUrl || !dbUser?.authVideoConfirmedAt || dbUser.authVideoText !== authText) {
     return NextResponse.json(
