@@ -8,6 +8,7 @@ import {
 } from "@/lib/aim/services/history-update"
 import { buildOutcomeUpdate, sanitizeOutcomeBody, type SanitizedOutcome } from "@/lib/content-outcome"
 import { normalizeAimGenerationForRead } from "@/lib/aim/history-normalize"
+import { createPublishPredictionOnRegister } from "@/lib/aim/publish-prediction-trigger"
 import {
   AccountProjectContextError,
   resolveBoundProject,
@@ -171,6 +172,19 @@ export async function PATCH(
       }
       return updated
     })
+
+    // WP-A3：发布登记成功且进入 published 态 → 事前预测落库（fire-and-forget，绝不阻断登记）。
+    if (record.workflowStatus === "published" && existing.workflowStatus !== "published") {
+      void createPublishPredictionOnRegister({
+        userId: user.id,
+        generationId: id,
+        projectId: record.projectId ?? null,
+      }).then((result) => {
+        if (!result.created && result.reason !== "already_exists") {
+          console.warn("[publish-prediction] 预测未生成:", result.reason, result.detail ?? "")
+        }
+      })
+    }
 
     return NextResponse.json(record)
   } catch (error) {
