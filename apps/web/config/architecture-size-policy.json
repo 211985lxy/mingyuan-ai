@@ -6,8 +6,8 @@
     300
   ],
   "functionLineLimit": 80,
-  "legacyFunctionBaseline": 230,
-  "legacyFunctionBaselineDate": "2026-09-12",
+  "legacyFunctionBaseline": 229,
+  "legacyFunctionBaselineDate": "2026-09-13",
   "legacyFiles": [
     {
       "path": "src/lib/aim-generation-prompts.ts",
@@ -16,8 +16,8 @@
     },
     {
       "path": "src/env.ts",
-      "maxLines": 563,
-      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 变量 + Step③ HITL 门闩/通知 4 变量（schema+runtime 各半）+ 五步升级 NEXT_PUBLIC（ADMIN_EMAIL/AIM_LANDING_DEFAULT）+ unified audit ingest secret（schema+runtime）；2026-09-10 飞书知识检索 4 变量（FEISHU_KNOWLEDGE_* 3 + FEISHU_TOKEN_ENCRYPTION_KEY，schema+runtime 各半）；2026-09-12 群链接灵感捕获 2 变量（CONTENT_PIPELINE_ENABLED / INSPIRATION_CAPTURE_ACK_ENABLED）；2026-09-12 数字人域恢复 8 变量（CHANJING_* 7 + DIGITAL_HUMAN_PROVIDER，schema+runtime 各半）"
+      "maxLines": 583,
+      "target": "src/lib/env/（按域拆分 server schema 与 runtime 映射）；2026-09 Fish Audio 4 变量 + Step③ HITL 门闩/通知 4 变量（schema+runtime 各半）+ 五步升级 NEXT_PUBLIC（ADMIN_EMAIL/AIM_LANDING_DEFAULT）+ unified audit ingest secret（schema+runtime）；2026-09-10 飞书知识检索 4 变量（FEISHU_KNOWLEDGE_* 3 + FEISHU_TOKEN_ENCRYPTION_KEY，schema+runtime 各半）；2026-09-12 群链接灵感捕获 2 变量（CONTENT_PIPELINE_ENABLED / INSPIRATION_CAPTURE_ACK_ENABLED）；2026-09-12 WP-1.3 Sentry 7 变量 + NEXT_RUNTIME（schema+runtime）；2026-09-12 WP-2.3/3.1 AIM_PUBLISH_REMINDER_ENABLED + AIM_AUTONOMY_L0_ENABLED；2026-09-12 数字人域恢复 8 变量（CHANJING_* 7 + DIGITAL_HUMAN_PROVIDER，schema+runtime 各半）"
     },
     {
       "path": "src/app/(dashboard)/aim/page.tsx",

@@ -10,11 +10,10 @@
 // 必须先解密再识别 challenge / token（2026-09-12：未解密导致控制台保存回调地址
 // 报「Challenge code没有返回」）。api-inventory: auth=signed_integration
 
-import * as lark from "@larksuiteoapi/node-sdk"
 import { NextResponse } from "next/server"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { prisma } from "@/lib/prisma"
-import { loadAgentBotRegistry, resolveBotByAppId, resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
+import { resolveBotByAppId, resolveBotByVerificationToken } from "@/lib/feishu-agent-registry"
 import { enqueueBackgroundTask } from "@/lib/background-tasks"
 import {
   TOPIC_REVIEW_ACTIONS,
@@ -24,123 +23,28 @@ import {
 } from "@/lib/topic-review"
 import { TOPIC_REGENERATE_TASK_KIND } from "@/features/topics/services/topic-regenerate-background-task"
 import { isDegradedTopicModel } from "@/lib/topic-degradation"
+import {
+  decryptCallbackBody,
+  describeShape,
+  normalizeCallbackBody,
+  resolveReviewerId,
+  resolveTopicCardBot,
+  type TopicCardCallbackBody,
+} from "@/lib/feishu-topic-card-callback"
 
 export const dynamic = "force-dynamic"
-
-interface TopicCardActionValue {
-  topic_action?: string
-  topic_selection_id?: string
-  topic_index?: number
-}
-
-interface TopicCardCallbackBody {
-  open_id?: string
-  user_id?: string
-  token?: string
-  type?: string
-  challenge?: string
-  encrypt?: string
-  action?: {
-    value?: TopicCardActionValue
-    tag?: string
-  }
-  /** 新版 card.action.trigger 外层信封 */
-  schema?: string
-  header?: {
-    token?: string
-    event_type?: string
-    app_id?: string
-  }
-  event?: {
-    token?: string
-    operator?: {
-      open_id?: string
-      user_id?: string
-    }
-    action?: {
-      value?: TopicCardActionValue
-      tag?: string
-    }
-  }
-}
-
-/**
- * 归一化两种回调信封为同一结构：
- *   - 经典（card.action.trigger_v1）：token / open_id / action.value 都在顶层；
- *   - 新版（card.action.trigger）：token 在 header.token 或 event.token，
- *     操作人在 event.operator，动作在 event.action。
- * 2026-09-12：只读顶层导致新版回调被判 404 Unknown agent bot，飞书客户端报 200671。
- */
-function normalizeCallbackBody(body: TopicCardCallbackBody): TopicCardCallbackBody {
-  const headerToken = body.header?.token
-  const eventToken = body.event?.token
-  const operator = body.event?.operator
-  const eventAction = body.event?.action
-  if (!headerToken && !eventToken && !operator && !eventAction) return body
-
-  return {
-    ...body,
-    token: body.token ?? eventToken ?? headerToken,
-    open_id: body.open_id ?? operator?.open_id,
-    user_id: body.user_id ?? operator?.user_id,
-    action: body.action ?? eventAction,
-  }
-}
-
-/**
- * 生成载荷的"字段骨架"（键名 + 类型，不含任何值），仅用于鉴权失败时定位
- * 飞书真实信封形状。绝不记录 token / open_id 等敏感值。
- */
-export function describeShape(value: unknown, depth = 0): unknown {
-  if (depth > 2) return typeof value
-  if (Array.isArray(value)) return `array(${value.length})`
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.keys(value as Record<string, unknown>).map((key) => [key, describeShape((value as Record<string, unknown>)[key], depth + 1)]),
-    )
-  }
-  return typeof value
-}
-
-/**
- * 应用配置了 Encrypt Key 时，飞书把回调体加密为 {"encrypt": "..."}。
- * 逐个尝试已注册 bot 的 encrypt key 解密（裁决卡由 topic planner 发出，
- * 但路由保持通用）；没有任何 key 能解开时返回 null。
- */
-function decryptCallbackBody(body: TopicCardCallbackBody): TopicCardCallbackBody | null {
-  if (typeof body.encrypt !== "string" || !body.encrypt) return body
-  for (const bot of loadAgentBotRegistry()) {
-    if (!bot.encryptKey) continue
-    try {
-      const decrypted = JSON.parse(new lark.AESCipher(bot.encryptKey).decrypt(body.encrypt))
-      if (decrypted && typeof decrypted === "object") return decrypted as TopicCardCallbackBody
-    } catch {
-      // 不是这个 bot 的 key，换下一个
-    }
-  }
-  return null
-}
+export { describeShape }
 
 function toast(content: string, type: "success" | "error" = "success") {
   return NextResponse.json({ toast: { type, content } }, { status: 200 })
 }
 
-/** 「换一批」的幂等键按分钟取整：挡住双击造成的重复生成，同时允许稍后再换。 */
 function regenerateIdempotencyKey(selectionId: string) {
   return `topic-regenerate-${selectionId}-${Math.floor(Date.now() / 60_000)}`
 }
 
-function resolveReviewerId(body: TopicCardCallbackBody): string {
-  return (
-    (typeof body.open_id === "string" && body.open_id.trim()) ||
-    (typeof body.user_id === "string" && body.user_id.trim()) ||
-    ""
-  )
-}
-
 type SettleOutcome = { ok: true; selectedIndex?: number } | { ok: false; message: string }
 
-/** 计划并落库一次人工裁决；采用路径带 pending 原子保护，避免与控制台并发重复采用。 */
 async function settleTopicReview(input: {
   selectionId: string
   action: TopicReviewAction
@@ -186,32 +90,29 @@ async function settleTopicReview(input: {
 export async function POST(request: Request) {
   let body: TopicCardCallbackBody | null
   try {
-    // 飞书卡片回调 body 结构动态（action.value 自由键），不能用严格 zod 收口
     body = (await parseJsonRecord(request)) as unknown as TopicCardCallbackBody | null
   } catch {
     return toast("请求体不可解析", "error")
   }
   if (!body) return toast("请求体不可解析", "error")
 
-  // 加密回调体先解密；解不开时明确报错而不是落进 404，方便在控制台侧定位
   const decrypted = decryptCallbackBody(body)
   if (!decrypted) return toast("回调解密失败：encrypt 内容无法用已注册 bot 的密钥解开", "error")
-  // 新版/经典两种信封归一化后再做校验与分发
-  const payload = normalizeCallbackBody(decrypted)
+  const { payload: rawPayload, bot: decryptedByBot } = decrypted
+  const payload = normalizeCallbackBody(rawPayload)
 
-  // 飞书卡片回调的 URL 校验挑战原样返回
   if (payload.type === "url_verification" && payload.challenge) {
     return NextResponse.json({ challenge: payload.challenge })
   }
 
-  // 鉴权：优先 verification token；token 缺失或不匹配时回退 header.app_id
-  // （新版 schema 2.0 回调在 header 里带 app_id，而 token 不一定下发）。
-  const bot =
-    resolveBotByVerificationToken(typeof payload.token === "string" ? payload.token : "") ??
-    resolveBotByAppId(typeof payload.header?.app_id === "string" ? payload.header.app_id : "")
+  const bot = resolveTopicCardBot({
+    payload,
+    decryptedByBot,
+    resolveByToken: resolveBotByVerificationToken,
+    resolveByAppId: resolveBotByAppId,
+  })
   if (!bot) {
-    // 只记录字段结构（不含任何值），用于定位飞书真实信封形状
-    console.warn("[feishu-topic-card-actions] 鉴权失败，回调字段结构:", describeShape(decrypted))
+    console.warn("[feishu-topic-card-actions] 鉴权失败，回调字段结构:", describeShape(rawPayload))
     return NextResponse.json({ error: "Unknown agent bot" }, { status: 404 })
   }
 
@@ -230,7 +131,10 @@ export async function POST(request: Request) {
     rawIndex: actionValue?.topic_index,
     reviewerId,
   })
-  if (!settled.ok) return toast(settled.message, "error")
+  if (!settled.ok) {
+    const duplicate = settled.message.includes("已被处理过")
+    return toast(settled.message, duplicate ? "success" : "error")
+  }
 
   if (action === "regenerate") {
     try {

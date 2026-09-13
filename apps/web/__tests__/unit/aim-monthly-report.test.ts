@@ -173,6 +173,7 @@ describe("renderMonthlyReportHtml", () => {
           revenue: null,
         },
         attribution: { traceableLeadCount: 1, unknownLeadCount: 0 },
+        metricLayer: { source: "metric-layer", publishedCount: 2, traceableLeadCount: 1, unknownLeadCount: 0 },
         taskInsights: [
           {
             contentTask: "推动咨询行动",

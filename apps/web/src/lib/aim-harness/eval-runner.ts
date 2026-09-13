@@ -20,6 +20,7 @@ import { gradeFixture } from "./eval/graders"
 import { judgeEvalCase } from "./eval-rubric"
 import { validateFormat, planAimRun } from "./index"
 import { deliveryBody } from "@/lib/aim-generation-text"
+import { formatLearningsBlock, stripLearningsPrefix } from "@/lib/aim/learning-injection"
 
 /** What a context adapter returns for a fixture. */
 export interface EvalContext {
@@ -47,9 +48,12 @@ export function createFrozenContextAdapter(): EvalContextAdapter {
     name: "frozen",
     async load(fixture: EvalFixture): Promise<EvalContext> {
       const ctx: FrozenContext = fixture.seedContext
-      const knowledgeBlock = ctx.knowledge
-        .map((entry) => `【${entry.title}】(${entry.category})\n${entry.content}`)
-        .join("\n\n")
+      const knowledgeBlock = [
+        formatLearningsBlock(ctx.learnings ?? []),
+        ctx.knowledge
+          .map((entry) => `【${entry.title}】(${entry.category})\n${entry.content}`)
+          .join("\n\n"),
+      ].filter(Boolean).join("\n\n")
       return {
         knowledgeBlock,
         ipWikiBlock: ctx.ipWikiBlock ?? "",
@@ -245,8 +249,9 @@ function deterministicDraftFor(
   if (fixture.expectations.mustWarnInsufficientInfo) {
     return "信息不足：请补充主题、产品或人设资料后再生成，避免编造内容。"
   }
-  const knowledge = ctx.knowledgeBlock ? `\n参考知识：${ctx.knowledgeBlock.slice(0, 80)}` : ""
-  return `${fixture.input.rawInput.slice(0, 40)} 的${format}稿件（确定性占位，仅用于 eval 路由/格式/上下文校验）。${knowledge}`
+  const knowledge = stripLearningsPrefix(ctx.knowledgeBlock)
+  const knowledgeSnippet = knowledge ? `\n参考知识：${knowledge.slice(0, 80)}` : ""
+  return `${fixture.input.rawInput.slice(0, 40)} 的${format}稿件（确定性占位，仅用于 eval 路由/格式/上下文校验）。${knowledgeSnippet}`
 }
 
 /** Deterministic sample of N fixtures (stable across runs, exactly N). */

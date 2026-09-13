@@ -15,6 +15,9 @@ import {
 } from "@/lib/aim/progressive-prompt-flags"
 import { stripViralToolkitFromMethodology } from "@/lib/ip-copywriting-methodology"
 import { AIM_ASSISTANT_PERSONA } from "@/lib/aim/assistant-persona"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { fillPromptTemplate } from "@/lib/prompt/template"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import type { ContentFormat } from "./aim-generator"
 
 export type { ContentProducerProgressiveFlags }
@@ -190,31 +193,26 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     ? `${params.selectedMethodologyBlock ? `${params.selectedMethodologyBlock}\n` : ""}${METHODOLOGY_INJECTION_PREFACE}\n${effectiveMethodology}`
     : params.selectedMethodologyBlock || ""
 
-  return `${AIM_ASSISTANT_PERSONA}
-
-北极星目标：${AIM_NORTH_STAR_GOAL}
-
-你的使命：
-根据用户已经给出的素材、热点选题、对标文案、企业知识库和方法论，直接给出可执行的文案方向、初稿或改写建议。
-
-当前对话上下文：
-${contextBlock}
-${params.workflowContext ? `\n工作流任务单：\n${params.workflowContext}\n` : ""}
-${methodologySection}
-${params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${params.ipWikiBlock}` : ""}
-${lightEditBlock}${goalClarify}
-${progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : ""}
-你的对话原则：
-1. ${CONTENT_PRODUCER_REPLY_OPENING}
-2. 缺关键信息（受众/卖点/场景）时追问 1-3 个具体问题；目标仍模糊时优先用上方「目标确认」单题。信息基本够则可假设交付并标注待确认项。
-3. 分析/优化建议问句：先给问题清单与最小改法（可举例改开头一两句），禁止另写整篇或用「替换稿」顶替建议；仅当用户明确说「重写/改写/出一版/生成/直接改」时再交付成稿。
-4. 第一人称学员/客户案例必须可追溯；缺依据标「未提供/待补充」，绝不虚构。
-5. 像该 IP 真人说话：先保住人的位置与手迹，再清 AI 腔、宣传腔、整齐排比和万能结尾；禁止官腔客套。
-6. ${knowledgeRule}
-7. ${AIM_SESSION_PRIORITY_RULES}；方法论只决定怎么写，不得盖过本轮明确要求。
-8. ${flags.includeOperatingLogicFull ? CONTENT_PRODUCER_OPERATING_LOGIC_RULE : CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE}
-
-请直接根据上文与用户的历史对话，产出下一轮内容。`
+  return fillPromptTemplate(
+    promptRegistry.get(PROMPT_KEYS.contentProducerChat).content,
+    {
+      persona: AIM_ASSISTANT_PERSONA,
+      northStarGoal: AIM_NORTH_STAR_GOAL,
+      contextBlock,
+      workflowBlock: params.workflowContext ? `\n工作流任务单：\n${params.workflowContext}\n` : "",
+      methodologySection,
+      ipWikiBlock: params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${params.ipWikiBlock}` : "",
+      lightEditBlock,
+      goalClarify,
+      progressiveBlocks: progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : "",
+      replyOpening: CONTENT_PRODUCER_REPLY_OPENING,
+      knowledgeRule,
+      sessionPriorityRules: AIM_SESSION_PRIORITY_RULES,
+      operatingLogic: flags.includeOperatingLogicFull
+        ? CONTENT_PRODUCER_OPERATING_LOGIC_RULE
+        : CONTENT_PRODUCER_OPERATING_LOGIC_CHAT_LINE,
+    },
+  )
 }
 
 export interface ContentProducerPromptFootprint {
@@ -267,184 +265,28 @@ export function measureContentProducerPromptFootprint(opts?: {
   }
 }
 
-// ─── 格式指令常量 ──────────────────────────────────────────
+// ─── 格式指令常量（正文在 prompt 注册表，这里只做 key 映射）──────────
 
-// 口播脚本的唯一规则源。
-// 大道至简整改：删除"每10-12秒40字转折"的伪节奏公式与"文盲式修改"怪规则；
-// 口语化与短句要求由下方通用表达条款承担。
-const BUZZWORD_BAN_LINE = "- 禁止使用以下词汇：赋能、闭环、抓手、颗粒度、对齐、拉通、打通、沉淀、复盘、迭代、链路、触达、心智、赛道"
-
-const VIDEO_SCRIPT_INSTRUCTION = `【口播文案】
-要求：
-- 篇幅只服从用户明确要求：用户给了时长、字数或"保持体量"时严格执行；用户没提任何时长/字数时，按内容自然收束成完整口播，不设默认时长、默认字数或交付门槛。如果是对标改写，按对标原文的信息密度和篇幅完整改写，禁止压缩成摘要
-- 开头3秒优先有冲突/反差/痛点/好奇，避免平铺直叙；若下方已注入「爆款开头库」可参考其中公式思路
-- 正文按问题→判断→案例→行动的自然节拍推进；只有用户素材或授权资料提供相应内容时才写案例/行动，不得为了填结构编造经历、数据或 CTA；若下方已注入「爆款文案结构库」可参考其结构
-- 结尾自然收束；行动引导/CTA 只在用户明确要求、或当前任务已确认目标是获客/成交时给出，不默认添加
-- 只输出纯口播文案正文，不要写画面、镜头、动作、字幕、音效或分镜说明
-- 禁止出现【画面】【旁白】【镜头】【字幕】等任何分镜标签
-- 用口语化表达，短句为主，保留必要停顿和语气词，禁止书面语
-- 一段话就是一个完整口播段落，可以直接录制
-- 排版：自然成段；段与段之间最多空一行；禁止每句后空一行，禁止连续多个空行把版面撑疏
-- 口播不是公众号长文：单线推进，一段只扛一个信息点；禁止写成综合长文或观点清单
-- 开头快速进入重点：先给判断再展开，不要长铺垫，不要堆一串痛点或并列问题
-- 产品/业务露出要承接前文判断，禁止突然硬切卖点或功能清单
-- 没有事实来源时，禁止虚构「我朋友/我客户/有位某行业老板/某家公司」「上周我看到一个老板」等具体案例；客户画像只能作为群体描述，不能擅自补出行业、人物、经历或结果
-- 禁止把「90%的老板」等无来源比例、金额、人数或效果数字写成事实；没有可追溯依据就改成不带数字的定性表达
-${BUZZWORD_BAN_LINE}
-建议要素：在用户素材支持时加入具体冲突/利益开头、可对号入座的客户场景、鲜明判断和可追溯证据或方法；素材未提供时用不带虚构事实的普遍场景或判断替代，行动引导只按用户要求加入，不作为默认必含项。
-禁用开场：今天给大家分享、很多人不知道、在这个时代、作为一名。
-平台语气：像真人面对镜头说话，不要播音腔或宣传稿。`
+function formatInstruction(key: string): string {
+  return promptRegistry.get(key).content
+}
 
 /**
  * @description 构建小红书图文视觉导演指令
  * @returns 小红书图文视觉方案提示词
  */
 export function buildXhsVisualDirectorInstruction(): string {
-  return `【小红书图文视觉方案】
-你现在是小红书高级图文视觉导演，不是普通文案助手。把用户输入的选题 / 观点 / 草稿 / 产品 / 案例，转化为一套可执行的图文视觉方案：风格判断 + 统一视觉母版 + 8 页图文结构 + 逐页视觉提示词 + 发布文案 + 发布前自检。
-
-## 画幅硬规则（每页都必须遵守）
-- 锁定 1080x1440px, strict 3:4 vertical portrait canvas
-- 每页提示词都要重复：strict 3:4 vertical portrait, not square, not landscape, no extra border, no crop
-- 手机端阅读优先，字不能小，重点信息一眼读懂
-
-## 视觉风格映射（按内容选主风格 + 辅助风格；封面可更冲击，内页更理性）
-- AI / Agent / 工具 / 技术观点：深色科技杂志风（主）+ 黑白灰荧光绿冲击风（封面）/ 架构图系统拆解风（内页）
-- 商业 / 企业服务 / 产业方案：高级商业提案风（主）+ 高级极简黑金风 + 数据报告趋势洞察风
-- 个人 IP / 观点 / 人设：个人品牌宣言风（主）+ 高级白底杂志风 + 夜间独白风
-- 方法论 / 教程 / 知识拆解：Notion 高级卡片风（主）+ 课程讲义风 + 架构图系统拆解风
-
-## 统一视觉母版（生成 8 页前必须先定，是后续每页的硬约束）
-- 固定画布 1080x1440px 3:4
-- 安全边距：左右 72px、上下 80px，整套一致
-- 中文文字安全区：标题与正文不得超出安全边距，重要文字避开顶部状态栏与底部页码区
-- 网格：12 列、8px 基准间距、统一卡片圆角
-- 色彩令牌：背景色 / 主文字色 / 辅助文字色 / 强调色（只 1 个强调色）
-- 字体令牌：中文标题、中文正文、英文注释
-- 页码角标：固定位置、大小、样式
-- 母版锁定前缀：后续每一页提示词都必须以这一段开头，不要只在总说明里写一次
-
-## 图文结构（每页只承担一个传播任务，禁止 PPT 式堆字；页数按用户指令，未指定时按信息量自然组织，通常 6-8 页）
-1. 封面：强钩子 + 强视觉（吸引点击）
-2. 痛点页：指出反常识或正在付出的代价
-3. 认知页：为什么这件事重要
-4. 方法页：给一个清晰框架
-5. 案例页：用具体例子证明
-6. 操作页：可立刻执行的步骤
-7. 总结页：收束核心观点
-8. 引导页（只在用户明确要互动引导时加）：收藏 / 评论 / 关注
-
-## 逐页必须输出
-- 页面标题、副标题、核心文案、本页传播任务
-- 本页使用风格 + 为什么这一页适合
-- 视觉构图、主视觉元素、辅助元素
-- 色彩、字体层级
-- 图像生成提示词：画幅锁定 + 沿用母版哪些元素 + 本页只变化什么
-- 负面提示词：必须含 no square image, no landscape, no inconsistent margins, no different template, no random layout shift
-
-## 发布文案
-- 小红书标题：用户指定数量时严格按用户数量；未指定时给一个主推标题，最多附少量备选，不设固定数量门槛
-- 正文（可用 emoji 但不堆砌，短句分段）
-- 标签贴合小红书搜索习惯，按内容需要给出；用户指定数量时严格按用户数量
-- 评论区引导只在用户明确要求时给，不默认添加
-
-## 发布前自检
-- 封面是否有冲击力、标题是否够大、手机端能否读清
-- 画幅 / 边距 / 字体 / 页码是否全套统一
-- 是否有收藏价值、是否避免了 PPT 感和廉价 AI 模板感
-- 是否只说"高级、科技、极简"等空泛词（必须给具体视觉做法）
-
-## 输出格式（用清晰 Markdown 分区，用户可直接复制给图片生成工具或设计师）
-# 风格判断报告
-# 统一视觉母版
-# 8 页图文结构
-# 逐页视觉提示词（Page 01 ~ Page 08）
-# 小红书发布文案
-# 发布前自检
-
-## 禁止
-- 廉价蓝紫渐变、随机霓虹、文字变形、塑料质感、儿童卡通感
-- 每页都中心构图、巨大页码喧宾夺主、辅助元素比核心信息更抢眼
-- 只写"高级、科技、极简"而不给具体视觉做法
-
-必含要素（发布文案层）：具体反差或代价开头、一个可执行方法或判断、适合谁/不适合谁边界；CTA 与互动引导按用户要求加入，不默认添加。
-禁用开场：超好用、强烈安利、闭眼入、姐妹们冲。
-平台语气：小红书种草口吻，短句分段，可少量 emoji 但不堆砌。`
+  return formatInstruction(PROMPT_KEYS.formatXiaohongshuPost)
 }
 
 export const FORMAT_INSTRUCTIONS: Record<ContentFormat, string> = {
-  video_script: VIDEO_SCRIPT_INSTRUCTION,
-
-  wechat_article: `【公众号文章】
-要求：
-- 篇幅只服从用户明确要求：用户给了字数/篇幅时严格执行；没提字数时按选题与信息量自然展开，不设默认字数下限或"最少字数"门槛
-- 有吸引人的标题（放在第一行，格式：标题：xxx）
-- 开头必须用下方「爆款开头库」中的一种思路做引子
-- 正文必须参考下方「爆款文案结构库」组织，但输出时不要写结构标签
-- 结尾必须用下方「结尾类型库」中的一种方式完成总结或互动
-- 语言专业但易懂
-- 适合微信公众号阅读习惯
-- 文中出现政策红利、行业趋势、数据性断言时，若缺乏可追溯依据，用定性表达或标注「未提供/待补充」，不要编造引用来源。`,
-
-  moments_post: `【朋友圈文案】
-要求：
-- 篇幅只服从用户明确要求；没提字数时保持朋友圈式短表达，不设固定字数区间门槛
-- 简洁有力，适合朋友圈阅读
-- 第一行必须有钩子，优先使用痛点、反差、利益输送或好奇开场
-- 可以用emoji但不要过多
-- 互动引导（提问/评论/私信）只在用户明确要求互动或引流时写；没要求时自然收束即可
-- 不要用#话题标签
-必含要素：第一行钩子、一句洞察；互动引导按用户要求，不默认添加。
-禁用开场：感恩遇见、持续输出价值、有需要的朋友欢迎咨询。
-平台语气：像老板随手发的真实状态，不要海报文案腔。`,
-
-  community_message: `【社群运营文案】
-要求：
-- 篇幅只服从用户明确要求；没提字数时保持群消息式短表达，不设固定字数区间门槛，适合微信群/企微群发布
-- 第一行先说明和群成员有关的痛点、机会或提醒，不能像广告
-- 语气自然，像群主或运营负责人在群里提醒大家
-- 轻量互动动作（回复关键词、评论问题、私信领取、报名咨询）只在用户明确要求时给出，不默认添加
-- 不要承诺结果，不要制造暴富焦虑，不要使用夸张符号刷屏
-必含要素：与群相关的具体提醒；互动动作按用户要求，不默认添加。
-禁用开场：家人们、冲冲冲、错过再等一年。
-平台语气：群主提醒，不硬广。`,
-
-  raw_copy: `【原始文案】
-要求：
-- 篇幅只服从用户明确要求；没提字数时围绕核心信息自然展开，不设固定字数区间门槛
-- 不套用任何爆款开头、文案结构或结尾模板
-- 不做去AI味处理，保持自然流畅
-- 围绕用户输入的核心信息展开，保留信息密度
-- 可以适当分段，但不要加小标题
-- 适合作为后续精修、改编的基础初稿
-必含要素：围绕用户核心信息完整展开，不丢关键事实。
-禁用开场：无强制模板；仍禁止空泛口号堆叠。
-平台语气：服从用户指定风格；未指定时保持自然书面/口语混合。`,
-
-  shooting_brief: `【拍摄交接单】
-要求：
-- 输出给拍摄、剪辑、运营执行，必须具体、清楚、可落地
-- 必须包含以下字段，字段名不能省略：
-视频标题：
-核心观点：
-目标客户：
-视频目标：涨粉 / 建信任 / 引流 / 成交 / 客户教育 / 招商加盟（选择最适合的一项）
-拍摄形式：口播 / 访谈 / 场景展示 / 混剪（选择最适合的一项）
-建议时长：
-脚本正文：
-必拍镜头：
-补充素材：
-封面文案：
-评论区引导：
-私域承接话术：
-事实风险提醒：
-- 必拍镜头按脚本内容需要给出（每条可直接执行）；评论区引导和私域承接话术必须能直接复制使用；用户指定了镜头数量时严格按用户数量
-- 脚本正文口语化、可直接照读，删掉废话和书面语
-- 补充素材按视觉节奏标注可执行的画面变化，例如 B-Roll、特写、音效、字幕特效或画面切换
-- 不承诺效果，不写保证涨粉、保证成交、月入多少等高风险表达`,
-
+  video_script: formatInstruction(PROMPT_KEYS.formatVideoScript),
+  wechat_article: formatInstruction(PROMPT_KEYS.formatWechatArticle),
+  moments_post: formatInstruction(PROMPT_KEYS.formatMomentsPost),
+  community_message: formatInstruction(PROMPT_KEYS.formatCommunityMessage),
+  raw_copy: formatInstruction(PROMPT_KEYS.formatRawCopy),
+  shooting_brief: formatInstruction(PROMPT_KEYS.formatShootingBrief),
   // 仅用于读取旧请求和历史结果；新生成会统一归一到 video_script。
-  koubo_script: VIDEO_SCRIPT_INSTRUCTION,
-
-  xiaohongshu_post: buildXhsVisualDirectorInstruction(),
+  koubo_script: formatInstruction(PROMPT_KEYS.formatVideoScript),
+  xiaohongshu_post: formatInstruction(PROMPT_KEYS.formatXiaohongshuPost),
 }

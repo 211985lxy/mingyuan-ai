@@ -9,6 +9,10 @@
  */
 
 import { AIM_AGENTS_PROMPT_SEEDS } from "./seeds-aim-agents"
+import { AIM_CREATION_PROMPT_SEEDS } from "./seeds-aim-creation"
+import { AIM_DIAGNOSIS_PROMPT_SEEDS } from "./seeds-aim-diagnosis"
+import { AIM_FORMAT_PROMPT_SEEDS } from "./seeds-aim-format"
+import { AIM_GENERATION_PROMPT_SEEDS } from "./seeds-aim-generation"
 import { AIM_SERVICES_PROMPT_SEEDS } from "./seeds-aim-services"
 import { API_ROUTES_PROMPT_SEEDS } from "./seeds-api-routes"
 import { QUALITY_GATE_PROMPT_SEEDS } from "./seeds-quality-gate"
@@ -180,4 +184,8 @@ export const PROMPT_SEEDS: PromptSeed[] = [
   ...AIM_SERVICES_PROMPT_SEEDS,
   ...QUALITY_GATE_PROMPT_SEEDS,
   ...API_ROUTES_PROMPT_SEEDS,
+  ...AIM_CREATION_PROMPT_SEEDS,
+  ...AIM_DIAGNOSIS_PROMPT_SEEDS,
+  ...AIM_GENERATION_PROMPT_SEEDS,
+  ...AIM_FORMAT_PROMPT_SEEDS,
 ]

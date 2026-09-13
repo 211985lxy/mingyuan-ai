@@ -2,6 +2,8 @@ import { executeChatLLM, executeChatLLMStream } from "@/lib/aim-agent-model"
 import { saveAimGenerationRecord } from "@/lib/aim-harness/persistence"
 import { buildScenarioPromptBlock } from "@/lib/content-scenario-config"
 import { FORMAT_INSTRUCTIONS, buildContentProducerChatPrompt } from "@/lib/aim-agent-prompts"
+import { promptRegistry } from "@/lib/prompt/registry"
+import { PROMPT_KEYS } from "@/lib/prompt/types"
 import {
   buildProducerSystemPrompt,
   buildUserPrompt,
@@ -125,7 +127,7 @@ export class ContentProducerHandler implements AimAgentHandler {
     const systemPrompt = context.unifiedContentExecution
       ? buildUnifiedProducerSystemPrompt(context)
       : closedWorldFastRun
-      ? `${agentPrompt}\n这是闭集事实任务：只使用用户原始输入里的事实、客户信息和数字，不调用或复述其他背景事实。客户案例段只能逐字引用用户原文里的事实锚点；禁止补充人员、流程、渠道、做法、原因、其他结果或因果解释，禁止计算、换算或概括降幅、比例等衍生数字，禁止用“他们”“该公司”“这家公司”引出任何新信息。事实锚点之前必须完整展开目标客户、用户明确写出的痛点、问题机制和不含新增事实或数字的可执行判断，篇幅必须匹配用户指定时长，不能缩成几句话。结尾只执行用户指定的行动引导，不增加免费、保证、限时或交付承诺。直接输出完整成稿，不解释、不分析、不增加案例细节。`
+      ? `${agentPrompt}\n${promptRegistry.get(PROMPT_KEYS.contentProducerClosedSetFacts).content}`
       : buildProducerSystemPrompt(agentPrompt, context)
         + scenarioBlock
         + (canonicalBlock ? `\n\n${canonicalBlock}` : "")

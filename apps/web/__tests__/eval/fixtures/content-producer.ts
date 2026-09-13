@@ -562,4 +562,124 @@ export const CONTENT_PRODUCER_FIXTURES: EvalFixture[] = [
       outputFormats: [],
     },
   },
+  {
+    id: "cp_learnings_ban_ai_flavor_25",
+    version: 1,
+    agent: "content_producer",
+    scenario: "new",
+    entrypoint: "generate",
+    description: "带历史教训：禁止赋能/闭环，格式契约仍成立",
+    input: {
+      rawInput: "帮我围绕供暖改造写一条短视频口播，目标是抖音。",
+      agentId: "content_producer",
+      taskType: "write_script",
+      targetFormats: ["video_script"],
+    },
+    seedContext: {
+      knowledge: [
+        {
+          id: "k_learn_1",
+          title: "供暖改造卖点",
+          category: "product",
+          valueGrade: "S",
+          content: "先改系统再谈流量，现场对比温度最有说服力。",
+        },
+      ],
+      learnings: [
+        { id: "lc_ai_flavor", targetType: "methodology_revision", constraint: "禁止使用赋能、闭环、抓手" },
+      ],
+    },
+    expectations: {
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: ["video_script"],
+      bannedSubstrings: ["赋能", "闭环", "抓手"],
+      minCharsPerFormat: 80,
+    },
+  },
+  {
+    id: "cp_learnings_hallucination_26",
+    version: 1,
+    agent: "content_producer",
+    scenario: "cite_knowledge",
+    entrypoint: "generate",
+    description: "带引用造假教训：必须引用知识，不得编造数据",
+    input: {
+      rawInput: "根据知识库写一条口播，讲清楚供暖改造省了多少钱。",
+      agentId: "content_producer",
+      taskType: "write_script",
+      targetFormats: ["video_script"],
+    },
+    seedContext: {
+      knowledge: [
+        {
+          id: "k_learn_2",
+          title: "现场账单",
+          category: "case",
+          valueGrade: "S",
+          content: "去年冬天这户电费从 1800 降到 1100。",
+        },
+      ],
+      learnings: [
+        { id: "lc_hallucination", targetType: "methodology_revision", constraint: "禁止编造未给出的数字和客户原话" },
+      ],
+    },
+    expectations: {
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: ["video_script"],
+      mustCiteKnowledgeIds: ["k_learn_2"],
+      minCharsPerFormat: 80,
+    },
+  },
+  {
+    id: "cp_learnings_light_edit_27",
+    version: 1,
+    agent: "content_producer",
+    scenario: "partial_edit",
+    entrypoint: "generate",
+    description: "轻改场景带教训：只改指定段，注入不得撑破轻改边界",
+    input: {
+      rawInput: "优化一下这条脚本的开头钩子，前3秒更抓人。",
+      agentId: "content_producer",
+      targetFormats: ["video_script"],
+    },
+    seedContext: {
+      knowledge: [],
+      learnings: [
+        { id: "lc_light_edit", targetType: "skill_draft", constraint: "轻改不得扩写未要求的段落" },
+      ],
+    },
+    expectations: {
+      runtimeTask: "light_edit",
+      knowledgeStrategy: "light_edit",
+      outputFormats: ["video_script"],
+    },
+  },
+  {
+    id: "cp_learnings_info_insufficient_28",
+    version: 1,
+    agent: "content_producer",
+    scenario: "info_insufficient",
+    entrypoint: "generate",
+    description: "信息不足时带教训：必须提示缺材料，不得用教训编造补充",
+    input: {
+      rawInput: "帮我写一条视频脚本。",
+      agentId: "content_producer",
+      taskType: "write_script",
+      targetFormats: ["video_script"],
+    },
+    seedContext: {
+      knowledge: [],
+      learnings: [
+        { id: "lc_insufficient", targetType: "methodology_revision", constraint: "没有证据就标明信息不足，禁止编案例" },
+      ],
+    },
+    expectations: {
+      runtimeTask: "new_copy",
+      knowledgeStrategy: "deep",
+      outputFormats: ["video_script"],
+      mustWarnInsufficientInfo: true,
+    },
+  },
 ]

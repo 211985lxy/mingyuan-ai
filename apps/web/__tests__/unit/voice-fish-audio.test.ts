@@ -165,9 +165,10 @@ describe("Fish Audio 声音克隆", () => {
       filename: "sample.mp3",
     })
 
-    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/model"))
+    const calls = fetchMock.mock.calls as unknown as Array<[unknown, { body?: FormData }]>
+    const call = calls.find((entry) => String(entry[0]).includes("/model"))
     expect(call).toBeDefined()
-    const form = call![1]!.body as FormData
+    const form = call?.[1]?.body as FormData
     expect(form.get("train_mode")).toBe("fast")
     expect(form.get("type")).toBe("tts")
     expect(form.get("visibility")).toBe("private")

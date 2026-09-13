@@ -5,6 +5,8 @@
  * 非法跳转必须显式失败，不静默成功。
  */
 
+import { isDouyinPublishPlatform, isValidPublishedWorkKey } from "@/lib/aim/platform-post-id"
+
 export const AIM_WORKFLOW_STATUSES = [
   "draft",
   "pending_review",
@@ -122,6 +124,14 @@ export function assertWorkflowTransition(input: WorkflowTransitionInput): Workfl
     }
     if (!input.publishUrl?.trim()) {
       return { ok: false, error: "登记已发布时必须填写作品链接或作品 ID（用于经营归因）" }
+    }
+    if (!isValidPublishedWorkKey(input.publishPlatform, input.publishUrl)) {
+      return {
+        ok: false,
+        error: isDouyinPublishPlatform(input.publishPlatform)
+          ? "登记抖音已发布时必须填写可解析的作品链接或 aweme_id"
+          : "登记已发布时必须填写作品链接或作品 ID（用于经营归因）",
+      }
     }
   }
   return { ok: true, from, to }

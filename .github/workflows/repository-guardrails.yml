@@ -61,7 +61,15 @@ jobs:
       - name: Typecheck tests
         run: pnpm --dir apps/web run typecheck:tests
       - name: Unit and evaluation tests
-        run: pnpm --dir apps/web test
+        run: pnpm --dir apps/web run test:coverage
+      - name: Upload unit coverage baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: apps/web/coverage/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Database E2E tests
         run: pnpm --dir apps/web run test:e2e
       - name: Environment contract

@@ -32,6 +32,7 @@ import type { PlanRunInput } from "./planner"
 import type { AimRunSpec, AimContextSource, AimRunMetadata } from "./types"
 import { HARNESS_VERSION } from "./types"
 import { hashPrompt, hashContextManifest, sha256 } from "./hashing"
+import { hashLearningsFromManifest } from "@/lib/aim/learning-injection"
 import { persistAimRunSnapshot, applyRunMetadataToTrace } from "./snapshot"
 import { AimRunExecutionError } from "@/lib/aim-error-message"
 import { wrapLlmTelemetryIterable } from "@/lib/llm/telemetry"
@@ -415,6 +416,7 @@ export async function streamAimRun(request: AimRunRequest): Promise<AimStreamHan
       degraded: failed.length > 0 && !!successful && ok,
       promptHash: hashPrompt(composedPrompt),
       contextHash: hashContextManifest(contextManifest),
+      learningsHash: hashLearningsFromManifest(contextManifest),
       providerAttempts: attempts,
     }
     if (request.persistSnapshot !== false) {

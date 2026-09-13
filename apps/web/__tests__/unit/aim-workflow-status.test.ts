@@ -62,6 +62,29 @@ describe("aim workflow status machine", () => {
     ).toEqual({ ok: true, from: "ready_to_publish", to: "published" })
   })
 
+  it("requires a parseable Douyin work key when platform is 抖音", () => {
+    expect(
+      assertWorkflowTransition({
+        from: "ready_to_publish",
+        to: "published",
+        publishPlatform: "抖音",
+        publishUrl: "dy_123",
+      }),
+    ).toEqual({
+      ok: false,
+      error: "登记抖音已发布时必须填写可解析的作品链接或 aweme_id",
+    })
+
+    expect(
+      assertWorkflowTransition({
+        from: "ready_to_publish",
+        to: "published",
+        publishPlatform: "抖音",
+        publishUrl: "https://v.douyin.com/AbCdEf/",
+      }).ok,
+    ).toBe(true)
+  })
+
   it("treats same-status as no-op", () => {
     expect(assertWorkflowTransition({ from: "editing", to: "editing" })).toEqual({
       ok: true,
