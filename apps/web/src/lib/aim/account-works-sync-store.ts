@@ -1,83 +1,31 @@
 import type { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
 import {
-  fetchDouyinRecentVideos,
-  refreshDouyinAccessToken,
-  type DouyinToken,
-} from "@/lib/douyin-openapi"
-import {
   runAccountWorksSync,
+  type AccountWorksFetchResult,
   type AccountWorksSyncStorePort,
   type AccountWorksSyncSummary,
-  type SyncedWorkItem,
 } from "@/lib/aim/account-works-sync"
+import { fetchAccountWorks } from "@/lib/aim/account-works-source"
 import { readWorkStats, type AccountWorkLike } from "@/lib/aim/account-work-assets"
 
-const EXPIRY_GRACE_MS = 60 * 1000
 const VIDEO_FETCH_MAX = 50
 
-// 与 outcome-autofetch-store 同一套令牌解析（刷新落库 + 宽限判断）。
-async function resolveBindingToken(binding: {
-  userId: string
-  openId: string
-  accessToken: string
-  refreshToken: string
-  accessExpiresAt: Date
-  scope: string
-}): Promise<DouyinToken | null> {
-  if (binding.accessExpiresAt.getTime() - EXPIRY_GRACE_MS > Date.now()) {
-    return {
-      accessToken: binding.accessToken,
-      refreshToken: binding.refreshToken,
-      openId: binding.openId,
-      expiresIn: Math.max(0, Math.floor((binding.accessExpiresAt.getTime() - Date.now()) / 1000)),
-      scope: binding.scope,
-    }
-  }
-  const refreshed = await refreshDouyinAccessToken(binding.refreshToken).catch(() => null)
-  if (!refreshed) return null
-  await prisma.douyinAccountBinding.update({
-    where: { userId_openId: { userId: binding.userId, openId: binding.openId } },
-    data: {
-      accessToken: refreshed.accessToken,
-      refreshToken: refreshed.refreshToken || binding.refreshToken,
-      accessExpiresAt: new Date(Date.now() + refreshed.expiresIn * 1000),
-      syncStatus: "ok",
-    },
-  }).catch(() => undefined)
-  return {
-    accessToken: refreshed.accessToken,
-    refreshToken: refreshed.refreshToken || binding.refreshToken,
-    openId: binding.openId,
-    expiresIn: refreshed.expiresIn,
-    scope: refreshed.scope || binding.scope,
-  }
-}
-
-async function fetchWorks(binding: { id: string; userId: string }): Promise<SyncedWorkItem[]> {
+/**
+ * 作品取数：抖音官方「授权账号作品列表」能力已下线（实测 28001056），
+ * 改走第三方公开数据通道（TikHub 主 / 红狐备），全部失败时抛错（不返回空数组造成假绿）。
+ */
+async function fetchWorks(binding: { id: string; userId: string }): Promise<AccountWorksFetchResult> {
   const row = await prisma.douyinAccountBinding.findFirst({
     where: { id: binding.id, userId: binding.userId },
+    select: { id: true, userId: true, secUserId: true, profileUrl: true },
   })
   if (!row) throw Object.assign(new Error("绑定不存在"), { code: "missing" })
-  const token = await resolveBindingToken(row)
-  if (!token) throw Object.assign(new Error("token expired"), { code: "expired" })
-  const videos = await fetchDouyinRecentVideos(token, VIDEO_FETCH_MAX)
-  return videos.map((video) => ({
-    externalWorkId: video.itemId,
-    title: video.title,
-    coverUrl: video.coverUrl ?? null,
-    publishedAt:
-      typeof video.createTime === "number" && video.createTime > 0
-        ? new Date(video.createTime * 1000).toISOString()
-        : null,
-    stats: {
-      views: video.statistics?.playCount ?? 0,
-      likes: video.statistics?.diggCount ?? 0,
-      comments: video.statistics?.commentCount ?? 0,
-      saves: video.statistics?.collectCount ?? 0,
-      shares: video.statistics?.shareCount ?? 0,
-    },
-  }))
+  return fetchAccountWorks({
+    secUserId: row.secUserId,
+    profileUrl: row.profileUrl,
+    count: VIDEO_FETCH_MAX,
+  })
 }
 
 async function listBindingsWithProject(): Promise<Array<{ id: string; userId: string; projectId: string | null }>> {

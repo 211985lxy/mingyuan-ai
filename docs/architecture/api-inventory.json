@@ -3947,6 +3947,22 @@
       "idempotency": true
     },
     {
+      "route": "/api/integrations/douyin/accounts/[id]/profile-url",
+      "file": "src/app/api/integrations/douyin/accounts/[id]/profile-url/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "integrations",
+      "kind": "crud",
+      "orchestratable": false,
+      "auth": "user_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "low",
+      "idempotency": false
+    },
+    {
       "route": "/api/integrations/douyin/accounts/[id]",
       "file": "src/app/api/integrations/douyin/accounts/[id]/route.ts",
       "methods": [
