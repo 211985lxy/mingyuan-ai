@@ -456,6 +456,9 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(warnedInsufficientInfo([
       { content: "这篇我现在写不了成稿——不是不会写，是手上一条能落地的事实都没有：不知道你卖给谁、卖什么、打的是哪类客户、客户在烦什么。" },
     ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板。写之前我就卡一件事，得先定它：\n\n**这条内容更想达成哪个目标？**\nA. 获客线索（留资/私信/预约诊断）\nB. 成交转化（报名/购买）\nC. 人设信任（来时路/专业可信）\nD. 品牌曝光（起号/流量/品宣）\n\n你回个字母就行。" },
+    ])).toBe(true)
   })
 
   it("shows the judge the frozen context used by the real executor", () => {

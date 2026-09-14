@@ -56,7 +56,8 @@ export function warnedInsufficientInfo(drafts: Array<{ content: string }>): bool
     const identityGapsListed = /行业.{0,40}产品.{0,80}(?:没有|没给|空|靠编)/.test(text)
     const identityGapCount = [/行业/, /产品|卖什么/, /客户|卖给谁/].filter((pattern) => pattern.test(text)).length
     const identityGapFallback = identityGapCount >= 2 && /没有|没给|空着|空的|靠编/.test(text)
-    return directWarning || missingData || refusesUnsupportedReview || positioningGap || identityGapsListed || identityGapFallback
+    const asksGoalFirst = /写之前.{0,24}卡|得先定它|更想达成哪个目标|你回个字母就行|获客线索.{0,80}成交转化.{0,80}人设信任/.test(text)
+    return directWarning || missingData || refusesUnsupportedReview || positioningGap || identityGapsListed || identityGapFallback || asksGoalFirst
   })
 }
 
