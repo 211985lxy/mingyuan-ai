@@ -98,8 +98,31 @@ HEYGEN_WEBHOOK_URL      # 回调地址（公网 HTTPS）
 HEYGEN_WEBHOOK_SECRET   # 注册端点后从响应取，只显示一次
 ```
 
-## 八、未接入
+## 八、未接入（含 2026-09-14 评估结论）
 
-- 形象授权提交（`POST /v3/avatars/{group_id}/consent`）
-- 声音克隆（`POST /v3/voices/clone`）——与自有语音（Fish→audio_url）二选一即可出片
-- 实弹验收（等 `HEYGEN_API_KEY`）
+### 8.1 声音克隆 `POST /v3/voices/clone`（Instant Clone）
+
+- 入参：`voice_name`* + `audio`（`{type:"url"|"asset_id"|"base64", ...}`）+ 可选 `language` 提示；**规格中无 consent 字段**（与形象克隆不同——授权责任完全落在调用方）
+- 异步：轮询 `GET /v3/voices/{voice_clone_id}` 至 `complete`（processing/complete/failed）
+- 成本：每账号有克隆额度，超额 `400 resource_limit_reached`；`DELETE /v3/voices/{id}` 释放
+- **评估结论：暂不接入**。我们已有 Fish Audio 自有语音方案（合成→OSS 签名→`audio_url` 出片），
+  覆盖同样场景且音色资产已沉淀在语音工坊；再引入 HeyGen 克隆会形成两套音色资产。
+  触发条件：需要「在 HeyGen 生态内直接用 voice_id 出片且不想走外部音频」时再接。
+
+### 8.2 Professional Voice Clone（`POST /v3/models/audio/voices`，mode=professional）
+
+- 20+ 分钟录音、付费槽位（`400 resource_limit_reached`=无空槽）、每槽 5 次训练/月
+- 结论：同上暂不接入；接入时用 `Idempotency-Key` 防重复训练
+
+### 8.3 形象授权提交 `POST /v3/avatars/{group_id}/consent`
+
+- 三种方式：`reroute_url`（浏览器授权页，链接 24h 过期）、`consent_text`（**自定义授权文案**，
+  渲染在授权页上替代 HeyGen 默认文案）、`consent_video`（enterprise 直接传预录授权视频）
+- **与我们的对接点**：`consent_text` 可以直接填我们 `{name}` 实例化后的授权原文——
+  供应商侧授权页展示的文案与我方门禁逐字一致，两套门禁合成一条证据链。
+  触发条件：需要在 HeyGen 侧克隆自有形象（digital twin）时接。
+- 完成状态轮询：`GET /v3/avatars/{group_id}` 看 `consent_status` → `approved`
+
+### 8.4 实弹验收
+
+等 `HEYGEN_API_KEY`。脚本就绪：`scripts/heygen-acceptance.ts`。
