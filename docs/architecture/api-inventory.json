@@ -722,6 +722,22 @@
       "idempotency": false
     },
     {
+      "route": "/api/admin/automation-ledger/run",
+      "file": "src/app/api/admin/automation-ledger/run/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "domain": "admin/automation-ledger",
+      "kind": "management",
+      "orchestratable": false,
+      "auth": "admin_session",
+      "input": "bounded_json_object",
+      "query": "none",
+      "externalService": true,
+      "cost": "medium",
+      "idempotency": true
+    },
+    {
       "route": "/api/admin/benchmark-profiles/[id]/import-analysis",
       "file": "src/app/api/admin/benchmark-profiles/[id]/import-analysis/route.ts",
       "methods": [

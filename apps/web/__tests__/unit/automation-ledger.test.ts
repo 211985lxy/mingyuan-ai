@@ -119,3 +119,28 @@ describe("backgroundKindLabel", () => {
     expect(backgroundKindLabel("unknown_kind")).toBe("unknown_kind")
   })
 })
+
+describe("WP-A2 V2：手动触发与停用开关的纯逻辑", () => {
+  it("findAutomationTaskSpec 按 id 查找，未知返回 null", async () => {
+    const { findAutomationTaskSpec } = await import("@/lib/aim/automation-ledger")
+    expect(findAutomationTaskSpec("douyin-hot")?.endpoint).toBe("/api/cron/douyin-hot")
+    expect(findAutomationTaskSpec("nope")).toBeNull()
+  })
+
+  it("parseDisabledTaskIds 解析逗号分隔并忽略空白与空片段", async () => {
+    const { parseDisabledTaskIds } = await import("@/lib/aim/automation-ledger")
+    expect(parseDisabledTaskIds("douyin-hot, cleanup , ,topic-daily")).toEqual(
+      new Set(["douyin-hot", "cleanup", "topic-daily"]),
+    )
+    expect(parseDisabledTaskIds("")).toEqual(new Set())
+    expect(parseDisabledTaskIds(undefined)).toEqual(new Set())
+    expect(parseDisabledTaskIds(123)).toEqual(new Set())
+  })
+
+  it("isAutomationTaskDisabled 判断停用态", async () => {
+    const { isAutomationTaskDisabled } = await import("@/lib/aim/automation-ledger")
+    const disabled = new Set(["cleanup"])
+    expect(isAutomationTaskDisabled(disabled, "cleanup")).toBe(true)
+    expect(isAutomationTaskDisabled(disabled, "douyin-hot")).toBe(false)
+  })
+})

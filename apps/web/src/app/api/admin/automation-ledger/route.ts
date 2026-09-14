@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma"
 import {
   AUTOMATION_TASK_SPECS,
   buildAutomationLedger,
+  isAutomationTaskDisabled,
+  parseDisabledTaskIds,
   type LedgerAlertInput,
   type LedgerKindStatsInput,
 } from "@/lib/aim/automation-ledger"
@@ -81,5 +83,10 @@ export const GET = withAdminOnly(async () => {
     new Date().toISOString(),
   )
 
-  return NextResponse.json(ledger)
+  // V2：输出每行的停用态（env AIM_AUTOMATION_TASKS_DISABLED），UI 据此置灰触发按钮
+  const disabled = parseDisabledTaskIds(process.env.AIM_AUTOMATION_TASKS_DISABLED)
+  return NextResponse.json({
+    ...ledger,
+    scheduled: ledger.scheduled.map((row) => ({ ...row, disabled: isAutomationTaskDisabled(disabled, row.id) })),
+  })
 })

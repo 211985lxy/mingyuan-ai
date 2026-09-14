@@ -28,7 +28,30 @@ function getSecret(): Uint8Array | null {
   return new TextEncoder().encode(secret)
 }
 
+/**
+ * WP-A2 V2 停用闸门：env `AIM_AUTOMATION_TASKS_DISABLED`（逗号分隔任务 id）中
+ * 列出的 cron 任务，请求直接 503——让「停用」在调度与手动触发两条路径上都真实生效
+ * （台账页的开关只是同一状态的展示）。未配置 = 全部启用，零行为变化。
+ */
+function cronTaskDisabled(pathname: string): boolean {
+  const raw = process.env.AIM_AUTOMATION_TASKS_DISABLED
+  if (!raw) return false
+  const match = /^\/api\/cron\/([a-z0-9-]+)(?:\/|$)/.exec(pathname)
+  if (!match) return false
+  return raw
+    .split(",")
+    .map((id) => id.trim())
+    .includes(match[1])
+}
+
 export async function middleware(request: NextRequest) {
+  if (cronTaskDisabled(request.nextUrl.pathname)) {
+    return NextResponse.json(
+      { error: "该任务已在环境配置中停用（AIM_AUTOMATION_TASKS_DISABLED）", code: "TASK_DISABLED" },
+      { status: 503 },
+    )
+  }
+
   const { pathname } = request.nextUrl
 
   // 仅保护后台页面；登录页本身需匿名访问。
@@ -62,6 +85,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // 仅匹配后台页面（含嵌套动态路由），不影响 API、营销页与用户工作台性能。
-  matcher: ["/admin/:path*"],
+  // 后台页面（纵深防御）+ cron 路由（WP-A2 V2 停用闸门）。
+  matcher: ["/admin/:path*", "/api/cron/:path*"],
 }
