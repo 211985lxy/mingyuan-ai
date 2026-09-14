@@ -91,4 +91,16 @@ describe("AIM delivery gate", () => {
       finishReason: "stop",
     }).passed).toBe(true)
   })
+
+  it("keeps a spoken imitate script that mentions 只给了结构 but actually writes the copy", () => {
+    const spoken = `好的老板，对标你只给了结构，我按冲突开头直接写。
+
+视频拍了不少，询盘没几个。先别急着怪产品。
+
+你开口第一句在讲自己，客户在算这个月亏了多少。评论区扣清单，我发你对照表。`
+    expect(inspectAimDeliveryCandidate({
+      contents: { video_script: spoken },
+      finishReason: "stop",
+    }).passed).toBe(true)
+  })
 })

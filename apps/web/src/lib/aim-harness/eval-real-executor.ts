@@ -49,12 +49,12 @@ function buildContextManifest(fixture: EvalFixture, context: EvalContext): AimCo
 export function warnedInsufficientInfo(drafts: Array<{ content: string }>): boolean {
   return drafts.some((draft) => {
     const text = draft.content
-    const directWarning = /信息不足|未提供|尚未提供|没有提供|数据(?:没|未)(?:登记|提供)|复盘做不了|做不了(?:结果)?复盘|还不知道效果|待补充|缺少|缺失|不完整|并非完整|没有(?:任何)?真实数字|没有真实数据|都是空的|全空着|全都没有|没法判断|无法判断|不会编数字|不能假装|必须先补数据|想写什么|写什么主题|哪个主题|没有(?:指定|给出)主题|没给选题|没给行业|没给案例|一条真实信息都没|(?:一条|一个)?.{0,12}信息都没有|写出来就是编的|只能靠编|我不干这个|信息量还不够|我不编|没替你编|补给我就能|手里只有/.test(text)
+    const directWarning = /信息不足|未提供|尚未提供|没有提供|数据(?:没|未)(?:登记|提供)|复盘做不了|做不了(?:结果)?复盘|还不知道效果|待补充|缺少|缺失|不完整|并非完整|没有(?:任何)?真实数字|没有真实数据|都是空的|全空着|全都没有|没法判断|无法判断|不会编数字|不能假装|必须先补数据|想写什么|写什么主题|哪个主题|没有(?:指定|给出)主题|没给选题|没给行业|没给案例|一条真实信息都没|(?:一条|一个)?.{0,16}(?:信息|事实)都没有|写出来就是编的|只能靠编|写不了成稿|我不干这个|信息量还不够|我不编|没替你编|补给我就能|手里只有|不知道你卖/.test(text)
     const missingData = /(?:还没(?:有)?|没有).{0,8}(?:登记|填|填写|记录|录入).{0,8}(?:数据|指标)|(?:数据|指标).{0,8}(?:全是空|为空|空的|缺失)/.test(text)
     const refusesUnsupportedReview = /(?:没法|无法|不能|不可).{0,8}(?:复盘|判断)|(?:不会|不能|拒绝).{0,8}(?:编数字|编造|假装)/.test(text)
     const positioningGap = /先回答这[一二三四五1-9]个问题|不先给你写|为什么不先给(?:你)?写|定位做不出来|没有行业|没有产品|没有客户|先把身份|四个问题/.test(text)
     const identityGapsListed = /行业.{0,40}产品.{0,80}(?:没有|没给|空|靠编)/.test(text)
-    const identityGapCount = [/行业/, /产品/, /客户|卖给谁|卖什么/].filter((pattern) => pattern.test(text)).length
+    const identityGapCount = [/行业/, /产品|卖什么/, /客户|卖给谁/].filter((pattern) => pattern.test(text)).length
     const identityGapFallback = identityGapCount >= 2 && /没有|没给|空着|空的|靠编/.test(text)
     return directWarning || missingData || refusesUnsupportedReview || positioningGap || identityGapsListed || identityGapFallback
   })

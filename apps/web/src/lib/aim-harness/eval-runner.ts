@@ -100,6 +100,8 @@ export interface EvalRunOptions {
   onProgress?: (done: number, total: number, fixtureId: string) => void
   /** Required for real-model runs. Deterministic CI intentionally omits it. */
   executor?: EvalExecutor
+  /** Last eval retry may keep a truncated spoken draft so the judge still scores it. */
+  acceptTruncatedSpoken?: boolean
 }
 
 export interface EvalExecutionResult {
@@ -153,7 +155,10 @@ async function runEvalCaseWithProviderRetry(
   let lastError: unknown
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      return await runEvalCase(fixture, adapter, options)
+      return await runEvalCase(fixture, adapter, {
+        ...options,
+        acceptTruncatedSpoken: attempt === maxAttempts - 1,
+      })
     } catch (error) {
       lastError = error
       if (!isRetryableEvalError(error) || attempt === maxAttempts - 1) throw error
@@ -207,7 +212,7 @@ export async function runEvalCase(
     content: deliveryBody(draft.content),
     contentPreview: deliveryBody(draft.content),
   }))
-  if (options.executor && spokenEvalDraftLooksTruncated(drafts)) {
+  if (options.executor && spokenEvalDraftLooksTruncated(drafts) && !options.acceptTruncatedSpoken) {
     throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
   }
 

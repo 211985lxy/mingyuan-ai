@@ -177,6 +177,27 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(report.results[0]?.drafts[0]?.contentPreview).toContain("评论区扣清单")
   })
 
+  it("still scores a spoken draft if every retry stays truncated", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_imitate_07")!
+    let calls = 0
+    const stump = "发了不少内容，询盘没几个。先别急着怪产品。做企业客户的老板，卡在这一步的特别多。不是不专业，恰恰是太专业了，专业"
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        return {
+          drafts: [{ format: "video_script", content: stump }],
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: `run_truncated_keep_${calls}`,
+        }
+      },
+    })
+
+    expect(calls).toBe(5)
+    expect(report.results[0]?.error).toBeUndefined()
+    expect(report.results[0]?.drafts[0]?.contentPreview).toContain("太专业了")
+  })
+
   it("retries a real-model case once when delivery is rejected as unfinished", async () => {
     const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
     let calls = 0
@@ -387,6 +408,9 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     ])).toBe(true)
     expect(warnedInsufficientInfo([
       { content: "好的老板。\n\n现在手里只有「写个文案」这四个字——行业、产品、卖给谁、发在哪、要谁来，全都没有。这样直接出稿，我只能靠编，编出来的东西你不敢发。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "这篇我现在写不了成稿——不是不会写，是手上一条能落地的事实都没有：不知道你卖给谁、卖什么、打的是哪类客户、客户在烦什么。" },
     ])).toBe(true)
   })
 

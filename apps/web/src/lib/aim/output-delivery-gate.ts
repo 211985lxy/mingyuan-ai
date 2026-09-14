@@ -57,7 +57,7 @@ const INTERNAL_META_LINES = [
 const PROTOCOL_META_LINE = /^(?:[-*]\s*)?(?:runtimeTask\s*[=：:]|businessGoal\s*[=：:]|AIM_INTERNAL_|\[\[(?:SYSTEM|DEBUG|THOUGHT|PROMPT))/i
 const ACCIDENT_META_LINE = /^(好的)?老板[，,]?我先(?:把)?这轮任务在内部复述|^(好的)?老板[，,]?我先在内部复述/
 const PROVIDER_ERROR_STUB = /未能返回完整正文|模型服务暂时未能返回/
-const ANALYSIS_PLAN_LINE = /本轮输入只锁定了结构|只给了结构|缺口位置已如实标注|^(?:\d+[\.．、]\s*)?(?:目标判定|内容路由|结构拆解|路由判定)/
+const ANALYSIS_PLAN_LINE = /本轮输入只锁定了结构|缺口位置已如实标注|^(?:\d+[\.．、]\s*)?(?:目标判定|内容路由|结构拆解|路由判定)/
 const FAKE_COMPLETE_CLAIM = /已经按[^。\n]{0,60}写完了|这版口播已经.{0,24}写完了/
 
 export function isFakeCompleteWithoutScript(body: string): boolean {
