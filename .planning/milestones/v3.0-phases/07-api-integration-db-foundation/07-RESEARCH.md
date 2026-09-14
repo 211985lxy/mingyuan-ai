@@ -436,7 +436,7 @@ if (videoTransfer.durable && isManagedOssUrl(videoTransfer.url)) {
 | Dependency | Required By | Available | Version | Fallback |
 |------------|------------|-----------|---------|----------|
 | Aliyun CLI | ALIYUN-04 (credential verification) | ✓ | 3.1.5 | Manual RAM policy attachment via web console |
-| Aliyun AccessKey (aliyun-aibao365 profile) | ALIYUN-04 | ✓ | AccessKeyId: LTAI5tF92T7hmyJLeFG9sgf7 | — |
+| Aliyun AccessKey (aliyun-aibao365 profile) | ALIYUN-04 | ✓ | AccessKeyId: <ALIBABA_ACCESS_KEY_ID 已移除> | — |
 | Node.js | SDK runtime | ✓ | (assume 18+) | — |
 | MySQL | INFRA-01 (schema migration) | ✓ | (existing Prisma connection) | — |
 | Redis | Webhook deduplication | ✓ | (existing connection) | — |

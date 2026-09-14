@@ -19,11 +19,11 @@
 | --- | --- |
 | 数据雷达（127.0.0.1:8811）配置 | ✅ 飞书同步 OAuth 配置完成；抖音账号授权完成（账号「IP明远」） |
 | 首次采集+同步 | ✅ 同步记录 2 次 SUCCESS（17:59 全量 42 成功/27 作品；18:07 增量 27） |
-| 数据总线 Base（用户本人飞书空间） | `https://ncny6abson0d.feishu.cn/base/NjwnbbqR4ar5uZsxgXXcsF0UnLe` |
+| 数据总线 Base（用户本人飞书空间） | `https://ncny6abson0d.feishu.cn/base/（已从文档移除；请从密钥管理获取）` |
 | 表清单 | 平台明细V2 `tbl27eKLAVKDLapi`(27) / 作品总表V2 `tblDom0lnfkBfqSN`(27) / 作品增量表(27) / 作品图表表(27) / 同步日志V2 `tbl7TDY4gVCdjxjF`(2) / 数据表(0,默认) |
 | 共享给 AIM 应用 | ✅ member-add appid=cli_aa839aa942b89bef perm=edit |
 | bot 读取 | ✅ `+record-list --as bot` 读平台明细V2 成功 |
-| AIM env | ✅ `.env.local` 增 `LARK_CREATOR_METRICS_BASE_TOKEN=NjwnbbqR4ar5uZsxgXXcsF0UnLe` / `DETAIL_TABLE_ID=tbl27eKLAVKDLapi` / `SYNC_LOG_TABLE_ID=tbl7TDY4gVCdjxjF` |
+| AIM env | ✅ `.env.local` 增 `LARK_CREATOR_METRICS_BASE_TOKEN=（已从文档移除；请从密钥管理获取）` / `DETAIL_TABLE_ID=tbl27eKLAVKDLapi` / `SYNC_LOG_TABLE_ID=tbl7TDY4gVCdjxjF` |
 | dev server | ✅ 已重启加载新 env（后台，日志 /tmp/aim-dev-3000.log） |
 | lib 冒烟 | ✅ fetchCreatorMetrics → ok（上述数据） |
 

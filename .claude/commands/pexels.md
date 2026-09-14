@@ -23,7 +23,7 @@ tags: [pexels, stock-photos, stock-videos, free-images, media-api, search, colle
 所有请求必须在 HTTP Header 中携带 API Key：
 
 ```
-Authorization: YOUR_API_KEY
+Authorization: $PEXELS_API_KEY
 ```
 
 API Key 通过 https://www.pexels.com/api/ 注册获取。
@@ -101,7 +101,7 @@ API Key 通过 https://www.pexels.com/api/ 注册获取。
 **请求示例：**
 
 ```bash
-curl -H "Authorization: YOUR_API_KEY" \
+curl -H "Authorization: $PEXELS_API_KEY" \
   "https://api.pexels.com/v1/search?query=nature&orientation=landscape&size=large&per_page=5&page=1"
 ```
 
@@ -133,7 +133,7 @@ curl -H "Authorization: YOUR_API_KEY" \
 **请求示例：**
 
 ```bash
-curl -H "Authorization: YOUR_API_KEY" \
+curl -H "Authorization: $PEXELS_API_KEY" \
   "https://api.pexels.com/v1/curated?per_page=10"
 ```
 
@@ -150,7 +150,7 @@ curl -H "Authorization: YOUR_API_KEY" \
 **请求示例：**
 
 ```bash
-curl -H "Authorization: YOUR_API_KEY" \
+curl -H "Authorization: $PEXELS_API_KEY" \
   "https://api.pexels.com/v1/photos/2014422"
 ```
 
@@ -174,7 +174,7 @@ curl -H "Authorization: YOUR_API_KEY" \
 **请求示例：**
 
 ```bash
-curl -H "Authorization: YOUR_API_KEY" \
+curl -H "Authorization: $PEXELS_API_KEY" \
   "https://api.pexels.com/videos/search?query=ocean&per_page=5"
 ```
 
@@ -208,7 +208,7 @@ curl -H "Authorization: YOUR_API_KEY" \
 **请求示例：**
 
 ```bash
-curl -H "Authorization: YOUR_API_KEY" \
+curl -H "Authorization: $PEXELS_API_KEY" \
   "https://api.pexels.com/videos/popular?min_duration=10&max_duration=60&per_page=5"
 ```
 
@@ -223,7 +223,7 @@ curl -H "Authorization: YOUR_API_KEY" \
 **请求示例：**
 
 ```bash
-curl -H "Authorization: YOUR_API_KEY" \
+curl -H "Authorization: $PEXELS_API_KEY" \
   "https://api.pexels.com/videos/videos/2499611"
 ```
 

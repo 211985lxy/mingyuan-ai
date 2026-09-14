@@ -66,3 +66,6 @@ apps/desktop/src-tauri/.window-state.json
 
 # stash 清理备份（本地临时存档，不入版本库）
 .stash-archive/
+
+# 本地凭证配置：按 .claude/skills/event-query/README.md 要求不入库
+.claude/skills/**/config.local.md
