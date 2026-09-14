@@ -64,6 +64,9 @@ async function reportProblems(results: IntegrationProbeResult[]): Promise<{ open
         fingerprint: { startsWith: `integration-probe:${name}:` },
       },
       select: { id: true },
+      // 有界：单个探针最多同时存在 3 种非成功态（failed/degraded/quota_blocked），
+      // 给足余量并满足查询有界性门禁。
+      take: 20,
     })
     for (const alert of open) {
       try {
