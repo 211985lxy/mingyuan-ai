@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
+import { execFileSync } from "node:child_process"
 import { extname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -63,6 +64,36 @@ const retiredPatterns = [
   /@\/lib\/(?:pexels|pixabay|volcengine-tts|public-avatar-preview)/,
 ]
 
+/**
+ * 只扫描 **git 跟踪** 的文件，不遍历文件系统。
+ *
+ * 原因（2026-09-14 实测）：原实现用 readdirSync 遍历，会把本机 `.git/info/exclude`
+ * 排除的文件（本地遗留产物）也算进来，导致同一提交在这台机器上门禁红、在 CI 上绿，
+ * 门禁噪声化——而门禁的可信度正是它全部价值所在。
+ */
+function collectTrackedFiles() {
+  let tracked = ""
+  try {
+    tracked = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 }).toString()
+  } catch {
+    // 非 git 环境（如打包产物内）退回遍历，保持可用
+    for (const directory of scanRoots) walk(directory)
+    return
+  }
+  for (const relativePath of tracked.split("\0")) {
+    if (!relativePath) continue
+    const normalized = relativePath.replaceAll("\\", "/")
+    if (ignoredSegments.some((segment) => normalized.includes(segment))) continue
+    if (!allowedExtensions.has(extname(normalized))) continue
+    // 只保留扫描根目录内的文件
+    if (!scanRoots.some((root) => {
+      const relativeRoot = relative(repoRoot, root).replaceAll("\\", "/")
+      return normalized === relativeRoot || normalized.startsWith(`${relativeRoot}/`)
+    })) continue
+    files.push(resolve(repoRoot, normalized))
+  }
+}
+
 function walk(directory) {
   if (!existsSync(directory)) return
 
@@ -75,7 +106,7 @@ function walk(directory) {
   }
 }
 
-for (const directory of scanRoots) walk(directory)
+collectTrackedFiles()
 
 const violations = []
 for (const file of files) {
