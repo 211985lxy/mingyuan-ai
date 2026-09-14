@@ -164,9 +164,31 @@ describe("audit event writer", () => {
       rule: "audit_idempotency_conflict",
       severity: "critical",
       source: "audit_index",
-      fingerprint: expect.stringMatching(/^audit-idempotency-conflict:server:[a-f0-9]{16}$/),
+      // 指纹收敛到来源级：逐幂等键会为每个 key 各生成一行 critical，把真实告警淹没
+      fingerprint: "audit-idempotency-conflict:server",
+      metadata: expect.objectContaining({ source: "server" }),
     }))
     expect(error).toHaveBeenCalledOnce()
+  })
+
+  it("refresh 模式：对账遇到同键异载荷时修正哈希而不是冲突", async () => {
+    findUnique.mockResolvedValueOnce({ id: "existing", payloadHash: "stale" })
+    upsert.mockResolvedValueOnce({ id: "existing" })
+    const result = await recordAuditEvent(
+      specialistAuditInput({
+        source: "server",
+        category: "runtime",
+        severity: "info",
+        status: "success",
+        action: "health.check",
+        summary: "health check",
+        sourceRecordType: "HealthCheck",
+        sourceRecordId: "hc-1",
+      }),
+      { onPayloadMismatch: "refresh" },
+    )
+    expect(result).toMatchObject({ ok: true, refreshed: true })
+    expect(upsertOperationalAlert).not.toHaveBeenCalled()
   })
 
   it("returns a resumable cursor after a bounded reconciliation page", async () => {
