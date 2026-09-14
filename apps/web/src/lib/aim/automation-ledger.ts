@@ -278,3 +278,30 @@ export function buildAutomationLedger(
     },
   }
 }
+
+// ── V2（可操作）：手动触发与停用开关 ──
+
+/** 手动触发互斥时长（秒）：同一任务 5 分钟内不可重复触发。 */
+export const AUTOMATION_RUN_MUTEX_SECONDS = 300
+
+export function findAutomationTaskSpec(id: string): AutomationTaskSpec | null {
+  return AUTOMATION_TASK_SPECS.find((spec) => spec.id === id) ?? null
+}
+
+/**
+ * 解析停用任务清单：env `AIM_AUTOMATION_TASKS_DISABLED`（逗号分隔任务 id）。
+ * 未配置 = 全部启用。无效片段忽略；解析纯函数化便于单测。
+ */
+export function parseDisabledTaskIds(value: unknown): Set<string> {
+  if (typeof value !== "string") return new Set()
+  return new Set(
+    value
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
+  )
+}
+
+export function isAutomationTaskDisabled(disabled: Set<string>, id: string): boolean {
+  return disabled.has(id)
+}

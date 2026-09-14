@@ -48,6 +48,10 @@ export const env = createEnv({
     AIM_HITL_INLINE_ENABLED: z.string().optional(),
     /** WP-A5 知识图谱扩展检索：默认关，达标后放量 */
     AIM_KNOWLEDGE_GRAPH_ENABLED: z.string().optional(),
+    /** WP-A2 V2：停用的自动化任务 id 清单（逗号分隔），UI/中间件双重生效 */
+    AIM_AUTOMATION_TASKS_DISABLED: z.string().optional(),
+    /** 本机回环触发 cron 用的服务端口（standalone 默认 3000） */
+    PORT: z.string().optional(),
     AIM_HITL_NOTIFY_ENABLED: z.string().optional(),
     AIM_HITL_NOTIFY_CHAT_ID: z.string().optional(),
     AIM_WEEKLY_NARRATIVE_ENABLED: z.string().optional(),
@@ -341,6 +345,8 @@ export const env = createEnv({
     AIM_STABLE_ROUTING: process.env.AIM_STABLE_ROUTING,
     AIM_HITL_INLINE_ENABLED: process.env.AIM_HITL_INLINE_ENABLED,
     AIM_KNOWLEDGE_GRAPH_ENABLED: process.env.AIM_KNOWLEDGE_GRAPH_ENABLED,
+    AIM_AUTOMATION_TASKS_DISABLED: process.env.AIM_AUTOMATION_TASKS_DISABLED,
+    PORT: process.env.PORT,
     AIM_HITL_NOTIFY_ENABLED: process.env.AIM_HITL_NOTIFY_ENABLED,
     AIM_HITL_NOTIFY_CHAT_ID: process.env.AIM_HITL_NOTIFY_CHAT_ID,
     AFU_BRIDGE_TOKEN: process.env.AFU_BRIDGE_TOKEN,

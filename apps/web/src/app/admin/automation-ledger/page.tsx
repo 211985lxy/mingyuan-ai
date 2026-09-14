@@ -1,10 +1,11 @@
 "use client"
 
 import React from "react"
-import { RefreshCw } from "lucide-react"
+import { Loader2, Play, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
 import { AdminPageShell } from "@/components/admin/admin-page-shell"
+import { Button as UiButton } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,15 +25,27 @@ const STATUS_VARIANT: Record<AutomationTaskStatus, "secondary" | "destructive" |
   idle: "outline",
 }
 
+type ScheduledRow = AutomationLedger["scheduled"][number] & { disabled?: boolean }
 type LedgerResponse = AutomationLedger
 
-function ScheduledTaskItem({ row }: { row: AutomationLedger["scheduled"][number] }) {
+function ScheduledTaskItem({ row, onRun, running }: { row: ScheduledRow; onRun: (id: string) => void; running: boolean }) {
   return (
     <div className="rounded-lg border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{row.name}</span>
         <Badge variant={STATUS_VARIANT[row.status]}>{STATUS_LABEL[row.status]}</Badge>
         <Badge variant="secondary">{row.cadence}</Badge>
+        {row.disabled ? <Badge variant="outline">已停用</Badge> : null}
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={row.disabled || running}
+          onClick={() => onRun(row.id)}
+          title={row.disabled ? "该任务已在环境配置中停用" : "手动触发一次（5 分钟互斥）"}
+        >
+          {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+          立即执行
+        </Button>
         {row.openErrorCount > 0 ? <Badge variant="destructive">错误 {row.openErrorCount}</Badge> : null}
         {row.openWarningCount > 0 ? <Badge variant="outline">警告 {row.openWarningCount}</Badge> : null}
         <code className="ml-auto text-xs text-muted-foreground">{row.endpoint}</code>
@@ -77,10 +90,33 @@ function BackgroundTaskItem({ row }: { row: AutomationLedger["background"][numbe
   )
 }
 
-export default function AutomationLedgerPage() {
+export default async function triggerAutomationTask(id: string): Promise<void> {
+  const response = await fetch("/api/admin/automation-ledger/run", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ id }),
+  })
+  const payload = (await response.json().catch(() => null)) as { error?: string } | null
+  if (!response.ok) throw new Error(payload?.error ?? `触发失败 (${response.status})`)
+}
+
+function AutomationLedgerPage() {
   const [ledger, setLedger] = React.useState<LedgerResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [runningId, setRunningId] = React.useState<string | null>(null)
+
+  const runTask = React.useCallback(async (id: string) => {
+    setRunningId(id)
+    try {
+      await triggerAutomationTask(id)
+      toast.success("任务已执行")
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : "触发失败")
+    } finally {
+      setRunningId(null)
+    }
+  }, [])
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -109,7 +145,7 @@ export default function AutomationLedgerPage() {
   return (
     <AdminPageShell
       title="自动化台账"
-      subtitle="系统每天自动在跑的定时能力与后台任务：职责、健康态、Owner 与停用条件。V1 只读；启停与立即执行在 V2 开放。"
+      subtitle="系统每天自动在跑的定时能力与后台任务：职责、健康态、Owner、停用条件；支持手动立即执行（5 分钟互斥）。"
       loading={loading}
       error={error}
       onRetry={load}
@@ -124,31 +160,44 @@ export default function AutomationLedgerPage() {
       }
       stats={summary ? <LedgerSummary summary={summary} generatedAt={ledger.generatedAt} /> : null}
     >
-      <Card>
-        <CardHeader>
-          <CardTitle>定时能力</CardTitle>
-          <CardDescription>
-            与 vercel.json / ops/systemd 对齐的定时任务注册表。V1 健康态来自未关闭告警；定时 cron 的「上次执行」需要 V2 接入持久化运行记录。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {ledger?.scheduled.map((row) => <ScheduledTaskItem key={row.id} row={row} />)}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>耐久后台任务</CardTitle>
-          <CardDescription>近 7 天执行记录（BackgroundTask 表）：失败优先置顶；排队积压超过 20 判定为降级。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {ledger && ledger.background.length > 0 ? (
-            ledger.background.map((row) => <BackgroundTaskItem key={row.kind} row={row} />)
-          ) : (
-            <p className="text-sm text-muted-foreground">近 7 天没有后台任务执行记录。</p>
-          )}
-        </CardContent>
-      </Card>
+      <ScheduledTasksCard rows={ledger?.scheduled as ScheduledRow[] | undefined} runningId={runningId} onRun={(id) => void runTask(id)} />
+      <BackgroundTasksCard rows={ledger?.background} />
     </AdminPageShell>
+  )
+}
+
+function ScheduledTasksCard({ rows, runningId, onRun }: { rows: ScheduledRow[] | undefined; runningId: string | null; onRun: (id: string) => void }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>定时能力</CardTitle>
+        <CardDescription>
+          与 vercel.json / ops/systemd 对齐的定时任务注册表。V1 健康态来自未关闭告警；定时 cron 的「上次执行」需要 V2 接入持久化运行记录。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {rows?.map((row) => (
+          <ScheduledTaskItem key={row.id} row={row} running={runningId === row.id} onRun={onRun} />
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
+function BackgroundTasksCard({ rows }: { rows: AutomationLedger["background"] | undefined }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>耐久后台任务</CardTitle>
+        <CardDescription>近 7 天执行记录（BackgroundTask 表）：失败优先置顶；排队积压超过 20 判定为降级。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {rows && rows.length > 0 ? (
+          rows.map((row) => <BackgroundTaskItem key={row.kind} row={row} />)
+        ) : (
+          <p className="text-sm text-muted-foreground">近 7 天没有后台任务执行记录。</p>
+        )}
+      </CardContent>
+    </Card>
   )
 }
