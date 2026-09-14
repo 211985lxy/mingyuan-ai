@@ -4,7 +4,6 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import {
   exchangeDouyinCodeForToken,
   fetchDouyinFansProfile,
-  fetchDouyinRecentVideos,
   fetchDouyinUserProfile,
   syncDouyinDataToLarkBase,
 } from "@/lib/douyin-openapi"
@@ -71,10 +70,14 @@ export async function GET(request: NextRequest) {
       throw new Error("授权码（code）换令牌失败，请确认抖音后台回调地址与 DOUYIN_REDIRECT_URI 完全一致。")
     }
 
-    /* 4. 并行拉取：用户信息、最近 20 条视频、粉丝画像 */
-    const [profile, videos, fans] = await Promise.all([
+    /* 4. 并行拉取：用户信息、粉丝画像
+     *
+     * 作品列表**不在此处拉取**：抖音开放平台的「授权账号作品列表」能力已下线
+     * （实测错误码 28001056），而第三方通道需要 sec_user_id——它由用户在绑定后
+     * 粘贴一次主页链接获得。此前这里调用已下线接口，结果作品表恒为空却仍报成功
+     * （静默失败）；现改为如实告知下一步。 */
+    const [profile, fans] = await Promise.all([
       fetchDouyinUserProfile(token),
-      fetchDouyinRecentVideos(token, 20),
       fetchDouyinFansProfile(token).catch(() => null), // 未获批 fans.data.bind 时为 null
     ])
     if (!profile) {
@@ -85,13 +88,13 @@ export async function GET(request: NextRequest) {
     await claimDouyinLoginIdentity(auth.id, token)
     await upsertDouyinBinding({ userId: auth.id, token, profile })
 
-    /* 5. 写入飞书 Base（账号表 + 视频数据表 + 粉丝画像分布列） */
+    /* 5. 写入飞书 Base（账号表 + 粉丝画像；作品表待补主页链接后由每日同步写入） */
     let syncResult: { accounts: number; videos: number; fansWritten: boolean } | null = null
     if (env.LARK_PLATFORM_DATA_BASE_TOKEN) {
-      syncResult = await syncDouyinDataToLarkBase({ profile, videos, token, fans, projectId })
+      syncResult = await syncDouyinDataToLarkBase({ profile, videos: [], token, fans, projectId })
     }
 
-    applySuccessParams(resultRedirect, profile, videos.length, syncResult)
+    applySuccessParams(resultRedirect, profile, 0, syncResult, true)
     return redirectWithOauthCookiesCleared(resultRedirect)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -106,11 +109,14 @@ function applySuccessParams(
   profile: { nickname: string; followers?: number | null },
   videoCount: number,
   syncResult: { accounts: number; videos: number } | null,
+  worksPendingProfileLink = false,
 ) {
   resultRedirect.searchParams.set("douyin_ok", "1")
   resultRedirect.searchParams.set("nickname", encodeURIComponent(profile.nickname))
   resultRedirect.searchParams.set("fans", String(profile.followers ?? 0))
   resultRedirect.searchParams.set("videos_count", String(videoCount))
+  // 作品数据待补主页链接（前端据此提示「补充主页链接」，而不是让用户以为同步了 0 条）
+  if (worksPendingProfileLink) resultRedirect.searchParams.set("works_pending_link", "1")
   if (syncResult) {
     resultRedirect.searchParams.set("lark_accounts", String(syncResult.accounts))
     resultRedirect.searchParams.set("lark_videos", String(syncResult.videos))
