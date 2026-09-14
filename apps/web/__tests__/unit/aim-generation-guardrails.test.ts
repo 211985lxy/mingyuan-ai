@@ -77,6 +77,16 @@ describe("AIM generation fact guardrails", () => {
       { video_script: "我见过太多老板卡在这儿。比如先替客户说出痛点。" },
       ["video_script"],
     )).toEqual(["video_script"])
+
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context({
+        rawInput: "写一版口播给目标客户看。",
+        knowledgeBlock: "年营收 300-3000 万的本地服务老板",
+        ipWikiBlock: "IP定位：用老板真实经历讲清楚内容如何承接咨询",
+      }),
+      { video_script: "我接触过不少本地服务老板，卡住的地方几乎一模一样。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
   })
 
   it("allows first-person evidence present in project knowledge", () => {
@@ -266,6 +276,16 @@ describe("AIM generation fact guardrails", () => {
     )
 
     expect(result).toBe("先讲清楚客户问题。某公司60天产出40条内容。最后给出行动。")
+  })
+
+  it("scrubs ungrounded 本地服务老板 anecdotes from ordinary spoken scripts", () => {
+    const result = scrubUnsupportedAnecdoteSentences(
+      "你内容也发了，为什么没人来问？\n\n我接触过不少本地服务老板，卡住的地方几乎一模一样。\n\n先别急着怪平台。",
+      "写一版口播给目标客户看。",
+      "年营收 300-3000 万的本地服务老板\nIP定位：用老板真实经历讲清楚内容如何承接咨询",
+    )
+    expect(result).toContain("先别急着怪平台")
+    expect(result).not.toContain("我接触过不少本地服务老板")
   })
 
   it("detects generic generation requests that have no factual context", () => {

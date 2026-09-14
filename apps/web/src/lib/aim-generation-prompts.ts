@@ -227,7 +227,7 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       parsed[format] = materializeApprovedFacts(parsed[format] || "", context.rawInput)
       if (isLightEdit) parsed[format] = scrubLeakedLightEditFeedback(parsed[format] || "", context.rawInput)
       parsed[format] = scrubUnsupportedNumericSentences(parsed[format] || "", context.rawInput, numericEvidence, !isLightEdit && !fastSpokenRoute)
-      parsed[format] = scrubUnsupportedAnecdoteSentences(parsed[format] || "", context.rawInput)
+      parsed[format] = scrubUnsupportedAnecdoteSentences(parsed[format] || "", context.rawInput, numericEvidence)
       if (isSpokenScriptFormat(format)) {
         parsed[format] = cleanSpokenDeliveryArtifacts(parsed[format] || "")
       }
