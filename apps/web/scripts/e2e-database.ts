@@ -48,6 +48,7 @@ async function applyBaseline(databaseUrl: string): Promise<void> {
 
 export async function resetE2eDatabase(databaseUrl = process.env.TEST_DATABASE_URL): Promise<void> {
   const safeUrl = requireTestDatabaseUrl(databaseUrl)
+  await ensureDatabaseExists(safeUrl)
   const connection = await connect(safeUrl)
   try {
     await connection.query("SET FOREIGN_KEY_CHECKS = 0")
@@ -97,6 +98,50 @@ async function verifySchemaContract(databaseUrl: string): Promise<void> {
   }
 }
 
+/** 库可能不存在（首次建环境或手动 DROP 过）；名称已由 requireTestDatabaseUrl 校验含 test 段。 */
+async function ensureDatabaseExists(databaseUrl: string): Promise<void> {
+  const url = new URL(databaseUrl)
+  const database = decodeURIComponent(url.pathname.replace(/^\//, ""))
+  const serverUrl = new URL(databaseUrl)
+  serverUrl.pathname = "/"
+  const connection = await connect(serverUrl.toString())
+  try {
+    await connection.query(
+      `CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+    )
+  } finally {
+    await connection.end()
+  }
+}
+
+/**
+ * 标记 baseline 迁移为已应用。
+ * prepare 会被反复执行（CI 全新库、本地常对已准备好的库再跑）；对已标记的迁移
+ * 重复 resolve 会得到 P3008，而「已应用」正是期望的终态——按成功处理，保证幂等。
+ */
+function resolveBaselineMigration(migration: string, databaseUrl: string): void {
+  let stdout = ""
+  let stderr = ""
+  try {
+    execFileSync("pnpm", ["exec", "prisma", "migrate", "resolve", "--applied", migration], {
+      cwd: WEB_ROOT,
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+  } catch (error) {
+    const err = error as { stdout?: Buffer; stderr?: Buffer }
+    stdout = err.stdout?.toString() ?? ""
+    stderr = err.stderr?.toString() ?? ""
+    if (stdout.includes("P3008") || stderr.includes("P3008")
+      || stdout.includes("already recorded as applied") || stderr.includes("already recorded as applied")) {
+      return
+    }
+    process.stderr.write(stdout)
+    process.stderr.write(stderr)
+    throw error
+  }
+}
+
 function runPrisma(args: string[], databaseUrl: string): void {
   execFileSync("pnpm", ["exec", "prisma", ...args], {
     cwd: WEB_ROOT,
@@ -112,7 +157,7 @@ export async function prepareE2eDatabase(databaseUrl = process.env.TEST_DATABASE
 
   const baselineMigrations = JSON.parse(readFileSync(BASELINE_MIGRATIONS, "utf8")) as string[]
   for (const migration of baselineMigrations) {
-    runPrisma(["migrate", "resolve", "--applied", migration], safeUrl)
+    resolveBaselineMigration(migration, safeUrl)
   }
 
   runPrisma(["migrate", "deploy"], safeUrl)
