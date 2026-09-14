@@ -651,3 +651,50 @@ JSON 记录为源，不得由日志截断处推断。
 | P4 灰度 | ✅ 两批 7/8 成功、均达阈值；⚠ 余额耗尽（1 豆），如需补跑充值 |
 | 人工评分 | ⛔ 待使用方观看 7 条成品打分 |
 | 生产上线 | ⛔ 待生产侧 `CHANJING_*` 配置 + 显式部署审批 |
+
+---
+
+## 附录 K：HeyGen 第三供应商接入（2026-09-13 → 09-14，全部合并）
+
+在蝉镜交付之外，应用户要求接入 HeyGen External API（v3）作为第三条数字人供应商。
+规范一律先取自官方规格再写代码：
+`openapi/external-api.json`（108 端点）/ `openapi.yaml`（52 端点，v2 弃用）；
+文档站直连超时，经本机代理 `127.0.0.1:10808` 拉取。
+
+| PR | 内容 | merge commit |
+| --- | --- | --- |
+| #65 | v3 客户端（users/avatars/looks/voices/videos）+ provider 接线 | `f8927616` |
+| #68 | 修两个真缺陷（列表响应双包致恒空数组；`DIGITAL_HUMAN_PROVIDER` 枚举漏 heygen 致启动期拒绝）+ live-fire 7 例 | `5be3219c` |
+| #69 | 公共数字人按供应商取数 + **consent 授权守卫**（null/缺失=不需授权✅、approved=已授权✅、其余剔除❌） | `91838a91` |
+| #72 | webhook 回调：HMAC-SHA256(rawBody) 验签 fail-closed → 幂等 → **回调查询复核（推送体不可信）** → 结算 | `fefbed96` |
+| #77 | 实弹验收脚本 `scripts/heygen-acceptance.ts` + 集成 skill `.codex/skills/heygen.md` | `95a6a4b0` |
+
+**验证口径**：unit 4044 / e2e 33 文件 274 用例全过；typecheck 双零；lint 0 errors；
+门禁全绿；每次合并后 main 推送 CI 全 success。
+**live-fire 的价值再证**：#68 的两个缺陷单元测试完全看不见（一个要真实报文往返、
+一个要过 env 校验），是集成测试抓出来的。
+
+### K.1 与蝉镜方案的对照
+
+| 维度 | 蝉镜 | HeyGen |
+| --- | --- | --- |
+| 音频驱动 | `create_video` audio 型（`wav_url`） | `/v3/videos` 的 `audio_url`（或 `audio_asset_id`，≤32MB） |
+| 脚本驱动 | `audio.tts`（audio_man） | `script` + `voice_id`；与音频**互斥** |
+| 形态 | figures（像素宽高） | 顶层 `aspect_ratio`/`resolution`（无像素形态） |
+| 授权 | 账号级授权话术（我们做逐字视频门禁 + `{name}` 实例化） | 形象组 `consent_status`（null=不需授权） |
+| 回调 | webhook + `access_token` 复核 | webhook + `signature` 头 HMAC-SHA256 + 查询复核 |
+| 计费 | 蝉豆（实测 5 豆/任务） | 订阅/配额（`GET /v3/users/me` 可查） |
+
+### K.2 未完成
+
+- **实弹验收**：等 `HEYGEN_API_KEY`（写入 `apps/web/.env.local`，勿贴对话；
+  HeyGen 官方同样要求 key 不入 chat）。脚本已就绪。
+- 形象授权提交 `POST /v3/avatars/{group_id}/consent`（自有形象克隆时才需要）。
+- 声音克隆 `POST /v3/voices/clone` —— 与自有语音（Fish→audio_url）二选一即可出片，建议实弹后再评估。
+
+### K.3 期间观察到的仓库安全事件（非本交付引入）
+
+`b2e42bfe`「从公开仓库当前树中移除 4 处真实凭证」——涉及 pexels 命令文档、
+飞书事件查询本地配置、抖音绑定 runbook 等，**与数字人域无关**，我们交付物未受影响。
+但注意：**git 历史中旧提交仍含这些凭证**；若仓库公开，应视为已泄露并轮换，
+仅清当前树不够。
