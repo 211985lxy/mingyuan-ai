@@ -97,14 +97,18 @@ async function main() {
   })
 
   const outDir = resolve(process.cwd(), opts.out)
+  const gate = evaluateEvalGate(report, opts.mode)
+  const markdown = `${renderEvalMarkdown(report)}${
+    gate.passed ? "" : `\n\n## Gate\n\nFAILED: ${gate.reasons.join("; ")}\n`
+  }`
+
   mkdirSync(outDir, { recursive: true })
   writeFileSync(resolve(outDir, "report.json"), JSON.stringify(report, null, 2))
-  writeFileSync(resolve(outDir, "report.md"), renderEvalMarkdown(report))
+  writeFileSync(resolve(outDir, "report.md"), markdown)
 
   // Print the markdown to stdout so it can be appended to $GITHUB_STEP_SUMMARY.
-  process.stdout.write(renderEvalMarkdown(report) + "\n")
+  process.stdout.write(markdown + "\n")
 
-  const gate = evaluateEvalGate(report, opts.mode)
   process.stderr.write(
     `[aim-eval] contract=${(report.contractPassRate * 100).toFixed(1)}% rubric=${
       report.rubricPassRate === null ? "n/a" : (report.rubricPassRate * 100).toFixed(1) + "%"

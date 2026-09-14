@@ -75,4 +75,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aim-eval-daily
-          path: apps/web/aim-eval-report/
+          path: |
+            apps/web/aim-eval-report/
+            eval.log

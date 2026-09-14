@@ -10,6 +10,53 @@ export interface EvalRubricResult {
   fabricatedFact: boolean
 }
 
+export const EVAL_JUDGE_RETRY_ATTEMPTS = 5
+const EVAL_JUDGE_RETRY_DELAY_MS = 1500
+const EVAL_PROVIDER_OFFSET_ENV = "AIM_EVAL_PROVIDER_OFFSET"
+
+function delayJudgeRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * @description 从评分官回包里抠出 JSON，兼容 markdown 代码块和数字写成字符串
+ */
+export function parseJudgePayload(raw: string): {
+  score: number
+  reasons: string | null
+  fabricated: boolean
+} {
+  const text = raw.trim()
+  if (!text) throw new Error("judge output is empty")
+  const candidates = [text]
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  if (fenced?.[1]) candidates.unshift(fenced[1].trim())
+  const objectMatch = text.match(/\{[\s\S]*\}/)
+  if (objectMatch?.[0]) candidates.push(objectMatch[0])
+
+  let lastError: unknown
+  const unique = [...new Set(candidates)]
+  for (const candidate of unique) {
+    try {
+      const parsed = JSON.parse(candidate) as {
+        score?: unknown
+        reasons?: unknown
+        fabricatedFact?: unknown
+      }
+      const score = typeof parsed.score === "number" ? parsed.score : Number(parsed.score)
+      if (!Number.isFinite(score)) throw new Error("judge score is not a number")
+      return {
+        score: Math.max(0, Math.min(100, score)),
+        reasons: typeof parsed.reasons === "string" ? parsed.reasons.slice(0, 500) : null,
+        fabricated: parsed.fabricatedFact === true,
+      }
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("judge output is not json")
+}
+
 /**
  * @description 构建rubricprompt
  * @param fixture - 固件
@@ -47,27 +94,58 @@ export function buildRubricPrompt(fixture: EvalFixture, draft: string): string {
   ].join("\n")
 }
 
+async function judgeDraftOnce(fixture: EvalFixture, draft: string) {
+  const result = await getAgentLLM("content_review").complete({
+    messages: [{ role: "user", content: buildRubricPrompt(fixture, draft) }],
+    temperature: 0,
+    // 判分 JSON 本身很短，但推理模型（gpt-5 等）会先消耗 reasoning tokens，
+    // 300 预算会在产出 JSON 前耗尽并返回空内容；留出推理余量。
+    maxTokens: 2000,
+    responseFormat: { type: "json_object" },
+  })
+  const parsed = parseJudgePayload(result.content)
+  return {
+    score: parsed.fabricated ? Math.min(parsed.score, 40) : parsed.score,
+    provider: result.provider,
+    model: result.model,
+    reason: parsed.reasons,
+    fabricated: parsed.fabricated,
+  }
+}
+
 async function judgeDraft(fixture: EvalFixture, draft: string) {
   if (!draft.trim()) {
     return { score: 0, provider: null, model: null, reason: "输出为空", fabricated: false }
   }
+  const previousOffset = process.env[EVAL_PROVIDER_OFFSET_ENV]
+  const baseOffset = Number.parseInt(previousOffset ?? "0", 10)
+  const startOffset = Number.isFinite(baseOffset) && baseOffset > 0 ? Math.floor(baseOffset) : 0
+  let lastError: unknown
   try {
-    const result = await getAgentLLM("content_review").complete({
-      messages: [{ role: "user", content: buildRubricPrompt(fixture, draft) }],
-      temperature: 0,
-      // 判分 JSON 本身很短，但推理模型（gpt-5 等）会先消耗 reasoning tokens，
-      // 300 预算会在产出 JSON 前耗尽并返回空内容；留出推理余量。
-      maxTokens: 2000,
-      responseFormat: { type: "json_object" },
-    })
-    const parsed = JSON.parse(result.content) as { score?: unknown; reasons?: unknown; fabricatedFact?: unknown }
-    const score = typeof parsed.score === "number" ? parsed.score : null
-    const reason = typeof parsed.reasons === "string" ? parsed.reasons.slice(0, 500) : null
-    const fabricated = parsed.fabricatedFact === true
-    return { score: fabricated && score !== null ? Math.min(score, 40) : score, provider: result.provider, model: result.model, reason, fabricated }
-  } catch {
-    return { score: null, provider: null, model: null, reason: null, fabricated: false }
+    for (let attempt = 0; attempt < EVAL_JUDGE_RETRY_ATTEMPTS; attempt += 1) {
+      process.env[EVAL_PROVIDER_OFFSET_ENV] = String(startOffset + attempt)
+      try {
+        return await judgeDraftOnce(fixture, draft)
+      } catch (error) {
+        lastError = error
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn(
+          `[aim-eval] ${fixture.id} 评分官第 ${attempt + 1}/${EVAL_JUDGE_RETRY_ATTEMPTS} 次没交卷：${message}`,
+        )
+        if (attempt === EVAL_JUDGE_RETRY_ATTEMPTS - 1) break
+        if (!process.env.VITEST) await delayJudgeRetry(EVAL_JUDGE_RETRY_DELAY_MS)
+      }
+    }
+  } finally {
+    if (previousOffset === undefined) delete process.env[EVAL_PROVIDER_OFFSET_ENV]
+    else process.env[EVAL_PROVIDER_OFFSET_ENV] = previousOffset
   }
+  console.warn(
+    `[aim-eval] ${fixture.id} 评分官连续 ${EVAL_JUDGE_RETRY_ATTEMPTS} 次没交卷${
+      lastError instanceof Error ? `：${lastError.message}` : ""
+    }`,
+  )
+  return { score: null, provider: null, model: null, reason: null, fabricated: false }
 }
 
 /**
