@@ -5,7 +5,7 @@
 # - typecheck:tests 与 CI 的 "Typecheck tests" 步骤同款：2026-09-11~12 测试文件类型
 #   错误三次直塞 main 导致 Guardrails 38 连败，此步堵住该盲区
 # - 紧急可 --no-verify 跳过（不推荐，会让坏代码进仓）
-# - 推送前想要完整检查：make preflight（typecheck+lint+全量测试）
+# - 推送前想要完整检查：make preflight（typecheck+lint+全量测试+全部架构门禁）
 
 # 1. 只看暂存（已 git add）的文件里，有没有 .ts/.tsx
 STAGED_TS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
@@ -23,10 +23,16 @@ pnpm typecheck || { echo "✗ typecheck 失败，修完再提交（--no-verify �
 echo "── pre-commit: typecheck:tests ──"
 pnpm typecheck:tests || { echo "✗ typecheck:tests 失败（测试文件类型错误），修完再提交"; exit 1; }
 
-# 4. 秒级门禁（各 0-1 秒）—— 你历史上反复被这几项打回
+# 4. 秒级门禁（各 0-2 秒）—— 你历史上反复被这几项打回
 echo "── pre-commit: 秒级门禁 ──"
 pnpm arch:size     || { echo "✗ arch:size 失败（有文件超 800 行？），修完再提交"; exit 1; }
 pnpm api:contracts || { echo "✗ api:contracts 失败（API 契约不一致？）"; exit 1; }
 pnpm env:check     || { echo "✗ env:check 失败（环境变量缺失？）"; exit 1; }
 
-echo "✓ pre-commit 全过（typecheck + typecheck:tests + arch:size + api:contracts + env:check）"
+# 5. 查询有界性 + 迁移完整性（约 2 秒）—— 2026-09-14 实测：新增 findMany 缺 take
+#    只在 CI 被拦下（本地 pre-commit 未覆盖该项，白白多跑一轮 11 分钟 CI）
+echo "── pre-commit: 查询有界性 + 迁移完整性 ──"
+node scripts/check-prisma-query-bounds.mjs || { echo "✗ Prisma 查询有界性失败（findMany 缺 take/上限？）"; exit 1; }
+node scripts/check-migration-integrity.mjs  || { echo "✗ 迁移完整性失败（迁移文件被改？）"; exit 1; }
+
+echo "✓ pre-commit 全过（typecheck + typecheck:tests + arch:size + api:contracts + env:check + 查询有界性 + 迁移完整性）"
