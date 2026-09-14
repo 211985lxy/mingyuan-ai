@@ -64,8 +64,10 @@ jobs:
         run: |
           pnpm --dir apps/web run eval:daily > daily-summary.md 2> eval.log
           STATUS=$?
+          mkdir -p apps/web/aim-eval-report
+          cp eval.log apps/web/aim-eval-report/eval.log
           cat daily-summary.md >> "$GITHUB_STEP_SUMMARY"
-          tail -n 20 eval.log >> "$GITHUB_STEP_SUMMARY"
+          tail -n 80 eval.log >> "$GITHUB_STEP_SUMMARY"
           exit $STATUS
 
       - name: Upload eval report

@@ -152,6 +152,8 @@ function spokenEvalDraftLooksTruncated(drafts: Array<{ format: string; content: 
   })
 }
 
+const EVAL_PROVIDER_OFFSET_ENV = "AIM_EVAL_PROVIDER_OFFSET"
+
 async function runEvalCaseWithProviderRetry(
   fixture: EvalFixture,
   adapter: EvalContextAdapter,
@@ -159,7 +161,9 @@ async function runEvalCaseWithProviderRetry(
 ): Promise<EvalCaseResult> {
   const maxAttempts = EVAL_PROVIDER_RETRY_ATTEMPTS
   let lastError: unknown
+  const previousOffset = process.env[EVAL_PROVIDER_OFFSET_ENV]
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    process.env[EVAL_PROVIDER_OFFSET_ENV] = String(attempt)
     try {
       return await runEvalCase(fixture, adapter, {
         ...options,
@@ -168,7 +172,13 @@ async function runEvalCaseWithProviderRetry(
     } catch (error) {
       lastError = error
       if (!isRetryableEvalError(error) || attempt === maxAttempts - 1) throw error
+      console.warn(
+        `[aim-eval] ${fixture.id} 空稿重试 ${attempt + 1}/${maxAttempts}，下一次先换第 ${attempt + 1} 条线路`,
+      )
       if (!options.skipRubric) await delayEvalRetry(EVAL_PROVIDER_RETRY_DELAY_MS)
+    } finally {
+      if (previousOffset === undefined) delete process.env[EVAL_PROVIDER_OFFSET_ENV]
+      else process.env[EVAL_PROVIDER_OFFSET_ENV] = previousOffset
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError))

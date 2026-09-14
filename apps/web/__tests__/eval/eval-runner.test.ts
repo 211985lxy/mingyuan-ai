@@ -68,6 +68,23 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(input.knowledgeBlock).toContain("主推产品")
   })
 
+  it("rotates the provider offset on each empty-body retry so the next attempt starts on another line", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    const offsets: string[] = []
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        offsets.push(process.env.AIM_EVAL_PROVIDER_OFFSET ?? "missing")
+        throw new Error("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
+      },
+    })
+
+    expect(offsets).toEqual(["0", "1", "2", "3", "4", "5", "6", "7"])
+    expect(process.env.AIM_EVAL_PROVIDER_OFFSET).toBeUndefined()
+    expect(report.contractPassRate).toBe(0)
+    expect(report.results[0]?.error).toContain("未能返回完整正文")
+  })
+
   it("retries a real-model case once when the provider returns an empty-body error", async () => {
     const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
     let calls = 0

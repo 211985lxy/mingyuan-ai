@@ -37,6 +37,7 @@ describe("agent router timeout overrides", () => {
     process.env.DOUBAO_API_KEY = "test-doubao"
     process.env.ZENMUX_API_KEY = "test-zenmux"
     process.env.LLM_TIMEOUT_MS = "60000"
+    delete process.env.AIM_EVAL_PROVIDER_OFFSET
     vi.resetModules()
   })
 
@@ -70,6 +71,7 @@ describe("agent router timeout overrides", () => {
 
     const llm = getAgentLLM("content_producer")
     expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "deepseek", "apimart", "doubao"])
+    expect(llm.providerNames).toContain("openrouter")
     expect(getAgentRecommendedModel("content_producer")).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
@@ -91,6 +93,7 @@ describe("agent router timeout overrides", () => {
     })
 
     expect(llm.providerNames.slice(0, 4)).toEqual(["zenmux", "deepseek", "apimart", "doubao"])
+    expect(llm.providerNames.at(-1)).toBe("openrouter")
     expect(getAgentRecommendedModel(routeKey)).toBe("anthropic/claude-sonnet-4.6")
 
     const zenmux = ctorArgs.find((config) => String(config.baseURL || "").includes("zenmux"))
@@ -193,7 +196,17 @@ describe("agent router timeout overrides", () => {
     })
 
     expect(llm.providerNames).toContain("deepseek")
+    expect(llm.providerNames).toContain("openrouter")
     expect(llm.providerNames).not.toContain("jiekou")
+  })
+
+  it("rotates the content_producer chain when eval retry offset is set", async () => {
+    process.env.AIM_EVAL_PROVIDER_OFFSET = "1"
+    const { getAgentLLM, rotateItems, readEvalProviderOffset } = await import("@/lib/llm/agent-router")
+
+    expect(readEvalProviderOffset()).toBe(1)
+    expect(rotateItems(["deepseek", "openrouter"], 1)).toEqual(["openrouter", "deepseek"])
+    expect(getAgentLLM("content_producer").providerNames[0]).toBe("deepseek")
   })
 
   it("reuses one ProxyAgent per proxy URL and never leaks (no per-request allocation)", async () => {
