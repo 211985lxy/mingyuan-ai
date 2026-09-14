@@ -31,6 +31,8 @@ export interface AuditReconcileBatchResult {
   scanned: number
   indexed: number
   skipped: number
+  /** 索引哈希按源表修正的条数（对账自愈，见 recordAuditEvent 的 refresh 模式） */
+  refreshed: number
   failures: number
   lagMs: number | null
   checkpoints: Array<{ source: string; nextCursor: string | null; lastSuccessAt: string | null; error: string | null }>
@@ -55,6 +57,7 @@ export async function runAuditReconcileBatch(
   let scanned = 0
   let indexed = 0
   let skipped = 0
+  let refreshed = 0
   let failures = 0
   let lagMs: number | null = null
   const checkpoints: AuditReconcileBatchResult["checkpoints"] = []
@@ -66,6 +69,7 @@ export async function runAuditReconcileBatch(
       scanned += result.scanned
       indexed += result.indexed
       skipped += result.skipped
+      refreshed += result.refreshed
       const updated = await delegate.update({
         where: { source },
         data: {
@@ -94,5 +98,5 @@ export async function runAuditReconcileBatch(
     }
   }
   if (lagMs !== null) auditReconcileLagMs.set(lagMs)
-  return { scanned, indexed, skipped, failures, lagMs, checkpoints }
+  return { scanned, indexed, skipped, refreshed, failures, lagMs, checkpoints }
 }
