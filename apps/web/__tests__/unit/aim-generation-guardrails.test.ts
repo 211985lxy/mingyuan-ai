@@ -87,6 +87,16 @@ describe("AIM generation fact guardrails", () => {
       { video_script: "我接触过不少本地服务老板，卡住的地方几乎一模一样。" },
       ["video_script"],
     )).toEqual(["video_script"])
+
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context({
+        rawInput: "写一版口播给目标客户看。",
+        knowledgeBlock: "年营收 300-3000 万的本地服务老板",
+        ipWikiBlock: "IP定位：用老板真实经历讲清楚内容如何承接咨询",
+      }),
+      { video_script: "我们梳理过很多本地服务门店的获客逻辑，卡住的地方几乎一模一样。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
   })
 
   it("allows first-person evidence present in project knowledge", () => {
@@ -286,6 +296,17 @@ describe("AIM generation fact guardrails", () => {
     )
     expect(result).toContain("先别急着怪平台")
     expect(result).not.toContain("我接触过不少本地服务老板")
+  })
+
+  it("scrubs ungrounded 我们梳理过很多门店 claims from spoken scripts", () => {
+    const result = scrubUnsupportedAnecdoteSentences(
+      "年营收做到300万到3000万的本地服务老板，做短视频最容易踩的一个坑，就是把账号当成了朋友圈。\n\n我们梳理过很多本地服务门店的获客逻辑，卡住的地方几乎一模一样。\n\n你不是在做内容，你是在做企业宣传片。",
+      "写一版口播给目标客户看。",
+      "年营收 300-3000 万的本地服务老板\nIP定位：用老板真实经历讲清楚内容如何承接咨询",
+    )
+    expect(result).toContain("把账号当成了朋友圈")
+    expect(result).toContain("企业宣传片")
+    expect(result).not.toContain("我们梳理过很多本地服务门店")
   })
 
   it("detects generic generation requests that have no factual context", () => {
