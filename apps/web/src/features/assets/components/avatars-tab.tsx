@@ -216,6 +216,7 @@ function CreateAvatarDialog({
   const [provider, setProvider] = useState<"chanjing" | "shanjian" | "heygen">("chanjing")
   const [authConfirmed, setAuthConfirmed] = useState(false)
   const [requirementsLoading, setRequirementsLoading] = useState(false)
+  const [requirementsError, setRequirementsError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const reset = useCallback(() => {
@@ -225,6 +226,7 @@ function CreateAvatarDialog({
     setAuthorizationText("")
     setAuthConfirmed(false)
     setRequirementsLoading(false)
+    setRequirementsError(null)
     setSubmitting(false)
   }, [])
 
@@ -235,8 +237,17 @@ function CreateAvatarDialog({
       setProvider(requirements.provider)
       setAuthorizationText(requirements.authorizationText)
     } catch (error) {
+      const code = (error as { code?: string })?.code
+      const status = (error as { status?: number })?.status
       toast.error(error instanceof Error ? error.message : "授权文案加载失败")
       setAuthorizationText("")
+      if (code === "AUTH_NAME_REQUIRED") {
+        setRequirementsError("请先在「账号设置」完善真实姓名：授权声明需以本人姓名逐字朗读。")
+      } else if (status === 401 || status === 403) {
+        setRequirementsError("登录状态已失效或账号未激活，请重新登录后再试。")
+      } else {
+        setRequirementsError("授权文案暂不可用，请联系管理员配置后重试。")
+      }
     } finally {
       setRequirementsLoading(false)
     }
@@ -347,7 +358,7 @@ function CreateAvatarDialog({
                 </label>
               </div>
             ) : (
-              <p className="text-xs text-destructive">授权文案暂不可用，请联系管理员配置后重试。</p>
+              <p className="text-xs text-destructive">{requirementsError ?? "授权文案暂不可用，请联系管理员配置后重试。"}</p>
             )}
           </div>
           <div className="space-y-2">
