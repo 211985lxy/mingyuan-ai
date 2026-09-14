@@ -118,6 +118,65 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(report.contractPassRate).toBe(1)
   })
 
+  it("retries a real-model case through the fifth attempt when empty bodies keep coming", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls < 5) {
+          throw new Error("生成结果没有满足你当前的要求，未作为正式成稿交付。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "第五次才交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_fifth_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(5)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
+  })
+
+  it("retries a spoken draft that stops mid-sentence instead of scoring the stump", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_imitate_07")!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          return {
+            drafts: [{
+              format: "video_script",
+              content: "发了不少内容，询盘没几个。先别急着怪产品。做企业客户的老板，卡在这一步的特别多。不是不专业，恰恰是太专业了，专业",
+            }],
+            citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+            runId: "run_truncated_first",
+          }
+        }
+        return {
+          drafts: [{
+            format: "video_script",
+            content: "发了不少内容，询盘没几个。先别急着怪产品。评论区扣清单，我发你对照表。",
+          }],
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_truncated_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.drafts[0]?.contentPreview).toContain("评论区扣清单")
+  })
+
   it("retries a real-model case once when delivery is rejected as unfinished", async () => {
     const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
     let calls = 0
@@ -306,6 +365,22 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     ])).toBe(true)
     expect(warnedInsufficientInfo([
       { content: "好的老板，你这条没给选题、没给行业、没给案例，我按「问题解决型」先落一版。凡是你的真实信息，我用【】标出来，【】里的东西我一个都没替你编。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: `---
+
+## 标题备选
+
+1. 别急着做IP，先回答这四个问题
+2. 定位做不出来，九成不是文案问题
+3. 我为什么不先给你写简介
+
+# 别急着做IP，先回答这四个问题
+
+老板找我做IP，第一句话往往是："帮我起个号名，写段简介"。` },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "这份方案现在只能算半成品。没有行业、没有产品、没有客户、没有一个能拿出去晒的结果。" },
     ])).toBe(true)
   })
 

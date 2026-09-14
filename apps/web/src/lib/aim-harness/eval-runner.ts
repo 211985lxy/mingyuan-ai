@@ -134,12 +134,22 @@ function isRetryableEvalError(error: unknown): boolean {
   return PROVIDER_EMPTY_BODY.test(message)
 }
 
+function spokenEvalDraftLooksTruncated(drafts: Array<{ format: string; content: string }>): boolean {
+  return drafts.some((draft) => {
+    if (draft.format !== "video_script" && draft.format !== "koubo_script") return false
+    const body = deliveryBody(draft.content).trim()
+    if (body.length < 40) return false
+    if (/[，,：:]$/u.test(body)) return true
+    return !/[。！？!?…"”』」）)\]]\s*$/u.test(body)
+  })
+}
+
 async function runEvalCaseWithProviderRetry(
   fixture: EvalFixture,
   adapter: EvalContextAdapter,
   options: EvalRunOptions,
 ): Promise<EvalCaseResult> {
-  const maxAttempts = 3
+  const maxAttempts = 5
   let lastError: unknown
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
@@ -197,6 +207,9 @@ export async function runEvalCase(
     content: deliveryBody(draft.content),
     contentPreview: deliveryBody(draft.content),
   }))
+  if (options.executor && spokenEvalDraftLooksTruncated(drafts)) {
+    throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
+  }
 
   const formatValidations = drafts.map((draft) => {
     const result = validateFormat({

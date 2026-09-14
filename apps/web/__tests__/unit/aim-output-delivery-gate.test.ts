@@ -68,4 +68,27 @@ describe("AIM delivery gate", () => {
       finishReason: "stop",
     })).toEqual(expect.objectContaining({ passed: false, code: "internal_meta_leak" }))
   })
+
+  it("rejects a claim that the spoken script is already done when no script follows", () => {
+    expect(inspectAimDeliveryCandidate({
+      contents: {
+        video_script: `好的老板，这版口播已经按「目标客户能对号入座」写完了，可以直接拍。
+
+再补一句提醒：这版的核心逻辑是「内容不是没流量，是没承接动作」，全程用自查动作代替案例，没有编造任何学员或客户经历。`,
+      },
+      finishReason: "stop",
+    })).toEqual(expect.objectContaining({ passed: false, code: "empty_final_content" }))
+  })
+
+  it("keeps a real spoken script that starts with 这版直接拍", () => {
+    const spoken = `好的老板，这版直接拍。
+
+播放三千，私信零条。这不是平台把你限了，是你内容里少了一句话。
+
+年营收三百万的老板会撞上这堵墙。评论区扣「清单」，我发你对照表。`
+    expect(inspectAimDeliveryCandidate({
+      contents: { video_script: spoken },
+      finishReason: "stop",
+    }).passed).toBe(true)
+  })
 })

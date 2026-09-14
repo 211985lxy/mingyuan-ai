@@ -49,4 +49,16 @@ describe("WP-1 daily contract regressions", () => {
     expect(result.passed).toBe(false)
     expect(result.assertions.some((item) => item.name === "delivery_body" && !item.passed)).toBe(true)
   })
+
+  it("fails contract when a koubo fixture claims the script is done but never writes it", () => {
+    const result = gradeFixture({
+      fixture: fixtureById("wp1_missing_body_01"),
+      producedFormats: ["koubo_script"],
+      draftText: `好的老板，这版口播已经按「目标客户能对号入座」写完了，可以直接拍。
+
+再补一句提醒：这版的核心逻辑是「内容不是没流量，是没承接动作」，全程用自查动作代替案例，没有编造任何学员或客户经历。`,
+    })
+    expect(result.passed).toBe(false)
+    expect(result.assertions.some((item) => item.name === "delivery_body" && !item.passed)).toBe(true)
+  })
 })

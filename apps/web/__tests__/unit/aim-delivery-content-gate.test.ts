@@ -168,6 +168,24 @@ describe("applyDeliveryContentGate", () => {
       expect(first.retryPrompt).toContain("不能改交分析方案")
     }
   })
+
+  it("quotes already-given knowledge numbers in the retry so the model cannot treat them as forbidden", () => {
+    const first = applyDeliveryContentGate({
+      parsed: { video_script: "本轮输入只锁定了结构。\n1. 目标判定\n太短" },
+      targetFormats: ["video_script"],
+      intent: unsetIntent,
+      attempt: 0,
+      maxAttempts: 3,
+      originalPrompt: "根据知识库写一条口播，讲清楚供暖改造省了多少钱。",
+      evidenceText: "去年冬天这户电费从 1800 降到 1100。",
+    })
+    expect(first.ok).toBe(false)
+    if (!first.ok) {
+      expect(first.retryPrompt).toContain("1800")
+      expect(first.retryPrompt).toContain("1100")
+      expect(first.retryPrompt).toContain("不算编造")
+    }
+  })
 })
 
 describe("sanitizeReasoningSummary", () => {
