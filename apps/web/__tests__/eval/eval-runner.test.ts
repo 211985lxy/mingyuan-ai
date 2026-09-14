@@ -144,6 +144,32 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(report.results[0]?.error).toBeUndefined()
   })
 
+  it("retries a real-model case through the eighth attempt when empty bodies keep coming", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls < 8) {
+          throw new Error("生成失败，请稍后重试")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "第八次才交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_eighth_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(8)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
+  })
+
   it("retries a spoken draft that stops mid-sentence instead of scoring the stump", async () => {
     const fixture = ALL_FIXTURES.find((item) => item.id === "cp_imitate_07")!
     let calls = 0
@@ -193,7 +219,7 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
       },
     })
 
-    expect(calls).toBe(5)
+    expect(calls).toBe(8)
     expect(report.results[0]?.error).toBeUndefined()
     expect(report.results[0]?.drafts[0]?.contentPreview).toContain("太专业了")
   })

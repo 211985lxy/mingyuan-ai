@@ -129,11 +129,17 @@ export interface EvalRunReport {
 }
 
 const RUBRIC_PASS_THRESHOLD = 70
-const PROVIDER_EMPTY_BODY = /未能返回完整正文|模型服务暂时未能返回|没有满足你当前的要求，未作为正式成稿|生成失败，请稍后重试|生成结果不包含可安全交付的最终内容|生成结果被截断或正文过短/
+const EVAL_PROVIDER_RETRY_ATTEMPTS = 8
+const EVAL_PROVIDER_RETRY_DELAY_MS = 1500
+const PROVIDER_EMPTY_BODY = /未能返回完整正文|模型服务暂时未能返回|没有满足你当前的要求，未作为正式成稿|生成失败，请稍后重试|生成结果不包含可安全交付的最终内容|生成结果被截断或正文过短|连续修正后仍未完成当前要求/
 
 function isRetryableEvalError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return PROVIDER_EMPTY_BODY.test(message)
+}
+
+function delayEvalRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function spokenEvalDraftLooksTruncated(drafts: Array<{ format: string; content: string }>): boolean {
@@ -151,7 +157,7 @@ async function runEvalCaseWithProviderRetry(
   adapter: EvalContextAdapter,
   options: EvalRunOptions,
 ): Promise<EvalCaseResult> {
-  const maxAttempts = 5
+  const maxAttempts = EVAL_PROVIDER_RETRY_ATTEMPTS
   let lastError: unknown
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
@@ -162,6 +168,7 @@ async function runEvalCaseWithProviderRetry(
     } catch (error) {
       lastError = error
       if (!isRetryableEvalError(error) || attempt === maxAttempts - 1) throw error
+      if (!options.skipRubric) await delayEvalRetry(EVAL_PROVIDER_RETRY_DELAY_MS)
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError))
