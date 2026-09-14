@@ -53,6 +53,7 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(ctx.knowledgeBlock).toContain("1100")
     expect(ctx.knowledgeBlock.indexOf("1800")).toBeLessThan(ctx.knowledgeBlock.indexOf("禁止编造未给出的数字"))
     expect(ctx.knowledgeBlock).toContain("不算编造")
+    expect(ctx.knowledgeBlock).toContain("不要自行加减出新数字")
   })
 
   it("feeds frozen IP wiki into real chat execution", async () => {
@@ -449,6 +450,7 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(prompt).toContain("属于创意表达，不得判为编造")
     expect(prompt).toContain("我有个学员/客户/朋友")
     expect(prompt).toContain("未提供/待补充")
+    expect(prompt).toContain("直接加减得到的差值")
   })
 
   it("dispatches real eval cases to the production generation/chat runners", async () => {
