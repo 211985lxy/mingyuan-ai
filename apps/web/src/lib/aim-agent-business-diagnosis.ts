@@ -2,6 +2,7 @@ import { executeChatLLM, executeChatLLMStream, executeGenerateLLM } from "@/lib/
 import { saveAimGenerationRecord } from "@/lib/aim-harness/persistence"
 import { AIM_HIGH_RISK_LOOP_RULE } from "@/lib/aim-agent-prompts"
 import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
+import { buildBoundProjectContextPrefix } from "@/lib/aim-intent-boundaries"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
@@ -14,8 +15,19 @@ import type {
   AimGenerateResponse,
 } from "./aim-agent-handlers"
 
-function buildChatContextBlock(params: { knowledgeBlock: string; conversationBlock?: string }) {
-  return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
+function buildChatContextBlock(params: AimChatParams) {
+  return [
+    buildBoundProjectContextPrefix(params),
+    params.conversationBlock,
+    params.knowledgeBlock,
+  ].filter(Boolean).join("\n\n")
+}
+
+function buildGenerateKnowledgeBlock(context: AimGenerateContext) {
+  return [
+    buildBoundProjectContextPrefix(context),
+    context.knowledgeBlock,
+  ].filter(Boolean).join("\n\n")
 }
 export class BusinessDiagnosisHandler implements AimAgentHandler {
   // 说明：这个 agentId 历史上叫 business_diagnosis，但实际职责是「选题策划/定位策划官」
@@ -55,7 +67,7 @@ export class BusinessDiagnosisHandler implements AimAgentHandler {
     const systemPrompt = fillPromptTemplate(
       promptRegistry.get(PROMPT_KEYS.businessDiagnosisGenerate).content,
       {
-        knowledgeBlock: context.knowledgeBlock,
+        knowledgeBlock: buildGenerateKnowledgeBlock(context),
         methodologyBlock: context.methodologyBlock,
         highRiskRule: AIM_HIGH_RISK_LOOP_RULE,
       },

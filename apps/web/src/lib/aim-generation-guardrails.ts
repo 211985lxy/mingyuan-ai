@@ -1,7 +1,7 @@
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import type { ContentFormat } from "./aim-generator"
 import { isBenchmarkCopyTooSimilar } from "./aim-benchmark-quality"
-import { AIM_FACT_PRIORITY_RULE } from "./aim-context-priority"
+import { shouldUseBoundProjectDefaults } from "./aim-intent-boundaries"
 import { deliveryBody, withoutMethodNote } from "./aim-generation-text"
 
 const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我(?:有|身边有)(?:个|一个|位|一位|家|一家)?|我(?:的)?)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)|(?:来找我|找到我|咨询我)(?:的)?(?:客户|老板|企业|小企业老板)/
@@ -226,20 +226,10 @@ export function isGenericContentRequestWithoutFacts(
     | "topicRationale"
     | "hotTopic"
     | "taskSpec"
+    | "projectId"
   >,
 ): boolean {
-  const meaningfulKnowledge = context.knowledgeBlock
-    ?.replace(AIM_FACT_PRIORITY_RULE, "")
-    .trim()
-  const hasContext = Boolean(
-    meaningfulKnowledge
-    || context.ipWikiBlock?.trim()
-    || context.topicTitle?.trim()
-    || context.topicRationale?.trim()
-    || context.hotTopic?.trim()
-    || context.taskSpec?.knownFacts?.length,
-  )
-  if (hasContext) return false
+  if (shouldUseBoundProjectDefaults(context)) return false
   const normalized = context.rawInput
     .trim()
     .replace(/[，。！？!?,.\s]/g, "")

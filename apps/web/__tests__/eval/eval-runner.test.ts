@@ -25,6 +25,7 @@ import { buildRubricPrompt } from "@/lib/aim-harness/eval-rubric"
 import {
   createRealEvalExecutor,
   warnedInsufficientInfo,
+  buildEvalChatHandlerInput,
 } from "@/lib/aim-harness/eval-real-executor"
 
 describe("aim-harness eval runner (frozen, deterministic)", () => {
@@ -52,6 +53,18 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(ctx.knowledgeBlock).toContain("1100")
     expect(ctx.knowledgeBlock.indexOf("1800")).toBeLessThan(ctx.knowledgeBlock.indexOf("禁止编造未给出的数字"))
     expect(ctx.knowledgeBlock).toContain("不算编造")
+  })
+
+  it("feeds frozen IP wiki into real chat execution", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "pq_ground_15")!
+    const chatFixture = {
+      ...fixture,
+      entrypoint: "chat" as const,
+    }
+    const ctx = await createFrozenContextAdapter().load(chatFixture)
+    const input = buildEvalChatHandlerInput(chatFixture, ctx)
+    expect(input.ipWikiBlock).toContain("IP定位")
+    expect(input.knowledgeBlock).toContain("主推产品")
   })
 
   it("retries a real-model case once when the provider returns an empty-body error", async () => {

@@ -113,9 +113,22 @@ const runRealGeneration: RealCaseRunner = async (fixture, context) => {
   }
 }
 
-const runRealChat: RealCaseRunner = async (fixture, context) => {
+export function buildEvalChatHandlerInput(
+  fixture: EvalFixture,
+  context: EvalContext,
+) {
   const rawInput = composeRawInput(fixture, context)
   const messages = fixture.input.messages ?? fixture.seedContext.history ?? [{ role: "user" as const, content: rawInput }]
+  return {
+    rawInput,
+    messages,
+    knowledgeBlock: context.knowledgeBlock,
+    ipWikiBlock: context.ipWikiBlock,
+  }
+}
+
+const runRealChat: RealCaseRunner = async (fixture, context) => {
+  const { rawInput, messages, knowledgeBlock, ipWikiBlock } = buildEvalChatHandlerInput(fixture, context)
   const conversationIntent = resolveAimConversationIntentWithRules({
     agentId: fixture.agent,
     messages,
@@ -137,7 +150,8 @@ const runRealChat: RealCaseRunner = async (fixture, context) => {
     const response = await buildAimChatResponse(spec.agentId, {
       userId: "aim-eval",
       messages,
-      knowledgeBlock: context.knowledgeBlock,
+      knowledgeBlock,
+      ipWikiBlock,
       conversationIntent,
       runtimeTask: spec.runtimeTask,
       modelPolicy: spec.modelPolicy,

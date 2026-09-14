@@ -2,6 +2,7 @@ import { executeChatLLM, executeChatLLMStream, executeGenerateLLM } from "@/lib/
 import { saveAimGenerationRecord } from "@/lib/aim-harness/persistence"
 import { AIM_HIGH_RISK_LOOP_RULE } from "@/lib/aim-agent-prompts"
 import { buildWorkflowContext } from "@/lib/aim-generation-prompts"
+import { buildBoundProjectContextPrefix } from "@/lib/aim-intent-boundaries"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
@@ -14,8 +15,19 @@ import type {
   AimGenerateResponse,
 } from "./aim-agent-handlers"
 
-function buildChatContextBlock(params: { knowledgeBlock: string; conversationBlock?: string }) {
-  return [params.conversationBlock, params.knowledgeBlock].filter(Boolean).join("\n\n")
+function buildChatContextBlock(params: AimChatParams) {
+  return [
+    buildBoundProjectContextPrefix(params),
+    params.conversationBlock,
+    params.knowledgeBlock,
+  ].filter(Boolean).join("\n\n")
+}
+
+function buildGenerateKnowledgeBlock(context: AimGenerateContext) {
+  return [
+    buildBoundProjectContextPrefix(context),
+    context.knowledgeBlock,
+  ].filter(Boolean).join("\n\n")
 }
 export class BusinessSystemDiagnosisHandler implements AimAgentHandler {
   agentId = "business_system_diagnosis" as const
@@ -53,7 +65,7 @@ export class BusinessSystemDiagnosisHandler implements AimAgentHandler {
       promptRegistry.get(PROMPT_KEYS.businessSystemDiagnosisGenerate).content,
       {
         businessDiagnosisBlock: context.businessDiagnosisBlock,
-        knowledgeBlock: context.knowledgeBlock,
+        knowledgeBlock: buildGenerateKnowledgeBlock(context),
         highRiskRule: AIM_HIGH_RISK_LOOP_RULE,
       },
     )

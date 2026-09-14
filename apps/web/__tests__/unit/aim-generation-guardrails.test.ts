@@ -283,6 +283,14 @@ describe("AIM generation fact guardrails", () => {
       rawInput: "帮我写一条视频脚本。",
       knowledgeBlock: AIM_FACT_PRIORITY_RULE,
     }))).toBe(true)
+    expect(isGenericContentRequestWithoutFacts(context({
+      rawInput: "写个文案",
+      ipWikiBlock: "【人设】供暖改造主理人",
+    }))).toBe(false)
+    expect(isGenericContentRequestWithoutFacts(context({
+      rawInput: "写个文案",
+      projectId: "project-bound",
+    }))).toBe(false)
   })
 
   it("flags over-compressed whole-passage polish but not opening-only edits", () => {

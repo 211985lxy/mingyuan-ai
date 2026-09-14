@@ -157,7 +157,10 @@ export function getAgentHandler(agentId: string): AimAgentHandler {
 type AimChatRuntimeInput = Omit<
   AimChatParams,
   "conversationBlock" | "methodologyBlock" | "businessDiagnosisBlock" | "ipWikiBlock"
->
+> & {
+  /** 评测冻结档案；传入字符串时不再按 projectId 打库 */
+  ipWikiBlock?: string
+}
 
 /**
  * IP Wiki 是项目事实底盘，不属于可选方法论。
@@ -202,11 +205,13 @@ async function buildAimChatRuntime(
       params.conversationIntent?.useMethodology === false || agentId !== "business_system_diagnosis"
         ? Promise.resolve("")
         : buildBusinessDiagnosisMethodologyBlock(),
-      shouldInjectChatIpWiki({
-        projectId: params.projectId,
-      })
-        ? buildIpWikiBlock({ projectId: params.projectId })
-        : Promise.resolve(""),
+      typeof params.ipWikiBlock === "string"
+        ? Promise.resolve(params.ipWikiBlock)
+        : shouldInjectChatIpWiki({
+            projectId: params.projectId,
+          })
+          ? buildIpWikiBlock({ projectId: params.projectId })
+          : Promise.resolve(""),
     ]),
     ([methodology, businessDiagnosis, ipWiki]) => ({
       summary: "运行上下文已构建",

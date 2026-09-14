@@ -2,7 +2,9 @@ import { AIM_OUTPUT_MAX_CHARS } from "@/lib/aim-benchmark-length"
 import {
   AIM_NORTH_STAR_GOAL,
   AIM_SESSION_PRIORITY_RULES,
+  BOUND_PROJECT_DEFAULT_COPY_RULE,
   LIGHT_EDIT_OUTPUT_BOUNDARY,
+  shouldUseBoundProjectDefaults,
 } from "@/lib/aim-intent-boundaries"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import {
@@ -38,6 +40,9 @@ export interface ContentProducerChatPromptParams {
   methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
   /** 本轮用户原文，用于推断发布包等渐进块 */
   rawInput?: string
+  /** 当前绑定的客户项目；有值时默认用项目档案写，不再问「谁的生意」 */
+  projectId?: string | null
+  taskSpec?: import("@/lib/task-spec").TaskSpec
   contentAction?: string | null
   hasBenchmarkText?: boolean
   includePublishPackage?: boolean
@@ -153,8 +158,19 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     knowledgeStrategy: params.knowledgeStrategy,
   })
   const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
+  const useBoundProjectDefaults = shouldUseBoundProjectDefaults({
+    projectId: params.projectId,
+    knowledgeBlock: params.knowledgeBlock,
+    ipWikiBlock: params.ipWikiBlock,
+    taskSpec: params.taskSpec,
+  })
+  const boundProjectBlock = useBoundProjectDefaults
+    ? `\n${BOUND_PROJECT_DEFAULT_COPY_RULE}\n`
+    : ""
   const goalClarify =
-    params.methodologyPlan?.businessGoal === "unclear" && (params.methodologyPlan.confidence ?? 0) < 0.6
+    !useBoundProjectDefaults
+    && params.methodologyPlan?.businessGoal === "unclear"
+    && (params.methodologyPlan.confidence ?? 0) < 0.6
       ? `\n目标确认（仅当目标仍模糊时，最多追问 1 题 + 下列选项，不要开放追问）：\n这条内容更想达成哪个目标？\nA. 获客线索（留资/私信/预约诊断）\nB. 成交转化（报名/购买）\nC. 人设信任（来时路/专业可信）\nD. 品牌曝光（起号/流量/品宣）\n`
       : ""
 
@@ -203,7 +219,7 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
       methodologySection,
       ipWikiBlock: params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${params.ipWikiBlock}` : "",
       lightEditBlock,
-      goalClarify,
+      goalClarify: `${boundProjectBlock}${goalClarify}`,
       progressiveBlocks: progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : "",
       replyOpening: CONTENT_PRODUCER_REPLY_OPENING,
       knowledgeRule,
