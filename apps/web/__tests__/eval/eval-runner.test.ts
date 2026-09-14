@@ -304,6 +304,9 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(warnedInsufficientInfo([
       { content: "好的老板，这句信息量还不够，我不编。先确认一个，剩下三行补给我就能直接出稿：" },
     ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板，你这条没给选题、没给行业、没给案例，我按「问题解决型」先落一版。凡是你的真实信息，我用【】标出来，【】里的东西我一个都没替你编。" },
+    ])).toBe(true)
   })
 
   it("shows the judge the frozen context used by the real executor", () => {
