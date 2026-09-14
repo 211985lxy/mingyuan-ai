@@ -7,6 +7,8 @@ export type DouyinSyncOkState = {
   nickname?: string
   fans?: string
   videosCount?: string
+  /** 作品数据待补主页链接（抖音官方作品列表能力已下线） */
+  worksPendingLink?: boolean
   larkAccounts?: string
   larkVideos?: string
 }
@@ -55,6 +57,7 @@ export function useDouyinSyncAlert() {
         nickname: sp.get("nickname") ? decodeURIComponent(sp.get("nickname")!) : undefined,
         fans: sp.get("fans") || undefined,
         videosCount: sp.get("videos_count") || undefined,
+        worksPendingLink: sp.get("works_pending_link") === "1",
         larkAccounts: sp.get("lark_accounts") || undefined,
         larkVideos: sp.get("lark_videos") || undefined,
       })
@@ -93,10 +96,18 @@ export function DouyinSyncAlert({
             {okState.nickname ? `已同步：${okState.nickname}` : "抖音账号同步成功"}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            粉丝 {okState.fans ?? "—"} · 拉取视频 {okState.videosCount ?? 0} 条
+            粉丝 {okState.fans ?? "—"}
+            {okState.worksPendingLink
+              ? " · 作品数据待补充主页链接后自动同步"
+              : ` · 拉取视频 ${okState.videosCount ?? 0} 条`}
             {okState.larkAccounts ? ` · 飞书账号表写入 ${okState.larkAccounts}` : ""}
             {okState.larkVideos ? ` · 飞书视频表写入 ${okState.larkVideos}` : ""}
           </div>
+          {okState.worksPendingLink ? (
+            <div className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+              抖音官方的「授权账号作品列表」能力已下线，请在下方账号卡片点「补充主页链接」完成作品数据接入。
+            </div>
+          ) : null}
         </div>
       ) : null}
       {errorMsg ? (
