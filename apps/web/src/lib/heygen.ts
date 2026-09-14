@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto"
 import { env } from "@/env"
 import { logger } from "./logger"
 import { externalApiDuration, externalApiRequestsTotal } from "./metrics"
@@ -304,4 +305,100 @@ export function mapHeygenVideoToTaskResult(video: HeygenVideo): HeygenTaskResult
     }
   }
   return { status: "processing" }
+}
+
+// ─── Webhook（端点管理与签名验证）────────────────────────
+
+export type HeygenWebhookEndpoint = {
+  endpoint_id: string
+  url: string
+  events?: string[] | null
+  status?: string
+  secret?: string
+}
+
+export async function createWebhookEndpoint(input: {
+  url: string
+  events?: string[]
+}): Promise<HeygenWebhookEndpoint> {
+  return request<HeygenWebhookEndpoint>("POST", "/v3/webhooks/endpoints", {
+    body: { url: input.url, ...(input.events?.length ? { events: input.events } : {}) },
+    timeoutMs: 20_000,
+  })
+}
+
+export async function listWebhookEndpoints(): Promise<HeygenWebhookEndpoint[]> {
+  const data = await request<HeygenWebhookEndpoint[]>("GET", "/v3/webhooks/endpoints", { timeoutMs: 15_000 })
+  return data ?? []
+}
+
+export async function rotateWebhookSecret(endpointId: string): Promise<HeygenWebhookEndpoint> {
+  return request<HeygenWebhookEndpoint>(
+    "POST",
+    `/v3/webhooks/endpoints/${encodeURIComponent(endpointId)}/rotate-secret`,
+    { timeoutMs: 15_000 },
+  )
+}
+
+export async function listWebhookEvents(input?: { eventType?: string; entityId?: string; limit?: number }) {
+  return request<unknown>("GET", "/v3/webhooks/events", {
+    params: {
+      event_type: input?.eventType ?? "",
+      entity_id: input?.entityId ?? "",
+      limit: input?.limit ? String(input.limit) : "10",
+    },
+    timeoutMs: 15_000,
+  })
+}
+
+export const HEYGEN_WEBHOOK_SIGNATURE_HEADER = "signature"
+
+/**
+ * 验证 HeyGen webhook 签名（官方口径）：
+ * `signature` 头 = hex(HMAC-SHA256(rawBody, endpoint secret))。
+ *
+ * 必须用**原始字节**计算——任何先 parse 再 stringify 的做法都会因键序/空白
+ * 差异导致签名失配。比对用 timingSafeEqual 防时序侧信道。
+ */
+export function verifyHeygenWebhookSignature(input: {
+  rawBody: string
+  signature: string | null
+  secret: string
+}): boolean {
+  const { rawBody, signature, secret } = input
+  if (!signature || !secret) return false
+  const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex")
+  const a = Buffer.from(expected, "hex")
+  const b = Buffer.from(signature.trim().toLowerCase(), "hex")
+  if (a.length !== b.length || a.length === 0) return false
+  return timingSafeEqual(a, b)
+}
+
+/** 只处理与出片相关的事件；其余事件确认收到但不结算。 */
+export const HEYGEN_VIDEO_WEBHOOK_EVENTS = ["avatar_video.success", "avatar_video.fail"] as const
+
+export type HeygenWebhookEvent = {
+  event_id?: string
+  event_type?: string
+  event_data?: {
+    video_id?: string
+    url?: string
+    gif_download_url?: string
+    video_page_url?: string
+    video_share_page_url?: string
+    folder_id?: string | null
+    callback_id?: string | null
+    /** fail 事件附带的错误信息（字段名以实际投递为准，只读不信任） */
+    error?: unknown
+    [key: string]: unknown
+  }
+  created_at?: string
+}
+
+export function parseHeygenWebhookEvent(raw: unknown): HeygenWebhookEvent | null {
+  if (!raw || typeof raw !== "object") return null
+  const obj = raw as Record<string, unknown>
+  const eventType = typeof obj.event_type === "string" ? obj.event_type : null
+  if (!eventType) return null
+  return obj as HeygenWebhookEvent
 }
