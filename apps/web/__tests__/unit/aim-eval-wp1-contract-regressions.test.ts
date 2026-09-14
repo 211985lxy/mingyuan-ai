@@ -37,4 +37,16 @@ describe("WP-1 daily contract regressions", () => {
     expect(result.passed).toBe(false)
     expect(result.assertions.some((item) => item.name === "delivery_body" && !item.passed)).toBe(true)
   })
+
+  it("fails contract when the imitate fixture lists 内容路由 instead of a spoken script", () => {
+    const result = gradeFixture({
+      fixture: fixtureById("wp1_analysis_not_script_01"),
+      producedFormats: ["video_script"],
+      draftText: `好的老板。先说一句：这条对标你只给了结构、没给原文和主题，所以我按「获客类内容转化」这个主题假设锁定，正文可以直接拍。
+
+2. 内容路由：problem_solve（问题`,
+    })
+    expect(result.passed).toBe(false)
+    expect(result.assertions.some((item) => item.name === "delivery_body" && !item.passed)).toBe(true)
+  })
 })

@@ -58,4 +58,14 @@ describe("AIM delivery gate", () => {
       finishReason: "stop",
     })).toEqual(expect.objectContaining({ passed: false, code: "internal_meta_leak" }))
   })
+
+  it("rejects imitate drafts that list 内容路由 instead of a script", () => {
+    const analysis = `好的老板。先说一句：这条对标你只给了结构、没给原文和主题，所以我按「获客类内容转化」这个主题假设锁定，正文可以直接拍。
+
+2. 内容路由：problem_solve（问题`
+    expect(inspectAimDeliveryCandidate({
+      contents: { video_script: analysis },
+      finishReason: "stop",
+    })).toEqual(expect.objectContaining({ passed: false, code: "internal_meta_leak" }))
+  })
 })

@@ -103,6 +103,18 @@ ${CLEAN}
       expect(result.leakedLines.some((line) => line.includes("businessGoal"))).toBe(true)
     }
   })
+
+  it("rejects imitate drafts that enumerate 内容路由 instead of a script", () => {
+    const result = inspectDeliveryContent({
+      format: "video_script",
+      content: `好的老板。先说一句：这条对标你只给了结构、没给原文和主题。\n2. 内容路由：problem_solve（问题解决）\n这里没有可拍的口播。`,
+      intent: unsetIntent,
+    })
+    expect(result.passed).toBe(false)
+    if (!result.passed) {
+      expect(result.leakedLines.some((line) => line.includes("内容路由"))).toBe(true)
+    }
+  })
 })
 
 describe("applyDeliveryContentGate", () => {
