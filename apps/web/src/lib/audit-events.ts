@@ -39,16 +39,20 @@ async function raiseIdempotencyConflictAlert(error: AuditIdempotencyConflictErro
   try {
     const { upsertOperationalAlert } = await import("@/lib/operational-alerts")
     const keyHash = createHash("sha256").update(error.idempotencyKey).digest("hex").slice(0, 16)
+    // 指纹收敛到**来源**级，而不是逐幂等键：逐键指纹会让每个不同的 key 各占一行 critical，
+    // 生产实测单个来源累积 15 行、9133 次命中，把真实告警淹没在噪声里（2026-09-13）。
+    // 最近冲突键放进 metadata，既保留诊断力又不放行数。
     await upsertOperationalAlert({
-      fingerprint: `audit-idempotency-conflict:${error.source}:${keyHash}`,
+      fingerprint: `audit-idempotency-conflict:${error.source}`,
       rule: "audit_idempotency_conflict",
       severity: "critical",
-      summary: `审计幂等载荷冲突（来源 ${error.source}）`,
+      summary: `审计幂等载荷冲突（来源 ${error.source}，最近冲突键 ${keyHash}）`,
       source: "audit_index",
       metadata: {
         source: error.source,
         errorCode: error.code,
-        targetId: error.existingId,
+        latestKeyHash: keyHash,
+        latestTargetId: error.existingId,
       },
     })
   } catch (alertError) {
@@ -77,8 +81,18 @@ async function backfillLegacyPayloadHash(
  */
 export async function recordAuditEvent(
   input: AuditEventInput,
-  options: { strict?: boolean } = {},
-): Promise<AuditWriteResult> {
+  options: {
+    strict?: boolean
+    /**
+     * 幂等键已存在但 payloadHash 不一致时的处置：
+     * - `error`（默认）：抛冲突并告警——适用于"实时写入方"，哈希不一致意味着幂等契约被破坏。
+     * - `refresh`：用本次哈希覆盖旧值——适用于**对账/回填**，其职责本就是让索引反映源表；
+     *   历史行因哈希算法或字段集变更而永不收敛会反复触发冲突（2026-09-13 生产实测：
+     *   单来源 9133 次冲突、15 行 critical 噪声）。
+     */
+    onPayloadMismatch?: "error" | "refresh"
+  } = {},
+): Promise<AuditWriteResult & { refreshed?: boolean }> {
   const delegate = getAuditEventDelegate()
   if (!delegate) {
     if (options.strict) throw new Error("AuditEvent client is not generated")
@@ -138,6 +152,16 @@ export async function recordAuditEvent(
             update: { payloadHash: event.payloadHash },
             select: { id: true },
           })
+        }
+        // 对账/回填模式：以源表为准修正索引哈希，使索引收敛而不是永久冲突。
+        if (options.onPayloadMismatch === "refresh") {
+          await delegate.upsert({
+            where: { source_idempotencyKey: { source: event.source, idempotencyKey } },
+            create: data,
+            update: { payloadHash: event.payloadHash },
+            select: { id: true },
+          })
+          return { ok: true, id: existing.id, inserted: false, refreshed: true }
         }
         throw new AuditIdempotencyConflictError(event.source, idempotencyKey, existing.id)
       }
@@ -289,7 +313,7 @@ export async function reconcileAuditEvents(
   limit = 100,
   cursorValue?: string,
   sourceFilter?: ReconcileSourceKey,
-): Promise<{ scanned: number; indexed: number; skipped: number; nextCursor: string | null }> {
+): Promise<{ scanned: number; indexed: number; skipped: number; refreshed: number; nextCursor: string | null }> {
   const boundedLimit = Math.min(200, Math.max(1, Math.trunc(limit)))
   const cursor = decodeReconcileCursor(cursorValue)
   const nextMarkers: ReconcileCursor = { ...cursor }
@@ -324,6 +348,7 @@ export async function reconcileAuditEvents(
   let scanned = 0
   let indexed = 0
   let skipped = 0
+  let refreshed = 0
   for (const source of sources) {
     if (!source.delegate) continue
     const marker = cursor[source.key]
@@ -383,10 +408,12 @@ export async function reconcileAuditEvents(
           totalTokens: typeof row.totalTokens === "number" ? row.totalTokens : undefined,
           qualityStatus: stringValue(row.qualityStatus),
         },
-      }))
-      if (result.ok) indexed += 1
-      else if (result.conflict || !result.ok) skipped += 1
+      }), { onPayloadMismatch: "refresh" })
+      if (result.ok) {
+        indexed += 1
+        if (result.refreshed) refreshed += 1
+      } else if (result.conflict || !result.ok) skipped += 1
     }
   }
-  return { scanned, indexed, skipped, nextCursor: hasMore ? encodeReconcileCursor(nextMarkers) : null }
+  return { scanned, indexed, skipped, refreshed, nextCursor: hasMore ? encodeReconcileCursor(nextMarkers) : null }
 }
