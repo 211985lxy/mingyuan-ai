@@ -4,6 +4,11 @@ import { describe, expect, it, vi } from "vitest"
 import { AimDeliverableBubble } from "@/components/aim/aim-deliverable-bubble"
 import type { AimGenerateResponse } from "@/lib/api/client"
 
+// 深链「去工坊出片」引入了 useRouter；静态渲染测试注入替身
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}))
+
 const deliverables: AimGenerateResponse = {
   id: "generation-1",
   results: [{

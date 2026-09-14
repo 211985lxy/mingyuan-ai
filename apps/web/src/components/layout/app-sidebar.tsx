@@ -17,7 +17,6 @@ import {
   Users,
   BookOpen,
   BarChart3,
-  AudioLines,
   Zap,
 } from "lucide-react"
 import {
@@ -60,9 +59,10 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>
 }
 
-/** 主线导航：创作 + 市场洞察/数据（核心经营环节）+ 项目 */
+/** 主线导航：创作 + 数字人工坊（核心出片模块）+ 市场洞察/数据 + 项目 */
 const primaryNav: NavItem[] = [
   { title: "创作台", href: "/home", icon: PenLine },
+  { title: "数字人工坊", href: "/studio", icon: Clapperboard },
   { title: "市场洞察", href: "/opportunities", icon: Users },
   { title: "数据看板", href: "/data-platform", icon: BarChart3 },
   { title: "我的项目", href: "/projects", icon: BriefcaseBusiness },
@@ -72,9 +72,7 @@ const primaryNav: NavItem[] = [
 const toolboxNav: NavItem[] = [
   { title: "极简模式", href: "/lite", icon: Zap },
   { title: "爆款拆解", href: "/video-copy", icon: FileText },
-  { title: "语音工坊", href: "/voice-studio", icon: AudioLines },
   { title: "资产库", href: "/assets", icon: FolderOpen },
-  { title: "我的成片", href: "/videos", icon: Clapperboard },
   { title: "我的知识库", href: "/knowledge", icon: BookOpen },
 ]
 
