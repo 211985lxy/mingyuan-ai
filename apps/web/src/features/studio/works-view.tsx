@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ListSkeleton } from "@/components/ui/skeletons"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
 import { listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
 import { saveVideoHandoff } from "@/lib/studio/studio-prefs"
@@ -108,7 +109,7 @@ export function WorksView() {
       <section className="space-y-3">
         <p className="text-sm font-medium text-foreground/85">数字人成片</p>
         {list.loading ? (
-          <p className="text-sm text-muted-foreground">加载中…</p>
+          <ListSkeleton rows={3} />
         ) : list.tasks.length === 0 ? (
           <EmptyState
             icon={<Clapperboard />}

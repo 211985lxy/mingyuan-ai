@@ -22,6 +22,7 @@ import { AdminPageShell } from "@/components/admin/admin-page-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DetailSkeleton } from "@/components/ui/skeletons"
 import { Input } from "@/components/ui/input"
 
 type AuditSource = "user" | "admin" | "aim" | "agent_api" | "repo_agent" | "server"
@@ -389,7 +390,13 @@ function StatCard({
 
 function AuditDetailPanel({ detail, loading }: { detail: AuditEventDetail | null; loading: boolean }) {
   if (loading) {
-    return <Card><CardContent className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">正在加载事件详情…</CardContent></Card>
+    return (
+      <Card>
+        <CardContent className="py-5">
+          <DetailSkeleton />
+        </CardContent>
+      </Card>
+    )
   }
   if (!detail) {
     return <Card><CardContent className="flex min-h-64 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground"><ShieldCheck className="h-8 w-8" /><p>选择一条事件查看详情和关联链路</p></CardContent></Card>

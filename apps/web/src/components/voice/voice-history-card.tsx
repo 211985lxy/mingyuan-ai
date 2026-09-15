@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ListSkeleton } from "@/components/ui/skeletons"
 import { ChevronLeft, ChevronRight, Copy, Download, History, Loader2, Trash2 } from "lucide-react"
 import {
   deleteVoiceHistory,
@@ -179,12 +180,7 @@ export function VoiceHistoryCard({ refreshKey }: { refreshKey: number }) {
         <CardDescription>工坊里勾选落库的合成记录；音频转存 OSS，全文留在系统内。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {loading ? (
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            加载中…
-          </p>
-        ) : null}
+        {loading ? <ListSkeleton rows={3} variant="plain" withAction={false} /> : null}
         {!loading && error ? <p className="text-sm text-destructive">{error}</p> : null}
         {!loading && !error && data?.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">还没有记录；生成配音时会自动进入这里。</p>
