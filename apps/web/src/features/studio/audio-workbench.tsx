@@ -1,13 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { StepIndicator, type StudioStep } from "@/components/studio/step-indicator"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useSegmentedSynthesis } from "@/lib/voice/segmented-synthesis"
 import { loadAudioPrefs, saveAudioPrefs, useMounted } from "@/lib/studio/studio-prefs"
+import { useSegmentAudio, type SegmentStatus } from "@/lib/voice/segment-audio"
 import { AudioVoiceStep, useVoiceModels } from "@/features/studio/audio-voice-step"
 import { AudioScriptStep } from "@/features/studio/audio-script-step"
 import { AudioResultStep } from "@/features/studio/audio-result-step"
+import { AudioSegmentEditor } from "@/features/studio/audio-segment-editor"
 
 const AUDIO_STEPS: StudioStep[] = [
   { key: "voice", label: "选音色" },
@@ -43,7 +44,6 @@ export function AudioWorkbench() {
   const [tier, setTier] = useState("")
   const [speed, setSpeed] = useState(1)
   const [text, setText] = useState("")
-  const [playerUrl, setPlayerUrl] = useState<string | null>(null)
   const [charCount, setCharCount] = useState<number | null>(null)
 
   useAudioPrefsInit(mounted, (prefs) => {
@@ -52,19 +52,23 @@ export function AudioWorkbench() {
     if (prefs.speed) setSpeed(prefs.speed)
   })
 
-  const { phase, progress, error, generate } = useSegmentedSynthesis({
-    onDone: useCallback((payload: { objectUrl: string; charCount: number | null }) => {
-      setPlayerUrl(payload.objectUrl)
-      setCharCount(payload.charCount)
-      setStep(3)
-    }, []),
-    onSaved: useCallback(() => {}, []),
-  })
+  const segmentAudio = useSegmentAudio()
 
   function handleGenerate() {
     const effectiveTier = tier || models?.defaultModel || ""
     saveAudioPrefs({ voiceId, tier: effectiveTier, speed })
-    void generate({ text, voiceId: voiceId || null, model: effectiveTier || null, speed })
+    void segmentAudio
+      .generateAll({ text, voiceId: voiceId || null, model: effectiveTier || null, speed })
+      .then(() => {
+        setCharCount(text.trim().length)
+        setStep(3)
+      })
+  }
+
+  // 进度由分段状态直接派生，避免维护两份状态
+  const progress = {
+    done: segmentAudio.statuses.filter((status) => status === "ready").length,
+    total: segmentAudio.segments.length,
   }
 
   const view: AudioWorkbenchViewProps = {
@@ -90,11 +94,15 @@ export function AudioWorkbench() {
     setTier,
     speed,
     setSpeed,
-    phase,
+    busy: segmentAudio.busy,
     progress,
-    error,
+    error: segmentAudio.error,
     onGenerate: handleGenerate,
-    playerUrl,
+    combinedUrl: segmentAudio.combinedUrl,
+    segments: segmentAudio.segments,
+    statuses: segmentAudio.statuses,
+    segmentUrls: segmentAudio.segmentUrls,
+    onRegenerateSegment: (index: number) => void segmentAudio.regenerateSegment(index),
     charCount,
   }
   return <AudioWorkbenchView {...view} />
@@ -120,11 +128,15 @@ interface AudioWorkbenchViewProps {
   setTier: (tier: string) => void
   speed: number
   setSpeed: (speed: number) => void
-  phase: "idle" | "synthesizing" | "saving"
+  busy: boolean
   progress: { done: number; total: number }
   error: string | null
   onGenerate: () => void
-  playerUrl: string | null
+  combinedUrl: string | null
+  segments: string[]
+  statuses: SegmentStatus[]
+  segmentUrls: (string | null)[]
+  onRegenerateSegment: (index: number) => void
   charCount: number | null
 }
 
@@ -174,7 +186,7 @@ function AudioWorkbenchView(props: AudioWorkbenchViewProps) {
           onTierChange={props.setTier}
           speed={props.speed}
           onSpeedChange={props.setSpeed}
-          phase={props.phase}
+          phase={props.busy ? "synthesizing" : "idle"}
           progress={props.progress}
           error={props.error}
           onGenerate={props.onGenerate}
@@ -182,13 +194,28 @@ function AudioWorkbenchView(props: AudioWorkbenchViewProps) {
         />
       ) : null}
 
-      {props.step === 3 && props.playerUrl ? (
-        <AudioResultStep
-          playerUrl={props.playerUrl}
-          charCount={props.charCount}
-          script={props.text}
-          onReedit={() => props.setStep(2)}
-        />
+      {props.step === 3 ? (
+        <>
+          {props.combinedUrl ? (
+            <AudioResultStep
+              playerUrl={props.combinedUrl}
+              charCount={props.charCount}
+              script={props.text}
+              onReedit={() => props.setStep(2)}
+            />
+          ) : (
+            <p className="text-sm text-destructive" role="alert">
+              有段落未生成成功，无法产出完整音频。请在下方逐段重试。
+            </p>
+          )}
+          <AudioSegmentEditor
+            segments={props.segments}
+            statuses={props.statuses}
+            segmentUrls={props.segmentUrls}
+            busy={props.busy}
+            onRegenerate={props.onRegenerateSegment}
+          />
+        </>
       ) : null}
 
       {props.step === 2 ? (
