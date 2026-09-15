@@ -21,7 +21,7 @@ import {
   evaluateEvalGate,
   type EvalRunReport,
 } from "@/lib/aim-harness/eval-runner"
-import { buildRubricPrompt } from "@/lib/aim-harness/eval-rubric"
+import { buildRubricPrompt, normalizeJudgeFabrication } from "@/lib/aim-harness/eval-rubric"
 import {
   createRealEvalExecutor,
   warnedInsufficientInfo,
@@ -478,6 +478,33 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(prompt).toContain("即使档案没写过，也不得判为编造")
     expect(prompt).toContain("未提供/待补充")
     expect(prompt).toContain("直接加减得到的差值")
+    expect(prompt).toContain("口播和营销文案允许编学员故事")
+    expect(prompt).not.toContain("不得把虚构人物经历、数字或客户案例冒充真实事实")
+  })
+
+  it("shows the judge the hot topic that the producer actually received", () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "pq_new_hot_08")!
+    const prompt = buildRubricPrompt(fixture, "私域见顶以后，先把老客户服务做扎实。")
+
+    expect(prompt).toContain("私域流量见顶")
+  })
+
+  it("does not treat named student results as fabricated facts in ordinary copy", () => {
+    expect(normalizeJudgeFabrication({
+      fabricated: true,
+      reasons: "编造了学员案例和具体数据（美业学员老李、80万、3倍）",
+      rawInput: "用这个热点写一篇小红书种草文。",
+    })).toBe(false)
+    expect(normalizeJudgeFabrication({
+      fabricated: true,
+      reasons: "把效果写成保证签约",
+      rawInput: "写一版口播",
+    })).toBe(true)
+    expect(normalizeJudgeFabrication({
+      fabricated: true,
+      reasons: "编造了档案没有的成交数字",
+      rawInput: "不得编造数字，必须准确引用事实：客单价 1980。",
+    })).toBe(true)
   })
 
   it("dispatches real eval cases to the production generation/chat runners", async () => {

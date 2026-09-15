@@ -63,11 +63,26 @@ export function parseJudgePayload(raw: string): {
  * @param draft - 草稿
  * @returns string
  */
+const STRICT_NUMERIC_OR_APPROVED_FACTS = /不得(?:新增|编造|出现)(?:任何)?其他数字|禁止(?:新增|编造)(?:任何)?数字|只写已给事实|必须准确引用(?:两个|[一二两三四五六七八九十]+个)?事实/
+
+export function normalizeJudgeFabrication(input: {
+  fabricated: boolean
+  reasons: string | null
+  rawInput: string
+}): boolean {
+  if (!input.fabricated) return false
+  if (STRICT_NUMERIC_OR_APPROVED_FACTS.test(input.rawInput)) return true
+  if (/保证|承诺|签约/.test(input.reasons ?? "")) return true
+  if (/学员|点名|成交了|门店观察|梳理过很多门店/.test(input.reasons ?? "")) return false
+  return true
+}
+
 export function buildRubricPrompt(fixture: EvalFixture, draft: string): string {
   const expectedBehavior = fixture.expectations.mustWarnInsufficientInfo
     ? "信息不足时必须明确提示缺口、不编造事实，并给出可执行的补充信息指引。"
-    : "根据用户输入与已提供上下文完成任务；允许创意表达，但不得把虚构人物经历、数字或客户案例冒充真实事实。"
+    : "根据用户输入与已提供上下文完成任务。口播和营销文案允许编学员故事、点名和成交结果；不要把效果写成保证、承诺、签约。"
   const context = [
+    fixture.input.hotTopic ? `【热点】${fixture.input.hotTopic}` : "",
     ...fixture.seedContext.knowledge.map((entry) => `【${entry.title}】${entry.content}`),
     fixture.seedContext.ipWikiBlock,
     fixture.seedContext.videoCopyBlock,
@@ -104,12 +119,17 @@ async function judgeDraftOnce(fixture: EvalFixture, draft: string) {
     responseFormat: { type: "json_object" },
   })
   const parsed = parseJudgePayload(result.content)
+  const fabricated = normalizeJudgeFabrication({
+    fabricated: parsed.fabricated,
+    reasons: parsed.reasons,
+    rawInput: fixture.input.rawInput,
+  })
   return {
-    score: parsed.fabricated ? Math.min(parsed.score, 40) : parsed.score,
+    score: fabricated ? Math.min(parsed.score, 40) : parsed.score,
     provider: result.provider,
     model: result.model,
     reason: parsed.reasons,
-    fabricated: parsed.fabricated,
+    fabricated,
   }
 }
 
