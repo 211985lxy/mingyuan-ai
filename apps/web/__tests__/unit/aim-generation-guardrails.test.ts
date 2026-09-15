@@ -35,48 +35,48 @@ function context(overrides: Partial<AimGenerateContext> = {}): AimGenerateContex
 }
 
 describe("AIM generation fact guardrails", () => {
-  it("flags unsupported first-person customer evidence", () => {
+  it("does not flag marketing anecdotes in ordinary copy", () => {
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
-      { video_script: "我有个学员，他每次汇报都说不到重点。" },
+      { video_script: "我有个学员张三，成交了 8 万。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我以前带过一个新人，他每次汇报都说不到重点。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我给你讲个真事儿。我们公司去年来了个应届生。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我观察了太多职场新人，他们汇报都像写日记。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "上周，我帮一家电商公司做了个客服机器人。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我见过有人发了三百条，询盘还是零。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我见过太多老板卡在这儿。比如先替客户说出痛点。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context({
@@ -86,7 +86,7 @@ describe("AIM generation fact guardrails", () => {
       }),
       { video_script: "我接触过不少本地服务老板，卡住的地方几乎一模一样。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
 
     expect(findUnsupportedFirstPersonClaimFormats(
       context({
@@ -96,7 +96,7 @@ describe("AIM generation fact guardrails", () => {
       }),
       { video_script: "我们梳理过很多本地服务门店的获客逻辑，卡住的地方几乎一模一样。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
   })
 
   it("allows first-person evidence present in project knowledge", () => {
@@ -115,47 +115,47 @@ describe("AIM generation fact guardrails", () => {
     )).toEqual([])
   })
 
-  it("blocks ungrounded friend and industry-owner anecdotes", () => {
+  it("allows friend and industry-owner stories in ordinary copy", () => {
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我有一个朋友，最近靠内容拿到了很多客户。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "有位装修老板，之前做了很多内容却没有询盘。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "上周我看到一个老板的视频，内容做得很热闹。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我上周就遇到几个老板，他们都说内容获客很难。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "之前有一家本地服务公司做了口播。后来咨询数据明显增长。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "有个做电商的老板问过我，内容到底怎么获客。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "很多老板问我，我们也在发内容，为什么线索质量上不来？" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
     expect(findUnsupportedFirstPersonClaimFormats(
       context(),
       { video_script: "我跟几个老板聊过，他们都说内容获客很难。" },
       ["video_script"],
-    )).toEqual(["video_script"])
+    )).toEqual([])
   })
 
   it("allows creative marketing numbers while preserving strict fact checks", () => {
@@ -286,27 +286,32 @@ describe("AIM generation fact guardrails", () => {
     )
 
     expect(result).toBe("先讲清楚客户问题。某公司60天产出40条内容。最后给出行动。")
+    expect(findUnsupportedFirstPersonClaimFormats(
+      context({ rawInput }),
+      { video_script: "很多老板问我，为什么线索质量上不来？某公司60天产出40条内容。" },
+      ["video_script"],
+    )).toEqual(["video_script"])
   })
 
-  it("scrubs ungrounded 本地服务老板 anecdotes from ordinary spoken scripts", () => {
+  it("keeps 本地服务老板 storytelling in ordinary spoken scripts", () => {
     const result = scrubUnsupportedAnecdoteSentences(
       "你内容也发了，为什么没人来问？\n\n我接触过不少本地服务老板，卡住的地方几乎一模一样。\n\n先别急着怪平台。",
       "写一版口播给目标客户看。",
       "年营收 300-3000 万的本地服务老板\nIP定位：用老板真实经历讲清楚内容如何承接咨询",
     )
     expect(result).toContain("先别急着怪平台")
-    expect(result).not.toContain("我接触过不少本地服务老板")
+    expect(result).toContain("我接触过不少本地服务老板")
   })
 
-  it("scrubs ungrounded 我们梳理过很多门店 claims from spoken scripts", () => {
+  it("keeps generic 我们梳理过很多门店 storytelling in spoken scripts", () => {
+    const content = "年营收做到300万到3000万的本地服务老板，做短视频最容易踩的一个坑，就是把账号当成了朋友圈。\n\n我们梳理过很多本地服务门店的获客逻辑，卡住的地方几乎一模一样。\n\n你不是在做内容，你是在做企业宣传片。"
     const result = scrubUnsupportedAnecdoteSentences(
-      "年营收做到300万到3000万的本地服务老板，做短视频最容易踩的一个坑，就是把账号当成了朋友圈。\n\n我们梳理过很多本地服务门店的获客逻辑，卡住的地方几乎一模一样。\n\n你不是在做内容，你是在做企业宣传片。",
+      content,
       "写一版口播给目标客户看。",
       "年营收 300-3000 万的本地服务老板\nIP定位：用老板真实经历讲清楚内容如何承接咨询",
     )
-    expect(result).toContain("把账号当成了朋友圈")
+    expect(result).toContain("我们梳理过很多本地服务门店")
     expect(result).toContain("企业宣传片")
-    expect(result).not.toContain("我们梳理过很多本地服务门店")
   })
 
   it("detects generic generation requests that have no factual context", () => {

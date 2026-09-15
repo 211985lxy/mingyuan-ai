@@ -21,6 +21,9 @@ import { judgeEvalCase } from "./eval-rubric"
 import { validateFormat, planAimRun } from "./index"
 import { deliveryBody } from "@/lib/aim-generation-text"
 import { formatLearningsBlock, mergeLearningsIntoKnowledge, stripLearningsPrefix } from "@/lib/aim/learning-injection"
+import { sampleFixtures } from "./eval-sampling"
+
+export { sampleFixtures }
 
 /** What a context adapter returns for a fixture. */
 export interface EvalContext {
@@ -312,29 +315,6 @@ function deterministicDraftFor(
   const knowledge = stripLearningsPrefix(ctx.knowledgeBlock)
   const knowledgeSnippet = knowledge ? `\n参考知识：${knowledge.slice(0, 80)}` : ""
   return `${fixture.input.rawInput.slice(0, 40)} 的${format}稿件（确定性占位，仅用于 eval 路由/格式/上下文校验）。${knowledgeSnippet}`
-}
-
-/** Deterministic sample of N fixtures (stable across runs, exactly N). */
-/**
- * @description samplefixtures
- * @param fixtures - fixtures
- * @param sampleSize? - sampleSize?
- * @returns EvalFixture[]
- */
-export function sampleFixtures(
-  fixtures: readonly EvalFixture[],
-  sampleSize?: number
-): EvalFixture[] {
-  if (!sampleSize || sampleSize >= fixtures.length) return [...fixtures]
-  // Contract regressions stay in the full deterministic suite. Daily/full subset
-  // sampling must ignore them, otherwise adding two cases reshuffles all 15.
-  const pool = fixtures.filter((fixture) => !fixture.contractRegressionOnly)
-  const sampled: EvalFixture[] = []
-  for (let i = 0; i < sampleSize; i += 1) {
-    const index = Math.floor((i * pool.length) / sampleSize)
-    sampled.push(pool[index])
-  }
-  return sampled
 }
 
 /** Run a set of fixtures and aggregate. */

@@ -7,7 +7,7 @@ import type { TaskSpec } from "@/lib/task-spec"
  */
 
 export const AIM_NORTH_STAR_GOAL =
-  "基于客户项目档案（IP Wiki / 知识库 / TaskSpec）生成可拍摄、可发布、可承接转化的针对性文案；严格服从本轮用户意图（新建 / 重写 / 轻改）；信息不足时标注「未提供/待补充」，禁止编造第一人称案例。"
+  "基于客户项目档案（IP Wiki / 知识库 / TaskSpec）生成可拍摄、可发布、可承接转化的针对性文案；严格服从本轮用户意图（新建 / 重写 / 轻改）；口播允许编学员故事、点名和成交结果，不要写成保证效果。"
 
 /** 局部修改部位词典（与 resolveAimRuntimeTask 对齐） */
 export const LOCAL_EDIT_PART_WORDS = [

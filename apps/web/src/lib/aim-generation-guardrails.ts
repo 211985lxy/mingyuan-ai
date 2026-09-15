@@ -8,7 +8,6 @@ const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我(?:有|身边有)(?:个|一个|位|
 const UNSUPPORTED_ANECDOTE_PATTERN = /我(?:上周|上个月|去年|前阵子|最近)[，,\s]*(?:帮|帮助|服务|辅导|带|见过|看到|看见|刷到|遇到|认识|接触|观察)(?:了|过)?|我[，,\s]*(?:帮|帮助|服务|辅导|带|见过|看到|看见|刷到|遇到|认识|接触|观察)(?:了|过)?(?:一家|一个|一位|有人|不少|很多|客户|公司|企业|老板|朋友|学员)|(?:上周|上个月|去年|前阵子|最近).{0,6}我(?:看到|看见|刷到|遇到|听说).{0,20}(?:老板|客户|公司|企业|朋友|学员|视频|案例)|(?:上周|上个月|去年|前阵子|最近).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:有|遇到|来了)(?:个|一个|位|一位|家|一家).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:一个|一位|一家|有位|有个).{0,20}(?:客户|公司|企业|老板|朋友|学员).{0,80}(?:做了|发了|赚了|成交|询盘|增长|提升|降低|节省|投了|推广|获客|引流|播放|点赞|效果|数据|营收|收入|利润)/
 const UNSUPPORTED_SELF_EXPERIENCE_PATTERN = /我.{0,16}(?:遇到|见到|见过|看到|看见|刷到|认识|接触|服务|辅导|帮助|帮|聊过|聊|沟通过|交流过)(?:了|过)?(?:几位|几个|一些|不少|很多|一位|一个|一家)?.{0,16}(?:老板|客户|公司|企业|朋友|学员|团队)|我.{0,8}(?:跟|和)(?:几位|几个|一些|不少|很多|一位|一个)?.{0,10}(?:老板|客户|朋友|学员).{0,8}(?:聊过|聊了|沟通过|交流过)/
 const UNSUPPORTED_REVERSE_EXPERIENCE_PATTERN = /(?:老板|客户|朋友|学员|公司|企业).{0,12}(?:来|曾经|之前)?(?:问我|问过我|来问我|找过我|找我|跟我聊过|和我聊过|向我咨询)|(?:问我|问过我|来问我|找过我|找我|跟我聊过|和我聊过).{0,16}(?:老板|客户|朋友|学员|公司|企业)/
-const UNSUPPORTED_WE_SURVEY_PATTERN = /我们.{0,16}(?:梳理|接触|观察|服务|辅导|调研|看)过(?:了)?(?:很多|不少|太多).{0,24}(?:门店|老板|客户|企业|学员|团队|本地服务)/
 const CONCRETE_CASE_PATTERN = /(?:某家|一家|有家|一个|某个|有个|一位|某位|有位).{0,30}(?:公司|企业|老板|客户|团队).{0,160}(?:咨询|线索|成交|推广|投放|获客|引流|营收|收入|利润|播放|点赞|评论|增长|降低|成本|效果|数据)/
 const HYPOTHETICAL_MARKER_PATTERN = /假设|比如|例如|举例|如果|设想|虚构示例/
 const STRICT_NUMERIC_CLAIM_PATTERN = /不得(?:新增|编造|出现)(?:任何)?其他数字|禁止(?:新增|编造)(?:任何)?数字/
@@ -171,8 +170,7 @@ function containsUnsupportedAnecdote(text: string): boolean {
   const sentences = text.split(/(?<=[。！？!?；;\n])/)
   const windows = sentences.map((sentence, index) => `${sentence}${sentences[index + 1] || ""}`)
   const anecdotePatterns = [FIRST_PERSON_EVIDENCE_PATTERN, UNSUPPORTED_ANECDOTE_PATTERN,
-    UNSUPPORTED_SELF_EXPERIENCE_PATTERN, UNSUPPORTED_REVERSE_EXPERIENCE_PATTERN,
-    UNSUPPORTED_WE_SURVEY_PATTERN, CONCRETE_CASE_PATTERN]
+    UNSUPPORTED_SELF_EXPERIENCE_PATTERN, UNSUPPORTED_REVERSE_EXPERIENCE_PATTERN, CONCRETE_CASE_PATTERN]
   return windows.some((window) => {
     const anecdoteIndex = anecdotePatterns.reduce((earliest, pattern) => {
       const index = window.search(pattern)
@@ -185,9 +183,10 @@ function containsUnsupportedAnecdote(text: string): boolean {
 }
 
 export function scrubUnsupportedAnecdoteSentences(content: string, rawInput: string, evidenceText = rawInput): string {
-  const evidence = evidenceText || rawInput
   const closedWorld = hasStrictNumericClaimConstraint(rawInput) && APPROVED_FACTS_PATTERN.test(rawInput)
-  if (!closedWorld && containsUnsupportedAnecdote(evidence)) return content
+  if (!closedWorld) return content
+  const evidence = evidenceText || rawInput
+  if (containsUnsupportedAnecdote(evidence)) return content
   if (!containsUnsupportedAnecdote(content)) return content
   return content
     .split(/\n{2,}/u)
@@ -204,19 +203,10 @@ export function findUnsupportedFirstPersonClaimFormats(
   parsed: Partial<Record<ContentFormat, string>>,
   targetFormats: ContentFormat[],
 ): ContentFormat[] {
-  if (hasStrictNumericClaimConstraint(context.rawInput) && APPROVED_FACTS_PATTERN.test(context.rawInput)) {
-    return targetFormats.filter((format) => containsUnsupportedAnecdote(parsed[format] || ""))
+  if (!(hasStrictNumericClaimConstraint(context.rawInput) && APPROVED_FACTS_PATTERN.test(context.rawInput))) {
+    return []
   }
-  const evidence = [
-    context.rawInput,
-    context.knowledgeBlock,
-    context.ipWikiBlock,
-    context.eventStorytellingBlock,
-  ].filter(Boolean).join("\n")
-  const evidenceHasAnecdote = containsUnsupportedAnecdote(evidence)
-
-  return targetFormats.filter((format) =>
-    !evidenceHasAnecdote && containsUnsupportedAnecdote(withoutMethodNote(parsed[format] || "")))
+  return targetFormats.filter((format) => containsUnsupportedAnecdote(parsed[format] || ""))
 }
 
 export function isGenericContentRequestWithoutFacts(

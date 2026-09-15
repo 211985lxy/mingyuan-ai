@@ -36,14 +36,20 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(a).toHaveLength(15)
   })
 
-  it("does not let WP-1 contract regressions shuffle the daily 15-case sample", () => {
-    expect(
-      ALL_FIXTURES.filter((fixture) => fixture.contractRegressionOnly).map((fixture) => fixture.id).sort(),
-    ).toEqual(["wp1_analysis_not_script_01", "wp1_missing_body_01"])
+  it("keeps every WP-1 contract regression in the daily 15-case sample", () => {
+    const regressions = ALL_FIXTURES.filter((fixture) => fixture.contractRegressionOnly)
+    expect(regressions.map((fixture) => fixture.id).sort()).toEqual([
+      "wp1_analysis_not_script_01",
+      "wp1_missing_body_01",
+    ])
+
     const daily = sampleFixtures(ALL_FIXTURES, 15).map((fixture) => fixture.id)
-    const baseline = ALL_FIXTURES.filter((fixture) => !fixture.id.startsWith("wp1_"))
-    expect(baseline).toHaveLength(ALL_FIXTURES.length - 2)
-    expect(sampleFixtures(baseline, 15).map((fixture) => fixture.id)).toEqual(daily)
+    expect(daily).toEqual(expect.arrayContaining(regressions.map((fixture) => fixture.id)))
+
+    const baseline = ALL_FIXTURES.filter((fixture) => !fixture.contractRegressionOnly)
+    const nonRegressionDaily = daily.filter((id) => !regressions.some((fixture) => fixture.id === id))
+    expect(baseline).toHaveLength(ALL_FIXTURES.length - regressions.length)
+    expect(nonRegressionDaily).toEqual(sampleFixtures(baseline, 13).map((fixture) => fixture.id))
   })
 
   it("exposes knowledge numbers as already-given facts for the hallucination fixture", async () => {
@@ -468,7 +474,8 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(prompt).toContain("爆款标题套路：数字+痛点+悬念")
     expect(prompt).toContain("比如/例如/假设")
     expect(prompt).toContain("属于创意表达，不得判为编造")
-    expect(prompt).toContain("我有个学员/客户/朋友")
+    expect(prompt).toContain("我有个学员张三成交了 8 万")
+    expect(prompt).toContain("即使档案没写过，也不得判为编造")
     expect(prompt).toContain("未提供/待补充")
     expect(prompt).toContain("直接加减得到的差值")
   })
