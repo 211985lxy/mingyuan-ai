@@ -17,6 +17,7 @@ import { AIM_SOFT_ACTION_CLASS } from "@/lib/aim/workbench-display"
 import { VOICE_MAX_TEXT_LENGTH } from "@/lib/api/voice"
 import { VoicePreviewButton } from "@/components/voice/voice-preview-button"
 import type { ContentFormat } from "@/lib/api/client"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 
 /** 底部悬浮输入框 + 安全边距，编辑框需铺满到其上方 */
 const EDITOR_BOTTOM_RESERVE_PX = 148
@@ -60,6 +61,7 @@ function readSelection(element: HTMLTextAreaElement): { text: string; range: Tex
 
 /** 对话区内联文案卡片：查看、复制、编辑与编辑态选区改写。 */
 export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
+  const confirm = useConfirm()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(props.content)
   const [saving, setSaving] = useState(false)
@@ -100,8 +102,13 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
     setEditing(true)
   }
 
-  function cancelEdit() {
-    if (dirty && !window.confirm("有未保存修改，确定取消？")) return
+  async function cancelEdit() {
+    if (dirty && !(await confirm({
+      title: "放弃未保存的修改？",
+      description: "当前编辑内容不会保留。",
+      confirmText: "放弃修改",
+      destructive: true,
+    }))) return
     setEditing(false)
     setDraft(props.content)
     setPending(null)
@@ -199,7 +206,7 @@ export function AimInlineDocumentCard(props: AimInlineDocumentCardProps) {
     <div className="flex flex-wrap items-center justify-end gap-1">
         {editing ? (
           <>
-            <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} disabled={saving} onClick={cancelEdit}><X className="h-3.5 w-3.5" />取消</Button>
+            <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} disabled={saving} onClick={() => void cancelEdit()}><X className="h-3.5 w-3.5" />取消</Button>
             <Button size="sm" variant="ghost" className={AIM_SOFT_ACTION_CLASS} disabled={saving || !dirty} onClick={() => void save()}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               {saving ? "保存中" : "保存"}

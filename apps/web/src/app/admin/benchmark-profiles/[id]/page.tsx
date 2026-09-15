@@ -20,6 +20,7 @@ import { ProfileDetailDialogs } from "@/features/benchmark-profiles/components/p
 import { ProfileMaterials } from "@/features/benchmark-profiles/components/profile-materials"
 import { PLATFORM_COLORS, PLATFORM_LABELS, type EditableProfileItem, type ImportableAnalysis, type ProfileDetail } from "@/features/benchmark-profiles/model"
 import { cn } from "@/lib/utils"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 
 // ── 辅助 ──
 
@@ -30,6 +31,7 @@ function authHeaders(json = false): Record<string, string> {
 // ── 主页面 ──
 
 export default function BenchmarkProfileDetailPage() {
+  const confirm = useConfirm()
   const params = useParams<{ id: string }>() ?? { id: "" }
   const router = useRouter()
   const id = params.id
@@ -193,7 +195,7 @@ export default function BenchmarkProfileDetailPage() {
   // ── 单条 item 删除 ──
 
   async function handleDeleteItem(itemId: string) {
-    if (!confirm("确定删除这条素材？")) return
+    if (!(await confirm({ title: "删除这条素材？", confirmText: "删除", destructive: true }))) return
     setError(null)
     try {
       const res = await fetch(`/api/admin/benchmark-profiles/${id}/items/${itemId}`, {

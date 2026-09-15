@@ -21,6 +21,7 @@ import {
 } from "@/lib/aim-sidebar-history"
 import type { AimAgentId } from "@/lib/aim-ui-config"
 import { buildAimAgentNavHref } from "@/lib/aim/task-session-reset"
+import { useConfirm, type ConfirmFn } from "@/components/ui/confirm-dialog"
 
 type AimExpertSidebarHistoryProps = {
   agentId: AimAgentId
@@ -33,11 +34,17 @@ type AimExpertSidebarHistoryProps = {
 }
 
 async function handleDeleteHistory(
+  confirm: ConfirmFn,
   onDelete: (id: string) => Promise<void>,
   id: string,
   title: string,
 ) {
-  if (!window.confirm(`删除这条任务？\n${title}`)) return
+  if (!(await confirm({
+    title: "删除这条任务？",
+    description: title,
+    confirmText: "删除",
+    destructive: true,
+  }))) return
   try {
     await onDelete(id)
     toast.success("已删除")
@@ -58,6 +65,7 @@ export function AimExpertSidebarHistory({
   onRequestLoad,
   onDelete,
 }: AimExpertSidebarHistoryProps) {
+  const confirm = useConfirm()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -107,7 +115,7 @@ export function AimExpertSidebarHistory({
                   <DropdownMenuContent align="end" className="w-28">
                     <DropdownMenuItem
                       variant="destructive"
-                      onClick={() => void handleDeleteHistory(onDelete, item.id, title)}
+                      onClick={() => void handleDeleteHistory(confirm, onDelete, item.id, title)}
                     >
                       <Trash2 className="h-4 w-4" />
                       删除

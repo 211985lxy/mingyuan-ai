@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl"
 import { getMessages } from "next-intl/server"
 import { BrandingProvider } from "@/components/providers/branding-provider"
 import { ThemeBootScript, ThemeProvider } from "@/components/providers/theme-provider"
+import { ConfirmProvider } from "@/components/ui/confirm-dialog"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
 import { getBrandingConfig } from "@/lib/branding"
@@ -53,8 +54,10 @@ export default async function RootLayout({
         <ThemeProvider>
           <BrandingProvider branding={branding}>
             <NextIntlClientProvider messages={messages}>
-              <TooltipProvider>{children}</TooltipProvider>
-              <Toaster richColors position="top-center" />
+              <ConfirmProvider>
+                <TooltipProvider>{children}</TooltipProvider>
+                <Toaster richColors position="top-center" />
+              </ConfirmProvider>
             </NextIntlClientProvider>
           </BrandingProvider>
         </ThemeProvider>

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AimWorkbenchSkill } from "@/lib/aim-agent-guides"
+import { useConfirm, type ConfirmFn } from "@/components/ui/confirm-dialog"
 
 type AdminFetch = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -70,9 +71,17 @@ async function saveSkill(form: SkillForm, isEdit: boolean, skill: AimWorkbenchSk
   }
 }
 
-async function deleteSkill(skill: AimWorkbenchSkill | null) {
+async function deleteSkill(
+  confirm: ConfirmFn,
+  skill: AimWorkbenchSkill | null,
+) {
   if (!skill?.isCustom) return
-  if (!confirm(`确认删除技能「${skill.label}」？`)) return
+  if (!(await confirm({
+    title: `删除技能「${skill.label}」？`,
+    description: "删除后该技能将从可用列表中移除。",
+    confirmText: "删除",
+    destructive: true,
+  }))) return
   const res = await ADMIN_FETCH(`/api/admin/aim/skills/${encodeURIComponent(skill.id)}`, { method: "DELETE" })
   if (!res.ok) throw new Error("删除失败")
 }
@@ -129,6 +138,7 @@ function SkillDialogFooter(props: {
 }
 
 export function AimSkillEditDialog(props: SkillDialogProps) {
+  const confirm = useConfirm()
   const { open, onOpenChange, skill, agentId, onSaved, onDeleted } = props
   const isEdit = Boolean(skill?.isCustom)
   const [saving, setSaving] = useState(false)
@@ -145,7 +155,7 @@ export function AimSkillEditDialog(props: SkillDialogProps) {
 
   async function handleDelete() {
     setSaving(true)
-    try { await deleteSkill(skill); onDeleted(); onOpenChange(false) }
+    try { await deleteSkill(confirm, skill); onDeleted(); onOpenChange(false) }
     catch (err) { setError(err instanceof Error ? err.message : "删除失败") }
     finally { setSaving(false) }
   }
