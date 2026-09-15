@@ -103,6 +103,7 @@ export function AudioWorkbench() {
     statuses: segmentAudio.statuses,
     segmentUrls: segmentAudio.segmentUrls,
     onRegenerateSegment: (index: number) => void segmentAudio.regenerateSegment(index),
+    onSegmentTextChange: segmentAudio.updateSegmentText,
     charCount,
   }
   return <AudioWorkbenchView {...view} />
@@ -137,6 +138,7 @@ interface AudioWorkbenchViewProps {
   statuses: SegmentStatus[]
   segmentUrls: (string | null)[]
   onRegenerateSegment: (index: number) => void
+  onSegmentTextChange: (index: number, text: string) => void
   charCount: number | null
 }
 
@@ -214,6 +216,7 @@ function AudioWorkbenchView(props: AudioWorkbenchViewProps) {
             segmentUrls={props.segmentUrls}
             busy={props.busy}
             onRegenerate={props.onRegenerateSegment}
+            onTextChange={props.onSegmentTextChange}
           />
         </>
       ) : null}

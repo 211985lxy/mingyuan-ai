@@ -25,6 +25,8 @@ export interface SegmentAudioController {
   error: string | null
   generateAll: (input: SegmentAudioInput) => Promise<void>
   regenerateSegment: (index: number) => Promise<void>
+  /** 就地改某段文字（改完可只重生成该段，不必回上一步重新分段全跑） */
+  updateSegmentText: (index: number, text: string) => void
 }
 
 /** 合成单段；库返回的临时地址用完即释放，只保留自有 blob。 */
@@ -175,6 +177,10 @@ export function useSegmentAudio(): SegmentAudioController {
     }
   }, [mark, segments, store])
 
+  const updateSegmentText = useCallback((index: number, text: string) => {
+    setSegments((current) => current.map((value, i) => (i === index ? text : value)))
+  }, [])
+
   return {
     segments,
     statuses,
@@ -184,5 +190,6 @@ export function useSegmentAudio(): SegmentAudioController {
     error,
     generateAll,
     regenerateSegment,
+    updateSegmentText,
   }
 }
