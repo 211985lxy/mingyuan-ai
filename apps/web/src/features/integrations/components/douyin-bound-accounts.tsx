@@ -142,10 +142,10 @@ function BoundAccountRow(props: {
               : ""}
           </div>
         </div>
-        <Button variant="ghost" size="icon" className="size-8 shrink-0 cursor-pointer" disabled={props.refreshing} onClick={props.onRefresh} title="刷新资料">
+        <Button variant="ghost" size="icon" className="size-8 shrink-0 cursor-pointer" disabled={props.refreshing} onClick={props.onRefresh} title="刷新资料" aria-label="刷新账号资料">
           {props.refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
         </Button>
-        <Button variant="ghost" size="icon" className="size-8 shrink-0 cursor-pointer text-muted-foreground" disabled={props.removing} onClick={props.onRemove} title="解绑">
+        <Button variant="ghost" size="icon" className="size-8 shrink-0 cursor-pointer text-muted-foreground" disabled={props.removing} onClick={props.onRemove} title="解绑" aria-label="解绑该抖音账号">
           {props.removing ? <Loader2 className="size-4 animate-spin" /> : <Unlink className="size-4" />}
         </Button>
       </div>

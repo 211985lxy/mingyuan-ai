@@ -333,7 +333,7 @@ export default function BenchmarkProfileDetailPage() {
       {/* 顶部导航 */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/benchmark-profiles")}>
+          <Button variant="ghost" size="icon" aria-label="返回对标档案列表" onClick={() => router.push("/admin/benchmark-profiles")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">

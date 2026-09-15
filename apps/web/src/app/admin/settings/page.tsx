@@ -284,7 +284,7 @@ function SettingRow({
           )}
         </div>
         {setting.type !== "boolean" && !editing && (
-          <Button variant="ghost" size="icon" onClick={() => setEditing(true)}>
+          <Button variant="ghost" size="icon" aria-label="编辑该项设置" onClick={() => setEditing(true)}>
             <Pencil className="h-4 w-4" />
           </Button>
         )}

@@ -44,6 +44,7 @@ function TopVideosTable({ evidence }: { evidence: EvidenceData }) {
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-4 pt-4 pb-2">
         Top 视频排行
       </p>
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
@@ -74,6 +75,7 @@ function TopVideosTable({ evidence }: { evidence: EvidenceData }) {
           ))}
         </TableBody>
       </Table>
+      </div>
     </Card>
   )
 }
