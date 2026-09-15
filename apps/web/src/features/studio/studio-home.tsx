@@ -170,9 +170,9 @@ function AudioContinueRow({ item }: { item: VoiceHistoryItem }) {
 function modeCard(href: string, icon: React.ReactNode, title: string, desc: string, eta: string) {
   return (
     <Link href={href} className="group block flex-1">
-      <Card className="h-full transition-colors group-hover:border-primary/40">
-        <CardContent className="flex h-full flex-col gap-3 py-6">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+      <Card interactive className="h-full">
+        <CardContent className="flex h-full flex-col gap-3 py-2">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/[0.14]">
             {icon}
           </div>
           <div className="space-y-1">

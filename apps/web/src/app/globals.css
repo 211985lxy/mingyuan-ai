@@ -46,6 +46,14 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* 阴影层级（规范 四.2）：卡片/浮层的静态→悬浮平滑过渡 */
+  --shadow-soft: var(--elevation-soft);
+  --shadow-card: var(--elevation-card);
+  --shadow-float: var(--elevation-float);
+  /* 品牌渐变（规范 四.1）：朱砂赤主按钮 / 厚土金辅按钮 */
+  --gradient-primary: var(--brand-gradient-primary);
+  --gradient-gold: var(--brand-gradient-gold);
 }
 
 :root {
@@ -91,6 +99,20 @@
   --sidebar-accent-foreground: oklch(0.38 0.08 68.0);
   --sidebar-border: oklch(0.915 0.018 76.0);
   --sidebar-ring: oklch(0.575 0.205 28.0);
+
+  /* 阴影层级：暖褐调，比纯黑更贴合暖玉底色（Light） */
+  --elevation-soft: 0 1px 2px oklch(0.24 0.035 68 / 0.05);
+  --elevation-card:
+    0 1px 2px oklch(0.24 0.035 68 / 0.04),
+    0 4px 14px -4px oklch(0.24 0.035 68 / 0.06);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.24 0.035 68 / 0.06),
+    0 16px 40px -8px oklch(0.24 0.035 68 / 0.12);
+  /* 品牌渐变：朱砂赤主按钮 / 厚土金辅按钮 */
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.60 0.20 30.0) 0%, oklch(0.545 0.195 26.0) 100%);
+  --brand-gradient-gold: linear-gradient(135deg, oklch(0.745 0.185 38.0) 0%, oklch(0.815 0.155 78.0) 100%);
+  /* 悬浮描边转淡金泥（规范 四.2） */
+  --ring-gold: oklch(0.745 0.185 38.0 / 45%);
 }
 
 .dark {
@@ -128,6 +150,18 @@
   --sidebar-accent-foreground: oklch(0.955 0.01 76.0);
   --sidebar-border: oklch(1 0 0 / 12%);
   --sidebar-ring: oklch(0.745 0.185 38.0);
+
+  /* 阴影层级：暗色下靠更深的黑撑出层次（Dark） */
+  --elevation-soft: 0 1px 2px oklch(0 0 0 / 0.35);
+  --elevation-card:
+    0 1px 2px oklch(0 0 0 / 0.3),
+    0 4px 14px -4px oklch(0 0 0 / 0.4);
+  --elevation-float:
+    0 2px 6px -1px oklch(0 0 0 / 0.4),
+    0 16px 40px -8px oklch(0 0 0 / 0.55);
+  /* 深色主按钮：赤金渐变，与 light 的朱砂形成同一火德语义 */
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.775 0.175 42.0) 0%, oklch(0.715 0.18 34.0) 100%);
+  --brand-gradient-gold: linear-gradient(135deg, oklch(0.775 0.175 42.0) 0%, oklch(0.845 0.145 82.0) 100%);
 }
 
 @layer base {
@@ -145,6 +179,126 @@
     overscroll-behavior-y: contain;
     /* Prevent horizontal scroll on mobile */
     overflow-x: hidden;
+    /* 字体渲染：与大厂一致的清晰度基线 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  /* 选中色：朱砂淡染，替换浏览器默认蓝 */
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+    color: var(--foreground);
+  }
+  /* 精细滚动条：细窄圆角、透明轨道、hover 加深 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--foreground) 18%, transparent) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--foreground) 16%, transparent);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--foreground) 30%, transparent);
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* ============================================================
+   品牌交互工具类（大厂手感）
+   ============================================================ */
+
+/* 毛玻璃浮层（规范 四.2）：仅用于弹窗/浮层/吸顶栏。
+   静态卡片保持实色——全站卡片加 backdrop-filter 会显著拖慢滚动。 */
+.glass-panel {
+  background-color: color-mix(in oklch, var(--card) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+.dark .glass-panel {
+  background-color: color-mix(in oklch, var(--card) 72%, transparent);
+}
+
+/* 可交互卡片：悬浮上浮（规范 四.2）。
+   描边转金与阴影升级交给组件里的 ring-/shadow- 工具类，
+   这里只负责位移与缓动——手写 box-shadow 会破坏 Tailwind 的 ring 组合。 */
+.card-interactive {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-interactive:hover {
+    transform: none;
+  }
+}
+
+/* 主操作按钮的统一缓动与柔光（配合 .bg-fire-earth-gradient） */
+.ease-brand {
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 朱砂赤主按钮（规范 四.1）：渐变底 + 柔光阴影，hover 上浮、按下回收 */
+.btn-brand {
+  background-image: var(--gradient-primary);
+  box-shadow: 0 4px 14px -4px color-mix(in oklch, var(--primary) 45%, transparent);
+  transition:
+    box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.btn-brand:hover {
+  box-shadow: 0 8px 22px -6px color-mix(in oklch, var(--primary) 55%, transparent);
+  filter: brightness(1.04);
+}
+.btn-brand:active {
+  box-shadow: 0 2px 8px -3px color-mix(in oklch, var(--primary) 40%, transparent);
+  filter: brightness(0.98);
+}
+
+/* 描边按钮悬浮：描边转淡金泥（规范 四.2） */
+.btn-gold-outline:hover {
+  border-color: color-mix(in oklch, oklch(0.745 0.185 38.0) 45%, transparent);
+}
+
+/* 厚土金辅按钮（规范 四.1）：土金渐变 + 金石发光 */
+.btn-gold {
+  background-image: var(--gradient-gold);
+  color: oklch(0.24 0.035 68.0);
+  box-shadow: 0 4px 14px -4px oklch(0.745 0.185 38.0 / 40%);
+  transition:
+    box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.btn-gold:hover {
+  box-shadow: 0 8px 22px -6px oklch(0.745 0.185 38.0 / 55%);
+  filter: brightness(1.04);
+}
+
+/* 减少动效偏好：只保留颜色反馈，不做位移与放大 */
+@media (prefers-reduced-motion: reduce) {
+  .btn-brand,
+  .btn-gold {
+    transition: none;
+  }
+  .btn-brand:hover,
+  .btn-gold:hover {
+    filter: none;
   }
 }
 
