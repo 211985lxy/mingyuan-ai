@@ -1,4 +1,5 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import type { IpProfileSeed } from "@/lib/aim/ip-profile-seed"
 import type { AimSemanticIntent } from "@/lib/aim/semantic-task-understanding"
 import { LOCAL_EDIT_PART_WORDS } from "@/lib/aim-intent-boundaries"
 import type { AimRuntimeTask } from "@/lib/aim-knowledge-strategy"
@@ -112,6 +113,18 @@ export function mapResolvedIntentToRuntimeTask(intent: ResolvedUserIntent): AimR
   }
 }
 
+/**
+ * 档案兜底可覆盖的缺口字段：档案已确认后，这两项不再重复追问。
+ * 只认 project_profile 来源——原话或已确认回答填上的字段本就不会进缺口。
+ */
+const PROFILE_COVERED_FIELDS = ["audience", "goal"] as const
+
+function profileCoveredGapFields(intent: ResolvedUserIntent): Set<IntentClarificationGap["field"]> {
+  return new Set<IntentClarificationGap["field"]>(
+    PROFILE_COVERED_FIELDS.filter((field) => intent.constraintSources[field] === "project_profile"),
+  )
+}
+
 export function resolveExecuteTurnGate(input: {
   envelope: AimContentSourceEnvelope
   handling: "respond" | "deliver" | "clarify"
@@ -119,8 +132,10 @@ export function resolveExecuteTurnGate(input: {
   formats?: ContentFormat[]
   /** LLM 结构化意图（协议 v2；快径与理解降级时为空，纯规则仲裁） */
   llmIntent?: AimSemanticIntent
+  /** 绑定项目已确认档案页的兜底（最低优先级，缺失时行为与改动前一致） */
+  profileSeed?: IpProfileSeed
 }): ExecuteTurnGateResult {
-  const ruleIntent = resolveUserIntentFromEnvelope(input.envelope, input.formats)
+  const ruleIntent = resolveUserIntentFromEnvelope(input.envelope, input.formats, input.profileSeed)
   const arbitration = input.llmIntent
     ? arbitrateIntentWithLlm(ruleIntent, input.llmIntent)
     : undefined
@@ -139,6 +154,12 @@ export function resolveExecuteTurnGate(input: {
   } else if (input.handling === "deliver" && deterministicGaps.length > 0) {
     // 用户指令唯一真源：关键缺口未确认不先生成，也不用隐藏默认值顶替
     gapsToAsk = deterministicGaps
+  }
+  // 档案已声明的字段不再追问：LLM 追问与确定性缺口都要过滤——
+  // 档案里确认过受众/目标的用户，再看到同样的追问等于被否认他确认过的档案。
+  const coveredByProfile = profileCoveredGapFields(intent)
+  if (coveredByProfile.size > 0) {
+    gapsToAsk = gapsToAsk.filter((gap) => !coveredByProfile.has(gap.field))
   }
   const clarificationText = gapsToAsk.length ? buildNumberedClarification(gapsToAsk) : undefined
 

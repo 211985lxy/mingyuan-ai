@@ -7,6 +7,7 @@
  */
 
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import type { IpProfileSeed } from "@/lib/aim/ip-profile-seed"
 import type { ContentFormat } from "@/lib/api/client"
 import { addAimTraceStep, type AimTraceRecorder } from "@/lib/aim-observability"
 import { countAimMaterialChars, extractAimInstructionText } from "@/lib/aim-current-user-input"
@@ -18,6 +19,8 @@ export async function resolveAndTraceTurnGate(input: {
   scopedParsed: { sourceEnvelope: AimContentSourceEnvelope; targetFormats: ContentFormat[] }
   understanding: Awaited<ReturnType<typeof understandAimContentTurnWithTrace>>
   trace?: AimTraceRecorder
+  /** 绑定项目已确认档案页的兜底；缺失时行为与改动前一致 */
+  profileSeed?: IpProfileSeed
 }) {
   const { scopedParsed, understanding, trace } = input
   const gate = resolveExecuteTurnGate({
@@ -26,6 +29,7 @@ export async function resolveAndTraceTurnGate(input: {
     llmQuestions: understanding.clarificationQuestions,
     formats: scopedParsed.targetFormats,
     llmIntent: understanding.intent,
+    ...(input.profileSeed ? { profileSeed: input.profileSeed } : {}),
   })
   const mountedSummary = gate.mountedRuleBlocks.length
     ? `｜挂载 ${gate.mountedRuleBlocks.map((id) => MOUNTED_RULE_BLOCK_LABELS[id]).join("、")}`

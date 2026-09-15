@@ -16,6 +16,7 @@ const {
   discardAimGenerationAttempt,
   failAimGenerationAttempt,
   AimGenerationAttemptError,
+  listIpWikiPages,
 } = vi.hoisted(() => {
   class AimGenerationAttemptError extends Error {
     code: string
@@ -51,6 +52,8 @@ const {
     discardAimGenerationAttempt: vi.fn(async () => undefined),
     failAimGenerationAttempt: vi.fn(async () => undefined),
     AimGenerationAttemptError,
+    // 档案兜底读库边界：不拦会连真库，用例会被下挂到超时
+    listIpWikiPages: vi.fn(async () => [] as unknown[]),
   }
 })
 
@@ -90,6 +93,10 @@ vi.mock("@/lib/aim/services/unified-content-execution", () => ({
 
 vi.mock("@/lib/aim/services/generate-request", () => ({
   serializeAimGenerationRun,
+}))
+
+vi.mock("@/lib/ip-wiki/repo", () => ({
+  listIpWikiPages,
 }))
 
 vi.mock("@/lib/aim/generation-attempt", async (importOriginal) => {
@@ -137,6 +144,8 @@ beforeEach(() => {
     created: true,
     replay: "continue",
   })
+  // 默认无档案兜底：未显式设置时行为与改动前一致
+  listIpWikiPages.mockResolvedValue([])
 })
 
 describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交付）", () => {
@@ -186,6 +195,37 @@ describe("POST /api/aim/execute（统一入口：理解 → 缺口追问 → 交
 
     expect(data.runId).toBe("run_real")
     expect(data.traceId).toBe("trace-1")
+  })
+
+  it("已绑项目且档案里写着受众与目标：不再追问，直接进生成", async () => {
+    // 线上档案形态：编译产出，无「## 我服务谁」小节，内容是陈述句
+    listIpWikiPages.mockResolvedValue([
+      { pageType: "audience", content: "核心客户：30-45 岁做高客单专业服务的小老板；痛点映射：P001、P002" },
+      { pageType: "positioning", content: "核心定位：把老板的经验变成可持续获客的经营系统。" },
+    ])
+    understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "用户要写见客户的内容，受众与目标由项目档案兜底。",
+    })
+    executeVerifiedUnifiedDelivery.mockResolvedValue({ output: {}, metadata: { runId: "run_profile" }, spec: {} })
+
+    const response = await executeRequest(baseBody({
+      sourceEnvelope: {
+        currentUserRequest: "写一条讲本周见客户的视频脚本",
+        relevantConversation: [],
+        referenceMaterials: [],
+      },
+    }))
+    const data = await response.json()
+
+    expect(listIpWikiPages).toHaveBeenCalledWith({
+      projectId: "project-1",
+      pageTypes: ["audience", "positioning", "content_strategy"],
+    })
+    expect(response.status).toBe(200)
+    expect(data.kind).toBe("deliverable")
+    expect(executeVerifiedUnifiedDelivery).toHaveBeenCalledOnce()
+    expect(markAimGenerationAwaitingInput).not.toHaveBeenCalled()
   })
 
   it("does not ask again when the user is answering a previous clarification", async () => {
