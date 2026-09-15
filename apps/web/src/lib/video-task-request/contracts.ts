@@ -36,6 +36,11 @@ export type CreateVideoTaskInput = {
   productionPlanId?: string;
   virtualmanId?: string;
   speakerId?: string;
+  /**
+   * 公共数字人的形态（蝉镜 figure_type，如 sit_body/whole_body/circle_view）。
+   * 蝉镜对带形态列表的形象要求显式指定，缺失会以 50000 拒绝下单。
+   */
+  figureType?: string;
   avatarName?: string;
   processRules?: unknown;
   speakerExtra?: unknown;
@@ -70,6 +75,7 @@ export type ResolvedAvatar = {
   status: string;
   externalVirtualmanId: string | null;
   externalSpeakerId: string | null;
+  externalFigureType?: string | null;
   speakerName: string | null;
 };
 

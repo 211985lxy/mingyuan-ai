@@ -10,6 +10,7 @@ import { clearVideoHandoff, saveVideoPrefs, useMounted } from "@/lib/studio/stud
 import type { PublicDigitalPersonOption } from "@/lib/api/digital-human"
 import {
   buildCreateVideoTaskInput,
+  pickFigureType,
   resolveVideoWorkbenchInit,
   useScriptPreview,
   useStudioFishVoices,
@@ -148,6 +149,8 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
           voiceSource,
           fishVoiceId,
           aimGenerationId: aimGenerationIdRef.current,
+          // 公共形象必须带形态：蝉镜对带形态列表的形象要求显式指定
+          figureType: pickFigureType(selectedPublic?.figures, aspectRatio),
         }),
       )
       saveVideoPrefs({ projectId, avatarId: avatarLibrary.selectedAvatarId, aspectRatio, fishVoiceId })

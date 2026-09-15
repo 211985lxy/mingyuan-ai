@@ -238,6 +238,26 @@ export function validateVideoSubmission(input: {
   return null
 }
 
+/**
+ * 从形象的形态列表中挑一个与目标画面比例匹配的 figure_type。
+ *
+ * 蝉镜对带形态列表的形象（公共形象全部如此）要求显式指定形态，缺失会以
+ * 50000 拒绝下单；且各形象形态不同（如样本形象只有 sit_body / circle_view，
+ * 没有 whole_body），因此必须按实际列表选，不能硬编码默认值。
+ */
+export function pickFigureType(
+  figures: Array<{ type: string; width: number; height: number }> | undefined,
+  aspectRatio: "9:16" | "16:9",
+): string | null {
+  if (!figures || figures.length === 0) return null
+  const [targetWidth, targetHeight] = aspectRatio === "16:9" ? [1920, 1080] : [1080, 1920]
+  const exact = figures.find((f) => f.width === targetWidth && f.height === targetHeight)
+  if (exact) return exact.type
+  const whole = figures.find((f) => f.type === "whole_body")
+  if (whole) return whole.type
+  return figures[0]?.type ?? null
+}
+
 /** 组装 createVideoTask 的入参（与 AIM 出片弹窗契约一致）。 */
 export function buildCreateVideoTaskInput(input: {
   projectId: string
@@ -250,6 +270,8 @@ export function buildCreateVideoTaskInput(input: {
   voiceSource: VideoVoiceSource
   fishVoiceId: string
   aimGenerationId: string | null
+  /** 公共形象的形态（从该形象的 figures 中按画面比例选出） */
+  figureType?: string | null
 }) {
   return {
     type: "virtualman_broadcast",
@@ -261,6 +283,7 @@ export function buildCreateVideoTaskInput(input: {
           virtualmanId: input.selectedPublic?.id,
           speakerId: input.publicVoiceId,
           avatarName: input.selectedPublic?.name ?? "",
+          ...(input.figureType ? { figureType: input.figureType } : {}),
         }
       : { avatarId: input.selectedAvatarId }),
     scriptContent: input.script,

@@ -297,6 +297,7 @@ export async function generateDemoVideo(input: {
   virtualmanId: string
   speakerId: string
   text: string
+  figureType?: string | null
 }): Promise<ShanjianSubmitResult> {
   try {
     if (getDigitalHumanProvider() === "chanjing") {
@@ -304,6 +305,7 @@ export async function generateDemoVideo(input: {
         personId: input.virtualmanId,
         audioManId: input.speakerId,
         text: input.text,
+        figureType: input.figureType ?? null,
       })
     }
     return await generateRawVideo({
@@ -407,7 +409,16 @@ async function submitChanjingVideo(
       "缺少音色或口播文案，无法提交蝉镜出片任务",
     )
   }
-  return await createDigitalHumanVideo({ personId, audioManId, text, width, height })
+  // 形态必须由调用方按实际形象传（公共形象各有形态列表，且并非都有 whole_body）；
+  // 缺失时交给供应商判定，不在此硬编码默认值以免传入该形象不具备的形态。
+  return await createDigitalHumanVideo({
+    personId,
+    audioManId,
+    text,
+    width,
+    height,
+    figureType: typeof payload.figureType === "string" ? payload.figureType : null,
+  })
 }
 
 const HEYGEN_VIDEO_TYPES = new Set([
