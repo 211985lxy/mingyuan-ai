@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
 import { getBrandingConfig } from "@/lib/branding"
 import "./globals.css"
+import "./brand-themes.css"
 
 // 所有页面都依赖 DB(getBrandingConfig)与请求上下文(getMessages),
 // 不做静态预渲染。否则 next build 在 prerender 阶段会因

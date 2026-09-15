@@ -133,3 +133,36 @@ pnpm test:component # 组件套件（jsdom）—— 改组件/导航/表单必�
 > 踩坑记录：只跑 `pnpm test` 会漏掉组件测试。曾因此让一个导航测试失效两个阶段未被发现。
 >
 > `pnpm test:e2e` 需要独立的 `TEST_DATABASE_URL` 测试库，本地默认不可运行。
+
+---
+
+## 七、八境主题层（`apps/web/src/app/brand-themes.css`）
+
+> 最后更新：2026-09-15。设计原型同源：工作区 `aim-workbench-landing-redesign.design/`（colors_and_type_v2.css + dark/light-theme-variants.css）。
+
+在默认「亮·暖玉玄黄 / 暗·玄曜赤金」之外，提供六境主题变体与五行全谱 token，**只覆写既有 shadcn 语义 token，组件零改动生效**：
+
+| 境 | 明暗 | 底 / 主色意象 | data-brand-theme |
+| --- | --- | --- | --- |
+| 暖玉玄黄 / 玄曜赤金 | 亮 / 暗 | 现行默认（不设属性） | （缺省） |
+| 月白青花 | 亮 | 月白冷宣 + 青花蓝 | `qinghua` |
+| 素宣点朱 | 亮 | 素宣纸 + 一点朱砂 | `suxuan` |
+| 松花竹青 | 亮 | 松花淡青 + 石绿 | `zhuqing` |
+| 玄水涵朱 | 暗 | 靛蓝玄夜 + 朱砂照夜（水火既济） | `xuanshui` |
+| 松烟入墨 | 暗 | 松烟墨 + 一点朱 | `songmo` |
+| 苍黛描金 | 暗 | 石青黛蓝 + 鎏金（金碧山水） | `cangdai` |
+
+```tsx
+// 切换：html 上设 data 属性，与 .dark 组合生效
+document.documentElement.classList.toggle("dark", true)
+document.documentElement.dataset.brandTheme = "xuanshui"   // 不设或设 undefined 即回默认境
+```
+
+**约定**：
+
+- 每个变体覆写**全套** per-theme token（bg/card/popover/primary/secondary/muted/accent/border/input/ring/sidebar×8/elevation×3/主渐变），不允许半套——否则侧栏与内容区混色
+- **火土金种子恒定**：`--brand-gradient-gold`、`--ring-gold`、`--destructive` 不随主题变；变的是中性底色族与主色（危于火的语义色不随审美漂移）
+- 五行全谱 `--el-fire/earth/metal/water/wood`（含 `-ink`/`-soft`）已映射 Tailwind（`text-el-fire`、`bg-el-water-soft` 等），语义归五行：成于木、告于水、警于金、危于火
+- 已知边界：`.dark` 的语义色板校准（amber-50 等中性阶）按暖褐 68 调校；冷色暗境（`xuanshui`/`cangdai`）下标记色仍偏暖，出现需求再按境分档
+- 默认两境的 `:root`/`.dark` 值与 `--chart-*` 未动；图表切五行五色是独立决策，不在本层范围内
+- 接线：`src/app/layout.tsx` 在 `globals.css` 之后引入 `brand-themes.css`（Turbopack 生产构建不下钻 CSS `@import`，必须走 JS 层引入）；`--el-*` 的 `@theme` 映射在 `globals.css`

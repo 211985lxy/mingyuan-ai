@@ -1,0 +1,284 @@
+/* ============================================================
+   八境品牌主题层 — 东方五行 · 火土玄学
+   依据：aim-workbench-landing-redesign.design/colors_and_type_v2.css
+        及 dark / light-theme-variants.css（设计原型同源）
+
+   用法：<html class="dark" data-brand-theme="xuanshui">
+   - 不设 data-brand-theme：默认 亮·暖玉玄黄 / 暗·玄曜赤金（globals.css）
+   - 亮色变体：qinghua 月白青花 · suxuan 素宣点朱 · zhuqing 松花竹青
+   - 暗色变体：xuanshui 玄水涵朱 · songmo 松烟入墨 · cangdai 苍黛描金
+   变体只覆写既有 token（shadcn 语义名），组件零改动即可生效。
+   接线：由 src/app/layout.tsx 在 globals.css 之后 import（Turbopack
+   生产构建不下钻 CSS @import，必须走 JS 层引入）。
+
+   约定（与 BRANDING-GUIDELINES.md / IMPLEMENTATION.md 一致）：
+   - 火土金种子色恒定（--brand-gradient-gold / --ring-gold / --destructive
+     不随主题变），仅中性底色族与主色随境切换
+   - 五行全谱 --el-* 的 @theme 映射在 globals.css，供五行组件与
+     图表扩展使用（text-el-fire / bg-el-water-soft 等），
+     语义归五行：成于木、告于水、警于金、危于火
+   - 已知边界：.dark 内的语义色板校准（amber-50 等中性阶）按暖褐 68
+     调校，冷色变体（xuanshui / cangdai）下标记色仍偏暖，后续按需分境校准
+   ============================================================ */
+
+/* ── 五行全谱（矿物颜料：朱砂 / 赭石 / 鎏金 / 石青 / 石绿） ── */
+:root {
+  --el-fire: oklch(0.575 0.205 28.0);
+  --el-fire-ink: oklch(0.48 0.185 28.0);
+  --el-fire-soft: color-mix(in oklch, var(--el-fire) 10%, transparent);
+  --el-earth: oklch(0.56 0.105 60.0);
+  --el-earth-ink: oklch(0.44 0.095 60.0);
+  --el-earth-soft: color-mix(in oklch, var(--el-earth) 12%, transparent);
+  --el-metal: oklch(0.62 0.125 85.0);
+  --el-metal-ink: oklch(0.48 0.11 85.0);
+  --el-metal-soft: color-mix(in oklch, var(--el-metal) 16%, transparent);
+  --el-water: oklch(0.50 0.085 235.0);
+  --el-water-ink: oklch(0.42 0.075 235.0);
+  --el-water-soft: color-mix(in oklch, var(--el-water) 10%, transparent);
+  --el-wood: oklch(0.52 0.095 165.0);
+  --el-wood-ink: oklch(0.42 0.085 165.0);
+  --el-wood-soft: color-mix(in oklch, var(--el-wood) 10%, transparent);
+}
+
+.dark {
+  --el-fire: oklch(0.70 0.19 32.0);
+  --el-fire-ink: oklch(0.76 0.17 34.0);
+  --el-fire-soft: color-mix(in oklch, var(--el-fire) 16%, transparent);
+  --el-earth: oklch(0.74 0.10 65.0);
+  --el-earth-ink: oklch(0.80 0.09 68.0);
+  --el-earth-soft: color-mix(in oklch, var(--el-earth) 18%, transparent);
+  --el-metal: oklch(0.80 0.125 88.0);
+  --el-metal-ink: oklch(0.85 0.11 90.0);
+  --el-metal-soft: color-mix(in oklch, var(--el-metal) 20%, transparent);
+  --el-water: oklch(0.72 0.085 235.0);
+  --el-water-ink: oklch(0.78 0.075 235.0);
+  --el-water-soft: color-mix(in oklch, var(--el-water) 16%, transparent);
+  --el-wood: oklch(0.72 0.10 165.0);
+  --el-wood-ink: oklch(0.78 0.09 165.0);
+  --el-wood-soft: color-mix(in oklch, var(--el-wood) 16%, transparent);
+}
+
+/* ═══ 亮色变体 ═══ */
+
+/* 月白青花 — 水德瓷境：月白冷宣 + 青花蓝 */
+:root:not(.dark)[data-brand-theme="qinghua"] {
+  --background: oklch(0.978 0.008 235.0);
+  --foreground: oklch(0.25 0.03 250.0);
+  --card: oklch(0.995 0.004 235.0);
+  --card-foreground: oklch(0.25 0.03 250.0);
+  --popover: oklch(0.995 0.004 235.0);
+  --popover-foreground: oklch(0.25 0.03 250.0);
+  --primary: oklch(0.52 0.12 240.0);
+  --primary-foreground: oklch(0.985 0.006 235.0);
+  --secondary: oklch(0.945 0.015 232.0);
+  --secondary-foreground: oklch(0.32 0.06 245.0);
+  --muted: oklch(0.955 0.012 235.0);
+  --muted-foreground: oklch(0.50 0.03 250.0);
+  --accent: oklch(0.935 0.022 235.0);
+  --accent-foreground: oklch(0.32 0.06 245.0);
+  --border: oklch(0.915 0.015 235.0);
+  --input: oklch(0.915 0.015 235.0);
+  --ring: oklch(0.52 0.12 240.0);
+  --sidebar: oklch(0.975 0.01 235.0);
+  --sidebar-foreground: oklch(0.25 0.03 250.0);
+  --sidebar-primary: oklch(0.52 0.12 240.0);
+  --sidebar-primary-foreground: oklch(0.985 0.006 235.0);
+  --sidebar-accent: oklch(0.935 0.022 235.0);
+  --sidebar-accent-foreground: oklch(0.32 0.06 245.0);
+  --sidebar-border: oklch(0.915 0.015 235.0);
+  --sidebar-ring: oklch(0.52 0.12 240.0);
+  --elevation-soft: 0 1px 2px oklch(0.25 0.03 245 / 0.05);
+  --elevation-card:
+    0 1px 2px oklch(0.25 0.03 245 / 0.04),
+    0 4px 14px -4px oklch(0.25 0.03 245 / 0.06);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.25 0.03 245 / 0.06),
+    0 16px 40px -8px oklch(0.25 0.03 245 / 0.12);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.565 0.125 243.0) 0%, oklch(0.475 0.115 237.0) 100%);
+}
+
+/* 素宣点朱 — 墨 · 文人纸境：素宣 + 朱砂唯一主色 */
+:root:not(.dark)[data-brand-theme="suxuan"] {
+  --background: oklch(0.975 0.004 90.0);
+  --foreground: oklch(0.21 0.015 80.0);
+  --card: oklch(0.992 0.003 90.0);
+  --card-foreground: oklch(0.21 0.015 80.0);
+  --popover: oklch(0.992 0.003 90.0);
+  --popover-foreground: oklch(0.21 0.015 80.0);
+  --primary: oklch(0.575 0.205 28.0);
+  --primary-foreground: oklch(0.985 0.008 76.0);
+  --secondary: oklch(0.94 0.008 90.0);
+  --secondary-foreground: oklch(0.30 0.03 82.0);
+  --muted: oklch(0.952 0.006 90.0);
+  --muted-foreground: oklch(0.50 0.015 80.0);
+  --accent: oklch(0.93 0.014 90.0);
+  --accent-foreground: oklch(0.30 0.03 82.0);
+  --border: oklch(0.91 0.007 90.0);
+  --input: oklch(0.91 0.007 90.0);
+  --ring: oklch(0.575 0.205 28.0);
+  --sidebar: oklch(0.972 0.006 90.0);
+  --sidebar-foreground: oklch(0.21 0.015 80.0);
+  --sidebar-primary: oklch(0.575 0.205 28.0);
+  --sidebar-primary-foreground: oklch(0.985 0.008 76.0);
+  --sidebar-accent: oklch(0.93 0.014 90.0);
+  --sidebar-accent-foreground: oklch(0.30 0.03 82.0);
+  --sidebar-border: oklch(0.91 0.007 90.0);
+  --sidebar-ring: oklch(0.575 0.205 28.0);
+  --elevation-soft: 0 1px 2px oklch(0.21 0.015 80 / 0.05);
+  --elevation-card:
+    0 1px 2px oklch(0.21 0.015 80 / 0.04),
+    0 4px 14px -4px oklch(0.21 0.015 80 / 0.06);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.21 0.015 80 / 0.06),
+    0 16px 40px -8px oklch(0.21 0.015 80 / 0.11);
+}
+
+/* 松花竹青 — 木德新雨：松花淡青 + 石绿 */
+:root:not(.dark)[data-brand-theme="zhuqing"] {
+  --background: oklch(0.972 0.018 150.0);
+  --foreground: oklch(0.25 0.035 165.0);
+  --card: oklch(0.99 0.006 150.0);
+  --card-foreground: oklch(0.25 0.035 165.0);
+  --popover: oklch(0.99 0.006 150.0);
+  --popover-foreground: oklch(0.25 0.035 165.0);
+  --primary: oklch(0.50 0.10 165.0);
+  --primary-foreground: oklch(0.985 0.008 150.0);
+  --secondary: oklch(0.94 0.022 152.0);
+  --secondary-foreground: oklch(0.32 0.06 160.0);
+  --muted: oklch(0.95 0.02 152.0);
+  --muted-foreground: oklch(0.50 0.035 165.0);
+  --accent: oklch(0.928 0.028 152.0);
+  --accent-foreground: oklch(0.32 0.06 160.0);
+  --border: oklch(0.905 0.022 152.0);
+  --input: oklch(0.905 0.022 152.0);
+  --ring: oklch(0.50 0.10 165.0);
+  --sidebar: oklch(0.968 0.014 150.0);
+  --sidebar-foreground: oklch(0.25 0.035 165.0);
+  --sidebar-primary: oklch(0.50 0.10 165.0);
+  --sidebar-primary-foreground: oklch(0.985 0.008 150.0);
+  --sidebar-accent: oklch(0.928 0.028 152.0);
+  --sidebar-accent-foreground: oklch(0.32 0.06 160.0);
+  --sidebar-border: oklch(0.905 0.022 152.0);
+  --sidebar-ring: oklch(0.50 0.10 165.0);
+  --elevation-soft: 0 1px 2px oklch(0.25 0.035 160 / 0.05);
+  --elevation-card:
+    0 1px 2px oklch(0.25 0.035 160 / 0.04),
+    0 4px 14px -4px oklch(0.25 0.035 160 / 0.06);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.25 0.035 160 / 0.06),
+    0 16px 40px -8px oklch(0.25 0.035 160 / 0.12);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.545 0.105 168.0) 0%, oklch(0.455 0.095 162.0) 100%);
+}
+
+/* ═══ 暗色变体 ═══ */
+
+/* 玄水涵朱 — 水火既济：靛蓝玄夜 + 朱砂照夜 */
+.dark[data-brand-theme="xuanshui"] {
+  --background: oklch(0.155 0.022 255.0);
+  --foreground: oklch(0.955 0.01 250.0);
+  --card: oklch(0.19 0.026 255.0);
+  --card-foreground: oklch(0.955 0.01 250.0);
+  --popover: oklch(0.19 0.026 255.0);
+  --popover-foreground: oklch(0.955 0.01 250.0);
+  --primary: oklch(0.575 0.20 29.0);
+  --primary-foreground: oklch(0.97 0.008 80.0);
+  --secondary: oklch(0.235 0.028 255.0);
+  --secondary-foreground: oklch(0.955 0.01 250.0);
+  --muted: oklch(0.23 0.028 255.0);
+  --muted-foreground: oklch(0.71 0.02 250.0);
+  --accent: oklch(0.245 0.03 255.0);
+  --accent-foreground: oklch(0.955 0.01 250.0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.575 0.20 29.0);
+  --sidebar: oklch(0.175 0.024 255.0);
+  --sidebar-foreground: oklch(0.955 0.01 250.0);
+  --sidebar-primary: oklch(0.575 0.20 29.0);
+  --sidebar-primary-foreground: oklch(0.97 0.008 80.0);
+  --sidebar-accent: oklch(0.23 0.028 255.0);
+  --sidebar-accent-foreground: oklch(0.955 0.01 250.0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.575 0.20 29.0);
+  --elevation-soft: 0 1px 2px oklch(0.06 0.02 255 / 0.4);
+  --elevation-card:
+    0 1px 2px oklch(0.06 0.02 255 / 0.35),
+    0 4px 14px -4px oklch(0.06 0.02 255 / 0.45);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.06 0.02 255 / 0.45),
+    0 16px 40px -8px oklch(0.05 0.018 255 / 0.6);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.62 0.19 32.0) 0%, oklch(0.52 0.185 27.0) 100%);
+}
+
+/* 松烟入墨 — 文人水墨：松烟墨 + 一点朱 */
+.dark[data-brand-theme="songmo"] {
+  --background: oklch(0.165 0.008 90.0);
+  --foreground: oklch(0.955 0.01 85.0);
+  --card: oklch(0.20 0.009 90.0);
+  --card-foreground: oklch(0.955 0.01 85.0);
+  --popover: oklch(0.20 0.009 90.0);
+  --popover-foreground: oklch(0.955 0.01 85.0);
+  --primary: oklch(0.575 0.205 28.0);
+  --primary-foreground: oklch(0.97 0.008 80.0);
+  --secondary: oklch(0.245 0.01 90.0);
+  --secondary-foreground: oklch(0.955 0.01 85.0);
+  --muted: oklch(0.24 0.01 90.0);
+  --muted-foreground: oklch(0.70 0.015 85.0);
+  --accent: oklch(0.25 0.012 90.0);
+  --accent-foreground: oklch(0.955 0.01 85.0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.575 0.205 28.0);
+  --sidebar: oklch(0.185 0.009 90.0);
+  --sidebar-foreground: oklch(0.955 0.01 85.0);
+  --sidebar-primary: oklch(0.575 0.205 28.0);
+  --sidebar-primary-foreground: oklch(0.97 0.008 80.0);
+  --sidebar-accent: oklch(0.24 0.01 90.0);
+  --sidebar-accent-foreground: oklch(0.955 0.01 85.0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.575 0.205 28.0);
+  --elevation-soft: 0 1px 2px oklch(0.05 0.005 90 / 0.4);
+  --elevation-card:
+    0 1px 2px oklch(0.05 0.005 90 / 0.35),
+    0 4px 14px -4px oklch(0.05 0.005 90 / 0.45);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.05 0.005 90 / 0.45),
+    0 16px 40px -8px oklch(0.04 0.005 90 / 0.6);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.66 0.195 30.0) 0%, oklch(0.55 0.185 26.0) 100%);
+}
+
+/* 苍黛描金 — 金碧山水：石青黛蓝 + 鎏金 */
+.dark[data-brand-theme="cangdai"] {
+  --background: oklch(0.17 0.028 195.0);
+  --foreground: oklch(0.955 0.012 200.0);
+  --card: oklch(0.205 0.03 195.0);
+  --card-foreground: oklch(0.955 0.012 200.0);
+  --popover: oklch(0.205 0.03 195.0);
+  --popover-foreground: oklch(0.955 0.012 200.0);
+  --primary: oklch(0.74 0.14 75.0);
+  --primary-foreground: oklch(0.15 0.02 195.0);
+  --secondary: oklch(0.25 0.032 195.0);
+  --secondary-foreground: oklch(0.955 0.012 200.0);
+  --muted: oklch(0.245 0.032 195.0);
+  --muted-foreground: oklch(0.71 0.03 200.0);
+  --accent: oklch(0.255 0.034 195.0);
+  --accent-foreground: oklch(0.955 0.012 200.0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.74 0.14 75.0);
+  --sidebar: oklch(0.185 0.028 195.0);
+  --sidebar-foreground: oklch(0.955 0.012 200.0);
+  --sidebar-primary: oklch(0.74 0.14 75.0);
+  --sidebar-primary-foreground: oklch(0.15 0.02 195.0);
+  --sidebar-accent: oklch(0.245 0.032 195.0);
+  --sidebar-accent-foreground: oklch(0.955 0.012 200.0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.74 0.14 75.0);
+  --elevation-soft: 0 1px 2px oklch(0.05 0.015 195 / 0.4);
+  --elevation-card:
+    0 1px 2px oklch(0.05 0.015 195 / 0.35),
+    0 4px 14px -4px oklch(0.05 0.015 195 / 0.45);
+  --elevation-float:
+    0 2px 6px -1px oklch(0.05 0.015 195 / 0.45),
+    0 16px 40px -8px oklch(0.04 0.015 195 / 0.6);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.78 0.135 77.0) 0%, oklch(0.70 0.145 72.0) 100%);
+}

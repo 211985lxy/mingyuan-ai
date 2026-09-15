@@ -54,6 +54,22 @@
   /* 品牌渐变（规范 四.1）：朱砂赤主按钮 / 厚土金辅按钮 */
   --gradient-primary: var(--brand-gradient-primary);
   --gradient-gold: var(--brand-gradient-gold);
+  /* 五行全谱（brand-themes.css）：语义归五行——成于木、告于水、警于金、危于火 */
+  --color-el-fire: var(--el-fire);
+  --color-el-fire-ink: var(--el-fire-ink);
+  --color-el-fire-soft: var(--el-fire-soft);
+  --color-el-earth: var(--el-earth);
+  --color-el-earth-ink: var(--el-earth-ink);
+  --color-el-earth-soft: var(--el-earth-soft);
+  --color-el-metal: var(--el-metal);
+  --color-el-metal-ink: var(--el-metal-ink);
+  --color-el-metal-soft: var(--el-metal-soft);
+  --color-el-water: var(--el-water);
+  --color-el-water-ink: var(--el-water-ink);
+  --color-el-water-soft: var(--el-water-soft);
+  --color-el-wood: var(--el-wood);
+  --color-el-wood-ink: var(--el-wood-ink);
+  --color-el-wood-soft: var(--el-wood-soft);
 }
 
 :root {
