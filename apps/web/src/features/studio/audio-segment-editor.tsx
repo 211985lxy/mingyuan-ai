@@ -6,7 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { SegmentStatus } from "@/lib/voice/segment-audio"
+
+/** Select 不接受 null 值，用哨兵表示「沿用全局音色」 */
+const DEF_DEFAULT_VOICE = "__default__"
 
 /**
  * 分段编辑：逐段试听与单独重生成。
@@ -21,6 +31,10 @@ export function AudioSegmentEditor({
   busy,
   onRegenerate,
   onTextChange,
+  segmentVoices,
+  voices,
+  defaultVoiceTitle,
+  onVoiceChange,
 }: {
   segments: string[]
   statuses: SegmentStatus[]
@@ -28,6 +42,10 @@ export function AudioSegmentEditor({
   busy: boolean
   onRegenerate: (index: number) => void
   onTextChange: (index: number, text: string) => void
+  segmentVoices: (string | null)[]
+  voices: Array<{ id: string; title: string }>
+  defaultVoiceTitle: string
+  onVoiceChange: (index: number, voiceId: string | null) => void
 }) {
   if (segments.length <= 1) return null
 
@@ -55,11 +73,33 @@ export function AudioSegmentEditor({
             busy={busy}
             onRegenerate={() => onRegenerate(index)}
             onTextChange={(next) => onTextChange(index, next)}
+            voiceId={segmentVoices[index] ?? null}
+            voices={voices}
+            voiceTitle={
+              segmentVoices[index]
+                ? voices.find((voice) => voice.id === segmentVoices[index])?.title ?? "指定音色"
+                : defaultVoiceTitle
+            }
+            onVoiceChange={(voiceId) => onVoiceChange(index, voiceId)}
           />
         ))}
       </div>
     </section>
   )
+}
+
+type SegmentRowProps = {
+  index: number
+  text: string
+  status: SegmentStatus
+  url: string | null
+  busy: boolean
+  onRegenerate: () => void
+  onTextChange: (next: string) => void
+  voiceId: string | null
+  voices: Array<{ id: string; title: string }>
+  voiceTitle: string
+  onVoiceChange: (voiceId: string | null) => void
 }
 
 function SegmentRow({
@@ -70,15 +110,11 @@ function SegmentRow({
   busy,
   onRegenerate,
   onTextChange,
-}: {
-  index: number
-  text: string
-  status: SegmentStatus
-  url: string | null
-  busy: boolean
-  onRegenerate: () => void
-  onTextChange: (next: string) => void
-}) {
+  voiceId,
+  voices,
+  voiceTitle,
+  onVoiceChange,
+}: SegmentRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(text)
   // 文字改动后该段音频已过期，需要重生成才生效
@@ -118,26 +154,20 @@ function SegmentRow({
           <SegmentStatusBadge status={status} />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pl-7">
-          {url ? (
-            <audio controls src={url} className="h-8 max-w-[260px] flex-1" preload="metadata">
-              <track kind="captions" />
-            </audio>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              {status === "loading" ? "合成中…" : status === "error" ? "该段未生成" : "待生成"}
-            </span>
-          )}
-          <SegmentActions
-            editing={editing}
-            stale={stale}
-            status={status}
-            busy={busy}
-            onCommit={commit}
-            onCancel={cancel}
-            onRegenerate={onRegenerate}
-          />
-        </div>
+        <SegmentControlRow
+          url={url}
+          status={status}
+          editing={editing}
+          stale={stale}
+          busy={busy}
+          voiceId={voiceId}
+          voices={voices}
+          voiceTitle={voiceTitle}
+          onVoiceChange={onVoiceChange}
+          onCommit={commit}
+          onCancel={cancel}
+          onRegenerate={onRegenerate}
+        />
       </CardContent>
     </Card>
   )
@@ -187,6 +217,101 @@ function SegmentTextBlock({
     >
       {text}
     </button>
+  )
+}
+
+/** 段控制行：试听播放器 + 音色 + 操作按钮。 */
+function SegmentControlRow({
+  url,
+  status,
+  editing,
+  stale,
+  busy,
+  voiceId,
+  voices,
+  voiceTitle,
+  onVoiceChange,
+  onCommit,
+  onCancel,
+  onRegenerate,
+}: {
+  url: string | null
+  status: SegmentStatus
+  editing: boolean
+  stale: boolean
+  busy: boolean
+  voiceId: string | null
+  voices: Array<{ id: string; title: string }>
+  voiceTitle: string
+  onVoiceChange: (voiceId: string | null) => void
+  onCommit: () => void
+  onCancel: () => void
+  onRegenerate: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pl-7">
+      {url ? (
+        <audio controls src={url} className="h-8 max-w-[260px] flex-1" preload="metadata">
+          <track kind="captions" />
+        </audio>
+      ) : (
+        <span className="text-xs text-muted-foreground">
+          {status === "loading" ? "合成中…" : status === "error" ? "该段未生成" : "待生成"}
+        </span>
+      )}
+      <SegmentVoicePicker
+        voiceId={voiceId}
+        voices={voices}
+        voiceTitle={voiceTitle}
+        onVoiceChange={onVoiceChange}
+      />
+      <SegmentActions
+        editing={editing}
+        stale={stale}
+        status={status}
+        busy={busy}
+        onCommit={onCommit}
+        onCancel={onCancel}
+        onRegenerate={onRegenerate}
+      />
+    </div>
+  )
+}
+
+/** 段音色：默认沿用全局音色，需要混排时单独切换（多音色不干扰主流程）。 */
+function SegmentVoicePicker({
+  voiceId,
+  voices,
+  voiceTitle,
+  onVoiceChange,
+}: {
+  voiceId: string | null
+  voices: Array<{ id: string; title: string }>
+  voiceTitle: string
+  onVoiceChange: (voiceId: string | null) => void
+}) {
+  // 只有可切换的音色不止「默认」一个时才值得露出
+  if (voices.length === 0) return null
+  return (
+    <Select
+      value={voiceId ?? DEF_DEFAULT_VOICE}
+      onValueChange={(value) => onVoiceChange(value === DEF_DEFAULT_VOICE ? null : value)}
+    >
+      <SelectTrigger
+        className="h-7 w-auto gap-1 px-2 text-xs text-muted-foreground"
+        aria-label="该段音色"
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={DEF_DEFAULT_VOICE}>{`${voiceTitle}（默认）`}</SelectItem>
+        {voices.map((voice) => (
+          <SelectItem key={voice.id} value={voice.id}>
+            {voice.title}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

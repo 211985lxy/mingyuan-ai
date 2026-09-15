@@ -19,6 +19,8 @@ export interface SegmentAudioController {
   statuses: SegmentStatus[]
   /** 每段的试听地址（objectURL），未生成为 null */
   segmentUrls: (string | null)[]
+  /** 每段的音色覆盖；null 表示沿用全局音色 */
+  segmentVoices: (string | null)[]
   /** 全部段落拼接后的整体地址；有段缺失时为 null */
   combinedUrl: string | null
   busy: boolean
@@ -27,6 +29,8 @@ export interface SegmentAudioController {
   regenerateSegment: (index: number) => Promise<void>
   /** 就地改某段文字（改完可只重生成该段，不必回上一步重新分段全跑） */
   updateSegmentText: (index: number, text: string) => void
+  /** 单独指定某段音色（多音色混排：如旁白与角色用不同声音） */
+  updateSegmentVoice: (index: number, voiceId: string | null) => void
 }
 
 /** 合成单段；库返回的临时地址用完即释放，只保留自有 blob。 */
@@ -117,13 +121,35 @@ function useSegmentBlobStore() {
  * 长文的常见返工是「某一段念错」，整篇重跑既费时又费额度；
  * 这里把粒度降到段，重生成只跑该段。blob 存在 ref 中避免大对象进 state。
  */
-export function useSegmentAudio(): SegmentAudioController {
+/** 段落属性（文字与音色覆盖）：与音频状态分开，避免主 hook 过长。 */
+function useSegmentMeta() {
   const [segments, setSegments] = useState<string[]>([])
+  const [segmentVoices, setSegmentVoices] = useState<(string | null)[]>([])
+
+  const reset = useCallback((list: string[]) => {
+    setSegments(list)
+    setSegmentVoices(list.map(() => null))
+  }, [])
+
+  const updateText = useCallback((index: number, text: string) => {
+    setSegments((current) => current.map((value, i) => (i === index ? text : value)))
+  }, [])
+
+  const updateVoice = useCallback((index: number, voiceId: string | null) => {
+    setSegmentVoices((current) => current.map((value, i) => (i === index ? voiceId : value)))
+  }, [])
+
+  return { segments, segmentVoices, reset, updateText, updateVoice }
+}
+
+export function useSegmentAudio(): SegmentAudioController {
   const [statuses, setStatuses] = useState<SegmentStatus[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<SegmentAudioInput | null>(null)
   const store = useSegmentBlobStore()
+  const meta = useSegmentMeta()
+  const { segments, segmentVoices } = meta
 
   const mark = useCallback((index: number, status: SegmentStatus) => {
     setStatuses((current) => current.map((value, i) => (i === index ? status : value)))
@@ -134,7 +160,7 @@ export function useSegmentAudio(): SegmentAudioController {
     if (list.length === 0) return
     store.reset()
     inputRef.current = input
-    setSegments(list)
+    meta.reset(list)
     setStatuses(list.map(() => "loading"))
     setBusy(true)
     setError(null)
@@ -156,7 +182,7 @@ export function useSegmentAudio(): SegmentAudioController {
       return
     }
     await saveHistory(input, list.length, store.blobsRef.current)
-  }, [mark, store])
+  }, [mark, meta, store])
 
   const regenerateSegment = useCallback(async (index: number) => {
     const input = inputRef.current
@@ -166,7 +192,9 @@ export function useSegmentAudio(): SegmentAudioController {
     setBusy(true)
     setError(null)
     try {
-      store.patch(index, await synthesizeOne(text, input))
+      // 该段若有单独音色则用之，否则沿用全局
+      const voiceOverride = segmentVoices[index] ?? null
+      store.patch(index, await synthesizeOne(text, { ...input, voiceId: voiceOverride ?? input.voiceId }))
       mark(index, "ready")
       store.recombine()
     } catch (caught) {
@@ -175,14 +203,11 @@ export function useSegmentAudio(): SegmentAudioController {
     } finally {
       setBusy(false)
     }
-  }, [mark, segments, store])
-
-  const updateSegmentText = useCallback((index: number, text: string) => {
-    setSegments((current) => current.map((value, i) => (i === index ? text : value)))
-  }, [])
+  }, [mark, segmentVoices, segments, store])
 
   return {
     segments,
+    segmentVoices,
     statuses,
     segmentUrls: store.segmentUrls,
     combinedUrl: store.combinedUrl,
@@ -190,6 +215,7 @@ export function useSegmentAudio(): SegmentAudioController {
     error,
     generateAll,
     regenerateSegment,
-    updateSegmentText,
+    updateSegmentText: meta.updateText,
+    updateSegmentVoice: meta.updateVoice,
   }
 }

@@ -104,6 +104,9 @@ export function AudioWorkbench() {
     segmentUrls: segmentAudio.segmentUrls,
     onRegenerateSegment: (index: number) => void segmentAudio.regenerateSegment(index),
     onSegmentTextChange: segmentAudio.updateSegmentText,
+    segmentVoices: segmentAudio.segmentVoices,
+    availableVoices: models?.voices ?? [],
+    onSegmentVoiceChange: segmentAudio.updateSegmentVoice,
     charCount,
   }
   return <AudioWorkbenchView {...view} />
@@ -139,7 +142,42 @@ interface AudioWorkbenchViewProps {
   segmentUrls: (string | null)[]
   onRegenerateSegment: (index: number) => void
   onSegmentTextChange: (index: number, text: string) => void
+  segmentVoices: (string | null)[]
+  availableVoices: Array<{ id: string; title: string }>
+  onSegmentVoiceChange: (index: number, voiceId: string | null) => void
   charCount: number | null
+}
+
+/** Step 3：成品（或失败提示）+ 分段编辑。 */
+function AudioResultSection({ props }: { props: AudioWorkbenchViewProps }) {
+  return (
+    <>
+      {props.combinedUrl ? (
+        <AudioResultStep
+          playerUrl={props.combinedUrl}
+          charCount={props.charCount}
+          script={props.text}
+          onReedit={() => props.setStep(2)}
+        />
+      ) : (
+        <p className="text-sm text-destructive" role="alert">
+          有段落未生成成功，无法产出完整音频。请在下方逐段重试。
+        </p>
+      )}
+      <AudioSegmentEditor
+        segments={props.segments}
+        statuses={props.statuses}
+        segmentUrls={props.segmentUrls}
+        busy={props.busy}
+        onRegenerate={props.onRegenerateSegment}
+        onTextChange={props.onSegmentTextChange}
+        segmentVoices={props.segmentVoices}
+        voices={props.availableVoices}
+        defaultVoiceTitle={props.voiceTitle}
+        onVoiceChange={props.onSegmentVoiceChange}
+      />
+    </>
+  )
 }
 
 function AudioWorkbenchSkeleton() {
@@ -196,30 +234,7 @@ function AudioWorkbenchView(props: AudioWorkbenchViewProps) {
         />
       ) : null}
 
-      {props.step === 3 ? (
-        <>
-          {props.combinedUrl ? (
-            <AudioResultStep
-              playerUrl={props.combinedUrl}
-              charCount={props.charCount}
-              script={props.text}
-              onReedit={() => props.setStep(2)}
-            />
-          ) : (
-            <p className="text-sm text-destructive" role="alert">
-              有段落未生成成功，无法产出完整音频。请在下方逐段重试。
-            </p>
-          )}
-          <AudioSegmentEditor
-            segments={props.segments}
-            statuses={props.statuses}
-            segmentUrls={props.segmentUrls}
-            busy={props.busy}
-            onRegenerate={props.onRegenerateSegment}
-            onTextChange={props.onSegmentTextChange}
-          />
-        </>
-      ) : null}
+      {props.step === 3 ? <AudioResultSection props={props} /> : null}
 
       {props.step === 2 ? (
         <p className="text-center text-xs text-muted-foreground">

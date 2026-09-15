@@ -18,6 +18,10 @@ function renderEditor(overrides: Partial<Parameters<typeof AudioSegmentEditor>[0
       busy={false}
       onRegenerate={onRegenerate}
       onTextChange={vi.fn()}
+      segmentVoices={[null, null, null]}
+      voices={[]}
+      defaultVoiceTitle="默认音色"
+      onVoiceChange={vi.fn()}
       {...overrides}
     />,
   )
@@ -34,6 +38,10 @@ describe("AudioSegmentEditor", () => {
         busy={false}
         onRegenerate={vi.fn()}
         onTextChange={vi.fn()}
+        segmentVoices={[null]}
+        voices={[]}
+        defaultVoiceTitle="默认音色"
+        onVoiceChange={vi.fn()}
       />,
     )
     expect(screen.queryByText(/分段试听/)).toBeNull()
@@ -73,6 +81,41 @@ describe("AudioSegmentEditor", () => {
     for (const button of screen.getAllByRole("button", { name: /重生成该段|重试该段/ })) {
       expect((button as HTMLButtonElement).disabled).toBe(true)
     }
+  })
+
+  it("有可切换音色时露出音色选择，默认项标注（默认）", async () => {
+    const user = userEvent.setup()
+    renderEditor({
+      voices: [
+        { id: "v1", title: "沉稳男声" },
+        { id: "v2", title: "活泼女声" },
+      ],
+    })
+
+    await user.click(screen.getAllByRole("combobox", { name: "该段音色" })[0])
+
+    expect(await screen.findByText("默认音色（默认）")).toBeTruthy()
+    expect(screen.getByText("沉稳男声")).toBeTruthy()
+    expect(screen.getByText("活泼女声")).toBeTruthy()
+  })
+
+  it("无可切换音色时不渲染音色选择（不干扰主流程）", () => {
+    renderEditor({ voices: [] })
+    expect(screen.queryByRole("combobox", { name: "该段音色" })).toBeNull()
+  })
+
+  it("切换某段音色时回调该段下标", async () => {
+    const user = userEvent.setup()
+    const onVoiceChange = vi.fn()
+    renderEditor({
+      voices: [{ id: "v1", title: "沉稳男声" }],
+      onVoiceChange,
+    })
+
+    await user.click(screen.getAllByRole("combobox", { name: "该段音色" })[1])
+    await user.click(await screen.findByText("沉稳男声"))
+
+    expect(onVoiceChange).toHaveBeenCalledWith(1, "v1")
   })
 
   it("点击段文字进入编辑态，保存后回调新文字", async () => {
