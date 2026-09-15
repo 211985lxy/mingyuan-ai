@@ -71,6 +71,8 @@ export async function resolveUnderstandingWithDegradation(input: {
   envelope: Parameters<typeof understandAimContentTurnWithTrace>[0]["envelope"]
   agentId: string
   trace?: AimTraceRecorder
+  /** 绑定项目已确认档案页的兜底：让理解模型不再就这些字段追问 */
+  profileSeed?: IpProfileSeed
 }) {
   try {
     return await understandAimContentTurnWithTrace(input)

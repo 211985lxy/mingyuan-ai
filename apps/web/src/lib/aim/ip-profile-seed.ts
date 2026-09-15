@@ -1,3 +1,4 @@
+import { detectGoal, type AimContentGoal } from "@/lib/aim/content-goal"
 import { parseProfileFromPages } from "@/lib/aim/ip-profile-form"
 import { listIpWikiPages } from "@/lib/ip-wiki/repo"
 import type { IpWikiPageType } from "@/lib/ip-wiki/types"
@@ -29,8 +30,10 @@ const AUDIENCE_MAX_CHARS = 80
 export interface IpProfileSeed {
   /** 「我服务谁」原文，已取首句并限长（最长 AUDIENCE_MAX_CHARS） */
   audience?: string
-  /** 档案里可能写着内容目标的原文，按优先级排列；由意图层判定成目标枚举 */
-  goalCandidates?: string[]
+  /** 档案里搜到的内容目标，已判定成枚举；档案没说目标时为空 */
+  goal?: AimContentGoal
+  /** 命中目标词的那段原文，供 trace 与排查溯源 */
+  goalText?: string
 }
 
 export interface IpProfileSeedPage {
@@ -65,16 +68,31 @@ export function profileSeedFromPages(pages: readonly IpProfileSeedPage[]): IpPro
   const form = parseProfileFromPages([...newest.values()])
 
   const audience = form.audience ? firstSentence(form.audience) : undefined
-
-  const goalCandidates = [
-    form.goal ?? "",
-    ...GOAL_CANDIDATE_PAGE_TYPES.map((pageType) => newest.get(pageType)?.content ?? ""),
-  ].map((text) => text.trim()).filter(Boolean)
+  const goalText = findGoalText(form, newest)
 
   return {
     ...(audience ? { audience } : {}),
-    ...(goalCandidates.length ? { goalCandidates } : {}),
+    ...(goalText ? { goal: detectGoal(goalText), goalText } : {}),
   }
+}
+
+/**
+ * 搜目标原文：表单填的「## 内容目标」小节优先，其次按页型顺序扫整页。
+ * 编译档案没有目标栏，只能靠页内目标词命中；命中即止，避免多页拼出互相矛盾的目标。
+ */
+function findGoalText(
+  form: ReturnType<typeof parseProfileFromPages>,
+  newest: Map<IpWikiPageType, IpProfileSeedPage>,
+): string | undefined {
+  const candidates = [
+    form.goal ?? "",
+    ...GOAL_CANDIDATE_PAGE_TYPES.map((pageType) => newest.get(pageType)?.content ?? ""),
+  ]
+  for (const candidate of candidates) {
+    const text = candidate.trim()
+    if (text && detectGoal(text)) return text
+  }
+  return undefined
 }
 
 /**

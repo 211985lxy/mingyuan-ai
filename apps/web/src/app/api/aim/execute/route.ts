@@ -79,14 +79,15 @@ export async function POST(request: NextRequest) {
         action: "generate",
         inputSummary: scopedParsed.sourceEnvelope.currentUserRequest,
       })
+      // 档案兜底要在理解之前取：理解与门禁都需要它，避免就已确认的受众/目标重复追问
+      const profileSeed = await loadIpProfileSeed({ projectId: boundProject.id })
       const understanding = await resolveUnderstandingWithDegradation({
         envelope: scopedParsed.sourceEnvelope,
         agentId,
         trace,
+        profileSeed,
       })
 
-      // 档案兜底必须在门禁前取：项目档案里已确认的受众/目标不必再被追问
-      const profileSeed = await loadIpProfileSeed({ projectId: boundProject.id })
       const gate = await resolveAndTraceTurnGate({
         scopedParsed,
         understanding,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { resolveExecuteTurnGate } from "@/lib/aim/execute-turn-intent-gate"
 import { profileSeedFromPages, type IpProfileSeedPage } from "@/lib/aim/ip-profile-seed"
+import { buildUnderstandingUserPrompt } from "@/lib/aim/semantic-task-understanding"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
 
 /**
@@ -53,16 +54,28 @@ describe("档案兜底：从档案页裁出受众与目标候选", () => {
     expect(seed.audience).toBe("核心客户：30-45 岁做高客单专业服务的小老板；行业只作案例背景")
   })
 
-  it("编译形态：目标候选按「定位主张 > 内容策略底盘」排序", () => {
+  it("编译形态：目标在定位主张里命中获客，并留下原文供溯源", () => {
     const seed = profileSeedFromPages(COMPILED_PAGES)
-    expect(seed.goalCandidates?.[0]).toContain("可持续获客的经营系统")
-    expect(seed.goalCandidates?.[1]).toContain("内容漏斗建议")
+    expect(seed.goal).toBe("lead")
+    expect(seed.goalText).toContain("可持续获客的经营系统")
   })
 
-  it("表单形态：内容目标小节排在候选首位，受众取小节原文", () => {
+  it("定位主张没提目标时，退到内容策略底盘", () => {
+    const seed = profileSeedFromPages([COMPILED_AUDIENCE, COMPILED_STRATEGY])
+    expect(seed.goal).toBe("convert")
+  })
+
+  it("表单形态：内容目标小节优先于整页扫描", () => {
     const seed = profileSeedFromPages(FORM_PAGES)
-    expect(seed.goalCandidates?.[0]).toBe("到店 + 建立懂行老板的人设")
+    expect(seed.goal).toBe("trust")
+    expect(seed.goalText).toBe("到店 + 建立懂行老板的人设")
     expect(seed.audience).toBe("20-40 岁情侣聚餐、家庭聚餐，想找味道正宗、价格不虚高的火锅店")
+  })
+
+  it("档案里没有任何目标词时不给目标，追问照旧保留", () => {
+    const seed = profileSeedFromPages([{ pageType: "audience", content: "核心客户：刚入行的新人。" }])
+    expect(seed.goal).toBeUndefined()
+    expect(seed.audience).toBe("核心客户：刚入行的新人")
   })
 
   it("同一页型有多版时取最新一版", () => {
@@ -123,6 +136,37 @@ describe("档案已声明的字段不再追问", () => {
       profileSeed: seed,
     })
     expect(gate.clarification).toBeNull()
+  })
+})
+
+describe("语义理解也看得到档案（从源头避免重复追问）", () => {
+  it("有档案：提示词带上已确认的受众与目标，并明确不要追问", () => {
+    const prompt = buildUnderstandingUserPrompt({
+      envelope: envelopeOf(NEW_DRAFT_REQUEST),
+      profileSeed: { audience: "核心客户：做高客单专业服务的小老板", goal: "lead" },
+    })
+    expect(prompt).toContain("【项目档案已确认】")
+    expect(prompt).toContain("目标人群：核心客户：做高客单专业服务的小老板")
+    expect(prompt).toContain("内容目标：获客咨询")
+    expect(prompt).toContain("不要为它们生成 clarificationQuestions")
+    // 用户原话仍排在档案之前：原话是唯一真源，档案只是已确认背景
+    expect(prompt.indexOf("【当前用户原话】")).toBeLessThan(prompt.indexOf("【项目档案已确认】"))
+  })
+
+  it("只有受众没目标时，只声明受众", () => {
+    const prompt = buildUnderstandingUserPrompt({
+      envelope: envelopeOf(NEW_DRAFT_REQUEST),
+      profileSeed: { audience: "实体店老板" },
+    })
+    expect(prompt).toContain("目标人群：实体店老板")
+    expect(prompt).not.toContain("内容目标：")
+  })
+
+  it("没有档案兜底时，提示词不含档案块（行为与改动前一致）", () => {
+    expect(buildUnderstandingUserPrompt({ envelope: envelopeOf(NEW_DRAFT_REQUEST) }))
+      .not.toContain("【项目档案已确认】")
+    expect(buildUnderstandingUserPrompt({ envelope: envelopeOf(NEW_DRAFT_REQUEST), profileSeed: {} }))
+      .not.toContain("【项目档案已确认】")
   })
 })
 

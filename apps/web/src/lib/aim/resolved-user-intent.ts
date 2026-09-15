@@ -1,4 +1,5 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import { detectGoal, type AimContentGoal } from "@/lib/aim/content-goal"
 import type { IpProfileSeed } from "@/lib/aim/ip-profile-seed"
 import type { ContentFormat } from "@/lib/api/client"
 import { AIM_BENCHMARK_MATERIAL_PATTERN, extractAimInstructionText } from "@/lib/aim-current-user-input"
@@ -27,7 +28,8 @@ export type AimIntentTaskKind =
   | "opener_optimize"
   | "answer_question"
 
-export type AimContentGoal = "traffic" | "lead" | "convert" | "trust" | "brand"
+/** 目标词汇表已抽到 content-goal：这里按原名再导出，兼容既有引用方 */
+export type { AimContentGoal }
 
 export type IntentConstraintSource = "user_current" | "task_confirmed" | "material_derived" | "project_profile"
 
@@ -92,14 +94,6 @@ function recentUserText(envelope: AimContentSourceEnvelope, turns = 2): string {
 export function isClarificationAnswerTurn(envelope: AimContentSourceEnvelope): boolean {
   const last = lastAssistantTurn(envelope)
   return Boolean(last && CLARIFICATION_LEAD_PATTERN.test(last.content.trim()))
-}
-
-function detectGoal(text: string): AimContentGoal | undefined {
-  if (/(获客|引流|留资|私信|咨询|线索|线索获客|预约)/.test(text)) return "lead"
-  if (/(成交|转化|卖货|下单|购买|招商)/.test(text)) return "convert"
-  if (/(人设|信任|故事|来时路|品牌)/.test(text)) return "trust"
-  if (/(涨粉|流量|曝光|起号|播放)/.test(text)) return "traffic"
-  return undefined
 }
 
 function detectQuantity(text: string): number | undefined {
@@ -225,15 +219,12 @@ export function resolveUserIntentFromEnvelope(
 
   const goalInRequest = detectGoal(request)
   const goalInConfirmed = goalInRequest ?? detectGoal(confirmedForConstraints)
-  // 档案没有专门的目标字段，给的是若干候选原文：逐个判定，命中即用
-  const seedGoalText = goalInRequest || goalInConfirmed
-    ? undefined
-    : (profileSeed?.goalCandidates ?? []).find((text) => detectGoal(text))
-  const goalFromSeed = seedGoalText ? detectGoal(seedGoalText) : undefined
+  // 档案里的目标已由档案层判定成枚举；本轮原话与已确认回答都没给时才用它
+  const goalFromSeed = goalInRequest || goalInConfirmed ? undefined : profileSeed?.goal
   const goal = goalInRequest ?? (allowHistoryConstraints ? goalInConfirmed : undefined) ?? goalFromSeed
   if (goalInRequest) sources.goal = "user_current"
   else if (allowHistoryConstraints && goalInConfirmed) sources.goal = "task_confirmed"
-  else if (seedGoalText) sources.goal = "project_profile"
+  else if (goalFromSeed) sources.goal = "project_profile"
 
   const length = resolveLengthConstraint({ request, confirmedText: confirmedForConstraints, envelope, taskKind })
   if (length.source) sources.length = length.source
