@@ -22,6 +22,7 @@ import {
 } from "@/lib/api/client"
 import {
   findAuthorizationNamePlaceholder,
+  isSelfExplanatoryNamePlaceholder,
   splitAuthorizationTextByPlaceholder,
 } from "@/lib/studio/authorization-text"
 import { CameraRecorder } from "@/features/studio/camera-recorder"
@@ -156,15 +157,11 @@ async function loadRequirements(set: (next: AuthRequirements) => void) {
     const data = await getAuthVideoRequirements()
     set({ status: "ready", provider: data.provider, authorizationText: data.authorizationText })
   } catch (error) {
-    const code = (error as { code?: string })?.code
     const status = (error as { status?: number })?.status
     toast.error(error instanceof Error ? error.message : "授权文案加载失败")
-    let message = "授权文案暂不可用，请联系管理员配置后重试。"
-    if (code === "AUTH_NAME_REQUIRED") {
-      message = "请先在「账号设置」完善真实姓名：授权声明需以本人姓名逐字朗读。"
-    } else if (status === 401 || status === 403) {
-      message = "登录状态已失效或账号未激活，请重新登录后再试。"
-    }
+    const message = status === 401 || status === 403
+      ? "登录状态已失效或账号未激活，请重新登录后再试。"
+      : "授权文案暂不可用，请联系管理员配置后重试。"
     set({ status: "error", message })
   }
 }
@@ -247,10 +244,12 @@ function AuthorizationTextBlock({
     )
   }
   const placeholder = findAuthorizationNamePlaceholder(requirements.authorizationText)
+  // 「（您的姓名）」本身已说明含义，无需再加提示框
+  const needsHint = placeholder !== null && !isSelfExplanatoryNamePlaceholder(placeholder)
   return (
     <div className="rounded-md border bg-muted/40 p-3 text-xs leading-5">
       <p className="mb-1 font-medium">{requirements.provider === "chanjing" ? "蝉镜" : "闪剪"}授权原文（请逐字朗读）</p>
-      {placeholder ? <NamePlaceholderHint placeholder={placeholder} /> : null}
+      {needsHint ? <NamePlaceholderHint placeholder={placeholder} /> : null}
       <AuthorizationTextPreview text={requirements.authorizationText} />
       <label className="mt-3 flex items-start gap-2">
         <Checkbox
@@ -264,7 +263,7 @@ function AuthorizationTextBlock({
   )
 }
 
-/** 姓名占位提示：明确告知「xxx」处要朗读本人真实姓名。 */
+/** 非自解释占位（如「xxx」）才配提示。 */
 function NamePlaceholderHint({ placeholder }: { placeholder: string }) {
   return (
     <p className="mb-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-200">

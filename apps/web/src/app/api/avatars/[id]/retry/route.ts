@@ -85,7 +85,6 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
-      name: true,
       authVideoUrl: true,
       authVideoText: true,
       authVideoConfirmedAt: true,
@@ -93,7 +92,7 @@ export const POST = withUserAuth(async (_request, { user, params }) => {
   })
 
   const authVideoUrl = dbUser?.authVideoUrl
-  const resolvedAuth = resolveAuthorizedAuthText(provider, dbUser?.name ?? null)
+  const resolvedAuth = resolveAuthorizedAuthText(provider)
   if (!resolvedAuth.ok) {
     return NextResponse.json(
       { error: resolvedAuth.message, code: resolvedAuth.code, provider },
