@@ -127,10 +127,10 @@ function NavList({ items, pathname, searchParams, onNavigate }: {
                   render={<Link href={item.href} onClick={onNavigate} />}
                   isActive={active}
                   className={cn(
-                    "h-10 w-full rounded-md px-2.5 text-sm font-normal md:h-9",
+                    "h-10 w-full rounded-md px-2.5 text-sm font-normal transition-colors duration-200 md:h-9",
                     active
-                      ? "bg-foreground/[0.07] font-medium text-foreground"
-                      : "text-foreground/75 hover:bg-foreground/[0.04] hover:text-foreground",
+                      ? "bg-primary/[0.10] font-medium text-primary"
+                      : "text-foreground/75 hover:bg-foreground/[0.05] hover:text-foreground",
                   )}
                 >
                   <item.icon className="h-4 w-4 opacity-70" />
@@ -314,7 +314,7 @@ export function AppSidebar() {
             closeMobile()
             router.push("/aim?agent=content_producer")
           }}
-          className="flex h-8 w-full items-center justify-center gap-1 rounded-lg bg-primary px-2.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          className="btn-brand flex h-8 w-full items-center justify-center gap-1 rounded-lg px-2.5 text-xs font-medium text-primary-foreground"
         >
           <Plus className="h-3.5 w-3.5" />
           新建任务
