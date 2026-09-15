@@ -252,9 +252,6 @@ function AuthorizationTextBlock({
       <p className="mb-1 font-medium">{requirements.provider === "chanjing" ? "蝉镜" : "闪剪"}授权原文（请逐字朗读）</p>
       {placeholder ? <NamePlaceholderHint placeholder={placeholder} /> : null}
       <AuthorizationTextPreview text={requirements.authorizationText} />
-      <p className="mt-2 text-muted-foreground">
-        录制时请把{placeholder ? "姓名清晰朗读为" : "全文（含您的姓名）"}逐字念出，与「账号设置」中登记的真实姓名保持一致。
-      </p>
       <label className="mt-3 flex items-start gap-2">
         <Checkbox
           checked={confirmed}
@@ -271,8 +268,7 @@ function AuthorizationTextBlock({
 function NamePlaceholderHint({ placeholder }: { placeholder: string }) {
   return (
     <p className="mb-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-200">
-      提示：原文中的「{placeholder}」是姓名占位——录制授权视频时，请把它朗读成
-      <strong>您本人的真实姓名</strong>（需与「账号设置」中登记的姓名一致）。
+      提示：原文中的「{placeholder}」是名字占位，录制时念您自己的名字就行。
     </p>
   )
 }
