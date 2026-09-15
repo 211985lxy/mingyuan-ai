@@ -180,10 +180,16 @@ pnpm test:component # 组件套件（jsdom）—— 改组件/导航/表单必�
 | 松烟入墨 | 暗 | 松烟墨 + 一点朱 | `songmo` |
 | 苍黛描金 | 暗 | 石青黛蓝 + 鎏金（金碧山水） | `cangdai` |
 
+切换入口（已上线）：侧栏账户菜单「主题境」子菜单（`sidebar-account-menu.tsx`），
+跟随当前明暗列出对应四境；明暗各记忆一境（localStorage
+`mingyuan-brand-theme-light` / `-dark`），首屏由 `ThemeBootScript`
+统一恢复，无闪烁。
+
 ```tsx
-// 切换：html 上设 data 属性，与 .dark 组合生效
+// 编程式切换：html 上设 data 属性，与 .dark 组合生效
+// （UI 路径请用 useTheme().setBrandTheme，会同步持久化）
 document.documentElement.classList.toggle("dark", true)
-document.documentElement.dataset.brandTheme = "xuanshui"   // 不设或设 undefined 即回默认境
+document.documentElement.dataset.brandTheme = "xuanshui"   // 不设或移除即回默认境
 ```
 
 **约定**：
