@@ -378,6 +378,7 @@ async function submitChanjingVideo(
     const submitted = await createDigitalHumanVideoFromAudio({
       wavUrl: ownVoiceAudioUrl,
       personId,
+      // 缺省 whole_body 是自建形象的既有契约（公有形象由前端显式传入形态）
       figureType: typeof payload.figureType === "string" ? payload.figureType : "whole_body",
       personWidth: width,
       personHeight: height,

@@ -131,7 +131,7 @@ export async function synthesizeOwnVoiceToOss(input: {
 export async function createOwnVoiceDigitalHumanVideo(input: {
   audioUrl: string
   personId: string
-  figureType: string
+  figureType?: string | null
   personWidth: number
   personHeight: number
   screenWidth?: number

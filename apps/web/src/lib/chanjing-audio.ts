@@ -61,7 +61,8 @@ export async function getAudioTaskState(taskId: string): Promise<ChanjingAudioTa
  */
 export async function createDigitalHumanVideoFromAudio(input: {
   personId: string
-  figureType: string
+  /** 形态类型；缺失则不下发该字段，交供应商判定（避免传入该形象不具备的形态） */
+  figureType?: string | null
   personWidth: number
   personHeight: number
   wavUrl: string
@@ -74,9 +75,9 @@ export async function createDigitalHumanVideoFromAudio(input: {
   const body = {
     person: {
       id: input.personId,
-      figure_type: input.figureType,
       width: input.personWidth,
       height: input.personHeight,
+      ...(input.figureType ? { figure_type: input.figureType } : {}),
     },
     audio: {
       type: "audio",
