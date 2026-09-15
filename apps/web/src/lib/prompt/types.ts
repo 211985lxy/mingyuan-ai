@@ -29,6 +29,7 @@ export const PROMPT_KEYS = {
   marketingShortvideo: "marketing.analysis.shortvideo",
   commentRadar: "comment.insight.radar",
   transcriptPolish: "marketing.analysis.transcript_polish",
+  mediaTranscriptPurify: "media.transcript.purify",
   competitorAnalysis: "competitor.analysis.default",
   meetingInsight: "aim.meeting.insight_extract.default",
   // ── 批1：语义任务理解 ──
