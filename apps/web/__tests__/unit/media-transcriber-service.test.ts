@@ -87,4 +87,10 @@ describe("runMediaTranscriptionTask", () => {
       errorCode: "DOC_VERIFY_FAILED",
     }))
   })
+
+  it("fails closed when the account or project binding is missing", async () => {
+    await expect(runMediaTranscriptionTask({ ...INPUT, projectId: "" }, deps))
+      .rejects.toMatchObject({ code: "PROJECT_UNBOUND" })
+    expect(deps.createTask).not.toHaveBeenCalled()
+  })
 })

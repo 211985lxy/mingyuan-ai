@@ -215,6 +215,9 @@ export async function runMediaTranscriptionTask(
   deps: Partial<MediaTranscriberDeps> = {},
 ): Promise<MediaTranscriptionResult> {
   const resolved = { ...defaultDeps, ...deps }
+  if (!input.userId.trim() || !input.projectId.trim()) {
+    throw new MediaTranscriberError("PROJECT_UNBOUND", "这条消息没有明确的账号或项目归属，暂不处理。")
+  }
   let sourceUrl: string
   try {
     sourceUrl = assertSupportedVideoUrl(input.sourceUrl)
