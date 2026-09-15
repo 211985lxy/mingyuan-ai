@@ -54,7 +54,10 @@ export async function purifyMediaTranscript(
 
   const chunks = splitTranscriptChunks(source, MAX_CHUNK_CHARS)
   try {
-    const outputs = await Promise.all(chunks.map((chunk) => completeChunk(input.title, chunk, complete)))
+    const outputs: string[] = []
+    for (const chunk of chunks) {
+      outputs.push(await completeChunk(input.title, chunk, complete))
+    }
     const markdown = outputs.join("\n\n").trim()
     return { markdown: markdown || source, usedFallback: outputs.some((output, index) => output === chunks[index]) }
   } catch (error) {

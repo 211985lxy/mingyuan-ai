@@ -169,13 +169,18 @@ async function createVerifiedDocument(
   const document = buildMediaTranscriptionDocument({ title, platform, sourceUrl: input.sourceUrl, purifiedMarkdown: markdown })
   let created: Awaited<ReturnType<typeof createFeishuDoc>>
   try {
-    created = await deps.createDoc({ title: document.title, content: document.content, folderToken: input.folderToken })
+    created = await deps.createDoc({
+      title: document.title,
+      content: document.content,
+      folderToken: input.folderToken,
+      identity: "bot",
+    })
   } catch {
     throw new MediaTranscriberError("DOC_CREATE_FAILED", "飞书文档创建失败，请稍后重试。")
   }
 
   try {
-    const verified = await deps.fetchDoc({ documentId: created.token })
+    const verified = await deps.fetchDoc({ documentId: created.token, identity: "bot" })
     if (!verified.title.trim() || !verified.content.trim()) throw new Error("empty document")
   } catch {
     throw new MediaTranscriberError("DOC_VERIFY_FAILED", "飞书文档已创建，但回读校验失败。")
@@ -227,6 +232,9 @@ export async function runMediaTranscriptionTask(
 
   const platform = detectVideoPlatform(sourceUrl)
   if (platform === "unknown") throw new MediaTranscriberError("UNSUPPORTED_LINK", "暂不支持这个视频平台。")
+  if (platform === "channels") {
+    throw new MediaTranscriberError("UNSUPPORTED_LINK", "视频号转录服务尚未完成真实联调，请先换用抖音、B站、快手、小红书或 YouTube 链接。")
+  }
 
   const { task, existing } = await claimTask(input, platform, resolved)
   if (existing) return existing
