@@ -20,6 +20,10 @@ import {
   saveAuthVideo,
   uploadFileToStorage,
 } from "@/lib/api/client"
+import {
+  findAuthorizationNamePlaceholder,
+  splitAuthorizationTextByPlaceholder,
+} from "@/lib/studio/authorization-text"
 
 /**
  * 极速克隆数字人：授权视频 + 本人素材（原资产库 avatars-tab 迁入工坊素材库）。
@@ -249,10 +253,15 @@ function AuthorizationTextBlock({
       </p>
     )
   }
+  const placeholder = findAuthorizationNamePlaceholder(requirements.authorizationText)
   return (
     <div className="rounded-md border bg-muted/40 p-3 text-xs leading-5">
       <p className="mb-1 font-medium">{requirements.provider === "chanjing" ? "蝉镜" : "闪剪"}授权原文（请逐字朗读）</p>
-      <p className="whitespace-pre-wrap">{requirements.authorizationText}</p>
+      {placeholder ? <NamePlaceholderHint placeholder={placeholder} /> : null}
+      <AuthorizationTextPreview text={requirements.authorizationText} />
+      <p className="mt-2 text-muted-foreground">
+        录制时请把{placeholder ? "姓名清晰朗读为" : "全文（含您的姓名）"}逐字念出，与「账号设置」中登记的真实姓名保持一致。
+      </p>
       <label className="mt-3 flex items-start gap-2">
         <Checkbox
           checked={confirmed}
@@ -262,5 +271,36 @@ function AuthorizationTextBlock({
         <span>我已按以上原文录制授权视频，并确认本人同意用于数字人制作。</span>
       </label>
     </div>
+  )
+}
+
+/** 姓名占位提示：明确告知「xxx」处要朗读本人真实姓名。 */
+function NamePlaceholderHint({ placeholder }: { placeholder: string }) {
+  return (
+    <p className="mb-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-amber-800 dark:text-amber-200">
+      提示：原文中的「{placeholder}」是姓名占位——录制授权视频时，请把它朗读成
+      <strong>您本人的真实姓名</strong>（需与「账号设置」中登记的姓名一致）。
+    </p>
+  )
+}
+
+/** 原文渲染：姓名占位符高亮显示。 */
+function AuthorizationTextPreview({ text }: { text: string }) {
+  const segments = splitAuthorizationTextByPlaceholder(text)
+  return (
+    <p className="whitespace-pre-wrap">
+      {segments.map((segment, index) =>
+        segment.type === "name" ? (
+          <mark
+            key={index}
+            className="rounded bg-amber-300/60 px-0.5 font-semibold text-amber-900 dark:bg-amber-400/30 dark:text-amber-100"
+          >
+            {segment.value}
+          </mark>
+        ) : (
+          <span key={index}>{segment.value}</span>
+        ),
+      )}
+    </p>
   )
 }
