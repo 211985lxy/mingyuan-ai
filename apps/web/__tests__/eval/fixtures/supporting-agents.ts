@@ -18,7 +18,9 @@ function fixturesFor(agent: SupportingAgent, prefix: string, label: string): Eva
       description: `${label}新任务`,
       input: {
         agentId: agent,
-        rawInput: `请用${label}完成一份可直接使用的初稿，主题是小企业用 AI 整理客户资料。`,
+        rawInput: agent === "content_review"
+          ? "请对下面这篇口播做发布前质检，给出可直接使用的质检报告。\n\n稿件：小企业客户资料散落在微信、表格和脑子里。老板最怕的不是没线索，是跟进到一半找不到对方昨天说了什么。用 AI 先把对话、备注和下次跟进收成一份客户卡，再打电话。"
+          : `请用${label}完成一份可直接使用的初稿，主题是小企业用 AI 整理客户资料。`,
         taskType: "write_script",
         targetFormats: ["raw_copy"],
       },
