@@ -164,7 +164,7 @@ pnpm test:component # 组件套件（jsdom）—— 改组件/导航/表单必�
 
 ---
 
-## 七、八境主题层（`apps/web/src/app/brand-themes.css`）
+## 八、八境主题层（`apps/web/src/app/brand-themes.css`）
 
 > 最后更新：2026-09-15。设计原型同源：工作区 `aim-workbench-landing-redesign.design/`（colors_and_type_v2.css + dark/light-theme-variants.css）。
 
