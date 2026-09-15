@@ -99,6 +99,11 @@ vi.mock("@/lib/ip-wiki/repo", () => ({
   listIpWikiPages,
 }))
 
+// 档案兜底可能在档案没给目标时退到知识库：不拦会连真库，用例会被下挂到超时
+vi.mock("@/lib/prisma", () => ({
+  prisma: { knowledgeEntry: { findMany: vi.fn(async () => []) } },
+}))
+
 vi.mock("@/lib/aim/generation-attempt", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/aim/generation-attempt")>()
   return {

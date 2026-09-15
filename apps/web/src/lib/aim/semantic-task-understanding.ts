@@ -291,6 +291,8 @@ export async function understandAimContentTurnWithTrace(input: {
           input.profileSeed?.audience ? "audience" : "",
           input.profileSeed?.goal ? "goal" : "",
         ].filter(Boolean).join(",") || null,
+        // 目标取自哪里（档案页 / 表单栏 / 知识库分类），排查目标判歪时先看这里
+        profileGoalSource: input.profileSeed?.goalSource ?? null,
       },
     }),
   )

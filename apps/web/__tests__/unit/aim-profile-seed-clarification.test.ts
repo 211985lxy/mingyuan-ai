@@ -1,9 +1,23 @@
-import { describe, expect, it } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { resolveExecuteTurnGate } from "@/lib/aim/execute-turn-intent-gate"
-import { profileSeedFromPages, type IpProfileSeedPage } from "@/lib/aim/ip-profile-seed"
+import {
+  goalFromKnowledgeEntries,
+  loadIpProfileSeed,
+  profileSeedFromPages,
+  type IpProfileSeedPage,
+} from "@/lib/aim/ip-profile-seed"
 import { buildUnderstandingUserPrompt } from "@/lib/aim/semantic-task-understanding"
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+
+// 读库边界：档案页与知识库条目都从外部读入，测试替身不得进入生产代码
+const { listIpWikiPages, findKnowledgeEntries } = vi.hoisted(() => ({
+  listIpWikiPages: vi.fn(async () => [] as unknown[]),
+  findKnowledgeEntries: vi.fn(async () => [] as unknown[]),
+}))
+
+vi.mock("@/lib/ip-wiki/repo", () => ({ listIpWikiPages }))
+vi.mock("@/lib/prisma", () => ({ prisma: { knowledgeEntry: { findMany: findKnowledgeEntries } } }))
 
 /**
  * 绑定项目后，档案里已确认的受众/目标不再被重复追问。
@@ -167,6 +181,68 @@ describe("语义理解也看得到档案（从源头避免重复追问）", () =
       .not.toContain("【项目档案已确认】")
     expect(buildUnderstandingUserPrompt({ envelope: envelopeOf(NEW_DRAFT_REQUEST), profileSeed: {} }))
       .not.toContain("【项目档案已确认】")
+  })
+})
+
+describe("知识库只作最后兜底", () => {
+  it("取第一个能判定目标的条目，并记录来源分类", () => {
+    expect(goalFromKnowledgeEntries([
+      { category: "positioning_material", content: "团队成本一直是老板最头疼的事。" },
+      { category: "product_usp", content: "90 天陪跑，把内容变成持续获客的系统。" },
+      { category: "product_usp", content: "这条不该被选中。" },
+    ])).toEqual({
+      goal: "lead",
+      goalText: "90 天陪跑，把内容变成持续获客的系统。",
+      goalSource: "knowledge:product_usp",
+    })
+  })
+
+  it("空正文与无目标词的条目被跳过", () => {
+    expect(goalFromKnowledgeEntries([
+      { category: "product_usp", content: "   " },
+      { category: "positioning_material", content: "讲的是一套方法论。" },
+    ])).toBeUndefined()
+  })
+})
+
+describe("loadIpProfileSeed：档案优先，知识库兜底", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    listIpWikiPages.mockResolvedValue([])
+    findKnowledgeEntries.mockResolvedValue([])
+  })
+
+  it("档案已给出目标：不再查知识库", async () => {
+    listIpWikiPages.mockResolvedValue([COMPILED_POSITIONING])
+    const seed = await loadIpProfileSeed({ projectId: "proj-1" })
+    expect(seed.goal).toBe("lead")
+    expect(seed.goalSource).toBe("page:positioning")
+    expect(findKnowledgeEntries).not.toHaveBeenCalled()
+  })
+
+  it("档案没提目标：退到知识库", async () => {
+    listIpWikiPages.mockResolvedValue([{ pageType: "audience", content: "核心客户：刚入行的新人。" }])
+    findKnowledgeEntries.mockResolvedValue([
+      { category: "product_usp", content: "把老板的经验变成持续成交的系统。" },
+    ])
+    const seed = await loadIpProfileSeed({ projectId: "proj-1" })
+    expect(seed.audience).toBe("核心客户：刚入行的新人")
+    expect(seed.goal).toBe("convert")
+    expect(seed.goalSource).toBe("knowledge:product_usp")
+  })
+
+  it("档案与知识库都说不清目标：不给目标，追问照旧保留", async () => {
+    listIpWikiPages.mockResolvedValue([{ pageType: "audience", content: "核心客户：刚入行的新人。" }])
+    findKnowledgeEntries.mockResolvedValue([{ category: "product_usp", content: "一套方法论。" }])
+    const seed = await loadIpProfileSeed({ projectId: "proj-1" })
+    expect(seed.goal).toBeUndefined()
+    expect(seed.audience).toBe("核心客户：刚入行的新人")
+  })
+
+  it("没绑项目：空种子，且一次库都不查", async () => {
+    expect(await loadIpProfileSeed({})).toEqual({})
+    expect(listIpWikiPages).not.toHaveBeenCalled()
+    expect(findKnowledgeEntries).not.toHaveBeenCalled()
   })
 })
 

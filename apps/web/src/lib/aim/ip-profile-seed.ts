@@ -2,6 +2,8 @@ import { detectGoal, type AimContentGoal } from "@/lib/aim/content-goal"
 import { parseProfileFromPages } from "@/lib/aim/ip-profile-form"
 import { listIpWikiPages } from "@/lib/ip-wiki/repo"
 import type { IpWikiPageType } from "@/lib/ip-wiki/types"
+import type { KnowledgeCategory } from "@/lib/knowledge-categories"
+import { prisma } from "@/lib/prisma"
 
 /**
  * 绑定项目的 IP 档案兜底（档案里已写明的受众/目标不再重复追问）。
@@ -15,7 +17,9 @@ import type { IpWikiPageType } from "@/lib/ip-wiki/types"
  *
  * 实践提醒：线上档案基本都来自编译那条路，页里**没有**「## 我服务谁 / ## 内容目标」
  * 小节标题（那是表单形态），内容是陈述句，首句才是受众本体、后面常跟痛点映射表。
- * 所以受众取首句，内容目标改为在整页里搜目标词。
+ * 所以受众取首句；内容目标在档案里没有专门栏目，故按页型顺序扫目标词，
+ * 仍找不到时才退到知识库的定位/卖点两类材料。受众只从档案取——档案页是
+ * 「这个账号服务谁」的正式声明，从原材料里倒推受众容易把成稿写给错的人。
  */
 
 /** 兜底读三页：受众取目标人群页，内容目标在定位主张 / 内容策略底盘里搜 */
@@ -27,17 +31,33 @@ const GOAL_CANDIDATE_PAGE_TYPES: IpWikiPageType[] = ["positioning", "content_str
 /** 受众一句话上限：与语义理解产出的受众截断长度对齐 */
 const AUDIENCE_MAX_CHARS = 80
 
+/**
+ * 档案没提目标时退到知识库，且只取「这个账号定位是什么 / 卖什么」两类材料。
+ * 案例、对标、灵感是原材料，里面出现「获客」等词不代表账号目标，
+ * 取进来会把目标判歪——这是接知识库最容易踩的坑。
+ */
+const GOAL_FALLBACK_CATEGORIES: KnowledgeCategory[] = ["positioning_material", "product_usp"]
+const GOAL_FALLBACK_MAX_ENTRIES = 20
+
 export interface IpProfileSeed {
   /** 「我服务谁」原文，已取首句并限长（最长 AUDIENCE_MAX_CHARS） */
   audience?: string
-  /** 档案里搜到的内容目标，已判定成枚举；档案没说目标时为空 */
+  /** 内容目标，已判定成枚举；档案与知识库都没说目标时为空 */
   goal?: AimContentGoal
   /** 命中目标词的那段原文，供 trace 与排查溯源 */
   goalText?: string
+  /** 目标来自哪里（page:positioning / profile_field / knowledge:product_usp） */
+  goalSource?: string
 }
 
 export interface IpProfileSeedPage {
   pageType: IpWikiPageType
+  content: string
+}
+
+/** 知识库候选条目（只用到分类与正文） */
+export interface IpProfileKnowledgeEntry {
+  category: string
   content: string
 }
 
@@ -68,42 +88,73 @@ export function profileSeedFromPages(pages: readonly IpProfileSeedPage[]): IpPro
   const form = parseProfileFromPages([...newest.values()])
 
   const audience = form.audience ? firstSentence(form.audience) : undefined
-  const goalText = findGoalText(form, newest)
+  const archiveGoal = findArchiveGoal(form, newest)
 
   return {
     ...(audience ? { audience } : {}),
-    ...(goalText ? { goal: detectGoal(goalText), goalText } : {}),
+    ...(archiveGoal ?? {}),
   }
 }
 
 /**
- * 搜目标原文：表单填的「## 内容目标」小节优先，其次按页型顺序扫整页。
+ * 搜档案里的目标：表单填的「## 内容目标」小节优先，其次按页型顺序扫整页。
  * 编译档案没有目标栏，只能靠页内目标词命中；命中即止，避免多页拼出互相矛盾的目标。
  */
-function findGoalText(
+function findArchiveGoal(
   form: ReturnType<typeof parseProfileFromPages>,
   newest: Map<IpWikiPageType, IpProfileSeedPage>,
-): string | undefined {
+): { goal: AimContentGoal; goalText: string; goalSource: string } | undefined {
   const candidates = [
-    form.goal ?? "",
-    ...GOAL_CANDIDATE_PAGE_TYPES.map((pageType) => newest.get(pageType)?.content ?? ""),
+    ...(form.goal ? [{ text: form.goal, source: "profile_field" }] : []),
+    ...GOAL_CANDIDATE_PAGE_TYPES.map((pageType) => ({
+      text: newest.get(pageType)?.content ?? "",
+      source: `page:${pageType}`,
+    })),
   ]
   for (const candidate of candidates) {
-    const text = candidate.trim()
-    if (text && detectGoal(text)) return text
+    const text = candidate.text.trim()
+    if (!text) continue
+    const goal = detectGoal(text)
+    if (goal) return { goal, goalText: text, goalSource: candidate.source }
   }
   return undefined
+}
+
+/** 纯函数：在知识库材料里找第一个能判定出目标的条目 */
+export function goalFromKnowledgeEntries(
+  entries: readonly IpProfileKnowledgeEntry[],
+): { goal: AimContentGoal; goalText: string; goalSource: string } | undefined {
+  for (const entry of entries) {
+    const text = entry.content?.trim()
+    if (!text) continue
+    const goal = detectGoal(text)
+    if (goal) return { goal, goalText: text, goalSource: `knowledge:${entry.category}` }
+  }
+  return undefined
+}
+
+async function listKnowledgeGoalEntries(projectId: string): Promise<IpProfileKnowledgeEntry[]> {
+  return prisma.knowledgeEntry.findMany({
+    where: { projectId, status: "active", category: { in: GOAL_FALLBACK_CATEGORIES } },
+    orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
+    take: GOAL_FALLBACK_MAX_ENTRIES,
+    select: { category: true, content: true },
+  })
 }
 
 /**
  * 读取绑定项目的档案兜底种子。读取失败不阻塞主流程：
  * 退回空种子，行为与本改动之前一致（照常追问）。
+ * 知识库只在档案没给出目标时才查——多一次查询只在真需要时付。
  */
 export async function loadIpProfileSeed(input: { projectId?: string }): Promise<IpProfileSeed> {
   if (!input.projectId) return {}
   try {
     const pages = await listIpWikiPages({ projectId: input.projectId, pageTypes: SEED_PAGE_TYPES })
-    return profileSeedFromPages(pages)
+    const seed = profileSeedFromPages(pages)
+    if (seed.goal) return seed
+    const fromKnowledge = goalFromKnowledgeEntries(await listKnowledgeGoalEntries(input.projectId))
+    return fromKnowledge ? { ...seed, ...fromKnowledge } : seed
   } catch (error) {
     console.warn("[aim-profile-seed] 档案兜底读取失败，本轮照常追问", error)
     return {}
