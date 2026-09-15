@@ -1,6 +1,7 @@
 import { env } from "@/env"
 import { getFeishuTenantAccessToken, replyFeishuTextMessage } from "@/lib/integrations/feishu-topic-chat"
 import { processVideo } from "@/lib/content-pipeline"
+import { MediaTranscriberError } from "@/lib/media-transcriber/service"
 
 /**
  * 飞书事件路由的即时回复与完成消息构建（从 api/integrations/feishu/events/route.ts
@@ -69,7 +70,7 @@ export async function sendMediaTranscriberFinalReply(
 }
 
 export async function sendMediaTranscriberErrorReply(messageId: string, error: unknown): Promise<void> {
-  const message = error && typeof error === "object" && "message" in error && typeof error.message === "string"
+  const message = error instanceof MediaTranscriberError
     ? error.message
     : "音视频转录整理失败，请换一个链接后重试。"
   await sendImmediateFeishuReply(messageId, `❌ 小D整理失败：${message}`, `media-transcriber:error:${messageId}`)

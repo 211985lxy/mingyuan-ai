@@ -21,4 +21,22 @@ describe("purifyMediaTranscript", () => {
     expect(result.markdown).toBe(source)
     expect(result.usedFallback).toBe(true)
   })
+
+  it("processes long transcript chunks sequentially", async () => {
+    const longSource = "这是一段需要忠实保留的访谈内容。".repeat(900)
+    let inFlight = 0
+    let maxInFlight = 0
+    const complete = vi.fn(async () => {
+      inFlight += 1
+      maxInFlight = Math.max(maxInFlight, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+      return { content: "整理后的访谈内容。".repeat(500) }
+    })
+
+    await purifyMediaTranscript({ title: "长访谈", transcript: longSource }, { complete })
+
+    expect(complete).toHaveBeenCalledTimes(3)
+    expect(maxInFlight).toBe(1)
+  })
 })

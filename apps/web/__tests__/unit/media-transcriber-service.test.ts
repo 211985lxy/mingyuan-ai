@@ -52,8 +52,9 @@ describe("runMediaTranscriptionTask", () => {
     expect(deps.createDoc).toHaveBeenCalledWith(expect.objectContaining({
       title: "【小D整理】门店经营访谈",
       content: expect.stringContaining("原始链接"),
+      identity: "bot",
     }))
-    expect(deps.fetchDoc).toHaveBeenCalledWith(expect.objectContaining({ documentId: "doc-1" }))
+    expect(deps.fetchDoc).toHaveBeenCalledWith(expect.objectContaining({ documentId: "doc-1", identity: "bot" }))
     expect(result).toEqual(expect.objectContaining({
       status: "completed",
       documentUrl: "https://feishu.cn/docx/doc-1",
@@ -92,5 +93,14 @@ describe("runMediaTranscriptionTask", () => {
     await expect(runMediaTranscriptionTask({ ...INPUT, projectId: "" }, deps))
       .rejects.toMatchObject({ code: "PROJECT_UNBOUND" })
     expect(deps.createTask).not.toHaveBeenCalled()
+  })
+
+  it("rejects the unverified video-channels provider before claiming a task", async () => {
+    await expect(runMediaTranscriptionTask({
+      ...INPUT,
+      sourceUrl: "https://channels.weixin.qq.com/feed/demo",
+    }, deps)).rejects.toMatchObject({ code: "UNSUPPORTED_LINK" })
+    expect(deps.createTask).not.toHaveBeenCalled()
+    expect(deps.extract).not.toHaveBeenCalled()
   })
 })
