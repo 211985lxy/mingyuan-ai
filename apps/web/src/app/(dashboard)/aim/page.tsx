@@ -286,7 +286,7 @@ export default function AimPage() {
   )
 
   return (
-    <div className="-mx-3 -my-3 flex h-[calc(100dvh-2.25rem)] min-h-115 overflow-hidden md:-mx-4 md:-my-4">
+    <div className="-mx-6 -my-6 flex h-[calc(100dvh-2.25rem)] min-h-115 overflow-hidden md:-mx-8 md:-my-8">
       <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-background px-2 md:px-4">
         <AimWorkbenchHeader
           workflowStage={w.currentWorkflowStage}

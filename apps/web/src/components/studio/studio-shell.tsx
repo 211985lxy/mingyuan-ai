@@ -59,7 +59,7 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-3 pb-24 pt-5 md:px-4">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-24 pt-8 md:px-8">{children}</main>
       <footer className="border-t border-border/40 py-3 text-center text-xs text-muted-foreground">
         <Clapperboard className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
         数字人工坊 · 音频与视频数字人一站式出品

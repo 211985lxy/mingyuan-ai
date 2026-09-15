@@ -109,7 +109,7 @@
     0 2px 6px -1px oklch(0.24 0.035 68 / 0.06),
     0 16px 40px -8px oklch(0.24 0.035 68 / 0.12);
   /* 品牌渐变：朱砂赤主按钮 / 厚土金辅按钮 */
-  --brand-gradient-primary: linear-gradient(135deg, oklch(0.60 0.20 30.0) 0%, oklch(0.545 0.195 26.0) 100%);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.638 0.203 31.0) 0%, oklch(0.523 0.188 25.0) 100%);
   --brand-gradient-gold: linear-gradient(135deg, oklch(0.745 0.185 38.0) 0%, oklch(0.815 0.155 78.0) 100%);
   /* 悬浮描边转淡金泥（规范 四.2） */
   --ring-gold: oklch(0.745 0.185 38.0 / 45%);
@@ -160,7 +160,7 @@
     0 2px 6px -1px oklch(0 0 0 / 0.4),
     0 16px 40px -8px oklch(0 0 0 / 0.55);
   /* 深色主按钮：赤金渐变，与 light 的朱砂形成同一火德语义 */
-  --brand-gradient-primary: linear-gradient(135deg, oklch(0.775 0.175 42.0) 0%, oklch(0.715 0.18 34.0) 100%);
+  --brand-gradient-primary: linear-gradient(135deg, oklch(0.802 0.168 46.0) 0%, oklch(0.698 0.183 33.0) 100%);
   --brand-gradient-gold: linear-gradient(135deg, oklch(0.775 0.175 42.0) 0%, oklch(0.845 0.145 82.0) 100%);
 }
 
