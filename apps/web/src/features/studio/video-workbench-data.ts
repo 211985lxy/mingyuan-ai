@@ -10,6 +10,9 @@ import type { ApiAvatar, ApiVideoTask } from "@/types/api"
 import { loadVideoHandoff, loadVideoPrefs } from "@/lib/studio/studio-prefs"
 import { loadMyVoices, type VideoVoiceSource } from "@/features/studio/video-script-step"
 
+/** 深链交接来源：携带文案时这些 from 标记视为有效交接（消费后清除）。 */
+const DEEP_LINK_SOURCES = new Set(["aim", "audio", "works"])
+
 const TASK_POLL_MS = 4000
 const ACTIVE_TASK_STATUS = ["pending", "queued", "processing"]
 
@@ -29,10 +32,12 @@ export interface VideoWorkbenchInit {
 /** 深链参数 → sessionStorage 交接 → 上次偏好，决定初始值与起始步骤（纯函数，挂载时应用一次）。 */
 export function resolveVideoWorkbenchInit(searchParams: URLSearchParams): VideoWorkbenchInit {
   const prefs = loadVideoPrefs()
-  const handoff = loadVideoHandoff()
+  const from = searchParams.get("from")
+  // 交接只在有效深链来源时消费：无 from 的直达访问不接收残留文案，保持全新开始
+  const validDeepLink = Boolean(from && DEEP_LINK_SOURCES.has(from))
+  const handoff = validDeepLink ? loadVideoHandoff() : null
   const script = searchParams.get("script") || handoff?.script || ""
   const voiceId = searchParams.get("voiceId") || handoff?.voiceId
-  const from = searchParams.get("from")
   return {
     script,
     projectId: searchParams.get("projectId") || handoff?.projectId || prefs.projectId || "",
@@ -41,8 +46,8 @@ export function resolveVideoWorkbenchInit(searchParams: URLSearchParams): VideoW
     aspectRatio: prefs.aspectRatio ?? "9:16",
     startAtScript: Boolean(script),
     aimGenerationId: searchParams.get("aimGenerationId"),
-    // 深链交接只消费一次；无 from 标记的直达访问清掉可能残留的旧交接
-    clearHandoff: !script || (from !== "aim" && from !== "audio"),
+    // 深链交接只消费一次；直达访问清掉可能残留的旧交接
+    clearHandoff: !script || !validDeepLink,
   }
 }
 

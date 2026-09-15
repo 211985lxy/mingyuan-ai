@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
 import { listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
+import { saveVideoHandoff } from "@/lib/studio/studio-prefs"
 import type { ApiVideoTask } from "@/types/api"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -152,6 +153,11 @@ function VideoTaskCard({
   onRetry: () => void
   onTransferRetry: () => void
 }) {
+  // 重新编辑：文案与项目带回视频工作台，改一处再出片
+  function handleReedit() {
+    saveVideoHandoff({ script: task.scriptContent, projectId: task.projectId ?? undefined })
+  }
+
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -167,7 +173,7 @@ function VideoTaskCard({
             {task.errorMessage ? ` · ${task.errorMessage}` : ""}
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {task.status === "failed" ? (
             <Button size="sm" variant="outline" disabled={retrying} onClick={onRetry}>
               {retrying ? "提交中…" : "重试"}
@@ -178,6 +184,14 @@ function VideoTaskCard({
               {transferring ? "转存中…" : "重试转存"}
             </Button>
           ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            nativeButton={false}
+            render={<Link href="/studio/video?from=works" onClick={handleReedit} />}
+          >
+            重新编辑
+          </Button>
           {task.status === "completed" && task.videoUrl ? (
             <Button size="sm" onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}>
               打开成片

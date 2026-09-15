@@ -100,7 +100,7 @@ export function VideoAvatarStep(props: {
   )
 }
 
-function ProjectPickerRow({
+export function ProjectPickerRow({
   projects,
   projectId,
   onProjectChange,

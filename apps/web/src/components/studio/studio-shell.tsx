@@ -7,7 +7,7 @@ import { BrandLogo } from "@/components/branding/brand-logo"
 import { cn } from "@/lib/utils"
 
 const STUDIO_LINKS = [
-  { title: "素材库", href: "/assets", icon: FolderOpen },
+  { title: "素材库", href: "/studio/library", icon: FolderOpen },
   { title: "作品", href: "/studio/works", icon: Library },
 ] as const
 
