@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { AlertTriangle, Clapperboard } from "lucide-react"
+import { AlertTriangle, Clapperboard, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { ListSkeleton } from "@/components/ui/skeletons"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
-import { listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
+import { deleteVideoTask, listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
 import { saveVideoHandoff } from "@/lib/studio/studio-prefs"
 import type { ApiVideoTask } from "@/types/api"
 
@@ -24,13 +25,70 @@ const STATUS_LABEL: Record<string, string> = {
 
 const PENDING_STATUS = ["queued", "pending", "processing"]
 
-/** 成片任务列表状态：加载 / 重试 / 转存重试 / 进行中自动轮询。 */
+/** 行级操作：重试、重试转存、删除（含确认）。与列表加载分离，各自保持可读长度。 */
+function useVideoTaskActions(
+  setTasks: React.Dispatch<React.SetStateAction<ApiVideoTask[]>>,
+) {
+  const [retryingId, setRetryingId] = useState<string | null>(null)
+  const [transferringId, setTransferringId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const confirm = useConfirm()
+
+  async function handleRetry(id: string) {
+    setRetryingId(id)
+    try {
+      const next = await retryVideoTask(id)
+      setTasks((current) => [next, ...current.filter((task) => task.id !== next.id)])
+      toast.success("已重新提交生成，仍沿用原供应商")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "重试失败")
+    } finally {
+      setRetryingId(null)
+    }
+  }
+
+  async function handleTransferRetry(id: string) {
+    setTransferringId(id)
+    try {
+      const next = await retryVideoTaskTransfer(id)
+      setTasks((current) => current.map((task) => task.id === next.id ? next : task))
+      toast.success(next.deliveryStatus === "durable" ? "成片已转存到 AIM" : "转存仍未完成，请稍后再试")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "转存重试失败")
+    } finally {
+      setTransferringId(null)
+    }
+  }
+
+  async function handleDelete(id: string, label: string) {
+    const ok = await confirm({
+      title: `删除任务「${label}」？`,
+      description: "只删除这条任务记录；已转存的成片文件不会被删除。",
+      confirmText: "删除",
+      destructive: true,
+    })
+    if (!ok) return
+    setDeletingId(id)
+    try {
+      await deleteVideoTask(id)
+      setTasks((current) => current.filter((task) => task.id !== id))
+      toast.success("已删除该任务记录")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "删除失败")
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+
+  return { retryingId, transferringId, deletingId, handleRetry, handleTransferRetry, handleDelete }
+}
+
+/** 成片任务列表状态：加载 / 进行中自动轮询。 */
 function useVideoTaskList() {
   const [tasks, setTasks] = useState<ApiVideoTask[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [retryingId, setRetryingId] = useState<string | null>(null)
-  const [transferringId, setTransferringId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -68,33 +126,8 @@ function useVideoTaskList() {
     return () => window.clearInterval(timer)
   }, [tasks])
 
-  async function handleRetry(id: string) {
-    setRetryingId(id)
-    try {
-      const next = await retryVideoTask(id)
-      setTasks((current) => [next, ...current.filter((task) => task.id !== next.id)])
-      toast.success("已重新提交生成，仍沿用原供应商")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "重试失败")
-    } finally {
-      setRetryingId(null)
-    }
-  }
-
-  async function handleTransferRetry(id: string) {
-    setTransferringId(id)
-    try {
-      const next = await retryVideoTaskTransfer(id)
-      setTasks((current) => current.map((task) => task.id === next.id ? next : task))
-      toast.success(next.deliveryStatus === "durable" ? "成片已转存到 AIM" : "转存仍未完成，请稍后再试")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "转存重试失败")
-    } finally {
-      setTransferringId(null)
-    }
-  }
-
-  return { tasks, loading, loadError, refresh, retryingId, transferringId, handleRetry, handleTransferRetry }
+  const actions = useVideoTaskActions(setTasks)
+  return { tasks, loading, loadError, refresh, ...actions }
 }
 
 /** 作品页：数字人成片任务 + 配音历史。进行中任务自动轮询。 */
@@ -145,8 +178,10 @@ export function WorksView() {
                 task={task}
                 retrying={list.retryingId === task.id}
                 transferring={list.transferringId === task.id}
+                deleting={list.deletingId === task.id}
                 onRetry={() => void list.handleRetry(task.id)}
                 onTransferRetry={() => void list.handleTransferRetry(task.id)}
+                onDelete={() => void list.handleDelete(task.id, task.avatarName || "数字人口播")}
               />
             ))}
           </div>
@@ -161,18 +196,86 @@ export function WorksView() {
   )
 }
 
-function VideoTaskCard({
+/** 任务操作区：重试 / 重试转存 / 重新编辑 / 打开成片 / 删除。 */
+function VideoTaskActions({
   task,
   retrying,
   transferring,
+  deleting,
   onRetry,
   onTransferRetry,
+  onDelete,
+  onReedit,
 }: {
   task: ApiVideoTask
   retrying: boolean
   transferring: boolean
+  deleting: boolean
   onRetry: () => void
   onTransferRetry: () => void
+  onDelete: () => void
+  onReedit: () => void
+}) {
+  return (
+    <div className="flex shrink-0 flex-wrap gap-2">
+      {task.status === "failed" ? (
+        <Button size="sm" variant="outline" disabled={retrying} onClick={onRetry}>
+          {retrying ? "提交中…" : "重试"}
+        </Button>
+      ) : null}
+      {task.status === "completed" && task.deliveryStatus === "degraded" ? (
+        <Button size="sm" variant="outline" disabled={transferring} onClick={onTransferRetry}>
+          {transferring ? "转存中…" : "重试转存"}
+        </Button>
+      ) : null}
+      <Button
+        size="sm"
+        variant="ghost"
+        nativeButton={false}
+        render={<Link href="/studio/video?from=works" onClick={onReedit} />}
+      >
+        重新编辑
+      </Button>
+      {task.status === "completed" && task.videoUrl ? (
+        <Button size="sm" onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}>
+          打开成片
+        </Button>
+      ) : null}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-muted-foreground"
+        aria-label="删除该任务记录"
+        disabled={deleting || ["queued", "pending", "processing"].includes(task.status)}
+        title={
+          ["queued", "pending", "processing"].includes(task.status)
+            ? "任务生成中，完成或失败后可删除"
+            : "删除任务记录"
+        }
+        onClick={onDelete}
+      >
+        {deleting ? "删除中…" : <Trash2 className="h-3.5 w-3.5" />}
+      </Button>
+    </div>
+  )
+}
+
+function VideoTaskCard({
+  task,
+  retrying,
+  transferring,
+  deleting,
+  onRetry,
+  onTransferRetry,
+  onDelete,
+}: {
+  task: ApiVideoTask
+  retrying: boolean
+  transferring: boolean
+  deleting: boolean
+  onRetry: () => void
+  onTransferRetry: () => void
+  onDelete: () => void
 }) {
   // 重新编辑：文案与项目带回视频工作台，改一处再出片
   function handleReedit() {
@@ -194,31 +297,16 @@ function VideoTaskCard({
             {task.errorMessage ? ` · ${task.errorMessage}` : ""}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {task.status === "failed" ? (
-            <Button size="sm" variant="outline" disabled={retrying} onClick={onRetry}>
-              {retrying ? "提交中…" : "重试"}
-            </Button>
-          ) : null}
-          {task.status === "completed" && task.deliveryStatus === "degraded" ? (
-            <Button size="sm" variant="outline" disabled={transferring} onClick={onTransferRetry}>
-              {transferring ? "转存中…" : "重试转存"}
-            </Button>
-          ) : null}
-          <Button
-            size="sm"
-            variant="ghost"
-            nativeButton={false}
-            render={<Link href="/studio/video?from=works" onClick={handleReedit} />}
-          >
-            重新编辑
-          </Button>
-          {task.status === "completed" && task.videoUrl ? (
-            <Button size="sm" onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}>
-              打开成片
-            </Button>
-          ) : null}
-        </div>
+        <VideoTaskActions
+          task={task}
+          retrying={retrying}
+          transferring={transferring}
+          deleting={deleting}
+          onRetry={onRetry}
+          onTransferRetry={onTransferRetry}
+          onDelete={onDelete}
+          onReedit={handleReedit}
+        />
       </CardContent>
     </Card>
   )
