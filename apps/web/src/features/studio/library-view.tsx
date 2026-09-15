@@ -1,12 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Loader2, RotateCcw, User } from "lucide-react"
+import { AlertTriangle, Loader2, RotateCcw, User } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { VoiceServiceNotice } from "@/components/voice/voice-service-notice"
 import { VoiceCloneButton } from "@/components/voice/voice-clone-dialog"
@@ -126,7 +127,7 @@ function MyAvatarsPanel() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 默认选中兜底
     setProjectId((current) => current || defaultProjectId)
   }, [defaultProjectId])
-  const { avatars, loading, refresh } = useAvatarLibraryList(projectId)
+  const { avatars, loading, loadError, refresh } = useAvatarLibraryList(projectId)
 
   return (
     <section className="space-y-4">
@@ -151,13 +152,19 @@ function MyAvatarsPanel() {
             </Card>
           ))}
         </div>
+      ) : loadError ? (
+        <EmptyState
+          icon={<AlertTriangle />}
+          title="形象列表读取失败"
+          description={loadError}
+          action={<Button onClick={refresh}>重新读取</Button>}
+        />
       ) : avatars.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-            <User className="h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">这个项目还没有数字人，点右上角「克隆数字人」创建。</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={<User />}
+          title="这个项目还没有数字人"
+          description="点右上角「克隆数字人」，用摄像头现场录一段即可创建。"
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {avatars.map((avatar) => (
@@ -172,10 +179,12 @@ function MyAvatarsPanel() {
 function useAvatarLibraryList(projectId: string): {
   avatars: ApiAvatar[]
   loading: boolean
+  loadError: string | null
   refresh: () => void
 } {
   const [avatars, setAvatars] = useState<ApiAvatar[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -185,6 +194,7 @@ function useAvatarLibraryList(projectId: string): {
       return
     }
     setLoading(true)
+    setLoadError(null)
     let cancelled = false
     void listAvatars(projectId)
       .then((rows) => {
@@ -192,7 +202,8 @@ function useAvatarLibraryList(projectId: string): {
       })
       .catch((error) => {
         if (cancelled) return
-        toast.error(error instanceof Error ? error.message : "数字人列表加载失败")
+        // 记失败态：空列表可能只是读取失败
+        setLoadError(error instanceof Error ? error.message : "形象列表加载失败")
         setAvatars([])
       })
       .finally(() => {
@@ -204,7 +215,7 @@ function useAvatarLibraryList(projectId: string): {
   }, [projectId, refreshKey])
 
   const refresh = useCallback(() => setRefreshKey((key) => key + 1), [])
-  return { avatars, loading, refresh }
+  return { avatars, loading, loadError, refresh }
 }
 
 function AvatarLibraryCard({ avatar, onRefresh }: { avatar: ApiAvatar; onRefresh: () => void }) {

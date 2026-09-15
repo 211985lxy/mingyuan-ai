@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowRight, AudioLines, Clapperboard, Loader2 } from "lucide-react"
+import { AlertTriangle, ArrowRight, AudioLines, Clapperboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { EmptyState } from "@/components/ui/empty-state"
+import { ListSkeleton } from "@/components/ui/skeletons"
 import { fetchVoiceHistory, type VoiceHistoryItem } from "@/lib/api/voice"
 import { listVideoTasks } from "@/lib/api/media"
 import type { ApiVideoTask } from "@/types/api"
@@ -25,6 +27,7 @@ type ContinueItem =
 /** 「继续上次」数据：最近成片任务 + 配音历史按时间混排。 */
 function useRecentWorks() {
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [recent, setRecent] = useState<ContinueItem[]>([])
 
   useEffect(() => {
@@ -33,6 +36,13 @@ function useRecentWorks() {
     setLoading(true)
     void Promise.allSettled([listVideoTasks(), fetchVoiceHistory(1, 3)]).then(([tasks, voices]) => {
       if (cancelled) return
+      // 两个来源都失败才算加载失败：任一成功就展示读到的那部分
+      if (tasks.status === "rejected" && voices.status === "rejected") {
+        setFailed(true)
+        setLoading(false)
+        return
+      }
+      setFailed(false)
       const items: ContinueItem[] = []
       if (tasks.status === "fulfilled") {
         for (const task of tasks.value.slice(0, 3)) items.push({ kind: "video", task })
@@ -53,12 +63,12 @@ function useRecentWorks() {
     }
   }, [])
 
-  return { loading, recent }
+  return { loading, failed, recent }
 }
 
 /** 工坊首页：两张大卡 = 唯二入口；「继续上次」直达最近的成品与进行中任务。 */
 export function StudioHome() {
-  const { loading, recent } = useRecentWorks()
+  const { loading, failed, recent } = useRecentWorks()
 
   return (
     <div className="space-y-8">
@@ -84,20 +94,31 @@ export function StudioHome() {
         )}
       </div>
 
-      <ContinueSection loading={loading} recent={recent} />
+      <ContinueSection loading={loading} failed={failed} recent={recent} />
     </div>
   )
 }
 
-function ContinueSection({ loading, recent }: { loading: boolean; recent: ContinueItem[] }) {
+function ContinueSection({
+  loading,
+  failed,
+  recent,
+}: {
+  loading: boolean
+  failed: boolean
+  recent: ContinueItem[]
+}) {
   return (
     <section className="space-y-3">
       <p className="text-sm font-medium text-foreground/85">继续上次</p>
       {loading ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          读取最近的成果…
-        </p>
+        <ListSkeleton rows={2} variant="plain" withAction={false} />
+      ) : failed ? (
+        <EmptyState
+          icon={<AlertTriangle />}
+          title="读取失败"
+          description="最近的成果暂时取不到，可能是网络或服务波动。刷新页面即可重试。"
+        />
       ) : recent.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-6 text-center text-sm text-muted-foreground">

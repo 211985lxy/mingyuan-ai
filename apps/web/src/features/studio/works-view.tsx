@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { Clapperboard } from "lucide-react"
+import { AlertTriangle, Clapperboard } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,15 +28,19 @@ const PENDING_STATUS = ["queued", "pending", "processing"]
 function useVideoTaskList() {
   const [tasks, setTasks] = useState<ApiVideoTask[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [transferringId, setTransferringId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       setTasks(await listVideoTasks())
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "成片列表加载失败")
+      // 记录失败态：页面主体要显示「读取失败」而非空态，
+      // 否则用户会误以为成片都不见了
+      setLoadError(error instanceof Error ? error.message : "成片列表加载失败")
       setTasks([])
     } finally {
       setLoading(false)
@@ -53,7 +57,10 @@ function useVideoTaskList() {
     if (!hasPending) return
     const timer = window.setInterval(() => {
       void listVideoTasks()
-        .then(setTasks)
+        .then((rows) => {
+          setTasks(rows)
+          setLoadError(null)
+        })
         .catch(() => {
           /* 轮询失败等下一轮 */
         })
@@ -87,7 +94,7 @@ function useVideoTaskList() {
     }
   }
 
-  return { tasks, loading, retryingId, transferringId, handleRetry, handleTransferRetry }
+  return { tasks, loading, loadError, refresh, retryingId, transferringId, handleRetry, handleTransferRetry }
 }
 
 /** 作品页：数字人成片任务 + 配音历史。进行中任务自动轮询。 */
@@ -110,6 +117,15 @@ export function WorksView() {
         <p className="text-sm font-medium text-foreground/85">数字人成片</p>
         {list.loading ? (
           <ListSkeleton rows={3} />
+        ) : list.loadError ? (
+          <EmptyState
+            icon={<AlertTriangle />}
+            title="成片列表读取失败"
+            description={list.loadError}
+            action={
+              <Button onClick={() => void list.refresh()}>重新读取</Button>
+            }
+          />
         ) : list.tasks.length === 0 ? (
           <EmptyState
             icon={<Clapperboard />}

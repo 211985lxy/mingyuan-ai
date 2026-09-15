@@ -229,6 +229,7 @@ function AvatarStepSection({ vm }: { vm: VideoWorkbenchModel }) {
       onSourceChange={vm.setAvatarSource}
       avatars={vm.avatarLibrary.avatars}
       loadingAvatars={vm.avatarLibrary.loading}
+      avatarLoadError={vm.avatarLibrary.loadError}
       selectedAvatarId={vm.avatarLibrary.selectedAvatarId}
       onSelectAvatar={vm.avatarLibrary.setSelectedAvatarId}
       publicPersons={vm.publicPersons}

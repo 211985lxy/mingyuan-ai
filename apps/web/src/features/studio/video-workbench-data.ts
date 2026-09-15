@@ -75,11 +75,13 @@ export function useVideoAvatarLibrary(
 ): {
   avatars: ApiAvatar[]
   loading: boolean
+  loadError: string | null
   selectedAvatarId: string
   setSelectedAvatarId: (id: string) => void
 } {
   const [avatars, setAvatars] = useState<ApiAvatar[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedAvatarId, setSelectedAvatarId] = useState("")
 
   useEffect(() => {
@@ -89,6 +91,7 @@ export function useVideoAvatarLibrary(
       return
     }
     setLoading(true)
+    setLoadError(null)
     let cancelled = false
     void listAvatars(projectId)
       .then((rows) => {
@@ -104,7 +107,8 @@ export function useVideoAvatarLibrary(
       })
       .catch((error) => {
         if (cancelled) return
-        toast.error(error instanceof Error ? error.message : "数字人列表加载失败")
+        // 记失败态：列表空可能只是加载失败，不能一律提示「还没有形象」
+        setLoadError(error instanceof Error ? error.message : "形象列表加载失败")
         setAvatars([])
       })
       .finally(() => {
@@ -116,7 +120,7 @@ export function useVideoAvatarLibrary(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 回调仅用于一次性引导公共形象
   }, [projectId])
 
-  return { avatars, loading, selectedAvatarId, setSelectedAvatarId }
+  return { avatars, loading, loadError, selectedAvatarId, setSelectedAvatarId }
 }
 
 /** 公共形象懒加载：首次需要时拉取一次。 */

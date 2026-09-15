@@ -28,6 +28,7 @@ export function VideoAvatarStep(props: {
   onSourceChange: (source: AvatarSource) => void
   avatars: ApiAvatar[]
   loadingAvatars: boolean
+  avatarLoadError: string | null
   selectedAvatarId: string
   onSelectAvatar: (avatarId: string) => void
   publicPersons: PublicDigitalPersonList | null
@@ -62,34 +63,7 @@ export function VideoAvatarStep(props: {
 
       <SourcePickerRow avatarSource={props.avatarSource} onSourceChange={props.onSourceChange} />
 
-      <Card>
-        <CardContent className="py-4">
-          {props.projects.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">先创建客户项目，再选择形象。</p>
-          ) : props.avatarSource === "public" ? (
-            <PublicPersonPicker
-              state={props.publicPersons}
-              loading={props.loadingPublic}
-              selectedId={props.selectedPublic?.id ?? ""}
-              onSelect={props.onSelectPublic}
-            />
-          ) : (
-            <AvatarPicker
-              avatars={readyAvatars}
-              loading={props.loadingAvatars}
-              selectedId={props.selectedAvatarId}
-              onSelect={props.onSelectAvatar}
-            />
-          )}
-          <SelectionHint
-            avatarSource={props.avatarSource}
-            loadingAvatars={props.loadingAvatars}
-            readyAvatars={readyAvatars}
-            selectedAvatarId={props.selectedAvatarId}
-            selectedPublic={props.selectedPublic}
-          />
-        </CardContent>
-      </Card>
+      <AvatarPickerCard {...props} readyAvatars={readyAvatars} />
 
       <div className="flex justify-end">
         <Button type="button" disabled={!canNext} onClick={props.onNext}>
@@ -97,6 +71,50 @@ export function VideoAvatarStep(props: {
         </Button>
       </div>
     </section>
+  )
+}
+
+/** 形象选择区：四种状态（无项目 / 读取失败 / 公共 / 我的）各给明确出口。 */
+function AvatarPickerCard({
+  readyAvatars,
+  ...props
+}: Parameters<typeof VideoAvatarStep>[0] & { readyAvatars: ApiAvatar[] }) {
+  return (
+    <Card>
+      <CardContent className="py-4">
+        {props.projects.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">先创建客户项目，再选择形象。</p>
+        ) : props.avatarSource === "mine" && props.avatarLoadError ? (
+          <div className="space-y-2 py-6 text-center">
+            <p className="text-sm text-destructive">形象列表读取失败：{props.avatarLoadError}</p>
+            <p className="text-xs text-muted-foreground">
+              这不代表你没有形象——可切换上方「公共形象」直接出片，或稍后重新进入本页。
+            </p>
+          </div>
+        ) : props.avatarSource === "public" ? (
+          <PublicPersonPicker
+            state={props.publicPersons}
+            loading={props.loadingPublic}
+            selectedId={props.selectedPublic?.id ?? ""}
+            onSelect={props.onSelectPublic}
+          />
+        ) : (
+          <AvatarPicker
+            avatars={readyAvatars}
+            loading={props.loadingAvatars}
+            selectedId={props.selectedAvatarId}
+            onSelect={props.onSelectAvatar}
+          />
+        )}
+        <SelectionHint
+          avatarSource={props.avatarSource}
+          loadingAvatars={props.loadingAvatars}
+          readyAvatars={readyAvatars}
+          selectedAvatarId={props.selectedAvatarId}
+          selectedPublic={props.selectedPublic}
+        />
+      </CardContent>
+    </Card>
   )
 }
 
