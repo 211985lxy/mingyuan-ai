@@ -365,6 +365,28 @@
       ]
     },
     {
+      "name": "MediaTranscriptionTask",
+      "columns": [
+        "id",
+        "userId",
+        "projectId",
+        "externalMessageId",
+        "externalChatId",
+        "sourceUrl",
+        "platform",
+        "sourceTitle",
+        "status",
+        "executionModeSnapshot",
+        "documentToken",
+        "documentUrl",
+        "errorCode",
+        "errorMessage",
+        "completedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
       "name": "ChannelBinding",
       "columns": [
         "id",

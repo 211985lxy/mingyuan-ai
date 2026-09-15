@@ -65,6 +65,7 @@ model User {
   avatars                 Avatar[]
   videoTasks              VideoTask[]
   productionPlans         VideoProductionPlan[]
+  mediaTranscriptionTasks MediaTranscriptionTask[]
 }
 
 model AdminUser {

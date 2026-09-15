@@ -25,6 +25,7 @@ import {
   compareAgainstBaseline,
   createTemplateBaseline,
 } from "@/lib/aim-harness/content-baseline"
+import { env } from "@/env"
 
 describe("executionPolicy (阶段 1)", () => {
   it("默认 single_shot 策略冻结", () => {
@@ -211,5 +212,12 @@ describe("content baseline compare", () => {
     const gate = compareAgainstBaseline(baseline, candidate)
     expect(gate.ok).toBe(false)
     expect(gate.reasons.some((reason) => reason.includes("acceptanceRate"))).toBe(true)
+  })
+})
+
+describe("media transcriber configuration", () => {
+  it("exposes the disabled-by-default Feishu media transcriber settings", () => {
+    expect(Object.prototype.hasOwnProperty.call(env, "FEISHU_MEDIA_TRANSCRIBER_ENABLED")).toBe(true)
+    expect(Object.prototype.hasOwnProperty.call(env, "FEISHU_MEDIA_TRANSCRIBER_FOLDER_TOKEN")).toBe(true)
   })
 })
