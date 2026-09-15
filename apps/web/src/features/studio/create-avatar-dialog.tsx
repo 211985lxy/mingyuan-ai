@@ -24,6 +24,7 @@ import {
   findAuthorizationNamePlaceholder,
   splitAuthorizationTextByPlaceholder,
 } from "@/lib/studio/authorization-text"
+import { CameraRecorder } from "@/features/studio/camera-recorder"
 
 /**
  * 极速克隆数字人：授权视频 + 本人素材（原资产库 avatars-tab 迁入工坊素材库）。
@@ -102,23 +103,26 @@ export function CreateAvatarDialog({
               placeholder="例如：老板本人"
             />
           </div>
+          <CameraRecorder
+            label="授权视频"
+            filePrefix="digital-human-authorization"
+            value={form.authFile}
+            onChange={(file) => patchForm({ authFile: file })}
+            hint="对准本人，逐字朗读下方授权原文（姓名处念您的真实姓名）。"
+          />
           <AuthorizationBlock
             requirements={requirements}
             confirmed={form.authConfirmed}
             onConfirmedChange={(checked) => patchForm({ authConfirmed: checked })}
-            onFileChange={(file) => patchForm({ authFile: file })}
             submitting={submitting}
           />
-          <div className="space-y-2">
-            <Label htmlFor="studio-source-video">克隆素材视频</Label>
-            <Input
-              id="studio-source-video"
-              type="file"
-              accept="video/*"
-              onChange={(e) => patchForm({ sourceFile: e.target.files?.[0] ?? null })}
-            />
-            <p className="text-xs text-muted-foreground">上传本人正面口播素材，用于生成数字人。</p>
-          </div>
+          <CameraRecorder
+            label="克隆素材视频"
+            filePrefix="digital-human-source"
+            value={form.sourceFile}
+            onChange={(file) => patchForm({ sourceFile: file })}
+            hint="正面口播 10–60 秒：光线充足、人像居中、正常语速说话，效果最佳。"
+          />
           <Button className="w-full" disabled={submitting} onClick={() => void handleSubmit()}>
             {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             提交克隆
@@ -199,36 +203,25 @@ async function submitAvatarClone(input: {
   })
 }
 
-/** 授权视频上传 + 服务端授权原文展示 + 本人确认勾选（合规步骤，完整保留）。 */
+/** 授权原文展示 + 本人确认勾选（合规步骤，完整保留）。 */
 function AuthorizationBlock({
   requirements,
   confirmed,
   onConfirmedChange,
-  onFileChange,
   submitting,
 }: {
   requirements: AuthRequirements
   confirmed: boolean
   onConfirmedChange: (checked: boolean) => void
-  onFileChange: (file: File | null) => void
   submitting: boolean
 }) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor="studio-auth-video">授权视频</Label>
-      <Input
-        id="studio-auth-video"
-        type="file"
-        accept="video/*"
-        onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-      />
-      <AuthorizationTextBlock
-        requirements={requirements}
-        confirmed={confirmed}
-        onConfirmedChange={onConfirmedChange}
-        submitting={submitting}
-      />
-    </div>
+    <AuthorizationTextBlock
+      requirements={requirements}
+      confirmed={confirmed}
+      onConfirmedChange={onConfirmedChange}
+      submitting={submitting}
+    />
   )
 }
 
