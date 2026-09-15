@@ -14,6 +14,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts"
+import { clickableProps } from "@/lib/a11y"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -417,13 +418,14 @@ export function KnowledgeMap({ projects, onDrillDown }: KnowledgeMapProps) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {sortedCategories.map((cat) => {
                   const has = cat.count > 0
+                  const drill = has && onDrillDown ? () => onDrillDown({ category: cat.category }) : undefined
                   return (
                     <div
                       key={cat.category}
                       className={`flex items-center gap-2 rounded-md border p-2 text-xs ${
                         has ? "bg-emerald-50/50 border-emerald-200/60" : "bg-muted/30 border-border/60"
-                      } ${has ? "cursor-pointer" : ""}`}
-                      onClick={has && onDrillDown ? () => onDrillDown({ category: cat.category }) : undefined}
+                      } ${drill ? "cursor-pointer" : ""}`}
+                      {...clickableProps(drill)}
                     >
                       <div
                         className={`h-2 w-2 rounded-full shrink-0 ${
