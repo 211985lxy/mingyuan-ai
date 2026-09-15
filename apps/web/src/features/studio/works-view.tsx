@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { useConfirm } from "@/components/ui/confirm-dialog"
+import { buildVideoFileName, downloadMedia } from "@/lib/media-download"
 import { ListSkeleton } from "@/components/ui/skeletons"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
 import { deleteVideoTask, listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
@@ -196,7 +197,35 @@ export function WorksView() {
   )
 }
 
-/** 任务操作区：重试 / 重试转存 / 重新编辑 / 打开成片 / 删除。 */
+/** 成片下载：跨域下载依赖对象存储 CORS，失败时降级为新标签打开并提示。 */
+function DownloadVideoButton({
+  url,
+  avatarName,
+  createdAt,
+}: {
+  url: string
+  avatarName: string | null
+  createdAt: string
+}) {
+  const [downloading, setDownloading] = useState(false)
+
+  async function handleDownload() {
+    setDownloading(true)
+    try {
+      await downloadMedia(url, buildVideoFileName(avatarName, createdAt))
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Button size="sm" variant="outline" disabled={downloading} onClick={() => void handleDownload()}>
+      {downloading ? "下载中…" : "下载"}
+    </Button>
+  )
+}
+
+/** 任务操作区：重试 / 重试转存 / 重新编辑 / 打开成片 / 下载 / 删除。 */
 function VideoTaskActions({
   task,
   retrying,
@@ -216,6 +245,8 @@ function VideoTaskActions({
   onDelete: () => void
   onReedit: () => void
 }) {
+  const downloadable = task.status === "completed" && Boolean(task.videoUrl)
+
   return (
     <div className="flex shrink-0 flex-wrap gap-2">
       {task.status === "failed" ? (
@@ -236,10 +267,13 @@ function VideoTaskActions({
       >
         重新编辑
       </Button>
-      {task.status === "completed" && task.videoUrl ? (
-        <Button size="sm" onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}>
-          打开成片
-        </Button>
+      {downloadable ? (
+        <>
+          <Button size="sm" onClick={() => window.open(task.videoUrl!, "_blank", "noopener,noreferrer")}>
+            打开成片
+          </Button>
+          <DownloadVideoButton url={task.videoUrl!} avatarName={task.avatarName} createdAt={task.createdAt} />
+        </>
       ) : null}
       <Button
         size="sm"
