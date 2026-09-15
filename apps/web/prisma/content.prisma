@@ -304,6 +304,33 @@ model Inspiration {
   outboxReplies ChannelReplyOutbox[]
 }
 
+model MediaTranscriptionTask {
+  id                    String   @id @default(cuid())
+  userId                String
+  projectId             String
+  externalMessageId     String   @unique @db.VarChar(191)
+  externalChatId        String   @db.VarChar(191)
+  sourceUrl             String   @db.VarChar(800)
+  platform              String   @db.VarChar(40)
+  sourceTitle           String?  @db.VarChar(500)
+  status                String   @default("processing") @db.VarChar(20)
+  executionModeSnapshot String   @db.VarChar(20)
+  documentToken         String?  @db.VarChar(191)
+  documentUrl           String?  @db.VarChar(800)
+  errorCode             String?  @db.VarChar(40)
+  errorMessage          String?  @db.Text
+  completedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project ClientProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([status, updatedAt])
+}
+
 model ChannelBinding {
   id                String   @id @default(cuid())
   platform          String   @db.VarChar(40)

@@ -105,6 +105,7 @@ model ClientProject {
   opportunityCollections OpportunityCollection[]
   userQuestionCards      UserQuestionCard[]
   customerOutcomes       CustomerOutcomeProjection[]
+  mediaTranscriptionTasks MediaTranscriptionTask[]
 
   @@index([userId, status])
   @@index([userId, createdAt])
