@@ -284,7 +284,7 @@ export async function processVideo(input: VideoProcessingInput): Promise<VideoPr
 
 // ─── 5a：视频文案提取 ──────────────────────────────────────────
 
-async function extractVideoTranscript(
+export async function extractVideoTranscript(
   url: string,
   platform: string,
 ): Promise<VideoTextExtractionResult> {
