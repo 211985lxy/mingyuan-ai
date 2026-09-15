@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { Clapperboard } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { EmptyState } from "@/components/ui/empty-state"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
 import { listVideoTasks, retryVideoTask, retryVideoTaskTransfer } from "@/lib/api/client"
 import { saveVideoHandoff } from "@/lib/studio/studio-prefs"
@@ -108,14 +110,16 @@ export function WorksView() {
         {list.loading ? (
           <p className="text-sm text-muted-foreground">加载中…</p>
         ) : list.tasks.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="space-y-3 py-10 text-center text-sm text-muted-foreground">
-              <p>还没有成片任务。</p>
-              <p>
-                去<Link className="text-primary underline-offset-2 hover:underline" href="/studio/video">视频工作台</Link>选个公共形象，几分钟出第一条片。
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Clapperboard />}
+            title="还没有成片任务"
+            description="去视频工作台选个公共形象，几分钟就能出第一条片。"
+            action={
+              <Button nativeButton={false} render={<Link href="/studio/video" />}>
+                去视频工作台
+              </Button>
+            }
+          />
         ) : (
           <div className="space-y-3">
             {list.tasks.map((task) => (

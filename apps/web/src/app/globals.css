@@ -558,6 +558,16 @@
   }
 }
 
+/* 骨架屏等长驻元素：尊重「减少动效」偏好，退化为静态底色 */
+@media (prefers-reduced-motion: reduce) {
+  .dao-shimmer::after {
+    display: none;
+  }
+  .dao-shimmer {
+    opacity: 0.85;
+  }
+}
+
 /* 乾坤太极微光旋转 (Tai Chi Rotation Light) */
 .tai-chi-rotate {
   animation: tai-chi-spin 12s linear infinite;
