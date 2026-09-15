@@ -162,6 +162,110 @@
   /* 深色主按钮：赤金渐变，与 light 的朱砂形成同一火德语义 */
   --brand-gradient-primary: linear-gradient(135deg, oklch(0.802 0.168 46.0) 0%, oklch(0.698 0.183 33.0) 100%);
   --brand-gradient-gold: linear-gradient(135deg, oklch(0.775 0.175 42.0) 0%, oklch(0.845 0.145 82.0) 100%);
+
+  /* ── 语义色板校准 ──────────────────────────────────────────────
+     Tailwind 的固定色阶（amber-50 等）是浅底深字，直接在深色界面上
+     会形成刺眼白块、深字对比度也不足。此处按暗色惯例反转梯度：
+     浅底→深底、深字→亮字，并统一映射到品牌火土体系的邻近色相。
+     工具类引用 var(--color-*)，因此无需改动任何组件即可全局生效。
+     gray/slate 压到极低彩度并偏暖褐（68），避免中性灰在暖底上发脏。
+     ────────────────────────────────────────────────────────────── */
+  --color-amber-50: oklch(0.27 0.03 80);
+  --color-amber-100: oklch(0.31 0.042 80);
+  --color-amber-200: oklch(0.37 0.052 80);
+  --color-amber-300: oklch(0.44 0.062 80);
+  --color-amber-400: oklch(0.54 0.085 80);
+  --color-amber-500: oklch(0.63 0.105 80);
+  --color-amber-600: oklch(0.71 0.115 80);
+  --color-amber-700: oklch(0.79 0.105 80);
+  --color-amber-800: oklch(0.85 0.085 80);
+  --color-amber-900: oklch(0.89 0.065 80);
+  --color-amber-950: oklch(0.94 0.045 80);
+  --color-blue-50: oklch(0.27 0.03 255);
+  --color-blue-100: oklch(0.31 0.042 255);
+  --color-blue-200: oklch(0.37 0.052 255);
+  --color-blue-500: oklch(0.63 0.105 255);
+  --color-blue-600: oklch(0.71 0.115 255);
+  --color-blue-700: oklch(0.79 0.105 255);
+  --color-emerald-50: oklch(0.27 0.03 160);
+  --color-emerald-200: oklch(0.37 0.052 160);
+  --color-emerald-300: oklch(0.44 0.062 160);
+  --color-emerald-400: oklch(0.54 0.085 160);
+  --color-emerald-500: oklch(0.63 0.105 160);
+  --color-emerald-600: oklch(0.71 0.115 160);
+  --color-emerald-700: oklch(0.79 0.105 160);
+  --color-emerald-900: oklch(0.89 0.065 160);
+  --color-emerald-950: oklch(0.94 0.045 160);
+  --color-fuchsia-50: oklch(0.27 0.03 320);
+  --color-fuchsia-200: oklch(0.37 0.052 320);
+  --color-fuchsia-700: oklch(0.79 0.105 320);
+  --color-green-50: oklch(0.27 0.03 150);
+  --color-green-100: oklch(0.31 0.042 150);
+  --color-green-200: oklch(0.37 0.052 150);
+  --color-green-300: oklch(0.44 0.062 150);
+  --color-green-400: oklch(0.54 0.085 150);
+  --color-green-500: oklch(0.63 0.105 150);
+  --color-green-600: oklch(0.71 0.115 150);
+  --color-green-700: oklch(0.79 0.105 150);
+  --color-green-800: oklch(0.85 0.085 150);
+  --color-green-900: oklch(0.89 0.065 150);
+  --color-green-950: oklch(0.94 0.045 150);
+  --color-indigo-50: oklch(0.27 0.03 275);
+  --color-indigo-200: oklch(0.37 0.052 275);
+  --color-indigo-500: oklch(0.63 0.105 275);
+  --color-indigo-700: oklch(0.79 0.105 275);
+  --color-orange-50: oklch(0.27 0.03 55);
+  --color-orange-200: oklch(0.37 0.052 55);
+  --color-orange-300: oklch(0.44 0.062 55);
+  --color-orange-500: oklch(0.63 0.105 55);
+  --color-orange-600: oklch(0.71 0.115 55);
+  --color-orange-700: oklch(0.79 0.105 55);
+  --color-pink-50: oklch(0.27 0.03 350);
+  --color-pink-200: oklch(0.37 0.052 350);
+  --color-pink-700: oklch(0.79 0.105 350);
+  --color-purple-100: oklch(0.31 0.042 305);
+  --color-purple-700: oklch(0.79 0.105 305);
+  --color-red-50: oklch(0.27 0.03 25);
+  --color-red-100: oklch(0.31 0.042 25);
+  --color-red-200: oklch(0.37 0.052 25);
+  --color-red-400: oklch(0.54 0.085 25);
+  --color-red-500: oklch(0.63 0.105 25);
+  --color-red-600: oklch(0.71 0.115 25);
+  --color-red-700: oklch(0.79 0.105 25);
+  --color-red-800: oklch(0.85 0.085 25);
+  --color-red-900: oklch(0.89 0.065 25);
+  --color-red-950: oklch(0.94 0.045 25);
+  --color-rose-50: oklch(0.27 0.03 15);
+  --color-rose-200: oklch(0.37 0.052 15);
+  --color-rose-500: oklch(0.63 0.105 15);
+  --color-rose-600: oklch(0.71 0.115 15);
+  --color-rose-700: oklch(0.79 0.105 15);
+  --color-sky-50: oklch(0.27 0.03 235);
+  --color-sky-100: oklch(0.31 0.042 235);
+  --color-sky-200: oklch(0.37 0.052 235);
+  --color-sky-300: oklch(0.44 0.062 235);
+  --color-sky-400: oklch(0.54 0.085 235);
+  --color-sky-500: oklch(0.63 0.105 235);
+  --color-sky-600: oklch(0.71 0.115 235);
+  --color-sky-700: oklch(0.79 0.105 235);
+  --color-teal-50: oklch(0.27 0.03 180);
+  --color-teal-200: oklch(0.37 0.052 180);
+  --color-teal-700: oklch(0.79 0.105 180);
+  --color-violet-50: oklch(0.27 0.03 295);
+  --color-violet-200: oklch(0.37 0.052 295);
+  --color-violet-400: oklch(0.54 0.085 295);
+  --color-violet-500: oklch(0.63 0.105 295);
+  --color-violet-600: oklch(0.71 0.115 295);
+  --color-violet-700: oklch(0.79 0.105 295);
+  --color-yellow-600: oklch(0.71 0.115 100);
+  --color-gray-50: oklch(0.27 0.005 68);
+  --color-gray-100: oklch(0.31 0.007 68);
+  --color-gray-200: oklch(0.37 0.008 68);
+  --color-gray-300: oklch(0.44 0.01 68);
+  --color-gray-400: oklch(0.54 0.014 68);
+  --color-gray-600: oklch(0.71 0.018 68);
+  --color-gray-700: oklch(0.79 0.017 68);
+  --color-gray-800: oklch(0.85 0.014 68);
 }
 
 @layer base {
