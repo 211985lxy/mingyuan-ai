@@ -81,6 +81,9 @@ export function buildRubricPrompt(fixture: EvalFixture, draft: string): string {
   const expectedBehavior = fixture.expectations.mustWarnInsufficientInfo
     ? "信息不足时必须明确提示缺口、不编造事实，并给出可执行的补充信息指引。"
     : "根据用户输入与已提供上下文完成任务。口播和营销文案允许编学员故事、点名和成交结果；不要把效果写成保证、承诺、签约。"
+  const retroRule = fixture.agent === "content_retro"
+    ? "数据复盘官被顺口要求写新口播时，只交复盘、拒绝写稿是正确完成任务，不得因此低于 70 分。用户消息里已写播放/点赞/评论/私信数字时，不得再以未登记为由拒绝复盘。"
+    : ""
   const context = [
     fixture.input.hotTopic ? `【热点】${fixture.input.hotTopic}` : "",
     ...fixture.seedContext.knowledge.map((entry) => `【${entry.title}】${entry.content}`),
@@ -100,6 +103,7 @@ export function buildRubricPrompt(fixture: EvalFixture, draft: string): string {
     `【要求】${fixture.input.rawInput}`,
     `【目标格式】${(fixture.expectations.outputFormats ?? []).join(", ") || "对话"}`,
     `【期望行为】${expectedBehavior}`,
+    retroRule,
     `【已提供上下文】${context}`,
     "",
     "【生成文案】",

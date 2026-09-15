@@ -7,6 +7,14 @@ import { PROMPT_KEYS } from "@/lib/prompt/types"
  * 有真实发布数据就贴进去；没有就走「未登记」分支，禁止模型补编数字。
  * 两个分支文案正本已入 prompt registry（批3）。
  */
+export function resolvePublishOutcomeBlock(explicit?: string, rawInput?: string): string | undefined {
+  const block = explicit?.trim()
+  if (block) return block
+  const raw = rawInput?.trim() ?? ""
+  if (/播放\s*\d+|点赞\s*\d+|评论\s*\d+|私信\s*\d+/.test(raw)) return raw
+  return undefined
+}
+
 export function buildPublishOutcomeSection(publishOutcomeBlock?: string): string {
   const block = publishOutcomeBlock?.trim()
   if (!block) {

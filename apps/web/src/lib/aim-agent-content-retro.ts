@@ -12,6 +12,7 @@ import type {
 import {
   buildContentRetroChatPrompt,
   buildContentRetroGeneratePrompt,
+  resolvePublishOutcomeBlock,
 } from "./aim-agent-content-retro-prompts"
 
 export {
@@ -33,9 +34,12 @@ export class ContentRetroHandler implements AimAgentHandler {
   private static readonly ALLOWED_GENERATE_FORMATS = new Set<ContentFormat>(["raw_copy"])
 
   private buildChatPrompt(params: AimChatParams): string {
+    const inlineOutcome = [params.publishOutcomeBlock, ...(params.messages ?? []).map((message) => message.content)]
+      .filter((value): value is string => typeof value === "string")
+      .join("\n")
     return buildContentRetroChatPrompt({
       contextBlock: buildChatContextBlock(params),
-      publishOutcomeBlock: params.publishOutcomeBlock,
+      publishOutcomeBlock: resolvePublishOutcomeBlock(params.publishOutcomeBlock, inlineOutcome),
     })
   }
 
@@ -55,7 +59,7 @@ export class ContentRetroHandler implements AimAgentHandler {
 
     const systemPrompt = buildContentRetroGeneratePrompt({
       knowledgeBlock: context.knowledgeBlock,
-      publishOutcomeBlock: context.publishOutcomeBlock,
+      publishOutcomeBlock: resolvePublishOutcomeBlock(context.publishOutcomeBlock, context.rawInput),
     })
 
     const workflowContext = buildWorkflowContext(context)

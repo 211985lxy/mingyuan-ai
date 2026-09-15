@@ -507,6 +507,14 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     })).toBe(true)
   })
 
+  it("tells the judge that retro refusing a new script is a pass", () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "retro_task_semantics_04")!
+    const prompt = buildRubricPrompt(fixture, "播放只有 800，先别写新稿，把这条为什么没人私信说清楚。")
+
+    expect(prompt).toContain("只交复盘、拒绝写稿是正确完成任务")
+    expect(prompt).toContain("不得再以未登记为由拒绝复盘")
+  })
+
   it("dispatches real eval cases to the production generation/chat runners", async () => {
     const calls: string[] = []
     const executor = createRealEvalExecutor({
