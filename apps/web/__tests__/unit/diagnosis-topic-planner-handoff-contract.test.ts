@@ -68,4 +68,26 @@ describe("诊断官与选题官：【禁止输出】清单对齐", () => {
     expect(topicPlannerPrompt).toContain("小红书图文")
     expect(diagnosisPrompt).toContain("小红书图文")
   })
+
+  it("does not ask whose business when the project archive is already bound", async () => {
+    mocks.execute.mockReset().mockResolvedValue({ content: "ok" })
+    await new BusinessSystemDiagnosisHandler().chat({
+      ...chatParams(),
+      projectId: "project-bound",
+      ipWikiBlock: "【客户】小区业主\n【产品】供暖改造",
+    })
+    const diagnosisPrompt = mocks.execute.mock.calls[0][1] as string
+    expect(diagnosisPrompt).toContain("客户 IP 专属档案")
+    expect(diagnosisPrompt).toContain("禁止追问「写谁的生意」")
+    expect(diagnosisPrompt).toContain("小区业主")
+
+    await new BusinessDiagnosisHandler().chat({
+      ...chatParams(),
+      projectId: "project-bound",
+      ipWikiBlock: "【客户】小区业主\n【产品】供暖改造",
+    })
+    const topicPlannerPrompt = mocks.execute.mock.calls[1][1] as string
+    expect(topicPlannerPrompt).toContain("禁止追问「写谁的生意」")
+    expect(topicPlannerPrompt).toContain("供暖改造")
+  })
 })

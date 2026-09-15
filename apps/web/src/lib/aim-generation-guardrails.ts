@@ -1,10 +1,10 @@
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import type { ContentFormat } from "./aim-generator"
 import { isBenchmarkCopyTooSimilar } from "./aim-benchmark-quality"
-import { AIM_FACT_PRIORITY_RULE } from "./aim-context-priority"
+import { shouldUseBoundProjectDefaults } from "./aim-intent-boundaries"
 import { deliveryBody, withoutMethodNote } from "./aim-generation-text"
 
-const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我(?:有|身边有)(?:个|一个|位|一位|家|一家)?|我(?:的)?)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队)|(?:来找我|找到我|咨询我)(?:的)?(?:客户|老板|企业|小企业老板)/
+const FIRST_PERSON_EVIDENCE_PATTERN = /(?:我(?:有|身边有)(?:个|一个|位|一位|家|一家)?|我(?:的)?)(?:学员|客户|朋友|同事|下属)|我给你讲(?:个|一个|件|一件)真事|我们(?:公司|团队)(?:(?:去年|前阵子|之前)\s*)?(?:来|招|遇到|有)(?:了)?(?:个|一个|一位)|我(?:(?:曾经|以前|之前|亲自|亲眼)\s*)?(?:带过|帮过|服务过|辅导过|遇到过|见过|做过|认识)(?:一个|一位|不少|很多|太多|客户|企业|老板|团队|新人)|我(?:观察|接触|辅导|服务|带)(?:了|过)?(?:太多|很多|不少)(?:学员|客户|(?:职场)?新人|老板|企业|团队|本地服务老板)|(?:来找我|找到我|咨询我)(?:的)?(?:客户|老板|企业|小企业老板)/
 const UNSUPPORTED_ANECDOTE_PATTERN = /我(?:上周|上个月|去年|前阵子|最近)[，,\s]*(?:帮|帮助|服务|辅导|带|见过|看到|看见|刷到|遇到|认识|接触|观察)(?:了|过)?|我[，,\s]*(?:帮|帮助|服务|辅导|带|见过|看到|看见|刷到|遇到|认识|接触|观察)(?:了|过)?(?:一家|一个|一位|有人|不少|很多|客户|公司|企业|老板|朋友|学员)|(?:上周|上个月|去年|前阵子|最近).{0,6}我(?:看到|看见|刷到|遇到|听说).{0,20}(?:老板|客户|公司|企业|朋友|学员|视频|案例)|(?:上周|上个月|去年|前阵子|最近).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:有|遇到|来了)(?:个|一个|位|一位|家|一家).{0,16}(?:客户|公司|企业|老板|朋友|学员)|(?:一个|一位|一家|有位|有个).{0,20}(?:客户|公司|企业|老板|朋友|学员).{0,80}(?:做了|发了|赚了|成交|询盘|增长|提升|降低|节省|投了|推广|获客|引流|播放|点赞|效果|数据|营收|收入|利润)/
 const UNSUPPORTED_SELF_EXPERIENCE_PATTERN = /我.{0,16}(?:遇到|见到|见过|看到|看见|刷到|认识|接触|服务|辅导|帮助|帮|聊过|聊|沟通过|交流过)(?:了|过)?(?:几位|几个|一些|不少|很多|一位|一个|一家)?.{0,16}(?:老板|客户|公司|企业|朋友|学员|团队)|我.{0,8}(?:跟|和)(?:几位|几个|一些|不少|很多|一位|一个)?.{0,10}(?:老板|客户|朋友|学员).{0,8}(?:聊过|聊了|沟通过|交流过)/
 const UNSUPPORTED_REVERSE_EXPERIENCE_PATTERN = /(?:老板|客户|朋友|学员|公司|企业).{0,12}(?:来|曾经|之前)?(?:问我|问过我|来问我|找过我|找我|跟我聊过|和我聊过|向我咨询)|(?:问我|问过我|来问我|找过我|找我|跟我聊过|和我聊过).{0,16}(?:老板|客户|朋友|学员|公司|企业)/
@@ -182,10 +182,12 @@ function containsUnsupportedAnecdote(text: string): boolean {
   })
 }
 
-export function scrubUnsupportedAnecdoteSentences(content: string, rawInput: string): string {
-  if (!hasStrictNumericClaimConstraint(rawInput) || !APPROVED_FACTS_PATTERN.test(rawInput)) {
-    return content
-  }
+export function scrubUnsupportedAnecdoteSentences(content: string, rawInput: string, evidenceText = rawInput): string {
+  const closedWorld = hasStrictNumericClaimConstraint(rawInput) && APPROVED_FACTS_PATTERN.test(rawInput)
+  if (!closedWorld) return content
+  const evidence = evidenceText || rawInput
+  if (containsUnsupportedAnecdote(evidence)) return content
+  if (!containsUnsupportedAnecdote(content)) return content
   return content
     .split(/\n{2,}/u)
     .map((paragraph) => (paragraph.match(/[^。！？!?；;]+[。！？!?；;]?/gu) ?? [paragraph])
@@ -201,19 +203,10 @@ export function findUnsupportedFirstPersonClaimFormats(
   parsed: Partial<Record<ContentFormat, string>>,
   targetFormats: ContentFormat[],
 ): ContentFormat[] {
-  if (hasStrictNumericClaimConstraint(context.rawInput) && APPROVED_FACTS_PATTERN.test(context.rawInput)) {
-    return targetFormats.filter((format) => containsUnsupportedAnecdote(parsed[format] || ""))
+  if (!(hasStrictNumericClaimConstraint(context.rawInput) && APPROVED_FACTS_PATTERN.test(context.rawInput))) {
+    return []
   }
-  const evidence = [
-    context.rawInput,
-    context.knowledgeBlock,
-    context.ipWikiBlock,
-    context.eventStorytellingBlock,
-  ].filter(Boolean).join("\n")
-  const evidenceHasAnecdote = containsUnsupportedAnecdote(evidence)
-
-  return targetFormats.filter((format) =>
-    !evidenceHasAnecdote && containsUnsupportedAnecdote(withoutMethodNote(parsed[format] || "")))
+  return targetFormats.filter((format) => containsUnsupportedAnecdote(parsed[format] || ""))
 }
 
 export function isGenericContentRequestWithoutFacts(
@@ -226,20 +219,10 @@ export function isGenericContentRequestWithoutFacts(
     | "topicRationale"
     | "hotTopic"
     | "taskSpec"
+    | "projectId"
   >,
 ): boolean {
-  const meaningfulKnowledge = context.knowledgeBlock
-    ?.replace(AIM_FACT_PRIORITY_RULE, "")
-    .trim()
-  const hasContext = Boolean(
-    meaningfulKnowledge
-    || context.ipWikiBlock?.trim()
-    || context.topicTitle?.trim()
-    || context.topicRationale?.trim()
-    || context.hotTopic?.trim()
-    || context.taskSpec?.knownFacts?.length,
-  )
-  if (hasContext) return false
+  if (shouldUseBoundProjectDefaults(context)) return false
   const normalized = context.rawInput
     .trim()
     .replace(/[，。！？!?,.\s]/g, "")

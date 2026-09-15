@@ -12,7 +12,9 @@ import { resolveContentProducerProgressiveFlags } from "@/lib/aim/progressive-pr
 import { composeLayeredAimPrompt } from "@/lib/aim/layered-prompt"
 import {
   AIM_SESSION_PRIORITY_RULES,
+  BOUND_PROJECT_DEFAULT_COPY_RULE,
   LIGHT_EDIT_USER_INSTRUCTION,
+  shouldUseBoundProjectDefaults,
 } from "@/lib/aim-intent-boundaries"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
@@ -225,12 +227,12 @@ export async function executeGenerateLLMWithBenchmarkRetry(
       parsed[format] = materializeApprovedFacts(parsed[format] || "", context.rawInput)
       if (isLightEdit) parsed[format] = scrubLeakedLightEditFeedback(parsed[format] || "", context.rawInput)
       parsed[format] = scrubUnsupportedNumericSentences(parsed[format] || "", context.rawInput, numericEvidence, !isLightEdit && !fastSpokenRoute)
-      parsed[format] = scrubUnsupportedAnecdoteSentences(parsed[format] || "", context.rawInput)
+      parsed[format] = scrubUnsupportedAnecdoteSentences(parsed[format] || "", context.rawInput, numericEvidence)
       if (isSpokenScriptFormat(format)) {
         parsed[format] = cleanSpokenDeliveryArtifacts(parsed[format] || "")
       }
     }
-    const contentDeliveryGate = applyDeliveryContentGate({ parsed, targetFormats, intent: context.unifiedContentExecution?.intent, attempt, maxAttempts, originalPrompt: userPrompt })
+    const contentDeliveryGate = applyDeliveryContentGate({ parsed, targetFormats, intent: context.unifiedContentExecution?.intent, attempt, maxAttempts, originalPrompt: userPrompt, evidenceText: numericEvidence })
     if (!contentDeliveryGate.ok) { activePrompt = contentDeliveryGate.retryPrompt; continue }
     const cotLeakHits = collectSpokenCotLeakHits(parsed, targetFormats, attempt + 1)
     const safety = inspectGenerationSafety(context, parsed, targetFormats)
@@ -417,9 +419,10 @@ export function buildProducerSystemPrompt(agentPrompt: string, context: AimGener
     "正文每一段都要推进信息，不要堆形容词，不要写营销黑话。",
     "先保住人的位置、代价和手迹，再清理 AI 腔、宣传腔、整齐排比和万能结尾。像该 IP 真人说话；跟最近成稿密度对齐。",
     "文案生成必须直接交付成稿，不要反问用户、不要让用户补充资料、不要输出开放式问题。",
-    "口播正文纯净性红线：正文从第一句起就是可直接使用的成稿。「需要先判断一下…」「用户说…」「上一轮质检未通过…」「写正文草稿：」「检查……：有。」等任务分析、草稿标记与自检报告句式一律禁止出现在正文，只能写在 [[AIM_METHOD_NOTE]] 块内。",
-    "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成事实，关键人物、数字、案例或结果缺失时标注「未提供/待补充」或省略。",
-    "没有明确来源时，禁止使用「我有个学员/客户/朋友」「我曾经/亲历」来伪造真实案例；改用普遍场景、方法论或明确标注的假设举例。",
+    shouldUseBoundProjectDefaults(context) ? BOUND_PROJECT_DEFAULT_COPY_RULE : "",
+    "口播正文纯净性红线：正文从第一句起就是可直接使用的成稿。「需要先判断一下…」「用户说…」「上一轮质检未通过…」「写正文草稿：」「检查……：有。」「1. 目标判定」「2. 内容路由」等任务分析、草稿标记与自检报告句式一律禁止出现在正文，只能写在 [[AIM_METHOD_NOTE]] 块内。禁止只声称「已经写完了」「可以直接拍」却不给可拍摄正文。知识库里已经出现的数字必须写进口播，这不算编造。",
+    "如果信息不足，只使用用户输入、已确认项目/IP事实和可追溯知识；不得把合理假设写成保证效果，关键人物、数字、案例或结果缺失时可以编口播故事，也可以标注「未提供/待补充」或省略。",
+    "口播允许编学员故事、点名和成交结果，例如「我有个学员张三成交了 8 万」。用户明确要求只写已给事实，或稿件写成保证、承诺、签约效果时除外。",
     progressive.includeBenchmark ? `对标改写硬规则：\n${BENCHMARK_REWRITE_GUARDRAIL}` : "",
     creationTraceRule,
     newsroomRule,

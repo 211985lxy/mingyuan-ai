@@ -50,6 +50,8 @@ function freezeAgentRoutes(
 export type AimEvalModelSwapProfile = "strong" | "weak"
 
 export const AIM_EVAL_MODEL_SWAP_ENV = "AIM_EVAL_MODEL_SWAP_PROFILE"
+/** 评测空稿重试时把线路顺序转一格，避免八次都打同一条已经空过的路。 */
+export const AIM_EVAL_PROVIDER_OFFSET_ENV = "AIM_EVAL_PROVIDER_OFFSET"
 
 /**
  * @description 读取评估用的 model-swap 画像（未设置则不影响生产路由）
@@ -58,6 +60,26 @@ export function readEvalModelSwapProfile(): AimEvalModelSwapProfile | null {
   const raw = process.env[AIM_EVAL_MODEL_SWAP_ENV]?.trim()
   if (raw === "strong" || raw === "weak") return raw
   return null
+}
+
+/**
+ * @description 评测重试时读线路旋转格数；未设置或非法值按 0，生产路径不受影响
+ */
+export function readEvalProviderOffset(): number {
+  const raw = Number.parseInt(process.env[AIM_EVAL_PROVIDER_OFFSET_ENV] ?? "0", 10)
+  if (!Number.isFinite(raw) || raw <= 0) return 0
+  return Math.floor(raw)
+}
+
+/**
+ * @description 把列表从头转到 offset 格，让重试先走下一条线路
+ */
+export function rotateItems<T>(items: readonly T[], offset: number): T[] {
+  if (items.length === 0) return []
+  const length = items.length
+  const shift = ((offset % length) + length) % length
+  if (shift === 0) return [...items]
+  return [...items.slice(shift), ...items.slice(0, shift)]
 }
 
 /**
@@ -96,6 +118,8 @@ const QUALITY_PRIMARY_ROUTE: AgentModelRoute[] = [
   // 末跳兜底：seed 是思考型模型，长 prompt 生成任务实测 120s+，仅作极端降级。
   // key 来源：DOUBAO_API_KEY（已开通账号）优先，回落 ARK_API_KEY（生产账号未开通 seed 模型，勿单独启用）。
   { name: "doubao", model: "doubao-seed-2-1-pro-260628", timeoutMs: 60_000, capability: "standard" },
+  // 考试机常只有 DeepSeek + OpenRouter。质量链原先不含 OpenRouter，DeepSeek 一空就没下一条。
+  { name: "openrouter", model: "qwen/qwen3.7-plus", timeoutMs: 45_000, capability: "standard" },
 ]
 
 export const AGENT_ROUTES = freezeAgentRoutes({
@@ -116,6 +140,7 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 45000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
     { name: "doubao", timeoutMs: 30000, capability: "standard" },
+    { name: "openrouter", model: "qwen/qwen3.7-plus", timeoutMs: 45000, capability: "standard" },
   ],
   business_diagnosis: [...QUALITY_PRIMARY_ROUTE],
 
@@ -272,13 +297,13 @@ export function getAgentLLM(agentId: string, policy?: AgentRoutingPolicy): LLMCl
     const fallbackProviders = allConfigs
       .map((config) => new OpenAICompatibleProvider(config))
       .filter((provider) => provider.isAvailable())
-    return new LLMClient(fallbackProviders, {
+    return new LLMClient(rotateItems(fallbackProviders, readEvalProviderOffset()), {
       maxAttempts: policy.maxProviderAttempts,
       circuitScope: COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId,
     })
   }
 
-  return new LLMClient(providers, {
+  return new LLMClient(rotateItems(providers, readEvalProviderOffset()), {
     maxAttempts: policy?.maxProviderAttempts,
     circuitScope: COPY_STUDIO_ROUTE_ALIASES[agentId] ?? agentId,
   })

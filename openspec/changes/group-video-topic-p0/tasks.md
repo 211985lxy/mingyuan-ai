@@ -16,6 +16,7 @@
 - [ ] 覆盖：长链/短链/无效链接/超长视频/Provider 失败与降级
 - [ ] 飞书测试群正式运行 3 天（回执与结果正确）
 - [x] 线上可回读发布版本、开关状态、健康状态（见 `docs/reports/group-video-topic-shadow-ops-2026-07-26.md`）
+- [x] 2026-09-13：daily 失败样本（正文缺失 / 分析方案冒充脚本）已固化为 `wp1_missing_body_01`、`wp1_analysis_not_script_01`；影子 30 条计时仍未开始
 
 ### 影子样本是什么
 - 真实群消息触发管道后写入的 `Inspiration` 行。

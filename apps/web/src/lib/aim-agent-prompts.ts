@@ -2,7 +2,9 @@ import { AIM_OUTPUT_MAX_CHARS } from "@/lib/aim-benchmark-length"
 import {
   AIM_NORTH_STAR_GOAL,
   AIM_SESSION_PRIORITY_RULES,
+  BOUND_PROJECT_DEFAULT_COPY_RULE,
   LIGHT_EDIT_OUTPUT_BOUNDARY,
+  shouldUseBoundProjectDefaults,
 } from "@/lib/aim-intent-boundaries"
 import type { AimRuntimeTask, ResolvedKnowledgeStrategy } from "@/lib/aim-knowledge-strategy"
 import {
@@ -38,6 +40,9 @@ export interface ContentProducerChatPromptParams {
   methodologyPlan?: import("@/lib/methodology/resolve-copy-methodology-plan").CopyMethodologyPlan
   /** 本轮用户原文，用于推断发布包等渐进块 */
   rawInput?: string
+  /** 当前绑定的客户项目；有值时默认用项目档案写，不再问「谁的生意」 */
+  projectId?: string | null
+  taskSpec?: import("@/lib/task-spec").TaskSpec
   contentAction?: string | null
   hasBenchmarkText?: boolean
   includePublishPackage?: boolean
@@ -76,7 +81,7 @@ export const AIM_HIGH_RISK_LOOP_RULE = [
   "高风险任务验证规则：只在正式交付场景生效，包括定位方案、生意系统体检、100 条选题库、会议纪要资产包、天命全案、完整成稿、发布包、获客文案、小红书图文方案、置顶视频脚本、正式质检报告。",
   "简单问答、局部润色、单句改写、纯发散创意、框架阶段或追问阶段，不要追加“验证结果”区块，避免把回复做重。",
   "命中正式交付场景时，先按内部成功标准组织输出，确认内容有没有围绕当前任务、有没有脱离用户原意、有没有把背景素材用错位置。",
-  "缺失事实统一写“未提供/待补充”，禁止补编案例、数据、来源、命理结论、对标信息或用户没给出的关键背景。",
+  "缺失事实统一写“未提供/待补充”，禁止补编命理结论、对标信息、账单数据和用户没给出的关键背景。口播和营销文案允许编学员故事；诊断、复盘、定位方案仍不得补编案例和数据。",
   "正式交付内容里必须让读者看出：哪些判断来自当前输入、知识库或上下文，哪些地方仍然缺依据；不要扩展成新的复杂模板。",
   "验证结论绝不进正文：已确认什么、待补什么、下一步最小动作这类验证信息只写进 [[AIM_METHOD_NOTE]] 说明区（思考依据），成稿正文保持可发布纯净。",
 ].join("\n")
@@ -119,8 +124,8 @@ export function buildContentProducerKnowledgeRule(input: {
     || knowledgeStrategy === "deep"
   ) {
     return [
-      "转化/人设/深度任务必须落地档案：至少写入 1 个目标客户可对号入座的场景，以及 1 条来自 IP Wiki 或知识库的可追溯卖点/案例/过程证据。",
-      "做不到时在对应位置标注「未提供/待补充」，禁止编造第一人称学员/客户经历。",
+      "转化/人设/深度任务必须落地档案：至少写入 1 个目标客户可对号入座的场景，以及 1 条来自 IP Wiki 或知识库的卖点/案例/过程证据。",
+      "档案没有时可以编口播故事，也可以标注「未提供/待补充」。不要写成保证、承诺、签约效果。",
       "知识库点到为止，服务选题推进，不要整段粘贴或跑题扩写。",
     ].join("\n")
   }
@@ -129,12 +134,12 @@ export function buildContentProducerKnowledgeRule(input: {
 
 export const CONTENT_PRODUCER_OPERATING_LOGIC_RULE = [
   "文案本身必须承载内容运营逻辑，但只在内部完成判断，最终不要输出运营分析、模板名称或写作步骤。",
-  "开写前锁定五件事：一个目标客户、一个真实问题、一个主要内容任务、一个可信证据、一个承接动作；一篇文案不要同时承担多个主任务。",
+  "开写前锁定五件事：一个目标客户、一个真实问题、一个主要内容任务、一个可信证据或口播故事、一个承接动作；一篇文案不要同时承担多个主任务。",
   "内容任务不同，正文重心必须不同：吸引目标客户要先制造停留和转发理由；建立专业信任要用过程、案例、边界或专业判断；推动咨询行动要让读者认出自己的问题，并给低门槛下一步；促进成交要讲清适合谁、不适合谁、为什么值得现在行动。",
   "正文默认按自然叙事完成：开头给停留理由，接着还原具体问题或场景，再给鲜明判断，用事实、案例、过程或方法建立可信度，最后自然落到下一步动作。不要机械输出这些环节标题。",
   "每一段都要承担一个作用：留人、共鸣、解释、证明、筛选或承接。不能说明问题、增强信任或推动行动的段落就删掉。",
   "行动引导的强度要匹配内容任务：曝光内容轻承接，信任内容邀请继续关注或查看案例，获客内容引导评论/私信/领取资料，成交内容才引导预约诊断或进一步咨询。",
-  "没有真实案例、数据或客户反馈时不要编造证据；改用可验证的方法、过程和判断边界支撑内容。",
+  "没有档案案例时，口播可以用学员故事、点名和成交结果做叙事；不要写成保证、承诺、签约效果。",
 ].join("\n")
 
 /** 文案创作对外回复的固定承接：先回「好的老板」，再给正文 */
@@ -153,8 +158,19 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
     knowledgeStrategy: params.knowledgeStrategy,
   })
   const lightEditBlock = params.runtimeTask === "light_edit" ? `\n${LIGHT_EDIT_OUTPUT_BOUNDARY}\n` : ""
+  const useBoundProjectDefaults = shouldUseBoundProjectDefaults({
+    projectId: params.projectId,
+    knowledgeBlock: params.knowledgeBlock,
+    ipWikiBlock: params.ipWikiBlock,
+    taskSpec: params.taskSpec,
+  })
+  const boundProjectBlock = useBoundProjectDefaults
+    ? `\n${BOUND_PROJECT_DEFAULT_COPY_RULE}\n`
+    : ""
   const goalClarify =
-    params.methodologyPlan?.businessGoal === "unclear" && (params.methodologyPlan.confidence ?? 0) < 0.6
+    !useBoundProjectDefaults
+    && params.methodologyPlan?.businessGoal === "unclear"
+    && (params.methodologyPlan.confidence ?? 0) < 0.6
       ? `\n目标确认（仅当目标仍模糊时，最多追问 1 题 + 下列选项，不要开放追问）：\n这条内容更想达成哪个目标？\nA. 获客线索（留资/私信/预约诊断）\nB. 成交转化（报名/购买）\nC. 人设信任（来时路/专业可信）\nD. 品牌曝光（起号/流量/品宣）\n`
       : ""
 
@@ -203,7 +219,7 @@ export function buildContentProducerChatPrompt(params: ContentProducerChatPrompt
       methodologySection,
       ipWikiBlock: params.ipWikiBlock ? `\n客户 IP 专属档案（仅当前项目）：\n${params.ipWikiBlock}` : "",
       lightEditBlock,
-      goalClarify,
+      goalClarify: `${boundProjectBlock}${goalClarify}`,
       progressiveBlocks: progressiveBlocks.length ? `${progressiveBlocks.join("\n\n")}\n` : "",
       replyOpening: CONTENT_PRODUCER_REPLY_OPENING,
       knowledgeRule,

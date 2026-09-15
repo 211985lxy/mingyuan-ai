@@ -1,10 +1,13 @@
+import { AIM_FACT_PRIORITY_RULE } from "@/lib/aim-context-priority"
+import type { TaskSpec } from "@/lib/task-spec"
+
 /**
  * Chat / Generate 共享的意图边界与轻改硬规则。
  * 两端必须复用同一文案，避免「优化开头」在 chat 只改局部、在 generate 却全文重写。
  */
 
 export const AIM_NORTH_STAR_GOAL =
-  "基于客户项目档案（IP Wiki / 知识库 / TaskSpec）生成可拍摄、可发布、可承接转化的针对性文案；严格服从本轮用户意图（新建 / 重写 / 轻改）；信息不足时标注「未提供/待补充」，禁止编造第一人称案例。"
+  "基于客户项目档案（IP Wiki / 知识库 / TaskSpec）生成可拍摄、可发布、可承接转化的针对性文案；严格服从本轮用户意图（新建 / 重写 / 轻改）；口播允许编学员故事、点名和成交结果，不要写成保证效果。"
 
 /** 局部修改部位词典（与 resolveAimRuntimeTask 对齐） */
 export const LOCAL_EDIT_PART_WORDS = [
@@ -25,6 +28,59 @@ export const LIGHT_EDIT_OUTPUT_BOUNDARY = [
 
 export const LIGHT_EDIT_USER_INSTRUCTION =
   "请只根据用户原文、选区和修改要求做局部优化；替换稿只改用户点名的内容，不要顺手改未点名的开头、工具名、结尾或结构；如果用户只要求优化开头/前三秒/第一句话/钩子，只输出开头候选或一个开头替换稿（数量按用户指令，没说先问一句要几个），禁止输出整篇文案；可以给开头、结构、结尾等简短可选建议，但不要主动结合企业知识库扩写。"
+
+/** 已绑定客户项目时：不要再问这是谁的生意。 */
+export const BOUND_PROJECT_NO_IDENTITY_ASK_RULE = [
+  "当前已绑定客户项目。禁止追问「写谁的生意」「这是谁的项目」「客户是谁」「卖什么」「受众是谁」。",
+  "身份、生意、客户、产品一律以当前项目 IP 档案和知识库为准；档案里有的必须用，没有的写「未提供/待补充」，不要改成盘问。",
+].join("\n")
+
+/** 内容创作：绑了项目后，「写个文案」默认就写当前项目。 */
+export const BOUND_PROJECT_DEFAULT_COPY_RULE = [
+  BOUND_PROJECT_NO_IDENTITY_ASK_RULE,
+  "用户只说「写个文案」「写个脚本」「写个内容」时，默认就写当前项目，不要先盘问再动笔。",
+  "本条内容目标：档案里已有默认内容目标就按默认写；没有也不要先问一长串，直接按获客线索写一版，再标注待确认。",
+].join("\n")
+
+export type BoundProjectDefaultContext = {
+  projectId?: string | null
+  knowledgeBlock?: string | null
+  ipWikiBlock?: string | null
+  topicTitle?: string | null
+  topicRationale?: string | null
+  hotTopic?: string | null
+  taskSpec?: Pick<TaskSpec, "knownFacts"> | null
+}
+
+export function hasBoundProjectArchive(context: BoundProjectDefaultContext): boolean {
+  const meaningfulKnowledge = context.knowledgeBlock
+    ?.replace(AIM_FACT_PRIORITY_RULE, "")
+    .trim()
+  return Boolean(
+    meaningfulKnowledge
+    || context.ipWikiBlock?.trim()
+    || context.topicTitle?.trim()
+    || context.topicRationale?.trim()
+    || context.hotTopic?.trim()
+    || context.taskSpec?.knownFacts?.length,
+  )
+}
+
+/** 账号已绑项目，或本轮已经有项目档案/知识：不要再问「写谁的生意」。 */
+export function shouldUseBoundProjectDefaults(context: BoundProjectDefaultContext): boolean {
+  return Boolean(context.projectId?.trim()) || hasBoundProjectArchive(context)
+}
+
+/** 诊断/选题对话：把项目档案和「别问这是谁的生意」放进上下文。 */
+export function buildBoundProjectContextPrefix(context: BoundProjectDefaultContext): string {
+  const wiki = context.ipWikiBlock?.trim()
+    ? `客户 IP 专属档案（仅当前项目）：\n${context.ipWikiBlock}`
+    : ""
+  const identity = shouldUseBoundProjectDefaults(context)
+    ? BOUND_PROJECT_NO_IDENTITY_ASK_RULE
+    : ""
+  return [identity, wiki].filter(Boolean).join("\n\n")
+}
 
 /** Chat 会话优先级与纠偏原则（原 content_producer chat 原则 16–20） */
 export const AIM_SESSION_PRIORITY_RULES = [

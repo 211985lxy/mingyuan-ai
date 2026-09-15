@@ -73,9 +73,42 @@ describe("AIM content production positioning", () => {
     expect(prompt).toContain("可假设交付并标注待确认项")
     expect(prompt).toContain("好的老板")
     expect(prompt).toContain("禁止「您好/很高兴为您服务/感谢咨询」这类空客套")
-    expect(prompt).toContain("可追溯")
-    expect(prompt).toContain("绝不虚构")
+    expect(prompt).toContain("口播允许编学员故事")
+    expect(prompt).not.toContain("绝不虚构")
     expect(prompt).not.toContain("不在内容生产官里追问")
+    expect(prompt).not.toContain("禁止追问「写谁的生意」")
+  })
+
+  it("does not ask whose business when a project is already bound", () => {
+    const unclearPlan = {
+      businessGoal: "unclear" as const,
+      contentRoute: "problem_solve" as const,
+      cardIds: [] as string[],
+      structureModules: [] as string[],
+      confidence: 0.2,
+      source: "inferred" as const,
+      assumptions: [] as string[],
+    }
+    const unbound = buildContentProducerChatPrompt({
+      conversationBlock: "",
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      ipWikiBlock: "",
+      methodologyPlan: unclearPlan,
+    })
+    expect(unbound).toContain("这条内容更想达成哪个目标")
+
+    const bound = buildContentProducerChatPrompt({
+      conversationBlock: "",
+      knowledgeBlock: "",
+      methodologyBlock: "",
+      ipWikiBlock: "【人设】供暖改造主理人\n【客户】小区业主",
+      projectId: "project-bound",
+      methodologyPlan: unclearPlan,
+      rawInput: "写个文案",
+    })
+    expect(bound).toContain("禁止追问「写谁的生意」")
+    expect(bound).not.toContain("这条内容更想达成哪个目标")
   })
 
   it("requires content producer replies to open with 好的老板", () => {
@@ -85,6 +118,15 @@ describe("AIM content production positioning", () => {
       targetFormats: ["video_script"],
     } as never)
     expect(systemPrompt).toContain("好的老板")
+    expect(systemPrompt).not.toContain("禁止追问「写谁的生意」")
+
+    const boundSystemPrompt = buildProducerSystemPrompt("agent", {
+      rawInput: "写个文案",
+      targetFormats: ["video_script"],
+      projectId: "project-bound",
+      ipWikiBlock: "【人设】供暖改造主理人",
+    } as never)
+    expect(boundSystemPrompt).toContain("禁止追问「写谁的生意」")
   })
 
   it("keeps one canonical spoken-script instruction with no hidden length defaults", () => {

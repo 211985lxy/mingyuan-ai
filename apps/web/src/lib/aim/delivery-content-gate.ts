@@ -1,6 +1,6 @@
 import type { ContentFormat } from "@/lib/aim-generator"
 import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
-import { inspectAimDeliveryCandidate } from "@/lib/aim/output-delivery-gate"
+import { collectDeliveryMetaLeakLines, inspectAimDeliveryCandidate } from "@/lib/aim/output-delivery-gate"
 import {
   detectSpokenChainOfThoughtLeakage,
   extractSpokenFinalDraft,
@@ -61,7 +61,10 @@ export function inspectDeliveryContent(input: {
   const protocol = inspectAimDeliveryCandidate({ contents: { [input.format]: body } })
   if (!protocol.passed) {
     if (protocol.code === "empty_final_content") violations.add("missing_final_content")
-    else violations.add("prompt_leak")
+    else {
+      violations.add("prompt_leak")
+      leakedLines.push(...collectDeliveryMetaLeakLines(body))
+    }
   }
 
   for (const line of body.split(/\r?\n/)) {
@@ -83,6 +86,15 @@ export function inspectDeliveryContent(input: {
   return { passed: false, violations: [...violations], leakedLines }
 }
 
+function formatGivenNumbersRetryHint(evidenceText?: string): string {
+  const numbers = [...new Set((evidenceText ?? "").match(/\d+(?:\.\d+)?/g) ?? [])]
+    .filter((value) => value.length >= 3 || Number(value) >= 100)
+  if (!numbers.length) {
+    return "知识库里已经给出的数字必须写进成稿，不能改交分析方案。"
+  }
+  return `证据里已经出现：${numbers.join("、")}。这些必须写进可拍摄正文，不算编造。禁止改交分析方案。`
+}
+
 export function applyDeliveryContentGate(input: {
   parsed: Partial<Record<ContentFormat, string>>
   targetFormats: ContentFormat[]
@@ -90,6 +102,7 @@ export function applyDeliveryContentGate(input: {
   attempt: number
   maxAttempts: number
   originalPrompt: string
+  evidenceText?: string
 }): { ok: true } | { ok: false; retryPrompt: string } {
   const intent = input.intent ?? fallbackIntent()
   const failed: Array<{ format: ContentFormat; violations: AimDeliveryViolation[]; leakedLines: string[] }> = []
@@ -122,7 +135,7 @@ export function applyDeliveryContentGate(input: {
     ok: false,
     retryPrompt: `${input.originalPrompt}
 
-上一版交付闸门未通过（${labels}）。正文从第一句起必须是可直接使用的成稿；任务分析、系统提示、自检和格式说明不得进入正文。
+上一版交付闸门未通过（${labels}）。正文从第一句起必须是可直接使用的成稿；任务分析、系统提示、自检和格式说明不得进入正文。${formatGivenNumbersRetryHint(input.evidenceText)}
 ${samples.length ? `例如不得出现：\n${samples.map((s) => `- ${s}`).join("\n")}` : ""}`,
   }
 }

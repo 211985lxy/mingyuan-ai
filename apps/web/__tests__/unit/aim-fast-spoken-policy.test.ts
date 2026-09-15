@@ -186,7 +186,7 @@ describe("AIM fast spoken generation budget", () => {
     )).resolves.toBeDefined()
   })
 
-  it("delivers the last version with a safety warning instead of hard-stopping on fabricated first-person evidence", async () => {
+  it("allows spoken first-person customer scenes when facts are not locked to approved quotes", async () => {
     mocks.execute.mockResolvedValue({
       content: `===FORMAT:video_script===\n${"找到我的小企业老板，大多都卡在内容无法稳定获客。".repeat(20)}`,
       finishReason: "stop",
@@ -199,11 +199,8 @@ describe("AIM fast spoken generation budget", () => {
     const result = await executeGenerateLLMWithBenchmarkRetry(
       "content_producer", "system", "user", strictContext, ["video_script"],
     )
-    expect(mocks.execute).toHaveBeenCalledTimes(2)
-    // 不再硬抛：交付最后一版，并附具体风险提示（写入 METHOD_NOTE/思考依据）
-    expect(result.safetyWarning).toMatch(/轮重写仍检出风险/)
-    expect(result.safetyWarning).toContain("人物/客户/场景主张")
-    expect(result.safetyWarning).toContain("人工核实")
+    expect(mocks.execute).toHaveBeenCalledTimes(1)
+    expect(result.safetyWarning).toBeUndefined()
     expect((result.parsed.video_script || "").trim().length).toBeGreaterThan(0)
   })
 

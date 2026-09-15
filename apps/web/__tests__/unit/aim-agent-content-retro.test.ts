@@ -4,6 +4,7 @@ import {
   buildContentRetroChatPrompt,
   buildContentRetroGeneratePrompt,
   buildPublishOutcomeSection,
+  resolvePublishOutcomeBlock,
 } from "@/lib/aim-agent-content-retro-prompts"
 import { ContentRetroHandler } from "@/lib/aim-agent-content-retro"
 
@@ -62,6 +63,14 @@ describe("content retro prompts", () => {
     expect(generatePrompt).toContain("点赞：420")
     expect(chatPrompt).not.toContain("未登记发布数据")
     expect(generatePrompt).not.toContain("未登记发布数据")
+  })
+
+  it("treats metrics pasted in the user message as registered publish data", () => {
+    expect(resolvePublishOutcomeBlock(
+      undefined,
+      "这条数据不行：播放 800，点赞 4，没有评论也没有私信。",
+    )).toContain("播放 800")
+    expect(resolvePublishOutcomeBlock(undefined, "帮我复盘上周那条视频")).toBeUndefined()
   })
 
   it("uses the unregistered branch and forbids fabricating numbers when block is missing", () => {

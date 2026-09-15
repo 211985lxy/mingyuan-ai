@@ -190,7 +190,12 @@ export function resetProviderCircuitForTests(): void {
   defaultCircuit = createProviderCircuit()
 }
 
+function evalCircuitDisabled(): boolean {
+  return process.env.AIM_EVAL_DISABLE_CIRCUIT === "1"
+}
+
 export async function isProviderCircuitOpen(provider: string, model: string, scope?: string): Promise<boolean> {
+  if (evalCircuitDisabled()) return false
   try {
     return await defaultCircuit.isOpen(provider, model, scope)
   } catch {
@@ -243,6 +248,7 @@ export async function observeProviderCircuit(
   outcome: { ok: true } | { ok: false; kind: ProviderErrorKind; message: string },
   scope?: string,
 ): Promise<void> {
+  if (evalCircuitDisabled()) return
   if (outcome.ok) {
     await recordProviderCircuitSuccess(provider, model, scope)
     return

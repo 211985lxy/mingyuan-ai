@@ -334,7 +334,7 @@ export function resolveAimTurnIntent(input: {
     }
   } else if (action === "create") {
     keep.push("本轮明确选题与交付格式")
-    avoid.push("编造无依据的第一人称案例", "空泛开场套话")
+    avoid.push("写成保证、承诺、签约效果", "空泛开场套话")
   } else if (action === "rewrite") {
     keep.push("原选题核心")
     avoid.push("照抄原句", "另起一个主题")

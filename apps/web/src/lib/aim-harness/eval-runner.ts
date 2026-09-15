@@ -20,7 +20,10 @@ import { gradeFixture } from "./eval/graders"
 import { judgeEvalCase } from "./eval-rubric"
 import { validateFormat, planAimRun } from "./index"
 import { deliveryBody } from "@/lib/aim-generation-text"
-import { formatLearningsBlock, stripLearningsPrefix } from "@/lib/aim/learning-injection"
+import { formatLearningsBlock, mergeLearningsIntoKnowledge, stripLearningsPrefix } from "@/lib/aim/learning-injection"
+import { sampleFixtures } from "./eval-sampling"
+
+export { sampleFixtures }
 
 /** What a context adapter returns for a fixture. */
 export interface EvalContext {
@@ -48,12 +51,13 @@ export function createFrozenContextAdapter(): EvalContextAdapter {
     name: "frozen",
     async load(fixture: EvalFixture): Promise<EvalContext> {
       const ctx: FrozenContext = fixture.seedContext
-      const knowledgeBlock = [
+      const knowledgeOnly = ctx.knowledge
+        .map((entry) => `【${entry.title}】(${entry.category})\n${entry.content}`)
+        .join("\n\n")
+      const knowledgeBlock = mergeLearningsIntoKnowledge(
+        knowledgeOnly,
         formatLearningsBlock(ctx.learnings ?? []),
-        ctx.knowledge
-          .map((entry) => `【${entry.title}】(${entry.category})\n${entry.content}`)
-          .join("\n\n"),
-      ].filter(Boolean).join("\n\n")
+      )
       return {
         knowledgeBlock,
         ipWikiBlock: ctx.ipWikiBlock ?? "",
@@ -99,6 +103,8 @@ export interface EvalRunOptions {
   onProgress?: (done: number, total: number, fixtureId: string) => void
   /** Required for real-model runs. Deterministic CI intentionally omits it. */
   executor?: EvalExecutor
+  /** Last eval retry may keep a truncated spoken draft so the judge still scores it. */
+  acceptTruncatedSpoken?: boolean
 }
 
 export interface EvalExecutionResult {
@@ -126,6 +132,60 @@ export interface EvalRunReport {
 }
 
 const RUBRIC_PASS_THRESHOLD = 70
+const EVAL_PROVIDER_RETRY_ATTEMPTS = 8
+const EVAL_PROVIDER_RETRY_DELAY_MS = 1500
+const PROVIDER_EMPTY_BODY = /未能返回完整正文|模型服务暂时未能返回|没有满足你当前的要求，未作为正式成稿|生成失败，请稍后重试|生成结果不包含可安全交付的最终内容|生成结果被截断或正文过短|连续修正后仍未完成当前要求/
+
+function isRetryableEvalError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return PROVIDER_EMPTY_BODY.test(message)
+}
+
+function delayEvalRetry(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function spokenEvalDraftLooksTruncated(drafts: Array<{ format: string; content: string }>): boolean {
+  return drafts.some((draft) => {
+    if (draft.format !== "video_script" && draft.format !== "koubo_script") return false
+    const body = deliveryBody(draft.content).trim()
+    if (body.length < 40) return false
+    if (/[，,：:]$/u.test(body)) return true
+    return !/[。！？!?…"”』」）)\]]\s*$/u.test(body)
+  })
+}
+
+const EVAL_PROVIDER_OFFSET_ENV = "AIM_EVAL_PROVIDER_OFFSET"
+
+async function runEvalCaseWithProviderRetry(
+  fixture: EvalFixture,
+  adapter: EvalContextAdapter,
+  options: EvalRunOptions,
+): Promise<EvalCaseResult> {
+  const maxAttempts = EVAL_PROVIDER_RETRY_ATTEMPTS
+  let lastError: unknown
+  const previousOffset = process.env[EVAL_PROVIDER_OFFSET_ENV]
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    process.env[EVAL_PROVIDER_OFFSET_ENV] = String(attempt)
+    try {
+      return await runEvalCase(fixture, adapter, {
+        ...options,
+        acceptTruncatedSpoken: attempt === maxAttempts - 1,
+      })
+    } catch (error) {
+      lastError = error
+      if (!isRetryableEvalError(error) || attempt === maxAttempts - 1) throw error
+      console.warn(
+        `[aim-eval] ${fixture.id} 空稿重试 ${attempt + 1}/${maxAttempts}，下一次先换第 ${attempt + 1} 条线路`,
+      )
+      if (!options.skipRubric) await delayEvalRetry(EVAL_PROVIDER_RETRY_DELAY_MS)
+    } finally {
+      if (previousOffset === undefined) delete process.env[EVAL_PROVIDER_OFFSET_ENV]
+      else process.env[EVAL_PROVIDER_OFFSET_ENV] = previousOffset
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError))
+}
 
 /**
  * The shared executor: plan the fixture, run the (mock/frozen) generation, then
@@ -172,6 +232,9 @@ export async function runEvalCase(
     content: deliveryBody(draft.content),
     contentPreview: deliveryBody(draft.content),
   }))
+  if (options.executor && spokenEvalDraftLooksTruncated(drafts) && !options.acceptTruncatedSpoken) {
+    throw new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求")
+  }
 
   const formatValidations = drafts.map((draft) => {
     const result = validateFormat({
@@ -254,28 +317,6 @@ function deterministicDraftFor(
   return `${fixture.input.rawInput.slice(0, 40)} 的${format}稿件（确定性占位，仅用于 eval 路由/格式/上下文校验）。${knowledgeSnippet}`
 }
 
-/** Deterministic sample of N fixtures (stable across runs, exactly N). */
-/**
- * @description samplefixtures
- * @param fixtures - fixtures
- * @param sampleSize? - sampleSize?
- * @returns EvalFixture[]
- */
-export function sampleFixtures(
-  fixtures: readonly EvalFixture[],
-  sampleSize?: number
-): EvalFixture[] {
-  if (!sampleSize || sampleSize >= fixtures.length) return [...fixtures]
-  // Evenly-spaced deterministic selection so the same N cases are picked every
-  // run and every fixture has an equal chance of inclusion.
-  const sampled: EvalFixture[] = []
-  for (let i = 0; i < sampleSize; i += 1) {
-    const index = Math.floor((i * fixtures.length) / sampleSize)
-    sampled.push(fixtures[index])
-  }
-  return sampled
-}
-
 /** Run a set of fixtures and aggregate. */
 /**
  * @description 运行evalsuite
@@ -296,7 +337,7 @@ export async function runEvalSuite(
   for (const fixture of sampled) {
     for (let rep = 0; rep < repetitions; rep += 1) {
       try {
-        const result = await runEvalCase(fixture, adapter, options)
+        const result = await runEvalCaseWithProviderRetry(fixture, adapter, options)
         results.push(result)
       } catch (error) {
         results.push({

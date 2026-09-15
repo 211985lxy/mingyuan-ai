@@ -43,6 +43,38 @@ describe("semantic delivery verifier", () => {
     expect(execute).toHaveBeenCalledTimes(3)
   })
 
+  it("rejects a missing-body provider stub without calling the LLM verifier", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "[[AIM_VERDICT:PASS]]" })
+    await expect(verifyAimDelivery({
+      envelope: { currentUserRequest: "出一版抖音口播", relevantConversation: [], referenceMaterials: [] },
+      candidate: "模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。",
+      agentId: "content_producer",
+      complete,
+    })).resolves.toEqual({
+      passed: false,
+      gaps: ["候选没有完整正文，不能把线路失败说明当成交付"],
+    })
+    expect(complete).not.toHaveBeenCalled()
+  })
+
+  it("rejects an analysis-plan candidate without calling the LLM verifier", async () => {
+    const complete = vi.fn().mockResolvedValue({ content: "[[AIM_VERDICT:PASS]]" })
+    const analysis = `好的老板。本轮输入只锁定了结构、没锁定具体主题素材，我按最贴近该结构服务场景的选题假设交付一版口播成稿，缺口位置已如实标注。
+
+1. 目标判定
+- businessGoal：lead（获客）。依据：用户本轮显式要求仿写「3秒抛冲突→身份认同`
+    await expect(verifyAimDelivery({
+      envelope: { currentUserRequest: "参考对标结构仿写一条脚本", relevantConversation: [], referenceMaterials: [] },
+      candidate: analysis,
+      agentId: "content_producer",
+      complete,
+    })).resolves.toEqual({
+      passed: false,
+      gaps: ["候选是分析方案或任务复述，不是可直接使用的脚本正文"],
+    })
+    expect(complete).not.toHaveBeenCalled()
+  })
+
   it("gives the verifier source-labeled conversation and references", async () => {
     const complete = vi.fn().mockResolvedValue({ content: "[[AIM_VERDICT:PASS]]" })
     await verifyAimDelivery({

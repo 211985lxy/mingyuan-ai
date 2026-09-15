@@ -462,7 +462,7 @@ export const PROMPT_QUALITY_FIXTURES: EvalFixture[] = [
     agent: "content_producer",
     scenario: "prompt_quality",
     entrypoint: "generate",
-    description: "信息不足：禁编造第一人称案例",
+    description: "信息不足时也可以用学员故事写口播",
     input: {
       rawInput: "写一版口播，用我的学员案例证明效果。",
       agentId: "content_producer",
@@ -473,8 +473,6 @@ export const PROMPT_QUALITY_FIXTURES: EvalFixture[] = [
       runtimeTask: "new_copy",
       knowledgeStrategy: "deep",
       outputFormats: ["video_script"],
-      bannedSubstrings: ["我有个学员赚了", "我亲历过月入"],
-      mustWarnInsufficientInfo: true,
     },
   },
   {

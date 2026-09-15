@@ -21,10 +21,11 @@ import {
   evaluateEvalGate,
   type EvalRunReport,
 } from "@/lib/aim-harness/eval-runner"
-import { buildRubricPrompt } from "@/lib/aim-harness/eval-rubric"
+import { buildRubricPrompt, normalizeJudgeFabrication } from "@/lib/aim-harness/eval-rubric"
 import {
   createRealEvalExecutor,
   warnedInsufficientInfo,
+  buildEvalChatHandlerInput,
 } from "@/lib/aim-harness/eval-real-executor"
 
 describe("aim-harness eval runner (frozen, deterministic)", () => {
@@ -33,6 +34,269 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     const b = sampleFixtures(ALL_FIXTURES, 15).map((f) => f.id)
     expect(a).toEqual(b)
     expect(a).toHaveLength(15)
+  })
+
+  it("keeps every WP-1 contract regression in the daily 15-case sample", () => {
+    const regressions = ALL_FIXTURES.filter((fixture) => fixture.contractRegressionOnly)
+    expect(regressions.map((fixture) => fixture.id).sort()).toEqual([
+      "wp1_analysis_not_script_01",
+      "wp1_missing_body_01",
+    ])
+
+    const daily = sampleFixtures(ALL_FIXTURES, 15).map((fixture) => fixture.id)
+    expect(daily).toEqual(expect.arrayContaining(regressions.map((fixture) => fixture.id)))
+
+    const baseline = ALL_FIXTURES.filter((fixture) => !fixture.contractRegressionOnly)
+    const nonRegressionDaily = daily.filter((id) => !regressions.some((fixture) => fixture.id === id))
+    expect(baseline).toHaveLength(ALL_FIXTURES.length - regressions.length)
+    expect(nonRegressionDaily).toEqual(sampleFixtures(baseline, 13).map((fixture) => fixture.id))
+  })
+
+  it("exposes knowledge numbers as already-given facts for the hallucination fixture", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_learnings_hallucination_26")!
+    const ctx = await createFrozenContextAdapter().load(fixture)
+    expect(ctx.knowledgeBlock).toContain("1800")
+    expect(ctx.knowledgeBlock).toContain("1100")
+    expect(ctx.knowledgeBlock.indexOf("1800")).toBeLessThan(ctx.knowledgeBlock.indexOf("禁止编造未给出的数字"))
+    expect(ctx.knowledgeBlock).toContain("不算编造")
+    expect(ctx.knowledgeBlock).toContain("不要自行加减出新数字")
+  })
+
+  it("feeds frozen IP wiki into real chat execution", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "pq_ground_15")!
+    const chatFixture = {
+      ...fixture,
+      entrypoint: "chat" as const,
+    }
+    const ctx = await createFrozenContextAdapter().load(chatFixture)
+    const input = buildEvalChatHandlerInput(chatFixture, ctx)
+    expect(input.ipWikiBlock).toContain("IP定位")
+    expect(input.knowledgeBlock).toContain("主推产品")
+  })
+
+  it("rotates the provider offset on each empty-body retry so the next attempt starts on another line", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    const offsets: string[] = []
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        offsets.push(process.env.AIM_EVAL_PROVIDER_OFFSET ?? "missing")
+        throw new Error("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
+      },
+    })
+
+    expect(offsets).toEqual(["0", "1", "2", "3", "4", "5", "6", "7"])
+    expect(process.env.AIM_EVAL_PROVIDER_OFFSET).toBeUndefined()
+    expect(report.contractPassRate).toBe(0)
+    expect(report.results[0]?.error).toContain("未能返回完整正文")
+  })
+
+  it("retries a real-model case once when the provider returns an empty-body error", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          throw new Error("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "重试后交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
+  })
+
+  it("retries a real-model case twice when the provider keeps returning an empty body", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls < 3) {
+          throw new Error("模型服务暂时未能返回完整正文，素材和要求已保留。点击重试会自动更换线路。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "第三次才交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_third_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(3)
+    expect(report.contractPassRate).toBe(1)
+  })
+
+  it("retries a real-model case through the fifth attempt when empty bodies keep coming", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls < 5) {
+          throw new Error("生成结果没有满足你当前的要求，未作为正式成稿交付。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "第五次才交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_fifth_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(5)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
+  })
+
+  it("retries a real-model case through the eighth attempt when empty bodies keep coming", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls < 8) {
+          throw new Error("生成失败，请稍后重试")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "第八次才交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_retry_eighth_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(8)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
+  })
+
+  it("retries a spoken draft that stops mid-sentence instead of scoring the stump", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_imitate_07")!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          return {
+            drafts: [{
+              format: "video_script",
+              content: "发了不少内容，询盘没几个。先别急着怪产品。做企业客户的老板，卡在这一步的特别多。不是不专业，恰恰是太专业了，专业",
+            }],
+            citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+            runId: "run_truncated_first",
+          }
+        }
+        return {
+          drafts: [{
+            format: "video_script",
+            content: "发了不少内容，询盘没几个。先别急着怪产品。评论区扣清单，我发你对照表。",
+          }],
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_truncated_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.drafts[0]?.contentPreview).toContain("评论区扣清单")
+  })
+
+  it("still scores a spoken draft if every retry stays truncated", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "cp_imitate_07")!
+    let calls = 0
+    const stump = "发了不少内容，询盘没几个。先别急着怪产品。做企业客户的老板，卡在这一步的特别多。不是不专业，恰恰是太专业了，专业"
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        return {
+          drafts: [{ format: "video_script", content: stump }],
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: `run_truncated_keep_${calls}`,
+        }
+      },
+    })
+
+    expect(calls).toBe(8)
+    expect(report.results[0]?.error).toBeUndefined()
+    expect(report.results[0]?.drafts[0]?.contentPreview).toContain("太专业了")
+  })
+
+  it("retries a real-model case once when delivery is rejected as unfinished", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          throw new Error("生成结果没有满足你当前的要求，未作为正式成稿交付。")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "重试后交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_delivery_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+  })
+
+  it("retries a real-model case once when generation throws the generic retry message", async () => {
+    const fixture = ALL_FIXTURES.find((item) => item.expectations.outputFormats.length > 0)!
+    let calls = 0
+    const report = await runEvalSuite([fixture], createFrozenContextAdapter(), {
+      skipRubric: true,
+      executor: async () => {
+        calls += 1
+        if (calls === 1) {
+          throw new Error("生成失败，请稍后重试")
+        }
+        return {
+          drafts: fixture.expectations.outputFormats.map((format) => ({
+            format,
+            content: "重试后交出的完整正文，长度足够用于发布。",
+          })),
+          citedKnowledgeIds: fixture.seedContext.knowledge.map((entry) => entry.id),
+          runId: "run_generic_retry_ok",
+        }
+      },
+    })
+
+    expect(calls).toBe(2)
+    expect(report.contractPassRate).toBe(1)
+    expect(report.results[0]?.error).toBeUndefined()
   })
 
   it("reports 100% contract pass rate across all fixtures (no model)", async () => {
@@ -164,6 +428,43 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(warnedInsufficientInfo([
       { content: "你还没填发布数据，所以现在没法做真正的复盘，所有硬指标全是空的。" },
     ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "你想写什么主题？先把产品和对象告诉我，我才能写。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板，这句信息量还不够，我不编。先确认一个，剩下三行补给我就能直接出稿：" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板，你这条没给选题、没给行业、没给案例，我按「问题解决型」先落一版。凡是你的真实信息，我用【】标出来，【】里的东西我一个都没替你编。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: `---
+
+## 标题备选
+
+1. 别急着做IP，先回答这四个问题
+2. 定位做不出来，九成不是文案问题
+3. 我为什么不先给你写简介
+
+# 别急着做IP，先回答这四个问题
+
+老板找我做IP，第一句话往往是："帮我起个号名，写段简介"。` },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "这份方案现在只能算半成品。没有行业、没有产品、没有客户、没有一个能拿出去晒的结果。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板，这个我直接说：**现在手上一条你的生意信息都没有，写出来就是编的，我不干这个。**" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板。\n\n现在手里只有「写个文案」这四个字——行业、产品、卖给谁、发在哪、要谁来，全都没有。这样直接出稿，我只能靠编，编出来的东西你不敢发。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "这篇我现在写不了成稿——不是不会写，是手上一条能落地的事实都没有：不知道你卖给谁、卖什么、打的是哪类客户、客户在烦什么。" },
+    ])).toBe(true)
+    expect(warnedInsufficientInfo([
+      { content: "好的老板。写之前我就卡一件事，得先定它：\n\n**这条内容更想达成哪个目标？**\nA. 获客线索（留资/私信/预约诊断）\nB. 成交转化（报名/购买）\nC. 人设信任（来时路/专业可信）\nD. 品牌曝光（起号/流量/品宣）\n\n你回个字母就行。" },
+    ])).toBe(true)
   })
 
   it("shows the judge the frozen context used by the real executor", () => {
@@ -173,8 +474,45 @@ describe("aim-harness eval runner (frozen, deterministic)", () => {
     expect(prompt).toContain("爆款标题套路：数字+痛点+悬念")
     expect(prompt).toContain("比如/例如/假设")
     expect(prompt).toContain("属于创意表达，不得判为编造")
-    expect(prompt).toContain("我有个学员/客户/朋友")
+    expect(prompt).toContain("我有个学员张三成交了 8 万")
+    expect(prompt).toContain("即使档案没写过，也不得判为编造")
     expect(prompt).toContain("未提供/待补充")
+    expect(prompt).toContain("直接加减得到的差值")
+    expect(prompt).toContain("口播和营销文案允许编学员故事")
+    expect(prompt).not.toContain("不得把虚构人物经历、数字或客户案例冒充真实事实")
+  })
+
+  it("shows the judge the hot topic that the producer actually received", () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "pq_new_hot_08")!
+    const prompt = buildRubricPrompt(fixture, "私域见顶以后，先把老客户服务做扎实。")
+
+    expect(prompt).toContain("私域流量见顶")
+  })
+
+  it("does not treat named student results as fabricated facts in ordinary copy", () => {
+    expect(normalizeJudgeFabrication({
+      fabricated: true,
+      reasons: "编造了学员案例和具体数据（美业学员老李、80万、3倍）",
+      rawInput: "用这个热点写一篇小红书种草文。",
+    })).toBe(false)
+    expect(normalizeJudgeFabrication({
+      fabricated: true,
+      reasons: "把效果写成保证签约",
+      rawInput: "写一版口播",
+    })).toBe(true)
+    expect(normalizeJudgeFabrication({
+      fabricated: true,
+      reasons: "编造了档案没有的成交数字",
+      rawInput: "不得编造数字，必须准确引用事实：客单价 1980。",
+    })).toBe(true)
+  })
+
+  it("tells the judge that retro refusing a new script is a pass", () => {
+    const fixture = ALL_FIXTURES.find((item) => item.id === "retro_task_semantics_04")!
+    const prompt = buildRubricPrompt(fixture, "播放只有 800，先别写新稿，把这条为什么没人私信说清楚。")
+
+    expect(prompt).toContain("只交复盘、拒绝写稿是正确完成任务")
+    expect(prompt).toContain("不得再以未登记为由拒绝复盘")
   })
 
   it("dispatches real eval cases to the production generation/chat runners", async () => {

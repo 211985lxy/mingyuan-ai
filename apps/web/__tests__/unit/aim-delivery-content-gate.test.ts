@@ -88,6 +88,33 @@ ${CLEAN}
       expect(result.passed, format).toBe(false)
     }
   })
+
+  it("puts analysis-plan lines into leakedLines so retry can name the fake script", () => {
+    const result = inspectDeliveryContent({
+      format: "video_script",
+      content: "本轮输入只锁定了结构，缺口位置已如实标注。\n1. 目标判定\n- businessGoal：lead\n\n这里没有可拍的口播。",
+      intent: unsetIntent,
+    })
+    expect(result.passed).toBe(false)
+    if (!result.passed) {
+      expect(result.violations).toContain("prompt_leak")
+      expect(result.leakedLines.some((line) => line.includes("只锁定了结构"))).toBe(true)
+      expect(result.leakedLines.some((line) => line.includes("目标判定"))).toBe(true)
+      expect(result.leakedLines.some((line) => line.includes("businessGoal"))).toBe(true)
+    }
+  })
+
+  it("rejects imitate drafts that enumerate 内容路由 instead of a script", () => {
+    const result = inspectDeliveryContent({
+      format: "video_script",
+      content: `好的老板。先说一句：这条对标你只给了结构、没给原文和主题。\n2. 内容路由：problem_solve（问题解决）\n这里没有可拍的口播。`,
+      intent: unsetIntent,
+    })
+    expect(result.passed).toBe(false)
+    if (!result.passed) {
+      expect(result.leakedLines.some((line) => line.includes("内容路由"))).toBe(true)
+    }
+  })
 })
 
 describe("applyDeliveryContentGate", () => {
@@ -124,6 +151,40 @@ describe("applyDeliveryContentGate", () => {
       maxAttempts: 3,
       originalPrompt: "写口播",
     })).toThrow(AimDeliveryContentError)
+  })
+
+  it("tells a retry to use knowledge numbers instead of handing in an analysis plan", () => {
+    const first = applyDeliveryContentGate({
+      parsed: { video_script: "本轮输入只锁定了结构。\n1. 目标判定\n太短" },
+      targetFormats: ["video_script"],
+      intent: unsetIntent,
+      attempt: 0,
+      maxAttempts: 3,
+      originalPrompt: "根据知识库写口播",
+    })
+    expect(first.ok).toBe(false)
+    if (!first.ok) {
+      expect(first.retryPrompt).toContain("知识库里已经给出的数字必须写进成稿")
+      expect(first.retryPrompt).toContain("不能改交分析方案")
+    }
+  })
+
+  it("quotes already-given knowledge numbers in the retry so the model cannot treat them as forbidden", () => {
+    const first = applyDeliveryContentGate({
+      parsed: { video_script: "本轮输入只锁定了结构。\n1. 目标判定\n太短" },
+      targetFormats: ["video_script"],
+      intent: unsetIntent,
+      attempt: 0,
+      maxAttempts: 3,
+      originalPrompt: "根据知识库写一条口播，讲清楚供暖改造省了多少钱。",
+      evidenceText: "去年冬天这户电费从 1800 降到 1100。",
+    })
+    expect(first.ok).toBe(false)
+    if (!first.ok) {
+      expect(first.retryPrompt).toContain("1800")
+      expect(first.retryPrompt).toContain("1100")
+      expect(first.retryPrompt).toContain("不算编造")
+    }
   })
 })
 

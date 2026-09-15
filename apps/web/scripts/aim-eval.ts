@@ -82,6 +82,8 @@ async function main() {
 
   if (opts.mode !== "deterministic") {
     assertRealModelProvidersConfigured(`eval:${opts.mode}`)
+    process.env.AIM_EVAL_DISABLE_CIRCUIT = "1"
+    process.stderr.write("[aim-eval] 评测关闭线路熔断，避免一道超时把后续同模型题目全部拖死\n")
   }
 
   process.stderr.write(`[aim-eval] mode=${opts.mode} adapter=${adapter.name}\n`)
@@ -95,14 +97,18 @@ async function main() {
   })
 
   const outDir = resolve(process.cwd(), opts.out)
+  const gate = evaluateEvalGate(report, opts.mode)
+  const markdown = `${renderEvalMarkdown(report)}${
+    gate.passed ? "" : `\n\n## Gate\n\nFAILED: ${gate.reasons.join("; ")}\n`
+  }`
+
   mkdirSync(outDir, { recursive: true })
   writeFileSync(resolve(outDir, "report.json"), JSON.stringify(report, null, 2))
-  writeFileSync(resolve(outDir, "report.md"), renderEvalMarkdown(report))
+  writeFileSync(resolve(outDir, "report.md"), markdown)
 
   // Print the markdown to stdout so it can be appended to $GITHUB_STEP_SUMMARY.
-  process.stdout.write(renderEvalMarkdown(report) + "\n")
+  process.stdout.write(markdown + "\n")
 
-  const gate = evaluateEvalGate(report, opts.mode)
   process.stderr.write(
     `[aim-eval] contract=${(report.contractPassRate * 100).toFixed(1)}% rubric=${
       report.rubricPassRate === null ? "n/a" : (report.rubricPassRate * 100).toFixed(1) + "%"
