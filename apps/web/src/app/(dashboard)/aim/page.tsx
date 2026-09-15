@@ -318,7 +318,7 @@ export default function AimPage() {
         <AimEvolutionSuggestions
           suggestions={w.evolutionSuggestions}
           onDismiss={w.dismissEvolutionSuggestion}
-          onSave={(s) => void w.handleSaveEvolutionSuggestion(s)}
+          onSave={w.handleSaveEvolutionSuggestion}
         />
 
         {w.planSession.session?.status === "asking" && !w.planSession.currentQuestion && (
