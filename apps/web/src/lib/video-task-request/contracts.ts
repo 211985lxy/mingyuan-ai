@@ -41,6 +41,8 @@ export type CreateVideoTaskInput = {
    * 蝉镜对带形态列表的形象要求显式指定，缺失会以 50000 拒绝下单。
    */
   figureType?: string;
+  /** 驱动模式：random=随机帧动作（动作更自然） */
+  driveMode?: "random";
   avatarName?: string;
   processRules?: unknown;
   speakerExtra?: unknown;
@@ -76,6 +78,7 @@ export type ResolvedAvatar = {
   externalVirtualmanId: string | null;
   externalSpeakerId: string | null;
   externalFigureType?: string | null;
+  externalDriveMode?: string | null;
   speakerName: string | null;
 };
 

@@ -23,6 +23,8 @@ export function VideoReviewStep(props: {
   speechSeconds: number
   aspectRatio: "9:16" | "16:9"
   onAspectRatioChange: (value: "9:16" | "16:9") => void
+  naturalMotion: boolean
+  onNaturalMotionChange: (value: boolean) => void
   submitting: boolean
   task: ApiVideoTask | null
   onSubmit: () => void
@@ -45,6 +47,28 @@ export function VideoReviewStep(props: {
           />
 
           <AspectRatioPicker value={props.aspectRatio} onChange={props.onAspectRatioChange} />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">动作</span>
+            <Button
+              type="button"
+              size="sm"
+              variant={props.naturalMotion ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs"
+              onClick={() => props.onNaturalMotionChange(true)}
+            >
+              自然（随机帧）
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={props.naturalMotion ? "ghost" : "secondary"}
+              className="h-7 px-2 text-xs"
+              onClick={() => props.onNaturalMotionChange(false)}
+            >
+              顺序播放
+            </Button>
+          </div>
 
           {props.task ? <TaskStatusCard task={props.task} /> : null}
         </CardContent>

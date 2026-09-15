@@ -272,6 +272,8 @@ export function buildCreateVideoTaskInput(input: {
   aimGenerationId: string | null
   /** 公共形象的形态（从该形象的 figures 中按画面比例选出） */
   figureType?: string | null
+  /** 驱动模式：random=随机帧动作（数字人动作更自然） */
+  driveMode?: "random" | null
 }) {
   return {
     type: "virtualman_broadcast",
@@ -288,6 +290,7 @@ export function buildCreateVideoTaskInput(input: {
       : { avatarId: input.selectedAvatarId }),
     scriptContent: input.script,
     aspectRatio: input.aspectRatio,
+    ...(input.driveMode === "random" ? { driveMode: "random" } : {}),
     ...(input.voiceSource === "own_voice"
       ? { voiceSource: input.voiceSource, voiceId: input.fishVoiceId === "default" ? undefined : input.fishVoiceId }
       : {}),

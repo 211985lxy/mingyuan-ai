@@ -191,6 +191,38 @@ describe("buildCreateVideoTaskInput", () => {
     expect(withVoice.voiceId).toBe("fish-9")
   })
 
+  it("naturalMotion 开启时带 driveMode=random，关闭时不带", () => {
+    const on = buildCreateVideoTaskInput({ ...base, avatarSource: "mine", driveMode: "random" })
+    expect("driveMode" in on).toBe(true)
+    expect((on as { driveMode?: string }).driveMode).toBe("random")
+
+    const off = buildCreateVideoTaskInput({ ...base, avatarSource: "mine", driveMode: null })
+    expect("driveMode" in off).toBe(false)
+  })
+
+  it("figureType 仅在有值时下发（避免传空形态）", () => {
+    const withFigure = buildCreateVideoTaskInput({
+      ...base,
+      avatarSource: "public",
+      selectedAvatarId: "",
+      selectedPublic: { id: "v1", name: "公共形象" },
+      publicVoiceId: "s1",
+      figureType: "sit_body",
+    })
+    expect("figureType" in withFigure).toBe(true)
+    expect((withFigure as { figureType?: string }).figureType).toBe("sit_body")
+
+    const without = buildCreateVideoTaskInput({
+      ...base,
+      avatarSource: "public",
+      selectedAvatarId: "",
+      selectedPublic: { id: "v1", name: "公共形象" },
+      publicVoiceId: "s1",
+      figureType: null,
+    })
+    expect("figureType" in without).toBe(false)
+  })
+
   it("AIM 生成 id 透传", () => {
     const payload = buildCreateVideoTaskInput({ ...base, aimGenerationId: "g1" })
     expect(payload.aimGenerationId).toBe("g1")

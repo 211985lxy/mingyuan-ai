@@ -62,6 +62,8 @@ interface VideoWorkbenchModel {
   fishVoices: ReturnType<typeof useStudioFishVoices>["fishVoices"]
   aspectRatio: "9:16" | "16:9"
   setAspectRatio: (ratio: "9:16" | "16:9") => void
+  naturalMotion: boolean
+  setNaturalMotion: (value: boolean) => void
   previewUrl: string | null
   previewing: boolean
   onPreview: () => void
@@ -81,6 +83,8 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
   const [voiceSource, setVoiceSource] = useState<VideoVoiceSource>("tts")
   const [fishVoiceId, setFishVoiceId] = useState("default")
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16")
+  // 默认开启随机帧驱动：动作更自然（可按需关闭）
+  const [naturalMotion, setNaturalMotion] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const aimGenerationIdRef = useRef<string | null>(null)
   const initRef = useRef(false)
@@ -151,6 +155,7 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
           aimGenerationId: aimGenerationIdRef.current,
           // 公共形象必须带形态：蝉镜对带形态列表的形象要求显式指定
           figureType: pickFigureType(selectedPublic?.figures, aspectRatio),
+          driveMode: naturalMotion ? "random" : null,
         }),
       )
       saveVideoPrefs({ projectId, avatarId: avatarLibrary.selectedAvatarId, aspectRatio, fishVoiceId })
@@ -186,6 +191,8 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
     fishVoices,
     aspectRatio,
     setAspectRatio,
+    naturalMotion,
+    setNaturalMotion,
     previewUrl,
     previewing,
     onPreview: preview,
@@ -279,6 +286,8 @@ function ReviewStepSection({ vm }: { vm: VideoWorkbenchModel }) {
       speechSeconds={Math.max(8, Math.round(vm.script.replace(/\s+/g, "").length / 4))}
       aspectRatio={vm.aspectRatio}
       onAspectRatioChange={(ratio) => vm.setAspectRatio(ratio)}
+      naturalMotion={vm.naturalMotion}
+      onNaturalMotionChange={vm.setNaturalMotion}
       submitting={vm.submitting}
       task={vm.task}
       onSubmit={vm.onSubmit}

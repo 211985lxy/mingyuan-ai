@@ -298,6 +298,7 @@ export async function generateDemoVideo(input: {
   speakerId: string
   text: string
   figureType?: string | null
+  driveMode?: "random" | null
 }): Promise<ShanjianSubmitResult> {
   try {
     if (getDigitalHumanProvider() === "chanjing") {
@@ -306,6 +307,7 @@ export async function generateDemoVideo(input: {
         audioManId: input.speakerId,
         text: input.text,
         figureType: input.figureType ?? null,
+        driveMode: input.driveMode ?? null,
       })
     }
     return await generateRawVideo({
@@ -419,6 +421,7 @@ async function submitChanjingVideo(
     width,
     height,
     figureType: typeof payload.figureType === "string" ? payload.figureType : null,
+    driveMode: payload.driveMode === "random" ? "random" : null,
   })
 }
 
