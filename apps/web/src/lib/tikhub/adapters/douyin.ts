@@ -9,7 +9,7 @@ import type {
 } from '../types'
 import { fetchFromLocalCrawler, LocalCrawlerResult } from '../../competitor-analysis/local-crawler'
 import { logger } from '@/lib/logger'
-import { resolveDouyinShortUrl } from '@/lib/douyin-short-url'
+import { resolveDouyinShortUrl } from '@/lib/douyin-short-url-resolver'
 
 const adapterLog = logger.child({ component: 'DouyinAdapter' })
 

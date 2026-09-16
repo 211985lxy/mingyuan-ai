@@ -7,10 +7,8 @@ import {
   isDouyinPublishPlatform,
   type PublishedWorkKey,
 } from "@/lib/aim/platform-post-id"
-import {
-  normalizeDouyinAwemeId,
-  resolveDouyinShortUrl,
-} from "@/lib/douyin-short-url"
+import { normalizeDouyinAwemeId } from "@/lib/douyin-short-url"
+import { resolveDouyinShortUrl } from "@/lib/douyin-short-url-resolver"
 
 export {
   classifyPublishedWorkKey,
