@@ -226,11 +226,16 @@ export function validateVideoSubmission(input: {
   selectedPublic: { id: string } | null
   publicVoiceId: string | null
   projectId: string
+  /** 音源：own_voice 时音频由 Fish 驱动，不依赖形象自带音色 */
+  voiceSource?: "tts" | "own_voice"
 }): string | null {
   if (!input.script.trim()) return "请先确认口播文案"
   if (input.avatarSource === "public") {
     if (!input.selectedPublic) return "请选择一个公共数字人"
-    if (!input.publicVoiceId) return "该形象暂无可用音色，请稍后重试或换一个形象"
+    // 仅回退到自带音色（tts）时才需要形象音色；Fish 音源与它无关
+    if (input.voiceSource !== "own_voice" && !input.publicVoiceId) {
+      return "该形象暂无自带音色，请改用 Fish 音色或稍后重试"
+    }
   } else if (!input.selectedAvatarId) {
     return "请选择一个可用数字人"
   }

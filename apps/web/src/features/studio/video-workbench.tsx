@@ -80,7 +80,8 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
   const [avatarSource, setAvatarSource] = useState<AvatarSource>("mine")
   const [selectedPublic, setSelectedPublic] = useState<PublicDigitalPersonOption | null>(null)
   const [script, setScript] = useState("")
-  const [voiceSource, setVoiceSource] = useState<VideoVoiceSource>("tts")
+  // 音频模型以 Fish Audio 为主（用户定位）：蝉镜只出画面，自带音色降为备选
+  const [voiceSource, setVoiceSource] = useState<VideoVoiceSource>("own_voice")
   const [fishVoiceId, setFishVoiceId] = useState("default")
   const [aspectRatio, setAspectRatio] = useState<"9:16" | "16:9">("9:16")
   // 默认开启随机帧驱动：动作更自然（可按需关闭）
@@ -134,6 +135,7 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
       selectedPublic,
       publicVoiceId,
       projectId,
+      voiceSource,
     })
     if (error) {
       toast.error(error)
@@ -281,7 +283,7 @@ function ReviewStepSection({ vm }: { vm: VideoWorkbenchModel }) {
   return (
     <VideoReviewStep
       avatarLabel={avatarLabel}
-      voiceLabel={vm.voiceSource === "tts" ? "形象配套音色" : "我的克隆音色"}
+      voiceLabel={vm.voiceSource === "tts" ? "形象自带音色（备选）" : "Fish 音色"}
       scriptPreview={vm.script.trim().slice(0, 60) || "（空文案）"}
       speechSeconds={Math.max(8, Math.round(vm.script.replace(/\s+/g, "").length / 4))}
       aspectRatio={vm.aspectRatio}

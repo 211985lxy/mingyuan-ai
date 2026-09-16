@@ -127,7 +127,29 @@ describe("validateVideoSubmission", () => {
       selectedPublic: { id: "v1" },
       publicVoiceId: null,
     })
-    expect(result).toBe("该形象暂无可用音色，请稍后重试或换一个形象")
+    expect(result).toBe("该形象暂无自带音色，请改用 Fish 音色或稍后重试")
+  })
+
+  it("own_voice 音源不依赖形象自带音色：无音色也放行", () => {
+    const result = validateVideoSubmission({
+      ...base,
+      avatarSource: "public",
+      selectedPublic: { id: "dp-1" },
+      publicVoiceId: null,
+      voiceSource: "own_voice",
+    })
+    expect(result).toBeNull()
+  })
+
+  it("tts 音源仍要求形象自带音色", () => {
+    const result = validateVideoSubmission({
+      ...base,
+      avatarSource: "public",
+      selectedPublic: { id: "dp-1" },
+      publicVoiceId: null,
+      voiceSource: "tts",
+    })
+    expect(result).toBe("该形象暂无自带音色，请改用 Fish 音色或稍后重试")
   })
 
   it("缺客户项目拦截", () => {

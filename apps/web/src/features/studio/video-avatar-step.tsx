@@ -203,7 +203,7 @@ function SelectionHint({
     return (
       <p className="mt-3 text-xs text-muted-foreground">
         已选「{selectedPublic.name}」
-        {selectedPublic.voiceName ? ` · 配套音色：${selectedPublic.voiceName}` : ""}
+        {selectedPublic.voiceName ? ` · ${selectedPublic.voiceName}` : ""}
       </p>
     )
   }
