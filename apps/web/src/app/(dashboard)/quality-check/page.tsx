@@ -190,7 +190,7 @@ export default function QualityCheckPage() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="在此输入您的营销文案、视频脚本或朋友圈文案；或者点击下方的「最近生成」直接快速导入进行多维检测。"
-                  className="min-h-72 resize-y pb-12 text-sm leading-relaxed bg-neutral-100/40 dark:bg-[#131211] border-border/80 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary focus-within:shadow-[0_0_20px_rgba(179,50,38,0.15)]"
+                  className="min-h-72 resize-y pb-12 text-sm leading-relaxed bg-muted/40 border-border/80 focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary focus-within:shadow-[0_0_20px_color-mix(in_oklch,var(--primary)_15%,transparent)]"
                   disabled={isChecking || isPolishing}
                 />
                 

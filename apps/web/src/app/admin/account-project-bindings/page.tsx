@@ -237,7 +237,7 @@ function RepairDialog(props: {
                     onClick={() => selectProject(project.id)}
                     className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                       selected
-                        ? "border-primary bg-primary/5"
+                        ? "border-primary bg-primary/10"
                         : "border-border hover:bg-muted/40"
                     }`}
                   >

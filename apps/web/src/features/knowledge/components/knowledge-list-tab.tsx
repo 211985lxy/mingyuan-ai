@@ -197,7 +197,7 @@ export function KnowledgeListTab(props: KnowledgeListTabProps) {
                 ) : entries.map((entry) => {
                   const cleanup = parseKnowledgeTags(entry.tags)
                   return (
-                    <tr key={entry.id} className={`border-b hover:bg-muted/30 transition-colors ${selectedIds.has(entry.id) ? "bg-primary/5" : ""}`}>
+                    <tr key={entry.id} className={`border-b hover:bg-muted/30 transition-colors ${selectedIds.has(entry.id) ? "bg-primary/10" : ""}`}>
                       <td className="p-3"><input type="checkbox" checked={selectedIds.has(entry.id)} onChange={() => props.onToggleSelect(entry.id)} className="cursor-pointer" /></td>
                       <td className="p-3 max-w-[260px]">
                         <button type="button" onClick={() => props.onOpenDetail(entry)} className="flex max-w-full items-center gap-1 truncate text-left font-medium hover:text-primary">

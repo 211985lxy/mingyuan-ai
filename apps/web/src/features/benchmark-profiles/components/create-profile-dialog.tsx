@@ -60,7 +60,7 @@ export function CreateProfileDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("max-w-md gap-5 rounded-xl bg-background p-5 transition-colors", isDraggingFile && "border-primary bg-primary/5")} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+      <DialogContent className={cn("max-w-md gap-5 rounded-xl bg-background p-5 transition-colors", isDraggingFile && "border-primary bg-primary/10")} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
         <DialogHeader>
           <DialogTitle>添加档案</DialogTitle>
           <DialogDescription className="leading-6">{mode === "account" ? "录入真实账号信息，后续可通过「一键拉取」导入账号分析。" : "粘贴聊天记录、客户资料或 Markdown 文档，保存后进入该项目的 AIM 检索。"}</DialogDescription>

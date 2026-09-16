@@ -75,7 +75,7 @@ const ZhuJianContent = memo(function ZhuJianContent({ text }: { text: string }) 
         return (
           <p
             key={index}
-            className="whitespace-pre-line text-base leading-7 text-[#2c2b2a] dark:text-[#f3ede2] sm:text-[1.05rem]"
+            className="whitespace-pre-line text-base leading-7 text-foreground sm:text-[1.05rem]"
           >
             {parts.map((part, partIndex) => {
               if (!part.startsWith("【") || !part.endsWith("】")) {

@@ -157,7 +157,7 @@ export default function LiteChatPage() {
       <div className="shrink-0 border-t bg-background px-4 pb-4 pt-3">
         <div className="mx-auto w-full max-w-3xl">
           <div
-            className={`relative rounded-2xl border bg-card p-2 shadow-sm focus-within:border-primary/40 ${dragOver ? "border-primary/60 bg-primary/5" : ""}`}
+            className={`relative rounded-2xl border bg-card p-2 shadow-sm focus-within:border-primary/40 ${dragOver ? "border-primary/60 bg-primary/10" : ""}`}
             onDragOver={(event) => {
               if (Array.from(event.dataTransfer?.types ?? []).includes("Files")) {
                 event.preventDefault()

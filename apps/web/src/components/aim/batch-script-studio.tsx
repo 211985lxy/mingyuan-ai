@@ -209,7 +209,7 @@ function GenerateTab(props: { projectId: string | null }) {
                 type="button"
                 onClick={() => setSelectedId(s.id)}
                 className={`w-full rounded-lg border p-2 text-left transition ${
-                  selectedId === s.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                  selectedId === s.id ? "border-primary bg-primary/10" : "hover:bg-muted/50"
                 }`}
               >
                 <p className="text-sm font-medium">{s.displayName}</p>

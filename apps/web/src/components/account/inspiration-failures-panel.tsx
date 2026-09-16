@@ -162,7 +162,7 @@ export function InspirationFailuresPanel() {
               <div
                 key={item.id}
                 className={`flex flex-col gap-2 rounded-md border p-3 transition-colors ${
-                  selectedIds.has(item.id) ? "border-primary bg-primary/5" : ""
+                  selectedIds.has(item.id) ? "border-primary bg-primary/10" : ""
                 }`}
                 onClick={() => toggleSelect(item.id)}
                 role="button"

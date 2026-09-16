@@ -403,7 +403,7 @@ export function KnowledgeBrowser({
                 <article
                   key={entry.id}
                   className={`rounded-lg border bg-card p-4 transition-colors ${
-                    selected ? "border-primary/40 bg-primary/5" : "hover:border-primary/30"
+                    selected ? "border-primary bg-primary/10" : "hover:border-primary/30"
                   }`}
                 >
                   <div className="mb-2 flex items-start gap-3">
