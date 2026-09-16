@@ -12,7 +12,8 @@ import {
 import { getAdapter } from "@/lib/tikhub/adapters/index"
 import type { Platform } from "@/lib/tikhub/types"
 import type { NormalizedComment } from "@/lib/tikhub/types"
-import { resolveDouyinAwemeId, extractDouyinAwemeId } from "@/lib/douyin-short-url"
+import { extractDouyinAwemeId } from "@/lib/douyin-short-url"
+import { resolveDouyinAwemeId } from "@/lib/douyin-short-url-resolver"
 import {
   assertFallbackResultLimits,
   fetchFallbackVideoExtraction,

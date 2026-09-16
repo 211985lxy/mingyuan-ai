@@ -1,4 +1,6 @@
 import { env } from "@/env"
+import { isIpLiteral, isPublicIp } from "@/lib/ssrf-guard"
+
 export const VIDEO_TEXT_EXTRACT_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
@@ -78,15 +80,24 @@ export function parseVideoTextSubmitResult(payload: ProviderTaskResponse): { bat
  * @param url - URL 地址
  * @returns string
  */
+/** 平台主机后缀白名单；严格 host 相等或 `.suffix` 结尾，杜绝 `douyin.com.evil.com` 子串绕过。 */
+const PLATFORM_HOST_SUFFIXES: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ["douyin", ["douyin.com", "iesdouyin.com"]],
+  ["bilibili", ["bilibili.com", "b23.tv"]],
+  ["kuaishou", ["kuaishou.com"]],
+  ["xiaohongshu", ["xiaohongshu.com", "xhslink.com"]],
+  ["channels", ["channels.weixin.qq.com", "weixin110.qq.com"]],
+  ["youtube", ["youtube.com", "youtu.be"]],
+]
+
 export function detectVideoPlatform(url: string): string {
   try {
     const hostname = new URL(url).hostname.toLowerCase()
-    if (hostname.includes("douyin.com") || hostname.includes("iesdouyin.com")) return "douyin"
-    if (hostname.includes("bilibili.com") || hostname.includes("b23.tv")) return "bilibili"
-    if (hostname.includes("kuaishou.com")) return "kuaishou"
-    if (hostname.includes("xiaohongshu.com") || hostname.includes("xhslink.com")) return "xiaohongshu"
-    if (hostname.includes("channels.weixin.qq.com") || hostname.includes("weixin110.qq.com")) return "channels"
-    if (hostname.includes("youtube.com") || hostname.includes("youtu.be")) return "youtube"
+    for (const [platform, suffixes] of PLATFORM_HOST_SUFFIXES) {
+      if (suffixes.some((suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`))) {
+        return platform
+      }
+    }
     return "unknown"
   } catch {
     return "unknown"
@@ -140,16 +151,10 @@ export function assertSupportedVideoUrl(input: string): string {
     hostname === "localhost"
     || hostname.endsWith(".localhost")
     || hostname.endsWith(".local")
-    || hostname === "0.0.0.0"
-    || hostname.startsWith("127.")
-    || hostname.startsWith("169.254.")
-    || hostname.startsWith("10.")
-    || hostname.startsWith("192.168.")
-    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
-    || hostname === "::1"
-    || hostname.startsWith("fc")
-    || hostname.startsWith("fd")
-    || hostname.startsWith("fe80:")
+    // 共享校验源（ssrf-guard）：IP 字面量一律按公网判定——含 new URL 已归一化的
+    // 八/十/十六进制 IPv4（2130706433 → 127.0.0.1）与 IPv4-mapped IPv6。
+    // 域名解析到私网的场景由服务端 sink（ssrf-guard.server）在真正 fetch 前拦截。
+    || (isIpLiteral(hostname) && !isPublicIp(hostname))
   ) {
     throw new Error("请粘贴公开视频链接，不要粘贴本站地址")
   }

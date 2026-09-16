@@ -11,6 +11,7 @@ export type SecurityMetricName =
   | "obsidian.denied"
   | "obsidian.quota"
   | "obsidian.ok"
+  | "ssrf.blocked"
 
 const counters = new Map<SecurityMetricName, number>()
 
@@ -45,6 +46,7 @@ export function getSecurityMetrics(): Record<SecurityMetricName, number> {
     "obsidian.denied": counters.get("obsidian.denied") ?? 0,
     "obsidian.quota": counters.get("obsidian.quota") ?? 0,
     "obsidian.ok": counters.get("obsidian.ok") ?? 0,
+    "ssrf.blocked": counters.get("ssrf.blocked") ?? 0,
   }
 }
 
