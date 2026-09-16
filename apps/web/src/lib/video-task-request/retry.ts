@@ -36,6 +36,14 @@ export function buildRetryPayload(
     const sp = task.shanjianPayload as Record<string, unknown>;
     if (sp.virtualmanId) payload.virtualmanId = sp.virtualmanId;
     if (sp.speakerId) payload.speakerId = sp.speakerId;
+    // 形态与驱动模式与创建路径同契约：公共形象缺 figureType 会被蝉镜 50000 拒绝；
+    // 快照里可能存顶层 figureType（video-task 载荷）或 person.figure_type（蝉镜载荷），两者都认。
+    if (typeof sp.figureType === "string" && sp.figureType) payload.figureType = sp.figureType;
+    const person = sp.person as { figure_type?: unknown } | undefined;
+    if (!payload.figureType && person && typeof person.figure_type === "string" && person.figure_type) {
+      payload.figureType = person.figure_type;
+    }
+    if (sp.driveMode === "random") payload.driveMode = "random";
     if (sp.styleId) payload.styleId = sp.styleId;
     if (sp.speakerExtra) payload.speakerExtra = sp.speakerExtra;
     if (sp.processRules) payload.processRules = sp.processRules;
