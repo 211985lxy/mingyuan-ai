@@ -13,6 +13,7 @@ import {
 } from "@/lib/aim-observability"
 import { NextResponse } from "next/server"
 import { streamAimChatDomain } from "@/lib/aim-harness/domain-executor"
+import { runWithActiveAimTrace } from "@/lib/aim/live-thinking"
 import {
   encodeFeishuSourceHeader,
   FEISHU_SOURCE_HEADER,
@@ -44,10 +45,12 @@ export function streamChatContent(
         const startedAt = Date.now()
         let output = ""
         try {
-          for await (const chunk of chunks) {
-            output += chunk
-            controller.enqueue(encoder.encode(chunk))
-          }
+          await runWithActiveAimTrace(trace?.id, async () => {
+            for await (const chunk of chunks) {
+              output += chunk
+              controller.enqueue(encoder.encode(chunk))
+            }
+          })
           await addAimTraceStep(trace, {
             key: "llm_stream_chat",
             label: "LLM 流式聊天生成",

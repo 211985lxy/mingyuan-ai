@@ -17,6 +17,7 @@ import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
 import { AIM_EXECUTION_DEADLINE_MS, runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
+import { runWithActiveAimTrace } from "@/lib/aim/live-thinking"
 import {
   AimGenerationAttemptError,
   completeAimGenerationAttempt,
@@ -107,20 +108,25 @@ export async function POST(request: NextRequest) {
         })
       }
       if (gate.intent.taskKind === "answer_question" || understanding.handling === "respond") {
-        const content = await executeVerifiedUnifiedReply({ userId: user.id, parsed: scopedParsed, understanding, trace })
+        const content = await runWithActiveAimTrace(trace?.id, () => executeVerifiedUnifiedReply({
+          userId: user.id,
+          parsed: scopedParsed,
+          understanding,
+          trace,
+        }))
         if (attempt!.created) await discardAimGenerationAttempt(attempt!)
         else await completeAimGenerationAttempt(attempt!)
         await finishAimTrace(trace, { status: "success", outputSummary: "reply", aimGenerationId: attempt!.id })
         return NextResponse.json({ kind: "reply", content, traceId: trace?.id })
       }
-      const run = await executeVerifiedUnifiedDelivery({
+      const run = await runWithActiveAimTrace(trace?.id, () => executeVerifiedUnifiedDelivery({
         userId: user.id,
         parsed: scopedParsed,
         understanding,
         intent: gate.intent,
         trace,
         generationAttemptId: attempt!.id,
-      })
+      }))
       await finishAimTrace(trace, { status: "success", aimGenerationId: attempt!.id })
       const serialized = serializeAimGenerationRun(run)
       const runId = serialized.runId ?? run.metadata?.runId

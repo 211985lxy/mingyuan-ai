@@ -39,6 +39,7 @@ function baseCallbacks() {
     eventSourceRef: { current: null as EventSource | null },
     onOpen: vi.fn(),
     onStep: vi.fn(),
+    onReasoning: vi.fn(),
     onTerminal: vi.fn(),
   }
 }
@@ -163,5 +164,32 @@ describe("connectAimTraceStream", () => {
 
     expect(MockEventSource.instances).toHaveLength(1)
     expect(cbs.onTerminal).not.toHaveBeenCalled()
+  })
+
+  it("reasoning 帧走 onReasoning，不收口连接，且会推迟 90s 守卫", () => {
+    const cbs = baseCallbacks()
+    const dispose = connectAimTraceStream("trace-reason", cbs)
+
+    vi.advanceTimersByTime(80_000)
+    MockEventSource.current().onmessage?.({
+      data: JSON.stringify({ type: "reasoning", text: "先想", attempt: 1 }),
+    })
+    expect(cbs.onReasoning).toHaveBeenCalledWith({
+      text: "先想",
+      attempt: 1,
+      reset: undefined,
+      done: undefined,
+    })
+    expect(cbs.onTerminal).not.toHaveBeenCalled()
+    expect(MockEventSource.current().closed).toBe(false)
+
+    vi.advanceTimersByTime(80_000)
+    expect(cbs.onTerminal).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(90_000)
+    expect(cbs.onTerminal).toHaveBeenCalledWith(false, false)
+    expect(MockEventSource.current().closed).toBe(true)
+
+    dispose()
   })
 })

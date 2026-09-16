@@ -37,6 +37,7 @@ import { persistAimRunSnapshot, applyRunMetadataToTrace } from "./snapshot"
 import { AimRunExecutionError } from "@/lib/aim-error-message"
 import { wrapLlmTelemetryIterable } from "@/lib/llm/telemetry"
 import type { LlmInvocation, ProviderAttempt } from "@/lib/llm/telemetry"
+import { runWithActiveAimTrace } from "@/lib/aim/live-thinking"
 import { flagAimGenerationDegraded } from "./persistence"
 import { buildAimContextManifest } from "./manifest"
 import { assessAimGeneration, isAimGenerationLike } from "./quality"
@@ -182,7 +183,7 @@ export async function executeAimRun<TOutput = unknown>(
 
   let execResult: AimHarnessOutcome
   try {
-    execResult = await runAimHarness({
+    execResult = await runWithActiveAimTrace(request.trace?.id, () => runAimHarness({
       traceId: request.trace?.id,
       plan,
       execute: async (spec) => {
@@ -195,7 +196,7 @@ export async function executeAimRun<TOutput = unknown>(
           composedPrompt: adapted.composedPrompt,
         }
       },
-    })
+    }))
   } catch (error) {
     await persistFailedAimRun(request, plan, error)
     throw error

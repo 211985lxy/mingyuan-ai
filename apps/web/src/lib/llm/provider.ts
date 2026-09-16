@@ -2,6 +2,11 @@ import { env } from "@/env"
 import OpenAI, { type ClientOptions } from "openai"
 import { type ChatCompletionMessageParam } from "openai/resources/chat/completions"
 import { ProxyAgent } from "undici"
+import {
+  attachLiveThinking,
+  getActiveAimTraceId,
+  isShowLiveThinkingEnabled,
+} from "@/lib/aim/live-thinking"
 import { getAimExecutionDeadline, resolveProviderTimeoutMs } from "./execution-deadline"
 import type {
   CompletionOptions,
@@ -9,6 +14,22 @@ import type {
   LLMProvider,
   LLMProviderConfig,
 } from "./types"
+
+type AssistantDelta = { content?: string | null; reasoning_content?: string | null }
+
+function readAssistantDelta(chunk: {
+  choices?: Array<{ delta?: AssistantDelta; finish_reason?: string | null }>
+  model?: string
+}) {
+  const choice = chunk.choices?.[0]
+  const delta = choice?.delta
+  return {
+    content: typeof delta?.content === "string" ? delta.content : "",
+    reasoning: typeof delta?.reasoning_content === "string" ? delta.reasoning_content : "",
+    finishReason: choice?.finish_reason,
+    model: chunk.model,
+  }
+}
 
 /**
  * 进程级 ProxyAgent 复用池。
@@ -99,6 +120,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   async complete(options: CompletionOptions): Promise<CompletionResult> {
+    // 开关打开且本轮有活跃 trace 时，改走内部流，才能把思考实时推到侧通道。
+    // 开关关闭时逐字保持原 complete（非流式 JSON），含 usage / finishReason。
+    if (isShowLiveThinkingEnabled() && getActiveAimTraceId()) {
+      return this.completeFromLiveStream(options)
+    }
     const model = options.model || this.defaultModel
     const timeout = resolveProviderTimeoutMs(this.routeTimeoutMs)
 
@@ -132,6 +158,44 @@ export class OpenAICompatibleProvider implements LLMProvider {
     }
   }
 
+  /** 成稿 complete 的实时思考路径：内部 stream，正文仍只累加 content。 */
+  private async completeFromLiveStream(options: CompletionOptions): Promise<CompletionResult> {
+    const model = options.model || this.defaultModel
+    const timeout = resolveProviderTimeoutMs(this.routeTimeoutMs)
+    const thinking = attachLiveThinking(getActiveAimTraceId())
+    const response = await this.client.chat.completions.create({
+      model,
+      messages: options.messages as ChatCompletionMessageParam[],
+      temperature: options.temperature,
+      max_tokens: options.maxTokens,
+      response_format: options.responseFormat,
+      stream: true,
+    }, { timeout, signal: getAimExecutionDeadline()?.signal })
+
+    let content = ""
+    let finishReason: string | null | undefined
+    let responseModel = model
+    try {
+      for await (const chunk of response) {
+        const delta = readAssistantDelta(chunk)
+        thinking.onReasoning(delta.reasoning)
+        if (delta.finishReason) finishReason = delta.finishReason
+        if (delta.model) responseModel = delta.model
+        if (delta.content) {
+          thinking.onContentStart()
+          content += delta.content
+        }
+      }
+    } finally {
+      thinking.finish(Boolean(content))
+    }
+    const trimmed = content.trim()
+    if (!trimmed) {
+      throw new Error(`[${this.name}] Empty response from model ${model}`)
+    }
+    return { content: trimmed, model: responseModel, provider: this.name, finishReason }
+  }
+
   async *stream(options: CompletionOptions): AsyncIterable<string> {
     const model = options.model || this.defaultModel
     const timeout = resolveProviderTimeoutMs(this.routeTimeoutMs)
@@ -145,18 +209,22 @@ export class OpenAICompatibleProvider implements LLMProvider {
       stream: true,
     }, { timeout, signal: getAimExecutionDeadline()?.signal })
 
-    // 推理模型的 reasoning_content 是内部思维链，绝不能成为用户可见内容：只透传 content 增量；
-    // 整段流结束仍无正文时抛错，让模型路由切换到下一个 provider（宁可见的失败，不可见的思维链泄漏）。
+    // 正文通道只透传 content。思考走 trace 侧通道（开关 + 活跃 trace 才推）；
+    // 整段流结束仍无正文时抛错，让模型路由切换到下一个 provider。
+    const thinking = attachLiveThinking(getActiveAimTraceId())
     let contentEmitted = false
-    for await (const chunk of response) {
-      const delta = chunk.choices[0]?.delta as
-        | { content?: string | null; reasoning_content?: string | null }
-        | undefined
-      const content = typeof delta?.content === "string" ? delta.content : ""
-      if (content) {
-        contentEmitted = true
-        yield content
+    try {
+      for await (const chunk of response) {
+        const delta = readAssistantDelta(chunk)
+        thinking.onReasoning(delta.reasoning)
+        if (delta.content) {
+          thinking.onContentStart()
+          contentEmitted = true
+          yield delta.content
+        }
       }
+    } finally {
+      thinking.finish(contentEmitted)
     }
     if (!contentEmitted) {
       throw new Error(`[${this.name}] Empty response from model ${model}`)

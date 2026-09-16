@@ -11,6 +11,7 @@ import {
   recordAimGenerationQuality,
   serializeAimGenerationRun,
 } from "@/lib/aim/services/generate-request"
+import { runWithActiveAimTrace } from "@/lib/aim/live-thinking"
 
 /** LLM 多步生成可达 1–3 分钟；与前端 generateAimContent timeout(180s) / Nginx 300s 对齐 */
 export const maxDuration = 180
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
       }, { status: prepared.status ?? 400 })
     }
 
-    const run = await executePreparedAimGeneration(prepared)
+    const run = await runWithActiveAimTrace(prepared.trace?.id, () => executePreparedAimGeneration(prepared))
     await recordAimGenerationQuality(prepared.trace, run)
     return NextResponse.json(serializeAimGenerationRun(run))
   } catch (error) {

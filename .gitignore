@@ -46,6 +46,9 @@ coverage/
 
 # claude worktrees & local settings
 .claude/worktrees/
+
+# local git worktrees
+.worktrees/
 .claude/settings.local.json
 .claude/remote-exec.json
 

@@ -170,4 +170,37 @@ describe("GET /api/aim/trace/[traceId] ownership and live subscribe gates", () =
     expect(body).toContain('"type":"replay"')
     expect(body).toContain('"type":"done"')
   })
+
+  it("forwards reasoning frames on a live trace and does not treat them as terminal", async () => {
+    findFirst.mockResolvedValue({
+      id: "trace-1",
+      userId: "user-1",
+      status: "running",
+      steps: [],
+    })
+    let onMessage: ((raw: string) => void) | undefined
+    brokerSubscribe.mockImplementation(async (input: { onMessage: (raw: string) => void }) => {
+      onMessage = input.onMessage
+      return { ok: true, unsubscribe: vi.fn() }
+    })
+
+    const res = await GET(makeRequest("trace-1"), {
+      params: Promise.resolve({ traceId: "trace-1" }),
+    })
+    expect(res.status).toBe(200)
+    expect(brokerSubscribe).toHaveBeenCalled()
+
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    const first = await reader.read()
+    expect(decoder.decode(first.value)).toContain('"type":"connected"')
+
+    onMessage?.(JSON.stringify({ type: "reasoning", text: "先想", attempt: 1 }))
+    const second = await reader.read()
+    const body = decoder.decode(second.value)
+    expect(body).toContain('"type":"reasoning"')
+    expect(body).toContain("先想")
+    expect(body).not.toContain('"type":"done"')
+    await reader.cancel()
+  })
 })
