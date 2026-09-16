@@ -26,7 +26,8 @@ export default function DashboardLayout({
         <SidebarProvider>
           <AppSidebar />
           <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
-            <header className="flex h-9 shrink-0 items-center gap-2 px-6 md:px-8">
+            {/* 桌面端折叠走侧栏 Rail 细缘；此条仅供移动端唤起侧栏 */}
+            <header className="flex h-9 shrink-0 items-center gap-2 px-6 md:hidden">
               <SidebarTrigger className="h-7 w-7 shrink-0 text-muted-foreground" />
             </header>
             <div className="min-w-0 flex-1 p-6 md:p-8">{children}</div>

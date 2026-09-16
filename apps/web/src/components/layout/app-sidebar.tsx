@@ -30,6 +30,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
 import { SidebarAccountMenu } from "@/components/layout/sidebar-account-menu"
@@ -373,6 +374,8 @@ export function AppSidebar() {
           onNavigate={closeMobile}
         />
       </SidebarFooter>
+
+      <SidebarRail />
     </Sidebar>
   )
 }
