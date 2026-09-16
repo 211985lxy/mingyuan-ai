@@ -1,6 +1,8 @@
 import asyncio
+import contextlib
 import ipaddress
 import json
+import logging
 import os
 import secrets
 import socket
@@ -10,7 +12,7 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -18,6 +20,9 @@ from pydantic import BaseModel, Field
 
 MAX_DURATION_SECONDS = 600
 MAX_BYTES = 200 * 1024 * 1024
+MAX_REDIRECTS = 5
+REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
+SECURITY_LOGGER = logging.getLogger("mingyuan.video_extractor.security")
 SUPPORTED_HOST_SUFFIXES = (
     "douyin.com", "iesdouyin.com", "bilibili.com", "b23.tv", "kuaishou.com",
     "xiaohongshu.com", "xhslink.com", "channels.weixin.qq.com", "weixin110.qq.com",
@@ -97,6 +102,77 @@ def initialize_database(settings: Settings | None = None):
         )
 
 
+def _is_public_address(address: str) -> bool:
+    try:
+        return ipaddress.ip_address(address).is_global
+    except ValueError:
+        return False
+
+
+def _public_ip_addresses(hostname: str, port: int | None) -> list[str]:
+    """解析 hostname 的全部地址并确认均属公网，返回这些地址。
+
+    任一地址落在私网/回环/链路本地/保留段即整体拒绝——多 A 记录里混一条内网
+    地址本身就是 DNS 重绑定的典型手法，不能只看"第一个能连上"。
+    """
+    try:
+        resolved = socket.getaddrinfo(hostname, port or 443, type=socket.SOCK_STREAM)
+    except socket.gaierror as error:
+        SECURITY_LOGGER.warning("ssrf.blocked reason=dns_failure host=%s", hostname)
+        raise ValueError("视频地址无法解析到公网 IP。") from error
+    addresses = [item[4][0] for item in resolved]
+    if not addresses:
+        SECURITY_LOGGER.warning("ssrf.blocked reason=no_address host=%s", hostname)
+        raise ValueError("视频地址必须解析到公网 IP。")
+    for address in addresses:
+        if not _is_public_address(address):
+            SECURITY_LOGGER.warning("ssrf.blocked reason=private_address host=%s address=%s", hostname, address)
+            raise ValueError("视频地址必须解析到公网 IP。")
+    return addresses
+
+
+def _guarded_getaddrinfo(host, port, *args, **kwargs):
+    results = _PREVIOUS_GETADDRINFO(host, port, *args, **kwargs)
+    addresses = [item[4][0] for item in results]
+    if not addresses or any(not _is_public_address(address) for address in addresses):
+        SECURITY_LOGGER.warning("ssrf.blocked reason=resolution host=%s", host)
+        raise socket.gaierror(f"解析到非公网地址，已拒绝：{host}")
+    return results
+
+
+_RESOLUTION_GUARD_DEPTH = 0
+_RESOLUTION_GUARD_LOCK = threading.Lock()
+_PREVIOUS_GETADDRINFO = socket.getaddrinfo
+
+
+@contextlib.contextmanager
+def _public_only_resolution():
+    """作用域内进程级守卫：任何 DNS 解析只要出现非公网地址就拒绝。
+
+    给"自己管 DNS 与重定向、没法注入传输层"的下载器（yt-dlp、f2 内部请求）兜底。
+    http.client / yt-dlp 走 `socket.getaddrinfo`，httpx 走 anyio → 事件循环
+    `getaddrinfo`（运行期在协程内取 `socket.getaddrinfo`），因此同一个守卫能覆盖两条路径；
+    校验发生在解析的那一刻，返回的地址就是随后真正连接的地址，F2 的 TOCTOU 窗口随之关闭。
+
+    用深度计数实现可重入：并发任务嵌套进入时，内层退出不会提前摘掉守卫。
+    注意这是进程级补丁，作用域内**所有**出站解析都要过公网校验——本服务的出站目标
+    本就全是公网（抖音/B站/CDN），不存在需要访问内网的合法场景。
+    """
+    global _RESOLUTION_GUARD_DEPTH, _PREVIOUS_GETADDRINFO
+    with _RESOLUTION_GUARD_LOCK:
+        if _RESOLUTION_GUARD_DEPTH == 0:
+            _PREVIOUS_GETADDRINFO = socket.getaddrinfo
+            socket.getaddrinfo = _guarded_getaddrinfo
+        _RESOLUTION_GUARD_DEPTH += 1
+    try:
+        yield
+    finally:
+        with _RESOLUTION_GUARD_LOCK:
+            _RESOLUTION_GUARD_DEPTH -= 1
+            if _RESOLUTION_GUARD_DEPTH == 0:
+                socket.getaddrinfo = _PREVIOUS_GETADDRINFO
+
+
 def assert_public_url(value: str):
     return _assert_public_network(value, reject_media=True)
 
@@ -107,12 +183,7 @@ def _assert_public_network(value: str, reject_media: bool):
         raise ValueError("只支持公开的 HTTP/HTTPS 视频分享链接。")
     if reject_media and parsed.path.lower().endswith((".mp4", ".mov", ".m4v", ".webm", ".m3u8", ".mp3", ".m4a", ".wav")):
         raise ValueError("请提供视频分享页，不要提供媒体文件直链。")
-    try:
-        addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)}
-    except socket.gaierror as error:
-        raise ValueError("视频地址无法解析到公网 IP。") from error
-    if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
-        raise ValueError("视频地址必须解析到公网 IP。")
+    _public_ip_addresses(parsed.hostname, parsed.port)
     return value
 
 
@@ -147,16 +218,61 @@ def whisper_model(settings: Settings | None = None):
     return WHISPER_MODEL
 
 
+async def _stream_media(url: str, target: Path, max_bytes: int, referer: str | None = None) -> int:
+    """流式下载媒体到 target，返回落盘字节数。
+
+    F1 修复：**不自动跟随重定向**，自己走跳转循环，每一跳都重新做公网校验。
+    以前 `follow_redirects=True` 把已校验过的地址交给 httpx 自己跟，302 一跳内网就出去了。
+
+    F2 修复：整个下载过程套在 `_public_only_resolution` 里——DNS 在「即将连接的那一刻」
+    被校验，返回的地址就是随后真正连接的地址，校验与连接之间没有能换 IP 的窗口。
+
+    关于「钉 IP」：曾按安全评审建议把 URL 的 host 换成 IP 字面量再配 Host 头 + TLS
+    `sni_hostname` 扩展。实测不可用——httpcore 的 HTTP 代理路径（`_async/http_proxy.py`）
+    不读 `sni_hostname`，一旦部署环境存在 HTTP CONNECT 代理，TLS 会用 IP 当 SNI，
+    握手直接失败。故改为「解析时刻强制校验」：同样封死 TOCTOU，且不改变请求形态、
+    不与代理/SNI 打架。代理场景下本进程看不到目标解析（由代理解析），属已知盲区，
+    依赖网络层出网阻断兜底。
+    """
+    base_headers = {"User-Agent": "Mozilla/5.0"}
+    if referer:
+        base_headers["Referer"] = referer
+    size = 0
+    current = url
+    with _public_only_resolution():
+        async with httpx.AsyncClient(follow_redirects=False, timeout=60) as client:
+            for _ in range(MAX_REDIRECTS + 1):
+                _assert_public_network(current, reject_media=False)
+                async with client.stream("GET", current, headers=base_headers) as response:
+                    if response.status_code in REDIRECT_STATUS_CODES:
+                        location = response.headers.get("location")
+                        if not location:
+                            raise ValueError("视频下载失败：跳转响应缺少目标地址。")
+                        current = urljoin(current, location)
+                        continue
+                    response.raise_for_status()
+                    with target.open("wb") as output:
+                        async for chunk in response.aiter_bytes():
+                            size += len(chunk)
+                            if size > max_bytes:
+                                raise ValueError("视频超过200MB，暂不支持自动收录。")
+                            output.write(chunk)
+                    return size
+    raise ValueError(f"视频下载失败：跳转次数超过 {MAX_REDIRECTS} 次。")
+
+
 async def download_with_f2(url: str, target: Path, max_bytes: int, settings: Settings):
     from f2.apps.douyin.handler import DouyinHandler
     from f2.apps.douyin.utils import AwemeIdFetcher
 
-    aweme_id = await AwemeIdFetcher.get_aweme_id(url)
-    video = await DouyinHandler({
-        "headers": {"User-Agent": "Mozilla/5.0", "Referer": "https://www.douyin.com/"},
-        "cookie": settings.douyin_cookie,
-        "proxies": {"http://": None, "https://": None},
-    }).fetch_one_video(aweme_id=aweme_id)
+    # f2 内部自己解析 DNS，且入参是用户提交的分享链接，套解析期守卫兜底 F2。
+    with _public_only_resolution():
+        aweme_id = await AwemeIdFetcher.get_aweme_id(url)
+        video = await DouyinHandler({
+            "headers": {"User-Agent": "Mozilla/5.0", "Referer": "https://www.douyin.com/"},
+            "cookie": settings.douyin_cookie,
+            "proxies": {"http://": None, "https://": None},
+        }).fetch_one_video(aweme_id=aweme_id)
     duration = int((video.duration or 0) / 1000)
     if duration > MAX_DURATION_SECONDS:
         raise ValueError("视频超过10分钟，暂不支持自动收录。")
@@ -164,16 +280,7 @@ async def download_with_f2(url: str, target: Path, max_bytes: int, settings: Set
     if not media_url:
         raise ValueError("抖音公开视频地址解析失败。")
     _assert_public_network(media_url, reject_media=False)
-    size = 0
-    async with httpx.AsyncClient(follow_redirects=True, timeout=60) as client:
-        async with client.stream("GET", media_url, headers={"Referer": "https://www.douyin.com/"}) as response:
-            response.raise_for_status()
-            with target.open("wb") as output:
-                async for chunk in response.aiter_bytes():
-                    size += len(chunk)
-                    if size > max_bytes:
-                        raise ValueError("视频超过200MB，暂不支持自动收录。")
-                    output.write(chunk)
+    size = await _stream_media(media_url, target, max_bytes, referer="https://www.douyin.com/")
     return {"title": video.desc or None, "coverUrl": video.cover or None, "durationSeconds": duration, "mediaSizeBytes": size}
 
 
@@ -189,28 +296,33 @@ def download_with_ytdlp(url: str, directory: Path, max_duration: int, max_bytes:
         "no_warnings": True,
         "socket_timeout": 30,
     }
-    with yt_dlp.YoutubeDL(options) as downloader:
-        info = downloader.extract_info(url, download=False)
-        duration = int(info.get("duration") or 0)
-        size = int(info.get("filesize") or info.get("filesize_approx") or 0)
-        if duration > max_duration:
-            raise ValueError("视频超过10分钟，暂不支持自动收录。")
-        if size > max_bytes:
-            raise ValueError("视频超过200MB，暂不支持自动收录。")
-        downloader.download([url])
-        files = [path for path in directory.glob("media.*") if path.is_file()]
-        if not files:
-            raise ValueError("视频音频下载失败。")
-        media = max(files, key=lambda path: path.stat().st_size)
-        actual_size = media.stat().st_size
-        if actual_size > max_bytes:
-            raise ValueError("视频超过200MB，暂不支持自动收录。")
-        return media, {
-            "title": info.get("title"),
-            "coverUrl": info.get("thumbnail"),
-            "durationSeconds": duration or None,
-            "mediaSizeBytes": actual_size,
-        }
+    # yt-dlp 自己管 DNS 与重定向（还可能是 HLS/DASH 分片），没法像 httpx 那样钉 IP，
+    # 因此用解析期守卫兜底：解析结果必须全公网，且就是随后真正连接的地址 → 关掉 F2 的 TOCTOU。
+    # 残余风险：若 yt-dlp 绕过 socket.getaddrinfo（例如交给外部进程/ffmpeg 拉流），则不在守卫内，
+    # 该场景依赖网络层出网阻断兜底（见安全评审行动项 2）。
+    with _public_only_resolution():
+        with yt_dlp.YoutubeDL(options) as downloader:
+            info = downloader.extract_info(url, download=False)
+            duration = int(info.get("duration") or 0)
+            size = int(info.get("filesize") or info.get("filesize_approx") or 0)
+            if duration > max_duration:
+                raise ValueError("视频超过10分钟，暂不支持自动收录。")
+            if size > max_bytes:
+                raise ValueError("视频超过200MB，暂不支持自动收录。")
+            downloader.download([url])
+            files = [path for path in directory.glob("media.*") if path.is_file()]
+            if not files:
+                raise ValueError("视频音频下载失败。")
+            media = max(files, key=lambda path: path.stat().st_size)
+            actual_size = media.stat().st_size
+            if actual_size > max_bytes:
+                raise ValueError("视频超过200MB，暂不支持自动收录。")
+            return media, {
+                "title": info.get("title"),
+                "coverUrl": info.get("thumbnail"),
+                "durationSeconds": duration or None,
+                "mediaSizeBytes": actual_size,
+            }
 
 
 def transcribe(media_path: Path, settings: Settings | None = None):
