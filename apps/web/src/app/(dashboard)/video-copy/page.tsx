@@ -359,7 +359,7 @@ const topComments = analysis?.topComments ?? []
           actions={
             <Link
               href={rewriteHref}
-              className="inline-flex h-8 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="inline-flex h-8 items-center gap-2 rounded-md btn-brand px-3 text-sm font-medium text-primary-foreground"
             >
               <Wand2 className="h-4 w-4" />
               进入文案创作

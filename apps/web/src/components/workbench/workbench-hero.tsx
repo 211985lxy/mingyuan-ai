@@ -26,7 +26,7 @@ export function WorkbenchHero({ title, subtitle, badge, actions, backHref, backL
           <div className="flex flex-wrap items-center gap-2">
             {backHref ? (
               <Link href={backHref} aria-label={backLabel ?? "返回上一级"}>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={backLabel ?? "返回上一级"}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
               </Link>

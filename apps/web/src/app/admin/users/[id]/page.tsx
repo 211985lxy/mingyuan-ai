@@ -65,8 +65,8 @@ export default function AdminUserDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/admin/users">
-          <Button variant="ghost" size="icon" className="cursor-pointer">
+        <Link href="/admin/users" aria-label="返回用户列表">
+          <Button variant="ghost" size="icon" className="cursor-pointer" aria-label="返回用户列表">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>

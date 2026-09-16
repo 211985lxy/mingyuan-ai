@@ -123,6 +123,11 @@ export async function retryVideoTask(id: string): Promise<ApiVideoTask> {
   return payload.data
 }
 
+/** @description 删除成片任务记录（不动已转存的成片文件） */
+export async function deleteVideoTask(id: string): Promise<void> {
+  await request(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE", timeout: 15000 })
+}
+
 /** @description 仅重试成片转存，不重新生成 */
 export async function retryVideoTaskTransfer(id: string): Promise<ApiVideoTask> {
   const payload = await request<{ data: ApiVideoTask }>(`/api/tasks/${encodeURIComponent(id)}/retry-transfer`, {

@@ -65,6 +65,7 @@ export function ProjectKnowledgeAssetHealth({
   onSaved,
 }: ProjectKnowledgeAssetHealthProps) {
   const [health, setHealth] = useState<KnowledgeAssetHealthResult | null>(null)
+  const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -85,8 +86,11 @@ export function ProjectKnowledgeAssetHealth({
     try {
       const payload = await fetchKnowledgeAssetHealth(projectId)
       setHealth(payload.health)
+      setFailed(false)
       onHealthChange?.(payload.health)
     } catch {
+      // 失败时不要静默隐藏整块：用户会以为这个功能不存在
+      setFailed(true)
       setHealth(null)
       onHealthChange?.(null)
     } finally {
@@ -221,7 +225,13 @@ export function ProjectKnowledgeAssetHealth({
     )
   }
 
-  if (!health) return null
+  if (!health) {
+    return failed ? (
+      <p className="text-xs text-muted-foreground">
+        知识资产健康度读取失败，可能只是网络波动；重新进入项目页即可重试。
+      </p>
+    ) : null
+  }
 
   const chips = (
     <div className={cn("flex flex-wrap gap-1", variant === "panel" && "gap-1.5")}>

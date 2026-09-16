@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DetailSkeleton } from "@/components/ui/skeletons"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -171,12 +172,7 @@ export default function AdminMethodologyProfileDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        加载中…
-      </div>
-    )
+    return <DetailSkeleton className="py-6" />
   }
 
   if (!detail) {

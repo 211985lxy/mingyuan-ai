@@ -4758,6 +4758,7 @@
       "route": "/api/tasks/[id]",
       "file": "src/app/api/tasks/[id]/route.ts",
       "methods": [
+        "DELETE",
         "GET"
       ],
       "domain": "tasks",

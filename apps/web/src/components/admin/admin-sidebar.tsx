@@ -205,7 +205,7 @@ export function AdminSidebar() {
                 size="icon"
                 onClick={handleLogout}
                 className="cursor-pointer"
-                aria-label="Logout"
+                aria-label="退出登录"
               >
                 <LogOut className="h-4 w-4" />
               </Button>

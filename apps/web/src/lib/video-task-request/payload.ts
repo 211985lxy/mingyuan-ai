@@ -43,6 +43,8 @@ export function buildShanjianSubmitPayload(input: {
     text: scriptContent,
     virtualmanId: avatar?.externalVirtualmanId ?? null,
     speakerId: avatar?.externalSpeakerId ?? null,
+    figureType: avatar?.externalFigureType ?? null,
+    driveMode: avatar?.externalDriveMode ?? null,
     speakerExtra,
     processRules,
     aspectRatio,

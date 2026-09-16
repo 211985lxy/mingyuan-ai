@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { CardGridSkeleton } from "@/components/ui/skeletons"
 import { Textarea } from "@/components/ui/textarea"
 import {
   createInspiration,
@@ -212,10 +213,7 @@ export default function InspirationPage() {
 
       {/* 灵感列表 */}
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          加载中…
-        </div>
+        <CardGridSkeleton count={6} />
       ) : !hasContent ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center gap-3 py-16">

@@ -19,6 +19,10 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        /** 金石印章：高亮标签、专业认定（规范 三.4） */
+        gold: "badge-gold border-transparent",
+        /** 竹简标签：分类前缀、场景标记（规范 三.5） */
+        bamboo: "bamboo-scene-tag rounded-md border-transparent pl-2 text-muted-foreground",
       },
     },
     defaultVariants: {

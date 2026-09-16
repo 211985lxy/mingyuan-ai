@@ -23,7 +23,7 @@ function PageHeader({
         {backHref ? (
           <div className="flex items-center gap-2 mb-1">
             <Link href={backHref} aria-label={backLabel ?? "返回"}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={backLabel ?? "返回"}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
             </Link>

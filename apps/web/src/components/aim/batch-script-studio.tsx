@@ -128,6 +128,7 @@ function ExtractTab(props: { projectId: string | null }) {
 
 function GenerateTab(props: { projectId: string | null }) {
   const [structures, setStructures] = useState<StructureOption[]>([])
+  const [structuresError, setStructuresError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string>("")
   const [count, setCount] = useState(3)
   const [topicTitle, setTopicTitle] = useState("")
@@ -146,7 +147,9 @@ function GenerateTab(props: { projectId: string | null }) {
       const list: StructureOption[] = body.data ?? []
       setStructures(list)
       if (list.length > 0 && !selectedId) setSelectedId(list[0].id)
-    } catch {
+    } catch (error) {
+      // 失败要可见：否则空列表会被误读成「还没有结构模板，先去创建」
+      setStructuresError(error instanceof Error ? error.message : "结构列表加载失败")
       setStructures([])
     } finally {
       setLoadingList(false)
@@ -192,6 +195,10 @@ function GenerateTab(props: { projectId: string | null }) {
         <Label className="text-xs text-muted-foreground">选择结构模板</Label>
         {loadingList ? (
           <LoadingState label="加载结构列表…" />
+        ) : structuresError ? (
+          <p className="text-xs text-destructive" role="alert">
+            结构列表加载失败：{structuresError}（这不代表你没有结构模板）
+          </p>
         ) : structures.length === 0 ? (
           <EmptyState message="还没有已提取的结构模板，先去「提取结构」Tab 创建一个" />
         ) : (

@@ -186,3 +186,66 @@ describe("buildRetryPayload own-voice fidelity", () => {
     )
   })
 })
+
+describe("buildRetryPayload 形态与驱动模式还原", () => {
+  const baseTask = {
+    id: "task-2",
+    videoType: "virtualman_broadcast",
+    scriptContent: "正文",
+    avatarName: "文昊",
+    avatarId: null,
+    projectId: "p1",
+    aimGenerationId: null,
+  };
+
+  it("公共形象从顶层 figureType 快照还原，缺失不下发", () => {
+    const restored = buildRetryPayload({
+      ...baseTask,
+      avatarId: null,
+      shanjianPayload: {
+        virtualmanId: "dp-1",
+        speakerId: "sp-1",
+        figureType: "sit_body",
+        aspectRatio: "9:16",
+      },
+    });
+    expect(restored.figureType).toBe("sit_body");
+    expect(restored.virtualmanId).toBe("dp-1");
+
+    const noFigure = buildRetryPayload({
+      ...baseTask,
+      avatarId: null,
+      shanjianPayload: { virtualmanId: "dp-1", speakerId: "sp-1" },
+    });
+    expect("figureType" in noFigure).toBe(false);
+  });
+
+  it("兼容蝉镜载荷形状 person.figure_type 的快照", () => {
+    const restored = buildRetryPayload({
+      ...baseTask,
+      avatarId: null,
+      shanjianPayload: {
+        virtualmanId: "dp-1",
+        speakerId: "sp-1",
+        person: { id: "dp-1", figure_type: "whole_body" },
+      },
+    });
+    expect(restored.figureType).toBe("whole_body");
+  });
+
+  it("随机帧驱动从快照还原，非 random 不下发", () => {
+    const random = buildRetryPayload({
+      ...baseTask,
+      avatarId: null,
+      shanjianPayload: { virtualmanId: "dp-1", speakerId: "sp-1", driveMode: "random" },
+    });
+    expect(random.driveMode).toBe("random");
+
+    const sequential = buildRetryPayload({
+      ...baseTask,
+      avatarId: null,
+      shanjianPayload: { virtualmanId: "dp-1", speakerId: "sp-1", driveMode: "sequence" },
+    });
+    expect("driveMode" in sequential).toBe(false);
+  });
+})

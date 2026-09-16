@@ -313,6 +313,10 @@ export function buildDigitalHumanVideoPayload(input: {
   text: string
   width?: number
   height?: number
+  /** 形态类型；蝉镜对带形态列表的形象（公共形象全部如此）要求显式指定，缺失会以 50000 拒绝下单 */
+  figureType?: string | null
+  /** 驱动模式：random=随机帧动作（动作更自然），缺省为顺序播放 */
+  driveMode?: "random" | null
 }): Record<string, unknown> {
   const screenWidth = input.width ?? 1080
   const screenHeight = input.height ?? 1920
@@ -325,6 +329,8 @@ export function buildDigitalHumanVideoPayload(input: {
       y: Math.round((screenHeight - personHeight) / 2),
       width: screenWidth,
       height: personHeight,
+      ...(input.figureType ? { figure_type: input.figureType } : {}),
+      ...(input.driveMode === "random" ? { drive_mode: "random" } : {}),
     },
     audio: {
       type: "tts",
@@ -350,6 +356,8 @@ export async function createDigitalHumanVideo(input: {
   text: string
   width?: number
   height?: number
+  figureType?: string | null
+  driveMode?: "random" | null
 }): Promise<ChanjingSubmitResult> {
   const body = buildDigitalHumanVideoPayload(input)
 
