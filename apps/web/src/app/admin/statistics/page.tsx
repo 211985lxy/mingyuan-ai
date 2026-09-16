@@ -10,6 +10,8 @@ import { AdminPageShell } from "@/components/admin/admin-page-shell"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { TableSkeleton } from "@/components/ui/skeletons"
 import { Input } from "@/components/ui/input"
 
 type Metric = number | null
@@ -103,7 +105,14 @@ function Freshness({ items }: { items: Overview["freshness"] }) {
 }
 
 function LoadingCard() {
-  return <Card><CardContent className="flex min-h-24 items-center justify-center text-sm text-muted-foreground">正在加载…</CardContent></Card>
+  return (
+    <Card>
+      <CardContent className="space-y-3 py-6" aria-hidden>
+        <Skeleton className="h-5 w-1/4" />
+        <TableSkeleton rows={4} columns={4} />
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function StatisticsPage() {

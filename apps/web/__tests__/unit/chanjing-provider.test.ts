@@ -82,6 +82,43 @@ describe("chanjing provider mapping", () => {
     expect(calls).toBe(3)
   })
 
+  it("figure_type 仅在有值时写入 person（缺失交供应商判定）", () => {
+    const withFigure = buildDigitalHumanVideoPayload({
+      personId: "person-1",
+      audioManId: "voice-1",
+      text: "测试",
+      figureType: "sit_body",
+    })
+    expect((withFigure.person as { figure_type?: string }).figure_type).toBe("sit_body")
+
+    const withoutFigure = buildDigitalHumanVideoPayload({
+      personId: "person-1",
+      audioManId: "voice-1",
+      text: "测试",
+      figureType: null,
+    })
+    // 定制数字人不读该参数；不下发而非传空，避免出现非法空形态
+    expect("figure_type" in (withoutFigure.person as Record<string, unknown>)).toBe(false)
+  })
+
+  it("drive_mode=random 时下发，否则保持缺省行为", () => {
+    const random = buildDigitalHumanVideoPayload({
+      personId: "person-1",
+      audioManId: "voice-1",
+      text: "测试",
+      driveMode: "random",
+    })
+    expect((random.person as { drive_mode?: string }).drive_mode).toBe("random")
+
+    const sequential = buildDigitalHumanVideoPayload({
+      personId: "person-1",
+      audioManId: "voice-1",
+      text: "测试",
+      driveMode: null,
+    })
+    expect("drive_mode" in (sequential.person as Record<string, unknown>)).toBe(false)
+  })
+
   it("marks compliance watermark in the generated video payload", () => {
     const payload = buildDigitalHumanVideoPayload({
       personId: "person-1",

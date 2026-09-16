@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import Link from "next/link"
 import {
   Activity,
@@ -56,6 +57,7 @@ interface MethodologyItem {
 }
 
 export default function AdminMethodologyPage() {
+  const confirm = useConfirm()
   const [methodologies, setMethodologies] = React.useState<MethodologyItem[]>([])
   const [loading, setLoading] = React.useState(true)
   // 编辑弹窗
@@ -121,7 +123,7 @@ export default function AdminMethodologyPage() {
   }
 
   async function handleReset(key: string) {
-    if (!confirm("确定重置为文件原文？当前 DB 中的编辑将被清除。")) return
+    if (!(await confirm({ title: "重置为文件原文？", description: "当前 DB 中的编辑将被清除，不可撤销。", confirmText: "重置", destructive: true }))) return
     try {
       const res = await fetch(`/api/admin/methodology/${key}`, {
         method: "POST",

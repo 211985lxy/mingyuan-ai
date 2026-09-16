@@ -4,10 +4,12 @@ import { NextIntlClientProvider } from "next-intl"
 import { getMessages } from "next-intl/server"
 import { BrandingProvider } from "@/components/providers/branding-provider"
 import { ThemeBootScript, ThemeProvider } from "@/components/providers/theme-provider"
+import { ConfirmProvider } from "@/components/ui/confirm-dialog"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "sonner"
 import { getBrandingConfig } from "@/lib/branding"
 import "./globals.css"
+import "./brand-themes.css"
 
 // 所有页面都依赖 DB(getBrandingConfig)与请求上下文(getMessages),
 // 不做静态预渲染。否则 next build 在 prerender 阶段会因
@@ -53,8 +55,10 @@ export default async function RootLayout({
         <ThemeProvider>
           <BrandingProvider branding={branding}>
             <NextIntlClientProvider messages={messages}>
-              <TooltipProvider>{children}</TooltipProvider>
-              <Toaster richColors position="top-center" />
+              <ConfirmProvider>
+                <TooltipProvider>{children}</TooltipProvider>
+                <Toaster richColors position="top-center" />
+              </ConfirmProvider>
             </NextIntlClientProvider>
           </BrandingProvider>
         </ThemeProvider>

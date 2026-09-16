@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import type { AimEvolutionSuggestion } from "@/lib/api/client"
@@ -61,8 +62,28 @@ export function AimEvolutionSuggestions({
 }: {
   suggestions: AimEvolutionSuggestion[]
   onDismiss: (suggestion: AimEvolutionSuggestion) => void
-  onSave: (suggestion: AimEvolutionSuggestion) => void
+  onSave: (suggestion: AimEvolutionSuggestion) => Promise<void> | void
 }) {
+  // 「写入知识库」是服务端创建操作：请求飞行期间重复点击会写入多条相同知识
+  const [savingKeys, setSavingKeys] = useState<Set<string>>(() => new Set())
+
+  async function handleSave(key: string, suggestion: AimEvolutionSuggestion) {
+    if (savingKeys.has(key)) return
+    setSavingKeys((current) => new Set(current).add(key))
+    try {
+      await onSave(suggestion)
+    } catch {
+      // onSave 内部已 toast 失败原因；此处吞掉异常避免未处理的 Promise 拒绝
+      // （调用处以 void 触发，异常无人接收），状态由 finally 释放以便重试
+    } finally {
+      setSavingKeys((current) => {
+        const next = new Set(current)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
   if (suggestions.length === 0) return null
   return (
     <div className="border-b bg-muted/30 px-4 py-3">
@@ -89,9 +110,10 @@ export function AimEvolutionSuggestions({
               <Button
                 size="sm"
                 className="h-8 px-2.5 text-sm"
-                onClick={() => onSave(suggestion)}
+                disabled={savingKeys.has(`${suggestion.title}-${suggestion.content}`)}
+                onClick={() => void handleSave(`${suggestion.title}-${suggestion.content}`, suggestion)}
               >
-                写入知识库
+                {savingKeys.has(`${suggestion.title}-${suggestion.content}`) ? "写入中…" : "写入知识库"}
               </Button>
             </div>
           </div>

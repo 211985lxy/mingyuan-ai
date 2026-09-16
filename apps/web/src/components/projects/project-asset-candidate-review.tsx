@@ -52,6 +52,7 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
   const [items, setItems] = useState<AssetCandidateItem[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [workflowId, setWorkflowId] = useState("content-growth-v1")
   const [approvalId, setApprovalId] = useState("")
@@ -63,7 +64,10 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
         `/api/aim/asset-candidates?projectId=${encodeURIComponent(projectId)}&reviewStatus=pending&take=20`,
       )
       setItems(payload.candidates || [])
+      setFailed(false)
     } catch {
+      // 失败时不要静默隐藏整块：用户会以为这个功能不存在
+      setFailed(true)
       setItems([])
     } finally {
       setLoading(false)
@@ -104,7 +108,13 @@ export function ProjectAssetCandidateReview({ projectId }: ProjectAssetCandidate
     )
   }
 
-  if (items.length === 0) return null
+  if (items.length === 0) {
+    return failed ? (
+      <p className="text-xs text-muted-foreground">
+        待确认素材读取失败，可能只是网络波动；重新进入项目页即可重试。
+      </p>
+    ) : null
+  }
 
   return (
     <div className="mt-3 rounded-xl border border-border/80 bg-secondary/20 p-3">

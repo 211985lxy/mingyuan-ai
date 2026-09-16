@@ -209,7 +209,7 @@ export function KnowledgeUploadDialog({
                 className="cursor-pointer"
               />
               {file && (
-                <Button variant="ghost" size="icon" onClick={() => onFileChange(null)} className="cursor-pointer">
+                <Button variant="ghost" size="icon" aria-label="移除已选文件" onClick={() => onFileChange(null)} className="cursor-pointer">
                   <X className="h-4 w-4" />
                 </Button>
               )}

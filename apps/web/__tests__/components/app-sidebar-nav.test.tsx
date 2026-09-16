@@ -60,10 +60,12 @@ beforeEach(() => {
 })
 
 describe("AppSidebar 导航收敛", () => {
-  it("主组展示创作台/市场洞察/数据看板/我的项目", () => {
+  it("主组展示创作台/数字人工坊/市场洞察/数据看板/我的项目", () => {
     renderSidebar()
 
     expect(screen.getByText("创作台")).toBeTruthy()
+    // 数字人工坊已进主线导航（2026-09-14 设计方案）
+    expect(screen.getByText("数字人工坊")).toBeTruthy()
     expect(screen.getByText("市场洞察")).toBeTruthy()
     expect(screen.getByText("数据看板")).toBeTruthy()
     expect(screen.getByText("我的项目")).toBeTruthy()
@@ -83,8 +85,11 @@ describe("AppSidebar 导航收敛", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true")
     expect(screen.getByText("爆款拆解")).toBeTruthy()
     expect(screen.getByText("极简模式")).toBeTruthy()
-    expect(screen.getByText("语音工坊")).toBeTruthy()
+    expect(screen.getByText("资产库")).toBeTruthy()
     expect(screen.getByText("我的知识库")).toBeTruthy()
+    // 语音工坊与我的成片已并入工坊并从导航移除（旧路由 301 到 /studio/*）
+    expect(screen.queryByText("语音工坊")).toBeNull()
+    expect(screen.queryByText("我的成片")).toBeNull()
   })
 
   it("新建任务徽标按非终态任务计数（published/archived 不计）", () => {

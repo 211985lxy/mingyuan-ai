@@ -30,6 +30,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname, "../.."),
   },
+  async redirects() {
+    return [
+      // 数字人工坊整合（2026-09-14 设计方案）：旧入口 301 到新模块
+      { source: "/voice-studio", destination: "/studio/audio", permanent: true },
+      { source: "/videos", destination: "/studio/works", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

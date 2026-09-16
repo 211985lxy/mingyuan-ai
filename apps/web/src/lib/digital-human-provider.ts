@@ -71,45 +71,37 @@ export function matchesDigitalHumanAuthorizationText(
  * 授权文案中的声明人姓名占位符。
  *
  * 供应商的授权话术要求声明人念自己的**真实姓名**（如「我 XXX 特此声明，授权…」），
- * 因此文案对每个人不同，不能在全平台写死一段。配置里以 `{name}` 标注该位置。
+ * 配置里以 `{name}` 标注该位置。
  */
 export const DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER = "{name}"
 
 /**
- * 把配置的授权文案模板实例化为某一位声明人的原文。
- *
- * 未包含占位符时原样返回（兼容「仅账号持有人本人克隆」的单一文案形态）；
- * 包含占位符但拿不到姓名时 fail-closed——宁可不放行，也不能让用户念一段
- * 写着别人姓名的声明。
+ * 姓名位展示文本：姓名不做校验、不从账号读取（2026-09-15 决策）。
+ * 声明人自己知道名字，录时念自己的即可；避免拼音缩写账号渲染出「我 lxy 特此声明」，
+ * 也不再把「先完善账号姓名」的压力转嫁给客户。
  */
-export function buildDigitalHumanAuthorizationText(
-  template: string,
-  userName?: string | null,
-): string {
+export const DIGITAL_HUMAN_AUTH_NAME_DISPLAY = "（您的姓名）"
+
+/**
+ * 模板实例化为对所有声明人通用的展示原文：姓名位统一为占位文本。
+ * 未包含占位符时原样返回（兼容单一文案形态）。
+ */
+export function buildDigitalHumanAuthorizationText(template: string): string {
   const normalized = normalizeDigitalHumanAuthorizationText(template)
   if (!normalized.includes(DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER)) return normalized
-
-  const name = typeof userName === "string" ? userName.replace(/\s+/g, " ").trim() : ""
-  if (!name) {
-    throw new DigitalHumanProviderError(
-      "AUTH_NAME_REQUIRED",
-      "授权文案含 {name} 占位符，需先完善账号姓名后才能生成授权原文",
-    )
-  }
   return normalizeDigitalHumanAuthorizationText(
-    normalized.replaceAll(DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER, name),
+    normalized.replaceAll(DIGITAL_HUMAN_AUTH_NAME_PLACEHOLDER, DIGITAL_HUMAN_AUTH_NAME_DISPLAY),
   )
 }
 
 /**
- * 返回当前供应商要求用户在授权视频中逐字朗读的原文（按声明人实例化）。
+ * 返回当前供应商要求用户在授权视频中逐字朗读的原文（姓名位为通用占位）。
  *
- * 这段文字是供应商账户配置的一部分，不能从品牌名、用户输入或前端
- * 拼接得到。未配置时直接阻止授权视频提交，避免将错误文案送到供应商。
+ * 这段文字是供应商账户配置的一部分，不能从品牌名、用户输入或前端拼接得到。
+ * 未配置时直接阻止授权视频提交，避免将错误文案送到供应商。
  */
 export function getDigitalHumanAuthorizationText(
   provider: DigitalHumanProvider = getDigitalHumanProvider(),
-  userName?: string | null,
 ): string {
   const configured = provider === "chanjing"
     ? env.CHANJING_AUTH_TEXT
@@ -121,16 +113,15 @@ export function getDigitalHumanAuthorizationText(
       `${provider === "chanjing" ? "蝉镜" : "闪剪"}授权文案暂未配置，请联系管理员`,
     )
   }
-  return buildDigitalHumanAuthorizationText(text, userName)
+  return buildDigitalHumanAuthorizationText(text)
 }
 
 export function hasExactDigitalHumanAuthorizationText(
   provided: unknown,
   provider: DigitalHumanProvider = getDigitalHumanProvider(),
-  userName?: string | null,
 ): boolean {
   try {
-    return matchesDigitalHumanAuthorizationText(provided, getDigitalHumanAuthorizationText(provider, userName))
+    return matchesDigitalHumanAuthorizationText(provided, getDigitalHumanAuthorizationText(provider))
   } catch {
     return false
   }
@@ -306,6 +297,8 @@ export async function generateDemoVideo(input: {
   virtualmanId: string
   speakerId: string
   text: string
+  figureType?: string | null
+  driveMode?: "random" | null
 }): Promise<ShanjianSubmitResult> {
   try {
     if (getDigitalHumanProvider() === "chanjing") {
@@ -313,6 +306,8 @@ export async function generateDemoVideo(input: {
         personId: input.virtualmanId,
         audioManId: input.speakerId,
         text: input.text,
+        figureType: input.figureType ?? null,
+        driveMode: input.driveMode ?? null,
       })
     }
     return await generateRawVideo({
@@ -385,6 +380,7 @@ async function submitChanjingVideo(
     const submitted = await createDigitalHumanVideoFromAudio({
       wavUrl: ownVoiceAudioUrl,
       personId,
+      // 缺省 whole_body 是自建形象的既有契约（公有形象由前端显式传入形态）
       figureType: typeof payload.figureType === "string" ? payload.figureType : "whole_body",
       personWidth: width,
       personHeight: height,
@@ -416,7 +412,17 @@ async function submitChanjingVideo(
       "缺少音色或口播文案，无法提交蝉镜出片任务",
     )
   }
-  return await createDigitalHumanVideo({ personId, audioManId, text, width, height })
+  // 形态必须由调用方按实际形象传（公共形象各有形态列表，且并非都有 whole_body）；
+  // 缺失时交给供应商判定，不在此硬编码默认值以免传入该形象不具备的形态。
+  return await createDigitalHumanVideo({
+    personId,
+    audioManId,
+    text,
+    width,
+    height,
+    figureType: typeof payload.figureType === "string" ? payload.figureType : null,
+    driveMode: payload.driveMode === "random" ? "random" : null,
+  })
 }
 
 const HEYGEN_VIDEO_TYPES = new Set([

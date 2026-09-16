@@ -1,31 +1,23 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { AudioLines, Loader2, RefreshCw, Volume2 } from "lucide-react"
+import { Loader2, RefreshCw, Volume2 } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { WorkbenchHero } from "@/components/workbench/workbench-hero"
+import { ModelSpeedCard, ScriptInputCard } from "@/components/voice/voice-studio-forms"
 import { VoiceHistoryCard } from "@/components/voice/voice-history-card"
 import { VoiceCloneButton } from "@/components/voice/voice-clone-dialog"
 import { VoiceServiceNotice } from "@/components/voice/voice-service-notice"
 import { useVoiceSamplePreview, VoicePickerList } from "@/components/voice/voice-sample-preview"
 import {
   fetchVoiceModels,
-  importVoiceHistory,
-  synthesizeVoiceAudio,
   VOICE_MAX_TOTAL_LENGTH,
   type VoiceModelsResponse,
 } from "@/lib/api/voice"
+import { useSegmentedSynthesis } from "@/lib/voice/segmented-synthesis"
 import { splitTextForSynthesis } from "@/lib/voice/segment-text"
 
 interface SynthesizedInfo {
@@ -165,45 +157,6 @@ export default function VoiceStudioPage() {
   )
 }
 
-function ScriptInputCard({ text, onChange }: { text: string; onChange: (value: string) => void }) {
-  const charCount = text.trim().length
-  const tooLong = charCount > VOICE_MAX_TOTAL_LENGTH
-  const plannedSegments = splitTextForSynthesis(text).length
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <AudioLines className="h-4 w-4 text-primary" />
-          输入文案
-        </CardTitle>
-        <CardDescription>
-          支持 [括号] 情绪提示（如 [轻松地]、[停顿]）；超过 1200 字自动按断句分段合成，上限 {VOICE_MAX_TOTAL_LENGTH} 字。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Textarea
-          value={text}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="把口播稿或文案粘贴到这里，例如：\n大家好，我是做暖通的老李。[轻松地] 今天讲讲暖气片为什么一半热一半凉。"
-          className="min-h-[220px] text-base leading-7"
-        />
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span className={tooLong ? "text-destructive" : ""}>
-            {charCount} / {VOICE_MAX_TOTAL_LENGTH} 字
-            {plannedSegments > 1 && !tooLong ? ` · 将自动分 ${plannedSegments} 段合成` : ""}
-          </span>
-          {text ? (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onChange("")}>
-              清空
-            </Button>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function VoicePickerCard({
   scope,
   onScopeChange,
@@ -287,125 +240,6 @@ function VoicePickerCard({
       </CardContent>
     </Card>
   )
-}
-
-function ModelSpeedCard({
-  models,
-  tier,
-  onTierChange,
-  speed,
-  onSpeedChange,
-}: {
-  models: VoiceModelsResponse | null
-  tier: string
-  onTierChange: (value: string) => void
-  speed: number
-  onSpeedChange: (value: number) => void
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">档位与语速</CardTitle>
-        <CardDescription>
-          档位默认免费档 s2.1-pro-free（与付费版同权重、无 SLA）；正式投放的配音可切到 s2.1-pro。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">档位</label>
-          <Select value={tier} onValueChange={(value) => onTierChange(value ?? "")}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="默认免费档" />
-            </SelectTrigger>
-            <SelectContent>
-              {(models?.tiers ?? []).map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            {(models?.tiers ?? []).find((item) => item.id === tier)?.note ?? "默认免费档，适合试听与原型"}
-          </p>
-        </div>
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-muted-foreground">语速 {speed.toFixed(1)}x</label>
-          <input
-            type="range"
-            min={0.5}
-            max={2}
-            step={0.1}
-            value={speed}
-            onChange={(event) => onSpeedChange(Number(event.target.value))}
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground">调整语速会重新合成，试听请耐心等待几秒。</p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-type SynthesisPhase = "idle" | "synthesizing" | "saving"
-
-interface SynthesisHandlers {
-  onDone: (payload: { objectUrl: string; charCount: number | null }) => void
-  onSaved: () => void
-}
-
-/** 逐段合成全文并在浏览器内拼接：免费档长文较慢（约 12.5 字/秒），进度可见、不占服务端长连接。 */
-function useSegmentedSynthesis(handlers: SynthesisHandlers) {
-  const { onDone, onSaved } = handlers
-  const [phase, setPhase] = useState<SynthesisPhase>("idle")
-  const [progress, setProgress] = useState({ done: 0, total: 0 })
-  const [error, setError] = useState<string | null>(null)
-
-  const generate = useCallback(
-    async (input: { text: string; voiceId: string | null; model: string | null; speed: number }) => {
-      const trimmed = input.text.trim()
-      if (!trimmed || phase !== "idle") return
-      setError(null)
-      setPhase("synthesizing")
-      try {
-        const segments = splitTextForSynthesis(trimmed)
-        setProgress({ done: 0, total: segments.length })
-        const parts: Blob[] = []
-        for (let i = 0; i < segments.length; i++) {
-          setProgress({ done: i, total: segments.length })
-          const result = await synthesizeVoiceAudio({
-            text: segments[i],
-            voiceId: input.voiceId,
-            model: input.model,
-            speed: input.speed,
-          })
-          parts.push(result.blob)
-          URL.revokeObjectURL(result.objectUrl)
-        }
-        setProgress({ done: segments.length, total: segments.length })
-        const combined = new Blob(parts, { type: "audio/mpeg" })
-        const objectUrl = URL.createObjectURL(combined)
-        onDone({ objectUrl, charCount: trimmed.length })
-
-        setPhase("saving")
-        await importVoiceHistory({
-          text: trimmed,
-          model: input.model || "s2.1-pro-free",
-          voiceId: input.voiceId,
-          segments: segments.length,
-          audio: combined,
-        })
-        onSaved()
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "配音失败，请稍后重试")
-      } finally {
-        setPhase("idle")
-      }
-    },
-    [onDone, onSaved, phase],
-  )
-
-  return { phase, progress, error, generate }
 }
 
 function ActionCard({

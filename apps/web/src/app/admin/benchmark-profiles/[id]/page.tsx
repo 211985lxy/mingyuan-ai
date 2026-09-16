@@ -20,6 +20,7 @@ import { ProfileDetailDialogs } from "@/features/benchmark-profiles/components/p
 import { ProfileMaterials } from "@/features/benchmark-profiles/components/profile-materials"
 import { PLATFORM_COLORS, PLATFORM_LABELS, type EditableProfileItem, type ImportableAnalysis, type ProfileDetail } from "@/features/benchmark-profiles/model"
 import { cn } from "@/lib/utils"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 
 // ── 辅助 ──
 
@@ -30,6 +31,7 @@ function authHeaders(json = false): Record<string, string> {
 // ── 主页面 ──
 
 export default function BenchmarkProfileDetailPage() {
+  const confirm = useConfirm()
   const params = useParams<{ id: string }>() ?? { id: "" }
   const router = useRouter()
   const id = params.id
@@ -193,7 +195,7 @@ export default function BenchmarkProfileDetailPage() {
   // ── 单条 item 删除 ──
 
   async function handleDeleteItem(itemId: string) {
-    if (!confirm("确定删除这条素材？")) return
+    if (!(await confirm({ title: "删除这条素材？", confirmText: "删除", destructive: true }))) return
     setError(null)
     try {
       const res = await fetch(`/api/admin/benchmark-profiles/${id}/items/${itemId}`, {
@@ -333,7 +335,7 @@ export default function BenchmarkProfileDetailPage() {
       {/* 顶部导航 */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/benchmark-profiles")}>
+          <Button variant="ghost" size="icon" aria-label="返回对标档案列表" onClick={() => router.push("/admin/benchmark-profiles")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0">

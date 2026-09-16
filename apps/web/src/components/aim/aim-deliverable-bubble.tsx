@@ -1,6 +1,7 @@
 "use client"
 
 import { memo, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { MarkdownRenderer } from "@/components/markdown-renderer"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,7 +13,7 @@ import type { AimAgentId } from "@/lib/aim-ui-config"
 import type { AimContentAction, AimWorkflowStage } from "@/lib/aim-workflow"
 import type { AimGenerateResponse, AimGenerateResult, ContentFormat } from "@/lib/api/client"
 import { AimInlineDocumentCard } from "@/components/aim/aim-inline-document-card"
-import { DigitalHumanVideoDialog } from "@/components/aim/digital-human-video-dialog"
+import { saveVideoHandoff } from "@/lib/studio/studio-prefs"
 import type { TextSelectionRange } from "@/lib/aim-editor"
 import type { TaskSpec } from "@/lib/task-spec"
 
@@ -226,11 +227,11 @@ function WorkflowRecordActions({ onOpenDecision, onOpenPublish, onOpenRetro, onO
  */
 export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
   const { deliverables, regenerating = false, nextActions = [], onNextAction, isBusy } = props
+  const router = useRouter()
   const digitalHumanActions = nextActions.filter(
     (action) => action.workbenchAction === "generate_digital_human_video",
   )
   const [activeTab, setActiveTab] = useState<ContentFormat>(deliverables.results[0]?.format || "raw_copy")
-  const [digitalHumanOpen, setDigitalHumanOpen] = useState(false)
   const activeFormat = deliverables.results.some((item) => item.format === activeTab) ? activeTab : deliverables.results[0]?.format || "raw_copy"
   const activeContent = useMemo(() => {
     const item = deliverables.results.find((row) => row.format === activeFormat) || deliverables.results[0]
@@ -239,7 +240,13 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
 
   function handleNextAction(action: AimNextAction) {
     if (action.workbenchAction === "generate_digital_human_video") {
-      setDigitalHumanOpen(true)
+      // 去工坊出片：文案走 sessionStorage 交接（长文超 URL 限制），视频工作台直达第 2 步
+      saveVideoHandoff({
+        script: activeContent,
+        projectId: props.projectId || undefined,
+        aimGenerationId: deliverables.id,
+      })
+      router.push("/studio/video?from=aim")
       return
     }
     onNextAction?.(action, activeContent, deliverables.id)
@@ -293,12 +300,5 @@ export function AimDeliverableBubble(props: AimDeliverableBubbleProps) {
         ))}
       </div>
     ) : null}
-    <DigitalHumanVideoDialog
-      open={digitalHumanOpen}
-      onOpenChange={setDigitalHumanOpen}
-      initialScript={activeContent}
-      projectId={props.projectId}
-      aimGenerationId={deliverables.id}
-    />
   </div>
 }

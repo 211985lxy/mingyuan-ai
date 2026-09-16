@@ -8,6 +8,7 @@ import {
 } from "@/lib/oss"
 import { analyzeMarketing } from "@/lib/marketing-analysis"
 import { LLMClient } from "@/lib/llm"
+import { ACTIVE_VIDEO_TASK_STATUSES } from "@/lib/video-task-domain"
 
 // ─── GET /api/tasks/[id] ────────────────────────────────
 
@@ -33,6 +34,38 @@ export const GET = withUserAuth(async (_request, { user, params }) => {
   return NextResponse.json({
     data: signTaskUrls(await enrichTaskForResponse(task)),
   })
+})
+
+// ─── DELETE /api/tasks/[id] ─────────────────────────────
+//
+// 只删除任务记录，不动已转存到自有 OSS 的成片文件——避免误删用户资产。
+// 生成中的任务不允许删除：供应商回调会落到已删记录，且此时计费已发生。
+
+export const DELETE = withUserAuth(async (_request, { user, params }) => {
+  const id = params?.id
+  if (!id) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 })
+  }
+
+  const task = await prisma.videoTask.findFirst({
+    where: { id, userId: user.id },
+    select: { id: true, status: true },
+  })
+
+  // 幂等且不泄露存在性：不存在或不属于本人，一律按成功返回
+  if (!task) {
+    return NextResponse.json({ data: { deleted: false } })
+  }
+
+  if (ACTIVE_VIDEO_TASK_STATUSES.includes(task.status as (typeof ACTIVE_VIDEO_TASK_STATUSES)[number])) {
+    return NextResponse.json(
+      { error: "任务生成中，请等它完成或失败后再删除", code: "TASK_IN_PROGRESS" },
+      { status: 409 },
+    )
+  }
+
+  await prisma.videoTask.delete({ where: { id } })
+  return NextResponse.json({ data: { deleted: true } })
 })
 
 // ─── Helpers ────────────────────────────────────────────

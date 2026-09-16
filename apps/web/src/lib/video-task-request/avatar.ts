@@ -37,6 +37,8 @@ function buildPublicAvatar(userId: string, projectId: string | null, body: Creat
     status: "ready",
     externalVirtualmanId: body.virtualmanId as string,
     externalSpeakerId: body.speakerId as string,
+    externalFigureType: (body.figureType as string) ?? null,
+    externalDriveMode: (body.driveMode as string) ?? null,
     speakerName: name,
   };
 }

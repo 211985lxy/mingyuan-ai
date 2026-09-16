@@ -63,7 +63,7 @@ export default function LiteWorksPage() {
         </p>
         <button
           type="button"
-          className="mt-6 cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
+          className="mt-6 cursor-pointer rounded-lg btn-brand px-4 py-2 text-sm text-primary-foreground transition-colors"
           onClick={() => router.push("/home")}
         >
           去创作台

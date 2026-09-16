@@ -108,7 +108,9 @@ export function RecentVideosTable({ videos }: { videos: PlatformVideo[] }) {
   return (
     <Card>
       <CardContent className="pt-2">
-        <Table>
+        {/* 宽表格在窄屏只横滑表格自身，不撑破整页 */}
+        <div className="overflow-x-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>作品</TableHead>
@@ -156,7 +158,8 @@ export function RecentVideosTable({ videos }: { videos: PlatformVideo[] }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   )
