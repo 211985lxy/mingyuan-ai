@@ -8,9 +8,9 @@ name: AIM Architecture Guard
 #   阶段 2 迁移完成后收紧为硬失败
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "release/**"]
   push:
-    branches: [main]
+    branches: [main, "release/**"]
   workflow_dispatch:
 
 concurrency:

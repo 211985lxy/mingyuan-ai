@@ -2,9 +2,11 @@ name: Repository Guardrails
 
 on:
   pull_request:
-    branches: [main]
+    # release/** 一并纳入：线上部署的是发布线，把它的自动门禁挂空会失去全部保护
+    # （2026-09-16 实测：发布线只有 workflow_dispatch，只能靠人手派发）
+    branches: [main, "release/**"]
   push:
-    branches: [main]
+    branches: [main, "release/**"]
   workflow_dispatch:
 
 concurrency:

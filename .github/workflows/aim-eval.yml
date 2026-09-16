@@ -3,11 +3,13 @@ name: AIM Harness Eval (deterministic)
 # Runs on every PR (and push to main): the deterministic harness gate.
 # No model calls, no customer DB writes. Asserts all eval fixtures pass the
 # routing/format/context contract grader at 100%.
+# 触发分支与 repository-guardrails 对齐：main + release/**。
+# release/** 是线上实际部署的线，漏掉它就等于线上代码没有自动门禁。
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "release/**"]
   push:
-    branches: [main]
+    branches: [main, "release/**"]
   workflow_dispatch:
 
 concurrency:
