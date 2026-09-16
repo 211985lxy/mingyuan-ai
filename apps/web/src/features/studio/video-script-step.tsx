@@ -52,7 +52,7 @@ export function VideoScriptStep(props: {
     <section className="space-y-5">
       <header className="space-y-1">
         <h2 className="text-lg font-semibold">声音与文案</h2>
-        <p className="text-sm text-muted-foreground">先用普通配音试听效果，满意再渲染成片。</p>
+        <p className="text-sm text-muted-foreground">声音默认来自 Fish Audio（语音工坊音色），可先试听，满意再渲染成片。</p>
       </header>
 
       <VoiceSourcePicker
@@ -111,21 +111,21 @@ function VoiceSourcePicker({
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <Button
           type="button"
-          variant={voiceSource === "tts" ? "secondary" : "ghost"}
-          size="sm"
-          className="h-7 px-2 text-xs"
-          onClick={() => onVoiceSourceChange("tts")}
-        >
-          形象配套音色
-        </Button>
-        <Button
-          type="button"
           variant={voiceSource === "own_voice" ? "secondary" : "ghost"}
           size="sm"
           className="h-7 px-2 text-xs"
           onClick={() => onVoiceSourceChange("own_voice")}
         >
-          我的克隆音色
+          Fish 音色（推荐）
+        </Button>
+        <Button
+          type="button"
+          variant={voiceSource === "tts" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => onVoiceSourceChange("tts")}
+        >
+          形象自带音色（备选）
         </Button>
         {voiceSource === "own_voice" ? (
           <Select value={fishVoiceId} onValueChange={(value) => value && onFishVoiceChange(value)}>
