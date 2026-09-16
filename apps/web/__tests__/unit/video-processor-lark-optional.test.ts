@@ -48,13 +48,24 @@ vi.mock("@/lib/transcript-polish", () => ({ polishTranscript: async (t: string) 
 // mock 掉避免单元测试构造真实 PrismaClient。
 vi.mock("@/lib/prisma", () => ({ prisma: {} }))
 
-import { processVideo } from "@/lib/content-pipeline/video-processor"
+import { extractVideoTranscript, processVideo } from "@/lib/content-pipeline/video-processor"
 
 const STORE_CONFIG = { baseToken: "bt", tableId: "tt" }
 
 describe("processVideo 飞书内容素材库可选降级", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it("exposes the existing transcript extraction boundary without running later AI stages", async () => {
+    const result = await extractVideoTranscript(
+      "https://www.douyin.com/video/7000000000000000000",
+      "douyin",
+    )
+
+    expect(result.status).toBe("completed")
+    expect(result.transcript).toBe("完整转录文本")
+    expect(result.title).toBe("对标视频标题")
   })
 
   it("未配置飞书 token/table 时流水线仍成功，且不调用任何飞书写入", async () => {

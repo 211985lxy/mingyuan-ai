@@ -1,4 +1,6 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import { AIM_CONTENT_GOAL_LABELS } from "@/lib/aim/content-goal"
+import type { IpProfileSeed } from "@/lib/aim/ip-profile-seed"
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import { runAimTraceStep, summarizeText, type AimTraceRecorder } from "@/lib/aim-observability"
 import type { AimModelPolicy } from "@/lib/aim-harness/types"
@@ -161,9 +163,39 @@ function renderEnvelopeForUnderstanding(envelope: AimContentSourceEnvelope) {
   ].filter(Boolean).join("\n\n")
 }
 
+/**
+ * 项目档案块：把已确认的受众/目标告诉理解模型，避免它就这些字段再生成追问。
+ * 只放结论（一句话受众 + 目标标签），不塞整页档案——整页在生成阶段另有注入。
+ */
+function renderIpProfileBlock(profileSeed?: IpProfileSeed): string {
+  if (!profileSeed || (!profileSeed.audience && !profileSeed.goal)) return ""
+  return [
+    "【项目档案已确认】用户绑定项目的 IP 档案里已经确认过：",
+    profileSeed.audience ? `- 目标人群：${profileSeed.audience}` : "",
+    profileSeed.goal ? `- 内容目标：${AIM_CONTENT_GOAL_LABELS[profileSeed.goal]}` : "",
+    "以上字段无需追问；除非用户本轮明确要改，不要为它们生成 clarificationQuestions。",
+  ].filter(Boolean).join("\n")
+}
+
+/**
+ * 理解步骤的用户消息：档案块跟在用户原话之后（原话是唯一真源，档案只作已确认背景）。
+ * 导出以便单测直接断言提示词内容。
+ */
+export function buildUnderstandingUserPrompt(input: {
+  envelope: AimContentSourceEnvelope
+  profileSeed?: IpProfileSeed
+}): string {
+  return [
+    renderEnvelopeForUnderstanding(input.envelope),
+    renderIpProfileBlock(input.profileSeed),
+  ].filter(Boolean).join("\n\n")
+}
+
 export async function understandAimContentTurn(input: {
   envelope: AimContentSourceEnvelope
   complete: CompletePort
+  /** 绑定项目里已确认的档案兜底：让理解模型不再就这些字段追问 */
+  profileSeed?: IpProfileSeed
 }): Promise<AimSemanticTaskUnderstanding> {
   const fastPath = resolveSemanticUnderstandingFastPath(input.envelope)
   if (fastPath) return fastPath
@@ -188,7 +220,7 @@ export async function understandAimContentTurn(input: {
   ].join("\n")
   const completion = await input.complete(
     promptRegistry.get(PROMPT_KEYS.semanticTaskUnderstanding).content,
-    `${renderEnvelopeForUnderstanding(input.envelope)}${v2Appendix}`,
+    `${buildUnderstandingUserPrompt({ envelope: input.envelope, profileSeed: input.profileSeed })}${v2Appendix}`,
   )
   try {
     return parseSemanticTaskUnderstanding(completion.content)
@@ -230,6 +262,8 @@ export async function understandAimContentTurnWithTrace(input: {
   agentId: string
   modelPolicy?: AimModelPolicy
   trace?: AimTraceRecorder
+  /** 绑定项目已确认的档案兜底：让理解模型不再就这些字段追问 */
+  profileSeed?: IpProfileSeed
 }): Promise<AimSemanticTaskUnderstanding> {
   return runAimTraceStep(
     input.trace,
@@ -237,6 +271,7 @@ export async function understandAimContentTurnWithTrace(input: {
     "语义任务理解",
     () => understandAimContentTurn({
       envelope: input.envelope,
+      profileSeed: input.profileSeed,
       complete: (systemPrompt, userPrompt) => executeGenerateLLM(
         input.agentId,
         systemPrompt,
@@ -251,6 +286,13 @@ export async function understandAimContentTurnWithTrace(input: {
         conversationTurns: input.envelope.relevantConversation.length,
         referenceCount: input.envelope.referenceMaterials.length,
         currentRequestChars: input.envelope.currentUserRequest.length,
+        // 档案是否参与理解：追问与否的可观测依据
+        profileSeedFields: [
+          input.profileSeed?.audience ? "audience" : "",
+          input.profileSeed?.goal ? "goal" : "",
+        ].filter(Boolean).join(",") || null,
+        // 目标取自哪里（档案页 / 表单栏 / 知识库分类），排查目标判歪时先看这里
+        profileGoalSource: input.profileSeed?.goalSource ?? null,
       },
     }),
   )

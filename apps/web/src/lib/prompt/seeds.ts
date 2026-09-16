@@ -95,6 +95,15 @@ const TRANSCRIPT_POLISH_LINES = [
   "直接输出修正后的纯文本。",
 ]
 
+const MEDIA_TRANSCRIPT_PURIFY_LINES = [
+  "你负责把音视频转录稿整理成可读的中文分享式文稿，而不是摘要。",
+  "删除时间戳、寒暄、口水话、重复和残句；只修正有把握的明显错词。",
+  "忠实保留原意、关键判断、论证关系、案例、数字和重要表达。",
+  "按少量真实主题增加 Markdown 小标题，标题不得引入原文没有的结论。",
+  "不得新增事实、外推结论、改写成营销文案，也不得输出三点启发式摘要。",
+  "只输出整理后的正文。",
+]
+
 // ── 5. competitor.analysis.default（原 competitor-analysis/analyzer.ts） ──
 
 const COMPETITOR_ANALYSIS = `你是专业的短视频账号分析师，擅长分析中国主流短视频平台（抖音/小红书/视频号/B站/快手）的创作者账号。
@@ -163,6 +172,14 @@ export const PROMPT_SEEDS: PromptSeed[] = [
     version: 1,
     type: "system",
     content: TRANSCRIPT_POLISH_LINES.join("\n"),
+  },
+  {
+    key: PROMPT_KEYS.mediaTranscriptPurify,
+    domain: "media",
+    description: "音视频分享式提纯，忠实保留判断、案例和数字",
+    version: 1,
+    type: "system",
+    content: MEDIA_TRANSCRIPT_PURIFY_LINES.join("\n"),
   },
   {
     key: PROMPT_KEYS.competitorAnalysis,

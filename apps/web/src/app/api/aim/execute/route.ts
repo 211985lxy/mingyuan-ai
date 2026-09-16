@@ -12,6 +12,7 @@ import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budge
 import { createAimTrace, failAimTrace, finishAimTrace, type AimTraceRecorder } from "@/lib/aim-observability"
 import { executeVerifiedUnifiedDelivery, executeVerifiedUnifiedReply } from "@/lib/aim/services/unified-content-execution"
 import { serializeAimGenerationRun } from "@/lib/aim/services/generate-request"
+import { loadIpProfileSeed } from "@/lib/aim/ip-profile-seed"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { AccountProjectContextError, resolveBoundProject } from "@/lib/account-project-context"
@@ -78,16 +79,20 @@ export async function POST(request: NextRequest) {
         action: "generate",
         inputSummary: scopedParsed.sourceEnvelope.currentUserRequest,
       })
+      // 档案兜底要在理解之前取：理解与门禁都需要它，避免就已确认的受众/目标重复追问
+      const profileSeed = await loadIpProfileSeed({ projectId: boundProject.id })
       const understanding = await resolveUnderstandingWithDegradation({
         envelope: scopedParsed.sourceEnvelope,
         agentId,
         trace,
+        profileSeed,
       })
 
       const gate = await resolveAndTraceTurnGate({
         scopedParsed,
         understanding,
         trace,
+        profileSeed,
       })
 
       if (gate.clarification) {

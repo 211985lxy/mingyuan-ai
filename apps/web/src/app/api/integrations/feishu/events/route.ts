@@ -1,15 +1,23 @@
 import { createHash } from "node:crypto"
 import * as lark from "@larksuiteoapi/node-sdk"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 import { env } from "@/env"
 import { parseJsonRecord } from "@/lib/api-contract"
 import { parseFeishuSdkMessageEvent, verifyFeishuEventToken, getFeishuTenantAccessToken, replyFeishuTextMessage, shouldPrioritizeInspirationCapture } from "@/lib/integrations/feishu-topic-chat"
-import { buildVideoCompletionMessage, sendImmediateFeishuReply } from "@/lib/integrations/feishu/event-replies"
+import {
+  buildVideoCompletionMessage,
+  MEDIA_TRANSCRIBER_ACCEPTED_REPLY,
+  sendImmediateFeishuReply,
+  sendMediaTranscriberErrorReply,
+  sendMediaTranscriberFinalReply,
+} from "@/lib/integrations/feishu/event-replies"
 import { ingestInspirationEvent, isExplicitInspirationCaptureMessage, resolveChannelBinding, resolveBindingExecutionMode } from "@/features/topics/services/inspiration-events"
 import { INSPIRATION_ACCEPTED_REPLY } from "@/features/topics/services/inspiration-reply"
 import { isReplySuppressed } from "@/lib/execution-mode"
 import { ingestAimChannelMessage } from "@/features/aim-channels/aim-channel-ingest"
 import { detectVideoLinks, processVideo } from "@/lib/content-pipeline"
+import { isMediaTranscriptionIntent } from "@/lib/media-transcriber/intent"
+import { runMediaTranscriptionTask } from "@/lib/media-transcriber/service"
 
 export const runtime = "nodejs"
 export const maxDuration = 120
@@ -101,11 +109,45 @@ export async function POST(request: Request) {
       const binding = await resolveChannelBinding({ platform: "feishu", externalChatId: event.chatId })
       if (!binding) return { ok: true, ignored: true, reason: "channel_unbound" }
 
-      const captureFromAimChat = shouldPrioritizeInspirationCapture(binding.routeTarget,
-        isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords))
+      const explicitInspirationCapture = isExplicitInspirationCaptureMessage(event.text, binding.triggerKeywords)
+      const captureFromAimChat = shouldPrioritizeInspirationCapture(binding.routeTarget, explicitInspirationCapture)
+      const inspirationCaptureRequested = captureFromAimChat || explicitInspirationCapture
       const linkDetection = detectVideoLinks(event.text)
+      const mediaTranscriberRequested =
+        env.FEISHU_MEDIA_TRANSCRIBER_ENABLED === "true"
+        && !inspirationCaptureRequested
+        && linkDetection.hasLinks
+        && isMediaTranscriptionIntent(event.text)
+
+      if (mediaTranscriberRequested) {
+        const executionMode = resolveBindingExecutionMode(binding.executionMode)
+        if (isReplySuppressed(executionMode)) {
+          return { ok: true, routed: "media_transcriber", suppressed: true }
+        }
+
+        const firstLink = linkDetection.links[0]
+        await sendImmediateFeishuReply(event.messageId, MEDIA_TRANSCRIBER_ACCEPTED_REPLY, `media-transcriber:accepted:${event.messageId}`)
+        after(async () => {
+          try {
+            const completed = await runMediaTranscriptionTask({
+              externalMessageId: event.messageId,
+              externalChatId: event.chatId,
+              userId: binding.userId,
+              projectId: binding.projectId,
+              sourceUrl: firstLink.url,
+              executionMode,
+              folderToken: env.FEISHU_MEDIA_TRANSCRIBER_FOLDER_TOKEN,
+            })
+            await sendMediaTranscriberFinalReply(event.messageId, completed)
+          } catch (error) {
+            await sendMediaTranscriberErrorReply(event.messageId, error)
+          }
+        })
+        return { ok: true, routed: "media_transcriber", url: firstLink.url, platform: firstLink.platform }
+      }
+
       // ─── 视频链接分流：显式收选题优先进入影子采集，其余视频走原内容流水线 ───
-      if (env.CONTENT_PIPELINE_ENABLED !== "false" && !captureFromAimChat && linkDetection.hasLinks) {
+      if (env.CONTENT_PIPELINE_ENABLED !== "false" && !inspirationCaptureRequested && linkDetection.hasLinks) {
         const detection = linkDetection
         if (detection.hasLinks) {
           const firstLink = detection.links[0]
@@ -141,7 +183,7 @@ export async function POST(request: Request) {
       }
 
       // AIM 群保留日常对话；视频链接不进对话——落到灵感采集记录链接与出处。
-      if (binding.routeTarget === "aim" && !captureFromAimChat && !linkDetection.hasLinks) {
+      if (binding.routeTarget === "aim" && !inspirationCaptureRequested && !linkDetection.hasLinks) {
         const ingested = await ingestAimChannelMessage({
           platform: "feishu",
           externalMessageId: event.messageId,

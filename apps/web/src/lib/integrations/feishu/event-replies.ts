@@ -1,6 +1,7 @@
 import { env } from "@/env"
 import { getFeishuTenantAccessToken, replyFeishuTextMessage } from "@/lib/integrations/feishu-topic-chat"
 import { processVideo } from "@/lib/content-pipeline"
+import { MediaTranscriberError } from "@/lib/media-transcriber/service"
 
 /**
  * 飞书事件路由的即时回复与完成消息构建（从 api/integrations/feishu/events/route.ts
@@ -11,7 +12,11 @@ import { processVideo } from "@/lib/content-pipeline"
  * 在 AIM 对话链路里，收到消息后立即线程回复一条提示（"收到…"或帮助文案）。
  * 凭证缺失或发送失败时不抛错，避免阻断消息接收与后台任务入队。
  */
-export async function sendImmediateFeishuReply(messageId: string, text: string): Promise<void> {
+export async function sendImmediateFeishuReply(
+  messageId: string,
+  text: string,
+  idempotencyKey = `aim-channel-ack:${messageId}`,
+): Promise<void> {
   const appId = env.FEISHU_APP_ID
   const appSecret = env.FEISHU_APP_SECRET
   if (!appId || !appSecret) return
@@ -21,11 +26,54 @@ export async function sendImmediateFeishuReply(messageId: string, text: string):
       messageId,
       text,
       tenantAccessToken: token,
-      idempotencyKey: `aim-channel-ack:${messageId}`,
+      idempotencyKey,
     })
   } catch (error) {
     console.error("[integrations/feishu/events] immediate reply failed", error)
   }
+}
+
+export const MEDIA_TRANSCRIBER_ACCEPTED_REPLY =
+  "已收到，正在转录并整理为可读文稿。完成后我会把飞书文档发在这里。"
+
+export function buildMediaTranscriberCompletedReply(result: {
+  title: string
+  platform: string
+  documentUrl: string
+}): string {
+  return [
+    "✅ 小D整理完成",
+    `标题：${result.title}`,
+    `来源：${result.platform}`,
+    `完整文稿：${result.documentUrl}`,
+    "涉及人名、数字和关键事实时，请回看原素材核对。",
+  ].join("\n")
+}
+
+export async function sendMediaTranscriberFinalReply(
+  messageId: string,
+  result: {
+    status: "completed" | "duplicate" | "processing"
+    title?: string
+    platform?: string
+    documentUrl?: string
+  },
+): Promise<void> {
+  const text = result.status === "processing"
+    ? "这条消息已经在处理中，请稍等，完成后会回传飞书文档。"
+    : buildMediaTranscriberCompletedReply({
+      title: result.title || "未命名音视频",
+      platform: result.platform || "未知",
+      documentUrl: result.documentUrl || "",
+    })
+  await sendImmediateFeishuReply(messageId, text, `media-transcriber:final:${messageId}`)
+}
+
+export async function sendMediaTranscriberErrorReply(messageId: string, error: unknown): Promise<void> {
+  const message = error instanceof MediaTranscriberError
+    ? error.message
+    : "音视频转录整理失败，请换一个链接后重试。"
+  await sendImmediateFeishuReply(messageId, `❌ 小D整理失败：${message}`, `media-transcriber:error:${messageId}`)
 }
 
 /**
