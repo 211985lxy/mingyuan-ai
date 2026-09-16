@@ -84,6 +84,32 @@ describe("isPublicIp —— IPv6 分类", () => {
   })
 })
 
+// 点分形式的 IPv4-mapped IPv6（`::ffff:169.254.169.254`）是 AWS/GCP 元数据地址的常见写法。
+// 早前解析器只认十六进制分组，导致这类地址被判成「非 IP 字面量」—— `isPublicIp` 靠
+// `?? false` 侥幸挡住，但任何依赖 `isIpLiteral` 的调用方会 fail-open。此处锁死能力本身。
+describe("IPv6 内嵌点分 IPv4 —— 字面量识别（fail-open 回归）", () => {
+  it("点分内嵌写法必须被识别为 IP 字面量", () => {
+    for (const ip of ["::ffff:169.254.169.254", "::ffff:127.0.0.1", "::ffff:8.8.8.8"]) {
+      expect(isIpLiteral(ip), ip).toBe(true)
+    }
+  })
+
+  it("classifyIpv6 给出明确判定而非 null（null 代表无法识别）", () => {
+    expect(classifyIpv6("::ffff:169.254.169.254")).toBe(false)
+    expect(classifyIpv6("::ffff:8.8.8.8")).toBe(true)
+  })
+
+  it("带方括号、带 zone id 的点分内嵌同样识别", () => {
+    expect(isIpLiteral("[::ffff:169.254.169.254]")).toBe(true)
+    expect(isPublicIp("::ffff:169.254.169.254%eth0")).toBe(false)
+  })
+
+  it("点分内嵌 + :: 压缩组合（NAT64 / 兼容地址）不放水", () => {
+    expect(isPublicIp("::127.0.0.1")).toBe(false) // IPv4-compatible
+    expect(isPublicIp("64:ff9b::127.0.0.1")).toBe(false) // NAT64 + 回环内嵌
+  })
+})
+
 describe("isIpLiteral", () => {
   it("识别 IPv4 / 带括号 IPv6，域名不算", () => {
     expect(isIpLiteral("127.0.0.1")).toBe(true)

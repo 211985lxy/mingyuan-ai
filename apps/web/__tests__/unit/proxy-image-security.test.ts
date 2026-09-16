@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { NextRequest } from "next/server"
 
+// 必须是真正的公网可路由地址：SSRF 共享校验源会把 TEST-NET-*(203.0.113.10/198.51.100.x)
+// 等文档保留段一律判为私网，旧的手写实现放行它们属于覆盖面缺口。
 vi.mock("node:dns/promises", () => ({
-  lookup: vi.fn(async () => [{ address: "203.0.113.10", family: 4 }]),
+  lookup: vi.fn(async () => [{ address: "8.8.8.8", family: 4 }]),
 }))
 
 vi.mock("@/lib/security-metrics", () => ({

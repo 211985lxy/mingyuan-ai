@@ -1,33 +1,63 @@
 import { NextRequest, NextResponse } from "next/server"
-import { lookup } from "node:dns/promises"
+import { Agent } from "undici"
+
 import { incrementSecurityMetric } from "@/lib/security-metrics"
+import { resolvePublicTarget, type PublicTarget } from "@/lib/ssrf-guard.server"
 import {
   getImageCandidateUrls,
   getProxyClientKey,
   isDomainAllowed,
-  isPrivateIpAddress,
   parseStrictContentLength,
   PROXY_IMAGE_MAX_BYTES,
   proxyImageGate,
   readStreamWithByteLimit,
 } from "./proxy-image-utils"
 
-async function isPublicAllowedTarget(value: string): Promise<boolean> {
-  const target = new URL(value)
-  if (!["http:", "https:"].includes(target.protocol) || !isDomainAllowed(target.hostname)) {
-    return false
+// SSRF 守卫依赖 node:dns / undici 钉 IP 连接，必须跑在 Node 运行时；
+// 显式声明以免将来被改成 edge runtime 后守卫静默失效。
+export const runtime = "nodejs"
+
+/**
+ * 解析并校验候选 URL：域名白名单 + **共享 SSRF 校验源**（全部解析地址均公网、禁内嵌凭据）。
+ *
+ * 返回 {@link PublicTarget}（含首次解析通过的地址），供调用方把连接钉死在该地址上，
+ * 消除「先解析校验 → fetch 自己再解析一次」的 DNS 重绑定窗口（TOCTOU）。
+ * 失败一律返回 null，由调用方统一降级，不区分具体原因避免向调用者泄漏内网拓扑信息。
+ */
+async function resolveAllowedTarget(value: string): Promise<PublicTarget | null> {
+  try {
+    const target = await resolvePublicTarget(value)
+    return isDomainAllowed(target.url.hostname) ? target : null
+  } catch {
+    return null
   }
-  const addresses = await lookup(target.hostname, { all: true, verbatim: true })
-  return addresses.length > 0 && addresses.every(({ address }) => !isPrivateIpAddress(address))
 }
 
-async function fetchAllowedUpstream(candidateUrls: string[]): Promise<Response | NextResponse> {
+async function fetchAllowedUpstream(
+  candidateUrls: string[],
+  agents: Agent[],
+): Promise<Response | NextResponse> {
   let upstream: Response | null = null
   for (const targetUrl of candidateUrls) {
-    if (!(await isPublicAllowedTarget(targetUrl))) {
+    const target = await resolveAllowedTarget(targetUrl)
+    if (!target) {
       incrementSecurityMetric("proxy_image.reject", { reason: "private_resolution" })
       return NextResponse.json({ error: "Resolved address is not allowed" }, { status: 403 })
     }
+
+    // 把实际连接钉在「首次校验通过」的那个地址上，使 DNS 重绑定无机可乘。
+    // 主机名仍保持原域名，因此 TLS SNI 与证书校验照旧生效 —— 这点是不能用
+    // 「把 hostname 直接换成 IP」来实现的，那会破坏证书校验。
+    const agent = new Agent({
+      connect: {
+        // undici 兼容传统 (err, address, family) 回调签名
+        lookup: (_hostname, _options, callback) => {
+          callback(null, target.address, target.family)
+        },
+      },
+    })
+    agents.push(agent)
+
     upstream = await fetch(targetUrl, {
       headers: {
         "User-Agent":
@@ -37,7 +67,9 @@ async function fetchAllowedUpstream(candidateUrls: string[]): Promise<Response |
       },
       signal: AbortSignal.timeout(10_000),
       redirect: "manual",
-    })
+      dispatcher: agent,
+    } as unknown as RequestInit)
+
     if (upstream.status >= 300 && upstream.status < 400) {
       incrementSecurityMetric("proxy_image.reject", { reason: "redirect" })
       return NextResponse.json({ error: "Upstream redirect rejected" }, { status: 502 })
@@ -133,10 +165,14 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // 钉 IP 用的 undici Agent 必须在「响应 body 读完之后」才能关闭，
+  // 否则连接池销毁会掐断尚未流式读完的上游响应，因此统一在出口回收。
+  const agents: Agent[] = []
+
   try {
     const parsed = parseRequestUrl(request)
     if (!parsed.ok) return parsed.response
-    const upstreamOrError = await fetchAllowedUpstream(parsed.candidates)
+    const upstreamOrError = await fetchAllowedUpstream(parsed.candidates, agents)
     if (upstreamOrError instanceof NextResponse) return upstreamOrError
     return await streamImageResponse(upstreamOrError)
   } catch {
@@ -144,5 +180,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch image" }, { status: 502 })
   } finally {
     proxyImageGate.release()
+    for (const agent of agents) {
+      void agent.close().catch(() => undefined)
+    }
   }
 }

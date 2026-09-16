@@ -58,12 +58,33 @@ export function classifyIpv4(ip: string): boolean | null {
   return !BLOCKED_IPV4_RANGES.some(([base, bits]) => inIpv4Range(value, base, bits))
 }
 
+/**
+ * 把 IPv6 尾部的点分 IPv4 段展开成两个十六进制组：`::ffff:169.254.169.254` → `::ffff:a9fe:a9fe`。
+ *
+ * RFC 4291 允许 IPv6 末 32 位用点分十进制书写，而 AWS/GCP 元数据地址 `169.254.169.254`
+ * 的 IPv4-mapped 形式正是这样出现在实际解析结果里的。缺了这一步，该类地址会被判成
+ * 「非 IP 字面量」而绕过全部 IP 校验 —— 属于 fail-open，必须堵。
+ */
+function expandEmbeddedIpv4(host: string): string {
+  const lastColon = host.lastIndexOf(":")
+  if (lastColon < 0) return host
+  const tail = host.slice(lastColon + 1)
+  const match = IPV4_PATTERN.exec(tail)
+  if (!match) return host
+  const octets = match.slice(1, 5).map(Number)
+  if (octets.some((value) => value > 255)) return host
+  const high = ((octets[0] << 8) | octets[1]).toString(16)
+  const low = ((octets[2] << 8) | octets[3]).toString(16)
+  return `${host.slice(0, lastColon + 1)}${high}:${low}`
+}
+
 /** 把 IPv6 字面量解析成 16 字节；非 IPv6 返回 null。支持 `::` 压缩、IPv4 内嵌、zone id。 */
 function ipv6ToBytes(input: string): Uint8Array | null {
   let host = input.replace(/^\[|\]$/g, "").toLowerCase()
   const zoneIndex = host.indexOf("%")
   if (zoneIndex >= 0) host = host.slice(0, zoneIndex)
   if (!host.includes(":")) return null
+  host = expandEmbeddedIpv4(host)
 
   const parseGroups = (segment: string): number[] | null => {
     if (!segment) return []
