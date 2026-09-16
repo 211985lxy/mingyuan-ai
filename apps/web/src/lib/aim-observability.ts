@@ -6,6 +6,7 @@ import {
   normalizeIsolationEntryType,
 } from "@/lib/account-project-isolation-metrics"
 import { recordAuditEvent, specialistAuditInput } from "@/lib/audit-events"
+import type { ProviderAttempt } from "@/lib/llm/telemetry"
 
 export type AimTraceStatus = "running" | "success" | "failed" | "skipped"
 
@@ -81,6 +82,31 @@ export function summarizeText(value: unknown, limit = MAX_SUMMARY_LENGTH): strin
   if (value == null) return ""
   const text = typeof value === "string" ? value : JSON.stringify(value)
   return text.replace(/\s+/g, " ").trim().slice(0, limit)
+}
+
+/** 失败落库的 errorMessage 放宽到 900：逐跳轨迹要跟用户文案、根因一起塞进去 */
+const MAX_TRACE_ERROR_LENGTH = 900
+/** 轨迹上限：跳数本就有界（maxProviderAttempts ≤ 5），这里只防异常长串 */
+const MAX_ATTEMPT_TRAIL_LENGTH = 400
+
+/**
+ * 逐跳线路轨迹：`provider:errorKind:durationMs` 依次相连。
+ *
+ * 为什么必须落库：整条链的总预算只有 115 秒，失败时只记「最后一跳」回答不了
+ * 「是哪一跳吃掉了预算」——2026-09 反复出现的超时就是这样一直定位不到。
+ * 只进服务端诊断字段，**不进 trace step**：step 会渲染进用户的思考过程面板，
+ * 内部线路名不能泄漏给终端用户。
+ */
+export function formatProviderAttemptTrail(attempts: readonly ProviderAttempt[]): string {
+  return attempts
+    .slice(0, 8)
+    .map((attempt) => [
+      attempt.provider,
+      attempt.errorKind ?? attempt.status,
+      attempt.durationMs != null ? `${attempt.durationMs}ms` : "",
+    ].filter(Boolean).join(":"))
+    .join(" → ")
+    .slice(0, MAX_ATTEMPT_TRAIL_LENGTH)
 }
 
 function getTraceDelegate() {
@@ -342,13 +368,19 @@ export async function failAimTrace(
   const rootCause = runError?.cause instanceof Error
     ? runError.cause.message
     : error instanceof Error ? error.message : ""
+  // 逐跳轨迹与根因一起落库：只记最后一跳无法定位「哪一跳吃掉了预算」
+  const trail = formatProviderAttemptTrail(runError?.providerAttempts ?? [])
   await safeUpdateTrace(trace.id, {
     status: "failed",
     durationMs: Date.now() - trace.startedAt,
     errorMessage: summarizeText(
-      rootCause && rootCause !== userMessage
-        ? `${userMessage}｜root-cause: ${rootCause}`
-        : userMessage,
+      [
+        rootCause && rootCause !== userMessage
+          ? `${userMessage}｜root-cause: ${rootCause}`
+          : userMessage,
+        trail ? `线路: ${trail}` : "",
+      ].filter(Boolean).join("｜"),
+      MAX_TRACE_ERROR_LENGTH,
     ),
     errorCode: code,
     ...(extra?.aimGenerationId ? { aimGenerationId: extra.aimGenerationId } : {}),
