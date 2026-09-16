@@ -58,7 +58,7 @@ jobs:
         run: python -m pip install --upgrade pip && pip install -e ".[dev]"
       - name: Run pip-audit
         # F4（供应链审计部分）：对实际安装依赖树做已知漏洞审计。
-        # 故意只 fail-on CRITICAL——先暴露最严重项、避免被第三方传递依赖的高危噪音
-        # 直接卡死合并；后续可随治理成熟度收紧到 HIGH。uv.lock 锁定（可复现构建）
-        # 列为后续项，需团队确认在 Dockerfile/CI 引入 uv 作为构建工具。
-        run: pip install pip-audit && pip-audit --fail-on CRITICAL
+        # 用 --severity critical 只放行「严重」级公告，把低于该级别的第三方传递依赖噪音
+        # 排除在门外，避免直接卡死合并；后续可随治理成熟度收紧到 high。uv.lock 锁定
+        # （可复现构建）列为后续项，需团队确认在 Dockerfile/CI 引入 uv 作为构建工具。
+        run: pip install "pip-audit>=2.7" && pip-audit --severity critical
