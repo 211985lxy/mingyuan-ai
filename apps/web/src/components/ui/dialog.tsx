@@ -60,6 +60,13 @@ function DialogOverlay({
   );
 }
 
+/**
+ * 弹层默认带高度上限与滚动：弹层是 fixed + 垂直居中（top-50% + -translate-y-1/2），
+ * 内容一旦超过视口高度会**上下同时溢出屏幕**，且遮罩锁住页面滚动 —— 标题和底部按钮
+ * 都够不着（2026-09-16 数字人弹层实测）。
+ * 业务侧仍可用自己的 max-h/overflow 覆盖（tailwind-merge 取后者，
+ * 例如既有弹层的 max-h-[85vh]），此处只负责"忘了写也不会坏"。
+ */
 function DialogContent({
   className,
   children,
@@ -74,7 +81,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed left-[50%] top-[50%] z-[9999] -translate-x-1/2 -translate-y-1/2 grid w-full max-w-lg gap-4 rounded-lg bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "fixed left-[50%] top-[50%] z-[9999] -translate-x-1/2 -translate-y-1/2 grid w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto gap-4 rounded-lg bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
         )}
         {...props}
