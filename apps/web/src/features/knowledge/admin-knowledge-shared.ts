@@ -56,7 +56,7 @@ export const JIEKOU_PROVIDER_MODELS: Record<
   jiekou: [
     { value: "gpt-4o", label: "gpt-4o" },
     { value: "gpt-4o-mini", label: "gpt-4o-mini" },
-    { value: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+    { value: "deepseek-flash", label: "deepseek-flash" },
     { value: "claude-sonnet-4-5", label: "claude-sonnet-4-5" },
   ],
   openrouter: [

@@ -11,7 +11,8 @@
  */
 
 import { retrieveEntityContext } from "@/lib/knowledge-entity-extractor"
-import { retrieveRelevantKnowledge, type ScoredKnowledgeEntry } from "@/lib/llm/embeddings"
+import type { ScoredKnowledgeEntry } from "@/lib/llm/embeddings"
+import { retrieveKnowledgeEntries } from "@/lib/llm/knowledge-retrieval"
 
 /** 图扩展最多补几条——宁少勿多，避免上下文被"语义远但实体近"的条目挤占。 */
 export const GRAPH_EXPANSION_BUDGET = 4
@@ -75,7 +76,7 @@ export function mergeGraphEntries(
 export async function retrieveKnowledgeWithGraph(
   input: GraphAwareRetrievalInput,
 ): Promise<GraphAwareRetrievalResult> {
-  const vector = await retrieveRelevantKnowledge({
+  const vector = await retrieveKnowledgeEntries({
     userId: input.userId,
     projectId: input.projectId,
     query: input.query,
