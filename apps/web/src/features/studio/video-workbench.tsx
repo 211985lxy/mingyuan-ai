@@ -43,6 +43,8 @@ interface VideoWorkbenchModel {
   mounted: boolean
   step: number
   setStep: (step: number) => void
+  avatarSelected: boolean
+  goToReview: () => void
   projects: ReturnType<typeof useStudioProjects>["projects"]
   projectId: string
   setProjectId: (id: string) => void
@@ -127,6 +129,21 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
     selectedPublic?.defaultVoiceId
     ?? (publicPersons?.status === "ok" ? publicPersons.fallbackVoiceId : null)
 
+  // 形象是否已选定：深链（from=audio 等）会跳过第 1 步，此处是全流程唯一事实
+  const avatarSelected = avatarSource === "public"
+    ? Boolean(selectedPublic)
+    : Boolean(avatarLibrary.selectedAvatarId)
+
+  /** 第 2 → 3 步过路守卫：形象未选时不进入复核页，带用户回第 1 步 */
+  function goToReview() {
+    if (!avatarSelected) {
+      toast.error("请先选择一个形象：回到第 1 步挑选公共形象或我的形象")
+      setStep(1)
+      return
+    }
+    setStep(3)
+  }
+
   async function handleSubmit() {
     const error = validateVideoSubmission({
       script,
@@ -174,6 +191,8 @@ function useVideoWorkbenchModel(): VideoWorkbenchModel {
     mounted,
     step,
     setStep,
+    avatarSelected,
+    goToReview,
     projects,
     projectId,
     setProjectId,
@@ -278,10 +297,12 @@ function ScriptStepSection({ vm }: { vm: VideoWorkbenchModel }) {
 
 function ReviewStepSection({ vm }: { vm: VideoWorkbenchModel }) {
   const avatarLabel = vm.avatarSource === "public"
-    ? vm.selectedPublic?.name || "公共形象"
-    : vm.avatarLibrary.avatars.find((item) => item.id === vm.avatarLibrary.selectedAvatarId)?.name || "我的形象"
+    ? vm.selectedPublic?.name || "未选择"
+    : vm.avatarLibrary.avatars.find((item) => item.id === vm.avatarLibrary.selectedAvatarId)?.name || "未选择"
   return (
     <VideoReviewStep
+      avatarSelected={vm.avatarSelected}
+      onGoSelectAvatar={() => vm.setStep(1)}
       avatarLabel={avatarLabel}
       voiceLabel={vm.voiceSource === "tts" ? "形象自带音色（备选）" : "Fish 音色"}
       scriptPreview={vm.script.trim().slice(0, 60) || "（空文案）"}
