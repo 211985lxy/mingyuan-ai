@@ -61,14 +61,17 @@ describe("downloadMedia", () => {
     expect(open).toHaveBeenCalled()
   })
 
-  it("降级打开也被拦截时给出可行动的错误提示", async () => {
+  it("降级打开也被拦截时，引导用户用「打开成片」按钮（不谎报已打开）", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")))
     vi.stubGlobal("window", { open: vi.fn(() => null), setTimeout })
 
     const result = await downloadMedia("https://oss.example.com/v.mp4", "片名.mp4")
 
     expect(result).toBe("failed")
-    expect(toastError).toHaveBeenCalledWith(expect.stringContaining("下载失败"))
+    expect(toastInfo).toHaveBeenCalledWith(
+      expect.stringContaining("打开成片"),
+      expect.objectContaining({ duration: expect.any(Number) }),
+    )
   })
 })
 

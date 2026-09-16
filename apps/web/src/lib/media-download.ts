@@ -35,13 +35,17 @@ export async function downloadMedia(
     }
     return "downloaded"
   } catch {
-    // 降级：新标签打开，用户可手动另存（常见于 CORS 未开放或签名过期）
+    // 降级：尝试新标签打开（常见于 CORS 未开放或签名过期）。
+    // 注意此处已脱离用户点击手势上下文，window.open 常被弹窗拦截器吞掉；
+    // 被拦截时绝不谎报「已打开」，而是引导用户点旁边真实存在的「打开成片」按钮。
     const opened = window.open(url, "_blank", "noopener,noreferrer")
     if (opened) {
       toast.info("已在新标签打开成片，请在那里选择「另存为」")
       return "opened"
     }
-    toast.error("下载失败，请检查网络后重试")
+    toast.info("浏览器拦截了自动打开：请点「打开成片」按钮，在新页面手动另存", {
+      duration: 8000,
+    })
     return "failed"
   }
 }
