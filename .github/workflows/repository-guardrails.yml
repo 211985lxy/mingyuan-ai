@@ -106,6 +106,10 @@ jobs:
         run: pnpm --dir apps/web run arch:retired
       - name: Bounded Prisma query guard
         run: pnpm --dir apps/web run db:bounds
+      # 知识索引接线门禁：堵住「新增知识条目忘了触发向量化 / 忘了建分块」。
+      # 漏接线不会报错，只表现为「这条知识 AI 检索不到」，靠 review 抓不住。
+      - name: Knowledge indexing guard
+        run: pnpm --dir apps/web run knowledge:index-guard
       - name: Deterministic harness
         run: pnpm --dir apps/web run test:harness
       # 构建门禁：push 到 main 时跑与 deploy-ecs-standalone.sh 同参的 production build，

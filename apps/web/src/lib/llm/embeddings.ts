@@ -177,6 +177,12 @@ export async function ensureKnowledgeEmbedding(entryId: string): Promise<void> {
   })
   if (!entry) return
 
+  // 必须在下面那条 contentHash 早退之前执行。
+  // 早退意味着「条目内容没变、向量已是最新」——但块级索引可能是空的
+  // （开关上线前的存量条目、或上一次建块失败的条目）。放在早退之后，
+  // 这些条目将永远没有机会补建。
+  await syncChunkIndex(entryId)
+
   const contentHash = computeContentHash(entry.content)
 
   // Check existing embedding — skip if content hasn't changed
@@ -222,6 +228,37 @@ export async function ensureKnowledgeEmbedding(entryId: string): Promise<void> {
       errorMessage: null,
     },
   })
+}
+
+/**
+ * 串联块级索引（P0 分块检索的数据来源）。
+ *
+ * 为什么收口在本模块、而不是让各个调用方自己记得调：
+ *   `KnowledgeEntry` 有 20+ 个写入入口（route / service / port），
+ *   「写完记得建块」这条约定无法靠 review 维持 —— 漏一处不报错，
+ *   只表现为该条知识在块级检索里永远缺席。收口在这里，改一处全站生效。
+ *
+ * 为什么用动态 import：
+ *   `knowledge-chunk-index.ts` 静态依赖本模块的 `generateEmbeddings`，
+ *   静态反向 import 会形成循环依赖。动态 import 只在调用时解析，不构成环。
+ *   本仓既有同写法：`aim-observability.ts:336`、`audit-events.ts:40`、
+ *   `integrations/probe.ts:288`（同样是用来打破环的）。
+ *
+ * 为什么吞掉异常：
+ *   块级索引是可选加速层，条目级 embedding 才是必备数据。
+ *   建块失败只应降级检索质量（分派器会自动回退到条目级），不应让知识写入失败。
+ *
+ * @param entryId - 知识条目 id
+ */
+async function syncChunkIndex(entryId: string): Promise<void> {
+  if (env.KNOWLEDGE_CHUNK_RETRIEVAL_ENABLED !== "true") return
+
+  try {
+    const { ensureEntryChunkEmbeddings } = await import("@/lib/llm/knowledge-chunk-index")
+    await ensureEntryChunkEmbeddings(entryId)
+  } catch (error) {
+    console.warn("[embedding] 块级索引建立失败，该条目检索将回退到条目级：", error)
+  }
 }
 
 // ─── Semantic retrieval ─────────────────────────────────────────────────────
