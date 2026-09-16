@@ -1,0 +1,29 @@
+# Hypit rendering backend — do not commit local state, secrets or media.
+.env
+state/
+outputs/
+tmp-bad/
+*.log
+
+# Runtime data belongs to the owner's Hypit checkout, not to this codebase.
+# 注意是仓库根级 `.hypit/`：工作区放宽到服务根后，渲染产物会落在这里（内含真实 MP4）。
+.hypit/
+smoke/node_modules
+smoke/_uploads/
+
+# Inline submissions: POST /builds|/checks with `content` writes <stem>_<hex><suffix>
+# at the workspace root. They are per-run scratch, never source of truth.
+inline_*.svml
+inline_*.svrun
+inline_*.svs
+tpl_*.svml
+
+# Compiled ps shim: rebuild with scripts/build_ps_shim.sh
+bin/ps
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.DS_Store

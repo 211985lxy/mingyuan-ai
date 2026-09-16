@@ -1,0 +1,24 @@
+[project]
+name = "mingyuan-hypit-renderer"
+version = "0.1.0"
+description = "Hypit 渲染服务的 HTTP 包装层（AIM 内部单租户渲染后端）"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.34.0",
+  "pydantic==2.10.4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"

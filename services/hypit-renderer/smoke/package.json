@@ -1,0 +1,6 @@
+{
+  "name": "hypit-backend-smoke",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Zero-cost local-only Hypit project used to smoke-test the HTTP backend (no hosted generation)."
+}

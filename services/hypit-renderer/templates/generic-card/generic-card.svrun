@@ -1,0 +1,8 @@
+<?svml using="@hypit/run-markup@1"?>
+
+<svrun version="1">
+  <author source="./generic-card.svml"/>
+  <target output="final-916.video"/>
+  <target output="final-169.video"/>
+  <target output="final-11.video"/>
+</svrun>
