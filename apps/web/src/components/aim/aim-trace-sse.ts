@@ -15,6 +15,13 @@ export interface TraceStep {
   error?: string
 }
 
+export interface TraceReasoningEvent {
+  text?: string
+  attempt?: number
+  reset?: boolean
+  done?: boolean
+}
+
 export interface AimTraceStreamCallbacks {
   /** 当前活动 EventSource 的引用（组件用 ref 持有，卸载/收口时复位） */
   eventSourceRef: { current: EventSource | null }
@@ -22,6 +29,8 @@ export interface AimTraceStreamCallbacks {
   onOpen: () => void
   /** 步骤 upsert：step / replay 服务端事件均携带 step */
   onStep: (step: TraceStep) => void
+  /** 实时思考增量：不落库，刷新即消失 */
+  onReasoning?: (event: TraceReasoningEvent) => void
   /**
    * 终态收口回调：
    * - failed：是否标记为失败态（error / done(status=failed)）
@@ -67,9 +76,35 @@ function teardownSseStream(rt: TraceStreamRuntime) {
   rt.callbacks.eventSourceRef.current = null
 }
 
+function armSseHangTimer(rt: TraceStreamRuntime) {
+  clearSseHangTimer(rt)
+  rt.hangTimer = window.setTimeout(() => {
+    if (rt.cancelled) return
+    rt.callbacks.onTerminal(false, false)
+    teardownSseStream(rt)
+  }, SSE_TIMEOUT_MS)
+}
+
 function dispatchAimTraceMessage(rt: TraceStreamRuntime, raw: string) {
-  const data = JSON.parse(raw) as { type: string; status?: string; step?: TraceStep }
+  const data = JSON.parse(raw) as {
+    type: string
+    status?: string
+    step?: TraceStep
+    text?: string
+    attempt?: number
+    reset?: boolean
+    done?: boolean
+  }
   if (data.type === "connected") return
+  if (data.type === "reasoning") {
+    rt.callbacks.onReasoning?.({
+      text: data.text,
+      attempt: data.attempt,
+      reset: data.reset,
+      done: data.done,
+    })
+    return
+  }
   if (data.type === "step" || data.type === "replay") {
     if (data.step) rt.callbacks.onStep(data.step)
     return
@@ -117,11 +152,8 @@ function openSseConnection(rt: TraceStreamRuntime) {
   rt.callbacks.eventSourceRef.current = rt.es
 
   // SSE 若迟迟收不到 done/error，前端强制收口，避免一直停在「正在思考…」
-  rt.hangTimer = window.setTimeout(() => {
-    if (rt.cancelled) return
-    rt.callbacks.onTerminal(false, false)
-    teardownSseStream(rt)
-  }, SSE_TIMEOUT_MS)
+  // 有帧到达（含思考增量）则重新武装，避免长思考被 90s 硬切。
+  armSseHangTimer(rt)
 
   rt.es.onopen = () => {
     if (!rt.cancelled) rt.callbacks.onOpen()
@@ -129,6 +161,7 @@ function openSseConnection(rt: TraceStreamRuntime) {
 
   rt.es.onmessage = (event) => {
     if (rt.cancelled) return
+    armSseHangTimer(rt)
     try {
       dispatchAimTraceMessage(rt, event.data as string)
     } catch {

@@ -47,6 +47,7 @@ export const env = createEnv({
     AIM_NAMED_METHODOLOGY_ENABLED: z.string().optional(),
     AIM_STABLE_ROUTING: z.string().optional(),
     AIM_HITL_INLINE_ENABLED: z.string().optional(),
+    AIM_SHOW_LIVE_THINKING_ENABLED: z.string().optional(),
     /** WP-A5 知识图谱扩展检索：默认关，达标后放量 */
     AIM_KNOWLEDGE_GRAPH_ENABLED: z.string().optional(),
     /** WP-A2 V2：停用的自动化任务 id 清单（逗号分隔），UI/中间件双重生效 */
@@ -349,6 +350,7 @@ export const env = createEnv({
     AIM_NAMED_METHODOLOGY_ENABLED: process.env.AIM_NAMED_METHODOLOGY_ENABLED,
     AIM_STABLE_ROUTING: process.env.AIM_STABLE_ROUTING,
     AIM_HITL_INLINE_ENABLED: process.env.AIM_HITL_INLINE_ENABLED,
+    AIM_SHOW_LIVE_THINKING_ENABLED: process.env.AIM_SHOW_LIVE_THINKING_ENABLED,
     AIM_KNOWLEDGE_GRAPH_ENABLED: process.env.AIM_KNOWLEDGE_GRAPH_ENABLED,
     AIM_AUTOMATION_TASKS_DISABLED: process.env.AIM_AUTOMATION_TASKS_DISABLED,
     PORT: process.env.PORT,

@@ -19,6 +19,12 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { connectAimTraceStream, type TraceStep } from "@/components/aim/aim-trace-sse"
+import { LiveReasoningBlock } from "@/components/aim/thinking-live-reasoning"
+import {
+  applyReasoningEvent,
+  EMPTY_LIVE_REASONING,
+  type LiveReasoningState,
+} from "@/components/aim/thinking-live-reasoning-state"
 
 // ── 类型定义 ──────────────────────────────────────────────────────────────
 
@@ -236,6 +242,12 @@ export function ThinkingProcessPanel({
   const [isFailed, setIsFailed] = useState(false)
   const [panelExpanded, setPanelExpanded] = useState(true)
   const [connected, setConnected] = useState(false)
+  const [liveReasoning, setLiveReasoning] = useState<LiveReasoningState>(EMPTY_LIVE_REASONING)
+  const [reasoningTraceId, setReasoningTraceId] = useState(traceId)
+  if (reasoningTraceId !== traceId) {
+    setReasoningTraceId(traceId)
+    setLiveReasoning(EMPTY_LIVE_REASONING)
+  }
   const eventSourceRef = useRef<EventSource | null>(null)
   const onCompleteRef = useRef(onComplete)
 
@@ -256,8 +268,10 @@ export function ThinkingProcessPanel({
         if (idx >= 0) { const next = [...prev]; next[idx] = step; return next }
         return [...prev, step]
       }),
+      onReasoning: (event) => setLiveReasoning((prev) => applyReasoningEvent(prev, event)),
       onTerminal: (failed, completed) => {
         setIsComplete(true)
+        setLiveReasoning((prev) => prev.streaming ? { ...prev, streaming: false, done: true } : prev)
         if (failed) setIsFailed(true)
         if (completed) onCompleteRef.current?.()
       },
@@ -279,8 +293,8 @@ export function ThinkingProcessPanel({
 
   // 无 traceId 时不渲染
   if (!traceId) return null
-  // 没有步骤且已完成且未连接时不渲染（已完成且折叠）
-  if (isComplete && steps.length === 0 && !connected) return null
+  // 没有步骤、没有实时思考、已完成且未连接时不渲染
+  if (isComplete && steps.length === 0 && !liveReasoning.text && !connected) return null
 
   const successCount = steps.filter((s) => s.status === "success").length
   const failedCount = steps.filter((s) => s.status === "failed").length
@@ -368,6 +382,7 @@ export function ThinkingProcessPanel({
       {/* 步骤列表 */}
       {(panelExpanded || !isComplete) && (
         <div className="border-t border-border/30 px-3 py-2.5">
+          <LiveReasoningBlock key={`${traceId}-${liveReasoning.attempt}`} reasoning={liveReasoning} />
           {/* Generate 模式：按阶段分组展示 */}
           {phaseGroups ? (
             <div className="space-y-3">
@@ -412,7 +427,7 @@ export function ThinkingProcessPanel({
           )}
 
           {/* 无步骤时的占位 */}
-          {steps.length === 0 && !isComplete && (
+          {steps.length === 0 && !isComplete && !liveReasoning.text && !liveReasoning.streaming && (
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
               <Loader2 className="h-3 w-3 animate-spin" />
               正在分析请求…
