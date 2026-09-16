@@ -20,9 +20,11 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
   const isHome = pathname === "/studio"
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col bg-background">
+    <div className="relative flex min-h-screen min-w-0 flex-col bg-background">
+      {/* 品牌氛围：火土金水墨晕染（复用 dashboard token 类，不引入新色板） */}
+      <div className="dashboard-ink-wash" aria-hidden="true" />
       <header className="sticky top-0 z-20 border-b border-border/40 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-12 w-full max-w-5xl items-center gap-3 px-3 md:px-4">
+        <div className="relative z-10 mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-6 md:px-8">
           {isHome ? (
             <span className="flex items-center gap-2 text-sm font-semibold tracking-tight">
               <BrandLogo className="h-6 w-6 rounded-md" />
@@ -59,8 +61,8 @@ export function StudioShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-6 pb-24 pt-8 md:px-8">{children}</main>
-      <footer className="border-t border-border/40 py-3 text-center text-xs text-muted-foreground">
+      <main className="relative z-10 mx-auto w-full max-w-5xl flex-1 px-6 pb-24 pt-8 md:px-8">{children}</main>
+      <footer className="relative z-10 border-t border-border/40 py-3 text-center text-xs text-muted-foreground">
         <Clapperboard className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
         数字人工坊 · 音频与视频数字人一站式出品
       </footer>

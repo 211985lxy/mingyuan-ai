@@ -1,6 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import type { ApiAvatar } from "@/types/api"
 import type { PublicDigitalPersonList, PublicDigitalPersonOption } from "@/lib/api/digital-human"
 
@@ -111,14 +112,21 @@ function PersonOption({
     <button
       type="button"
       onClick={onSelect}
-      className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
-        selected ? "border-primary bg-primary/5" : "hover:border-primary/40"
-      }`}
+      aria-pressed={selected}
+      className={cn(
+        "rounded-lg border px-3 py-2 text-left text-sm transition-all",
+        selected
+          ? "border-primary bg-primary/10 shadow-sm"
+          : "border-border hover:border-primary/40 hover:bg-muted/60",
+      )}
     >
       <span className="flex items-center gap-2">
         <span className="truncate font-medium">{name}</span>
         {badge ? (
-          <Badge variant="outline" className="px-1.5 text-xs font-normal">
+          <Badge
+            variant={selected ? "secondary" : "outline"}
+            className="px-1.5 text-xs font-normal"
+          >
             {badge}
           </Badge>
         ) : null}
