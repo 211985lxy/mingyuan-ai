@@ -45,3 +45,42 @@ jobs:
         # F18 P0：Python 侧共享校验源 (_assert_public_network / assert_supported_share_url)
         # 与 web/TS 侧 resolveDouyinShortUrl 修复保持跨语言一致性，必须全绿才能合并。
         run: pytest tests/test_ssrf_regression.py -v
+
+  supply-chain:
+    name: Supply chain audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies (full declared graph)
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+      - name: Run pip-audit
+        # F4（供应链审计部分）：对实际安装依赖树做已知漏洞审计。
+        # pip-audit 不同版本参数差异大（有的不支持 --severity/--fail-on），故统一走 JSON
+        # 输出 + 内联判定：仅「严重(CRITICAL)」级公告判失败，HIGH/MEDIUM/LOW 直接放行，
+        # 避免第三方传递依赖噪音卡死合并；后续可随治理成熟度收紧。uv.lock 锁定（可复现构建）
+        # 列为后续项，需团队确认在 Dockerfile/CI 引入 uv 作为构建工具。
+        run: |
+          pip install "pip-audit>=2.7"
+          if pip-audit -f json -o audit.json; then
+            echo "pip-audit: 未报告漏洞（exit 0）"
+            exit 0
+          fi
+          python - <<'PY'
+          import json, sys
+          try:
+              data = json.load(open("audit.json"))
+          except Exception as e:
+              print("audit.json 缺失/不可读，pip-audit 报告失败：", e); sys.exit(1)
+          crit = 0
+          for dep in data.get("dependencies", []):
+              for vuln in dep.get("vulns", []):
+                  if str(vuln.get("severity") or "").upper() == "CRITICAL":
+                      crit += 1
+                      print("CRITICAL", vuln.get("id"), dep.get("name"), "fix:", vuln.get("fix_versions"))
+          if crit:
+              print(f"FAILED: {crit} 个严重漏洞"); sys.exit(1)
+          print("OK: 存在漏洞但无严重级")
+          PY

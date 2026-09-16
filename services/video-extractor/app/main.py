@@ -5,10 +5,12 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import socket
 import sqlite3
 import tempfile
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -44,6 +46,10 @@ class Settings:
         self.whisper_compute_type = get("WHISPER_COMPUTE_TYPE", "int8")
         self.douyin_cookie = get("DOUYIN_COOKIE", "")
         self.f2_douyin_enabled = str(get("F2_DOUYIN_ENABLED", "true")).lower() == "true"
+        # F3 限流：每把 API Key 每分钟最多提交的任务数；<=0 表示不限制。
+        self.rate_limit_per_minute = max(0, int(get("RATE_LIMIT_PER_MINUTE", "10")))
+        # F6 磁盘熔断：work_dir 剩余空间低于此阈值时直接拒绝新任务，避免下载把磁盘写满。
+        self.disk_min_free_bytes = int(get("DISK_MIN_FREE_BYTES", str(500 * 1024 * 1024)))
 
 
 DEFAULT_SETTINGS = Settings()
@@ -51,6 +57,49 @@ DEFAULT_SETTINGS = Settings()
 DB_LOCK = threading.Lock()
 MODEL_LOCK = threading.Lock()
 WHISPER_MODEL = None  # 惰性加载（首次转写时按 settings 构建）
+
+
+class RateLimiter:
+    """F3：每把 API Key 一个令牌桶，按时间补充，线程安全。
+
+    key 为空（匿名）时归到 "anonymous"。capacity 即每分钟配额，refill 秒数默认 60，
+    故令牌补充速率 = capacity/60。now 可注入（测试用）便于确定性断言。
+    """
+
+    def __init__(self, capacity: int, refill_seconds: float = 60.0, now: callable = time.monotonic):
+        self.capacity = max(1, capacity)
+        self.refill = float(refill_seconds)
+        self._now = now
+        self._buckets: dict[str, tuple[float, float]] = {}  # key -> (tokens, last_ts)
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        now = self._now()
+        with self._lock:
+            tokens, last = self._buckets.get(key, (float(self.capacity), now))
+            tokens = min(self.capacity, tokens + (now - last) * (self.capacity / self.refill))
+            if tokens < 1.0:
+                self._buckets[key] = (tokens, last)
+                return False
+            self._buckets[key] = (tokens - 1.0, now)
+            return True
+
+
+def _check_disk_budget(settings: Settings | None = None):
+    """F6：下载前确认 work_dir 剩余空间够用，不够直接抛错让 process_job 判失败。
+
+    已落盘的临时文件 / 模型缓存 / 转写结果都会占 work_dir，磁盘写满会拖垮整服务，
+    故在真正拉流前用熔断挡住新任务，而不是等到 write 抛异常。
+    """
+    settings = settings or DEFAULT_SETTINGS
+    settings.work_dir.mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(settings.work_dir).free
+    if free < settings.disk_min_free_bytes:
+        SECURITY_LOGGER.warning(
+            "resource.disk_low path=%s free_bytes=%d min_bytes=%d",
+            settings.work_dir, free, settings.disk_min_free_bytes,
+        )
+        raise ValueError("磁盘可用空间不足，请稍后再试。")
 
 
 class JobRequest(BaseModel):
@@ -360,6 +409,7 @@ def process_job(job_id: str, request: JobRequest, settings: Settings | None = No
     try:
         assert_supported_share_url(request.url)
         settings.work_dir.mkdir(parents=True, exist_ok=True)
+        _check_disk_budget(settings)
         with tempfile.TemporaryDirectory(prefix=f"{job_id}-", dir=settings.work_dir) as temp_dir:
             directory = Path(temp_dir)
             parsed_host = (urlparse(request.url).hostname or "").lower()
@@ -392,11 +442,20 @@ def create_app(settings: Settings | None = None, executor: ThreadPoolExecutor | 
         if not secrets.compare_digest(authorization[7:].strip(), settings.api_key):
             raise HTTPException(status_code=401, detail="unauthorized")
 
+    rate_limiter = RateLimiter(settings.rate_limit_per_minute) if settings.rate_limit_per_minute > 0 else None
+
+    def rate_limit(authorization: str | None = Header(default=None)):
+        if rate_limiter is None:
+            return
+        key = authorization[7:].strip() if authorization and authorization.startswith("Bearer ") else "anonymous"
+        if not rate_limiter.allow(key):
+            raise HTTPException(status_code=429, detail="too many requests")
+
     @app.get("/healthz")
     def healthz():
         return {"ok": True}
 
-    @app.post("/jobs", response_model=JobResponse, status_code=202, dependencies=[Depends(require_api_key)])
+    @app.post("/jobs", response_model=JobResponse, status_code=202, dependencies=[Depends(require_api_key), Depends(rate_limit)])
     def create_job(request: Request, payload: JobRequest):
         try:
             assert_supported_share_url(payload.url)
