@@ -21,8 +21,17 @@ dev = [
   "pytest-timeout>=2.2",
 ]
 # schemathesis 接口模糊测试（重依赖，独立环境/CI job 安装）
+# 版本 pin 到 3.x，理由（2026-09-16 实测）：
+#   1) schemathesis 4.x 移除了 `from_fastapi`，并把 `schema["/path"]["GET"].parametrize(...)`
+#      换成只接受 () 的全局 `schema.parametrize()`（配置改走 SchemathesisConfig），
+#      pytest 集成 API 属破坏性变更；
+#   2) 3.x 的 `schema.openapi.from_asgi` + endpoint 级 parametrize + per-call checks
+#      是本测试采用的稳定写法；
+#   3) 另注：FastAPI 0.116 默认产出 OpenAPI 3.1.0，3.x 只支持 3.0.x，故测试内把
+#      **测试实例** 的 `openapi_version` 降为 "3.0.2"（不影响产品代码）。
+# 迁移到 4.x（原生支持 3.1）列为后续项。
 fuzz = [
-  "schemathesis>=3.0",
+  "schemathesis>=3.39,<4.0",
   "hypothesis>=6.100",
 ]
 # CER 评测（可选；cer_eval.py 有纯 Python 回退，不装也能跑单测）
