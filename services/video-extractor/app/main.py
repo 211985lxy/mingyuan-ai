@@ -13,9 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
-import yt_dlp
-from fastapi import Depends, FastAPI, Header, HTTPException
-from faster_whisper import WhisperModel
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 MAX_DURATION_SECONDS = 600
@@ -25,13 +23,29 @@ SUPPORTED_HOST_SUFFIXES = (
     "xiaohongshu.com", "xhslink.com", "channels.weixin.qq.com", "weixin110.qq.com",
     "youtube.com", "youtu.be",
 )
-DB_PATH = Path(os.getenv("JOB_DB_PATH", "/data/jobs.sqlite3"))
-WORK_DIR = Path(os.getenv("WORK_DIR", "/data/work"))
-API_KEY = os.getenv("VIDEO_EXTRACTOR_API_KEY", "")
-EXECUTOR = ThreadPoolExecutor(max_workers=max(1, int(os.getenv("EXTRACTOR_WORKERS", "2"))))
+
+
+class Settings:
+    """集中配置，从环境变量读取；测试可传入隔离实例覆盖任意字段。"""
+
+    def __init__(self, **overrides):
+        get = lambda key, default: overrides.get(key, os.getenv(key, default))
+        self.db_path = Path(get("JOB_DB_PATH", "/data/jobs.sqlite3"))
+        self.work_dir = Path(get("WORK_DIR", "/data/work"))
+        self.api_key = get("VIDEO_EXTRACTOR_API_KEY", "")
+        self.extractor_workers = max(1, int(get("EXTRACTOR_WORKERS", "2")))
+        self.whisper_model = get("WHISPER_MODEL", "small")
+        self.whisper_device = get("WHISPER_DEVICE", "cpu")
+        self.whisper_compute_type = get("WHISPER_COMPUTE_TYPE", "int8")
+        self.douyin_cookie = get("DOUYIN_COOKIE", "")
+        self.f2_douyin_enabled = str(get("F2_DOUYIN_ENABLED", "true")).lower() == "true"
+
+
+DEFAULT_SETTINGS = Settings()
+
 DB_LOCK = threading.Lock()
 MODEL_LOCK = threading.Lock()
-WHISPER_MODEL = None
+WHISPER_MODEL = None  # 惰性加载（首次转写时按 settings 构建）
 
 
 class JobRequest(BaseModel):
@@ -51,15 +65,21 @@ class JobResponse(BaseModel):
     errorMessage: str | None = None
 
 
-def connect():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH, timeout=30)
+def connect(settings: Settings | None = None):
+    settings = settings or DEFAULT_SETTINGS
+    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(settings.db_path, timeout=30, isolation_level=None)
     connection.row_factory = sqlite3.Row
+    # WAL 允许读写并发，消除 F17：EXTRACTOR_WORKERS>=2 时 get_job 轮询与 update_job
+    # 写竞争导致的 "database is locked" 偶发 500（无需给读路径加锁，避免限并发）。
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA busy_timeout=5000")
     return connection
 
 
-def initialize_database():
-    with DB_LOCK, connect() as db:
+def initialize_database(settings: Settings | None = None):
+    settings = settings or DEFAULT_SETTINGS
+    with DB_LOCK, connect(settings) as db:
         db.execute("""
           CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,
@@ -71,14 +91,10 @@ def initialize_database():
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
           )
         """)
-        db.execute("UPDATE jobs SET status = 'failed', error_message = '提取服务重启，请重新提交任务。', updated_at = CURRENT_TIMESTAMP WHERE status IN ('queued', 'extracting')")
-
-
-def require_api_key(authorization: str | None = Header(default=None)):
-    if not API_KEY or not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="unauthorized")
-    if not secrets.compare_digest(authorization[7:].strip(), API_KEY):
-        raise HTTPException(status_code=401, detail="unauthorized")
+        db.execute(
+            "UPDATE jobs SET status = 'failed', error_message = '提取服务重启，请重新提交任务。', "
+            "updated_at = CURRENT_TIMESTAMP WHERE status IN ('queued', 'extracting')"
+        )
 
 
 def assert_public_url(value: str):
@@ -108,34 +124,37 @@ def assert_supported_share_url(value: str):
     return value
 
 
-def update_job(job_id: str, status: str, result: dict | None = None, error: str | None = None):
-    with DB_LOCK, connect() as db:
+def update_job(job_id: str, status: str, result: dict | None = None, error: str | None = None, settings: Settings | None = None):
+    settings = settings or DEFAULT_SETTINGS
+    with DB_LOCK, connect(settings) as db:
         db.execute(
             "UPDATE jobs SET status = ?, result_json = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (status, json.dumps(result, ensure_ascii=False) if result else None, error, job_id),
         )
 
 
-def whisper_model():
+def whisper_model(settings: Settings | None = None):
     global WHISPER_MODEL
+    settings = settings or DEFAULT_SETTINGS
     with MODEL_LOCK:
         if WHISPER_MODEL is None:
+            from faster_whisper import WhisperModel
             WHISPER_MODEL = WhisperModel(
-                os.getenv("WHISPER_MODEL", "small"),
-                device=os.getenv("WHISPER_DEVICE", "cpu"),
-                compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8"),
+                settings.whisper_model,
+                device=settings.whisper_device,
+                compute_type=settings.whisper_compute_type,
             )
     return WHISPER_MODEL
 
 
-async def download_with_f2(url: str, target: Path, max_bytes: int):
+async def download_with_f2(url: str, target: Path, max_bytes: int, settings: Settings):
     from f2.apps.douyin.handler import DouyinHandler
     from f2.apps.douyin.utils import AwemeIdFetcher
 
     aweme_id = await AwemeIdFetcher.get_aweme_id(url)
     video = await DouyinHandler({
         "headers": {"User-Agent": "Mozilla/5.0", "Referer": "https://www.douyin.com/"},
-        "cookie": os.getenv("DOUYIN_COOKIE", ""),
+        "cookie": settings.douyin_cookie,
         "proxies": {"http://": None, "https://": None},
     }).fetch_one_video(aweme_id=aweme_id)
     duration = int((video.duration or 0) / 1000)
@@ -159,6 +178,7 @@ async def download_with_f2(url: str, target: Path, max_bytes: int):
 
 
 def download_with_ytdlp(url: str, directory: Path, max_duration: int, max_bytes: int):
+    import yt_dlp
     output_template = str(directory / "media.%(ext)s")
     options = {
         "format": "bestaudio/best",
@@ -193,67 +213,102 @@ def download_with_ytdlp(url: str, directory: Path, max_duration: int, max_bytes:
         }
 
 
-def transcribe(media_path: Path):
-    segments, _ = whisper_model().transcribe(str(media_path), vad_filter=True, beam_size=5)
+def transcribe(media_path: Path, settings: Settings | None = None):
+    settings = settings or DEFAULT_SETTINGS
+    model = whisper_model(settings)
+    segments, info = model.transcribe(str(media_path), vad_filter=True, beam_size=5)
+    segments = list(segments)
     transcript = "".join(segment.text.strip() for segment in segments).strip()
     if not transcript:
         raise ValueError("视频中没有识别到可用语音。")
-    return transcript
+    duration = getattr(info, "duration_after_vad", None) or getattr(info, "duration", 0.0) or 0.0
+    if segments:
+        avg_logprob = sum(getattr(s, "avg_logprob", 0.0) for s in segments) / len(segments)
+        no_speech_prob = sum(getattr(s, "no_speech_prob", 0.0) for s in segments) / len(segments)
+    else:
+        avg_logprob = 0.0
+        no_speech_prob = 0.0
+    metrics = {
+        "device": settings.whisper_device,
+        "compute_type": settings.whisper_compute_type,
+        "model": settings.whisper_model,
+        "duration_seconds": round(duration, 2),
+        "chars_per_second": round(len(transcript) / duration, 2) if duration > 0 else 0.0,
+        "avg_logprob": round(avg_logprob, 4),
+        "no_speech_prob": round(no_speech_prob, 4),
+        "language": getattr(info, "language", None),
+        "language_probability": round(getattr(info, "language_probability", 0.0), 4),
+    }
+    return transcript, metrics
 
 
-def process_job(job_id: str, request: JobRequest):
-    update_job(job_id, "extracting")
+def process_job(job_id: str, request: JobRequest, settings: Settings | None = None):
+    settings = settings or DEFAULT_SETTINGS
+    update_job(job_id, "extracting", settings=settings)
     try:
         assert_supported_share_url(request.url)
-        WORK_DIR.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix=f"{job_id}-", dir=WORK_DIR) as temp_dir:
+        settings.work_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=f"{job_id}-", dir=settings.work_dir) as temp_dir:
             directory = Path(temp_dir)
             parsed_host = (urlparse(request.url).hostname or "").lower()
-            if "douyin.com" in parsed_host and os.getenv("F2_DOUYIN_ENABLED", "true").lower() == "true":
+            if "douyin.com" in parsed_host and settings.f2_douyin_enabled:
                 try:
                     media_path = directory / "media.mp4"
-                    metadata = asyncio.run(download_with_f2(request.url, media_path, request.maxBytes))
+                    metadata = asyncio.run(download_with_f2(request.url, media_path, request.maxBytes, settings))
                 except Exception:
                     media_path, metadata = download_with_ytdlp(request.url, directory, request.maxDurationSeconds, request.maxBytes)
             else:
                 media_path, metadata = download_with_ytdlp(request.url, directory, request.maxDurationSeconds, request.maxBytes)
-            metadata["transcript"] = transcribe(media_path)
-            update_job(job_id, "completed", metadata)
+            transcript, metrics = transcribe(media_path, settings)
+            metadata["transcript"] = transcript
+            metadata["metrics"] = metrics
+            update_job(job_id, "completed", metadata, settings=settings)
     except Exception as error:
-        update_job(job_id, "failed", error=str(error)[:2000])
+        update_job(job_id, "failed", error=str(error)[:2000], settings=settings)
 
 
-def schedule(job_id: str, request: JobRequest):
-    EXECUTOR.submit(process_job, job_id, request)
+def create_app(settings: Settings | None = None, executor: ThreadPoolExecutor | None = None, init_db: bool = True):
+    settings = settings or DEFAULT_SETTINGS
+    executor = executor or ThreadPoolExecutor(max_workers=settings.extractor_workers)
+    app = FastAPI(title="Mingyuan Video Extractor", version="0.1.0")
+    app.state.settings = settings
+    app.state.executor = executor
+
+    def require_api_key(authorization: str | None = Header(default=None), request: Request = None):
+        if not settings.api_key or not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="unauthorized")
+        if not secrets.compare_digest(authorization[7:].strip(), settings.api_key):
+            raise HTTPException(status_code=401, detail="unauthorized")
+
+    @app.get("/healthz")
+    def healthz():
+        return {"ok": True}
+
+    @app.post("/jobs", response_model=JobResponse, status_code=202, dependencies=[Depends(require_api_key)])
+    def create_job(request: Request, payload: JobRequest):
+        try:
+            assert_supported_share_url(payload.url)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        job_id = str(uuid.uuid4())
+        with DB_LOCK, connect(settings) as db:
+            db.execute("INSERT INTO jobs (id, source_url, status) VALUES (?, ?, 'queued')", (job_id, payload.url))
+        executor.submit(process_job, job_id, payload, settings)
+        return JobResponse(status="extracting", jobId=job_id)
+
+    @app.get("/jobs/{job_id}", response_model=JobResponse, dependencies=[Depends(require_api_key)])
+    def get_job(job_id: str, request: Request):
+        with connect(settings) as db:
+            row = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="job not found")
+        result = json.loads(row["result_json"]) if row["result_json"] else {}
+        return JobResponse(status=row["status"], jobId=job_id, errorMessage=row["error_message"], **result)
+
+    if init_db:
+        initialize_database(settings)
+    return app
 
 
-initialize_database()
-app = FastAPI(title="Mingyuan Video Extractor", version="0.1.0")
-
-
-@app.get("/healthz")
-def healthz():
-    return {"ok": True}
-
-
-@app.post("/jobs", response_model=JobResponse, status_code=202, dependencies=[Depends(require_api_key)])
-def create_job(request: JobRequest):
-    try:
-        assert_supported_share_url(request.url)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-    job_id = str(uuid.uuid4())
-    with DB_LOCK, connect() as db:
-        db.execute("INSERT INTO jobs (id, source_url, status) VALUES (?, ?, 'queued')", (job_id, request.url))
-    schedule(job_id, request)
-    return JobResponse(status="extracting", jobId=job_id)
-
-
-@app.get("/jobs/{job_id}", response_model=JobResponse, dependencies=[Depends(require_api_key)])
-def get_job(job_id: str):
-    with connect() as db:
-        row = db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="job not found")
-    result = json.loads(row["result_json"]) if row["result_json"] else {}
-    return JobResponse(status=row["status"], jobId=job_id, errorMessage=row["error_message"], **result)
+# uvicorn 入口（app.main:app）。行为与改造前一致：导入即建库、绑定默认线程池。
+app = create_app()

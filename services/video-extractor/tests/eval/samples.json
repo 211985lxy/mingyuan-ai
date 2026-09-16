@@ -1,0 +1,143 @@
+{
+  "version": 1,
+  "language": "zh",
+  "model": "small",
+  "description": "GPU 推理质量回退 CER 评估集。音频文件不入库（二进制），默认存放于 tests/eval/audio/，可用环境变量 CER_AUDIO_ROOT 覆盖。baseline_cer 为 null 表示尚无基线，首次运行请带 UPDATE_CER_BASELINE=1 建立基线。",
+  "samples": [
+    {
+      "id": "std-001",
+      "path": "audio/std-001.wav",
+      "duration_seconds": 38.0,
+      "category": "standard",
+      "keywords": ["供暖", "阀门"],
+      "reference": "各位业主大家好，本月供暖季即将开始，请提前检查家中暖气阀门是否完好。",
+      "baseline_cer": null
+    },
+    {
+      "id": "std-002",
+      "path": "audio/std-002.wav",
+      "duration_seconds": 52.0,
+      "category": "standard",
+      "keywords": ["资产", "台账"],
+      "reference": "本次巡检共盘点固定资产一百二十三件，已更新设备资产台账并归档。",
+      "baseline_cer": null
+    },
+    {
+      "id": "dialect-ne-001",
+      "path": "audio/dialect-ne-001.wav",
+      "duration_seconds": 41.0,
+      "category": "dialect_northeast",
+      "keywords": ["报修", "工单"],
+      "reference": "我家暖气片冰凉，赶紧给俺派个单子，这工单号你记一下啊。",
+      "baseline_cer": null
+    },
+    {
+      "id": "dialect-sc-001",
+      "path": "audio/dialect-sc-001.wav",
+      "duration_seconds": 47.0,
+      "category": "dialect_sichuan",
+      "keywords": ["阀门", "漏水"],
+      "reference": "那个水管阀门又漏水咯，麻烦尽快安排师傅来处理一哈。",
+      "baseline_cer": null
+    },
+    {
+      "id": "dialect-yue-001",
+      "path": "audio/dialect-yue-001.wav",
+      "duration_seconds": 44.0,
+      "category": "dialect_cantonese",
+      "keywords": ["资产", "维修"],
+      "reference": "地下停车场个消防资产要尽快维修，唔可以再拖落去啦。",
+      "baseline_cer": null
+    },
+    {
+      "id": "dialect-min-001",
+      "path": "audio/dialect-min-001.wav",
+      "duration_seconds": 39.0,
+      "category": "dialect_minnan",
+      "keywords": ["供暖", "管廊"],
+      "reference": "冬天到了，管廊里向的供暖管线爱先检查一遍才稳妥。",
+      "baseline_cer": null
+    },
+    {
+      "id": "bgm-001",
+      "path": "audio/bgm-001.wav",
+      "duration_seconds": 55.0,
+      "category": "bgm_heavy",
+      "keywords": ["换热站", "调度"],
+      "reference": "换热站今日调度正常，夜间负荷有所下降，请注意循环泵运行。",
+      "baseline_cer": null
+    },
+    {
+      "id": "bgm-002",
+      "path": "audio/bgm-002.wav",
+      "duration_seconds": 49.0,
+      "category": "noisy",
+      "keywords": ["工单", "现场"],
+      "reference": "现场施工噪音比较大，这个报修工单我已经提交给值班人员了。",
+      "baseline_cer": null
+    },
+    {
+      "id": "silence-001",
+      "path": "audio/silence-001.wav",
+      "duration_seconds": 120.0,
+      "category": "long_silence",
+      "keywords": ["会议", "供暖"],
+      "reference": "会议开始，先汇报供暖准备情况，中间有较长时间静音等待。",
+      "baseline_cer": null
+    },
+    {
+      "id": "silence-002",
+      "path": "audio/silence-002.wav",
+      "duration_seconds": 88.0,
+      "category": "long_silence",
+      "keywords": ["资产", "盘点"],
+      "reference": "资产盘点录像中间有静音，最后确认总台账数量无误。",
+      "baseline_cer": null
+    },
+    {
+      "id": "domain-heating-001",
+      "path": "audio/domain-heating-001.wav",
+      "duration_seconds": 61.0,
+      "category": "domain_heating",
+      "keywords": ["供暖", "换热站", "管网"],
+      "reference": "供暖季前需完成管网冲洗，换热站补水压力要保持在合理区间。",
+      "baseline_cer": null
+    },
+    {
+      "id": "domain-asset-001",
+      "path": "audio/domain-asset-001.wav",
+      "duration_seconds": 57.0,
+      "category": "domain_asset",
+      "keywords": ["资产", "台账", "折旧"],
+      "reference": "本月新增资产已录入台账，相应折旧与处置流程按制度执行。",
+      "baseline_cer": null
+    },
+    {
+      "id": "domain-valve-001",
+      "path": "audio/domain-valve-001.wav",
+      "duration_seconds": 63.0,
+      "category": "domain_valve",
+      "keywords": ["阀门", "报修", "工单"],
+      "reference": "三号楼阀门报修已生成工单，维修人员到场后更换了密封圈。",
+      "baseline_cer": null
+    },
+    {
+      "id": "lowsnr-001",
+      "path": "audio/lowsnr-001.wav",
+      "duration_seconds": 45.0,
+      "category": "low_snr",
+      "keywords": ["物业", "工单"],
+      "reference": "物业电话录音信号较弱，已根据工单内容安排次日上门查看。",
+      "baseline_cer": null
+    },
+    {
+      "id": "mixed-001",
+      "path": "audio/mixed-001.wav",
+      "duration_seconds": 96.0,
+      "category": "mixed",
+      "keywords": ["供暖", "资产", "阀门", "换热站", "工单"],
+      "reference": "本周完成供暖换热站巡检，发现两处阀门渗漏，已建工单并登记资产维修台账，预计三天内闭环。",
+      "baseline_cer": null
+    }
+  ]
+}

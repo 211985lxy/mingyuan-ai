@@ -1,0 +1,38 @@
+name: video-extractor CER quality gate (GPU nightly)
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "刷新基线（首次建基线或模型升级后）"
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    working-directory: services/video-extractor
+
+jobs:
+  cer-gate:
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # F19 已修（httpx pin 放宽为 >=0.27.2,<0.29），恢复完整声明依赖安装。
+      - name: Install eval dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,eval]"
+      - name: Run CER gate
+        run: pytest tests/eval/test_cer_gate.py -m gpu --timeout=1800
+        env:
+          ENABLE_CER_GATE: "1"
+          UPDATE_CER_BASELINE: ${{ github.event.inputs.update_baseline == 'true' && '1' || '' }}
+          WHISPER_DEVICE: "cuda"
+          WHISPER_COMPUTE_TYPE: "float16"
+          WHISPER_MODEL: "small"
+          CER_AUDIO_ROOT: "/data/cer-eval-audio"
