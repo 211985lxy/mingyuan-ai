@@ -17,6 +17,9 @@ const TASK_STATUS_LABEL: Record<string, string> = {
 
 /** Step 3 出成片：默认即最优（竖屏），一次确认即提交；提交后任务后台化。 */
 export function VideoReviewStep(props: {
+  /** 形象是否已选定：未选时显示「未选择」并提供一键回第 1 步 */
+  avatarSelected: boolean
+  onGoSelectAvatar: () => void
   avatarLabel: string
   voiceLabel: string
   scriptPreview: string
@@ -40,7 +43,9 @@ export function VideoReviewStep(props: {
       <Card>
         <CardContent className="space-y-4 py-5">
           <SummaryBlock
-            avatarLabel={props.avatarLabel}
+            avatarLabel={props.avatarSelected ? props.avatarLabel : "未选择"}
+            avatarNotSelected={!props.avatarSelected}
+            onGoSelectAvatar={props.onGoSelectAvatar}
             voiceLabel={props.voiceLabel}
             scriptPreview={props.scriptPreview}
             speechSeconds={props.speechSeconds}
@@ -89,11 +94,15 @@ export function VideoReviewStep(props: {
 
 function SummaryBlock({
   avatarLabel,
+  avatarNotSelected,
+  onGoSelectAvatar,
   voiceLabel,
   scriptPreview,
   speechSeconds,
 }: {
   avatarLabel: string
+  avatarNotSelected?: boolean
+  onGoSelectAvatar?: () => void
   voiceLabel: string
   scriptPreview: string
   speechSeconds: number
@@ -102,7 +111,12 @@ function SummaryBlock({
     <div className="space-y-1.5 text-sm">
       <p className="flex flex-wrap items-center gap-1.5">
         <span className="text-muted-foreground">形象</span>
-        <span className="font-medium">{avatarLabel}</span>
+        <span className={avatarNotSelected ? "font-medium text-destructive" : "font-medium"}>{avatarLabel}</span>
+        {avatarNotSelected ? (
+          <Button type="button" size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={onGoSelectAvatar}>
+            去选形象
+          </Button>
+        ) : null}
         <span className="mx-2 text-border">|</span>
         <span className="text-muted-foreground">声音</span>
         <span className="font-medium">{voiceLabel}</span>
