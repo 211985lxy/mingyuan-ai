@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeDigitalHumanProvider } from "@/lib/digital-human-provider";
 import { releaseProviderSlot } from "@/lib/digital-human-semaphore";
 import { settleVideoTaskFailure } from "@/lib/video-task-settlement";
 import {
@@ -69,7 +70,7 @@ async function expireCloningAvatar(
       data: { status: "failed", errorCode: "CLONING_TIMEOUT", errorMessage: "数字人克隆超时，请重试" },
     });
     if (updated.count > 0) {
-      await releaseProviderSlot(provider === "shanjian" ? "shanjian" : "chanjing");
+      await releaseProviderSlot(normalizeDigitalHumanProvider(provider));
     }
     console.warn(`${logPrefix} Expired zombie cloning avatar ${avatarId}`);
   } catch (error) {

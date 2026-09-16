@@ -46,7 +46,7 @@ export async function createVideoTask(
   const aimGenerationId = await resolveAimGeneration(userId, projectId, body.aimGenerationId);
   const provider = options.provider ?? getDigitalHumanProvider();
   const retryOfTaskId = await resolveRetrySource(userId, options.retryOfTaskId ?? body.retryOfTaskId, projectId, provider);
-  const aspectRatio = resolveAspectRatio(body.aspectRatio);
+  const aspectRatio = resolveAspectRatio(body.aspectRatio, provider);
   const avatar = await resolveVideoTaskAvatar({ userId, projectId, videoType, body });
   const resolvedScript = await resolveVideoTaskScript({ userId, body, plan, videoType });
   const { idempotencyKey, shanjianPayload } = await prepareSubmissionInputs({
@@ -116,7 +116,7 @@ async function prepareSubmissionInputs(input: {
   projectId: string | null;
   aimGenerationId: string | null;
   provider: DigitalHumanProvider;
-  aspectRatio: "9:16" | "16:9";
+  aspectRatio: "9:16" | "16:9" | "1:1";
   scriptContent: string;
 }): Promise<{ idempotencyKey: string; shanjianPayload: Record<string, unknown> }> {
   const voiceSource = input.body.voiceSource === "own_voice" ? "own_voice" : "tts";
@@ -243,10 +243,27 @@ async function resolveAimGeneration(
   return generation.id;
 }
 
-function resolveAspectRatio(value: CreateVideoTaskInput["aspectRatio"]): "9:16" | "16:9" {
+/**
+ * 交付比例校验。
+ *
+ * `1:1` 目前只有 Hypit 支持（同一份 SVML 模板里同时定义三个 Canvas，一次渲染出
+ * 三比例的多个产物）。蝉镜 / 闪剪 / HeyGen 的载荷都写成 `=== "16:9" ? "16:9" : "9:16"`，
+ * 传 1:1 会被静默降级成 9:16——**比报错更糟**：用户以为点了方版，拿到的是竖版。
+ * 所以这里按 provider fail-closed，其余 provider 传 1:1 直接 400。
+ */
+function resolveAspectRatio(
+  value: CreateVideoTaskInput["aspectRatio"],
+  provider: DigitalHumanProvider,
+): "9:16" | "16:9" | "1:1" {
   if (!value) return "9:16";
   if (value === "9:16" || value === "16:9") return value;
-  throw new VideoTaskRequestError("aspectRatio must be 9:16 or 16:9", 400, { field: "aspectRatio" });
+  if (value === "1:1") {
+    if (provider !== "hypit") {
+      throw new VideoTaskRequestError("aspectRatio 1:1 目前仅本机渲染服务支持", 400, { field: "aspectRatio" });
+    }
+    return value;
+  }
+  throw new VideoTaskRequestError("aspectRatio must be 9:16, 16:9 or 1:1", 400, { field: "aspectRatio" });
 }
 
 function isUniqueViolation(error: unknown): boolean {

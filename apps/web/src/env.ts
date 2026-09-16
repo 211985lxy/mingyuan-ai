@@ -89,7 +89,23 @@ export const env = createEnv({
     CHANJING_WEBHOOK_SECRET: z.string().optional(),
     CHANJING_AUTH_TEXT: z.string().optional(),
     CHANJING_MAX_CONCURRENT: z.string().optional(),
-    DIGITAL_HUMAN_PROVIDER: z.enum(["chanjing", "shanjian", "heygen"]).optional(),
+    // Hypit 渲染服务（services/hypit-renderer）——单租户内部渲染后端。
+    // HYPIT_API_TOKEN 是服务端内部共享 token，绝不下发浏览器。
+    HYPIT_RENDERER_URL: z.string().optional(),
+    HYPIT_API_TOKEN: z.string().optional(),
+    HYPIT_ENABLED: z.string().optional(),
+    HYPIT_SHADOW_MODE: z.string().optional(),
+    HYPIT_MAX_CONCURRENT: z.string().optional(),
+    HYPIT_POLL_TIMEOUT_MS: z.string().optional(),
+    /**
+     * 模板素材在渲染服务工作区里的目录（**相对**工作区根，默认 `templates`）。
+     *
+     * 必须是相对路径：`.svs` 的 `<import source=...>` 只接受相对路径或 npm 包名，
+     * 绝对路径会被当成 npm 包 spec 直接失败（"must be one npm package Source export"）。
+     * 见 `services/hypit-renderer/docs/TEMPLATE-CONTRACT.md`。
+     */
+    HYPIT_TEMPLATE_DIR: z.string().optional(),
+    DIGITAL_HUMAN_PROVIDER: z.enum(["chanjing", "shanjian", "heygen", "hypit"]).optional(),
     TASK_RECOVERY_HEARTBEAT_FILE: z.string().optional(), TASK_RECOVERY_INTERVAL_MS: z.string().optional(), TASK_RECOVERY_STARTUP_DELAY_MS: z.string().optional(), ALIYUN_VIAPI_ENDPOINT: z.string().optional(), ALIYUN_ENHANCEMENT_WEBHOOK_SECRET: z.string().optional(),
     DATABASE_URL: z.string().optional(),
     DEEPSEEK_API_KEY: z.string().optional(),
@@ -376,6 +392,7 @@ export const env = createEnv({
     SHANJIAN_APP_KEY: process.env.SHANJIAN_APP_KEY, SHANJIAN_AUTH_TEXT: process.env.SHANJIAN_AUTH_TEXT, SHANJIAN_BASE_URL: process.env.SHANJIAN_BASE_URL, SHANJIAN_MAX_CONCURRENT: process.env.SHANJIAN_MAX_CONCURRENT, SHANJIAN_WEBHOOK_SECRET: process.env.SHANJIAN_WEBHOOK_SECRET, SHANJIAN_WEBHOOK_URL: process.env.SHANJIAN_WEBHOOK_URL,
     HEYGEN_API_KEY: process.env.HEYGEN_API_KEY, HEYGEN_BASE_URL: process.env.HEYGEN_BASE_URL, HEYGEN_MAX_CONCURRENT: process.env.HEYGEN_MAX_CONCURRENT, HEYGEN_WEBHOOK_SECRET: process.env.HEYGEN_WEBHOOK_SECRET, HEYGEN_WEBHOOK_URL: process.env.HEYGEN_WEBHOOK_URL,
     CHANJING_APP_ID: process.env.CHANJING_APP_ID, CHANJING_SECRET_KEY: process.env.CHANJING_SECRET_KEY, CHANJING_BASE_URL: process.env.CHANJING_BASE_URL, CHANJING_WEBHOOK_URL: process.env.CHANJING_WEBHOOK_URL, CHANJING_WEBHOOK_SECRET: process.env.CHANJING_WEBHOOK_SECRET, CHANJING_AUTH_TEXT: process.env.CHANJING_AUTH_TEXT, CHANJING_MAX_CONCURRENT: process.env.CHANJING_MAX_CONCURRENT, DIGITAL_HUMAN_PROVIDER: process.env.DIGITAL_HUMAN_PROVIDER,
+    HYPIT_RENDERER_URL: process.env.HYPIT_RENDERER_URL, HYPIT_API_TOKEN: process.env.HYPIT_API_TOKEN, HYPIT_ENABLED: process.env.HYPIT_ENABLED, HYPIT_SHADOW_MODE: process.env.HYPIT_SHADOW_MODE, HYPIT_MAX_CONCURRENT: process.env.HYPIT_MAX_CONCURRENT, HYPIT_POLL_TIMEOUT_MS: process.env.HYPIT_POLL_TIMEOUT_MS, HYPIT_TEMPLATE_DIR: process.env.HYPIT_TEMPLATE_DIR,
     TASK_RECOVERY_HEARTBEAT_FILE: process.env.TASK_RECOVERY_HEARTBEAT_FILE, TASK_RECOVERY_INTERVAL_MS: process.env.TASK_RECOVERY_INTERVAL_MS, TASK_RECOVERY_STARTUP_DELAY_MS: process.env.TASK_RECOVERY_STARTUP_DELAY_MS, ALIYUN_VIAPI_ENDPOINT: process.env.ALIYUN_VIAPI_ENDPOINT, ALIYUN_ENHANCEMENT_WEBHOOK_SECRET: process.env.ALIYUN_ENHANCEMENT_WEBHOOK_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
