@@ -1,4 +1,6 @@
 import type { AimContentSourceEnvelope } from "@/lib/aim/content-source-envelope"
+import { detectGoal, type AimContentGoal } from "@/lib/aim/content-goal"
+import type { IpProfileSeed } from "@/lib/aim/ip-profile-seed"
 import type { ContentFormat } from "@/lib/api/client"
 import { AIM_BENCHMARK_MATERIAL_PATTERN, extractAimInstructionText } from "@/lib/aim-current-user-input"
 
@@ -10,8 +12,11 @@ import { AIM_BENCHMARK_MATERIAL_PATTERN, extractAimInstructionText } from "@/lib
  * 2. 按任务类型检查会实质改变成稿的关键缺口（主题/受众/目标/长度/数量/修改范围/新旧任务）；
  * 3. 缺口一次性输出最多 3 个编号追问，绝不使用隐藏默认值顶替。
  *
- * 约束优先级（固定）：当前用户明确要求 > 本任务已确认要求 > 当前素材可直接确定的信息。
- * 历史任务、项目档案、平台模板不得成为硬约束（只作参考）。
+ * 约束优先级（固定）：当前用户明确要求 > 本任务已确认要求 > 当前素材可直接确定的信息
+ * > 绑定项目已确认的档案页（project_profile，最低优先级兜底）。
+ * 历史任务与平台模板仍是只作参考，不得成为硬约束；档案页例外，因为它进 active 之前
+ * 都经过人工确认（手填表单直接落库；定位方案编译是「提议，待人工确认」，要逐页勾选）——
+ * 那是用户给过的要求被持久化，不是系统脑补的默认值，重复追问等于否认他确认过的档案。
  */
 
 export type AimIntentTaskKind =
@@ -23,9 +28,10 @@ export type AimIntentTaskKind =
   | "opener_optimize"
   | "answer_question"
 
-export type AimContentGoal = "traffic" | "lead" | "convert" | "trust" | "brand"
+/** 目标词汇表已抽到 content-goal：这里按原名再导出，兼容既有引用方 */
+export type { AimContentGoal }
 
-export type IntentConstraintSource = "user_current" | "task_confirmed" | "material_derived"
+export type IntentConstraintSource = "user_current" | "task_confirmed" | "material_derived" | "project_profile"
 
 export interface ResolvedUserIntent {
   taskKind: AimIntentTaskKind
@@ -88,14 +94,6 @@ function recentUserText(envelope: AimContentSourceEnvelope, turns = 2): string {
 export function isClarificationAnswerTurn(envelope: AimContentSourceEnvelope): boolean {
   const last = lastAssistantTurn(envelope)
   return Boolean(last && CLARIFICATION_LEAD_PATTERN.test(last.content.trim()))
-}
-
-function detectGoal(text: string): AimContentGoal | undefined {
-  if (/(获客|引流|留资|私信|咨询|线索|线索获客|预约)/.test(text)) return "lead"
-  if (/(成交|转化|卖货|下单|购买|招商)/.test(text)) return "convert"
-  if (/(人设|信任|故事|来时路|品牌)/.test(text)) return "trust"
-  if (/(涨粉|流量|曝光|起号|播放)/.test(text)) return "traffic"
-  return undefined
 }
 
 function detectQuantity(text: string): number | undefined {
@@ -187,10 +185,12 @@ function resolveLengthConstraint(input: {
 /**
  * 从信封确定性解析当前意图（规则可测；LLM 语义理解负责模糊语义，二者互补）。
  * 「本任务已确认要求」= 追问后用户的最近回答（recentUserText）。
+ * profileSeed = 绑定项目已确认档案页的兜底（最低优先级）。
  */
 export function resolveUserIntentFromEnvelope(
   envelope: AimContentSourceEnvelope,
   formats?: ContentFormat[],
+  profileSeed?: IpProfileSeed,
 ): ResolvedUserIntent {
   // 指令/素材分离：请求侧字段只从「用户指令」解析；素材只作为参考材料喂给模型，
   // 素材里的「适合宝妈/品牌/3条/开头/接下来写」不再成为硬约束或触发追问误判。
@@ -204,20 +204,27 @@ export function resolveUserIntentFromEnvelope(
   const allowHistoryConstraints = !isNewTask || isClarificationAnswerTurn(envelope)
   const confirmedForConstraints = allowHistoryConstraints ? confirmedText : ""
 
+  // 档案兜底：只在本轮原话与本任务已确认回答都没给出该字段时生效
+  const seedAudience = profileSeed?.audience?.trim()
+
   const sources: ResolvedUserIntent["constraintSources"] = {}
   const audienceInRequest = AUDIENCE_PATTERN.test(request)
   const audienceInConfirmed = !audienceInRequest && AUDIENCE_PATTERN.test(confirmedForConstraints)
   const audience = audienceInRequest || audienceInConfirmed
     ? (audienceInRequest ? request : confirmedForConstraints)
-    : undefined
+    : seedAudience || undefined
   if (audienceInRequest) sources.audience = "user_current"
   else if (audienceInConfirmed) sources.audience = "task_confirmed"
+  else if (audience) sources.audience = "project_profile"
 
   const goalInRequest = detectGoal(request)
   const goalInConfirmed = goalInRequest ?? detectGoal(confirmedForConstraints)
-  const goal = goalInRequest ?? (allowHistoryConstraints ? goalInConfirmed : undefined)
+  // 档案里的目标已由档案层判定成枚举；本轮原话与已确认回答都没给时才用它
+  const goalFromSeed = goalInRequest || goalInConfirmed ? undefined : profileSeed?.goal
+  const goal = goalInRequest ?? (allowHistoryConstraints ? goalInConfirmed : undefined) ?? goalFromSeed
   if (goalInRequest) sources.goal = "user_current"
-  else if (goal) sources.goal = "task_confirmed"
+  else if (allowHistoryConstraints && goalInConfirmed) sources.goal = "task_confirmed"
+  else if (goalFromSeed) sources.goal = "project_profile"
 
   const length = resolveLengthConstraint({ request, confirmedText: confirmedForConstraints, envelope, taskKind })
   if (length.source) sources.length = length.source

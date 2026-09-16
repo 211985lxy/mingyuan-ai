@@ -1,17 +1,10 @@
 import type { AimGenerateContext } from "@/lib/aim/agent-types"
 import { AIM_ASSISTANT_PERSONA } from "@/lib/aim/assistant-persona"
-import type { AimContentGoal, ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
+import { AIM_CONTENT_GOAL_LABELS } from "@/lib/aim/content-goal"
+import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
 import { promptRegistry } from "@/lib/prompt/registry"
 import { fillPromptTemplate } from "@/lib/prompt/template"
 import { PROMPT_KEYS } from "@/lib/prompt/types"
-
-const GOAL_LABELS: Record<AimContentGoal, string> = {
-  traffic: "搞流量",
-  lead: "获客咨询",
-  convert: "成交转化",
-  trust: "建立人设信任",
-  brand: "品牌",
-}
 
 function buildConfirmedIntentBlock(intent?: ResolvedUserIntent): string {
   if (!intent) return ""
@@ -23,7 +16,7 @@ function buildConfirmedIntentBlock(intent?: ResolvedUserIntent): string {
     lines.push("长度要求：保持原稿体量")
   }
   if (typeof intent.quantity === "number") lines.push(`数量：${intent.quantity}`)
-  if (intent.goal) lines.push(`内容目标：${GOAL_LABELS[intent.goal]}`)
+  if (intent.goal) lines.push(`内容目标：${AIM_CONTENT_GOAL_LABELS[intent.goal]}`)
   if (!lines.length) return ""
   return `【已确认要求】\n${lines.join("\n")}`
 }
