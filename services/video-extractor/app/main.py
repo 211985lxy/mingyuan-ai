@@ -4,6 +4,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import socket
@@ -14,7 +15,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -30,6 +31,90 @@ SUPPORTED_HOST_SUFFIXES = (
     "xiaohongshu.com", "xhslink.com", "channels.weixin.qq.com", "weixin110.qq.com",
     "youtube.com", "youtu.be",
 )
+
+# F9/F7：落库与回显前的敏感信息收敛。
+#
+# 两条泄漏路径都来自「原样保存用户/上游给的字符串」：
+#   1) `jobs.source_url` 直接存提交的原始 URL —— 平台分享链接常带签名令牌
+#      （token/sign/expires…），明文落库等于把「可用凭证」沉淀进 DB 与备份；
+#   2) `jobs.error_message` 存 `str(error)` 后又经 `GET /jobs/{id}` 的 `errorMessage`
+#      回给调用方 —— 下载器/ffmpeg 的异常里常带 work_dir 绝对路径与上游 URL。
+#
+# 采用「脱敏」而非「统一替换成通用文案」：本服务大量错误文案本身是给用户看的
+# 业务提示（"视频超过10分钟…"），整体替换会让排障与用户提示同时失效。
+# 已知局限：正则脱敏是尽力而为，不构成"绝对无泄漏"的保证；新增敏感字段时应同步扩充此表。
+# 占位符刻意用 URL 安全字符：`***` 经 urlencode 会变成 `%2A%2A%2A`，落库 URL 可读性差。
+REDACTED = "REDACTED"
+SENSITIVE_QUERY_KEYS = frozenset({
+    "access_token", "api_key", "apikey", "auth", "authorization", "code",
+    "cookie", "credential", "expire", "expired_at", "expires", "key",
+    "ms_token", "password", "passwd", "pwd", "refresh_token", "secret",
+    "session", "session_id", "sessionid", "sid", "sig", "sign", "signature",
+    "ticket", "token", "x-bogus", "x_bogus",
+})
+
+_URL_RE = re.compile(r"https?://[^\s\"'<>)\],;。，、]+")
+# 绝对路径：只覆盖会出现在本服务异常里的敏感根，避免误伤 URL 与普通文本。
+_ABS_PATH_RE = re.compile(
+    r"/(?:data|tmp|var|private|Users|home|root|app|opt|etc)(?:/[\w.\-]+)+"
+)
+# 第 1 组含分隔符与键名（逐字回填，避免吃掉 `&`/空格），第 2 组为待脱敏的值。
+_KV_SECRET_RE = re.compile(
+    r"(?i)((?:^|[\s?&;,])(?:"
+    + "|".join(sorted((re.escape(key) for key in SENSITIVE_QUERY_KEYS), key=len, reverse=True))
+    + r")=)([^\s&;,\"']+)"
+)
+_BEARER_RE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._\-+/=]{6,}")
+
+
+def _scrub_url(value: str) -> str:
+    """把 URL 查询串中敏感参数的值换成 ``REDACTED``，保留键名与其余参数以便排障。"""
+    parsed = urlparse(value)
+    if not parsed.query:
+        return value
+    try:
+        pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    except ValueError:
+        return value
+    if not pairs:
+        return value
+    scrubbed = [
+        (name, REDACTED if name.lower() in SENSITIVE_QUERY_KEYS else val)
+        for name, val in pairs
+    ]
+    return urlunparse(parsed._replace(query=urlencode(scrubbed)))
+
+
+def _scrub_url_match(match: "re.Match[str]") -> str:
+    """清洗文本中命中的 URL，并回填被正则一并吃进来的尾部标点（`:` `.`）。"""
+    raw = match.group(0)
+    stripped = raw.rstrip(":.")
+    return _scrub_url(stripped) + raw[len(stripped):]
+
+
+def _redact_kv_match(match: "re.Match[str]") -> str:
+    """脱敏 `key=value`，同样回填尾部标点。
+
+    值刻意保持贪婪（不排除 `:`）——否则 `sign=abc:def` 只会脱敏 `abc`，
+    留下半截密钥，比多留一个标点危险得多。
+    """
+    value = match.group(2)
+    stripped = value.rstrip(":.")
+    return f"{match.group(1)}{REDACTED}{value[len(stripped):]}"
+
+
+def _scrub_secrets(value: str) -> str:
+    """文本级脱敏：URL 查询令牌 / Bearer 凭证 / 敏感 k=v / 绝对文件路径。
+
+    顺序有讲究：先整段替换 URL（避免后续按 `k=v` 规则重复处理），再处理裸凭证与路径。
+    """
+    if not value:
+        return value
+    text = _URL_RE.sub(_scrub_url_match, value)
+    text = _BEARER_RE.sub(lambda match: f"{match.group(1)} {REDACTED}", text)
+    text = _KV_SECRET_RE.sub(_redact_kv_match, text)
+    text = _ABS_PATH_RE.sub(REDACTED, text)
+    return text
 
 
 class Settings:
@@ -119,7 +204,17 @@ class JobResponse(BaseModel):
     errorMessage: str | None = None
 
 
+@contextlib.contextmanager
 def connect(settings: Settings | None = None):
+    """打开 SQLite 连接；退出上下文时**必然关闭**。
+
+    原先直接返回 ``sqlite3.Connection``，于是 ``with connect(...) as db`` 走的是
+    Connection 自身的 ``__enter__/__exit__`` —— 它只提交/回滚，**不关闭连接**。
+    每次调用都会留下一个未关闭的连接（fd + WAL 句柄），只能靠 GC 兜底回收；
+    而 ``get_job`` 每个请求都建一条连接，并发下会瞬时耗尽 fd，并伴随
+    ``ResourceWarning: unclosed database``。此处改为显式关闭。
+    （``isolation_level=None`` 是自动提交，退出时原本的 commit 就是空操作，故关闭即可。）
+    """
     settings = settings or DEFAULT_SETTINGS
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(settings.db_path, timeout=30, isolation_level=None)
@@ -128,7 +223,10 @@ def connect(settings: Settings | None = None):
     # 写竞争导致的 "database is locked" 偶发 500（无需给读路径加锁，避免限并发）。
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA busy_timeout=5000")
-    return connection
+    try:
+        yield connection
+    finally:
+        connection.close()
 
 
 def initialize_database(settings: Settings | None = None):
@@ -246,10 +344,14 @@ def assert_supported_share_url(value: str):
 
 def update_job(job_id: str, status: str, result: dict | None = None, error: str | None = None, settings: Settings | None = None):
     settings = settings or DEFAULT_SETTINGS
+    # F7：error_message 会经 GET /jobs/{id} 的 errorMessage 原样回给调用方，
+    # 而它多是下载器/ffmpeg 的异常原文（含 work_dir 绝对路径、上游带令牌的 URL）。
+    # 在唯一的写入口做脱敏，避免后续新增调用方时漏处理。
+    safe_error = _scrub_secrets(error) if error else None
     with DB_LOCK, connect(settings) as db:
         db.execute(
             "UPDATE jobs SET status = ?, result_json = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (status, json.dumps(result, ensure_ascii=False) if result else None, error, job_id),
+            (status, json.dumps(result, ensure_ascii=False) if result else None, safe_error, job_id),
         )
 
 
@@ -463,7 +565,13 @@ def create_app(settings: Settings | None = None, executor: ThreadPoolExecutor | 
             raise HTTPException(status_code=400, detail=str(error)) from error
         job_id = str(uuid.uuid4())
         with DB_LOCK, connect(settings) as db:
-            db.execute("INSERT INTO jobs (id, source_url, status) VALUES (?, ?, 'queued')", (job_id, payload.url))
+            # F9：入库前脱敏。分享链接常带平台签名参数（token/sign/expires…），
+            # 明文落库会把可用凭证一起沉淀进 DB 与备份；此处只改写落库副本，
+            # 任务实际使用的是内存中的 payload.url，行为不受影响。
+            db.execute(
+                "INSERT INTO jobs (id, source_url, status) VALUES (?, ?, 'queued')",
+                (job_id, _scrub_url(payload.url)),
+            )
         executor.submit(process_job, job_id, payload, settings)
         return JobResponse(status="extracting", jobId=job_id)
 
