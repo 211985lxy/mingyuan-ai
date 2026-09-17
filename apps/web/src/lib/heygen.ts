@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 import { env } from "@/env"
+import { resolveLlmProxyUrl } from "@/lib/llm/config"
+import { getSharedProxyAgent } from "@/lib/llm/provider"
 import { logger } from "./logger"
 import { externalApiDuration, externalApiRequestsTotal } from "./metrics"
 
@@ -57,6 +59,16 @@ function extractError(json: HeygenEnvelope<unknown>): { code: string; message: s
   }
 }
 
+/**
+ * HeyGen 出站请求。api.heygen.com 在境内网络直连常超时（本机/服务器实测），
+ * 配置 HEYGEN_PROXY_URL 后经 undici ProxyAgent 出站（与 fish-audio 同款方案）。
+ */
+function heygenFetch(url: string | URL, init: RequestInit = {}): Promise<Response> {
+  const proxyURL = resolveLlmProxyUrl(env.HEYGEN_PROXY_URL)
+  if (!proxyURL) return fetch(url, init)
+  return fetch(url, { ...init, dispatcher: getSharedProxyAgent(proxyURL) } as RequestInit)
+}
+
 export async function request<T>(
   method: "GET" | "POST" | "DELETE" | "PATCH",
   path: string,
@@ -77,7 +89,7 @@ export async function request<T>(
 
   let res: Response
   try {
-    res = await fetch(url.toString(), {
+    res = await heygenFetch(url.toString(), {
       method,
       headers: {
         "X-Api-Key": API_KEY,
@@ -195,9 +207,18 @@ export type HeygenVoice = {
   type?: string
 }
 
-export async function listVoices(input?: { limit?: number; token?: string }): Promise<HeygenVoice[]> {
+export async function listVoices(input?: {
+  limit?: number
+  token?: string
+  /** 按语言过滤（如 "Chinese"/"English"，取值即目录里的 language 字段） */
+  language?: string
+}): Promise<HeygenVoice[]> {
   const data = await request<HeygenVoice[]>("GET", "/v3/voices", {
-    params: { limit: input?.limit ? String(input.limit) : "50", token: input?.token ?? "" },
+    params: {
+      limit: input?.limit ? String(input.limit) : "50",
+      token: input?.token ?? "",
+      language: input?.language ?? "",
+    },
     timeoutMs: 20_000,
   })
   return data ?? []
