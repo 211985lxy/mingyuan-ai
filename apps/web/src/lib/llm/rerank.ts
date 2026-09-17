@@ -83,7 +83,7 @@ export const MIN_RERANK_CANDIDATES = 12
  *
  * ⚠️ 这个数字**只有在文档取自命中块时才成立**。若文档仍取条目开头 512 字，
  * 就与「向量编码的是第 3 块」对不上——数字一样，地理范围却不同。
- * 所以 `buildRerankDocuments` 必须优先用 `matchedChunkText`，两者是一组，不能只改一处。
+ * 所以 `buildRerankDocuments` 必须优先用 `matchedChunkTexts`，两者是一组，不能只改一处。
  */
 export const RERANK_DOC_MAX_CHARS = 512
 
