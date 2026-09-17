@@ -26,11 +26,30 @@ MAX_BYTES = 200 * 1024 * 1024
 MAX_REDIRECTS = 5
 REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
 SECURITY_LOGGER = logging.getLogger("mingyuan.video_extractor.security")
+# 任务级日志：与安全日志分开命名，便于运维只抓"任务失败"这条线而不被 SSRF 拦截日志淹没。
+JOB_LOGGER = logging.getLogger("mingyuan.video_extractor.jobs")
 SUPPORTED_HOST_SUFFIXES = (
     "douyin.com", "iesdouyin.com", "bilibili.com", "b23.tv", "kuaishou.com",
     "xiaohongshu.com", "xhslink.com", "channels.weixin.qq.com", "weixin110.qq.com",
     "youtube.com", "youtu.be",
 )
+
+# F12：弱/占位 API Key 启动自检。
+#
+# 为什么值得查：README 的示例值就是 `change-me`，复制粘贴即可上线；而**未配置** Key 时
+# 所有请求恒 401 —— 那是 fail-closed（安全），但表现为"进程起来了、请求全挂"的静默故障，
+# 而这恰恰最容易把锅甩给上游。两种情况都该在启动时留一条明确信号。
+MIN_API_KEY_LENGTH = 16
+PLACEHOLDER_API_KEYS = frozenset({
+    "change-me", "change_me", "changeit", "changeme", "example", "example-key",
+    "fixme", "foo", "none", "null", "password", "placeholder", "secret", "test",
+    "test-key", "test_key", "testkey", "todo", "your-api-key", "your-key", "your_key",
+})
+API_KEY_PROBLEMS = {
+    "api_key_unset": "未设置 VIDEO_EXTRACTOR_API_KEY：所有请求都会返回 401（fail-closed）。",
+    "api_key_placeholder": "VIDEO_EXTRACTOR_API_KEY 仍是占位/示例值（如 change-me、test-key），必须换成强随机密钥。",
+    "api_key_weak": f"VIDEO_EXTRACTOR_API_KEY 长度不足 {MIN_API_KEY_LENGTH} 位，建议改用强随机密钥。",
+}
 
 # F9/F7：落库与回显前的敏感信息收敛。
 #
@@ -129,6 +148,18 @@ class Settings:
         self.whisper_model = get("WHISPER_MODEL", "small")
         self.whisper_device = get("WHISPER_DEVICE", "cpu")
         self.whisper_compute_type = get("WHISPER_COMPUTE_TYPE", "int8")
+        # 转写参数外提（默认值 = 改造前硬编码值，故默认行为零变更）。
+        # beam_size 越大越准越慢；vad_filter 关掉会让长静音一起进解码，质量与耗时同时变差，
+        # 但偶发"整段静音被判无人声"时它是唯一的排查开关，故给出口而非写死。
+        self.whisper_beam_size = max(1, int(get("WHISPER_BEAM_SIZE", "5")))
+        self.whisper_vad_filter = str(get("WHISPER_VAD_FILTER", "true")).lower() == "true"
+        # 模型层并发度（映射到 CTranslate2 的 inter_threads，见 whisper_model 注释）。
+        # 默认 1：多个转写在模型层排队执行。若把 EXTRACTOR_WORKERS 提到 2 而本值仍为 1，
+        # 线程池是并发的、转写却是串行的 —— 这里保持 1 是为了不替部署方决定"用内存换吞吐"。
+        self.whisper_num_workers = max(1, int(get("WHISPER_NUM_WORKERS", "1")))
+        # F12：默认只告警不阻断，避免波及仍用 test-key 的既有测试与本地环境；
+        # 生产可设 VIDEO_EXTRACTOR_STRICT_KEY=true，让自检失败直接拒绝启动。
+        self.strict_api_key = str(get("VIDEO_EXTRACTOR_STRICT_KEY", "false")).lower() == "true"
         self.douyin_cookie = get("DOUYIN_COOKIE", "")
         self.f2_douyin_enabled = str(get("F2_DOUYIN_ENABLED", "true")).lower() == "true"
         # F3 限流：每把 API Key 每分钟最多提交的任务数；<=0 表示不限制。
@@ -139,9 +170,45 @@ class Settings:
 
 DEFAULT_SETTINGS = Settings()
 
+
+def audit_api_key(settings: Settings | None = None) -> str | None:
+    """F12 启动自检：返回问题码，``None`` 表示通过。
+
+    独立成纯函数是为了让「启动期告警」与「测试断言」走同一套判定，不出现两处口径。
+    """
+    settings = settings or DEFAULT_SETTINGS
+    key = settings.api_key
+    if not key:
+        return "api_key_unset"
+    if key.strip().lower() in PLACEHOLDER_API_KEYS:
+        return "api_key_placeholder"
+    if len(key) < MIN_API_KEY_LENGTH:
+        return "api_key_weak"
+    return None
+
+
+def enforce_api_key_policy(settings: Settings | None = None):
+    """按 ``VIDEO_EXTRACTOR_STRICT_KEY`` 把自检结果落成告警或拒绝启动。
+
+    默认只写 warning：问题可见，但不打断启动（既有测试与本地环境都还在用 test-key）。
+    严格模式抛 ``RuntimeError``，让 uvicorn 启动失败把问题直接顶到运维面前，
+    而不是等业务侧发现"请求全 401"再回溯。
+    """
+    settings = settings or DEFAULT_SETTINGS
+    problem = audit_api_key(settings)
+    if problem is None:
+        return
+    detail = API_KEY_PROBLEMS[problem]
+    if settings.strict_api_key:
+        raise RuntimeError(f"{problem}: {detail}")
+    SECURITY_LOGGER.warning("config.api_key problem=%s detail=%s", problem, detail)
+
+
 DB_LOCK = threading.Lock()
 MODEL_LOCK = threading.Lock()
-WHISPER_MODEL = None  # 惰性加载（首次转写时按 settings 构建）
+# 模型缓存：(配置键, 实例)。只保留最近一套配置 —— 生产只有一套配置，故等价于单例；
+# 配置切换时替换而非堆积，避免内存无界增长。详见 whisper_model 的说明。
+_MODEL_CACHE: "tuple[tuple, object] | None" = None
 
 
 class RateLimiter:
@@ -355,18 +422,43 @@ def update_job(job_id: str, status: str, result: dict | None = None, error: str 
         )
 
 
+def _whisper_config_key(settings: Settings) -> tuple:
+    return (
+        settings.whisper_model,
+        settings.whisper_device,
+        settings.whisper_compute_type,
+        settings.whisper_num_workers,
+    )
+
+
 def whisper_model(settings: Settings | None = None):
-    global WHISPER_MODEL
+    """按配置键缓存模型实例，配置变化即重建。
+
+    原实现只在 ``WHISPER_MODEL is None`` 时构建，于是**配置被首次调用永久冻结**：
+    进程内后续针对新 settings 的调用（测试隔离、运行期改参数）都拿回旧实例，
+    而且不报错 —— 静默用错模型/设备/精度，metrics 里还会如实汇报新配置，
+    让"看板显示 cuda+float16、实际跑的是 cpu+int8"这种事无法被发现。
+
+    这里保留「同配置复用同一实例」的用法：faster-whisper 的 ``WhisperModel`` 内部无锁，
+    官方文档明确支持多线程并发调用 ``transcribe()``，并行度由构造期的 ``num_workers``
+    （CTranslate2 ``inter_threads``）决定，而非"每线程一个实例"。
+    因此**刻意不做 per-thread 实例化**：那会让内存按 worker 数成倍增长，且与官方用法相悖。
+    """
+    global _MODEL_CACHE
     settings = settings or DEFAULT_SETTINGS
+    key = _whisper_config_key(settings)
     with MODEL_LOCK:
-        if WHISPER_MODEL is None:
-            from faster_whisper import WhisperModel
-            WHISPER_MODEL = WhisperModel(
-                settings.whisper_model,
-                device=settings.whisper_device,
-                compute_type=settings.whisper_compute_type,
-            )
-    return WHISPER_MODEL
+        if _MODEL_CACHE is not None and _MODEL_CACHE[0] == key:
+            return _MODEL_CACHE[1]
+        from faster_whisper import WhisperModel
+        model = WhisperModel(
+            settings.whisper_model,
+            device=settings.whisper_device,
+            compute_type=settings.whisper_compute_type,
+            num_workers=settings.whisper_num_workers,
+        )
+        _MODEL_CACHE = (key, model)
+        return model
 
 
 async def _stream_media(url: str, target: Path, max_bytes: int, referer: str | None = None) -> int:
@@ -476,10 +568,27 @@ def download_with_ytdlp(url: str, directory: Path, max_duration: int, max_bytes:
             }
 
 
+def _mean_segment_metric(segments: list, attribute: str):
+    """段级指标的均值；同类段全无该字段时返回 ``None``。
+
+    用 None 而不是 0.0：0.0 的含义是"确有该值且为零"，与"本版本根本不提供该字段"
+    必须区分开 —— 否则一个缺失的字段会被看板读成"一切正常"。
+    """
+    values = [
+        value for value in (getattr(segment, attribute, None) for segment in segments)
+        if isinstance(value, (int, float))
+    ]
+    return round(sum(values) / len(values), 4) if values else None
+
+
 def transcribe(media_path: Path, settings: Settings | None = None):
     settings = settings or DEFAULT_SETTINGS
     model = whisper_model(settings)
-    segments, info = model.transcribe(str(media_path), vad_filter=True, beam_size=5)
+    segments, info = model.transcribe(
+        str(media_path),
+        vad_filter=settings.whisper_vad_filter,
+        beam_size=settings.whisper_beam_size,
+    )
     segments = list(segments)
     transcript = "".join(segment.text.strip() for segment in segments).strip()
     if not transcript:
@@ -495,10 +604,18 @@ def transcribe(media_path: Path, settings: Settings | None = None):
         "device": settings.whisper_device,
         "compute_type": settings.whisper_compute_type,
         "model": settings.whisper_model,
+        # 实际生效的解码参数一并留痕：排查"同一个音频两次结果不一样"时，
+        # 第一个要回答的问题就是当时用的是哪套参数。
+        "beam_size": settings.whisper_beam_size,
+        "vad_filter": settings.whisper_vad_filter,
         "duration_seconds": round(duration, 2),
         "chars_per_second": round(len(transcript) / duration, 2) if duration > 0 else 0.0,
         "avg_logprob": round(avg_logprob, 4),
         "no_speech_prob": round(no_speech_prob, 4),
+        # compression_ratio：段文本压缩比。复读/幻觉片段的取值会显著低于正常语音，
+        # 比 avg_logprob 更早暴露"模型在编词"。旧版 faster-whisper 的 Segment 无此属性，
+        # 此时记 None，不把"字段缺失"伪装成"值正常"。
+        "compression_ratio": _mean_segment_metric(segments, "compression_ratio"),
         "language": getattr(info, "language", None),
         "language_probability": round(getattr(info, "language_probability", 0.0), 4),
     }
@@ -529,11 +646,20 @@ def process_job(job_id: str, request: JobRequest, settings: Settings | None = No
             update_job(job_id, "completed", metadata, settings=settings)
     except Exception as error:
         update_job(job_id, "failed", error=str(error)[:2000], settings=settings)
+        # 失败必须留服务端痕迹：此前只有 DB 里的 error_message，服务端日志零信号 ——
+        # 失败率上升时，唯一的外部表现就是"用户说不好用"。日志与回显走同一套脱敏
+        # （异常原文常带 work_dir 路径与上游令牌 URL），并截断到 500 字符防日志刷爆。
+        JOB_LOGGER.error(
+            "job.failed job_id=%s error=%s", job_id, _scrub_secrets(str(error))[:500]
+        )
 
 
 def create_app(settings: Settings | None = None, executor: ThreadPoolExecutor | None = None, init_db: bool = True):
     settings = settings or DEFAULT_SETTINGS
     executor = executor or ThreadPoolExecutor(max_workers=settings.extractor_workers)
+    # F12：启动即自检 API Key（默认告警、严格模式拒绝启动）。放在最前面，
+    # 让"配置错了"表现为启动失败，而不是运行期一串 401。
+    enforce_api_key_policy(settings)
     app = FastAPI(title="Mingyuan Video Extractor", version="0.1.0")
     app.state.settings = settings
     app.state.executor = executor
