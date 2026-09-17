@@ -173,7 +173,11 @@ export const AGENT_ROUTES = freezeAgentRoutes({
     { name: "qianfan", model: "ernie-5.1", timeoutMs: 45000, capability: "advanced" },
     { name: "lihuo", model: "gpt-5.6", timeoutMs: 20000, capability: "advanced" },
     { name: "doubao", timeoutMs: 30000, capability: "standard" },
-    { name: "openrouter", model: "qwen/qwen3.7-plus", timeoutMs: 45000, capability: "standard" },
+    // 2026-09-17 合并取舍：本条路由曾另挂一个 openrouter 末跳（qwen/qwen3.7-plus）。
+    // 引入上面的 openrouter 首跳后两者会撞车——客户端对同一 provider 只打一次，
+    // 末跳变成永远够不到的死条目。故保留首跳（claudeOpus，高级能力，符合本组
+    // 「高质量写作」定位），删除末跳。「考试机只有 deepseek+openrouter」的兜底
+    // 诉求仍被满足：那台机器上真正有 key 的跳仍是 openrouter + deepseek 两条。
   ],
   business_diagnosis: [...QUALITY_PRIMARY_ROUTE],
 
