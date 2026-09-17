@@ -75,10 +75,11 @@ export type HypitTemplateDef = {
  * 通用卡片模板（方案 A：预置素材 + 换文案变量）。
  *
  * 三套 Canvas / Film / render:Video 共用同一张卡片与背景音，只换画布尺寸。
- * 当前是**占位模板**：没有可见文字层，因此除内部的 `{{template_dir}}` 外不声明
- * 业务变量（多余变量会被忽略）。业务模板（中汝达供暖 / 芳姐 IP）按 Hypit 的
- * 字幕/文本图元补上可见标题，并用 `{{title}}` 等变量换文案——那时要同步补
- * `hypitVariables` 的取值校验。
+ * 可见标题**烤进卡片设计图**（方案 A：素材随模板预置、只换图），不在 markup 里叠
+ * 文字层——Hypit 没有「静态叠字」图元，叠字要么走 AI 字幕（不可控、依赖模型）
+ * 要么烤进图。卡片图通过 `{{card_image}}` 变量换：业务把带标题的设计稿预置在
+ * `templates/<name>/assets/` 下，提交时传该变量即可；不传用默认占位图。
+ * 文案（中汝达供暖 / 芳姐 IP / 通用卡片）由业务侧给，与图一起预置。
  */
 const GENERIC_CARD_MARKUP = `<?svml using="@hypit/markup@1"?>
 <svml>
@@ -106,7 +107,7 @@ const GENERIC_CARD_MARKUP = `<?svml using="@hypit/markup@1"?>
   <space:Extent id="extent-169" width="1080" height="1080"/>
   <space:Extent id="extent-11"  width="1080" height="1080"/>
 
-  <asset:Image id="card-image" src="{{template_dir}}/assets/card.jpg"/>
+  <asset:Image id="card-image" src="{{card_image}}"/>
   <asset:Audio id="bed-audio" src="{{template_dir}}/assets/ranking-move.wav"/>
   <pipeline:Normalize id="bed-media" source={bed-audio}
     video="none" audio="default" span-authority="audio" clock={clock}/>
@@ -182,6 +183,10 @@ export function renderHypitTemplateByName(
   }
   const merged: Record<string, string | number | undefined | null> = {
     template_dir: `./${TEMPLATE_DIR}/${name}`,
+    // 卡片图可换：业务把带标题文字的设计稿预置在 `templates/<name>/assets/` 下，
+    // 提交时传 `card_image` 指向它即可（例如 `./templates/generic-card/assets/zhongruda.jpg`）。
+    // 不传则用默认占位图，保证链路始终可渲染。
+    card_image: `./${TEMPLATE_DIR}/${name}/assets/card.jpg`,
     ...variables,
   }
   const markup = renderHypitTemplate({ template: def.markup, variables: merged })
