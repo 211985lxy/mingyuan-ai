@@ -67,8 +67,8 @@ const AGENT_KNOWLEDGE_CATEGORIES: Record<AimAgentId, string[]> = {
  */
 const AGENT_MODEL_CHAINS: Record<AimAgentId, string[]> = {
   content_producer: ["deepseek", "apimart", "zenmux", "openrouter", "jiekou", "doubao"],
-  free_copywriter: ["qianfan", "deepseek", "doubao", "apimart", "zenmux", "jiekou"],
-  work_editor: ["zenmux", "lihuo", "qianfan", "apimart", "deepseek", "doubao"],
+  free_copywriter: ["qianfan", "openrouter", "moonshot", "deepseek", "doubao", "apimart", "zenmux", "dashscope", "gemini", "xai", "jiekou"],
+  work_editor: ["zenmux", "openrouter", "gemini", "moonshot", "apimart", "deepseek", "qianfan", "lihuo", "doubao"],
   business_diagnosis: ["apimart", "zenmux", "openrouter", "openrouter", "lihuo", "deepseek", "jiekou", "therouter", "doubao"],
   business_system_diagnosis: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "doubao"],
   content_review: ["deepseek", "apimart", "zenmux", "openrouter", "openrouter", "jiekou", "doubao"],

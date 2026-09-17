@@ -256,6 +256,75 @@ describe("POST /api/aim/generate", () => {
     expect(buildRawInputWithTrendingContext).toHaveBeenCalledWith(expect.any(String), false)
     expect(buildRawInputWithCommentInsightContext).toHaveBeenCalledWith("user-1", expect.any(String), false)
   })
+
+  it("shares one budget across context assembly and generation", async () => {
+    const { getAimExecutionDeadline, AIM_EXECUTION_DEADLINE_MS } = await import("@/lib/llm/execution-deadline")
+    let remainingAtGeneration: number | undefined
+    // 前置阶段慢下来：项目绑定等步骤要占掉同一份预算里的时间。
+    resolveBoundProject.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      return { id: "project-1", name: "测试项目", status: "active" }
+    })
+    generateAimContent.mockImplementation(async () => {
+      remainingAtGeneration = getAimExecutionDeadline()?.remainingMs()
+      return {
+        id: "gen-budget",
+        results: [{ format: "video_script", content: "口播", wordCount: 2 }],
+        knowledgeUsed: [],
+      }
+    })
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      rawInput: "写一条文案",
+      targetFormats: ["video_script"],
+      projectId: "project-1",
+    }))
+
+    expect(res.status).toBe(200)
+    expect(remainingAtGeneration).toBeDefined()
+    // 关键：前置阶段花掉的时间必须从同一份预算里扣。此前前置阶段在 deadline 之外，
+    // 生成阶段又能自建一份完整预算，两者相加最坏 175s，越过前端 120s 的放弃点。
+    expect(remainingAtGeneration).toBeLessThanOrEqual(AIM_EXECUTION_DEADLINE_MS - 50)
+    expect(remainingAtGeneration).toBeGreaterThan(0)
+  })
+
+  it("returns a stable failure code so failures are identifiable", async () => {
+    generateAimContent.mockRejectedValueOnce(new Error("Request timed out."))
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      rawInput: "写一条文案",
+      targetFormats: ["video_script"],
+      projectId: "project-1",
+    }))
+    const body = await res.json()
+
+    expect(res.status).toBe(504)
+    expect(body.code).toBe("MODEL_TIMEOUT")
+    expect(body.recoverable).toBe(true)
+    expect(body.requestId).toBeTruthy()
+  })
+
+  it("keeps opaque fallbacks uncoded so the retry button survives", async () => {
+    generateAimContent.mockRejectedValueOnce(
+      new Error("生成结果被截断或正文过短，已停止交付，请重试本次请求"),
+    )
+
+    const res = await POST(makeRequest({
+      agentId: "content_producer",
+      rawInput: "写一条文案",
+      targetFormats: ["video_script"],
+      projectId: "project-1",
+    }))
+    const body = await res.json()
+
+    // code=INTERNAL_ERROR 在前端被当作「不可重试」，会让重试按钮消失；
+    // 而这句文案本身就是「请重试本次请求」，所以这里不下发错误码。
+    expect(res.status).toBe(500)
+    expect(body.code).toBeUndefined()
+    expect(body.error).toContain("请重试本次请求")
+  })
 })
 
 describe("serializeAimGenerationRun", () => {
