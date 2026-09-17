@@ -394,7 +394,9 @@ describe("Topic Generation Prompts", () => {
     const prompt = buildTopicSystemPrompt("fresh", [], "daily")
     expect(prompt).toContain("今日推荐模式")
     expect(prompt).toContain("最近 24 小时热点")
-    expect(prompt).toContain("账号适配度、转化价值、流量潜力、素材支撑、执行难度")
+    // daily 模式不得另立评分维度名：必须与 scoreBreakdown 的五个键一致（历史冲突见 commit 2059cc7b 前后）
+    expect(prompt).toContain("评分维度就是 scoreBreakdown 的五个键")
+    expect(prompt).not.toContain("账号适配度、转化价值、流量潜力、素材支撑、执行难度")
     expect(prompt).toContain("topicType")
     expect(prompt).toContain("scoreReason")
     expect(prompt).toContain("hook（开头钩子）")
