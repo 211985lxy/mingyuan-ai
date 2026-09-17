@@ -16,6 +16,10 @@ import {
   type TopicSource,
 } from "@/lib/topic-source-builders"
 import {
+  buildTopicWebResearchQuery,
+  fetchTopicWebResearchSource,
+} from "@/lib/topic-web-research"
+import {
   deriveRecentElementSets,
   deriveRecentTitles,
   ensureTopicIpProfile,
@@ -71,32 +75,47 @@ interface TopicSourceBundle {
   benchmarkSources: TopicSource[]
   videoCopySources: TopicSource[]
   hotTopicSources: TopicSource[]
+  /** 是否搜到了联网线索（用于富信号判定与降级重试） */
+  webResearchSearched: boolean
 }
 
-/** 组装选题来源：项目基准线 → 对标账号 → 拆解文案 → 当日热点。 */
+/** 组装选题来源：项目基准线 → 对标账号 → 拆解文案 → 当日热点 → 全网线索。 */
 async function buildTopicSourceBundle(input: {
   project: ProjectRecord
   selectedKnowledge: KnowledgeRecord[]
   watchAccounts: WatchAccountRecord[]
   videoCopyExtractions: VideoCopyRecord[]
+  /** IP 档案的内容支柱主题，联网搜索词的第一优先来源 */
+  contentThemeNames?: string[]
 }): Promise<TopicSourceBundle> {
   const projectSource = buildProjectSource(input.project)
   const hotTopicSources = await getHotTopicSources()
   const benchmarkSources = buildBenchmarkAccountSources(input.watchAccounts)
   const videoCopySources = buildVideoCopyExtractionSources(input.videoCopyExtractions)
+  // 联网线索放在最后：它只用来启发选题角度，不该挤占项目全案与对标的权重
+  const webResearch = await attachWebResearchSource({
+    topicSources: [],
+    industry: input.project.industry,
+    targetCustomer: input.project.targetCustomer,
+    contentThemeNames: input.contentThemeNames,
+  })
 
   return {
     projectSource,
     benchmarkSources,
     videoCopySources,
     hotTopicSources,
-    topicSources: buildTopicSources({
-      projectSource,
-      selectedKnowledge: input.selectedKnowledge,
-      benchmarkSources,
-      videoCopySources,
-      hotTopicSources,
-    }),
+    webResearchSearched: webResearch.searched,
+    topicSources: [
+      ...buildTopicSources({
+        projectSource,
+        selectedKnowledge: input.selectedKnowledge,
+        benchmarkSources,
+        videoCopySources,
+        hotTopicSources,
+      }),
+      ...webResearch.topicSources,
+    ],
   }
 }
 
@@ -238,6 +257,29 @@ async function reviewAndPersistSelection(input: {
 }
 
 /**
+ * 选题联网线索：搜到就追加成一条来源，搜不到原样返回。
+ * 联网是可选增强（业务约定：只在选题时搜，写稿链路不接），失败绝不阻塞选题。
+ */
+async function attachWebResearchSource(input: {
+  topicSources: TopicSource[]
+  industry?: string | null
+  targetCustomer?: string | null
+  contentThemeNames?: string[]
+}): Promise<{ topicSources: TopicSource[]; searched: boolean }> {
+  const source = await fetchTopicWebResearchSource(
+    buildTopicWebResearchQuery({
+      industry: input.industry,
+      targetCustomer: input.targetCustomer,
+      contentThemeNames: input.contentThemeNames,
+    }),
+  )
+  return {
+    topicSources: source ? [...input.topicSources, source] : input.topicSources,
+    searched: Boolean(source),
+  }
+}
+
+/**
  * @description 生成一批选题并落库为 TopicSelection
  * @param input - 生成入参（用户、项目、知识条目、元素、推荐模式）
  * @returns 成功返回记录 ID 与候选卡；失败返回可供路由直接转 HTTP 的状态码与文案
@@ -255,16 +297,18 @@ export async function generateAndStoreTopicSelection(
 
   const recentElementSets = deriveRecentElementSets(recentSelections)
   const recentTitles = deriveRecentTitles(recentSelections)
+  // IP 档案先于来源组装取：内容支柱主题要作为联网搜索词的第一优先来源
+  const { ipProfileRecord, contentThemes, topicIpProfile } = await ensureTopicIpProfile({
+    userId,
+    project,
+    existing: ipProfile,
+  })
   const bundle = await buildTopicSourceBundle({
     project,
     selectedKnowledge,
     watchAccounts,
     videoCopyExtractions,
-  })
-  const { ipProfileRecord, contentThemes, topicIpProfile } = await ensureTopicIpProfile({
-    userId,
-    project,
-    existing: ipProfile,
+    contentThemeNames: contentThemes?.map((theme) => theme.name),
   })
 
   const startTime = Date.now()
@@ -285,7 +329,8 @@ export async function generateAndStoreTopicSelection(
     hasEnrichedSignals:
       bundle.benchmarkSources.length > 0
       || bundle.videoCopySources.length > 0
-      || bundle.hotTopicSources.length > 0,
+      || bundle.hotTopicSources.length > 0
+      || bundle.webResearchSearched,
     requestId: input.requestId,
   })
   console.log(`[${input.requestId}] Generation completed in ${Date.now() - startTime}ms, success=${result.success}`)
