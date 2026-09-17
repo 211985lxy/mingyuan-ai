@@ -44,13 +44,51 @@
 -- 回滚：
 --   ALTER TABLE `KnowledgeChunk` DROP INDEX `KnowledgeChunk_text_idx`;
 --   （不影响任何数据；混合检索会自动降级为纯向量，见 knowledge-retrieval.ts）
+--
+-- ⚠️ 引擎差异（2026-09-17 生产实测补，务必看完再改）：
+--   `WITH PARSER ngram` 是 **MySQL 专有**特性。生产库是 **MariaDB 10.5**，没有 ngram 插件，
+--   直接执行会报 `1128 Function 'ngram' is not defined`，**整条迁移失败**。
+--   危害不只于本功能：失败的迁移会在 `_prisma_migrations` 里留一条未完成记录，
+--   之后每次 `prisma migrate deploy` 都以 `P3009` 直接中止 —— 等于**整个仓库再也发不出去**。
+--   （2026-09-17 实测：CI 用 mysql:8.4、本地隔离库用 mysql:8.0，两边都能建 ngram 索引，
+--     所以这个问题在合并前完全看不见，只在生产暴露。）
+--
+--   MariaDB 也没有等价的 CJK 解析器：内置解析器按空白/标点切词，中文整段落成一个 token，
+--   建出来等于一个「不报错但中文召回极差」的坏索引（比不建更危险）。
+--
+--   故本迁移改为**认引擎执行**：
+--     · 有 ngram（MySQL）→ 建 ngram FULLTEXT，与原先行为完全一致；
+--     · 无 ngram（MariaDB）→ 跳过建索引。
+--
+--   跳过是安全的、且是应用侧已预期的情况：`keyword-retrieval.ts` 的 `runKeywordQuery`
+--   捕获 MySQL 1191「Can't find FULLTEXT index matching the column list」，
+--   只记一条 warn 并降级为纯向量召回（等价 P0 行为），不会把「索引没建」变成线上故障。
+--   代价：MariaDB 部署上**没有词面召回**，混合检索退化为纯向量。
+--
+--   为什么用动态 SQL 而不是把 ALTER 拆成两句：Prisma 的迁移文件没有条件语法，
+--   而 `ADD FULLTEXT INDEX` 在缺索引时才能成功；用 PREPARE 把「建」与「不建」收敛成一条
+--   可执行语句，才能保证同一个文件在两种引擎上都**成功**（迁移记录落 finished）。
 
-ALTER TABLE `KnowledgeChunk`
-  ADD FULLTEXT INDEX `KnowledgeChunk_text_idx` (`text`) WITH PARSER ngram;
+SET @ngram_available := (
+  SELECT COUNT(*)
+  FROM information_schema.PLUGINS
+  WHERE PLUGIN_NAME = 'ngram'
+    AND PLUGIN_STATUS = 'ACTIVE'
+);
+
+SET @knowledge_chunk_fts_ddl := IF(
+  @ngram_available > 0,
+  'ALTER TABLE `KnowledgeChunk` ADD FULLTEXT INDEX `KnowledgeChunk_text_idx` (`text`) WITH PARSER ngram',
+  'SELECT 1'
+);
+
+PREPARE knowledge_chunk_fts_stmt FROM @knowledge_chunk_fts_ddl;
+EXECUTE knowledge_chunk_fts_stmt;
+DEALLOCATE PREPARE knowledge_chunk_fts_stmt;
 
 -- 回填完成后让优化器拿到真实基数
 -- ANALYZE TABLE `KnowledgeChunk`;
 
--- 核实索引类型（应为 FULLTEXT）：
+-- 核实索引类型（应为 FULLTEXT；MariaDB 上应为空集，属预期）：
 -- SELECT INDEX_NAME, INDEX_TYPE FROM INFORMATION_SCHEMA.STATISTICS
 --   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'KnowledgeChunk';
