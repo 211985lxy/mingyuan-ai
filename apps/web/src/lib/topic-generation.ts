@@ -83,6 +83,7 @@ const TOPIC_SOURCE_LABELS: Record<string, string> = {
   customer_qa: "客户问答",
   client_project: "IP操作方案基准线",
   industry_hot: "行业热点",
+  web_research: "全网线索",
 }
 
 function truncateTopicSourceContent(content: string): string {
