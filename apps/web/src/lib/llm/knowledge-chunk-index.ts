@@ -35,6 +35,18 @@ const FALLBACK_CANDIDATE_LIMIT = 6000
 /** 单条目最多保留的块数，与 chunking 模块的上限保持一致 */
 const MAX_CHUNKS_PER_ENTRY = 200
 
+/**
+ * 每条目透传给下游（P2 精排）的命中块数。
+ *
+ * 取 3 的实测依据：argmax 那块的余弦常与含答案块只差 9% 量级，
+ * 单块会让精排读到「语义相邻但答非所问」的块。同一 query 下直接对比
+ * reranker 分：top3 窗口 0.0416 / 0.0353，单块 0.0048 / 0.0041（差 7–9 倍）。
+ *
+ * ⚠️ 改动此值需同步看 `rerank.ts` 的 `RERANK_DOC_WINDOW_MAX_CHARS` ——
+ * 窗口预算按 3 块推导，块数调大而预算没跟上，第 3 块起会被截断丢弃。
+ */
+const MATCHED_CHUNK_WINDOW = 3
+
 /** 批量嵌入的单批大小，避免一次请求过大 */
 const EMBED_BATCH_SIZE = 16
 
@@ -261,6 +273,38 @@ export interface ChunkRetrieveInput {
   prefilter?: KnowledgePrefilter
 }
 
+/** 一次命中：块原文 + 它与查询的余弦 */
+interface ChunkHit {
+  score: number
+  text: string
+}
+
+/** 条目级聚合：entry 的 type 由 `loadCandidateChunks` 的 select 决定 */
+type EntryFields = Omit<ScoredKnowledgeEntry, "score" | "matchedChunkTexts">
+
+interface EntryAccumulator {
+  entry: EntryFields
+  /** 该条目所有命中块里的最高余弦（条目级分数沿用此定义，不求和：长条目块多会虚高） */
+  score: number
+  /** 余弦最高的前 `MATCHED_CHUNK_WINDOW` 块，降序 */
+  hits: ChunkHit[]
+}
+
+/**
+ * 把一次命中按余弦降序插入定长列表，只保留前 `limit` 个。
+ * 定长而非全量收集：候选可达数千块，全存会让「块多但无关」的条目白占内存。
+ */
+function keepTopHits(hits: ChunkHit[], hit: ChunkHit, limit: number): void {
+  const worst = hits[hits.length - 1]
+  if (hits.length >= limit && worst && hit.score <= worst.score) return
+
+  const at = hits.findIndex((existing) => hit.score > existing.score)
+  if (at === -1) hits.push(hit)
+  else hits.splice(at, 0, hit)
+
+  if (hits.length > limit) hits.length = limit
+}
+
 /**
  * @description 按知识块做向量召回，再聚合回知识条目。
  * 同一条目命中多块时取最高分块 —— 不用求和，否则长条目会因块多而虚高。
@@ -277,17 +321,44 @@ export async function retrieveEntriesByChunks(input: ChunkRetrieveInput): Promis
   // 值类型直接是 ScoredKnowledgeEntry：loadCandidateChunks 的 select 里没有 score
   // （分数要等块级命中合并时才算），所以在这里 spread 补上，
   // 而不是给 entry 再套一层 { entry, score } 包装 —— 后者与返回类型不符。
-  const best = new Map<string, ScoredKnowledgeEntry>()
+  //
+  // 同时把**命中的若干块原文**一并带出（`matchedChunkTexts`）。这不是锦上添花：
+  // 条目可长达数千字，而这里是按 400 字块比余弦的，真正命中查询的是**某一块**。
+  // 只返回条目而丢掉块，下游（P2 精排）就只剩「条目开头」一个视角，
+  // 与向量路的判据范围不一致 —— 长尾用例被系统性压低（见 `rerank.ts` 顶部）。
+  //
+  // 为什么要**多块**而不是只留 argmax 那一块：实测 argmax 经常不是含答案的块。
+  // badcase 用例里答案在 idx=3（cos 0.5128），argmax 却是 idx=1（cos 0.5591），
+  // 两者只差 9% —— 单块方案会把「语义相邻但答非所问」的块喂给精排。
+  // 直接对比同一 query 下 reranker 的 relevance_score：top3 窗口是单块的 7–9 倍
+  // （0.0416 vs 0.0048 / 0.0353 vs 0.0041）。
+  const best = new Map<string, EntryAccumulator>()
   for (const row of rows) {
     const vector = decodeVector(row.embedding as Uint8Array, row.dimensions)
     const score = cosineSimilarity(queryVector.vector, Array.from(vector))
     if (!Number.isFinite(score)) continue
 
     const current = best.get(row.entry.id)
-    if (!current || score > current.score) best.set(row.entry.id, { ...row.entry, score })
+    if (!current) {
+      best.set(row.entry.id, {
+        entry: row.entry,
+        score,
+        hits: [{ score, text: row.text }],
+      })
+      continue
+    }
+    if (score > current.score) current.score = score
+    keepTopHits(current.hits, { score, text: row.text }, MATCHED_CHUNK_WINDOW)
   }
 
-  return [...best.values()].sort((a, b) => b.score - a.score).slice(0, topK)
+  return [...best.values()]
+    .map(({ entry, score, hits }) => ({
+      ...entry,
+      score,
+      matchedChunkTexts: hits.map((hit) => hit.text),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
 }
 
 function buildQueryText(input: ChunkRetrieveInput): string {
@@ -318,6 +389,16 @@ async function loadCandidateChunks(input: ChunkRetrieveInput) {
       },
     },
     select: {
+      // text 必须取：命中块的原文要透传给下游精排，否则 reranker 只能读条目开头
+      // （`ScoredKnowledgeEntry.matchedChunkTexts` 的由来）。块文本本就存在库里，
+      // 不额外取它不会省下任何查询，只会让下游丢掉判据。
+      //
+      // 代价与取舍：即便 P2 关闭也会多取这一列。之所以不做成
+      // 「仅当 KNOWLEDGE_RERANK_ENABLED 时才 select text」，是因为那会让
+      // **P0 的查询形状依赖 P2 的开关** —— 读路径的返回类型随另一个功能的开关变化，
+      // 是更难排查的耦合。当前语料 200 余块、单块 ~450 字，多取约 90KB，
+      // 可忽略。语料规模到「数千块」量级时应重新评估此取舍。
+      text: true,
       embedding: true,
       dimensions: true,
       entry: {

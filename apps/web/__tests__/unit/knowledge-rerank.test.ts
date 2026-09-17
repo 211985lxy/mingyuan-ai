@@ -5,6 +5,7 @@ import {
   MAX_RERANK_CANDIDATES,
   MIN_RERANK_CANDIDATES,
   RERANK_DOC_MAX_CHARS,
+  RERANK_DOC_WINDOW_MAX_CHARS,
   applyRerankOrder,
   buildRerankDocuments,
   parseRerankResponse,
@@ -79,6 +80,55 @@ describe("rerank / 文档构造", () => {
   it("全空条目给空格兜底，不与入参错位", () => {
     const docs = buildRerankDocuments([{ title: null, content: null }, {}])
     expect(docs).toEqual([" ", " "])
+  })
+
+  // ─── 判据的地理范围（P2 盲区修复的契约）────────────────────────────────
+  // 这组是本次修复的核心断言：精排必须读「命中的块」而不是「条目的开头」。
+  // 少了它们，改动一旦被回退，测试仍然全绿，长尾会无声退化。
+
+  it("有 matchedChunkTexts 时优先用它，而不是条目开头", () => {
+    const longContent = `${"开篇导语。".repeat(200)}${"答案在中段。"}${"尾段。".repeat(200)}`
+    const [doc] = buildRerankDocuments([
+      { title: "5000字案例", content: longContent, matchedChunkTexts: ["答案在中段。"] },
+    ])
+    expect(doc).toBe("5000字案例\n答案在中段。")
+    expect(doc).not.toContain("开篇导语")
+  })
+
+  // 为什么必须拼多块：argmax 常不是含答案的块。实测 badcase 用例答案在 idx=3，
+  // argmax 是 idx=1，cos 仅差 9%；同一 query 下 reranker 分差 8.7 倍。
+  it("多块按余弦顺序拼接，且不被单块预算截断", () => {
+    const window = ["第一块。".repeat(70), "第二块。".repeat(70), "含答案的第三块。"]
+    const [doc] = buildRerankDocuments([
+      { title: "T", content: "条目开头", matchedChunkTexts: window },
+    ])
+    expect(doc.startsWith("T\n第一块。")).toBe(true)
+    expect(doc).toContain("含答案的第三块。")
+    expect(doc).not.toContain("条目开头")
+    expect(doc.length).toBeLessThanOrEqual(RERANK_DOC_WINDOW_MAX_CHARS)
+  })
+
+  it("窗口预算足以容纳 3 个块（改块数忘了改预算就会在这里红）", () => {
+    // 每块 480 字（块预算上限）+ 标题，3 块应完整放下、**不发生截断**
+    const chunk = "块".repeat(480)
+    const [doc] = buildRerankDocuments([{ title: "T", matchedChunkTexts: [chunk, chunk, chunk] }])
+    expect(doc).toBe(`T\n${chunk}\n${chunk}\n${chunk}`)
+    expect(doc.length).toBeGreaterThanOrEqual(3 * 480)
+    expect(doc.length).toBeLessThanOrEqual(RERANK_DOC_WINDOW_MAX_CHARS)
+  })
+
+  it("matchedChunkTexts 缺失或全为空时回退到 content，且仍守单块预算", () => {
+    const fallback = "条目开头"
+    expect(buildRerankDocuments([{ title: "T", content: fallback }])[0]).toBe(`T\n${fallback}`)
+    // 空数组 / 空串 / null 元素都算缺失：绝不能退化成一只有标题的文档
+    for (const empty of [[], [""], [null], ["   "], null]) {
+      expect(buildRerankDocuments([{ title: "T", content: fallback, matchedChunkTexts: empty }])[0]).toBe(
+        `T\n${fallback}`,
+      )
+    }
+    // 回退路径守 512：条目级向量只编码了前 ~500 字，放宽会引入未编码文本
+    const long = buildRerankDocuments([{ title: "T", content: "甲".repeat(2000) }])[0]
+    expect(long.length).toBe(RERANK_DOC_MAX_CHARS)
   })
 })
 

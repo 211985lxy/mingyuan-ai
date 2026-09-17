@@ -271,6 +271,11 @@ export interface ScoredKnowledgeEntry {
   tags: unknown
   valueGrade: string | null
   score: number
+  /**
+   * 块级召回命中的若干块原文，按余弦降序（关键词路 / 旧条目级路径不填，下游回退 `content`）。
+   * 取多块而非 argmax 单块，理由见 `rerank.ts` 顶部「判据的地理范围」。
+   */
+  matchedChunkTexts?: string[]
 }
 
 /**

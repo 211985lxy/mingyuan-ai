@@ -65,9 +65,20 @@ export function isRerankEnabled(): boolean {
  * @param input - query / candidates / topK
  * @returns 重排后的条目；不适用或失败时 `null`
  */
-export async function rerankEntries<T extends { id: string; title: string; content: string; score: number }>(
-  input: RerankEntriesInput<T>,
-): Promise<T[] | null> {
+export async function rerankEntries<
+  T extends {
+    id: string
+    title: string
+    content: string
+    score: number
+    /**
+     * 命中块原文，按余弦降序（块级召回才有）。写进约束里是有意的：
+     * 若只写在上游接口、不写在这里，TS 会按约束把该字段"忘掉"，
+     * 将来有人把参数拆成局部对象时就会静默丢掉它，盲区无声回归。
+     */
+    matchedChunkTexts?: ReadonlyArray<string | null> | null
+  },
+>(input: RerankEntriesInput<T>): Promise<T[] | null> {
   const topK = Math.max(1, Math.floor(input.topK))
   if (!isRerankEnabled()) return null
   if (!input.query.trim()) return null
