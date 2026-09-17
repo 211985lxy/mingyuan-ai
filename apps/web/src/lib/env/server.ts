@@ -305,14 +305,14 @@ export const serverSchema = {
     TIKHUB_API_KEY: z.string().optional(),
     TIKHUB_BASE_URL: z.string().optional(),
     TOPIC_GENERATION_MODEL: z.string().optional(),
-    /** 选题联网线索（Tavily）；未配置则选题不联网，不降级到不可靠的免费搜索表面 */
-    TOPIC_WEB_SEARCH_API_KEY: z.string().optional(),
     UNLIMITED_BETA_EMAILS: z.string().optional(),
     UNLIMITED_BETA_USER_IDS: z.string().optional(),
-    VIDEO_TEXT_EXTRACT_API_KEY: z.string().optional(),
     VIDEO_EXTRACT_FALLBACK_API_KEY: z.string().optional(),
     VIDEO_EXTRACT_FALLBACK_ENABLED: z.string().optional(),
     VIDEO_EXTRACT_FALLBACK_URL: z.string().optional(),
+    VIDEO_TEXT_EXTRACT_API_KEY: z.string().optional(),
+    /** 共享搜索层（Tavily）；未配置则选题不联网、热点证据退回既有实现 */
+    WEB_SEARCH_API_KEY: z.string().optional(),
     WECOM_INSPIRATION_ENABLED: z.string().optional(),
     WECOM_CALLBACK_TOKEN: z.string().optional(),
     WECOM_ENCODING_AES_KEY: z.string().optional(),
