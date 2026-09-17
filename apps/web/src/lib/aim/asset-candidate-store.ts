@@ -21,6 +21,7 @@ import {
   WIKI_PATCH_KIND,
 } from "@/lib/aim/wiki-patch-mapper"
 import { applyWikiPatchCandidate } from "@/lib/aim/wiki-patch-apply"
+import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import type { MeetingInsight } from "@/lib/aim/meeting-insight"
 import { MEETING_INSIGHT_TASK_SPEC_KIND } from "@/lib/aim/meeting-insight-result-sink"
 
@@ -299,7 +300,7 @@ async function promoteKnowledgeEntry(input: {
   crossProjectAllowed: boolean
 }) {
   const isCustomerOutcomeCase = Boolean(input.record.customerOutcomeProjectionId)
-  return input.store.knowledgeEntry.create({
+  const entry = await input.store.knowledgeEntry.create({
     data: {
       userId: input.userId,
       projectId: input.crossProjectAllowed ? null : input.record.projectId,
@@ -314,6 +315,9 @@ async function promoteKnowledgeEntry(input: {
       sourceType: isCustomerOutcomeCase ? "customer_outcome" : "meeting_insight",
     },
   })
+  // 正式知识必须触发向量化：漏掉不会报错，只表现为「这条知识 AI 检索不到」。
+  ensureKnowledgeEmbedding(entry.id).catch(() => {})
+  return entry
 }
 
 async function rejectAssetCandidate(
