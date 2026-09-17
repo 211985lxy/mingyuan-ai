@@ -97,4 +97,44 @@ describe("topic scoring", () => {
     expect(cards[0].title.length).toBeLessThanOrEqual(20)
     expect(cards.every((card) => card.elementCodes.length > 0)).toBe(true)
   })
+
+  // 回归：2026-09-17 早报 4 张卡因 creativeTrace 字段超长（每卡 1 个 160 上限错误）
+  // 连续 3 轮校验失败整批降级为无评分模板卡。normalize 必须把超长字段截到位。
+  it("clips overlong creativeTrace fields instead of failing the whole batch", () => {
+    const cards = coerceTopicCards([
+      {
+        title: "命理依据写太长的选题",
+        elementCodes: ["trust"],
+        openingTypeCode: "curiosity_open",
+        structureCode: "suspense_reveal",
+        creativeTrace: {
+          stylePositioning: "专".repeat(200), // schema max 120
+          logicSteps: ["推".repeat(300), "逻辑步骤二", "逻辑步骤三"], // 每条 max 160
+          sources: [
+            { kind: "benchmark", source: "对标".repeat(200), usage: "用".repeat(300) }, // source max 160 / usage max 200
+            { kind: "product", source: "产品来源", usage: "正常用法" },
+            { kind: "persona", source: "人设来源", usage: "正常用法" },
+          ],
+          destinyAlignment: {
+            baziBasis: "八".repeat(300), // max 160
+            ziweiBasis: "紫".repeat(300), // max 160
+            styleMapping: "风".repeat(400), // max 240
+          },
+        },
+      },
+      { title: "第二个选题" },
+      { title: "第三个选题" },
+      { title: "第四个选题" },
+    ], ["trust"])
+
+    const normalized = normalizeTopicCards(cards, { recommendationMode: "daily" })
+    const result = TopicCardSchema.safeParse(normalized[0])
+    if (!result.success) {
+      console.error(result.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`))
+    }
+    expect(result.success).toBe(true)
+    expect(normalized[0]?.creativeTrace?.stylePositioning.length).toBeLessThanOrEqual(120)
+    expect(normalized[0]?.creativeTrace?.logicSteps.every((s) => s.length <= 160)).toBe(true)
+    expect(normalized[0]?.creativeTrace?.destinyAlignment.baziBasis.length).toBeLessThanOrEqual(160)
+  })
 })
