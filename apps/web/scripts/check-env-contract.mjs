@@ -1,10 +1,26 @@
-import { readFileSync, readdirSync, statSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
-const ENV_PATH = join(WEB_ROOT, "src", "env.ts")
+// env 声明已按域拆到 src/lib/env/*.ts，src/env.ts 只剩聚合与 escape hatch。
+// 声明面必须整体扫描：只读 src/env.ts 会得到空 declared，进而把全量读取误报为缺失。
+const ENV_DIR = join(WEB_ROOT, "src", "lib", "env")
+const ENV_ENTRY = join(WEB_ROOT, "src", "env.ts")
 const ENV_ACCESS = /process\.env(?:\.([A-Z][A-Z0-9_]*)|\[["']([A-Z][A-Z0-9_]*)["']\])/g
+
+/** 声明文件集：聚合入口 + src/lib/env 下全部 .ts（动态枚举，新增域模块自动纳入）。 */
+function listEnvDeclarationFiles() {
+  const paths = [ENV_ENTRY]
+  if (existsSync(ENV_DIR)) {
+    for (const entry of readdirSync(ENV_DIR)) {
+      if (/\.ts$/.test(entry)) paths.push(join(ENV_DIR, entry))
+    }
+  }
+  return paths
+}
+
+const ENV_DECLARATION_FILES = listEnvDeclarationFiles()
 
 function listFiles(directory, files = []) {
   for (const entry of readdirSync(directory)) {
@@ -26,7 +42,7 @@ function readEnvironmentNames(path) {
 function findEnvironmentReads(paths) {
   const reads = new Set()
   for (const path of paths) {
-    if (path === ENV_PATH) continue
+    if (ENV_DECLARATION_FILES.includes(path)) continue
     const source = readFileSync(path, "utf8")
     for (const match of source.matchAll(ENV_ACCESS)) reads.add(match[1] || match[2])
   }
@@ -39,13 +55,18 @@ const sourceFiles = [
   join(WEB_ROOT, "prisma.config.ts"),
   join(WEB_ROOT, "create-codes.ts"),
 ]
-const declared = readEnvironmentNames(ENV_PATH)
+const declared = new Set()
+for (const path of ENV_DECLARATION_FILES) {
+  for (const name of readEnvironmentNames(path)) declared.add(name)
+}
 const missing = [...findEnvironmentReads(sourceFiles)].filter((name) => !declared.has(name)).sort()
 
 if (missing.length > 0) {
-  console.error("Environment contract failed. Add these variables to src/env.ts:")
+  console.error("Environment contract failed. Add these variables to src/lib/env/ (or src/env.ts):")
   for (const name of missing) console.error(`  - ${name}`)
   process.exit(1)
 }
 
-console.log(`environment-contract-ok variables=${declared.size}`)
+console.log(
+  `environment-contract-ok variables=${declared.size} declarations=${ENV_DECLARATION_FILES.length}`,
+)
