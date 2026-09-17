@@ -1,0 +1,1034 @@
+### HEAD: b5d5dcabf7944a050008413b576034d5218ddfae
+### 开始: 2026-09-17T05:29:56Z
+
+===== GATE: typecheck =====
+----- typecheck EXIT=0 (5s) -----
+
+===== GATE: typecheck:tests =====
+----- typecheck:tests EXIT=0 (19s) -----
+
+===== GATE: test:harness =====
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/Users/xiangyu/Desktop/AIM-worktrees/p0-gates/apps/web[39m
+
+[90mstdout[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mfalls back when a provider returns a balance or quota 403
+[22m[39m[llm-circuit] {
+  provider: [32m'exhausted-provider'[39m,
+  model: [32m'expensive-model'[39m,
+  scope: [32m'global'[39m,
+  kind: [32m'balance'[39m,
+  consecutiveFailures: [33m1[39m,
+  openedUntil: [33m1789623921473[39m
+}
+
+[90mstderr[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mfalls back when a provider returns a balance or quota 403
+[22m[39m[llm] Provider "exhausted-provider" failed (rate_limit), trying next: 403 预扣费额度失败，用户剩余额度：$0.086392，需要预扣费额度：$0.203380
+
+[90mstdout[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mcaps the provider fallback chain
+[22m[39m[llm-circuit] {
+  provider: [32m'provider-1'[39m,
+  model: [32m'provider-1-model'[39m,
+  scope: [32m'global'[39m,
+  kind: [32m'network'[39m,
+  consecutiveFailures: [33m1[39m,
+  openedUntil: [1mnull[22m
+}
+
+[90mstderr[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mcaps the provider fallback chain
+[22m[39m[llm] Provider "provider-1" failed (network), trying next: ECONNRESET
+
+[90mstdout[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mcaps the provider fallback chain
+[22m[39m[llm-circuit] {
+  provider: [32m'provider-2'[39m,
+  model: [32m'provider-2-model'[39m,
+  scope: [32m'global'[39m,
+  kind: [32m'network'[39m,
+  consecutiveFailures: [33m1[39m,
+  openedUntil: [1mnull[22m
+}
+
+[90mstderr[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mcaps the provider fallback chain
+[22m[39m[llm] Provider "provider-2" failed (network), trying next: ECONNRESET
+
+[90mstdout[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mmaxProviderAttempts=1 时临时失败也不尝试第二个 provider
+[22m[39m[llm-circuit] {
+  provider: [32m'provider-1'[39m,
+  model: [32m'model-1'[39m,
+  scope: [32m'global'[39m,
+  kind: [32m'server'[39m,
+  consecutiveFailures: [33m1[39m,
+  openedUntil: [1mnull[22m
+}
+
+[90mstderr[2m | __tests__/unit/aim-harness-core.test.ts[2m > [22m[2maim-harness fallback policy[2m > [22m[2mmaxProviderAttempts=1 时临时失败也不尝试第二个 provider
+[22m[39m[llm] Provider "provider-1" failed (server), trying next: status 503
+
+ [32m✓[39m __tests__/unit/aim-harness-core.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 879[2mms[22m[39m
+     [33m[2m✓[22m[39m falls back when a provider returns a balance or quota 403 [33m 403[2mms[22m[39m
+     [33m[2m✓[22m[39m maxProviderAttempts=1 时临时失败也不尝试第二个 provider [33m 402[2mms[22m[39m
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 2/8，下一次先换第 2 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 3/8，下一次先换第 3 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 4/8，下一次先换第 4 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 5/8，下一次先换第 5 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 6/8，下一次先换第 6 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mrotates the provider offset on each empty-body retry so the next attempt starts on another line
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 7/8，下一次先换第 7 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case once when the provider returns an empty-body error
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case twice when the provider keeps returning an empty body
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case twice when the provider keeps returning an empty body
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 2/8，下一次先换第 2 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the fifth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the fifth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 2/8，下一次先换第 2 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the fifth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 3/8，下一次先换第 3 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the fifth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 4/8，下一次先换第 4 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 2/8，下一次先换第 2 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 3/8，下一次先换第 3 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 4/8，下一次先换第 4 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 5/8，下一次先换第 5 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 6/8，下一次先换第 6 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case through the eighth attempt when empty bodies keep coming
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 7/8，下一次先换第 7 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a spoken draft that stops mid-sentence instead of scoring the stump
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 2/8，下一次先换第 2 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 3/8，下一次先换第 3 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 4/8，下一次先换第 4 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 5/8，下一次先换第 5 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 6/8，下一次先换第 6 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mstill scores a spoken draft if every retry stays truncated
+[22m[39m[aim-eval] cp_imitate_07 空稿重试 7/8，下一次先换第 7 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case once when delivery is rejected as unfinished
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+[90mstderr[2m | __tests__/eval/eval-runner.test.ts[2m > [22m[2maim-harness eval runner (frozen, deterministic)[2m > [22m[2mretries a real-model case once when generation throws the generic retry message
+[22m[39m[aim-eval] cp_new_video_01 空稿重试 1/8，下一次先换第 1 条线路
+
+ [32m✓[39m __tests__/eval/eval-runner.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m __tests__/eval/harness.fixtures.test.ts [2m([22m[2m103 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m __tests__/unit/aim-admin-runs-route.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | __tests__/eval/eval-rubric.test.ts[2m > [22m[2meval rubric judge[2m > [22m[2mretries after invalid JSON then accepts a later score
+[22m[39m[aim-eval] cp_learnings_hallucination_26 评分官第 1/5 次没交卷：Unexpected token '不', "不是json" is not valid JSON
+
+[90mstderr[2m | __tests__/eval/eval-rubric.test.ts[2m > [22m[2meval rubric judge[2m > [22m[2mgives up with a null score after every judge attempt fails
+[22m[39m[aim-eval] cp_learnings_hallucination_26 评分官第 1/5 次没交卷：empty response
+
+[90mstderr[2m | __tests__/eval/eval-rubric.test.ts[2m > [22m[2meval rubric judge[2m > [22m[2mgives up with a null score after every judge attempt fails
+[22m[39m[aim-eval] cp_learnings_hallucination_26 评分官第 2/5 次没交卷：empty response
+
+[90mstderr[2m | __tests__/eval/eval-rubric.test.ts[2m > [22m[2meval rubric judge[2m > [22m[2mgives up with a null score after every judge attempt fails
+[22m[39m[aim-eval] cp_learnings_hallucination_26 评分官第 3/5 次没交卷：empty response
+
+[90mstderr[2m | __tests__/eval/eval-rubric.test.ts[2m > [22m[2meval rubric judge[2m > [22m[2mgives up with a null score after every judge attempt fails
+[22m[39m[aim-eval] cp_learnings_hallucination_26 评分官第 4/5 次没交卷：empty response
+
+[90mstderr[2m | __tests__/eval/eval-rubric.test.ts[2m > [22m[2meval rubric judge[2m > [22m[2mgives up with a null score after every judge attempt fails
+[22m[39m[aim-eval] cp_learnings_hallucination_26 评分官第 5/5 次没交卷：empty response
+[aim-eval] cp_learnings_hallucination_26 评分官连续 5 次没交卷：empty response
+
+ [32m✓[39m __tests__/eval/eval-rubric.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m __tests__/eval/daily-sample-regressions.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m178 passed[39m[22m[90m (178)[39m
+[2m   Start at [22m 13:30:20
+[2m   Duration [22m 4.42s[2m (transform 759ms, setup 29ms, import 2.79s, tests 943ms, environment 0ms)[22m
+
+----- test:harness EXIT=0 (5s) -----
+
+===== GATE: arch:check =====
+
+✅ AIM 架构护栏全部通过，无待收紧项。
+----- arch:check EXIT=0 (0s) -----
+
+===== GATE: arch:domains =====
+domain-boundaries-ok pages=68 routeLimit=250 legacyRoutes=6
+----- arch:domains EXIT=0 (0s) -----
+
+===== GATE: arch:size =====
+architecture-size-ok fileLimit=500 prismaFileLimit=undefined legacyFiles=7 warnings=functions>80:229 baseline=229
+----- arch:size EXIT=0 (2s) -----
+
+===== GATE: db:bounds =====
+prisma-query-bounds-ok
+----- db:bounds EXIT=0 (2s) -----
+
+===== GATE: api:contracts =====
+api-contracts-ok routes=317
+----- api:contracts EXIT=0 (0s) -----
+
+===== GATE: env:check =====
+environment-contract-ok variables=316 declarations=4
+----- env:check EXIT=0 (0s) -----
+
+===== GATE: build =====
+▲ Next.js 16.3.4 (Turbopack)
+✓ Running next.config.ts took 645ms
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 100s
+  Running TypeScript ...
+  Finished TypeScript in 18.3s ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/198) ...
+  Generating static pages using 9 workers (49/198) 
+  Generating static pages using 9 workers (98/198) 
+  Generating static pages using 9 workers (148/198) 
+✓ Generating static pages using 9 workers (198/198) in 249ms
+Turbopack build encountered 13 warnings:
+./apps/web/src/lib/aim-harness/skill-loader.ts:117:22
+Warning: The file pattern ('/ROOT/' <dynamic> | '/ROOT/apps/' <dynamic> | '/ROOT/apps/web/' <dynamic> | <dynamic> '/' <dynamic> | '/ROOT' <dynamic> | '/ROOT/apps' <dynamic> | '/ROOT/apps/web' <dynamic> | <dynamic>) matches 12150 files in [project]/apps/web
+  [90m115 |[0m     [36mfor[0m ([36mconst[0m root [36mof[0m repoRootCandidates()) {
+  [90m116 |[0m       [36mtry[0m {
+[33m[1m>[0m [90m117 |[0m         [36mconst[0m full = path.join(root, skill.relativePath)
+  [90m    |[0m                      [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m118 |[0m         content = [36mawait[0m readFile(full, [32m"utf8"[0m)
+  [90m119 |[0m         [36mbreak[0m
+  [90m120 |[0m       } [36mcatch[0m {
+
+Overly broad patterns can lead to build performance issues and over bundling.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/aim-harness/context-assembly.ts
+    ./apps/web/src/lib/aim-harness/runtime.ts
+    ./apps/web/src/app/api/inspiration/[id]/generate/route.ts
+
+
+./apps/web/src/lib/account-industry-sources.ts:159:31
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m157 |[0m ...[36mnst[0m file [36mof[0m candidates) {
+  [90m158 |[0m ...
+[33m[1m>[0m [90m159 |[0m ...[36murn[0m [33mJSON[0m.parse([36mawait[0m fs.readFile(file, [32m"utf8"[0m)) [36mas[0m { items?: [33mRadar...[0m
+  [90m    |[0m                         [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m160 |[0m ...[36mch[0m {
+  [90m161 |[0m ...[90mponytail: standalone runs from repo root, dev runs from apps/web.[0m
+  [90m162 |[0m ...
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/account-industry-sources.ts
+    ./apps/web/src/app/api/admin/hot-sources/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/account-industry-sources.ts
+    ./apps/web/src/lib/avatar-voice-assets.ts
+    ./apps/web/src/app/api/webhook/chanjing/route.ts
+
+
+./apps/web/src/lib/aim-harness/skill-loader.ts:118:25
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m116 |[0m       [36mtry[0m {
+  [90m117 |[0m         [36mconst[0m full = path.join(root, skill.relativePath)
+[33m[1m>[0m [90m118 |[0m         content = [36mawait[0m readFile(full, [32m"utf8"[0m)
+  [90m    |[0m                         [33m[1m^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m119 |[0m         [36mbreak[0m
+  [90m120 |[0m       } [36mcatch[0m {
+  [90m121 |[0m         [90m// try next root[0m
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/aim-harness/context-assembly.ts
+    ./apps/web/src/lib/aim-harness/runtime.ts
+    ./apps/web/src/app/api/inspiration/[id]/generate/route.ts
+
+
+./apps/web/src/lib/aim-harness/skill-loader.ts:117:22
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m115 |[0m     [36mfor[0m ([36mconst[0m root [36mof[0m repoRootCandidates()) {
+  [90m116 |[0m       [36mtry[0m {
+[33m[1m>[0m [90m117 |[0m         [36mconst[0m full = path.join(root, skill.relativePath)
+  [90m    |[0m                      [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m118 |[0m         content = [36mawait[0m readFile(full, [32m"utf8"[0m)
+  [90m119 |[0m         [36mbreak[0m
+  [90m120 |[0m       } [36mcatch[0m {
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: path.join(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/aim-harness/context-assembly.ts
+    ./apps/web/src/lib/aim-harness/runtime.ts
+    ./apps/web/src/app/api/inspiration/[id]/generate/route.ts
+
+
+./apps/web/src/lib/aim-harness/skill-loader.ts:60:5
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m58 |[0m   [36mreturn[0m [
+  [90m59 |[0m     path.resolve(process.cwd(), [32m"../.."[0m),
+[33m[1m>[0m [90m60 |[0m     path.resolve(process.cwd(), [32m".."[0m),
+  [90m   |[0m     [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m61 |[0m     process.cwd(),
+  [90m62 |[0m   ]
+  [90m63 |[0m }
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: path.resolve(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim-harness/skill-loader.ts
+    ./apps/web/src/lib/aim-harness/context-assembly.ts
+    ./apps/web/src/lib/aim-harness/runtime.ts
+    ./apps/web/src/app/api/inspiration/[id]/generate/route.ts
+
+
+./apps/web/src/lib/aim/scanned-pdf-ocr.ts:76:27
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m74 |[0m     [36mconst[0m images: string[] = []
+  [90m75 |[0m     [36mfor[0m ([36mconst[0m page [36mof[0m pages) {
+[33m[1m>[0m [90m76 |[0m       [36mconst[0m bytes = [36mawait[0m readFile(path.join(dir, page))
+  [90m   |[0m                           [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m77 |[0m       images.push([32m`data:image/png;base64,[0m${bytes.toString([32m"base64"[0m)[32m}`[0m)
+  [90m78 |[0m     }
+  [90m79 |[0m     [36mreturn[0m images
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim/scanned-pdf-ocr.ts
+    ./apps/web/src/app/api/aim/attachment-parse/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim/scanned-pdf-ocr.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+./apps/web/src/lib/aim/scanned-pdf-ocr.ts:73:26
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m71 |[0m       )
+  [90m72 |[0m     })
+[33m[1m>[0m [90m73 |[0m     [36mconst[0m pages = ([36mawait[0m readdir(dir)).filter((name) => name.startsWit..[32m.[0m
+  [90m   |[0m                          [33m[1m^^^^^^^^^^^^[0m
+  [90m74 |[0m     [36mconst[0m images: string[] = []
+  [90m75 |[0m     [36mfor[0m ([36mconst[0m page [36mof[0m pages) {
+  [90m76 |[0m       [36mconst[0m bytes = [36mawait[0m readFile(path.join(dir, page))
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readdir(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim/scanned-pdf-ocr.ts
+    ./apps/web/src/app/api/aim/attachment-parse/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim/scanned-pdf-ocr.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+./apps/web/src/lib/aim/scanned-pdf-ocr.ts:76:36
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m74 |[0m     [36mconst[0m images: string[] = []
+  [90m75 |[0m     [36mfor[0m ([36mconst[0m page [36mof[0m pages) {
+[33m[1m>[0m [90m76 |[0m       [36mconst[0m bytes = [36mawait[0m readFile(path.join(dir, page))
+  [90m   |[0m                                    [33m[1m^^^^^^^^^^^^^^^^^^^^[0m
+  [90m77 |[0m       images.push([32m`data:image/png;base64,[0m${bytes.toString([32m"base64"[0m)[32m}`[0m)
+  [90m78 |[0m     }
+  [90m79 |[0m     [36mreturn[0m images
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: path.join(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/aim/scanned-pdf-ocr.ts
+    ./apps/web/src/app/api/aim/attachment-parse/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/aim/scanned-pdf-ocr.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+./apps/web/src/lib/competitor-analysis/local-crawler.ts:118:23
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m116 |[0m     [36mlet[0m settled = [36mfalse[0m
+  [90m117 |[0m     [36mlet[0m killTimer: [33mNodeJS[0m.[33mTimeout[0m | [36mnull[0m = [36mnull[0m
+[33m[1m>[0m [90m118 |[0m     [36mconst[0m pyProcess = spawn(cmd, args, {
+  [90m    |[0m                       [33m[1m^^^^^^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m119 |[0m       cwd: sauDir,
+  [90m    |[0m [33m[1m^^^^^^^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m120 |[0m       env: {
+  [90m    |[0m [33m[1m^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m121 |[0m         ...getProcessEnvironment(),
+  [90m    |[0m [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m122 |[0m         [33mPYTHONIOENCODING[0m: [32m'utf-8'[0m,
+  [90m    |[0m [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m123 |[0m         [90m// 针对 Playwright 在特定国内网络下无法下载的阿里镜像源设置[0m
+  [90m    |[0m [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m124 |[0m         [33mPLAYWRIGHT_DOWNLOAD_HOST[0m: [32m'https://npmmirror.com/mirrors/play...[0m
+  [90m    |[0m [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[33m[1m>[0m [90m125 |[0m       }
+  [90m    |[0m [33m[1m^^^^^^^[0m
+[33m[1m>[0m [90m126 |[0m     })
+  [90m    |[0m [33m[1m^^^^^^[0m
+  [90m127 |[0m
+  [90m128 |[0m     [36mconst[0m timeoutMs = [33mNumber[0m(env.[33mLOCAL_CRAWLER_TIMEOUT_MS[0m || [35m30000[0m)
+  [90m129 |[0m     [36mconst[0m timeoutTimer = setTimeout(() => {
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: child_process.spawn(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/competitor-analysis/local-crawler.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/competitor-analysis/local-crawler.ts
+    ./apps/web/src/lib/tikhub/adapters/douyin.ts
+    ./apps/web/src/app/api/integrations/douyin/accounts/[id]/profile-url/route.ts
+
+
+./apps/web/src/lib/document-parser.ts:109:9
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m107 |[0m   ]
+  [90m108 |[0m   [36mfor[0m ([36mconst[0m candidate [36mof[0m compiledCandidates) {
+[33m[1m>[0m [90m109 |[0m     [36mif[0m (existsSync(candidate)) [36mreturn[0m candidate
+  [90m    |[0m         [33m[1m^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m110 |[0m   }
+  [90m111 |[0m   [90m// 开发/测试环境：tsx 直跑 ts 源码[0m
+  [90m112 |[0m   [36mreturn[0m path.join(here, [32m"document-parser-worker.ts"[0m)
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.existsSync(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/document-parser.ts
+    ./apps/web/src/app/api/knowledge/upload/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/document-parser.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+./apps/web/src/lib/knowledge-multipart.ts:255:24
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m253 |[0m
+  [90m254 |[0m       [36mconst[0m safeName = [32m`f[0m${index[32m}[0m${ext[32m}`[0m
+[33m[1m>[0m [90m255 |[0m       [36mconst[0m tempPath = path.join(root, safeName)
+  [90m    |[0m                        [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m256 |[0m       [36mawait[0m writeFile(tempPath, buffer)
+  [90m257 |[0m       files.push({
+  [90m258 |[0m         fieldName,
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: path.join(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/knowledge-multipart.ts
+    ./apps/web/src/app/api/knowledge/upload/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/knowledge-multipart.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+./apps/web/src/lib/market-insights/last30days.ts:54:21
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m52 |[0m
+  [90m53 |[0m   [90m// 2. 验证 Skill 目录[0m
+[33m[1m>[0m [90m54 |[0m   [36mif[0m (!skillDir || !fs.existsSync(skillDir)) {
+  [90m   |[0m                     [33m[1m^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m55 |[0m     logger.error([32m`last30days-cn skill directory not found: [0m${skillDir[32m}`[0m)
+  [90m56 |[0m     [36mthrow[0m [36mnew[0m [33mError[0m([32m"近30天市场讨论脚本路径未配置或不存在"[0m)
+  [90m57 |[0m   }
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.existsSync(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import trace:
+  App Route:
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+./apps/web/src/lib/obsidian-export.ts:156:25
+Warning: Dynamic filesystem access causes tracing of the whole project
+  [90m154 |[0m     [36mtry[0m {
+  [90m155 |[0m       [36mawait[0m access(candidate)
+[33m[1m>[0m [90m156 |[0m       [36mconst[0m raw = [36mawait[0m readFile(candidate, [32m"utf-8"[0m)
+  [90m    |[0m                         [33m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m157 |[0m       [36mreturn[0m [33mJSON[0m.parse(raw) [36mas[0m [33mObsidianConfig[0m
+  [90m158 |[0m     } [36mcatch[0m {
+  [90m159 |[0m       [90m// try next[0m
+
+Static analysis determined that this filesystem access causes the whole project to be traced and included in the output.
+This is usually unintentional and leads to all source files (including the public folder) to be deployed as part of the server code.
+This can slow down deployments or lead to failures when size limits are exceeded.
+To resolve this, you can
+- make sure the path is statically scoped to some subfolder, for example path.join(process.cwd(), 'data', bar), or
+- only use them in development, or
+- opt out by adding an ignore comment to the highlighted call: fs.readFile(/*turbopackIgnore: true*/ ...), or
+- remove them.
+
+Import traces:
+  #1 [App Route]:
+    ./apps/web/src/lib/obsidian-export.ts
+    ./apps/web/src/app/api/knowledge/obsidian-status/route.ts
+
+  #2 [App Route]:
+    ./apps/web/src/lib/obsidian-export.ts
+    ./apps/web/src/lib/market-insights/last30days.ts
+    ./apps/web/src/app/api/market-insights/last30days/route.ts
+
+
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /about
+├ ƒ /account
+├ ƒ /account/data-ownership
+├ ƒ /activate
+├ ƒ /admin
+├ ƒ /admin/account-project-bindings
+├ ƒ /admin/activation-codes
+├ ƒ /admin/agents
+├ ƒ /admin/alerts
+├ ƒ /admin/audit-center
+├ ƒ /admin/automation-ledger
+├ ƒ /admin/benchmark-profiles
+├ ƒ /admin/benchmark-profiles/[id]
+├ ƒ /admin/governance
+├ ƒ /admin/hot-sources
+├ ƒ /admin/knowledge
+├ ƒ /admin/login
+├ ƒ /admin/logs
+├ ƒ /admin/methodology
+├ ƒ /admin/methodology-profiles
+├ ƒ /admin/methodology-profiles/[id]
+├ ƒ /admin/methodology/[agentId]
+├ ƒ /admin/prompts
+├ ƒ /admin/retrieval-test
+├ ƒ /admin/settings
+├ ƒ /admin/statistics
+├ ƒ /admin/templates
+├ ƒ /admin/usage
+├ ƒ /admin/users
+├ ƒ /admin/users/[id]
+├ ƒ /ai-hot
+├ ƒ /aim
+├ ƒ /api/account/agent-keys
+├ ƒ /api/account/agent-keys/[id]
+├ ƒ /api/account/channel-bindings
+├ ƒ /api/account/channel-bindings/[id]
+├ ƒ /api/account/channel-bindings/[id]/test
+├ ƒ /api/account/hot-sources
+├ ƒ /api/account/inspiration-failures
+├ ƒ /api/account/project-context
+├ ƒ /api/admin/account-project-bindings
+├ ƒ /api/admin/account-project-bindings/[userId]/preview
+├ ƒ /api/admin/account-project-bindings/[userId]/repair
+├ ƒ /api/admin/activation-codes
+├ ƒ /api/admin/activation-codes/export
+├ ƒ /api/admin/activation-codes/generate
+├ ƒ /api/admin/activation-codes/stats
+├ ƒ /api/admin/agents/guides
+├ ƒ /api/admin/agents/traces
+├ ƒ /api/admin/agents/traces/[id]
+├ ƒ /api/admin/aim/customer-outcomes
+├ ƒ /api/admin/aim/efficiency-baselines
+├ ƒ /api/admin/aim/learning-candidates
+├ ƒ /api/admin/aim/learning-candidates/[id]
+├ ƒ /api/admin/aim/operating-cohorts
+├ ƒ /api/admin/aim/operating-metrics
+├ ƒ /api/admin/aim/operating-qualification
+├ ƒ /api/admin/aim/outcome-attributions
+├ ƒ /api/admin/aim/review-cycles
+├ ƒ /api/admin/aim/review-cycles/[id]
+├ ƒ /api/admin/aim/runs
+├ ƒ /api/admin/aim/runs/[runId]
+├ ƒ /api/admin/aim/skills
+├ ƒ /api/admin/aim/skills/[id]
+├ ƒ /api/admin/alerts
+├ ƒ /api/admin/alerts/[id]
+├ ƒ /api/admin/approval-decisions
+├ ƒ /api/admin/audit-events
+├ ƒ /api/admin/audit-events/[id]
+├ ƒ /api/admin/audit-events/[id]/related
+├ ƒ /api/admin/audit-events/summary
+├ ƒ /api/admin/audit-logs
+├ ƒ /api/admin/auth/login
+├ ƒ /api/admin/auth/logout
+├ ƒ /api/admin/auth/me
+├ ƒ /api/admin/automation-ledger
+├ ƒ /api/admin/automation-ledger/run
+├ ƒ /api/admin/benchmark-profiles
+├ ƒ /api/admin/benchmark-profiles/[id]
+├ ƒ /api/admin/benchmark-profiles/[id]/import-analysis
+├ ƒ /api/admin/benchmark-profiles/[id]/items
+├ ƒ /api/admin/benchmark-profiles/[id]/items/[itemId]
+├ ƒ /api/admin/benchmark-profiles/compare
+├ ƒ /api/admin/benchmark-profiles/import-text
+├ ƒ /api/admin/benchmark-profiles/importable-analyses
+├ ƒ /api/admin/benchmark-table
+├ ƒ /api/admin/channel-metrics
+├ ƒ /api/admin/dashboard
+├ ƒ /api/admin/governance-assignments
+├ ƒ /api/admin/hot-sources
+├ ƒ /api/admin/hot-topics/history
+├ ƒ /api/admin/hot-topics/stats
+├ ƒ /api/admin/jiekou/test
+├ ƒ /api/admin/knowledge
+├ ƒ /api/admin/knowledge/asset-health
+├ ƒ /api/admin/knowledge/distill
+├ ƒ /api/admin/knowledge/smart-import
+├ ƒ /api/admin/knowledge/smart-import/confirm
+├ ƒ /api/admin/knowledge/stats
+├ ƒ /api/admin/knowledge/upload
+├ ƒ /api/admin/methodology
+├ ƒ /api/admin/methodology-profiles
+├ ƒ /api/admin/methodology-profiles/[id]
+├ ƒ /api/admin/methodology/[key]
+├ ƒ /api/admin/projects
+├ ƒ /api/admin/prompts
+├ ƒ /api/admin/prompts/[key]/promote
+├ ƒ /api/admin/prompts/[key]/versions
+├ ƒ /api/admin/seed-topic-engine
+├ ƒ /api/admin/settings
+├ ƒ /api/admin/settings/[key]
+├ ƒ /api/admin/settings/seed
+├ ƒ /api/admin/statistics/overview
+├ ƒ /api/admin/tasks/[id]/retry
+├ ƒ /api/admin/templates
+├ ƒ /api/admin/templates/[id]
+├ ƒ /api/admin/templates/[id]/archive
+├ ƒ /api/admin/templates/[id]/feature
+├ ƒ /api/admin/templates/[id]/publish
+├ ƒ /api/admin/templates/[id]/restore
+├ ƒ /api/admin/templates/[id]/sort
+├ ƒ /api/admin/users
+├ ƒ /api/admin/users/[id]
+├ ƒ /api/admin/users/stats
+├ ƒ /api/agent/v1/aim/generate
+├ ƒ /api/agent/v1/aim/runs/[runId]/outcome
+├ ƒ /api/agent/v1/capabilities
+├ ƒ /api/agent/v1/inspiration/events
+├ ƒ /api/agent/v1/inspiration/events/[id]
+├ ƒ /api/agent/v1/inspiration/replies/[id]/ack
+├ ƒ /api/agent/v1/inspiration/replies/claim
+├ ƒ /api/agent/v1/invocations
+├ ƒ /api/agent/v1/invocations/[id]
+├ ƒ /api/agent/v1/knowledge/wechat-chat/confirm
+├ ƒ /api/agent/v1/knowledge/wechat-chat/import
+├ ƒ /api/agent/v1/projects
+├ ƒ /api/aihot-briefing/today
+├ ƒ /api/aihot-briefing/today/refresh
+├ ƒ /api/aim-mcp/[transport]
+├ ƒ /api/aim/asset-candidates
+├ ƒ /api/aim/asset-candidates/[id]
+├ ƒ /api/aim/attachment-parse
+├ ƒ /api/aim/attachment-transcribe
+├ ƒ /api/aim/chat
+├ ƒ /api/aim/connectors
+├ ƒ /api/aim/creator-metrics
+├ ƒ /api/aim/data-export
+├ ƒ /api/aim/evolve
+├ ƒ /api/aim/evolve-style
+├ ƒ /api/aim/execute
+├ ƒ /api/aim/export-office
+├ ƒ /api/aim/generate
+├ ƒ /api/aim/history
+├ ƒ /api/aim/history/[id]
+├ ƒ /api/aim/history/[id]/canonical
+├ ƒ /api/aim/history/[id]/distribution-claim
+├ ƒ /api/aim/history/[id]/outcome
+├ ƒ /api/aim/history/[id]/retro-report
+├ ƒ /api/aim/ip-wiki/compile
+├ ƒ /api/aim/ip-wiki/lint
+├ ƒ /api/aim/ip-wiki/pages
+├ ƒ /api/aim/ip-wiki/pages/[id]
+├ ƒ /api/aim/lead-attributions
+├ ƒ /api/aim/meeting-insights/[id]/asset-candidates
+├ ƒ /api/aim/meeting-recording
+├ ƒ /api/aim/memories/[id]
+├ ƒ /api/aim/outcome-import
+├ ƒ /api/aim/outcomes/reminders
+├ ƒ /api/aim/process-video
+├ ƒ /api/aim/reports/monthly
+├ ƒ /api/aim/retro-list
+├ ƒ /api/aim/review/weekly
+├ ƒ /api/aim/runs/[runId]/events
+├ ƒ /api/aim/scenarios
+├ ƒ /api/aim/script-structures
+├ ƒ /api/aim/script-structures/[id]
+├ ƒ /api/aim/script-structures/[id]/generate
+├ ƒ /api/aim/script-structures/pipeline
+├ ƒ /api/aim/skills
+├ ƒ /api/aim/style-status
+├ ƒ /api/aim/trace/[traceId]
+├ ƒ /api/aim/transcribe
+├ ƒ /api/aim/weekly-content
+├ ƒ /api/aim/workflow/brief
+├ ƒ /api/aim/workflow/plan
+├ ƒ /api/assets
+├ ƒ /api/assets/[id]
+├ ƒ /api/assets/upload-url
+├ ƒ /api/assets/uploads/[uploadId]/complete
+├ ƒ /api/assets/uploads/[uploadId]/put
+├ ƒ /api/auth/activate
+├ ƒ /api/auth/auth-video
+├ ƒ /api/auth/dev-login
+├ ƒ /api/auth/douyin/callback
+├ ƒ /api/auth/douyin/complete
+├ ƒ /api/auth/douyin/start
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/auth/me
+├ ƒ /api/auth/register
+├ ƒ /api/auth/sms/login
+├ ƒ /api/auth/sms/send
+├ ƒ /api/avatars
+├ ƒ /api/avatars/[id]
+├ ƒ /api/avatars/[id]/retry
+├ ƒ /api/brief/ai-fill
+├ ƒ /api/comment-insights
+├ ƒ /api/comment-insights/[id]
+├ ƒ /api/comment-insights/[id]/adopt-topic
+├ ƒ /api/comment-insights/[id]/analyze
+├ ƒ /api/comment-insights/[id]/export
+├ ƒ /api/comment-insights/[id]/sync
+├ ƒ /api/competitor-analysis/methodology/compile
+├ ƒ /api/competitor/[id]
+├ ƒ /api/competitor/analyze
+├ ƒ /api/competitor/channels-collections
+├ ƒ /api/competitor/channels-collections/videos
+├ ƒ /api/competitor/channels-live-replays
+├ ƒ /api/competitor/discover-similar
+├ ƒ /api/competitor/reports
+├ ƒ /api/competitor/search-accounts
+├ ƒ /api/competitor/search-accounts/douyin-url
+├ ƒ /api/competitor/search-channels
+├ ƒ /api/competitor/search-channels-user
+├ ƒ /api/competitor/search-channels/analyze
+├ ƒ /api/competitor/search-within-channel
+├ ƒ /api/competitor/watch-accounts
+├ ƒ /api/competitor/watch-accounts/[id]
+├ ƒ /api/competitor/watch-accounts/recommendations
+├ ƒ /api/competitor/watch-accounts/refresh
+├ ƒ /api/competitor/watch-accounts/videos/extract
+├ ƒ /api/competitor/web-research
+├ ƒ /api/content-opportunities/collections
+├ ƒ /api/content-opportunities/collections/[id]
+├ ƒ /api/content-opportunities/collections/[id]/analyze
+├ ƒ /api/content-opportunities/collections/[id]/create-topic
+├ ƒ /api/content-opportunities/collections/[id]/create-work-item
+├ ƒ /api/content-opportunities/collections/[id]/newsroom
+├ ƒ /api/content-opportunities/search
+├ ƒ /api/content-versions
+├ ƒ /api/content-versions/[id]/restore
+├ ƒ /api/cron/account-works-sync
+├ ƒ /api/cron/aihot-briefing
+├ ƒ /api/cron/audit-reconcile
+├ ƒ /api/cron/background-tasks
+├ ƒ /api/cron/channel-metrics-rollup
+├ ƒ /api/cron/cleanup
+├ ƒ /api/cron/control-center-retention
+├ ƒ /api/cron/douyin-hot
+├ ƒ /api/cron/feishu-work-items/dispatch
+├ ƒ /api/cron/integration-probe
+├ ƒ /api/cron/market-hotlist
+├ ƒ /api/cron/operational-alerts
+├ ƒ /api/cron/outcome-autofetch
+├ ƒ /api/cron/outcome-flywheel
+├ ƒ /api/cron/poll-tasks
+├ ƒ /api/cron/prediction-reconcile
+├ ƒ /api/cron/publish-reminder
+├ ƒ /api/cron/topic-daily
+├ ƒ /api/cron/topic-evening
+├ ƒ /api/cron/topic-noon
+├ ƒ /api/data-platform/summary
+├ ƒ /api/digital-human/public-persons
+├ ƒ /api/douyin-hot
+├ ƒ /api/healthz
+├ ƒ /api/hot-decisions
+├ ƒ /api/hot-decisions/refresh
+├ ƒ /api/hot-topics
+├ ƒ /api/hot-topics/[id]/fit
+├ ƒ /api/hot-topics/[id]/insight
+├ ƒ /api/hot-topics/ai
+├ ƒ /api/hot-topics/ai/daily
+├ ƒ /api/images/generate
+├ ƒ /api/insights/comments
+├ ƒ /api/inspiration
+├ ƒ /api/inspiration/[id]/generate
+├ ƒ /api/inspiration/[id]/process
+├ ƒ /api/integrations/douyin/accounts
+├ ƒ /api/integrations/douyin/accounts/[id]
+├ ƒ /api/integrations/douyin/accounts/[id]/profile-url
+├ ƒ /api/integrations/douyin/auth
+├ ƒ /api/integrations/douyin/callback
+├ ƒ /api/integrations/douyin/events
+├ ƒ /api/integrations/feishu/agent-events
+├ ƒ /api/integrations/feishu/card-actions
+├ ƒ /api/integrations/feishu/events
+├ ƒ /api/integrations/feishu/hitl-card-actions
+├ ƒ /api/integrations/feishu/knowledge/oauth/callback
+├ ƒ /api/integrations/feishu/knowledge/oauth/start
+├ ƒ /api/integrations/feishu/run-outcomes
+├ ƒ /api/integrations/feishu/topic-card-actions
+├ ƒ /api/integrations/feishu/work-items/execute
+├ ƒ /api/integrations/feishu/work-items/meeting-insight
+├ ƒ /api/integrations/wechat-mp/events
+├ ƒ /api/integrations/wecom/events
+├ ƒ /api/internal/afu-bridge/cards
+├ ƒ /api/internal/audit-events
+├ ƒ /api/knowledge
+├ ƒ /api/knowledge/[id]
+├ ƒ /api/knowledge/asset-health
+├ ƒ /api/knowledge/export-obsidian
+├ ƒ /api/knowledge/obsidian-status
+├ ƒ /api/knowledge/smart-import
+├ ƒ /api/knowledge/smart-import/confirm
+├ ƒ /api/knowledge/sync
+├ ƒ /api/knowledge/upload
+├ ƒ /api/lark-base/export
+├ ƒ /api/lark-base/import
+├ ƒ /api/market-insights/last30days
+├ ƒ /api/market-insights/last30days/hotlist
+├ ƒ /api/market-insights/last30days/hotlist/refresh
+├ ƒ /api/methodology-profiles
+├ ƒ /api/methodology-profiles/[id]
+├ ƒ /api/metrics
+├ ƒ /api/projects
+├ ƒ /api/projects/[id]
+├ ƒ /api/projects/[id]/export
+├ ƒ /api/proxy-image
+├ ƒ /api/scripts/[id]
+├ ƒ /api/scripts/generate
+├ ƒ /api/scripts/polish
+├ ƒ /api/scripts/quality-check
+├ ƒ /api/structures
+├ ƒ /api/tasks
+├ ƒ /api/tasks/[id]
+├ ƒ /api/tasks/[id]/retry
+├ ƒ /api/tasks/[id]/retry-transfer
+├ ƒ /api/templates
+├ ƒ /api/templates/[id]
+├ ƒ /api/templates/[id]/generate
+├ ƒ /api/topics/[id]/select
+├ ƒ /api/topics/chat
+├ ƒ /api/topics/copy-structures
+├ ƒ /api/topics/ending-types
+├ ƒ /api/topics/generate
+├ ƒ /api/topics/opening-types
+├ ƒ /api/topics/today
+├ ƒ /api/trending/redfox
+├ ƒ /api/video-copy-extractions
+├ ƒ /api/video-copy-extractions/[id]
+├ ƒ /api/video-copy-extractions/[id]/sync
+├ ƒ /api/voice/clone
+├ ƒ /api/voice/history
+├ ƒ /api/voice/models
+├ ƒ /api/voice/tts
+├ ƒ /api/webhook/chanjing
+├ ƒ /api/webhook/heygen
+├ ƒ /api/webhook/inspiration
+├ ƒ /api/webhook/shanjian
+├ ƒ /assets
+├ ƒ /cases
+├ ƒ /competitor
+├ ƒ /competitor/[id]
+├ ƒ /data-platform
+├ ƒ /home
+├ ƒ /hot-topics
+├ ƒ /img/[filename]
+├ ƒ /inspiration
+├ ƒ /ip-agent
+├ ƒ /knowledge
+├ ƒ /lite
+├ ƒ /lite/works
+├ ƒ /login
+├ ƒ /meeting-minutes
+├ ƒ /opportunities
+├ ƒ /projects
+├ ƒ /quality-check
+├ ƒ /register
+├ ƒ /scheduled-tasks
+├ ƒ /studio
+├ ƒ /studio/audio
+├ ƒ /studio/library
+├ ƒ /studio/video
+├ ƒ /studio/works
+├ ƒ /topic-planning
+├ ƒ /video-copy
+├ ƒ /videos
+└ ƒ /voice-studio
+
+
+ƒ Proxy (Middleware)
+
+ƒ  (Dynamic)  server-rendered on demand
+
+----- build EXIT=0 (128s) -----
+
+### 结束: 2026-09-17T05:32:37Z
