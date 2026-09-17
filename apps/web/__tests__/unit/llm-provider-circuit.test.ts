@@ -7,6 +7,7 @@ import {
   recordProviderCircuitFailure,
   recordProviderCircuitSuccess,
   resetProviderCircuitForTests,
+  SHORT_COOLDOWN_MS,
   summarizeAimRouteProbe,
   type ProviderCircuitStore,
 } from "@/lib/llm/provider-circuit"
@@ -48,16 +49,31 @@ afterEach(() => {
 })
 
 describe("provider circuit", () => {
-  it("opens for 5 minutes after two retryable failures in the window", async () => {
+  it("opens a short cooldown after a single timeout so a retry really switches lines", async () => {
     let now = 1_000_000
     const circuit = createProviderCircuit({ now: () => now, store: memoryStore() })
     await circuit.recordFailure("zenmux", "anthropic/claude-sonnet-4.6", "timeout")
+    // 单次超时即让路：用户点「再试一次」必须换到下一跳，而不是原样再撞同一条首跳。
+    expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(true)
+    now += SHORT_COOLDOWN_MS - 1
+    expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(true)
+    // 冷却到期后回到半开：只放行一次探测，不能把一条可用线路永久拉黑。
+    now += 2
+    expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(false)
+    expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(true)
+    expect(await circuit.isOpen("zenmux", "other-model")).toBe(false)
+  })
+
+  it("still needs two non-timeout retryable failures in the window", async () => {
+    let now = 1_100_000
+    const circuit = createProviderCircuit({ now: () => now, store: memoryStore() })
+    // 空正文、网络、5xx 不属于「这一跳慢」，保持原有的两次阈值，避免单次抖动就拉黑。
+    await circuit.recordFailure("zenmux", "anthropic/claude-sonnet-4.6", "empty_response")
     expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(false)
     await circuit.recordFailure("zenmux", "anthropic/claude-sonnet-4.6", "empty_response")
     expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(true)
     now += FIVE_MIN - 1
     expect(await circuit.isOpen("zenmux", "anthropic/claude-sonnet-4.6")).toBe(true)
-    expect(await circuit.isOpen("zenmux", "other-model")).toBe(false)
   })
 
   it("opens for 15 minutes after a single auth or balance failure", async () => {
@@ -71,9 +87,9 @@ describe("provider circuit", () => {
 
   it("resets consecutive failures after a success", async () => {
     const circuit = createProviderCircuit({ now: () => 4_000_000, store: memoryStore() })
-    await circuit.recordFailure("zenmux", "claude", "timeout")
+    await circuit.recordFailure("zenmux", "claude", "empty_response")
     await circuit.recordSuccess("zenmux", "claude")
-    await circuit.recordFailure("zenmux", "claude", "timeout")
+    await circuit.recordFailure("zenmux", "claude", "empty_response")
     expect(await circuit.isOpen("zenmux", "claude")).toBe(false)
   })
 

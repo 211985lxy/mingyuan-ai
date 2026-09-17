@@ -35,6 +35,15 @@ type CircuitState = {
 
 const FIVE_MIN_MS = 5 * 60 * 1000
 const FIFTEEN_MIN_MS = 15 * 60 * 1000
+/**
+ * 超时一次即让路的冷却时长。
+ *
+ * 原规则是「5 分钟内连续 2 次超时才开闸」，结果是用户点「再试一次」仍从同一条
+ * 首跳开始，原样再撞一次同样的失败——卡面承诺的「自动更换线路」没有落地。
+ * 超时改为单次即开闸，冷却只给 60s：超时也可能是这一轮 prompt 特别长，
+ * 不能久留；冷却到期后回到半开状态只放行一次探测，再失败会升到 5 分钟。
+ */
+export const SHORT_COOLDOWN_MS = 60_000
 const STORE_TTL_SECONDS = 20 * 60
 const REDIS_BUDGET_MS = 150
 const RETRYABLE_KINDS = new Set<CircuitFailureKind>(["timeout", "network", "server", "empty_response"])
@@ -118,6 +127,11 @@ function stateAfterFailure(prev: CircuitState | null, kind: CircuitFailureKind, 
   }
   if (severe) {
     return { consecutiveFailures: 1, lastFailureAt: t, openedUntil: t + FIFTEEN_MIN_MS, halfOpen: false }
+  }
+  // 超时：单次即开闸，让重试真的换线路（见 SHORT_COOLDOWN_MS 注释）。
+  // 熔断键含 scope（智能体），所以影响面限于同一智能体，不会波及其它智能体。
+  if (kind === "timeout") {
+    return { consecutiveFailures: 1, lastFailureAt: t, openedUntil: t + SHORT_COOLDOWN_MS, halfOpen: false }
   }
   const withinWindow = Boolean(prev && t - prev.lastFailureAt <= FIVE_MIN_MS)
   const consecutiveFailures = withinWindow ? prev!.consecutiveFailures + 1 : 1

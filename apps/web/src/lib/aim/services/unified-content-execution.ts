@@ -5,7 +5,8 @@ import type { ResolvedUserIntent } from "@/lib/aim/resolved-user-intent"
 import type { AimTraceRecorder } from "@/lib/aim-observability"
 import { executeGenerateLLM } from "@/lib/aim-agent-model"
 import { inspectAimDeliveryCandidate, parseStrictMultiFormatResponse } from "@/lib/aim/output-delivery-gate"
-import { AimSemanticDeliveryError, buildAimSemanticRevisionPrompt, runAimSemanticRevisionLoop, verifyAimDelivery, type AimSemanticDeliveryVerdict } from "@/lib/aim/semantic-delivery-verifier"
+import { AimSemanticDeliveryError, buildAimSemanticRevisionPrompt, runAimSemanticRevisionLoop, verifyAimDelivery, AIM_SEMANTIC_REVISION_MIN_BUDGET_MS, type AimSemanticDeliveryVerdict } from "@/lib/aim/semantic-delivery-verifier"
+import { AimDeadlineExceededError, getAimExecutionDeadline } from "@/lib/llm/execution-deadline"
 
 interface UnifiedReplyPorts {
   complete: (systemPrompt: string, userPrompt: string) => Promise<{ content: string; finishReason?: string | null }>
@@ -42,6 +43,14 @@ export async function executeVerifiedUnifiedReply(input: {
 
   return runAimSemanticRevisionLoop({
     maxRevisions: 2,
+    // 与生成路径同一道闸：一轮返工 = 一次完整生成 + 一次独立验收，
+    // 预算不足就别再启动，直接以可重试的截止错误收手。
+    beforeRound: () => {
+      const deadline = getAimExecutionDeadline()
+      if (deadline && deadline.remainingMs() < AIM_SEMANTIC_REVISION_MIN_BUDGET_MS) {
+        throw new AimDeadlineExceededError("剩余预算不足以再完成一轮返工")
+      }
+    },
     execute: async (gaps) => {
       const prompt = gaps.length ? buildAimSemanticRevisionPrompt({ originalPrompt, gaps }) : originalPrompt
       const completion = await complete(systemPrompt, prompt)

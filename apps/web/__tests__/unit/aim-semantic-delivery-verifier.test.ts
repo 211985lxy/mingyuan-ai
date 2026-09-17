@@ -43,6 +43,35 @@ describe("semantic delivery verifier", () => {
     expect(execute).toHaveBeenCalledTimes(3)
   })
 
+  it("does not start another round once the budget gate says stop", async () => {
+    const execute = vi.fn().mockResolvedValue("未合格候选")
+    const verify = vi.fn().mockResolvedValue({ passed: false, gaps: ["交付不完整"] })
+    // 第 1 轮（attempt=1）开工前预算已不够：必须直接收手，不能再跑第二、第三轮。
+    const beforeRound = vi.fn((attempt: number) => {
+      if (attempt > 0) throw new Error("剩余预算不足以再完成一轮返工")
+    })
+
+    await expect(runAimSemanticRevisionLoop({ execute, verify, maxRevisions: 2, beforeRound }))
+      .rejects.toThrow("剩余预算不足以再完成一轮返工")
+    expect(beforeRound).toHaveBeenCalledWith(1)
+    // 只跑了第 0 轮：返工轮一次都没启动（否则用户剩下的等待就白烧了）。
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps revising while the budget gate allows it", async () => {
+    const execute = vi.fn().mockResolvedValueOnce("只有开头").mockResolvedValueOnce("完整脚本")
+    const verify = vi.fn()
+      .mockResolvedValueOnce({ passed: false, gaps: ["缺完整正文"] })
+      .mockResolvedValueOnce({ passed: true })
+    const beforeRound = vi.fn()
+
+    await expect(runAimSemanticRevisionLoop({ execute, verify, maxRevisions: 2, beforeRound }))
+      .resolves.toBe("完整脚本")
+    expect(beforeRound).toHaveBeenCalledTimes(1)
+    expect(beforeRound).toHaveBeenCalledWith(1)
+  })
+
   it("gives the verifier source-labeled conversation and references", async () => {
     const complete = vi.fn().mockResolvedValue({ content: "[[AIM_VERDICT:PASS]]" })
     await verifyAimDelivery({

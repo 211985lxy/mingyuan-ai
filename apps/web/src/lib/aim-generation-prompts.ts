@@ -22,7 +22,8 @@ import { COLLABORATION_MODE_LABELS, type TaskSpec } from "@/lib/task-spec"
 import { continuationDirectiveBlockIfApplicable, formatAimTurnIntentBlock, looksLikePassagePolish, resolveAimTurnIntent } from "@/lib/aim-turn-intent"
 import type { AimGenerateContext } from "./aim-agent-handlers"
 import { parseMultiFormatResponse, type ContentFormat } from "./aim-generator"
-import { buildAimSemanticRevisionPrompt } from "@/lib/aim/semantic-delivery-verifier"
+import { buildAimSemanticRevisionPrompt, AIM_SEMANTIC_REVISION_MIN_BUDGET_MS } from "@/lib/aim/semantic-delivery-verifier"
+import { AimDeadlineExceededError, getAimExecutionDeadline } from "@/lib/llm/execution-deadline"
 import { inspectUnifiedGenerationProtocol, shouldApplyLegacyLightEditRules, verifyUnifiedGenerationCandidate } from "@/lib/aim/unified-generation-gate"
 import {
   CONTENT_CREATION_TRACE_RULE,
@@ -181,6 +182,16 @@ export function buildCompactWorkflowContext(
 
 export { composeLayeredAimPrompt, type LayeredAimPromptInput } from "@/lib/aim/layered-prompt"
 
+/**
+ * 剩余预算够不够再跑一轮「生成 + 语义验收」。
+ * 不在 deadline 作用域内（单测直调）时视为够，保持既有行为。
+ */
+function hasBudgetForAnotherGenerationRound(): boolean {
+  const deadline = getAimExecutionDeadline()
+  if (!deadline) return true
+  return deadline.remainingMs() >= AIM_SEMANTIC_REVISION_MIN_BUDGET_MS
+}
+
 export async function executeGenerateLLMWithBenchmarkRetry(
   agentId: string,
   systemPrompt: string,
@@ -201,6 +212,13 @@ export async function executeGenerateLLMWithBenchmarkRetry(
   let isLengthRewrite = false
   let semanticRevisions = 0
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    // 返工轮要再跑「一次完整生成 + 一次语义验收」，两趟都得拿到首跳预算才有胜算。
+    // 预算不够就立刻以可重试的截止错误收手：此前没有这道闸，第一版写得慢一点就把
+    // 整段 115s 烧在注定跑不完的返工上，用户等满才拿到 MODEL_TIMEOUT。
+    // 第 0 轮不查——那时还没有「已经用掉多少」，查了等于不让开工。
+    if (attempt > 0 && !hasBudgetForAnotherGenerationRound()) {
+      throw new AimDeadlineExceededError("剩余预算不足以再完成一轮返工")
+    }
     const modelPolicy = isLengthRewrite && context.modelPolicy
       ? { ...context.modelPolicy, temperature: 0.2 }
       : context.modelPolicy
