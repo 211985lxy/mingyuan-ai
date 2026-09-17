@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:25-alpine AS base
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
@@ -26,7 +26,7 @@ RUN pnpm --dir apps/web exec prisma generate
 RUN pnpm --filter @mingyuan/web build
 
 # Lean runtime: do not inherit build tooling (pnpm/corepack) or ship npm's vulnerable tar.
-FROM node:20-alpine AS web-runner
+FROM node:25-alpine AS web-runner
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat \
