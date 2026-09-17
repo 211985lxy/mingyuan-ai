@@ -133,10 +133,18 @@ model KnowledgeRelation {
 // embedding 为 Float32Array 原始字节（1024 维 = 4KB），
 // 由 knowledge-chunk-index.ts 的 encodeVector / decodeVector 负责编解码。
 //
-// @@fulltext([text]) 不是可选声明：P1 的 FULLTEXT 索引由原始 SQL 建立
-// （Prisma 语法表达不了 WITH PARSER ngram），schema 里不声明它，
-// 下一次 `migrate dev` 会把它判为「库中多余」并生成 DROP INDEX，
-// 中文检索静默失效。理由详见 P1 的 knowledge.prisma.patch.md。
+// 这里**刻意不声明** `@@fulltext([text])`。
+//
+// 原因：中文全文检索必须用 `WITH PARSER ngram`（内置解析器按空格切词，中文整段落成
+// 一个 token）。而 Prisma 语法表达不了 parser，且生产库是 MariaDB 10.5 ——
+// 它根本不支持 ngram 解析器，声明它只会让 `prisma migrate deploy` 在生产上失败
+// （2026-09-16 已实际发生一次，见 20260916160000 迁移文件的决策记录）。
+//
+// 因此词面召回是**可选能力**：索引存在就用，不存在就纯向量。
+//   探测与降级：src/lib/llm/keyword-retrieval.ts + src/lib/llm/keyword-capability.ts
+//   补索引的运维语句：prisma/migrations/20260916160000_add_knowledge_chunk_fulltext/migration.sql
+// 代价是 `prisma migrate dev` 在**已经手工建过该索引**的库上会提示一条 DROP INDEX ——
+// 那种库请用 `migrate dev --create-only` 审查后丢弃该条，不要让它跑到任何环境。
 model KnowledgeChunk {
   id           String   @id @default(cuid())
   entryId      String
@@ -157,5 +165,4 @@ model KnowledgeChunk {
   @@index([entryId])
   @@index([status])
   @@index([contentHash])
-  @@fulltext([text])
 }
