@@ -18,6 +18,8 @@
   "build": "next build",
   "config:gap-status": "tsx --tsconfig tsconfig.json scripts/print-gap-config-status.ts",
   "db:bounds": "node scripts/check-prisma-query-bounds.mjs",
+  "knowledge:backfill-chunks": "DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' tsx --tsconfig tsconfig.json scripts/backfill-knowledge-chunks.ts",
+  "knowledge:index-guard": "node scripts/check-knowledge-indexing.mjs",
   "dev": "next dev --webpack",
   "dev:sanity": "DOTENV_CONFIG_PATH=.env.local NODE_OPTIONS='-r dotenv/config' tsx --tsconfig tsconfig.json scripts/verify-dev-environment.ts",
   "env:check": "node scripts/check-env-contract.mjs",

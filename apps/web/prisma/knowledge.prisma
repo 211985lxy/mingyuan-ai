@@ -58,6 +58,7 @@ model KnowledgeEntry {
 
   embedding KnowledgeEmbedding?
   relations KnowledgeRelation[]
+  chunks    KnowledgeChunk[]
 
   @@index([userId, category])
   @@index([userId, status])
@@ -123,4 +124,38 @@ model KnowledgeRelation {
   @@unique([fromEntityId, toEntityId, entryId, type])
   @@index([fromEntityId, type])
   @@index([entryId])
+}
+
+// 知识块索引（P0）：把检索单元从条目下沉到 ~400 字的带重叠块。
+// 存在的原因见 src/lib/llm/chunking.ts 顶部注释 —— 导入切 5000 字、
+// 嵌入只取前 500 字，导致长条目约 90% 的内容无法被检索到。
+//
+// embedding 为 Float32Array 原始字节（1024 维 = 4KB），
+// 由 knowledge-chunk-index.ts 的 encodeVector / decodeVector 负责编解码。
+//
+// @@fulltext([text]) 不是可选声明：P1 的 FULLTEXT 索引由原始 SQL 建立
+// （Prisma 语法表达不了 WITH PARSER ngram），schema 里不声明它，
+// 下一次 `migrate dev` 会把它判为「库中多余」并生成 DROP INDEX，
+// 中文检索静默失效。理由详见 P1 的 knowledge.prisma.patch.md。
+model KnowledgeChunk {
+  id           String   @id @default(cuid())
+  entryId      String
+  idx          Int
+  text         String   @db.Text
+  embedding    Bytes?
+  dimensions   Int      @default(1024)
+  model        String   @default("BAAI/bge-large-zh-v1.5")
+  contentHash  String   @db.VarChar(64)
+  status       String   @default("pending") @db.VarChar(20) // pending | completed | failed
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  entry KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, idx])
+  @@index([entryId])
+  @@index([status])
+  @@index([contentHash])
+  @@fulltext([text])
 }

@@ -1,5 +1,6 @@
 import type { Prisma } from "@/generated/prisma/client"
 import { prisma } from "@/lib/prisma"
+import { ensureKnowledgeEmbedding } from "@/lib/llm/embeddings"
 import { generateTopicCards } from "@/lib/topic-generation"
 import {
   buildTopicChatReply,
@@ -146,6 +147,9 @@ export async function handleTopicChatMessage(input: {
     }
     return { knowledgeEntry, selection }
   })
+
+  // 新条目必须触发向量化，否则该知识 AI 检索不到（静默走 raw 兜底，不报错）。
+  ensureKnowledgeEmbedding(knowledgeEntry.id).catch(() => {})
 
   const reply = buildTopicChatReply({
     savedTitle: knowledgeEntry.title,

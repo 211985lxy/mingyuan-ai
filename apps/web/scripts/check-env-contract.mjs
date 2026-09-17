@@ -3,7 +3,11 @@ import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const WEB_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
-const ENV_PATH = join(WEB_ROOT, "src", "env.ts")
+// env 定义已按域拆分：env.ts 只做聚合，变量分散在 src/lib/env/*.ts
+const ENV_DIR = join(WEB_ROOT, "src", "lib", "env")
+const ENV_PATHS = [join(WEB_ROOT, "src", "env.ts"), ...listFiles(ENV_DIR)]
+// 声明源文件本身不算「业务读取」（env.ts 聚合、runtime.ts 是 process.env 映射）
+const SKIP_READS = new Set([join(WEB_ROOT, "src", "env.ts"), join(ENV_DIR, "runtime.ts")])
 const ENV_ACCESS = /process\.env(?:\.([A-Z][A-Z0-9_]*)|\[["']([A-Z][A-Z0-9_]*)["']\])/g
 
 function listFiles(directory, files = []) {
@@ -16,17 +20,19 @@ function listFiles(directory, files = []) {
   return files
 }
 
-function readEnvironmentNames(path) {
+function readEnvironmentNames(paths) {
   const names = new Set()
-  const source = readFileSync(path, "utf8")
-  for (const match of source.matchAll(/^\s{4}([A-Z][A-Z0-9_]*): z\./gm)) names.add(match[1])
+  for (const path of paths) {
+    const source = readFileSync(path, "utf8")
+    for (const match of source.matchAll(/^\s{4}([A-Z][A-Z0-9_]*): z\./gm)) names.add(match[1])
+  }
   return names
 }
 
 function findEnvironmentReads(paths) {
   const reads = new Set()
   for (const path of paths) {
-    if (path === ENV_PATH) continue
+    if (SKIP_READS.has(path)) continue
     const source = readFileSync(path, "utf8")
     for (const match of source.matchAll(ENV_ACCESS)) reads.add(match[1] || match[2])
   }
@@ -39,11 +45,11 @@ const sourceFiles = [
   join(WEB_ROOT, "prisma.config.ts"),
   join(WEB_ROOT, "create-codes.ts"),
 ]
-const declared = readEnvironmentNames(ENV_PATH)
+const declared = readEnvironmentNames(ENV_PATHS)
 const missing = [...findEnvironmentReads(sourceFiles)].filter((name) => !declared.has(name)).sort()
 
 if (missing.length > 0) {
-  console.error("Environment contract failed. Add these variables to src/env.ts:")
+  console.error("Environment contract failed. Add these variables to src/env.ts or src/lib/env/:")
   for (const name of missing) console.error(`  - ${name}`)
   process.exit(1)
 }
