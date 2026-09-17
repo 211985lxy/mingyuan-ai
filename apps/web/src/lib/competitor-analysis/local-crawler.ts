@@ -3,6 +3,7 @@ import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import { logger } from '@/lib/logger'
+import { isSupportedPlatformUrl } from '../tikhub/url-parser'
 import type { NormalizedAccount, NormalizedVideo, NormalizedComment } from '../tikhub/types'
 
 export interface LocalCrawlerResult {
@@ -65,6 +66,17 @@ export async function fetchFromLocalCrawler(
   targetUrl: string,
   count: number = 50
 ): Promise<LocalCrawlerResult> {
+  // ── SSRF 前置闸门：Spawn 之前必须拦 ──────────────────────────────
+  // 本函数会把 targetUrl 原样作为 `--url` 参数交给 Python 侧，最终由**真实浏览器**
+  // （Playwright）导航过去。浏览器比 fetch 更危险：能渲染、能访问云 metadata 端点、
+  // 能碰到只有内网可达的管理面。
+  // 因此这里不依赖调用方已校验——调用方可能有多种（管线/刷新/ upsert），任何一路漏
+  // 掉都会形成 sink。校验复用平台 URL 的唯一判定源，严禁在此另写一份。
+  if (!isSupportedPlatformUrl(targetUrl)) {
+    log.warn({ targetUrl }, '本地爬虫拒绝非支持平台 URL（SSRF 闸门）')
+    throw new Error('目标链接不在已支持的平台域名白名单内，已拒绝本地抓取。')
+  }
+
   const sauDir = findSocialAutoUploadDir()
   const crawlerScript = path.join(sauDir, 'crawler.py')
 
