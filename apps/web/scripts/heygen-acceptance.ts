@@ -110,8 +110,12 @@ async function main(): Promise<void> {
 
   // ─── 步骤 3：选声音（优先中文，与验收文案匹配）───
   console.log("\n== 步骤 3：GET /v3/voices ==")
-  const voices = await listVoices({ limit: 50 }).catch((e) => fail(`声音列表失败：${e instanceof Error ? e.message : e}`))
-  console.log(`  共 ${voices.length} 个声音`)
+  // 验收文案是中文：优先取目录里的中文声音（language=Chinese）
+  let voices = await listVoices({ limit: 50, language: "Chinese" }).catch(() => [])
+  if (voices.length === 0) {
+    voices = await listVoices({ limit: 50 }).catch((e) => fail(`声音列表失败：${e instanceof Error ? e.message : e}`))
+  }
+  console.log(`  共 ${voices.length} 个声音${voices[0]?.language ? `（语言 ${voices[0].language}）` : ""}`)
   const zhVoice =
     voices.find((v) => /zh|cmn|chinese/i.test(v.language)) ??
     voices.find((v) => v.voice_id === chosen.default_voice_id) ??
