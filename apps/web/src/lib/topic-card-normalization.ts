@@ -58,6 +58,23 @@ function profileText(ipProfile: TopicGenerationInput["ipProfile"]): string {
   ].filter(Boolean).join("\n")
 }
 
+// creativeTrace 各字段的 schema 上限（topic-validation.ts）。normalize 是校验前
+// 最后一站，必须在这里把自由文本截到位——2026-09-17 早报曾因模型把命理依据等
+// 字段写超 160 字符，4 张卡连续 3 轮校验失败整批降级为无评分模板卡。
+const TRACE_LIMITS = {
+  stylePositioning: 120,
+  logicStep: 160,
+  source: 160,
+  usage: 200,
+  baziBasis: 160,
+  ziweiBasis: 160,
+  styleMapping: 240,
+} as const
+
+function clip(text: string | null | undefined, max: number): string {
+  return (text ?? "").trim().slice(0, max)
+}
+
 function traceSource(
   kind: CreativeTraceSource["kind"],
   source: string | null | undefined,
@@ -65,8 +82,8 @@ function traceSource(
 ): CreativeTraceSource {
   return {
     kind,
-    source: source?.trim() || "未提供/待补充",
-    usage: source?.trim() ? usage : "本次未引用，待补充后再校准。",
+    source: clip(source, TRACE_LIMITS.source) || "未提供/待补充",
+    usage: source?.trim() ? clip(usage, TRACE_LIMITS.usage) : "本次未引用，待补充后再校准。",
   }
 }
 
@@ -95,15 +112,18 @@ function normalizeCreativeTrace(
   const persona = firstMatchingSource(input.topicSources, (source) => ["boss_experience", "client_project"].includes(source.category))
   const raw = trace && typeof trace === "object" ? trace : undefined
   const logicSteps = Array.isArray(raw?.logicSteps)
-    ? raw.logicSteps.filter((item): item is string => typeof item === "string" && item.trim().length >= 2).slice(0, 5)
+    ? raw.logicSteps
+        .filter((item): item is string => typeof item === "string" && item.trim().length >= 2)
+        .slice(0, 5)
+        .map((item) => clip(item, TRACE_LIMITS.logicStep))
     : []
   const baziBasis = destinyBasis(/八字|四柱|五行/, "八字", input)
   const ziweiBasis = destinyBasis(/紫微|命宫|天命/, "紫微", input)
   const hasDestinySource = baziBasis !== "未提供/待补充" || ziweiBasis !== "未提供/待补充"
 
   return {
-    stylePositioning: raw?.stylePositioning?.trim()
-      || [input.ipProfile?.toneOfVoice, input.ipProfile?.ipTraits].filter(Boolean).join("、")
+    stylePositioning: clip(raw?.stylePositioning, TRACE_LIMITS.stylePositioning)
+      || [input.ipProfile?.toneOfVoice, input.ipProfile?.ipTraits].filter(Boolean).join("、").slice(0, TRACE_LIMITS.stylePositioning)
       || "专业、清晰、可信",
     logicSteps: logicSteps.length >= 2 ? logicSteps : [
       "先对齐目标客户与真实问题，避免只追求流量。",
@@ -115,11 +135,14 @@ function normalizeCreativeTrace(
       traceSource("persona", sourceCitation(persona) || (input.ipProfile?.ipTraits || input.ipProfile?.toneOfVoice ? "IP档案：人设与语气" : null), "用于校准表达角度、用词和情绪基调。"),
     ],
     destinyAlignment: {
-      baziBasis,
-      ziweiBasis,
-      styleMapping: hasDestinySource
-        ? raw?.destinyAlignment?.styleMapping?.trim() || "已将现有命理资料作为文风、用词与情感基调的校准依据。"
-        : "未做命理适配；待补充八字或紫微资料后再校准。",
+      baziBasis: clip(baziBasis, TRACE_LIMITS.baziBasis),
+      ziweiBasis: clip(ziweiBasis, TRACE_LIMITS.ziweiBasis),
+      styleMapping: clip(
+        hasDestinySource
+          ? raw?.destinyAlignment?.styleMapping || "已将现有命理资料作为文风、用词与情感基调的校准依据。"
+          : "未做命理适配；待补充八字或紫微资料后再校准。",
+        TRACE_LIMITS.styleMapping,
+      ),
     },
   }
 }

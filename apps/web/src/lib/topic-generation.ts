@@ -461,7 +461,8 @@ export async function generateTopicCards(
 
       console.warn(
         `[topic-gen] Validation failed attempt ${attempt + 1}:`,
-        validated.error.issues.map((e) => e.message).join(", "),
+        // 带上字段路径（如 cards.0.creativeTrace.destinyAlignment.baziBasis），否则无法定位是哪个字段超限
+        validated.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`).join(", "),
       )
     } catch (error) {
       console.error(
