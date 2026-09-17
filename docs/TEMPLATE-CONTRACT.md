@@ -149,8 +149,10 @@ AIM 侧实现：`lib/hypit-templates.ts`（渲染 + 生成 svrun）、
 
 ## 七、待确认（给业务侧）
 
-1. 模板三份的内容：中汝达供暖 / 芳姐 IP / 通用卡片 —— 各自文案与配色。
-   当前的 `generic-card` 是**占位模板**（卡片图 + 背景音，无文字层），只用来证明链路。
+1. 模板三份的**带字设计图**：中汝达供暖 / 芳芳 IP / 通用卡片 —— 各自由业务侧用设计软件
+   把标题文字做进卡片图。已决：**可见标题烤进设计图**（Hypit 无静态叠字图元，AI 字幕不可控、
+   且免费线不一定支持）。AIM 侧 `generic-card` 已支持 `{{card_image}}` 换图变量（默认 `card.jpg`
+   占位），业务图预置到 `templates/generic-card/assets/`，提交时传 `card_image` 路径即出三比例片。
 2. 要不要配音？配音走 AIM 既有 `voiceSource:"own_voice"`（Fish Audio），
    **Hypit 只管画面**；音频作为素材进 SVML 的 audio-track。
 3. 每条片子的时长与分镜数。
