@@ -11,11 +11,15 @@
   AIM 侧 `lib/hypit-ratio.ts` 的 `inferHypitAspectRatio()` 按产物名里的比例标记
   把三条产物分派到对应比例；命名约定见 services/hypit-renderer/docs/TEMPLATE-CONTRACT.md。
 
-  资产用相对路径 `./assets/...`（源文件形态，渲染服务按源文件所在目录解析）。
-  AIM 侧 `content` 内联提交走绝对路径，见 `lib/hypit-templates.ts` 的 `{{asset_base}}`。
+  可见标题**烤进卡片设计图**（Hypit 没有「静态叠字」图元），本模板不叠文字层。
+  卡片图可换：把带标题的设计稿放进 `assets/` 并把 `<asset:Image>` 的 `src` 指过去。
 
-  文案变量此处留空——占位模板只验证三比例多产物链路；可见标题由业务模板
-  （中汝达供暖 / 芳姐 IP / 通用卡片）按 Hypit 字幕/文本图元补上。
+  ⚠️ 换图必须同步改 `space:Extent`：extent 描述**源图的真实像素尺寸**，`fit: cover`
+  按它算宽高比。写错会让画面被拉伸或放大裁掉（曾把 1024×1536 的竖版稿按 800×800
+  方形处理，标题被裁）。默认值 800×800 对齐占位图 `assets/card.jpg`。
+
+  资产用相对路径 `./assets/...`（源文件形态，渲染服务按源文件所在目录解析）。
+  AIM 侧 `content` 内联提交走工作区根相对路径，见 `lib/hypit-templates.ts`。
 -->
 <svml>
   <import as="asset" from="@hypit/media@1"/>
@@ -40,9 +44,9 @@
   <space:Frame id="frame-916" within={canvas-916} left="0%" top="0%" right="100%" bottom="100%"/>
   <space:Frame id="frame-169" within={canvas-169} left="0%" top="0%" right="100%" bottom="100%"/>
   <space:Frame id="frame-11"  within={canvas-11}  left="0%" top="0%" right="100%" bottom="100%"/>
-  <space:Extent id="extent-916" width="1080" height="1080"/>
-  <space:Extent id="extent-169" width="1080" height="1080"/>
-  <space:Extent id="extent-11"  width="1080" height="1080"/>
+  <space:Extent id="extent-916" width="800" height="800"/>
+  <space:Extent id="extent-169" width="800" height="800"/>
+  <space:Extent id="extent-11"  width="800" height="800"/>
 
   <asset:Image id="card-image" src="./assets/card.jpg"/>
   <asset:Audio id="bed-audio" src="./assets/ranking-move.wav"/>

@@ -103,9 +103,9 @@ const GENERIC_CARD_MARKUP = `<?svml using="@hypit/markup@1"?>
   <space:Frame id="frame-916" within={canvas-916} left="0%" top="0%" right="100%" bottom="100%"/>
   <space:Frame id="frame-169" within={canvas-169} left="0%" top="0%" right="100%" bottom="100%"/>
   <space:Frame id="frame-11"  within={canvas-11}  left="0%" top="0%" right="100%" bottom="100%"/>
-  <space:Extent id="extent-916" width="1080" height="1080"/>
-  <space:Extent id="extent-169" width="1080" height="1080"/>
-  <space:Extent id="extent-11"  width="1080" height="1080"/>
+  <space:Extent id="extent-916" width="{{card_width}}" height="{{card_height}}"/>
+  <space:Extent id="extent-169" width="{{card_width}}" height="{{card_height}}"/>
+  <space:Extent id="extent-11"  width="{{card_width}}" height="{{card_height}}"/>
 
   <asset:Image id="card-image" src="{{card_image}}"/>
   <asset:Audio id="bed-audio" src="{{template_dir}}/assets/ranking-move.wav"/>
@@ -187,6 +187,11 @@ export function renderHypitTemplateByName(
     // 提交时传 `card_image` 指向它即可（例如 `./templates/generic-card/assets/zhongruda.jpg`）。
     // 不传则用默认占位图，保证链路始终可渲染。
     card_image: `./${TEMPLATE_DIR}/${name}/assets/card.jpg`,
+    // `extent` 必须等于**源图的真实像素尺寸**（Hypit 的 extent 语义：描述源图字节），
+    // 否则 `fit: cover` 会按错误的宽高比拉伸/裁切（曾把 1024×1536 的竖版稿按方形处理，
+    // 导致标题被放大裁掉）。换图时连通尺寸一起传；默认值配默认占位图（800×800）。
+    card_width: 800,
+    card_height: 800,
     ...variables,
   }
   const markup = renderHypitTemplate({ template: def.markup, variables: merged })

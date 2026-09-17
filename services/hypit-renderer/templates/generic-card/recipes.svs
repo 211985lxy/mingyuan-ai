@@ -4,8 +4,26 @@
   film.vertical   { background: #0B0B0F; }
   film.horizontal { background: #0B0B0F; }
   film.square     { background: #0B0B0F; }
+  /*
+    卡片图铺满画布（cover），但**裁切锚点对齐顶部**而非居中。
+
+    为什么：一张竖版设计稿（如 1024×1536）放到横屏/方形画布上，cover 必然裁掉一条。
+    居中裁切裁掉的是**图的上方**，而标题通常就在上方 → 标题被裁掉。
+    实测（同一张竖版稿出三比例，抽帧对比）：
+      · 居中 cover   → 16:9 / 1:1 标题全被裁掉，只剩场景
+      · contain      → 标题完整，但左右留黑边（横版）/ 上下留黑边
+      · 顶部对齐 cover → 标题完整且满屏无黑边   ← 取这个
+    9:16 不受影响：竖版稿在竖屏画布上裁的是**左右**，纵向锚点无作用
+    （实测两种对齐的 9:16 产物字节完全一致）。
+
+    设计含义：关键内容（标题/主视觉）请放在图的**上方**，底部留白会被裁掉。
+    若某份设计需要别的呈现，改这一处即可：居中=删掉 content-y/frame-y；
+    完整不裁（letterbox）=把 fit 改成 contain。
+  */
   media.card {
     stack-order: 40;
     fit: cover;
+    content-y: 0;
+    frame-y: 0;
   }
 </sheet>
