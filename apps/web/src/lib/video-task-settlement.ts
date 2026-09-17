@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
+import { normalizeDigitalHumanProvider } from "@/lib/digital-human-provider";
 import {
   isManagedOssUrl,
   persistVideoThumbnail,
@@ -26,10 +27,44 @@ type SuccessfulResult = {
   videoUrl?: string;
   coverUrl?: string;
   duration?: number;
+  /**
+   * 一次渲染的多个产物（三比例）。只有 Hypit 会带：同一个 build 出三条片子，
+   * `videoUrl` 是首选那条，其余从这里交付。
+   */
+  renderOutputs?: Prisma.InputJsonValue;
 };
 
+/** 把 provider 返回的产物清单收敛成可落库的 JSON。 */
+export function toRenderOutputsJson(
+  outputs: unknown,
+): Prisma.InputJsonValue | undefined {
+  if (!Array.isArray(outputs) || outputs.length === 0) return undefined;
+  const normalized = outputs
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      outputName: typeof item.outputName === "string" ? item.outputName : null,
+      url: typeof item.url === "string" ? item.url : null,
+      mediaType: typeof item.mediaType === "string" ? item.mediaType : null,
+      aspectRatio:
+        item.aspectRatio === "9:16" || item.aspectRatio === "16:9" || item.aspectRatio === "1:1"
+          ? item.aspectRatio
+          : null,
+    }))
+    .filter((item) => Boolean(item.url));
+  if (normalized.length === 0) return undefined;
+  return normalized as unknown as Prisma.InputJsonValue;
+}
+
+/**
+ * 严格解析 provider 列（白名单 + 蝉镜兜底）。
+ *
+ * 这里原本是 `provider === "shanjian" ? "shanjian" : "chanjing"`，于是 HeyGen 与 Hypit
+ * 的任务在结算时会去**释放蝉镜的并发槽**（Redis key 不是自己那把），并把 metrics
+ * 打到 chanjing 名下——槽位计数漂移、看板上这两家的结算量永远是 0。
+ * 改为走 `normalizeDigitalHumanProvider` 的白名单校验，与 `video-polling` 一致。
+ */
 function resolveTaskProvider(provider: string | null | undefined): DigitalHumanProvider {
-  return provider === "shanjian" ? "shanjian" : "chanjing";
+  return normalizeDigitalHumanProvider(provider);
 }
 
 async function findTask(taskId: string): Promise<VideoTaskRecord> {
@@ -311,13 +346,14 @@ export async function settleVideoTaskSuccess(input: {
         id: input.taskId,
         status: { in: [...ACTIVE_VIDEO_TASK_STATUSES] },
       },
-      data: {
-        status: "completed",
-        videoUrl: input.result.videoUrl,
-        coverUrl: input.result.coverUrl ?? null,
-        duration: input.result.duration ?? null,
-        completedAt: new Date(),
-        errorCode: "TRANSFER_FAILED",
+    data: {
+      status: "completed",
+      videoUrl: input.result.videoUrl,
+      coverUrl: input.result.coverUrl ?? null,
+      duration: input.result.duration ?? null,
+      ...(input.result.renderOutputs ? { renderOutputs: input.result.renderOutputs } : {}),
+      completedAt: new Date(),
+      errorCode: "TRANSFER_FAILED",
         errorMessage: error instanceof Error ? error.message : "成片转存失败，可稍后重试转存",
         deliveryStatus: "degraded",
         deliveryWarning: "供应商已完成生成，但 AIM 存储转存失败；请重试转存，不会重复生成。",
@@ -347,6 +383,8 @@ export async function settleVideoTaskSuccess(input: {
       videoUrl: archived.videoUrl,
       coverUrl: archived.coverUrl,
       duration: input.result.duration ?? null,
+      // 多产物清单不参与转存：它已经是 OSS 直址，与主 URL 同源同生命周期
+      ...(input.result.renderOutputs ? { renderOutputs: input.result.renderOutputs } : {}),
       completedAt: new Date(),
       errorCode: null,
       errorMessage: null,

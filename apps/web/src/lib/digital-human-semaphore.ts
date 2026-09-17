@@ -29,11 +29,15 @@ export function providerSemaphoreKey(provider: DigitalHumanProvider): string {
 }
 
 export function providerMaxConcurrent(provider: DigitalHumanProvider): number {
+  // hypit 走本机渲染：CPU 密集且独占一个 Runtime Worker，缺省并发固定为 1。
+  // 想调大必须先按方案 §7 实测单任务资源占用，否则会把网站一起拖慢。
   const configured = provider === "chanjing"
     ? env.CHANJING_MAX_CONCURRENT
     : provider === "heygen"
       ? env.HEYGEN_MAX_CONCURRENT
-      : env.SHANJIAN_MAX_CONCURRENT
+      : provider === "hypit"
+        ? env.HYPIT_MAX_CONCURRENT
+        : env.SHANJIAN_MAX_CONCURRENT
   const parsed = Number.parseInt(configured ?? "1", 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
 }

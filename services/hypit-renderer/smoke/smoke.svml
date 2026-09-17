@@ -1,0 +1,52 @@
+<?svml using="@hypit/markup@1"?>
+
+<!--
+  Hypit Backend smoke Source (zero hosted cost).
+
+  Purpose: give the HTTP backend a Build that completes using ONLY local providers
+  (hyperframes.local rendering + media.local muxing). No Provider account, no paid
+  generation, no network call. Use it to verify submit -> poll -> export end to end
+  before authorising any paid Run.
+
+  Card asset copied from examples/ranking-football/assets/haaland.jpg (800x800).
+-->
+<svml>
+  <import as="asset" from="@hypit/media@1"/>
+  <import as="space" from="@hypit/spatial@1"/>
+  <import as="time" from="@hypit/timeline-author@1"/>
+  <import as="pipeline" from="@hypit/media-pipeline@1"/>
+  <import as="media-track" from="@hypit/media-track@1"/>
+  <import as="audio-track" from="@hypit/audio-track@1"/>
+  <import as="film" from="@hypit/film@1"/>
+  <import as="render" from="@hypit/render-hyperframes@1"/>
+  <import as="recipes" source="./recipes.svs"/>
+
+  <space:Canvas id="vertical" width="1080" height="1920"/>
+  <time:Clock id="clock" frame-rate="30"/>
+  <time:Timeline id="program" clock={clock} end="6s"/>
+  <space:Frame id="stage" within={vertical} left="0%" top="0%" right="100%" bottom="100%"/>
+  <space:Extent id="card-extent" width="800" height="800"/>
+
+  <asset:Image id="card-image" src="./assets/card.jpg"/>
+  <asset:Audio id="bed-audio" src="./assets/ranking-move.wav"/>
+  <pipeline:Normalize id="bed-media" source={bed-audio}
+    video="none" audio="default" span-authority="audio" clock={clock}/>
+
+  <media-track:Track id="cards" timeline={program.timeline} canvas={vertical}>
+    <media-track:Item id="card" image={card-image} extent={card-extent} during="program"
+      frame={stage} appearance={recipes.media.card}/>
+  </media-track:Track>
+
+  <audio-track:Track id="bed" timeline={program.timeline}>
+    <audio-track:Item source={bed-media.media} during="program"
+      playback="once-start" gain="0.4"/>
+  </audio-track:Track>
+
+  <film:Film id="main" canvas={vertical} timeline={program.timeline}
+    appearance={recipes.film.vertical}>
+    <film:Track source={cards.visual}/>
+    <film:Track source={bed.audio}/>
+  </film:Film>
+
+  <render:Video id="final" composition={main.composition} timeline={program.timeline}/>
+</svml>

@@ -1,0 +1,47 @@
+# Hypit 渲染服务 —— compose 片段（草稿，待审批后合入根 docker-compose.prod.yml）
+#
+# 为什么是片段：根 `docker-compose.prod.yml` 属生产编排，改动需审批。
+# 合入方式：把下面的 `hypit-renderer:` 块粘到 web 服务之后，
+# 并把 `hypit_renderer_state` 加进顶层 volumes。
+#
+# 形态对齐现成的 `video-extractor`：profiles 可选服务 + 同网络 + 命名卷。
+# 差异只有三点：副本恒为 1、需要更大的 CPU、产物目录要持久化。
+
+  hypit-renderer:
+    profiles: ["hypit-renderer"]
+    build:
+      context: services/hypit-renderer
+      # Hypit CLI 源码不进构建上下文（许可限制：不得再分发），由宿主机以 build context 注入。
+      # 构建前先 `cp -R <hypit-repo> /tmp/hypit-src` 或在 CI 里 checkout。
+      args:
+        HYPIT_SRC: hypit
+    image: clip-registry-vpc.cn-hangzhou.cr.aliyuncs.com/mingyuan/hypit-renderer:latest
+    container_name: mingyuan-hypit-renderer
+    restart: unless-stopped
+    environment:
+      HYPIT_API_TOKEN: ${HYPIT_API_TOKEN}
+      HYPIT_BIN: /opt/hypit/bin/hypit
+      HYPIT_WORKSPACE_ROOT: /var/lib/hypit/workspace
+      HYPIT_ALLOWED_SOURCE_ROOTS: /var/lib/hypit/workspace
+      HYPIT_STATE_DIR: /var/lib/hypit/state
+      HYPIT_OUTPUT_DIR: /var/lib/hypit/outputs
+      # 浏览器路径由 scripts/resolve-browser.sh 在启动时按架构解析并写回，
+      # 这里只给一个兜底值（镜像里两个架构的 Chrome 都在）。
+      HYPERFRAMES_BROWSER_PATH: /opt/hypit/chrome/chrome-headless-shell
+      WARM_UP_ON_STARTUP: "1"
+      LOG_LEVEL: ${HYPIT_LOG_LEVEL:-info}
+    volumes:
+      - hypit_renderer_state:/var/lib/hypit
+    # 渲染是 CPU 密集长任务，别让 compose 在部署时把它和健康检查一起卡死
+    healthcheck:
+      test: ["CMD", "python", "scripts/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - mingyuan-prod
+
+# 顶层追加：
+# volumes:
+#   hypit_renderer_state:

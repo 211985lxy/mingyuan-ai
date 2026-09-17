@@ -19,7 +19,13 @@ export function buildShanjianSubmitPayload(input: {
   videoType: VideoTaskType;
   avatar: ResolvedAvatar | null;
   scriptContent: string;
-  aspectRatio?: "9:16" | "16:9";
+  /**
+   * 交付比例。这里是**通用载荷**，三家上游各自按自己的能力窄化
+   * （蝉镜/HeyGen 都写成 `=== "16:9" ? "16:9" : "9:16"`），
+   * 所以新增比例只在这里放开即可，不必改各 provider 分支。
+   * 目前 `1:1` 只有 hypit 支持，是否允许由 API 层按 provider 校验。
+   */
+  aspectRatio?: "9:16" | "16:9" | "1:1";
   /** 自有语音路径：蝉镜可抓取的签名音频 URL（audio 型下单用） */
   ownVoiceAudioUrl?: string;
   /** 自有语音音色 id：仅作重试快照，避免重试时静默退回数字人自带音色 */

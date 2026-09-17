@@ -1,0 +1,93 @@
+<?svml using="@hypit/markup@1"?>
+
+<!--
+  Generic three-ratio card template (zero hosted cost, local providers only).
+
+  One Build → three target outputs:
+    final-916.video  (9:16  · 1080×1920)
+    final-169.video  (16:9  · 1920×1080)
+    final-11.video   (1:1   · 1080×1080)
+
+  AIM 侧 `lib/hypit-ratio.ts` 的 `inferHypitAspectRatio()` 按产物名里的比例标记
+  把三条产物分派到对应比例；命名约定见 services/hypit-renderer/docs/TEMPLATE-CONTRACT.md。
+
+  资产用相对路径 `./assets/...`（源文件形态，渲染服务按源文件所在目录解析）。
+  AIM 侧 `content` 内联提交走绝对路径，见 `lib/hypit-templates.ts` 的 `{{asset_base}}`。
+
+  文案变量此处留空——占位模板只验证三比例多产物链路；可见标题由业务模板
+  （中汝达供暖 / 芳姐 IP / 通用卡片）按 Hypit 字幕/文本图元补上。
+-->
+<svml>
+  <import as="asset" from="@hypit/media@1"/>
+  <import as="space" from="@hypit/spatial@1"/>
+  <import as="time" from="@hypit/timeline-author@1"/>
+  <import as="pipeline" from="@hypit/media-pipeline@1"/>
+  <import as="media-track" from="@hypit/media-track@1"/>
+  <import as="audio-track" from="@hypit/audio-track@1"/>
+  <import as="film" from="@hypit/film@1"/>
+  <import as="render" from="@hypit/render-hyperframes@1"/>
+  <import as="recipes" source="./recipes.svs"/>
+
+  <!-- 三个画布 -->
+  <space:Canvas id="canvas-916" width="1080" height="1920"/>
+  <space:Canvas id="canvas-169" width="1920" height="1080"/>
+  <space:Canvas id="canvas-11"  width="1080" height="1080"/>
+
+  <time:Clock id="clock" frame-rate="30"/>
+  <time:Timeline id="program" clock={clock} end="6s"/>
+
+  <!-- 三个满屏框 + 卡片范围 -->
+  <space:Frame id="frame-916" within={canvas-916} left="0%" top="0%" right="100%" bottom="100%"/>
+  <space:Frame id="frame-169" within={canvas-169} left="0%" top="0%" right="100%" bottom="100%"/>
+  <space:Frame id="frame-11"  within={canvas-11}  left="0%" top="0%" right="100%" bottom="100%"/>
+  <space:Extent id="extent-916" width="1080" height="1080"/>
+  <space:Extent id="extent-169" width="1080" height="1080"/>
+  <space:Extent id="extent-11"  width="1080" height="1080"/>
+
+  <asset:Image id="card-image" src="./assets/card.jpg"/>
+  <asset:Audio id="bed-audio" src="./assets/ranking-move.wav"/>
+  <pipeline:Normalize id="bed-media" source={bed-audio}
+    video="none" audio="default" span-authority="audio" clock={clock}/>
+
+  <!-- 三个媒体轨（各绑定一个画布，共用同一张卡片） -->
+  <media-track:Track id="cards-916" timeline={program.timeline} canvas={canvas-916}>
+    <media-track:Item id="card-916" image={card-image} extent={extent-916} during="program"
+      frame={frame-916} appearance={recipes.media.card}/>
+  </media-track:Track>
+  <media-track:Track id="cards-169" timeline={program.timeline} canvas={canvas-169}>
+    <media-track:Item id="card-169" image={card-image} extent={extent-169} during="program"
+      frame={frame-169} appearance={recipes.media.card}/>
+  </media-track:Track>
+  <media-track:Track id="cards-11" timeline={program.timeline} canvas={canvas-11}>
+    <media-track:Item id="card-11" image={card-image} extent={extent-11} during="program"
+      frame={frame-11} appearance={recipes.media.card}/>
+  </media-track:Track>
+
+  <!-- 共用一条背景音轨 -->
+  <audio-track:Track id="bed" timeline={program.timeline}>
+    <audio-track:Item source={bed-media.media} during="program"
+      playback="once-start" gain="0.4"/>
+  </audio-track:Track>
+
+  <!-- 三个合成 -->
+  <film:Film id="film-916" canvas={canvas-916} timeline={program.timeline}
+    appearance={recipes.film.vertical}>
+    <film:Track source={cards-916.visual}/>
+    <film:Track source={bed.audio}/>
+  </film:Film>
+  <film:Film id="film-169" canvas={canvas-169} timeline={program.timeline}
+    appearance={recipes.film.horizontal}>
+    <film:Track source={cards-169.visual}/>
+    <film:Track source={bed.audio}/>
+  </film:Film>
+  <film:Film id="film-11" canvas={canvas-11} timeline={program.timeline}
+    appearance={recipes.film.square}>
+    <film:Track source={cards-11.visual}/>
+    <film:Track source={bed.audio}/>
+  </film:Film>
+
+  <!-- 三个产物：id 必须带比例标记 -->
+  <render:Video id="final-916" composition={film-916.composition} timeline={program.timeline}/>
+  <render:Video id="final-169" composition={film-169.composition} timeline={program.timeline}/>
+  <render:Video id="final-11"  composition={film-11.composition}  timeline={program.timeline}/>
+</svml>

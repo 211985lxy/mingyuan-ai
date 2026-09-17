@@ -9,7 +9,6 @@ import {
 } from "@/lib/chanjing"
 import { createDigitalHumanVideoFromAudio } from "@/lib/chanjing-audio"
 import {
-  createVideo as createHeygenVideo,
   getVideo as getHeygenVideo,
   isHeygenConfigured,
   mapHeygenVideoToTaskResult,
@@ -25,33 +24,33 @@ import {
   ShanjianError,
   type ShanjianSubmitResult,
 } from "@/lib/shanjian"
+import { HypitError, isHypitConfigured } from "@/lib/hypit"
+import { HypitTemplateError } from "@/lib/hypit-template"
 import { env } from "@/env"
+import { DigitalHumanProviderError } from "./digital-human-provider-error"
+import { submitHeygenVideo } from "./heygen-submit"
+import { resolveHypitTaskResult, submitHypitVideo } from "./hypit-submit"
 
-export type DigitalHumanProvider = "chanjing" | "shanjian" | "heygen"
+// 错误类型已抽到 `digital-human-provider-error.ts`（子模块也要抛它，留在会造成循环
+// import）；这里转出，保持既有 `@/lib/digital-human-provider` 的导入路径不变。
+export { DigitalHumanProviderError } from "./digital-human-provider-error"
+
+export type DigitalHumanProvider = "chanjing" | "shanjian" | "heygen" | "hypit"
 
 export function isDigitalHumanProvider(value: unknown): value is DigitalHumanProvider {
-  return value === "chanjing" || value === "shanjian" || value === "heygen"
+  return value === "chanjing" || value === "shanjian" || value === "heygen" || value === "hypit"
 }
 
 export function normalizeDigitalHumanProvider(value: unknown): DigitalHumanProvider {
-  if (value === "shanjian" || value === "heygen") return value
+  if (value === "shanjian" || value === "heygen" || value === "hypit") return value
   return "chanjing"
-}
-
-export class DigitalHumanProviderError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public requestId?: string,
-  ) {
-    super(message)
-    this.name = "DigitalHumanProviderError"
-  }
 }
 
 export function getDigitalHumanProvider(): DigitalHumanProvider {
   const configured = env.DIGITAL_HUMAN_PROVIDER
-  if (configured === "chanjing" || configured === "shanjian" || configured === "heygen") return configured
+  if (configured === "chanjing" || configured === "shanjian" || configured === "heygen" || configured === "hypit") {
+    return configured
+  }
   return "chanjing"
 }
 
@@ -103,6 +102,14 @@ export function buildDigitalHumanAuthorizationText(template: string): string {
 export function getDigitalHumanAuthorizationText(
   provider: DigitalHumanProvider = getDigitalHumanProvider(),
 ): string {
+  // Hypit 是自建渲染后端，不存在「供应商要求用户朗读授权原文」这套概念。
+  // 显式拒绝，避免落到下方闪剪分支去读 SHANJIAN_AUTH_TEXT。
+  if (provider === "hypit") {
+    throw new DigitalHumanProviderError(
+      "AUTH_TEXT_NOT_APPLICABLE",
+      "本机渲染服务不涉及形象授权文案",
+    )
+  }
   const configured = provider === "chanjing"
     ? env.CHANJING_AUTH_TEXT
     : env.SHANJIAN_AUTH_TEXT
@@ -131,12 +138,22 @@ export function isDigitalHumanConfigured(): boolean {
   const provider = getDigitalHumanProvider()
   if (provider === "chanjing") return isChanjingConfigured()
   if (provider === "heygen") return isHeygenConfigured()
+  if (provider === "hypit") return isHypitConfigured()
   return Boolean(env.SHANJIAN_APP_KEY)
 }
 
 function wrapError(error: unknown): DigitalHumanProviderError {
   if (error instanceof DigitalHumanProviderError) return error
-  if (error instanceof ChanjingError || error instanceof ShanjianError || error instanceof HeygenError) {
+  // 变量缺值要原样带出 `MISSING_VARIABLE`，否则调用方无法区分「模板没填」和「服务异常」。
+  if (error instanceof HypitTemplateError) {
+    return new DigitalHumanProviderError(error.code, error.message)
+  }
+  if (
+    error instanceof ChanjingError
+    || error instanceof ShanjianError
+    || error instanceof HeygenError
+    || error instanceof HypitError
+  ) {
     return new DigitalHumanProviderError(error.code, error.message, error.requestId)
   }
   if (error instanceof Error) {
@@ -279,6 +296,11 @@ export async function getVideoTaskStatus(taskId: string) {
 export async function getVideoTaskStatusForProvider(
   provider: DigitalHumanProvider,
   taskId: string,
+  /**
+   * 仅 Hypit 用：本次任务要的比例。一次 build 会吐出三比例的多个产物，
+   * 决定 `videoUrl` 取哪一条。不传则取渲染顺序的第一条。
+   */
+  options: { aspectRatio?: "9:16" | "16:9" | "1:1" } = {},
 ) {
   try {
     if (provider === "chanjing") {
@@ -286,6 +308,9 @@ export async function getVideoTaskStatusForProvider(
     }
     if (provider === "heygen") {
       return mapHeygenVideoToTaskResult(await getHeygenVideo(taskId))
+    }
+    if (provider === "hypit") {
+      return await resolveHypitTaskResult(taskId, options.aspectRatio)
     }
     return await getShanjianTaskInfo(taskId)
   } catch (error) {
@@ -334,6 +359,9 @@ export async function submitVideoToProvider(
   try {
     if (provider === "heygen") {
       return await submitHeygenVideo(videoType, payload)
+    }
+    if (provider === "hypit") {
+      return await submitHypitVideo(payload)
     }
     if (provider === "chanjing") {
       return await submitChanjingVideo(videoType, payload)
@@ -423,73 +451,4 @@ async function submitChanjingVideo(
     figureType: typeof payload.figureType === "string" ? payload.figureType : null,
     driveMode: payload.driveMode === "random" ? "random" : null,
   })
-}
-
-const HEYGEN_VIDEO_TYPES = new Set([
-  "virtualman_broadcast",
-  "virtualman_video",
-  "custom_virtualman_broadcast",
-])
-
-/**
- * HeyGen v3 出片提交。
- *
- * 两种驱动二选一（与 /v3/videos 的契约一致）：
- * - 音频驱动：载荷里有 ownVoiceAudioUrl 时传 audio_url，脚本不参与（口型跟音频）
- * - 脚本驱动：传 script + voice_id，由 HeyGen 侧 TTS
- * avatar_id 必填；缺失或类型不支持时 fail-closed，不提交半个任务。
- */
-async function submitHeygenVideo(
-  videoType: string,
-  payload: Record<string, unknown>,
-): Promise<ShanjianSubmitResult> {
-  if (!HEYGEN_VIDEO_TYPES.has(videoType)) {
-    throw new DigitalHumanProviderError(
-      "UNSUPPORTED_VIDEO_TYPE",
-      `HeyGen 暂不支持 ${videoType} 类型出片`,
-    )
-  }
-  const avatarId = typeof payload.virtualmanId === "string" ? payload.virtualmanId : null
-  if (!avatarId) {
-    throw new DigitalHumanProviderError(
-      "MISSING_VIDEO_INPUT",
-      "缺少数字人形象，无法提交 HeyGen 出片任务",
-    )
-  }
-
-  const aspectRatio = payload.aspectRatio === "16:9" ? "16:9" : "9:16"
-  const script = typeof payload.text === "string"
-    ? payload.text
-    : typeof payload.content === "string"
-      ? payload.content
-      : null
-  const audioUrl = typeof payload.ownVoiceAudioUrl === "string" ? payload.ownVoiceAudioUrl : null
-  const voiceId = typeof payload.speakerId === "string" ? payload.speakerId : null
-
-  if (!audioUrl && (!script || !voiceId)) {
-    throw new DigitalHumanProviderError(
-      "MISSING_VIDEO_INPUT",
-      "缺少音色或口播文案，无法提交 HeyGen 出片任务",
-    )
-  }
-
-  const submitted = await createHeygenVideo({
-    type: "avatar",
-    avatar_id: avatarId,
-    ...(audioUrl ? { audio_url: audioUrl } : { script: script!, voice_id: voiceId! }),
-    aspect_ratio: aspectRatio,
-    ...(typeof payload.title === "string" ? { title: payload.title } : {}),
-  })
-
-  return {
-    ...submitted,
-    payload: {
-      ...submitted.payload,
-      // 与蝉镜分支一致：把 own-voice 快照标记并入返回载荷，供重试还原音源
-      ...(audioUrl ? { audioType: "audio", ownVoiceAudioUrl: audioUrl } : {}),
-      ...(audioUrl && typeof payload.ownVoiceVoiceId === "string"
-        ? { ownVoiceVoiceId: payload.ownVoiceVoiceId }
-        : {}),
-    },
-  }
 }

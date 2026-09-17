@@ -2,7 +2,7 @@ import { createAvatarVoiceCloneAsset, createAvatarVoiceCloneAssetFromVideo, ensu
 import { triggerAvatarDemoVideo } from "@/lib/avatar-demo";
 import { transferFromUrl } from "@/lib/oss";
 import { prisma } from "@/lib/prisma";
-import { getAvatarCloneStatusForProvider } from "@/lib/digital-human-provider";
+import { getAvatarCloneStatusForProvider, normalizeDigitalHumanProvider } from "@/lib/digital-human-provider";
 import { releaseProviderSlot, type DigitalHumanProvider } from "@/lib/digital-human-semaphore";
 import { digitalHumanEventsTotal } from "@/lib/metrics";
 import { acquireTaskRecoveryLock } from "./lock";
@@ -168,6 +168,7 @@ async function repairAvatarDemo(avatar: MissingDemoAvatar, logPrefix: string): P
   }
 }
 
+/** 与 `video-polling` 同款白名单校验：认不出的 provider 兜底蝉镜，不再误判为闪剪之外皆蝉镜。 */
 function normalizeProvider(provider: string): DigitalHumanProvider {
-  return provider === "shanjian" ? "shanjian" : "chanjing";
+  return normalizeDigitalHumanProvider(provider);
 }

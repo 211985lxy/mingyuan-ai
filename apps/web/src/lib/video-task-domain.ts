@@ -46,8 +46,8 @@ export function buildVideoTaskIdempotencyKey(input: {
   aimGenerationId?: string | null;
   avatarId: string | null;
   scriptContent: string;
-  aspectRatio: "9:16" | "16:9";
-  provider: "chanjing" | "shanjian" | "heygen";
+  aspectRatio: "9:16" | "16:9" | "1:1";
+  provider: "chanjing" | "shanjian" | "heygen" | "hypit";
   actionId?: string | null;
   voiceSource?: string | null;
   /** 公共数字人无 DB 记录，用供应商形象 id 参与去重；缺省不参与，保持既有键不变 */

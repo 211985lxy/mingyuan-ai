@@ -24,10 +24,10 @@ export type CreateVideoTaskInput = {
   type?: string;
   projectId?: string;
   aimGenerationId?: string;
-  aspectRatio?: "9:16" | "16:9";
+  aspectRatio?: "9:16" | "16:9" | "1:1";
   actionId?: string;
   retryOfTaskId?: string;
-  provider?: "chanjing" | "shanjian" | "heygen";
+  provider?: "chanjing" | "shanjian" | "heygen" | "hypit";
   avatarId?: string;
   scriptId?: string;
   scriptContent?: string;
@@ -50,6 +50,31 @@ export type CreateVideoTaskInput = {
   voiceSource?: "tts" | "own_voice";
   /** 自有语音的音色 id（Fish Audio reference_id）；留空用平台默认音色 */
   voiceId?: string;
+  /**
+   * ── Hypit 渲染源（`provider: "hypit"` 专用）────────────────────────────
+   *
+   * 与前三个 provider 不同，Hypit 不认识「数字人形象 + 口播文案」，它渲染的是一份
+   * SVML 源。两个字段二选一：
+   * - `hypitSourcePath`：渲染服务工作区内的一条 .svml / .svs / .svrun 路径
+   * - `hypitSource`：内联源文本，由渲染服务写入工作区后提交
+   *
+   * 缺省时提交会被 fail-closed 拒绝（见 `lib/digital-human-provider.ts`）。
+   */
+  hypitSourcePath?: string;
+  hypitSource?: string;
+  /** 配合 `hypitSource` 指定扩展名（决定源类型），默认 inline.svml */
+  hypitSourceFilename?: string;
+  /**
+   * 模板名（`provider: "hypit"` 专用，与 `hypitSource` / `hypitSourcePath` 互斥）。
+   *
+   * 走「预置模板 + 换文案变量」路线（见 `services/hypit-renderer/docs/TEMPLATE-CONTRACT.md`
+   * 方案 A）：AIM 侧按名字从 `lib/hypit-templates.ts` 取出模板源文本，用
+   * `hypitVariables` 渲染 `{{var}}` 后内联提交。素材路径由模板里的 `{{asset_base}}`
+   * 决定（指向渲染服务内已烤好的素材目录，绝对路径）。
+   */
+  hypitTemplateName?: string;
+  /** 模板变量；缺值按 `HypitTemplateError` fail-closed（绝不把 `{{var}}` 留进片子）。 */
+  hypitVariables?: Record<string, string | number>;
   [key: string]: unknown;
 };
 

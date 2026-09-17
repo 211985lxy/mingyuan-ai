@@ -1,0 +1,32 @@
+# Keep secrets, host-only artifacts and local state out of the build context.
+#
+# The context is uploaded to the builder before any COPY runs, so anything listed
+# here never leaves this machine. `.env` holds HYPIT_API_TOKEN — it must not be
+# in the context even though no COPY line references it.
+
+.env
+.env.*
+
+# Host virtualenv: hundreds of MB, and meaningless on Linux.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Compiled shim for macOS 26 — a Mach-O binary that must never reach a Linux image.
+bin/
+
+# Local state and produced media.
+state/
+outputs/
+smoke/.hypit/
+smoke/outputs/
+
+# Docs and host tooling are not needed at runtime.
+docs/
+HANDOFF.md
+tools/
+
+.git/
+.gitignore
+.dockerignore

@@ -47,7 +47,10 @@ export function buildRetryPayload(
     if (sp.styleId) payload.styleId = sp.styleId;
     if (sp.speakerExtra) payload.speakerExtra = sp.speakerExtra;
     if (sp.processRules) payload.processRules = sp.processRules;
-    if (sp.aspectRatio === "16:9" || sp.aspectRatio === "9:16") payload.aspectRatio = sp.aspectRatio;
+    // 比例要一并还原：漏掉会让重试静默退回默认 9:16（1:1 尤其致命，只有 hypit 认它）
+    if (sp.aspectRatio === "16:9" || sp.aspectRatio === "9:16" || sp.aspectRatio === "1:1") {
+      payload.aspectRatio = sp.aspectRatio;
+    }
 
     // 落库的 payload 是供应商返回的那份，own-voice 标记可能出现在两处形状：
     // 顶层 audioType（服务端构造）或 provider 的 audio.type（蝉镜 audio 型）。

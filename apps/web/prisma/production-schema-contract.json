@@ -715,7 +715,8 @@
         "scriptContent",
         "avatarName",
         "externalTaskId",
-        "deliveryStatus"
+        "deliveryStatus",
+        "renderOutputs"
       ]
     },
     {
