@@ -52,19 +52,27 @@ probe_hop() {
   echo "[model-probe] hop$position/$total $name ($model): transient ($code) ${body:0:160}"
 }
 
-# ── 跳表：模型名写死为 agent-router.ts QUALITY_PRIMARY_ROUTE 的路由覆盖值，
+# ── 跳表：模型名与顺序写死为 agent-router.ts QUALITY_PRIMARY_ROUTE 的路由覆盖值，
 #    不读 env 模型变量（env 里的 *_MODEL 是 provider 默认值，质量链实际不用它们）。──
+# 2026-09-15 修正与质量链的三处失同步（此前门禁探的是一条不存在的线路）：
+#   1. deepseek 探的是 deepseek-v4-pro，质量链实际用 DeepSeek 的 flash 线
+#      （v4-pro 因「思维链失控，72s+ 无正文」已被逐出质量链）。
+#      2026-09-16 起该 flash 线的正式 ID 为 deepseek-flash（V4.1-Flash），
+#      deepseek-v4-flash 已降为兼容别名，跳表统一用正式 ID。
+#   2. 顺序把 doubao 排在 2、deepseek 排在 4，与质量链（zenmux → deepseek → apimart → doubao）相反。
+#   3. 顺序错位使 abort 语义倒挂：质量链里 doubao 是末跳（死配置只告警不阻断），
+#      这里却按非末位处理，一旦豆包未开通就会误拦发布，而真正该拦的前三跳反而没人管。
 ZENMUX_MODEL_ID="anthropic/claude-sonnet-4.6"
 APIMART_MODEL_ID="gpt-5.4"
-DEEPSEEK_MODEL_ID="deepseek-v4-pro"
+DEEPSEEK_MODEL_ID="deepseek-flash"
 DOUBAO_MODEL_ID="doubao-seed-2-1-pro-260628"
 DOUBAO_KEY="${DOUBAO_API_KEY:-${ARK_API_KEY:-}}"
 DOUBAO_BASE="${DOUBAO_BASE_URL:-https://ark.cn-beijing.volces.com/api/v3}"
 
 probe_hop zenmux   "$ZENMUX_MODEL_ID"    "${ZENMUX_BASE_URL:-https://zenmux.ai/api/v1}"    "${ZENMUX_API_KEY:-}"   "${ZENMUX_PROXY_URL:-}"  1 4
-probe_hop doubao   "$DOUBAO_MODEL_ID"    "$DOUBAO_BASE"                                    "$DOUBAO_KEY"           ""                        2 4
+probe_hop deepseek "$DEEPSEEK_MODEL_ID"  "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}" "${DEEPSEEK_API_KEY:-}" ""                       2 4
 probe_hop apimart  "$APIMART_MODEL_ID"   "${APIMART_BASE_URL:-https://api.apimart.ai/v1}" "${APIMART_API_KEY:-}"  "${APIMART_PROXY_URL:-}" 3 4
-probe_hop deepseek "$DEEPSEEK_MODEL_ID"  "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}" "${DEEPSEEK_API_KEY:-}" ""                        4 4
+probe_hop doubao   "$DOUBAO_MODEL_ID"    "$DOUBAO_BASE"                                    "$DOUBAO_KEY"           ""                        4 4
 
 if [ "$abort" -ne 0 ]; then
   echo "[model-probe] GATE=ABORT：质量链非末位跳存在确定性死配置（未开通/鉴权失败），中止发布。请在方舟/网关控制台修复或调整 agent-router 跳序。" >&2

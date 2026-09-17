@@ -9,6 +9,15 @@
 export const CROSS_GATEWAY_MODELS = {
   /** 中文长文案质感主力（模型路由规范：深度文案 → Claude） */
   claudeSonnet: "anthropic/claude-sonnet-4.6",
+  /** 内容创作质量首选（模型路由规范：深度文案 → Claude Opus）；仅聚合网关认识该跨网关名 */
+  claudeOpus: "anthropic/claude-opus-4.6",
+  /**
+   * 以下三个由 2026-09-17 实测 OpenRouter 目录（444 个模型）确认存在，勿凭记忆改：
+   * 该站用厂商前缀名，与 jiekou 的裸名（gemini-3.8-flash）不是一套写法。
+   */
+  geminiFlash: "google/gemini-3.8-flash",
+  kimiK3: "moonshotai/kimi-k3",
+  grok: "x-ai/grok-4.6",
 } as const
 
 export type CrossGatewayModel = (typeof CROSS_GATEWAY_MODELS)[keyof typeof CROSS_GATEWAY_MODELS]

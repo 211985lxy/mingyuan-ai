@@ -26,6 +26,8 @@ export interface AimExecutionDeadline {
   deadlineAt: number
   remainingMs(): number
   signal: AbortSignal
+  /** 本层预算是否被自己的计时器耗尽：用于把「超时」与「上游中止」分开分类。 */
+  expiredByTimer: boolean
 }
 
 const storage = new AsyncLocalStorage<AimExecutionDeadline>()
@@ -34,50 +36,78 @@ export function getAimExecutionDeadline(): AimExecutionDeadline | undefined {
   return storage.getStore()
 }
 
-function createStore(timeoutMs: number): AimExecutionDeadline & { controller: AbortController } {
-  const budget = Number.isFinite(timeoutMs) ? Math.max(0, Math.floor(timeoutMs)) : 0
-  const deadlineAt = Date.now() + budget
-  const controller = new AbortController()
-  return {
-    deadlineAt,
-    controller,
-    signal: controller.signal,
-    remainingMs() {
-      return Math.max(0, deadlineAt - Date.now())
-    },
-  }
+function normalizeBudgetMs(timeoutMs: number): number {
+  return Number.isFinite(timeoutMs) ? Math.max(0, Math.floor(timeoutMs)) : 0
 }
 
+/**
+ * 中止原因分类：本层计时器耗尽算超时；否则沿用上游原因——父层计时器耗尽同样算超时，
+ * 剩下的（客户端断开等）算用户中止。误判成用户中止会让降级链继续空转，所以父层的
+ * 耗尽原因必须分辨，不能只看信号是否 aborted。
+ */
+function abortReason(
+  parent: AimExecutionDeadline | undefined,
+  timedOut: boolean,
+  upstreamSignal: AbortSignal | undefined,
+): Error {
+  if (timedOut) return new AimDeadlineExceededError()
+  if (parent) return parent.expiredByTimer ? new AimDeadlineExceededError() : new AimExecutionAbortedError()
+  return upstreamSignal?.aborted ? new AimExecutionAbortedError() : new AimDeadlineExceededError()
+}
+
+/**
+ * 建立一层执行预算并运行 fn；嵌套时取更严的那一层。
+ *
+ * 此前嵌套直接 `return fn()`，内层的 timeoutMs 被静默丢掉，于是：
+ *   - 「给某个阶段加一层更严的上限」完全无效；
+ *   - 反过来在外层套一个更宽的预算（入口层 115s 套住 runner 的 60s），会把内层更严的
+ *     上限一起放大——2026-09-15 在 /api/aim/generate 上真的踩过一次。
+ * 现在取 min(内层上限, 外层剩余)，两个方向都不会出意外。
+ */
 export async function runWithAimExecutionDeadline<T>(
   timeoutMs: number,
   fn: () => Promise<T>,
   externalSignal?: AbortSignal,
 ): Promise<T> {
-  const existing = storage.getStore()
-  if (existing) return fn()
-  const store = createStore(timeoutMs)
+  const parent = storage.getStore()
+  const upstreamSignal = parent?.signal ?? externalSignal
+  const budgetMs = parent
+    ? Math.min(normalizeBudgetMs(timeoutMs), parent.remainingMs())
+    : normalizeBudgetMs(timeoutMs)
+
+  const deadlineAt = Date.now() + budgetMs
+  const controller = new AbortController()
+  const store: AimExecutionDeadline & { controller: AbortController } = {
+    deadlineAt,
+    controller,
+    signal: controller.signal,
+    expiredByTimer: false,
+    remainingMs() {
+      return Math.max(0, deadlineAt - Date.now())
+    },
+  }
+
   return storage.run(store, async () => {
     let timer: ReturnType<typeof setTimeout> | undefined
-    let onExternalAbort: (() => void) | undefined
+    let onUpstreamAbort: (() => void) | undefined
     let rejectForAbort: (() => void) | undefined
     const abortError = new Promise<never>((_, reject) => {
-      rejectForAbort = () => {
-        reject(externalSignal?.aborted
-          ? new AimExecutionAbortedError()
-          : new AimDeadlineExceededError())
-      }
-      store.controller.signal.addEventListener("abort", rejectForAbort, { once: true })
-      onExternalAbort = () => store.controller.abort()
-      if (externalSignal?.aborted) onExternalAbort()
-      else externalSignal?.addEventListener("abort", onExternalAbort, { once: true })
-      timer = setTimeout(() => store.controller.abort(), Math.max(0, Math.floor(timeoutMs)))
+      rejectForAbort = () => reject(abortReason(parent, store.expiredByTimer, upstreamSignal))
+      controller.signal.addEventListener("abort", rejectForAbort, { once: true })
+      onUpstreamAbort = () => controller.abort()
+      if (upstreamSignal?.aborted) onUpstreamAbort()
+      else upstreamSignal?.addEventListener("abort", onUpstreamAbort, { once: true })
+      timer = setTimeout(() => {
+        store.expiredByTimer = true
+        controller.abort()
+      }, budgetMs)
     })
     try {
       return await Promise.race([fn(), abortError])
     } finally {
       if (timer) clearTimeout(timer)
-      if (rejectForAbort) store.controller.signal.removeEventListener("abort", rejectForAbort)
-      if (onExternalAbort) externalSignal?.removeEventListener("abort", onExternalAbort)
+      if (rejectForAbort) controller.signal.removeEventListener("abort", rejectForAbort)
+      if (onUpstreamAbort) upstreamSignal?.removeEventListener("abort", onUpstreamAbort)
     }
   })
 }
