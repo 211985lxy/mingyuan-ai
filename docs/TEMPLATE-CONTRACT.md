@@ -126,6 +126,11 @@ AIM 侧实现：`lib/hypit-templates.ts`（渲染 + 生成 svrun）、
 - `{{raw:body}}` — 不转义，调用方自负
 - `{{template_dir}}` — **内部变量**，由 `HYPIT_TEMPLATE_DIR`（默认 `templates`）
   拼出 `./templates/<name>`，调用方不用传
+- `{{card_image}}` — `generic-card` 的卡片图路径，默认 `./templates/<name>/assets/card.jpg`
+- `{{card_width}}` / `{{card_height}}` — **卡片图的真实像素尺寸**，默认 `800×800`（对齐占位图）。
+  ⚠️ 换图**必须连通尺寸一起传**：Hypit 的 `space:Extent` 按这两个值描述源图字节，
+  `fit: cover` 据此算宽高比。写错会让画面被拉伸或放大裁掉（曾把 1024×1536 的竖版稿
+  按方形处理，标题被裁）。例：`{card_image:"...zhongruda.jpg", card_width:1024, card_height:1536}`
 - 缺值 → **提交失败**（`MISSING_VARIABLE`），绝不留 `{{title}}` 进片子
 
 `hypitVariables` 只接受字符串/数字；对象与数组会被丢弃（否则会被 `String()`
