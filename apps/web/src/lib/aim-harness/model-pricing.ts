@@ -2,6 +2,9 @@ export interface ModelTokenPrices { input: number; output: number; cached?: numb
 
 const PRICES: Record<string, ModelTokenPrices> = {
   // 2026-07-31 起 deepseek-v4-flash 正式版上线；deepseek-chat/reasoner 已停用，保留兼容旧账单
+  // 2026-09-10 起 V4.1-Flash 的正式 ID 是 deepseek-flash，deepseek-v4-flash 降为兼容别名
+  // （当前两者指向同一版本、同一价目，故取同一组数字；别名条目保留以兼容旧账单）
+  "deepseek|deepseek-flash": { input: 3, output: 6, cached: 0.1 },
   "deepseek|deepseek-v4-flash": { input: 3, output: 6, cached: 0.1 },
   "deepseek|deepseek-v4-pro": { input: 3, output: 6, cached: 0.1 },
   "deepseek|deepseek-chat": { input: 3, output: 6, cached: 0.1 },
@@ -17,7 +20,7 @@ function resolvePrices(provider?: string, model?: string): ModelTokenPrices {
   if (exact) return exact
   const name = (model ?? "").toLowerCase()
   if (name.includes("doubao") || name.includes("seed")) return name.includes("pro") ? PRICES["doubao|doubao-seed-2-1-pro-260628"] : PRICES["doubao|doubao-seed-2-1-turbo-260628"]
-  if (name.includes("deepseek")) return PRICES["deepseek|deepseek-v4-flash"]
+  if (name.includes("deepseek")) return PRICES["deepseek|deepseek-flash"]
   if (name.includes("kimi")) return PRICES["openrouter|moonshotai/kimi-k2.6"]
   return { input: 5, output: 20 }
 }

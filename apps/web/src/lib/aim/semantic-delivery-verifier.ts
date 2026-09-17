@@ -86,13 +86,23 @@ export function buildAimSemanticRevisionPrompt(input: { originalPrompt: string; 
   ].join("\n\n")
 }
 
+/**
+ * 一轮返工的起跳预算：返工要再跑「一次完整生成 + 一次独立验收」两趟模型调用，
+ * 两边都至少得拿到首跳的预算才有胜算（生成首跳 25s + 验收约 20s）。
+ * 低于这个数就不该再启动新一轮——那只会把用户剩下的等待烧在注定跑不完的版本上。
+ */
+export const AIM_SEMANTIC_REVISION_MIN_BUDGET_MS = 45_000
+
 export async function runAimSemanticRevisionLoop<T>(input: {
   execute: (gaps: string[], attempt: number) => Promise<T>
   verify: (candidate: T) => Promise<AimSemanticDeliveryVerdict>
   maxRevisions: number
+  /** 每轮开工前的预算闸（第 0 轮不查）：预算不足时抛错提前收手。 */
+  beforeRound?: (attempt: number) => void
 }): Promise<T> {
   let gaps: string[] = []
   for (let attempt = 0; attempt <= input.maxRevisions; attempt += 1) {
+    if (attempt > 0) input.beforeRound?.(attempt)
     const candidate = await input.execute(gaps, attempt)
     const verdict = await input.verify(candidate)
     if (verdict.passed) return candidate
