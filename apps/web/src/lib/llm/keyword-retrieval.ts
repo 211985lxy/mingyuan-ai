@@ -5,6 +5,10 @@ import {
   type ScoredKnowledgeEntry,
 } from "@/lib/llm/embeddings"
 import {
+  FULLTEXT_INDEX_PROBE_SQL,
+  createCachedFulltextProbe,
+} from "@/lib/llm/keyword-capability"
+import {
   KEYWORD_CHUNK_LIMIT,
   bestRelevanceByEntry,
   buildKeywordQueryText,
@@ -15,11 +19,23 @@ import {
 /**
  * 关键词检索（P1 混合检索的「词面」一路）—— 数据访问层
  *
- * 纯逻辑（清洗 / SQL 拼装 / 聚合）在 `keyword-query.ts`，本文件只负责取数与回表。
+ * 纯逻辑（清洗 / SQL 拼装 / 聚合）在 `keyword-query.ts`；
+ * 索引可用性探测在 `keyword-capability.ts`；本文件只负责取数与回表。
  *
  * 为什么需要这一路：纯向量召回对**精确术语**不敏感。客户名、产品型号、地名、
  * 专有名词（「中汝达」「下二闸」「bge-reranker」）在语义空间里常常挤在一起，
  * 而 FULLTEXT 能一击命中。两路排名用 RRF 融合（见 `rank-fusion.ts`）。
+ *
+ * ⚠️ 当前生产上这一路处于**停用**状态，且这是预期行为：
+ * 生产库是 MariaDB 10.5，不支持 MySQL 专有的 `WITH PARSER ngram`，而中文全文检索
+ * 离开 ngram 就不可用（内置解析器把整段落成一个 token，能建索引但召回极差 ——
+ * 一个静默失败模式，比没有索引更坏）。于是混合检索在生产上等价为纯向量召回，
+ * 排序稳定性由 `rank-fusion.ts` 的归一化保证（「单路有结果」是设计内的一档）。
+ * 决策记录与补救路径：
+ * `prisma/migrations/20260916160000_add_knowledge_chunk_fulltext/migration.sql`。
+ *
+ * 代码保留这一路是为了「索引一旦可用就自动生效」：换 MySQL 8、或按上述迁移文件的
+ * ALTER 语句手工建好索引后，探测通过即启用词面召回，**不需要改代码或改配置**。
  *
  * 为什么是 ngram + NATURAL LANGUAGE 模式：
  *   1. 内置解析器以空格/标点分词，中文没有词边界 → 整段落成一个 token，等于不可检索。
@@ -58,6 +74,38 @@ const ENTRY_SELECT = {
 } as const
 
 /**
+ * 进程级缓存的 FULLTEXT 可用性探测（缓存与重试策略见 `keyword-capability.ts`）。
+ *
+ * 一次性日志写在这里、而不是写在 `retrieveEntriesByKeyword` 里：探测结果被缓存，
+ * 回调因此只在首次探得确定结果时触发一次；写在检索路径上会变成每次检索一条。
+ */
+const isFulltextIndexAvailable = createCachedFulltextProbe(
+  () => prisma.$queryRawUnsafe(FULLTEXT_INDEX_PROBE_SQL),
+  {
+    onResolved: ({ available, indexName }) => {
+      if (available) {
+        console.info(
+          `[keyword-retrieval] 检测到 FULLTEXT 索引 ${indexName ?? "(未命名)"}，词面召回应启用`,
+        )
+        return
+      }
+      console.warn(
+        "[keyword-retrieval] KnowledgeChunk.text 无可用 FULLTEXT 索引（生产库为 MariaDB 10.5，" +
+          "不支持 WITH PARSER ngram）—— 词面路停用，混合检索等价为纯向量。" +
+          "补救路径见 prisma/migrations/20260916160000_add_knowledge_chunk_fulltext/migration.sql",
+      )
+    },
+    onError: (error) => {
+      // 探测失败与「索引不存在」是两回事：前者不落缓存，下次检索会重试
+      console.warn(
+        "[keyword-retrieval] FULLTEXT 可用性探测失败，本轮机按不可用处理（不缓存）：",
+        error instanceof Error ? error.message : error,
+      )
+    },
+  },
+)
+
+/**
  * @description 关键词召回：FULLTEXT 命中块 → 按条目取最高相关度 → 回表取完整条目。
  *
  * 为什么拿到 id 后要回表用 Prisma 取、而不是在 SQL 里直接 SELECT e.*：
@@ -68,13 +116,18 @@ const ENTRY_SELECT = {
  * 回表一次换取与向量那一路**完全一致**的字段形态，这笔交易划算。
  *
  * @param input - 与向量召回同形
- * @returns 条目级结果，按相关度降序；查询无效或索引缺失时返回空数组
+ * @returns 条目级结果，按相关度降序；查询无效或索引不可用时返回空数组
  */
 export async function retrieveEntriesByKeyword(
   input: KeywordRetrieveInput,
 ): Promise<ScoredKnowledgeEntry[]> {
   const query = sanitizeKeywordQuery(buildKeywordQueryText(input))
+  // 清洗放在探测之前：空/无效查询直接早退，不该为它发起一次（哪怕是被缓存的）能力探测
   if (!query) return []
+
+  // 索引不在位就短路：不查 KnowledgeChunk、不打日志、不吃一次 errno 1191。
+  // 探测结果进程级缓存，这里的开销是一次 Promise 判定。
+  if (!(await isFulltextIndexAvailable())) return []
 
   const rows = await runKeywordQuery(input, query)
   if (rows.length === 0) return []
@@ -120,9 +173,10 @@ async function runKeywordQuery(
       ...built.values,
     )
   } catch (error) {
-    // 典型是 MySQL 1191「Can't find FULLTEXT index matching the column list」——
-    // P1 迁移尚未在目标库执行。此处不抛错：混合检索降级为纯向量，等价 P0 行为，
-    // 避免「索引没建」把一个功能发布变成线上故障。
+    // 走到这里说明探测已认为索引可用（或探测恰好没覆盖到），执行却失败 —— 典型是
+    // MySQL 1191「Can't find FULLTEXT index matching the column list」：索引在探测之后
+    // 被删、或索引不覆盖 text 列。此处不抛错：混合检索降级为纯向量，等价 P0 行为，
+    // 避免「索引异常」把一个检索请求变成 500。
     console.warn(
       "[keyword-retrieval] FULLTEXT 召回失败，本轮机降级为纯向量：",
       error instanceof Error ? error.message : error,

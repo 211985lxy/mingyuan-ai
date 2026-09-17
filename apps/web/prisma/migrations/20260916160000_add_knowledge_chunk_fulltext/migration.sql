@@ -1,56 +1,44 @@
--- P1 混合检索：给 KnowledgeChunk.text 加 ngram FULLTEXT 索引
+-- ⚠️ 本迁移是**有意的空操作**，不要往里加 SQL。
 --
--- 作用：为关键词（词面）召回提供索引，与块级向量召回一起进 RRF 融合。
---       应用侧见 src/lib/llm/keyword-retrieval.ts。
+-- 原计划：给 `KnowledgeChunk`.`text` 加 ngram FULLTEXT 索引，为 P1 混合检索
+-- 提供「词面」召回（与块级向量一路进 RRF 融合，应用侧见 src/lib/llm/keyword-retrieval.ts）。
 --
--- 为什么必须指定 WITH PARSER ngram：
---   MySQL 内置全文解析器用空格/标点判断词边界。中文没有词边界，整段会被当成一个
---   token，中文检索等于不可用。ngram 解析器是 MySQL 官方为 CJK 提供的解，
---   默认 token_size=2（bigram）。
+-- 为什么放弃（2026-09-17 决策）：
+--   生产库是 **MariaDB 10.5**，不支持 MySQL 专有的 `WITH PARSER ngram`。
+--   首次发布时本迁移在生产上以 P3018 / errno 1128
+--   （`Function 'ngram' is not defined`）失败。CI 用 MySQL 8.4，所以这个差异
+--   在合并前没被任何门禁暴露出来。
 --
---   ⚠️ 最危险的失败模式（静默、不报错）：
---   如果这个索引被以**默认解析器**建出来（例如后续有人让 Prisma Migrate 自动生成
---   而不带 WITH PARSER），MATCH ... AGAINST 不会报错，只会中文召回极差。
---   发布后务必核实：
---       SHOW CREATE TABLE `KnowledgeChunk`;
---   应看到 `FULLTEXT KEY `KnowledgeChunk_text_idx` (`text`) /*!50100 WITH PARSER `ngram` */`。
+--   为什么**不**退而求其次建「默认解析器」的 FULLTEXT 索引：
+--   MySQL/MariaDB 内置解析器按空格与标点切词，中文没有词边界，整段文本会落成
+--   一个 token。索引建得出来、`MATCH ... AGAINST` 也不报错，只是中文召回极差 ——
+--   这是比「没有索引」更坏的失败模式：一个静默的、看起来在工作、实际不工作的检索路。
+--   宁可明确停用，不要静默劣化。
 --
--- 为什么应用侧用 NATURAL LANGUAGE 而不是 BOOLEAN 模式：
---   1. ngram 在 boolean 模式下把检索词转成「ngram 短语」，要求 n 元组连续命中，
---      对长中文查询过于严格，召回塌陷；
---   2. NL 模式下转成「ngram 词并集」，召回符合检索预期；
---   3. 官方文档所述的「50% 阈值」（出现在半数以上行中的词被当停用词）是 MyISAM 的限制，
---      **InnoDB 不受影响**；本表引擎为 InnoDB，故 NL 模式安全；
---   4. RRF 只消费排名、不比较分数绝对量纲，故 MySQL 相关度分与余弦分不可比无妨。
+-- 现状（无需人工干预）：
+--   `keyword-retrieval.ts` 在检索前探测 `KnowledgeChunk.text` 上是否存在可用的
+--   FULLTEXT 索引，探测不通过就直接短路，**不查库、不刷日志**。
+--   混合检索因此在当前生产上固定等价为纯向量召回。
+--   融合层的归一化本来就是按「单路有结果」这一档设计的，排序稳定性不受影响
+--   （见 rank-fusion.ts 的 FUSION_SCORE_FLOOR 说明）。
 --
--- 索引命名：
---   `KnowledgeChunk_text_idx` 是 Prisma `@@fulltext([text])` 的默认命名。
---   必须与 prisma/knowledge.prisma 的 `@@fulltext` 声明（见 knowledge.prisma.patch.md）
---   完全一致，否则 `prisma migrate dev` 会把本索引判定为「库里有、schema 里没有」
---   并生成一条 DROP INDEX 迁移。改名前请先跑：
---       npx prisma migrate dev --create-only
---   若生成的迁移里出现 DROP INDEX / ADD FULLTEXT，说明名字对不上，按提示改名或改用 map。
+-- 保留这个空迁移而不是删除它的原因：
+--   这条迁移在生产 `_prisma_migrations` 里已有一条**失败**记录。
+--   删掉文件会让本地历史与库里的记录对不上；保留文件 + 在服务器上执行一次
+--   `prisma migrate resolve --applied 20260916160000_add_knowledge_chunk_fulltext`
+--   即可把失败标记收敛为「已应用」，且后续部署不再被它阻塞。
 --
--- 执行时机（有讲究）：
---   在 P0 回填（scripts/backfill-knowledge-chunks.ts）**之前**执行这条 ALTER，
---   此时 KnowledgeChunk 基本是空表，建索引是常数开销；
---   反过来先回填 6000 行再建索引，就要多扫一遍全表。
---   回填过程中插入行会增量维护 FTS 索引，这是 InnoDB 的正常开销，无需额外处理。
+-- 什么时候需要恢复词面召回：
+--   1. 数据库换成 MySQL 8（或 MariaDB 启用 Mroonga / 外部检索引擎）；
+--   2. 库上手工建索引（schema 里刻意不声明 `@@fulltext`，见 knowledge.prisma 的说明）：
+--        ALTER TABLE `KnowledgeChunk`
+--          ADD FULLTEXT INDEX `KnowledgeChunk_text_idx` (`text`) WITH PARSER ngram;
+--      建好后**无需改代码**：下一次检索探测到索引即可自动启用词面路。
+--      核实：SHOW INDEX FROM `KnowledgeChunk` WHERE Key_name = 'KnowledgeChunk_text_idx';
+--      应看到 Index_type = FULLTEXT。
+--   3. 或者改用不依赖数据库全文特性的方案（应用侧倒排 / bigram 打分表），
+--      那样连上面这条 ALTER 都不需要。
 --
--- 参数依赖：
---   ngram_token_size 是 read-only 服务器变量（默认 2）。**改动它必须重建本索引**
---   才生效：DROP INDEX + 本迁移重跑。否则索引里存的是旧 token 长度，与新查询不一致。
---
--- 回滚：
---   ALTER TABLE `KnowledgeChunk` DROP INDEX `KnowledgeChunk_text_idx`;
---   （不影响任何数据；混合检索会自动降级为纯向量，见 knowledge-retrieval.ts）
+-- 回滚：本迁移无 DDL，无需回滚。
 
-ALTER TABLE `KnowledgeChunk`
-  ADD FULLTEXT INDEX `KnowledgeChunk_text_idx` (`text`) WITH PARSER ngram;
-
--- 回填完成后让优化器拿到真实基数
--- ANALYZE TABLE `KnowledgeChunk`;
-
--- 核实索引类型（应为 FULLTEXT）：
--- SELECT INDEX_NAME, INDEX_TYPE FROM INFORMATION_SCHEMA.STATISTICS
---   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'KnowledgeChunk';
+-- 故意留空：不要在下面添加任何语句。

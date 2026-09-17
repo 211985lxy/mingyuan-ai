@@ -8,7 +8,9 @@
 --    相比 JSON 文本（约 11KB）省约 64%，且免去 JSON.parse 开销。
 --    编解码见 src/lib/llm/knowledge-chunk-index.ts 的 encodeVector / decodeVector。
 -- 2. 不修改 KnowledgeEmbedding 表 —— 旧路径完整保留，便于一键回退。
--- 3. 本迁移不含 FULLTEXT 索引，P1 的混合检索单独发一个迁移。
+-- 3. 本迁移不含 FULLTEXT 索引：中文全文检索必须用 ngram 解析器，而生产库
+--    （MariaDB 10.5）不支持，P1 的词面召回因此刻意停用。
+--    决策记录、现状影响与补救路径见 20260916160000 迁移的文件头。
 --
 -- 回滚：DROP TABLE `KnowledgeChunk`;  （无其他表受影响）
 
