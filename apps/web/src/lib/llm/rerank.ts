@@ -15,6 +15,24 @@ import { FUSION_SCORE_FLOOR, normalizeScoreToFloor } from "@/lib/llm/rank-fusion
  * 那里的类别/分级/标签倍率是**业务偏好**，不是语义相关性；顺序反了，
  * Cross-Encoder 的 0–1 相关分会被业务倍率污染。
  *
+ * ─── 判据的地理范围：精排必须读「命中的块」，不是「条目的开头」 ───
+ *
+ * 条目与块是**两种尺度**：一条客户案例可以 5000 字，而 P0 把它切成 ~400 字的块、
+ * 逐块编码向量。于是「向量路认为这条相关」的真正依据，是**其中某一块**与查询相近。
+ *
+ * 若精排改读条目开头 512 字，两路判的就不是同一段文字：
+ * 一条把答案写在中段的条目，向量路（按块）判得出，精排（按开头）判不出。
+ * 实测这正是 P2 拖垮长尾的原因 —— 在 33 条评测集上 g1 长尾 MRR 从 0.513 掉到 0.319。
+ *
+ * 所以：`ScoredKnowledgeEntry.matchedChunkTexts` 由 P0 的块级召回带出
+ * （`knowledge-chunk-index.ts` 的 `retrieveEntriesByChunks`），
+ * `buildRerankDocuments` 优先用它。**这两处是一组，改一处不改另一处就回到盲区。**
+ * 关键词路与旧条目级路径没有块文本，按设计回退到 `content` 开头。
+ *
+ * ⚠️ 只带 argmax 那一块**仍然不够**：实测 argmax 经常不是含答案的块
+ * （badcase：答案在 idx=3 cos 0.5128，argmax 是 idx=1 cos 0.5591，仅差 9%）。
+ * 取 top-M 窗口而非单块，是这条链路上第二个必须一起改的点。
+ *
  * ─── 为什么 rerank 分必须再归一化一次（本模块最容易被漏掉的一条） ───
  *
  * 直觉上「rerank 输出就是 0–1 的相关分，直接用」看似合理。**错。**
@@ -62,8 +80,25 @@ export const MIN_RERANK_CANDIDATES = 12
  * `embeddings.ts` 的 `maxChars` 对 BGE 系列是 500，P0 的 `CHUNK_EMBED_BUDGET` 是 480。
  * 若让 reranker 看到 2000 字而向量只编码了前 500 字，两路判据的地理范围不一致，
  * 融合后的排序语义就说不清了。512 = 480（块预算）+ 标题余量。
+ *
+ * ⚠️ 这个数字**只有在文档取自命中块时才成立**。若文档仍取条目开头 512 字，
+ * 就与「向量编码的是第 3 块」对不上——数字一样，地理范围却不同。
+ * 所以 `buildRerankDocuments` 必须优先用 `matchedChunkText`，两者是一组，不能只改一处。
  */
 export const RERANK_DOC_MAX_CHARS = 512
+
+/**
+ * 当文档来自「命中块窗口」时的字符上限。
+ *
+ * 按 3 块推导（`knowledge-chunk-index.ts` 的 `MATCHED_CHUNK_WINDOW`），
+ * 与单块上限共用同一套推理：向量编码的是这些块，所以窗口内文本都在
+ * 语义路判据的范围内 —— 只是**跨了多个已编码区间**，而不是引入未编码的文本。
+ *
+ * 为什么不干脆把 `RERANK_DOC_MAX_CHARS` 调大：回退路径（无块文本）用的是
+ * 条目开头，而条目级向量只编码了前 ~500 字，那条路径必须守 512。
+ * 两条路径的预算不同，是因为它们「判据地理范围」的边界本来就不同。
+ */
+export const RERANK_DOC_WINDOW_MAX_CHARS = RERANK_DOC_MAX_CHARS * 3
 
 /**
  * 未获 reranker 评分的候选（`top_n` 截断掉的那批）的分数衰减步长。
@@ -111,20 +146,43 @@ export function shouldRerank(candidateCount: number, topK: number): boolean {
 }
 
 /**
- * @description 条目 → reranker 文档文本：`标题\n正文`，按预算截断。
+ * @description 条目 → reranker 文档文本：`标题\n<判据正文>`，按预算截断。
+ *
+ * **判据正文优先取 `matchedChunkTexts`（块级召回按余弦降序的命中块）并拼接**，
+ * 缺失时才回退到 `content` 的开头。这是 P2 的核心正确性所在，原因见模块顶部
+ * 「判据的地理范围」：条目可达数千字而块只有 400 字，精排若读条目开头，
+ * 判的就是「标题+导语」，与向量路按块判的**不是同一段文字**。
+ *
+ * 为什么拼多块而不是只取最高分的单块：argmax 常不是含答案的块 ——
+ * 实测 badcase 用例答案在 idx=3（cos 0.5128），argmax 是 idx=1（cos 0.5591），
+ * 仅差 9%。同一 query 下 reranker 分：top3 窗口 0.0416，单块 0.0048（差 8.7 倍）。
+ * 多块的代价只是文档更长（预算相应放宽到 `RERANK_DOC_WINDOW_MAX_CHARS`）。
+ *
  * 空文本给一个空格兜底（与 `embeddings.ts` 的 `(t || " ")` 同处理），
  * 避免服务端对空串报错。
- * @param entries - 候选条目
+ * @param entries - 候选条目（可带 `matchedChunkTexts`）
  * @returns 与入参等长的文档数组
  */
 export function buildRerankDocuments(
-  entries: ReadonlyArray<{ title?: string | null; content?: string | null }>,
+  entries: ReadonlyArray<{
+    title?: string | null
+    content?: string | null
+    matchedChunkTexts?: ReadonlyArray<string | null> | null
+  }>,
 ): string[] {
   return entries.map((entry) => {
     const title = (entry.title ?? "").trim()
-    const content = (entry.content ?? "").trim()
-    const text = title ? `${title}\n${content}` : content
-    return text.slice(0, RERANK_DOC_MAX_CHARS) || " "
+    // 用 filter(Boolean) 而不是只判 null：空串与纯空白块**也算缺失**。
+    // 只判 nullish 会让 `[""]` 通过，整篇文档退化成「只有标题」——
+    // 精排拿一个只剩标题的文档打分，比读条目开头还差，且完全无声。
+    const chunks = (entry.matchedChunkTexts ?? [])
+      .map((chunk) => (chunk ?? "").trim())
+      .filter(Boolean)
+    const hasChunks = chunks.length > 0
+    const body = hasChunks ? chunks.join("\n") : (entry.content ?? "").trim()
+    const budget = hasChunks ? RERANK_DOC_WINDOW_MAX_CHARS : RERANK_DOC_MAX_CHARS
+    const text = title ? `${title}\n${body}` : body
+    return text.slice(0, budget) || " "
   })
 }
 
