@@ -77,6 +77,34 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
 }
 
 /**
+ * 构造「把连接钉死在指定地址」的 undici dispatcher。
+ *
+ * **必须兼容 Node 的 `autoSelectFamily`**：Node 18.13+ 默认开启该特性，`net.connect`
+ * 会以 `{ all: true, hints: ... }` 调用 lookup，此时回调**必须返回数组**。若按传统
+ * `cb(null, address, family)` 三参形式回，undici 会抛 `ERR_INVALID_IP_ADDRESS`，
+ * 请求**直接失败**（不是降级、不是退回未钉 IP）——而调用方通常把异常吞掉，
+ * 于是表现为「功能静默失效」，最难排查。
+ *
+ * 同时保留非 all 模式的三参回法，兼容 `autoSelectFamily: false` 或未来行为变化。
+ */
+export function createPinnedAgent(address: string, family: 4 | 6): Agent {
+  type AllCallback = (error: null, addresses: Array<{ address: string; family: number }>) => void
+  type SingleCallback = (error: null, address: string, family: number) => void
+
+  return new Agent({
+    connect: {
+      lookup: (_hostname, options, callback) => {
+        if (options?.all) {
+          ;(callback as unknown as AllCallback)(null, [{ address, family }])
+          return
+        }
+        ;(callback as unknown as SingleCallback)(null, address, family)
+      },
+    },
+  })
+}
+
+/**
  * 以钉住的 IP 发起一次「不自动跟随重定向」的请求，返回校验过的跳转目标。
  *
  * - 连接地址 = 首次解析结果（防重绑定）；Host/SNI 仍为原域名；
@@ -86,14 +114,7 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
 export async function probeRedirect(rawUrl: string, init: RequestInit = {}): Promise<string | null> {
   const target = await resolvePublicTarget(rawUrl)
 
-  const agent = new Agent({
-    connect: {
-      // undici 兼容传统 (err, address, family) 回调签名
-      lookup: (_hostname, _options, callback) => {
-        callback(null, target.address, target.family)
-      },
-    },
-  })
+  const agent = createPinnedAgent(target.address, target.family)
 
   try {
     const requestInit = {

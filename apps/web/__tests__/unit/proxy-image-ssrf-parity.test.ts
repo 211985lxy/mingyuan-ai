@@ -148,6 +148,24 @@ describe("GET /api/proxy-image — 出站 TOCTOU", () => {
     await expect(resolvePinnedAddress()).resolves.toEqual({ address: "8.8.8.8", family: 4 })
   })
 
+  it("钉 IP 回调兼容 autoSelectFamily：all 模式必须回数组", async () => {
+    const res = await GET(makeRequest("https://p3.douyinpic.com/a.jpg"))
+    expect(res.status).toBe(200)
+
+    const lookup = agentOptions.at(-1)?.connect?.lookup
+    expect(typeof lookup).toBe("function")
+
+    // Node 18.13+ 默认 autoSelectFamily，net 会以 { all: true } 调用 lookup。
+    // 此时返回三参形式会触发 ERR_INVALID_IP_ADDRESS 使请求**直接失败**。
+    const asArray = await new Promise((resolve, reject) => {
+      lookup("p3.douyinpic.com", { all: true }, (err: Error | null, addresses: unknown) => {
+        if (err) reject(err)
+        else resolve(addresses)
+      })
+    })
+    expect(asArray).toEqual([{ address: "8.8.8.8", family: 4 }])
+  })
+
   it("首次解析即落到私网时直接 403，不发起任何出站请求", async () => {
     state.sequence = ["169.254.169.254"]
     const res = await GET(makeRequest("https://p3.douyinpic.com/a.jpg"))

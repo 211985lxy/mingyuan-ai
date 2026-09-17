@@ -2,16 +2,23 @@ import { logger } from "@/lib/logger"
 
 /**
  * 轻量进程内安全计数：只记类别，不记凭证 / Prompt / 客户正文 / PII。
+ *
+ * 指标名以**单一数组**为准，类型与快照都从它派生 —— 早前类型与 `getSecurityMetrics`
+ * 是两份手写清单，新增指标时容易只改一处（漏改快照会被 tsc 拦下，但清单本身仍会漂移）。
  */
-export type SecurityMetricName =
-  | "proxy_image.reject"
-  | "proxy_image.oversize"
-  | "proxy_image.rate_limited"
-  | "proxy_image.ok"
-  | "obsidian.denied"
-  | "obsidian.quota"
-  | "obsidian.ok"
-  | "ssrf.blocked"
+export const SECURITY_METRIC_NAMES = [
+  "proxy_image.reject",
+  "proxy_image.oversize",
+  "proxy_image.rate_limited",
+  "proxy_image.ok",
+  "obsidian.denied",
+  "obsidian.quota",
+  "obsidian.ok",
+  "ssrf.blocked",
+  "ssrf.short_url_error",
+] as const
+
+export type SecurityMetricName = (typeof SECURITY_METRIC_NAMES)[number]
 
 const counters = new Map<SecurityMetricName, number>()
 
@@ -38,16 +45,9 @@ export function incrementSecurityMetric(
  * @description 读取当前进程安全指标快照
  */
 export function getSecurityMetrics(): Record<SecurityMetricName, number> {
-  return {
-    "proxy_image.reject": counters.get("proxy_image.reject") ?? 0,
-    "proxy_image.oversize": counters.get("proxy_image.oversize") ?? 0,
-    "proxy_image.rate_limited": counters.get("proxy_image.rate_limited") ?? 0,
-    "proxy_image.ok": counters.get("proxy_image.ok") ?? 0,
-    "obsidian.denied": counters.get("obsidian.denied") ?? 0,
-    "obsidian.quota": counters.get("obsidian.quota") ?? 0,
-    "obsidian.ok": counters.get("obsidian.ok") ?? 0,
-    "ssrf.blocked": counters.get("ssrf.blocked") ?? 0,
-  }
+  return Object.fromEntries(
+    SECURITY_METRIC_NAMES.map((name) => [name, counters.get(name) ?? 0]),
+  ) as Record<SecurityMetricName, number>
 }
 
 /**

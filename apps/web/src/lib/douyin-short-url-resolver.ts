@@ -9,6 +9,7 @@
  * 并只接受 `v.douyin.com` 严格主机白名单，故 F18-A（实时 POST）/ F18-B（cron 存量）两条
  * 路径一并收敛到此处。
  */
+import { logger } from "@/lib/logger"
 import { incrementSecurityMetric } from "@/lib/security-metrics"
 import { isDouyinShortUrl, normalizeDouyinAwemeId } from "@/lib/douyin-short-url"
 import { probeRedirect, SsrfBlockedError } from "@/lib/ssrf-guard.server"
@@ -25,6 +26,12 @@ export async function resolveDouyinShortUrl(url: string): Promise<string> {
   } catch (error) {
     if (error instanceof SsrfBlockedError) {
       incrementSecurityMetric("ssrf.blocked", { reason: "douyin_short_url" })
+    } else {
+      // 非 SSRF 拦截的运行期失败（DNS/连接/udici 配置等）也**必须**留下信号。
+      // 这里曾长期只打 SsrfBlockedError 的点，导致「钉 IP 回调签名与 Node
+      // autoSelectFamily 不兼容」这类缺陷完全静默——业务侧只表现为短链统计变零。
+      incrementSecurityMetric("ssrf.short_url_error", { reason: "unexpected" })
+      logger.warn({ event: "ssrf.short_url_error", error: String(error) }, "短链探测异常")
     }
     // 短链探测失败时不抛错，调用方降级为「无统计」
   }

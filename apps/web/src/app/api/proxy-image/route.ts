@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Agent } from "undici"
 
 import { incrementSecurityMetric } from "@/lib/security-metrics"
-import { resolvePublicTarget, type PublicTarget } from "@/lib/ssrf-guard.server"
+import { createPinnedAgent, resolvePublicTarget, type PublicTarget } from "@/lib/ssrf-guard.server"
 import {
   getImageCandidateUrls,
   getProxyClientKey,
@@ -35,7 +34,7 @@ async function resolveAllowedTarget(value: string): Promise<PublicTarget | null>
 
 async function fetchAllowedUpstream(
   candidateUrls: string[],
-  agents: Agent[],
+  agents: Array<ReturnType<typeof createPinnedAgent>>,
 ): Promise<Response | NextResponse> {
   let upstream: Response | null = null
   for (const targetUrl of candidateUrls) {
@@ -48,14 +47,7 @@ async function fetchAllowedUpstream(
     // 把实际连接钉在「首次校验通过」的那个地址上，使 DNS 重绑定无机可乘。
     // 主机名仍保持原域名，因此 TLS SNI 与证书校验照旧生效 —— 这点是不能用
     // 「把 hostname 直接换成 IP」来实现的，那会破坏证书校验。
-    const agent = new Agent({
-      connect: {
-        // undici 兼容传统 (err, address, family) 回调签名
-        lookup: (_hostname, _options, callback) => {
-          callback(null, target.address, target.family)
-        },
-      },
-    })
+    const agent = createPinnedAgent(target.address, target.family)
     agents.push(agent)
 
     upstream = await fetch(targetUrl, {
@@ -167,7 +159,7 @@ export async function GET(request: NextRequest) {
 
   // 钉 IP 用的 undici Agent 必须在「响应 body 读完之后」才能关闭，
   // 否则连接池销毁会掐断尚未流式读完的上游响应，因此统一在出口回收。
-  const agents: Agent[] = []
+  const agents: Array<ReturnType<typeof createPinnedAgent>> = []
 
   try {
     const parsed = parseRequestUrl(request)
