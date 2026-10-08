@@ -15,6 +15,7 @@ description: Call Mingdong AIM agents to generate draft-only IP content assets f
 - 定位策划官：处理 IP 定位、内容定位、人设表达与成交路径
 - 内容生产官：生成视频脚本、朋友圈、社群文案、公众号文章、拍摄交接单
 - 数据复盘官：对已发布或待发布内容做数据复盘、优化和复用建议
+- 作品编辑：把已经写好的成稿做成能发出去的草稿。对应页面 `/aim?agent=work_editor&stage=publish`。能做的是文字二改/润色（去 AI 味）、审查违禁词、公众号排版、小红书图文，以及发布前质检。不会真的发出去。
 
 当前版本明确不允许：
 
@@ -100,6 +101,44 @@ Authorization: Bearer maim_xxx
 }
 ```
 
+## MCP
+
+外部 Agent 也可以走 MCP，不必自己拼 REST。
+
+- 地址：`/api/aim-mcp/mcp`（例如 `https://mingyuan-ai.cn/api/aim-mcp/mcp`）
+- 传输：Streamable HTTP，POST JSON-RPC。先 `initialize`，再 `tools/list`。
+- 鉴权：`Authorization: Bearer maim_xxx`。没有有效钥匙会返回 401，不会放行。
+- 默认关闭。管理员要在服务器设置 `AIM_MCP_ENABLED=true` 后重启，这个地址才会应答。没打开时返回 HTTP 503，正文是 `{"error":"MCP surface is disabled"}`。域名白名单用 `AIM_MCP_ALLOWED_HOSTS`，不设时只允许 `mingyuan-ai.cn`。
+
+作品编辑用工具 `aim_work_editor_start`：
+
+```json
+{
+  "action": "text_polish",
+  "draft": "这里贴上要改的成稿正文"
+}
+```
+
+`action` 可以是：
+
+- `text_polish`：文字二改/润色，去 AI 味
+- `forbidden_word_audit`：先审查违禁词，再给修复稿
+- `wechat_layout`：整理成公众号排版
+- `xiaohongshu_edit`：改成小红书图文
+- `full_publish_review`：发布前全检，只给最小改法
+- `publish_decision`：判断现在值不值得发，不重写
+
+然后用 `aim_invocation_get` 轮询。返回的是草稿，不是已发布内容。
+
+下面这些会明确拒绝，不会假装成功：
+
+- `publish`：自动发布
+- `feishu_write`：写入飞书
+- `knowledge_edit`：修改知识库
+- `ip_plan_edit`：修改 IP 营销全案
+
+没有绑定项目、成稿是空的、或跑完没有正文，都算失败，不能当成做完了。
+
 ## 使用建议
 
-外部 Agent 应该先读取能力和项目列表，再生成草稿。生成结果只作为草稿，发布前需要人工确认。
+外部 Agent 应该先读取能力和项目列表，再生成草稿。要改已有成稿，走作品编辑。生成结果只作为草稿，发布前需要人工确认。

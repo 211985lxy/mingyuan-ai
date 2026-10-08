@@ -125,6 +125,7 @@ export const REMOTE_ERROR_CODE = {
   INVOCATION_FORBIDDEN: "INVOCATION_FORBIDDEN",
   REMOTE_FEATURE_DISABLED: "REMOTE_FEATURE_DISABLED",
   EXECUTION_UNKNOWN: "EXECUTION_UNKNOWN",
+  EMPTY_RESULT: "EMPTY_RESULT",
 } as const
 
 export type RemoteErrorCode = (typeof REMOTE_ERROR_CODE)[keyof typeof REMOTE_ERROR_CODE]
@@ -149,6 +150,8 @@ export function remoteErrorStatus(code: RemoteErrorCode): number {
       return 429
     case REMOTE_ERROR_CODE.INVOCATION_NOT_FOUND:
       return 404
+    case REMOTE_ERROR_CODE.EMPTY_RESULT:
+      return 422
     case REMOTE_ERROR_CODE.REMOTE_FEATURE_DISABLED:
       return 503
     default:

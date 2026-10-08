@@ -177,7 +177,7 @@ export default function AccountPage() {
               <div className="min-w-0">
                 <p className="text-sm font-medium">MCP 接入地址（Codex）</p>
                 <p className="mt-1 break-all text-sm text-muted-foreground">{mcpUrl}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Streamable HTTP，Bearer Token 使用下方 maim_ Key。当前由管理员发放专用 Codex Key 后开通。</p>
+                <p className="mt-1 text-xs text-muted-foreground">Streamable HTTP，Bearer Token 使用下方 maim_ Key。管理员还要在服务器打开 AIM_MCP_ENABLED=true，否则这个地址会回答「MCP 功能未开启」。作品编辑可以润色、查违禁词、排公众号和做发布前检查；不能发布、不能写飞书、不能改知识库、不能改营销全案。</p>
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={() => copyText(mcpUrl)}>

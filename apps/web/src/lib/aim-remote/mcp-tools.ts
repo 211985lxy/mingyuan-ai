@@ -13,10 +13,11 @@
  */
 
 import { z } from "zod"
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { buildAgentCapabilities } from "@/lib/agent-api-contract"
 import { assertAgentScope } from "@/lib/agent-api-auth"
-import { submitInvocation, getInvocation } from "./invocation-service"
+import { submitInvocation, getInvocation, invocationResultsAreEmpty } from "./invocation-service"
+import type { AimMcpToolServer } from "./mcp-tool-server"
+import { describeWorkEditorSurface, startWorkEditorJob } from "./work-editor-mcp"
 import {
   AGENT_SCOPE,
   MAX_IDEMPOTENCY_KEY_LENGTH,
@@ -67,10 +68,10 @@ function toolSuccess(text: string, structured?: unknown) {
 }
 
 /**
- * Register the four AIM MCP tools on a McpServer instance.
- * The server is created by createMcpHandler in the route file.
+ * Register the AIM MCP tools. 作品编辑单独走 aim_work_editor_start。
+ * The server is created by the Streamable HTTP handler in the route file.
  */
-export function registerAimMcpTools(server: McpServer): void {
+export function registerAimMcpTools(server: AimMcpToolServer): void {
   // ── aim_capabilities ──
   server.registerTool(
     "aim_capabilities",
@@ -83,9 +84,12 @@ export function registerAimMcpTools(server: McpServer): void {
       const resolved = await requireContext(extra.authInfo)
       if (!resolved.ok) return resolved.error
       assertAgentScope(resolved.context, AGENT_SCOPE.capabilitiesRead)
-      const capabilities = buildAgentCapabilities()
+      const capabilities = {
+        ...buildAgentCapabilities(),
+        workEditor: describeWorkEditorSurface(),
+      }
       return toolSuccess(
-        `可用智能体 ${capabilities.agents.length} 个，目标格式 ${capabilities.targetFormats.length} 种。仅生成草稿，发布与正式知识写入需人工确认。`,
+        `可用智能体 ${capabilities.agents.length} 个。作品编辑用 aim_work_editor_start，只改草稿或做发布前检查。不允许发布、写飞书、改知识库、改营销全案。`,
         capabilities,
       )
     },
@@ -103,11 +107,17 @@ export function registerAimMcpTools(server: McpServer): void {
       const resolved = await requireContext(extra.authInfo)
       if (!resolved.ok) return resolved.error
       assertAgentScope(resolved.context, AGENT_SCOPE.projectsRead)
+      if (resolved.context.allowedProjects.length === 0) {
+        return toolError("还没有可编辑的项目。请先在账号里绑定 IP 营销全案。空列表不算成功。", "NO_BOUND_PROJECT")
+      }
       const projects = await prisma.clientProject.findMany({
         where: { id: { in: resolved.context.allowedProjects }, status: "active" },
         take: resolved.context.allowedProjects.length,
         select: { id: true, name: true },
       })
+      if (projects.length === 0) {
+        return toolError("还没有可编辑的项目。请先在账号里绑定 IP 营销全案。空列表不算成功。", "NO_BOUND_PROJECT")
+      }
       return toolSuccess(`当前 Key 可访问 ${projects.length} 个项目`, { projects })
     },
   )
@@ -117,7 +127,7 @@ export function registerAimMcpTools(server: McpServer): void {
     "aim_draft_submit",
     {
       title: "提交草稿生成",
-      description: "异步提交一次草稿生成任务。必须携带 idempotencyKey（相同键+相同请求不重复消耗 Token）。返回 invocationId 用于轮询。",
+      description: "异步提交一次草稿生成。不会发布，也不会写飞书。作品编辑（润色、违禁词、公众号排版、发布前质检）请改用 aim_work_editor_start。必须携带 idempotencyKey。",
       inputSchema: {
         idempotencyKey: z.string().min(MIN_IDEMPOTENCY_KEY_LENGTH).max(MAX_IDEMPOTENCY_KEY_LENGTH),
         projectId: z.string().min(1).max(80).optional(),
@@ -175,9 +185,63 @@ export function registerAimMcpTools(server: McpServer): void {
       if (!response) {
         return toolError("调用不存在或无权读取", REMOTE_ERROR_CODE.INVOCATION_NOT_FOUND)
       }
-      return toolSuccess(`调用 ${response.invocationId} 状态：${response.status}`, response)
+      return formatInvocationToolResult(response)
     },
   )
+
+  registerWorkEditorTool(server)
+}
+
+function registerWorkEditorTool(server: AimMcpToolServer): void {
+  server.registerTool(
+    "aim_work_editor_start",
+    {
+      title: "作品编辑",
+      description: "发作品阶段：把已有成稿润色、审查违禁词、排成公众号或小红书，或做发布前质检。action 用 text_polish、forbidden_word_audit、wechat_layout、xiaohongshu_edit、full_publish_review、publish_decision。传 publish、feishu_write、knowledge_edit、ip_plan_edit 会明确拒绝。没有成稿或没有项目会失败。",
+      inputSchema: {
+        action: z.string().min(1).max(60),
+        draft: z.string().max(MAX_RAW_INPUT_CHARS).optional(),
+        idempotencyKey: z.string().min(MIN_IDEMPOTENCY_KEY_LENGTH).max(MAX_IDEMPOTENCY_KEY_LENGTH).optional(),
+        topicTitle: z.string().max(500).optional(),
+      },
+    },
+    async (args, extra) => {
+      const resolved = await requireContext(extra.authInfo)
+      if (!resolved.ok) return resolved.error
+      assertAgentScope(resolved.context, AGENT_SCOPE.draftsSubmit)
+      const result = await startWorkEditorJob(resolved.context, args)
+      if (!result.ok) return toolError(result.errorMessage, result.errorCode)
+      const response = result.response
+      return toolSuccess(
+        `已提交作品编辑「${result.label}」（发作品阶段）。状态：${response.status}。这是草稿，不会发布。${response.pollAfterSeconds} 秒后用 aim_invocation_get 取结果。`,
+        {
+          invocationId: response.invocationId,
+          status: response.status,
+          pollAfterSeconds: response.pollAfterSeconds,
+          stage: "publish",
+          label: result.label,
+          requiresHumanReview: true,
+        },
+      )
+    },
+  )
+}
+
+function formatInvocationToolResult(response: Awaited<ReturnType<typeof getInvocation>>) {
+  if (!response) return toolError("调用不存在或无权读取", REMOTE_ERROR_CODE.INVOCATION_NOT_FOUND)
+  if (response.status === "failed") {
+    return toolError(response.errorMessage || "调用失败", response.errorCode || REMOTE_ERROR_CODE.EXECUTION_UNKNOWN)
+  }
+  if (response.status === "succeeded" && invocationResultsAreEmpty(response.results)) {
+    return toolError(
+      "调用结束了，但没有可交付正文。空结果不算成功。请确认成稿不是空的，再重新提交。",
+      REMOTE_ERROR_CODE.EMPTY_RESULT,
+    )
+  }
+  if (response.status === "succeeded") {
+    return toolSuccess(`调用 ${response.invocationId} 已完成。下面是草稿，尚未发布。`, response)
+  }
+  return toolSuccess(`调用 ${response.invocationId} 状态：${response.status}。请稍后再用 aim_invocation_get 查询。`, response)
 }
 
 // Re-export for the route file to assemble the handler.

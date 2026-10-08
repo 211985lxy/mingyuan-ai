@@ -46,3 +46,19 @@ export function getAllowedMcpHosts(): string[] {
     .map((h) => h.trim())
     .filter(Boolean)
 }
+
+/** 只接受白名单域名本身，或它的子域名。避免 evilmingyuan-ai.cn 这种蹭后缀混进来。 */
+export function isAllowedMcpHost(host: string | null | undefined): boolean {
+  if (!host) return false
+  const allowed = getAllowedMcpHosts()
+  if (allowed.length === 0) return true
+  const name = normalizeHost(host)
+  return allowed.some((rule) => {
+    const expected = normalizeHost(rule)
+    return name === expected || name.endsWith(`.${expected}`)
+  })
+}
+
+function normalizeHost(value: string): string {
+  return value.trim().toLowerCase().replace(/:\d+$/, "")
+}

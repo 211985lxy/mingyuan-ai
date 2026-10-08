@@ -10,12 +10,14 @@ const mocks = vi.hoisted(() => ({
   enqueueBackgroundTask: vi.fn(),
   transaction: vi.fn(),
   clientProjectFindFirst: vi.fn(),
+  aimGenerationFindUnique: vi.fn(),
 }))
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     $transaction: mocks.transaction,
     clientProject: { findFirst: mocks.clientProjectFindFirst },
+    aimGeneration: { findUnique: mocks.aimGenerationFindUnique },
     agentInvocation: {
       findUnique: mocks.agentInvocationFindUnique,
       create: mocks.agentInvocationCreate,
@@ -195,10 +197,47 @@ describe("getInvocation ownership", () => {
       errorCode: null,
       errorMessage: null,
     })
+    mocks.aimGenerationFindUnique.mockResolvedValue({
+      rawCopy: "  改好的正文  ",
+      videoScript: null,
+      wechatArticle: null,
+      momentsPost: null,
+      communityMessage: null,
+      shootingBrief: null,
+    })
     const result = await getInvocation(makeContext(), "inv-1")
     expect(result).not.toBeNull()
     expect(result?.invocationId).toBe("inv-1")
     expect(result?.status).toBe("succeeded")
+    expect(result?.results).toEqual([{ format: "raw_copy", content: "改好的正文" }])
+  })
+
+  it("treats a succeeded invocation with blank copy as an empty result", async () => {
+    mocks.agentInvocationFindUnique.mockResolvedValue({
+      id: "inv-blank",
+      apiKeyId: "key-1",
+      status: "succeeded",
+      runId: null,
+      aimGenerationId: "gen-blank",
+      provider: null,
+      model: null,
+      degraded: false,
+      inputTokens: null,
+      outputTokens: null,
+      costCny: null,
+      errorCode: null,
+      errorMessage: null,
+    })
+    mocks.aimGenerationFindUnique.mockResolvedValue({
+      rawCopy: "   ",
+      videoScript: " ",
+      wechatArticle: null,
+      momentsPost: null,
+      communityMessage: null,
+      shootingBrief: null,
+    })
+    const result = await getInvocation(makeContext(), "inv-blank")
+    expect(result?.results).toEqual([])
   })
 
   it("returns null (forbidden) when the invocation belongs to a different key", async () => {

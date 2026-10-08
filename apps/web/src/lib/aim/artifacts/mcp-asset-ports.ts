@@ -1,8 +1,8 @@
 /**
  * MCP 远程调用端口（WP-8）。
  *
- * 在黄金链路稳定后，通过 Vercel mcp-handler 暴露 5 个业务端口。
- * 不暴露任意 lark-cli 执行权。
+ * 公开 MCP 不暴露飞书写入。registerAssetMcpTools 只返回明确拒绝。
+ * createMcpToolHandlers 仍是内部注入口，不挂到 /api/aim-mcp。
  *
  * 端口列表：
  * 1. create_artifact — 创建飞书资产（Doc/Base/Sheet/Drive）
@@ -18,7 +18,7 @@
  * - 所有操作记录 Trace
  */
 import { z } from "zod"
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
+import type { AimMcpToolServer } from "@/lib/aim-remote/mcp-tool-server"
 import type {
   AimArtifactSpec,
   FeishuAssetReceipt,
@@ -26,7 +26,7 @@ import type {
   ArtifactRole,
   PermissionProfile,
 } from "@/lib/aim/artifacts/contracts"
-import { buildArtifactKey, computeContentHash } from "@/lib/aim/artifacts/contracts"
+import { buildArtifactKey } from "@/lib/aim/artifacts/contracts"
 
 // ─── MCP Tool 定义 ───────────────────────────────────────────────────────────
 
@@ -209,16 +209,23 @@ export function validateUpdateArtifactInput(input: Record<string, unknown>): str
 
 // ─── 统一 MCP Server 注册（与 aim-remote/mcp-tools.ts 共享同一 server）───────
 
+export const FEISHU_MCP_REFUSAL = "不允许通过 MCP 创建、修改、查询或核验飞书资产。外部调用只生成草稿，不能同步或写入飞书。请在明动 AIM 页面里由人处理。"
+
+/** 飞书资产工具一律明确拒绝，不能返回空列表或 queued 假装成功。 */
+export function feishuAssetToolResult(): McpToolResult {
+  return { content: [{ type: "text", text: FEISHU_MCP_REFUSAL }], isError: true }
+}
+
 /**
- * 将 5 个资产管理工具注册到统一 MCP Server。
- * 在 api/aim-mcp/[transport]/route.ts 中与 registerAimMcpTools 一起调用。
+ * 保留工具名，避免旧客户端撞上「没有这个工具」这种说不清的失败。
+ * 公开 MCP 路由不再注册它们；就算被接上，也只返回拒绝。
  */
-export function registerAssetMcpTools(server: McpServer): void {
+export function registerAssetMcpTools(server: AimMcpToolServer): void {
   server.registerTool(
     "asset_create",
     {
       title: "创建飞书资产",
-      description: "创建飞书资产（Doc/Base记录/Sheet/Drive文件）。",
+      description: FEISHU_MCP_REFUSAL,
       inputSchema: {
         kind: z.enum(["feishu_doc", "feishu_base_records", "feishu_sheet", "feishu_drive_file"]),
         title: z.string().min(1).max(200),
@@ -229,28 +236,14 @@ export function registerAssetMcpTools(server: McpServer): void {
         permissionProfile: z.enum(["internal", "project_team", "client_delivery"]).optional(),
       },
     },
-    async (args) => {
-      const spec: AimArtifactSpec = {
-        artifactKey: buildArtifactKey(args.kind as FeishuAssetKind, args.workItemRecordId),
-        generationId: `mcp_${Date.now()}`,
-        workItemRecordId: args.workItemRecordId,
-        projectId: args.projectId,
-        kind: args.kind as FeishuAssetKind,
-        role: (args.role as ArtifactRole) ?? "primary",
-        title: args.title,
-        required: true,
-        permissionProfile: (args.permissionProfile as PermissionProfile) ?? "internal",
-        payload: { markdown: args.content },
-      }
-      return { content: [{ type: "text" as const, text: JSON.stringify({ spec, status: "queued" }) }] }
-    },
+    async () => feishuAssetToolResult(),
   )
 
   server.registerTool(
     "asset_query",
     {
       title: "查询资产状态",
-      description: "通过 artifactKey 或 generationId 查询资产 Receipt。",
+      description: FEISHU_MCP_REFUSAL,
       annotations: { readOnlyHint: true },
       inputSchema: {
         artifactKey: z.string().optional(),
@@ -258,16 +251,14 @@ export function registerAssetMcpTools(server: McpServer): void {
         projectId: z.string().optional(),
       },
     },
-    async (args) => {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ query: args, receipts: [] }) }] }
-    },
+    async () => feishuAssetToolResult(),
   )
 
   server.registerTool(
     "asset_update",
     {
       title: "更新飞书资产",
-      description: "更新已有飞书资产，遵循阶段感知更新策略（不覆盖人工编辑）。",
+      description: FEISHU_MCP_REFUSAL,
       inputSchema: {
         artifactKey: z.string().min(1),
         docToken: z.string().optional(),
@@ -275,41 +266,35 @@ export function registerAssetMcpTools(server: McpServer): void {
         stage: z.enum(["draft", "pending_review", "completed", "human_edited"]),
       },
     },
-    async (args) => {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ updated: args.artifactKey, stage: args.stage }) }] }
-    },
+    async () => feishuAssetToolResult(),
   )
 
   server.registerTool(
     "asset_list",
     {
       title: "列出项目资产",
-      description: "列出项目下所有已落地的飞书资产。",
+      description: FEISHU_MCP_REFUSAL,
       annotations: { readOnlyHint: true },
       inputSchema: {
         projectId: z.string().min(1),
         kind: z.enum(["feishu_doc", "feishu_base_records", "feishu_sheet", "feishu_drive_file"]).optional(),
       },
     },
-    async (args) => {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ projectId: args.projectId, receipts: [] }) }] }
-    },
+    async () => feishuAssetToolResult(),
   )
 
   server.registerTool(
     "asset_verify",
     {
       title: "验证资产完整性",
-      description: "回读验证飞书资产是否可访问且内容完整。",
+      description: FEISHU_MCP_REFUSAL,
       annotations: { readOnlyHint: true },
       inputSchema: {
         token: z.string().min(1),
         kind: z.enum(["feishu_doc", "feishu_base_records", "feishu_sheet", "feishu_drive_file"]),
       },
     },
-    async (args) => {
-      return { content: [{ type: "text" as const, text: JSON.stringify({ token: args.token, ok: true }) }] }
-    },
+    async () => feishuAssetToolResult(),
   )
 }
 
