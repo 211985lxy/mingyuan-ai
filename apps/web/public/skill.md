@@ -117,6 +117,7 @@ Authorization: Bearer maim_xxx
 - 发作品：`aim_text_polish`、`aim_forbidden_word_audit`、`aim_wechat_layout`、`aim_xiaohongshu_edit`、`aim_full_publish_review`、`aim_publish_decision`
 - 看结果：`aim_single_content_retro`、`aim_find_pattern_and_actions`
 - 不点具体技能、只选一个智能体开工：`aim_start`，`agent` 用上面那些智能体 id，`material` 贴正文或素材
+- 输入框里的发送和提问：`aim_chat`。`message` 写问题，问「这篇 / 这个 / 这段」时把成稿放在 `draft`，这样模型看得到正文。它只回复，不会发布，也不会写飞书或改知识库
 
 调用示例：
 

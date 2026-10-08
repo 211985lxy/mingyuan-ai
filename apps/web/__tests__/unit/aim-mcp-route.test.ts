@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   startAimGenerationAttempt: vi.fn(),
   listIpWikiPages: vi.fn(),
   enforceDailyBetaLimit: vi.fn(),
+  executeAimRun: vi.fn(),
+  executeAimChatDomain: vi.fn(),
 }))
 
 vi.mock("@/lib/aim-remote/feature-flags", async () => {
@@ -24,6 +26,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     clientProject: { findMany: mocks.projectFindMany },
     knowledgeEntry: { findMany: vi.fn(async () => []) },
+    aimMemory: { findMany: vi.fn(async () => []) },
     aimGeneration: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   },
 }))
@@ -76,6 +79,20 @@ vi.mock("@/lib/aim/semantic-task-understanding", () => ({
 vi.mock("@/lib/ip-wiki/repo", () => ({
   listIpWikiPages: mocks.listIpWikiPages,
 }))
+
+vi.mock("@/lib/aim-harness/runtime", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/aim-harness/runtime")>(
+    "@/lib/aim-harness/runtime",
+  )
+  return { ...actual, executeAimRun: mocks.executeAimRun }
+})
+
+vi.mock("@/lib/aim-harness/domain-executor", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/aim-harness/domain-executor")>(
+    "@/lib/aim-harness/domain-executor",
+  )
+  return { ...actual, executeAimChatDomain: mocks.executeAimChatDomain }
+})
 
 vi.mock("@/lib/aim/generation-attempt", async () => {
   const actual = await vi.importActual<typeof import("@/lib/aim/generation-attempt")>(
@@ -205,6 +222,7 @@ describe("AIM MCP route", () => {
     const names = (await (await mcp("tools/list")).json()).result.tools.map((item: { name: string }) => item.name)
     for (const name of [
       "aim_start",
+      "aim_chat",
       "aim_business_diagnosis_core",
       "aim_benchmark_topic_pool",
       "aim_traffic_funnel",
@@ -320,6 +338,66 @@ describe("AIM MCP route", () => {
     expect(noProject.result.isError).toBe(true)
     expect(noProject.result.content[0].text).toContain("尚未绑定项目")
     expect(mocks.executePreparedAimGeneration).not.toHaveBeenCalled()
+  })
+
+  it("answers a question through the page send path and keeps the draft in view", async () => {
+    mocks.executeAimRun.mockImplementation(async (_request: unknown, domain: (spec: unknown) => Promise<unknown>) => {
+      await domain({})
+      return {
+        output: "结构是三句话：先讲卡点，再讲做法，最后讲下一步。",
+        metadata: { runId: "chat-1", degraded: false, provider: "test", model: "test" },
+      }
+    })
+    const response = await tool("aim_chat", {
+      agent: "work_editor",
+      message: "结构怎么拆",
+      draft: "先说客户为什么不来，再说你怎么把人留下来，最后约一次到店。",
+    })
+    const body = await response.json()
+    expect(body.result.isError).toBeUndefined()
+    expect(body.result.content[0].text).toContain("结构是三句话")
+    expect(mocks.executePreparedAimGeneration).not.toHaveBeenCalled()
+    expect(mocks.enforceDailyBetaLimit).toHaveBeenCalledWith("user-1", "aim_chat")
+    expect(mocks.executeAimChatDomain).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        userId: "user-1",
+        knowledgeBlock: expect.stringContaining("先说客户为什么不来"),
+      }),
+      expect.anything(),
+    )
+  })
+
+  it("refuses to send a feishu or knowledge write through the chat box", async () => {
+    const feishu = await (await tool("aim_chat", {
+      agent: "work_editor",
+      message: "把这篇同步到飞书",
+      draft: "一段成稿",
+    })).json()
+    expect(feishu.result.isError).toBe(true)
+    expect(feishu.result.content[0].text).toContain("不允许写入飞书")
+
+    const knowledge = await (await tool("aim_chat", {
+      agent: "content_retro",
+      message: "沉淀到知识库",
+    })).json()
+    expect(knowledge.result.isError).toBe(true)
+    expect(knowledge.result.content[0].text).toContain("不允许修改知识库")
+    expect(mocks.executeAimRun).not.toHaveBeenCalled()
+  })
+
+  it("fails an empty chat and a blank reply", async () => {
+    const empty = await (await tool("aim_chat", { agent: "work_editor", message: "   " })).json()
+    expect(empty.result.isError).toBe(true)
+    expect(empty.result.content[0].text).toContain("还没有要说的话")
+
+    mocks.executeAimRun.mockResolvedValueOnce({
+      output: "   ",
+      metadata: { runId: "chat-empty", degraded: false, provider: "test", model: "test" },
+    })
+    const blank = await (await tool("aim_chat", { agent: "work_editor", message: "在吗" })).json()
+    expect(blank.result.isError).toBe(true)
+    expect(blank.result.content[0].text).toContain("空结果不算成功")
   })
 
   it("treats a finished page run with no copy as a failure", async () => {

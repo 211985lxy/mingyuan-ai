@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma"
 import { AGENT_SCOPE, MAX_RAW_INPUT_CHARS, REMOTE_ERROR_CODE } from "./contracts"
 import { loadContextForApiKey, type AimMcpAuthInfo } from "./mcp-auth"
 import type { AimMcpToolServer } from "./mcp-tool-server"
+import { emptyChatMessage, runAimChatJob } from "./chat-action-run"
 import { listAimPageActions, stageTitle, type AimPageAction } from "./page-action-catalog"
 import { emptyMaterialMessage, runAimPageJob } from "./page-action-run"
 
@@ -48,6 +49,7 @@ export function registerAimMcpTools(server: AimMcpToolServer): void {
   registerCapabilityTool(server)
   registerProjectTool(server)
   registerStartTool(server)
+  registerChatTool(server)
   for (const action of listAimPageActions()) registerActionTool(server, action)
 }
 
@@ -71,7 +73,7 @@ function registerCapabilityTool(server: AimMcpToolServer) {
         mode: action.mode,
       }))
       return toolSuccess(
-        "这些动作和网页是同一套。用对应工具，或用 aim_start 指定智能体。不会发布、不会写飞书、不会改知识库、不会改营销全案。没素材、没项目、跑完没正文，都算失败。",
+        "这些动作和网页是同一套。用对应工具，或用 aim_start 指定智能体。提问、看结构走 aim_chat，问「这篇」要把成稿放在 draft。不会发布、不会写飞书、不会改知识库、不会改营销全案。没素材、没项目、跑完没正文，都算失败。",
         { ...buildAgentCapabilities(), actions },
       )
     },
@@ -128,6 +130,36 @@ function registerStartTool(server: AimMcpToolServer) {
         mode: "run",
         materialNoun: stage === "publish" ? "成稿" : "素材",
       }, args, extra.authInfo)
+    },
+  )
+}
+
+function registerChatTool(server: AimMcpToolServer) {
+  const ids = listVisibleAimAgents().map((agent) => agent.id) as [string, ...string[]]
+  server.registerTool(
+    "aim_chat",
+    {
+      title: "发送一句话",
+      description: "对应网页输入框的发送。用来提问、看结构、接着聊。问「这篇」时把成稿放在 draft。不会发布，不会写飞书，不会改知识库。",
+      inputSchema: {
+        agent: z.enum(ids),
+        message: z.string().max(MAX_RAW_INPUT_CHARS).optional(),
+        draft: z.string().max(MAX_RAW_INPUT_CHARS).optional(),
+      },
+    },
+    async (args, extra) => {
+      const resolved = await requireContext(extra.authInfo)
+      if (!resolved.ok) return resolved.error
+      assertAgentScope(resolved.context, AGENT_SCOPE.draftsSubmit)
+      const message = args.message?.trim() ?? ""
+      if (message) {
+        const agent = getAimAgent(args.agent)
+        assertAgentAccess(resolved.context, agent.id)
+        const outcome = await runAimChatJob(resolved.context.userId, agent.id, message, args.draft)
+        if (!outcome.ok) return toolError(outcome.message, outcome.code)
+        return toolSuccess(outcome.text)
+      }
+      return toolError(emptyChatMessage(), "EMPTY_MATERIAL")
     },
   )
 }

@@ -101,6 +101,11 @@ const R1_DELEGATES: Record<string, { symbol: string; module: string; file: strin
     module: "@/lib/aim/services/generate-request",
     file: "src/lib/aim/services/generate-request.ts",
   },
+  "src/app/api/aim/chat/route.ts": {
+    symbol: "runSignedInAimChat",
+    module: "@/lib/aim/services/signed-in-chat",
+    file: "src/lib/aim/services/signed-in-chat.ts",
+  },
 }
 
 function usesHarnessRuntime(entrypoint: string, text: string): boolean {
