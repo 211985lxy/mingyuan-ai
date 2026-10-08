@@ -16,11 +16,12 @@ import { verifyMcpToken } from "@/lib/aim-remote/mcp-auth"
 import { registerAimMcpTools } from "@/lib/aim-remote/mcp-tools"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+export const maxDuration = 180
 
 const MCP_INSTRUCTIONS = [
-  "只生成草稿。作品编辑（发作品阶段）用 aim_work_editor_start：润色、违禁词审查、公众号排版、小红书图文、发布前质检。",
-  "没有成稿或没有绑定项目会失败，空结果不算成功。",
+  "和登录后的网页是同一套动作：定方向、做内容、发作品、看结果。",
+  "先 tools/list。用对应工具，或用 aim_start 指定智能体。material 里贴上正文或素材。",
+  "没有素材、没有绑定项目、跑完没有正文，都算失败。",
   "不允许自动发布、写入飞书、修改知识库、修改 IP 营销全案。",
 ].join("")
 

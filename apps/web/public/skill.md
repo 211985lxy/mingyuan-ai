@@ -103,42 +103,43 @@ Authorization: Bearer maim_xxx
 
 ## MCP
 
-外部 Agent 也可以走 MCP，不必自己拼 REST。
+外部 Agent 也可以走 MCP。它调用的是登录网页上的同一套生成，不是另一条只排队的交稿通道。
 
 - 地址：`/api/aim-mcp/mcp`（例如 `https://mingyuan-ai.cn/api/aim-mcp/mcp`）
 - 传输：Streamable HTTP，POST JSON-RPC。先 `initialize`，再 `tools/list`。
-- 鉴权：`Authorization: Bearer maim_xxx`。没有有效钥匙会返回 401，不会放行。
+- 鉴权：`Authorization: Bearer maim_xxx`。没有有效钥匙会返回 401。不接受浏览器 Cookie 代替钥匙。
 - 默认关闭。管理员要在服务器设置 `AIM_MCP_ENABLED=true` 后重启，这个地址才会应答。没打开时返回 HTTP 503，正文是 `{"error":"MCP surface is disabled"}`。域名白名单用 `AIM_MCP_ALLOWED_HOSTS`，不设时只允许 `mingyuan-ai.cn`。
 
-作品编辑用工具 `aim_work_editor_start`：
+`tools/list` 里的工具和网页上的阶段、智能体、技能对应：
+
+- 定方向：商业诊断 `aim_business_diagnosis_core`，选题策划 `aim_benchmark_topic_pool`、`aim_purpose_topics`、`aim_select_high_potential_topics`、`aim_meeting_topics`
+- 做内容：`aim_traffic_funnel`、`aim_lead_acquisition`、`aim_general_story`
+- 发作品：`aim_text_polish`、`aim_forbidden_word_audit`、`aim_wechat_layout`、`aim_xiaohongshu_edit`、`aim_full_publish_review`、`aim_publish_decision`
+- 看结果：`aim_single_content_retro`、`aim_find_pattern_and_actions`
+- 不点具体技能、只选一个智能体开工：`aim_start`，`agent` 用上面那些智能体 id，`material` 贴正文或素材
+
+调用示例：
 
 ```json
 {
-  "action": "text_polish",
-  "draft": "这里贴上要改的成稿正文"
+  "name": "aim_text_polish",
+  "arguments": { "material": "这里贴上要改的成稿正文" }
 }
 ```
 
-`action` 可以是：
+工具会直接返回草稿正文。返回里写着「还没发布」。不要再轮询另一条调用队列。
 
-- `text_polish`：文字二改/润色，去 AI 味
-- `forbidden_word_audit`：先审查违禁词，再给修复稿
-- `wechat_layout`：整理成公众号排版
-- `xiaohongshu_edit`：改成小红书图文
-- `full_publish_review`：发布前全检，只给最小改法
-- `publish_decision`：判断现在值不值得发，不重写
+下面这些工具会明确拒绝，不会假装成功：
 
-然后用 `aim_invocation_get` 轮询。返回的是草稿，不是已发布内容。
+- `aim_publish`：自动发布
+- `aim_feishu_write`：写入飞书
+- `aim_knowledge_edit`：修改知识库
+- `aim_ip_plan_edit`：修改 IP 营销全案
 
-下面这些会明确拒绝，不会假装成功：
+搜对标、批量文案工作室、数字人视频要在网页里打开面板，MCP 会说明做不了，不会编一个结果。
 
-- `publish`：自动发布
-- `feishu_write`：写入飞书
-- `knowledge_edit`：修改知识库
-- `ip_plan_edit`：修改 IP 营销全案
-
-没有绑定项目、成稿是空的、或跑完没有正文，都算失败，不能当成做完了。
+没有绑定项目、素材或成稿是空的、或跑完没有正文，都算失败，不能当成做完了。
 
 ## 使用建议
 
-外部 Agent 应该先读取能力和项目列表，再生成草稿。要改已有成稿，走作品编辑。生成结果只作为草稿，发布前需要人工确认。
+外部 Agent 应该先 `tools/list`，再按网页上的动作调用。生成结果只作为草稿，发布前需要人工确认。

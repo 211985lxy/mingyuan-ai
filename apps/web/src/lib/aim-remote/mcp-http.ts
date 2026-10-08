@@ -161,7 +161,7 @@ async function callTool(params: unknown, authInfo: unknown, tools: Map<string, R
   const name = params && typeof params === "object" && "name" in params ? String((params as { name?: unknown }).name ?? "") : ""
   const tool = tools.get(name)
   if (!tool) {
-    return toolText(`没有「${name || "未命名"}」这个工具。作品编辑请用 aim_work_editor_start。发布、写飞书、改知识库、改营销全案都不提供。`, true)
+    return toolText(`没有「${name || "未命名"}」这个工具。先 tools/list 看网页上有的动作。发布、写飞书、改知识库、改营销全案会明确拒绝，不会假装做成。`, true)
   }
   const args = params && typeof params === "object" && "arguments" in params
     ? (params as { arguments?: unknown }).arguments

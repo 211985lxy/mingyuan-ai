@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const flags = vi.hoisted(() => ({ enabled: true }))
 const mocks = vi.hoisted(() => ({
-  submitInvocation: vi.fn(),
-  getInvocation: vi.fn(),
   verifyMcpToken: vi.fn(),
   loadContextForApiKey: vi.fn(),
   projectFindMany: vi.fn(),
+  resolveBoundProject: vi.fn(),
+  executePreparedAimGeneration: vi.fn(),
+  understandAimContentTurnWithTrace: vi.fn(),
+  startAimGenerationAttempt: vi.fn(),
+  listIpWikiPages: vi.fn(),
+  enforceDailyBetaLimit: vi.fn(),
 }))
 
 vi.mock("@/lib/aim-remote/feature-flags", async () => {
@@ -17,7 +21,11 @@ vi.mock("@/lib/aim-remote/feature-flags", async () => {
 })
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { clientProject: { findMany: mocks.projectFindMany } },
+  prisma: {
+    clientProject: { findMany: mocks.projectFindMany },
+    knowledgeEntry: { findMany: vi.fn(async () => []) },
+    aimGeneration: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+  },
 }))
 
 vi.mock("@/lib/aim-remote/mcp-auth", () => ({
@@ -25,13 +33,66 @@ vi.mock("@/lib/aim-remote/mcp-auth", () => ({
   loadContextForApiKey: mocks.loadContextForApiKey,
 }))
 
-vi.mock("@/lib/aim-remote/invocation-service", () => ({
-  submitInvocation: mocks.submitInvocation,
-  getInvocation: mocks.getInvocation,
-  invocationResultsAreEmpty: (results?: Array<{ content: string }>) =>
-    !results || results.length === 0 || results.every((item) => item.content.trim().length === 0),
+vi.mock("@/lib/internal-beta-limits", () => ({
+  enforceDailyBetaLimit: mocks.enforceDailyBetaLimit,
 }))
 
+vi.mock("@/lib/account-project-context", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/account-project-context")>(
+    "@/lib/account-project-context",
+  )
+  return { ...actual, resolveBoundProject: mocks.resolveBoundProject }
+})
+
+vi.mock("@/lib/aim-observability", () => ({
+  createAimTrace: vi.fn(async () => ({ id: "trace-1" })),
+  addAimTraceStep: vi.fn(async () => undefined),
+  failAimTrace: vi.fn(async () => undefined),
+  finishAimTrace: vi.fn(async () => undefined),
+  logAimProjectContextRejection: vi.fn(async () => undefined),
+  runAimTraceStep: vi.fn(async (_trace, _key, _label, fn: () => unknown) => fn()),
+  summarizeText: vi.fn((input: unknown) => String(input ?? "")),
+}))
+
+vi.mock("@/lib/aim-generate-context", () => ({
+  buildRawInputWithMarketViralContext: vi.fn(async (_userId: string, rawInput: string) => rawInput),
+  buildRawInputWithVideoCopyContext: vi.fn(async (_userId: string, rawInput: string) => rawInput),
+  buildRawInputWithTrendingContext: vi.fn(async (rawInput: string) => rawInput),
+  buildRawInputWithCommentInsightContext: vi.fn(async (_userId: string, rawInput: string) => rawInput),
+  buildRawInputWithOpportunityBrief: vi.fn((rawInput: string) => rawInput),
+}))
+
+vi.mock("@/lib/aim/services/generate-request", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/aim/services/generate-request")>(
+    "@/lib/aim/services/generate-request",
+  )
+  return { ...actual, executePreparedAimGeneration: mocks.executePreparedAimGeneration }
+})
+
+vi.mock("@/lib/aim/semantic-task-understanding", () => ({
+  understandAimContentTurnWithTrace: mocks.understandAimContentTurnWithTrace,
+}))
+
+vi.mock("@/lib/ip-wiki/repo", () => ({
+  listIpWikiPages: mocks.listIpWikiPages,
+}))
+
+vi.mock("@/lib/aim/generation-attempt", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/aim/generation-attempt")>(
+    "@/lib/aim/generation-attempt",
+  )
+  return {
+    ...actual,
+    startAimGenerationAttempt: mocks.startAimGenerationAttempt,
+    markAimGenerationRunning: vi.fn(async () => undefined),
+    markAimGenerationAwaitingInput: vi.fn(async () => undefined),
+    discardAimGenerationAttempt: vi.fn(async () => undefined),
+    completeAimGenerationAttempt: vi.fn(async () => undefined),
+    failAimGenerationAttempt: vi.fn(async () => undefined),
+  }
+})
+
+import { AccountProjectContextError } from "@/lib/account-project-context"
 import { GET, POST } from "@/app/api/aim-mcp/[transport]/route"
 
 const context = {
@@ -39,7 +100,15 @@ const context = {
   userId: "user-1",
   boundProjectId: "proj-1",
   allowedProjects: ["proj-1"],
-  allowedAgents: ["work_editor", "content_review"],
+  allowedAgents: [
+    "business_system_diagnosis",
+    "business_diagnosis",
+    "content_producer",
+    "free_copywriter",
+    "work_editor",
+    "content_review",
+    "content_retro",
+  ],
   clientType: "codex",
   allowedScopes: [],
   expiresAt: null,
@@ -60,6 +129,24 @@ function mcp(method: string, params?: unknown, token = "maim_unit_test_key") {
   }))
 }
 
+function tool(name: string, args: Record<string, unknown>) {
+  return mcp("tools/call", { name, arguments: args })
+}
+
+function pageRun(content: string, format = "raw_copy") {
+  return {
+    output: {
+      id: "gen-1",
+      results: [{ format, content, wordCount: content.trim().length }],
+      knowledgeUsed: [],
+    },
+    metadata: { runId: "run-1", degraded: false, provider: "test", model: "test" },
+    traceId: "trace-1",
+    qualityStatus: "skipped" as const,
+    qualityChecks: [],
+  }
+}
+
 describe("AIM MCP route", () => {
   beforeEach(() => {
     flags.enabled = true
@@ -70,17 +157,24 @@ describe("AIM MCP route", () => {
     })
     mocks.loadContextForApiKey.mockResolvedValue(context)
     mocks.projectFindMany.mockResolvedValue([{ id: "proj-1", name: "示例项目" }])
-    mocks.submitInvocation.mockResolvedValue({
-      ok: true,
-      created: true,
-      response: {
-        invocationId: "inv-1",
-        status: "queued",
-        pollAfterSeconds: 8,
-        warnings: ["draft_only"],
-        requiresHumanReview: true,
-      },
+    mocks.resolveBoundProject.mockResolvedValue({ id: "proj-1", name: "示例项目", status: "active" })
+    mocks.enforceDailyBetaLimit.mockResolvedValue(null)
+    mocks.listIpWikiPages.mockResolvedValue([
+      { pageType: "audience", content: "核心客户：实体店老板" },
+      { pageType: "positioning", content: "核心定位：帮老板把经验变成获客内容。" },
+    ])
+    mocks.understandAimContentTurnWithTrace.mockResolvedValue({
+      handling: "deliver",
+      brief: "按用户素材直接生成。",
     })
+    mocks.startAimGenerationAttempt.mockResolvedValue({
+      id: "generated-attempt",
+      created: true,
+      replay: "continue",
+    })
+    mocks.executePreparedAimGeneration.mockImplementation(async (prepared: { parsed: { targetFormats: string[] } }) => (
+      pageRun("改好的正文", prepared.parsed.targetFormats[0] || "raw_copy")
+    ))
   })
 
   it("stays dark until AIM_MCP_ENABLED=true and tells the operator how to turn it on", async () => {
@@ -96,142 +190,142 @@ describe("AIM MCP route", () => {
   it("rejects a missing key even after the surface is on", async () => {
     const response = await mcp("initialize", {}, "")
     expect(response.status).toBe(401)
-    expect(mocks.submitInvocation).not.toHaveBeenCalled()
+    expect(mocks.executePreparedAimGeneration).not.toHaveBeenCalled()
   })
 
-  it("initializes and lists the work-editor tool for a valid key", async () => {
+  it("lists the same actions the signed-in site can start", async () => {
     const initialized = await mcp("initialize", {
       protocolVersion: "2025-03-26",
       capabilities: {},
       clientInfo: { name: "unit", version: "0" },
     })
     expect(initialized.status).toBe(200)
-    const initBody = await initialized.json()
-    expect(initBody.result.protocolVersion).toBe("2025-03-26")
-    expect(initBody.result.serverInfo.name).toBe("mingyuan-aim")
-    expect(initBody.result.instructions).toContain("不允许自动发布")
+    expect((await initialized.json()).result.instructions).toContain("不允许自动发布")
 
-    const listed = await mcp("tools/list")
-    const names = (await listed.json()).result.tools.map((tool: { name: string }) => tool.name)
-    expect(names).toContain("aim_work_editor_start")
-    expect(names).toContain("aim_capabilities")
+    const names = (await (await mcp("tools/list")).json()).result.tools.map((item: { name: string }) => item.name)
+    for (const name of [
+      "aim_start",
+      "aim_business_diagnosis_core",
+      "aim_benchmark_topic_pool",
+      "aim_traffic_funnel",
+      "aim_text_polish",
+      "aim_forbidden_word_audit",
+      "aim_wechat_layout",
+      "aim_full_publish_review",
+      "aim_single_content_retro",
+      "aim_publish",
+      "aim_feishu_write",
+      "aim_knowledge_edit",
+      "aim_ip_plan_edit",
+      "aim_batch_script_studio",
+      "aim_market_benchmark_search",
+    ]) {
+      expect(names).toContain(name)
+    }
+    expect(names).not.toContain("aim_draft_submit")
+    expect(names).not.toContain("aim_work_editor_start")
     expect(names).not.toContain("asset_create")
     expect(names).not.toContain("asset_verify")
   })
 
-  it("starts a polish job from the pasted draft and does not publish", async () => {
-    const response = await mcp("tools/call", {
-      name: "aim_work_editor_start",
-      arguments: { action: "text_polish", draft: "今天聊聊怎么把成稿改顺。" },
-    })
+  it("polishes a draft through the page generate path and returns the copy", async () => {
+    const response = await tool("aim_text_polish", { material: "今天聊聊怎么把成稿改顺。" })
     const body = await response.json()
     expect(body.result.isError).toBeUndefined()
-    expect(body.result.content[0].text).toContain("不会发布")
-    expect(mocks.submitInvocation).toHaveBeenCalledWith(context, expect.objectContaining({
-      projectId: "proj-1",
-      agentId: "work_editor",
-      rawInput: "今天聊聊怎么把成稿改顺。",
-      targetFormats: ["raw_copy"],
+    expect(body.result.content[0].text).toContain("改好的正文")
+    expect(body.result.content[0].text).toContain("还没发布")
+    expect(mocks.executePreparedAimGeneration).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      parsed: expect.objectContaining({
+        agentId: "work_editor",
+        targetFormats: ["raw_copy"],
+        rawInput: expect.stringContaining("今天聊聊怎么把成稿改顺。"),
+      }),
     }))
-    const instruction = mocks.submitInvocation.mock.calls[0][1].instruction as string
-    expect(instruction).toContain("去 AI 味")
-    expect(instruction).toContain("不要宣称已经发布")
+    const rawInput = mocks.executePreparedAimGeneration.mock.calls[0][0].parsed.rawInput as string
+    expect(rawInput).toContain("去 AI 味")
   })
 
-  it("sends wechat layout to the work editor and pre-publish review to the review agent", async () => {
-    await mcp("tools/call", {
-      name: "aim_work_editor_start",
-      arguments: { action: "wechat_layout", draft: "一段要排进公众号的成稿。" },
-    })
-    expect(mocks.submitInvocation).toHaveBeenLastCalledWith(context, expect.objectContaining({
-      agentId: "work_editor",
-      targetFormats: ["wechat_article"],
+  it("sends the other main stages through the same page executor", async () => {
+    await tool("aim_wechat_layout", { material: "一段要排进公众号的成稿。" })
+    expect(mocks.executePreparedAimGeneration).toHaveBeenLastCalledWith(expect.objectContaining({
+      parsed: expect.objectContaining({ agentId: "work_editor", targetFormats: ["raw_copy"] }),
     }))
 
-    await mcp("tools/call", {
-      name: "aim_work_editor_start",
-      arguments: { action: "full_publish_review", draft: "一段待检口播。" },
+    await tool("aim_full_publish_review", { material: "一段待检口播。" })
+    expect(mocks.executePreparedAimGeneration).toHaveBeenLastCalledWith(expect.objectContaining({
+      parsed: expect.objectContaining({ agentId: "content_review", targetFormats: ["raw_copy"] }),
+    }))
+
+    await tool("aim_single_content_retro", { material: "这条发出去播放 1200，评论 3 条。" })
+    expect(mocks.executePreparedAimGeneration).toHaveBeenLastCalledWith(expect.objectContaining({
+      userId: "user-1",
+      parsed: expect.objectContaining({ agentId: "content_retro", targetFormats: ["raw_copy"] }),
+    }))
+
+    const diagnosis = await tool("aim_business_diagnosis_core", {
+      material: "老板 IP 做了三个月没成交，想先找流量和成交卡在哪。",
     })
-    expect(mocks.submitInvocation).toHaveBeenLastCalledWith(context, expect.objectContaining({
-      agentId: "content_review",
-      targetFormats: ["raw_copy"],
+    expect((await diagnosis.json()).result.content[0].text).toContain("改好的正文")
+    expect(mocks.executePreparedAimGeneration).toHaveBeenLastCalledWith(expect.objectContaining({
+      userId: "user-1",
+      parsed: expect.objectContaining({ agentId: "business_system_diagnosis" }),
+    }))
+
+    const topics = await tool("aim_benchmark_topic_pool", {
+      material: "目标客户是实体店老板，想整理可拍选题，不要写正文。",
+    })
+    expect((await topics.json()).result.isError).toBeUndefined()
+    expect(mocks.executePreparedAimGeneration).toHaveBeenLastCalledWith(expect.objectContaining({
+      parsed: expect.objectContaining({ agentId: "business_diagnosis", targetFormats: ["raw_copy"] }),
+    }))
+
+    const copy = await tool("aim_traffic_funnel", {
+      material: "写一条讲门店获客的口播，写给实体店老板，目标是引流获客。",
+    })
+    const copyBody = await copy.json()
+    expect(copyBody.result.isError).toBeUndefined()
+    expect(copyBody.result.content[0].text).toContain("改好的正文")
+    expect(mocks.executePreparedAimGeneration).toHaveBeenLastCalledWith(expect.objectContaining({
+      userId: "user-1",
+      parsed: expect.objectContaining({ agentId: "content_producer", targetFormats: ["video_script"] }),
     }))
   })
 
   it("says publish, feishu, knowledge and plan edits are not allowed", async () => {
-    for (const action of ["publish", "feishu_write", "knowledge_edit", "ip_plan_edit"]) {
-      const response = await mcp("tools/call", {
-        name: "aim_work_editor_start",
-        arguments: { action, draft: "有正文也不许做这件事。" },
-      })
-      const body = await response.json()
+    for (const name of ["aim_publish", "aim_feishu_write", "aim_knowledge_edit", "aim_ip_plan_edit"]) {
+      const body = await (await tool(name, { material: "有正文也不许做这件事。" })).json()
       expect(body.result.isError).toBe(true)
       expect(body.result.content[0].text).toContain("不允许")
     }
-    expect(mocks.submitInvocation).not.toHaveBeenCalled()
+    const panel = await (await tool("aim_batch_script_studio", { material: "三条素材" })).json()
+    expect(panel.result.isError).toBe(true)
+    expect(panel.result.content[0].text).toContain("网页")
+    expect(mocks.executePreparedAimGeneration).not.toHaveBeenCalled()
   })
 
   it("fails an empty draft and an account with no project instead of succeeding", async () => {
-    const emptyDraft = await (await mcp("tools/call", {
-      name: "aim_work_editor_start",
-      arguments: { action: "text_polish", draft: "   " },
-    })).json()
+    const emptyDraft = await (await tool("aim_text_polish", { material: "   " })).json()
     expect(emptyDraft.result.isError).toBe(true)
     expect(emptyDraft.result.content[0].text).toContain("还没有成稿")
 
-    mocks.loadContextForApiKey.mockResolvedValue({ ...context, boundProjectId: null, allowedProjects: [] })
-    const noProject = await (await mcp("tools/call", {
-      name: "aim_work_editor_start",
-      arguments: { action: "text_polish", draft: "有正文，但是没有项目。" },
-    })).json()
+    const emptyBrief = await (await tool("aim_traffic_funnel", { material: "" })).json()
+    expect(emptyBrief.result.isError).toBe(true)
+    expect(emptyBrief.result.content[0].text).toContain("还没有素材")
+
+    mocks.resolveBoundProject.mockRejectedValue(
+      new AccountProjectContextError("ACCOUNT_PROJECT_SETUP_REQUIRED", "账号尚未绑定项目，请先完成项目设置"),
+    )
+    const noProject = await (await tool("aim_text_polish", { material: "有正文，但是没有项目。" })).json()
     expect(noProject.result.isError).toBe(true)
-    expect(noProject.result.content[0].text).toContain("还没有绑定项目")
-    expect(mocks.submitInvocation).not.toHaveBeenCalled()
+    expect(noProject.result.content[0].text).toContain("尚未绑定项目")
+    expect(mocks.executePreparedAimGeneration).not.toHaveBeenCalled()
   })
 
-  it("treats a finished call with no copy as a failure, and returns the draft when there is one", async () => {
-    mocks.getInvocation.mockResolvedValueOnce({
-      invocationId: "inv-empty",
-      status: "succeeded",
-      pollAfterSeconds: 8,
-      results: [],
-      warnings: ["draft_only"],
-      requiresHumanReview: true,
-    })
-    const empty = await (await mcp("tools/call", {
-      name: "aim_invocation_get",
-      arguments: { invocationId: "inv-empty" },
-    })).json()
+  it("treats a finished page run with no copy as a failure", async () => {
+    mocks.executePreparedAimGeneration.mockResolvedValueOnce(pageRun("   "))
+    const empty = await (await tool("aim_text_polish", { material: "有正文，但模型交了白卷。" })).json()
     expect(empty.result.isError).toBe(true)
     expect(empty.result.content[0].text).toContain("空结果不算成功")
-
-    mocks.getInvocation.mockResolvedValueOnce({
-      invocationId: "inv-done",
-      status: "succeeded",
-      pollAfterSeconds: 8,
-      results: [{ format: "raw_copy", content: "改好的正文" }],
-      warnings: ["draft_only"],
-      requiresHumanReview: true,
-    })
-    const done = await (await mcp("tools/call", {
-      name: "aim_invocation_get",
-      arguments: { invocationId: "inv-done" },
-    })).json()
-    expect(done.result.isError).toBeUndefined()
-    expect(done.result.content[0].text).toContain("改好的正文")
-    expect(done.result.content[0].text).toContain("尚未发布")
-  })
-
-  it("rejects a host that only looks like the production domain", async () => {
-    const response = await POST(new Request("http://evilmingyuan-ai.cn/api/aim-mcp/mcp", {
-      method: "POST",
-      headers: {
-        host: "evilmingyuan-ai.cn",
-        "content-type": "application/json",
-        authorization: "Bearer maim_unit_test_key",
-      },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
-    }))
-    expect(response.status).toBe(403)
   })
 })
