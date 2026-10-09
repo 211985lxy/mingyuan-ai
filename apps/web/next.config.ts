@@ -26,6 +26,9 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // ali-oss 可选代理会带上 vm2。这个沙箱包的写法网站构建器编译不了，
+  // 而且只有开了 PAC 代理才会用到。上传走直连，不把这串打进网站包。
+  serverExternalPackages: ["ali-oss"],
   allowedDevOrigins: ["127.0.0.1", "localhost", "172.31.2.187", "192.168.104.200"],
   turbopack: {
     root: path.join(__dirname, "../.."),

@@ -58,7 +58,7 @@
       "undici": "6.29.0",
       "urllib": "2.44.1",
       "vite": "8.0.16",
-      "vm2": "3.12.2"
+      "vm2": "-"
     },
     "patchedDependencies": {
       "minimatch@3.1.5": "patches/minimatch@3.1.5.patch"
