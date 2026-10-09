@@ -9,7 +9,10 @@ import {
   validateCreateArtifactInput,
   validateUpdateArtifactInput,
   createMcpToolHandlers,
+  registerAssetMcpTools,
+  FEISHU_MCP_REFUSAL,
 } from "@/lib/aim/artifacts/mcp-asset-ports"
+import { createAimMcpHttpHandler } from "@/lib/aim-remote/mcp-http"
 
 describe("mcp-asset-ports", () => {
   describe("工具定义", () => {
@@ -155,6 +158,28 @@ describe("mcp-asset-ports", () => {
       const handlers = createMcpToolHandlers(mockServices as never)
       const result = await handlers.list_project_assets({})
       expect(result.isError).toBe(true)
+    })
+
+    it("公开注册的飞书工具明确拒绝，不会假装成功", async () => {
+      const handler = createAimMcpHttpHandler({
+        register: registerAssetMcpTools,
+        verifyToken: async () => ({ __aim: true }),
+        serverInfo: { name: "test", version: "0" },
+        instructions: "",
+      })
+      const response = await handler(new Request("http://mingyuan-ai.cn/api/aim-mcp/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer maim_unit_test_key", "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "asset_verify", arguments: { token: "doc_x", kind: "feishu_doc" } },
+        }),
+      }))
+      const body = await response.json()
+      expect(body.result.isError).toBe(true)
+      expect(body.result.content[0].text).toBe(FEISHU_MCP_REFUSAL)
     })
 
     it("verify_artifact 成功时返回验证结果", async () => {

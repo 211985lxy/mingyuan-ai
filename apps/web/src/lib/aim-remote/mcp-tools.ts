@@ -1,37 +1,26 @@
 /**
- * MCP tool definitions for the AIM remote capability surface.
- *
- * Four tools, matching the REST surface:
- * - aim_capabilities    (capabilities.read)
- * - aim_projects_list   (projects.read)
- * - aim_draft_submit    (drafts.submit)   — requires idempotencyKey
- * - aim_invocation_get  (invocations.read)
- *
- * Tools call the shared domain service (invocation-service.ts) directly — they
- * do NOT re-invoke internal REST over HTTP. Each tool resolves the caller's
- * AgentApiContext from extra.authInfo (set by withMcpAuth's verifyToken).
+ * 公开 MCP 工具：和登录后的网页用同一套生成。
+ * 不提供另一条只排队的交稿通道。
  */
 
 import { z } from "zod"
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { buildAgentCapabilities } from "@/lib/agent-api-contract"
-import { assertAgentScope } from "@/lib/agent-api-auth"
-import { submitInvocation, getInvocation } from "./invocation-service"
-import {
-  AGENT_SCOPE,
-  MAX_IDEMPOTENCY_KEY_LENGTH,
-  MAX_INSTRUCTION_CHARS,
-  MAX_RAW_INPUT_CHARS,
-  MAX_TARGET_FORMATS,
-  MIN_IDEMPOTENCY_KEY_LENGTH,
-  MIN_TARGET_FORMATS,
-  REMOTE_ERROR_CODE,
-  remoteErrorStatus,
-} from "./contracts"
-import { loadContextForApiKey, type AimMcpAuthInfo } from "./mcp-auth"
+import { assertAgentAccess, assertAgentScope } from "@/lib/agent-api-auth"
+import { getWorkflowStageForAgent } from "@/lib/aim-workflow"
+import { getAimAgent, listVisibleAimAgents } from "@/lib/aim-ui-config"
 import { prisma } from "@/lib/prisma"
+import { AGENT_SCOPE, MAX_RAW_INPUT_CHARS, REMOTE_ERROR_CODE } from "./contracts"
+import { loadContextForApiKey, type AimMcpAuthInfo } from "./mcp-auth"
+import type { AimMcpToolServer } from "./mcp-tool-server"
+import { emptyChatMessage, runAimChatJob } from "./chat-action-run"
+import { listAimPageActions, stageTitle, type AimPageAction } from "./page-action-catalog"
+import { emptyMaterialMessage, runAimPageJob } from "./page-action-run"
 
-/** Shape of extra.authInfo after withMcpAuth resolved the token. */
+const materialSchema = {
+  material: z.string().max(MAX_RAW_INPUT_CHARS).optional(),
+  topicTitle: z.string().max(500).optional(),
+}
+
 function asAimAuth(authInfo: unknown): AimMcpAuthInfo | null {
   if (authInfo && typeof authInfo === "object" && "__aim" in authInfo && (authInfo as AimMcpAuthInfo).__aim === true) {
     return authInfo as AimMcpAuthInfo
@@ -39,146 +28,169 @@ function asAimAuth(authInfo: unknown): AimMcpAuthInfo | null {
   return null
 }
 
-/** Resolve the AgentApiContext from the MCP auth info, or throw a tool error. */
 async function requireContext(authInfo: unknown) {
   const aim = asAimAuth(authInfo)
-  if (!aim) {
-    return { ok: false as const, error: toolError("未通过鉴权（缺少有效的 maim_ Key）", REMOTE_ERROR_CODE.KEY_DISABLED) }
-  }
+  if (!aim) return { ok: false as const, error: toolError("未通过鉴权（缺少有效的 maim_ Key）", REMOTE_ERROR_CODE.KEY_DISABLED) }
   const context = await loadContextForApiKey(aim.apiKeyId)
-  if (!context) {
-    return { ok: false as const, error: toolError("API Key 已停用或过期", REMOTE_ERROR_CODE.KEY_DISABLED) }
-  }
+  if (!context) return { ok: false as const, error: toolError("API Key 已停用或过期", REMOTE_ERROR_CODE.KEY_DISABLED) }
   return { ok: true as const, context }
 }
 
-/** Build a structured MCP tool error result. */
 function toolError(message: string, code: string) {
-  return {
-    content: [{ type: "text" as const, text: `${message}（code: ${code}）` }],
-    isError: true,
-  }
+  return { content: [{ type: "text" as const, text: `${message}（code: ${code}）` }], isError: true }
 }
 
-/** Build a successful MCP tool result with both short text and structured data. */
 function toolSuccess(text: string, structured?: unknown) {
   const payload = structured == null ? text : `${text}\n\n${JSON.stringify(structured)}`
   return { content: [{ type: "text" as const, text: payload }] }
 }
 
-/**
- * Register the four AIM MCP tools on a McpServer instance.
- * The server is created by createMcpHandler in the route file.
- */
-export function registerAimMcpTools(server: McpServer): void {
-  // ── aim_capabilities ──
+export function registerAimMcpTools(server: AimMcpToolServer): void {
+  registerCapabilityTool(server)
+  registerProjectTool(server)
+  registerStartTool(server)
+  registerChatTool(server)
+  for (const action of listAimPageActions()) registerActionTool(server, action)
+}
+
+function registerCapabilityTool(server: AimMcpToolServer) {
   server.registerTool(
     "aim_capabilities",
     {
       title: "AIM 能力清单",
-      description: "查询可用智能体、目标格式和禁止动作。无需参数。",
+      description: "查询网页上能做的阶段、智能体和动作，以及明确不做的事。",
       annotations: { readOnlyHint: true },
     },
     async (extra) => {
       const resolved = await requireContext(extra.authInfo)
       if (!resolved.ok) return resolved.error
       assertAgentScope(resolved.context, AGENT_SCOPE.capabilitiesRead)
-      const capabilities = buildAgentCapabilities()
+      const actions = listAimPageActions().map((action) => ({
+        tool: action.toolName,
+        title: action.title,
+        stage: stageTitle(action.stage),
+        agentId: action.agentId,
+        mode: action.mode,
+      }))
       return toolSuccess(
-        `可用智能体 ${capabilities.agents.length} 个，目标格式 ${capabilities.targetFormats.length} 种。仅生成草稿，发布与正式知识写入需人工确认。`,
-        capabilities,
+        "这些动作和网页是同一套。用对应工具，或用 aim_start 指定智能体。提问、看结构走 aim_chat，问「这篇」要把成稿放在 draft。不会发布、不会写飞书、不会改知识库、不会改营销全案。没素材、没项目、跑完没正文，都算失败。",
+        { ...buildAgentCapabilities(), actions },
       )
     },
   )
+}
 
-  // ── aim_projects_list ──
+function registerProjectTool(server: AimMcpToolServer) {
   server.registerTool(
     "aim_projects_list",
     {
       title: "授权项目列表",
-      description: "查询当前 API Key 可访问的项目。",
+      description: "查询当前 API Key 可访问的项目。没有项目会失败。",
       annotations: { readOnlyHint: true },
     },
     async (extra) => {
       const resolved = await requireContext(extra.authInfo)
       if (!resolved.ok) return resolved.error
       assertAgentScope(resolved.context, AGENT_SCOPE.projectsRead)
+      if (resolved.context.allowedProjects.length === 0) {
+        return toolError("还没有可编辑的项目。请先在账号里绑定 IP 营销全案。空列表不算成功。", "NO_BOUND_PROJECT")
+      }
       const projects = await prisma.clientProject.findMany({
         where: { id: { in: resolved.context.allowedProjects }, status: "active" },
         take: resolved.context.allowedProjects.length,
         select: { id: true, name: true },
       })
+      if (projects.length === 0) {
+        return toolError("还没有可编辑的项目。请先在账号里绑定 IP 营销全案。空列表不算成功。", "NO_BOUND_PROJECT")
+      }
       return toolSuccess(`当前 Key 可访问 ${projects.length} 个项目`, { projects })
     },
   )
+}
 
-  // ── aim_draft_submit ──
+function registerStartTool(server: AimMcpToolServer) {
+  const agents = listVisibleAimAgents()
+  const ids = agents.map((agent) => agent.id) as [string, ...string[]]
   server.registerTool(
-    "aim_draft_submit",
+    "aim_start",
     {
-      title: "提交草稿生成",
-      description: "异步提交一次草稿生成任务。必须携带 idempotencyKey（相同键+相同请求不重复消耗 Token）。返回 invocationId 用于轮询。",
+      title: "按智能体开工",
+      description: "对应网页上选中一个智能体后点开始。agent 用 business_system_diagnosis、business_diagnosis、content_producer、work_editor、content_retro。material 是你要交给它的正文或素材。",
+      inputSchema: { ...materialSchema, agent: z.enum(ids) },
+    },
+    async (args, extra) => {
+      const agent = getAimAgent(args.agent)
+      const stage = getWorkflowStageForAgent(agent.id)
+      return runRegisteredAction({
+        toolName: "aim_start",
+        title: agent.title,
+        description: agent.description,
+        stage,
+        agentId: agent.id,
+        mode: "run",
+        materialNoun: stage === "publish" ? "成稿" : "素材",
+      }, args, extra.authInfo)
+    },
+  )
+}
+
+function registerChatTool(server: AimMcpToolServer) {
+  const ids = listVisibleAimAgents().map((agent) => agent.id) as [string, ...string[]]
+  server.registerTool(
+    "aim_chat",
+    {
+      title: "发送一句话",
+      description: "对应网页输入框的发送。用来提问、看结构、接着聊。问「这篇」时把成稿放在 draft。不会发布，不会写飞书，不会改知识库。",
       inputSchema: {
-        idempotencyKey: z.string().min(MIN_IDEMPOTENCY_KEY_LENGTH).max(MAX_IDEMPOTENCY_KEY_LENGTH),
-        projectId: z.string().min(1).max(80).optional(),
-        agentId: z.string().min(1).max(60),
-        rawInput: z.string().min(1).max(MAX_RAW_INPUT_CHARS),
-        targetFormats: z.array(z.string()).min(MIN_TARGET_FORMATS).max(MAX_TARGET_FORMATS),
-        instruction: z.string().max(MAX_INSTRUCTION_CHARS).optional(),
-        topicTitle: z.string().max(500).optional(),
-        topicRationale: z.string().max(2000).optional(),
+        agent: z.enum(ids),
+        message: z.string().max(MAX_RAW_INPUT_CHARS).optional(),
+        draft: z.string().max(MAX_RAW_INPUT_CHARS).optional(),
       },
     },
     async (args, extra) => {
       const resolved = await requireContext(extra.authInfo)
       if (!resolved.ok) return resolved.error
       assertAgentScope(resolved.context, AGENT_SCOPE.draftsSubmit)
-
-      const result = await submitInvocation(resolved.context, {
-        idempotencyKey: args.idempotencyKey,
-        projectId: args.projectId || resolved.context.boundProjectId || "",
-        agentId: args.agentId as never,
-        rawInput: args.rawInput,
-        targetFormats: args.targetFormats as never,
-        instruction: args.instruction,
-        topicTitle: args.topicTitle,
-        topicRationale: args.topicRationale,
-      })
-      if (!result.ok) {
-        return toolError(result.errorMessage, result.errorCode)
+      const message = args.message?.trim() ?? ""
+      if (message) {
+        const agent = getAimAgent(args.agent)
+        assertAgentAccess(resolved.context, agent.id)
+        const outcome = await runAimChatJob(resolved.context.userId, agent.id, message, args.draft)
+        if (!outcome.ok) return toolError(outcome.message, outcome.code)
+        return toolSuccess(outcome.text)
       }
-      const r = result.response
-      return toolSuccess(
-        `已${result.created ? "提交" : "返回已存在"}调用（幂等）。状态：${r.status}。${r.pollAfterSeconds}s 后可用 aim_invocation_get 轮询。`,
-        { invocationId: r.invocationId, status: r.status, pollAfterSeconds: r.pollAfterSeconds, requiresHumanReview: true },
-      )
-    },
-  )
-
-  // ── aim_invocation_get ──
-  server.registerTool(
-    "aim_invocation_get",
-    {
-      title: "查询调用状态",
-      description: "查询草稿生成的排队/运行/结果/错误与 Token 成本。只能读取当前 Key 自己创建的调用。",
-      annotations: { readOnlyHint: true },
-      inputSchema: {
-        invocationId: z.string().min(1).max(60),
-      },
-    },
-    async (args, extra) => {
-      const resolved = await requireContext(extra.authInfo)
-      if (!resolved.ok) return resolved.error
-      assertAgentScope(resolved.context, AGENT_SCOPE.invocationsRead)
-
-      const response = await getInvocation(resolved.context, args.invocationId)
-      if (!response) {
-        return toolError("调用不存在或无权读取", REMOTE_ERROR_CODE.INVOCATION_NOT_FOUND)
-      }
-      return toolSuccess(`调用 ${response.invocationId} 状态：${response.status}`, response)
+      return toolError(emptyChatMessage(), "EMPTY_MATERIAL")
     },
   )
 }
 
-// Re-export for the route file to assemble the handler.
-export { remoteErrorStatus }
+function registerActionTool(server: AimMcpToolServer, action: AimPageAction) {
+  server.registerTool(
+    action.toolName,
+    {
+      title: action.title,
+      description: action.description,
+      inputSchema: materialSchema,
+    },
+    async (args, extra) => runRegisteredAction(action, args, extra.authInfo),
+  )
+}
+
+async function runRegisteredAction(
+  action: AimPageAction,
+  args: { material?: string; topicTitle?: string },
+  authInfo: unknown,
+) {
+  const resolved = await requireContext(authInfo)
+  if (!resolved.ok) return resolved.error
+  assertAgentScope(resolved.context, action.mode === "run" ? AGENT_SCOPE.draftsSubmit : AGENT_SCOPE.capabilitiesRead)
+  if (action.mode === "refuse") return toolError(action.refusal || "不允许。", "FORBIDDEN")
+  if (action.mode === "page_only") return toolError(action.refusal || "这个动作要在网页里做。", "PAGE_ONLY")
+  const material = args.material?.trim() ?? ""
+  if (!material) return toolError(emptyMaterialMessage(action), "EMPTY_MATERIAL")
+  if (!action.agentId) return toolError("这个动作没有对应的智能体。", "INVALID_REQUEST")
+  assertAgentAccess(resolved.context, action.agentId)
+  const outcome = await runAimPageJob(resolved.context.userId, action, material, args.topicTitle)
+  if (!outcome.ok) return toolError(outcome.message, outcome.code)
+  return toolSuccess(outcome.text)
+}

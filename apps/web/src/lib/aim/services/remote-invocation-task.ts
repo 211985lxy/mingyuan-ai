@@ -30,7 +30,7 @@ import { executeAimRun, normalizeAimAgentId } from "@/lib/aim-harness/runtime"
 import { executeAimGenerationDomain } from "@/lib/aim-harness/domain-executor"
 import { resolveLlmQuality } from "@/lib/aim-harness/llm-quality-policy"
 import { createAimTrace } from "@/lib/aim-observability"
-import { extractInvocationResults } from "@/lib/aim-remote/invocation-service"
+import { invocationResultsAreEmpty, loadInvocationResultItems } from "@/lib/aim-remote/invocation-service"
 import { REMOTE_ERROR_CODE } from "@/lib/aim-remote/contracts"
 import type { ContentFormat } from "@/lib/aim-generator"
 
@@ -152,8 +152,22 @@ export async function executeRemoteInvocationBackgroundTask(taskId: string) {
 
     const generationId = run.generationId
     const results = generationId
-      ? await loadInvocationResults(generationId)
+      ? await loadInvocationResultItems(generationId)
       : []
+
+    if (invocationResultsAreEmpty(results)) {
+      const message = "生成结束但没有可交付正文"
+      await failInvocation(invocationId, REMOTE_ERROR_CODE.EMPTY_RESULT, message)
+      await failBackgroundTask(prisma, {
+        taskId: task.id,
+        leaseToken: task.leaseToken!,
+        attempt: task.attempt,
+        maxAttempts: task.maxAttempts,
+        retryable: false,
+        error: message,
+      })
+      return true
+    }
 
     // ── Persist success ──
     await prisma.agentInvocation.update({
@@ -173,12 +187,6 @@ export async function executeRemoteInvocationBackgroundTask(taskId: string) {
       },
     })
 
-    // Stash the results snapshot for the GET endpoint (best-effort).
-    if (results.length > 0) {
-      // Results are derived from AimGeneration columns; the GET endpoint reads
-      // them directly via extractInvocationResults when needed. No extra write.
-    }
-
     await completeBackgroundTask(prisma, task.id, task.leaseToken!)
     return true
   } catch (error) {
@@ -197,23 +205,6 @@ export async function executeRemoteInvocationBackgroundTask(taskId: string) {
     })
     return true
   }
-}
-
-/** Load the per-format outputs from the generated AimGeneration record. */
-async function loadInvocationResults(generationId: string) {
-  const gen = await prisma.aimGeneration.findUnique({
-    where: { id: generationId },
-    select: {
-      videoScript: true,
-      wechatArticle: true,
-      momentsPost: true,
-      communityMessage: true,
-      shootingBrief: true,
-      rawCopy: true,
-    },
-  })
-  if (!gen) return []
-  return extractInvocationResults(gen)
 }
 
 /** Mark an invocation failed with a structured error code. */

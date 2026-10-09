@@ -5,5 +5,12 @@
     "expiresOn": "2026-12-08",
     "reason": "ali-oss 6.23.0 → urllib（已升 2.44.1）代理链依赖 ip；上游 ip 全版本（含最新 2.0.1）仍在漏洞范围，无补丁发布。",
     "controls": "Server-side external URL transfer rejects loopback, private, link-local, and carrier-grade NAT literals before OSS transfer. Recheck ali-oss and urllib upgrades before expiry."
+  },
+  "GHSA-vfj7-8cjw-p6xm": {
+    "package": "braces",
+    "owner": "repository maintainer",
+    "expiresOn": "2026-12-08",
+    "reason": "braces 3.0.3 是最新版，上游没有修好的版本。它被 micromatch 用来展开本地文件名，不拿用户输入去套嵌套花括号。",
+    "controls": "No patched release exists. Recheck before expiry; remove this exception if braces or micromatch ships a fix."
   }
 }

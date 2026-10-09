@@ -225,7 +225,33 @@ export async function getInvocation(
   if (!invocation) return null
   // Strict ownership: a key may only read invocations it created.
   if (invocation.apiKeyId !== context.apiKeyId) return null
-  return toInvocationResponse(invocation)
+  const response = toInvocationResponse(invocation)
+  if (invocation.status === "succeeded" && invocation.aimGenerationId) {
+    response.results = await loadInvocationResultItems(invocation.aimGenerationId)
+  }
+  return response
+}
+
+/** 从成稿记录取出正文。空白正文不算有结果。 */
+export async function loadInvocationResultItems(generationId: string): Promise<InvocationResultItem[]> {
+  const gen = await prisma.aimGeneration.findUnique({
+    where: { id: generationId },
+    select: {
+      videoScript: true,
+      wechatArticle: true,
+      momentsPost: true,
+      communityMessage: true,
+      shootingBrief: true,
+      rawCopy: true,
+    },
+  })
+  return gen ? extractInvocationResults(gen) : []
+}
+
+/** 没有可用正文时，调用方必须当成失败，不能当成做完了。 */
+export function invocationResultsAreEmpty(results: InvocationResultItem[] | undefined): boolean {
+  if (!results || results.length === 0) return true
+  return results.every((item) => item.content.trim().length === 0)
 }
 
 /** Map an AgentInvocation row into the wire response shape. */
@@ -285,7 +311,8 @@ export function extractInvocationResults(output: {
   const items: InvocationResultItem[] = []
   for (const [format, content] of pairs) {
     // 存量列里混存的 METHOD_NOTE 思考依据在出参边界剥离：远程调用方只拿可发布正文
-    if (content) items.push({ format, content: splitGenerationReasoning(content).content })
+    const body = content ? splitGenerationReasoning(content).content.trim() : ""
+    if (body) items.push({ format, content: body })
   }
   return items
 }

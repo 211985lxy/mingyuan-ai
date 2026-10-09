@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { authenticateRequest, authErrorResponse } from "@/lib/user-auth"
-import { failAimTrace, type AimTraceRecorder } from "@/lib/aim-observability"
+import { failAimTrace } from "@/lib/aim-observability"
 import { enforceDailyBetaLimit } from "@/lib/internal-beta-limits"
 import { apiRequestErrorResponse, parseJsonRecord } from "@/lib/api-contract"
 import { aimFailureHttpStatus, mapAimErrorToUserMessage, toAimFailureResponse } from "@/lib/aim-error-message"
 import { AIM_GENERATE_MAX_REQUEST_BYTES } from "@/lib/aim/generate-payload-budget"
 import { AIM_EXECUTION_DEADLINE_MS, runWithAimExecutionDeadline } from "@/lib/llm/execution-deadline"
-import {
-  executePreparedAimGeneration,
-  prepareAimGenerateRequest,
-  recordAimGenerationQuality,
-  serializeAimGenerationRun,
-} from "@/lib/aim/services/generate-request"
-import { runWithActiveAimTrace } from "@/lib/aim/live-thinking"
+import { runSignedInAimGenerate, type SignedInGenerateState } from "@/lib/aim/services/signed-in-generate"
 
 /** LLM 多步生成可达 1–3 分钟；与 Nginx 300s 对齐（前端等待上限见 AIM_GENERATION_CLIENT_TIMEOUT_MS=120s） */
 export const maxDuration = 180
@@ -23,7 +17,7 @@ export const maxDuration = 180
  * @returns 无返回值
  */
 export async function POST(request: NextRequest) {
-  let trace: AimTraceRecorder | undefined
+  const state: SignedInGenerateState = {}
   try {
     /**
      * 整条请求共享一份 115s 预算（前端 120s 放弃）。
@@ -42,21 +36,12 @@ export async function POST(request: NextRequest) {
       if (quotaResponse) return quotaResponse
 
       // 对话历史会塞进 rawInput；默认 64 KiB 过严，与 chat 一样显式抬高。
-      const prepared = await prepareAimGenerateRequest(
-        user.id,
-        await parseJsonRecord(request, { maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES }),
-      )
-      trace = prepared.trace
-      if (!prepared.ok) {
-        return NextResponse.json({
-          error: prepared.validationError,
-          ...(prepared.errorCode ? { code: prepared.errorCode } : {}),
-        }, { status: prepared.status ?? 400 })
-      }
-
-      const run = await runWithActiveAimTrace(prepared.trace?.id, () => executePreparedAimGeneration(prepared))
-      await recordAimGenerationQuality(prepared.trace, run)
-      return NextResponse.json(serializeAimGenerationRun(run))
+      const result = await runSignedInAimGenerate({
+        userId: user.id,
+        body: await parseJsonRecord(request, { maxBytes: AIM_GENERATE_MAX_REQUEST_BYTES }),
+        state,
+      })
+      return NextResponse.json(result.body, { status: result.status })
     }, request.signal)
   } catch (error) {
     const authResponse = authErrorResponse(error)
@@ -65,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (contractResponse) return contractResponse
 
     console.error("[aim/generate] Error:", error)
-    await failAimTrace(trace, error)
+    await failAimTrace(state.trace, error)
     const requestId = request.headers.get("x-request-id") || crypto.randomUUID()
     const failure = toAimFailureResponse(error, requestId)
     // 分类落在 INTERNAL_ERROR 时不下发错误码：前端把该码当作「不可重试」，而这里的
