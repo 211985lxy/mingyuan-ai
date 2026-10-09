@@ -1,5 +1,33 @@
+import { isWebSearchEnabled, runWebSearch } from "@/lib/web-search"
 import { HotTopicIntelligenceError, MIN_EVIDENCE_COUNT, SEARCH_LIMIT, SEARCH_RETRY_LIMIT, SEARCH_TIMEOUT_MS, type SearchEvidence } from "./types"
 import { toIsoDate } from "./formatting"
+
+/**
+ * 取回一条查询的证据。配了共享搜索层（Tavily）就走可靠源，
+ * 否则退回既有的 Bing RSS 实现——零回归，且配了 key 立刻变可靠。
+ *
+ * 为什么需要这个分支：Bing 的 `format=rss` 表面已不可用，实测「某地暴雨内涝」
+ * 返回斗地主页面、「教师节送礼引发争议」返回教育考试网导航页，且**不报错**——
+ * 下面的「至少 N 条」校验会把垃圾当有效证据放行，模型据此生成"事实核实过的洞察"。
+ */
+async function fetchEvidenceForQuery(query: string): Promise<SearchEvidence[]> {
+  if (!isWebSearchEnabled()) return fetchBingRssEvidence(query)
+
+  const hits = await runWebSearch(query, { limit: SEARCH_LIMIT })
+  if (!hits) {
+    throw new HotTopicIntelligenceError(
+      "HOT_TOPIC_SEARCH_FAILED",
+      "热点事实检索暂时失败，请稍后重试",
+      502,
+    )
+  }
+  return hits.map((hit) => ({
+    title: hit.title,
+    snippet: hit.snippet,
+    url: hit.url,
+    publishedAt: hit.publishedAt,
+  }))
+}
 
 /**
  * @description 请求获取searchevidence
@@ -18,7 +46,7 @@ export async function fetchSearchEvidence(topicTitle: string): Promise<SearchEvi
 
   for (const query of queryVariants) {
     try {
-      const items = await fetchBingRssEvidence(query)
+      const items = await fetchEvidenceForQuery(query)
       combined = dedupeByUrl([...combined, ...items]).slice(0, SEARCH_LIMIT)
       if (combined.length >= MIN_EVIDENCE_COUNT) {
         return combined

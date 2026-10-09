@@ -1,66 +1,43 @@
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
 /**
- * 选题联网线索。
+ * 选题联网线索：组装层。
  *
- * 业务约定（2026-09-16）：**只在选题时搜索，写稿链路不接**——写稿的知识来源是
- * 项目知识库 / IP 档案 / 爆款库；联网搜索会拖慢出稿（链路本就在 115 秒预算边缘），
- * 且把不可控的网页噪声引入成稿。
+ * 范围约定（2026-09-16 与业务确认）：**只在选题时搜索，写稿链路不接**——
+ * 写稿的知识来源是项目知识库 / IP 档案 / 爆款库；联网搜索会拖慢出稿
+ * （链路本就在 115 秒预算边缘）且把不可控的网页噪声引入成稿。
  *
- * 数据源选型：曾用 Bing 的 `format=rss`（零成本纯 HTTP），实测该表面已不可用——
- * 「空气源热泵群控」及其加引号短语、换词变体返回的是同一批无关缓存结果，
- * 而「特斯拉 财报」又正常（微软已退役 Bing Search API）。故改用 Tavily，
- * 并把开关交给配置：**没配 key 就不联网**，而不是降级到返回垃圾的免费表面。
+ * 搜索能力本身在 lib/web-search（独立用例覆盖）；这里只测"用什么词搜"与
+ * "搜到的东西怎么进 prompt"。
  */
 
-const { envMock, fetchMock } = vi.hoisted(() => ({
-  envMock: { TOPIC_WEB_SEARCH_API_KEY: undefined as string | undefined },
-  fetchMock: vi.fn(),
+const { runWebSearchMock, enabledMock } = vi.hoisted(() => ({
+  runWebSearchMock: vi.fn(),
+  enabledMock: vi.fn(() => true),
 }))
 
-vi.mock("@/env", () => ({ env: envMock }))
+vi.mock("@/lib/web-search", () => ({
+  runWebSearch: runWebSearchMock,
+  isWebSearchEnabled: enabledMock,
+}))
 
 import {
+  buildTopicWebResearchContent,
   buildTopicWebResearchQuery,
   fetchTopicWebResearchSource,
   isTopicWebResearchEnabled,
-  parseTopicSearchResults,
 } from "@/lib/topic-web-research"
 
-const TAVILY_PAYLOAD = {
-  results: [
-    {
-      title: "多机头热泵并联运行的启停与负荷分配",
-      url: "https://example.com/a",
-      content: "群控策略决定多台机组能否均衡运行",
-      score: 0.9,
-      published_date: "2026-09-15T00:00:00Z",
-    },
-    {
-      title: "热泵系统群控方案对比",
-      url: "https://www.example.org/b",
-      content: "从集中控制到分布式联动的几种做法",
-      score: 0.7,
-    },
-  ],
-}
-
-function respondWith(payload: unknown, ok = true) {
-  fetchMock.mockResolvedValue({ ok, status: ok ? 200 : 503, json: async () => payload })
-}
+const HITS = [
+  { title: "多机头热泵并联运行的启停与负荷分配", url: "https://example.com/a", snippet: "群控策略决定多台机组能否均衡运行", publishedAt: "2026-09-15" },
+  { title: "热泵系统群控方案对比", url: "https://www.example.org/b", snippet: "从集中控制到分布式联动", publishedAt: null },
+]
 
 beforeEach(() => {
-  fetchMock.mockReset()
-  // 必须逐用例装：afterEach 的 unstubAllGlobals 会还原真实 fetch，
-  // 否则后续用例会真的发到 api.tavily.com
-  vi.stubGlobal("fetch", fetchMock)
-  envMock.TOPIC_WEB_SEARCH_API_KEY = "tvly-test-key"
-})
-
-afterEach(() => {
-  vi.unstubAllGlobals()
+  runWebSearchMock.mockReset()
+  enabledMock.mockReturnValue(true)
 })
 
 describe("搜索词构建", () => {
@@ -92,87 +69,47 @@ describe("搜索词构建", () => {
   })
 })
 
-describe("解析搜索结果", () => {
-  it("只保留字段完整的条目，并按 url 去重", () => {
-    const parsed = parseTopicSearchResults({
-      results: [
-        { title: "有效", url: "https://a.com/1", content: "摘要" },
-        { title: "无 url", content: "摘要" },
-        { title: "无摘要", url: "https://a.com/2" },
-        { title: "重复 url", url: "https://a.com/1", content: "摘要" },
-        null,
-      ],
-    })
-    expect(parsed).toHaveLength(1)
-    expect(parsed[0]?.url).toBe("https://a.com/1")
+describe("线索渲染", () => {
+  it("编号列出标题/摘要/来源域名/日期，并声明只用于启发角度", () => {
+    const content = buildTopicWebResearchContent("空气源热泵群控", HITS)
+    expect(content).toContain("1. 多机头热泵并联运行的启停与负荷分配")
+    expect(content).toContain("example.com")
+    expect(content).toContain("2026-09-15")
+    expect(content).toContain("只用于启发选题角度")
+    expect(content).toContain("不要当作事实依据引用")
   })
 
-  it("响应形状不对时返回空数组（不抛错）", () => {
-    expect(parseTopicSearchResults(null)).toEqual([])
-    expect(parseTopicSearchResults({ results: "不是数组" })).toEqual([])
-    expect(parseTopicSearchResults({})).toEqual([])
-  })
-
-  it("发布日期缺失时留空，不编造", () => {
-    expect(parseTopicSearchResults({ results: [{ title: "t", url: "https://a.com", content: "c" }] })[0]?.publishedAt)
-      .toBeNull()
+  it("无日期的条目不留占位符", () => {
+    const content = buildTopicWebResearchContent("暖通设备", [HITS[1]!])
+    expect(content).toContain("example.org）")
+    expect(content).not.toContain("null")
   })
 })
 
-describe("未配置搜索能力：不联网，也不降级到免费表面", () => {
-  it("没有 key 时直接返回 null，连请求都不发", async () => {
-    envMock.TOPIC_WEB_SEARCH_API_KEY = undefined
-    expect(isTopicWebResearchEnabled()).toBe(false)
-    expect(await fetchTopicWebResearchSource("空气源热泵群控")).toBeNull()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it("配置了 key 才算启用", () => {
-    expect(isTopicWebResearchEnabled()).toBe(true)
-  })
-})
-
-describe("搜索与降级：联网是可选增强，绝不阻塞选题", () => {
-  it("空搜索词直接返回 null", async () => {
-    expect(await fetchTopicWebResearchSource(null)).toBeNull()
-    expect(await fetchTopicWebResearchSource("   ")).toBeNull()
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  it("搜索成功时组装成一条「全网线索」来源", async () => {
-    respondWith(TAVILY_PAYLOAD)
+describe("组装成选题来源", () => {
+  it("搜到结果时生成一条 web_research 来源", async () => {
+    runWebSearchMock.mockResolvedValue(HITS)
     const source = await fetchTopicWebResearchSource("空气源热泵群控")
     expect(source?.category).toBe("web_research")
     expect(source?.title).toBe("全网线索：空气源热泵群控")
-    expect(source?.content).toContain("1. 多机头热泵并联运行的启停与负荷分配")
-    expect(source?.content).toContain("example.com")
-    expect(source?.content).toContain("2026-09-15")
-    expect(source?.content).toContain("只用于启发选题角度")
+    expect(source?.content).toContain("多机头热泵并联运行的启停与负荷分配")
+    expect(runWebSearchMock).toHaveBeenCalledWith("空气源热泵群控", { limit: 5 })
   })
 
-  it("按契约发送请求：Bearer 鉴权 + basic 深度", async () => {
-    respondWith(TAVILY_PAYLOAD)
-    await fetchTopicWebResearchSource("暖通设备")
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(url).toBe("https://api.tavily.com/search")
-    expect(init.method).toBe("POST")
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer tvly-test-key")
-    expect(JSON.parse(String(init.body))).toMatchObject({ query: "暖通设备", search_depth: "basic" })
+  it("空搜索词不调用搜索层", async () => {
+    expect(await fetchTopicWebResearchSource(null)).toBeNull()
+    expect(await fetchTopicWebResearchSource("   ")).toBeNull()
+    expect(runWebSearchMock).not.toHaveBeenCalled()
   })
 
-  it("非 200 返回 null（不抛错、不中断选题）", async () => {
-    respondWith({}, false)
+  it("搜索层返回 null（未配 key / 失败 / 空结果）时返回 null，不阻塞选题", async () => {
+    runWebSearchMock.mockResolvedValue(null)
     expect(await fetchTopicWebResearchSource("暖通设备")).toBeNull()
   })
 
-  it("结果为空时返回 null", async () => {
-    respondWith({ results: [] })
-    expect(await fetchTopicWebResearchSource("暖通设备")).toBeNull()
-  })
-
-  it("请求抛错（超时/网络）时返回 null", async () => {
-    fetchMock.mockRejectedValue(new Error("fetch failed"))
-    expect(await fetchTopicWebResearchSource("暖通设备")).toBeNull()
+  it("能力开关透传自共享层", () => {
+    enabledMock.mockReturnValue(false)
+    expect(isTopicWebResearchEnabled()).toBe(false)
   })
 })
 
