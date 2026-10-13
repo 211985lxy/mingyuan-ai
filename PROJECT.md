@@ -9,9 +9,20 @@
 - `https://github.com/211985lxy/aimarkting.git` 是历史外层 monorepo，内部曾包含 `mingyuan/` 子目录，但与当前独立仓库 Git 历史不相连，不得绑定为当前项目的 `origin`。
 - 判断“最新版本”时以正本仓库的候选发布分支和明确 commit SHA 为准，不以本机其他 worktree、历史外层仓库或聊天记录为准。
 
-## 部署与运维（仅部署环境，开发机无此配置）
+## 部署与运维
 
-- Kube 配置：`KUBECONFIG=~/.kube/config-ask-aibao365`（部署机，开发机不存在）
-- 阿里云 AccessKey：profile 名为 `aliyun-aibao365`，存储在 `~/.aliyun/config.json`（部署机）
-- ECS 独立部署脚本：`mingyuan/scripts/deploy-ecs-standalone.sh`
+ECS 独立部署只认这一条路。开发机不用装 rsync、cwRsync 或 choco。
+
+- 前提只有部署密钥：`~/.ssh/mingyuan_aliyun_deploy`（权限 600）。
+- Windows（Git Bash）：`scripts/deploy-windows.sh`
+- macOS / Linux：`scripts/deploy-ecs-standalone.sh`
+- 传输用系统自带的 `tar` 和 `ssh`：本地打一个包上传，远端对上 sha256 再解压。
+- 先演练再真发。演练会跑本地检查并上传到服务器临时目录，不会改 systemd、不会动数据库、不会切换线上版本：
+  - `DRY_RUN=1 bash scripts/deploy-windows.sh`
+  - 确认没问题后：`bash scripts/deploy-windows.sh`
 - 发布默认从明确 commit 部署，不从大量未提交改动里临时挑文件。临时 worktree 指定文件发布只用于用户明确要求的抢修，发布后要回收成 commit。
+
+下面两项是旧的 Kube 部署机配置，这条 ECS 脚本用不到，开发机上也不存在：
+
+- Kube 配置：`KUBECONFIG=~/.kube/config-ask-aibao365`
+- 阿里云 AccessKey：profile 名为 `aliyun-aibao365`，存储在 `~/.aliyun/config.json`
