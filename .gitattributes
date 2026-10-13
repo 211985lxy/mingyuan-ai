@@ -1,0 +1,7 @@
+# 发布用的脚本和 systemd 单元必须是 LF。不要给其他文件加 text 规则，避免整库重写换行。
+*.sh text eol=lf
+ops/systemd/**/*.service text eol=lf
+ops/systemd/**/*.timer text eol=lf
+ops/systemd/**/*.conf text eol=lf
+ops/bin/mingyuan-refuse-older-release text eol=lf
+scripts/mingyuan-refuse-older-release text eol=lf
